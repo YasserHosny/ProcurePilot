@@ -38,29 +38,32 @@ highest-risk external dependency in the chunk, and the contract has moved betwee
 
 ## R2 — Runtime language switching in Angular
 
-**Decision**: **Transloco** for runtime translation, with catalogues living in `packages/i18n`
-and consumed by both web and (later) mobile.
+**Decision**: **@ngx-translate/core ^16.0.0 with @ngx-translate/http-loader**, as pinned in
+`docs/architecture/tech-stack-blueprint.md` §frontend, with catalogues living in `packages/i18n`
+and served as JSON assets.
 
-**Rationale**: FR-019 requires a member to switch language and have the choice persist across
-sessions. Angular's built-in `@angular/localize` compiles one bundle per locale and selects at
-*build* time, which makes in-app switching a page reload against a different deployed bundle —
-workable for a marketing site, wrong for an authenticated application with a per-member
-preference. Transloco loads catalogues at runtime, supports lazy scopes, and keeps the catalogue
-as plain JSON that a shared package can own.
+**Rationale**: FR-019 requires a member to switch language in-app and have the choice persist
+across sessions. ngx-translate loads catalogues at runtime over HTTP and switches with
+`translate.use(lang)`, which satisfies the requirement directly. The blueprint already pins the
+library and its loader, and the install command in §3b lists it — this decision instantiates
+that choice rather than revisiting it.
 
 **Alternatives considered**:
-- *`@angular/localize`* — first-party and well-supported, but build-time locale selection
-  conflicts directly with FR-019. Rejected on requirements, not on quality.
-- *ngx-translate* — functionally similar to Transloco; Transloco is preferred for its stricter
-  typing story and first-class missing-key handling, which FR-017 and SC-005 need (a missing key
-  must be *detectable by automated check*, not silently rendered).
+- *`@angular/localize`* — first-party, but it compiles one bundle per locale and selects at
+  *build* time. In-app switching would mean reloading against a different deployed bundle.
+  Rejected on requirements: FR-019 cannot be met cleanly this way.
+- *Transloco* — a capable alternative with a stricter typing story, and it was the initial
+  choice in this document. **Rejected**: the blueprint pins ngx-translate, and the difference
+  between the two is preference, not capability. Introducing a second i18n library into a
+  stack that already names one is unjustified divergence, and the constitution requires
+  deviations to be documented and justified rather than assumed.
 
-**Consequence**: RTL is handled independently of translation — `dir` on the document root plus
-CSS logical properties (`margin-inline-start` rather than `margin-left`). Angular Material
-supports bidirectionality through the CDK's `Directionality` service, which the shell wires to
-the active language.
-
----
+**Consequence**: missing-key detection is not built into ngx-translate as strongly as
+SC-005 requires, so a `MissingTranslationHandler` is registered to fail loudly in development
+and a catalogue-completeness test (T068) enforces parity in CI. RTL is handled independently of
+translation — `dir` on the document root plus CSS logical properties (`margin-inline-start`
+rather than `margin-left`); Angular Material supports bidirectionality through the CDK's
+`Directionality` service, which the shell wires to the active language.
 
 ## R3 — A person in several workspaces
 
@@ -208,7 +211,7 @@ fatal. Keeping the boundary in the database means a role bug cannot become a ten
 | # | Question | Decision |
 |---|---|---|
 | R1 | `tenant_id` into the JWT | Supabase custom access token auth hook |
-| R2 | Runtime i18n | Transloco, catalogues in `packages/i18n` |
+| R2 | Runtime i18n | @ngx-translate/core ^16 + http-loader (blueprint-pinned), catalogues in `packages/i18n` |
 | R3 | Multi-workspace membership | One active workspace per session; switch re-issues the token |
 | R4 | Isolation enforcement | `FORCE` RLS with `USING` + `WITH CHECK` against the JWT claim |
 | R5 | Local stack | Compose runs api + web + pinned Supabase stack |

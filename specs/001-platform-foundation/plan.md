@@ -29,7 +29,7 @@ Flutter (mobile placeholder only) · SQL (versioned migrations)
 **Primary Dependencies**: FastAPI 0.115.6 · Uvicorn 0.34.0 · Pydantic v2 + pydantic-settings ·
 python-jose 3.3.0 (JWT verification) · httpx 0.28.1 · SlowAPI 0.1.9 (rate limiting) ·
 supabase-py 2.11.0 · Angular Material + CDK · RxJS · Zod (shared validation) ·
-Transloco (runtime i18n — see research R2)
+@ngx-translate/core ^16 + http-loader (runtime i18n, blueprint-pinned — see research R2)
 
 **Storage**: Supabase Postgres 17 with `pgvector` and `pg_trgm` extensions enabled at
 migration time (unused until chunks 4.3/4.4) · Supabase Storage (bucket created, unused
