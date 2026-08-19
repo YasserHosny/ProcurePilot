@@ -1,0 +1,7 @@
+# Local agent tooling / runtime state
+.autoclaude/
+.heartbeats/
+.claude_agent_farm_backups/
+
+# Agent folder: local settings may contain credentials
+.claude/settings.local.json

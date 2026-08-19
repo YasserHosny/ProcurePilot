@@ -1,0 +1,2525 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ProcurePilot — Interactive Roadmap</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+/* ============================= TOKENS ============================= */
+:root{
+  --bg:#0a0e17; --bg-2:#0f1521; --surface:#131a28; --surface-2:#1a2333;
+  --border:#233046; --border-soft:#1b2436;
+  --text:#e8edf5; --text-2:#9aa8bd; --text-3:#67748c;
+  --accent:#3ddc97; --accent-2:#4cc9f0; --accent-3:#f9c74f;
+  --accent-4:#f0708a; --accent-5:#a78bfa; --accent-6:#fb923c;
+  --grid:rgba(255,255,255,.055); --shadow:0 18px 50px -12px rgba(0,0,0,.7);
+  --r:14px; --r-sm:9px;
+}
+:root{ --border-soft:#1b2436; }
+html[data-theme="light"]{
+  --bg:#f6f8fb; --bg-2:#eef2f7; --surface:#ffffff; --surface-2:#f4f7fa;
+  --border:#dfe6ef; --border-soft:#e8edf3;
+  --text:#111a2b; --text-2:#4d5c73; --text-3:#7c8aa0;
+  --accent:#0f9d6f; --accent-2:#0a84c4; --accent-3:#c98a00;
+  --accent-4:#d9455f; --accent-5:#7c5cd6; --accent-6:#d9700f;
+  --grid:rgba(0,0,0,.06); --shadow:0 14px 40px -16px rgba(20,40,70,.22);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{
+  background:var(--bg); color:var(--text);
+  font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  font-size:14px; line-height:1.6; -webkit-font-smoothing:antialiased;
+  transition:background .3s ease,color .3s ease;
+}
+::selection{background:var(--accent);color:#04140d}
+/* scrollbar */
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-track{background:var(--bg-2)}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:6px}
+::-webkit-scrollbar-thumb:hover{background:var(--text-3)}
+
+/* ============================= LAYOUT ============================= */
+.app{display:grid;grid-template-columns:266px 1fr;min-height:100vh}
+aside{
+  position:sticky;top:0;height:100vh;overflow-y:auto;
+  background:var(--bg-2);border-right:1px solid var(--border);
+  padding:26px 18px;display:flex;flex-direction:column;gap:22px;z-index:20;
+}
+.brand{display:flex;align-items:center;gap:11px}
+.logo{
+  width:38px;height:38px;border-radius:11px;flex:none;
+  background:linear-gradient(140deg,var(--accent),var(--accent-2));
+  display:grid;place-items:center;font-weight:800;color:#04140d;font-size:15px;
+  box-shadow:0 6px 18px -6px var(--accent);
+}
+.brand h1{font-size:15.5px;font-weight:700;letter-spacing:-.2px}
+.brand p{font-size:10.5px;color:var(--text-3);text-transform:uppercase;letter-spacing:.9px;font-weight:600}
+nav{display:flex;flex-direction:column;gap:2px}
+.nav-label{font-size:9.5px;text-transform:uppercase;letter-spacing:1.1px;color:var(--text-3);font-weight:700;padding:14px 10px 6px}
+nav a{
+  display:flex;align-items:center;gap:10px;padding:8.5px 11px;border-radius:9px;
+  color:var(--text-2);text-decoration:none;font-size:13px;font-weight:500;
+  transition:all .18s ease;border:1px solid transparent;
+}
+nav a:hover{background:var(--surface);color:var(--text)}
+nav a.on{background:var(--surface-2);color:var(--text);border-color:var(--border);font-weight:600}
+nav a.on .dot{background:var(--accent);box-shadow:0 0 9px var(--accent)}
+.dot{width:5px;height:5px;border-radius:50%;background:var(--text-3);flex:none;transition:.18s}
+.side-foot{margin-top:auto;display:flex;flex-direction:column;gap:12px}
+.toggle{
+  display:flex;align-items:center;justify-content:space-between;gap:8px;
+  background:var(--surface);border:1px solid var(--border);border-radius:10px;
+  padding:9px 12px;cursor:pointer;color:var(--text-2);font-size:12.5px;font-weight:600;
+  transition:.18s;width:100%;font-family:inherit;
+}
+.toggle:hover{border-color:var(--accent);color:var(--text)}
+.side-note{font-size:10.5px;color:var(--text-3);line-height:1.5}
+
+main{padding:0 0 90px;overflow-x:hidden}
+.wrap{max-width:1400px;margin:0 auto;padding:0 40px}
+
+/* ============================= HERO ============================= */
+.hero{
+  position:relative;padding:74px 0 54px;overflow:hidden;
+  border-bottom:1px solid var(--border);
+  background:
+    radial-gradient(900px 420px at 12% -10%,color-mix(in srgb,var(--accent) 13%,transparent),transparent 70%),
+    radial-gradient(760px 380px at 88% 0%,color-mix(in srgb,var(--accent-2) 12%,transparent),transparent 70%);
+}
+.hero-grid{
+  position:absolute;inset:0;pointer-events:none;opacity:.5;
+  background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);
+  background-size:52px 52px;
+  mask-image:radial-gradient(ellipse 80% 60% at 50% 30%,#000,transparent);
+}
+.eyebrow{
+  display:inline-flex;align-items:center;gap:8px;font-size:11px;font-weight:700;
+  text-transform:uppercase;letter-spacing:1.4px;color:var(--accent);
+  background:color-mix(in srgb,var(--accent) 11%,transparent);
+  border:1px solid color-mix(in srgb,var(--accent) 26%,transparent);
+  padding:6px 13px;border-radius:100px;margin-bottom:22px;
+}
+.pulse{width:6px;height:6px;border-radius:50%;background:var(--accent);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.35;transform:scale(.8)}}
+h2.hero-title{
+  font-size:clamp(34px,4.6vw,58px);font-weight:800;letter-spacing:-1.6px;
+  line-height:1.06;max-width:15ch;margin-bottom:20px;
+}
+h2.hero-title em{
+  font-style:normal;
+  background:linear-gradient(100deg,var(--accent),var(--accent-2) 55%,var(--accent-5));
+  -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+}
+.hero-lead{font-size:16.5px;color:var(--text-2);max-width:64ch;line-height:1.72}
+.hero-lead strong{color:var(--text);font-weight:600}
+
+/* ============================= KPI ============================= */
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(178px,1fr));gap:14px;margin-top:40px}
+.kpi{
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--r);
+  padding:19px 20px;position:relative;overflow:hidden;transition:.22s;
+}
+.kpi:hover{transform:translateY(-3px);border-color:color-mix(in srgb,var(--accent) 42%,var(--border));box-shadow:var(--shadow)}
+.kpi::after{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--kc,var(--accent));opacity:.85}
+.kpi .k-label{font-size:10.5px;text-transform:uppercase;letter-spacing:.9px;color:var(--text-3);font-weight:700;margin-bottom:9px}
+.kpi .k-val{font-size:27px;font-weight:800;letter-spacing:-1px;line-height:1;font-family:'JetBrains Mono',monospace}
+.kpi .k-sub{font-size:11.5px;color:var(--text-2);margin-top:7px}
+
+/* ============================= SECTIONS ============================= */
+section{padding:72px 0 12px;scroll-margin-top:0}
+.sec-head{margin-bottom:30px;display:flex;align-items:flex-end;justify-content:space-between;gap:24px;flex-wrap:wrap}
+.sec-num{
+  font-family:'JetBrains Mono',monospace;font-size:11.5px;color:var(--accent);
+  font-weight:600;letter-spacing:1.5px;margin-bottom:9px;display:block;
+}
+.sec-head h3{font-size:29px;font-weight:750;letter-spacing:-.85px;line-height:1.2}
+.sec-head p{color:var(--text-2);font-size:14.5px;max-width:78ch;margin-top:9px}
+.divider{height:1px;background:linear-gradient(90deg,var(--border),transparent);margin:0 0 30px}
+
+/* ============================= CARDS / GRID ============================= */
+.grid{display:grid;gap:16px}
+.g2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.g3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.g4{grid-template-columns:repeat(4,minmax(0,1fr))}
+.g23{grid-template-columns:2fr 1fr}
+.g32{grid-template-columns:1fr 2fr}
+@media(max-width:1150px){.g3,.g4,.g23,.g32{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:820px){.grid{grid-template-columns:1fr!important}}
+
+.card{
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--r);
+  padding:22px;transition:.22s;position:relative;overflow:hidden;
+}
+.card:hover{border-color:var(--border-soft);box-shadow:var(--shadow)}
+.card-h{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;margin-bottom:6px}
+.card-h h4{font-size:14.5px;font-weight:650;letter-spacing:-.25px}
+.card-sub{font-size:11.5px;color:var(--text-3);margin-bottom:16px;line-height:1.5}
+.card-h h4{display:flex;align-items:center;gap:8px}
+.c-info{
+  width:18px;height:18px;border-radius:50%;border:1px solid var(--border-soft);
+  background:var(--surface-2);color:var(--text-3);font-size:11px;font-weight:700;
+  display:inline-grid;place-items:center;cursor:pointer;flex:none;transition:.18s;
+}
+.c-info:hover,.c-info:focus{color:var(--accent);border-color:var(--accent);outline:none}
+.c-tip{
+  position:fixed;z-index:2000;background:var(--bg-2);color:var(--text-2);
+  border:1px solid var(--border);border-radius:10px;padding:10px 12px;
+  font-size:11.5px;line-height:1.55;max-width:300px;box-shadow:var(--shadow);
+  display:none
+}
+.c-tip.show{display:block}
+.tag{
+  font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;
+  padding:4px 9px;border-radius:100px;white-space:nowrap;flex:none;
+  background:color-mix(in srgb,var(--accent) 13%,transparent);
+  color:var(--accent);border:1px solid color-mix(in srgb,var(--accent) 28%,transparent);
+}
+.tag.b{background:color-mix(in srgb,var(--accent-2) 13%,transparent);color:var(--accent-2);border-color:color-mix(in srgb,var(--accent-2) 28%,transparent)}
+.tag.y{background:color-mix(in srgb,var(--accent-3) 15%,transparent);color:var(--accent-3);border-color:color-mix(in srgb,var(--accent-3) 30%,transparent)}
+.tag.r{background:color-mix(in srgb,var(--accent-4) 13%,transparent);color:var(--accent-4);border-color:color-mix(in srgb,var(--accent-4) 28%,transparent)}
+.tag.p{background:color-mix(in srgb,var(--accent-5) 13%,transparent);color:var(--accent-5);border-color:color-mix(in srgb,var(--accent-5) 28%,transparent)}
+.tag.n{background:var(--surface-2);color:var(--text-3);border-color:var(--border)}
+
+.cv{position:relative;width:100%}
+.h200{height:200px}.h230{height:230px}.h260{height:260px}.h290{height:290px}
+.h320{height:320px}.h360{height:360px}.h420{height:420px}.h470{height:470px}
+
+/* ============================= CONTROLS ============================= */
+.ctrls{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:18px}
+.chip{
+  background:var(--surface);border:1px solid var(--border);color:var(--text-2);
+  padding:7px 14px;border-radius:100px;font-size:12px;font-weight:600;cursor:pointer;
+  transition:.18s;font-family:inherit;
+}
+.chip:hover{color:var(--text);border-color:var(--text-3)}
+.chip.on{background:var(--accent);color:#04140d;border-color:var(--accent);box-shadow:0 4px 14px -4px var(--accent)}
+
+/* ============================= PHASE RAIL ============================= */
+.rail{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:22px}
+@media(max-width:1000px){.rail{grid-template-columns:repeat(2,1fr)}}
+.ph{
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--r);
+  padding:18px;cursor:pointer;transition:.22s;position:relative;overflow:hidden;text-align:left;
+  font-family:inherit;color:inherit;
+}
+.ph::before{content:'';position:absolute;top:0;left:0;width:100%;height:3px;background:var(--pc);opacity:.25;transition:.22s}
+.ph:hover::before,.ph.on::before{opacity:1}
+.ph.on{border-color:var(--pc);background:color-mix(in srgb,var(--pc) 7%,var(--surface))}
+.ph .p-id{font-family:'JetBrains Mono',monospace;font-size:10.5px;font-weight:600;color:var(--pc);letter-spacing:1px}
+.ph .p-name{font-size:14px;font-weight:680;margin:7px 0 4px;letter-spacing:-.2px}
+.ph .p-win{font-size:11px;color:var(--text-3);font-family:'JetBrains Mono',monospace}
+.ph .p-win .has-tip{cursor:help;border-bottom:1px dotted var(--text-3)}
+.ph .p-q{font-size:11.5px;color:var(--text-2);margin-top:10px;line-height:1.5;display:none}
+.ph.on .p-q{display:block}
+
+/* ============================= TABLES ============================= */
+.tbl-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:var(--r);background:var(--surface)}
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th{
+  text-align:left;padding:12px 14px;font-size:10px;text-transform:uppercase;
+  letter-spacing:.9px;color:var(--text-3);font-weight:700;
+  border-bottom:1px solid var(--border);background:var(--surface-2);white-space:nowrap;
+}
+td{padding:11px 14px;border-bottom:1px solid var(--border-soft);color:var(--text-2);vertical-align:top}
+tr:last-child td{border-bottom:none}
+tbody tr{transition:.15s}
+tbody tr:hover{background:var(--surface-2)}
+td strong{color:var(--text);font-weight:600}
+td.num,th.num{text-align:right;font-family:'JetBrains Mono',monospace}
+.mono{font-family:'JetBrains Mono',monospace;font-size:11.5px}
+
+/* ============================= MATRIX ============================= */
+.mx{overflow-x:auto}
+.mx table{font-size:12px}
+.mx td.c{text-align:center;font-weight:700;font-size:14px;width:64px}
+.yes{color:var(--accent)}
+.part{color:var(--accent-3)}
+.no{color:var(--text-3);opacity:.35}
+.mx td:first-child{color:var(--text);font-weight:500;min-width:250px}
+
+/* ============================= BARS ============================= */
+.blist{display:flex;flex-direction:column;gap:13px}
+.brow .b-top{display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:6px}
+.brow .b-top span:last-child{font-family:'JetBrains Mono',monospace;color:var(--text-3);font-size:11.5px}
+.btrack{height:6px;background:var(--surface-2);border-radius:100px;overflow:hidden}
+.bfill{height:100%;border-radius:100px;width:0;transition:width 1.1s cubic-bezier(.22,1,.36,1)}
+
+/* ============================= FLOW / DIAGRAM ============================= */
+.flow{display:flex;flex-direction:column;gap:0}
+.fnode{
+  background:var(--surface-2);border:1px solid var(--border);border-radius:10px;
+  padding:12px 16px;font-size:12.5px;display:flex;align-items:center;gap:12px;transition:.2s;
+}
+.fnode:hover{border-color:var(--accent);transform:translateX(4px)}
+.fnode .fi{
+  width:24px;height:24px;border-radius:7px;flex:none;display:grid;place-items:center;
+  font-size:10.5px;font-weight:700;font-family:'JetBrains Mono',monospace;
+  background:color-mix(in srgb,var(--accent) 15%,transparent);color:var(--accent);
+}
+.fnode strong{color:var(--text);font-weight:600}
+.fnode span{color:var(--text-3);font-size:11.5px}
+.farrow{height:16px;width:1px;background:var(--border);margin-left:28px}
+.gate{
+  background:color-mix(in srgb,var(--accent-3) 10%,transparent);
+  border-color:color-mix(in srgb,var(--accent-3) 35%,transparent);
+}
+.gate .fi{background:color-mix(in srgb,var(--accent-3) 18%,transparent);color:var(--accent-3)}
+
+.arch{display:flex;flex-direction:column;gap:8px}
+.layer{
+  border:1px solid var(--border);border-radius:11px;padding:14px 16px;
+  background:var(--surface-2);transition:.2s;
+}
+.layer:hover{border-color:var(--lc,var(--accent))}
+.layer .l-name{font-size:10.5px;text-transform:uppercase;letter-spacing:1.1px;font-weight:700;color:var(--lc,var(--accent));margin-bottom:9px}
+.pills{display:flex;flex-wrap:wrap;gap:6px}
+.pill{
+  font-size:11px;padding:4.5px 10px;border-radius:7px;background:var(--surface);
+  border:1px solid var(--border);color:var(--text-2);font-weight:500;
+}
+
+/* ============================= LISTS ============================= */
+.ilist{display:flex;flex-direction:column;gap:11px}
+.item{display:flex;gap:12px;align-items:flex-start}
+.inum{
+  width:21px;height:21px;border-radius:6px;flex:none;display:grid;place-items:center;
+  font-size:10.5px;font-weight:700;font-family:'JetBrains Mono',monospace;
+  background:var(--surface-2);color:var(--accent);border:1px solid var(--border);
+}
+.item p{font-size:12.5px;color:var(--text-2);line-height:1.62}
+.item p strong{color:var(--text);font-weight:600}
+
+.callout{
+  border-left:3px solid var(--accent);background:color-mix(in srgb,var(--accent) 7%,transparent);
+  padding:15px 18px;border-radius:0 10px 10px 0;font-size:13px;color:var(--text-2);line-height:1.68;
+}
+.callout.warn{border-color:var(--accent-3);background:color-mix(in srgb,var(--accent-3) 8%,transparent)}
+.callout.risk{border-color:var(--accent-4);background:color-mix(in srgb,var(--accent-4) 7%,transparent)}
+.callout strong{color:var(--text)}
+
+/* ============================= SCREENS ============================= */
+.screens{display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:12px}
+.scr{
+  background:var(--surface-2);border:1px solid var(--border);border-radius:11px;padding:15px;transition:.2s;
+}
+.scr:hover{border-color:var(--accent-2);transform:translateY(-2px)}
+.scr .s-i{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--accent-2);font-weight:600;letter-spacing:1px}
+.scr h5{font-size:13px;font-weight:650;margin:6px 0 6px}
+.scr p{font-size:11.5px;color:var(--text-3);line-height:1.55}
+
+/* ============================= FOOT ============================= */
+footer{
+  border-top:1px solid var(--border);margin-top:80px;padding:34px 0;
+  color:var(--text-3);font-size:12px;display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap;
+}
+.legend{display:flex;gap:16px;flex-wrap:wrap;font-size:11.5px;color:var(--text-3);margin-top:12px}
+.legend span{display:flex;align-items:center;gap:6px}
+.sw{width:9px;height:9px;border-radius:3px}
+
+.reveal{opacity:0;transform:translateY(18px);transition:opacity .6s ease,transform .6s cubic-bezier(.22,1,.36,1)}
+.reveal.in{opacity:1;transform:none}
+
+@media(max-width:1000px){
+  .app{grid-template-columns:1fr}
+  aside{position:relative;height:auto;flex-direction:row;align-items:center;flex-wrap:wrap;gap:14px;padding:16px 20px}
+  nav{flex-direction:row;flex-wrap:wrap;flex:1}
+  .nav-label{display:none}
+  .side-foot{margin:0;flex-direction:row}
+  .side-note{display:none}
+  .wrap{padding:0 20px}
+}
+@media print{aside{display:none}.app{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="app">
+
+<aside>
+  <div class="brand">
+    <div class="logo">PP</div>
+    <div>
+      <h1>ProcurePilot</h1>
+      <p>Roadmap v1.0</p>
+    </div>
+  </div>
+
+  <nav id="nav">
+    <span class="nav-label">Strategy</span>
+    <a href="#overview" class="on"><span class="dot"></span>Overview</a>
+    <a href="#vision"><span class="dot"></span>Vision &amp; Thesis</a>
+    <a href="#problem"><span class="dot"></span>Problem &amp; Leakage</a>
+    <a href="#market"><span class="dot"></span>Market &amp; Personas</a>
+    <span class="nav-label">Roadmap</span>
+    <a href="#phases"><span class="dot"></span>Phases &amp; Gates</a>
+    <a href="#timeline"><span class="dot"></span>Timeline</a>
+    <a href="#scope"><span class="dot"></span>Scope Matrix</a>
+    <span class="nav-label">Product</span>
+    <a href="#modules"><span class="dot"></span>Modules &amp; Value</a>
+    <a href="#ai"><span class="dot"></span>AI Capabilities</a>
+    <a href="#data"><span class="dot"></span>Data &amp; Quality</a>
+    <span class="nav-label">Build</span>
+    <a href="#arch"><span class="dot"></span>Architecture</a>
+    <a href="#web"><span class="dot"></span>Web App</a>
+    <a href="#mobile"><span class="dot"></span>Mobile App</a>
+    <span class="nav-label">Execution</span>
+    <a href="#metrics"><span class="dot"></span>Metrics</a>
+    <a href="#business"><span class="dot"></span>Business Model</a>
+    <a href="#gtm"><span class="dot"></span>Go-to-Market</a>
+    <a href="#team"><span class="dot"></span>Team &amp; Risk</a>
+    <a href="#decisions"><span class="dot"></span>Decisions</a>
+  </nav>
+
+  <div class="side-foot">
+    <button class="toggle" id="themeBtn"><span>Appearance</span><strong id="themeLbl">Light</strong></button>
+    <p class="side-note">All numeric values are illustrative planning assumptions unless validated by customer research.</p>
+  </div>
+</aside>
+
+<main>
+<!-- ══════════════════ HERO ══════════════════ -->
+<div class="hero">
+  <div class="hero-grid"></div>
+  <div class="wrap">
+    <span class="eyebrow"><span class="pulse"></span>Master Roadmap · M0 → M24</span>
+    <h2 class="hero-title">From business vision to <em>web &amp; mobile</em> in five gated phases</h2>
+    <p class="hero-lead">
+      ProcurePilot converts fragmented quotations, supplier prices, invoices, and stock signals into
+      <strong>normalised comparisons, recommended orders, approval-ready decisions, and verified savings</strong>
+      — for small businesses that buy recurring consumables. This dashboard visualises the full plan:
+      strategy, phased delivery, architecture, web and mobile implementation, metrics, and risk.
+    </p>
+
+    <div class="kpis">
+      <div class="kpi" style="--kc:var(--accent)">
+        <div class="k-label">North Star</div>
+        <div class="k-val" data-count="350" data-pre="£" data-post="+">£0</div>
+        <div class="k-sub">Verified monthly value per business</div>
+      </div>
+      <div class="kpi" style="--kc:var(--accent-2)">
+        <div class="k-label">Horizon</div>
+        <div class="k-val" data-count="24" data-post=" mo">0</div>
+        <div class="k-sub">5 phases · 4 stage gates</div>
+      </div>
+      <div class="kpi" style="--kc:var(--accent-3)">
+        <div class="k-label">MVP Live</div>
+        <div class="k-val" data-count="9" data-pre="M">M0</div>
+        <div class="k-sub">Web intelligence MVP · gate G1</div>
+      </div>
+      <div class="kpi" style="--kc:var(--accent-5)">
+        <div class="k-label">Mobile Live</div>
+        <div class="k-val" data-count="13" data-pre="M">M0</div>
+        <div class="k-sub">Request · approve · confirm</div>
+      </div>
+      <div class="kpi" style="--kc:var(--accent-6)">
+        <div class="k-label">Match Precision</div>
+        <div class="k-val" data-count="92" data-post="%">0%</div>
+        <div class="k-sub">Phase 1 exit gate</div>
+      </div>
+      <div class="kpi" style="--kc:var(--accent-4)">
+        <div class="k-label">Value : Fee</div>
+        <div class="k-val" data-count="3.4" data-post="×" data-dec="1">0×</div>
+        <div class="k-sub">Year-1 objective · 3.0× at G1</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="wrap">
+
+<!-- ══════════════════ 01 OVERVIEW ══════════════════ -->
+<section id="overview" class="reveal">
+  <div class="sec-head">
+    <div>
+      <span class="sec-num">01 — OVERVIEW</span>
+      <h3>The roadmap at a glance</h3>
+      <p>Five phases, each answering one question and ending in a hard go/no-go gate. Nothing proceeds on optimism instead of measured accuracy and verified customer value.</p>
+    </div>
+  </div>
+
+  <div class="grid g23" style="margin-bottom:16px">
+    <div class="card">
+      <div class="card-h"><h4>Roadmap maturity — value vs. defensibility vs. complexity</h4><span class="tag b">Bubble = complexity</span></div>
+      <p class="card-sub">Customer value and defensibility rise together; bubble size shows delivery complexity. The steep complexity curve after Phase 2 is why integrations and prediction are deliberately deferred.</p>
+      <div class="cv h360"><canvas id="cMaturity"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-h"><h4>Strategic success factors</h4><span class="tag">Importance</span></div>
+      <p class="card-sub">Trustworthy data outranks every feature.</p>
+      <div class="cv h360"><canvas id="cSuccess"></canvas></div>
+    </div>
+  </div>
+
+  <div class="grid g4">
+    <div class="card">
+      <div class="card-h"><h4>Decision quality by maturity</h4></div>
+      <p class="card-sub">Each layer of normalisation compounds.</p>
+      <div class="cv h230"><canvas id="cDecisionQ"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-h"><h4>Customer value by capability</h4></div>
+      <p class="card-sub">Workflow control tops raw price visibility.</p>
+      <div class="cv h230"><canvas id="cCapValue"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-h"><h4>Module adoption ramp</h4></div>
+      <p class="card-sub">Modules live per customer over 12 months.</p>
+      <div class="cv h230"><canvas id="cAdoption"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-h"><h4>Mitigation maturity</h4></div>
+      <p class="card-sub">Controls harden phase by phase.</p>
+      <div class="cv h230"><canvas id="cMitigation"></canvas></div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════ 02 VISION ══════════════════ -->
+<section id="vision" class="reveal">
+  <div class="divider"></div>
+  <div class="sec-head">
+    <div>
+      <span class="sec-num">02 — VISION &amp; THESIS</span>
+      <h3>Why the product exists</h3>
+      <p>Large organisations employ procurement teams. Small businesses buy the same categories, repeatedly, with none of that infrastructure — relying on habit, relationships, and memory.</p>
+    </div>
+  </div>
+
+  <div class="grid g2" style="margin-bottom:16px">
+    <div class="card">
+      <div class="card-h"><h4 data-info="Defines the long-term direction (Vision), the daily job (Mission), how customers describe us (Positioning), and the North Star metric that proves value.">Vision, mission, positioning</h4><span class="tag">Locked</span></div>
+      <p class="card-sub">Binding statements for the roadmap horizon.</p>
+      <div class="ilist">
+        <div class="item"><div class="inum">V</div><p><strong>Vision.</strong> Every small business should buy as well as a large enterprise — same price visibility, supplier leverage, and decision evidence, without the cost, staff, or complexity.</p></div>
+        <div class="item"><div class="inum">M</div><p><strong>Mission.</strong> Turn fragmented supplier information into trusted, comparable, actionable purchasing decisions — and prove the money saved.</p></div>
+        <div class="item"><div class="inum">P</div><p><strong>Positioning.</strong> An AI purchasing co-pilot and lightweight procurement operating system for small businesses.</p></div>
+        <div class="item"><div class="inum">N</div><p><strong>North star.</strong> Verified savings and cost avoidance generated per active business per month.</p></div>
+      </div>
+      <div class="callout" style="margin-top:18px">
+        Three verbs define the entire product: <strong>Normalise</strong> — make offers genuinely comparable.
+        <strong>Recommend</strong> — convert comparison into a specific action. <strong>Verify</strong> — measure the realised outcome.
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-h"><h4 data-info="Maps the end-to-end data flow from a noisy supplier document to a verified saving. Any feature that does not tighten this chain is surface area, not core value.">The product thesis — one causal chain</h4><span class="tag b">Every feature must earn a place here</span></div>
+      <p class="card-sub">The normalisation and entity-resolution core <em>is</em> the product. Dashboards and integrations are replaceable surface area.</p>
+      <div class="flow">
+        <div class="fnode"><div class="fi">01</div><div><strong>Noisy supplier document</strong> <span>· PDF, photo, Excel, email, WhatsApp</span></div></div>
+        <div class="farrow"></div>
+        <div class="fnode"><div class="fi">02</div><div><strong>Extracted line items</strong> <span>· document intelligence</span></div></div>
+        <div class="farrow"></div>
+        <div class="fnode"><div class="fi">03</div><div><strong>Resolved product identity</strong> <span>· entity resolution</span></div></div>
+        <div class="farrow"></div>
+        <div class="fnode"><div class="fi">04</div><div><strong>Comparable unit basis</strong> <span>· pack-size normalisation</span></div></div>
+        <div class="farrow"></div>
+        <div class="fnode"><div class="fi">05</div><div><strong>True landed cost</strong> <span>· versioned cost engine</span></div></div>
+        <div class="farrow"></div>
+        <div class="fnode"><div class="fi">06</div><div><strong>Recommended action</strong> <span>· scorer + basket optimiser</span></div></div>
+        <div class="farrow"></div>
+        <div class="fnode"><div class="fi">07</div><div><strong>Executed purchase</strong> <span>· approval + order workflow</span></div></div>
+        <div class="farrow"></div>
+        <div class="fnode gate"><div class="fi">08</div><div><strong>Verified saving + model feedback</strong> <span>· auditable ledger</span></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid g23">
+    <div class="card">
+      <div class="card-h"><h4>Differentiation profile — spreadsheet process vs. ProcurePilot target</h4><span class="tag">Scale 0–10</span></div>
+      <p class="card-sub">The gap is widest exactly where small businesses are least equipped: cost clarity, supplier insight, and automation.</p>
+      <div class="cv h320"><canvas id="cDiff"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-h"><h4>Strategic pillars</h4></div>
+      <p class="card-sub">Six principles that gate every decision.</p>
+      <div class="ilist">
+        <div class="item"><div class="inum">1</div><p><strong>Trustworthy data before clever AI.</strong> Confidence and provenance are product features.</p></div>
+        <div class="item"><div class="inum">2</div><p><strong>Every insight ends in an action.</strong> No read-only dashboards.</p></div>
+        <div class="item"><div class="inum">3</div><p><strong>Verified value, not claimed value.</strong> Auditable to source documents.</p></div>
+        <div class="item"><div class="inum">4</div><p><strong>Depth in one wedge before breadth.</strong> Recurring consumables first.</p></div>
+        <div class="item"><div class="inum">5</div><p><strong>Data accretion as moat.</strong> Year 1 optimises for structured history.</p></div>
+        <div class="item"><div class="inum">6</div><p><strong>Phased complexity.</strong> No enterprise S2P without validated demand.</p></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════ 03 PROBLEM ══════════════════ -->
+<section id="problem" class="reveal">
+  <div class="divider"></div>
+  <div class="sec-head">
+    <div>
+      <span class="sec-num">03 — PROBLEM &amp; LEAKAGE</span>
+      <h3>Where the money leaks</h3>
+      <p>The loss is not one large error; it is dozens of small, invisible, repeated ones. The root cause is <strong>structural incomparability</strong> — not carelessness.</p>
+    </div>
+  </div>
+
+  <div class="grid g3" style="margin-bottom:16px">
+    <div class="card">
+      <div class="card-h"><h4>Procurement leakage sources</h4><span class="tag r">Share of loss</span></div>
+      <p class="card-sub">Poor comparison and emergency buying account for roughly half of all leakage.</p>
+      <div class="cv h290"><canvas id="cLeak"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-h"><h4>Time per buying-cycle stage</h4><span class="tag y">Minutes</span></div>
+      <p class="card-sub">Quote collection is the single largest time sink — and the first target.</p>
+      <div class="cv h290"><canvas id="cTimeStage"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-h"><h4>Procurement cycle time</h4><span class="tag">Before vs. with</span></div>
+      <p class="card-sub">End-to-end cycle compression across five stages.</p>
+      <div class="cv h290"><canvas id="cCycle"></canvas></div>
+    </div>
+  </div>
+
+  <div class="grid g2">
+    <div class="card">
+      <div class="card-h"><h4 data-info="Human buyers cannot normalise pack sizes, variants, taxes, delivery, discounts and terms in the seconds available, so they default to the familiar supplier and create leakage.">Why offers are incomparable</h4></div>
+      <p class="card-sub">A 6×5L quote, a 12×750ml WhatsApp message, and a marketplace listing with a free-delivery threshold cannot be compared by a human in the seconds available.</p>
+      <div class="pills">
+        <span class="pill">Pack size</span><span class="pill">Product variant</span><span class="pill">Quantity</span>
+        <span class="pill">VAT treatment</span><span class="pill">Delivery cost</span><span class="pill">Minimum order value</span>
+        <span class="pill">Quantity discount</span><span class="pill">Payment terms</span><span class="pill">Lead time</span>
+        <span class="pill">Stock availability</span><span class="pill">Currency</span><span class="pill">Return policy</span>
+      </div>
+      <div class="callout warn" style="margin-top:18px">
+        <strong>Consequence:</strong> the business defaults to the familiar supplier — and supplier concentration
+        becomes its own leakage source, compounding the original problem.
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-h"><h4>Fragmented sources of price and terms</h4><span class="tag n">Ingestion targets</span></div>
+      <p class="card-sub">All of these must become one normalised offer table.</p>
+      <div class="cv h230"><canvas id="cSources"></canvas></div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════ 04 MARKET ══════════════════ -->
+<section id="market" class="reveal">
+  <div class="divider"></div>
+  <div class="sec-head">
+    <div>
+      <span class="sec-num">04 — MARKET &amp; PERSONAS</span>
+      <h3>Who buys, and who decides</h3>
+      <p>One wedge, three personas, three distinct jobs. Role influence per stage drives the split between web and mobile.</p>
+    </div>
+  </div>
+
+  <div class="grid g23" style="margin-bottom:16px">
+    <div class="card">
+      <div class="card-h"><h4>Segment attractiveness</h4><span class="tag">Wedge selection</span></div>
+      <p class="card-sub">Cleaning and hygiene leads: frequently reordered, relatively standardised, and pack-size normalisation creates immediately visible value.</p>
+      <div class="cv h290"><canvas id="cSegments"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-h"><h4 data-info="The first beachhead category: cleaning, hygiene, office and café consumables. Chosen because it is frequently reordered, relatively standardised, and savings from pack normalisation show up quickly.">Initial wedge</h4><span class="tag">Locked</span></div>
+      <p class="card-sub">Cleaning, hygiene, office &amp; café consumables.</p>
+      <div class="ilist">
+        <div class="item"><div class="inum">✓</div><p>Frequently reordered</p></div>
+        <div class="item"><div class="inum">✓</div><p>Relatively standardised</p></div>
+        <div class="item"><div class="inum">✓</div><p>Pack normalisation shows value fast</p></div>
+        <div class="item"><div class="inum">✓</div><p>Available via marketplaces &amp; distributors</p></div>
+        <div class="item"><div class="inum">✓</div><p>Savings measurable quickly</p></div>
+        <div class="item"><div class="inum">✕</div><p>Not fashion, fresh food, or industrial spares</p></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid g32">
+    <div class="card">
+      <div class="card-h"><h4>Personas</h4></div>
+      <p class="card-sub">Three jobs, two platforms.</p>
+      <div class="ilist">
+        <div class="item"><div class="inum">O</div><p><strong>Owner / GM</strong> — economic buyer, final approver. Cares about £ saved, budget control, supplier dependence. <span class="mono">Mobile: approve</span></p></div>
+        <div class="item"><div class="inum">B</div><p><strong>Buyer / Operations</strong> — daily power user. Collects quotes, compares, builds baskets, resolves exceptions. <span class="mono">Web: everything</span></p></div>
+        <div class="item"><div class="inum">S</div><p><strong>Branch Manager</strong> — demand owner. Requests items, reports low stock, confirms receipt. <span class="mono">Mobile: request + confirm</span></p></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-h"><h4>Role influence by procurement stage</h4><span class="tag b">Scale 0–100</span></div>
+      <p class="card-sub">Branch managers dominate need identification; buyers dominate comparison and ordering; owners dominate approval and review. This distribution is the reason mobile carries only three jobs.</p>
+      <div class="cv h290"><canvas id="cRoles"></canvas></div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════ 05 PHASES ══════════════════ -->
+<section id="phases" class="reveal">
+  <div class="divider"></div>
+  <div class="sec-head">
+    <div>
+      <span class="sec-num">05 — PHASES &amp; GATES</span>
+      <h3>Five phases, four hard gates</h3>
+      <p>Select a phase to see the question it answers. Failing a gate means iterating inside the phase — never proceeding.</p>
+    </div>
+  </div>
+
+  <div class="rail" id="rail">
+    <button class="ph on" style="--pc:var(--accent-6)" data-ph="0">
+      <div class="p-id">PHASE 0 · M0–M3</div>
+      <div class="p-name">Concierge Validation</div>
+      <div class="p-win">3 months · ~3 FTE</div>
+      <div class="p-q">Is the problem real, and will businesses pay to solve it? Almost no software — spend reviews by hand, labelled datasets, paid pilots.</div>
+    </button>
+    <button class="ph" style="--pc:var(--accent)" data-ph="1">
+      <div class="p-id">PHASE 1 · M3–M9</div>
+      <div class="p-name">Intelligence MVP (Web)</div>
+      <div class="p-win">6 months · ~7 FTE</div>
+      <div class="p-q">Can software reliably produce the comparison and the saving? Ingestion, extraction, matching, landed cost, compare, savings ledger.</div>
+    </button>
+    <button class="ph" style="--pc:var(--accent-2)" data-ph="2">
+      <div class="p-id">PHASE 2 · M9–M15</div>
+      <div class="p-name">Team Workflow + Mobile</div>
+      <div class="p-win">6 months · ~10.5 FTE</div>
+      <div class="p-q">Does it become the system of record for buying decisions? Branches, budgets, approvals, optimiser, mobile app.</div>
+    </button>
+    <button class="ph" style="--pc:var(--accent-5)" data-ph="3">
+      <div class="p-id">PHASE 3 · M15–M20</div>
+      <div class="p-name">Connected Operations</div>
+      <div class="p-win">5 months · ~14 FTE</div>
+      <div class="p-q">Can it plug into the existing stack and stay current automatically? Email ingestion, accounting, POS, reconciliation, API.</div>
+    </button>
+    <button class="ph" style="--pc:var(--accent-3)" data-ph="4">
+      <div class="p-id">PHASE 4 · M20–M24+</div>
+      <div class="p-name">Predictive Procurement</div>
+      <div class="p-win">5 months+ · ~14 FTE</div>
+      <div class="p-q">Can it decide when and how much before the customer asks? Forecasting, supplier risk, negotiation, grounded analyst.</div>
+    </button>
+  </div>
+
+  <div class="grid g2" style="margin-bottom:16px">
+    <div class="card">
+      <div class="card-h"><h4 data-info="The ordered dependency chain from P0 prerequisites through domain model, extraction, matching, landed-cost engine, and each hard gate, up to predictive procurement. P0 decisions determine the entire schema before engineering begins.">Critical path</h4><span class="tag y">Gates in amber</span></div>
+      <p class="card-sub">Each node is blocked by the one above it. Two P0 items block all engineering.</p>
+      <div class="flow">
+        <div class="fnode"><div class="fi">P0</div><div><strong>Savings baseline policy decided</strong> <span>· schema-determining</span></div></div>
+        <div class="farrow"></div>
+        <div class="fnode"><div class="fi">P0</div><div><strong>Labelled benchmark datasets</strong> <span>· defines "correct"</span></div></div>
+        <div class="farrow"></div>
+        <div class="fnode"><div class="fi">R1</div><div><strong>Domain model + pack normalisation</strong></div></div>
+        <div class="farrow"></div>
+        <div class="fnode"><div class="fi">R1</div><div><strong>Extraction pipeline + review queue</strong></div></div>
+        <div class="farrow"></div>
+        <div class="fnode"><div class="fi">R1</div><div><strong>Matching engine at precision gate</strong></div></div>
+        <div class="farrow"></div>
+        <div class="fnode"><div class="fi">R1</div><div><strong>Landed-cost engine + Smart Compare</strong></div></div>
+        <div class="farrow"></div>
+        <div class="fnode gate"><div class="fi">G1</div><div><strong>Savings ledger with verified records</strong> <span>· MVP live</span></div></div>
+        <div class="farrow"></div>
+        <div class="fnode"><div class="fi">R2</div><div><strong>Org model: branches, budgets, roles</strong></div></div>
+        <div class="farrow"></div>
+        <div class="fnode"><div class="fi">R2</div><div><strong>Requests + approvals</strong></div></div>
+        <div class="farrow"></div>
+        <div class="fnode gate"><div class="fi">G2</div><div><strong>Mobile app in stores</strong></div></div>
+        <div class="farrow"></div>
+        <div class="fnode gate"><div class="fi">G3</div><div><strong>Integrations + automated data inflow</strong></div></div>
+        <div class="farrow"></div>
+        <div class="fnode"><div class="fi">P4</div><div><strong>Forecasting &amp; predictive procurement</strong></div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-h"><h4 data-info="The four go/no-go gates (G0–G3) that separate the phases. Each gate lists the evidence required to proceed and the explicit consequence of not meeting it.">Stage gate exit criteria</h4><span class="tag y">Go / No-Go</span></div>
+      <p class="card-sub">Explicit consequences prevent optimistic progression.</p>
+      <div class="tbl-wrap" style="border:none">
+        <table>
+          <thead><tr><th>Gate</th><th>Exit criteria</th><th>If not met</th></tr></thead>
+          <tbody>
+            <tr><td><strong>G0</strong><div class="mono">→ Phase 1</div></td><td>≥3 paid pilots · savings documented in ≥5 businesses · labelled datasets built</td><td>Re-select wedge or reframe offer. <strong>Do not build software.</strong></td></tr>
+            <tr><td><strong>G1</strong><div class="mono">→ Phase 2</div></td><td>Matching + extraction targets met · ≥10 verified savings · ≥8 paying self-serve customers</td><td>Invest further in data quality and review UX before adding workflow</td></tr>
+            <tr><td><strong>G2</strong><div class="mono">→ Phase 3</div></td><td>Workflow origination ≥70% · mobile adoption target met · retention ≥90%</td><td>Deepen workflow before spending on integrations</td></tr>
+            <tr><td><strong>G3</strong><div class="mono">→ Phase 4</div></td><td>Integration-sourced data ≥60% · ≥6 months history for ≥30 accounts</td><td>Continue data accumulation. Forecasting without history will fail.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-h"><h4 data-info="Key results tracked from Phase 1 through Phase 4 exit, including extraction quality, verified savings, customer adoption, workflow usage, integration coverage, and predictive readiness.">Phase OKR progression</h4><span class="tag b">Interactive</span></div>
+    <p class="card-sub">Key results tracked from Phase 1 exit through Phase 4 exit. Toggle series to isolate a metric.</p>
+    <div class="cv h360"><canvas id="cOkr"></canvas></div>
+  </div>
+</section>
+<!-- ... -->
+<!-- ══════════════════ 06 TIMELINE ══════════════════ -->
+<section id="timeline" class="reveal">
+  <div class="divider"></div>
+  <div class="sec-head">
+    <div>
+      <span class="sec-num">06 — TIMELINE</span>
+      <h3>24-month delivery plan</h3>
+      <p>Release-level Gantt across business, web, mobile, AI, and integration tracks. Filter by track to isolate a workstream.</p>
+    </div>
+  </div>
+
+  <div class="ctrls" id="ganttCtrls">
+    <button class="chip on" data-track="all">All tracks</button>
+    <button class="chip" data-track="Business">Business</button>
+    <button class="chip" data-track="Platform">Platform</button>
+    <button class="chip" data-track="AI">AI / Data</button>
+    <button class="chip" data-track="Web">Web</button>
+    <button class="chip" data-track="Mobile">Mobile</button>
+    <button class="chip" data-track="Integrations">Integrations</button>
+    <button class="chip" data-track="Predictive">Predictive</button>
+  </div>
+
+  <div class="card" style="margin-bottom:16px">
+    <div class="card-h"><h4>Master Gantt — releases R1.0 → R4.3</h4><span class="tag">Hover for detail</span></div>
+    <p class="card-sub">Bars span start and end months. Gates G0–G3 fall at M3, M9, M15, and M20.</p>
+    <div class="cv h470"><canvas id="cGantt"></canvas></div>
+    <div class="legend">
+      <span><i class="sw" style="background:var(--accent-6)"></i>Business / validation</span>
+      <span><i class="sw" style="background:var(--accent)"></i>Platform &amp; web</span>
+      <span><i class="sw" style="background:var(--accent-2)"></i>AI &amp; data</span>
+      <span><i class="sw" style="background:var(--accent-5)"></i>Mobile</span>
+      <span><i class="sw" style="background:var(--accent-3)"></i>Integrations &amp; predictive</span>
+    </div>
+  </div>
+
+  <div class="grid g2">
+    <div class="card">
+      <div class="card-h"><h4>Team ramp by phase</h4><span class="tag">FTE</span></div>
+      <p class="card-sub">The procurement/data-operations role starts in Phase 0 and is never removed — it is why customers trust the output.</p>
+      <div class="cv h320"><canvas id="cTeam"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-h"><h4>Consolidated milestones</h4></div>
+      <p class="card-sub">Business and engineering tracks in parallel.</p>
+      <div class="tbl-wrap" style="border:none">
+        <table>
+          <thead><tr><th>Window</th><th>Engineering</th><th>Milestone</th></tr></thead>
+          <tbody>
+            <tr><td class="mono">M0–M3</td><td>PRD, domain model, datasets</td><td><strong>G0 gate</strong></td></tr>
+            <tr><td class="mono">M3–M5</td><td>R1.0–R1.1 foundation, catalogue</td><td>Platform skeleton</td></tr>
+            <tr><td class="mono">M5–M6</td><td>R1.2 ingestion + extraction</td><td>First automated extraction</td></tr>
+            <tr><td class="mono">M6–M7</td><td>R1.3 matching + landed cost</td><td>Precision gate met</td></tr>
+            <tr><td class="mono">M7–M9</td><td>R1.4–R1.5 compare, savings ledger</td><td><strong>G1 — MVP live</strong></td></tr>
+            <tr><td class="mono">M9–M11</td><td>R2.0–R2.1 org, requests, approvals</td><td>Workflow on web</td></tr>
+            <tr><td class="mono">M11–M13</td><td>R2.2–R2.3 mobile MVP + approvals</td><td>Mobile in stores</td></tr>
+            <tr><td class="mono">M13–M15</td><td>R2.4–R2.5 optimiser, hardening</td><td><strong>G2 gate</strong></td></tr>
+            <tr><td class="mono">M15–M20</td><td>R3.0–R3.4 integrations, API</td><td><strong>G3 gate</strong></td></tr>
+            <tr><td class="mono">M20–M24</td><td>R4.0–R4.3 forecasting, analyst</td><td>Predictive live</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════ 07 SCOPE ══════════════════ -->
+<section id="scope" class="reveal">
+  <div class="divider"></div>
+  <div class="sec-head">
+    <div>
+      <span class="sec-num">07 — SCOPE MATRIX</span>
+      <h3>What ships when</h3>
+      <p>Capability by phase. <span class="yes">●</span> in scope · <span class="part">◐</span> partial or basic · <span class="no">○</span> out of scope.</p>
+    </div>
+  </div>
+
+  <div class="grid g32" style="margin-bottom:16px">
+    <div class="card">
+      <div class="card-h"><h4>Scope accumulation</h4><span class="tag">Count of 25</span></div>
+      <p class="card-sub">Full-scope (●) and partial-scope (◐) capabilities per phase, counted from the matrix.</p>
+      <div class="cv h320"><canvas id="cScope"></canvas></div>
+    </div>
+    <div class="card mx">
+      <div class="card-h"><h4>Capability × phase matrix</h4><span class="tag n">25 capabilities</span></div>
+      <p class="card-sub">Deferrals are deliberate, each with a stated dependency reason.</p>
+      <div class="tbl-wrap" style="border:none;max-height:420px;overflow-y:auto">
+        <table id="mxTable">
+          <thead><tr><th>Capability</th><th class="c">P0</th><th class="c">P1</th><th class="c">P2</th><th class="c">P3</th><th class="c">P4</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid g2">
+    <div class="card">
+      <div class="card-h"><h4>Deliberate deferrals</h4><span class="tag y">With rationale</span></div>
+      <div class="tbl-wrap" style="border:none">
+        <table>
+          <thead><tr><th>Deferred</th><th>To</th><th>Why</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Demand forecasting</strong></td><td class="mono">P4</td><td>Needs ≥6 months history; premature forecasts destroy trust</td></tr>
+            <tr><td><strong>Basket optimisation (full)</strong></td><td class="mono">P2</td><td>Needs multiple concurrent normalised offers per SKU</td></tr>
+            <tr><td><strong>Rich executive dashboard</strong></td><td class="mono">P2</td><td>Nothing meaningful to display until history accumulates</td></tr>
+            <tr><td><strong>Integrations</strong></td><td class="mono">P3</td><td>CSV, upload, and email cover 80% of need at 10% of cost</td></tr>
+            <tr><td><strong>Mobile app</strong></td><td class="mono">P2</td><td>Mobile-native jobs (request, approve) are Phase 2 features</td></tr>
+            <tr><td><strong>In-platform ordering</strong></td><td class="mono">Post-P3</td><td>Large architectural fork; keep external until validated</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-h"><h4>Explicit non-goals</h4><span class="tag r">Binding</span></div>
+      <p class="card-sub">Requests matching these are logged, not built.</p>
+      <div class="pills">
+        <span class="pill">Consumer shopping app</span><span class="pill">Coupon / deals app</span>
+        <span class="pill">Public price-comparison site</span><span class="pill">Supplier-review marketplace</span>
+        <span class="pill">Marketplace seller repricing</span><span class="pill">Enterprise Source-to-Pay suite</span>
+        <span class="pill">ERP replacement</span><span class="pill">Autonomous purchasing</span>
+        <span class="pill">Social features</span><span class="pill">Public reviews</span>
+      </div>
+      <div class="callout risk" style="margin-top:18px">
+        <strong>Scope discipline.</strong> Any proposed feature must map to a persona, procurement stage,
+        business problem, expected value, required data, technical dependency, and phase — or it is not built.
+      </div>
+    </div>
+  </div>
+</section>
+<!-- ══════════════════ 08 MODULES ══════════════════ -->
+<section id="modules" class="reveal">
+  <div class="divider"></div>
+  <div class="sec-head">
+    <div>
+      <span class="sec-num">08 — MODULES &amp; VALUE</span>
+      <h3>Nine modules, ranked by customer value</h3>
+      <p>Smart Compare, Quotation Inbox, and Basket Optimiser lead — all three sit directly on the causal chain.</p>
+    </div>
+  </div>
+
+  <div class="grid g23" style="margin-bottom:16px">
+    <div class="card">
+      <div class="card-h"><h4>Module customer value</h4><span class="tag">Score 0–100</span></div>
+      <p class="card-sub">Integrations score lowest despite being the most requested — a classic build-order trap.</p>
+      <div class="cv h360"><canvas id="cModules"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-h"><h4>Retention drivers</h4><span class="tag b">Influence</span></div>
+      <p class="card-sub">Verified savings dominates. Do not depend on notification frequency or dashboard engagement.</p>
+      <div class="cv h360"><canvas id="cRetention"></canvas></div>
+    </div>
+  </div>
+
+  <div class="grid g3" style="margin-bottom:16px">
+    <div class="card">
+      <div class="card-h"><h4>Dashboard information priority</h4></div>
+      <p class="card-sub">Immediate actions outrank trend insights by more than 2×.</p>
+      <div class="cv h260"><canvas id="cDashPri"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-h"><h4>Action inbox composition</h4></div>
+      <p class="card-sub">Half of all items are urgent or high value.</p>
+      <div class="cv h260"><canvas id="cInbox"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-h"><h4>Core entity importance</h4></div>
+      <p class="card-sub">Product, Offer, and Purchase form the spine.</p>
+      <div class="cv h260"><canvas id="cEntities"></canvas></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-h"><h4>Module scope by phase</h4><span class="tag n">9 modules</span></div>
+    <p class="card-sub">Every module maps to a stage on the causal chain.</p>
+    <div class="tbl-wrap" style="border:none">
+      <table>
+        <thead><tr><th>Module</th><th>Chain stage</th><th>Core functions</th><th>Phase</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Quotation Inbox</strong></td><td class="mono">02 extract</td><td>Upload PDF / image / spreadsheet · forward email · extract line items, VAT, delivery, terms, expiry · version compare</td><td><span class="tag">P1</span></td></tr>
+          <tr><td><strong>Business Catalogue</strong></td><td class="mono">03 identity</td><td>Normalised product master · family, variant, brand · GTIN/SKU · unit, pack size, normalised quantity · substitutes</td><td><span class="tag">P1</span></td></tr>
+          <tr><td><strong>Smart Compare</strong></td><td class="mono">05 cost</td><td>Displayed vs. unit vs. total landed cost · VAT, delivery, lead time, terms · reliability · match confidence · last paid</td><td><span class="tag">P1</span></td></tr>
+          <tr><td><strong>Spend &amp; Savings Dashboard</strong></td><td class="mono">08 verify</td><td>Monitored spend · potential and realised saving · avoided increases · emergency count · concentration · variance</td><td><span class="tag">P1</span></td></tr>
+          <tr><td><strong>Supplier Hub</strong></td><td class="mono">06 recommend</td><td>Profile · price history · lead time · fulfilment rate · terms · MOV · delivery fee · quality incidents · risk score</td><td><span class="tag b">P2</span></td></tr>
+          <tr><td><strong>Basket Optimiser</strong></td><td class="mono">06 recommend</td><td>One-supplier vs. split · delivery thresholds · MOVs · quantity discounts · urgency · preference · risk tolerance</td><td><span class="tag b">P2</span></td></tr>
+          <tr><td><strong>Requests &amp; Approvals</strong></td><td class="mono">07 execute</td><td>Create request · branch and cost centre · budget check · approval routing · thresholds · exceptions · audit log</td><td><span class="tag b">P2</span></td></tr>
+          <tr><td><strong>Stock &amp; Reorder Signals</strong></td><td class="mono">01 capture</td><td>Manual / CSV / POS / inventory / ERP inputs → reorder point, safety stock, order date and quantity, risk flags</td><td><span class="tag p">P3</span></td></tr>
+          <tr><td><strong>Reports &amp; Integrations</strong></td><td class="mono">cross-cutting</td><td>Excel / PDF export · scheduled reports · accounting, POS, ERP, inventory · supplier and partner API · digests · webhooks</td><td><span class="tag p">P3</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════ 09 AI ══════════════════ -->
+<section id="ai" class="reveal">
+  <div class="divider"></div>
+  <div class="sec-head">
+    <div>
+      <span class="sec-num">09 — AI CAPABILITIES</span>
+      <h3>Build order is not preference — it is dependency</h3>
+      <p>AI is embedded in the data and decision flow, not added as a decorative chatbot. Nothing downstream is trustworthy without resolved product identity.</p>
+    </div>
+  </div>
+
+  <div class="grid g2" style="margin-bottom:16px">
+    <div class="card">
+      <div class="card-h"><h4>AI capability priority vs. build phase</h4><span class="tag b">Priority score</span></div>
+      <p class="card-sub">Bars show priority; colour shows the phase in which each capability ships.</p>
+      <div class="cv h360"><canvas id="cAiPri"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-h"><h4>Matching pipeline — layered, cheapest signal first</h4><span class="tag">Phase 1</span></div>
+      <p class="card-sub">Human review is a permanent component, not a temporary crutch. The target is to shrink the review band, never remove the safety net.</p>
+      <div class="flow">
+        <div class="fnode"><div class="fi">1</div><div><strong>Deterministic keys</strong> <span>· GTIN/EAN/UPC, supplier SKU, confirmed alias</span></div></div>
+        <div class="farrow"></div>
+        <div class="fnode"><div class="fi">2</div><div><strong>Lexical candidates</strong> <span>· pg_trgm similarity</span></div></div>
+        <div class="farrow"></div>
+        <div class="fnode"><div class="fi">3</div><div><strong>Semantic candidates</strong> <span>· pgvector embeddings</span></div></div>
+        <div class="farrow"></div>
+        <div class="fnode"><div class="fi">4</div><div><strong>Feature scoring</strong> <span>· brand, variant, pack, unit, price plausibility</span></div></div>
+        <div class="farrow"></div>
+        <div class="fnode"><div class="fi">5</div><div><strong>Calibrated confidence</strong> <span>· auto-accept / review band / auto-reject</span></div></div>
+        <div class="farrow"></div>
+        <div class="fnode gate"><div class="fi">6</div><div><strong>Feedback loop</strong> <span>· every human decision writes an alias + label</span></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid g3" style="margin-bottom:16px">
+    <div class="card">
+      <div class="card-h"><h4>Extraction accuracy trajectory</h4><span class="tag">vs. review band</span></div>
+      <p class="card-sub">Months after a tenant onboards, not programme months. Accuracy rises as the human review band shrinks — the core operational leverage.</p>
+      <div class="cv h290"><canvas id="cAccuracy"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-h"><h4>Landed-cost formula</h4><span class="tag y">Deterministic</span></div>
+      <p class="card-sub">A versioned, replayable pure function — not a model.</p>
+      <div class="callout" style="margin-bottom:14px">
+        <span class="mono">item cost + VAT + delivery + payment fees − discounts − cashback</span>
+      </div>
+      <p class="card-sub" style="margin-bottom:10px">Modified by:</p>
+      <div class="pills">
+        <span class="pill">Minimum order</span><span class="pill">Quantity tier</span><span class="pill">Free-delivery threshold</span>
+        <span class="pill">Lead time</span><span class="pill">Payment terms</span><span class="pill">Reliability</span><span class="pill">Return policy</span>
+      </div>
+      <div class="callout warn" style="margin-top:16px">
+        Stored with <span class="mono">ruleset_version</span> so historical recommendations remain reproducible when rules change.
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-h"><h4>Every AI output must carry</h4><span class="tag r">Non-negotiable</span></div>
+      <p class="card-sub">These are schema requirements, not UI decoration.</p>
+      <div class="ilist">
+        <div class="item"><div class="inum">1</div><p><strong>Source data</strong> — linked records, not prose references</p></div>
+        <div class="item"><div class="inum">2</div><p><strong>Calculation</strong> — visible and reproducible</p></div>
+        <div class="item"><div class="inum">3</div><p><strong>Confidence</strong> — calibrated, not decorative</p></div>
+        <div class="item"><div class="inum">4</div><p><strong>Risk</strong> — what could make this wrong</p></div>
+        <div class="item"><div class="inum">5</div><p><strong>Validity period</strong> — when this stops being true</p></div>
+        <div class="item"><div class="inum">6</div><p><strong>Correction path</strong> — override is learned from</p></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-h"><h4>Evaluation harness — built in Phase 0, enforced from Phase 1</h4><span class="tag r">CI gate</span></div>
+    <p class="card-sub">Any model, prompt, or threshold change runs the eval suite. A precision regression blocks merge.</p>
+    <div class="grid g4" style="gap:12px">
+      <div class="scr"><div class="s-i">DATASETS</div><h5>Versioned benchmarks</h5><p>Extraction set + matching set, grown continuously from review-queue corrections.</p></div>
+      <div class="scr"><div class="s-i">EXTRACTION</div><h5>Field accuracy</h5><p>Field-level accuracy, document exact match, arithmetic-validation pass rate.</p></div>
+      <div class="scr"><div class="s-i">MATCHING</div><h5>Precision @ threshold</h5><p>Precision at auto-accept, recall, review-band size, alias hit rate over time.</p></div>
+      <div class="scr"><div class="s-i">CALIBRATION</div><h5>Expected calibration error</h5><p>Confidence must mean what it claims, or thresholds are meaningless.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════ 10 DATA ══════════════════ -->
+<section id="data" class="reveal">
+  <div class="divider"></div>
+  <div class="sec-head">
+    <div>
+      <span class="sec-num">10 — DATA &amp; QUALITY</span>
+      <h3>Trust is the product</h3>
+      <p>A wrong match produces a <em>fabricated</em> saving — worse than no saving at all. Data quality is therefore a permanent workstream, not a phase.</p>
+    </div>
+  </div>
+
+  <div class="grid g23" style="margin-bottom:16px">
+    <div class="card">
+      <div class="card-h"><h4>Expected data-quality maturity</h4><span class="tag">Match accuracy vs. field completeness</span></div>
+      <p class="card-sub">Months after a tenant onboards, not programme months. Month-1 accuracy of 72% means roughly 1 in 4 comparisons is wrong. This is precisely why Phase 0 value must come from human-verified concierge output, not autonomous AI.</p>
+      <div class="cv h320"><canvas id="cQuality"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-h"><h4>Cold-start tension</h4><span class="tag r">Key risk</span></div>
+      <div class="callout risk">
+        <strong>Pricing promises month-1 ROI.</strong> Accuracy assumptions say 72% match / 65% completeness in month 1.
+        These cannot both be true autonomously.
+      </div>
+      <div class="callout" style="margin-top:12px">
+        <strong>Resolution.</strong> Month-1 value comes from concierge output with human verification. The review /
+        exception queue is therefore a <strong>first-class product surface</strong> in the MVP — arguably more important
+        than the executive dashboard.
+      </div>
+      <div class="blist" style="margin-top:18px">
+        <div class="brow"><div class="b-top"><span>Review band shrink target</span><span>8% → 3%</span></div><div class="btrack"><div class="bfill" data-w="62" style="background:var(--accent)"></div></div></div>
+        <div class="brow"><div class="b-top"><span>Alias hit rate growth</span><span>compounding</span></div><div class="btrack"><div class="bfill" data-w="84" style="background:var(--accent-2)"></div></div></div>
+        <div class="brow"><div class="b-top"><span>Arithmetic validation coverage</span><span>100% of lines</span></div><div class="btrack"><div class="bfill" data-w="100" style="background:var(--accent-3)"></div></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid g2">
+    <div class="card">
+      <div class="card-h"><h4>Domain model — implementation view</h4><span class="tag n">15 of 29 shown</span></div>
+      <p class="card-sub"><strong>SavingRecord</strong> closes a gap in the source context: verified savings is the north-star metric but had no entity. It is a Phase 1 requirement, not a reporting afterthought.</p>
+      <div class="tbl-wrap" style="border:none;max-height:340px;overflow-y:auto">
+        <table>
+          <thead><tr><th>Entity</th><th>Implementation note</th></tr></thead>
+          <tbody>
+            <tr><td><strong>CanonicalProduct</strong></td><td>Shared global spine — brand, variant, GTIN normalised</td></tr>
+            <tr><td><strong>TenantProduct</strong></td><td>Per-tenant overlay: naming, preferences, substitutes</td></tr>
+            <tr><td><strong>ProductAlias</strong></td><td>Learned supplier text → product. Primary matching accelerator</td></tr>
+            <tr><td><strong>PackDefinition</strong></td><td><span class="mono">pack_count × unit_size → normalised_quantity</span></td></tr>
+            <tr><td><strong>Document</strong></td><td>Immutable. Hash, source channel, storage URI, MIME</td></tr>
+            <tr><td><strong>QuotationLine</strong></td><td>Retains original text beside resolved values</td></tr>
+            <tr><td><strong>SupplierOffer</strong></td><td>Bitemporal: <span class="mono">valid_from · valid_to · recorded_at</span></td></tr>
+            <tr><td><strong>PriceObservation</strong></td><td>Append-only price fact. Feeds history, drift, anomalies</td></tr>
+            <tr><td><strong>LandedCostComputation</strong></td><td>Inputs + <span class="mono">ruleset_version</span> for replay</td></tr>
+            <tr><td><strong>MatchDecision</strong></td><td>Candidates, scores, method, model version, threshold, reviewer</td></tr>
+            <tr><td><strong>ReviewTask</strong></td><td>State machine with SLA tracking</td></tr>
+            <tr><td><strong>Recommendation</strong></td><td>Evidence refs, calculation, confidence, risk, validity</td></tr>
+            <tr><td><strong>RecommendationOutcome</strong></td><td>Actioned / ignored / modified — the model feedback signal</td></tr>
+            <tr><td><strong>SavingRecord</strong></td><td><strong>Immutable once verified.</strong> Baseline policy, baseline, actual, delta, evidence</td></tr>
+            <tr><td><strong>AuditEvent</strong></td><td>Append-only. Actor, action, entity, before/after, timestamp</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-h"><h4>Architectural principles</h4><span class="tag b">8 rules</span></div>
+      <div class="ilist">
+        <div class="item"><div class="inum">1</div><p><strong>Modular monolith first.</strong> Extract the extraction worker and optimiser only when scale demands it.</p></div>
+        <div class="item"><div class="inum">2</div><p><strong>Normalisation is pure, versioned, replayable.</strong> Store inputs plus rule version.</p></div>
+        <div class="item"><div class="inum">3</div><p><strong>Confidence and provenance are columns</strong>, not metadata blobs.</p></div>
+        <div class="item"><div class="inum">4</div><p><strong>Bitemporal price data.</strong> Defensible savings requires "what did we know, and when?"</p></div>
+        <div class="item"><div class="inum">5</div><p><strong>Outcomes are event-sourced.</strong> Mutable rows destroy the audit trail.</p></div>
+        <div class="item"><div class="inum">6</div><p><strong>Canonical spine + tenant overlay.</strong> Enables future benchmarking without data leakage.</p></div>
+        <div class="item"><div class="inum">7</div><p><strong>Human-in-the-loop is architectural.</strong> Review queue has its own state machine and metrics.</p></div>
+        <div class="item"><div class="inum">8</div><p><strong>Multi-currency, multi-tax, bilingual from the schema up.</strong> Retrofitting is disproportionately expensive.</p></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════ 11 ARCH ══════════════════ -->
+<section id="arch" class="reveal">
+  <div class="divider"></div>
+  <div class="sec-head">
+    <div>
+      <span class="sec-num">11 — ARCHITECTURE</span>
+      <h3>Seven layers, one deployable core</h3>
+      <p>A distributed system at Phase 1 is self-inflicted cost. Strict internal module boundaries make later extraction cheap.</p>
+    </div>
+  </div>
+
+  <div class="grid g32" style="margin-bottom:16px">
+    <div class="card">
+      <div class="card-h"><h4>System layers</h4><span class="tag">Hover a layer</span></div>
+      <div class="arch">
+        <div class="layer" style="--lc:var(--accent-5)">
+          <div class="l-name">Experience</div>
+          <div class="pills"><span class="pill">Web console (Angular)</span><span class="pill">Mobile app (Flutter)</span><span class="pill">Email digests</span><span class="pill">Scheduled reports</span><span class="pill">Partner API</span></div>
+        </div>
+        <div class="layer" style="--lc:var(--accent-2)">
+          <div class="l-name">API gateway / BFF</div>
+          <div class="pills"><span class="pill">Nginx reverse proxy</span><span class="pill">Auth</span><span class="pill">Rate limiting</span><span class="pill">Tenant resolution</span><span class="pill">Request validation</span><span class="pill">Idempotency</span></div>
+        </div>
+        <div class="layer" style="--lc:var(--accent)">
+          <div class="l-name">Business services</div>
+          <div class="pills"><span class="pill">Catalogue</span><span class="pill">Supplier</span><span class="pill">Quotation</span><span class="pill">Offer</span><span class="pill">Request</span><span class="pill">Approval</span><span class="pill">Order</span><span class="pill">Savings ledger</span><span class="pill">Alert</span><span class="pill">Report</span><span class="pill">Subscription</span></div>
+        </div>
+        <div class="layer" style="--lc:var(--accent-3)">
+          <div class="l-name">Decision engine</div>
+          <div class="pills"><span class="pill">Landed-cost engine</span><span class="pill">Basket optimiser (OR-Tools)</span><span class="pill">Policy engine</span><span class="pill">Recommendation scorer</span><span class="pill">Supplier-risk scorer</span><span class="pill">Forecast service (P4)</span></div>
+        </div>
+        <div class="layer" style="--lc:var(--accent-6)">
+          <div class="l-name">AI / data layer</div>
+          <div class="pills"><span class="pill">Bedrock/Azure document AI</span><span class="pill">Entity resolution</span><span class="pill">Unit normaliser</span><span class="pill">Embeddings + vector search</span><span class="pill">Confidence calibration</span><span class="pill">Anomaly detection</span></div>
+        </div>
+        <div class="layer" style="--lc:var(--accent-4)">
+          <div class="l-name">Ingestion</div>
+          <div class="pills"><span class="pill">File upload</span><span class="pill">Email forwarding</span><span class="pill">API connectors</span><span class="pill">Schedulers</span><span class="pill">Validation queue</span><span class="pill">Human review queue</span></div>
+        </div>
+        <div class="layer" style="--lc:var(--text-3)">
+          <div class="l-name">Data</div>
+          <div class="pills"><span class="pill">Supabase Postgres + pgvector</span><span class="pill">Object storage</span><span class="pill">Redis</span><span class="pill">Event log</span><span class="pill">Audit log</span><span class="pill">Analytics store</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-h"><h4>Stack</h4><span class="tag b">Recommended</span></div>
+      <div class="tbl-wrap" style="border:none;max-height:520px;overflow-y:auto">
+        <table>
+          <thead><tr><th>Layer</th><th>Choice</th></tr></thead>
+          <tbody>
+            <tr><td>Web</td><td><strong>Angular 19</strong> + TypeScript</td></tr>
+            <tr><td>UI</td><td>Angular Material · Angular CDK · SCSS · Material Icons</td></tr>
+            <tr><td>Data / tables</td><td>RxJS · Angular HttpClient · Angular Material Table · ng2-charts</td></tr>
+            <tr><td>Forms</td><td>Angular Reactive Forms + Zod</td></tr>
+            <tr><td>Mobile</td><td><strong>Flutter</strong> (Dart, iOS + Android)</td></tr>
+            <tr><td>Backend</td><td><strong>Python 3.12 + FastAPI 0.115.6 + Uvicorn 0.34.0</strong></td></tr>
+            <tr><td>Validation</td><td>Pydantic v2 + pydantic-settings + Zod</td></tr>
+            <tr><td>Auth / HTTP</td><td>python-jose + httpx + SlowAPI</td></tr>
+            <tr><td>DB client</td><td>supabase-py 2.11.0</td></tr>
+            <tr><td>Migrations</td><td>Versioned SQL files + Supabase CLI</td></tr>
+            <tr><td>Database</td><td><strong>Supabase Postgres 17</strong> + pgvector + pg_trgm</td></tr>
+            <tr><td>Storage</td><td>Supabase Storage (S3-compatible)</td></tr>
+            <tr><td>Queue / cache</td><td>Redis · Celery (or ARQ)</td></tr>
+            <tr><td>Orchestration</td><td>Temporal (P3+, if needed)</td></tr>
+            <tr><td>Document AI</td><td>AWS Bedrock (Claude 3 Haiku) primary + Azure Document Intelligence fallback</td></tr>
+            <tr><td>Optimisation</td><td><strong>OR-Tools</strong> CP-SAT / MIP</td></tr>
+            <tr><td>Auth</td><td><strong>Supabase Auth</strong></td></tr>
+            <tr><td>Payments</td><td>Stripe</td></tr>
+            <tr><td>Reverse proxy</td><td>Nginx (SPA fallback + /api/ proxy)</td></tr>
+            <tr><td>Telemetry</td><td>PostHog · Sentry</td></tr>
+            <tr><td>Monorepo</td><td>Turborepo + pnpm · uv</td></tr>
+            <tr><td>CI/CD</td><td>GitHub Actions · Docker Buildx · GHCR · BunnyWay/container-update-image</td></tr>
+            <tr><td>Hosting</td><td><strong>Web FE + Backend runtime + Mobile build</strong> on bunny.net Magic Containers; shared namespace, <code>BACKEND_HOST=localhost</code></td></tr>
+            <tr><td>IaC</td><td>Terraform</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout" style="margin-top:14px">
+        <strong>Self-managed alternative.</strong> Supabase is the Phase 1 platform. A future move to self-managed Postgres +
+        custom Auth/Storage remains available if residency, scale, or pricing require it.
+      </div>
+    </div>
+  </div>
+
+  <div class="grid g2">
+    <div class="card">
+      <div class="card-h"><h4>Security &amp; compliance plan</h4><span class="tag r">Financial data</span></div>
+      <div class="tbl-wrap" style="border:none">
+        <table>
+          <thead><tr><th>Area</th><th>Control</th><th>Phase</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Authentication</strong></td><td>Supabase Auth · MFA · session revocation</td><td class="mono">P1</td></tr>
+            <tr><td><strong>Tenant isolation</strong></td><td><span class="mono">tenant_id</span> everywhere + row-level security</td><td class="mono">P1</td></tr>
+            <tr><td><strong>Authorisation</strong></td><td>RBAC, deny by default, per-endpoint checks</td><td class="mono">P1</td></tr>
+            <tr><td><strong>Rate limiting</strong></td><td>SlowAPI per-endpoint limits</td><td class="mono">P1</td></tr>
+            <tr><td><strong>CORS</strong></td><td>Configurable origin allowlist via env</td><td class="mono">P1</td></tr>
+            <tr><td><strong>Encryption</strong></td><td>TLS 1.3 in transit · AES-256 at rest</td><td class="mono">P1</td></tr>
+            <tr><td><strong>Nginx hardening</strong></td><td>CSP · HSTS · X-Frame-Options · X-Content-Type-Options</td><td class="mono">P1</td></tr>
+            <tr><td><strong>Audit logging</strong></td><td>Append-only on every mutation, exportable</td><td class="mono">P1</td></tr>
+            <tr><td><strong>AI data handling</strong></td><td>No third-party training on customer data · zero-retention endpoints · sub-processor list</td><td class="mono">P1</td></tr>
+            <tr><td><strong>GDPR posture</strong></td><td>DPA, processing register, SAR/deletion workflows, residency</td><td class="mono">P1–P2</td></tr>
+            <tr><td><strong>Backups</strong></td><td>Daily automated, tested restore, documented RPO/RTO</td><td class="mono">P1</td></tr>
+            <tr><td><strong>Penetration test</strong></td><td>Third-party before general availability</td><td class="mono">End P2</td></tr>
+            <tr><td><strong>SOC 2 readiness</strong></td><td>Policy set + evidence collection when demand appears</td><td class="mono">P3</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-h"><h4>API design standards</h4><span class="tag b">OpenAPI 3.1</span></div>
+      <div class="ilist">
+        <div class="item"><div class="inum">1</div><p><strong>Tenant scoping server-side</strong> from the token — never from a client parameter.</p></div>
+        <div class="item"><div class="inum">2</div><p><strong>Idempotency keys</strong> on all mutations — critical for mobile retries on poor connectivity.</p></div>
+        <div class="item"><div class="inum">3</div><p><strong>Cursor pagination</strong> on all collections, with a capped limit.</p></div>
+        <div class="item"><div class="inum">4</div><p><strong>Async ops return a job resource</strong> with polling and webhook completion.</p></div>
+        <div class="item"><div class="inum">5</div><p><strong>Derived values carry</strong> <span class="mono">confidence · computed_at · ruleset_version</span>.</p></div>
+        <div class="item"><div class="inum">6</div><p><strong>Types generated from the spec</strong> and shared by web and mobile.</p></div>
+      </div>
+      <div class="callout" style="margin-top:16px">
+        <strong>Fast-start alternative:</strong> Supabase (Postgres + Auth + Storage) for Phase 1 materially reduces
+        initial infrastructure work, with a clear path to self-managed Postgres later.
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════ 12 WEB ══════════════════ -->
+<section id="web" class="reveal">
+  <div class="divider"></div>
+  <div class="sec-head">
+    <div>
+      <span class="sec-num">12 — WEB APPLICATION</span>
+      <h3>Web first, desktop-optimised</h3>
+      <p>Phase 1 jobs — uploading documents, resolving matches, comparing offers — are dense keyboard-and-screen tasks. Mobile arrives when mobile-native jobs exist.</p>
+    </div>
+  </div>
+
+  <div class="grid g23" style="margin-bottom:16px">
+    <div class="card">
+      <div class="card-h"><h4>Phase 1 web sprint plan — 15 sprints</h4><span class="tag">M3 → M9</span></div>
+      <p class="card-sub">Hover a bar for the sprint deliverable. Extraction review and match resolution are the highest-value engineering weeks in the entire MVP.</p>
+      <div class="cv h420"><canvas id="cWebSprints"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-h"><h4>Design principles</h4><span class="tag b">6 rules</span></div>
+      <div class="ilist">
+        <div class="item"><div class="inum">1</div><p><strong>Action-first layout.</strong> Answer "what should I do next?" before "what happened?"</p></div>
+        <div class="item"><div class="inum">2</div><p><strong>Evidence one click away.</strong> Any number expands to its calculation and source document.</p></div>
+        <div class="item"><div class="inum">3</div><p><strong>Confidence visible.</strong> Low-confidence values are visually distinct and inline-correctable.</p></div>
+        <div class="item"><div class="inum">4</div><p><strong>Density where experts work.</strong> Grids and queues dense and keyboard-navigable; dashboards calm.</p></div>
+        <div class="item"><div class="inum">5</div><p><strong>Bilingual + RTL from the first component.</strong> No hard-coded left/right spacing.</p></div>
+        <div class="item"><div class="inum">6</div><p><strong>WCAG 2.1 AA baseline.</strong> Contrast, focus order, keyboard operability, labels.</p></div>
+      </div>
+      <div class="blist" style="margin-top:18px">
+        <div class="brow"><div class="b-top"><span>Dashboard FCP</span><span>&lt; 1.5 s</span></div><div class="btrack"><div class="bfill" data-w="88" style="background:var(--accent)"></div></div></div>
+        <div class="brow"><div class="b-top"><span>Compare grid recalculation</span><span>&lt; 150 ms</span></div><div class="btrack"><div class="bfill" data-w="94" style="background:var(--accent-2)"></div></div></div>
+        <div class="brow"><div class="b-top"><span>Extraction turnaround p95</span><span>&lt; 45 s</span></div><div class="btrack"><div class="bfill" data-w="72" style="background:var(--accent-3)"></div></div></div>
+        <div class="brow"><div class="b-top"><span>Uptime target (P1 → P3)</span><span>99.5% → 99.9%</span></div><div class="btrack"><div class="bfill" data-w="99" style="background:var(--accent-5)"></div></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:16px">
+    <div class="card-h"><h4>Screen specifications — Phase 1 priority order</h4><span class="tag">7 core screens</span></div>
+    <p class="card-sub">Ordered by engineering value, not by navigation order.</p>
+    <div class="screens">
+      <div class="scr"><div class="s-i">01 · HIGHEST VALUE</div><h5>Quotation Inbox + Extraction Review</h5><p>Document left, fields right. Field-level confidence badges, click-to-highlight source region, keyboard flow through low-confidence fields only, version compare on re-quote.</p></div>
+      <div class="scr"><div class="s-i">02</div><h5>Match Resolution</h5><p>Candidates with score <em>and reason</em>. Explicit vocabulary: same product · different pack · different variant · compatible alternative · no match. One decision creates a reusable alias.</p></div>
+      <div class="scr"><div class="s-i">03</div><h5>Smart Compare</h5><p>Landed cost per supplier with live quantity recalculation across thresholds, tiers, and MOVs. Context columns: last paid, 6-month average, best historical.</p></div>
+      <div class="scr"><div class="s-i">04</div><h5>Product Intelligence</h5><p>Best landed cost, last paid, average paid, 30-day change, price-history chart with annotated purchase events, preferred supplier and approved alternatives.</p></div>
+      <div class="scr"><div class="s-i">05</div><h5>Savings Ledger</h5><p>Baseline policy used, baseline value, actual value, delta, verification status. Evidence drawer with source quotation, competing offers, purchase record, calculation.</p></div>
+      <div class="scr"><div class="s-i">06</div><h5>Dashboard</h5><p>Actions required first, then savings opportunities, then realised savings. Every tile links to a filtered actionable list — no dead-end metrics.</p></div>
+      <div class="scr"><div class="s-i">07</div><h5>Catalogue &amp; Supplier Hub</h5><p>CSV import with validation and mapping step. Pack normalisation shown explicitly (<span class="mono">6 × 5L = 30L</span>). Supplier terms, MOV, reliability, incidents.</p></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-h"><h4>Route map</h4><span class="tag n">Information architecture</span></div>
+    <div class="pills">
+      <span class="pill mono">/</span><span class="pill mono">/inbox</span><span class="pill mono">/quotations</span>
+      <span class="pill mono">/quotations/[id]</span><span class="pill mono">/review</span><span class="pill mono">/products</span>
+      <span class="pill mono">/products/[id]</span><span class="pill mono">/compare</span><span class="pill mono">/baskets/[id]</span>
+      <span class="pill mono">/suppliers</span><span class="pill mono">/suppliers/[id]</span><span class="pill mono">/savings</span>
+      <span class="pill mono">/reports</span><span class="pill mono">/requests · P2</span><span class="pill mono">/requests/[id] · P2</span><span class="pill mono">/approvals · P2</span>
+      <span class="pill mono">/settings/organisation · P2</span><span class="pill mono">/settings/policies · P2</span>
+      <span class="pill mono">/settings/team</span><span class="pill mono">/settings/integrations · P3</span><span class="pill mono">/settings/billing</span>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════ 13 MOBILE ══════════════════ -->
+<section id="mobile" class="reveal">
+  <div class="divider"></div>
+  <div class="sec-head">
+    <div>
+      <span class="sec-num">13 — MOBILE APPLICATION</span>
+      <h3>Three jobs, not feature parity</h3>
+      <p>Mobile is not a shrunken web console. It serves three jobs that happen away from a desk — and resisting parity is the main design discipline.</p>
+    </div>
+  </div>
+
+  <div class="grid g3" style="margin-bottom:16px">
+    <div class="card">
+      <div class="card-h"><h4>Request</h4><span class="tag p">Branch manager</span></div>
+      <p class="card-sub">A manager standing in front of an empty shelf.</p>
+      <div class="pills"><span class="pill">Catalogue search</span><span class="pill">Recent items</span><span class="pill">Quantity stepper</span><span class="pill">Required-by date</span><span class="pill">Barcode scan</span><span class="pill">Shelf photo</span><span class="pill">Low-stock report</span></div>
+    </div>
+    <div class="card">
+      <div class="card-h"><h4>Approve</h4><span class="tag p">Owner / GM</span></div>
+      <p class="card-sub">A decision in under 30 seconds, with enough evidence to be confident.</p>
+      <div class="pills"><span class="pill">Amount + branch</span><span class="pill">Budget impact</span><span class="pill">Recommended supplier</span><span class="pill">Expected saving</span><span class="pill">Policy exceptions</span><span class="pill">Landed-cost summary</span><span class="pill">One-tap decision</span></div>
+    </div>
+    <div class="card">
+      <div class="card-h"><h4>Confirm</h4><span class="tag p">Branch manager</span></div>
+      <p class="card-sub">Receipt, shortage, or quality problem at the point of delivery.</p>
+      <div class="pills"><span class="pill">Confirm quantities</span><span class="pill">Flag shortage</span><span class="pill">Damage photo</span><span class="pill">Quality rating</span><span class="pill">Feeds supplier score</span></div>
+    </div>
+  </div>
+
+  <div class="grid g23" style="margin-bottom:16px">
+    <div class="card">
+      <div class="card-h"><h4>Mobile sprint plan — 8 sprints</h4><span class="tag p">M11 → M15</span></div>
+      <p class="card-sub">Store review timelines add 2–3 weeks of buffer at the end of the sequence.</p>
+      <div class="cv h360"><canvas id="cMobSprints"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-h"><h4>Technical requirements</h4><span class="tag b">Flutter</span></div>
+      <div class="tbl-wrap" style="border:none;max-height:400px;overflow-y:auto">
+        <table>
+          <thead><tr><th>Requirement</th><th>Approach</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Offline tolerance</strong></td><td>Local drafts (MMKV/SQLite); queue mutations, replay with idempotency keys</td></tr>
+            <tr><td><strong>Poor network</strong></td><td>Tight timeouts, retry with backoff, optimistic UI with pending state</td></tr>
+            <tr><td><strong>Images</strong></td><td>Client-side compression, presigned direct-to-storage, background upload</td></tr>
+            <tr><td><strong>Push</strong></td><td>Categories for approvals, urgent alerts, delivery due · deep links</td></tr>
+            <tr><td><strong>Auth</strong></td><td>Short-lived access + refresh · biometric gate · remote revocation</td></tr>
+            <tr><td><strong>Localisation</strong></td><td>Shared i18n catalogue with web · full RTL on both platforms</td></tr>
+            <tr><td><strong>Accessibility</strong></td><td>44 pt touch targets, dynamic type, screen-reader labels</td></tr>
+            <tr><td><strong>App size</strong></td><td>Target &lt; 30 MB</td></tr>
+            <tr><td><strong>Cold start</strong></td><td>&lt; 2.5 s on mid-range Android</td></tr>
+            <tr><td><strong>Distribution</strong></td><td>TestFlight + Play internal testing → staged public release</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid g2">
+    <div class="card">
+      <div class="card-h"><h4>Screen set</h4><span class="tag">11 screens</span></div>
+      <div class="pills">
+        <span class="pill">Login / biometric unlock</span><span class="pill">Role-aware home</span><span class="pill">Quick request</span>
+        <span class="pill">Scan / photo capture</span><span class="pill">Low-stock report</span><span class="pill">My requests</span>
+        <span class="pill">Approval queue</span><span class="pill">Approval detail</span><span class="pill">Delivery confirmation</span>
+        <span class="pill">Alerts</span><span class="pill">Settings (lang / notifications / branch)</span>
+      </div>
+      <div class="callout" style="margin-top:18px">
+        <strong>Why Flutter.</strong> Single Dart codebase for iOS and Android from one team · native UI performance ·
+        store-distributed releases · shared domain contracts via OpenAPI-generated Dart types.
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-h"><h4>Deliberately out of scope</h4><span class="tag r">Charter</span></div>
+      <p class="card-sub">These are desk tasks. Putting them on mobile would degrade both platforms.</p>
+      <div class="pills">
+        <span class="pill">Extraction review</span><span class="pill">Match resolution</span><span class="pill">Catalogue administration</span>
+        <span class="pill">Basket optimiser config</span><span class="pill">Report builders</span><span class="pill">Integration setup</span>
+        <span class="pill">Billing</span>
+      </div>
+      <div class="callout risk" style="margin-top:18px">
+        <strong>Risk #12 — mobile scope creep toward parity.</strong> Controlled by a written scope charter and the
+        three-jobs rule enforced in design review.
+      </div>
+    </div>
+  </div>
+</section>
+<!-- ══════════════════ 14 METRICS ══════════════════ -->
+<section id="metrics" class="reveal">
+  <div class="divider"></div>
+  <div class="sec-head">
+    <div>
+      <span class="sec-num">14 — METRICS</span>
+      <h3>One north star, five branches</h3>
+      <p>Verified savings per active business per month. Every other metric exists because it enables that one.</p>
+    </div>
+  </div>
+
+  <div class="grid g2" style="margin-bottom:16px">
+    <div class="card">
+      <div class="card-h"><h4>Metric targets by phase exit</h4><span class="tag b">Toggle series</span></div>
+      <p class="card-sub">Decision quality leads; engagement and commercial outcomes follow. The review band is the only metric that should fall.</p>
+      <div class="cv h360"><canvas id="cTargets"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-h"><h4>Verified value per customer vs. review band</h4><span class="tag">Dual axis</span></div>
+      <p class="card-sub">Value rises as human review shrinks — the two curves are causally linked through data quality.</p>
+      <div class="cv h360"><canvas id="cValueBand"></canvas></div>
+    </div>
+  </div>
+
+  <div class="grid g32" style="margin-bottom:16px">
+    <div class="card">
+      <div class="card-h"><h4>KPI tree</h4><span class="tag">5 branches</span></div>
+      <div class="flow">
+        <div class="fnode gate"><div class="fi">★</div><div><strong>Verified savings per business / month</strong> <span>· north star</span></div></div>
+        <div class="farrow"></div>
+        <div class="fnode"><div class="fi">1</div><div><strong>Value created</strong> <span>· opportunities, actioned, realised, avoidance</span></div></div>
+        <div class="fnode" style="margin-top:6px"><div class="fi">2</div><div><strong>Decision quality</strong> <span>· precision, accuracy, completeness, freshness</span></div></div>
+        <div class="fnode" style="margin-top:6px"><div class="fi">3</div><div><strong>Engagement</strong> <span>· WAB rate, docs/week, users/account, in-platform %</span></div></div>
+        <div class="fnode" style="margin-top:6px"><div class="fi">4</div><div><strong>Operational efficiency</strong> <span>· review load, resolution time, cycle times</span></div></div>
+        <div class="fnode" style="margin-top:6px"><div class="fi">5</div><div><strong>Commercial</strong> <span>· value:fee, NRR, CAC payback, expansion</span></div></div>
+      </div>
+      <div class="callout" style="margin-top:16px">
+        Every recommendation emits <strong>view, action, and outcome events</strong> — this is the model feedback loop,
+        not just analytics.
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-h"><h4>Full metric target table</h4><span class="tag n">Illustrative</span></div>
+      <div class="tbl-wrap" style="border:none">
+        <table>
+          <thead><tr><th>Metric</th><th class="num">P1</th><th class="num">P2</th><th class="num">P3</th><th class="num">P4</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Match precision</strong> (auto-accept)</td><td class="num">92%</td><td class="num">94%</td><td class="num">96%</td><td class="num">97%</td></tr>
+            <tr><td><strong>Extraction field accuracy</strong></td><td class="num">90%</td><td class="num">93%</td><td class="num">95%</td><td class="num">96%</td></tr>
+            <tr><td><strong>Review band</strong> (% to human)</td><td class="num">≤8%</td><td class="num">≤6%</td><td class="num">≤4%</td><td class="num">≤3%</td></tr>
+            <tr><td><strong>Weekly active business rate</strong></td><td class="num">45%</td><td class="num">60%</td><td class="num">65%</td><td class="num">70%</td></tr>
+            <tr><td><strong>Actioned recs / business / mo</strong></td><td class="num">2</td><td class="num">4</td><td class="num">5</td><td class="num">6</td></tr>
+            <tr><td><strong>Verified monthly value</strong></td><td class="num">£180</td><td class="num">£350</td><td class="num">£500</td><td class="num">£700</td></tr>
+            <tr><td><strong>Value-to-fee ratio</strong></td><td class="num">3.0×</td><td class="num">3.4×</td><td class="num">4.0×</td><td class="num">4.5×</td></tr>
+            <tr><td><strong>In-platform purchase origination</strong></td><td class="num">—</td><td class="num">70%</td><td class="num">80%</td><td class="num">85%</td></tr>
+            <tr><td><strong>Emergency-order rate vs. baseline</strong></td><td class="num">—</td><td class="num">−15%</td><td class="num">−25%</td><td class="num">−40%</td></tr>
+            <tr><td><strong>Logo retention</strong> (annualised)</td><td class="num">—</td><td class="num">90%</td><td class="num">92%</td><td class="num">93%</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════ 15 BUSINESS ══════════════════ -->
+<section id="business" class="reveal">
+  <div class="divider"></div>
+  <div class="sec-head">
+    <div>
+      <span class="sec-num">15 — BUSINESS MODEL</span>
+      <h3>Pricing justified by measurable ROI</h3>
+      <p>Four plans, one principle: the customer must be able to name the money saved and see it exceed the fee — 3.0× at MVP exit, rising to 4.5× by Phase 4.</p>
+    </div>
+  </div>
+
+  <div class="grid g4" style="margin-bottom:16px">
+    <div class="card" style="--kc:var(--text-3)">
+      <div class="card-h"><h4>Free</h4><span class="tag n">£0</span></div>
+      <p class="card-sub">1 user · 20 products · 2 suppliers</p>
+      <div class="pills"><span class="pill">Manual uploads</span><span class="pill">Monthly report</span></div>
+    </div>
+    <div class="card">
+      <div class="card-h"><h4>Starter</h4><span class="tag">£39/mo</span></div>
+      <p class="card-sub">100 products · 5 suppliers</p>
+      <div class="pills"><span class="pill">Alerts</span><span class="pill">Basic extraction</span><span class="pill">Savings dashboard</span></div>
+    </div>
+    <div class="card">
+      <div class="card-h"><h4>Team</h4><span class="tag b">£99/mo</span></div>
+      <p class="card-sub">500 products · 10 users</p>
+      <div class="pills"><span class="pill">Approvals</span><span class="pill">Branches</span><span class="pill">Basket optimisation</span></div>
+    </div>
+    <div class="card">
+      <div class="card-h"><h4>Growth</h4><span class="tag p">£249/mo</span></div>
+      <p class="card-sub">2,000 products</p>
+      <div class="pills"><span class="pill">Integrations</span><span class="pill">Advanced AI</span><span class="pill">API</span><span class="pill">Custom policies</span></div>
+    </div>
+  </div>
+
+  <div class="grid g3" style="margin-bottom:16px">
+    <div class="card">
+      <div class="card-h"><h4>Customer value vs. fee</h4><span class="tag">Per plan</span></div>
+      <p class="card-sub">The gap is the sales argument — and the retention argument.</p>
+      <div class="cv h290"><canvas id="cValueFee"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-h"><h4>Unit economics</h4><span class="tag">MRR · cost · margin</span></div>
+      <p class="card-sub">Gross margin improves with plan size as support cost scales sub-linearly.</p>
+      <div class="cv h290"><canvas id="cUnitEcon"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-h"><h4>Revenue mix</h4><span class="tag">Illustrative</span></div>
+      <p class="card-sub">Subscription-dominant, with partner and API upside.</p>
+      <div class="cv h290"><canvas id="cRevMix"></canvas></div>
+    </div>
+  </div>
+
+  <div class="grid g2">
+    <div class="card">
+      <div class="card-h"><h4>Pricing tension — flagged as risk #11</h4><span class="tag r">Revisit at G1</span></div>
+      <div class="callout risk">
+        Plans are gated on <strong>product, supplier, and user counts</strong> — but value is driven by
+        <strong>tracked spend and decision volume</strong>.
+      </div>
+      <div class="ilist" style="margin-top:16px">
+        <div class="item"><div class="inum">A</div><p>A café with 40 SKUs and £30k monthly spend gets large value on Starter.</p></div>
+        <div class="item"><div class="inum">B</div><p>A business with 500 low-value SKUs pays £99 for comparatively little.</p></div>
+        <div class="item"><div class="inum">→</div><p><strong>Action:</strong> revisit plan gating after 10 paying customers; consider tracked spend as the primary dimension.</p></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-h"><h4>Other revenue opportunities</h4><span class="tag n">Post-P2</span></div>
+      <div class="pills">
+        <span class="pill">API fees</span><span class="pill">Integration fees</span><span class="pill">Partner revenue</span>
+        <span class="pill">Premium services</span><span class="pill">White-label licensing</span><span class="pill">Supplier analytics</span>
+        <span class="pill">Referral commission</span><span class="pill">Sponsored placement — labelled, never ranking-affecting</span>
+      </div>
+      <div class="callout warn" style="margin-top:18px">
+        <strong>Cost-control levers:</strong> structured-input fast paths that bypass Bedrock calls · caching by document hash ·
+        tiered model selection · alias hits that avoid inference entirely.
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════ 16 GTM ══════════════════ -->
+<section id="gtm" class="reveal">
+  <div class="divider"></div>
+  <div class="sec-head">
+    <div>
+      <span class="sec-num">16 — GO-TO-MARKET</span>
+      <h3>Lead with a spend review, not a demo</h3>
+      <p>The acquisition offer is a free or low-cost manual spend review that quantifies leakage before any software is involved.</p>
+    </div>
+  </div>
+
+  <div class="grid g3" style="margin-bottom:16px">
+    <div class="card">
+      <div class="card-h"><h4>Acquisition funnel</h4><span class="tag">Per 100 leads</span></div>
+      <p class="card-sub">Lead → spend review → pilot → paid → expanded.</p>
+      <div class="cv h290"><canvas id="cFunnel"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-h"><h4>Channel attractiveness</h4><span class="tag">Score 0–100</span></div>
+      <p class="card-sub">Accountants lead; paid digital is last. Distribution is partner-led, not ad-led.</p>
+      <div class="cv h290"><canvas id="cChannels"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-h"><h4>Spend review deliverable</h4><span class="tag">P0 asset</span></div>
+      <p class="card-sub">Customer provides invoices, quotations, product and supplier lists. They receive:</p>
+      <div class="ilist">
+        <div class="item"><div class="inum">1</div><p>Price leakage quantified</p></div>
+        <div class="item"><div class="inum">2</div><p>Supplier alternatives identified</p></div>
+        <div class="item"><div class="inum">3</div><p>Pack-size issues exposed</p></div>
+        <div class="item"><div class="inum">4</div><p>Emergency-buying patterns</p></div>
+        <div class="item"><div class="inum">5</div><p>Potential savings figure</p></div>
+        <div class="item"><div class="inum">6</div><p>Pilot proposal</p></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-h"><h4>GTM motion by phase</h4><span class="tag b">Founder-led → partner-led</span></div>
+    <div class="tbl-wrap" style="border:none">
+      <table>
+        <thead><tr><th>Phase</th><th>Motion</th><th>Primary asset</th><th>Channel focus</th></tr></thead>
+        <tbody>
+          <tr><td><strong>P0</strong></td><td>Founder-led concierge spend review</td><td>Spend Review Report</td><td>Direct outreach, network, SME communities</td></tr>
+          <tr><td><strong>P1</strong></td><td>Design-partner conversion, self-serve pilot</td><td>Live product + verified savings evidence</td><td>Accountants, SME communities</td></tr>
+          <tr><td><strong>P2</strong></td><td>Repeatable sales with proof cases</td><td>Case studies with verified £ saved</td><td>Accountants, POS partners, wholesalers</td></tr>
+          <tr><td><strong>P3</strong></td><td>Partner-led, integration-marketplace driven</td><td>Integration listings, partner API</td><td>Accounting &amp; POS marketplaces, referrals</td></tr>
+          <tr><td><strong>P4</strong></td><td>Expansion and category widening</td><td>Benchmark insights, predictive value</td><td>Partner channel + targeted outbound</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════ 17 TEAM & RISK ══════════════════ -->
+<section id="team" class="reveal">
+  <div class="divider"></div>
+  <div class="sec-head">
+    <div>
+      <span class="sec-num">17 — TEAM &amp; RISK</span>
+      <h3>Fifteen risks, four with severity 5</h3>
+      <p>Bubble position shows severity against likelihood; size shows exposure. The top-right quadrant is where mitigation effort concentrates.</p>
+    </div>
+  </div>
+
+  <div class="grid g2" style="margin-bottom:16px">
+    <div class="card">
+      <div class="card-h"><h4>Risk matrix — severity × likelihood</h4><span class="tag r">Hover for detail</span></div>
+      <p class="card-sub">Incorrect product matching sits alone in the extreme quadrant: high severity, high likelihood, and it contaminates the north-star metric itself.</p>
+      <div class="cv h420"><canvas id="cRiskMatrix"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-h"><h4>Risk severity ranking</h4><span class="tag">Score 0–100</span></div>
+      <p class="card-sub">Product matching and price freshness lead the register.</p>
+      <div class="cv h420"><canvas id="cRiskSev"></canvas></div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:16px">
+    <div class="card-h"><h4>Risk register</h4><span class="tag n">15 risks · owners assigned</span></div>
+    <div class="tbl-wrap" style="border:none;max-height:460px;overflow-y:auto">
+      <table>
+        <thead><tr><th>#</th><th>Risk</th><th class="num">Sev</th><th class="num">Lik</th><th>Mitigation</th><th>Owner</th></tr></thead>
+        <tbody>
+          <tr><td class="mono">1</td><td><strong>Incorrect product matching</strong> contaminates savings and destroys trust</td><td class="num">5</td><td class="num">4</td><td>Confidence thresholds · permanent human review · GTIN support · alias learning · match audit · CI eval gate</td><td>AI lead</td></tr>
+          <tr><td class="mono">2</td><td><strong>Savings baseline disputed</strong> by customer</td><td class="num">5</td><td class="num">3</td><td>Policy decided in P0 · conservative default · full evidence trail · customer-configurable</td><td>Product</td></tr>
+          <tr><td class="mono">3</td><td><strong>Price data stale or unavailable</strong></td><td class="num">4</td><td class="num">4</td><td>Multiple channels · freshness scoring · explicit timestamps · quotation-first</td><td>Data ops</td></tr>
+          <tr><td class="mono">4</td><td><strong>Customers will not upload documents</strong></td><td class="num">5</td><td class="num">3</td><td>Email forwarding · concierge onboarding · WhatsApp export guidance · do-it-for-them month 1</td><td>Customer success</td></tr>
+          <tr><td class="mono">5</td><td><strong>Over-broad market scope</strong> dilutes product</td><td class="num">4</td><td class="num">3</td><td>Single wedge discipline · out-of-wedge requests logged, not built</td><td>Founder</td></tr>
+          <tr><td class="mono">6</td><td><strong>Insufficient history</strong> makes forecasting weak</td><td class="num">3</td><td class="num">4</td><td>Forecasting deferred to P4 · rules-based interim · uncertainty always shown</td><td>AI lead</td></tr>
+          <tr><td class="mono">7</td><td><strong>Low actionability</strong> — interesting but not payable</td><td class="num">4</td><td class="num">3</td><td>Every insight attached to an executable action with expected value · measure action rate</td><td>Product</td></tr>
+          <tr><td class="mono">8</td><td><strong>Integration burden</strong> slows delivery</td><td class="num">3</td><td class="num">3</td><td>CSV/email first · connector framework · build only on 3+ customer demand</td><td>Eng lead</td></tr>
+          <tr><td class="mono">9</td><td><strong>AI inference cost</strong> erodes gross margin</td><td class="num">3</td><td class="num">3</td><td>Tiered models · hash caching · structured fast paths · per-document cost tracking</td><td>Eng lead</td></tr>
+          <tr><td class="mono">10</td><td><strong>Review-queue ops do not scale</strong></td><td class="num">4</td><td class="num">3</td><td>Alias learning · throughput metrics · queue prioritised by financial impact</td><td>Data ops</td></tr>
+          <tr><td class="mono">11</td><td><strong>Pricing misaligned with value</strong></td><td class="num">3</td><td class="num">4</td><td>Revisit gating after 10 paying customers · consider tracked-spend dimension</td><td>Founder</td></tr>
+          <tr><td class="mono">12</td><td><strong>Mobile scope creep</strong> toward web parity</td><td class="num">3</td><td class="num">3</td><td>Written scope charter · three-jobs rule enforced in review</td><td>Product</td></tr>
+          <tr><td class="mono">13</td><td><strong>Data security incident</strong></td><td class="num">5</td><td class="num">2</td><td>Tenant isolation with RLS · encryption · least privilege · audit logs · pen test · incident runbook</td><td>Eng lead</td></tr>
+          <tr><td class="mono">14</td><td><strong>Key-person dependency</strong> on founder domain knowledge</td><td class="num">3</td><td class="num">4</td><td>ADRs · train analyst · record review methodology</td><td>Founder</td></tr>
+          <tr><td class="mono">15</td><td><strong>Supplier resistance</strong> to being compared</td><td class="num">2</td><td class="num">3</td><td>Buyer-side positioning · no public price publication · no supplier shaming</td><td>Founder</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="grid g2">
+    <div class="card">
+      <div class="card-h"><h4>Role composition by phase</h4><span class="tag">FTE breakdown</span></div>
+      <p class="card-sub">Engineering grows; the analyst and customer-success functions grow alongside it, not after it.</p>
+      <div class="cv h320"><canvas id="cRoles2"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-h"><h4>External dependencies</h4><span class="tag y">Outside our control</span></div>
+      <div class="ilist">
+        <div class="item"><div class="inum">1</div><p><strong>AWS Bedrock / Azure DI</strong> availability, pricing, and data-retention terms</p></div>
+        <div class="item"><div class="inum">2</div><p><strong>Accounting and POS partner</strong> API access and approval processes</p></div>
+        <div class="item"><div class="inum">3</div><p><strong>App Store / Play review</strong> timelines — 2–3 weeks buffer built into P2</p></div>
+        <div class="item"><div class="inum">4</div><p><strong>Payment provider onboarding</strong> in the launch region</p></div>
+        <div class="item"><div class="inum">5</div><p><strong>Legal review</strong> of supplier-data usage and web-sourced pricing in the launch jurisdiction</p></div>
+      </div>
+      <div class="callout warn" style="margin-top:16px">
+        <strong>Never removed:</strong> the procurement / data-operations role. They run the review queue and own data
+        quality — the reason customers trust the output. Treating this as a cost to eliminate would be a strategic error.
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════ 18 DECISIONS ══════════════════ -->
+<section id="decisions" class="reveal">
+  <div class="divider"></div>
+  <div class="sec-head">
+    <div>
+      <span class="sec-num">18 — DECISIONS &amp; NEXT ACTIONS</span>
+      <h3>Eight decisions block Phase 1 engineering</h3>
+      <p>Building the matching and extraction core without a benchmark and a baseline policy means building without a definition of correct.</p>
+    </div>
+  </div>
+
+  <div class="grid g2" style="margin-bottom:16px">
+    <div class="card">
+      <div class="card-h"><h4>Decisions required before engineering begins</h4><span class="tag r">Blocking</span></div>
+      <div class="tbl-wrap" style="border:none">
+        <table>
+          <thead><tr><th>#</th><th>Decision</th><th>Blocks</th><th>By</th></tr></thead>
+          <tbody>
+            <tr><td class="mono">1</td><td><strong>Savings baseline policy</strong> — which baseline, customer-configurable?</td><td>Savings ledger schema · entire value narrative</td><td class="mono">M2</td></tr>
+            <tr><td class="mono">2</td><td><strong>Launch region, currency set, tax model</strong></td><td>Landed-cost engine · all monetary fields</td><td class="mono">M2</td></tr>
+            <tr><td class="mono">3</td><td><strong>Does ordering happen in-platform?</strong></td><td>Whether PurchaseOrder is transactional</td><td class="mono">M2</td></tr>
+            <tr><td class="mono">4</td><td><strong>Is stock owned or mirrored?</strong></td><td>Stock-signal model · inventory-drift risk</td><td class="mono">M2</td></tr>
+            <tr><td class="mono">5</td><td><strong>Auto-accept confidence threshold</strong></td><td>Matching pipeline · review sizing · ops headcount</td><td class="mono">M3</td></tr>
+            <tr><td class="mono">6</td><td><strong>Bilingual scope at launch</strong> — English only or +Arabic?</td><td>Design system · content pipeline · QA effort</td><td class="mono">M2</td></tr>
+            <tr><td class="mono">7</td><td><strong>Build platform</strong> — self-managed Postgres or Supabase?</td><td>Infrastructure work in R1.0</td><td class="mono">M2</td></tr>
+            <tr><td class="mono">8</td><td><strong>WhatsApp ingestion</strong> — direct or file-based?</td><td>Ingestion layer scope</td><td class="mono">M4</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-h"><h4>Immediate next actions</h4><span class="tag">Phase 0</span></div>
+      <div class="tbl-wrap" style="border:none">
+        <table>
+          <thead><tr><th>#</th><th>Action</th><th>Output</th></tr></thead>
+          <tbody>
+            <tr><td class="mono">1</td><td>Recruit the first 5 wedge businesses</td><td>Signed discovery participation</td></tr>
+            <tr><td class="mono">2</td><td>Write and run the customer interview guide</td><td>15 completed interviews</td></tr>
+            <tr><td class="mono">3</td><td>Deliver 3 manual spend reviews</td><td>3 reports with quantified savings</td></tr>
+            <tr><td class="mono">4</td><td><strong>Decide the savings baseline policy</strong></td><td>Signed decision record</td></tr>
+            <tr><td class="mono">5</td><td><strong>Build the product-matching benchmark</strong></td><td>500+ labelled pairs</td></tr>
+            <tr><td class="mono">6</td><td><strong>Build the extraction test dataset</strong></td><td>300+ labelled line items</td></tr>
+            <tr><td class="mono">7</td><td>Write the Phase 1 PRD and domain model</td><td>PRD + ERD + ADR set</td></tr>
+            <tr><td class="mono">8</td><td><strong>Close the eight pre-engineering decisions</strong></td><td>Decision log</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout risk" style="margin-top:16px">
+        <strong>Do not begin Phase 1 engineering until items 4, 5, 6, and 8 are complete.</strong>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid g2">
+    <div class="card">
+      <div class="card-h"><h4>Deliberately unresolved</h4><span class="tag y">Revisit at gates</span></div>
+      <div class="ilist">
+        <div class="item"><div class="inum">G1</div><p>Whether pricing shifts from count-based to spend-based tiers</p></div>
+        <div class="item"><div class="inum">G2</div><p>Which second vertical to expand into</p></div>
+        <div class="item"><div class="inum">G3</div><p>Whether cross-tenant benchmarking becomes a product — requires explicit consent design</p></div>
+        <div class="item"><div class="inum">G3</div><p>Whether in-platform payment facilitation is pursued</p></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-h"><h4>Assumptions underpinning the plan</h4><span class="tag n">To be validated</span></div>
+      <div class="ilist">
+        <div class="item"><div class="inum">1</div><p>Recurring standardised consumables is the correct first wedge</p></div>
+        <div class="item"><div class="inum">2</div><p>SMBs will share invoices and quotations once trust is established</p></div>
+        <div class="item"><div class="inum">3</div><p>≥90% extraction accuracy on priority fields is achievable with Bedrock/Azure Document Intelligence</p></div>
+        <div class="item"><div class="inum">4</div><p>A human review layer is commercially sustainable at the stated price points</p></div>
+        <div class="item"><div class="inum">5</div><p>Accountants are a viable and willing distribution channel</p></div>
+        <div class="item"><div class="inum">6</div><p>Ordering can remain external through Phase 2 without blocking value</p></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div>
+    <strong style="color:var(--text)">ProcurePilot Master Roadmap</strong> · v1.0 · 24-month horizon<br>
+    Derived from <span class="mono">procurepilot_roadmap.md</span> and <span class="mono">procurepilot_ai_context.md</span>
+  </div>
+  <div style="text-align:right">
+    All numeric values are illustrative planning assumptions<br>unless supported by customer research.
+  </div>
+</footer>
+
+</div><!-- /wrap -->
+</main>
+</div>
+
+<script>
+/* ══════════════════════════════════════════════════════════════
+   ProcurePilot Roadmap — visualisation engine
+   ══════════════════════════════════════════════════════════════ */
+const CH = {};                                   // chart registry
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const P = () => ({
+  a:css('--accent'), b:css('--accent-2'), y:css('--accent-3'), r:css('--accent-4'),
+  v:css('--accent-5'), o:css('--accent-6'),
+  txt:css('--text'), txt2:css('--text-2'), txt3:css('--text-3'),
+  grid:css('--grid'), surf:css('--surface'), bord:css('--border')
+});
+const alpha = (hex,a) => {
+  if(hex.startsWith('#')){
+    const h=hex.slice(1), f=h.length===3?h.split('').map(c=>c+c).join(''):h;
+    const n=parseInt(f,16);
+    return `rgba(${(n>>16)&255},${(n>>8)&255},${n&255},${a})`;
+  }
+  return hex;
+};
+
+/* ── global chart defaults ───────────────────────────────────── */
+function setDefaults(){
+  const p=P();
+  Chart.defaults.font.family="'Inter',system-ui,sans-serif";
+  Chart.defaults.font.size=11;
+  Chart.defaults.color=p.txt2;
+  Chart.defaults.borderColor=p.grid;
+  Chart.defaults.maintainAspectRatio=false;
+  Chart.defaults.animation.duration=780;
+  Chart.defaults.animation.easing='easeOutQuart';
+  Chart.defaults.plugins.legend.labels.boxWidth=9;
+  Chart.defaults.plugins.legend.labels.boxHeight=9;
+  Chart.defaults.plugins.legend.labels.usePointStyle=true;
+  Chart.defaults.plugins.legend.labels.pointStyle='circle';
+  Chart.defaults.plugins.legend.labels.padding=13;
+  Chart.defaults.plugins.tooltip.backgroundColor=css('--bg-2');
+  Chart.defaults.plugins.tooltip.titleColor=p.txt;
+  Chart.defaults.plugins.tooltip.bodyColor=p.txt2;
+  Chart.defaults.plugins.tooltip.borderColor=p.bord;
+  Chart.defaults.plugins.tooltip.borderWidth=1;
+  Chart.defaults.plugins.tooltip.padding=11;
+  Chart.defaults.plugins.tooltip.cornerRadius=8;
+  Chart.defaults.plugins.tooltip.displayColors=true;
+  Chart.defaults.plugins.tooltip.boxPadding=4;
+}
+
+/* ── axis helpers ────────────────────────────────────────────── */
+const ax = (opts={}) => {
+  const p=P();
+  return {
+    grid:{color:p.grid,drawTicks:false,...(opts.grid||{})},
+    border:{display:false},
+    ticks:{color:p.txt3,padding:8,font:{size:10.5},...(opts.ticks||{})},
+    ...opts.rest
+  };
+};
+const noGrid = o => ({...ax(o), grid:{display:false}});
+
+/* ══════════════════ DATA ══════════════════ */
+const D = {
+  maturity:[
+    {l:'Validation',        x:20,y:8,  c:12},
+    {l:'Intelligence MVP',  x:48,y:30, c:34},
+    {l:'Team workflow',     x:72,y:55, c:58},
+    {l:'Connected ops',     x:87,y:80, c:78},
+    {l:'Predictive',        x:96,y:95, c:92}
+  ],
+  success:{l:['Trustworthy data','Actionable decisions','Verified ROI','Workflow adoption','Integrations'],v:[95,92,90,80,70]},
+  decisionQ:{l:['Manual','Basic compare','Normalised','AI rec','Closed-loop'],v:[35,52,69,84,94]},
+  capValue:{l:['Price visibility','Supplier competition','Unit normalisation','Basket optimisation','Forecasting','Workflow control'],v:[18,31,46,64,77,89]},
+  adoption:{l:['Month 1','Month 3','Month 6','Month 12'],intel:[2,4,6,8],flow:[0,1,3,6],integ:[0,0,2,5]},
+  mitigation:{l:['Validation','MVP','Phase 2','Phase 3'],data:[25,55,78,92],flow:[10,32,70,90],ops:[15,38,66,88]},
+  diff:{l:['Data quality','Cost clarity','Supplier insight','Forecasting','Workflow','Automation'],sheet:[2,2,1,1,2,1],pp:[9,10,9,8,8,9]},
+  leak:{l:['Poor comparison','Emergency buying','Wrong quantities','Missed discounts','Supplier concentration','Duplicate spend'],v:[27,22,17,14,11,9]},
+  timeStage:{l:['Collect quotes','Compare offers','Approval','Follow-up'],man:[120,75,45,55],pp:[18,12,15,18]},
+  cycle:{l:['Requirement','Quote collection','Evaluation','Approval','Order placement'],before:[40,120,70,45,35],after:[15,20,15,18,20]},
+  sources:{l:['PDF quotations','Email','Excel / CSV','WhatsApp','Marketplaces','Supplier sites','Paper invoices','Phone'],v:[95,88,82,74,68,60,45,30]},
+  segments:{l:['Cleaning & hygiene','Office supplies','Café packaging','Salon consumables','Retail stock','Industrial spares'],v:[92,86,84,76,70,55]},
+  roles:{l:['Need ID','Offer compare','Approval','Ordering','Perf. review'],own:[25,35,95,20,90],buy:[70,95,45,95,75],br:[95,45,25,30,60]},
+  okr:{l:['P1 exit','P2 exit','P3 exit','P4 exit'],
+    prec:[92,94,96,97], acc:[90,93,95,96], wab:[45,60,65,70], inplat:[null,70,80,85]},
+  gantt:[
+    {t:'Business',  n:'P0 · Discovery & interviews',        s:0,e:2},
+    {t:'Business',  n:'P0 · Manual spend reviews',           s:1,e:3},
+    {t:'AI',        n:'P0 · Benchmark dataset labelling',    s:1,e:3},
+    {t:'Business',  n:'P0 · Paid pilots & pricing tests',    s:2,e:3},
+    {t:'Platform',  n:'R1.0 · Foundation, auth, tenancy',    s:3,e:4},
+    {t:'Web',       n:'R1.1 · Catalogue & suppliers',        s:4,e:5},
+    {t:'AI',        n:'R1.2 · Ingestion & extraction',       s:5,e:6},
+    {t:'AI',        n:'R1.3 · Matching & landed cost',       s:6,e:7},
+    {t:'Web',       n:'R1.4 · Smart Compare & intelligence', s:7,e:8},
+    {t:'Web',       n:'R1.5 · Savings ledger & launch',      s:8,e:9},
+    {t:'Platform',  n:'R2.0 · Org model, branches, budgets', s:9,e:10},
+    {t:'Web',       n:'R2.1 · Requests & approvals',         s:10,e:11},
+    {t:'Mobile',    n:'R2.2 · Mobile MVP (request)',         s:11,e:12},
+    {t:'Mobile',    n:'R2.3 · Mobile approvals & receipt',   s:12,e:13},
+    {t:'Platform',  n:'R2.4 · Optimiser & supplier IQ',      s:13,e:14},
+    {t:'Platform',  n:'R2.5 · Reporting & hardening',        s:14,e:15},
+    {t:'Integrations',n:'R3.0 · Email ingestion & catalogues',s:15,e:16},
+    {t:'Integrations',n:'R3.1 · Accounting integration #1',  s:16,e:17},
+    {t:'Integrations',n:'R3.2 · POS / inventory integration', s:17,e:18},
+    {t:'Integrations',n:'R3.3 · Order tracking & 3-way match',s:18,e:19},
+    {t:'Integrations',n:'R3.4 · Partner API & webhooks',     s:19,e:20},
+    {t:'Predictive',n:'R4.0 · Forecasting engine',           s:20,e:21},
+    {t:'Predictive',n:'R4.1 · Supplier risk & negotiation',  s:21,e:22},
+    {t:'Predictive',n:'R4.2 · Grounded procurement analyst', s:22,e:23},
+    {t:'Predictive',n:'R4.3 · Automated RFQ sourcing',       s:23,e:24}
+  ],
+  team:{l:['P0','P1','P2','P3','P4'],
+    rows:[
+      ['Founder / Product',[1,1,1,1,1],'v'],
+      ['Full-stack eng',[0,2,3,3,3],'a'],
+      ['AI / data eng',[0.5,1,1,2,2],'b'],
+      ['Mobile eng',[0,0,1,1,1],'o'],
+      ['Designer',[0.5,1,1,1,1],'y'],
+      ['Analyst / data ops',[1,1,1.5,2,2],'r'],
+      ['Customer success',[0,0.5,1,2,2],'txt3'],
+      ['Sales / partnerships',[0,0.5,1,2,2],'txt2']
+    ]},
+  scope:{l:['P0','P1','P2','P3','P4'],full:[1,10,17,21,25],partial:[6,4,3,2,0]},
+  modules:{l:['Smart compare','Quotation inbox','Basket optimiser','Business catalogue','Supplier hub','Savings dashboard','Approvals','Stock & reorder signals','Integrations'],v:[94,91,89,85,83,82,76,70,68]},
+  retention:{l:['Verified savings','Workflow dependency','Supplier history','Team collaboration','Integrations','Forecast accuracy'],v:[96,86,81,76,72,64]},
+  dashPri:{l:['Immediate actions','Savings opportunities','Spend status','Supplier risk','Budget variance','Trend insights'],v:[95,88,72,63,58,45]},
+  inbox:{l:['High value','Review','Informational','Urgent'],v:[32,28,22,18]},
+  entities:{l:['Product','Offer','Purchase','Supplier','Quotation','Outcome','Stock signal','Approval'],v:[100,96,95,92,86,81,74,62]},
+  aiPri:{l:['Product matching','Document extraction','Landed-cost normalisation','Supplier recommendation','Anomaly detection','Forecasting','Negotiation assistant','Procurement analyst'],
+    v:[97,94,92,88,84,78,73,70], ph:[1,1,1,1,2,4,4,4]},
+  accuracy:{l:['Mo 1','Mo 2','Mo 3','Mo 6','Mo 12'],acc:[72,80,86,92,96],band:[28,20,14,8,4]},
+  quality:{l:['Mo 1','Mo 2','Mo 3','Mo 6','Mo 12'],match:[72,80,86,92,96],complete:[65,74,82,89,94]},
+  webSprints:[
+    ['W1 · Repo, CI, shell, auth',3.0,3.5],
+    ['W2 · Onboarding, roles, nav',3.5,4.0],
+    ['W3 · Catalogue, unit & pack UI',4.0,4.3],
+    ['W4 · CSV import, suppliers',4.3,4.8],
+    ['W5 · Upload pipeline, viewer',4.8,5.2],
+    ['W6 · Extraction review screen',5.2,5.8],
+    ['W7 · Review queue, versioning',5.8,6.2],
+    ['W8 · Match resolution, aliases',6.2,6.7],
+    ['W9 · Smart Compare grid',6.7,7.1],
+    ['W10 · Product intelligence',7.1,7.5],
+    ['W11 · Basket split, alerts inbox',7.5,7.9],
+    ['W12 · Savings ledger, evidence',7.9,8.3],
+    ['W13 · Dashboard, exports',8.3,8.6],
+    ['W14 · Billing, Arabic/RTL pass',8.6,8.9],
+    ['W15 · Perf, a11y, launch prep',8.9,9.0]
+  ],
+  mobSprints:[
+    ['M1 · Shell, auth, biometric, home',11.0,11.4],
+    ['M2 · Catalogue search, quick request',11.4,12.0],
+    ['M3 · Camera, barcode, low-stock',12.0,12.4],
+    ['M4 · Push, deep links, timeline',12.4,13.0],
+    ['M5 · Approval queue & detail',13.0,13.4],
+    ['M6 · Delivery & quality reporting',13.4,14.0],
+    ['M7 · Offline queue, RTL, a11y',14.0,14.5],
+    ['M8 · Store submission & rollout',14.5,15.0]
+  ],
+  targets:{l:['P1 exit','P2 exit','P3 exit','P4 exit'],
+    prec:[92,94,96,97], acc:[90,93,95,96], band:[8,6,4,3],
+    wab:[45,60,65,70], recs:[2,4,5,6], ret:[null,90,92,93]},
+  valueBand:{l:['P1','P2','P3','P4'],val:[180,350,500,700],band:[8,6,4,3]},
+  valueFee:{l:['Starter','Team','Growth'],fee:[39,99,249],val:[180,520,1450]},
+  unitEcon:{l:['Starter','Team','Growth'],mrr:[39,99,249],cost:[9,18,42],margin:[76,81,84]},
+  revMix:{l:['Subscriptions','API & integrations','Partner revenue','Premium services'],v:[72,13,9,6]},
+  funnel:{l:['Leads','Spend reviews','Pilots','Paid customers','Expanded accounts'],v:[100,40,20,11,5]},
+  channels:{l:['Accountants','POS partners','Wholesalers','SME communities','Targeted outbound','Paid digital'],v:[91,88,82,76,69,48]},
+  risks:[
+    {n:1,l:'Incorrect product matching',s:5,k:4},
+    {n:2,l:'Savings baseline disputed',s:5,k:3},
+    {n:3,l:'Price data stale',s:4,k:4},
+    {n:4,l:'Customers won\'t upload docs',s:5,k:3},
+    {n:5,l:'Over-broad market scope',s:4,k:3},
+    {n:6,l:'Insufficient history',s:3,k:4},
+    {n:7,l:'Low actionability',s:4,k:3},
+    {n:8,l:'Integration burden',s:3,k:3},
+    {n:9,l:'AI inference cost',s:3,k:3},
+    {n:10,l:'Review queue does not scale',s:4,k:3},
+    {n:11,l:'Pricing misaligned with value',s:3,k:4},
+    {n:12,l:'Mobile scope creep',s:3,k:3},
+    {n:13,l:'Data security incident',s:5,k:2},
+    {n:14,l:'Key-person dependency',s:3,k:4},
+    {n:15,l:'Supplier resistance',s:2,k:3}
+  ],
+  riskSev:{l:['Product matching','Price freshness','Market scope','User data depth','Actionability','Integrations'],v:[92,84,79,70,68,61]},
+  matrix:[
+    ['Business catalogue (product master)',1,2,2,2,2],
+    ['Supplier hub',1,1,2,2,2],
+    ['Quotation inbox (upload)',0,2,2,2,2],
+    ['Document extraction (AI)',0,2,2,2,2],
+    ['Product matching (AI)',1,2,2,2,2],
+    ['Unit + pack-size normalisation',1,2,2,2,2],
+    ['Landed-cost engine',1,2,2,2,2],
+    ['Smart Compare',0,2,2,2,2],
+    ['Human review / exception queue',2,2,2,2,2],
+    ['Price history + product intelligence',0,2,2,2,2],
+    ['Savings ledger + verification',1,2,2,2,2],
+    ['Alerts inbox (actionable)',0,1,2,2,2],
+    ['Basket optimiser',0,1,2,2,2],
+    ['Purchase requests',0,1,2,2,2],
+    ['Approvals, budgets, branches',0,0,2,2,2],
+    ['Mobile application',0,0,2,2,2],
+    ['Supplier performance intelligence',0,0,2,2,2],
+    ['Email ingestion (forwarding)',0,0,1,2,2],
+    ['Accounting / POS / inventory integrations',0,0,0,2,2],
+    ['Order tracking + reconciliation',0,0,1,2,2],
+    ['Demand forecasting + reorder points',0,0,0,1,2],
+    ['Anomaly detection',0,0,1,2,2],
+    ['Negotiation assistant',0,0,0,0,2],
+    ['NL procurement analyst',0,0,0,0,2],
+    ['Partner / public API',0,0,0,1,2]
+  ]
+};
+
+/* ══════════════════ CHART TOOLTIPS ══════════════════ */
+const CHART_INFO = {
+  cMaturity: `Bubble chart plotting each roadmap phase across customer value, defensibility and delivery complexity. Larger bubbles signal harder implementation; the steep rise after Phase 2 is why integrations and predictive work are deliberately deferred.`,
+  cSuccess: `Radar of strategic success factors. Trustworthy data scores highest because inaccurate extraction or matching corrupts every downstream saving, approval and recommendation.`,
+  cDecisionQ: `Line chart showing how decision quality improves as buying data moves from manual records through normalisation, AI recommendations and closed-loop verification.`,
+  cCapValue: `Area chart ranking product capabilities by perceived customer value. Workflow control tops the list because it directly changes daily buying behaviour.`,
+  cAdoption: `Stacked bar chart of module adoption per customer over the first 12 months. Intelligence features lead, followed by workflow and integrations.`,
+  cMitigation: `Multi-line chart tracking data, workflow and operational-control maturity across roadmap phases. Shows how risk controls harden over time.`,
+  cDiff: `Radar comparing the current spreadsheet-based buying process against the ProcurePilot target profile. Wider gaps show where small businesses lack cost clarity, supplier insight and automation.`,
+  cLeak: `Doughnut of procurement-leakage sources. Poor comparison and emergency buying dominate, indicating where the first features should focus.`,
+  cTimeStage: `Grouped bar chart comparing minutes spent per buying-cycle stage manually versus with ProcurePilot. Quote collection is the biggest time sink.`,
+  cCycle: `Horizontal grouped bar chart of end-to-end cycle time across five procurement stages, before and after ProcurePilot.`,
+  cSources: `Polar-area chart of quotation and invoice document sources. PDFs and email dominate, defining document-ingestion priorities.`,
+  cSegments: `Horizontal bar chart of target-segment attractiveness. Cleaning, hygiene and office supplies score highest for an initial beachhead.`,
+  cRoles: `Grouped bar chart of role influence across procurement activities. Buyers drive comparison and ordering, owners drive approvals, branch managers drive need identification.`,
+  cOkr: `Line chart of phase-exit OKRs: match precision, extraction accuracy, weekly active-business rate and in-platform origination.`,
+  cGantt: `Floating horizontal-bar timeline of all roadmap workstreams from M0 to M24, filterable by track.`,
+  cTeam: `Stacked bar chart of full-time equivalents per role across phases P0 to P4.`,
+  cScope: `Stacked bar chart of full-scope versus partial-scope features delivered in each phase.`,
+  cModules: `Horizontal bar chart of module value/importance. Smart Compare and the Quotation inbox lead the roadmap.`,
+  cRetention: `Horizontal bar chart of retention drivers. Verified savings is the strongest lock-in, followed by workflow dependency and supplier history.`,
+  cDashPri: `Bar chart of dashboard-widget priority. Immediate actions and savings opportunities dominate the user's home screen.`,
+  cInbox: `Doughnut of alert types in the action inbox. High-value and review alerts make up the bulk of notifications.`,
+  cEntities: `Polar-area chart of domain-entity importance. Product, Offer, Purchase and Supplier are the core data objects.`,
+  cAiPri: `Horizontal bar chart of AI feature priority, coloured by the phase in which each capability ships.`,
+  cAccuracy: `Line chart of product-match accuracy versus the human-review band over the first 12 months.`,
+  cQuality: `Line chart tracking match accuracy and field completeness as data quality matures.`,
+  cWebSprints: `Gantt-style floating-bar chart of web-engineering sprints and their month range.`,
+  cMobSprints: `Gantt-style floating-bar chart of mobile-engineering sprints and their month range.`,
+  cTargets: `Line chart of metric targets across phase exits: precision, accuracy, engagement, retention and review band.`,
+  cValueBand: `Dual-axis chart comparing verified monthly value per phase against the review-band percentage.`,
+  cValueFee: `Grouped bar chart comparing monthly subscription fees to estimated customer value for each tier.`,
+  cUnitEcon: `Mixed bar-and-line chart of unit economics: MRR, support cost and gross margin by tier.`,
+  cRevMix: `Doughnut of projected revenue mix. Subscriptions are the primary source.`,
+  cFunnel: `Horizontal bar funnel showing conversion from leads through spend reviews, pilots, paid customers and expanded accounts.`,
+  cChannels: `Horizontal bar chart of go-to-market channel effectiveness. Accountants and POS partners are the strongest channels.`,
+  cRiskMatrix: `Bubble chart mapping identified risks by likelihood and severity. Bubble colour indicates severity level.`,
+  cRiskSev: `Horizontal bar chart of top risk-severity scores, highlighting product matching, price freshness and market scope.`,
+  cRoles2: `Horizontal stacked bar chart of role composition (FTE) across phases P0 to P4.`
+};
+
+function initTooltips(){
+  const tip=document.createElement('div');
+  tip.className='c-tip'; tip.id='chartTip'; tip.setAttribute('role','tooltip');
+  document.body.appendChild(tip);
+  const show=(btn)=>{
+    const r=btn.getBoundingClientRect();
+    tip.textContent=btn.dataset.tip;
+    const pad=10, mw=300;
+    let left=r.left+18;
+    let top=r.bottom+8;
+    if(left+mw+pad>window.innerWidth) left=Math.max(pad,window.innerWidth-mw-pad);
+    tip.style.left=left+'px'; tip.style.top=top+'px'; tip.style.maxWidth=mw+'px';
+    tip.style.display='block';
+  };
+  const hide=()=>{ tip.style.display='none'; };
+  document.querySelectorAll('.card-h').forEach(h=>{
+    const h4=h.querySelector('h4');
+    const cv=h.closest('.card')?.querySelector('.cv canvas');
+    const id=cv?.id;
+    const info=CHART_INFO[id] || h4?.dataset.info;
+    if(!info || !h4) return;
+    const title=h4.textContent.trim();
+    const btn=document.createElement('button');
+    btn.className='c-info'; btn.type='button'; btn.textContent='i';
+    btn.setAttribute('aria-label',`Definition for ${title}`);
+    btn.dataset.tip=info;
+    h4.appendChild(btn);
+    btn.addEventListener('mouseenter',()=>show(btn));
+    btn.addEventListener('focus',()=>show(btn));
+    btn.addEventListener('mouseleave',hide);
+    btn.addEventListener('blur',hide);
+  });
+  document.querySelectorAll('.ph .p-win').forEach(w=>{
+    w.innerHTML=w.innerHTML.replace(/(~\d+(?:\.\d+)? FTE)/g,'<span class="has-tip" data-tip="FTE = Full-Time Equivalent; the approximate number of full-time people needed across product, engineering, data and go-to-market roles during this phase.">$1</span>');
+  });
+  document.querySelectorAll('.ph .p-win .has-tip').forEach(el=>{
+    el.addEventListener('mouseenter',()=>show(el));
+    el.addEventListener('mouseleave',hide);
+  });
+  const CP_INFO={
+    "Savings baseline policy decided": `Defines how a saving is counted and what counts as a valid baseline before any extraction work can begin.`,
+    "Labelled benchmark datasets": `Curated examples of correct extractions and matches that define 'good enough' for the model and review queue.`,
+    "Domain model + pack normalisation": `The shared taxonomy for products, suppliers, units and offers; normalises pack sizes so unlike offers become comparable.`,
+    "Extraction pipeline + review queue": `Turns documents, images and messages into structured line items and routes uncertain extractions to human review.`,
+    "Matching engine at precision gate": `Links extracted offers to real products and suppliers at the accuracy required before savings can be trusted.`,
+    "Landed-cost engine + Smart Compare": `Calculates true total cost per unit including delivery, VAT and discounts, then ranks comparable offers.`,
+    "Savings ledger with verified records": `The gate where live customers confirm real, verified savings; proves the MVP works before adding workflow.`,
+    "Org model: branches, budgets, roles": `Establishes branches, cost centres, budgets and roles — the subject that approval rules operate on. Without it, approval rules have nothing to apply to.`,
+    "Requests + approvals": `Request creation, threshold-based approval routing, budget checks, exceptions and the audit log that make team buying auditable.`,
+    "Mobile app in stores": `Releases the mobile app for branch managers; validates adoption and retention before integrations.`,
+    "Integrations + automated data inflow": `Connects accounting, POS, email and supplier systems so the product stays current without manual uploads.`,
+    "Forecasting & predictive procurement": `Predicts future demand, optimal order timing and supplier risk using accumulated purchase history.`
+  };
+  document.querySelectorAll('.fnode').forEach(el=>{
+    const text=el.querySelector('strong')?.textContent.trim();
+    const info=CP_INFO[text];
+    if(!info) return;
+    el.dataset.tip=info;
+    el.style.cursor='help';
+    el.addEventListener('mouseenter',()=>show(el));
+    el.addEventListener('mouseleave',hide);
+  });
+}
+
+/* ══════════════════ BUILDERS ══════════════════ */
+const mk = (id,cfg) => { const el=document.getElementById(id); if(el) CH[id]=new Chart(el,cfg); };
+
+function buildAll(){
+  const p=P();
+  const legendTop = {position:'top',align:'end'};
+
+  /* 1 · Roadmap maturity — bubble */
+  mk('cMaturity',{type:'bubble',data:{datasets:D.maturity.map((d,i)=>({
+      label:d.l,
+      data:[{x:d.x,y:d.y,r:6+d.c/6}],
+      backgroundColor:alpha([p.o,p.a,p.b,p.v,p.y][i],.32),
+      borderColor:[p.o,p.a,p.b,p.v,p.y][i],borderWidth:2
+    }))},
+    options:{plugins:{legend:legendTop,tooltip:{callbacks:{label:c=>{
+      const d=D.maturity[c.datasetIndex];
+      return `${d.l} — value ${d.x} · defensibility ${d.y} · complexity ${d.c}`;}}}},
+      scales:{x:{...ax(),title:{display:true,text:'Customer value',color:p.txt3,font:{size:10}},min:0,max:105},
+              y:{...ax(),title:{display:true,text:'Defensibility',color:p.txt3,font:{size:10}},min:0,max:105}}}});
+
+  /* 2 · Strategic success factors — radar */
+  mk('cSuccess',{type:'radar',data:{labels:D.success.l,datasets:[{
+      data:D.success.v,backgroundColor:alpha(p.a,.16),borderColor:p.a,borderWidth:2,
+      pointBackgroundColor:p.a,pointRadius:3.5}]},
+    options:{layout:{padding:{left:34,right:34,top:8,bottom:8}},
+      plugins:{legend:{display:false}},scales:{r:{
+      min:0,max:100,grid:{color:p.grid},angleLines:{color:p.grid},
+      pointLabels:{color:p.txt2,font:{size:10.5}},ticks:{display:false}}}}});
+
+  /* 3 · Decision quality — line */
+  mk('cDecisionQ',{type:'line',data:{labels:D.decisionQ.l,datasets:[{
+      data:D.decisionQ.v,borderColor:p.a,backgroundColor:alpha(p.a,.14),
+      fill:true,tension:.36,pointRadius:3,borderWidth:2}]},
+    options:{plugins:{legend:{display:false}},scales:{x:noGrid({ticks:{maxRotation:45,minRotation:35}}),y:{...ax(),min:0,max:100}}}});
+
+  /* 4 · Customer value by capability — area */
+  mk('cCapValue',{type:'line',data:{labels:['Price vis.','Supplier comp.','Unit norm.','Basket opt.','Forecasting','Workflow'],
+    datasets:[{data:D.capValue.v,borderColor:p.b,backgroundColor:alpha(p.b,.14),
+      fill:true,tension:.34,pointRadius:3,borderWidth:2}]},
+    options:{plugins:{legend:{display:false},tooltip:{callbacks:{title:c=>D.capValue.l[c[0].dataIndex]}}},
+      scales:{x:noGrid({ticks:{maxRotation:45,minRotation:35}}),y:{...ax(),min:0,max:100}}}});
+
+  /* 5 · Module adoption — stacked bar */
+  mk('cAdoption',{type:'bar',data:{labels:D.adoption.l,datasets:[
+      {label:'Intelligence',data:D.adoption.intel,backgroundColor:p.a,borderRadius:4},
+      {label:'Workflow',data:D.adoption.flow,backgroundColor:p.b,borderRadius:4},
+      {label:'Integrations',data:D.adoption.integ,backgroundColor:p.v,borderRadius:4}]},
+    options:{plugins:{legend:{position:'bottom',labels:{padding:9,font:{size:10}}}},
+      scales:{x:{...noGrid(),stacked:true},y:{...ax(),stacked:true}}}});
+
+  /* 6 · Mitigation maturity — line */
+  mk('cMitigation',{type:'line',data:{labels:D.mitigation.l,datasets:[
+      {label:'Data',data:D.mitigation.data,borderColor:p.a,tension:.34,borderWidth:2,pointRadius:2.5},
+      {label:'Workflow',data:D.mitigation.flow,borderColor:p.b,tension:.34,borderWidth:2,pointRadius:2.5},
+      {label:'Operational',data:D.mitigation.ops,borderColor:p.y,tension:.34,borderWidth:2,pointRadius:2.5}]},
+    options:{plugins:{legend:{position:'bottom',labels:{padding:9,font:{size:10}}}},
+      scales:{x:noGrid(),y:{...ax(),min:0,max:100}}}});
+
+  /* 7 · Differentiation — radar */
+  mk('cDiff',{type:'radar',data:{labels:D.diff.l,datasets:[
+      {label:'Spreadsheet process',data:D.diff.sheet,backgroundColor:alpha(p.r,.14),borderColor:p.r,borderWidth:2,pointRadius:3},
+      {label:'ProcurePilot target',data:D.diff.pp,backgroundColor:alpha(p.a,.16),borderColor:p.a,borderWidth:2,pointRadius:3}]},
+    options:{layout:{padding:{left:26,right:26,top:6}},
+      plugins:{legend:{position:'bottom',labels:{padding:11,font:{size:10.5}}}},
+      scales:{r:{min:0,max:10,grid:{color:p.grid},
+      angleLines:{color:p.grid},pointLabels:{color:p.txt2,font:{size:10.5}},
+      ticks:{display:false,stepSize:2}}}}});
+
+  /* 8 · Leakage — doughnut */
+  mk('cLeak',{type:'doughnut',data:{labels:D.leak.l,datasets:[{
+      data:D.leak.v,backgroundColor:[p.r,p.o,p.y,p.b,p.v,p.txt3],
+      borderColor:css('--surface'),borderWidth:3,hoverOffset:8}]},
+    options:{cutout:'58%',plugins:{legend:{position:'right',labels:{padding:8,font:{size:10}}},
+      tooltip:{callbacks:{label:c=>` ${c.label} — ${c.parsed}%`}}}}});
+
+  /* 9 · Time per stage — grouped bar */
+  mk('cTimeStage',{type:'bar',data:{labels:D.timeStage.l,datasets:[
+      {label:'Manual',data:D.timeStage.man,backgroundColor:alpha(p.r,.75),borderRadius:5},
+      {label:'ProcurePilot',data:D.timeStage.pp,backgroundColor:p.a,borderRadius:5}]},
+    options:{plugins:{legend:legendTop,tooltip:{callbacks:{label:c=>` ${c.dataset.label}: ${c.parsed.y} min`}}},
+      scales:{x:noGrid({ticks:{maxRotation:35,minRotation:25}}),y:{...ax(),title:{display:true,text:'minutes',color:p.txt3,font:{size:10}}}}}});
+
+  /* 10 · Cycle time — horizontal grouped bar */
+  mk('cCycle',{type:'bar',data:{labels:D.cycle.l,datasets:[
+      {label:'Before',data:D.cycle.before,backgroundColor:alpha(p.txt3,.55),borderRadius:5},
+      {label:'With ProcurePilot',data:D.cycle.after,backgroundColor:p.b,borderRadius:5}]},
+    options:{indexAxis:'y',plugins:{legend:legendTop,tooltip:{callbacks:{label:c=>` ${c.dataset.label}: ${c.parsed.x} min`}}},
+      scales:{x:{...ax()},y:noGrid({ticks:{font:{size:10}}})}}});
+
+  /* 11 · Sources — polar area */
+  mk('cSources',{type:'polarArea',data:{labels:D.sources.l,datasets:[{
+      data:D.sources.v,
+      backgroundColor:[p.a,p.b,p.y,p.v,p.o,p.r,p.txt3,p.txt2].map(c=>alpha(c,.62)),
+      borderColor:css('--surface'),borderWidth:2}]},
+    options:{plugins:{legend:{position:'right',labels:{padding:6,font:{size:9.5}}}},
+      scales:{r:{grid:{color:p.grid},ticks:{display:false},angleLines:{color:p.grid}}}}});
+
+  /* 12 · Segments — horizontal bar */
+  mk('cSegments',{type:'bar',data:{labels:D.segments.l,datasets:[{
+      data:D.segments.v,
+      backgroundColor:D.segments.v.map((v,i)=>i===0?p.a:alpha(p.a,.62-i*.07)),
+      borderRadius:5,barThickness:18}]},
+    options:{indexAxis:'y',plugins:{legend:{display:false}},
+      scales:{x:{...ax(),min:0,max:100},y:noGrid({ticks:{font:{size:10.5}}})}}});
+
+  /* 13 · Role influence — grouped bar */
+  mk('cRoles',{type:'bar',data:{labels:D.roles.l,datasets:[
+      {label:'Owner / GM',data:D.roles.own,backgroundColor:p.v,borderRadius:4},
+      {label:'Buyer / Ops',data:D.roles.buy,backgroundColor:p.a,borderRadius:4},
+      {label:'Branch manager',data:D.roles.br,backgroundColor:p.b,borderRadius:4}]},
+    options:{plugins:{legend:legendTop},scales:{x:noGrid(),y:{...ax(),min:0,max:100}}}});
+
+  /* 14 · Phase OKR progression */
+  mk('cOkr',{type:'line',data:{labels:D.okr.l,datasets:[
+      {label:'Match precision %',data:D.okr.prec,borderColor:p.a,backgroundColor:alpha(p.a,.1),tension:.3,borderWidth:2.5,pointRadius:4,fill:true},
+      {label:'Extraction accuracy %',data:D.okr.acc,borderColor:p.b,tension:.3,borderWidth:2.5,pointRadius:4},
+      {label:'Weekly active business %',data:D.okr.wab,borderColor:p.y,tension:.3,borderWidth:2.5,pointRadius:4},
+      {label:'In-platform origination %',data:D.okr.inplat,borderColor:p.v,tension:.3,borderWidth:2.5,pointRadius:4,borderDash:[5,4]}]},
+    options:{plugins:{legend:legendTop},interaction:{mode:'index',intersect:false},
+      scales:{x:noGrid(),y:{...ax(),min:0,max:100,ticks:{callback:v=>v+'%'}}}}});
+
+  /* 15 · Master Gantt — floating horizontal bars */
+  buildGantt('all');
+
+  /* 16 · Team ramp — stacked bar */
+  mk('cTeam',{type:'bar',data:{labels:D.team.l,datasets:D.team.rows.map(r=>({
+      label:r[0],data:r[1],
+      backgroundColor:r[2]==='txt3'?alpha(p.txt3,.7):r[2]==='txt2'?alpha(p.txt2,.55):p[r[2]],
+      borderRadius:3}))},
+    options:{plugins:{legend:{position:'bottom',labels:{padding:8,font:{size:9.5}}},
+      tooltip:{callbacks:{label:c=>` ${c.dataset.label}: ${c.parsed.y} FTE`}}},
+      scales:{x:{...noGrid(),stacked:true},y:{...ax(),stacked:true,title:{display:true,text:'FTE',color:p.txt3,font:{size:10}}}}}});
+
+  /* 17 · Scope accumulation */
+  mk('cScope',{type:'bar',data:{labels:D.scope.l,datasets:[
+      {label:'Full scope',data:D.scope.full,backgroundColor:p.a,borderRadius:5},
+      {label:'Partial',data:D.scope.partial,backgroundColor:alpha(p.y,.7),borderRadius:5}]},
+    options:{plugins:{legend:legendTop},scales:{x:{...noGrid(),stacked:true},y:{...ax(),stacked:true,max:27}}}});
+
+  /* 18 · Module value */
+  mk('cModules',{type:'bar',data:{labels:D.modules.l,datasets:[{
+      data:D.modules.v,
+      backgroundColor:D.modules.v.map((v,i)=>i<3?p.a:i<6?p.b:alpha(p.v,.7)),
+      borderRadius:5,barThickness:17}]},
+    options:{indexAxis:'y',plugins:{legend:{display:false}},
+      scales:{x:{...ax(),min:0,max:100},y:noGrid({ticks:{font:{size:10.5}}})}}});
+
+  /* 19 · Retention drivers */
+  mk('cRetention',{type:'bar',data:{labels:D.retention.l,datasets:[{
+      data:D.retention.v,
+      backgroundColor:D.retention.v.map((v,i)=>i===0?p.a:alpha(p.b,.75-i*.06)),
+      borderRadius:5,barThickness:17}]},
+    options:{indexAxis:'y',plugins:{legend:{display:false}},
+      scales:{x:{...ax(),min:0,max:100},y:noGrid({ticks:{font:{size:10.5}}})}}});
+
+  /* 20 · Dashboard priority */
+  mk('cDashPri',{type:'bar',data:{labels:['Actions','Savings','Spend','Risk','Budget','Trends'],datasets:[{
+      data:D.dashPri.v,backgroundColor:[p.a,p.b,p.y,p.o,p.v,p.txt3],borderRadius:5}]},
+    options:{plugins:{legend:{display:false},tooltip:{callbacks:{title:c=>D.dashPri.l[c[0].dataIndex]}}},
+      scales:{x:noGrid({ticks:{font:{size:10}}}),y:{...ax(),min:0,max:100}}}});
+
+  /* 21 · Action inbox */
+  mk('cInbox',{type:'doughnut',data:{labels:D.inbox.l,datasets:[{
+      data:D.inbox.v,backgroundColor:[p.a,p.b,p.txt3,p.r],
+      borderColor:css('--surface'),borderWidth:3,hoverOffset:8}]},
+    options:{cutout:'55%',plugins:{legend:{position:'bottom',labels:{padding:9,font:{size:10}}},
+      tooltip:{callbacks:{label:c=>` ${c.label} — ${c.parsed}%`}}}}});
+
+  /* 22 · Entity importance */
+  mk('cEntities',{type:'polarArea',data:{labels:D.entities.l,datasets:[{
+      data:D.entities.v,
+      backgroundColor:[p.a,p.b,p.y,p.v,p.o,p.r,p.txt3,p.txt2].map(c=>alpha(c,.6)),
+      borderColor:css('--surface'),borderWidth:2}]},
+    options:{plugins:{legend:{position:'right',labels:{padding:6,font:{size:9.5}}}},
+      scales:{r:{grid:{color:p.grid},ticks:{display:false},angleLines:{color:p.grid}}}}});
+
+  /* 23 · AI priority coloured by phase */
+  const phC={1:p.a,2:p.b,4:p.y};
+  mk('cAiPri',{type:'bar',data:{labels:D.aiPri.l,datasets:[{
+      data:D.aiPri.v,backgroundColor:D.aiPri.ph.map(x=>phC[x]),borderRadius:5,barThickness:18}]},
+    options:{indexAxis:'y',plugins:{legend:{display:false},
+      tooltip:{callbacks:{label:c=>` priority ${c.parsed.x} · ships in Phase ${D.aiPri.ph[c.dataIndex]}`}}},
+      scales:{x:{...ax(),min:0,max:100},y:noGrid({ticks:{font:{size:10.5}}})}}});
+
+  /* 24 · Accuracy vs review band */
+  mk('cAccuracy',{type:'line',data:{labels:D.accuracy.l,datasets:[
+      {label:'Match accuracy %',data:D.accuracy.acc,borderColor:p.a,backgroundColor:alpha(p.a,.12),fill:true,tension:.34,borderWidth:2.5,pointRadius:3},
+      {label:'Human review band %',data:D.accuracy.band,borderColor:p.r,backgroundColor:alpha(p.r,.1),fill:true,tension:.34,borderWidth:2.5,pointRadius:3,borderDash:[5,4]}]},
+    options:{plugins:{legend:{position:'bottom',labels:{padding:9,font:{size:10}}}},
+      interaction:{mode:'index',intersect:false},
+      scales:{x:noGrid(),y:{...ax(),min:0,max:100,ticks:{callback:v=>v+'%'}}}}});
+
+  /* 25 · Data-quality maturity */
+  mk('cQuality',{type:'line',data:{labels:D.quality.l,datasets:[
+      {label:'Match accuracy',data:D.quality.match,borderColor:p.a,backgroundColor:alpha(p.a,.14),fill:true,tension:.34,borderWidth:2.5,pointRadius:4},
+      {label:'Field completeness',data:D.quality.complete,borderColor:p.b,backgroundColor:alpha(p.b,.1),fill:true,tension:.34,borderWidth:2.5,pointRadius:4}]},
+    options:{plugins:{legend:legendTop},interaction:{mode:'index',intersect:false},
+      scales:{x:noGrid(),y:{...ax(),min:55,max:100,ticks:{callback:v=>v+'%'}}}}});
+
+  /* 26 · Web sprints */
+  sprintChart('cWebSprints',D.webSprints,[p.a,p.b],3,9.2);
+  /* 27 · Mobile sprints */
+  sprintChart('cMobSprints',D.mobSprints,[p.v,p.b],11,15.2);
+
+  /* 28 · Metric targets */
+  mk('cTargets',{type:'line',data:{labels:D.targets.l,datasets:[
+      {label:'Match precision %',data:D.targets.prec,borderColor:p.a,tension:.3,borderWidth:2.5,pointRadius:3.5},
+      {label:'Extraction accuracy %',data:D.targets.acc,borderColor:p.b,tension:.3,borderWidth:2.5,pointRadius:3.5},
+      {label:'Weekly active business %',data:D.targets.wab,borderColor:p.y,tension:.3,borderWidth:2.5,pointRadius:3.5},
+      {label:'Logo retention %',data:D.targets.ret,borderColor:p.v,tension:.3,borderWidth:2.5,pointRadius:3.5},
+      {label:'Review band % (lower is better)',data:D.targets.band,borderColor:p.r,tension:.3,borderWidth:2.5,pointRadius:3.5,borderDash:[5,4]}]},
+    options:{plugins:{legend:{position:'bottom',labels:{padding:9,font:{size:10}}}},
+      interaction:{mode:'index',intersect:false},
+      scales:{x:noGrid(),y:{...ax(),min:0,max:100,ticks:{callback:v=>v+'%'}}}}});
+
+  /* 29 · Value vs review band — dual axis */
+  mk('cValueBand',{type:'bar',data:{labels:D.valueBand.l,datasets:[
+      {type:'bar',label:'Verified monthly value (£)',data:D.valueBand.val,backgroundColor:p.a,borderRadius:6,yAxisID:'y',order:2},
+      {type:'line',label:'Review band %',data:D.valueBand.band,borderColor:p.r,backgroundColor:p.r,tension:.32,borderWidth:2.5,pointRadius:4,yAxisID:'y1',order:1}]},
+    options:{plugins:{legend:legendTop},interaction:{mode:'index',intersect:false},
+      scales:{x:noGrid(),
+        y:{...ax(),position:'left',title:{display:true,text:'£ / month',color:p.txt3,font:{size:10}}},
+        y1:{...ax({grid:{display:false}}),position:'right',min:0,max:12,title:{display:true,text:'review band %',color:p.txt3,font:{size:10}}}}}});
+
+  /* 30 · Value vs fee */
+  mk('cValueFee',{type:'bar',data:{labels:D.valueFee.l,datasets:[
+      {label:'Monthly fee',data:D.valueFee.fee,backgroundColor:alpha(p.txt3,.6),borderRadius:5},
+      {label:'Estimated customer value',data:D.valueFee.val,backgroundColor:p.a,borderRadius:5}]},
+    options:{plugins:{legend:legendTop,tooltip:{callbacks:{label:c=>` ${c.dataset.label}: £${c.parsed.y}`}}},
+      scales:{x:noGrid(),y:{...ax(),ticks:{callback:v=>'£'+v}}}}});
+
+  /* 31 · Unit economics */
+  mk('cUnitEcon',{type:'bar',data:{labels:D.unitEcon.l,datasets:[
+      {type:'bar',label:'MRR',data:D.unitEcon.mrr,backgroundColor:p.a,borderRadius:5,yAxisID:'y'},
+      {type:'bar',label:'Support cost',data:D.unitEcon.cost,backgroundColor:alpha(p.r,.7),borderRadius:5,yAxisID:'y'},
+      {type:'line',label:'Gross margin %',data:D.unitEcon.margin,borderColor:p.y,backgroundColor:p.y,tension:.3,borderWidth:2.5,pointRadius:4,yAxisID:'y1'}]},
+    options:{plugins:{legend:{position:'bottom',labels:{padding:9,font:{size:10}}}},
+      interaction:{mode:'index',intersect:false},
+      scales:{x:noGrid(),y:{...ax(),ticks:{callback:v=>'£'+v}},
+        y1:{...ax({grid:{display:false}}),position:'right',min:60,max:95,ticks:{callback:v=>v+'%'}}}}});
+
+  /* 32 · Revenue mix */
+  mk('cRevMix',{type:'doughnut',data:{labels:D.revMix.l,datasets:[{
+      data:D.revMix.v,backgroundColor:[p.a,p.b,p.v,p.y],
+      borderColor:css('--surface'),borderWidth:3,hoverOffset:8}]},
+    options:{cutout:'58%',plugins:{legend:{position:'bottom',labels:{padding:9,font:{size:10}}},
+      tooltip:{callbacks:{label:c=>` ${c.label} — ${c.parsed}%`}}}}});
+
+  /* 33 · Funnel */
+  mk('cFunnel',{type:'bar',data:{labels:D.funnel.l,datasets:[{
+      data:D.funnel.v,
+      backgroundColor:[alpha(p.b,.35),alpha(p.b,.55),alpha(p.a,.7),p.a,p.y],
+      borderRadius:5,barThickness:22}]},
+    options:{indexAxis:'y',plugins:{legend:{display:false},
+      tooltip:{callbacks:{label:c=>` ${c.parsed.x} businesses`}}},
+      scales:{x:{...ax(),max:105},y:noGrid({ticks:{font:{size:10.5}}})}}});
+
+  /* 34 · Channels */
+  mk('cChannels',{type:'bar',data:{labels:D.channels.l,datasets:[{
+      data:D.channels.v,
+      backgroundColor:D.channels.v.map((v,i)=>i<2?p.a:i<4?p.b:alpha(p.txt3,.65)),
+      borderRadius:5,barThickness:18}]},
+    options:{indexAxis:'y',plugins:{legend:{display:false}},
+      scales:{x:{...ax(),min:0,max:100},y:noGrid({ticks:{font:{size:10.5}}})}}});
+
+  /* 35 · Risk matrix — bubble (jittered so co-located risks stay legible) */
+  const rc = r => r.s>=5?p.r : r.s>=4?p.o : r.s>=3?p.y : p.txt3;
+  const seen={};
+  const riskPts=D.risks.map(r=>{
+    const key=r.s+'|'+r.k; const i=seen[key]=(seen[key]||0);
+    seen[key]=i+1;
+    const ang=i*2.4, rad=i===0?0:.17+i*.045;
+    return {x:r.k+Math.cos(ang)*rad, y:r.s+Math.sin(ang)*rad,
+            r:6+r.s*r.k/3.2, _n:r.n, _l:r.l, _s:r.s, _k:r.k};
+  });
+  mk('cRiskMatrix',{type:'bubble',data:{datasets:[{
+      data:riskPts,
+      backgroundColor:D.risks.map(r=>alpha(rc(r),.34)),
+      borderColor:D.risks.map(r=>rc(r)),borderWidth:2}]},
+    options:{plugins:{legend:{display:false},tooltip:{callbacks:{
+        label:c=>{const d=c.raw;return ` #${d._n} ${d._l} — severity ${d._s}, likelihood ${d._k}`;}}}},
+      scales:{
+        x:{...ax(),min:1,max:5.6,title:{display:true,text:'Likelihood →',color:p.txt3,font:{size:10}},ticks:{stepSize:1}},
+        y:{...ax(),min:1,max:5.6,title:{display:true,text:'Severity →',color:p.txt3,font:{size:10}},ticks:{stepSize:1}}}}});
+
+  /* 36 · Risk severity */
+  mk('cRiskSev',{type:'bar',data:{labels:D.riskSev.l,datasets:[{
+      data:D.riskSev.v,
+      backgroundColor:D.riskSev.v.map(v=>v>=85?p.r:v>=75?p.o:alpha(p.y,.8)),
+      borderRadius:5,barThickness:20}]},
+    options:{indexAxis:'y',plugins:{legend:{display:false}},
+      scales:{x:{...ax(),min:0,max:100},y:noGrid({ticks:{font:{size:10.5}}})}}});
+
+  /* 37 · Role composition */
+  mk('cRoles2',{type:'bar',data:{labels:D.team.l,datasets:D.team.rows.map(r=>({
+      label:r[0],data:r[1],
+      backgroundColor:r[2]==='txt3'?alpha(p.txt3,.7):r[2]==='txt2'?alpha(p.txt2,.55):p[r[2]],
+      borderRadius:3}))},
+    options:{indexAxis:'y',plugins:{legend:{position:'bottom',labels:{padding:8,font:{size:9.5}}}},
+      scales:{x:{...ax(),stacked:true,title:{display:true,text:'FTE',color:p.txt3,font:{size:10}}},
+              y:{...noGrid(),stacked:true}}}});
+}
+
+/* ── sprint plan builder (floating bars over month axis) ─────── */
+function sprintChart(id,rows,colors,min,max){
+  const p=P();
+  mk(id,{type:'bar',data:{labels:rows.map(r=>r[0]),datasets:[{
+      data:rows.map(r=>[r[1],r[2]]),
+      backgroundColor:rows.map((r,i)=>alpha(colors[i%2],.8)),
+      borderColor:rows.map((r,i)=>colors[i%2]),
+      borderWidth:1,borderRadius:4,borderSkipped:false,
+      barThickness:rows.length>10?13:19}]},
+    options:{indexAxis:'y',plugins:{legend:{display:false},
+      tooltip:{callbacks:{
+        title:c=>rows[c[0].dataIndex][0],
+        label:c=>{const r=rows[c.dataIndex];
+          return ` M${r[1].toFixed(1)} → M${r[2].toFixed(1)}  (${((r[2]-r[1])*4.3).toFixed(0)} weeks)`;}}}},
+      scales:{
+        x:{...ax(),min:min,max:max,ticks:{stepSize:1,callback:v=>'M'+v},
+           title:{display:true,text:'Month from start',color:p.txt3,font:{size:10}}},
+        y:noGrid({ticks:{font:{size:rows.length>10?9.5:10.5}}})}}});
+}
+
+/* ── Gantt builder (filterable) ──────────────────────────────── */
+function trackColor(t){
+  const p=P();
+  return {Business:p.o,Platform:p.a,Web:p.a,AI:p.b,Mobile:p.v,Integrations:p.y,Predictive:p.y}[t]||p.txt3;
+}
+function buildGantt(filter){
+  const p=P();
+  if(CH.cGantt){CH.cGantt.destroy();delete CH.cGantt;}
+  const rows = filter==='all' ? D.gantt : D.gantt.filter(g=>g.t===filter);
+  mk('cGantt',{type:'bar',data:{labels:rows.map(r=>r.n),datasets:[{
+      data:rows.map(r=>[r.s,r.e]),
+      backgroundColor:rows.map(r=>alpha(trackColor(r.t),.82)),
+      borderColor:rows.map(r=>trackColor(r.t)),
+      borderWidth:1,borderRadius:4,borderSkipped:false,barThickness:rows.length>18?11:16}]},
+    options:{indexAxis:'y',plugins:{legend:{display:false},
+      tooltip:{callbacks:{
+        title:c=>rows[c[0].dataIndex].n,
+        label:c=>{const r=rows[c.dataIndex];return ` ${r.t} · M${r.s} → M${r.e} (${r.e-r.s} mo)`;}}}},
+      scales:{
+        x:{...ax(),min:0,max:24,ticks:{stepSize:3,callback:v=>'M'+v},
+           title:{display:true,text:'Month from start  ·  gates at M3 · M9 · M15 · M20',color:p.txt3,font:{size:10}}},
+        y:noGrid({ticks:{font:{size:rows.length>18?9.5:10.5}}})}}});
+}
+
+/* ══════════════════ MATRIX TABLE ══════════════════ */
+function buildMatrix(){
+  const tb=document.querySelector('#mxTable tbody'); if(!tb) return;
+  const g={0:'<span class="no">○</span>',1:'<span class="part">◐</span>',2:'<span class="yes">●</span>'};
+  tb.innerHTML=D.matrix.map(r=>
+    `<tr><td>${r[0]}</td>${r.slice(1).map(v=>`<td class="c">${g[v]}</td>`).join('')}</tr>`).join('');
+}
+
+/* ══════════════════ INTERACTIONS ══════════════════ */
+/* theme */
+function initTheme(){
+  const btn=document.getElementById('themeBtn'), lbl=document.getElementById('themeLbl');
+  btn.addEventListener('click',()=>{
+    const next=document.documentElement.dataset.theme==='dark'?'light':'dark';
+    document.documentElement.dataset.theme=next;
+    lbl.textContent=next==='dark'?'Dark':'Light';
+    Object.values(CH).forEach(c=>c.destroy());
+    Object.keys(CH).forEach(k=>delete CH[k]);
+    setDefaults(); buildAll();
+    const active=document.querySelector('#ganttCtrls .chip.on');
+    if(active&&active.dataset.track!=='all') buildGantt(active.dataset.track);
+  });
+}
+
+/* gantt filter */
+function initGanttFilter(){
+  const box=document.getElementById('ganttCtrls'); if(!box) return;
+  box.addEventListener('click',e=>{
+    const b=e.target.closest('.chip'); if(!b) return;
+    box.querySelectorAll('.chip').forEach(c=>c.classList.remove('on'));
+    b.classList.add('on'); buildGantt(b.dataset.track);
+  });
+}
+
+/* phase rail */
+function initRail(){
+  const rail=document.getElementById('rail'); if(!rail) return;
+  rail.addEventListener('click',e=>{
+    const b=e.target.closest('.ph'); if(!b) return;
+    rail.querySelectorAll('.ph').forEach(x=>x.classList.remove('on'));
+    b.classList.add('on');
+  });
+}
+
+/* scroll spy */
+function initSpy(){
+  const links=[...document.querySelectorAll('#nav a')];
+  const map=new Map(links.map(a=>[a.getAttribute('href').slice(1),a]));
+  const io=new IntersectionObserver(es=>{
+    es.forEach(en=>{
+      if(en.isIntersecting){
+        links.forEach(a=>a.classList.remove('on'));
+        const a=map.get(en.target.id); if(a) a.classList.add('on');
+      }
+    });
+  },{rootMargin:'-15% 0px -75% 0px',threshold:0});
+  document.querySelectorAll('section[id]').forEach(s=>io.observe(s));
+}
+
+/* reveal + bar fills + counters */
+function initReveal(){
+  const io=new IntersectionObserver(es=>{
+    es.forEach(en=>{ if(en.isIntersecting){ en.target.classList.add('in'); io.unobserve(en.target);} });
+  },{threshold:.06});
+  document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+
+  const bio=new IntersectionObserver(es=>{
+    es.forEach(en=>{
+      if(en.isIntersecting){
+        en.target.style.width=en.target.dataset.w+'%';
+        bio.unobserve(en.target);
+      }
+    });
+  },{threshold:.3});
+  document.querySelectorAll('.bfill').forEach(el=>bio.observe(el));
+}
+
+function initCounters(){
+  document.querySelectorAll('[data-count]').forEach(el=>{
+    const target=parseFloat(el.dataset.count);
+    const dec=parseInt(el.dataset.dec||'0',10);
+    const pre=el.dataset.pre||'', post=el.dataset.post||'';
+    const t0=performance.now(), dur=1300;
+    const step=now=>{
+      const k=Math.min(1,(now-t0)/dur);
+      const e=1-Math.pow(1-k,3);
+      const v=target*e;
+      el.textContent=pre+(dec?v.toFixed(dec):Math.round(v).toLocaleString())+post;
+      if(k<1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  });
+}
+
+/* ══════════════════ BOOT ══════════════════ */
+window.addEventListener('DOMContentLoaded',()=>{
+  if(typeof Chart==='undefined'){
+    document.querySelectorAll('.cv').forEach(c=>{
+      c.innerHTML='<div style="height:100%;display:grid;place-items:center;color:var(--text-3);font-size:12px;text-align:center;padding:20px">Chart library unavailable —<br>this page needs an internet connection<br>to load Chart.js from CDN.</div>';
+    });
+  } else {
+    setDefaults();
+    buildAll();
+    initGanttFilter();
+  }
+  buildMatrix();
+  initTheme();
+  initTooltips();
+  initRail();
+  initSpy();
+  initReveal();
+  initCounters();
+});
+</script>
+</body>
+</html>
