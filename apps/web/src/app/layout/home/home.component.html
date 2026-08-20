@@ -1,0 +1,146 @@
+<div class="home-container">
+  <div class="hero-card">
+    <div class="hero-header">
+      <div class="badge-active">
+        <mat-icon aria-hidden="true">verified</mat-icon>
+        <span>{{ 'home.workspaceReadyBadge' | translate }}</span>
+      </div>
+    </div>
+    <h1 class="hero-title">{{ 'home.welcomePrefix' | translate }} {{ tenant()?.name }}</h1>
+    <p class="hero-description">{{ 'home.heroDescription' | translate }}</p>
+  </div>
+
+  <div class="cards-grid">
+    <!-- Tenant & Security Card -->
+    <mat-card class="info-card">
+      <mat-card-header>
+        <div class="card-icon" mat-card-avatar>
+          <mat-icon aria-hidden="true">security</mat-icon>
+        </div>
+        <mat-card-title>{{ 'home.cardTenantTitle' | translate }}</mat-card-title>
+        <mat-card-subtitle>{{ 'home.cardTenantSubtitle' | translate }}</mat-card-subtitle>
+      </mat-card-header>
+      <mat-card-content>
+        <div class="property-list">
+          <div class="property-row">
+            <span class="prop-label">{{ 'home.labelTenantId' | translate }}</span>
+            <span class="prop-value mono">{{ tenant()?.id }}</span>
+          </div>
+          <div class="property-row">
+            <span class="prop-label">{{ 'home.labelSlug' | translate }}</span>
+            <span class="prop-value">{{ tenant()?.slug }}</span>
+          </div>
+          <div class="property-row">
+            <span class="prop-label">{{ 'home.labelIsolation' | translate }}</span>
+            <span class="prop-value highlight">{{ 'home.valIsolation' | translate }}</span>
+          </div>
+        </div>
+      </mat-card-content>
+    </mat-card>
+
+    <!-- Regional & Financial Config Card -->
+    <mat-card class="info-card">
+      <mat-card-header>
+        <div class="card-icon" mat-card-avatar>
+          <mat-icon aria-hidden="true">payments</mat-icon>
+        </div>
+        <mat-card-title>{{ 'home.cardConfigTitle' | translate }}</mat-card-title>
+        <mat-card-subtitle>{{ 'home.cardConfigSubtitle' | translate }}</mat-card-subtitle>
+      </mat-card-header>
+      <mat-card-content>
+        <div class="property-list">
+          <div class="property-row">
+            <span class="prop-label">{{ 'home.labelRegion' | translate }}</span>
+            <span class="prop-value">{{ tenant()?.region }}</span>
+          </div>
+          <div class="property-row">
+            <span class="prop-label">{{ 'home.labelCurrency' | translate }}</span>
+            <span class="prop-value highlight">{{ tenant()?.currency }}</span>
+          </div>
+          <div class="property-row">
+            <span class="prop-label">{{ 'home.labelTaxModel' | translate }}</span>
+            <span class="prop-value">{{ tenant()?.tax_model }}</span>
+          </div>
+          <div class="property-row">
+            <span class="prop-label">{{ 'home.labelDefaultLocale' | translate }}</span>
+            <span class="prop-value">{{ tenant()?.default_locale?.toUpperCase() }}</span>
+          </div>
+        </div>
+      </mat-card-content>
+    </mat-card>
+
+    <!-- User Authority Card -->
+    <mat-card class="info-card">
+      <mat-card-header>
+        <div class="card-icon" mat-card-avatar>
+          <mat-icon aria-hidden="true">badge</mat-icon>
+        </div>
+        <mat-card-title>{{ 'home.cardMemberTitle' | translate }}</mat-card-title>
+        <mat-card-subtitle>{{ 'home.cardMemberSubtitle' | translate }}</mat-card-subtitle>
+      </mat-card-header>
+      <mat-card-content>
+        <div class="property-list">
+          <div class="property-row">
+            <span class="prop-label">{{ 'home.labelEmail' | translate }}</span>
+            <span class="prop-value">{{ member()?.email }}</span>
+          </div>
+          <div class="property-row">
+            <span class="prop-label">{{ 'home.labelRole' | translate }}</span>
+            <span class="prop-value highlight">
+              @if (member()?.role; as role) {
+                {{ 'common.roles.' + role | translate }}
+              }
+            </span>
+          </div>
+          <div class="property-row">
+            <span class="prop-label">{{ 'home.labelMfa' | translate }}</span>
+            <span class="prop-value">{{ (member()?.mfa_enabled ? 'home.valMfaEnabled' : 'home.valMfaDisabled') | translate }}</span>
+          </div>
+        </div>
+      </mat-card-content>
+    </mat-card>
+  </div>
+
+  <!-- Roadmap / Empty State Card -->
+  <mat-card class="roadmap-card">
+    <mat-card-header>
+      <mat-card-title>{{ 'home.emptyStateTitle' | translate }}</mat-card-title>
+      <mat-card-subtitle>{{ 'home.emptyStateDescription' | translate }}</mat-card-subtitle>
+    </mat-card-header>
+    <mat-card-content>
+      <div class="steps-list">
+        <div class="step-item active">
+          <div class="step-header">
+            <span class="step-title">{{ 'home.step1Title' | translate }}</span>
+          </div>
+          <p class="step-desc">{{ 'home.step1Desc' | translate }}</p>
+          <span class="step-status">{{ 'home.step1Status' | translate }}</span>
+        </div>
+
+        <div class="step-item">
+          <div class="step-header">
+            <span class="step-title">{{ 'home.step2Title' | translate }}</span>
+          </div>
+          <p class="step-desc">{{ 'home.step2Desc' | translate }}</p>
+          <span class="step-status">{{ 'home.step2Status' | translate }}</span>
+        </div>
+
+        <div class="step-item">
+          <div class="step-header">
+            <span class="step-title">{{ 'home.step3Title' | translate }}</span>
+          </div>
+          <p class="step-desc">{{ 'home.step3Desc' | translate }}</p>
+          <span class="step-status">{{ 'home.step3Status' | translate }}</span>
+        </div>
+
+        <div class="step-item">
+          <div class="step-header">
+            <span class="step-title">{{ 'home.step4Title' | translate }}</span>
+          </div>
+          <p class="step-desc">{{ 'home.step4Desc' | translate }}</p>
+          <span class="step-status">{{ 'home.step4Status' | translate }}</span>
+        </div>
+      </div>
+    </mat-card-content>
+  </mat-card>
+</div>

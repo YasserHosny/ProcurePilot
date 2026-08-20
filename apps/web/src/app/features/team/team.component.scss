@@ -1,0 +1,273 @@
+.team-container {
+  max-inline-size: 1100px;
+  margin-inline: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.header-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.page-title {
+  margin: 0;
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.page-subtitle {
+  margin: 0;
+  font-size: 0.9375rem;
+  color: #64748b;
+}
+
+.invite-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 500;
+  border-radius: 8px;
+}
+
+.error-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding-inline: 1rem;
+  padding-block: 0.75rem;
+  background-color: #fef2f2;
+  border: 1px solid #fee2e2;
+  border-radius: 8px;
+  color: #991b1b;
+
+  .error-icon {
+    color: #ef4444;
+    font-size: 24px;
+    inline-size: 24px;
+    block-size: 24px;
+  }
+
+  .error-text-wrap {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .error-title {
+    font-weight: 600;
+    font-size: 0.9375rem;
+  }
+
+  .error-message {
+    font-size: 0.875rem;
+  }
+
+  .error-trace {
+    font-size: 0.75rem;
+    color: #b91c1c;
+    font-family: monospace;
+  }
+}
+
+.team-card {
+  border-radius: 12px;
+  background-color: #ffffff;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  overflow: hidden;
+}
+
+.tab-icon {
+  margin-inline-end: 0.5rem;
+  font-size: 20px;
+  inline-size: 20px;
+  block-size: 20px;
+}
+
+.count-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #f1f5f9;
+  color: #475569;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding-inline: 0.5rem;
+  padding-block: 0.125rem;
+  border-radius: 9999px;
+  margin-inline-start: 0.5rem;
+}
+
+.tab-body {
+  padding-inline: 1.5rem;
+  padding-block: 1.5rem;
+}
+
+.loading-state,
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding-block: 3rem;
+  gap: 1rem;
+  color: #64748b;
+}
+
+.empty-icon {
+  font-size: 48px;
+  inline-size: 48px;
+  block-size: 48px;
+  color: #cbd5e1;
+}
+
+.table-responsive {
+  overflow-x: auto;
+}
+
+.members-table,
+.invitations-table {
+  inline-size: 100%;
+
+  th.mat-header-cell {
+    color: #64748b;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    padding-inline: 1rem;
+  }
+
+  td.mat-cell {
+    padding-inline: 1rem;
+    padding-block: 0.875rem;
+    font-size: 0.875rem;
+    color: #1e293b;
+  }
+}
+
+.member-identity {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.member-avatar {
+  inline-size: 36px;
+  block-size: 36px;
+  border-radius: 9999px;
+  background-color: #e0e7ff;
+  color: #4338ca;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 0.8125rem;
+  flex-shrink: 0;
+}
+
+.member-details {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.member-email {
+  font-weight: 500;
+  color: #0f172a;
+}
+
+.you-badge {
+  font-size: 0.75rem;
+  color: #4f46e5;
+  font-weight: 600;
+}
+
+.role-pill {
+  display: inline-flex;
+  align-items: center;
+  padding-inline: 0.625rem;
+  padding-block: 0.25rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: capitalize;
+
+  &.role-owner { background-color: #fef3c7; color: #92400e; }
+  &.role-buyer { background-color: #e0e7ff; color: #3730a3; }
+  &.role-branch_manager { background-color: #dbeafe; color: #1e40af; }
+  &.role-approver { background-color: #d1fae5; color: #065f46; }
+  &.role-viewer { background-color: #f1f5f9; color: #475569; }
+}
+
+.status-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+
+  .dot {
+    inline-size: 8px;
+    block-size: 8px;
+    border-radius: 9999px;
+  }
+
+  &.status-active .dot,
+  &.status-accepted .dot { background-color: #10b981; }
+  &.status-pending .dot { background-color: #f59e0b; }
+  &.status-removed .dot,
+  &.status-expired .dot { background-color: #94a3b8; }
+  &.status-revoked .dot { background-color: #ef4444; }
+}
+
+.mfa-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.8125rem;
+  color: #64748b;
+
+  mat-icon {
+    font-size: 16px;
+    inline-size: 16px;
+    block-size: 16px;
+  }
+
+  &.enabled {
+    color: #059669;
+    mat-icon { color: #10b981; }
+  }
+}
+
+.date-cell {
+  color: #64748b;
+  font-size: 0.8125rem;
+  white-space: nowrap;
+}
+
+.inv-email {
+  font-weight: 500;
+  color: #0f172a;
+}
+
+.revoke-btn {
+  font-size: 0.8125rem;
+  font-weight: 500;
+}
+
+.danger-action {
+  color: #ef4444;
+}

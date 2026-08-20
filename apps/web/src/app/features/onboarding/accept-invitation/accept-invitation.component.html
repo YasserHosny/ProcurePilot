@@ -1,0 +1,109 @@
+<div class="accept-container">
+  <mat-card class="accept-card">
+    <div class="card-header">
+      <div class="brand-badge">
+        <mat-icon aria-hidden="true">mark_email_read</mat-icon>
+      </div>
+      <h1 class="card-title">{{ 'onboarding.acceptInvitation.title' | translate }}</h1>
+      <p class="card-subtitle">{{ 'onboarding.acceptInvitation.subtitle' | translate }}</p>
+    </div>
+
+    @if (errorAlert(); as alert) {
+      <div class="error-banner" role="alert">
+        <mat-icon class="error-icon" aria-hidden="true">error_outline</mat-icon>
+        <div class="error-content">
+          <span class="error-title">{{ alert.title }}</span>
+          <span class="error-message">{{ alert.message }}</span>
+          @if (alert.traceId) {
+            <span class="error-trace">{{ 'common.traceId' | translate }}: {{ alert.traceId }}</span>
+          }
+        </div>
+      </div>
+    }
+
+    <form [formGroup]="form" (ngSubmit)="onSubmit()" class="accept-form">
+      <!-- Token Field -->
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>{{ 'onboarding.acceptInvitation.tokenLabel' | translate }}</mat-label>
+        <input
+          matInput
+          formControlName="token"
+          [placeholder]="'onboarding.acceptInvitation.tokenPlaceholder' | translate"
+          autocomplete="off"
+        />
+        <mat-icon matPrefix aria-hidden="true">vpn_key</mat-icon>
+        @if (form.controls.token.hasError('required')) {
+          <mat-error>{{ 'onboarding.acceptInvitation.tokenRequired' | translate }}</mat-error>
+        }
+      </mat-form-field>
+
+      <!-- Account Mode Selection -->
+      <div class="account-mode-group">
+        <mat-radio-group
+          [value]="accountMode()"
+          (change)="onAccountModeChange($event.value)"
+          class="radio-group"
+        >
+          <mat-radio-button value="new" class="radio-option">
+            {{ 'onboarding.acceptInvitation.newAccountOption' | translate }}
+          </mat-radio-button>
+          <mat-radio-button value="existing" class="radio-option">
+            {{ 'onboarding.acceptInvitation.hasAccountOption' | translate }}
+          </mat-radio-button>
+        </mat-radio-group>
+      </div>
+
+      <!-- Password Field (only for new users) -->
+      @if (accountMode() === 'new') {
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>{{ 'onboarding.acceptInvitation.passwordLabel' | translate }}</mat-label>
+          <input
+            matInput
+            [type]="hidePassword() ? 'password' : 'text'"
+            formControlName="password"
+            [placeholder]="'onboarding.acceptInvitation.passwordPlaceholder' | translate"
+            autocomplete="new-password"
+          />
+          <mat-icon matPrefix aria-hidden="true">lock</mat-icon>
+          <button
+            mat-icon-button
+            matSuffix
+            type="button"
+            (click)="togglePasswordVisibility()"
+            [attr.aria-label]="(hidePassword() ? 'onboarding.acceptInvitation.showPassword' : 'onboarding.acceptInvitation.hidePassword') | translate"
+          >
+            <mat-icon aria-hidden="true">{{ hidePassword() ? 'visibility_off' : 'visibility' }}</mat-icon>
+          </button>
+          <mat-hint>{{ 'onboarding.acceptInvitation.passwordHint' | translate }}</mat-hint>
+          @if (form.controls.password.hasError('required')) {
+            <mat-error>{{ 'onboarding.acceptInvitation.passwordRequired' | translate }}</mat-error>
+          }
+          @if (form.controls.password.hasError('minlength')) {
+            <mat-error>{{ 'onboarding.acceptInvitation.passwordMinLength' | translate }}</mat-error>
+          }
+        </mat-form-field>
+      }
+
+      <button
+        mat-flat-button
+        color="primary"
+        type="submit"
+        class="submit-btn"
+        [disabled]="isSubmitting() || form.invalid"
+      >
+        @if (isSubmitting()) {
+          <mat-spinner diameter="20" class="spinner"></mat-spinner>
+          <span>{{ 'onboarding.acceptInvitation.submittingButton' | translate }}</span>
+        } @else {
+          <span>{{ 'onboarding.acceptInvitation.submitButton' | translate }}</span>
+        }
+      </button>
+    </form>
+
+    <div class="card-footer">
+      <a routerLink="/auth/sign-in" class="signin-link">
+        {{ 'onboarding.acceptInvitation.backToSignIn' | translate }}
+      </a>
+    </div>
+  </mat-card>
+</div>

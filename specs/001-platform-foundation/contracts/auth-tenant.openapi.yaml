@@ -1,0 +1,539 @@
+openapi: 3.1.0
+info:
+  title: ProcurePilot Platform Foundation API
+  version: 0.1.0
+  description: >
+    Auth, workspace, and membership surface for chunk 4.1. Conventions follow
+    docs/architecture/api-specification.md: base path /api/v1, Supabase JWT bearer auth,
+    tenant scope resolved server-side from the token (never from path, query, or header),
+    Idempotency-Key on mutations, and the {code, message, details, trace_id} error envelope.
+
+servers:
+  - url: /api/v1
+
+security:
+  - bearerAuth: []
+
+paths:
+  /health:
+    get:
+      summary: Liveness and dependency health
+      description: Reports healthy only when the API and its database are both reachable (FR-024).
+      security: []
+      responses:
+        '200':
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status]
+                properties:
+                  status: { type: string, const: ok }
+              example: { status: ok }
+        '503':
+          description: Unhealthy — a dependency is unreachable
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /auth/signup:
+    post:
+      summary: Create a workspace and its first owner
+      description: >
+        Requires a valid, unexpired, unspent platform invitation token (FR-033). Region,
+        currency, and tax model are supplied by the registrant; no default is applied (FR-031)
+        and each is validated against the enabled reference set (FR-032).
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [invitation_token, email, password, business_name, region, currency, tax_model]
+              properties:
+                invitation_token: { type: string, minLength: 32 }
+                email: { type: string, format: email }
+                password: { type: string, minLength: 12 }
+                business_name: { type: string, minLength: 1, maxLength: 200 }
+                region: { type: string, example: GB }
+                currency: { type: string, pattern: '^[A-Z]{3}$', example: GBP }
+                tax_model: { type: string, example: uk_vat_standard }
+                default_locale: { type: string, enum: [en, ar], default: en }
+      responses:
+        '201':
+          description: Workspace created; caller is its owner
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Session' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403':
+          description: Invitation missing, expired, spent, or revoked
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+
+  /auth/login:
+    post:
+      summary: Sign in
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string }
+      responses:
+        '200':
+          description: Signed in
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Session' }
+        '401':
+          description: Invalid credentials — deliberately indistinguishable from unknown account
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+
+  /auth/logout:
+    post:
+      summary: Sign out and invalidate the refresh token
+      description: >
+        The refresh token is optional in the body. The access token alone identifies the session
+        to end, but Supabase can only revoke a refresh token it is handed — without it the
+        refresh token stays valid until it expires. Clients that hold one should send it.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                refresh_token: { type: string }
+      responses:
+        '204': { description: Signed out }
+
+  /auth/password-reset:
+    post:
+      summary: Request a password reset email
+      description: Always returns 202 regardless of whether the address exists, to avoid account enumeration.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: { type: string, format: email }
+      responses:
+        '202': { description: Accepted }
+        '429': { $ref: '#/components/responses/RateLimited' }
+
+  /me:
+    get:
+      summary: The caller, their role, and their active workspace
+      responses:
+        '200':
+          description: Current member
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Me' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    patch:
+      summary: Update own profile preferences
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                preferred_locale: { type: string, enum: [en, ar] }
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Me' }
+
+  /me/workspaces:
+    get:
+      summary: All workspaces the caller belongs to
+      responses:
+        '200':
+          description: Memberships
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/WorkspaceSummary' }
+
+  /me/active-workspace:
+    put:
+      summary: Switch the active workspace
+      description: >
+        Sets the active membership and returns a re-issued session whose tenant_id claim
+        matches the new workspace (research R3). The old token remains valid until expiry
+        but continues to resolve the previous workspace.
+
+        `refresh_token` is required in practice: the claim is injected at token issuance, so a new
+        access token has to be minted, and Supabase mints one only in exchange for a refresh
+        token. Discovered during implementation — the endpoint cannot honour its own contract
+        without it.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [tenant_id, refresh_token]
+              properties:
+                tenant_id: { type: string, format: uuid }
+                refresh_token: { type: string }
+      responses:
+        '200':
+          description: Switched; session re-issued
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Session' }
+        '404':
+          description: Caller has no active membership in that workspace
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /tenant:
+    get:
+      summary: The active workspace
+      responses:
+        '200':
+          description: Workspace
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Tenant' }
+    patch:
+      summary: Update workspace settings
+      description: Owner only. Region, currency, and tax model are immutable after creation.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string, maxLength: 200 }
+                default_locale: { type: string, enum: [en, ar] }
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Tenant' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /members:
+    get:
+      summary: List members of the active workspace
+      parameters:
+        - { name: cursor, in: query, schema: { type: string } }
+        - { name: limit, in: query, schema: { type: integer, maximum: 100, default: 50 } }
+      responses:
+        '200':
+          description: Members
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/Member' }
+                  next_cursor: { type: string, nullable: true }
+
+  /members/{member_id}:
+    parameters:
+      - { name: member_id, in: path, required: true, schema: { type: string, format: uuid } }
+    patch:
+      summary: Change a member's role
+      description: Owner only. Refused if it would leave the workspace without an active owner (FR-012).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [role]
+              properties:
+                role: { $ref: '#/components/schemas/Role' }
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Member' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409':
+          description: Would leave the workspace ownerless
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+    delete:
+      summary: Remove a member
+      description: >
+        Owner only. Sets status to removed; the membership row is retained for audit.
+        Refused if it would leave the workspace without an active owner.
+      responses:
+        '204': { description: Removed }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409':
+          description: Would leave the workspace ownerless
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /invitations:
+    get:
+      summary: List pending member invitations
+      responses:
+        '200':
+          description: Invitations
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/Invitation' }
+    post:
+      summary: Invite a colleague to the active workspace
+      description: Owner only. Expires after 7 days (FR-010).
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, role]
+              properties:
+                email: { type: string, format: email }
+                role: { $ref: '#/components/schemas/Role' }
+      responses:
+        '201':
+          description: >
+            Invitation created. The plaintext token is returned ONCE, in this response and
+            nowhere else — there is no email delivery in this chunk, so the owner passes it to
+            the invitee themselves. It is stored only as a hash, never logged, and never
+            appears in any listing.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Invitation'
+                  - type: object
+                    properties:
+                      token:
+                        type: string
+                        description: Shown once at creation; not retrievable afterwards.
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409':
+          description: An invitation is already pending for that address
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /invitations/{invitation_id}:
+    parameters:
+      - { name: invitation_id, in: path, required: true, schema: { type: string, format: uuid } }
+    delete:
+      summary: Revoke a pending invitation
+      responses:
+        '204': { description: Revoked }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /invitations/accept:
+    post:
+      summary: Accept a member invitation
+      description: >
+        Idempotent — accepting the same invitation twice returns the existing membership
+        rather than creating a second one.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token]
+              properties:
+                token: { type: string }
+                password: { type: string, minLength: 12, description: Required only if the invitee has no account yet }
+      responses:
+        '200':
+          description: Membership active; session issued
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Session' }
+        '403':
+          description: Invitation expired, revoked, or addressed to another email
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /reference/config-options:
+    get:
+      summary: Enabled regions, currencies, and tax models for sign-up
+      security: []
+      responses:
+        '200':
+          description: Supported set
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  regions: { type: array, items: { $ref: '#/components/schemas/ReferenceOption' } }
+                  currencies: { type: array, items: { $ref: '#/components/schemas/ReferenceOption' } }
+                  tax_models: { type: array, items: { $ref: '#/components/schemas/ReferenceOption' } }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Supabase-issued access token carrying tenant_id and role claims (research R1).
+
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: false
+      schema: { type: string, format: uuid }
+
+  responses:
+    BadRequest:
+      description: Malformed request
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Unauthorized:
+      description: Missing, invalid, or expired token
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Forbidden:
+      description: The caller's role does not permit this action
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Unprocessable:
+      description: Validation failed — e.g. an unsupported region, currency, or tax model
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    RateLimited:
+      description: Too many attempts
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+
+  schemas:
+    Error:
+      type: object
+      required: [code, message, trace_id]
+      properties:
+        code: { type: string, example: forbidden_role }
+        message: { type: string }
+        details: { type: object, additionalProperties: true }
+        trace_id: { type: string }
+
+    Role:
+      type: string
+      enum: [owner, buyer, branch_manager, approver, viewer]
+
+    Session:
+      type: object
+      required: [access_token, refresh_token, user]
+      properties:
+        access_token: { type: string }
+        refresh_token: { type: string }
+        expires_in: { type: integer }
+        user: { $ref: '#/components/schemas/Me' }
+
+    Me:
+      type: object
+      required: [id, email, role, tenant]
+      properties:
+        id: { type: string, format: uuid }
+        email: { type: string, format: email }
+        role: { $ref: '#/components/schemas/Role' }
+        preferred_locale: { type: string, enum: [en, ar], nullable: true }
+        mfa_enabled: { type: boolean }
+        tenant: { $ref: '#/components/schemas/Tenant' }
+
+    Tenant:
+      type: object
+      required: [id, name, slug, region, currency, tax_model]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        slug: { type: string }
+        region: { type: string }
+        currency: { type: string, description: ISO 4217; every monetary value is stored with an explicit currency }
+        tax_model: { type: string }
+        default_locale: { type: string, enum: [en, ar] }
+        created_at: { type: string, format: date-time }
+
+    WorkspaceSummary:
+      type: object
+      properties:
+        tenant_id: { type: string, format: uuid }
+        name: { type: string }
+        role: { $ref: '#/components/schemas/Role' }
+        is_active: { type: boolean }
+
+    Member:
+      type: object
+      required: [id, email, role, status]
+      properties:
+        id: { type: string, format: uuid }
+        email: { type: string, format: email }
+        role: { $ref: '#/components/schemas/Role' }
+        status: { type: string, enum: [active, removed] }
+        mfa_enabled: { type: boolean }
+        created_at: { type: string, format: date-time }
+
+    Invitation:
+      type: object
+      required: [id, email, role, status, expires_at]
+      properties:
+        id: { type: string, format: uuid }
+        email: { type: string, format: email }
+        role: { $ref: '#/components/schemas/Role' }
+        status: { type: string, enum: [pending, accepted, revoked, expired] }
+        expires_at: { type: string, format: date-time }
+
+    ReferenceOption:
+      type: object
+      required: [code, label_en, label_ar]
+      properties:
+        code: { type: string }
+        label_en: { type: string }
+        label_ar: { type: string }

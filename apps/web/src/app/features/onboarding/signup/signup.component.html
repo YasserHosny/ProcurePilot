@@ -1,0 +1,175 @@
+<main class="signup-container">
+  <mat-card class="signup-card">
+    <div class="brand-header">
+      <mat-icon class="brand-icon" aria-hidden="true">insights</mat-icon>
+      <span class="brand-name">{{ 'common.brandName' | translate }}</span>
+    </div>
+
+    <h1 class="card-title">{{ 'onboarding.signup.title' | translate }}</h1>
+    <p class="card-subtitle">{{ 'onboarding.signup.subtitle' | translate }}</p>
+
+    <div class="invitation-badge">
+      <mat-icon aria-hidden="true">verified_user</mat-icon>
+      <span>{{ 'onboarding.signup.invitationGatedNotice' | translate }}</span>
+    </div>
+
+    @if (errorAlert(); as error) {
+      <div class="alert-banner" [class.error]="error.type === 'error'" [class.forbidden]="error.type === 'forbidden'" role="alert">
+        <span class="alert-title">{{ error.title }}</span>
+        <span>{{ error.message }}</span>
+        @if (error.traceId) {
+          <span class="trace-id">{{ 'common.traceId' | translate }}: {{ error.traceId }}</span>
+        }
+      </div>
+    }
+
+    <form [formGroup]="form" (ngSubmit)="onSubmit()" class="signup-form" novalidate>
+      <mat-form-field appearance="outline" class="form-field">
+        <mat-label>{{ 'onboarding.signup.tokenLabel' | translate }}</mat-label>
+        <input
+          matInput
+          formControlName="invitation_token"
+          [placeholder]="'onboarding.signup.tokenPlaceholder' | translate"
+          required
+          autocomplete="off"
+        />
+        <mat-hint>{{ 'onboarding.signup.tokenHint' | translate }}</mat-hint>
+        @if (form.controls.invitation_token.hasError('required')) {
+          <mat-error>{{ 'onboarding.signup.tokenRequired' | translate }}</mat-error>
+        }
+        @if (form.controls.invitation_token.hasError('minlength')) {
+          <mat-error>{{ 'onboarding.signup.tokenMinLength' | translate }}</mat-error>
+        }
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="form-field">
+        <mat-label>{{ 'onboarding.signup.businessNameLabel' | translate }}</mat-label>
+        <input
+          matInput
+          formControlName="business_name"
+          [placeholder]="'onboarding.signup.businessNamePlaceholder' | translate"
+          required
+          autocomplete="organization"
+        />
+        @if (form.controls.business_name.hasError('required')) {
+          <mat-error>{{ 'onboarding.signup.businessNameRequired' | translate }}</mat-error>
+        }
+        @if (form.controls.business_name.hasError('maxlength')) {
+          <mat-error>{{ 'onboarding.signup.businessNameMaxLength' | translate }}</mat-error>
+        }
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="form-field">
+        <mat-label>{{ 'onboarding.signup.emailLabel' | translate }}</mat-label>
+        <input
+          matInput
+          type="email"
+          formControlName="email"
+          [placeholder]="'onboarding.signup.emailPlaceholder' | translate"
+          required
+          autocomplete="email"
+        />
+        @if (form.controls.email.hasError('required')) {
+          <mat-error>{{ 'onboarding.signup.emailRequired' | translate }}</mat-error>
+        }
+        @if (form.controls.email.hasError('email')) {
+          <mat-error>{{ 'onboarding.signup.emailInvalid' | translate }}</mat-error>
+        }
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="form-field">
+        <mat-label>{{ 'onboarding.signup.passwordLabel' | translate }}</mat-label>
+        <input
+          matInput
+          [type]="hidePassword() ? 'password' : 'text'"
+          formControlName="password"
+          [placeholder]="'onboarding.signup.passwordPlaceholder' | translate"
+          required
+          autocomplete="new-password"
+        />
+        <button
+          mat-icon-button
+          matSuffix
+          type="button"
+          (click)="togglePasswordVisibility()"
+          [attr.aria-label]="(hidePassword() ? 'onboarding.signup.showPassword' : 'onboarding.signup.hidePassword') | translate"
+        >
+          <mat-icon aria-hidden="true">{{ hidePassword() ? 'visibility_off' : 'visibility' }}</mat-icon>
+        </button>
+        <mat-hint>{{ 'onboarding.signup.passwordHint' | translate }}</mat-hint>
+        @if (form.controls.password.hasError('required')) {
+          <mat-error>{{ 'onboarding.signup.passwordRequired' | translate }}</mat-error>
+        }
+        @if (form.controls.password.hasError('minlength')) {
+          <mat-error>{{ 'onboarding.signup.passwordMinLength' | translate }}</mat-error>
+        }
+      </mat-form-field>
+
+      <div class="form-row">
+        <mat-form-field appearance="outline" class="form-field">
+          <mat-label>{{ 'onboarding.signup.regionLabel' | translate }}</mat-label>
+          <mat-select formControlName="region" [placeholder]="'onboarding.signup.regionPlaceholder' | translate" required>
+            @for (region of configOptions()?.regions; track region.code) {
+              <mat-option [value]="region.code">
+                {{ i18n.currentLocale() === 'ar' ? region.label_ar : region.label_en }} ({{ region.code }})
+              </mat-option>
+            }
+          </mat-select>
+          @if (form.controls.region.hasError('required')) {
+            <mat-error>{{ 'onboarding.signup.regionRequired' | translate }}</mat-error>
+          }
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="form-field">
+          <mat-label>{{ 'onboarding.signup.currencyLabel' | translate }}</mat-label>
+          <mat-select formControlName="currency" [placeholder]="'onboarding.signup.currencyPlaceholder' | translate" required>
+            @for (currency of configOptions()?.currencies; track currency.code) {
+              <mat-option [value]="currency.code">
+                {{ currency.code }} - {{ i18n.currentLocale() === 'ar' ? currency.label_ar : currency.label_en }}
+              </mat-option>
+            }
+          </mat-select>
+          @if (form.controls.currency.hasError('required')) {
+            <mat-error>{{ 'onboarding.signup.currencyRequired' | translate }}</mat-error>
+          }
+        </mat-form-field>
+      </div>
+
+      <mat-form-field appearance="outline" class="form-field">
+        <mat-label>{{ 'onboarding.signup.taxModelLabel' | translate }}</mat-label>
+        <mat-select formControlName="tax_model" [placeholder]="'onboarding.signup.taxModelPlaceholder' | translate" required>
+          @for (taxModel of configOptions()?.tax_models; track taxModel.code) {
+            <mat-option [value]="taxModel.code">
+              {{ i18n.currentLocale() === 'ar' ? taxModel.label_ar : taxModel.label_en }}
+            </mat-option>
+          }
+        </mat-select>
+        @if (form.controls.tax_model.hasError('required')) {
+          <mat-error>{{ 'onboarding.signup.taxModelRequired' | translate }}</mat-error>
+        }
+      </mat-form-field>
+
+      <div class="form-actions">
+        <button
+          mat-flat-button
+          color="primary"
+          type="submit"
+          class="submit-button"
+          [disabled]="isSubmitting() || isLoadingConfig()"
+        >
+          @if (isSubmitting()) {
+            <mat-spinner diameter="20" class="button-spinner"></mat-spinner>
+            <span>{{ 'onboarding.signup.submittingButton' | translate }}</span>
+          } @else {
+            <span>{{ 'onboarding.signup.submitButton' | translate }}</span>
+          }
+        </button>
+
+        <div class="signin-prompt">
+          <span>{{ 'onboarding.signup.alreadyHaveAccount' | translate }}</span>
+          <a routerLink="/auth/sign-in">{{ 'onboarding.signup.signInLink' | translate }}</a>
+        </div>
+      </div>
+    </form>
+  </mat-card>
+</main>

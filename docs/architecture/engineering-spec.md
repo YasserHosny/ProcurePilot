@@ -90,8 +90,10 @@ procurepilot/
 
 - **Supabase Postgres 17** with `pgvector` and `pg_trgm`.
 - **RLS** policies enforce `tenant_id` isolation.
-- **Migrations:** versioned SQL files in `apps/api/migrations/`.
-- **Redis** for sessions, rate-limit counters, lightweight job queues.
+- **Migrations:** versioned SQL files in `supabase/migrations/`.
+- **Redis** for sessions, rate-limit counters, lightweight job queues. Redis is the Phase 1 end
+  state but is not used in chunk 4.1; it is deferred to chunk 4.3, when the first background job
+  arrives. Current rate limiting uses SlowAPI's in-process store.
 - **Supabase Storage** for source documents.
 
 ## 5. Key Algorithms

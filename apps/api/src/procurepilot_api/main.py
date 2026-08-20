@@ -1,0 +1,45 @@
+from __future__ import annotations
+
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+from procurepilot_api.config import Settings, get_settings
+from procurepilot_api.errors import register_exception_handlers
+from procurepilot_api.modules.auth.router import router as auth_router
+from procurepilot_api.modules.health.router import router as health_router
+from procurepilot_api.modules.members.router import router as members_router
+from procurepilot_api.modules.tenants.router import router as tenants_router
+from procurepilot_api.shared.logging import TraceIdMiddleware, configure_logging
+from procurepilot_api.shared.observability import init_error_reporting
+from procurepilot_api.shared.rate_limit import configure_rate_limiting
+
+API_PREFIX = "/api/v1"
+
+
+def create_app(settings: Settings | None = None) -> FastAPI:
+    active_settings = settings or get_settings()
+    # Before anything else can fail, so that startup errors are reported too.
+    init_error_reporting(active_settings)
+    configure_logging(active_settings.api_log_level)
+
+    app = FastAPI(title="ProcurePilot API")
+    app.add_middleware(TraceIdMiddleware)
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=list(active_settings.api_cors_origins),
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+    register_exception_handlers(app)
+    configure_rate_limiting(app, active_settings)
+
+    app.include_router(health_router, prefix=API_PREFIX)
+    app.include_router(auth_router, prefix=API_PREFIX)
+    app.include_router(tenants_router, prefix=API_PREFIX)
+    app.include_router(members_router, prefix=API_PREFIX)
+    return app
+
+
+app = create_app()

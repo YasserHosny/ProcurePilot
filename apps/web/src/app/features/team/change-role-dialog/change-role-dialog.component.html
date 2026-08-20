@@ -1,0 +1,37 @@
+<h2 mat-dialog-title>{{ 'team.changeRoleDialog.title' | translate }}</h2>
+
+<mat-dialog-content>
+  <p class="dialog-description">
+    {{ 'team.changeRoleDialog.description' | translate }}
+    <strong>{{ data.member.email }}</strong>
+  </p>
+
+  <form [formGroup]="form" id="change-role-form" (ngSubmit)="onConfirm()">
+    <mat-form-field appearance="outline" class="full-width">
+      <mat-label>{{ 'team.changeRoleDialog.roleLabel' | translate }}</mat-label>
+      <mat-select formControlName="role">
+        @for (role of roles; track role) {
+          <mat-option [value]="role">
+            {{ 'common.roles.' + role | translate }}
+          </mat-option>
+        }
+      </mat-select>
+      <mat-icon matPrefix aria-hidden="true">admin_panel_settings</mat-icon>
+    </mat-form-field>
+  </form>
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button mat-button type="button" (click)="onCancel()">
+    {{ 'team.changeRoleDialog.cancelButton' | translate }}
+  </button>
+  <button
+    mat-flat-button
+    color="primary"
+    type="submit"
+    form="change-role-form"
+    [disabled]="form.invalid || form.getRawValue().role === data.member.role"
+  >
+    {{ 'team.changeRoleDialog.confirmButton' | translate }}
+  </button>
+</mat-dialog-actions>

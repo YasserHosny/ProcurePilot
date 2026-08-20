@@ -1,0 +1,166 @@
+<div class="shell-container">
+  <mat-toolbar class="shell-toolbar">
+    <button
+      mat-icon-button
+      (click)="sidenav.toggle()"
+      [attr.aria-label]="'shell.toggleNav' | translate"
+      type="button"
+    >
+      <mat-icon aria-hidden="true">menu</mat-icon>
+    </button>
+
+    <a routerLink="/home" class="brand-section">
+      <mat-icon class="brand-icon" aria-hidden="true">insights</mat-icon>
+      <span class="brand-title">{{ 'common.brandName' | translate }}</span>
+    </a>
+
+    @if (tenant(); as currentTenant) {
+      <div class="workspace-badge" [matTooltip]="currentTenant.slug">
+        <mat-icon aria-hidden="true">business</mat-icon>
+        <span>{{ currentTenant.name }}</span>
+      </div>
+    }
+
+    <span class="toolbar-spacer"></span>
+
+    <!-- Workspace Switcher -->
+    <button
+      mat-button
+      [matMenuTriggerFor]="workspaceMenu"
+      class="workspace-switcher-btn"
+      type="button"
+      [attr.aria-label]="'shell.switchWorkspace' | translate"
+      (click)="loadWorkspaces()"
+    >
+      <mat-icon aria-hidden="true">swap_horiz</mat-icon>
+      <span class="workspace-name">{{ tenant()?.name || ('shell.switchWorkspace' | translate) }}</span>
+      <mat-icon class="dropdown-icon" aria-hidden="true">expand_more</mat-icon>
+    </button>
+
+    <mat-menu #workspaceMenu="matMenu" xPosition="before">
+      <div class="menu-header">
+        <span class="menu-user-email">{{ 'shell.workspaceListTitle' | translate }}</span>
+      </div>
+
+      @for (ws of workspaces(); track ws.tenant_id) {
+        <button
+          mat-menu-item
+          (click)="onSwitchWorkspace(ws.tenant_id)"
+          [disabled]="isSwitchingWorkspace() || ws.is_active"
+        >
+          <div class="workspace-menu-item">
+            <div class="ws-info">
+              <span class="ws-name">{{ ws.name }}</span>
+              <span class="ws-role">{{ 'common.roles.' + ws.role | translate }}</span>
+            </div>
+            @if (ws.is_active) {
+              <mat-icon class="active-icon" aria-hidden="true">check</mat-icon>
+            }
+          </div>
+        </button>
+      }
+    </mat-menu>
+
+    <!-- Account Menu -->
+    <button
+      mat-icon-button
+      [matMenuTriggerFor]="accountMenu"
+      class="account-btn"
+      type="button"
+      [attr.aria-label]="'shell.accountMenuLabel' | translate"
+    >
+      <div class="account-avatar">
+        {{ userInitials() }}
+      </div>
+    </button>
+
+    <mat-menu #accountMenu="matMenu" xPosition="before">
+      <div class="menu-header">
+        <div class="menu-user-email">{{ member()?.email }}</div>
+        @if (member()?.role; as role) {
+          <div class="menu-user-role">{{ 'common.roles.' + role | translate }}</div>
+        }
+      </div>
+
+      <!-- Language Selector in Account Menu -->
+      <div class="menu-section-header">{{ 'shell.language' | translate }}</div>
+
+      <button mat-menu-item (click)="onSelectLanguage('en')">
+        <mat-icon aria-hidden="true">{{ currentLocale() === 'en' ? 'check' : '' }}</mat-icon>
+        <span>{{ 'common.languages.en' | translate }}</span>
+      </button>
+
+      <button mat-menu-item (click)="onSelectLanguage('ar')">
+        <mat-icon aria-hidden="true">{{ currentLocale() === 'ar' ? 'check' : '' }}</mat-icon>
+        <span>{{ 'common.languages.ar' | translate }}</span>
+      </button>
+
+      <mat-divider></mat-divider>
+
+      <button mat-menu-item (click)="onSignOut()">
+        <mat-icon aria-hidden="true">logout</mat-icon>
+        <span>{{ 'shell.signOut' | translate }}</span>
+      </button>
+    </mat-menu>
+  </mat-toolbar>
+
+  <mat-sidenav-container class="sidenav-container">
+    <mat-sidenav #sidenav mode="side" opened class="shell-sidenav">
+      <div class="nav-section-title">{{ 'shell.navSectionMain' | translate }}</div>
+
+      <a
+        mat-list-item
+        routerLink="/home"
+        routerLinkActive="active"
+        class="nav-item"
+      >
+        <mat-icon aria-hidden="true">dashboard</mat-icon>
+        <span class="nav-label">{{ 'shell.navHome' | translate }}</span>
+      </a>
+
+      <div class="nav-item disabled" aria-disabled="true">
+        <mat-icon aria-hidden="true">receipt_long</mat-icon>
+        <span class="nav-label">{{ 'shell.navQuotations' | translate }}</span>
+        <span class="soon-badge">{{ 'common.comingSoon' | translate }}</span>
+      </div>
+
+      <div class="nav-item disabled" aria-disabled="true">
+        <mat-icon aria-hidden="true">compare_arrows</mat-icon>
+        <span class="nav-label">{{ 'shell.navCompare' | translate }}</span>
+        <span class="soon-badge">{{ 'common.comingSoon' | translate }}</span>
+      </div>
+
+      <div class="nav-item disabled" aria-disabled="true">
+        <mat-icon aria-hidden="true">savings</mat-icon>
+        <span class="nav-label">{{ 'shell.navSavings' | translate }}</span>
+        <span class="soon-badge">{{ 'common.comingSoon' | translate }}</span>
+      </div>
+
+      <a
+        mat-list-item
+        routerLink="/team"
+        routerLinkActive="active"
+        class="nav-item"
+        *appRole="'owner'"
+      >
+        <mat-icon aria-hidden="true">group</mat-icon>
+        <span class="nav-label">{{ 'shell.navTeam' | translate }}</span>
+      </a>
+
+      <div class="nav-item disabled" aria-disabled="true">
+        <mat-icon aria-hidden="true">settings</mat-icon>
+        <span class="nav-label">{{ 'shell.navSettings' | translate }}</span>
+        <span class="soon-badge">{{ 'common.comingSoon' | translate }}</span>
+      </div>
+    </mat-sidenav>
+
+    <!--
+      tabindex="0" because this region scrolls (overflow-y: auto) and axe flags a scrollable
+      region with no focusable content: a keyboard-only user could not scroll it at all. Making
+      the container itself focusable gives them arrow-key access.
+    -->
+    <mat-sidenav-content class="main-content" tabindex="0">
+      <router-outlet></router-outlet>
+    </mat-sidenav-content>
+  </mat-sidenav-container>
+</div>

@@ -1,0 +1,50 @@
+[build-system]
+requires = ["hatchling>=1.27,<2"]
+build-backend = "hatchling.build"
+
+[project]
+name = "procurepilot-api"
+version = "0.1.0"
+description = "ProcurePilot FastAPI modular monolith backend"
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "fastapi==0.115.6",
+    "uvicorn[standard]==0.34.0",
+    "pydantic>=2.10,<3",
+    "pydantic-settings>=2.7,<3",
+    "python-jose[cryptography]==3.3.0",
+    "httpx==0.28.1",
+    "slowapi==0.1.9",
+    "supabase==2.11.0",
+    "psycopg[binary]>=3.2,<4",
+    "sentry-sdk[fastapi]>=2.20,<3",
+]
+
+[dependency-groups]
+dev = [
+    "pytest==8.3.4",
+    "pytest-asyncio==0.25.2",
+    "ruff",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/procurepilot_api"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "src/procurepilot_api",
+    "README.md",
+    "pyproject.toml",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "ANN"]

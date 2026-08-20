@@ -5,3 +5,34 @@
 
 # Agent folder: local settings may contain credentials
 .claude/settings.local.json
+
+# Secrets and local configuration
+.env
+.env.local
+*.pem
+*.key
+
+# Dependencies
+node_modules/
+.pnpm-store/
+.venv/
+__pycache__/
+*.py[cod]
+
+# Build output
+dist/
+build/
+.angular/
+.turbo/
+*.egg-info/
+
+# Test and coverage artefacts
+.pytest_cache/
+coverage/
+htmlcov/
+playwright-report/
+test-results/
+
+# Editor / OS
+.DS_Store
+*.swp

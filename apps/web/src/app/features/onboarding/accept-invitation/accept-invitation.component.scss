@@ -1,0 +1,156 @@
+.accept-container {
+  min-block-size: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #f8fafc;
+  padding-inline: 1rem;
+  padding-block: 2rem;
+}
+
+.accept-card {
+  inline-size: 100%;
+  max-inline-size: 460px;
+  border-radius: 12px;
+  background-color: #ffffff;
+  padding-inline: 2rem;
+  padding-block: 2rem;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+}
+
+.card-header {
+  text-align: center;
+  margin-block-end: 1.5rem;
+}
+
+.brand-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 48px;
+  block-size: 48px;
+  border-radius: 12px;
+  background-color: #eef2ff;
+  color: #4f46e5;
+  margin-block-end: 0.75rem;
+
+  mat-icon {
+    font-size: 28px;
+    inline-size: 28px;
+    block-size: 28px;
+  }
+}
+
+.card-title {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #0f172a;
+  letter-spacing: -0.02em;
+  margin-block-end: 0.5rem;
+}
+
+.card-subtitle {
+  margin: 0;
+  font-size: 0.875rem;
+  color: #64748b;
+  line-height: 1.5;
+}
+
+.error-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding-inline: 1rem;
+  padding-block: 0.75rem;
+  background-color: #fef2f2;
+  border: 1px solid #fee2e2;
+  border-radius: 8px;
+  color: #991b1b;
+  margin-block-end: 1.25rem;
+
+  .error-icon {
+    color: #ef4444;
+    font-size: 22px;
+    inline-size: 22px;
+    block-size: 22px;
+    margin-block-start: 2px;
+  }
+
+  .error-content {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .error-title {
+    font-weight: 600;
+    font-size: 0.875rem;
+  }
+
+  .error-message {
+    font-size: 0.8125rem;
+    line-height: 1.4;
+  }
+
+  .error-trace {
+    font-size: 0.75rem;
+    color: #b91c1c;
+    font-family: monospace;
+  }
+}
+
+.accept-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.full-width {
+  inline-size: 100%;
+}
+
+.account-mode-group {
+  margin-block-end: 0.5rem;
+}
+
+.radio-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.radio-option {
+  font-size: 0.875rem;
+  color: #334155;
+}
+
+.submit-btn {
+  block-size: 44px;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  border-radius: 8px;
+  margin-block-start: 0.5rem;
+}
+
+.spinner {
+  display: inline-block;
+  margin-inline-end: 0.5rem;
+}
+
+.card-footer {
+  margin-block-start: 1.5rem;
+  text-align: center;
+}
+
+.signin-link {
+  color: #4f46e5;
+  text-decoration: none;
+  font-size: 0.875rem;
+  font-weight: 500;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}

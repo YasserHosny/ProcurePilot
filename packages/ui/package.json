@@ -1,0 +1,8 @@
+{
+  "name": "@procurepilot/ui",
+  "version": "0.1.0",
+  "private": true,
+  "exports": {
+    "./tokens.scss": "./src/tokens.scss"
+  }
+}
