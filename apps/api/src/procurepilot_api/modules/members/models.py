@@ -4,13 +4,14 @@ from datetime import datetime
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from procurepilot_api.modules.auth.jwt import MemberRole
 from procurepilot_api.modules.tenants.models import Tenant
 
 type Locale = Literal["en", "ar"]
 type MembershipStatus = Literal["active", "removed"]
+type MemberInvitationStatus = Literal["pending", "accepted", "revoked", "expired"]
 
 
 class Membership(BaseModel):
@@ -24,6 +25,47 @@ class Membership(BaseModel):
     is_active_workspace: bool
     status: MembershipStatus
     created_at: datetime | None = None
+
+
+class Member(BaseModel):
+    id: UUID
+    email: str
+    role: MemberRole
+    status: MembershipStatus
+    mfa_enabled: bool = False
+    created_at: datetime | None = None
+
+
+class MemberList(BaseModel):
+    items: list[Member]
+    next_cursor: str | None = None
+
+
+class MemberRoleUpdate(BaseModel):
+    role: MemberRole
+
+
+class MemberInvitation(BaseModel):
+    id: UUID
+    email: str
+    role: MemberRole
+    status: MemberInvitationStatus
+    expires_at: datetime
+    token: str | None = None
+
+
+class MemberInvitationList(BaseModel):
+    items: list[MemberInvitation]
+
+
+class MemberInvitationCreate(BaseModel):
+    email: str
+    role: MemberRole
+
+
+class MemberInvitationAccept(BaseModel):
+    token: str = Field(min_length=32)
+    password: str | None = Field(default=None, min_length=12)
 
 
 class Me(BaseModel):

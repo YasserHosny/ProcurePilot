@@ -336,10 +336,21 @@ paths:
                 role: { $ref: '#/components/schemas/Role' }
       responses:
         '201':
-          description: Invitation sent
+          description: >
+            Invitation created. The plaintext token is returned ONCE, in this response and
+            nowhere else — there is no email delivery in this chunk, so the owner passes it to
+            the invitee themselves. It is stored only as a hash, never logged, and never
+            appears in any listing.
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/Invitation' }
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Invitation'
+                  - type: object
+                    properties:
+                      token:
+                        type: string
+                        description: Shown once at creation; not retrievable afterwards.
         '403': { $ref: '#/components/responses/Forbidden' }
         '409':
           description: An invitation is already pending for that address
