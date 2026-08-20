@@ -98,6 +98,31 @@
       "defaultErrorTitle": "Workspace Creation Failed",
       "showPassword": "Show password",
       "hidePassword": "Hide password"
+    },
+    "acceptInvitation": {
+      "title": "Accept workspace invitation",
+      "subtitle": "Join your team's isolated workspace on ProcurePilot.",
+      "tokenLabel": "Invitation Token",
+      "tokenPlaceholder": "e.g. 32-character invitation token",
+      "tokenHint": "Requires a valid invitation token",
+      "tokenRequired": "Invitation token is required",
+      "tokenMinLength": "Token must be at least 32 characters",
+      "hasAccountOption": "I already have a ProcurePilot account",
+      "newAccountOption": "I am new to ProcurePilot (set password)",
+      "passwordLabel": "Password",
+      "passwordPlaceholder": "Enter a secure password",
+      "passwordHint": "Must be at least 12 characters",
+      "passwordRequired": "Password is required for new accounts",
+      "passwordMinLength": "Password must be at least 12 characters",
+      "submitButton": "Accept Invitation & Join",
+      "submittingButton": "Joining Workspace...",
+      "invalidOrExpiredTitle": "Invitation Refused",
+      "invalidOrExpiredMessage": "This invitation is missing, expired, revoked, or addressed to another email address.",
+      "defaultErrorTitle": "Unable to Accept Invitation",
+      "genericError": "Unable to accept invitation. Please check your connection and try again.",
+      "backToSignIn": "Back to sign in",
+      "showPassword": "Show password",
+      "hidePassword": "Hide password"
     }
   },
   "shell": {
@@ -159,5 +184,90 @@
     "step4Title": "Verified Savings Ledger",
     "step4Desc": "Auditable proof of purchasing savings vs baseline policies.",
     "step4Status": "Upcoming (Chunk 4.6)"
+  },
+  "team": {
+    "title": "Team Management",
+    "subtitle": "Manage workspace members, invite colleagues, and configure role-based access.",
+    "inviteButton": "Invite Member",
+    "membersTab": "Members",
+    "invitationsTab": "Pending Invitations",
+    "membersSectionTitle": "Workspace Members",
+    "invitationsSectionTitle": "Pending Invitations",
+    "columns": {
+      "member": "Member",
+      "email": "Email Address",
+      "role": "Role",
+      "status": "Status",
+      "joined": "Joined",
+      "mfa": "MFA",
+      "expires": "Expires",
+      "actions": "Actions"
+    },
+    "status": {
+      "active": "Active",
+      "removed": "Removed",
+      "pending": "Pending",
+      "accepted": "Accepted",
+      "revoked": "Revoked",
+      "expired": "Expired"
+    },
+    "actions": {
+      "changeRole": "Change role",
+      "removeMember": "Remove member",
+      "revokeInvitation": "Revoke invitation"
+    },
+    "emptyMembers": "No members found in this workspace.",
+    "emptyInvitations": "No pending invitations.",
+    "inviteSuccess": "Invitation created successfully.",
+    "revokeSuccess": "Invitation revoked successfully.",
+    "roleChangeSuccess": "Member role updated successfully.",
+    "removeSuccess": "Member removed successfully.",
+    "lastOwnerErrorTitle": "Action Refused",
+    "lastOwnerErrorMessage": "A workspace must retain at least one active owner. Demoting or removing the only owner is refused by the server.",
+    "genericError": "An unexpected error occurred. Please try again.",
+    "inviteDialog": {
+      "title": "Invite a Colleague",
+      "subtitle": "Create an invitation for a team member to join this workspace with a specified role.",
+      "emailLabel": "Work Email Address",
+      "emailPlaceholder": "colleague@company.com",
+      "emailRequired": "Email is required",
+      "emailInvalid": "Please enter a valid email address",
+      "roleLabel": "Assigned Role",
+      "roleHint": "Select the initial authority level for this user.",
+      "submitButton": "Create Invitation",
+      "submittingButton": "Creating...",
+      "cancelButton": "Cancel",
+      "closeButton": "Close",
+      "tokenCreatedTitle": "Invitation Created",
+      "tokenCreatedNotice": "Share this invitation link or token with the invitee. Because email delivery is not configured in this phase, the token is shown once only.",
+      "tokenLabel": "Invitation Token",
+      "linkCopyButton": "Copy Link",
+      "tokenCopyButton": "Copy Token",
+      "copied": "Copied to clipboard!",
+      "duplicateInviteError": "An invitation is already pending for this email address.",
+      "genericError": "Unable to create invitation. Please try again."
+    },
+    "changeRoleDialog": {
+      "title": "Change Member Role",
+      "description": "Select a new role for this member:",
+      "roleLabel": "New Role",
+      "confirmButton": "Update Role",
+      "cancelButton": "Cancel",
+      "updatingButton": "Updating..."
+    },
+    "removeMemberDialog": {
+      "title": "Remove Member",
+      "message": "Are you sure you want to remove this member from the workspace? They will lose access immediately.",
+      "confirmButton": "Remove Member",
+      "cancelButton": "Cancel",
+      "removingButton": "Removing..."
+    },
+    "revokeInvitationDialog": {
+      "title": "Revoke Invitation",
+      "message": "Are you sure you want to revoke this invitation? The invitee will no longer be able to use the invitation token.",
+      "confirmButton": "Revoke Invitation",
+      "cancelButton": "Cancel",
+      "revokingButton": "Revoking..."
+    }
   }
 }

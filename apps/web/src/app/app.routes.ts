@@ -1,6 +1,6 @@
 import { Routes } from '@angular/router';
 
-import { authGuard } from './core/auth/auth.guard';
+import { authGuard, roleGuard } from './core/auth/auth.guard';
 
 /**
  * Public routes and guarded routes are kept in separate blocks (FR-016).
@@ -36,6 +36,13 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./features/onboarding/signup/signup.component').then((m) => m.SignupComponent),
       },
+      {
+        path: 'accept-invitation',
+        loadComponent: () =>
+          import('./features/onboarding/accept-invitation/accept-invitation.component').then(
+            (m) => m.AcceptInvitationComponent,
+          ),
+      },
       { path: '', pathMatch: 'full', redirectTo: 'signup' },
     ],
   },
@@ -52,6 +59,12 @@ export const routes: Routes = [
         path: 'home',
         loadComponent: () =>
           import('./layout/home/home.component').then((m) => m.HomeComponent),
+      },
+      {
+        path: 'team',
+        canActivate: [roleGuard('owner')],
+        loadComponent: () =>
+          import('./features/team/team.component').then((m) => m.TeamComponent),
       },
     ],
   },

@@ -1,0 +1,123 @@
+@if (!createdResult()) {
+  <h2 mat-dialog-title>{{ 'team.inviteDialog.title' | translate }}</h2>
+
+  <mat-dialog-content>
+    <p class="dialog-subtitle">{{ 'team.inviteDialog.subtitle' | translate }}</p>
+
+    @if (errorMessage()) {
+      <div class="error-banner" role="alert">
+        <mat-icon aria-hidden="true">error</mat-icon>
+        <div class="error-content">
+          <span class="error-message">{{ errorMessage() }}</span>
+          @if (errorTraceId()) {
+            <span class="error-trace">{{ 'common.traceId' | translate }}: {{ errorTraceId() }}</span>
+          }
+        </div>
+      </div>
+    }
+
+    <form [formGroup]="form" id="invite-form" (ngSubmit)="onSubmit()" class="dialog-form">
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>{{ 'team.inviteDialog.emailLabel' | translate }}</mat-label>
+        <input
+          matInput
+          type="email"
+          formControlName="email"
+          [placeholder]="'team.inviteDialog.emailPlaceholder' | translate"
+          autocomplete="email"
+        />
+        <mat-icon matPrefix aria-hidden="true">mail</mat-icon>
+        @if (form.controls.email.hasError('required')) {
+          <mat-error>{{ 'team.inviteDialog.emailRequired' | translate }}</mat-error>
+        }
+        @if (form.controls.email.hasError('email')) {
+          <mat-error>{{ 'team.inviteDialog.emailInvalid' | translate }}</mat-error>
+        }
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>{{ 'team.inviteDialog.roleLabel' | translate }}</mat-label>
+        <mat-select formControlName="role">
+          @for (role of roles; track role) {
+            <mat-option [value]="role">
+              {{ 'common.roles.' + role | translate }}
+            </mat-option>
+          }
+        </mat-select>
+        <mat-icon matPrefix aria-hidden="true">admin_panel_settings</mat-icon>
+        <mat-hint>{{ 'team.inviteDialog.roleHint' | translate }}</mat-hint>
+      </mat-form-field>
+    </form>
+  </mat-dialog-content>
+
+  <mat-dialog-actions align="end">
+    <button mat-button type="button" (click)="onCancel()" [disabled]="isSubmitting()">
+      {{ 'team.inviteDialog.cancelButton' | translate }}
+    </button>
+    <button
+      mat-flat-button
+      color="primary"
+      type="submit"
+      form="invite-form"
+      [disabled]="isSubmitting() || form.invalid"
+    >
+      @if (isSubmitting()) {
+        <mat-spinner diameter="18" class="spinner"></mat-spinner>
+        <span>{{ 'team.inviteDialog.submittingButton' | translate }}</span>
+      } @else {
+        <span>{{ 'team.inviteDialog.submitButton' | translate }}</span>
+      }
+    </button>
+  </mat-dialog-actions>
+} @else {
+  <h2 mat-dialog-title>
+    <mat-icon class="success-icon" aria-hidden="true">check_circle</mat-icon>
+    {{ 'team.inviteDialog.tokenCreatedTitle' | translate }}
+  </h2>
+
+  <mat-dialog-content>
+    <p class="dialog-subtitle">{{ 'team.inviteDialog.tokenCreatedNotice' | translate }}</p>
+
+    @if (createdResult()?.inviteUrl; as url) {
+      <div class="token-box">
+        <span class="token-label">{{ 'team.inviteDialog.linkCopyButton' | translate }}</span>
+        <div class="token-row">
+          <input class="token-input" [value]="url" readonly />
+          <button
+            mat-stroked-button
+            type="button"
+            (click)="copyToClipboard(url)"
+            class="copy-btn"
+          >
+            <mat-icon aria-hidden="true">{{ isCopied() ? 'check' : 'content_copy' }}</mat-icon>
+            <span>{{ (isCopied() ? 'team.inviteDialog.copied' : 'team.inviteDialog.linkCopyButton') | translate }}</span>
+          </button>
+        </div>
+      </div>
+    }
+
+    @if (createdResult()?.token; as token) {
+      <div class="token-box">
+        <span class="token-label">{{ 'team.inviteDialog.tokenLabel' | translate }}</span>
+        <div class="token-row">
+          <input class="token-input mono" [value]="token" readonly />
+          <button
+            mat-stroked-button
+            type="button"
+            (click)="copyToClipboard(token)"
+            class="copy-btn"
+          >
+            <mat-icon aria-hidden="true">{{ isCopied() ? 'check' : 'content_copy' }}</mat-icon>
+            <span>{{ (isCopied() ? 'team.inviteDialog.copied' : 'team.inviteDialog.tokenCopyButton') | translate }}</span>
+          </button>
+        </div>
+      </div>
+    }
+  </mat-dialog-content>
+
+  <mat-dialog-actions align="end">
+    <button mat-flat-button color="primary" type="button" (click)="onCloseSuccess()">
+      {{ 'team.inviteDialog.closeButton' | translate }}
+    </button>
+  </mat-dialog-actions>
+}

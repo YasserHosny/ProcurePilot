@@ -1,5 +1,5 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
-import { Observable, tap } from 'rxjs';
+import { Observable, tap, throwError } from 'rxjs';
 
 import { ApiService } from '../api/api.service';
 import type { Me, Role, Session, WorkspaceSummary } from '../api/models';
@@ -45,8 +45,16 @@ export class SessionService {
     return this.api.me().pipe(tap((me) => this.member.set(me)));
   }
 
+  get refreshToken(): string | null {
+    return localStorage.getItem(REFRESH_TOKEN_KEY);
+  }
+
   switchWorkspace(tenantId: string): Observable<Session> {
-    return this.api.setActiveWorkspace(tenantId).pipe(tap((s) => this.adopt(s)));
+    const refresh = this.refreshToken;
+    if (!refresh) {
+      return throwError(() => new Error('cannot switch workspace without a refresh token'));
+    }
+    return this.api.setActiveWorkspace(tenantId, refresh).pipe(tap((s) => this.adopt(s)));
   }
 
   workspaces(): Observable<{ items: WorkspaceSummary[] }> {

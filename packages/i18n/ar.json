@@ -98,6 +98,31 @@
       "defaultErrorTitle": "فشل إنشاء مساحة العمل",
       "showPassword": "عرض كلمة المرور",
       "hidePassword": "إخفاء كلمة المرور"
+    },
+    "acceptInvitation": {
+      "title": "قبول دعوة مساحة العمل",
+      "subtitle": "انضم إلى مساحة العمل المستقلة لفريقك على منصة ProcurePilot.",
+      "tokenLabel": "رمز الدعوة",
+      "tokenPlaceholder": "مثلاً رمز الدعوة المكون من 32 حرفاً",
+      "tokenHint": "يتطلب رمز دعوة صالحاً للمنصة",
+      "tokenRequired": "رمز الدعوة مطلوب",
+      "tokenMinLength": "يجب أن يتكون الرمز من 32 حرفاً على الأقل",
+      "hasAccountOption": "لدي حساب بالفعل على ProcurePilot",
+      "newAccountOption": "أنا مستخدم جديد في ProcurePilot (تعيين كلمة المرور)",
+      "passwordLabel": "كلمة المرور",
+      "passwordPlaceholder": "أدخل كلمة مرور آمنة",
+      "passwordHint": "يجب أن تتكون من 12 حرفاً على الأقل",
+      "passwordRequired": "كلمة المرور مطلوبة للحسابات الجديدة",
+      "passwordMinLength": "يجب أن تتكون كلمة المرور من 12 حرفاً على الأقل",
+      "submitButton": "قبول الدعوة والانضمام",
+      "submittingButton": "جاري الانضمام إلى مساحة العمل...",
+      "invalidOrExpiredTitle": "تم رفض الدعوة",
+      "invalidOrExpiredMessage": "هذه الدعوة مفقودة أو منتهية الصلاحية أو ملغاة أو مخصصة لبريد إلكتروني آخر.",
+      "defaultErrorTitle": "تعذر قبول الدعوة",
+      "genericError": "تعذر قبول الدعوة. يُرجى التحقق من اتصالك والمحاولة مرة أخرى.",
+      "backToSignIn": "العودة لتسجيل الدخول",
+      "showPassword": "عرض كلمة المرور",
+      "hidePassword": "إخفاء كلمة المرور"
     }
   },
   "shell": {
@@ -159,5 +184,90 @@
     "step4Title": "سجل الوفورات الموثقة",
     "step4Desc": "إثبات قابل للتدقيق للوفورات المحققة في المشتريات مقارنة بالسياسات الأساسية.",
     "step4Status": "قادم (المرحلة 4.6)"
+  },
+  "team": {
+    "title": "إدارة الفريق",
+    "subtitle": "إدارة أعضاء مساحة العمل ودعوة الزملاء وضبط التحكم في الوصول القائم على الأدوار.",
+    "inviteButton": "دعوة عضو",
+    "membersTab": "الأعضاء",
+    "invitationsTab": "الدعوات المعلقة",
+    "membersSectionTitle": "أعضاء مساحة العمل",
+    "invitationsSectionTitle": "الدعوات المعلقة",
+    "columns": {
+      "member": "العضو",
+      "email": "البريد الإلكتروني",
+      "role": "الدور",
+      "status": "الحالة",
+      "joined": "تاريخ الانضمام",
+      "mfa": "المصادقة الثنائية",
+      "expires": "تاريخ الانتهاء",
+      "actions": "الإجراءات"
+    },
+    "status": {
+      "active": "نشط",
+      "removed": "تمت الإزالة",
+      "pending": "معلقة",
+      "accepted": "مقبولة",
+      "revoked": "ملغاة",
+      "expired": "منتهية الصلاحية"
+    },
+    "actions": {
+      "changeRole": "تغيير الدور",
+      "removeMember": "إزالة العضو",
+      "revokeInvitation": "إلغاء الدعوة"
+    },
+    "emptyMembers": "لم يتم العثور على أعضاء في مساحة العمل هذه.",
+    "emptyInvitations": "لا توجد دعوات معلقة.",
+    "inviteSuccess": "تم إنشاء الدعوة بنجاح.",
+    "revokeSuccess": "تم إلغاء الدعوة بنجاح.",
+    "roleChangeSuccess": "تم تحديث دور العضو بنجاح.",
+    "removeSuccess": "تمت إزالة العضو بنجاح.",
+    "lastOwnerErrorTitle": "تم رفض الإجراء",
+    "lastOwnerErrorMessage": "يجب أن تحتفظ مساحة العمل بمالك نشط واحد على الأقل. يرفض الخادم إزالة المالك الوحيد أو تخفيض صلاحياته.",
+    "genericError": "حدث خطأ غير متوقع. يُرجى المحاولة مرة أخرى.",
+    "inviteDialog": {
+      "title": "دعوة زميل عمل",
+      "subtitle": "إنشاء دعوة لعضو فريق للانضمام إلى مساحة العمل هذه مع تحديد الدور.",
+      "emailLabel": "بريد العمل الإلكتروني",
+      "emailPlaceholder": "colleague@company.com",
+      "emailRequired": "البريد الإلكتروني مطلوب",
+      "emailInvalid": "يُرجى إدخال عنوان بريد إلكتروني صالح",
+      "roleLabel": "الدور المعين",
+      "roleHint": "اختر مستوى الصلاحيات الأولي لهذا المستخدم.",
+      "submitButton": "إنشاء الدعوة",
+      "submittingButton": "جاري الإنشاء...",
+      "cancelButton": "إلغاء",
+      "closeButton": "إغلاق",
+      "tokenCreatedTitle": "تم إنشاء الدعوة بنجاح",
+      "tokenCreatedNotice": "شارك رابط الدعوة هذا أو رمز الدعوة مع الشخص المدعو. نظراً لعدم تفعيل الإرسال بالبريد في هذه المرحلة، يظهر الرمز لمرة واحدة فقط.",
+      "tokenLabel": "رمز الدعوة",
+      "linkCopyButton": "نسخ الرابط",
+      "tokenCopyButton": "نسخ الرمز",
+      "copied": "تم النسخ إلى الحافظة!",
+      "duplicateInviteError": "توجد دعوة معلقة بالفعل لهذا البريد الإلكتروني.",
+      "genericError": "تعذر إنشاء الدعوة. يُرجى المحاولة مرة أخرى."
+    },
+    "changeRoleDialog": {
+      "title": "تغيير دور العضو",
+      "description": "اختر دوراً جديداً لهذا العضو:",
+      "roleLabel": "الدور الجديد",
+      "confirmButton": "تحديث الدور",
+      "cancelButton": "إلغاء",
+      "updatingButton": "جاري التحديث..."
+    },
+    "removeMemberDialog": {
+      "title": "إزالة العضو",
+      "message": "هل أنت متأكد من رغبتك في إزالة هذا العضو من مساحة العمل؟ سيفقد حق الوصول فوراً.",
+      "confirmButton": "إزالة العضو",
+      "cancelButton": "إلغاء",
+      "removingButton": "جاري الإزالة..."
+    },
+    "revokeInvitationDialog": {
+      "title": "إلغاء الدعوة",
+      "message": "هل أنت متأكد من رغبتك في إلغاء هذه الدعوة؟ لن يتمكن المدعو من استخدام رمز الدعوة بعد الآن.",
+      "confirmButton": "إلغاء الدعوة",
+      "cancelButton": "إلغاء",
+      "revokingButton": "جاري الإلغاء..."
+    }
   }
 }

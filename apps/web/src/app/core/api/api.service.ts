@@ -66,9 +66,18 @@ export class ApiService {
     return this.http.get<{ items: WorkspaceSummary[] }>(`${this.base}/me/workspaces`);
   }
 
-  /** Switching re-issues the session so the tenant_id claim follows (research R3). */
-  setActiveWorkspace(tenantId: string): Observable<Session> {
-    return this.http.put<Session>(`${this.base}/me/active-workspace`, { tenant_id: tenantId });
+  /**
+   * Switching re-issues the session so the tenant_id claim follows (research R3).
+   *
+   * The refresh token is required: the claim is injected at token issuance, so a new access
+   * token has to be minted, and that is only done in exchange for a refresh token. Omitting it
+   * returns 422.
+   */
+  setActiveWorkspace(tenantId: string, refreshToken: string): Observable<Session> {
+    return this.http.put<Session>(`${this.base}/me/active-workspace`, {
+      tenant_id: tenantId,
+      refresh_token: refreshToken,
+    });
   }
 
   // --- workspace ----------------------------------------------------------

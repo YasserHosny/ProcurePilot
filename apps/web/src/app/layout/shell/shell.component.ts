@@ -11,6 +11,7 @@ import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/rou
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
 import type { Locale, Role, WorkspaceSummary } from '../../core/api/models';
+import { RoleDirective } from '../../core/auth/role.directive';
 import { SessionService } from '../../core/auth/session.service';
 import { I18nService } from '../../core/i18n';
 
@@ -30,6 +31,7 @@ import { I18nService } from '../../core/i18n';
     MatTooltipModule,
     MatListModule,
     TranslatePipe,
+    RoleDirective,
   ],
   templateUrl: './shell.component.html',
   styleUrl: './shell.component.scss',

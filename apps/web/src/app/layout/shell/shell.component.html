@@ -136,11 +136,16 @@
         <span class="soon-badge">{{ 'common.comingSoon' | translate }}</span>
       </div>
 
-      <div class="nav-item disabled">
+      <a
+        mat-list-item
+        routerLink="/team"
+        routerLinkActive="active"
+        class="nav-item"
+        *appRole="'owner'"
+      >
         <mat-icon aria-hidden="true">group</mat-icon>
         <span class="nav-label">{{ 'shell.navTeam' | translate }}</span>
-        <span class="soon-badge">{{ 'common.comingSoon' | translate }}</span>
-      </div>
+      </a>
 
       <div class="nav-item disabled">
         <mat-icon aria-hidden="true">settings</mat-icon>

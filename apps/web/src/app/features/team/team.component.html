@@ -1,0 +1,255 @@
+<div class="team-container">
+  <!-- Page Header -->
+  <div class="page-header">
+    <div class="header-info">
+      <h1 class="page-title">{{ 'team.title' | translate }}</h1>
+      <p class="page-subtitle">{{ 'team.subtitle' | translate }}</p>
+    </div>
+
+    <div class="header-actions" *appRole="'owner'">
+      <button
+        mat-flat-button
+        color="primary"
+        type="button"
+        (click)="openInviteDialog()"
+        class="invite-btn"
+      >
+        <mat-icon aria-hidden="true">person_add</mat-icon>
+        <span>{{ 'team.inviteButton' | translate }}</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Error Banner -->
+  @if (errorMessage()) {
+    <div class="error-banner" role="alert">
+      <mat-icon class="error-icon" aria-hidden="true">error_outline</mat-icon>
+      <div class="error-text-wrap">
+        <span class="error-title">{{ 'team.lastOwnerErrorTitle' | translate }}</span>
+        <span class="error-message">{{ errorMessage() }}</span>
+        @if (errorTraceId()) {
+          <span class="error-trace">{{ 'common.traceId' | translate }}: {{ errorTraceId() }}</span>
+        }
+      </div>
+      <button mat-icon-button (click)="errorMessage.set(null)" type="button" aria-label="Close error">
+        <mat-icon aria-hidden="true">close</mat-icon>
+      </button>
+    </div>
+  }
+
+  <!-- Main Tabs -->
+  <mat-card class="team-card">
+    <mat-tab-group animationDuration="200ms">
+      <!-- Members Tab -->
+      <mat-tab>
+        <ng-template mat-tab-label>
+          <mat-icon class="tab-icon" aria-hidden="true">group</mat-icon>
+          <span>{{ 'team.membersTab' | translate }}</span>
+          @if (!isLoadingMembers()) {
+            <span class="count-badge">{{ members().length }}</span>
+          }
+        </ng-template>
+
+        <div class="tab-body">
+          @if (isLoadingMembers()) {
+            <div class="loading-state">
+              <mat-spinner diameter="36"></mat-spinner>
+              <span>{{ 'common.loading' | translate }}</span>
+            </div>
+          } @else if (members().length === 0) {
+            <div class="empty-state">
+              <mat-icon class="empty-icon" aria-hidden="true">people_outline</mat-icon>
+              <p>{{ 'team.emptyMembers' | translate }}</p>
+            </div>
+          } @else {
+            <div class="table-responsive">
+              <table mat-table [dataSource]="members()" class="members-table">
+                <!-- Email / Identity Column -->
+                <ng-container matColumnDef="email">
+                  <th mat-header-cell *matHeaderCellDef>{{ 'team.columns.member' | translate }}</th>
+                  <td mat-cell *matCellDef="let member">
+                    <div class="member-identity">
+                      <div class="member-avatar">
+                        {{ member.email.substring(0, 2).toUpperCase() }}
+                      </div>
+                      <div class="member-details">
+                        <span class="member-email">{{ member.email }}</span>
+                        @if (member.id === currentMember()?.id) {
+                          <span class="you-badge">(You)</span>
+                        }
+                      </div>
+                    </div>
+                  </td>
+                </ng-container>
+
+                <!-- Role Column -->
+                <ng-container matColumnDef="role">
+                  <th mat-header-cell *matHeaderCellDef>{{ 'team.columns.role' | translate }}</th>
+                  <td mat-cell *matCellDef="let member">
+                    <span class="role-pill" [class]="'role-' + member.role">
+                      {{ 'common.roles.' + member.role | translate }}
+                    </span>
+                  </td>
+                </ng-container>
+
+                <!-- Status Column -->
+                <ng-container matColumnDef="status">
+                  <th mat-header-cell *matHeaderCellDef>{{ 'team.columns.status' | translate }}</th>
+                  <td mat-cell *matCellDef="let member">
+                    <span class="status-indicator" [class]="'status-' + member.status">
+                      <span class="dot"></span>
+                      <span>{{ 'team.status.' + member.status | translate }}</span>
+                    </span>
+                  </td>
+                </ng-container>
+
+                <!-- MFA Column -->
+                <ng-container matColumnDef="mfa">
+                  <th mat-header-cell *matHeaderCellDef>{{ 'team.columns.mfa' | translate }}</th>
+                  <td mat-cell *matCellDef="let member">
+                    <span class="mfa-badge" [class.enabled]="member.mfa_enabled">
+                      <mat-icon aria-hidden="true">{{ member.mfa_enabled ? 'check_circle' : 'remove_circle_outline' }}</mat-icon>
+                      <span>{{ (member.mfa_enabled ? 'home.valMfaEnabled' : 'home.valMfaDisabled') | translate }}</span>
+                    </span>
+                  </td>
+                </ng-container>
+
+                <!-- Joined Column -->
+                <ng-container matColumnDef="joined">
+                  <th mat-header-cell *matHeaderCellDef>{{ 'team.columns.joined' | translate }}</th>
+                  <td mat-cell *matCellDef="let member" class="date-cell">
+                    {{ member.created_at | formatDate }}
+                  </td>
+                </ng-container>
+
+                <!-- Actions Column -->
+                <ng-container matColumnDef="actions">
+                  <th mat-header-cell *matHeaderCellDef>{{ 'team.columns.actions' | translate }}</th>
+                  <td mat-cell *matCellDef="let member">
+                    <div *appRole="'owner'">
+                      @if (member.status === 'active') {
+                        <button
+                          mat-icon-button
+                          [matMenuTriggerFor]="actionMenu"
+                          type="button"
+                          [attr.aria-label]="'team.columns.actions' | translate"
+                          class="action-menu-btn"
+                        >
+                          <mat-icon aria-hidden="true">more_vert</mat-icon>
+                        </button>
+
+                        <mat-menu #actionMenu="matMenu" xPosition="before">
+                          <button mat-menu-item (click)="openChangeRoleDialog(member)">
+                            <mat-icon aria-hidden="true">admin_panel_settings</mat-icon>
+                            <span>{{ 'team.actions.changeRole' | translate }}</span>
+                          </button>
+                          <button mat-menu-item (click)="openRemoveMemberDialog(member)" class="danger-action">
+                            <mat-icon aria-hidden="true" color="warn">person_remove</mat-icon>
+                            <span>{{ 'team.actions.removeMember' | translate }}</span>
+                          </button>
+                        </mat-menu>
+                      }
+                    </div>
+                  </td>
+                </ng-container>
+
+                <tr mat-header-row *matHeaderRowDef="memberColumns"></tr>
+                <tr mat-row *matRowDef="let row; columns: memberColumns"></tr>
+              </table>
+            </div>
+          }
+        </div>
+      </mat-tab>
+
+      <!-- Invitations Tab -->
+      <mat-tab>
+        <ng-template mat-tab-label>
+          <mat-icon class="tab-icon" aria-hidden="true">mail</mat-icon>
+          <span>{{ 'team.invitationsTab' | translate }}</span>
+          @if (!isLoadingInvitations()) {
+            <span class="count-badge">{{ invitations().length }}</span>
+          }
+        </ng-template>
+
+        <div class="tab-body">
+          @if (isLoadingInvitations()) {
+            <div class="loading-state">
+              <mat-spinner diameter="36"></mat-spinner>
+              <span>{{ 'common.loading' | translate }}</span>
+            </div>
+          } @else if (invitations().length === 0) {
+            <div class="empty-state">
+              <mat-icon class="empty-icon" aria-hidden="true">mark_email_read</mat-icon>
+              <p>{{ 'team.emptyInvitations' | translate }}</p>
+            </div>
+          } @else {
+            <div class="table-responsive">
+              <table mat-table [dataSource]="invitations()" class="invitations-table">
+                <!-- Email Column -->
+                <ng-container matColumnDef="email">
+                  <th mat-header-cell *matHeaderCellDef>{{ 'team.columns.email' | translate }}</th>
+                  <td mat-cell *matCellDef="let inv">
+                    <span class="inv-email">{{ inv.email }}</span>
+                  </td>
+                </ng-container>
+
+                <!-- Role Column -->
+                <ng-container matColumnDef="role">
+                  <th mat-header-cell *matHeaderCellDef>{{ 'team.columns.role' | translate }}</th>
+                  <td mat-cell *matCellDef="let inv">
+                    <span class="role-pill" [class]="'role-' + inv.role">
+                      {{ 'common.roles.' + inv.role | translate }}
+                    </span>
+                  </td>
+                </ng-container>
+
+                <!-- Status Column -->
+                <ng-container matColumnDef="status">
+                  <th mat-header-cell *matHeaderCellDef>{{ 'team.columns.status' | translate }}</th>
+                  <td mat-cell *matCellDef="let inv">
+                    <span class="status-indicator" [class]="'status-' + inv.status">
+                      <span class="dot"></span>
+                      <span>{{ 'team.status.' + inv.status | translate }}</span>
+                    </span>
+                  </td>
+                </ng-container>
+
+                <!-- Expires Column -->
+                <ng-container matColumnDef="expires">
+                  <th mat-header-cell *matHeaderCellDef>{{ 'team.columns.expires' | translate }}</th>
+                  <td mat-cell *matCellDef="let inv" class="date-cell">
+                    {{ inv.expires_at | formatDate }}
+                  </td>
+                </ng-container>
+
+                <!-- Actions Column -->
+                <ng-container matColumnDef="actions">
+                  <th mat-header-cell *matHeaderCellDef>{{ 'team.columns.actions' | translate }}</th>
+                  <td mat-cell *matCellDef="let inv">
+                    <div *appRole="'owner'">
+                      @if (inv.status === 'pending') {
+                        <button
+                          mat-button
+                          color="warn"
+                          type="button"
+                          (click)="openRevokeInvitationDialog(inv)"
+                          class="revoke-btn"
+                        >
+                          <mat-icon aria-hidden="true">cancel</mat-icon>
+                          <span>{{ 'team.actions.revokeInvitation' | translate }}</span>
+                        </button>
+                      }
+                    </div>
+                  </td>
+                </ng-container>
+
+                <tr mat-header-row *matHeaderRowDef="invitationColumns"></tr>
+                <tr mat-row *matRowDef="let row; columns: invitationColumns"></tr>
+              </table>
+            </div>
+          }
+        </div>
+      </mat-tab>
+    </mat-tab-group>
+  </mat-card>
+</div>
