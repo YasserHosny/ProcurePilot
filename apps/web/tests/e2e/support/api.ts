@@ -87,13 +87,18 @@ export async function createMember(role = 'buyer'): Promise<CreatedMember> {
 }
 
 /** Invite without accepting — for tests about pending invitations rather than members. */
-export async function createPendingInvitation(role = 'buyer'): Promise<{ email: string; id: string }> {
+export async function createPendingInvitation(
+  role = 'buyer',
+): Promise<{ email: string; id: string; token: string }> {
   const ownerToken = await signInOwner();
   const email = `e2e.pending.${Date.now()}.${Math.floor(Math.random() * 10000)}@example.test`;
-  const invitation = await call<{ id: string }>('/invitations', {
+  const invitation = await call<{ id: string; token?: string }>('/invitations', {
     method: 'POST',
     headers: { Authorization: `Bearer ${ownerToken}` },
     body: JSON.stringify({ email, role }),
   });
-  return { email, id: invitation.id };
+  if (!invitation.token) {
+    throw new Error('POST /invitations did not return a token');
+  }
+  return { email, id: invitation.id, token: invitation.token };
 }

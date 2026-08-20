@@ -3,6 +3,8 @@ import { join } from 'node:path';
 
 import { test, expect } from '@playwright/test';
 
+import { createMember, createPendingInvitation } from './support/api';
+
 /**
  * Credentials come from global-setup, which creates a real workspace through the sign-up
  * endpoint. They used to be hardcoded to an account nothing created, which is why every test
@@ -74,34 +76,36 @@ test.describe('ProcurePilot Team Management (T061)', () => {
     await expect(page.locator('.invitations-table')).toContainText(colleagueEmail);
   });
 
-  test('should allow invitee to accept invitation and join the workspace', async ({ browser }) => {
-    // New browser context representing the invitee
+  test('should allow invitee to accept invitation and join the workspace', async ({ browser, page }) => {
+    // A real pending invitation, and the real token that came with it. This test previously used
+    // a fabricated token string, so it exercised nothing: the invitation it claimed to accept
+    // never existed, and the member the next three tests depended on was never created.
+    const { email, token } = await createPendingInvitation('buyer');
+
     const inviteeContext = await browser.newContext();
     const inviteePage = await inviteeContext.newPage();
 
-    // Navigate to accept invitation with a token
-    const testToken = 'mock_invitation_token_32_characters_long_for_test';
-    await inviteePage.goto(`/onboarding/accept-invitation?token=${testToken}`);
+    await inviteePage.goto(`/onboarding/accept-invitation?token=${encodeURIComponent(token)}`);
+    await expect(inviteePage.locator('input[formControlName="token"]')).toHaveValue(token);
 
-    await expect(inviteePage.locator('.card-title')).toContainText('Accept workspace invitation');
-    await expect(inviteePage.locator('input[formControlName="token"]')).toHaveValue(testToken);
-
-    // Set new password
     await inviteePage.fill('input[formControlName="password"]', colleaguePassword);
     await inviteePage.click('button[type="submit"]');
 
-    // Should authenticate and land on home
     await inviteePage.waitForURL('**/home');
-    await expect(inviteePage.locator('.badge-active')).toBeVisible();
-
     await inviteeContext.close();
+
+    // And the workspace genuinely contains them now.
+    await page.goto('/team');
+    await expect(page.locator('tr.mat-row', { hasText: email })).toBeVisible();
   });
 
   test('should allow owner to change a member role', async ({ page }) => {
+    // This test used to act on a member the two tests above were supposed to have created, so a
+    // failure there took this one with it and it could never be run alone. It now makes its own.
+    const member = await createMember('buyer');
     await page.goto('/team');
 
-    // Find colleague row and open actions menu
-    const memberRow = page.locator('tr.mat-row', { hasText: colleagueEmail });
+    const memberRow = page.locator('tr.mat-row', { hasText: member.email });
     await memberRow.locator('.action-menu-btn').click();
 
     // Click Change role
@@ -135,9 +139,10 @@ test.describe('ProcurePilot Team Management (T061)', () => {
   });
 
   test('should allow owner to remove a member from the workspace', async ({ page }) => {
+    const member = await createMember('buyer');
     await page.goto('/team');
 
-    const memberRow = page.locator('tr.mat-row', { hasText: colleagueEmail });
+    const memberRow = page.locator('tr.mat-row', { hasText: member.email });
     await memberRow.locator('.action-menu-btn').click();
     await page.click('button:has-text("Remove member")');
 
