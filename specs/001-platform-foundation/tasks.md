@@ -112,7 +112,7 @@ and from a direct database connection that neither can read, list, or detect the
 - [x] T047 [P] [US1] Build the sign-in, sign-out, and password-reset screens in `apps/web/src/app/features/auth/`
 - [x] T048 [US1] Build the authenticated shell in `apps/web/src/app/layout/` with navigation, workspace identity, workspace switcher, and account menu (FR-016)
 - [x] T049 [P] [US1] Write `apps/api/tests/integration/test_signup.py` covering a valid invitation, an expired one, a spent one, a revoked one, an absent one, and an unsupported currency
-- [ ] T050 [P] [US1] Write `apps/web/tests/e2e/signup.spec.ts` (Playwright) driving invitation → sign-up → shell
+- [x] T050 [P] [US1] Write `apps/web/tests/e2e/signup.spec.ts` (Playwright) driving invitation → sign-up → shell
 
 **Checkpoint**: US1 is independently demonstrable. This is the MVP — isolation is proven with nothing else built.
 
@@ -171,16 +171,16 @@ and no untranslated key appears.
 **Independent test**: on a clean machine, follow quickstart.md and reach a healthy system; open a
 trivial PR and see checks run.
 
-- [ ] T072 [P] [US4] Write `.github/workflows/ci.yml` running ruff, Angular lint, pytest, Karma, and Playwright on every PR, with a required blocking verdict (FR-025)
-- [ ] T073 [US4] Add the isolation test (T036) to `ci.yml` as a separately named required check, so its failure is never mistaken for an unrelated test failure (FR-030)
-- [ ] T074 [P] [US4] Add a gitleaks step to `ci.yml` failing the build on any secret finding (FR-027, SC-009)
-- [ ] T075 [P] [US4] Add an axe-core accessibility step to `ci.yml` asserting zero WCAG 2.1 AA violations on every shell screen (FR-022, SC-006)
-- [ ] T076 [P] [US4] Write `.github/workflows/deploy-backend.yml` per deployment-plan §3: build, push to ghcr, test in container, update the Bunny backend container
-- [ ] T077 [P] [US4] Write `.github/workflows/deploy-frontend.yml`: Angular production build, Nginx image, push, update the Bunny frontend container
-- [ ] T078 [P] [US4] Write the Terraform skeleton in `infra/terraform/` for the bunny.net app, its two containers, and DNS
-- [ ] T079 [P] [US4] Document required GitHub secrets (`BUNNY_API_KEY`, `BUNNY_BACKEND_APP_ID`, and the rest) in `infra/README.md`, with values held only in GitHub
-- [ ] T080 [US4] Configure the staging and production environments with independent configuration and data, documented in `infra/README.md` (FR-028)
-- [ ] T081 [P] [US4] Wire Sentry error reporting into both `apps/api/src/procurepilot_api/main.py` and `apps/web/src/main.ts` (FR-029)
+- [x] T072 [P] [US4] Write `.github/workflows/ci.yml` running ruff, Angular lint, pytest, Karma, and Playwright on every PR, with a required blocking verdict (FR-025)
+- [x] T073 [US4] Add the isolation test (T036) to `ci.yml` as a separately named required check, so its failure is never mistaken for an unrelated test failure (FR-030)
+- [x] T074 [P] [US4] Add a gitleaks step to `ci.yml` failing the build on any secret finding (FR-027, SC-009)
+- [x] T075 [P] [US4] Add an axe-core accessibility step to `ci.yml` asserting zero WCAG 2.1 AA violations on every shell screen (FR-022, SC-006)
+- [x] T076 [P] [US4] Write `.github/workflows/deploy-backend.yml` per deployment-plan §3: build, push to ghcr, test in container, update the Bunny backend container
+- [x] T077 [P] [US4] Write `.github/workflows/deploy-frontend.yml`: Angular production build, Nginx image, push, update the Bunny frontend container
+- [x] T078 [P] [US4] Write the Terraform skeleton in `infra/terraform/` for the bunny.net app, its two containers, and DNS
+- [x] T079 [P] [US4] Document required GitHub secrets (`BUNNY_API_KEY`, `BUNNY_BACKEND_APP_ID`, and the rest) in `infra/README.md`, with values held only in GitHub
+- [x] T080 [US4] Configure the staging and production environments with independent configuration and data, documented in `infra/README.md` (FR-028)
+- [x] T081 [P] [US4] Wire Sentry error reporting into both `apps/api/src/procurepilot_api/main.py` and `apps/web/src/main.ts` (FR-029)
 
 **Checkpoint**: a change can go from PR to deployed artefact without manual assembly.
 
