@@ -1,0 +1,21 @@
+{
+  "name": "procurepilot",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@9.15.4",
+  "scripts": {
+    "build": "turbo run build",
+    "test": "turbo run test",
+    "lint": "turbo run lint",
+    "db:migrate": "supabase db push",
+    "db:seed": "uv run --project apps/api python apps/api/scripts/seed.py",
+    "test:api": "uv run --project apps/api pytest",
+    "test:web": "pnpm --filter web test",
+    "test:e2e": "playwright test",
+    "test:isolation": "uv run --project apps/api pytest tests/integration/test_tenant_isolation.py",
+    "test:a11y": "playwright test --grep @a11y"
+  },
+  "devDependencies": {
+    "turbo": "^2.4.0"
+  }
+}
