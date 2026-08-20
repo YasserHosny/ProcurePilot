@@ -7,14 +7,14 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { RouterLink } from '@angular/router';
 
+import { ApiService } from '../../../core/api/api.service';
 import type { ApiError } from '../../../core/api/models';
-import { SessionService } from '../../../core/auth/session.service';
-import { SIGNIN_STRINGS } from './sign-in.strings';
+import { PASSWORD_RESET_STRINGS } from './password-reset.strings';
 
 @Component({
-  selector: 'app-sign-in',
+  selector: 'app-password-reset',
   standalone: true,
   imports: [
     ReactiveFormsModule,
@@ -26,30 +26,23 @@ import { SIGNIN_STRINGS } from './sign-in.strings';
     MatIconModule,
     MatProgressSpinnerModule,
   ],
-  templateUrl: './sign-in.component.html',
-  styleUrl: './sign-in.component.scss',
+  templateUrl: './password-reset.component.html',
+  styleUrl: './password-reset.component.scss',
 })
-export class SignInComponent {
+export class PasswordResetComponent {
   private readonly fb = inject(FormBuilder);
-  private readonly session = inject(SessionService);
-  private readonly router = inject(Router);
-  private readonly route = inject(ActivatedRoute);
+  private readonly api = inject(ApiService);
 
-  readonly strings = SIGNIN_STRINGS;
+  readonly strings = PASSWORD_RESET_STRINGS;
 
   readonly isLoading = signal<boolean>(false);
-  readonly hidePassword = signal<boolean>(true);
+  readonly isSubmitted = signal<boolean>(false);
   readonly errorMessage = signal<string | null>(null);
   readonly errorTraceId = signal<string | null>(null);
 
   readonly form = this.fb.nonNullable.group({
     email: ['', [Validators.required, Validators.email]],
-    password: ['', [Validators.required]],
   });
-
-  togglePasswordVisibility(): void {
-    this.hidePassword.update((val) => !val);
-  }
 
   onSubmit(): void {
     if (this.form.invalid) {
@@ -61,25 +54,19 @@ export class SignInComponent {
     this.errorTraceId.set(null);
     this.isLoading.set(true);
 
-    const { email, password } = this.form.getRawValue();
+    const { email } = this.form.getRawValue();
 
-    this.session.login(email.trim(), password).subscribe({
+    this.api.requestPasswordReset(email.trim()).subscribe({
       next: () => {
         this.isLoading.set(false);
-        const returnUrl = this.route.snapshot.queryParamMap.get('returnUrl') || '/home';
-        void this.router.navigateByUrl(returnUrl);
+        // Deliberate security rule: always report success regardless of address known/unknown
+        this.isSubmitted.set(true);
       },
       error: (err: unknown) => {
         this.isLoading.set(false);
         if (err instanceof HttpErrorResponse) {
           const apiError = err.error as ApiError | undefined;
           this.errorTraceId.set(apiError?.trace_id ?? null);
-
-          // Deliberate security rule: 401 must not reveal whether account exists
-          if (err.status === 401) {
-            this.errorMessage.set(this.strings.invalidCredentialsError);
-            return;
-          }
 
           if (err.status === 429) {
             this.errorMessage.set(this.strings.rateLimitedError);

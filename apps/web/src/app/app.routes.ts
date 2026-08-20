@@ -5,27 +5,54 @@ import { authGuard } from './core/auth/auth.guard';
 /**
  * Public routes and guarded routes are kept in separate blocks (FR-016).
  *
- * Screens land in later tasks; the shape is fixed here so they are added rather than
- * restructured. Note that sign-up is reachable but invitation-gated at the server — the pilot
- * is not open to public registration (FR-033).
+ * Sign-up is reachable but invitation-gated at the server (FR-033).
+ * Guarded routes render inside the authenticated shell.
  */
 export const routes: Routes = [
-  // --- public ---
+  // --- public routes ---
   {
     path: 'auth',
     children: [
-      { path: 'sign-in', loadComponent: () => import('./features/auth/sign-in/sign-in.component').then((m) => m.SignInComponent) },
+      {
+        path: 'sign-in',
+        loadComponent: () =>
+          import('./features/auth/sign-in/sign-in.component').then((m) => m.SignInComponent),
+      },
+      {
+        path: 'password-reset',
+        loadComponent: () =>
+          import('./features/auth/password-reset/password-reset.component').then(
+            (m) => m.PasswordResetComponent,
+          ),
+      },
       { path: '', pathMatch: 'full', redirectTo: 'sign-in' },
     ],
   },
+  {
+    path: 'onboarding',
+    children: [
+      {
+        path: 'signup',
+        loadComponent: () =>
+          import('./features/onboarding/signup/signup.component').then((m) => m.SignupComponent),
+      },
+      { path: '', pathMatch: 'full', redirectTo: 'signup' },
+    ],
+  },
 
-  // --- guarded ---
+  // --- guarded shell ---
   {
     path: '',
     canActivate: [authGuard],
+    loadComponent: () =>
+      import('./layout/shell/shell.component').then((m) => m.ShellComponent),
     children: [
       { path: '', pathMatch: 'full', redirectTo: 'home' },
-      { path: 'home', loadComponent: () => import('./layout/home/home.component').then((m) => m.HomeComponent) },
+      {
+        path: 'home',
+        loadComponent: () =>
+          import('./layout/home/home.component').then((m) => m.HomeComponent),
+      },
     ],
   },
 

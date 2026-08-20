@@ -1,0 +1,144 @@
+.signin-container {
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding-inline: 1rem;
+  padding-block: 2rem;
+  background: linear-gradient(135deg, #f8fafc 0%, #eef2ff 100%);
+  box-sizing: border-box;
+}
+
+.signin-card {
+  inline-size: 100%;
+  max-inline-size: 460px;
+  padding-inline: 2rem;
+  padding-block: 2.5rem;
+  border-radius: 12px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.04);
+  background-color: #ffffff;
+}
+
+.brand-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-block-end: 1rem;
+  color: #4f46e5;
+
+  .brand-icon {
+    font-size: 28px;
+    inline-size: 28px;
+    block-size: 28px;
+  }
+
+  .brand-name {
+    font-size: 1.25rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+}
+
+.card-title {
+  margin: 0;
+  margin-block-end: 0.5rem;
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.card-subtitle {
+  margin: 0;
+  margin-block-end: 1.5rem;
+  font-size: 0.875rem;
+  color: #64748b;
+  line-height: 1.4;
+}
+
+.alert-banner {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding-inline: 1rem;
+  padding-block: 0.75rem;
+  margin-block-end: 1.5rem;
+  border-radius: 6px;
+  background-color: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #991b1b;
+  font-size: 0.875rem;
+  line-height: 1.4;
+
+  .trace-id {
+    margin-block-start: 0.25rem;
+    font-size: 0.75rem;
+    color: #6b7280;
+    font-family: monospace;
+  }
+}
+
+.signin-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.form-field {
+  inline-size: 100%;
+}
+
+.password-header {
+  display: flex;
+  justify-content: flex-end;
+  margin-block-end: 0.25rem;
+}
+
+.forgot-password-link {
+  font-size: 0.8125rem;
+  color: #4f46e5;
+  text-decoration: none;
+  font-weight: 500;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
+.form-actions {
+  margin-block-start: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.submit-button {
+  block-size: 48px;
+  font-size: 1rem;
+  font-weight: 600;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.button-spinner {
+  display: inline-block;
+}
+
+.signup-prompt {
+  text-align: center;
+  font-size: 0.875rem;
+  color: #64748b;
+  margin-block-start: 0.5rem;
+
+  a {
+    color: #4f46e5;
+    text-decoration: none;
+    font-weight: 500;
+    margin-inline-start: 0.25rem;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+}

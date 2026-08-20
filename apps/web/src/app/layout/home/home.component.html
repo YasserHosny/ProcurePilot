@@ -1,0 +1,142 @@
+<div class="home-container">
+  <div class="hero-card">
+    <div class="hero-header">
+      <div class="badge-active">
+        <mat-icon aria-hidden="true">verified</mat-icon>
+        <span>{{ strings.workspaceReadyBadge }}</span>
+      </div>
+    </div>
+    <h1 class="hero-title">{{ strings.welcomePrefix }} {{ tenant()?.name }}</h1>
+    <p class="hero-description">{{ strings.heroDescription }}</p>
+  </div>
+
+  <div class="cards-grid">
+    <!-- Tenant & Security Card -->
+    <mat-card class="info-card">
+      <mat-card-header>
+        <div class="card-icon" mat-card-avatar>
+          <mat-icon aria-hidden="true">security</mat-icon>
+        </div>
+        <mat-card-title>{{ strings.cardTenantTitle }}</mat-card-title>
+        <mat-card-subtitle>{{ strings.cardTenantSubtitle }}</mat-card-subtitle>
+      </mat-card-header>
+      <mat-card-content>
+        <div class="property-list">
+          <div class="property-row">
+            <span class="prop-label">{{ strings.labelTenantId }}</span>
+            <span class="prop-value mono">{{ tenant()?.id }}</span>
+          </div>
+          <div class="property-row">
+            <span class="prop-label">{{ strings.labelSlug }}</span>
+            <span class="prop-value">{{ tenant()?.slug }}</span>
+          </div>
+          <div class="property-row">
+            <span class="prop-label">{{ strings.labelIsolation }}</span>
+            <span class="prop-value highlight">{{ strings.valIsolation }}</span>
+          </div>
+        </div>
+      </mat-card-content>
+    </mat-card>
+
+    <!-- Regional & Financial Config Card -->
+    <mat-card class="info-card">
+      <mat-card-header>
+        <div class="card-icon" mat-card-avatar>
+          <mat-icon aria-hidden="true">payments</mat-icon>
+        </div>
+        <mat-card-title>{{ strings.cardConfigTitle }}</mat-card-title>
+        <mat-card-subtitle>{{ strings.cardConfigSubtitle }}</mat-card-subtitle>
+      </mat-card-header>
+      <mat-card-content>
+        <div class="property-list">
+          <div class="property-row">
+            <span class="prop-label">{{ strings.labelRegion }}</span>
+            <span class="prop-value">{{ tenant()?.region }}</span>
+          </div>
+          <div class="property-row">
+            <span class="prop-label">{{ strings.labelCurrency }}</span>
+            <span class="prop-value highlight">{{ tenant()?.currency }}</span>
+          </div>
+          <div class="property-row">
+            <span class="prop-label">{{ strings.labelTaxModel }}</span>
+            <span class="prop-value">{{ tenant()?.tax_model }}</span>
+          </div>
+          <div class="property-row">
+            <span class="prop-label">{{ strings.labelDefaultLocale }}</span>
+            <span class="prop-value">{{ tenant()?.default_locale?.toUpperCase() }}</span>
+          </div>
+        </div>
+      </mat-card-content>
+    </mat-card>
+
+    <!-- User Authority Card -->
+    <mat-card class="info-card">
+      <mat-card-header>
+        <div class="card-icon" mat-card-avatar>
+          <mat-icon aria-hidden="true">badge</mat-icon>
+        </div>
+        <mat-card-title>{{ strings.cardMemberTitle }}</mat-card-title>
+        <mat-card-subtitle>{{ strings.cardMemberSubtitle }}</mat-card-subtitle>
+      </mat-card-header>
+      <mat-card-content>
+        <div class="property-list">
+          <div class="property-row">
+            <span class="prop-label">{{ strings.labelEmail }}</span>
+            <span class="prop-value">{{ member()?.email }}</span>
+          </div>
+          <div class="property-row">
+            <span class="prop-label">{{ strings.labelRole }}</span>
+            <span class="prop-value highlight">{{ formatRole(member()?.role) }}</span>
+          </div>
+          <div class="property-row">
+            <span class="prop-label">{{ strings.labelMfa }}</span>
+            <span class="prop-value">{{ member()?.mfa_enabled ? strings.valMfaEnabled : strings.valMfaDisabled }}</span>
+          </div>
+        </div>
+      </mat-card-content>
+    </mat-card>
+  </div>
+
+  <!-- Roadmap / Empty State Card -->
+  <mat-card class="roadmap-card">
+    <mat-card-header>
+      <mat-card-title>{{ strings.emptyStateTitle }}</mat-card-title>
+      <mat-card-subtitle>{{ strings.emptyStateDescription }}</mat-card-subtitle>
+    </mat-card-header>
+    <mat-card-content>
+      <div class="steps-list">
+        <div class="step-item active">
+          <div class="step-header">
+            <span class="step-title">{{ strings.step1Title }}</span>
+          </div>
+          <p class="step-desc">{{ strings.step1Desc }}</p>
+          <span class="step-status">{{ strings.step1Status }}</span>
+        </div>
+
+        <div class="step-item">
+          <div class="step-header">
+            <span class="step-title">{{ strings.step2Title }}</span>
+          </div>
+          <p class="step-desc">{{ strings.step2Desc }}</p>
+          <span class="step-status">{{ strings.step2Status }}</span>
+        </div>
+
+        <div class="step-item">
+          <div class="step-header">
+            <span class="step-title">{{ strings.step3Title }}</span>
+          </div>
+          <p class="step-desc">{{ strings.step3Desc }}</p>
+          <span class="step-status">{{ strings.step3Status }}</span>
+        </div>
+
+        <div class="step-item">
+          <div class="step-header">
+            <span class="step-title">{{ strings.step4Title }}</span>
+          </div>
+          <p class="step-desc">{{ strings.step4Desc }}</p>
+          <span class="step-status">{{ strings.step4Status }}</span>
+        </div>
+      </div>
+    </mat-card-content>
+  </mat-card>
+</div>

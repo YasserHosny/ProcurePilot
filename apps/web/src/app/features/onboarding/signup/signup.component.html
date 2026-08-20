@@ -1,0 +1,169 @@
+<main class="signup-container">
+  <mat-card class="signup-card">
+    <div class="brand-header">
+      <mat-icon class="brand-icon" aria-hidden="true">insights</mat-icon>
+      <span class="brand-name">{{ strings.brandName }}</span>
+    </div>
+
+    <h1 class="card-title">{{ strings.title }}</h1>
+    <p class="card-subtitle">{{ strings.subtitle }}</p>
+
+    <div class="invitation-badge">
+      <mat-icon aria-hidden="true">verified_user</mat-icon>
+      <span>{{ strings.invitationGatedNotice }}</span>
+    </div>
+
+    @if (errorAlert(); as error) {
+      <div class="alert-banner" [class.error]="error.type === 'error'" [class.forbidden]="error.type === 'forbidden'" role="alert">
+        <span class="alert-title">{{ error.title }}</span>
+        <span>{{ error.message }}</span>
+        @if (error.traceId) {
+          <span class="trace-id">{{ strings.traceIdLabel }}: {{ error.traceId }}</span>
+        }
+      </div>
+    }
+
+    <form [formGroup]="form" (ngSubmit)="onSubmit()" class="signup-form" novalidate>
+      <mat-form-field appearance="outline" class="form-field">
+        <mat-label>{{ strings.tokenLabel }}</mat-label>
+        <input
+          matInput
+          formControlName="invitation_token"
+          [placeholder]="strings.tokenPlaceholder"
+          required
+          autocomplete="off"
+        />
+        <mat-hint>{{ strings.tokenHint }}</mat-hint>
+        @if (form.controls.invitation_token.hasError('required')) {
+          <mat-error>{{ strings.tokenRequired }}</mat-error>
+        }
+        @if (form.controls.invitation_token.hasError('minlength')) {
+          <mat-error>{{ strings.tokenMinLength }}</mat-error>
+        }
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="form-field">
+        <mat-label>{{ strings.businessNameLabel }}</mat-label>
+        <input
+          matInput
+          formControlName="business_name"
+          [placeholder]="strings.businessNamePlaceholder"
+          required
+          autocomplete="organization"
+        />
+        @if (form.controls.business_name.hasError('required')) {
+          <mat-error>{{ strings.businessNameRequired }}</mat-error>
+        }
+        @if (form.controls.business_name.hasError('maxlength')) {
+          <mat-error>{{ strings.businessNameMaxLength }}</mat-error>
+        }
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="form-field">
+        <mat-label>{{ strings.emailLabel }}</mat-label>
+        <input
+          matInput
+          type="email"
+          formControlName="email"
+          [placeholder]="strings.emailPlaceholder"
+          required
+          autocomplete="email"
+        />
+        @if (form.controls.email.hasError('required')) {
+          <mat-error>{{ strings.emailRequired }}</mat-error>
+        }
+        @if (form.controls.email.hasError('email')) {
+          <mat-error>{{ strings.emailInvalid }}</mat-error>
+        }
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="form-field">
+        <mat-label>{{ strings.passwordLabel }}</mat-label>
+        <input
+          matInput
+          [type]="hidePassword() ? 'password' : 'text'"
+          formControlName="password"
+          [placeholder]="strings.passwordPlaceholder"
+          required
+          autocomplete="new-password"
+        />
+        <button
+          mat-icon-button
+          matSuffix
+          type="button"
+          (click)="togglePasswordVisibility()"
+          [attr.aria-label]="hidePassword() ? 'Show password' : 'Hide password'"
+        >
+          <mat-icon aria-hidden="true">{{ hidePassword() ? 'visibility_off' : 'visibility' }}</mat-icon>
+        </button>
+        <mat-hint>{{ strings.passwordHint }}</mat-hint>
+        @if (form.controls.password.hasError('required')) {
+          <mat-error>{{ strings.passwordRequired }}</mat-error>
+        }
+        @if (form.controls.password.hasError('minlength')) {
+          <mat-error>{{ strings.passwordMinLength }}</mat-error>
+        }
+      </mat-form-field>
+
+      <div class="form-row">
+        <mat-form-field appearance="outline" class="form-field">
+          <mat-label>{{ strings.regionLabel }}</mat-label>
+          <mat-select formControlName="region" [placeholder]="strings.regionPlaceholder" required>
+            @for (region of configOptions()?.regions; track region.code) {
+              <mat-option [value]="region.code">{{ region.label_en }} ({{ region.code }})</mat-option>
+            }
+          </mat-select>
+          @if (form.controls.region.hasError('required')) {
+            <mat-error>{{ strings.regionRequired }}</mat-error>
+          }
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="form-field">
+          <mat-label>{{ strings.currencyLabel }}</mat-label>
+          <mat-select formControlName="currency" [placeholder]="strings.currencyPlaceholder" required>
+            @for (currency of configOptions()?.currencies; track currency.code) {
+              <mat-option [value]="currency.code">{{ currency.code }} - {{ currency.label_en }}</mat-option>
+            }
+          </mat-select>
+          @if (form.controls.currency.hasError('required')) {
+            <mat-error>{{ strings.currencyRequired }}</mat-error>
+          }
+        </mat-form-field>
+      </div>
+
+      <mat-form-field appearance="outline" class="form-field">
+        <mat-label>{{ strings.taxModelLabel }}</mat-label>
+        <mat-select formControlName="tax_model" [placeholder]="strings.taxModelPlaceholder" required>
+          @for (taxModel of configOptions()?.tax_models; track taxModel.code) {
+            <mat-option [value]="taxModel.code">{{ taxModel.label_en }}</mat-option>
+          }
+        </mat-select>
+        @if (form.controls.tax_model.hasError('required')) {
+          <mat-error>{{ strings.taxModelRequired }}</mat-error>
+        }
+      </mat-form-field>
+
+      <div class="form-actions">
+        <button
+          mat-flat-button
+          color="primary"
+          type="submit"
+          class="submit-button"
+          [disabled]="isSubmitting() || isLoadingConfig()"
+        >
+          @if (isSubmitting()) {
+            <mat-spinner diameter="20" class="button-spinner"></mat-spinner>
+            <span>{{ strings.submittingButton }}</span>
+          } @else {
+            <span>{{ strings.submitButton }}</span>
+          }
+        </button>
+
+        <div class="signin-prompt">
+          <span>{{ strings.alreadyHaveAccount }}</span>
+          <a routerLink="/auth/sign-in">{{ strings.signInLink }}</a>
+        </div>
+      </div>
+    </form>
+  </mat-card>
+</main>

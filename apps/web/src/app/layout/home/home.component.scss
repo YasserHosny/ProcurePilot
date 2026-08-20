@@ -1,0 +1,234 @@
+.home-container {
+  max-inline-size: 1100px;
+  margin-inline: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.hero-card {
+  padding-inline: 2rem;
+  padding-block: 2rem;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #4338ca 0%, #6366f1 100%);
+  color: #ffffff;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+}
+
+.hero-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-block-end: 1rem;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.badge-active {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding-inline: 0.75rem;
+  padding-block: 0.25rem;
+  background-color: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 9999px;
+  font-size: 0.8125rem;
+  font-weight: 500;
+
+  mat-icon {
+    font-size: 16px;
+    inline-size: 16px;
+    block-size: 16px;
+    color: #a7f3d0;
+  }
+}
+
+.hero-title {
+  margin: 0;
+  margin-block-end: 0.5rem;
+  font-size: 1.75rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.hero-description {
+  margin: 0;
+  font-size: 0.9375rem;
+  line-height: 1.5;
+  color: #e0e7ff;
+  max-inline-size: 700px;
+}
+
+.cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 1.25rem;
+}
+
+.info-card {
+  border-radius: 12px;
+  background-color: #ffffff;
+  padding-inline: 1.5rem;
+  padding-block: 1.5rem;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
+
+  mat-card-header {
+    padding: 0;
+    margin-block-end: 1.25rem;
+  }
+
+  mat-card-title {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: #0f172a;
+  }
+
+  mat-card-subtitle {
+    font-size: 0.8125rem;
+    color: #64748b;
+    margin-block-start: 0.25rem;
+  }
+}
+
+.card-icon {
+  background-color: #eef2ff;
+  color: #4f46e5;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 40px;
+  block-size: 40px;
+  margin-inline-end: 0.75rem;
+
+  mat-icon {
+    font-size: 22px;
+    inline-size: 22px;
+    block-size: 22px;
+  }
+}
+
+.property-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.property-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-block-end: 0.5rem;
+  border-block-end: 1px solid #f1f5f9;
+  font-size: 0.875rem;
+
+  &:last-child {
+    border-block-end: none;
+    padding-block-end: 0;
+  }
+
+  .prop-label {
+    color: #64748b;
+  }
+
+  .prop-value {
+    font-weight: 500;
+    color: #0f172a;
+    text-align: end;
+    word-break: break-all;
+
+    &.mono {
+      font-family: monospace;
+      font-size: 0.8125rem;
+      background-color: #f8fafc;
+      padding-inline: 0.375rem;
+      padding-block: 0.125rem;
+      border-radius: 4px;
+      border: 1px solid #e2e8f0;
+    }
+
+    &.highlight {
+      color: #4338ca;
+      font-weight: 600;
+    }
+  }
+}
+
+.roadmap-card {
+  border-radius: 12px;
+  background-color: #ffffff;
+  padding-inline: 1.5rem;
+  padding-block: 1.5rem;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
+
+  mat-card-header {
+    padding: 0;
+    margin-block-end: 1.5rem;
+  }
+
+  mat-card-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #0f172a;
+  }
+
+  mat-card-subtitle {
+    font-size: 0.875rem;
+    color: #64748b;
+    margin-block-start: 0.25rem;
+  }
+}
+
+.steps-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+}
+
+.step-item {
+  padding-inline: 1.25rem;
+  padding-block: 1.25rem;
+  border-radius: 8px;
+  background-color: #f8fafc;
+  border: 1px solid #e2e8f0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+
+  &.active {
+    background-color: #eef2ff;
+    border-color: #c7d2fe;
+
+    .step-status {
+      color: #3730a3;
+      font-weight: 600;
+    }
+  }
+
+  .step-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .step-title {
+    font-weight: 600;
+    font-size: 0.9375rem;
+    color: #0f172a;
+  }
+
+  .step-status {
+    font-size: 0.75rem;
+    color: #64748b;
+  }
+
+  .step-desc {
+    font-size: 0.8125rem;
+    color: #475569;
+    line-height: 1.4;
+    margin: 0;
+  }
+}
