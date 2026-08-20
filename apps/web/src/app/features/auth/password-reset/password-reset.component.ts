@@ -8,10 +8,10 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { RouterLink } from '@angular/router';
+import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
 import { ApiService } from '../../../core/api/api.service';
 import type { ApiError } from '../../../core/api/models';
-import { PASSWORD_RESET_STRINGS } from './password-reset.strings';
 
 @Component({
   selector: 'app-password-reset',
@@ -25,6 +25,7 @@ import { PASSWORD_RESET_STRINGS } from './password-reset.strings';
     MatButtonModule,
     MatIconModule,
     MatProgressSpinnerModule,
+    TranslatePipe,
   ],
   templateUrl: './password-reset.component.html',
   styleUrl: './password-reset.component.scss',
@@ -32,8 +33,7 @@ import { PASSWORD_RESET_STRINGS } from './password-reset.strings';
 export class PasswordResetComponent {
   private readonly fb = inject(FormBuilder);
   private readonly api = inject(ApiService);
-
-  readonly strings = PASSWORD_RESET_STRINGS;
+  private readonly translate = inject(TranslateService);
 
   readonly isLoading = signal<boolean>(false);
   readonly isSubmitted = signal<boolean>(false);
@@ -69,15 +69,17 @@ export class PasswordResetComponent {
           this.errorTraceId.set(apiError?.trace_id ?? null);
 
           if (err.status === 429) {
-            this.errorMessage.set(this.strings.rateLimitedError);
+            this.errorMessage.set(this.translate.instant('auth.reset.rateLimitedError'));
             return;
           }
 
-          this.errorMessage.set(apiError?.message ?? err.message ?? this.strings.genericError);
+          this.errorMessage.set(
+            apiError?.message ?? err.message ?? this.translate.instant('auth.reset.genericError'),
+          );
           return;
         }
 
-        this.errorMessage.set(this.strings.genericError);
+        this.errorMessage.set(this.translate.instant('auth.reset.genericError'));
       },
     });
   }

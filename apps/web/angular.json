@@ -33,6 +33,11 @@
               {
                 "glob": "**/*",
                 "input": "public"
+              },
+              {
+                "glob": "*.json",
+                "input": "../../packages/i18n",
+                "output": "assets/i18n"
               }
             ],
             "styles": [
@@ -93,6 +98,11 @@
               {
                 "glob": "**/*",
                 "input": "public"
+              },
+              {
+                "glob": "*.json",
+                "input": "../../packages/i18n",
+                "output": "assets/i18n"
               }
             ],
             "styles": [

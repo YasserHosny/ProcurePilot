@@ -8,10 +8,10 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
 import type { ApiError } from '../../../core/api/models';
 import { SessionService } from '../../../core/auth/session.service';
-import { SIGNIN_STRINGS } from './sign-in.strings';
 
 @Component({
   selector: 'app-sign-in',
@@ -25,6 +25,7 @@ import { SIGNIN_STRINGS } from './sign-in.strings';
     MatButtonModule,
     MatIconModule,
     MatProgressSpinnerModule,
+    TranslatePipe,
   ],
   templateUrl: './sign-in.component.html',
   styleUrl: './sign-in.component.scss',
@@ -34,8 +35,7 @@ export class SignInComponent {
   private readonly session = inject(SessionService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
-
-  readonly strings = SIGNIN_STRINGS;
+  private readonly translate = inject(TranslateService);
 
   readonly isLoading = signal<boolean>(false);
   readonly hidePassword = signal<boolean>(true);
@@ -77,20 +77,22 @@ export class SignInComponent {
 
           // Deliberate security rule: 401 must not reveal whether account exists
           if (err.status === 401) {
-            this.errorMessage.set(this.strings.invalidCredentialsError);
+            this.errorMessage.set(this.translate.instant('auth.signin.invalidCredentialsError'));
             return;
           }
 
           if (err.status === 429) {
-            this.errorMessage.set(this.strings.rateLimitedError);
+            this.errorMessage.set(this.translate.instant('auth.signin.rateLimitedError'));
             return;
           }
 
-          this.errorMessage.set(apiError?.message ?? err.message ?? this.strings.genericError);
+          this.errorMessage.set(
+            apiError?.message ?? err.message ?? this.translate.instant('auth.signin.genericError'),
+          );
           return;
         }
 
-        this.errorMessage.set(this.strings.genericError);
+        this.errorMessage.set(this.translate.instant('auth.signin.genericError'));
       },
     });
   }

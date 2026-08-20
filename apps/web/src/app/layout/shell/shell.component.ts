@@ -8,10 +8,11 @@ import { MatSidenavModule } from '@angular/material/sidenav';
 import { MatToolbarModule } from '@angular/material/toolbar';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
-import type { Role, WorkspaceSummary } from '../../core/api/models';
+import type { Locale, Role, WorkspaceSummary } from '../../core/api/models';
 import { SessionService } from '../../core/auth/session.service';
-import { SHELL_STRINGS } from './shell.strings';
+import { I18nService } from '../../core/i18n';
 
 @Component({
   selector: 'app-shell',
@@ -28,6 +29,7 @@ import { SHELL_STRINGS } from './shell.strings';
     MatDividerModule,
     MatTooltipModule,
     MatListModule,
+    TranslatePipe,
   ],
   templateUrl: './shell.component.html',
   styleUrl: './shell.component.scss',
@@ -35,11 +37,12 @@ import { SHELL_STRINGS } from './shell.strings';
 export class ShellComponent implements OnInit {
   private readonly session = inject(SessionService);
   private readonly router = inject(Router);
-
-  readonly strings = SHELL_STRINGS;
+  readonly i18n = inject(I18nService);
+  private readonly translate = inject(TranslateService);
 
   readonly member = this.session.currentMember;
   readonly tenant = this.session.tenant;
+  readonly currentLocale = this.i18n.currentLocale;
 
   readonly workspaces = signal<WorkspaceSummary[]>([]);
   readonly isSwitchingWorkspace = signal<boolean>(false);
@@ -67,18 +70,11 @@ export class ShellComponent implements OnInit {
 
   formatRole(role: Role | null | undefined): string {
     if (!role) return '';
-    switch (role) {
-      case 'owner':
-        return this.strings.roleOwner;
-      case 'buyer':
-        return this.strings.roleBuyer;
-      case 'branch_manager':
-        return this.strings.roleBranchManager;
-      case 'approver':
-        return this.strings.roleApprover;
-      case 'viewer':
-        return this.strings.roleViewer;
-    }
+    return this.translate.instant(`common.roles.${role}`);
+  }
+
+  onSelectLanguage(lang: Locale): void {
+    this.i18n.setLocale(lang);
   }
 
   onSwitchWorkspace(tenantId: string): void {

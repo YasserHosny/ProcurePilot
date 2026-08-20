@@ -9,11 +9,12 @@ import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSelectModule } from '@angular/material/select';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
 import { ApiService } from '../../../core/api/api.service';
 import type { ApiError, ConfigOptions } from '../../../core/api/models';
 import { SessionService } from '../../../core/auth/session.service';
-import { SIGNUP_STRINGS } from './signup.strings';
+import { I18nService } from '../../../core/i18n';
 
 interface ErrorAlert {
   readonly type: 'error' | 'forbidden';
@@ -35,6 +36,7 @@ interface ErrorAlert {
     MatButtonModule,
     MatIconModule,
     MatProgressSpinnerModule,
+    TranslatePipe,
   ],
   templateUrl: './signup.component.html',
   styleUrl: './signup.component.scss',
@@ -45,8 +47,8 @@ export class SignupComponent implements OnInit {
   private readonly session = inject(SessionService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
-
-  readonly strings = SIGNUP_STRINGS;
+  private readonly translate = inject(TranslateService);
+  readonly i18n = inject(I18nService);
 
   readonly isSubmitting = signal<boolean>(false);
   readonly isLoadingConfig = signal<boolean>(true);
@@ -90,8 +92,8 @@ export class SignupComponent implements OnInit {
         this.isLoadingConfig.set(false);
         this.errorAlert.set({
           type: 'error',
-          title: this.strings.defaultErrorTitle,
-          message: this.strings.configError,
+          title: this.translate.instant('onboarding.signup.defaultErrorTitle'),
+          message: this.translate.instant('onboarding.signup.configError'),
         });
       },
     });
@@ -121,7 +123,7 @@ export class SignupComponent implements OnInit {
         region: formVal.region,
         currency: formVal.currency,
         tax_model: formVal.tax_model,
-        default_locale: 'en',
+        default_locale: this.i18n.currentLocale(),
       })
       .subscribe({
         next: (session) => {
@@ -136,8 +138,8 @@ export class SignupComponent implements OnInit {
             if (err.status === 403) {
               this.errorAlert.set({
                 type: 'forbidden',
-                title: this.strings.invitationForbiddenTitle,
-                message: this.strings.invitationForbiddenMessage,
+                title: this.translate.instant('onboarding.signup.invitationForbiddenTitle'),
+                message: this.translate.instant('onboarding.signup.invitationForbiddenMessage'),
                 traceId: apiError?.trace_id,
               });
               return;
@@ -145,8 +147,11 @@ export class SignupComponent implements OnInit {
 
             this.errorAlert.set({
               type: 'error',
-              title: this.strings.defaultErrorTitle,
-              message: apiError?.message ?? err.message ?? this.strings.invitationForbiddenMessage,
+              title: this.translate.instant('onboarding.signup.defaultErrorTitle'),
+              message:
+                apiError?.message ??
+                err.message ??
+                this.translate.instant('onboarding.signup.invitationForbiddenMessage'),
               traceId: apiError?.trace_id,
             });
             return;
@@ -154,8 +159,8 @@ export class SignupComponent implements OnInit {
 
           this.errorAlert.set({
             type: 'error',
-            title: this.strings.defaultErrorTitle,
-            message: this.strings.configError,
+            title: this.translate.instant('onboarding.signup.defaultErrorTitle'),
+            message: this.translate.instant('onboarding.signup.configError'),
           });
         },
       });

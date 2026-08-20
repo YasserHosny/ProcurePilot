@@ -3,7 +3,7 @@
     <button
       mat-icon-button
       (click)="sidenav.toggle()"
-      [attr.aria-label]="strings.toggleNav"
+      [attr.aria-label]="'shell.toggleNav' | translate"
       type="button"
     >
       <mat-icon aria-hidden="true">menu</mat-icon>
@@ -11,7 +11,7 @@
 
     <a routerLink="/home" class="brand-section">
       <mat-icon class="brand-icon" aria-hidden="true">insights</mat-icon>
-      <span class="brand-title">{{ strings.brandName }}</span>
+      <span class="brand-title">{{ 'common.brandName' | translate }}</span>
     </a>
 
     @if (tenant(); as currentTenant) {
@@ -29,17 +29,17 @@
       [matMenuTriggerFor]="workspaceMenu"
       class="workspace-switcher-btn"
       type="button"
-      [attr.aria-label]="strings.switchWorkspace"
+      [attr.aria-label]="'shell.switchWorkspace' | translate"
       (click)="loadWorkspaces()"
     >
       <mat-icon aria-hidden="true">swap_horiz</mat-icon>
-      <span class="workspace-name">{{ tenant()?.name || strings.switchWorkspace }}</span>
+      <span class="workspace-name">{{ tenant()?.name || ('shell.switchWorkspace' | translate) }}</span>
       <mat-icon class="dropdown-icon" aria-hidden="true">expand_more</mat-icon>
     </button>
 
     <mat-menu #workspaceMenu="matMenu" xPosition="before">
       <div class="menu-header">
-        <span class="menu-user-email">{{ strings.workspaceListTitle }}</span>
+        <span class="menu-user-email">{{ 'shell.workspaceListTitle' | translate }}</span>
       </div>
 
       @for (ws of workspaces(); track ws.tenant_id) {
@@ -51,7 +51,7 @@
           <div class="workspace-menu-item">
             <div class="ws-info">
               <span class="ws-name">{{ ws.name }}</span>
-              <span class="ws-role">{{ formatRole(ws.role) }}</span>
+              <span class="ws-role">{{ 'common.roles.' + ws.role | translate }}</span>
             </div>
             @if (ws.is_active) {
               <mat-icon class="active-icon" aria-hidden="true">check</mat-icon>
@@ -67,7 +67,7 @@
       [matMenuTriggerFor]="accountMenu"
       class="account-btn"
       type="button"
-      [attr.aria-label]="strings.accountMenuLabel"
+      [attr.aria-label]="'shell.accountMenuLabel' | translate"
     >
       <div class="account-avatar">
         {{ userInitials() }}
@@ -77,21 +77,36 @@
     <mat-menu #accountMenu="matMenu" xPosition="before">
       <div class="menu-header">
         <div class="menu-user-email">{{ member()?.email }}</div>
-        <div class="menu-user-role">{{ formatRole(member()?.role) }}</div>
+        @if (member()?.role; as role) {
+          <div class="menu-user-role">{{ 'common.roles.' + role | translate }}</div>
+        }
       </div>
+
+      <!-- Language Selector in Account Menu -->
+      <div class="menu-section-header">{{ 'shell.language' | translate }}</div>
+
+      <button mat-menu-item (click)="onSelectLanguage('en')">
+        <mat-icon aria-hidden="true">{{ currentLocale() === 'en' ? 'check' : '' }}</mat-icon>
+        <span>{{ 'common.languages.en' | translate }}</span>
+      </button>
+
+      <button mat-menu-item (click)="onSelectLanguage('ar')">
+        <mat-icon aria-hidden="true">{{ currentLocale() === 'ar' ? 'check' : '' }}</mat-icon>
+        <span>{{ 'common.languages.ar' | translate }}</span>
+      </button>
 
       <mat-divider></mat-divider>
 
       <button mat-menu-item (click)="onSignOut()">
         <mat-icon aria-hidden="true">logout</mat-icon>
-        <span>{{ strings.signOut }}</span>
+        <span>{{ 'shell.signOut' | translate }}</span>
       </button>
     </mat-menu>
   </mat-toolbar>
 
   <mat-sidenav-container class="sidenav-container">
     <mat-sidenav #sidenav mode="side" opened class="shell-sidenav">
-      <div class="nav-section-title">{{ strings.navSectionMain }}</div>
+      <div class="nav-section-title">{{ 'shell.navSectionMain' | translate }}</div>
 
       <a
         mat-list-item
@@ -100,37 +115,37 @@
         class="nav-item"
       >
         <mat-icon aria-hidden="true">dashboard</mat-icon>
-        <span class="nav-label">{{ strings.navHome }}</span>
+        <span class="nav-label">{{ 'shell.navHome' | translate }}</span>
       </a>
 
       <div class="nav-item disabled">
         <mat-icon aria-hidden="true">receipt_long</mat-icon>
-        <span class="nav-label">{{ strings.navQuotations }}</span>
-        <span class="soon-badge">{{ strings.comingSoon }}</span>
+        <span class="nav-label">{{ 'shell.navQuotations' | translate }}</span>
+        <span class="soon-badge">{{ 'common.comingSoon' | translate }}</span>
       </div>
 
       <div class="nav-item disabled">
         <mat-icon aria-hidden="true">compare_arrows</mat-icon>
-        <span class="nav-label">{{ strings.navCompare }}</span>
-        <span class="soon-badge">{{ strings.comingSoon }}</span>
+        <span class="nav-label">{{ 'shell.navCompare' | translate }}</span>
+        <span class="soon-badge">{{ 'common.comingSoon' | translate }}</span>
       </div>
 
       <div class="nav-item disabled">
         <mat-icon aria-hidden="true">savings</mat-icon>
-        <span class="nav-label">{{ strings.navSavings }}</span>
-        <span class="soon-badge">{{ strings.comingSoon }}</span>
+        <span class="nav-label">{{ 'shell.navSavings' | translate }}</span>
+        <span class="soon-badge">{{ 'common.comingSoon' | translate }}</span>
       </div>
 
       <div class="nav-item disabled">
         <mat-icon aria-hidden="true">group</mat-icon>
-        <span class="nav-label">{{ strings.navTeam }}</span>
-        <span class="soon-badge">{{ strings.comingSoon }}</span>
+        <span class="nav-label">{{ 'shell.navTeam' | translate }}</span>
+        <span class="soon-badge">{{ 'common.comingSoon' | translate }}</span>
       </div>
 
       <div class="nav-item disabled">
         <mat-icon aria-hidden="true">settings</mat-icon>
-        <span class="nav-label">{{ strings.navSettings }}</span>
-        <span class="soon-badge">{{ strings.comingSoon }}</span>
+        <span class="nav-label">{{ 'shell.navSettings' | translate }}</span>
+        <span class="soon-badge">{{ 'common.comingSoon' | translate }}</span>
       </div>
     </mat-sidenav>
 

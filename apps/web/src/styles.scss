@@ -3,5 +3,20 @@
 
 @include mat.core();
 
-html, body { height: 100%; }
-body { margin: 0; font-family: Roboto, "Helvetica Neue", sans-serif; }
+html, body {
+  block-size: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: Roboto, "Helvetica Neue", sans-serif;
+  text-align: start;
+}
+
+[dir="rtl"] {
+  font-family: Roboto, "Segoe UI", "Cairo", Tahoma, sans-serif;
+
+  .rtl-flip {
+    transform: scaleX(-1);
+  }
+}

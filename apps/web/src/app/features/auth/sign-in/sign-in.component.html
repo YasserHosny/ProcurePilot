@@ -2,53 +2,53 @@
   <mat-card class="signin-card">
     <div class="brand-header">
       <mat-icon class="brand-icon" aria-hidden="true">insights</mat-icon>
-      <span class="brand-name">{{ strings.brandName }}</span>
+      <span class="brand-name">{{ 'common.brandName' | translate }}</span>
     </div>
 
-    <h1 class="card-title">{{ strings.title }}</h1>
-    <p class="card-subtitle">{{ strings.subtitle }}</p>
+    <h1 class="card-title">{{ 'auth.signin.title' | translate }}</h1>
+    <p class="card-subtitle">{{ 'auth.signin.subtitle' | translate }}</p>
 
     @if (errorMessage(); as error) {
       <div class="alert-banner" role="alert">
         <span>{{ error }}</span>
         @if (errorTraceId(); as traceId) {
-          <span class="trace-id">{{ strings.traceIdLabel }}: {{ traceId }}</span>
+          <span class="trace-id">{{ 'common.traceId' | translate }}: {{ traceId }}</span>
         }
       </div>
     }
 
     <form [formGroup]="form" (ngSubmit)="onSubmit()" class="signin-form" novalidate>
       <mat-form-field appearance="outline" class="form-field">
-        <mat-label>{{ strings.emailLabel }}</mat-label>
+        <mat-label>{{ 'auth.signin.emailLabel' | translate }}</mat-label>
         <input
           matInput
           type="email"
           formControlName="email"
-          [placeholder]="strings.emailPlaceholder"
+          [placeholder]="'auth.signin.emailPlaceholder' | translate"
           required
           autocomplete="email"
         />
         @if (form.controls.email.hasError('required')) {
-          <mat-error>{{ strings.emailRequired }}</mat-error>
+          <mat-error>{{ 'auth.signin.emailRequired' | translate }}</mat-error>
         }
         @if (form.controls.email.hasError('email')) {
-          <mat-error>{{ strings.emailInvalid }}</mat-error>
+          <mat-error>{{ 'auth.signin.emailInvalid' | translate }}</mat-error>
         }
       </mat-form-field>
 
       <div class="password-header">
         <a routerLink="/auth/password-reset" class="forgot-password-link">
-          {{ strings.forgotPassword }}
+          {{ 'auth.signin.forgotPassword' | translate }}
         </a>
       </div>
 
       <mat-form-field appearance="outline" class="form-field">
-        <mat-label>{{ strings.passwordLabel }}</mat-label>
+        <mat-label>{{ 'auth.signin.passwordLabel' | translate }}</mat-label>
         <input
           matInput
           [type]="hidePassword() ? 'password' : 'text'"
           formControlName="password"
-          [placeholder]="strings.passwordPlaceholder"
+          [placeholder]="'auth.signin.passwordPlaceholder' | translate"
           required
           autocomplete="current-password"
         />
@@ -57,12 +57,12 @@
           matSuffix
           type="button"
           (click)="togglePasswordVisibility()"
-          [attr.aria-label]="hidePassword() ? 'Show password' : 'Hide password'"
+          [attr.aria-label]="(hidePassword() ? 'auth.signin.showPassword' : 'auth.signin.hidePassword') | translate"
         >
           <mat-icon aria-hidden="true">{{ hidePassword() ? 'visibility_off' : 'visibility' }}</mat-icon>
         </button>
         @if (form.controls.password.hasError('required')) {
-          <mat-error>{{ strings.passwordRequired }}</mat-error>
+          <mat-error>{{ 'auth.signin.passwordRequired' | translate }}</mat-error>
         }
       </mat-form-field>
 
@@ -76,15 +76,15 @@
         >
           @if (isLoading()) {
             <mat-spinner diameter="20" class="button-spinner"></mat-spinner>
-            <span>{{ strings.submittingButton }}</span>
+            <span>{{ 'auth.signin.submittingButton' | translate }}</span>
           } @else {
-            <span>{{ strings.submitButton }}</span>
+            <span>{{ 'auth.signin.submitButton' | translate }}</span>
           }
         </button>
 
         <div class="signup-prompt">
-          <span>{{ strings.noAccountPrompt }}</span>
-          <a routerLink="/onboarding/signup">{{ strings.createWorkspaceLink }}</a>
+          <span>{{ 'auth.signin.noAccountPrompt' | translate }}</span>
+          <a routerLink="/onboarding/signup">{{ 'auth.signin.createWorkspaceLink' | translate }}</a>
         </div>
       </div>
     </form>
