@@ -138,3 +138,86 @@ purpose (see `specs/001-platform-foundation/plan.md` Complexity Tracking).
 |-----------|------------|---------------------------------------|
 | New deployable: `services/extraction-worker` | AI extraction calls (Bedrock, with Azure DI fallback) run seconds to tens of seconds and depend on a third-party API's own availability. Running this inline inside an `apps/api` request would hold a web worker hostage per document and make a clean fallback-provider retry impossible without also blocking the caller. The constitution names this exact service as pre-authorised ("when load justifies it") — the load reason is latency and third-party dependency isolation, not raw request volume. | Running extraction synchronously in `apps/api` was rejected: it couples the API's availability to two external AI providers' latency and uptime, and a provider failover would have to happen within a single HTTP request's timeout budget instead of a retryable background job. |
 | New infrastructure dependency: Redis | Backs the extraction job queue — `apps/api` enqueues a job, `services/extraction-worker` consumes it, and the `jobs` module exposes pollable status back to the client. This is the first asynchronous flow in the product; nothing before it needed a durable queue. | An in-process queue (as used for chunk 4.1's rate limiting) was rejected: it does not survive an API process restart mid-extraction, and would silently lose a job a reviewer is waiting on — unacceptable for a workflow the constitution requires to have "its own state machine, SLAs, and metrics." Already flagged and deferred to exactly this chunk in `specs/001-platform-foundation/research.md` R7. |
+
+## Constitution Check — re-run against delivered code (T069)
+
+Run at the close of chunk 4.3, against what was built, verified directly against a real local
+Supabase Postgres (all migrations through `20260819000021` applied), a real Redis queue, a real
+`services/extraction-worker` process in its own isolated virtual environment, and a real browser
+walkthrough of the actual running stack — not accepted from either delegate's self-report.
+
+| Principle | Verdict | Evidence |
+|---|---|---|
+| **I. Evidence Over Assertion** | ✅ PASS | `field_extraction` is its own table, one row per field on a header or line — confirmed live: a real CSV extraction produced 9 separate provenance rows (2 lines × 3 fields + 4 header fields), each carrying its own `confidence`, `extraction_method`, `model_version`, and `source_page`/`source_region`, with `corrected_value`/`corrected_by`/`corrected_at` left null until a human actually intervenes. No aggregate confidence anywhere. |
+| **II. Deterministic, Replayable Normalisation** | ✅ N/A | Unchanged — no landed-cost computation in this chunk. |
+| **III. Human Authority Over Automation** | ✅ PASS | Verified live end-to-end: an extraction with a genuine arithmetic mismatch (line items summing to £130.00 against a stated £120.00) was automatically placed `in_review` with a `review_task` (`reason=arithmetic_mismatch`, `priority=high`); `POST /confirm` correctly refused with 409 first for the missing supplier, then again for the unresolved mismatch, in the right order; only after both were resolved did the quotation reach `reviewed` — the one trusted status — with `reviewed_by`/`reviewed_at` recorded. |
+| **IV. Every Insight Ends in an Action** | ✅ PASS | Unchanged from pre-design — the review queue is the action surface. |
+| **V. Tenant Isolation by Construction** | ✅ PASS | Queried directly: all six tenant-scoped tables (`document`, `quotation`, `quotation_line`, `field_extraction`, `extraction_job`, `review_task`) show RLS `ENABLED` and `FORCED` — `True/True` on every row. `test_tenant_isolation.py` (T063) exercises real cross-workspace reads/writes on all six under a real JWT claim, **plus** a real `storage.objects` insert/select proving the second isolation boundary: a member of workspace alpha cannot read workspace beta's uploaded file even given its exact storage path. 29/29 isolation tests pass. |
+| **VI. Modular Monolith Until Scale Demands Otherwise** | ⚠️ PASS with justification | See Complexity Tracking above — unchanged in substance, but the delivered code initially violated its own spirit: a first backend pass had `services/extraction-worker` importing `apps/api`'s `csv_import.parse_decimal` directly, which crashed the worker on every job in a real isolated deployment (RQ reported it as `AttributeError: module has no attribute 'worker'`, masking the real `ModuleNotFoundError`). Fixed by duplicating the one small pure function into the worker's own package rather than sharing import-time state across the two deployables — re-verified in a clean venv containing only the worker's own declared dependencies. |
+| **VII. Money, Tax, Language from the Schema Up** | ✅ PASS | Every quotation line amount uses the chunk 4.2 `Money` convention exactly, confirmed live (`unit_price: {amount, currency}` for both lines). Arithmetic mismatch tolerance uses exact `Decimal` arithmetic reusing the existing catalogue parser, not a second implementation with its own drift risk. |
+
+**Workflow gates**: delegated work reviewed ✅ — backend (Codex), frontend (Antigravity), and docs
+(Codex) lanes were dispatched in parallel; every diff was re-verified against a live local Postgres,
+a live Redis queue, a live worker process, and a live browser session rather than accepted from
+self-reports. Real, load-bearing gaps surfaced only by this — not by either delegate's own sandbox,
+which lacked the infrastructure to find them:
+
+- **A stuck-quotation bug**: the extraction-enqueue endpoint wrote `quotation.status = 'extracting'`
+  and created an `extraction_job` row *before* pushing the job to Redis; when the Redis push failed,
+  neither write was rolled back, permanently stranding the quotation (unextractable and unable to
+  accept a new extraction attempt, with no recovery path in the API). Fixed to compensate on
+  enqueue failure: mark the job `failed` with a clear reason and restore the quotation's prior
+  status.
+- **A worker import bug**: covered under Principle VI above.
+- **Eight inert placeholder tests**: the backend lane's first pass replaced every DB-backed
+  integration test (T017–T022, T038–T042, T054, T058) with a file whose entire body was
+  `pytest.skip(...)` — none of them ever ran, regardless of `TEST_DATABASE_URL`. Replaced with real
+  assertions against a real database in the delta round.
+- **A test-helper role-privilege bug**: the new `quotation_helpers.py`'s reference-data setup
+  (`supported_base_unit`) needed superuser privilege but ran after the cursor had already switched
+  to `authenticated` role in a prior fixture call within the same connection — the same class of bug
+  fixed in chunk 4.2's `catalogue_helpers.py`. Fixed the same way: reset role immediately before the
+  privileged insert, restore it after.
+- **A test double's JSON-encoding bug**: the fake Supabase-REST-over-psycopg test client only
+  wrapped `dict`/`list` payload values in `Jsonb(...)`, not scalars destined for `jsonb` columns —
+  a plain string written to `corrected_value` produced invalid JSON. Fixed by naming the known
+  `jsonb` columns explicitly in the adapter.
+- **A frontend persistence bug, found only by driving the actual browser against the actual
+  running API**: selecting a supplier on the review screen with no other field correction never
+  reached the backend — `confirmQuotation()` only PATCHed the supplier alongside pending
+  corrections, so a supplier-only change was silently dropped and every confirm attempt 409'd with
+  `supplier_not_confirmed` forever. Neither Karma's mocked API nor the backend's own tests could see
+  this, because it is purely a coordination bug between two independently-built lanes reading the
+  same contract differently. Fixed the trigger condition to also cover a changed, unsaved supplier
+  selection; added a regression test for both the changed-supplier and already-saved-supplier cases.
+
+### Quality gates
+
+| Gate | Threshold | Status |
+|---|---|---|
+| Cross-tenant isolation | Proven on every change | ✅ 29/29, including the Storage-object boundary, against a real database |
+| Per-field evidence (Principle I) | Confidence + provenance per field, not per line/quotation | ✅ Verified live: 9 `field_extraction` rows from one 2-line CSV |
+| Arithmetic mismatch forces review (SC-003) | 100% held in mandatory review | ✅ Verified live: a genuine £10 mismatch produced a high-priority `review_task`, and `POST /confirm` 409'd until it was resolved |
+| Human confirmation gates trust (SC-006) | Zero quotations trusted without it | ✅ Verified live end-to-end: upload → extract → mismatch detected → supplier confirmed → mismatch resolved → `POST /confirm` succeeded → `status = reviewed`, `reviewed_by`/`reviewed_at` recorded |
+| Structured-format bypass (FR-006) | No LLM call for CSV/Excel | ✅ Verified live: `extraction_method = structured_parse`, `model_version = structured-quotation-parser-v1` on every field |
+| Backend test suite | All passing | ✅ 266 passed, 1 skipped (unrelated, pre-existing), ruff clean, against a real local Postgres — confirmed idempotent on repeat runs |
+| Worker test suite | All passing, in isolation | ✅ 5 passed, ruff clean, in a venv containing only the worker's own declared dependencies (no `apps/api` on the path) |
+| Frontend test suite | All passing | ✅ 62 passed (61 + 1 new regression test), `ng lint` clean, i18n 573/573 exact parity |
+| Live end-to-end walkthrough | Human-eye pass through the running app | ✅ Real signup-derived session, real upload, real async extraction via a real Redis-backed worker, real arithmetic-mismatch detection, real 409 refusals in the correct order, real confirmation — all against the actually-running stack, not mocks |
+
+### The honest gaps
+
+- **T066's AI evaluation harness cannot honestly report the ≥90% field-accuracy or calibration
+  gates**, because there are no real Bedrock/Azure Document Intelligence credentials yet and no real
+  held-out benchmark dataset — this chunk runs entirely on a stub extraction provider by explicit,
+  user-approved decision (see spec.md's Assumptions). The harness machinery itself (accuracy,
+  document-exact-match, arithmetic pass rate, cost, ECE calculation) is built and runs, clearly
+  labelled `gate_status=not_validated_stub_provider_no_held_out_benchmark`, so nobody mistakes
+  mechanical correctness for a real accuracy claim.
+- **No router/service-level test asserts `test_quotation_trusted_data.py`'s premise beyond a
+  documented no-op** — there is genuinely no downstream consumer of `reviewed` quotations yet
+  (chunk 4.4's matching pipeline is that consumer), so there is nothing else to assert until that
+  chunk exists.
+- **Re-quote versioning (US4, P2)** was verified through backend tests and Karma, but not through
+  the live browser walkthrough — the walkthrough focused on the P1 MVP loop (upload, extract,
+  mismatch, confirm), which is where the constitutional non-negotiables live.

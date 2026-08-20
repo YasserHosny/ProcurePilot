@@ -483,5 +483,199 @@
       "unsupportedFileError": "File format not supported. Please upload a valid CSV file.",
       "genericError": "Unable to process import. Please try again."
     }
+  },
+  "quotations": {
+    "nav": {
+      "queue": "Review Queue",
+      "upload": "Upload Quotation"
+    },
+    "upload": {
+      "title": "Upload Supplier Quotation",
+      "subtitle": "Upload PDF, scanned image, or spreadsheet quotations for automated line-item extraction.",
+      "dropzonePrompt": "Drag and drop quotation file here, or click to browse",
+      "dropzoneHint": "Supported formats: PDF, PNG, JPEG, TIFF, CSV, XLS, XLSX (Max 25MB)",
+      "fileLabel": "Choose File",
+      "selectedFile": "Selected File:",
+      "fileSize": "Size:",
+      "fileType": "Type:",
+      "unsupportedFormatError": "Unsupported file format. Please upload a PDF, PNG, JPEG, TIFF, CSV, XLS, or XLSX file.",
+      "fileTooLargeError": "File size exceeds the 25MB limit.",
+      "emptyFileError": "The selected file is empty.",
+      "uploadButton": "Upload & Extract",
+      "uploading": "Uploading document...",
+      "processing": "Extracting line items...",
+      "processingHint": "AI is reading header fields, pricing, and line items. This typically takes a few seconds.",
+      "extractionSuccess": "Extraction completed successfully!",
+      "goToReview": "Proceed to Review",
+      "uploadAnother": "Upload Another Quotation",
+      "failedTitle": "Extraction Failed",
+      "failedMessage": "The document could not be processed. Please verify the document is legible and try again.",
+      "retryButton": "Try Again",
+      "directStorageNotice": "Documents are uploaded securely and directly to encrypted storage.",
+      "status": {
+        "uploading": "Uploading",
+        "processing": "Extracting",
+        "extracted": "Extracted",
+        "failed": "Failed"
+      }
+    },
+    "queue": {
+      "title": "Quotation Review Queue",
+      "subtitle": "Review and authorize extracted supplier quotations before they become trusted commercial data.",
+      "uploadNew": "Upload Quotation",
+      "filterStatus": "Filter by Status",
+      "filterPriority": "Filter by Priority",
+      "status": {
+        "all": "All Statuses",
+        "open": "Open",
+        "in_progress": "In Progress",
+        "resolved": "Resolved"
+      },
+      "priority": {
+        "all": "All Priorities",
+        "low": "Low",
+        "normal": "Normal",
+        "high": "High"
+      },
+      "reason": {
+        "low_confidence": "Low Confidence Extraction",
+        "arithmetic_mismatch": "Arithmetic Mismatch",
+        "read_failure": "Read Failure",
+        "review_required": "Review Required"
+      },
+      "columns": {
+        "id": "Quotation ID",
+        "supplier": "Supplier",
+        "reason": "Reason for Review",
+        "priority": "Priority",
+        "status": "Status",
+        "createdAt": "Uploaded At",
+        "actions": "Actions"
+      },
+      "actions": {
+        "review": "Review & Authorize",
+        "view": "View (Read-Only)"
+      },
+      "readOnlyBadge": "Read-Only Access",
+      "readOnlyNotice": "Your role has read-only access. Only Owners and Buyers can correct and confirm quotations.",
+      "emptyTitle": "No Review Tasks Found",
+      "emptyMessage": "There are no quotation review tasks matching your current filters."
+    },
+    "review": {
+      "title": "Quotation Review & Authorization",
+      "subtitle": "Inspect extracted fields side by side with the source document. Verify supplier and resolve any discrepancies.",
+      "backToQueue": "Back to Review Queue",
+      "readOnlyNotice": "Read-only mode. You can view extraction evidence, but editing and confirmation require Owner or Buyer permissions.",
+      "panels": {
+        "document": "Source Document Evidence",
+        "extractedData": "Extracted Commercial Data"
+      },
+      "keyboardNav": {
+        "title": "Attention Navigation (FR-014)",
+        "hint": "Jump directly between fields needing attention (low confidence or missing data)",
+        "nextField": "Next Flagged Field",
+        "prevField": "Previous Flagged Field",
+        "flaggedCount": "{{current}} of {{total}} flagged fields needing attention"
+      },
+      "header": {
+        "title": "Quotation Details",
+        "supplierLabel": "Supplier (Required)",
+        "supplierPlaceholder": "Select confirmed supplier...",
+        "supplierRequired": "Supplier confirmation is required before authorizing this quotation",
+        "currencyLabel": "Currency",
+        "currencyPlaceholder": "e.g. USD, EUR, GBP",
+        "currencyRequired": "Currency is required",
+        "issueDateLabel": "Issue Date",
+        "expiryDateLabel": "Expiry Date",
+        "statedTotalLabel": "Stated Total Amount",
+        "statedTotalCurrency": "Stated Total Currency",
+        "statusLabel": "Status"
+      },
+      "lines": {
+        "title": "Extracted Line Items",
+        "colLine": "#",
+        "colOriginalText": "Original Document Text",
+        "colQuantity": "Qty",
+        "colPack": "Pack Details",
+        "colUnitPrice": "Unit Price",
+        "colVat": "VAT %",
+        "colDeliveryFee": "Delivery Fee",
+        "colDiscount": "Discount",
+        "colConfidence": "Confidence",
+        "colActions": "Actions",
+        "packCount": "Pack Count",
+        "unitSize": "Unit Size",
+        "unit": "Unit",
+        "noLines": "No line items extracted for this quotation."
+      },
+      "confidence": {
+        "high": "High Confidence",
+        "medium": "Medium Confidence",
+        "low": "Low Confidence — Needs Review",
+        "flaggedBadge": "Needs Attention",
+        "scoreTooltip": "AI confidence score: {{score}}% via {{method}} ({{model}})"
+      },
+      "provenance": {
+        "title": "Field Extraction Provenance",
+        "method": "Method:",
+        "model": "Model:",
+        "page": "Page:",
+        "originalValue": "Original AI Value:",
+        "correctedValue": "Corrected Value:",
+        "correctedBy": "Corrected By:",
+        "correctedAt": "Corrected At:",
+        "showSource": "Show in Document"
+      },
+      "corrections": {
+        "title": "Correct Field",
+        "saveCorrection": "Save Correction",
+        "cancelCorrection": "Cancel",
+        "editTooltip": "Correct this field value",
+        "correctedBadge": "Corrected by Human"
+      },
+      "arithmetic": {
+        "mismatchTitle": "Arithmetic Discrepancy Detected (US3)",
+        "mismatchDescription": "The sum of the extracted line totals does not match the stated document total. This quotation cannot be confirmed until this discrepancy is reconciled or corrected.",
+        "statedTotal": "Stated Document Total:",
+        "computedTotal": "Computed Line Total:",
+        "difference": "Discrepancy:",
+        "reconciled": "Line items match the stated document total perfectly.",
+        "statusMismatch": "Discrepancy Unresolved",
+        "statusReconciled": "Reconciled"
+      },
+      "versioning": {
+        "title": "Quotation Versioning (US4)",
+        "isRequoteLabel": "This is an updated re-quote of an existing quotation",
+        "selectPreviousLabel": "Select Prior Quotation to Supersede",
+        "selectPreviousPlaceholder": "Select previous quotation...",
+        "bannerTitle": "Version History",
+        "isUpdateOf": "This quotation is an updated version of",
+        "hasNewerVersion": "A newer version of this quotation exists:",
+        "viewPriorVersion": "View Prior Version",
+        "viewNewerVersion": "View Newer Version",
+        "versionId": "Quotation #{{id}}"
+      },
+      "actions": {
+        "saveChanges": "Save Corrections",
+        "saving": "Saving corrections...",
+        "confirmButton": "Confirm & Authorize Quotation",
+        "confirming": "Authorizing quotation...",
+        "confirmSuccess": "Quotation confirmed and authorized as trusted commercial data.",
+        "saveSuccess": "Corrections saved successfully.",
+        "confirmBlockedTitle": "Cannot Confirm Quotation",
+        "confirmBlockedMissingSupplier": "Please select and confirm a supplier before authorizing.",
+        "confirmBlockedArithmetic": "Unresolved arithmetic mismatch. Please correct the lines or stated total.",
+        "confirmBlockedConfidence": "Unresolved low-confidence fields require correction.",
+        "genericError": "Unable to update quotation. Please check your inputs and try again."
+      },
+      "status": {
+        "pending": "Pending Extraction",
+        "extracting": "Extracting",
+        "extracted": "Extracted (Awaiting Review)",
+        "in_review": "In Review",
+        "reviewed": "Reviewed & Authorized",
+        "refused": "Refused"
+      }
+    }
   }
 }

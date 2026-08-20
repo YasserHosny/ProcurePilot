@@ -483,5 +483,199 @@
       "unsupportedFileError": "صيغة الملف غير مدعومة. يُرجى رفع ملف CSV صالح.",
       "genericError": "تعذر معالجة الاستيراد. يُرجى المحاولة مرة أخرى."
     }
+  },
+  "quotations": {
+    "nav": {
+      "queue": "قائمة المراجعة",
+      "upload": "رفع عرض سعر"
+    },
+    "upload": {
+      "title": "رفع عرض أسعار المورد",
+      "subtitle": "رفع عروض الأسعار بصيغة PDF أو صور ممسوحة ضوئياً أو جداول إلكترونية للاستخراج الآلي للبنود.",
+      "dropzonePrompt": "اسحب وأفلت ملف عرض السعر هنا، أو انقر للاختيار",
+      "dropzoneHint": "الصيغ المدعومة: PDF و PNG و JPEG و TIFF و CSV و XLS و XLSX (الحد الأقصى 25 ميجابايت)",
+      "fileLabel": "اختر ملفاً",
+      "selectedFile": "الملف المحدد:",
+      "fileSize": "الحجم:",
+      "fileType": "النوع:",
+      "unsupportedFormatError": "صيغة الملف غير مدعومة. يُرجى رفع ملف PDF أو PNG أو JPEG أو TIFF أو CSV أو XLS أو XLSX.",
+      "fileTooLargeError": "حجم الملف يتجاوز الحد المسموح به (25 ميجابايت).",
+      "emptyFileError": "الملف المحدد فارغ.",
+      "uploadButton": "رفع واستخراج البيانات",
+      "uploading": "جاري رفع المستند...",
+      "processing": "جاري استخراج بنود عرض السعر...",
+      "processingHint": "يقوم الذكاء الاصطناعي بقراءة بيانات الترويسة والأسعار والبنود. يستغرق هذا عادةً بضع ثوانٍ.",
+      "extractionSuccess": "تم استخراج البيانات بنجاح!",
+      "goToReview": "الانتقال إلى المراجعة",
+      "uploadAnother": "رفع عرض سعر آخر",
+      "failedTitle": "فشل استخراج البيانات",
+      "failedMessage": "تعذر معالجة المستند. يُرجى التأكد من وضوح المستند والمحاولة مرة أخرى.",
+      "retryButton": "إعادة المحاولة",
+      "directStorageNotice": "يتم رفع المستندات بأمان ومباشرةً إلى وحدة التخزين المشفرة.",
+      "status": {
+        "uploading": "جاري الرفع",
+        "processing": "جاري الاستخراج",
+        "extracted": "تم الاستخراج",
+        "failed": "فشلت المعالجة"
+      }
+    },
+    "queue": {
+      "title": "قائمة مراجعة عروض الأسعار",
+      "subtitle": "مراجعة واعتماد عروض الأسعار المستخرجة للموردين قبل اعتمادها كبيانات تجارية موثوقة.",
+      "uploadNew": "رفع عرض سعر",
+      "filterStatus": "تصفية حسب الحالة",
+      "filterPriority": "تصفية حسب الأولوية",
+      "status": {
+        "all": "جميع الحالات",
+        "open": "مفتوحة",
+        "in_progress": "قيد المعالجة",
+        "resolved": "مكتملة"
+      },
+      "priority": {
+        "all": "جميع الأولويات",
+        "low": "منخفضة",
+        "normal": "عادية",
+        "high": "عالية"
+      },
+      "reason": {
+        "low_confidence": "استخراج منخفض الثقة",
+        "arithmetic_mismatch": "عدم تطابق حسابي",
+        "read_failure": "تعذر قراءة المستند",
+        "review_required": "تتطلب مراجعة بشرية"
+      },
+      "columns": {
+        "id": "معرف عرض السعر",
+        "supplier": "المورد",
+        "reason": "سبب المراجعة",
+        "priority": "الأولوية",
+        "status": "الحالة",
+        "createdAt": "تاريخ الرفع",
+        "actions": "الإجراءات"
+      },
+      "actions": {
+        "review": "مراجعة واعتماد",
+        "view": "عرض (للقراءة فقط)"
+      },
+      "readOnlyBadge": "صلاحية قراءة فقط",
+      "readOnlyNotice": "دورك يتيح صلاحية القراءة فقط. يملك المالكون والمشترون فقط صلاحية تصحيح واعتماد عروض الأسعار.",
+      "emptyTitle": "لا توجد مهام مراجعة",
+      "emptyMessage": "لا توجد مهام مراجعة لعروض الأسعار تطابق خيارات التصفية الحالية."
+    },
+    "review": {
+      "title": "مراجعة واعتماد عرض السعر",
+      "subtitle": "فحص الحقول المستخرجة جنباً إلى جنب مع المستند الأصلي. تحقق من المورد وعالج أي فروقات.",
+      "backToQueue": "العودة إلى قائمة المراجعة",
+      "readOnlyNotice": "وضع القراءة فقط. يمكنك الاطلاع على أدلة الاستخراج، ولكن التعديل والاعتماد يتطلبان صلاحيات المالك أو المشتري.",
+      "panels": {
+        "document": "أدلة المستند الأصلي",
+        "extractedData": "البيانات التجارية المستخرجة"
+      },
+      "keyboardNav": {
+        "title": "التنقل بين الحقول (FR-014)",
+        "hint": "الانتقال المباشر بين الحقول التي تتطلب اهتماماً (منخفضة الثقة أو بيانات مفقودة)",
+        "nextField": "الحقل التالي المنبه",
+        "prevField": "الحقل السابق المنبه",
+        "flaggedCount": "{{current}} من {{total}} حقول تتطلب الانتباه"
+      },
+      "header": {
+        "title": "تفاصيل عرض السعر",
+        "supplierLabel": "المورد (مطلوب)",
+        "supplierPlaceholder": "اختر المورد المعتمد...",
+        "supplierRequired": "تأكيد المورد إلزامي قبل اعتماد عرض السعر",
+        "currencyLabel": "العملة",
+        "currencyPlaceholder": "مثال: USD, EUR, SAR",
+        "currencyRequired": "العملة مطلوبة",
+        "issueDateLabel": "تاريخ الإصدار",
+        "expiryDateLabel": "تاريخ الانتهاء",
+        "statedTotalLabel": "إجمالي المبلغ المذكور",
+        "statedTotalCurrency": "عملة المبلغ المذكور",
+        "statusLabel": "الحالة"
+      },
+      "lines": {
+        "title": "بنود عرض السعر المستخرجة",
+        "colLine": "#",
+        "colOriginalText": "النص الأصلي من المستند",
+        "colQuantity": "الكمية",
+        "colPack": "تفاصيل العبوة",
+        "colUnitPrice": "سعر الوحدة",
+        "colVat": "ضريبة القيمة المضافة %",
+        "colDeliveryFee": "رسوم التوصيل",
+        "colDiscount": "الخصم",
+        "colConfidence": "مستوى الثقة",
+        "colActions": "الإجراءات",
+        "packCount": "عدد العبوات",
+        "unitSize": "حجم الوحدة",
+        "unit": "الوحدة",
+        "noLines": "لم يتم استخراج بنود لعرض السعر هذا."
+      },
+      "confidence": {
+        "high": "ثقة عالية",
+        "medium": "ثقة متوسطة",
+        "low": "ثقة منخفضة — تتطلب مراجعة",
+        "flaggedBadge": "تتطلب انتباهاً",
+        "scoreTooltip": "درجة ثقة الذكاء الاصطناعي: {{score}}% عبر {{method}} ({{model}})"
+      },
+      "provenance": {
+        "title": "مصدر استخراج الحقل",
+        "method": "الطريقة:",
+        "model": "النموذج:",
+        "page": "الصفحة:",
+        "originalValue": "القيمة الأصلية المستخرجة:",
+        "correctedValue": "القيمة المصححة:",
+        "correctedBy": "تم التصحيح بواسطة:",
+        "correctedAt": "تاريخ التصحيح:",
+        "showSource": "عرض في المستند"
+      },
+      "corrections": {
+        "title": "تصحيح الحقل",
+        "saveCorrection": "حفظ التصحيح",
+        "cancelCorrection": "إلغاء",
+        "editTooltip": "تصحيح قيمة هذا الحقل",
+        "correctedBadge": "تم التصحيح يدوياً"
+      },
+      "arithmetic": {
+        "mismatchTitle": "تم اكتشاف عدم تطابق حسابي (US3)",
+        "mismatchDescription": "مجموع قيم البنود المستخرجة لا يطابق المبلغ الإجمالي المذكور في المستند. لا يمكن اعتماد عرض السعر حتى تتم تسوية هذا الفارق أو تصحيحه.",
+        "statedTotal": "الإجمالي المذكور في المستند:",
+        "computedTotal": "الإجمالي المحسوب للبنود:",
+        "difference": "الفارق الحسابي:",
+        "reconciled": "قيم البنود متطابقة تماماً مع الإجمالي المذكور في المستند.",
+        "statusMismatch": "عدم تطابق غير محلول",
+        "statusReconciled": "متطابق"
+      },
+      "versioning": {
+        "title": "إصدارات عروض الأسعار (US4)",
+        "isRequoteLabel": "هذا العرض هو تحديث لعرض سعر سابق",
+        "selectPreviousLabel": "اختر عرض السعر السابق لاستبداله",
+        "selectPreviousPlaceholder": "اختر عرض السعر السابق...",
+        "bannerTitle": "سجل الإصدارات",
+        "isUpdateOf": "عرض السعر هذا هو إصدار محدث من",
+        "hasNewerVersion": "يوجد إصدار أحدث لعرض السعر هذا:",
+        "viewPriorVersion": "عرض الإصدار السابق",
+        "viewNewerVersion": "عرض الإصدار الأحدث",
+        "versionId": "عرض سعر #{{id}}"
+      },
+      "actions": {
+        "saveChanges": "حفظ التصحيحات",
+        "saving": "جاري حفظ التصحيحات...",
+        "confirmButton": "تأكيد واعتماد عرض السعر",
+        "confirming": "جاري اعتماد عرض السعر...",
+        "confirmSuccess": "تم تأكيد واعتماد عرض السعر كبيانات تجارية موثوقة.",
+        "saveSuccess": "تم حفظ التصحيحات بنجاح.",
+        "confirmBlockedTitle": "تعذر تأكيد عرض السعر",
+        "confirmBlockedMissingSupplier": "يُرجى تحديد وتأكيد المورد قبل الاعتماد.",
+        "confirmBlockedArithmetic": "يوجد عدم تطابق حسابي غير معالج. يُرجى تصحيح البنود أو الإجمالي المذكور.",
+        "confirmBlockedConfidence": "توجد حقول منخفضة الثقة تتطلب التصحيح قبل الاعتماد.",
+        "genericError": "تعذر تحديث عرض السعر. يُرجى التحقق من المدخلات والمحاولة مرة أخرى."
+      },
+      "status": {
+        "pending": "بانتظار الاستخراج",
+        "extracting": "جاري الاستخراج",
+        "extracted": "تم الاستخراج (بانتظار المراجعة)",
+        "in_review": "قيد المراجعة",
+        "reviewed": "تمت المراجعة والاعتماد",
+        "refused": "مرفوض"
+      }
+    }
   }
 }

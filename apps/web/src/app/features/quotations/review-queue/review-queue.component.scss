@@ -1,0 +1,262 @@
+.review-queue-container {
+  padding: 1.5rem;
+  max-width: 1200px;
+  margin-inline: auto;
+}
+
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-block-end: 1.5rem;
+  flex-wrap: wrap;
+  gap: 1rem;
+
+  .header-titles {
+    .page-title {
+      font-size: 1.75rem;
+      font-weight: 700;
+      margin: 0 0 0.25rem;
+      color: var(--mat-sys-on-surface, #1e293b);
+    }
+
+    .page-subtitle {
+      font-size: 0.95rem;
+      color: var(--mat-sys-on-surface-variant, #64748b);
+      margin: 0;
+    }
+  }
+
+  .upload-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+}
+
+.read-only-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 1rem;
+  border-radius: 8px;
+  background-color: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #1e40af;
+  margin-block-end: 1.5rem;
+
+  .banner-icon {
+    flex-shrink: 0;
+    color: #3b82f6;
+  }
+
+  .banner-content {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+
+    .banner-title {
+      font-weight: 600;
+      font-size: 0.95rem;
+    }
+
+    .banner-text {
+      font-size: 0.875rem;
+    }
+  }
+}
+
+.error-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 1rem;
+  border-radius: 8px;
+  background-color: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #991b1b;
+  margin-block-end: 1.5rem;
+
+  .error-icon {
+    flex-shrink: 0;
+    color: #dc2626;
+  }
+
+  .error-content {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+
+    .error-text {
+      font-weight: 500;
+    }
+
+    .error-trace {
+      font-size: 0.8rem;
+      color: #7f1d1d;
+    }
+  }
+}
+
+.filter-card {
+  border-radius: 12px;
+  margin-block-end: 1.5rem;
+
+  .filter-row {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+    align-items: center;
+    padding: 1rem;
+
+    .filter-field {
+      min-width: 200px;
+    }
+  }
+}
+
+.table-card {
+  border-radius: 12px;
+}
+
+.loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 4rem 1rem;
+  gap: 1rem;
+  color: var(--mat-sys-on-surface-variant, #64748b);
+}
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 4rem 1.5rem;
+  text-align: center;
+
+  .empty-icon {
+    font-size: 56px;
+    width: 56px;
+    height: 56px;
+    color: var(--mat-sys-outline, #94a3b8);
+    margin-block-end: 1rem;
+  }
+
+  .empty-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin: 0 0 0.5rem;
+    color: var(--mat-sys-on-surface, #1e293b);
+  }
+
+  .empty-message {
+    font-size: 0.95rem;
+    color: var(--mat-sys-on-surface-variant, #64748b);
+    max-width: 400px;
+    margin: 0;
+  }
+}
+
+.table-responsive {
+  overflow-x: auto;
+}
+
+.tasks-table {
+  width: 100%;
+
+  .mono-cell {
+    font-family: monospace;
+    font-size: 0.85rem;
+  }
+
+  .id-badge {
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    background-color: #f1f5f9;
+    color: #475569;
+  }
+
+  .reason-chip {
+    display: inline-block;
+    padding: 0.25rem 0.6rem;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    font-weight: 500;
+
+    &.reason-arithmetic_mismatch {
+      background-color: #fee2e2;
+      color: #b91c1c;
+    }
+
+    &.reason-low_confidence {
+      background-color: #fef3c7;
+      color: #b45309;
+    }
+
+    &.reason-read_failure {
+      background-color: #f1f5f9;
+      color: #64748b;
+    }
+
+    &.reason-review_required {
+      background-color: #e0e7ff;
+      color: #4338ca;
+    }
+  }
+
+  .priority-badge {
+    display: inline-block;
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+
+    &.priority-high {
+      background-color: #fee2e2;
+      color: #dc2626;
+    }
+
+    &.priority-normal {
+      background-color: #f3f4f6;
+      color: #4b5563;
+    }
+
+    &.priority-low {
+      background-color: #f0fdf4;
+      color: #16a34a;
+    }
+  }
+
+  .status-badge {
+    display: inline-block;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    font-weight: 500;
+
+    &.status-open {
+      background-color: #fef3c7;
+      color: #d97706;
+    }
+
+    &.status-in_progress {
+      background-color: #dbeafe;
+      color: #2563eb;
+    }
+
+    &.status-resolved {
+      background-color: #dcfce7;
+      color: #16a34a;
+    }
+  }
+
+  .action-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+  }
+}

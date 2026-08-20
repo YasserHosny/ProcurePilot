@@ -7,14 +7,25 @@ import type {
   Alias,
   BaseUnit,
   ConfigOptions,
+  Document,
   ImportPreview,
   ImportResult,
   Invitation,
+  Job,
   Me,
   Member,
+  PresignRequest,
+  PresignResponse,
   Product,
   ProductCreate,
   ProductUpdate,
+  Quotation,
+  QuotationCreate,
+  QuotationDetail,
+  QuotationReviewPatch,
+  ReviewTask,
+  ReviewTaskPriority,
+  ReviewTaskStatus,
   Role,
   Session,
   Supplier,
@@ -253,6 +264,96 @@ export class ApiService {
     return this.http.post<ImportResult>(`${this.base}/imports/${importId}/commit`, {
       on_duplicate: onDuplicate,
     });
+  }
+
+  // --- documents & quotation inbox (Chunk 4.3) -----------------------------
+
+  presignDocument(body: PresignRequest, idempotencyKey?: string): Observable<PresignResponse> {
+    const headers = idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined;
+    return this.http.post<PresignResponse>(`${this.base}/documents/presign`, body, { headers });
+  }
+
+  uploadFileToStorage(
+    uploadUrl: string,
+    file: File,
+    uploadFields?: Record<string, string>,
+  ): Observable<void> {
+    if (uploadFields && Object.keys(uploadFields).length > 0) {
+      const formData = new FormData();
+      for (const [k, v] of Object.entries(uploadFields)) {
+        formData.append(k, v);
+      }
+      formData.append('file', file);
+      return this.http.post<void>(uploadUrl, formData);
+    }
+    return this.http.put<void>(uploadUrl, file, {
+      headers: {
+        'Content-Type': file.type || 'application/octet-stream',
+      },
+    });
+  }
+
+  getDocument(documentId: string): Observable<Document> {
+    return this.http.get<Document>(`${this.base}/documents/${documentId}`);
+  }
+
+  createQuotation(body: QuotationCreate, idempotencyKey?: string): Observable<Quotation> {
+    const headers = idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined;
+    return this.http.post<Quotation>(`${this.base}/quotations`, body, { headers });
+  }
+
+  getQuotation(quotationId: string): Observable<QuotationDetail> {
+    return this.http.get<QuotationDetail>(`${this.base}/quotations/${quotationId}`);
+  }
+
+  patchQuotation(
+    quotationId: string,
+    body: QuotationReviewPatch,
+    idempotencyKey?: string,
+  ): Observable<QuotationDetail> {
+    const headers = idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined;
+    return this.http.patch<QuotationDetail>(`${this.base}/quotations/${quotationId}`, body, {
+      headers,
+    });
+  }
+
+  extractQuotation(quotationId: string, idempotencyKey?: string): Observable<Job> {
+    const headers = idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined;
+    return this.http.post<Job>(`${this.base}/quotations/${quotationId}/extract`, {}, { headers });
+  }
+
+  confirmQuotation(
+    quotationId: string,
+    body?: { previous_quotation_id?: string | null },
+    idempotencyKey?: string,
+  ): Observable<Quotation> {
+    const headers = idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined;
+    return this.http.post<Quotation>(
+      `${this.base}/quotations/${quotationId}/confirm`,
+      body ?? {},
+      { headers },
+    );
+  }
+
+  getJob(jobId: string): Observable<Job> {
+    return this.http.get<Job>(`${this.base}/jobs/${jobId}`);
+  }
+
+  getReviewTasks(params?: {
+    cursor?: string;
+    limit?: number;
+    status?: ReviewTaskStatus | 'all';
+    priority?: ReviewTaskPriority;
+  }): Observable<{ items: ReviewTask[]; next_cursor: string | null }> {
+    const query = new URLSearchParams();
+    if (params?.cursor) query.set('cursor', params.cursor);
+    if (params?.limit) query.set('limit', String(params.limit));
+    if (params?.status) query.set('status', params.status);
+    if (params?.priority) query.set('priority', params.priority);
+    const qs = query.toString() ? `?${query.toString()}` : '';
+    return this.http.get<{ items: ReviewTask[]; next_cursor: string | null }>(
+      `${this.base}/review-tasks${qs}`,
+    );
   }
 }
 

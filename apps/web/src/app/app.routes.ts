@@ -118,6 +118,35 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./features/team/team.component').then((m) => m.TeamComponent),
       },
+      {
+        path: 'quotations',
+        loadComponent: () =>
+          import('./features/quotations/review-queue/review-queue.component').then(
+            (m) => m.ReviewQueueComponent,
+          ),
+      },
+      {
+        path: 'quotations/upload',
+        canActivate: [roleGuard('owner', 'buyer')],
+        loadComponent: () =>
+          import('./features/quotations/upload/quotation-upload.component').then(
+            (m) => m.QuotationUploadComponent,
+          ),
+      },
+      {
+        path: 'quotations/:id/review',
+        loadComponent: () =>
+          import('./features/quotations/quotation-review/quotation-review.component').then(
+            (m) => m.QuotationReviewComponent,
+          ),
+      },
+      {
+        path: 'quotations/:id',
+        loadComponent: () =>
+          import('./features/quotations/quotation-review/quotation-review.component').then(
+            (m) => m.QuotationReviewComponent,
+          ),
+      },
     ],
   },
 

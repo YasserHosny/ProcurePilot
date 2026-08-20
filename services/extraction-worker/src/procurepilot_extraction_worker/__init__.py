@@ -1,0 +1,1 @@
+"""ProcurePilot quotation extraction worker."""

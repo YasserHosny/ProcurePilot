@@ -258,6 +258,196 @@ All tenant-scoped catalogue tables have RLS enabled and forced with tenant-claim
 `WITH CHECK` policies. Owner and buyer may mutate catalogue data; branch manager, approver, and
 viewer are read-only.
 
+## Implemented quotation inbox and extraction entities
+
+## `Document`
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | uuid | PK |
+| `tenant_id` | uuid | Required FK -> Tenant; RLS key |
+| `storage_bucket` | text | Required Supabase Storage bucket, for example `quotation-documents` |
+| `storage_path` | text | Required tenant-prefixed Supabase Storage path; unique |
+| `mime_type` | text | Required accepted PDF, image, Excel, or CSV MIME type |
+| `content_hash` | text | Optional SHA-256 hash; nullable until upload completes |
+| `source_channel` | enum | `upload`; enum leaves room for future `email` and `api` ingestion |
+| `status` | enum | `uploaded` or `failed_to_read` |
+| `created_at` | timestamptz | Audit field |
+| `created_by` | uuid | Required FK -> Membership |
+
+`Document` stores metadata only. The file bytes live in a private Supabase Storage bucket and are
+protected by both Postgres RLS on this row and Storage bucket policy on `storage_path`; a readable
+row never implies a public object URL.
+
+Constraints:
+
+- Unique `storage_path`, plus unique `(tenant_id, storage_path)` for defensive lookup.
+- Check `storage_path like 'tenants/%/quotations/%'`; the path is allocated from the verified
+  tenant claim, not client input.
+- Duplicate `content_hash` values are allowed in this chunk. Duplicate detection and merging are
+  explicitly out of scope.
+
+## `Quotation`
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | uuid | PK |
+| `tenant_id` | uuid | Required FK -> Tenant; RLS key |
+| `document_id` | uuid | Required FK -> Document |
+| `supplier_id` | uuid | Optional FK -> Supplier; reviewer confirms before final review |
+| `currency` | text | Optional FK -> `supported_currency.code`; nullable until extracted or reviewed |
+| `issue_date` | date | Optional quotation issue date |
+| `expiry_date` | date | Optional quotation expiry date |
+| `status` | enum | `pending`, `extracting`, `extracted`, `in_review`, `reviewed`, or `refused` |
+| `previous_quotation_id` | uuid | Optional FK -> Quotation; links a supplier re-quote without replacing history |
+| `stated_total_amount` | numeric(18,4) | Optional stated quotation total amount |
+| `stated_total_currency` | text | Optional FK -> `supported_currency.code`; required exactly when amount is present |
+| `arithmetic_status` | enum | Optional `not_applicable`, `reconciled`, or `mismatch` |
+| `created_at` | timestamptz | Audit field |
+| `reviewed_by` | uuid | Optional FK -> Membership |
+| `reviewed_at` | timestamptz | Optional review timestamp |
+
+`reviewed` is the only trusted state for downstream commercial data. `extracted` means automation
+completed; it does not mean the quotation may be used for matching, comparison, or savings.
+
+Constraints:
+
+- Check `expiry_date is null or issue_date is null or expiry_date >= issue_date`.
+- Check `previous_quotation_id is null or previous_quotation_id <> id`.
+- Check `(stated_total_amount is null) = (stated_total_currency is null)`.
+- `supplier_id` may remain null until review; confirmation refuses while it is null.
+- `reviewed_by` and `reviewed_at` are both present or both absent.
+
+State transitions:
+
+```text
+pending -> extracting -> extracted -> in_review -> reviewed
+pending -> extracting -> refused
+pending -> refused
+extracted -> reviewed
+```
+
+## `QuotationLine`
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | uuid | PK |
+| `tenant_id` | uuid | Required FK -> Tenant; RLS key |
+| `quotation_id` | uuid | Required FK -> Quotation |
+| `line_number` | integer | Required line number; check `> 0` |
+| `original_text` | text | Required raw extracted line description |
+| `quantity` | numeric(18,6) | Optional until extracted or corrected; check `> 0` when present |
+| `pack_count` | integer | Optional pack count; check `> 0` when present |
+| `unit_size` | numeric(18,6) | Optional pack unit size; check `> 0` when present |
+| `pack_unit` | text | Optional FK -> `supported_base_unit.code` where applicable |
+| `unit_price_amount` | numeric(18,4) | Optional unit price amount |
+| `unit_price_currency` | text | Optional FK -> `supported_currency.code`; required exactly when amount is present |
+| `vat_rate` | numeric(5,4) | Optional VAT rate; check between 0 and 1 |
+| `delivery_fee_amount` | numeric(18,4) | Optional delivery fee amount |
+| `delivery_fee_currency` | text | Optional FK -> `supported_currency.code`; required exactly when amount is present |
+| `discount_amount` | numeric(18,4) | Optional discount amount |
+| `discount_currency` | text | Optional FK -> `supported_currency.code`; required exactly when amount is present |
+| `created_at` | timestamptz | Audit field |
+
+Money is stored as amount/currency pairs and exposed by the API as `Money { amount, currency }`.
+Check constraints reject an amount without a currency and a currency without an amount; no money
+field is a bare number.
+
+Constraints:
+
+- Unique `(tenant_id, quotation_id, line_number)`.
+- Check `(unit_price_amount is null) = (unit_price_currency is null)`.
+- Check `(delivery_fee_amount is null) = (delivery_fee_currency is null)`.
+- Check `(discount_amount is null) = (discount_currency is null)`.
+- Check `(pack_count is null) = (unit_size is null)`.
+- `pack_unit` may be null for free-text pack descriptions the reviewer has not normalised yet.
+
+## `FieldExtraction`
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | uuid | PK |
+| `tenant_id` | uuid | Required FK -> Tenant; RLS key |
+| `quotation_id` | uuid | Required FK -> Quotation |
+| `entity_type` | enum | `quotation` or `quotation_line` |
+| `entity_id` | uuid | Required polymorphic target id for the quoted `entity_type` |
+| `field_name` | text | Required extracted field name, for example `supplier_id`, `currency`, `unit_price`, or `quantity` |
+| `extracted_value` | jsonb | Required original machine/structured value |
+| `confidence` | numeric(5,4) | Required confidence score; check `0 <= confidence <= 1` |
+| `source_page` | integer | Optional source page; check `> 0` when present |
+| `source_region` | jsonb | Optional page-relative bounding box or polygon |
+| `extraction_method` | enum | `structured_parse`, `bedrock`, or `azure_di` |
+| `model_version` | text | Required parser/rule/model version |
+| `corrected_value` | jsonb | Optional human-corrected value |
+| `corrected_by` | uuid | Optional FK -> Membership |
+| `corrected_at` | timestamptz | Optional correction timestamp |
+| `created_at` | timestamptz | Audit field |
+
+`FieldExtraction` is the constitutional evidence record for this chunk. Confidence and source
+location are deliberately stored per field, not per line and not per quotation, so each extracted
+commercial value can be audited independently under Constitution Principle I. Human correction is
+distinct from `extracted_value`; review records the decision without overwriting the evidence.
+
+Constraints:
+
+- Unique `(tenant_id, entity_type, entity_id, field_name)`.
+- Check `source_region` is null or contains a supported shape (`bbox` or `polygon`) in
+  implementation validation.
+- Check `corrected_by` and `corrected_at` are both present or both absent.
+- `entity_id` cannot be protected by a simple FK because it is polymorphic; writes validate that
+  the target entity belongs to the same tenant and quotation in the same transaction.
+
+## `ExtractionJob`
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | uuid | PK |
+| `tenant_id` | uuid | Required FK -> Tenant; RLS key |
+| `quotation_id` | uuid | Required FK -> Quotation |
+| `status` | enum | `queued`, `running`, `succeeded`, or `failed` |
+| `attempted_provider` | enum | Optional `structured_parse`, `bedrock`, or `azure_di` |
+| `error` | jsonb | Optional tenant-safe code, message, and details |
+| `created_at` | timestamptz | Audit field |
+| `started_at` | timestamptz | Optional start timestamp |
+| `completed_at` | timestamptz | Optional completion timestamp |
+
+`ExtractionJob` is the persisted job resource behind `/jobs/{job_id}`. Redis may deliver work to
+the worker, but it is not the source of truth for user-visible state.
+
+Constraints:
+
+- Partial unique `(tenant_id, quotation_id) where status in ('queued', 'running')`: one active
+  extraction per quotation.
+- `completed_at` is present only for terminal states.
+
+## `ReviewTask`
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | uuid | PK |
+| `tenant_id` | uuid | Required FK -> Tenant; RLS key |
+| `quotation_id` | uuid | Required FK -> Quotation |
+| `status` | enum | `open`, `in_progress`, or `resolved` |
+| `priority` | enum | `low`, `normal`, or `high` |
+| `reason` | enum | `low_confidence`, `arithmetic_mismatch`, `read_failure`, or `review_required` |
+| `created_at` | timestamptz | Audit field |
+| `resolved_at` | timestamptz | Optional resolution timestamp |
+
+`ReviewTask` is a standalone review queue resource, not a view over quotations. It exists because
+human review has its own state machine, SLA, and metrics under Constitution Principle III.
+
+Constraints:
+
+- Partial unique `(tenant_id, quotation_id) where status in ('open', 'in_progress')`: one
+  outstanding task per quotation.
+- `resolved_at` is present only when `status = 'resolved'`.
+
+All tenant-scoped quotation inbox tables have RLS enabled and forced with tenant-claim `USING` and
+`WITH CHECK` policies. Owner and buyer may upload, extract, correct, and confirm; branch manager,
+approver, and viewer are read-only. Cross-tenant reads return not found, never forbidden. `Document`
+also requires private Supabase Storage policies that compare the path tenant segment and related
+document row to the caller's JWT tenant claim.
+
 ## Planned later domain entities
 
 ## `Branch` / `CostCentre`
@@ -269,46 +459,6 @@ viewer are read-only.
 | `name` | text | |
 | `code` | text | Short code for requests |
 | `parent_id` | uuid | Optional hierarchy |
-
-## `Document`
-
-| Field | Type | Notes |
-|---|---|---|
-| `id` | uuid | PK |
-| `tenant_id` | uuid | FK → Tenant |
-| `storage_uri` | text | Supabase Storage path |
-| `mime_type` | text | |
-| `hash` | text | SHA-256 for caching |
-| `source_channel` | enum | upload, email, api |
-| `created_at` | timestamptz | |
-
-## `Quotation`
-
-| Field | Type | Notes |
-|---|---|---|
-| `id` | uuid | PK |
-| `tenant_id` | uuid | FK → Tenant |
-| `document_id` | uuid | FK → Document |
-| `supplier_id` | uuid | FK → Supplier |
-| `currency` | text | |
-| `issue_date` | date | |
-| `expiry_date` | date | |
-| `status` | enum | pending, extracted, reviewed, accepted |
-
-## `QuotationLine`
-
-| Field | Type | Notes |
-|---|---|---|
-| `id` | uuid | PK |
-| `quotation_id` | uuid | FK → Quotation |
-| `original_text` | text | Raw extracted description |
-| `supplier_sku` | text | |
-| `quantity` | decimal | |
-| `unit_price` | money | |
-| `vat_rate` | decimal | |
-| `delivery_fee` | money | |
-| `discount` | money | |
-| `confidence` | decimal | 0–1 per field aggregate |
 
 ## `SupplierOffer`
 

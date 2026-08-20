@@ -8,9 +8,11 @@ real migrations, as the real `authenticated` role, carrying a real JWT claim.
 FR-030 requires this to run on every proposed change. It is wired into CI as its own named check
 so that its failure is never mistaken for an unrelated test failure.
 
-Set TEST_DATABASE_URL to a database with migrations 0001-0016 applied — extended for
+Set TEST_DATABASE_URL to a database with migrations 0001-0021 applied — extended for
 002-catalogue-suppliers (T038) to cover workspace_product, pack_definition, supplier,
-product_alias and import_job, plus the canonical_product exception.
+product_alias and import_job, plus the canonical_product exception; extended again for
+003-quotation-inbox-extraction (T063) to cover document, quotation, quotation_line,
+field_extraction, extraction_job, review_task, and the Supabase Storage object policy.
 """
 
 from __future__ import annotations
@@ -42,6 +44,9 @@ class Workspace:
         canonical_product_id: UUID,
         workspace_product_id: UUID,
         supplier_id: UUID,
+        document_id: UUID,
+        quotation_id: UUID,
+        storage_path: str,
     ) -> None:
         self.tenant_id = tenant_id
         self.user_id = user_id
@@ -50,6 +55,9 @@ class Workspace:
         self.canonical_product_id = canonical_product_id
         self.workspace_product_id = workspace_product_id
         self.supplier_id = supplier_id
+        self.document_id = document_id
+        self.quotation_id = quotation_id
+        self.storage_path = storage_path
 
     def claims(self) -> str:
         return (
@@ -131,6 +139,48 @@ def make_workspace(cur: psycopg.Cursor, label: str) -> Workspace:
         (tenant_id, f"{label}.csv"),
     )
 
+    # Quotation inbox and extraction — chunk 4.3 (003-quotation-inbox-extraction), T063.
+    document_id, quotation_id, quotation_line_id = uuid4(), uuid4(), uuid4()
+    field_extraction_id, extraction_job_id, review_task_id = uuid4(), uuid4(), uuid4()
+    storage_path = f"tenants/{tenant_id}/quotations/{document_id}/{label}.pdf"
+    cur.execute(
+        "insert into document "
+        "(id,tenant_id,storage_bucket,storage_path,mime_type,created_by) "
+        "values (%s,%s,'quotation-documents',%s,'application/pdf',%s)",
+        (document_id, tenant_id, storage_path, membership_id),
+    )
+    cur.execute(
+        "insert into quotation (id,tenant_id,document_id) values (%s,%s,%s)",
+        (quotation_id, tenant_id, document_id),
+    )
+    cur.execute(
+        "insert into quotation_line (id,tenant_id,quotation_id,line_number,original_text) "
+        "values (%s,%s,%s,1,%s)",
+        (quotation_line_id, tenant_id, quotation_id, f"{label} line item"),
+    )
+    cur.execute(
+        "insert into field_extraction "
+        "(id,tenant_id,quotation_id,entity_type,entity_id,field_name,extracted_value,"
+        "confidence,extraction_method,model_version) "
+        "values (%s,%s,%s,'quotation',%s,'currency','\"GBP\"'::jsonb,0.9,"
+        "'structured_parse','test-fixture-v1')",
+        (field_extraction_id, tenant_id, quotation_id, quotation_id),
+    )
+    cur.execute(
+        "insert into extraction_job (id,tenant_id,quotation_id) values (%s,%s,%s)",
+        (extraction_job_id, tenant_id, quotation_id),
+    )
+    cur.execute(
+        "insert into review_task (id,tenant_id,quotation_id,reason) "
+        "values (%s,%s,%s,'low_confidence')",
+        (review_task_id, tenant_id, quotation_id),
+    )
+    cur.execute(
+        "insert into storage.objects (bucket_id,name,owner) "
+        "values ('quotation-documents',%s,%s)",
+        (storage_path, user_id),
+    )
+
     return Workspace(
         tenant_id,
         user_id,
@@ -139,6 +189,9 @@ def make_workspace(cur: psycopg.Cursor, label: str) -> Workspace:
         canonical_product_id,
         workspace_product_id,
         supplier_id,
+        document_id,
+        quotation_id,
+        storage_path,
     )
 
 
@@ -414,6 +467,137 @@ def test_a_cross_workspace_supplier_update_changes_nothing(
     assert row is not None and row[0] == "beta Supplier Co"
 
 
+# --- quotation inbox and extraction (003-quotation-inbox-extraction, T063) --
+
+
+def test_another_workspaces_documents_are_invisible(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        cur.execute("select id from document where id = %s", (beta.document_id,))
+        assert cur.fetchall() == []
+
+
+def test_another_workspaces_quotations_are_invisible(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        cur.execute("select id from quotation where id = %s", (beta.quotation_id,))
+        assert cur.fetchall() == []
+
+
+def test_another_workspaces_quotation_lines_are_invisible(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        cur.execute(
+            "select count(*) from quotation_line where quotation_id = %s", (beta.quotation_id,)
+        )
+        row = cur.fetchone()
+    assert row is not None and row[0] == 0
+
+
+def test_another_workspaces_field_extractions_are_invisible(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    """Constitution Principle I's evidence record is exactly as tenant-private as anything else."""
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        cur.execute(
+            "select count(*) from field_extraction where quotation_id = %s", (beta.quotation_id,)
+        )
+        row = cur.fetchone()
+    assert row is not None and row[0] == 0
+
+
+def test_another_workspaces_extraction_jobs_are_invisible(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        cur.execute(
+            "select count(*) from extraction_job where quotation_id = %s", (beta.quotation_id,)
+        )
+        row = cur.fetchone()
+    assert row is not None and row[0] == 0
+
+
+def test_another_workspaces_review_tasks_are_invisible(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    """FR-019: the review queue is standalone, but still tenant-private."""
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        cur.execute(
+            "select count(*) from review_task where quotation_id = %s", (beta.quotation_id,)
+        )
+        row = cur.fetchone()
+    assert row is not None and row[0] == 0
+
+
+def test_a_member_cannot_write_a_quotation_into_another_workspace(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            cur.execute(
+                "insert into quotation (tenant_id,document_id) values (%s,%s)",
+                (beta.tenant_id, beta.document_id),
+            )
+
+
+def test_a_cross_workspace_quotation_update_changes_nothing(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        cur.execute(
+            "update quotation set status = 'refused' where id = %s", (beta.quotation_id,)
+        )
+        assert cur.rowcount == 0
+        cur.execute("reset role")
+        cur.execute("select status from quotation where id = %s", (beta.quotation_id,))
+        row = cur.fetchone()
+    assert row is not None and row[0] == "pending"
+
+
+def test_storage_object_from_another_workspace_is_invisible(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    """The second isolation boundary (research.md R8): table RLS is not the only guarantee.
+
+    A member of alpha must not be able to read beta's quotation-document object even knowing
+    (or guessing) its exact storage path.
+    """
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        cur.execute(
+            "select name from storage.objects where bucket_id = 'quotation-documents' "
+            "and name = %s",
+            (beta.storage_path,),
+        )
+        assert cur.fetchall() == []
+        cur.execute(
+            "select name from storage.objects where bucket_id = 'quotation-documents' "
+            "and name = %s",
+            (alpha.storage_path,),
+        )
+        assert cur.fetchall() == [(alpha.storage_path,)]
+
+
 def test_platform_invitations_are_unreadable_by_members(
     workspaces: tuple[psycopg.Connection, Workspace, Workspace],
 ) -> None:
@@ -440,6 +624,8 @@ def test_rls_is_enabled_and_forced_on_every_tenant_scoped_table(
         "tenant", "membership", "member_invitation", "audit_event", "platform_invitation",
         "workspace_product", "pack_definition", "product_substitute", "supplier",
         "product_alias", "import_job", "canonical_product",
+        "document", "quotation", "quotation_line", "field_extraction", "extraction_job",
+        "review_task",
     }
     with conn.cursor() as cur:
         cur.execute(

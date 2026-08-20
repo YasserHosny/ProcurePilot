@@ -149,11 +149,15 @@
         <span class="nav-label">{{ 'shell.navImport' | translate }}</span>
       </a>
 
-      <div class="nav-item disabled" aria-disabled="true">
+      <a
+        mat-list-item
+        routerLink="/quotations"
+        routerLinkActive="active"
+        class="nav-item"
+      >
         <mat-icon aria-hidden="true">receipt_long</mat-icon>
         <span class="nav-label">{{ 'shell.navQuotations' | translate }}</span>
-        <span class="soon-badge">{{ 'common.comingSoon' | translate }}</span>
-      </div>
+      </a>
 
       <div class="nav-item disabled" aria-disabled="true">
         <mat-icon aria-hidden="true">compare_arrows</mat-icon>

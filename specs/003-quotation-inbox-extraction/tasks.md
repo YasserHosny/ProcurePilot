@@ -23,12 +23,12 @@ description: "Task list for Quotation Inbox and Extraction Review implementation
 
 **Purpose**: repo-level scaffolding for the first asynchronous extraction service, AI evaluation assets, Redis, and quotation i18n.
 
-- [ ] T001 Create the extraction-worker package manifest in `services/extraction-worker/pyproject.toml` with Python 3.12, RQ/Redis, Bedrock, Azure Document Intelligence and test dependencies because this chunk is the first real code in that placeholder service
-- [ ] T002 [P] Create the extraction-worker entrypoint skeleton in `services/extraction-worker/src/procurepilot_extraction_worker/__main__.py` for the RQ worker process, leaving provider implementations to US1
-- [ ] T003 [P] Create the versioned quotation benchmark skeleton in `ml/benchmarks/quotation_extraction/README.md` and `ml/benchmarks/quotation_extraction/.gitkeep` per engineering-spec.md repository layout
-- [ ] T004 [P] Create the AI eval harness skeleton in `ml/evals/quotation_extraction/README.md` and `ml/evals/quotation_extraction/.gitkeep` so later model/prompt changes have a fixed home
-- [ ] T005 Add Redis and `services/extraction-worker` to the local stack in `docker-compose.yml`, matching research R4 and quickstart.md's requirement that Redis delivers jobs while Postgres remains the durable job state
-- [ ] T006 [P] Add the quotation-inbox i18n namespace to `packages/i18n/en.json` and `packages/i18n/ar.json`, keeping English and Arabic keys at parity before any web screen ships
+- [x] T001 Create the extraction-worker package manifest in `services/extraction-worker/pyproject.toml` with Python 3.12, RQ/Redis, Bedrock, Azure Document Intelligence and test dependencies because this chunk is the first real code in that placeholder service
+- [x] T002 [P] Create the extraction-worker entrypoint skeleton in `services/extraction-worker/src/procurepilot_extraction_worker/__main__.py` for the RQ worker process, leaving provider implementations to US1
+- [x] T003 [P] Create the versioned quotation benchmark skeleton in `ml/benchmarks/quotation_extraction/README.md` and `ml/benchmarks/quotation_extraction/.gitkeep` per engineering-spec.md repository layout
+- [x] T004 [P] Create the AI eval harness skeleton in `ml/evals/quotation_extraction/README.md` and `ml/evals/quotation_extraction/.gitkeep` so later model/prompt changes have a fixed home
+- [x] T005 Add Redis and `services/extraction-worker` to the local stack in `docker-compose.yml`, matching research R4 and quickstart.md's requirement that Redis delivers jobs while Postgres remains the durable job state
+- [x] T006 [P] Add the quotation-inbox i18n namespace to `packages/i18n/en.json` and `packages/i18n/ar.json`, keeping English and Arabic keys at parity before any web screen ships
 
 **Checkpoint**: local compose can include Redis and the worker container, and i18n parity is ready for frontend work.
 
@@ -40,16 +40,16 @@ description: "Task list for Quotation Inbox and Extraction Review implementation
 
 ⚠️ **Everything else depends on this phase.** Migrations first, Storage isolation as its own boundary, then module skeletons.
 
-- [ ] T007 Write migration `supabase/migrations/20260819000017_quotation_reference.sql` creating only the quotation reference enums from data-model.md: document source/status, quotation status, extraction method, job status, review status/priority/reason and arithmetic status
-- [ ] T008 Write migration `supabase/migrations/20260819000018_documents_quotations.sql` creating `document`, `quotation` and `quotation_line` with exactly the data-model.md fields, FKs, date checks, version self-check, and amount+currency pair checks
-- [ ] T009 Write migration `supabase/migrations/20260819000019_extraction_review_jobs.sql` creating `field_extraction`, `extraction_job` and `review_task` with exactly the data-model.md fields, uniqueness constraints, correction metadata checks and active-job/task partial indexes
-- [ ] T010 Write migration `supabase/migrations/20260819000020_quotation_storage.sql` creating the private quotation source-document bucket and tenant-prefixed Storage policies from research R8 because blob access is a second isolation boundary beyond table RLS
-- [ ] T011 Write migration `supabase/migrations/20260819000021_quotation_rls.sql` applying ENABLE + FORCE row level security plus USING and WITH CHECK tenant policies to `document`, `quotation`, `quotation_line`, `field_extraction`, `extraction_job` and `review_task`
-- [ ] T012 [P] Create the documents module skeleton in `apps/api/src/procurepilot_api/modules/documents/__init__.py` and register its router in `apps/api/src/procurepilot_api/main.py`
-- [ ] T013 [P] Create the quotations module skeleton in `apps/api/src/procurepilot_api/modules/quotations/__init__.py` and register its router in `apps/api/src/procurepilot_api/main.py`
-- [ ] T014 [P] Create the extraction module skeleton in `apps/api/src/procurepilot_api/modules/extraction/__init__.py` and register its router in `apps/api/src/procurepilot_api/main.py`
-- [ ] T015 [P] Create the jobs module skeleton in `apps/api/src/procurepilot_api/modules/jobs/__init__.py` and register its router in `apps/api/src/procurepilot_api/main.py`
-- [ ] T016 Implement the shared generic Job resource for `/jobs/{job_id}` in `apps/api/src/procurepilot_api/modules/jobs/router.py`, backed by `extraction_job` rather than Redis so polling has a durable source of truth
+- [x] T007 Write migration `supabase/migrations/20260819000017_quotation_reference.sql` creating only the quotation reference enums from data-model.md: document source/status, quotation status, extraction method, job status, review status/priority/reason and arithmetic status
+- [x] T008 Write migration `supabase/migrations/20260819000018_documents_quotations.sql` creating `document`, `quotation` and `quotation_line` with exactly the data-model.md fields, FKs, date checks, version self-check, and amount+currency pair checks
+- [x] T009 Write migration `supabase/migrations/20260819000019_extraction_review_jobs.sql` creating `field_extraction`, `extraction_job` and `review_task` with exactly the data-model.md fields, uniqueness constraints, correction metadata checks and active-job/task partial indexes
+- [x] T010 Write migration `supabase/migrations/20260819000020_quotation_storage.sql` creating the private quotation source-document bucket and tenant-prefixed Storage policies from research R8 because blob access is a second isolation boundary beyond table RLS
+- [x] T011 Write migration `supabase/migrations/20260819000021_quotation_rls.sql` applying ENABLE + FORCE row level security plus USING and WITH CHECK tenant policies to `document`, `quotation`, `quotation_line`, `field_extraction`, `extraction_job` and `review_task`
+- [x] T012 [P] Create the documents module skeleton in `apps/api/src/procurepilot_api/modules/documents/__init__.py` and register its router in `apps/api/src/procurepilot_api/main.py`
+- [x] T013 [P] Create the quotations module skeleton in `apps/api/src/procurepilot_api/modules/quotations/__init__.py` and register its router in `apps/api/src/procurepilot_api/main.py`
+- [x] T014 [P] Create the extraction module skeleton in `apps/api/src/procurepilot_api/modules/extraction/__init__.py` and register its router in `apps/api/src/procurepilot_api/main.py`
+- [x] T015 [P] Create the jobs module skeleton in `apps/api/src/procurepilot_api/modules/jobs/__init__.py` and register its router in `apps/api/src/procurepilot_api/main.py`
+- [x] T016 Implement the shared generic Job resource for `/jobs/{job_id}` in `apps/api/src/procurepilot_api/modules/jobs/router.py`, backed by `extraction_job` rather than Redis so polling has a durable source of truth
 
 **Checkpoint**: migrations apply from scratch; the API imports all four new modules; no user story code starts before this passes.
 
@@ -63,30 +63,30 @@ description: "Task list for Quotation Inbox and Extraction Review implementation
 
 ### Tests for User Story 1
 
-- [ ] T017 [P] [US1] Write contract tests for `POST /documents/presign`, `POST /quotations`, `POST /quotations/{quotation_id}/extract` and `GET /jobs/{job_id}` in `apps/api/tests/contract/test_quotation_upload_extract_contract.py`
-- [ ] T018 [P] [US1] Write integration tests proving presigned upload metadata creation and accepted/refused MIME handling in `apps/api/tests/integration/test_quotation_upload.py`
-- [ ] T019 [P] [US1] Write worker unit tests proving CSV/Excel structured inputs bypass the LLM and emit confidence `1.0000` in `services/extraction-worker/tests/test_structured_parse.py`
-- [ ] T020 [P] [US1] Write arithmetic and locale parsing tests in `services/extraction-worker/tests/test_arithmetic_validation.py`, reusing `apps/api/src/procurepilot_api/modules/catalogue/csv_import.py` `parse_decimal` so ambiguous values such as `1,234` are refused rather than guessed
-- [ ] T021 [P] [US1] Extend tenant isolation integration coverage for US1 records in `apps/api/tests/integration/test_quotation_upload_isolation.py`, proving cross-tenant reads of `document`, `quotation` and `extraction_job` return not found
-- [ ] T022 [P] [US1] Write extraction workflow integration tests in `apps/api/tests/integration/test_extraction_workflow.py` proving structured files bypass the LLM, arithmetic mismatch forces review status, and `field_extraction` rows are written per field
+- [x] T017 [P] [US1] Write contract tests for `POST /documents/presign`, `POST /quotations`, `POST /quotations/{quotation_id}/extract` and `GET /jobs/{job_id}` in `apps/api/tests/contract/test_quotation_upload_extract_contract.py`
+- [x] T018 [P] [US1] Write integration tests proving presigned upload metadata creation and accepted/refused MIME handling in `apps/api/tests/integration/test_quotation_upload.py`
+- [x] T019 [P] [US1] Write worker unit tests proving CSV/Excel structured inputs bypass the LLM and emit confidence `1.0000` in `services/extraction-worker/tests/test_structured_parse.py`
+- [x] T020 [P] [US1] Write arithmetic and locale parsing tests in `services/extraction-worker/tests/test_arithmetic_validation.py`, reusing `apps/api/src/procurepilot_api/modules/catalogue/csv_import.py` `parse_decimal` so ambiguous values such as `1,234` are refused rather than guessed
+- [x] T021 [P] [US1] Extend tenant isolation integration coverage for US1 records in `apps/api/tests/integration/test_quotation_upload_isolation.py`, proving cross-tenant reads of `document`, `quotation` and `extraction_job` return not found
+- [x] T022 [P] [US1] Write extraction workflow integration tests in `apps/api/tests/integration/test_extraction_workflow.py` proving structured files bypass the LLM, arithmetic mismatch forces review status, and `field_extraction` rows are written per field
 
 ### Implementation for User Story 1
 
-- [ ] T023 [P] [US1] Create document Pydantic schemas in `apps/api/src/procurepilot_api/modules/documents/schemas.py` for PresignRequest, PresignResponse and Document matching the OpenAPI contract
-- [ ] T024 [US1] Implement document storage-path allocation and metadata persistence in `apps/api/src/procurepilot_api/modules/documents/service.py`, deriving tenancy from the verified JWT claim rather than client input
-- [ ] T025 [US1] Implement `POST /documents/presign` and `GET /documents/{document_id}` in `apps/api/src/procurepilot_api/modules/documents/router.py`, refusing unsupported media before extraction per FR-004
-- [ ] T026 [P] [US1] Create quotation Pydantic schemas in `apps/api/src/procurepilot_api/modules/quotations/schemas.py` for QuotationCreate, Quotation, QuotationLine, FieldExtraction and Money with decimal strings and explicit currency
-- [ ] T027 [US1] Implement quotation creation in `apps/api/src/procurepilot_api/modules/quotations/service.py`, linking to an uploaded `document` and starting `quotation.status = pending`
-- [ ] T028 [US1] Implement `POST /quotations` in `apps/api/src/procurepilot_api/modules/quotations/router.py`, guarded to owner and buyer for mutation and returning not found for cross-tenant documents
-- [ ] T029 [P] [US1] Implement deterministic CSV/Excel structured-format parsing in `services/extraction-worker/src/procurepilot_extraction_worker/structured_parse.py`, recording `extraction_method = structured_parse` and parser/rule `model_version`
-- [ ] T030 [P] [US1] Implement the Bedrock Claude 3 Haiku primary extraction path with strict JSON schema handling in `services/extraction-worker/src/procurepilot_extraction_worker/bedrock.py`
-- [ ] T031 [P] [US1] Implement the Azure Document Intelligence fallback path in `services/extraction-worker/src/procurepilot_extraction_worker/azure_di.py`, used only on operational or contract failure per research R2
-- [ ] T032 [US1] Implement Redis/RQ enqueue and consume wiring in `apps/api/src/procurepilot_api/modules/extraction/service.py` and `services/extraction-worker/src/procurepilot_extraction_worker/worker.py`, persisting status changes to `extraction_job`
-- [ ] T033 [US1] Implement exact-Decimal arithmetic validation and locale-sensitive decimal parsing in `services/extraction-worker/src/procurepilot_extraction_worker/validation.py`, reusing `apps/api/src/procurepilot_api/modules/catalogue/csv_import.py` `parse_decimal` rather than inventing a second parser
-- [ ] T034 [US1] Implement per-field provenance persistence in `apps/api/src/procurepilot_api/modules/extraction/provenance.py`, writing one `field_extraction` row per header or line field with source page/region, method and model version
-- [ ] T035 [US1] Implement `POST /quotations/{quotation_id}/extract` in `apps/api/src/procurepilot_api/modules/extraction/router.py`, returning a pollable Job and preventing duplicate active extraction jobs
-- [ ] T036 [P] [US1] Build the upload screen in `apps/web/src/app/features/quotations/upload/`, including accepted-format validation, direct Storage upload progress and job polling copy from `packages/i18n`
-- [ ] T037 [P] [US1] Write upload and extraction E2E coverage in `apps/web/tests/e2e/quotation-upload.spec.ts`, proving the browser flow creates a quotation and shows processing/extracted states
+- [x] T023 [P] [US1] Create document Pydantic schemas in `apps/api/src/procurepilot_api/modules/documents/schemas.py` for PresignRequest, PresignResponse and Document matching the OpenAPI contract
+- [x] T024 [US1] Implement document storage-path allocation and metadata persistence in `apps/api/src/procurepilot_api/modules/documents/service.py`, deriving tenancy from the verified JWT claim rather than client input
+- [x] T025 [US1] Implement `POST /documents/presign` and `GET /documents/{document_id}` in `apps/api/src/procurepilot_api/modules/documents/router.py`, refusing unsupported media before extraction per FR-004
+- [x] T026 [P] [US1] Create quotation Pydantic schemas in `apps/api/src/procurepilot_api/modules/quotations/schemas.py` for QuotationCreate, Quotation, QuotationLine, FieldExtraction and Money with decimal strings and explicit currency
+- [x] T027 [US1] Implement quotation creation in `apps/api/src/procurepilot_api/modules/quotations/service.py`, linking to an uploaded `document` and starting `quotation.status = pending`
+- [x] T028 [US1] Implement `POST /quotations` in `apps/api/src/procurepilot_api/modules/quotations/router.py`, guarded to owner and buyer for mutation and returning not found for cross-tenant documents
+- [x] T029 [P] [US1] Implement deterministic CSV/Excel structured-format parsing in `services/extraction-worker/src/procurepilot_extraction_worker/structured_parse.py`, recording `extraction_method = structured_parse` and parser/rule `model_version`
+- [x] T030 [P] [US1] Implement the Bedrock Claude 3 Haiku primary extraction path with strict JSON schema handling in `services/extraction-worker/src/procurepilot_extraction_worker/bedrock.py`
+- [x] T031 [P] [US1] Implement the Azure Document Intelligence fallback path in `services/extraction-worker/src/procurepilot_extraction_worker/azure_di.py`, used only on operational or contract failure per research R2
+- [x] T032 [US1] Implement Redis/RQ enqueue and consume wiring in `apps/api/src/procurepilot_api/modules/extraction/service.py` and `services/extraction-worker/src/procurepilot_extraction_worker/worker.py`, persisting status changes to `extraction_job`
+- [x] T033 [US1] Implement exact-Decimal arithmetic validation and locale-sensitive decimal parsing in `services/extraction-worker/src/procurepilot_extraction_worker/validation.py`, reusing `apps/api/src/procurepilot_api/modules/catalogue/csv_import.py` `parse_decimal` rather than inventing a second parser
+- [x] T034 [US1] Implement per-field provenance persistence in `apps/api/src/procurepilot_api/modules/extraction/provenance.py`, writing one `field_extraction` row per header or line field with source page/region, method and model version
+- [x] T035 [US1] Implement `POST /quotations/{quotation_id}/extract` in `apps/api/src/procurepilot_api/modules/extraction/router.py`, returning a pollable Job and preventing duplicate active extraction jobs
+- [x] T036 [P] [US1] Build the upload screen in `apps/web/src/app/features/quotations/upload/`, including accepted-format validation, direct Storage upload progress and job polling copy from `packages/i18n`
+- [x] T037 [P] [US1] Write upload and extraction E2E coverage in `apps/web/tests/e2e/quotation-upload.spec.ts`, proving the browser flow creates a quotation and shows processing/extracted states
 
 **Checkpoint**: a buyer can upload a quotation, trigger extraction, poll the job, and inspect extracted fields with confidence and provenance.
 
@@ -102,25 +102,25 @@ description: "Task list for Quotation Inbox and Extraction Review implementation
 
 ### Tests for User Story 2
 
-- [ ] T038 [P] [US2] Write contract tests for `GET /quotations/{quotation_id}`, `PATCH /quotations/{quotation_id}`, `POST /quotations/{quotation_id}/confirm` and `GET /review-tasks` in `apps/api/tests/contract/test_quotation_review_contract.py`
-- [ ] T039 [P] [US2] Write review workflow integration tests in `apps/api/tests/integration/test_quotation_review.py` proving a quotation cannot reach `reviewed` without required corrections and supplier confirmation, and `POST /confirm` returns 409 while unresolved work remains
-- [ ] T040 [P] [US2] Write correction provenance tests in `apps/api/tests/integration/test_field_corrections.py` proving a correction is a distinct fact on `field_extraction` and the original `extracted_value` is untouched
-- [ ] T041 [P] [US2] Write trusted-data gating tests in `apps/api/tests/integration/test_quotation_trusted_data.py` proving unreviewed quotations are not exposed as trusted commercial data anywhere per FR-016
-- [ ] T042 [P] [US2] Write quotation RBAC tests in `apps/api/tests/integration/test_quotation_rbac.py`, following `apps/api/tests/integration/test_catalogue_rbac.py` so owner/buyer mutate and branch_manager/approver/viewer are read-only
+- [x] T038 [P] [US2] Write contract tests for `GET /quotations/{quotation_id}`, `PATCH /quotations/{quotation_id}`, `POST /quotations/{quotation_id}/confirm` and `GET /review-tasks` in `apps/api/tests/contract/test_quotation_review_contract.py`
+- [x] T039 [P] [US2] Write review workflow integration tests in `apps/api/tests/integration/test_quotation_review.py` proving a quotation cannot reach `reviewed` without required corrections and supplier confirmation, and `POST /confirm` returns 409 while unresolved work remains
+- [x] T040 [P] [US2] Write correction provenance tests in `apps/api/tests/integration/test_field_corrections.py` proving a correction is a distinct fact on `field_extraction` and the original `extracted_value` is untouched
+- [x] T041 [P] [US2] Write trusted-data gating tests in `apps/api/tests/integration/test_quotation_trusted_data.py` proving unreviewed quotations are not exposed as trusted commercial data anywhere per FR-016
+- [x] T042 [P] [US2] Write quotation RBAC tests in `apps/api/tests/integration/test_quotation_rbac.py`, following `apps/api/tests/integration/test_catalogue_rbac.py` so owner/buyer mutate and branch_manager/approver/viewer are read-only
 
 ### Implementation for User Story 2
 
-- [ ] T043 [US2] Implement quotation detail loading in `apps/api/src/procurepilot_api/modules/quotations/service.py`, returning header, lines, document metadata, field_extractions and review_task in one tenant-scoped read
-- [ ] T044 [US2] Implement `GET /quotations/{quotation_id}` in `apps/api/src/procurepilot_api/modules/quotations/router.py`, preserving cross-tenant not-found semantics
-- [ ] T045 [US2] Implement correction and supplier-confirmation handling in `apps/api/src/procurepilot_api/modules/quotations/review_service.py`, recording `corrected_value`, `corrected_by` and `corrected_at` without overwriting extraction evidence
-- [ ] T046 [US2] Implement `PATCH /quotations/{quotation_id}` in `apps/api/src/procurepilot_api/modules/quotations/router.py`, guarded to owner and buyer for mutation with idempotency support
-- [ ] T047 [US2] Implement human confirmation in `apps/api/src/procurepilot_api/modules/quotations/confirmation_service.py`, refusing 409 while low-confidence fields, arithmetic mismatch or missing supplier confirmation remain unresolved
-- [ ] T048 [US2] Implement `POST /quotations/{quotation_id}/confirm` in `apps/api/src/procurepilot_api/modules/quotations/router.py`, recording `reviewed_by` and `reviewed_at` as the only path to trusted `reviewed` status
-- [ ] T049 [US2] Implement review-task listing in `apps/api/src/procurepilot_api/modules/quotations/review_tasks.py`, supporting status and priority filters for the standalone `review_task` resource
-- [ ] T050 [US2] Implement `GET /review-tasks` in `apps/api/src/procurepilot_api/modules/quotations/router.py`, keeping the queue independent of a single quotation detail page per FR-019
-- [ ] T051 [P] [US2] Build the side-by-side review screen in `apps/web/src/app/features/quotations/quotation-review/`, including source-region highlighting, low-confidence flags, correction controls and keyboard navigation per FR-014
-- [ ] T052 [P] [US2] Build the review queue list in `apps/web/src/app/features/quotations/review-queue/`, including status/priority filters and read-only presentation for non-writing roles
-- [ ] T053 [P] [US2] Write review and queue E2E coverage in `apps/web/tests/e2e/quotation-review.spec.ts`, proving source highlighting, keyboard movement through flagged fields, correction, supplier confirmation and final confirm
+- [x] T043 [US2] Implement quotation detail loading in `apps/api/src/procurepilot_api/modules/quotations/service.py`, returning header, lines, document metadata, field_extractions and review_task in one tenant-scoped read
+- [x] T044 [US2] Implement `GET /quotations/{quotation_id}` in `apps/api/src/procurepilot_api/modules/quotations/router.py`, preserving cross-tenant not-found semantics
+- [x] T045 [US2] Implement correction and supplier-confirmation handling in `apps/api/src/procurepilot_api/modules/quotations/review_service.py`, recording `corrected_value`, `corrected_by` and `corrected_at` without overwriting extraction evidence
+- [x] T046 [US2] Implement `PATCH /quotations/{quotation_id}` in `apps/api/src/procurepilot_api/modules/quotations/router.py`, guarded to owner and buyer for mutation with idempotency support
+- [x] T047 [US2] Implement human confirmation in `apps/api/src/procurepilot_api/modules/quotations/confirmation_service.py`, refusing 409 while low-confidence fields, arithmetic mismatch or missing supplier confirmation remain unresolved
+- [x] T048 [US2] Implement `POST /quotations/{quotation_id}/confirm` in `apps/api/src/procurepilot_api/modules/quotations/router.py`, recording `reviewed_by` and `reviewed_at` as the only path to trusted `reviewed` status
+- [x] T049 [US2] Implement review-task listing in `apps/api/src/procurepilot_api/modules/quotations/review_tasks.py`, supporting status and priority filters for the standalone `review_task` resource
+- [x] T050 [US2] Implement `GET /review-tasks` in `apps/api/src/procurepilot_api/modules/quotations/router.py`, keeping the queue independent of a single quotation detail page per FR-019
+- [x] T051 [P] [US2] Build the side-by-side review screen in `apps/web/src/app/features/quotations/quotation-review/`, including source-region highlighting, low-confidence flags, correction controls and keyboard navigation per FR-014
+- [x] T052 [P] [US2] Build the review queue list in `apps/web/src/app/features/quotations/review-queue/`, including status/priority filters and read-only presentation for non-writing roles
+- [x] T053 [P] [US2] Write review and queue E2E coverage in `apps/web/tests/e2e/quotation-review.spec.ts`, proving source highlighting, keyboard movement through flagged fields, correction, supplier confirmation and final confirm
 
 **Checkpoint**: upload/extraction and human review/confirmation form the P1 MVP loop, with no trusted commercial data before human confirmation.
 
@@ -138,13 +138,13 @@ description: "Task list for Quotation Inbox and Extraction Review implementation
 
 ### Tests for User Story 3
 
-- [ ] T054 [P] [US3] Write dedicated mismatch integration tests in `apps/api/tests/integration/test_arithmetic_mismatch_review.py` proving 100% of mismatched-total quotations land in mandatory review regardless of field confidence
-- [ ] T055 [P] [US3] Write reviewer visibility E2E coverage in `apps/web/tests/e2e/quotation-arithmetic-mismatch.spec.ts` proving the mismatch itself, not just individual fields, is surfaced on the review screen
+- [x] T054 [P] [US3] Write dedicated mismatch integration tests in `apps/api/tests/integration/test_arithmetic_mismatch_review.py` proving 100% of mismatched-total quotations land in mandatory review regardless of field confidence
+- [x] T055 [P] [US3] Write reviewer visibility E2E coverage in `apps/web/tests/e2e/quotation-arithmetic-mismatch.spec.ts` proving the mismatch itself, not just individual fields, is surfaced on the review screen
 
 ### Implementation for User Story 3
 
-- [ ] T056 [US3] Extend review-task creation in `apps/api/src/procurepilot_api/modules/extraction/service.py` so arithmetic mismatch creates or keeps an open high-priority `review_task` with `reason = arithmetic_mismatch`
-- [ ] T057 [US3] Add arithmetic-mismatch presentation state in `apps/web/src/app/features/quotations/quotation-review/`, showing stated total, computed line total and unresolved status from the API
+- [x] T056 [US3] Extend review-task creation in `apps/api/src/procurepilot_api/modules/extraction/service.py` so arithmetic mismatch creates or keeps an open high-priority `review_task` with `reason = arithmetic_mismatch`
+- [x] T057 [US3] Add arithmetic-mismatch presentation state in `apps/web/src/app/features/quotations/quotation-review/`, showing stated total, computed line total and unresolved status from the API
 
 **Checkpoint**: SC-003 is directly testable and no high-confidence arithmetic mismatch can skip human review.
 
@@ -160,14 +160,14 @@ description: "Task list for Quotation Inbox and Extraction Review implementation
 
 ### Tests for User Story 4
 
-- [ ] T058 [P] [US4] Write versioning integration tests in `apps/api/tests/integration/test_quotation_versioning.py` proving `previous_quotation_id` is set at confirm time, is same-tenant, is not self-referential, and does not hide either quotation
-- [ ] T059 [P] [US4] Write re-quote E2E coverage in `apps/web/tests/e2e/quotation-versioning.spec.ts` proving both current and prior versions are visible and openable
+- [x] T058 [P] [US4] Write versioning integration tests in `apps/api/tests/integration/test_quotation_versioning.py` proving `previous_quotation_id` is set at confirm time, is same-tenant, is not self-referential, and does not hide either quotation
+- [x] T059 [P] [US4] Write re-quote E2E coverage in `apps/web/tests/e2e/quotation-versioning.spec.ts` proving both current and prior versions are visible and openable
 
 ### Implementation for User Story 4
 
-- [ ] T060 [US4] Extend confirmation logic in `apps/api/src/procurepilot_api/modules/quotations/confirmation_service.py` to validate and persist `previous_quotation_id` only during human confirm
-- [ ] T061 [US4] Extend quotation detail responses in `apps/api/src/procurepilot_api/modules/quotations/service.py` to include prior/current version references while preserving tenant isolation
-- [ ] T062 [US4] Add re-quote version controls and prior-version links in `apps/web/src/app/features/quotations/quotation-review/`, keeping both versions visible rather than replacing history
+- [x] T060 [US4] Extend confirmation logic in `apps/api/src/procurepilot_api/modules/quotations/confirmation_service.py` to validate and persist `previous_quotation_id` only during human confirm
+- [x] T061 [US4] Extend quotation detail responses in `apps/api/src/procurepilot_api/modules/quotations/service.py` to include prior/current version references while preserving tenant isolation
+- [x] T062 [US4] Add re-quote version controls and prior-version links in `apps/web/src/app/features/quotations/quotation-review/`, keeping both versions visible rather than replacing history
 
 **Checkpoint**: a P2 re-quote can be linked and audited without changing the P1 upload/extract/review loop.
 
@@ -179,13 +179,13 @@ description: "Task list for Quotation Inbox and Extraction Review implementation
 
 **Purpose**: feature-wide isolation, RBAC, accessibility, AI quality gates, documentation and constitutional verification.
 
-- [ ] T063 Extend `apps/api/tests/integration/test_tenant_isolation.py` to cover all six new tenant-scoped tables - `document`, `quotation`, `quotation_line`, `field_extraction`, `extraction_job` and `review_task` - following the chunk 4.2 precedent T038 in `specs/002-catalogue-suppliers/tasks.md`
-- [ ] T064 Extend role coverage in `apps/api/tests/integration/test_quotation_rbac.py` for all quotation/document/extraction/review mutations, following the same owner/buyer versus branch_manager/approver/viewer split as `apps/api/tests/integration/test_catalogue_rbac.py`
-- [ ] T065 [P] Add `@a11y` specs for upload, review queue and quotation review screens in both English and Arabic in `apps/web/tests/e2e/quotation-a11y.spec.ts`, with RTL checks and zero axe violations
-- [ ] T066 [P] Implement the AI evaluation harness in `ml/evals/quotation_extraction/run_eval.py`, reporting field-level accuracy >= 90%, document exact match, arithmetic-validation pass rate, cost per document and ECE calibration within 5% per bucket against the versioned held-out benchmark in `ml/benchmarks/quotation_extraction/` per docs/quality/test-strategy.md section 4 and research R7
-- [ ] T067 [P] Fold this chunk's `[new]` data-model.md fields into `docs/architecture/data-dictionary.md`, including per-field provenance, review_task, extraction_job and quotation versioning
-- [ ] T068 [P] Add the quotation inbox API surface to `docs/architecture/api-specification.md`, covering the eight endpoints in `specs/003-quotation-inbox-extraction/contracts/quotation-inbox.openapi.yaml`
-- [ ] T069 Re-run the Constitution Check from `specs/003-quotation-inbox-extraction/plan.md` against delivered code and record the result, following the chunk 4.2 precedent T043 in `specs/002-catalogue-suppliers/tasks.md`
+- [x] T063 Extend `apps/api/tests/integration/test_tenant_isolation.py` to cover all six new tenant-scoped tables - `document`, `quotation`, `quotation_line`, `field_extraction`, `extraction_job` and `review_task` - following the chunk 4.2 precedent T038 in `specs/002-catalogue-suppliers/tasks.md`
+- [x] T064 Extend role coverage in `apps/api/tests/integration/test_quotation_rbac.py` for all quotation/document/extraction/review mutations, following the same owner/buyer versus branch_manager/approver/viewer split as `apps/api/tests/integration/test_catalogue_rbac.py`
+- [x] T065 [P] Add `@a11y` specs for upload, review queue and quotation review screens in both English and Arabic in `apps/web/tests/e2e/quotation-a11y.spec.ts`, with RTL checks and zero axe violations
+- [x] T066 [P] Implement the AI evaluation harness in `ml/evals/quotation_extraction/run_eval.py`, reporting field-level accuracy >= 90%, document exact match, arithmetic-validation pass rate, cost per document and ECE calibration within 5% per bucket against the versioned held-out benchmark in `ml/benchmarks/quotation_extraction/` per docs/quality/test-strategy.md section 4 and research R7
+- [x] T067 [P] Fold this chunk's `[new]` data-model.md fields into `docs/architecture/data-dictionary.md`, including per-field provenance, review_task, extraction_job and quotation versioning
+- [x] T068 [P] Add the quotation inbox API surface to `docs/architecture/api-specification.md`, covering the eight endpoints in `specs/003-quotation-inbox-extraction/contracts/quotation-inbox.openapi.yaml`
+- [x] T069 Re-run the Constitution Check from `specs/003-quotation-inbox-extraction/plan.md` against delivered code and record the result, following the chunk 4.2 precedent T043 in `specs/002-catalogue-suppliers/tasks.md`
 
 ---
 

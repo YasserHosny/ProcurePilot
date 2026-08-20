@@ -304,133 +304,133 @@ viewer are read-only.
 
 ---
 
-## Documents
+## Delivered Quotation Inbox and Extraction API
+
+The following endpoints are delivered for chunk 4.3 and mirror
+`specs/003-quotation-inbox-extraction/contracts/quotation-inbox.openapi.yaml`. All routes require
+bearer auth. Tenant scope is resolved from the token. Owner and buyer may upload, extract, correct,
+and confirm; branch manager, approver, and viewer are read-only. Cross-tenant records return `404`,
+deliberately indistinguishable from records that do not exist.
+
+Every monetary value is a `Money` object with `amount` as a decimal string and explicit
+`currency`; the API has no bare money numbers.
 
 ### `POST /documents/presign`
 
-Request:
-```json
-{
-  "filename": "quote.pdf",
-  "mime_type": "application/pdf",
-  "size": 123456
-}
-```
+- Requires bearer auth and owner or buyer role; accepts `Idempotency-Key`.
+- Creates a tenant-scoped document row and returns a short-lived Supabase Storage upload target.
+- File bytes go directly from the client to Storage.
+- Request fields: `filename`, `mime_type`, `size_bytes`, optional `content_hash`.
+- Accepted MIME types: `application/pdf`, `image/png`, `image/jpeg`, `image/tiff`, `text/csv`,
+  `application/vnd.ms-excel`, and
+  `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`.
+- Returns `201` with `document_id`, `storage_bucket`, `storage_path`, `upload_url`, optional
+  `upload_fields`, and `expires_at`.
+- Returns `403` when the caller's role may not request an upload target.
+- Returns `415` when the file type is refused before extraction.
+- Returns `422` when validation fails.
 
-Response:
-```json
-{
-  "document_id": "uuid",
-  "upload_url": "https://...",
-  "path": "tenants/<id>/documents/..."
-}
-```
+### `GET /documents/{document_id}`
 
-### `GET /documents/{id}`
-
-Response:
-```json
-{
-  "id": "uuid",
-  "storage_uri": "...",
-  "mime_type": "...",
-  "hash": "...",
-  "source_channel": "upload",
-  "created_at": "..."
-}
-```
-
----
-
-## Quotations
+- Requires bearer auth.
+- Reads document metadata and processing status in the active workspace.
+- Returns `200` with `id`, `storage_bucket`, `storage_path`, `mime_type`, optional
+  `content_hash`, `source_channel`, `status`, `created_at`, and `created_by`.
+- `source_channel` is `upload`; `status` is `uploaded` or `failed_to_read`.
+- Returns `404` when the document is not in the caller's workspace; this is deliberately
+  indistinguishable from a document that exists in another workspace.
 
 ### `POST /quotations`
 
-Request:
-```json
-{
-  "document_id": "uuid",
-  "supplier_id": "uuid?"
-}
-```
+- Requires bearer auth and owner or buyer role; accepts `Idempotency-Key`.
+- Creates a quotation lifecycle record for an uploaded document after direct upload completes.
+- Request fields: `document_id`, optional `supplier_id`.
+- `supplier_id` is optional because the reviewer may confirm it later.
+- Returns `201` with a `Quotation`.
+- Returns `403` when the caller's role may not create quotations.
+- Returns `404` when the document is not in the caller's workspace.
+- Returns `409` when the document already has an active quotation or cannot be used.
+- Returns `422` when validation fails.
 
-Response:
-```json
-{
-  "id": "uuid",
-  "document_id": "uuid",
-  "status": "pending",
-  "job_id": "uuid"
-}
-```
+### `GET /quotations/{quotation_id}`
 
-### `POST /quotations/{id}/extract`
+- Requires bearer auth.
+- Reads a quotation in the active workspace.
+- Returns `200` with `QuotationDetail`: quotation header, `document`, `lines`,
+  `field_extractions`, and optional `review_task`.
+- Header fields include `id`, `document_id`, optional `supplier_id`, optional `currency`,
+  optional `issue_date`, optional `expiry_date`, `status`, optional `previous_quotation_id`,
+  optional `stated_total`, optional `arithmetic_status`, `created_at`, optional `reviewed_by`, and
+  optional `reviewed_at`.
+- Line fields include `id`, `line_number`, `original_text`, optional decimal-string `quantity`,
+  optional `pack`, optional `unit_price`, optional decimal-string `vat_rate`, optional
+  `delivery_fee`, and optional `discount`.
+- Field extraction records include the per-field `extracted_value`, decimal-string `confidence`,
+  optional `source_page`, optional `source_region`, `extraction_method`, `model_version`, and
+  optional correction metadata.
+- Returns `404` when the quotation is not in the caller's workspace; this is deliberately
+  indistinguishable from a quotation that exists in another workspace.
 
-Triggers or re-runs extraction. Response: `Job`.
+### `PATCH /quotations/{quotation_id}`
 
-### `GET /quotations/{id}`
+- Requires bearer auth and owner or buyer role; accepts `Idempotency-Key`.
+- Corrects extracted fields and confirms supplier.
+- Request fields: optional `supplier_id`, optional `corrections`.
+- Each correction has `field_extraction_id` and `corrected_value`.
+- Corrections are recorded as human decisions on field provenance records; original extracted
+  values are retained.
+- Returns `200` with the updated `QuotationDetail`.
+- Returns `403` when the caller's role may not correct quotations.
+- Returns `404` when the quotation is not in the caller's workspace.
+- Returns `409` when the quotation is not editable in its current state.
+- Returns `422` when validation fails.
 
-Response includes header, lines, extraction confidence, review status.
+### `POST /quotations/{quotation_id}/extract`
 
-```json
-{
-  "id": "uuid",
-  "supplier_id": "uuid",
-  "currency": "GBP",
-  "lines": [
-    {
-      "id": "uuid",
-      "original_text": "6 x 5L ...",
-      "quantity": 6,
-      "unit_price": 12.50,
-      "vat_rate": 0.20,
-      "confidence": 0.94
-    }
-  ]
-}
-```
+- Requires bearer auth and owner or buyer role; accepts `Idempotency-Key`.
+- Enqueues asynchronous extraction for a quotation.
+- Returns `202` with the pollable `Job` resource.
+- `Job` fields include `id`, `quotation_id`, `status`, optional `attempted_provider`, optional
+  `error`, optional `result_url`, `created_at`, optional `started_at`, and optional
+  `completed_at`.
+- Returns `403` when the caller's role may not extract quotations.
+- Returns `404` when the quotation is not in the caller's workspace.
+- Returns `409` when extraction is already running or the quotation cannot be extracted.
 
----
+### `POST /quotations/{quotation_id}/confirm`
 
-## Review Queue
+- Requires bearer auth and owner or buyer role; accepts `Idempotency-Key`.
+- Confirms a reviewed quotation as the human authorization step.
+- Optional request field: `previous_quotation_id` to link this quotation to an earlier supplier
+  re-quote.
+- Returns `200` with a `Quotation`.
+- A quotation is not trusted commercial data until this endpoint succeeds.
+- Returns `403` when the caller's role may not confirm quotations.
+- Returns `404` when the quotation is not in the caller's workspace.
+- Returns `409` when supplier confirmation, required corrections, or arithmetic mismatch remain
+  unresolved.
 
 ### `GET /review-tasks`
 
-Query: `?type=extraction|matching&status=open&priority=high&cursor=&limit=`
+- Requires bearer auth.
+- Lists outstanding quotation review work in the active workspace.
+- Query parameters: optional `cursor`, optional `limit` capped at 100 and defaulting to 50,
+  optional `status` (`open`, `in_progress`, `resolved`, or `all`) defaulting to `open`, optional
+  `priority` (`low`, `normal`, or `high`).
+- Returns `200` with `items` containing `ReviewTask` resources and nullable `next_cursor`.
+- Review task fields include `id`, `quotation_id`, `status`, `priority`, `reason`, `created_at`,
+  and optional `resolved_at`.
 
-Response:
-```json
-{
-  "data": [
-    {
-      "id": "uuid",
-      "type": "extraction",
-      "quotation_id": "uuid",
-      "line_id": "uuid?",
-      "priority_score": 0.95,
-      "created_at": "..."
-    }
-  ],
-  "next_cursor": "..."
-}
-```
+### `GET /jobs/{job_id}`
 
-### `POST /review-tasks/{id}/resolve`
-
-Request:
-```json
-{
-  "field_corrections": {
-    "line_id": { "unit_price": 13.00, "quantity": 6 }
-  },
-  "match_decision": {
-    "tenant_product_id": "uuid",
-    "outcome": "same_product"
-  }
-}
-```
-
-Response: updated `Quotation` or `QuotationLine`.
+- Requires bearer auth.
+- Polls asynchronous extraction job status in the active workspace.
+- Returns `200` with a `Job`.
+- Job statuses are `queued`, `running`, `succeeded`, and `failed`.
+- `attempted_provider` is optional and may be `structured_parse`, `bedrock`, or `azure_di`.
+- `result_url` is present on success and usually points to `/api/v1/quotations/{quotation_id}`.
+- Returns `404` when the job is not in the caller's workspace; this is deliberately
+  indistinguishable from a job that exists in another workspace.
 
 ---
 
@@ -585,23 +585,6 @@ Request:
 ```
 
 Response: `Job` resource; result URL returned on completion.
-
----
-
-## Jobs
-
-### `GET /jobs/{id}`
-
-Response:
-```json
-{
-  "id": "uuid",
-  "status": "pending|running|completed|failed",
-  "progress": 0.75,
-  "result_url": "...",
-  "error": { "code": "", "message": "" }
-}
-```
 
 ---
 

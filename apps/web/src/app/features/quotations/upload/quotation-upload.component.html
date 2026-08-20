@@ -1,0 +1,188 @@
+<div class="quotation-upload-container">
+  <!-- Page Header -->
+  <header class="page-header">
+    <div class="header-titles">
+      <h1 class="page-title">{{ 'quotations.upload.title' | translate }}</h1>
+      <p class="page-subtitle">{{ 'quotations.upload.subtitle' | translate }}</p>
+    </div>
+    <div class="header-actions">
+      <a mat-button routerLink="/quotations" class="back-link">
+        <mat-icon aria-hidden="true">arrow_back</mat-icon>
+        <span>{{ 'quotations.review.backToQueue' | translate }}</span>
+      </a>
+    </div>
+  </header>
+
+  <!-- Error Alert -->
+  @if (errorMessage()) {
+    <div class="error-banner" role="alert">
+      <mat-icon class="error-icon" aria-hidden="true">error_outline</mat-icon>
+      <div class="error-content">
+        <span class="error-text">{{ errorMessage() }}</span>
+        @if (errorTraceId()) {
+          <span class="error-trace">{{ 'common.traceId' | translate }}: {{ errorTraceId() }}</span>
+        }
+      </div>
+    </div>
+  }
+
+  <mat-card class="upload-card">
+    <mat-card-content>
+      @switch (uploadState()) {
+        @case ('idle') {
+          <!-- Dropzone -->
+          <div
+            class="dropzone"
+            [class.drag-over]="isDragOver()"
+            (dragover)="onDragOver($event)"
+            (dragleave)="onDragLeave($event)"
+            (drop)="onDropFile($event)"
+          >
+            <mat-icon class="dropzone-icon" aria-hidden="true">cloud_upload</mat-icon>
+            <p class="dropzone-prompt">{{ 'quotations.upload.dropzonePrompt' | translate }}</p>
+            <p class="dropzone-hint">{{ 'quotations.upload.dropzoneHint' | translate }}</p>
+
+            <label class="file-browse-label">
+              <input
+                type="file"
+                class="file-input"
+                (change)="onFileSelected($event)"
+                accept=".pdf,.png,.jpg,.jpeg,.tiff,.tif,.csv,.xls,.xlsx,application/pdf,image/png,image/jpeg,image/tiff,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                [attr.aria-label]="'quotations.upload.fileLabel' | translate"
+              />
+              <span mat-stroked-button class="browse-btn">
+                <mat-icon aria-hidden="true">folder_open</mat-icon>
+                {{ 'quotations.upload.fileLabel' | translate }}
+              </span>
+            </label>
+          </div>
+
+          <!-- Selected File Details -->
+          @if (selectedFile(); as file) {
+            <div class="selected-file-card">
+              <div class="file-icon-box">
+                <mat-icon aria-hidden="true">description</mat-icon>
+              </div>
+              <div class="file-meta">
+                <span class="file-name">{{ file.name }}</span>
+                <span class="file-size">{{ formatFileSize(file.size) }}</span>
+              </div>
+              <button
+                mat-icon-button
+                type="button"
+                (click)="selectedFile.set(null)"
+                [attr.aria-label]="'quotations.review.corrections.cancelCorrection' | translate"
+              >
+                <mat-icon aria-hidden="true">close</mat-icon>
+              </button>
+            </div>
+
+            <div class="upload-actions">
+              <button
+                mat-flat-button
+                color="primary"
+                type="button"
+                (click)="startUpload()"
+                class="start-upload-btn"
+              >
+                <mat-icon aria-hidden="true">auto_awesome</mat-icon>
+                <span>{{ 'quotations.upload.uploadButton' | translate }}</span>
+              </button>
+            </div>
+          }
+
+          <div class="security-notice">
+            <mat-icon aria-hidden="true">lock</mat-icon>
+            <span>{{ 'quotations.upload.directStorageNotice' | translate }}</span>
+          </div>
+        }
+
+        @case ('uploading') {
+          <div class="progress-container">
+            <mat-spinner diameter="48"></mat-spinner>
+            <h2 class="progress-title">{{ 'quotations.upload.uploading' | translate }}</h2>
+            <mat-progress-bar mode="indeterminate" class="progress-bar"></mat-progress-bar>
+            @if (selectedFile(); as file) {
+              <p class="file-caption">{{ file.name }} ({{ formatFileSize(file.size) }})</p>
+            }
+          </div>
+        }
+
+        @case ('processing') {
+          <div class="progress-container">
+            <mat-spinner diameter="48"></mat-spinner>
+            <h2 class="progress-title">{{ 'quotations.upload.processing' | translate }}</h2>
+            <p class="progress-hint">{{ 'quotations.upload.processingHint' | translate }}</p>
+            <mat-progress-bar mode="indeterminate" class="progress-bar"></mat-progress-bar>
+          </div>
+        }
+
+        @case ('extracted') {
+          <div class="result-container success">
+            <div class="result-icon-circle success-circle">
+              <mat-icon aria-hidden="true">check_circle</mat-icon>
+            </div>
+            <h2 class="result-title">{{ 'quotations.upload.extractionSuccess' | translate }}</h2>
+            @if (createdQuotation(); as q) {
+              <div class="result-details">
+                <span class="detail-badge">
+                  <mat-icon aria-hidden="true">tag</mat-icon>
+                  {{ q.id }}
+                </span>
+                <span class="detail-badge status-extracted">
+                  {{ 'quotations.review.status.' + q.status | translate }}
+                </span>
+              </div>
+            }
+
+            <div class="result-actions">
+              @if (createdQuotation(); as q) {
+                <a
+                  mat-flat-button
+                  color="primary"
+                  [routerLink]="['/quotations', q.id, 'review']"
+                  class="action-btn"
+                >
+                  <mat-icon aria-hidden="true">visibility</mat-icon>
+                  <span>{{ 'quotations.upload.goToReview' | translate }}</span>
+                </a>
+              }
+              <button
+                mat-stroked-button
+                type="button"
+                (click)="resetUpload()"
+                class="action-btn"
+              >
+                <mat-icon aria-hidden="true">add</mat-icon>
+                <span>{{ 'quotations.upload.uploadAnother' | translate }}</span>
+              </button>
+            </div>
+          </div>
+        }
+
+        @case ('failed') {
+          <div class="result-container failure">
+            <div class="result-icon-circle failure-circle">
+              <mat-icon aria-hidden="true">error_outline</mat-icon>
+            </div>
+            <h2 class="result-title">{{ 'quotations.upload.failedTitle' | translate }}</h2>
+            <p class="result-message">{{ errorMessage() || ('quotations.upload.failedMessage' | translate) }}</p>
+
+            <div class="result-actions">
+              <button
+                mat-flat-button
+                color="primary"
+                type="button"
+                (click)="resetUpload()"
+                class="action-btn"
+              >
+                <mat-icon aria-hidden="true">refresh</mat-icon>
+                <span>{{ 'quotations.upload.retryButton' | translate }}</span>
+              </button>
+            </div>
+          </div>
+        }
+      }
+    </mat-card-content>
+  </mat-card>
+</div>

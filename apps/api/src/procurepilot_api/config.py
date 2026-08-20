@@ -37,6 +37,19 @@ class Settings(BaseSettings):
     member_invitation_ttl_days: int = Field(validation_alias="MEMBER_INVITATION_TTL_DAYS", gt=0)
 
     rate_limit_auth: str = Field(validation_alias="RATE_LIMIT_AUTH")
+    redis_url: str = Field(default="redis://localhost:6379/0", validation_alias="REDIS_URL")
+    extraction_queue_name: str = Field(
+        default="quotation-extraction", validation_alias="EXTRACTION_QUEUE_NAME"
+    )
+    extraction_provider_mode: Literal["stub", "bedrock", "azure_di"] = Field(
+        default="stub", validation_alias="EXTRACTION_PROVIDER_MODE"
+    )
+    extraction_confidence_threshold: float = Field(
+        default=0.85, validation_alias="EXTRACTION_CONFIDENCE_THRESHOLD", ge=0, le=1
+    )
+    quotation_documents_bucket: str = Field(
+        default="quotation-documents", validation_alias="QUOTATION_DOCUMENTS_BUCKET"
+    )
 
     web_api_base_url: str = Field(validation_alias="WEB_API_BASE_URL")
     web_default_locale: Locale = Field(validation_alias="WEB_DEFAULT_LOCALE")
