@@ -166,16 +166,16 @@ def accept_invitation(
         existing_session = auth.login(email=invitation.email, password=payload.password)
         user_id = existing_session.user.id
 
-    # Sign in BEFORE accepting. Acceptance now goes through an RPC that reads the caller from
-    # their own JWT, so the invitee needs a session first — they had none a moment ago, which is
-    # precisely what being invited means.
-    session = auth.login(email=invitation.email, password=payload.password)
+    # Accept FIRST, then sign in. Signing in builds a session that requires a tenant_id claim,
+    # and the auth hook only injects that once a membership exists — which acceptance is what
+    # creates. Signing in first made acceptance depend on its own outcome.
     membership = invitation_service.accept(
-        bearer_token=session.access_token,
+        bearer_token="",
         token=payload.token,
         user_id=user_id,
         accepting_email=invitation.email,
     )
+    session = auth.login(email=invitation.email, password=payload.password)
     get_audit_writer().record(
         AuditEventCreate(
             tenant_id=membership.tenant_id,

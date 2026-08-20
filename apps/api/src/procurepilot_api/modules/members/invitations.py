@@ -22,6 +22,11 @@ from procurepilot_api.modules.members.models import MemberInvitation, Membership
 from procurepilot_api.modules.members.service import authenticated_client
 from procurepilot_api.shared.audit import AuditEventCreate, get_audit_writer
 
+
+def anon_client(settings: Settings) -> Client:
+    """A client with no user session, for calls that legitimately precede authentication."""
+    return create_client(settings.supabase_url, settings.supabase_anon_key.get_secret_value())
+
 INVITATION_COLUMNS = (
     "id,tenant_id,email,role,token_hash,invited_by,expires_at,status,created_at"
 )
@@ -71,7 +76,7 @@ class MemberInvitationRepository(Protocol):
     def accept(
         self,
         *,
-        bearer_token: str,
+        bearer_token: str,  # noqa: ARG002 - kept for protocol compatibility; acceptance is anon
         invitation: MemberInvitationRecord,
         user_id: UUID,
         email: str,
@@ -202,7 +207,7 @@ class SupabaseMemberInvitationRepository:
     def accept(
         self,
         *,
-        bearer_token: str,
+        bearer_token: str,  # noqa: ARG002 - kept for protocol compatibility; acceptance is anon
         invitation: MemberInvitationRecord,
         user_id: UUID,
         email: str,
@@ -221,7 +226,11 @@ class SupabaseMemberInvitationRepository:
         idempotent, returning the membership a first acceptance created rather than failing or
         duplicating.
         """
-        client = authenticated_client(self._settings, bearer_token)
+        # Anon client, deliberately: the invitee has no session yet and cannot get one, because a
+        # session needs a tenant_id claim that only exists once this call has created the
+        # membership. The RPC proves authority from the token hash and the addressee's email
+        # instead of from the caller's claims.
+        client = anon_client(self._settings)
         try:
             response = client.rpc(
                 "accept_member_invitation",
@@ -383,7 +392,7 @@ class MemberInvitationService:
     def accept(
         self,
         *,
-        bearer_token: str,
+        bearer_token: str,  # noqa: ARG002 - kept for protocol compatibility; acceptance is anon
         token: str,
         user_id: UUID,
         accepting_email: str | None = None,
