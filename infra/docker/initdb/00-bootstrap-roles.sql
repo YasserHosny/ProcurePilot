@@ -15,6 +15,12 @@
 -- The `auth` SCHEMA is created here, but its TABLES are not: GoTrue owns those and creates them
 -- in its own migrations. This file only guarantees the schema exists for GoTrue to write into.
 
+-- The image's own configuration references supabase_admin (it is the bootstrap superuser on
+-- hosted Supabase). Without it, even `create extension pgcrypto` fails with
+-- 'role "supabase_admin" does not exist' — which is what broke migration 0001.
+do $$ begin create role supabase_admin superuser createrole createdb replication bypassrls;
+       exception when duplicate_object then null; end $$;
+
 -- Roles. NOLOGIN: these are assumed via `set role` from a verified JWT, never connected to
 -- directly. Granting login rights would turn a leaked anon key into a database session.
 do $$ begin create role anon nologin noinherit;                     exception when duplicate_object then null; end $$;

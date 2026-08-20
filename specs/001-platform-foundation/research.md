@@ -165,6 +165,27 @@ Compose is already the documented local trigger in the deployment plan §1.
 **Consequence**: image versions are pinned explicitly and bumped deliberately. Unpinned Supabase
 component images are the most likely source of "works on my machine" drift.
 
+**What running it actually cost, recorded so the next person does not pay it twice.** The stack was
+written, reviewed, and committed before anyone ran it. Starting it for the first time surfaced five
+defects in one sitting, none of which a parse check could see:
+
+1. Two image tags did not exist — plausible version numbers that were never published. `pinned`
+   was verified; `pinned and real` was not.
+2. Nothing in the project created the Supabase roles or the `auth` schema. GoTrue and Storage both
+   crash-looped. The application migrations assumed these objects too — every RLS grant names
+   `authenticated`, and `membership.user_id` references `auth.users`.
+3. The `db` service declared `volumes:` twice, so the fix for (2) was silently discarded. YAML
+   keeps the last key and reports nothing.
+4. GoTrue v2.164.0 could not migrate against the pinned Postgres image, failing on a type its own
+   earlier migration should have created. v2.196.0 works.
+5. `supabase_admin` must exist before `create extension` succeeds at all — the image's
+   configuration references it.
+
+The through-line: the test harness had been hand-creating the roles and `auth.users` in every test
+database. That fixture was standing in for missing production setup, and because the tests passed,
+nothing pointed at the hole. A fixture that invents infrastructure the real system lacks does not
+just fail to catch the gap — it actively conceals it.
+
 ---
 
 ## R6 — The platform invitation gate
