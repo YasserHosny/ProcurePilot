@@ -97,20 +97,21 @@ cross-tenant leak.
 **Independent test**: create two workspaces, put a marker record in each, and confirm from the API
 and from a direct database connection that neither can read, list, or detect the other's.
 
-- [ ] T036 [P] [US1] Write `apps/api/tests/integration/test_tenant_isolation.py` — the FR-030 test: two workspaces, marker records, cross-reads via API and via a member's database connection, asserting "not found" rather than "forbidden" (FR-005)
-- [ ] T037 [P] [US1] Write `apps/api/tests/contract/test_signup_contract.py` validating request and response shapes against `contracts/auth-tenant.openapi.yaml`
-- [ ] T038 [US1] Implement the tenant, membership, and platform-invitation Pydantic models in `apps/api/src/procurepilot_api/modules/tenants/models.py` and `modules/members/models.py`
-- [ ] T039 [US1] Implement platform-invitation validation in `apps/api/src/procurepilot_api/modules/tenants/invitations.py`: hash lookup, expiry and status checks, single-use marking (research R6, FR-033)
-- [ ] T040 [US1] Implement workspace creation in `apps/api/src/procurepilot_api/modules/tenants/service.py`: validate the invitation, validate region/currency/tax_model against enabled reference rows, create the tenant, create the owner membership, mark the invitation spent, and write the audit event — all in one transaction (FR-001, FR-031, FR-032, FR-034)
-- [ ] T041 [US1] Implement `POST /api/v1/auth/signup` in `apps/api/src/procurepilot_api/modules/tenants/router.py`
-- [ ] T042 [P] [US1] Implement `POST /api/v1/auth/login`, `POST /api/v1/auth/logout`, and `POST /api/v1/auth/password-reset` in `apps/api/src/procurepilot_api/modules/auth/router.py`, with login failures indistinguishable from unknown accounts and reset always returning `202`
-- [ ] T043 [P] [US1] Implement `GET /api/v1/reference/config-options` in `apps/api/src/procurepilot_api/modules/tenants/reference_router.py` returning enabled regions, currencies, and tax models
-- [ ] T044 [P] [US1] Implement `GET /api/v1/me`, `PATCH /api/v1/me`, `GET /api/v1/tenant`, and `PATCH /api/v1/tenant` (owner-only; region, currency, and tax model immutable after creation) in `apps/api/src/procurepilot_api/modules/tenants/router.py` and `modules/members/router.py`
-- [ ] T045 [US1] Implement `GET /api/v1/me/workspaces` and `PUT /api/v1/me/active-workspace` in `apps/api/src/procurepilot_api/modules/members/router.py`, re-issuing the session so the `tenant_id` claim follows the switch (research R3)
-- [ ] T046 [P] [US1] Build the sign-up screen in `apps/web/src/app/features/onboarding/signup/` collecting the invitation token, business name, region, currency, and tax model, with no pre-selected default
-- [ ] T047 [P] [US1] Build the sign-in, sign-out, and password-reset screens in `apps/web/src/app/features/auth/`
-- [ ] T048 [US1] Build the authenticated shell in `apps/web/src/app/layout/` with navigation, workspace identity, workspace switcher, and account menu (FR-016)
-- [ ] T049 [P] [US1] Write `apps/api/tests/integration/test_signup.py` covering a valid invitation, an expired one, a spent one, a revoked one, an absent one, and an unsupported currency
+- [x] T036a Write migration `apps/api/migrations/0008_workspace_switching.sql` adding `list_my_workspaces()` and `set_active_workspace()` — membership RLS makes cross-workspace listing impossible by construction (found in review; see research.md R3)
+- [x] T036 [P] [US1] Write `apps/api/tests/integration/test_tenant_isolation.py` — the FR-030 test: two workspaces, marker records, cross-reads via API and via a member's database connection, asserting "not found" rather than "forbidden" (FR-005)
+- [x] T037 [P] [US1] Write `apps/api/tests/contract/test_signup_contract.py` validating request and response shapes against `contracts/auth-tenant.openapi.yaml`
+- [x] T038 [US1] Implement the tenant, membership, and platform-invitation Pydantic models in `apps/api/src/procurepilot_api/modules/tenants/models.py` and `modules/members/models.py`
+- [x] T039 [US1] Implement platform-invitation validation in `apps/api/src/procurepilot_api/modules/tenants/invitations.py`: hash lookup, expiry and status checks, single-use marking (research R6, FR-033)
+- [x] T040 [US1] Implement workspace creation in `apps/api/src/procurepilot_api/modules/tenants/service.py`: validate the invitation, validate region/currency/tax_model against enabled reference rows, create the tenant, create the owner membership, mark the invitation spent, and write the audit event — all in one transaction (FR-001, FR-031, FR-032, FR-034)
+- [x] T041 [US1] Implement `POST /api/v1/auth/signup` in `apps/api/src/procurepilot_api/modules/tenants/router.py`
+- [x] T042 [P] [US1] Implement `POST /api/v1/auth/login`, `POST /api/v1/auth/logout`, and `POST /api/v1/auth/password-reset` in `apps/api/src/procurepilot_api/modules/auth/router.py`, with login failures indistinguishable from unknown accounts and reset always returning `202`
+- [x] T043 [P] [US1] Implement `GET /api/v1/reference/config-options` in `apps/api/src/procurepilot_api/modules/tenants/reference_router.py` returning enabled regions, currencies, and tax models
+- [x] T044 [P] [US1] Implement `GET /api/v1/me`, `PATCH /api/v1/me`, `GET /api/v1/tenant`, and `PATCH /api/v1/tenant` (owner-only; region, currency, and tax model immutable after creation) in `apps/api/src/procurepilot_api/modules/tenants/router.py` and `modules/members/router.py`
+- [x] T045 [US1] Implement `GET /api/v1/me/workspaces` and `PUT /api/v1/me/active-workspace` in `apps/api/src/procurepilot_api/modules/members/router.py`, re-issuing the session so the `tenant_id` claim follows the switch (research R3)
+- [x] T046 [P] [US1] Build the sign-up screen in `apps/web/src/app/features/onboarding/signup/` collecting the invitation token, business name, region, currency, and tax model, with no pre-selected default
+- [x] T047 [P] [US1] Build the sign-in, sign-out, and password-reset screens in `apps/web/src/app/features/auth/`
+- [x] T048 [US1] Build the authenticated shell in `apps/web/src/app/layout/` with navigation, workspace identity, workspace switcher, and account menu (FR-016)
+- [x] T049 [P] [US1] Write `apps/api/tests/integration/test_signup.py` covering a valid invitation, an expired one, a spent one, a revoked one, an absent one, and an unsupported currency
 - [ ] T050 [P] [US1] Write `apps/web/tests/e2e/signup.spec.ts` (Playwright) driving invitation → sign-up → shell
 
 **Checkpoint**: US1 is independently demonstrable. This is the MVP — isolation is proven with nothing else built.
