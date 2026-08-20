@@ -188,16 +188,16 @@ trivial PR and see checks run.
 
 ## Phase 7: Polish & Cross-Cutting Concerns
 
-- [ ] T082 [P] Apply design tokens from `packages/ui` — colour, typography, spacing — across the shell (FR-021)
-- [ ] T083 [P] Verify `specs/001-platform-foundation/quickstart.md` end to end on a clean machine and correct anything that misleads (SC-007)
-- [ ] T084 [P] Add the `Money` type (amount + currency, never a bare number) to `packages/domain-types` before chunk 4.2 stores its first price
-- [ ] T085 [P] Fold the `[new]` fields from data-model.md back into `docs/architecture/data-dictionary.md`
-- [ ] T086 [P] Add the `/auth`, `/me`, `/tenant`, `/members`, and `/invitations` surface to `docs/architecture/api-specification.md`
-- [ ] T087 Confirm CI reports a verdict within 10 minutes and tune the slowest job in `.github/workflows/ci.yml` if not (SC-008)
-- [ ] T089 [P] Assert the SC-001 timing budget in `apps/web/tests/e2e/signup.spec.ts` — invitation to workspace under 3 minutes unaided
-- [ ] T090 [P] Assert the SC-003 timing budget in `apps/web/tests/e2e/team-management.spec.ts` — invite to active member under 2 minutes
-- [ ] T091 [P] Record the Redis deferral (research R7) as a note in `docs/architecture/engineering-spec.md` §4, so the document and the build agree
-- [ ] T088 Re-run the Constitution Check table from `specs/001-platform-foundation/plan.md` against the delivered code and record the result in the PR description
+- [x] T082 [P] Apply design tokens from `packages/ui` — colour, typography, spacing — across the shell (FR-021)
+- [x] T083 [P] Verify `specs/001-platform-foundation/quickstart.md` end to end on a clean machine and correct anything that misleads (SC-007)
+- [x] T084 [P] Add the `Money` type (amount + currency, never a bare number) to `packages/domain-types` before chunk 4.2 stores its first price
+- [x] T085 [P] Fold the `[new]` fields from data-model.md back into `docs/architecture/data-dictionary.md`
+- [x] T086 [P] Add the `/auth`, `/me`, `/tenant`, `/members`, and `/invitations` surface to `docs/architecture/api-specification.md`
+- [ ] T087 Confirm CI reports a verdict within 10 minutes and tune the slowest job in `.github/workflows/ci.yml` if not (SC-008) — **BLOCKED: no workflow has run on GitHub yet, so the 10-minute budget is unmeasured. The first PR is the proof.**
+- [x] T089 [P] Assert the SC-001 timing budget in `apps/web/tests/e2e/signup.spec.ts` — invitation to workspace under 3 minutes unaided
+- [x] T090 [P] Assert the SC-003 timing budget in `apps/web/tests/e2e/team-management.spec.ts` — invite to active member under 2 minutes
+- [x] T091 [P] Record the Redis deferral (research R7) as a note in `docs/architecture/engineering-spec.md` §4, so the document and the build agree
+- [x] T088 Re-run the Constitution Check table from `specs/001-platform-foundation/plan.md` against the delivered code and record the result in the PR description
 
 ---
 

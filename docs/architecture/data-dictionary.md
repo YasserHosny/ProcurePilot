@@ -2,30 +2,124 @@
 
 > Field-level definitions for the core domain entities.
 
+Foundation tables in this section reflect the SQL that is applied from
+`supabase/migrations/`. Entities for later chunks are marked as planned and are not present in
+the current foundation migrations.
+
 ---
+
+## Implemented foundation entities
 
 ## `Tenant`
 
 | Field | Type | Notes |
 |---|---|---|
-| `id` | uuid | PK |
-| `name` | text | Business name |
-| `slug` | text | Unique subdomain identifier |
-| `region` | text | Launch region for data residency |
-| `currency` | text | Primary currency code |
-| `tax_model` | text | VAT/GST configuration |
+| `id` | uuid | PK, default `gen_random_uuid()` |
+| `name` | text | Business name; required, 1-200 characters |
+| `slug` | text | Unique subdomain identifier; lowercase letters, digits, and hyphens |
+| `region` | text | Required FK -> `supported_region.code`; collected at sign-up |
+| `currency` | text | Required FK -> `supported_currency.code`; no default |
+| `tax_model` | text | Required FK -> `supported_tax_model.code`; no default |
+| `default_locale` | text | Required workspace fallback locale; `en` or `ar`, default `en` |
+| `platform_invitation_id` | uuid | Required unique FK -> `platform_invitation.id`; invitation that produced the workspace |
 | `created_at` | timestamptz | Audit field |
+
+`Tenant` is protected by RLS, but it is not keyed by `tenant_id`; its policy compares `id` to the
+verified JWT tenant claim.
 
 ## `User` / `Membership`
 
 | Field | Type | Notes |
 |---|---|---|
-| `id` | uuid | PK |
-| `tenant_id` | uuid | FK → Tenant |
-| `email` | text | Supabase Auth identity |
+| `id` | uuid | PK, default `gen_random_uuid()` |
+| `tenant_id` | uuid | Required FK -> Tenant; RLS key |
+| `user_id` | uuid | Required FK -> `auth.users.id`; Supabase Auth identity |
+| `email` | text | Required denormalised email for display and invitation matching |
 | `role` | enum | owner, buyer, branch_manager, approver, viewer |
 | `mfa_enabled` | boolean | MFA status |
+| `preferred_locale` | text | Optional user locale override; `en` or `ar` |
+| `is_active_workspace` | boolean | Whether this membership supplies the active JWT tenant claim; default `false` |
+| `status` | enum | `active` or `removed`; default `active` |
 | `created_at` | timestamptz | Audit field |
+
+Constraints:
+
+- Unique `(tenant_id, user_id)`: one membership per person per workspace.
+- Partial unique `(user_id) where is_active_workspace`: at most one active workspace flag per
+  person.
+- Multiple owners are allowed. The database trigger refuses updates/deletes that would leave a
+  workspace with no active owner.
+
+## `PlatformInvitation`
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | uuid | PK, default `gen_random_uuid()` |
+| `email` | text | Required intended recipient |
+| `token_hash` | text | Required, unique; only the token hash is stored |
+| `expires_at` | timestamptz | Required expiry timestamp |
+| `status` | enum | `pending`, `spent`, `revoked`, or `expired`; default `pending` |
+| `spent_at` | timestamptz | Required exactly when `status = 'spent'`; otherwise null |
+| `created_at` | timestamptz | Audit field |
+
+`PlatformInvitation` is not tenant-scoped because it exists before a workspace exists. RLS is
+enabled and forced with no authenticated policy; the service role is the operational path.
+
+Indexes and checks:
+
+- Unique `token_hash`.
+- Index on `lower(email)`.
+- Partial index on pending `status`.
+- Check constraint keeps `spent_at` consistent with `status = 'spent'`.
+
+## `MemberInvitation`
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | uuid | PK, default `gen_random_uuid()` |
+| `tenant_id` | uuid | Required FK -> Tenant; RLS key |
+| `email` | text | Required invited address |
+| `role` | enum | Required role assigned on acceptance |
+| `token_hash` | text | Required, unique; only the token hash is stored |
+| `invited_by` | uuid | Required FK -> `membership.id` |
+| `expires_at` | timestamptz | Required expiry timestamp |
+| `status` | enum | `pending`, `accepted`, `revoked`, or `expired`; default `pending` |
+| `created_at` | timestamptz | Audit field |
+
+Constraints and access:
+
+- Unique `token_hash`.
+- Partial unique `(tenant_id, lower(email)) where status = 'pending'`: one open invitation per
+  address per workspace.
+- RLS is enabled and forced with tenant-claim `USING` and `WITH CHECK` policies.
+- Acceptance and token lookup use security-definer functions because an invitee may not yet hold
+  a tenant claim for the target workspace.
+
+## `AuditEvent`
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | bigint | PK, generated always as identity |
+| `tenant_id` | uuid | Nullable FK -> Tenant; null for pre-workspace events |
+| `actor_membership_id` | uuid | Nullable FK -> Membership; set null if membership is deleted |
+| `actor_email` | text | Optional preserved actor email |
+| `action` | text | Required action name, for example `member.invited`, `auth.failed`, `tenant.created` |
+| `target` | jsonb | Optional target payload |
+| `outcome` | enum | Required; `success` or `refused` |
+| `trace_id` | text | Optional correlation id matching the error envelope |
+| `occurred_at` | timestamptz | Required occurrence timestamp; default `now()` |
+
+`AuditEvent` is append-only. Authenticated users can select and insert tenant-scoped rows through
+RLS; no update or delete policy exists, update/delete privileges are revoked, and the service role
+is granted only select/insert. Pre-authentication or refused events are written through the
+`record_audit_event` security-definer function.
+
+Indexes:
+
+- `(tenant_id, occurred_at desc)` for workspace history.
+- `(action)` for action filtering.
+
+## Planned later domain entities
 
 ## `Branch` / `CostCentre`
 
@@ -173,18 +267,3 @@
 | `status` | enum | pending, approved, rejected, escalated |
 | `comment` | text | |
 | `decided_at` | timestamptz | |
-
-## `AuditEvent`
-
-| Field | Type | Notes |
-|---|---|---|
-| `id` | uuid | PK |
-| `tenant_id` | uuid | FK → Tenant |
-| `actor_id` | uuid | FK → User |
-| `action` | text | create, update, delete |
-| `entity_type` | text | |
-| `entity_id` | uuid | |
-| `before` | jsonb | |
-| `after` | jsonb | |
-| `ip_address` | text | |
-| `created_at` | timestamptz | |

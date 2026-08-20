@@ -10,6 +10,7 @@
  * way a customer would, through invite and accept — without depending on another test having run.
  */
 
+import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -130,4 +131,39 @@ export async function setOwnerLocale(locale: 'en' | 'ar'): Promise<void> {
     headers: { Authorization: `Bearer ${token}` },
     body: JSON.stringify({ preferred_locale: locale }),
   });
+}
+
+
+/**
+ * Mint a platform invitation addressed to a specific email, for tests that drive sign-up through
+ * the UI. Sign-up is invitation-gated and refuses an address mismatch, so the invitation must be
+ * issued to the account that will redeem it.
+ */
+export function mintPlatformInvitation(forEmail: string): {
+  invitation_token: string;
+  region: string;
+  currency: string;
+  tax_model: string;
+} {
+  const raw = execFileSync(
+    'uv',
+    ['run', '--project', 'apps/api', 'python', 'apps/api/scripts/seed.py', '--json'],
+    {
+      // support/ -> e2e -> tests -> web -> apps -> repo root. Five levels, not four: this helper
+      // lives one directory deeper than global-setup.ts, which is where the pattern came from.
+      cwd: join(__dirname, '..', '..', '..', '..', '..'),
+      env: {
+        ...process.env,
+        DATABASE_URL:
+          process.env['E2E_DATABASE_URL'] ??
+          'postgresql://postgres:postgres@localhost:54322/postgres',
+        SEED_INVITATION_EMAIL: forEmail,
+        // uv's default cache lives under $HOME and is not always writable where CI or a sandbox
+        // runs this. Point it somewhere we know we can write.
+        UV_CACHE_DIR: process.env['UV_CACHE_DIR'] ?? '/tmp/uv-cache-e2e',
+      },
+      encoding: 'utf-8',
+    },
+  );
+  return JSON.parse(raw.trim().split('\n').pop() ?? '{}');
 }

@@ -160,3 +160,60 @@ documented placeholders so that later chunks add files rather than restructure t
 |-----------|------------|-------------------------------------|
 | Placeholder directories for three services and three ML folders that contain no code and deploy nothing (brushes against Principle VI's "no new services") | ADR-008 fixes the monorepo layout, and engineering-spec §1 specifies this exact tree. Creating empty, documented placeholders costs one README each and prevents a disruptive restructure when chunks 4.3–4.5 land. No service is built, containerised, deployed, or referenced by the running system. | Creating directories only when first needed would be simpler, but it defers a *layout* decision that is already made and would force import-path and CI-path churn across three later chunks. The constitutional concern is operating a distributed system prematurely — no process, container, or network hop is introduced here, so the substance of Principle VI is respected even though the tree anticipates future work. |
 | Enabling `pgvector` and `pg_trgm` extensions in the first migration though nothing queries them until chunks 4.3–4.4 | Extension enablement is a privileged, environment-level operation. Doing it once in the foundation migration means later chunks ship plain table migrations. | Enabling them later is possible but concentrates privileged operations into a chunk already carrying the highest AI risk, and risks a staging/production drift that surfaces only under load. |
+
+
+---
+
+## Constitution Check — re-run against delivered code (T088)
+
+Run at the close of Phase 1, against what was built rather than what was planned. Evidence is a
+command that was executed, not a claim.
+
+| Principle | Verdict | Evidence |
+|---|---|---|
+| **I. Evidence Over Assertion** | ✅ PASS | Every security- and membership-significant action writes an `audit_event` with actor, workspace, action, outcome and trace id. The table is append-only, proven by `test_audit_append_only.py`. No derived or extracted values exist yet, so the rest of the principle carries forward to chunk 4.3. |
+| **II. Deterministic Normalisation** | ✅ N/A | No normalisation or landed cost in this chunk. The append-only `audit_event` establishes the pattern early, at no cost. Carried forward as a gate on chunk 4.4. |
+| **III. Human Authority** | ✅ N/A | No automation, recommendation or purchasing path exists. Carried forward to chunks 4.3–4.5. |
+| **IV. Every Insight Ends in an Action** | ✅ N/A | The shell ships with no dashboards, which is consistent with the principle rather than an exception to it. |
+| **V. Tenant Isolation by Construction** | ✅ PASS | All five tenant-scoped tables have RLS both `ENABLED` and `FORCED` — verified by query, `5 | 5 | 5`. Twelve isolation tests run as the real `authenticated` role with a real JWT claim and are mutation-checked: removing `FORCE` from one table fails one test, dropping a policy fails two. CI runs them as their own named job. |
+| **VI. Modular Monolith** | ⚠️ PASS with justification | One deployable backend. `services/*` and `ml/*` remain empty placeholders. The Supabase CLI now runs the local stack, which adds no ProcurePilot service. Complexity Tracking above still holds. |
+| **VII. Money, Tax, Language from the Schema Up** | ✅ PASS | Region, currency and tax model are collected at sign-up, validated against data-held reference tables, and no default is inferred. EN/AR catalogues are at parity (233 keys) with a completeness check that fails the build on a gap. RTL verified by E2E. **Zero monetary columns exist yet** — confirmed by query — and the `Money` type (amount + currency, decimal string never a float) landed in `packages/domain-types` before chunk 4.2 can store the first price, which is the whole point of doing it now. |
+
+### Standing exceptions, recorded rather than buried
+
+**Four SECURITY DEFINER functions cross or precede the tenancy boundary** — `record_audit_event`
+(0007), `list_my_workspaces` and `set_active_workspace` (0008), `accept_member_invitation` (0009),
+`member_invitation_for_token` (0010). Each re-derives authority from something the caller must
+already hold — the JWT `sub` claim, or an invitation token hash — rather than trusting a parameter.
+They exist because RLS cannot express "an outsider becoming an insider", and the alternative was an
+RLS bypass in application code. That is a deliberate, tested design, not a workaround.
+
+**Four service-role call sites remain**, all in `modules/members/invitations.py`: the invitation
+lookup and the mark-expired/mark-accepted back-office operations. These do not serve an
+authenticated user's request. `find_membership` immediately after acceptance is the closest call:
+the caller's token still names their previous workspace, so the new membership is not yet visible
+to them. It is scoped to one tenant and one user id the RPC has already validated. **This is the
+place a future reviewer should look first** if the service-role surface starts growing.
+
+### Quality gates
+
+| Gate | Threshold | Status |
+|---|---|---|
+| Accessibility | WCAG 2.1 AA, zero violations | ✅ 4 axe-core specs, all green. Two real defects found and fixed: 2.87:1 contrast, and a scrollable region unreachable by keyboard. |
+| Cross-tenant isolation | Proven on every change | ✅ Own CI job, mutation-checked |
+| Secrets in repo | Zero, verified | ✅ gitleaks job on every PR |
+| i18n completeness | No key in one catalogue only | ✅ Unit test, mutation-checked |
+| Sign-up time (SC-001) | Under 3 minutes | ✅ Asserted in `signup.spec.ts` |
+| Invite time (SC-003) | Under 2 minutes | ✅ Asserted in `team-management.spec.ts` |
+| CI verdict (SC-008) | Within 10 minutes | ⚠️ **UNVERIFIED.** No workflow has ever run on GitHub. Every job's steps were executed locally, but wall-clock time on a runner is unknown until a real PR runs. |
+| Extraction / matching accuracy | ≥90% / ≥92% | N/A — no AI in this chunk. Gates on chunks 4.3/4.4. |
+
+### The honest gaps
+
+- **No CI run has happened.** The workflows are valid and their steps verified locally; the first
+  PR is the proof, and one round of runner-environment adjustment should be expected.
+- **The acceptance criterion in spec.md is now false.** `docker compose up --build` no longer
+  starts Supabase. quickstart.md has been corrected; the spec's own wording still needs amending,
+  which is a decision for the owner rather than a silent edit.
+- **Deployment has never been exercised.** The deploy workflows and Terraform are validated but
+  have never run against a real bunny.net account.

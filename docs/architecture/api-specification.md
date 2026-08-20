@@ -16,38 +16,134 @@
 
 ---
 
-## Auth / Tenant
+## Delivered Platform Foundation API
+
+The following endpoints are delivered for chunk 4.1 and mirror
+`specs/001-platform-foundation/contracts/auth-tenant.openapi.yaml`.
+
+### `POST /auth/signup`
+
+- Public.
+- Accepts `Idempotency-Key`.
+- Creates a workspace and first owner from a valid platform invitation token.
+- Request fields: `invitation_token`, `email`, `password`, `business_name`, `region`,
+  `currency`, `tax_model`, optional `default_locale`.
+- Returns `201` with a `Session`.
+- Returns `403` when the platform invitation is missing, expired, spent, or revoked.
 
 ### `POST /auth/login`
 
-Request:
-```json
-{
-  "email": "user@example.com",
-  "password": "..."
-}
-```
+- Public.
+- Request fields: `email`, `password`.
+- Returns `200` with a `Session`.
+- Invalid credentials return `401` without distinguishing an unknown account from a wrong
+  password.
+- Rate limited.
 
-Response:
-```json
-{
-  "access_token": "...",
-  "refresh_token": "...",
-  "user": { "id": "uuid", "email": "...", "role": "buyer" }
-}
-```
+### `POST /auth/logout`
+
+- Requires bearer auth.
+- Optional request field: `refresh_token`.
+- Returns `204`.
+- If a client holds a refresh token it should send it, because Supabase can only revoke a refresh
+  token it receives.
+
+### `POST /auth/password-reset`
+
+- Public.
+- Request field: `email`.
+- Always returns `202` to avoid account enumeration.
+- Rate limited.
 
 ### `GET /me`
 
-Response:
-```json
-{
-  "id": "uuid",
-  "email": "...",
-  "role": "buyer",
-  "tenant": { "id": "uuid", "name": "...", "currency": "GBP" }
-}
-```
+- Requires bearer auth.
+- Returns the caller's id, email, role, MFA status, preferred locale, and active `Tenant`.
+
+### `PATCH /me`
+
+- Requires bearer auth.
+- Updates caller profile preferences.
+- Request field: optional `preferred_locale` (`en` or `ar`).
+- Returns the updated `Me` resource.
+
+### `GET /me/workspaces`
+
+- Requires bearer auth.
+- Returns every active workspace membership for the caller as `WorkspaceSummary` items.
+
+### `PUT /me/active-workspace`
+
+- Requires bearer auth.
+- Request fields: `tenant_id`, `refresh_token`.
+- Sets the caller's active membership and returns a re-issued `Session`.
+- `refresh_token` is required because the tenant claim is injected when an access token is issued;
+  switching workspace must mint a new access token carrying the new `tenant_id`.
+- Returns `404` when the caller has no active membership in the requested workspace.
+
+### `GET /tenant`
+
+- Requires bearer auth.
+- Returns the active workspace.
+
+### `PATCH /tenant`
+
+- Requires bearer auth and owner role.
+- Updates workspace settings.
+- Request fields: optional `name`, optional `default_locale`.
+- `region`, `currency`, and `tax_model` are immutable after creation.
+
+### `GET /members`
+
+- Requires bearer auth.
+- Lists members of the active workspace.
+- Query parameters: optional `cursor`, optional `limit` capped at 100 and defaulting to 50.
+
+### `PATCH /members/{member_id}`
+
+- Requires bearer auth and owner role.
+- Request field: `role`.
+- Changes a member's role.
+- Returns `409` when the change would leave the workspace without an active owner.
+
+### `DELETE /members/{member_id}`
+
+- Requires bearer auth and owner role.
+- Removes a member by setting their status to `removed`; the membership row is retained.
+- Returns `409` when removal would leave the workspace without an active owner.
+
+### `GET /invitations`
+
+- Requires bearer auth.
+- Lists pending member invitations for the active workspace.
+
+### `POST /invitations`
+
+- Requires bearer auth and owner role; accepts `Idempotency-Key`.
+- Request fields: `email`, `role`.
+- Creates a member invitation that expires after 7 days.
+- Returns `201` with the invitation and the plaintext invitation token.
+- The plaintext token is returned once because this chunk has no email delivery; after creation it
+  is stored only as a hash and is not retrievable from listings.
+- Returns `409` when an invitation is already pending for that address.
+
+### `DELETE /invitations/{invitation_id}`
+
+- Requires bearer auth.
+- Revokes a pending invitation.
+
+### `POST /invitations/accept`
+
+- Public.
+- Request field: `token`; `password` is required only when the invitee has no account yet.
+- Idempotent: accepting the same invitation again returns the existing membership rather than
+  creating a duplicate.
+- Returns `200` with a `Session`.
+
+### `GET /reference/config-options`
+
+- Public.
+- Returns enabled regions, currencies, and tax models for sign-up.
 
 ---
 

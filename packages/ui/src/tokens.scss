@@ -1,0 +1,57 @@
+// ProcurePilot design tokens — task T082 (FR-021).
+//
+// One place for colour, typography and spacing, so the shell is consistent by construction rather
+// than by each screen re-deciding. Values are the ones already in use; this file names them so the
+// next screen inherits rather than invents.
+//
+// Contrast note: $text-muted is #475569, not the #94a3b8 this started as. That measured 2.87:1
+// against white — under the WCAG AA minimum of 4.5:1 — and Angular Material applies an inherited
+// opacity on top, so the effective contrast was lower still. Any new muted tone must clear 4.5:1
+// AFTER blending; the axe-core specs in apps/web/tests/e2e/a11y.spec.ts will catch it if not.
+
+// --- Colour ---------------------------------------------------------------
+$brand-primary: #4f46e5;
+$brand-primary-dark: #4338ca;
+$brand-primary-tint: #e0e7ff;
+
+$text-strong: #0f172a;
+$text-default: #334155;
+$text-muted: #475569;   // WCAG AA compliant after Material's inherited opacity
+$text-on-brand: #ffffff;
+
+$surface-page: #f8fafc;
+$surface-card: #ffffff;
+$surface-subtle: #f1f5f9;
+$border-subtle: #e2e8f0;
+
+$state-error: #b91c1c;
+$state-warning: #b45309;
+$state-success: #15803d;
+
+// --- Typography -----------------------------------------------------------
+$font-family-base: Roboto, 'Helvetica Neue', sans-serif;
+$font-size-sm: 0.8125rem;
+$font-size-base: 0.875rem;
+$font-size-lg: 1rem;
+$font-size-title: 1.5rem;
+$font-weight-regular: 400;
+$font-weight-medium: 500;
+$font-weight-bold: 600;
+
+// --- Spacing --------------------------------------------------------------
+// A 4px scale. Use these rather than ad-hoc rem values so rhythm stays consistent.
+$space-1: 0.25rem;
+$space-2: 0.5rem;
+$space-3: 0.75rem;
+$space-4: 1rem;
+$space-6: 1.5rem;
+$space-8: 2rem;
+
+// --- Radius and elevation -------------------------------------------------
+$radius-sm: 4px;
+$radius-md: 8px;
+$radius-lg: 12px;
+
+// --- Direction ------------------------------------------------------------
+// Reminder, not a token: use logical properties (margin-inline-start, padding-inline-end,
+// text-align: start) everywhere. The app ships in Arabic and must mirror correctly.

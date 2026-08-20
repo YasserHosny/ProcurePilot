@@ -14,7 +14,8 @@ under 30 minutes (SC-007). If this document takes you longer, that is a defect i
 | Docker + Compose v2 | 24+ | Runs the whole stack |
 | Node.js + pnpm | 20 LTS / 9+ | Angular build, monorepo tooling |
 | Python + uv | 3.12 / latest | Backend dependencies |
-| Supabase CLI | latest | Migrations (ADR-007) |
+| Supabase CLI | 2.x | Runs the whole Supabase stack and applies migrations (ADR-007) |
+| Google Chrome | any recent | End-to-end tests use the system browser, not a bundled one |
 | Git | any recent | — |
 
 ---
@@ -24,40 +25,72 @@ under 30 minutes (SC-007). If this document takes you longer, that is a defect i
 ```bash
 git clone https://github.com/YasserHosny/ProcurePilot.git
 cd ProcurePilot
-cp .env.example .env
 ```
 
-`.env.example` is committed and contains **no real values** — only keys with safe local
-defaults. `.env` is git-ignored, and a gitleaks scan blocks any PR that carries a secret
-(FR-027, SC-009). Nothing in step 1 requires a cloud account: the local stack is self-contained.
-
-## 2. Start everything
+## 2. Start Supabase
 
 ```bash
-docker compose up --build
+supabase start
 ```
 
-This brings up the API, the web app behind Nginx, and the local Supabase stack — one command,
-per the acceptance criterion (research R5).
+This starts Postgres, Auth, PostgREST, Storage, Kong and Studio, applies everything in
+`supabase/migrations/`, and honours `supabase/config.toml` — which enables the custom access token
+hook. That hook is not optional: it puts `tenant_id` into the JWT, and row-level security reads the
+claim from there. Without it every tenant-scoped query returns zero rows and the app looks *empty*
+rather than broken, which is a confusing hour to lose.
+
+**Not `docker compose`.** A hand-assembled compose stack was tried first and abandoned: three
+GoTrue versions could not complete their own migrations against it, including the pairing Supabase
+themselves publish. `research.md` R5 records the whole episode. `docker-compose.yml` remains for
+building the api and web images; it no longer starts Supabase.
+
+| Service | URL |
+|---|---|
+| Supabase API | http://localhost:54321 |
+| Postgres | postgresql://postgres:postgres@localhost:54322/postgres |
+| Supabase Studio | http://localhost:54323 |
+| Inbucket (captured email) | http://localhost:54324 |
+
+## 3. Write your local environment
+
+```bash
+supabase status -o env        # shows ANON_KEY, SERVICE_ROLE_KEY, JWT_SECRET, DB_URL
+cp .env.example .env          # then paste those four values in
+```
+
+`.env.example` is committed and holds **no real values**. The anon and service_role keys are not
+arbitrary secrets — they are JWTs signed with the project's JWT secret — so they cannot be written
+into a template; take them from `supabase status`. `.env` is git-ignored and a gitleaks scan blocks
+any PR carrying a secret (FR-027, SC-009).
+
+## 4. Seed reference data
+
+```bash
+pnpm db:seed
+```
+
+Enabled regions, currencies and tax models, plus one **platform invitation token**, printed once.
+You need it to sign up: the pilot is invitation-gated (FR-033), including locally.
+
+## 5. Run the API and the web app
+
+```bash
+# terminal 1
+set -a && . ./.env && set +a
+uv run --project apps/api uvicorn procurepilot_api.main:app \
+  --host 127.0.0.1 --port 8000 --app-dir apps/api/src
+
+# terminal 2
+cd apps/web && pnpm install && pnpm exec ng serve
+```
 
 | Service | URL |
 |---|---|
 | Web app | http://localhost:4200 |
 | API | http://localhost:8000/api/v1 |
 | API docs | http://localhost:8000/docs |
-| Supabase Studio | http://localhost:54323 |
 
-## 3. Apply migrations and seed reference data
-
-```bash
-pnpm db:migrate     # versioned SQL via Supabase CLI
-pnpm db:seed        # enabled regions, currencies, tax models + one platform invitation
-```
-
-The seed prints a **platform invitation token**. You need it for the next step — sign-up is
-invitation-gated during the pilot (FR-033), including locally.
-
-## 4. Verify it works
+## 6. Verify it works
 
 ```bash
 curl -s http://localhost:8000/api/v1/health
@@ -77,13 +110,16 @@ Then in the browser:
 5. Switch the language to Arabic. The layout mirrors to RTL and every string changes. If you see
    a raw key, that is a missing catalogue entry — a bug, not a placeholder (SC-005).
 
-## 5. Prove the isolation guarantee
+## 7. Prove the isolation guarantee
 
 The single most important thing this chunk delivers:
 
 ```bash
-pnpm test:isolation
+TEST_DATABASE_URL=postgresql://postgres:postgres@localhost:54322/postgres pnpm test:isolation
 ```
+
+The environment variable is required, not optional: without it these tests **skip** rather than
+fail, which looks identical to passing in a summary line.
 
 This creates two workspaces, gives each a marker record, and asserts that neither can read,
 list, or detect the other's — through the API *and* directly against the database with a
@@ -99,7 +135,7 @@ If you change anything touching tenancy, run this before anything else.
 pnpm test              # everything
 pnpm test:api          # pytest — unit, integration, contract
 pnpm test:web          # Karma + Jasmine
-pnpm test:e2e          # Playwright against the compose stack
+pnpm test:e2e          # Playwright against the running stack (needs steps 2-5 up)
 pnpm test:a11y         # axe-core, zero violations required (FR-022)
 pnpm lint              # ruff + Angular CLI lint
 ```

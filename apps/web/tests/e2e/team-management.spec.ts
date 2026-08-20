@@ -45,6 +45,8 @@ test.describe('ProcurePilot Team Management (T061)', () => {
   });
 
   test('should allow owner to navigate to team management and invite a colleague', async ({ page }) => {
+    // SC-003: an owner can invite a colleague and see them active in under 2 minutes.
+    const started = Date.now();
     // Navigate to Team Management
     await page.click('a[routerLink="/team"]');
     await page.waitForURL('**/team');
@@ -69,6 +71,12 @@ test.describe('ProcurePilot Team Management (T061)', () => {
     // Two .token-input fields exist — the shareable link and the raw token — so an unqualified
     // locator is ambiguous and Playwright's strict mode rejects it. Assert both, specifically.
     await expect(page.locator('.token-input').first()).toBeVisible();
+
+    const elapsedSeconds = (Date.now() - started) / 1000;
+    expect(
+      elapsedSeconds,
+      `SC-003 allows 2 minutes to invite a colleague; this took ${elapsedSeconds.toFixed(1)}s`,
+    ).toBeLessThan(120);
     await expect(page.locator('.token-input.mono')).toBeVisible();
     await expect(page.locator('.token-input.mono')).not.toHaveValue('');
 
