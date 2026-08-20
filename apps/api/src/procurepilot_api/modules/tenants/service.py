@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import re
 from collections.abc import Sequence
 from uuid import UUID, uuid4
@@ -25,6 +26,7 @@ from procurepilot_api.modules.tenants.models import (
     WorkspaceCreated,
 )
 
+logger = logging.getLogger(__name__)
 
 class PostgresPlatformInvitationStore(PlatformInvitationStore):
     def __init__(self, cursor: psycopg.Cursor) -> None:
@@ -84,6 +86,10 @@ class TenantSignupRepository:
         except (UnprocessableEntityError, ServiceUnavailableError):
             raise
         except psycopg.Error as exc:
+            # Log before collapsing to a generic 503. The envelope deliberately tells the caller
+            # nothing about internals, which means the cause exists only here — without this line
+            # a database failure is undiagnosable from the outside, trace_id or not.
+            logger.exception("Database error during sign-up", extra={"stage": "signup"})
             raise ServiceUnavailableError(details={"dependency": "database"}) from exc
 
     def create_workspace(self, request: SignupRequest, user_id: UUID) -> WorkspaceCreated:
@@ -120,6 +126,10 @@ class TenantSignupRepository:
         except (UnprocessableEntityError, ServiceUnavailableError):
             raise
         except psycopg.Error as exc:
+            # Log before collapsing to a generic 503. The envelope deliberately tells the caller
+            # nothing about internals, which means the cause exists only here — without this line
+            # a database failure is undiagnosable from the outside, trace_id or not.
+            logger.exception("Database error during sign-up", extra={"stage": "signup"})
             raise ServiceUnavailableError(details={"dependency": "database"}) from exc
 
     def config_options(self) -> ConfigOptions:
@@ -135,6 +145,10 @@ class TenantSignupRepository:
                         tax_models=self._reference_options(cur, "supported_tax_model"),
                     )
         except psycopg.Error as exc:
+            # Log before collapsing to a generic 503. The envelope deliberately tells the caller
+            # nothing about internals, which means the cause exists only here — without this line
+            # a database failure is undiagnosable from the outside, trace_id or not.
+            logger.exception("Database error during sign-up", extra={"stage": "signup"})
             raise ServiceUnavailableError(details={"dependency": "database"}) from exc
 
     def _validate_reference_rows(self, cur: psycopg.Cursor, request: SignupRequest) -> None:
@@ -233,8 +247,12 @@ class TenantSignupRepository:
               'success',
               %s::uuid,
               %s::uuid,
-              %s,
-              jsonb_build_object('tenant_id', %s::text, 'slug', %s)
+              %s::text,
+              -- Every parameter is cast explicitly. jsonb_build_object accepts "any", so Postgres
+              -- cannot infer a type for an uncast placeholder inside it and rejects the statement
+              -- with 'could not determine data type of parameter $5' — which surfaced as a bare
+              -- 503 on sign-up.
+              jsonb_build_object('tenant_id', %s::text, 'slug', %s::text)
             )
             """,
             (tenant.id, membership_id, email, tenant.id, tenant.slug),
