@@ -125,17 +125,18 @@ and from a direct database connection that neither can read, list, or detect the
 **Independent test**: invite one member of each role, sign in as each, and confirm permitted and
 refused actions match the role matrix.
 
-- [ ] T051 [P] [US2] Write `apps/api/tests/integration/test_rbac_matrix.py` asserting, for every one of the five roles, which owner-only actions are refused (SC-004)
-- [ ] T052 [P] [US2] Write `apps/api/tests/integration/test_last_owner_guard.py` asserting that self-demotion, self-removal, and demoting the final owner are all refused (FR-012)
-- [ ] T053 [US2] Implement member-invitation issuing in `apps/api/src/procurepilot_api/modules/members/invitations.py`: hashed token, 7-day expiry, one pending invitation per address per workspace (FR-009, FR-010)
-- [ ] T054 [US2] Implement idempotent invitation acceptance in `apps/api/src/procurepilot_api/modules/members/invitations.py` — a second acceptance returns the existing membership rather than creating a duplicate (concurrent-acceptance edge case)
-- [ ] T055 [US2] Implement `POST /api/v1/invitations`, `GET /api/v1/invitations`, `DELETE /api/v1/invitations/{id}`, and `POST /api/v1/invitations/accept` in `apps/api/src/procurepilot_api/modules/members/router.py`
-- [ ] T056 [US2] Implement `GET /api/v1/members`, `PATCH /api/v1/members/{id}`, and `DELETE /api/v1/members/{id}` with owner-only guards and the last-owner check, removal being a status change rather than a delete (FR-011, FR-014)
-- [ ] T057 [P] [US2] Build the team management screen in `apps/web/src/app/features/team/` listing members with role, status, and actions
-- [ ] T058 [P] [US2] Build the invite dialog in `apps/web/src/app/features/team/invite/` with email and role selection, per `docs/product/ui-mockup-prompts.md` §W settings
-- [ ] T059 [P] [US2] Build the invitation acceptance screen in `apps/web/src/app/features/onboarding/accept-invitation/`, handling both existing and new accounts
-- [ ] T060 [US2] Hide actions the active role may not perform in `apps/web/src/app/core/auth/role.directive.ts` — as a display concern **in addition to** server enforcement, never instead of it (FR-013)
-- [ ] T061 [P] [US2] Write `apps/web/tests/e2e/team-management.spec.ts` covering invite → accept → role change → removal
+- [x] T051 [P] [US2] Write `apps/api/tests/integration/test_rbac_matrix.py` asserting, for every one of the five roles, which owner-only actions are refused (SC-004)
+- [x] T052 [P] [US2] Write `apps/api/tests/integration/test_last_owner_guard.py` asserting that self-demotion, self-removal, and demoting the final owner are all refused (FR-012)
+- [x] T052a Write migration `apps/api/migrations/0009_member_invitations.sql` adding `accept_member_invitation` — the invitee holds no claim for the target workspace, so acceptance is impossible under RLS (found in review; third instance of the pattern after 0007 and 0008)
+- [x] T053 [US2] Implement member-invitation issuing in `apps/api/src/procurepilot_api/modules/members/invitations.py`: hashed token, 7-day expiry, one pending invitation per address per workspace (FR-009, FR-010)
+- [x] T054 [US2] Implement idempotent invitation acceptance in `apps/api/src/procurepilot_api/modules/members/invitations.py` — a second acceptance returns the existing membership rather than creating a duplicate (concurrent-acceptance edge case)
+- [x] T055 [US2] Implement `POST /api/v1/invitations`, `GET /api/v1/invitations`, `DELETE /api/v1/invitations/{id}`, and `POST /api/v1/invitations/accept` in `apps/api/src/procurepilot_api/modules/members/router.py`
+- [x] T056 [US2] Implement `GET /api/v1/members`, `PATCH /api/v1/members/{id}`, and `DELETE /api/v1/members/{id}` with owner-only guards and the last-owner check, removal being a status change rather than a delete (FR-011, FR-014)
+- [x] T057 [P] [US2] Build the team management screen in `apps/web/src/app/features/team/` listing members with role, status, and actions
+- [x] T058 [P] [US2] Build the invite dialog in `apps/web/src/app/features/team/invite/` with email and role selection, per `docs/product/ui-mockup-prompts.md` §W settings
+- [x] T059 [P] [US2] Build the invitation acceptance screen in `apps/web/src/app/features/onboarding/accept-invitation/`, handling both existing and new accounts
+- [x] T060 [US2] Hide actions the active role may not perform in `apps/web/src/app/core/auth/role.directive.ts` — as a display concern **in addition to** server enforcement, never instead of it (FR-013)
+- [x] T061 [P] [US2] Write `apps/web/tests/e2e/team-management.spec.ts` covering invite → accept → role change → removal
 
 **Checkpoint**: US1 and US2 both work independently.
 
@@ -148,16 +149,16 @@ refused actions match the role matrix.
 **Independent test**: switch language on the shell and confirm every string resolves, layout mirrors,
 and no untranslated key appears.
 
-- [ ] T062 [P] [US3] Create the `packages/i18n` catalogue package with `en.json` and `ar.json` and a shared loader
-- [ ] T063 [US3] Configure @ngx-translate/core with http-loader in `apps/web/src/app/core/i18n/` per research R2, loading catalogues from `packages/i18n` at runtime, and register a `MissingTranslationHandler` that fails loudly in development
-- [ ] T064 [US3] Wire the CDK `Directionality` service to the active language in `apps/web/src/app/core/i18n/direction.service.ts`, setting `dir` on the document root (FR-018)
-- [ ] T065 [US3] Implement locale persistence: `PATCH /api/v1/me` writing `preferred_locale`, and restoration on sign-in (FR-019)
-- [ ] T066 [P] [US3] Replace every hardcoded string in `apps/web/src/app/` with a catalogue key, and translate all of them into both catalogues
-- [ ] T067 [P] [US3] Convert directional CSS to logical properties across `apps/web/src/app/` and `apps/web/src/styles/` (`margin-inline-start`, not `margin-left`)
-- [ ] T068 [P] [US3] Add a missing-key check to `apps/web/tests/unit/i18n-completeness.spec.ts` failing the build on any key present in one catalogue and absent from the other (SC-005)
-- [ ] T069 [P] [US3] Implement locale-aware currency and date formatting in `apps/web/src/app/core/format/`, always rendering an explicit currency (FR-020)
-- [ ] T070 [P] [US3] Write `apps/api/tests/unit/test_locale_parsing.py` covering decimal-separator handling for both locales — the known leakage source named in the roadmap
-- [ ] T071 [P] [US3] Write `apps/web/tests/e2e/rtl.spec.ts` asserting mirrored layout and Arabic strings after a language switch
+- [x] T062 [P] [US3] Create the `packages/i18n` catalogue package with `en.json` and `ar.json` and a shared loader
+- [x] T063 [US3] Configure @ngx-translate/core with http-loader in `apps/web/src/app/core/i18n/` per research R2, loading catalogues from `packages/i18n` at runtime, and register a `MissingTranslationHandler` that fails loudly in development
+- [x] T064 [US3] Wire the CDK `Directionality` service to the active language in `apps/web/src/app/core/i18n/direction.service.ts`, setting `dir` on the document root (FR-018)
+- [x] T065 [US3] Implement locale persistence: `PATCH /api/v1/me` writing `preferred_locale`, and restoration on sign-in (FR-019)
+- [x] T066 [P] [US3] Replace every hardcoded string in `apps/web/src/app/` with a catalogue key, and translate all of them into both catalogues
+- [x] T067 [P] [US3] Convert directional CSS to logical properties across `apps/web/src/app/` and `apps/web/src/styles/` (`margin-inline-start`, not `margin-left`)
+- [x] T068 [P] [US3] Add a missing-key check to `apps/web/tests/unit/i18n-completeness.spec.ts` failing the build on any key present in one catalogue and absent from the other (SC-005)
+- [x] T069 [P] [US3] Implement locale-aware currency and date formatting in `apps/web/src/app/core/format/`, always rendering an explicit currency (FR-020)
+- [x] T070 [P] [US3] Write `apps/api/tests/unit/test_locale_parsing.py` covering decimal-separator handling for both locales — the known leakage source named in the roadmap
+- [x] T071 [P] [US3] Write `apps/web/tests/e2e/rtl.spec.ts` asserting mirrored layout and Arabic strings after a language switch
 
 **Checkpoint**: all three customer-facing stories work.
 
