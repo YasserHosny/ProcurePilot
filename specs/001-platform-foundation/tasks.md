@@ -25,16 +25,16 @@ and the constitution's Quality Gates make them release conditions rather than pr
 
 **Purpose**: an empty but correct monorepo that builds and starts.
 
-- [ ] T001 Create the monorepo tree per plan.md Structure Decision: `apps/{api,web,mobile}`, `packages/{domain-types,ui,validation,i18n}`, `services/{extraction-worker,matching-worker,optimiser}`, `ml/{benchmarks,evals,notebooks}`, `infra/{docker,nginx,terraform}`, `.github/workflows/`
-- [ ] T002 [P] Add `package.json`, `pnpm-workspace.yaml`, and `turbo.json` at the repo root declaring the workspace globs and the `test`, `lint`, `build`, `db:migrate`, `db:seed` pipelines
-- [ ] T003 [P] Initialise the Python backend project in `apps/api/pyproject.toml` with uv, pinning FastAPI 0.115.6, Uvicorn 0.34.0, Pydantic v2, pydantic-settings, python-jose 3.3.0, httpx 0.28.1, SlowAPI 0.1.9, supabase-py 2.11.0
-- [ ] T004 [P] Scaffold the Angular 19 app in `apps/web/` with Angular Material, the CDK, strict TypeScript, and SCSS
-- [ ] T005 [P] Configure ruff in `apps/api/pyproject.toml` and Angular CLI lint in `apps/web/eslint.config.js`
-- [ ] T006 [P] Add placeholder `README.md` to each of `apps/mobile/`, `services/extraction-worker/`, `services/matching-worker/`, `services/optimiser/`, `ml/benchmarks/`, `ml/evals/`, `ml/notebooks/`, each stating which chunk populates it
-- [ ] T007 [P] Write `.env.example` at the repo root with every configuration key and safe local defaults, and add `.env` to `.gitignore`
-- [ ] T008 Write `docker-compose.yml` running api, web-nginx, and the pinned local Supabase stack (Postgres, GoTrue, PostgREST, Storage, Kong) per research R5, with explicit image tags
-- [ ] T009 [P] Write `infra/docker/api.Dockerfile` and `infra/docker/web.Dockerfile` (multi-stage: Angular build → Nginx serve)
-- [ ] T010 [P] Write `infra/nginx/nginx.conf` with SPA fallback, `/api/` proxy, and the security headers from tech-stack-blueprint §7 (`X-Content-Type-Options`, `X-Frame-Options DENY`, HSTS, CSP, `Referrer-Policy`)
+- [x] T001 Create the monorepo tree per plan.md Structure Decision: `apps/{api,web,mobile}`, `packages/{domain-types,ui,validation,i18n}`, `services/{extraction-worker,matching-worker,optimiser}`, `ml/{benchmarks,evals,notebooks}`, `infra/{docker,nginx,terraform}`, `.github/workflows/`
+- [x] T002 [P] Add `package.json`, `pnpm-workspace.yaml`, and `turbo.json` at the repo root declaring the workspace globs and the `test`, `lint`, `build`, `db:migrate`, `db:seed` pipelines
+- [x] T003 [P] Initialise the Python backend project in `apps/api/pyproject.toml` with uv, pinning FastAPI 0.115.6, Uvicorn 0.34.0, Pydantic v2, pydantic-settings, python-jose 3.3.0, httpx 0.28.1, SlowAPI 0.1.9, supabase-py 2.11.0
+- [x] T004 [P] Scaffold the Angular 19 app in `apps/web/` with Angular Material, the CDK, strict TypeScript, and SCSS
+- [x] T005 [P] Configure ruff in `apps/api/pyproject.toml` and Angular CLI lint in `apps/web/eslint.config.js`
+- [x] T006 [P] Add placeholder `README.md` to each of `apps/mobile/`, `services/extraction-worker/`, `services/matching-worker/`, `services/optimiser/`, `ml/benchmarks/`, `ml/evals/`, `ml/notebooks/`, each stating which chunk populates it
+- [x] T007 [P] Write `.env.example` at the repo root with every configuration key and safe local defaults, and add `.env` to `.gitignore`
+- [x] T008 Write `docker-compose.yml` running api, web-nginx, and the pinned local Supabase stack (Postgres, GoTrue, PostgREST, Storage, Kong) per research R5, with explicit image tags
+- [x] T009 [P] Write `infra/docker/api.Dockerfile` and `infra/docker/web.Dockerfile` (multi-stage: Angular build → Nginx serve)
+- [x] T010 [P] Write `infra/nginx/nginx.conf` with SPA fallback, `/api/` proxy, and the security headers from tech-stack-blueprint §7 (`X-Content-Type-Options`, `X-Frame-Options DENY`, HSTS, CSP, `Referrer-Policy`)
 
 **Checkpoint**: `docker compose up --build` starts all containers, even with no routes yet.
 
