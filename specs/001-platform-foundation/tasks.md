@@ -50,40 +50,41 @@ cross-tenant leak.
 
 ### Database
 
-- [ ] T011 Write migration `apps/api/migrations/0001_extensions.sql` enabling `pgvector` and `pg_trgm` (unused until chunks 4.3/4.4 — justified in plan.md Complexity Tracking)
-- [ ] T012 Write migration `apps/api/migrations/0002_reference_tables.sql` creating `supported_region`, `supported_currency`, `supported_tax_model` with `code`, `label_en`, `label_ar`, `is_enabled`
-- [ ] T013 Write migration `apps/api/migrations/0003_tenancy.sql` creating `tenant`, `membership`, `platform_invitation`, `member_invitation`, and `audit_event` exactly per data-model.md, including every constraint
-- [ ] T014 Write migration `apps/api/migrations/0004_rls.sql` applying `ENABLE ROW LEVEL SECURITY` **and** `FORCE ROW LEVEL SECURITY` to every tenant-scoped table, with policies supplying both `USING` and `WITH CHECK` against `(auth.jwt() ->> 'tenant_id')::uuid` per research R4
-- [ ] T015 Add to `apps/api/migrations/0004_rls.sql` the `audit_event` policy set granting `INSERT`/`SELECT` and granting no `UPDATE` or `DELETE` to any role, making the table append-only
-- [ ] T016 Write migration `apps/api/migrations/0005_owner_guard.sql` with a trigger refusing any update or delete that would leave a tenant with no active owner (FR-012)
-- [ ] T017 Write migration `apps/api/migrations/0006_auth_hook.sql` defining the Supabase custom access token hook that injects `tenant_id` and `role` from the caller's active membership, per research R1
-- [ ] T018 [P] Write `apps/api/scripts/seed.py` inserting enabled reference rows and minting one platform invitation, printing its plaintext token once
+- [x] T011 Write migration `apps/api/migrations/0001_extensions.sql` enabling `pgvector` and `pg_trgm` (unused until chunks 4.3/4.4 — justified in plan.md Complexity Tracking)
+- [x] T012 Write migration `apps/api/migrations/0002_reference_tables.sql` creating `supported_region`, `supported_currency`, `supported_tax_model` with `code`, `label_en`, `label_ar`, `is_enabled`
+- [x] T013 Write migration `apps/api/migrations/0003_tenancy.sql` creating `tenant`, `membership`, `platform_invitation`, `member_invitation`, and `audit_event` exactly per data-model.md, including every constraint
+- [x] T014 Write migration `apps/api/migrations/0004_rls.sql` applying `ENABLE ROW LEVEL SECURITY` **and** `FORCE ROW LEVEL SECURITY` to every tenant-scoped table, with policies supplying both `USING` and `WITH CHECK` against `(auth.jwt() ->> 'tenant_id')::uuid` per research R4
+- [x] T015 Add to `apps/api/migrations/0004_rls.sql` the `audit_event` policy set granting `INSERT`/`SELECT` and granting no `UPDATE` or `DELETE` to any role, making the table append-only
+- [x] T016 Write migration `apps/api/migrations/0005_owner_guard.sql` with a trigger refusing any update or delete that would leave a tenant with no active owner (FR-012)
+- [x] T017 Write migration `apps/api/migrations/0006_auth_hook.sql` defining the Supabase custom access token hook that injects `tenant_id` and `role` from the caller's active membership, per research R1
+- [x] T018a Write migration `apps/api/migrations/0007_audit_writer.sql` adding the `record_audit_event` SECURITY DEFINER function, so pre-authentication and refused events are recordable without a service-role bypass (found in review; see research.md R4)
+- [x] T018 [P] Write `apps/api/scripts/seed.py` inserting enabled reference rows and minting one platform invitation, printing its plaintext token once
 
 ### Backend primitives
 
-- [ ] T019 [P] Implement settings in `apps/api/src/procurepilot_api/config.py` using pydantic-settings, reading every value from the environment with no hardcoded fallback for any secret
-- [ ] T020 [P] Implement the error envelope `{code, message, details, trace_id}` and its exception handlers in `apps/api/src/procurepilot_api/errors.py`
-- [ ] T021 [P] Implement structured JSON logging with trace-id propagation in `apps/api/src/procurepilot_api/shared/logging.py`
-- [ ] T022 Implement Supabase JWT verification with python-jose in `apps/api/src/procurepilot_api/modules/auth/jwt.py`, rejecting tokens whose signature, expiry, audience, or issuer fails
-- [ ] T023 Implement the `current_member` dependency in `apps/api/src/procurepilot_api/deps.py`, resolving exactly one workspace from the `tenant_id` claim, re-checking that the membership is still `active`, and refusing any request that resolves to none (FR-004, and the session-outlives-membership edge case)
-- [ ] T024 Implement the `require_role(*roles)` dependency in `apps/api/src/procurepilot_api/modules/auth/rbac.py` per research R9
-- [ ] T025 [P] Implement the append-only audit writer in `apps/api/src/procurepilot_api/shared/audit.py`, recording actor, workspace, action, target, outcome, and trace id, and never recording credentials
-- [ ] T026 [P] Implement SlowAPI rate limiting in `apps/api/src/procurepilot_api/shared/rate_limit.py` using the in-process store (research R7), applied to auth endpoints
-- [ ] T027 Implement the app factory in `apps/api/src/procurepilot_api/main.py` mounting routers at `/api/v1`, wiring middleware, CORS, and the exception handlers
-- [ ] T028 Implement `GET /api/v1/health` in `apps/api/src/procurepilot_api/modules/health/router.py`, returning `{"status":"ok"}` only when a database round-trip succeeds and `503` otherwise (FR-024)
+- [x] T019 [P] Implement settings in `apps/api/src/procurepilot_api/config.py` using pydantic-settings, reading every value from the environment with no hardcoded fallback for any secret
+- [x] T020 [P] Implement the error envelope `{code, message, details, trace_id}` and its exception handlers in `apps/api/src/procurepilot_api/errors.py`
+- [x] T021 [P] Implement structured JSON logging with trace-id propagation in `apps/api/src/procurepilot_api/shared/logging.py`
+- [x] T022 Implement Supabase JWT verification with python-jose in `apps/api/src/procurepilot_api/modules/auth/jwt.py`, rejecting tokens whose signature, expiry, audience, or issuer fails
+- [x] T023 Implement the `current_member` dependency in `apps/api/src/procurepilot_api/deps.py`, resolving exactly one workspace from the `tenant_id` claim, re-checking that the membership is still `active`, and refusing any request that resolves to none (FR-004, and the session-outlives-membership edge case)
+- [x] T024 Implement the `require_role(*roles)` dependency in `apps/api/src/procurepilot_api/modules/auth/rbac.py` per research R9
+- [x] T025 [P] Implement the append-only audit writer in `apps/api/src/procurepilot_api/shared/audit.py`, recording actor, workspace, action, target, outcome, and trace id, and never recording credentials
+- [x] T026 [P] Implement SlowAPI rate limiting in `apps/api/src/procurepilot_api/shared/rate_limit.py` using the in-process store (research R7), applied to auth endpoints
+- [x] T027 Implement the app factory in `apps/api/src/procurepilot_api/main.py` mounting routers at `/api/v1`, wiring middleware, CORS, and the exception handlers
+- [x] T028 Implement `GET /api/v1/health` in `apps/api/src/procurepilot_api/modules/health/router.py`, returning `{"status":"ok"}` only when a database round-trip succeeds and `503` otherwise (FR-024)
 
 ### Frontend primitives
 
-- [ ] T029 [P] Configure routing in `apps/web/src/app/app.routes.ts` separating public routes from guarded ones
-- [ ] T030 [P] Implement the auth interceptor and guard in `apps/web/src/app/core/auth/` attaching the bearer token and redirecting unauthenticated users
-- [ ] T031 [P] Implement the session service in `apps/web/src/app/core/auth/session.service.ts` holding the current member, active workspace, and token refresh
-- [ ] T032 [P] Implement the typed API client in `apps/web/src/app/core/api/` generated from `contracts/auth-tenant.openapi.yaml` into `packages/domain-types`
+- [x] T029 [P] Configure routing in `apps/web/src/app/app.routes.ts` separating public routes from guarded ones
+- [x] T030 [P] Implement the auth interceptor and guard in `apps/web/src/app/core/auth/` attaching the bearer token and redirecting unauthenticated users
+- [x] T031 [P] Implement the session service in `apps/web/src/app/core/auth/session.service.ts` holding the current member, active workspace, and token refresh
+- [x] T032 [P] Implement the typed API client in `apps/web/src/app/core/api/` generated from `contracts/auth-tenant.openapi.yaml` into `packages/domain-types`
 
 ### Foundational tests
 
-- [ ] T033 [P] Write `apps/api/tests/integration/test_health.py` asserting `200` when the database is reachable and `503` when it is not
-- [ ] T034 [P] Write `apps/api/tests/unit/test_jwt.py` covering expired, wrong-signature, wrong-audience, and missing-claim tokens
-- [ ] T035 [P] Write `apps/api/tests/unit/test_audit_append_only.py` asserting that `UPDATE` and `DELETE` on `audit_event` fail for every role including service
+- [x] T033 [P] Write `apps/api/tests/integration/test_health.py` asserting `200` when the database is reachable and `503` when it is not
+- [x] T034 [P] Write `apps/api/tests/unit/test_jwt.py` covering expired, wrong-signature, wrong-audience, and missing-claim tokens
+- [x] T035 [P] Write `apps/api/tests/unit/test_audit_append_only.py` asserting that `UPDATE` and `DELETE` on `audit_event` fail for every role including service
 
 **Checkpoint**: migrations apply cleanly, health reports honestly, and a forged token is refused.
 
