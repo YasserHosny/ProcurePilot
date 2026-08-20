@@ -13,20 +13,23 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_HOST: /var/run/postgresql
       POSTGRES_PORT: 5432
+    volumes:
+      # Creates the Supabase roles and the auth schema before any service connects. Without it
+      # GoTrue and Storage crash-loop on their own migrations.
+      - ./infra/docker/initdb:/docker-entrypoint-initdb.d:ro
+      - db-data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
       interval: 5s
       timeout: 5s
       retries: 10
-    volumes:
-      - db-data:/var/lib/postgresql/data
     restart: unless-stopped
 
   # ---------------------------------------------------------------------------
   # Auth Service (GoTrue)
   # ---------------------------------------------------------------------------
   auth:
-    image: supabase/gotrue:v2.164.0
+    image: supabase/gotrue:v2.196.0
     container_name: procurepilot-auth
     depends_on:
       db:
