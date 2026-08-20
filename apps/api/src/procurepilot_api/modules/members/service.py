@@ -182,7 +182,6 @@ class MemberService:
                 client.table("membership")
                 .update({"role": patch.role.value})
                 .eq("id", str(member_id))
-                .select("id,email,role,status,mfa_enabled,created_at")
                 .execute()
             )
         except APIError as exc:
@@ -213,9 +212,10 @@ class MemberService:
         try:
             response = (
                 client.table("membership")
+                # No `.select()` after `.update()` — unsupported by the pinned supabase-py
+                # builder; `.execute()` returns the updated representation anyway.
                 .update({"status": "removed", "is_active_workspace": False})
                 .eq("id", str(member_id))
-                .select("id,email,role,status,mfa_enabled,created_at")
                 .execute()
             )
         except APIError as exc:

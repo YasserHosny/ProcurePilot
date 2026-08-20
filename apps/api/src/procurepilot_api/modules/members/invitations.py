@@ -109,12 +109,11 @@ class SupabaseMemberInvitationRepository:
             "status": "pending",
         }
         try:
-            response = (
-                client.table("member_invitation")
-                .insert(payload)
-                .select(INVITATION_COLUMNS)
-                .execute()
-            )
+            # `.insert(...).execute()` already returns the inserted rows. Chaining `.select()`
+            # after an insert is not supported by the pinned supabase-py and raised
+            # AttributeError: 'SyncQueryRequestBuilder' object has no attribute 'select'
+            # — surfacing as a 500 on every invitation.
+            response = client.table("member_invitation").insert(payload).execute()
         except APIError as exc:
             if _api_error_code(exc) == "23505":
                 raise ConflictError(details={"reason": "pending_invitation_exists"}) from exc
@@ -144,11 +143,12 @@ class SupabaseMemberInvitationRepository:
         client = authenticated_client(self._settings, bearer_token)
         try:
             response = (
+                # No `.select()` after `.update()`: the pinned supabase-py builder does not
+                # support it, and it fails the same way `.insert(...).select(...)` did.
                 client.table("member_invitation")
                 .update({"status": "revoked"})
                 .eq("id", str(invitation_id))
                 .eq("status", "pending")
-                .select(INVITATION_COLUMNS)
                 .execute()
             )
         except APIError as exc:
