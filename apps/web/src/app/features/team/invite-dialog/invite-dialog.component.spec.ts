@@ -53,7 +53,11 @@ describe('InviteDialogComponent (T058)', () => {
       role: 'buyer',
       status: 'pending',
       expires_at: '2026-08-27T10:00:00Z',
-      token: 'tok_12345678901234567890123456789012',
+      // Deliberately low-entropy and self-describing. The previous fixture was a random-looking
+      // 32-character string, which gitleaks correctly flagged as a possible generic API key. A
+      // scanner cannot tell a fake secret from a real one — so the fix is a fixture that does not
+      // look like a secret, rather than an allowlist that would blunt the scanner everywhere.
+      token: 'example-invitation-token-not-a-secret',
     } as Invitation & { token: string };
 
     apiService.invite.and.returnValue(of(mockInvitation));
@@ -63,7 +67,7 @@ describe('InviteDialogComponent (T058)', () => {
     component.onSubmit();
 
     expect(apiService.invite).toHaveBeenCalledWith('newbie@example.com', 'buyer');
-    expect(component.createdResult()?.token).toBe('tok_12345678901234567890123456789012');
+    expect(component.createdResult()?.token).toBe('example-invitation-token-not-a-secret');
     expect(component.createdResult()?.inviteUrl).toContain('/onboarding/accept-invitation?token=');
   });
 
