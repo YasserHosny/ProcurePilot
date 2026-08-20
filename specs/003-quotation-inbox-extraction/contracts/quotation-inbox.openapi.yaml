@@ -1,0 +1,464 @@
+openapi: 3.1.0
+info:
+  title: ProcurePilot Quotation Inbox and Extraction API
+  version: 0.3.0
+  description: >
+    Chunk 4.3. Conventions unchanged from earlier chunks: base path /api/v1, Supabase JWT bearer
+    auth, tenant scope resolved server-side from the token and never from a parameter, cursor
+    pagination capped at 100, Idempotency-Key on mutations, and the {code, message, details,
+    trace_id} error envelope.
+
+    Role gate: owner and buyer may upload, extract, correct and confirm quotations. Branch manager,
+    approver and viewer read only. Cross-tenant records return not found, never forbidden.
+    Every monetary value is a Money object with amount decimal string plus explicit currency.
+
+servers:
+  - url: /api/v1
+
+security:
+  - bearerAuth: []
+
+paths:
+  /documents/presign:
+    post:
+      summary: Request a direct-to-storage upload target
+      description: >
+        Owner or buyer only. Creates a tenant-scoped document row and returns a short-lived
+        Supabase Storage upload target. File bytes go directly from client to Storage.
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PresignRequest' }
+      responses:
+        '201':
+          description: Upload target created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PresignResponse' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '415': { $ref: '#/components/responses/UnsupportedMediaType' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+
+  /documents/{document_id}:
+    parameters:
+      - { name: document_id, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      summary: Read document metadata and processing status
+      responses:
+        '200':
+          description: Document
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Document' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /quotations:
+    post:
+      summary: Create a quotation for an uploaded document
+      description: >
+        Owner or buyer only. Creates the quotation lifecycle record after the direct upload has
+        completed. `supplier_id` is optional because the reviewer may confirm it later.
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/QuotationCreate' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Quotation' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: Document already has an active quotation or cannot be used
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+
+  /quotations/{quotation_id}:
+    parameters:
+      - { name: quotation_id, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      summary: Read quotation header, lines, provenance and review status
+      responses:
+        '200':
+          description: Quotation
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/QuotationDetail' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      summary: Correct extracted fields and confirm supplier
+      description: >
+        Owner or buyer only. Corrections are recorded as human decisions on the field provenance
+        record; the original extracted values are retained.
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/QuotationReviewPatch' }
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/QuotationDetail' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: Quotation is not editable in its current state
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+
+  /quotations/{quotation_id}/extract:
+    parameters:
+      - { name: quotation_id, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      summary: Trigger asynchronous extraction
+      description: Owner or buyer only. Enqueues extraction and returns the pollable job resource.
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      responses:
+        '202':
+          description: Extraction queued
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Job' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: Extraction is already running or the quotation cannot be extracted
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /quotations/{quotation_id}/confirm:
+    parameters:
+      - { name: quotation_id, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      summary: Confirm a reviewed quotation
+      description: >
+        Owner or buyer only. This is the human authorization step. A quotation is not trusted
+        commercial data until this succeeds.
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                previous_quotation_id:
+                  type: string
+                  format: uuid
+                  nullable: true
+                  description: Link this quotation to an earlier supplier re-quote, if confirmed.
+      responses:
+        '200':
+          description: Reviewed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Quotation' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: Supplier, required corrections, or arithmetic mismatch remain unresolved
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /review-tasks:
+    get:
+      summary: List outstanding quotation review work
+      parameters:
+        - { name: cursor, in: query, schema: { type: string } }
+        - { name: limit, in: query, schema: { type: integer, maximum: 100, default: 50 } }
+        - name: status
+          in: query
+          schema: { type: string, enum: [open, in_progress, resolved, all], default: open }
+        - name: priority
+          in: query
+          schema: { type: string, enum: [low, normal, high] }
+      responses:
+        '200':
+          description: Review tasks
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/ReviewTask' } }
+                  next_cursor: { type: string, nullable: true }
+
+  /jobs/{job_id}:
+    parameters:
+      - { name: job_id, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      summary: Poll asynchronous job status
+      responses:
+        '200':
+          description: Job
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Job' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: false
+      schema: { type: string, format: uuid }
+
+  responses:
+    Forbidden:
+      description: The caller's role may not perform this action (owner or buyer required)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    NotFound:
+      description: >
+        No such record in this workspace. Deliberately indistinguishable from a record that exists
+        in another workspace.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    UnsupportedMediaType:
+      description: Not an accepted quotation file type. Refused before extraction.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Unprocessable:
+      description: Validation failed
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+
+  schemas:
+    Error:
+      type: object
+      required: [code, message, trace_id]
+      properties:
+        code: { type: string }
+        message: { type: string }
+        details: { type: object, additionalProperties: true }
+        trace_id: { type: string }
+
+    Money:
+      type: object
+      description: >
+        There is no bare number for money in this API. `amount` is a DECIMAL STRING, never a JSON
+        number.
+      required: [amount, currency]
+      properties:
+        amount: { type: string, pattern: '^-?\d+(\.\d{1,4})?$', example: '250.00' }
+        currency: { type: string, pattern: '^[A-Z]{3}$', example: 'GBP' }
+
+    PresignRequest:
+      type: object
+      required: [filename, mime_type, size_bytes]
+      properties:
+        filename: { type: string, minLength: 1, maxLength: 255 }
+        mime_type:
+          type: string
+          enum:
+            - application/pdf
+            - image/png
+            - image/jpeg
+            - image/tiff
+            - text/csv
+            - application/vnd.ms-excel
+            - application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
+        size_bytes: { type: integer, minimum: 1 }
+        content_hash:
+          type: string
+          nullable: true
+          description: sha256 hex when the client can compute it before upload.
+
+    PresignResponse:
+      type: object
+      required: [document_id, storage_bucket, storage_path, upload_url, expires_at]
+      properties:
+        document_id: { type: string, format: uuid }
+        storage_bucket: { type: string }
+        storage_path: { type: string }
+        upload_url:
+          type: string
+          format: uri
+          description: Short-lived Supabase Storage signed upload URL.
+        upload_fields:
+          type: object
+          additionalProperties: { type: string }
+          description: Provider-specific form fields when required; empty for signed PUT style.
+        expires_at: { type: string, format: date-time }
+
+    Document:
+      type: object
+      required: [id, storage_bucket, storage_path, mime_type, source_channel, status, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        storage_bucket: { type: string }
+        storage_path: { type: string }
+        mime_type: { type: string }
+        content_hash: { type: string, nullable: true }
+        source_channel: { type: string, enum: [upload] }
+        status: { type: string, enum: [uploaded, failed_to_read] }
+        created_at: { type: string, format: date-time }
+        created_by: { type: string, format: uuid }
+
+    QuotationCreate:
+      type: object
+      required: [document_id]
+      properties:
+        document_id: { type: string, format: uuid }
+        supplier_id: { type: string, format: uuid, nullable: true }
+
+    Quotation:
+      type: object
+      required: [id, document_id, status, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        document_id: { type: string, format: uuid }
+        supplier_id: { type: string, format: uuid, nullable: true }
+        currency: { type: string, pattern: '^[A-Z]{3}$', nullable: true }
+        issue_date: { type: string, format: date, nullable: true }
+        expiry_date: { type: string, format: date, nullable: true }
+        status: { type: string, enum: [pending, extracting, extracted, in_review, reviewed, refused] }
+        previous_quotation_id: { type: string, format: uuid, nullable: true }
+        stated_total: { allOf: [{ $ref: '#/components/schemas/Money' }], nullable: true }
+        arithmetic_status: { type: string, enum: [not_applicable, reconciled, mismatch], nullable: true }
+        created_at: { type: string, format: date-time }
+        reviewed_by: { type: string, format: uuid, nullable: true }
+        reviewed_at: { type: string, format: date-time, nullable: true }
+
+    QuotationDetail:
+      allOf:
+        - $ref: '#/components/schemas/Quotation'
+        - type: object
+          required: [document, lines, field_extractions]
+          properties:
+            document: { $ref: '#/components/schemas/Document' }
+            lines: { type: array, items: { $ref: '#/components/schemas/QuotationLine' } }
+            field_extractions:
+              type: array
+              items: { $ref: '#/components/schemas/FieldExtraction' }
+            review_task: { $ref: '#/components/schemas/ReviewTask' }
+
+    QuotationLine:
+      type: object
+      required: [id, line_number, original_text]
+      properties:
+        id: { type: string, format: uuid }
+        line_number: { type: integer, minimum: 1 }
+        original_text: { type: string }
+        quantity: { type: string, nullable: true, description: Decimal string }
+        pack:
+          type: object
+          nullable: true
+          properties:
+            pack_count: { type: integer, minimum: 1 }
+            unit_size: { type: string, description: Decimal string }
+            unit: { type: string, nullable: true }
+        unit_price: { allOf: [{ $ref: '#/components/schemas/Money' }], nullable: true }
+        vat_rate:
+          type: string
+          nullable: true
+          description: Decimal string in the range 0 to 1.
+        delivery_fee: { allOf: [{ $ref: '#/components/schemas/Money' }], nullable: true }
+        discount: { allOf: [{ $ref: '#/components/schemas/Money' }], nullable: true }
+
+    FieldExtraction:
+      type: object
+      required:
+        - id
+        - quotation_id
+        - entity_type
+        - entity_id
+        - field_name
+        - extracted_value
+        - confidence
+        - extraction_method
+        - model_version
+      properties:
+        id: { type: string, format: uuid }
+        quotation_id: { type: string, format: uuid }
+        entity_type: { type: string, enum: [quotation, quotation_line] }
+        entity_id: { type: string, format: uuid }
+        field_name: { type: string }
+        extracted_value: {}
+        confidence: { type: string, pattern: '^(0(\.\d{1,4})?|1(\.0{1,4})?)$' }
+        source_page: { type: integer, nullable: true, minimum: 1 }
+        source_region:
+          type: object
+          nullable: true
+          additionalProperties: true
+          description: Page-relative bbox or polygon used to highlight source evidence.
+        extraction_method: { type: string, enum: [structured_parse, bedrock, azure_di] }
+        model_version: { type: string }
+        corrected_value: { nullable: true }
+        corrected_by: { type: string, format: uuid, nullable: true }
+        corrected_at: { type: string, format: date-time, nullable: true }
+
+    FieldCorrection:
+      type: object
+      required: [field_extraction_id, corrected_value]
+      properties:
+        field_extraction_id: { type: string, format: uuid }
+        corrected_value: {}
+
+    QuotationReviewPatch:
+      type: object
+      properties:
+        supplier_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: Existing supplier confirmed by the reviewer.
+        corrections:
+          type: array
+          items: { $ref: '#/components/schemas/FieldCorrection' }
+
+    Job:
+      type: object
+      required: [id, quotation_id, status, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        quotation_id: { type: string, format: uuid }
+        status: { type: string, enum: [queued, running, succeeded, failed] }
+        attempted_provider: { type: string, enum: [structured_parse, bedrock, azure_di], nullable: true }
+        error: { type: object, nullable: true, additionalProperties: true }
+        result_url:
+          type: string
+          nullable: true
+          description: Present on success; usually /api/v1/quotations/{quotation_id}.
+        created_at: { type: string, format: date-time }
+        started_at: { type: string, format: date-time, nullable: true }
+        completed_at: { type: string, format: date-time, nullable: true }
+
+    ReviewTask:
+      type: object
+      required: [id, quotation_id, status, priority, reason, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        quotation_id: { type: string, format: uuid }
+        status: { type: string, enum: [open, in_progress, resolved] }
+        priority: { type: string, enum: [low, normal, high] }
+        reason: { type: string, enum: [low_confidence, arithmetic_mismatch, read_failure, review_required] }
+        created_at: { type: string, format: date-time }
+        resolved_at: { type: string, format: date-time, nullable: true }

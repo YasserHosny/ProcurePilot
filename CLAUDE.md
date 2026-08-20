@@ -1,6 +1,6 @@
 # ProcurePilot — Development Guidelines
 
-Last updated: 2026-08-20 · Active feature: `001-platform-foundation`
+Last updated: 2026-08-21 · Active feature: `001-platform-foundation`
 
 ProcurePilot turns fragmented supplier information into trusted, comparable purchasing
 decisions and proves the money saved. Read `.specify/memory/constitution.md` before writing
@@ -120,6 +120,8 @@ corresponding stage gate is passed. Sketching is allowed; building is not.
 ## Active Technologies
 - unchanged — Python 3.12 (backend), TypeScript 5.6 / Angular 19 (web), SQL + unchanged from chunk 4.1. One addition under consideration for CSV (002-catalogue-suppliers)
 - Supabase Postgres 17 via the Supabase CLI local stack. Migrations continue in (002-catalogue-suppliers)
+- unchanged — Python 3.12 (`apps/api` and the new `services/extraction-worker`), + unchanged from chunks 4.1–4.2 for `apps/api`, plus a Redis client (003-quotation-inbox-extraction)
+- Supabase Postgres 17 (unchanged) for `document`, `quotation`, `quotation_line`, (003-quotation-inbox-extraction)
 
 ## Recent Changes
 - 002-catalogue-suppliers: Added unchanged — Python 3.12 (backend), TypeScript 5.6 / Angular 19 (web), SQL + unchanged from chunk 4.1. One addition under consideration for CSV
