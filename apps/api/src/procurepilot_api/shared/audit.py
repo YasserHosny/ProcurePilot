@@ -32,13 +32,19 @@ class AuditWriter:
     def __init__(self, settings: Settings | None = None) -> None:
         self._settings = settings or get_settings()
 
-    def record(self, event: AuditEventCreate) -> None:
+    def record(self, event: AuditEventCreate, bearer_token: str | None = None) -> None:
         """Append one audit event.
 
         Writes through the `record_audit_event` SECURITY DEFINER function (migration 0007), not
         the service role. The function is append-only by construction and validates the tenant
         against the caller's own claim, so pre-authentication and refused events can be recorded
         without putting an RLS bypass in the request path (research R4).
+
+        `bearer_token` is the CALLER's access token and must be supplied for any event belonging
+        to a workspace. Without it the request carries no JWT claims, `current_tenant_id()` is
+        NULL, and the event is silently filed with no tenant — losing exactly the attribution the
+        audit trail exists for. Omit it only for genuinely pre-authentication events such as a
+        failed sign-in, which have no tenant by definition.
         """
         payload = {
             "tenant_id": str(event.tenant_id) if event.tenant_id else None,
@@ -52,7 +58,7 @@ class AuditWriter:
             "trace_id": event.trace_id or get_trace_id(),
         }
         try:
-            self._client().rpc(
+            self._client(bearer_token).rpc(
                 "record_audit_event",
                 {
                     "p_action": payload["action"],
@@ -71,13 +77,17 @@ class AuditWriter:
             )
             raise ServiceUnavailableError(details={"dependency": "audit_event"}) from exc
 
-    def _client(self) -> Client:
-        # The anon key is sufficient: record_audit_event is granted to authenticated and anon,
-        # and enforces tenancy itself. The service-role key deliberately does not appear here.
-        return create_client(
+    def _client(self, bearer_token: str | None) -> Client:
+        # The anon key opens the connection; the caller's token, when present, supplies the claims
+        # that record_audit_event validates against. The service-role key deliberately never
+        # appears here.
+        client = create_client(
             self._settings.supabase_url,
             self._settings.supabase_anon_key.get_secret_value(),
         )
+        if bearer_token:
+            client.postgrest.auth(bearer_token)
+        return client
 
 
 def get_audit_writer() -> AuditWriter:

@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import os
 from collections.abc import Iterator
+from uuid import UUID, uuid4
 
 import psycopg
 import pytest
@@ -22,8 +23,36 @@ pytestmark = pytest.mark.skipif(
     reason="TEST_DATABASE_URL is not set; needs a Postgres with the migrations applied",
 )
 
-TENANT_A = "aaaaaaaa-1111-1111-1111-111111111111"
-TENANT_B = "bbbbbbbb-2222-2222-2222-222222222222"
+def make_tenant(cur: psycopg.Cursor, label: str) -> UUID:
+    """Create a self-contained tenant.
+
+    These tests used to reference fixed uuids seeded elsewhere, which made them pass or fail
+    according to whatever happened to be in the database. Each test now builds what it needs.
+    """
+    tenant_id, invitation_id = uuid4(), uuid4()
+    cur.execute(
+        "insert into supported_region (code,label_en,label_ar) values ('GB','UK','ب') "
+        "on conflict do nothing"
+    )
+    cur.execute(
+        "insert into supported_currency (code,label_en,label_ar) values ('GBP','Pound','ج') "
+        "on conflict do nothing"
+    )
+    cur.execute(
+        "insert into supported_tax_model (code,label_en,label_ar,region_code) "
+        "values ('uk_vat','UK VAT','ض','GB') on conflict do nothing"
+    )
+    cur.execute(
+        "insert into platform_invitation (id,email,token_hash,expires_at) "
+        "values (%s,%s,%s, now() + interval '7 days')",
+        (invitation_id, f"{label}@example.test", f"hash-{invitation_id}"),
+    )
+    cur.execute(
+        "insert into tenant (id,name,slug,region,currency,tax_model,platform_invitation_id) "
+        "values (%s,%s,%s,'GB','GBP','uk_vat',%s)",
+        (tenant_id, f"{label} Ltd", f"{label}-{tenant_id.hex[:8]}", invitation_id),
+    )
+    return tenant_id
 
 
 @pytest.fixture
@@ -33,7 +62,7 @@ def conn() -> Iterator[psycopg.Connection]:
         connection.rollback()
 
 
-def act_as_member(cur: psycopg.Cursor, tenant_id: str) -> None:
+def act_as_member(cur: psycopg.Cursor, tenant_id: UUID | str) -> None:
     """Become the `authenticated` role carrying a tenant claim, as a real request would."""
     cur.execute("set local role authenticated")
     cur.execute(
@@ -44,21 +73,21 @@ def act_as_member(cur: psycopg.Cursor, tenant_id: str) -> None:
 
 def test_authenticated_cannot_update_an_audit_event(conn: psycopg.Connection) -> None:
     with conn.cursor() as cur:
-        act_as_member(cur, TENANT_A)
+        act_as_member(cur, make_tenant(cur, "upd"))
         with pytest.raises(psycopg.errors.InsufficientPrivilege):
             cur.execute("update audit_event set action = 'tampered'")
 
 
 def test_authenticated_cannot_delete_an_audit_event(conn: psycopg.Connection) -> None:
     with conn.cursor() as cur:
-        act_as_member(cur, TENANT_A)
+        act_as_member(cur, make_tenant(cur, "del"))
         with pytest.raises(psycopg.errors.InsufficientPrivilege):
             cur.execute("delete from audit_event")
 
 
 def test_writer_records_an_event_for_the_callers_own_tenant(conn: psycopg.Connection) -> None:
     with conn.cursor() as cur:
-        act_as_member(cur, TENANT_A)
+        act_as_member(cur, make_tenant(cur, "own"))
         cur.execute("select record_audit_event('test.event', 'success')")
         row = cur.fetchone()
         assert row is not None and row[0] > 0
@@ -67,10 +96,12 @@ def test_writer_records_an_event_for_the_callers_own_tenant(conn: psycopg.Connec
 def test_writer_refuses_an_event_for_another_tenant(conn: psycopg.Connection) -> None:
     """SECURITY DEFINER gives the function elevated rights; it must not lend them to the caller."""
     with conn.cursor() as cur:
-        act_as_member(cur, TENANT_A)
+        mine = make_tenant(cur, "mine")
+        theirs = make_tenant(cur, "theirs")
+        act_as_member(cur, mine)
         with pytest.raises(psycopg.errors.InsufficientPrivilege):
             cur.execute(
-                "select record_audit_event('forged.event', 'success', %s::uuid)", (TENANT_B,)
+                "select record_audit_event('forged.event', 'success', %s::uuid)", (theirs,)
             )
 
 

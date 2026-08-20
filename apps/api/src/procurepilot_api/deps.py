@@ -40,10 +40,18 @@ def current_member(
     credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)],
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> CurrentMember:
+    return resolve_member_from_token(bearer_token(credentials), settings)
+
+
+def bearer_token(
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)],
+) -> str:
     if credentials is None or credentials.scheme.lower() != "bearer":
         raise AuthenticationError(details={"reason": "missing_bearer_token"})
+    return credentials.credentials
 
-    token = credentials.credentials
+
+def resolve_member_from_token(token: str, settings: Settings) -> CurrentMember:
     claims = verify_supabase_jwt(token, settings)
     client = _authenticated_client(settings, token)
 

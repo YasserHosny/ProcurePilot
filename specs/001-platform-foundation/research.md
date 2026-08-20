@@ -89,6 +89,21 @@ enforcement and the application view can never disagree.
 - *One session per workspace in separate browser profiles* — no implementation cost, but an
   unacceptable experience for the multi-branch operators the product targets.
 
+**Listing and switching need their own RPCs.** Found implementing the endpoints: membership RLS is
+scoped to the active workspace, which makes "which workspaces do I belong to?" unanswerable by a
+direct query — it can only ever return the one the token already names. The first implementation
+reached past RLS with a privileged connection filtered by `user_id` in Python; not exploitable as
+written, but an RLS bypass in the request path, and a precedent for later chunks. Migration 0008
+adds `list_my_workspaces()` and `set_active_workspace()` as SECURITY DEFINER functions that read
+the caller from the JWT's `sub` claim and take no user parameter, so neither can be pointed at
+another person. Proven by test: a second user calling `list_my_workspaces` sees only their own.
+
+**The backend must forward the caller's token.** PostgREST derives `request.jwt.claims` from the
+bearer token it receives. A backend call made with the anon key alone carries no claims, so
+`current_tenant_id()` is NULL and RLS denies — or, for the audit writer, silently files the event
+with no tenant. Every on-behalf-of-user call therefore opens the client with the anon key and then
+sets the caller's access token on it.
+
 ---
 
 ## R4 — RLS policy pattern

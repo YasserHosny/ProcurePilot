@@ -45,10 +45,34 @@ class PermissionDeniedError(AppError):
     safe_message = "Action is not permitted."
 
 
+class InvalidCredentialsError(AppError):
+    status_code = status.HTTP_401_UNAUTHORIZED
+    code = "auth.invalid_credentials"
+    safe_message = "Authentication failed."
+
+
+class InvitationRefusedError(AppError):
+    status_code = status.HTTP_403_FORBIDDEN
+    code = "invitation.refused"
+    safe_message = "Invitation is not valid."
+
+
 class NotFoundError(AppError):
     status_code = status.HTTP_404_NOT_FOUND
     code = "not_found"
     safe_message = "Resource was not found."
+
+
+class ConflictError(AppError):
+    status_code = status.HTTP_409_CONFLICT
+    code = "conflict"
+    safe_message = "Request conflicts with the current state."
+
+
+class UnprocessableEntityError(AppError):
+    status_code = status.HTTP_422_UNPROCESSABLE_ENTITY
+    code = "validation.invalid_value"
+    safe_message = "Request validation failed."
 
 
 class ServiceUnavailableError(AppError):

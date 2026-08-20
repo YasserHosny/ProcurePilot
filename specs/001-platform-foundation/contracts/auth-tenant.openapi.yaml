@@ -107,6 +107,18 @@ paths:
   /auth/logout:
     post:
       summary: Sign out and invalidate the refresh token
+      description: >
+        The refresh token is optional in the body. The access token alone identifies the session
+        to end, but Supabase can only revoke a refresh token it is handed — without it the
+        refresh token stays valid until it expires. Clients that hold one should send it.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                refresh_token: { type: string }
       responses:
         '204': { description: Signed out }
 
@@ -177,15 +189,21 @@ paths:
         Sets the active membership and returns a re-issued session whose tenant_id claim
         matches the new workspace (research R3). The old token remains valid until expiry
         but continues to resolve the previous workspace.
+
+        `refresh_token` is required in practice: the claim is injected at token issuance, so a new
+        access token has to be minted, and Supabase mints one only in exchange for a refresh
+        token. Discovered during implementation — the endpoint cannot honour its own contract
+        without it.
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              required: [tenant_id]
+              required: [tenant_id, refresh_token]
               properties:
                 tenant_id: { type: string, format: uuid }
+                refresh_token: { type: string }
       responses:
         '200':
           description: Switched; session re-issued
