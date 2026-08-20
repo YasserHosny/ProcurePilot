@@ -3,7 +3,7 @@ services:
   # Database (PostgreSQL 17 with pgvector & pg_trgm extensions)
   # ---------------------------------------------------------------------------
   db:
-    image: supabase/postgres:17.6.1.165
+    image: supabase/postgres:17.6.1.136
     container_name: procurepilot-db
     ports:
       - "54322:5432"
@@ -14,9 +14,11 @@ services:
       POSTGRES_HOST: /var/run/postgresql
       POSTGRES_PORT: 5432
     volumes:
-      # Creates the Supabase roles and the auth schema before any service connects. Without it
-      # GoTrue and Storage crash-loop on their own migrations.
-      - ./infra/docker/initdb:/docker-entrypoint-initdb.d:ro
+      # Mounted as a single FILE inside the image's init directory. Mounting the whole
+      # directory masks supabase/postgres's own init scripts — which is what left the database
+      # with no anon/authenticated/supabase_auth_admin roles and made GoTrue and Storage
+      # crash-loop. The image creates those roles itself; we only add what it does not.
+      - ./infra/docker/initdb/99-procurepilot.sql:/docker-entrypoint-initdb.d/init-scripts/99-procurepilot.sql:ro
       - db-data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
@@ -29,7 +31,7 @@ services:
   # Auth Service (GoTrue)
   # ---------------------------------------------------------------------------
   auth:
-    image: supabase/gotrue:v2.196.0
+    image: supabase/gotrue:v2.189.0
     container_name: procurepilot-auth
     depends_on:
       db:
@@ -39,12 +41,12 @@ services:
       GOTRUE_API_PORT: 9999
       API_EXTERNAL_URL: ${SUPABASE_URL:-http://localhost:54321}
       GOTRUE_DB_DRIVER: postgres
-      # Connect as supabase_auth_admin, not postgres. GoTrue queries its own tables unqualified
-      # (identities, sessions, ...), so it needs a search_path that includes the auth schema.
-      # As postgres the search_path is "$$user", public, and GoTrue fails at runtime with
-      # 'relation "identities" does not exist' — while still reporting healthy, because its
-      # migrations DID run and only the queries miss.
-      GOTRUE_DB_DATABASE_URL: postgres://supabase_auth_admin:${POSTGRES_PASSWORD:-postgres}@db:5432/postgres?sslmode=disable&search_path=auth
+      # Connect as supabase_auth_admin, exactly as Supabase's own compose does. As postgres,
+      # GoTrue reported healthy but failed every query with 'relation "identities" does not
+      # exist', because postgres's search_path is "$$user", public and GoTrue queries its tables
+      # unqualified. supabase_auth_admin has the right search_path set by the image, so no
+      # search_path parameter belongs on this URL — adding one broke migrations instead.
+      GOTRUE_DB_DATABASE_URL: postgres://supabase_auth_admin:${POSTGRES_PASSWORD:-postgres}@db:5432/postgres?sslmode=disable
       GOTRUE_SITE_URL: http://localhost:4200
       GOTRUE_URI_ALLOW_LIST: http://localhost:4200/*
       GOTRUE_JWT_SECRET: ${SUPABASE_JWT_SECRET:-replace-with-local-jwt-secret}
@@ -63,7 +65,7 @@ services:
   # REST Service (PostgREST)
   # ---------------------------------------------------------------------------
   rest:
-    image: postgrest/postgrest:v12.2.3
+    image: postgrest/postgrest:v14.12
     container_name: procurepilot-rest
     depends_on:
       db:
@@ -80,7 +82,7 @@ services:
   # Storage Service
   # ---------------------------------------------------------------------------
   storage:
-    image: supabase/storage-api:v1.14.3
+    image: supabase/storage-api:v1.60.4
     container_name: procurepilot-storage
     depends_on:
       db:
@@ -132,7 +134,7 @@ services:
   # Supabase Studio Dashboard
   # ---------------------------------------------------------------------------
   studio:
-    image: supabase/studio:2026.08.17-sha-0c1da8f
+    image: supabase/studio:2026.08.03-sha-022b374
     container_name: procurepilot-studio
     depends_on:
       db:
