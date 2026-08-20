@@ -1,0 +1,16 @@
+# gitleaks findings suppressed by fingerprint: commit:file:rule:line.
+#
+# Each entry pins ONE finding in ONE commit. It cannot suppress a rule, a path, or a future
+# finding — which is deliberate. An allowlist by path or rule would have been quicker and would
+# have quietly disarmed the scanner for every test file from here on.
+#
+# ---------------------------------------------------------------------------
+# A mock invitation token in a unit test: 'tok_1234...' repeated to 32 characters. Not a
+# credential, and never was; it looked like one to a generic-api-key rule, which is the rule
+# working as intended.
+#
+# The fixture was replaced in 2e7fd72 with an obviously-fake, low-entropy string. This entry
+# exists only because gitleaks scans COMMIT HISTORY, so the original commit still carries the
+# value even though no file in the tree does. The alternative was rewriting 37 commits of an
+# open pull request, which is a worse trade for a string that was never secret.
+031a050fbc4185095fc4b9b62a3e2dd1c68ffa23:apps/web/src/app/features/team/invite-dialog/invite-dialog.component.spec.ts:generic-api-key:56
