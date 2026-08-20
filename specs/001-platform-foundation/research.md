@@ -30,6 +30,13 @@ refresh rather than being frozen at sign-up.
   isolation boundary. Explicitly rejected by engineering-spec §3 ("tenant resolved server-side
   from token").
 
+**The claim is `member_role`, not `role`.** Discovered while reviewing the backend primitives:
+Supabase and PostgREST use the `role` claim as the *Postgres role* to assume for the request
+(`authenticated`, `anon`, `service_role`). Writing the member's role there makes PostgREST issue
+`set role owner`, which fails with `role "owner" does not exist` — every request, not an edge
+case. Verified directly against Postgres 17. The hook therefore injects `tenant_id` and
+`member_role` and leaves `role` untouched.
+
 **Verification required during implementation**: confirm the auth hook API shape against the
 Supabase version pinned in `docker-compose.yml` before building on it — this is the single
 highest-risk external dependency in the chunk, and the contract has moved between versions.
@@ -111,6 +118,17 @@ role.
 **Service-role handling**: the service role bypasses RLS and is therefore restricted to
 migrations and the platform-invitation flow, which by definition runs before a workspace exists.
 It is never used to serve an authenticated request. This restriction is itself a test.
+
+**Writing audit events without a service role.** The audit insert policy requires
+`tenant_id = current_tenant_id()`, which the two most security-relevant events cannot satisfy: a
+failed sign-in has no tenant claim, and a refused workspace creation has no tenant yet. Both carry
+`tenant_id` NULL, and `NULL = NULL` is not true — so the events most worth recording were the ones
+that could not be written. Handing the backend a service-role key would have solved it and broken
+the rule above; instead migration 0007 adds `record_audit_event`, a `SECURITY DEFINER` function
+that is the only sanctioned write path. It is append-only by construction and validates the
+target tenant against the caller's own claim, so elevated rights cannot be turned into
+cross-tenant writes. Proven by test: a member of tenant A recording an event against tenant B is
+refused.
 
 ---
 

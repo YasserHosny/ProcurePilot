@@ -12,6 +12,12 @@
 -- ⚠️  VERIFY THE HOOK CONTRACT against the Supabase version pinned in docker-compose.yml before
 --     relying on this. research.md flags it as the highest-risk external dependency in the chunk;
 --     the hook's expected argument and return shape has changed between versions.
+--
+-- ⚠️  DO NOT write the member's role into the `role` claim. Supabase and PostgREST use `role` as
+--     the POSTGRES role to switch to for the request (`authenticated`, `anon`, `service_role`).
+--     Setting it to 'owner' or 'buyer' makes PostgREST issue `set role owner`, which fails with
+--     'role "owner" does not exist' and breaks every request. The member's role therefore travels
+--     as a separate `member_role` claim, and `role` is left exactly as Supabase set it.
 
 create or replace function public.custom_access_token_hook(event jsonb)
 returns jsonb
@@ -35,13 +41,13 @@ begin
   limit 1;
 
   if found then
-    claims := jsonb_set(claims, '{tenant_id}', to_jsonb(active.tenant_id::text));
-    claims := jsonb_set(claims, '{role}',      to_jsonb(active.role::text));
+    claims := jsonb_set(claims, '{tenant_id}',   to_jsonb(active.tenant_id::text));
+    claims := jsonb_set(claims, '{member_role}', to_jsonb(active.role::text));
   else
     -- No active membership: issue a token with NO tenant claim. current_tenant_id() then returns
     -- NULL and every tenant-scoped policy denies. A user between workspaces sees nothing rather
     -- than something arbitrary.
-    claims := claims - 'tenant_id' - 'role';
+    claims := claims - 'tenant_id' - 'member_role';
   end if;
 
   return jsonb_set(event, '{claims}', claims);
@@ -52,5 +58,6 @@ grant execute on function public.custom_access_token_hook(jsonb) to supabase_aut
 revoke execute on function public.custom_access_token_hook(jsonb) from authenticated, anon, public;
 
 comment on function public.custom_access_token_hook(jsonb) is
-  'Injects tenant_id and role into the access token from the caller''s active membership.
+  'Injects tenant_id and member_role into the access token from the caller''s active membership.
+   Never touches the `role` claim, which Postgres/PostgREST reserve for the database role.
    Register as the custom access token hook in Supabase Auth configuration.';

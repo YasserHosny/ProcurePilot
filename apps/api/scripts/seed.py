@@ -90,7 +90,10 @@ def main() -> int:
         row = cur.fetchone()
         conn.commit()
 
-    print(f"Seeded {len(REGIONS)} regions, {len(CURRENCIES)} currencies, {len(TAX_MODELS)} tax models.")
+    print(
+        f"Seeded {len(REGIONS)} regions, {len(CURRENCIES)} currencies, "
+        f"{len(TAX_MODELS)} tax models."
+    )
     print()
     print("Platform invitation created — single use, this token is shown ONCE:")
     print()
