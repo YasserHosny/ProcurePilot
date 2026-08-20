@@ -26,7 +26,11 @@ const credentials = JSON.parse(
 test.describe('ProcurePilot Team Management (T061)', () => {
   const ownerEmail = credentials.ownerEmail;
   const ownerPassword = credentials.ownerPassword;
-  const colleagueEmail = 'buyer.colleague@example.com';
+  // Unique per run. A fixed address makes the suite pass once and fail forever after: the
+  // server allows only ONE pending invitation per address per workspace (a deliberate rule), so
+  // the second run gets a 409 from residue the first run left behind. CI reruns the same
+  // database, so this is not hypothetical.
+  const colleagueEmail = `buyer.colleague.${Date.now()}@example.test`;
   const colleaguePassword = 'ColleaguePassword123!';
 
   test.beforeEach(async ({ page }) => {
