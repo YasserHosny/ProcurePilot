@@ -8,7 +8,9 @@
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
     "lint": "ng lint",
-    "test:unit": "ng test --watch=false --browsers=ChromeHeadless"
+    "test:unit": "ng test --watch=false --browsers=ChromeHeadless",
+    "test:e2e": "playwright test",
+    "test:e2e:headed": "playwright test --headed"
   },
   "private": true,
   "dependencies": {

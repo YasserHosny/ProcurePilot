@@ -44,6 +44,7 @@ def hash_token(token: str) -> str:
 
 
 def main() -> int:
+    as_json = "--json" in sys.argv
     dsn = os.environ.get("DATABASE_URL")
     if not dsn:
         print("DATABASE_URL is not set. Copy .env.example to .env first.", file=sys.stderr)
@@ -89,6 +90,25 @@ def main() -> int:
         )
         row = cur.fetchone()
         conn.commit()
+
+    if as_json:
+        # Machine-readable for the E2E global setup, which needs a fresh invitation to create
+        # its own workspace rather than assuming one already exists.
+        import json
+
+        print(
+            json.dumps(
+                {
+                    "invitation_token": invitation_token,
+                    "invitation_id": str(row["id"]) if row else None,
+                    "email": email,
+                    "region": REGIONS[0][0],
+                    "currency": CURRENCIES[0][0],
+                    "tax_model": TAX_MODELS[0][0],
+                }
+            )
+        )
+        return 0
 
     print(
         f"Seeded {len(REGIONS)} regions, {len(CURRENCIES)} currencies, "

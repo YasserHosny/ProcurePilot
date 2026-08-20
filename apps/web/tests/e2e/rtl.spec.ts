@@ -1,4 +1,16 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
 import { test, expect } from '@playwright/test';
+
+/**
+ * Credentials come from global-setup, which creates a real workspace through the sign-up
+ * endpoint. They used to be hardcoded to an account nothing created, which is why every test
+ * here failed at sign-in the first time the suite was ever executed.
+ */
+const credentials = JSON.parse(
+  readFileSync(join(__dirname, '.credentials.json'), 'utf-8'),
+) as { ownerEmail: string; ownerPassword: string; businessName: string };
 
 /**
  * E2E tests for English/Arabic localisation and Right-to-Left (RTL) mirroring (T071).
@@ -23,8 +35,8 @@ test.describe('ProcurePilot Localisation & RTL Layout (T071)', () => {
   test('should mirror layout to RTL and render Arabic strings when language is switched', async ({ page }) => {
     // Sign in and land on authenticated shell
     await page.goto('/auth/sign-in');
-    await page.fill('input[formControlName="email"]', 'owner@example.com');
-    await page.fill('input[formControlName="password"]', 'Password123!@#');
+    await page.fill('input[formControlName="email"]', credentials.ownerEmail);
+    await page.fill('input[formControlName="password"]', credentials.ownerPassword);
     await page.click('button[type="submit"]');
 
     await page.waitForURL('**/home');
@@ -59,8 +71,8 @@ test.describe('ProcurePilot Localisation & RTL Layout (T071)', () => {
   test('should persist Arabic language preference across sign-out and sign-in', async ({ page }) => {
     // Sign in
     await page.goto('/auth/sign-in');
-    await page.fill('input[formControlName="email"]', 'owner@example.com');
-    await page.fill('input[formControlName="password"]', 'Password123!@#');
+    await page.fill('input[formControlName="email"]', credentials.ownerEmail);
+    await page.fill('input[formControlName="password"]', credentials.ownerPassword);
     await page.click('button[type="submit"]');
     await page.waitForURL('**/home');
 
@@ -75,8 +87,8 @@ test.describe('ProcurePilot Localisation & RTL Layout (T071)', () => {
     await page.waitForURL('**/auth/sign-in');
 
     // Sign in again with same account
-    await page.fill('input[formControlName="email"]', 'owner@example.com');
-    await page.fill('input[formControlName="password"]', 'Password123!@#');
+    await page.fill('input[formControlName="email"]', credentials.ownerEmail);
+    await page.fill('input[formControlName="password"]', credentials.ownerPassword);
     await page.click('button[type="submit"]');
     await page.waitForURL('**/home');
 

@@ -1,4 +1,16 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
 import { test, expect } from '@playwright/test';
+
+/**
+ * Credentials come from global-setup, which creates a real workspace through the sign-up
+ * endpoint. They used to be hardcoded to an account nothing created, which is why every test
+ * here failed at sign-in the first time the suite was ever executed.
+ */
+const credentials = JSON.parse(
+  readFileSync(join(__dirname, '.credentials.json'), 'utf-8'),
+) as { ownerEmail: string; ownerPassword: string; businessName: string };
 
 /**
  * End-to-End test suite for User Story 2: Team Management (T061).
@@ -12,8 +24,8 @@ import { test, expect } from '@playwright/test';
  * - FR-013: Non-owners cannot access team management or perform administrative mutations.
  */
 test.describe('ProcurePilot Team Management (T061)', () => {
-  const ownerEmail = 'owner@example.com';
-  const ownerPassword = 'Password123!@#';
+  const ownerEmail = credentials.ownerEmail;
+  const ownerPassword = credentials.ownerPassword;
   const colleagueEmail = 'buyer.colleague@example.com';
   const colleaguePassword = 'ColleaguePassword123!';
 
