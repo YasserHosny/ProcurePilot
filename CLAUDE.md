@@ -116,3 +116,10 @@ corresponding stage gate is passed. Sketching is allowed; building is not.
 
 <!-- MANUAL ADDITIONS START -->
 <!-- MANUAL ADDITIONS END -->
+
+## Active Technologies
+- unchanged — Python 3.12 (backend), TypeScript 5.6 / Angular 19 (web), SQL + unchanged from chunk 4.1. One addition under consideration for CSV (002-catalogue-suppliers)
+- Supabase Postgres 17 via the Supabase CLI local stack. Migrations continue in (002-catalogue-suppliers)
+
+## Recent Changes
+- 002-catalogue-suppliers: Added unchanged — Python 3.12 (backend), TypeScript 5.6 / Angular 19 (web), SQL + unchanged from chunk 4.1. One addition under consideration for CSV
