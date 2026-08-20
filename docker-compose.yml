@@ -3,7 +3,7 @@ services:
   # Database (PostgreSQL 17 with pgvector & pg_trgm extensions)
   # ---------------------------------------------------------------------------
   db:
-    image: supabase/postgres:17.2.0.0
+    image: supabase/postgres:17.6.1.165
     container_name: procurepilot-db
     ports:
       - "54322:5432"
@@ -124,7 +124,7 @@ services:
   # Supabase Studio Dashboard
   # ---------------------------------------------------------------------------
   studio:
-    image: supabase/studio:20241216-7ecc371
+    image: supabase/studio:2026.08.17-sha-0c1da8f
     container_name: procurepilot-studio
     depends_on:
       db:
