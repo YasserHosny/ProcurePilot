@@ -36,3 +36,12 @@ test-results/
 # Editor / OS
 .DS_Store
 *.swp
+
+# Terraform provider cache and state. Reproducible from .terraform.lock.hcl, which IS committed.
+# These were committed by accident — a Dockerised `terraform init` created them as root, and a
+# `git add -A` swept them in, putting a provider BINARY in the repository and leaving root-owned
+# paths that broke `git checkout` and `git pull` on the developer's machine.
+.terraform/
+*.tfstate
+*.tfstate.*
+.terraform.tfstate.lock.info
