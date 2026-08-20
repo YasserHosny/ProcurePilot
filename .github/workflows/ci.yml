@@ -21,6 +21,13 @@ jobs:
   secrets:
     name: Secret scan
     runs-on: ubuntu-latest
+    # gitleaks-action writes its findings back to the pull request. Without these it fails with
+    # 403 'Resource not accessible by integration' — which looks like a licensing problem and is
+    # not: the log says plainly that an individual account needs no licence key.
+    permissions:
+      contents: read
+      pull-requests: write
+      security-events: write
     steps:
       - uses: actions/checkout@v4
         with:
@@ -74,6 +81,26 @@ jobs:
       - uses: astral-sh/setup-uv@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
+      - name: Prepare the schema
+        # Setting TEST_DATABASE_URL without applying the migrations was worse than not setting it:
+        # the database-backed tests stop skipping and start failing on an empty schema.
+        env:
+          PGPASSWORD: postgres
+        run: |
+          psql -h localhost -U postgres -v ON_ERROR_STOP=1 <<'SQL'
+          create schema if not exists auth;
+          create table if not exists auth.users (id uuid primary key, email text);
+          do $$ begin create role anon nologin; exception when duplicate_object then null; end $$;
+          do $$ begin create role authenticated nologin; exception when duplicate_object then null; end $$;
+          do $$ begin create role service_role nologin bypassrls; exception when duplicate_object then null; end $$;
+          do $$ begin create role supabase_auth_admin noinherit login password 'postgres'; exception when duplicate_object then null; end $$;
+          do $$ begin create role supabase_admin superuser; exception when duplicate_object then null; end $$;
+          grant usage on schema public, auth to anon, authenticated, service_role;
+          grant anon, authenticated, service_role to postgres;
+          SQL
+          for f in supabase/migrations/*.sql; do
+            psql -h localhost -U postgres -v ON_ERROR_STOP=1 -q -f "$f"
+          done
       - name: Run unit and integration tests
         # TEST_DATABASE_URL is what the database-backed tests look for; without it they SKIP
         # rather than fail, so omitting it would quietly hollow out this job.
@@ -164,12 +191,13 @@ jobs:
       - uses: astral-sh/setup-uv@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
+          # The post-run cache save exits 2 here and failed the whole job AFTER all 14 specs had
+          # passed. A caching optimisation must never be able to fail a green test run.
+          enable-cache: false
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: pnpm
-          cache-dependency-path: apps/web/pnpm-lock.yaml
       - uses: supabase/setup-cli@v1
         with:
           version: latest
