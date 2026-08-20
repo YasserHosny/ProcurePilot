@@ -66,7 +66,11 @@ test.describe('ProcurePilot Team Management (T061)', () => {
 
     // Token creation confirmation should appear
     await expect(page.locator('.success-icon')).toBeVisible();
-    await expect(page.locator('.token-input')).toBeVisible();
+    // Two .token-input fields exist — the shareable link and the raw token — so an unqualified
+    // locator is ambiguous and Playwright's strict mode rejects it. Assert both, specifically.
+    await expect(page.locator('.token-input').first()).toBeVisible();
+    await expect(page.locator('.token-input.mono')).toBeVisible();
+    await expect(page.locator('.token-input.mono')).not.toHaveValue('');
 
     // Close dialog
     await page.click('button:has-text("Close")');
@@ -96,7 +100,7 @@ test.describe('ProcurePilot Team Management (T061)', () => {
 
     // And the workspace genuinely contains them now.
     await page.goto('/team');
-    await expect(page.locator('tr.mat-row', { hasText: email })).toBeVisible();
+    await expect(page.locator('tr[mat-row]', { hasText: email })).toBeVisible();
   });
 
   test('should allow owner to change a member role', async ({ page }) => {
@@ -105,7 +109,7 @@ test.describe('ProcurePilot Team Management (T061)', () => {
     const member = await createMember('buyer');
     await page.goto('/team');
 
-    const memberRow = page.locator('tr.mat-row', { hasText: member.email });
+    const memberRow = page.locator('tr[mat-row]', { hasText: member.email });
     await memberRow.locator('.action-menu-btn').click();
 
     // Click Change role
@@ -125,7 +129,7 @@ test.describe('ProcurePilot Team Management (T061)', () => {
     await page.goto('/team');
 
     // Attempt to change owner's role to Viewer
-    const ownerRow = page.locator('tr.mat-row', { hasText: ownerEmail });
+    const ownerRow = page.locator('tr[mat-row]', { hasText: ownerEmail });
     await ownerRow.locator('.action-menu-btn').click();
     await page.click('button:has-text("Change role")');
 
@@ -142,7 +146,7 @@ test.describe('ProcurePilot Team Management (T061)', () => {
     const member = await createMember('buyer');
     await page.goto('/team');
 
-    const memberRow = page.locator('tr.mat-row', { hasText: member.email });
+    const memberRow = page.locator('tr[mat-row]', { hasText: member.email });
     await memberRow.locator('.action-menu-btn').click();
     await page.click('button:has-text("Remove member")');
 

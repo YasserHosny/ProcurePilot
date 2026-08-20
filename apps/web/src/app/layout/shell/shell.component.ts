@@ -76,7 +76,12 @@ export class ShellComponent implements OnInit {
   }
 
   onSelectLanguage(lang: Locale): void {
-    this.i18n.setLocale(lang);
+    // MUST subscribe. setLocale applies the language immediately but returns a cold observable
+    // for the PATCH /me that persists the choice, and an unsubscribed HttpClient observable never
+    // issues its request. Without this the switch looked like it worked — the UI flipped to
+    // Arabic and RTL — and then reverted on the next reload, because the server had never been
+    // told and still reported 'en'.
+    this.i18n.setLocale(lang).subscribe();
   }
 
   onSwitchWorkspace(tenantId: string): void {

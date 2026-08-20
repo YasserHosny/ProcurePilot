@@ -1,4 +1,4 @@
-import { Injectable, effect, inject, signal } from '@angular/core';
+import { Injectable, effect, inject, signal, untracked } from '@angular/core';
 import { TranslateService } from '@ngx-translate/core';
 import { Observable, of } from 'rxjs';
 import { catchError, map } from 'rxjs/operators';
@@ -19,6 +19,9 @@ export class I18nService {
 
   private readonly localeSignal = signal<Locale>('en');
 
+  /** The last locale the SESSION reported, so a user's own choice is not overwritten by it. */
+  private lastSessionLocale: Locale | null = null;
+
   readonly currentLocale = this.localeSignal.asReadonly();
   readonly isRtl = this.direction.isRtl;
 
@@ -34,11 +37,23 @@ export class I18nService {
 
     this.applyLocale(initialLocale);
 
-    // Reactively synchronise when session/member updates (e.g. login, session restore)
+    this.lastSessionLocale = initialLocale;
+
+    // Adopt the session's locale when the SESSION changes — sign-in, session restore, workspace
+    // switch — and never merely because the local choice differs from it.
+    //
+    // The previous version compared against localeSignal() and so re-ran on every local change:
+    // choosing Arabic set the signal, the effect woke, saw the server still said 'en', and
+    // immediately applied 'en' again. The language switcher appeared completely dead — no error,
+    // no flicker, nothing — because the revert happened in the same tick. Tracking the last value
+    // the session reported means a user's explicit choice is never fought by a stale one.
     effect(() => {
       const active = this.session.activeLocale();
-      if (active && active !== this.localeSignal()) {
-        this.applyLocale(active);
+      if (active && active !== this.lastSessionLocale) {
+        this.lastSessionLocale = active;
+        if (active !== untracked(this.localeSignal)) {
+          this.applyLocale(active);
+        }
       }
     });
   }
@@ -50,6 +65,9 @@ export class I18nService {
    * Always persists to localStorage to support guest screens and reloads.
    */
   setLocale(locale: Locale, persistToServer = true): Observable<Me | null> {
+    // Claim the choice before applying it: the server round-trip below is asynchronous, and
+    // without this the session effect would still be holding the old value.
+    this.lastSessionLocale = locale;
     this.applyLocale(locale);
 
     if (persistToServer && this.session.isAuthenticated()) {

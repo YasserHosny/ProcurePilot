@@ -46,9 +46,20 @@ export async function signIn(email: string, password: string): Promise<string> {
   return session.access_token;
 }
 
+/**
+ * Cached for the run. Every helper needs the owner's token, and signing in afresh each time hit
+ * the auth rate limit (10/minute) part-way through the suite — the limiter behaving exactly as
+ * intended against a caller that was simply wasteful. One sign-in per run is also faster.
+ */
+let cachedOwnerToken: string | null = null;
+
 export async function signInOwner(): Promise<string> {
+  if (cachedOwnerToken) {
+    return cachedOwnerToken;
+  }
   const { ownerEmail, ownerPassword } = credentials();
-  return signIn(ownerEmail, ownerPassword);
+  cachedOwnerToken = await signIn(ownerEmail, ownerPassword);
+  return cachedOwnerToken;
 }
 
 export interface CreatedMember {
@@ -101,4 +112,22 @@ export async function createPendingInvitation(
     throw new Error('POST /invitations did not return a token');
   }
   return { email, id: invitation.id, token: invitation.token };
+}
+
+
+/**
+ * Force the owner's persisted locale back to a known value.
+ *
+ * The locale is stored per member, so a test that switches to Arabic leaves it that way for every
+ * later test and every later RUN. That made the RTL specs order-dependent: whichever ran second
+ * signed in already in Arabic and failed its "starts in English" assertion. Each test normalises
+ * the state it depends on instead of assuming it.
+ */
+export async function setOwnerLocale(locale: 'en' | 'ar'): Promise<void> {
+  const token = await signInOwner();
+  await call('/me', {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ preferred_locale: locale }),
+  });
 }

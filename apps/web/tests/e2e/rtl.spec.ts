@@ -1,16 +1,13 @@
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 
 import { test, expect } from '@playwright/test';
+
+import { createMember, type CreatedMember } from './support/api';
 
 /**
  * Credentials come from global-setup, which creates a real workspace through the sign-up
  * endpoint. They used to be hardcoded to an account nothing created, which is why every test
  * here failed at sign-in the first time the suite was ever executed.
  */
-const credentials = JSON.parse(
-  readFileSync(join(__dirname, '.credentials.json'), 'utf-8'),
-) as { ownerEmail: string; ownerPassword: string; businessName: string };
 
 /**
  * E2E tests for English/Arabic localisation and Right-to-Left (RTL) mirroring (T071).
@@ -21,6 +18,19 @@ const credentials = JSON.parse(
  * - FR-019: Persistence across sessions and reloads.
  */
 test.describe('ProcurePilot Localisation & RTL Layout (T071)', () => {
+  // Each test gets its OWN member.
+  //
+  // The locale is stored per member, so sharing the workspace owner made these tests contend for
+  // one row: switching to Arabic fires a PATCH /me, and the next test's reset could land before
+  // that PATCH did, leaving the account in Arabic and the test signing in to the wrong language.
+  // They passed alone and failed in the suite — the signature of shared mutable state. A fresh
+  // member per test has nothing to race against.
+  let member: CreatedMember;
+
+  test.beforeEach(async () => {
+    member = await createMember('buyer');
+  });
+
   test('should render in English and LTR by default', async ({ page }) => {
     await page.goto('/auth/sign-in');
 
@@ -35,8 +45,8 @@ test.describe('ProcurePilot Localisation & RTL Layout (T071)', () => {
   test('should mirror layout to RTL and render Arabic strings when language is switched', async ({ page }) => {
     // Sign in and land on authenticated shell
     await page.goto('/auth/sign-in');
-    await page.fill('input[formControlName="email"]', credentials.ownerEmail);
-    await page.fill('input[formControlName="password"]', credentials.ownerPassword);
+    await page.fill('input[formControlName="email"]', member.email);
+    await page.fill('input[formControlName="password"]', member.password);
     await page.click('button[type="submit"]');
 
     await page.waitForURL('**/home');
@@ -71,8 +81,8 @@ test.describe('ProcurePilot Localisation & RTL Layout (T071)', () => {
   test('should persist Arabic language preference across sign-out and sign-in', async ({ page }) => {
     // Sign in
     await page.goto('/auth/sign-in');
-    await page.fill('input[formControlName="email"]', credentials.ownerEmail);
-    await page.fill('input[formControlName="password"]', credentials.ownerPassword);
+    await page.fill('input[formControlName="email"]', member.email);
+    await page.fill('input[formControlName="password"]', member.password);
     await page.click('button[type="submit"]');
     await page.waitForURL('**/home');
 
@@ -87,8 +97,8 @@ test.describe('ProcurePilot Localisation & RTL Layout (T071)', () => {
     await page.waitForURL('**/auth/sign-in');
 
     // Sign in again with same account
-    await page.fill('input[formControlName="email"]', credentials.ownerEmail);
-    await page.fill('input[formControlName="password"]', credentials.ownerPassword);
+    await page.fill('input[formControlName="email"]', member.email);
+    await page.fill('input[formControlName="password"]', member.password);
     await page.click('button[type="submit"]');
     await page.waitForURL('**/home');
 
