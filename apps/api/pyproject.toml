@@ -17,6 +17,7 @@ dependencies = [
     "httpx==0.28.1",
     "slowapi==0.1.9",
     "supabase==2.11.0",
+    "psycopg[binary]>=3.2,<4",
 ]
 
 [dependency-groups]
