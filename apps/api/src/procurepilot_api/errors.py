@@ -75,6 +75,12 @@ class UnprocessableEntityError(AppError):
     safe_message = "Request validation failed."
 
 
+class UnsupportedMediaTypeError(AppError):
+    status_code = status.HTTP_415_UNSUPPORTED_MEDIA_TYPE
+    code = "validation.unsupported_media_type"
+    safe_message = "File type is not supported."
+
+
 class ServiceUnavailableError(AppError):
     status_code = status.HTTP_503_SERVICE_UNAVAILABLE
     code = "service_unavailable"

@@ -8,7 +8,9 @@ real migrations, as the real `authenticated` role, carrying a real JWT claim.
 FR-030 requires this to run on every proposed change. It is wired into CI as its own named check
 so that its failure is never mistaken for an unrelated test failure.
 
-Set TEST_DATABASE_URL to a database with migrations 0001-0007 applied.
+Set TEST_DATABASE_URL to a database with migrations 0001-0016 applied — extended for
+002-catalogue-suppliers (T038) to cover workspace_product, pack_definition, supplier,
+product_alias and import_job, plus the canonical_product exception.
 """
 
 from __future__ import annotations
@@ -31,11 +33,23 @@ pytestmark = pytest.mark.skipif(
 class Workspace:
     """One tenant, its owner, and a marker row only that tenant should ever see."""
 
-    def __init__(self, tenant_id: UUID, user_id: UUID, membership_id: UUID, name: str) -> None:
+    def __init__(
+        self,
+        tenant_id: UUID,
+        user_id: UUID,
+        membership_id: UUID,
+        name: str,
+        canonical_product_id: UUID,
+        workspace_product_id: UUID,
+        supplier_id: UUID,
+    ) -> None:
         self.tenant_id = tenant_id
         self.user_id = user_id
         self.membership_id = membership_id
         self.name = name
+        self.canonical_product_id = canonical_product_id
+        self.workspace_product_id = workspace_product_id
+        self.supplier_id = supplier_id
 
     def claims(self) -> str:
         return (
@@ -82,7 +96,50 @@ def make_workspace(cur: psycopg.Cursor, label: str) -> Workspace:
         "insert into audit_event (tenant_id,action,outcome,target) values (%s,%s,'success',%s)",
         (tenant_id, f"{label}.secret", f'{{"secret":"{label}-confidential"}}'),
     )
-    return Workspace(tenant_id, user_id, membership_id, f"{label} Ltd")
+
+    # Catalogue and supplier data — chunk 4.2 (002-catalogue-suppliers), T038.
+    canonical_product_id, workspace_product_id, supplier_id = uuid4(), uuid4(), uuid4()
+    cur.execute(
+        "insert into supported_base_unit (code,label_en,label_ar,dimension,is_enabled) "
+        "values ('each','Each','قطعة','count',true) on conflict do nothing"
+    )
+    cur.execute(
+        "insert into canonical_product (id,name,base_unit) values (%s,%s,'each')",
+        (canonical_product_id, f"{label} widget"),
+    )
+    cur.execute(
+        "insert into workspace_product (id,tenant_id,canonical_product_id,tenant_name) "
+        "values (%s,%s,%s,%s)",
+        (workspace_product_id, tenant_id, canonical_product_id, f"{label} widget"),
+    )
+    cur.execute(
+        "insert into pack_definition (tenant_id,workspace_product_id,pack_count,unit_size) "
+        "values (%s,%s,6,5)",
+        (tenant_id, workspace_product_id),
+    )
+    cur.execute(
+        "insert into supplier (id,tenant_id,name) values (%s,%s,%s)",
+        (supplier_id, tenant_id, f"{label} Supplier Co"),
+    )
+    cur.execute(
+        "insert into product_alias (tenant_id,workspace_product_id,supplier_id,alias_text) "
+        "values (%s,%s,%s,%s)",
+        (tenant_id, workspace_product_id, supplier_id, f"{label}-supplier-wording"),
+    )
+    cur.execute(
+        "insert into import_job (tenant_id,kind,filename) values (%s,'products',%s)",
+        (tenant_id, f"{label}.csv"),
+    )
+
+    return Workspace(
+        tenant_id,
+        user_id,
+        membership_id,
+        f"{label} Ltd",
+        canonical_product_id,
+        workspace_product_id,
+        supplier_id,
+    )
 
 
 @pytest.fixture
@@ -243,6 +300,120 @@ def test_a_malformed_tenant_claim_sees_nothing(
     assert row is not None and row[0] == 0
 
 
+# --- catalogue and suppliers (002-catalogue-suppliers, T038) ----------------
+
+
+def test_another_workspaces_products_are_invisible(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        cur.execute(
+            "select id from workspace_product where id = %s", (beta.workspace_product_id,)
+        )
+        assert cur.fetchall() == []
+
+
+def test_another_workspaces_pack_definitions_are_invisible(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        cur.execute(
+            "select count(*) from pack_definition where workspace_product_id = %s",
+            (beta.workspace_product_id,),
+        )
+        row = cur.fetchone()
+    assert row is not None and row[0] == 0
+
+
+def test_another_workspaces_suppliers_are_invisible(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        cur.execute("select id from supplier where id = %s", (beta.supplier_id,))
+        assert cur.fetchall() == []
+
+
+def test_another_workspaces_aliases_are_invisible(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    """FR-027: an alias resolves only for the workspace that recorded it."""
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        cur.execute(
+            "select count(*) from product_alias where workspace_product_id = %s",
+            (beta.workspace_product_id,),
+        )
+        row = cur.fetchone()
+    assert row is not None and row[0] == 0
+
+
+def test_another_workspaces_import_jobs_are_invisible(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        cur.execute("select count(*) from import_job where tenant_id = %s", (beta.tenant_id,))
+        row = cur.fetchone()
+    assert row is not None and row[0] == 0
+
+
+def test_canonical_product_is_shared_across_workspaces_by_design(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    """The ONE deliberate exception (research.md R5) — must stay an exception, not a leak.
+
+    canonical_product carries no workspace-identifying data, so both workspaces may read both
+    rows. If this ever starts failing, it means someone added a workspace-identifying column
+    to canonical_product without moving it to workspace_product — check that first.
+    """
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        cur.execute(
+            "select id from canonical_product where id = any(%s)",
+            ([alpha.canonical_product_id, beta.canonical_product_id],),
+        )
+        seen = {r[0] for r in cur.fetchall()}
+    assert seen == {alpha.canonical_product_id, beta.canonical_product_id}
+
+
+def test_a_member_cannot_write_a_supplier_into_another_workspace(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            cur.execute(
+                "insert into supplier (tenant_id,name) values (%s,'intruder co')",
+                (beta.tenant_id,),
+            )
+
+
+def test_a_cross_workspace_supplier_update_changes_nothing(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        cur.execute(
+            "update supplier set name = 'renamed' where id = %s", (beta.supplier_id,)
+        )
+        assert cur.rowcount == 0
+        cur.execute("reset role")
+        cur.execute("select name from supplier where id = %s", (beta.supplier_id,))
+        row = cur.fetchone()
+    assert row is not None and row[0] == "beta Supplier Co"
+
+
 def test_platform_invitations_are_unreadable_by_members(
     workspaces: tuple[psycopg.Connection, Workspace, Workspace],
 ) -> None:
@@ -265,7 +436,11 @@ def test_rls_is_enabled_and_forced_on_every_tenant_scoped_table(
     Without FORCE, every test above could pass while production leaked.
     """
     conn, _alpha, _beta = workspaces
-    expected = {"tenant", "membership", "member_invitation", "audit_event", "platform_invitation"}
+    expected = {
+        "tenant", "membership", "member_invitation", "audit_event", "platform_invitation",
+        "workspace_product", "pack_definition", "product_substitute", "supplier",
+        "product_alias", "import_job", "canonical_product",
+    }
     with conn.cursor() as cur:
         cur.execute(
             "select relname, relrowsecurity, relforcerowsecurity from pg_class "

@@ -1,0 +1,4 @@
+tenant_name,canonical_name,brand,variant,gtin,base_unit,pack_count,unit_size,preferred_supplier_id
+"Tomatoes, chopped",Chopped tomatoes,Acme,400g,,each,24,1,
+Olive oil,Olive oil,Harvest,Extra virgin,,litre,6,1.5,
+Dish soap,Dish soap,CleanCo,Lemon,,litre,12,"1.234,56",

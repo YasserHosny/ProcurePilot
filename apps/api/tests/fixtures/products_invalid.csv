@@ -1,0 +1,4 @@
+tenant_name,canonical_name,brand,variant,gtin,base_unit,pack_count,unit_size,preferred_supplier_id
+Olive oil,Olive oil,Harvest,Extra virgin,,litre,6,1.5,
+Broken pack,Broken pack,Acme,Test,,each,0,1.0,
+Ambiguous decimal,Ambiguous decimal,Acme,Test,,litre,6,"1,234",

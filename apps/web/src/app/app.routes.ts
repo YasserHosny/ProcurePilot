@@ -61,6 +61,58 @@ export const routes: Routes = [
           import('./layout/home/home.component').then((m) => m.HomeComponent),
       },
       {
+        path: 'products',
+        loadComponent: () =>
+          import('./features/catalogue/product-list/product-list.component').then(
+            (m) => m.ProductListComponent,
+          ),
+      },
+      {
+        path: 'products/new',
+        canActivate: [roleGuard('owner', 'buyer')],
+        loadComponent: () =>
+          import('./features/catalogue/product-form/product-form.component').then(
+            (m) => m.ProductFormComponent,
+          ),
+      },
+      {
+        path: 'products/:id',
+        loadComponent: () =>
+          import('./features/catalogue/product-form/product-form.component').then(
+            (m) => m.ProductFormComponent,
+          ),
+      },
+      {
+        path: 'suppliers',
+        loadComponent: () =>
+          import('./features/catalogue/supplier-list/supplier-list.component').then(
+            (m) => m.SupplierListComponent,
+          ),
+      },
+      {
+        path: 'suppliers/new',
+        canActivate: [roleGuard('owner', 'buyer')],
+        loadComponent: () =>
+          import('./features/catalogue/supplier-form/supplier-form.component').then(
+            (m) => m.SupplierFormComponent,
+          ),
+      },
+      {
+        path: 'suppliers/:id',
+        loadComponent: () =>
+          import('./features/catalogue/supplier-form/supplier-form.component').then(
+            (m) => m.SupplierFormComponent,
+          ),
+      },
+      {
+        path: 'import',
+        canActivate: [roleGuard('owner', 'buyer')],
+        loadComponent: () =>
+          import('./features/catalogue/import-wizard/import-wizard.component').then(
+            (m) => m.ImportWizardComponent,
+          ),
+      },
+      {
         path: 'team',
         canActivate: [roleGuard('owner')],
         loadComponent: () =>

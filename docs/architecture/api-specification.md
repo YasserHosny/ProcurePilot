@@ -147,50 +147,160 @@ The following endpoints are delivered for chunk 4.1 and mirror
 
 ---
 
-## Catalogue
+## Delivered Catalogue and Suppliers API
+
+The following endpoints are delivered for chunk 4.2 and mirror
+`specs/002-catalogue-suppliers/contracts/catalogue.openapi.yaml`. All routes require bearer auth.
+Tenant scope is resolved from the token. Owner and buyer may mutate; branch manager, approver, and
+viewer are read-only.
 
 ### `GET /products`
 
-Query: `?cursor=&limit=&search=&supplier_id=`
-
-Response:
-```json
-{
-  "data": [
-    {
-      "id": "uuid",
-      "name": "...",
-      "brand": "...",
-      "base_unit": "litre",
-      "pack_count": 6,
-      "unit_size": 5.0,
-      "preferred_supplier_id": "uuid",
-      "updated_at": "..."
-    }
-  ],
-  "next_cursor": "..."
-}
-```
+- Requires bearer auth.
+- Lists products in the active workspace.
+- Query parameters: optional `cursor`, optional `limit` capped at 100 and defaulting to 50,
+  optional `status` (`active`, `archived`, or `all`) defaulting to `active`, optional `q`
+  free-text filter on the workspace's own product name.
+- Returns `200` with `items` containing `Product` resources and nullable `next_cursor`.
 
 ### `POST /products`
 
-Request:
-```json
-{
-  "canonical_product_id": "uuid?",
-  "name": "...",
-  "brand": "...",
-  "base_unit": "litre",
-  "pack_count": 6,
-  "unit_size": 5.0,
-  "preferred_supplier_id": "uuid?"
-}
-```
+- Requires bearer auth and owner or buyer role; accepts `Idempotency-Key`.
+- Creates a product in the active workspace.
+- Request fields: `tenant_name`, `base_unit`, `pack`; optional `brand`, `canonical_name`,
+  `variant`, `gtin`, `preferred_supplier_id`.
+- `pack` fields: `pack_count`, `unit_size`; `base_quantity` is database-derived and returned
+  read-only.
+- Returns `201` with a `Product`.
+- Returns `403` when the caller's role may not create products.
+- Returns `422` when validation fails.
 
-### `POST /products/import`
+### `GET /products/{product_id}`
 
-Async CSV import. Request: multipart/form-data with `file`.
-Response: `Job` resource.
+- Requires bearer auth.
+- Returns a product in the active workspace.
+- Returns `200` with a `Product`.
+- Returns `404` when the product is not in the caller's workspace; this is deliberately
+  indistinguishable from a product that exists in another workspace.
+
+### `PATCH /products/{product_id}`
+
+- Requires bearer auth and owner or buyer role.
+- Updates a product in the active workspace.
+- Request fields: optional `tenant_name`, optional `gtin`, optional `pack`, optional
+  `preferred_supplier_id`.
+- Pack changes recompute the normalised quantity.
+- Returns `200` with the updated `Product`.
+- Returns `403` when the caller's role may not update products.
+
+### `DELETE /products/{product_id}`
+
+- Requires bearer auth and owner or buyer role.
+- Archives a product; it never deletes the row.
+- Returns `204`.
+- Returns `403` when the caller's role may not archive products.
+
+### `POST /products/{product_id}/substitutes`
+
+- Requires bearer auth and owner or buyer role.
+- Approves another workspace product as a substitute.
+- Request field: `substitute_product_id`.
+- Returns `201` when the substitute is recorded.
+- Returns `403` when the caller's role may not record substitutes.
+- Returns `422` when a product is submitted as its own substitute.
+
+### `GET /suppliers`
+
+- Requires bearer auth.
+- Lists suppliers in the active workspace.
+- Query parameters: optional `cursor`, optional `limit` capped at 100 and defaulting to 50,
+  optional `status` (`active`, `preferred`, `blocked`, `archived`, or `all`) defaulting to
+  `active`.
+- Returns `200` with `items` containing `Supplier` resources and nullable `next_cursor`.
+
+### `POST /suppliers`
+
+- Requires bearer auth and owner or buyer role; accepts `Idempotency-Key`.
+- Creates a supplier in the active workspace.
+- Request fields: `name`; optional `payment_terms`, `lead_time_days`, `minimum_order_value`,
+  `delivery_fee`.
+- Monetary fields are objects with `amount` as a decimal string and explicit `currency`; the API
+  has no bare money numbers.
+- Returns `201` with a `Supplier`.
+- Returns `403` when the caller's role may not create suppliers.
+- Returns `422` when validation fails.
+
+### `GET /suppliers/{supplier_id}`
+
+- Requires bearer auth.
+- Returns a supplier in the active workspace.
+- Returns `200` with a `Supplier`.
+- Returns `404` when the supplier is not in the caller's workspace; this is deliberately
+  indistinguishable from a supplier that exists in another workspace.
+
+### `PATCH /suppliers/{supplier_id}`
+
+- Requires bearer auth and owner or buyer role.
+- Updates a supplier, including its status.
+- Request fields: optional `name`, optional `payment_terms`, optional `lead_time_days`, optional
+  `minimum_order_value`, optional `delivery_fee`, optional `status` (`active`, `preferred`,
+  `blocked`, or `archived`).
+- Returns `200` with the updated `Supplier`.
+- Returns `403` when the caller's role may not update suppliers.
+
+### `DELETE /suppliers/{supplier_id}`
+
+- Requires bearer auth and owner or buyer role.
+- Archives a supplier.
+- Returns `204` when archived.
+- Returns `409` when the supplier is referenced by other records and cannot be deleted; archiving
+  is offered instead.
+
+### `GET /aliases`
+
+- Requires bearer auth.
+- Lists the active workspace's supplier-wording aliases.
+- Returns `200` with `items` containing `Alias` resources.
+
+### `POST /aliases`
+
+- Requires bearer auth and owner or buyer role.
+- Records that supplier wording refers to a workspace product.
+- Request fields: `workspace_product_id`, `alias_text`, optional `supplier_id`.
+- Returns `201` with an `Alias`.
+- Returns `409` when the wording already resolves to a product in this workspace.
+
+### `DELETE /aliases/{alias_id}`
+
+- Requires bearer auth and owner or buyer role.
+- Removes an alias from the active workspace.
+- Returns `204`.
+
+### `POST /imports`
+
+- Requires bearer auth and owner or buyer role.
+- Uploads a file and validates it without saving catalogue or supplier rows.
+- Request: `multipart/form-data` with `kind` (`products` or `suppliers`) and `file`.
+- Returns `200` with `ImportPreview`. A `200` means the file was read, not that the file was valid.
+- `ImportPreview` includes `import_id`, `kind`, `row_count`, `valid`, `missing_columns`,
+  `unrecognised_columns`, `duplicates`, `errors`, and `preview`.
+- Import errors include the source file `line`, optional `column`, and `reason`.
+- Returns `403` when the caller's role may not import.
+- Returns `415` when the file type is refused before parsing.
+
+### `POST /imports/{import_id}/commit`
+
+- Requires bearer auth and owner or buyer role.
+- Commits a previously validated import all-or-nothing.
+- Request field: optional `on_duplicate` (`skip` or `update`), default `skip`.
+- Returns `200` with `ImportResult` fields `import_id`, `created`, `skipped`, and `updated`.
+- Returns `409` when the import had errors or was already committed.
+
+### `GET /reference/base-units`
+
+- Requires bearer auth.
+- Returns enabled base units a product may be measured in.
+- Returns `200` with `items` containing `BaseUnit` resources.
 
 ---
 

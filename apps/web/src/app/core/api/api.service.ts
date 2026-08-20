@@ -4,12 +4,22 @@ import { Observable } from 'rxjs';
 
 import { environment } from '../../../environments/environment';
 import type {
+  Alias,
+  BaseUnit,
   ConfigOptions,
+  ImportPreview,
+  ImportResult,
   Invitation,
   Me,
   Member,
+  Product,
+  ProductCreate,
+  ProductUpdate,
   Role,
   Session,
+  Supplier,
+  SupplierCreate,
+  SupplierUpdate,
   Tenant,
   WorkspaceSummary,
 } from './models';
@@ -128,4 +138,121 @@ export class ApiService {
   configOptions(): Observable<ConfigOptions> {
     return this.http.get<ConfigOptions>(`${this.base}/reference/config-options`);
   }
+
+  baseUnits(): Observable<{ items: BaseUnit[] }> {
+    return this.http.get<{ items: BaseUnit[] }>(`${this.base}/reference/base-units`);
+  }
+
+  // --- products -----------------------------------------------------------
+
+  products(params?: {
+    cursor?: string;
+    limit?: number;
+    status?: 'active' | 'archived' | 'all';
+    q?: string;
+  }): Observable<{ items: Product[]; next_cursor: string | null }> {
+    const query = new URLSearchParams();
+    if (params?.cursor) query.set('cursor', params.cursor);
+    if (params?.limit) query.set('limit', String(params.limit));
+    if (params?.status) query.set('status', params.status);
+    if (params?.q) query.set('q', params.q);
+    const qs = query.toString() ? `?${query.toString()}` : '';
+    return this.http.get<{ items: Product[]; next_cursor: string | null }>(
+      `${this.base}/products${qs}`,
+    );
+  }
+
+  product(productId: string): Observable<Product> {
+    return this.http.get<Product>(`${this.base}/products/${productId}`);
+  }
+
+  createProduct(body: ProductCreate, idempotencyKey?: string): Observable<Product> {
+    const headers = idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined;
+    return this.http.post<Product>(`${this.base}/products`, body, { headers });
+  }
+
+  updateProduct(productId: string, body: ProductUpdate): Observable<Product> {
+    return this.http.patch<Product>(`${this.base}/products/${productId}`, body);
+  }
+
+  archiveProduct(productId: string): Observable<void> {
+    return this.http.delete<void>(`${this.base}/products/${productId}`);
+  }
+
+  approveSubstitute(productId: string, substituteProductId: string): Observable<void> {
+    return this.http.post<void>(`${this.base}/products/${productId}/substitutes`, {
+      substitute_product_id: substituteProductId,
+    });
+  }
+
+  // --- suppliers ----------------------------------------------------------
+
+  suppliers(params?: {
+    cursor?: string;
+    limit?: number;
+    status?: 'active' | 'preferred' | 'blocked' | 'archived' | 'all';
+  }): Observable<{ items: Supplier[]; next_cursor: string | null }> {
+    const query = new URLSearchParams();
+    if (params?.cursor) query.set('cursor', params.cursor);
+    if (params?.limit) query.set('limit', String(params.limit));
+    if (params?.status) query.set('status', params.status);
+    const qs = query.toString() ? `?${query.toString()}` : '';
+    return this.http.get<{ items: Supplier[]; next_cursor: string | null }>(
+      `${this.base}/suppliers${qs}`,
+    );
+  }
+
+  supplier(supplierId: string): Observable<Supplier> {
+    return this.http.get<Supplier>(`${this.base}/suppliers/${supplierId}`);
+  }
+
+  createSupplier(body: SupplierCreate, idempotencyKey?: string): Observable<Supplier> {
+    const headers = idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined;
+    return this.http.post<Supplier>(`${this.base}/suppliers`, body, { headers });
+  }
+
+  updateSupplier(supplierId: string, body: SupplierUpdate): Observable<Supplier> {
+    return this.http.patch<Supplier>(`${this.base}/suppliers/${supplierId}`, body);
+  }
+
+  archiveSupplier(supplierId: string): Observable<void> {
+    return this.http.delete<void>(`${this.base}/suppliers/${supplierId}`);
+  }
+
+  // --- aliases ------------------------------------------------------------
+
+  aliases(): Observable<{ items: Alias[] }> {
+    return this.http.get<{ items: Alias[] }>(`${this.base}/aliases`);
+  }
+
+  createAlias(body: {
+    workspace_product_id: string;
+    supplier_id?: string | null;
+    alias_text: string;
+  }): Observable<Alias> {
+    return this.http.post<Alias>(`${this.base}/aliases`, body);
+  }
+
+  deleteAlias(aliasId: string): Observable<void> {
+    return this.http.delete<void>(`${this.base}/aliases/${aliasId}`);
+  }
+
+  // --- imports ------------------------------------------------------------
+
+  uploadImport(kind: 'products' | 'suppliers', file: File): Observable<ImportPreview> {
+    const formData = new FormData();
+    formData.append('kind', kind);
+    formData.append('file', file);
+    return this.http.post<ImportPreview>(`${this.base}/imports`, formData);
+  }
+
+  commitImport(
+    importId: string,
+    onDuplicate: 'skip' | 'update' = 'skip',
+  ): Observable<ImportResult> {
+    return this.http.post<ImportResult>(`${this.base}/imports/${importId}/commit`, {
+      on_duplicate: onDuplicate,
+    });
+  }
 }
+

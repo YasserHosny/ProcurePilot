@@ -1,0 +1,195 @@
+<div class="catalogue-container">
+  <div class="page-header">
+    <div class="header-info">
+      <h1 class="page-title">{{ 'catalogue.products.title' | translate }}</h1>
+      <p class="page-subtitle">{{ 'catalogue.products.subtitle' | translate }}</p>
+    </div>
+
+    <div class="header-actions">
+      <a
+        mat-stroked-button
+        routerLink="/import"
+        [queryParams]="{ kind: 'products' }"
+        class="action-btn"
+        *appRole="['owner', 'buyer']"
+      >
+        <mat-icon aria-hidden="true">upload_file</mat-icon>
+        <span>{{ 'catalogue.products.importButton' | translate }}</span>
+      </a>
+
+      <a
+        mat-flat-button
+        color="primary"
+        routerLink="/products/new"
+        class="action-btn"
+        *appRole="['owner', 'buyer']"
+      >
+        <mat-icon aria-hidden="true">add</mat-icon>
+        <span>{{ 'catalogue.products.createButton' | translate }}</span>
+      </a>
+    </div>
+  </div>
+
+  @if (!isWriter()) {
+    <div class="read-only-banner" role="status">
+      <mat-icon class="info-icon" aria-hidden="true">info</mat-icon>
+      <span class="read-only-text">{{ 'catalogue.products.readOnlyBanner' | translate }}</span>
+    </div>
+  }
+
+  @if (errorMessage()) {
+    <div class="error-banner" role="alert">
+      <mat-icon class="error-icon" aria-hidden="true">error_outline</mat-icon>
+      <div class="error-text-wrap">
+        <div class="error-title">{{ 'common.traceId' | translate }}</div>
+        <div class="error-message">{{ errorMessage() }}</div>
+        @if (errorTraceId(); as traceId) {
+          <div class="error-trace">{{ traceId }}</div>
+        }
+      </div>
+    </div>
+  }
+
+  <mat-card class="catalogue-card">
+    <div class="filter-toolbar">
+      <mat-form-field appearance="outline" class="search-field" subscriptSizing="dynamic">
+        <mat-icon matPrefix aria-hidden="true">search</mat-icon>
+        <input
+          matInput
+          [placeholder]="'catalogue.products.searchPlaceholder' | translate"
+          [(ngModel)]="searchQuery"
+          (keyup.enter)="onSearch()"
+        />
+        @if (searchQuery()) {
+          <button
+            mat-icon-button
+            matSuffix
+            type="button"
+            (click)="clearSearch()"
+            [attr.aria-label]="'catalogue.products.form.cancel' | translate"
+          >
+            <mat-icon aria-hidden="true">close</mat-icon>
+          </button>
+        }
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="status-field" subscriptSizing="dynamic">
+        <mat-select
+          [value]="statusFilter()"
+          (selectionChange)="onFilterChange($event.value)"
+          [attr.aria-label]="'catalogue.products.filterStatus' | translate"
+        >
+          <mat-option value="active">{{ 'catalogue.products.statusActive' | translate }}</mat-option>
+          <mat-option value="archived">{{ 'catalogue.products.statusArchived' | translate }}</mat-option>
+          <mat-option value="all">{{ 'catalogue.products.statusAll' | translate }}</mat-option>
+        </mat-select>
+      </mat-form-field>
+    </div>
+
+    @if (isLoading()) {
+      <div class="loading-state" aria-live="polite">
+        <mat-spinner diameter="40"></mat-spinner>
+        <span>{{ 'common.loading' | translate }}</span>
+      </div>
+    } @else if (products().length === 0) {
+      <div class="empty-state">
+        <mat-icon class="empty-icon" aria-hidden="true">inventory_2</mat-icon>
+        <p class="empty-message">
+          {{ (searchQuery() ? 'catalogue.products.emptySearch' : 'catalogue.products.emptyList') | translate }}
+        </p>
+      </div>
+    } @else {
+      <div class="table-responsive">
+        <table mat-table [dataSource]="products()" class="products-table">
+          <ng-container matColumnDef="name">
+            <th mat-header-cell *matHeaderCellDef>{{ 'catalogue.products.columns.name' | translate }}</th>
+            <td mat-cell *matCellDef="let product">
+              <div class="product-name-cell">
+                <span class="product-tenant-name">{{ product.tenant_name }}</span>
+                @if (product.canonical_name && product.canonical_name !== product.tenant_name) {
+                  <span class="product-canonical-name">{{ product.canonical_name }}</span>
+                }
+              </div>
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="brand">
+            <th mat-header-cell *matHeaderCellDef>{{ 'catalogue.products.columns.brand' | translate }}</th>
+            <td mat-cell *matCellDef="let product">
+              <div class="brand-variant-cell">
+                <span>{{ product.brand || '—' }}</span>
+                @if (product.variant) {
+                  <span class="variant-tag">{{ product.variant }}</span>
+                }
+              </div>
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="gtin">
+            <th mat-header-cell *matHeaderCellDef>{{ 'catalogue.products.columns.gtin' | translate }}</th>
+            <td mat-cell *matCellDef="let product" class="gtin-cell">
+              {{ product.gtin || '—' }}
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="pack">
+            <th mat-header-cell *matHeaderCellDef>{{ 'catalogue.products.columns.pack' | translate }}</th>
+            <td mat-cell *matCellDef="let product">
+              {{ formatPack(product) }}
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="normalised">
+            <th mat-header-cell *matHeaderCellDef>{{ 'catalogue.products.columns.normalised' | translate }}</th>
+            <td mat-cell *matCellDef="let product" class="normalised-cell">
+              <strong>{{ formatNormalised(product) }}</strong>
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="status">
+            <th mat-header-cell *matHeaderCellDef>{{ 'catalogue.products.columns.status' | translate }}</th>
+            <td mat-cell *matCellDef="let product">
+              <span class="status-indicator status-{{ product.status }}">
+                <span class="dot"></span>
+                <span>{{ 'catalogue.products.status' + (product.status === 'active' ? 'Active' : 'Archived') | translate }}</span>
+              </span>
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="actions">
+            <th mat-header-cell *matHeaderCellDef>{{ 'catalogue.products.columns.actions' | translate }}</th>
+            <td mat-cell *matCellDef="let product">
+              <div class="actions-cell">
+                <a
+                  mat-icon-button
+                  [routerLink]="['/products', product.id]"
+                  [attr.aria-label]="(isWriter() ? 'catalogue.products.actions.edit' : 'catalogue.products.actions.view') | translate"
+                  [matTooltip]="(isWriter() ? 'catalogue.products.actions.edit' : 'catalogue.products.actions.view') | translate"
+                >
+                  <mat-icon aria-hidden="true">{{ isWriter() ? 'edit' : 'visibility' }}</mat-icon>
+                </a>
+
+                @if (product.status !== 'archived') {
+                  <button
+                    mat-icon-button
+                    type="button"
+                    (click)="openArchiveDialog(product)"
+                    class="danger-action"
+                    [attr.aria-label]="'catalogue.products.actions.archive' | translate"
+                    [matTooltip]="'catalogue.products.actions.archive' | translate"
+                    *appRole="['owner', 'buyer']"
+                  >
+                    <mat-icon aria-hidden="true">archive</mat-icon>
+                  </button>
+                }
+              </div>
+            </td>
+          </ng-container>
+
+          <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+          <tr mat-row *matRowDef="let row; columns: displayedColumns"></tr>
+        </table>
+      </div>
+    }
+  </mat-card>
+</div>

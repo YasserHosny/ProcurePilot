@@ -79,4 +79,97 @@ test.describe('Accessibility @a11y', () => {
     const results = await scan(page);
     expect(results.violations, describeViolations(results)).toEqual([]);
   });
+
+  // --- Catalogue and Suppliers A11y (T040, SC-008) ---
+
+  test('the product list screen in English has no WCAG 2.1 AA violations @a11y', async ({ page }) => {
+    await signIn(page);
+    await page.goto('/products');
+    await expect(page.locator('.page-title')).toContainText('Product Master');
+    const results = await scan(page);
+    expect(results.violations, describeViolations(results)).toEqual([]);
+  });
+
+  test('the product list screen in Arabic has no WCAG 2.1 AA violations @a11y', async ({ page }) => {
+    await signIn(page);
+    await page.click('.account-btn');
+    await page.click('button:has-text("العربية")');
+    await page.goto('/products');
+    await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
+    const results = await scan(page);
+    expect(results.violations, describeViolations(results)).toEqual([]);
+  });
+
+  test('the product form screen in English has no WCAG 2.1 AA violations @a11y', async ({ page }) => {
+    await signIn(page);
+    await page.goto('/products/new');
+    await expect(page.locator('.page-title')).toContainText('Create Product');
+    const results = await scan(page);
+    expect(results.violations, describeViolations(results)).toEqual([]);
+  });
+
+  test('the product form screen in Arabic has no WCAG 2.1 AA violations @a11y', async ({ page }) => {
+    await signIn(page);
+    await page.click('.account-btn');
+    await page.click('button:has-text("العربية")');
+    await page.goto('/products/new');
+    await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
+    const results = await scan(page);
+    expect(results.violations, describeViolations(results)).toEqual([]);
+  });
+
+  test('the supplier list screen in English has no WCAG 2.1 AA violations @a11y', async ({ page }) => {
+    await signIn(page);
+    await page.goto('/suppliers');
+    await expect(page.locator('.page-title')).toContainText('Suppliers');
+    const results = await scan(page);
+    expect(results.violations, describeViolations(results)).toEqual([]);
+  });
+
+  test('the supplier list screen in Arabic has no WCAG 2.1 AA violations @a11y', async ({ page }) => {
+    await signIn(page);
+    await page.click('.account-btn');
+    await page.click('button:has-text("العربية")');
+    await page.goto('/suppliers');
+    await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
+    const results = await scan(page);
+    expect(results.violations, describeViolations(results)).toEqual([]);
+  });
+
+  test('the supplier form screen in English has no WCAG 2.1 AA violations @a11y', async ({ page }) => {
+    await signIn(page);
+    await page.goto('/suppliers/new');
+    await expect(page.locator('.page-title')).toContainText('Create Supplier');
+    const results = await scan(page);
+    expect(results.violations, describeViolations(results)).toEqual([]);
+  });
+
+  test('the supplier form screen in Arabic has no WCAG 2.1 AA violations @a11y', async ({ page }) => {
+    await signIn(page);
+    await page.click('.account-btn');
+    await page.click('button:has-text("العربية")');
+    await page.goto('/suppliers/new');
+    await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
+    const results = await scan(page);
+    expect(results.violations, describeViolations(results)).toEqual([]);
+  });
+
+  test('the import wizard screen in English has no WCAG 2.1 AA violations @a11y', async ({ page }) => {
+    await signIn(page);
+    await page.goto('/import');
+    await expect(page.locator('.page-title')).toContainText('Import Wizard');
+    const results = await scan(page);
+    expect(results.violations, describeViolations(results)).toEqual([]);
+  });
+
+  test('the import wizard screen in Arabic has no WCAG 2.1 AA violations @a11y', async ({ page }) => {
+    await signIn(page);
+    await page.click('.account-btn');
+    await page.click('button:has-text("العربية")');
+    await page.goto('/import');
+    await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
+    const results = await scan(page);
+    expect(results.violations, describeViolations(results)).toEqual([]);
+  });
 });
+
