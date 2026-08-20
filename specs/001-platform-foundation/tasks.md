@@ -227,10 +227,10 @@ Task groups are shaped to be dispatched to separate implementer CLIs with minima
 
 | Lane | Scope | Owner | Tasks |
 |---|---|---|---|
-| **A — Backend** | FastAPI modules, services, endpoints | `codex` | T003, T019–T028, T038–T045, T053–T056, T065 |
-| **B — Frontend** | Angular shell, screens, i18n | `agy` | T004, T029–T032, T046–T048, T057–T061, T062–T069, T082 |
-| **C — Infra & CI** | compose, Dockerfiles, workflows, Terraform | `opencode` | T001, T002, T005–T010, T072–T081 |
-| **D — Tenancy & security** | migrations, RLS, auth hook, isolation tests | **not delegated** | T011–T018, T033–T037, T049, T051, T052 |
+| **A — Backend** | FastAPI modules, services, endpoints | lane `backend` → codex | T003, T019–T028, T038–T045, T053–T056, T065 |
+| **B — Frontend** | Angular shell, screens, i18n | lane `frontend` → opencode | T004, T029–T032, T046–T048, T057–T061, T062–T069, T082 |
+| **C — Infra & CI** | compose, Dockerfiles, workflows, Terraform | lane `infra` → agy | T001, T002, T005–T010, T072–T081 |
+| **D — Tenancy & security** | migrations, RLS, auth hook, isolation tests | **not delegated** — orchestrator | T011–T018, T033–T037, T049, T051, T052 |
 
 **Lane D is deliberately retained.** Principle V's failure mode is silent and unrecoverable: a
 policy that is merely *present* but missing `WITH CHECK`, or a table with `ENABLE` but not
