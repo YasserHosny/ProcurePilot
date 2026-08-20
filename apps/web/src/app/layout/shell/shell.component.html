@@ -118,19 +118,19 @@
         <span class="nav-label">{{ 'shell.navHome' | translate }}</span>
       </a>
 
-      <div class="nav-item disabled">
+      <div class="nav-item disabled" aria-disabled="true">
         <mat-icon aria-hidden="true">receipt_long</mat-icon>
         <span class="nav-label">{{ 'shell.navQuotations' | translate }}</span>
         <span class="soon-badge">{{ 'common.comingSoon' | translate }}</span>
       </div>
 
-      <div class="nav-item disabled">
+      <div class="nav-item disabled" aria-disabled="true">
         <mat-icon aria-hidden="true">compare_arrows</mat-icon>
         <span class="nav-label">{{ 'shell.navCompare' | translate }}</span>
         <span class="soon-badge">{{ 'common.comingSoon' | translate }}</span>
       </div>
 
-      <div class="nav-item disabled">
+      <div class="nav-item disabled" aria-disabled="true">
         <mat-icon aria-hidden="true">savings</mat-icon>
         <span class="nav-label">{{ 'shell.navSavings' | translate }}</span>
         <span class="soon-badge">{{ 'common.comingSoon' | translate }}</span>
@@ -147,14 +147,19 @@
         <span class="nav-label">{{ 'shell.navTeam' | translate }}</span>
       </a>
 
-      <div class="nav-item disabled">
+      <div class="nav-item disabled" aria-disabled="true">
         <mat-icon aria-hidden="true">settings</mat-icon>
         <span class="nav-label">{{ 'shell.navSettings' | translate }}</span>
         <span class="soon-badge">{{ 'common.comingSoon' | translate }}</span>
       </div>
     </mat-sidenav>
 
-    <mat-sidenav-content class="main-content">
+    <!--
+      tabindex="0" because this region scrolls (overflow-y: auto) and axe flags a scrollable
+      region with no focusable content: a keyboard-only user could not scroll it at all. Making
+      the container itself focusable gives them arrow-key access.
+    -->
+    <mat-sidenav-content class="main-content" tabindex="0">
       <router-outlet></router-outlet>
     </mat-sidenav-content>
   </mat-sidenav-container>

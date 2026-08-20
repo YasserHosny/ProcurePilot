@@ -1,0 +1,272 @@
+name: CI
+
+# Every check here is required to merge. A gate nobody has watched fail is not a gate, so each job
+# below has been run locally against the real stack before being wired in — see the commit that
+# introduced this file.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: '3.12'
+  NODE_VERSION: '20'
+
+jobs:
+  secrets:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # gitleaks needs history to scan the commits a PR adds, not just the tree.
+          fetch-depth: 0
+      - name: Scan for committed secrets
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: apps/web/pnpm-lock.yaml
+      - name: Install web dependencies
+        working-directory: apps/web
+        run: pnpm install --ignore-workspace --frozen-lockfile
+      - name: Lint backend
+        run: uv run --project apps/api ruff check apps/api
+      - name: Lint web
+        working-directory: apps/web
+        run: pnpm lint
+
+  backend-tests:
+    name: Backend tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        # pgvector is required by migration 0001. The plain postgres image cannot apply it.
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Run unit and integration tests
+        # TEST_DATABASE_URL is what the database-backed tests look for; without it they SKIP
+        # rather than fail, so omitting it would quietly hollow out this job.
+        env:
+          TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
+        run: uv run --project apps/api pytest apps/api -q
+
+  tenant-isolation:
+    name: Tenant isolation
+    # Deliberately its own job with its own name (FR-030). Constitution Principle V's failure mode
+    # is silent, and a cross-tenant leak buried among two hundred other test results is a leak
+    # nobody notices. When this check goes red, the reason is unambiguous.
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Prepare the Supabase stand-ins the migrations depend on
+        # The migrations reference auth.users and grant to the Supabase roles. Hosted Supabase and
+        # the local CLI both provide these; a bare Postgres service does not.
+        env:
+          PGPASSWORD: postgres
+        run: |
+          psql -h localhost -U postgres -v ON_ERROR_STOP=1 <<'SQL'
+          create schema if not exists auth;
+          create table if not exists auth.users (id uuid primary key, email text);
+          do $$ begin create role anon nologin; exception when duplicate_object then null; end $$;
+          do $$ begin create role authenticated nologin; exception when duplicate_object then null; end $$;
+          do $$ begin create role service_role nologin bypassrls; exception when duplicate_object then null; end $$;
+          do $$ begin create role supabase_auth_admin noinherit login password 'postgres'; exception when duplicate_object then null; end $$;
+          do $$ begin create role supabase_admin superuser; exception when duplicate_object then null; end $$;
+          grant usage on schema public, auth to anon, authenticated, service_role;
+          grant anon, authenticated, service_role to postgres;
+          SQL
+      - name: Apply migrations
+        env:
+          PGPASSWORD: postgres
+        run: |
+          for f in supabase/migrations/*.sql; do
+            echo "applying $f"
+            psql -h localhost -U postgres -v ON_ERROR_STOP=1 -q -f "$f"
+          done
+      - name: Prove cross-tenant isolation
+        env:
+          TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
+        run: uv run --project apps/api pytest apps/api/tests/integration/test_tenant_isolation.py -q
+
+  web-unit-tests:
+    name: Web unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: apps/web/pnpm-lock.yaml
+      - name: Install web dependencies
+        working-directory: apps/web
+        run: pnpm install --ignore-workspace --frozen-lockfile
+      - name: Unit tests
+        # Includes the i18n catalogue completeness check (SC-005): a key present in one language
+        # and missing from the other fails here rather than reaching a customer as a raw key.
+        working-directory: apps/web
+        run: pnpm exec ng test --watch=false --browsers=ChromeHeadless
+      - name: Production build
+        working-directory: apps/web
+        run: pnpm exec ng build
+
+  e2e:
+    name: End-to-end
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: apps/web/pnpm-lock.yaml
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Start Supabase
+        # `supabase start` — NOT docker compose. Three GoTrue versions could not migrate against a
+        # hand-assembled compose stack, including the pairing Supabase themselves publish; the CLI
+        # ships a set that works together. research.md R5 records the whole episode.
+        # This also applies supabase/migrations and honours supabase/config.toml, which enables the
+        # custom access token hook that puts tenant_id into the JWT. Without that hook every
+        # tenant-scoped query returns zero rows and the app looks empty rather than broken.
+        run: supabase start
+
+      - name: Export Supabase credentials
+        run: |
+          supabase status -o env | sed 's/^/SUPABASE_/' > /tmp/sb.env
+          {
+            echo "SUPABASE_URL=$(supabase status -o env | grep '^API_URL=' | cut -d= -f2- | tr -d '\"')"
+            echo "SUPABASE_ANON_KEY=$(supabase status -o env | grep '^ANON_KEY=' | cut -d= -f2- | tr -d '\"')"
+            echo "SUPABASE_SERVICE_ROLE_KEY=$(supabase status -o env | grep '^SERVICE_ROLE_KEY=' | cut -d= -f2- | tr -d '\"')"
+            echo "SUPABASE_JWT_SECRET=$(supabase status -o env | grep '^JWT_SECRET=' | cut -d= -f2- | tr -d '\"')"
+            echo "DATABASE_URL=$(supabase status -o env | grep '^DB_URL=' | cut -d= -f2- | tr -d '\"')"
+          } >> "$GITHUB_ENV"
+
+      - name: Seed reference data
+        env:
+          API_HOST: 127.0.0.1
+          API_PORT: '8000'
+          API_ENV: local
+          API_LOG_LEVEL: info
+          API_CORS_ORIGINS: http://localhost:4200
+          SUPABASE_JWT_AUDIENCE: authenticated
+          PLATFORM_INVITATION_TTL_DAYS: '7'
+          MEMBER_INVITATION_TTL_DAYS: '7'
+          RATE_LIMIT_AUTH: 60/minute
+          WEB_API_BASE_URL: http://localhost:8000/api/v1
+          WEB_DEFAULT_LOCALE: en
+        run: uv run --project apps/api python apps/api/scripts/seed.py
+
+      - name: Start the API
+        env:
+          API_HOST: 127.0.0.1
+          API_PORT: '8000'
+          API_ENV: local
+          API_LOG_LEVEL: info
+          API_CORS_ORIGINS: http://localhost:4200
+          SUPABASE_JWT_AUDIENCE: authenticated
+          PLATFORM_INVITATION_TTL_DAYS: '7'
+          MEMBER_INVITATION_TTL_DAYS: '7'
+          # Higher than production on purpose: the suite signs in far more often than a person
+          # does, and a 429 mid-run is a false failure. It is still a real limit, not disabled.
+          RATE_LIMIT_AUTH: 60/minute
+          WEB_API_BASE_URL: http://localhost:8000/api/v1
+          WEB_DEFAULT_LOCALE: en
+        run: |
+          SUPABASE_JWT_ISSUER="${SUPABASE_URL}/auth/v1" \
+            uv run --project apps/api uvicorn procurepilot_api.main:app \
+            --host 127.0.0.1 --port 8000 --app-dir apps/api/src &
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:8000/api/v1/health && break
+            sleep 2
+          done
+          curl -sf http://localhost:8000/api/v1/health
+
+      - name: Install web dependencies
+        working-directory: apps/web
+        run: pnpm install --ignore-workspace --frozen-lockfile
+
+      - name: Start the web app
+        working-directory: apps/web
+        run: |
+          pnpm exec ng serve --port 4200 &
+          for i in $(seq 1 60); do
+            curl -sf http://localhost:4200/ >/dev/null && break
+            sleep 2
+          done
+          curl -sf http://localhost:4200/ >/dev/null
+
+      - name: Accessibility — WCAG 2.1 AA, zero violations
+        # Its own step so an accessibility regression is named as one rather than buried among
+        # the functional specs (FR-022, SC-006).
+        working-directory: apps/web
+        run: pnpm exec playwright test a11y
+
+      - name: Run end-to-end specs
+        # playwright.config.ts uses channel:'chrome' rather than a bundled browser, so CI must
+        # provide Chrome. ubuntu-latest runners ship with it; this step fails loudly if that
+        # ever stops being true.
+        working-directory: apps/web
+        run: |
+          google-chrome --version
+          pnpm exec playwright test
+
+      - name: Upload failure artefacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-artifacts
+          path: apps/web/test-results/
+          retention-days: 7

@@ -130,7 +130,11 @@
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: #94a3b8;
+  // Was #94a3b8, which measured 2.87:1 against white — well under the WCAG AA minimum of 4.5:1.
+  // #64748b alone was not enough either: Material applies an inherited opacity to this text, so
+  // axe measured the BLENDED colour (#9199a5) rather than the declared one. #475569 is ~7:1
+  // before blending and clears the bar after it.
+  color: #475569;
 }
 
 .nav-item {
@@ -230,7 +234,11 @@
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: #94a3b8;
+  // Was #94a3b8, which measured 2.87:1 against white — well under the WCAG AA minimum of 4.5:1.
+  // #64748b alone was not enough either: Material applies an inherited opacity to this text, so
+  // axe measured the BLENDED colour (#9199a5) rather than the declared one. #475569 is ~7:1
+  // before blending and clears the bar after it.
+  color: #475569;
 }
 
 .workspace-menu-item {

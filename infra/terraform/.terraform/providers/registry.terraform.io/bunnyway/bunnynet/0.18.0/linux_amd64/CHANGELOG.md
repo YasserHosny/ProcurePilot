@@ -1,0 +1,610 @@
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
+
+> [!NOTE]
+> While we strive to maintain backwards compatibility as much as possible, we can't guarantee semantic versioning will be strictly followed, as this provider depends on the underlying [bunny.net API](https://docs.bunny.net/reference/bunnynet-api-overview).
+
+## Unreleased
+
+## 0.18.0 - 2026-08-13
+
+### Backwards compatibility breaks
+
+The `pullzone_shield` `ddos.mode` attribute was removed. Shield Zones are always in Blocking mode, but you can configure its sensitivity via the [`ddos.level`](https://registry.terraform.io/providers/BunnyWay/bunnynet/latest/docs/resources/pullzone_shield#level-1) attribute.
+
+### Added
+- action `pullzone_cache_purge`;
+- action `url_cache_purge`;
+- resource `pullzone_shield`: support Upload Scanning;
+- resource `pullzone_shield`: support Whitelabel custom pages;
+
+### Fixed
+- resource `dns_record`: changing `zone` should trigger a replacement ([#90](https://github.com/BunnyWay/terraform-provider-bunnynet/issues/90));
+
+### Changed
+- resource `pullzone_shield`: removed the `ddos.mode` attribute;
+
+## 0.17.0 - 2026-08-04
+
+### Backwards compatibility breaks
+
+The `storage_zone.hostname` changes in [v0.16.0](#0160---2026-07-30) were reverted.
+
+### Added
+- resource `storage_zone`: expose `hostname_s3`;
+
+### Changed
+- resource `storage_zone`: `hostname` will return the Standard hostname, regardless of `type`;
+
+### Fixed
+- resource `pullzone_optimizer_class`: `auto_optimize` wrongly overrides `crop_gravity`;
+
+## 0.16.0 - 2026-07-30
+
+### Backwards compatibility breaks
+
+The `hostname` field in a `storage_zone` resource will now return the S3-specific hostname (i.e.: `sg-s3.storage.bunnycdn.com`) when `type = "S3"`. Previously it would return the Standard hostname (i.e.: `sg.storage.bunnycdn.com`).
+
+### Added
+- resource `pullzone`: expose `origin.script_execute_before_cache`;
+
+### Changed
+- resource `storage_zone`: `hostname` will now return the S3-specific hostname when applicable;
+
+## 0.15.2 - 2026-07-27
+
+### Added
+- resource `stream_library`: expose `api_key_readonly`;
+
+### Changed
+- resource `compute_container_app`: expose `container[].endpoint[].id`;
+- datasource `bunnynet_compute_container_app_container_endpoint`: expose endpoint `id`;
+
+## 0.15.1 - 2026-06-22
+
+### Fixed
+- resource `account_subuser`: wrong permissions in the docs;
+
+## 0.15.0 - 2026-06-22
+
+### Added
+- Support to manage team members via the `account_subuser` resource;
+
+### Changed
+- Bumped minimum Terraform version to 1.11;
+
+## 0.14.3 - 2026-06-15
+
+### Added
+- resource `pullzone`: vary cache by request headers;
+
+### Changed
+- resource `pullzone`: `websockets_max_connections` can be configured to increments of 100;
+
+## 0.14.2 - 2026-05-19
+
+### Fixed
+- resource `stream_library`: videolibrary API URL change ([#81](https://github.com/BunnyWay/terraform-provider-bunnynet/pull/81));
+- resource `stream_library`: mark `api_key` as sensitive ([#82](https://github.com/BunnyWay/terraform-provider-bunnynet/pull/82));
+- provider config: mark `api_key` as sensitive ([#82](https://github.com/BunnyWay/terraform-provider-bunnynet/pull/82));
+
+### Changed
+- resource `pullzone_ratelimit_rule`: update enums;
+- resource `pullzone_waf_rule`: update enums;
+
+## 0.14.1 - 2026-05-11
+
+### Added
+- resource `storage_zone`: S3 support;
+- resource `compute_container_app`: container `image_digest` attribute;
+### Fixed
+- resource `compute_container_app`: normalize endpoint protocol casing;
+
+## 0.14.0 - 2026-03-25
+
+### Backwards compatibility breaks
+
+1. All attributes under `origin` are now validated with regard to the origin `type`, which can cause errors in some configurations. Just remove the attributes as the validation suggests;
+
+2. The `ComputeScript` type does not require the `url = "https://bunnycdn.com"` configuration anymore;
+
+3. The `ComputeContainer` type does not require the `url = "https://bunny.net"` configuration anymore;
+
+4. Pullzones using the `DnsAccelerate` origin type now have to be configured via the new [`dns_port`](https://registry.terraform.io/providers/BunnyWay/bunnynet/latest/docs/resources/pullzone#dns_port-1) and [`dns_scheme`](https://registry.terraform.io/providers/BunnyWay/bunnynet/latest/docs/resources/pullzone#dns_scheme-1) attributes:
+
+```terraform
+resource "bunnynet_pullzone" "example" {
+  # ...
+
+  origin {
+    type       = "DnsAccelerate"
+    dns_scheme = "https"
+    dns_port   = 443
+  }
+
+  routing {
+    tier = "Standard"
+  }
+}
+```
+
+### Added
+- resource `pullzone`: origin `dns_port` and `dns_scheme` for DnsAccelerate origin types;
+- resource `pullzone_access_list`: support `JA4` and `Organization` list types;
+- resource `pullzone_edgerule`: support `EnableRequestCoalescing` and `DisableRequestCoalescing` actions;
+
+### Changed
+- Bumped minimum Go version to 1.25;
+- resource `pullzone`: validate all `origin` attributes respective to the `type`;
+
+### Fixed
+- resource `pullzone`: the origin `host_header` attribute can now be removed;
+
+## 0.13.4 - 2026-03-17
+
+### Changed
+- resource `pullzone`: improve `origin` block validation;
+
+## 0.13.3 - 2026-03-17
+
+### Changed
+- resource `stream_library`: update default player version;
+- resource `compute_container_app`: standardize volume name validation;
+- resource `pullzone`: improve `origin` block validation;
+- resource `pullzone_edgerule`: validate action type;
+- resource `compute_container_app`: allow spaces in container/endpoint names;
+
+## 0.13.2 - 2026-03-10
+
+### Changed
+- resource `compute_container_app`: allow a volume to be mounted in multiple containers at once;
+- resource `compute_script`: publish after code changes ([#77](https://github.com/BunnyWay/terraform-provider-bunnynet/pull/77));
+
+## 0.13.1 - 2026-03-05
+
+### Changed
+- updated dependencies;
+
+## 0.13.0 - 2026-02-12
+
+### Backwards compatibility breaks
+
+1. All resources are now being [marked as removed](https://github.com/hashicorp/terraform-plugin-framework/blob/v1.17.0/tfsdk/state.go#L100-L106) when the API reports them as not existing;
+
+2. The provider's `container_api_url` configuration has been removed, as the compute container (Magic Containers) resources and datasources now use the official [Public API](https://docs.bunny.net/api-reference/magic-containers/overview);
+
+### Added
+- resource `dns_record`: support `SVCB`, `HTTPS` and `TLSA` types;
+- resource `dns_record`: support [Null MX](https://www.rfc-editor.org/rfc/rfc7505.html) ([#74](https://github.com/BunnyWay/terraform-provider-bunnynet/pull/74));
+
+### Fixed
+- resource `compute_container_app`: fix flaky "attribute was null" error;
+
+## 0.12.1 - 2026-02-04
+
+### Fixed
+- resource `pullzone_ratelimit_rule` and `pullzone_waf_rule`: fix upgrading pre v0.12 resources;
+
+## 0.12.0 - 2026-01-29
+
+### Backwards compatibility break
+
+The `transformations` attribute in both `pullzone_ratelimit_rule` and `pullzone_waf_rule` resources was moved from the `condition` block to the resource itself. This was done in order to accommodate multiple `condition` blocks, although you can only apply transformations on a per-resource basis.
+
+This means that for a resource like the example below, both `LOWERCASE` and `NORMALIZEPATH` will apply to _both_ conditions:
+
+```terraform
+resource "bunnynet_pullzone_ratelimit_rule" "ratelimit_login_page" {
+  # ...
+  transformations = ["LOWERCASE", "NORMALIZEPATH"]
+
+  condition {
+    variable = "REQUEST_METHOD"
+    operator = "STREQ"
+    value = "post"
+  }
+
+  condition {
+    variable = "REQUEST_URI"
+    operator = "BEGINSWITH"
+    value = "/login"
+  }
+}
+```
+
+### Added multiple `condition` support
+
+Both `pullzone_ratelimit_rule` and `pullzone_waf_rule` now support multiple `condition` blocks. There are a few limitations though:
+
+- `condition` blocks have to sorted by `variable`. You'll need to follow the same order on your .tf files, otherwise terraform will show them as modified after an `apply`;
+- Changing a `variable` will cause the plan to show unrelated conditions being modified, as their order jumps up or down. We recommend deleting the block, applying, and then adding the block again with the new variable name;
+
+### Added
+- Support for Database
+- resource compute_container_app: support persistent volumes;
+- resource pullzone_ratelimit_rule: support multiple `condition` blocks;
+- resource pullzone_waf_rule: support multiple `condition` blocks;
+
+## 0.11.6 - 2026-01-15
+
+### Fixed
+- resource pullzone_waf_rule: concurrent creation failure ([#64](https://github.com/BunnyWay/terraform-provider-bunnynet/issues/64))
+
+### Changed
+- resource pullzone_access_list: update enums;
+- resource pullzone_ratelimit_rule: update enums;
+- resource pullzone_waf_rule: update enums;
+
+## 0.11.5 - 2026-01-13
+
+### Fixed
+- data source pullzone: mark `id` and `name` as computed to avoid dependencies being marked as empty ([#63](https://github.com/BunnyWay/terraform-provider-bunnynet/issues/63));
+
+## 0.11.4 - 2025-12-12
+
+### Added
+- data source pullzone: allow references by either `id` or `name`;
+### Fixed
+- resource pullzone: change default for websockets_enabled;
+
+## 0.11.3 - 2025-11-24
+
+### Added
+- resource dns_zone: expose `dnssec_public_key` ([#57](https://github.com/BunnyWay/terraform-provider-bunnynet/pull/57));
+- data source dns_zone: expose `dnssec_public_key` ([#57](https://github.com/BunnyWay/terraform-provider-bunnynet/pull/57));
+
+## 0.11.2 - 2025-11-20
+
+### Added
+- resource dns_zone: support DNSSEC;
+### Fixed
+- resource dns_record: validate weight for type Redirect ([#29](https://github.com/BunnyWay/terraform-provider-bunnynet/issues/29#issuecomment-3549960461))
+
+## 0.11.1 - 2025-11-11
+
+### Added
+- resource dns_record: validate trailing dots on hostname values ([#48](https://github.com/BunnyWay/terraform-provider-bunnynet/issues/48));
+- resource pullzone_edgerule: document `triggers[].type` accepted values;
+
+### Fixed
+- resource dns_record: validate pullzone_id;
+
+## 0.11.0 - 2025-10-27
+
+### Backwards compatibility break
+
+The resource `compute_container_app` now uses a [list type](https://developer.hashicorp.com/terraform/plugin/framework/handling-data/types/list) to define `container`, `endpoint` and `env` blocks. While both set and list types are compatible at the [state](https://developer.hashicorp.com/terraform/language/state) level, this change has some limitations:
+
+#### Limitations
+
+- `container`, `endpoint` and `env` blocks have to sorted by `name`. You'll need to follow the same order on your .tf files, otherwise terraform will show them as modified after an `apply`;
+- Renaming a `container`, `endpoint` or `env` will cause the plan to show unrelated items being modified, as their order jumps up or down. We recommend deleting the block, applying, and then adding the block again with the new name;
+- Renaming an `endpoint` of type CDN might cause pullzones to be recreated, even if they aren't directly affected;
+
+#### Upgrade path
+
+1. Make sure `terraform plan` reports no changes;
+2. Upgrade the bunny.net provider;
+3. Sort the `container`, `endpoint` and `env` blocks in your .tf files;
+4. Add `version = 2` to your `bunnynet_compute_container_app` resources;
+5. Run `terraform plan`, it should report no changes apart from the `version` attribute;
+
+#### Motivation
+
+While the [set type](https://developer.hashicorp.com/terraform/plugin/framework/handling-data/types/set) would be the semantically correct type to use for those blocks, Terraform's implementation is neither complete nor uses the same internal details as the List type. This means that changing attributes in a sub-block often causes the entire `container` to be replaced, causing endpoints to be re-created, including their pullzones. It is also not possible to reference set objects in `lifecycle.ignore_changes`.
+
+Related issues: [#777](https://github.com/hashicorp/terraform-plugin-framework/issues/777), [#974](https://github.com/hashicorp/terraform-plugin-framework/issues/974), [#1036](https://github.com/hashicorp/terraform-plugin-framework/issues/1036).
+
+### Changed
+
+- resource compute_container_app: replace Set with List types;
+- Bumped minimum Go version to 1.24;
+- Bumped minimum Terraform version to 1.5;
+
+## 0.10.6 - 2025-10-20
+
+### Fixed
+
+- resource pullzone_hostname: allow deletion of `bunny.run` subdomains ([#54](https://github.com/BunnyWay/terraform-provider-bunnynet/issues/54));
+
+## 0.10.5 - 2025-10-16
+
+## Added
+
+- data source pullzone;
+- resource pullzone_edgerule: add new action types;
+
+## 0.10.4 - 2025-10-10
+
+## Added
+
+- resource stream_library: add `player_version` attribute;
+
+## Fixed
+
+- resource pullzone: expose `origin.container_app_id` and `origin.container_endpoint_id` so users can manage the pullzone generated by a `bunnynet_compute_container_app` CDN endpoint ([#53](https://github.com/BunnyWay/terraform-provider-bunnynet/issues/53));
+
+## 0.10.3 - 2025-10-06
+
+## Added
+
+- resource pullzone: support Burrow Smart Routing;
+
+## 0.10.2 - 2025-10-02
+
+## Added
+
+- resource pullzone: support websockets;
+- resource pullzone: support HTML prerender;
+
+## 0.10.1 - 2025-09-29
+
+## Fixed
+
+- resource dns_record: `weight` automatically set to `null` for non-`A`/`AAAA`/`SRV` records;
+
+## 0.10.0 - 2025-09-23
+
+## Backwards compatibility break
+
+The `weight` attribute on a `dns_record` was previously available for all record types, however, outside `SRV`/`A`/`AAAA` they aren't used and can be discarded by the bunny.net API. For that reason, we're limiting the `weight` attribute usage to only the record types that actually support it on our backend systems.
+
+## Changed
+- resource dns_record: `weight` is now only available for `SRV`/`A`/`AAAA` record types;
+- resource dns_script: publish script after code changes;
+
+## 0.9.0 - 2025-09-02
+
+## Backwards compatibility break
+
+To declare a DNS record with `type = "PullZone"`, instead of `link_name`, you now need to use `pullzone_id`. The `link_name` field was made read-only.
+
+Before:
+```terraform
+resource "bunnynet_dns_record" "record" {
+  zone      = data.bunnynet_dns_zone.domain.id
+  name      = "www"
+  type      = "PullZone"
+  value     = bunnynet_pullzone.pullzone.name
+  link_name = bunnynet_pullzone.pullzone.id
+}
+```
+
+After:
+```terraform
+resource "bunnynet_dns_record" "record" {
+  zone        = data.bunnynet_dns_zone.domain.id
+  name        = "www"
+  type        = "PullZone"
+  value       = bunnynet_pullzone.pullzone.name
+  pullzone_id = bunnynet_pullzone.pullzone.id
+}
+```
+
+## Added
+- Support for DNS Script
+## Fixed
+- resource dns_record: fix `The script ID is not valid` error for `type = Script`;
+## Changed
+- resource dns_record: `link_name` is now a computed field;
+- resource dns_record: use `pullzone_id` to link a pullzone with `type = "PullZone"`;
+
+## [0.8.2] - 2025-08-27
+### Added
+- resource pullzone: support `state` for `cache_vary`;
+
+## [0.8.1] - 2025-08-26
+### Fixed
+- resource pullzone: invalid new value for `cache_expiration_time` ([#45](https://github.com/BunnyWay/terraform-provider-bunnynet/issues/45));
+
+## [0.8.0] - 2025-08-04
+### Added
+- resource pullzone_shield: support managed Access Lists;
+- resource pullzone_access_list: customized Access Lists;
+- resource pullzone_shield: Bot Detection;
+- resource pullzone_shield: support `Business` and `Enterprise` tiers;
+- resource pullzone_shield: support Whitelabel block pages;
+- resource pullzone_shield: support request/response body limits;
+- resource pullzone: validate fields for ComputeScript origin.type ([#43](https://github.com/BunnyWay/terraform-provider-bunnynet/issues/43));
+### Fixed
+- resource pullzone: validation for `safehop_connection_timeout` and `safehop_response_timeout`;
+- resource pullzone: normalize origin.url ([#44](https://github.com/BunnyWay/terraform-provider-bunnynet/issues/44));
+- resource pullzone_edgerule: expose underlying error message;
+
+## [0.7.6] - 2025-07-21
+### Fixed
+- resource pullzone_edgerule: add missing actions ([#42](https://github.com/BunnyWay/terraform-provider-bunnynet/issues/42));
+- resource pullzone_hostname: create: clean up after loadFreeCertificate error ([#41](https://github.com/BunnyWay/terraform-provider-bunnynet/issues/41));
+- resource pullzone_edgerule: do not panic when an edgerule action is not mapped;
+
+## [0.7.5] - 2025-06-19
+### Fixed
+- resource storage_file: changed referenced `source` file does not trigger an update ([#40](https://github.com/BunnyWay/terraform-provider-bunnynet/issues/40));
+
+## [0.7.4] - 2025-06-18
+### Fixed
+- resource pullzone_optimizer_class: fix `Edge Script ID not found` error ([#39](https://github.com/BunnyWay/terraform-provider-bunnynet/issues/39));
+- resource pullzone_shield: missing realtime_threat_intelligence causes a panic
+
+## [0.7.3] - 2025-06-17
+### Added
+- resource pullzone_edgerule: added `priority` to control the execution order of the edge rules ([#37](https://github.com/BunnyWay/terraform-provider-bunnynet/issues/37));
+
+## [0.7.2] - 2025-06-04
+### Added
+- resource pullzone_edgerule: add missing actions and trigger types ([#38](https://github.com/BunnyWay/terraform-provider-bunnynet/issues/38));
+
+## [0.7.1] - 2025-06-03
+### Fixed
+- resource pullzone_hostname: create: clean up after a loadFreeCertificate error ([#36](https://github.com/BunnyWay/terraform-provider-bunnynet/issues/36));
+
+## [0.7.0] - 2025-04-15
+### Added
+- Support for Bunny Shield
+- Build releases for openbsd
+### Fixed
+- resource storage_zone: handle empty set for `replication_regions`
+- resource storage_zone: validate `name`
+
+## [0.6.2] - 2025-03-18
+### Changed
+- updated dependencies
+
+## [0.6.1] - 2025-02-26
+### Fixed
+- resource storage_zone: support variables during validation ([#31](https://github.com/BunnyWay/terraform-provider-bunnynet/issues/31))
+
+## [0.6.0] - 2025-02-25
+### Added
+- Support for Magic Containers
+- resource storage_zone: validate regions
+### Changed
+- Bumped minimum Go version to 1.23
+- Bumped minimum Terraform version to 1.4
+
+## [0.5.6] - 2025-01-23
+### Added
+- resource stream_library: support for HEVC and AV1 on output_codecs
+### Fixed
+- resource dns_record: create CNAME with a defined weight ([#29](https://github.com/BunnyWay/terraform-provider-bunnynet/issues/29))
+
+## [0.5.5] - 2025-01-21
+### Added
+- resource stream_library: Premium Encoding support
+
+## [0.5.4] - 2025-01-20
+### Added
+- resource compute_script_secret ([#27](https://github.com/BunnyWay/terraform-provider-bunnynet/issues/27))
+
+## [0.5.3] - 2025-01-17
+### Added
+- resource compute_script: expose deployment_key and release attributes ([#26](https://github.com/BunnyWay/terraform-provider-bunnynet/issues/26))
+
+## [0.5.2] - 2025-01-14
+### Fixed
+- resource compute_script: workaround for updating code in published scripts ([#25](https://github.com/BunnyWay/terraform-provider-bunnynet/issues/25))
+
+## [0.5.1] - 2025-01-07
+### Changed
+- updated dependencies
+### Fixed
+- resource pullzone: fix panic when origin or routing blocks are missing ([#20](https://github.com/BunnyWay/terraform-provider-bunnynet/issues/20))
+- resource dns_record: support PZ type ([#22](https://github.com/BunnyWay/terraform-provider-bunnynet/issues/23))
+- resource pullzone_edgerule: fix action params validation ([#23](https://github.com/BunnyWay/terraform-provider-bunnynet/issues/23))
+
+## [0.5.0] - 2024-12-12
+### Changed
+- Bumped minimum Go version to 1.22
+- update dependencies
+### Added
+- resource pullzone_edgerule: support ActionParameter3
+- resource pullzone_edgerule: validate Redirect action parameters
+
+## [0.4.2] - 2024-12-09
+### Fixed
+- resource pullzone: create multiple at once throws 502 Bad Gateway
+
+## [0.4.1] - 2024-11-22
+### Fixed
+- ValidateResource has unknown values on first pass if they use variables ([#18](https://github.com/BunnyWay/terraform-provider-bunnynet/issues/18))
+
+## [0.4.0] - 2024-11-07
+### Added
+- Support for Compute Script
+
+## [0.3.16] - 2024-10-31
+### Added
+- negative number validation for all integer attributes
+### Fixed
+- resource pullzone_edgerule: validate trigger fields ([#17](https://github.com/BunnyWay/terraform-provider-bunnynet/issues/17))
+- concurrent resource creation with set attributes causes intermixed values
+
+## [0.3.15] - 2024-09-12
+### Added
+- resource pullzone_edgerule: multi-actions support
+
+## [0.3.14] - 2024-09-10
+### Changed
+- resource pullzone_hostname: deleting an internal hostname (`*.b-cdn.net`) will remove the resource from state without deleting it, as internal hostnames cannot be deleted;
+- resource pullzone_hostname: creating an internal hostname (`*.b-cdn.net`) will adopt the pre-existing default hostname instead of creating a new one, as the default hostname is automatically created with the `pullzone` resource;
+
+## [0.3.13] - 2024-09-09
+### Fixed
+- resource pullzone_optimizer_class: some fields were wrongly escaped ([#11](https://github.com/BunnyWay/terraform-provider-bunnynet/issues/11))
+
+## [0.3.12] - 2024-09-06
+### Added
+- data source bunnynet_dns_zone
+- data source bunnynet_dns_record
+### Changed
+- resource storage_zone: custom_404_file_path can be unset
+
+## [0.3.11] - 2024-09-02
+### Added
+- resource pullzone_hostname: custom certificates support
+### Changed
+- Expose API error messages for all resources
+
+## [0.3.10] - 2024-08-28
+### Changed
+- resource pullzone: autoupdate use_background_update when changing cache_stale ([#4](https://github.com/BunnyWay/terraform-provider-bunnynet/issues/4))
+- resource dns_record: accelerated_pullzone cannot be set ([#5](https://github.com/BunnyWay/terraform-provider-bunnynet/issues/5))
+- resource pullzone: avoid deadlocks when changing multiple resources linked to the same pullzone ([#6](https://github.com/BunnyWay/terraform-provider-bunnynet/issues/6))
+
+## [0.3.9] - 2024-08-20
+### Changed
+- resource pullzone: autoupdate cache_expiration_time when changing permacache_storagezone
+
+## [0.3.8] - 2024-08-19
+### Added
+- resource pullzone: originshield_zone attribute
+- resource dns_record: document how to set an apex domain record
+
+## [0.3.7] - 2024-08-15
+### Fixed
+- resource pullzone_edgerule: creating multiple edgerules for the same pullzone causes inconsistencies in tfstate
+- resource storage_zone: zone_tier cannot be changed
+### Changed
+- resource dns_zone: run Create() in two passes
+- resource dns_zone: refactored custom nameserver validation
+- resource storage_zone: run Create() in two passes
+
+## [0.3.6] - 2024-08-14
+### Fixed
+- resource pullzone_hostname: cannot create resource with tls_enabled=true and force_ssl=true ([#2](https://github.com/BunnyWay/terraform-provider-bunnynet/issues/2))
+
+## [0.3.5] - 2024-08-06
+### Added
+- Import command example for all resources
+### Changed
+- resource pullzone_hostname: force_ssl can only be enabled when tls_enabled is true
+
+## [0.3.4] - 2024-08-01
+### Added
+- resource pullzone_hostname: manage free TLS certificate
+### Changed
+- resource pullzone_hostname: import via name instead of ID
+
+## [0.3.3] - 2024-07-30
+### Added
+- resource stream_library: multiple output audio track support
+### Changed
+- resource stream_library: run Create() in two passes
+
+## [0.3.2] - 2024-07-22
+### Added
+- Run acceptance tests for every commit
+### Changed
+- Refactored code according to golangci-lint
+- Improved documentation
+
+## [0.3.1] - 2024-07-17
+### Changed
+- Some examples had the wrong resource name
+
+## [0.3.0] - 2024-07-17
+
+- Initial public release

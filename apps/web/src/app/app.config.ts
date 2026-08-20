@@ -14,6 +14,7 @@ import {
 } from '@ngx-translate/core';
 
 import { routes } from './app.routes';
+import { provideErrorReporting } from './core/observability/sentry';
 import { authInterceptor } from './core/auth/auth.interceptor';
 import { restoreSessionOnStartup } from './core/auth/session-initializer';
 import {
@@ -35,6 +36,7 @@ export const appConfig: ApplicationConfig = {
     // Synchronous rather than the async variant: pnpm's strict node_modules isolation stops
     // esbuild resolving platform-browser's dynamic import of @angular/animations/browser.
     provideAnimations(),
+    ...provideErrorReporting(),
     provideTranslateService({
       defaultLanguage: 'en',
       loader: {
