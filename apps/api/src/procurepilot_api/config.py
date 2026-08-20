@@ -23,7 +23,11 @@ class Settings(BaseSettings):
     supabase_url: str = Field(validation_alias="SUPABASE_URL")
     supabase_anon_key: SecretStr = Field(validation_alias="SUPABASE_ANON_KEY")
     supabase_service_role_key: SecretStr = Field(validation_alias="SUPABASE_SERVICE_ROLE_KEY")
-    supabase_jwt_secret: SecretStr = Field(validation_alias="SUPABASE_JWT_SECRET")
+    # Optional: Supabase signs access tokens with asymmetric keys (ES256) and publishes the
+    # public half via JWKS. The shared secret is only needed by deployments still issuing HS256.
+    supabase_jwt_secret: SecretStr | None = Field(
+        default=None, validation_alias="SUPABASE_JWT_SECRET"
+    )
     supabase_jwt_audience: str = Field(validation_alias="SUPABASE_JWT_AUDIENCE")
     supabase_jwt_issuer: str = Field(validation_alias="SUPABASE_JWT_ISSUER")
 
