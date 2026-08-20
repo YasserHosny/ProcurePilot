@@ -205,13 +205,18 @@ place a future reviewer should look first** if the service-role surface starts g
 | i18n completeness | No key in one catalogue only | ✅ Unit test, mutation-checked |
 | Sign-up time (SC-001) | Under 3 minutes | ✅ Asserted in `signup.spec.ts` |
 | Invite time (SC-003) | Under 2 minutes | ✅ Asserted in `team-management.spec.ts` |
-| CI verdict (SC-008) | Within 10 minutes | ⚠️ **UNVERIFIED.** No workflow has ever run on GitHub. Every job's steps were executed locally, but wall-clock time on a runner is unknown until a real PR runs. |
+| CI verdict (SC-008) | Within 10 minutes | ✅ **5m29s**, measured on run 32375539305 of PR #1. All six jobs green on a real runner. |
 | Extraction / matching accuracy | ≥90% / ≥92% | N/A — no AI in this chunk. Gates on chunks 4.3/4.4. |
 
 ### The honest gaps
 
-- **No CI run has happened.** The workflows are valid and their steps verified locally; the first
-  PR is the proof, and one round of runner-environment adjustment should be expected.
+- ~~No CI run has happened.~~ **Resolved.** Four runs on PR #1 took the pipeline from 3/6 to 6/6.
+  Every failure was a real defect, not a flake: gitleaks lacking permission to report findings;
+  `backend-tests` handed a database and `TEST_DATABASE_URL` but no schema, which made the
+  database-backed tests stop skipping and start failing; uv's post-run cache save failing a job
+  *after* all 14 E2E specs had passed; a high-entropy test fixture that looked exactly like an API
+  key; and that fixture surviving in commit history after the file was fixed, because
+  `gitleaks detect` scans history rather than the working tree.
 - **The acceptance criterion in spec.md is now false.** `docker compose up --build` no longer
   starts Supabase. quickstart.md has been corrected; the spec's own wording still needs amending,
   which is a decision for the owner rather than a silent edit.
