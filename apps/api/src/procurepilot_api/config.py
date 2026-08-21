@@ -50,6 +50,21 @@ class Settings(BaseSettings):
     quotation_documents_bucket: str = Field(
         default="quotation-documents", validation_alias="QUOTATION_DOCUMENTS_BUCKET"
     )
+    matching_auto_accept_threshold: float = Field(
+        default=0.9200, validation_alias="MATCHING_AUTO_ACCEPT_THRESHOLD", ge=0, le=1
+    )
+    matching_auto_reject_threshold: float = Field(
+        default=0.2500, validation_alias="MATCHING_AUTO_REJECT_THRESHOLD", ge=0, le=1
+    )
+    matching_review_margin: float = Field(
+        default=0.0500, validation_alias="MATCHING_REVIEW_MARGIN", ge=0, le=1
+    )
+    matching_trigram_threshold: float = Field(
+        default=0.30, validation_alias="MATCHING_TRIGRAM_THRESHOLD", ge=0, le=1
+    )
+    matching_embedding_model: str = Field(
+        default="stub-hash-v1", validation_alias="MATCHING_EMBEDDING_MODEL"
+    )
 
     web_api_base_url: str = Field(validation_alias="WEB_API_BASE_URL")
     web_default_locale: Locale = Field(validation_alias="WEB_DEFAULT_LOCALE")

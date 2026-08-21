@@ -133,6 +133,7 @@
     "navSuppliers": "Suppliers",
     "navImport": "Import Catalogue",
     "navQuotations": "Quotation Inbox",
+    "navMatching": "Match Resolution",
     "navCompare": "Smart Compare",
     "navSavings": "Savings Ledger",
     "navTeam": "Team Management",
@@ -675,6 +676,215 @@
         "in_review": "In Review",
         "reviewed": "Reviewed & Authorized",
         "refused": "Refused"
+      }
+    }
+  },
+  "matching": {
+    "queue": {
+      "title": "Match Resolution Queue",
+      "subtitle": "Review and resolve quotation lines requiring product matching decisions or catalogue additions.",
+      "readOnlyBadge": "Read-Only Access",
+      "readOnlyNotice": "Your role has read-only access. You can inspect match tasks and candidates, but cannot confirm decisions or create products.",
+      "filterStatus": "Status",
+      "filterPriority": "Priority",
+      "filterReason": "Routing Reason",
+      "status": {
+        "open": "Open",
+        "in_progress": "In Progress",
+        "resolved": "Resolved",
+        "all": "All Statuses"
+      },
+      "priority": {
+        "low": "Low",
+        "normal": "Normal",
+        "high": "High",
+        "all": "All Priorities"
+      },
+      "reason": {
+        "low_confidence": "Low Confidence",
+        "close_candidates": "Close Candidates",
+        "no_candidate": "No Candidate",
+        "alias_conflict": "Alias Conflict",
+        "all": "All Reasons"
+      },
+      "columns": {
+        "quotation": "Quotation",
+        "line": "Line",
+        "originalText": "Original Supplier Wording",
+        "reason": "Reason",
+        "priority": "Priority",
+        "status": "Status",
+        "candidates": "Candidates",
+        "createdAt": "Queued At",
+        "actions": "Actions"
+      },
+      "actions": {
+        "resolve": "Resolve Match",
+        "view": "View Details"
+      },
+      "emptyTitle": "No match tasks found",
+      "emptyMessage": "There are no quotation lines currently awaiting match resolution."
+    },
+    "resolution": {
+      "title": "Match Resolution",
+      "subtitle": "Review candidate matches, evaluate signal evidence, and resolve the quotation line.",
+      "backToQueue": "Back to Queue",
+      "readOnlyBanner": "You have view-only access. Only workspace owners and buyers can resolve matches and create catalogue products.",
+      "keyboardShortcutsTitle": "Keyboard Controls (FR-012)",
+      "shortcuts": {
+        "selectCandidate": "1–9: Select Candidate",
+        "navigate": "↑ / ↓: Navigate Candidates",
+        "confirm": "Enter: Confirm Decision",
+        "toggleOutcome": "O: Cycle Outcomes"
+      },
+      "lineDetails": {
+        "title": "Quotation Line Details",
+        "lineNumber": "Line #{{line}}",
+        "quotation": "Quotation",
+        "originalText": "Supplier Line Wording",
+        "quantity": "Quantity",
+        "pack": "Supplier Pack",
+        "unitPrice": "Unit Price",
+        "vatRate": "VAT Rate",
+        "deliveryFee": "Delivery Fee",
+        "discount": "Discount"
+      },
+      "candidates": {
+        "title": "Ranked Product Candidates",
+        "subtitle": "Evaluated through deterministic keys, lexical (pg_trgm), semantic (pgvector), and feature plausibility scoring.",
+        "rank": "Rank #{{rank}}",
+        "confidence": "Match Confidence",
+        "noCandidates": "No candidates found for this line item.",
+        "signalsTitle": "Reason Breakdown",
+        "signals": {
+          "aliasHit": "Alias Hit",
+          "aliasHitDesc": "Matches existing confirmed alias",
+          "gtinMatch": "GTIN Match",
+          "gtinMatchDesc": "Matches product barcode/GTIN",
+          "supplierCodeMatch": "Supplier Code Match",
+          "supplierCodeMatchDesc": "Matches supplier catalog code",
+          "lexicalSimilarity": "Lexical Similarity",
+          "semanticSimilarity": "Semantic Similarity",
+          "featureScores": "Feature Plausibility Breakdown",
+          "brandMatch": "Brand Match",
+          "variantMatch": "Variant Match",
+          "packUnitMatch": "Pack Unit Match",
+          "packSizePlausibility": "Pack Size Plausibility",
+          "pricePlausibility": "Price Plausibility",
+          "scoringVersion": "Scoring Version",
+          "embeddingModel": "Embedding Model"
+        },
+        "product": {
+          "brand": "Brand",
+          "variant": "Variant",
+          "gtin": "GTIN",
+          "baseUnit": "Base Unit",
+          "pack": "Pack Definition",
+          "status": {
+            "active": "Active",
+            "archived": "Archived"
+          },
+          "archivedWarning": "This catalogue product is archived."
+        }
+      },
+      "outcomes": {
+        "title": "Select Resolution Outcome",
+        "subtitle": "Select how this line resolves against the catalogue or create a new product.",
+        "same_product": {
+          "label": "Same Product",
+          "description": "Line matches the chosen product exactly in identity, formulation, and pack."
+        },
+        "different_pack": {
+          "label": "Different Pack Size",
+          "description": "Same product, but supplied in a different pack size, unit, or quantity packaging."
+        },
+        "different_variant": {
+          "label": "Different Variant",
+          "description": "Same product family, but a distinct variant (e.g. flavor, color, specification)."
+        },
+        "compatible_alternative": {
+          "label": "Compatible Alternative",
+          "description": "Functional substitute or compatible alternative to the candidate product."
+        },
+        "no_match_new_product": {
+          "label": "No Match — Create New Product",
+          "description": "No candidate fits. Create a new product in the catalogue and map this line."
+        }
+      },
+      "newProduct": {
+        "title": "New Catalogue Product",
+        "subtitle": "Create a product directly from this quotation line. The supplier wording will be saved as an alias.",
+        "tenantNameLabel": "Product Name (Workspace)",
+        "tenantNamePlaceholder": "e.g. Semi-Skimmed Milk 2L",
+        "tenantNameRequired": "Product name is required",
+        "tenantNameMaxLength": "Product name cannot exceed 200 characters",
+        "brandLabel": "Brand (Optional)",
+        "brandPlaceholder": "e.g. Arla",
+        "canonicalNameLabel": "Canonical Name (Optional)",
+        "canonicalNamePlaceholder": "Defaults to workspace product name",
+        "canonicalNameHint": "Leave blank to match workspace product name",
+        "variantLabel": "Variant / Description (Optional)",
+        "variantPlaceholder": "e.g. 2L Bottle",
+        "gtinLabel": "GTIN / Barcode (Optional)",
+        "gtinPlaceholder": "8, 12, 13, or 14 digits",
+        "gtinInvalid": "GTIN must be 8, 12, 13, or 14 digits",
+        "baseUnitLabel": "Base Unit",
+        "baseUnitRequired": "Base unit is required",
+        "packSectionTitle": "Pack Definition",
+        "packSectionDescription": "Specify packaging count and size for cross-supplier normalisation.",
+        "packCountLabel": "Pack Count",
+        "packCountPlaceholder": "e.g. 1",
+        "packCountRequired": "Pack count is required",
+        "packCountMin": "Pack count must be at least 1",
+        "unitSizeLabel": "Unit Size",
+        "unitSizePlaceholder": "e.g. 2.0",
+        "unitSizeRequired": "Unit size is required",
+        "unitSizePositive": "Unit size must be a positive number",
+        "liveNormalisedLabel": "Normalised Base Quantity",
+        "liveNormalisedHelp": "Derived as Pack Count × Unit Size in the selected base unit",
+        "preferredSupplierLabel": "Preferred Supplier (Optional)",
+        "noPreferredSupplier": "None (No preferred supplier)"
+      },
+      "landedCost": {
+        "title": "Deterministic Landed Cost (US3)",
+        "subtitle": "Replayable landed cost normalised to the catalogue base unit.",
+        "unitPrice": "Unit Price",
+        "vatAmount": "Derived VAT",
+        "vatRate": "VAT Rate: {{rate}}%",
+        "deliveryFee": "Delivery Fee",
+        "discount": "Discount",
+        "otherCharges": "Other Charges",
+        "total": "Total Landed Cost",
+        "normalisedQuantity": "Normalised Quantity",
+        "baseUnit": "Base Unit",
+        "ruleVersion": "Rule Version",
+        "validFrom": "Valid From",
+        "recordedAt": "Recorded At",
+        "replayableNotice": "Deterministic calculation pinned to rule version {{version}}."
+      },
+      "decision": {
+        "title": "Resolution Decision",
+        "matchedProduct": "Matched Product:",
+        "outcome": "Outcome:",
+        "decidedBy": "Decided By:",
+        "decidedAt": "Decided At:",
+        "automatic": "Automatic Match",
+        "human": "Human Resolution",
+        "confidence": "Decision Confidence:"
+      },
+      "actions": {
+        "confirm": "Confirm Match Decision",
+        "confirming": "Confirming...",
+        "saveSuccess": "Match decision confirmed and alias saved successfully.",
+        "candidateRequired": "Please select a candidate before confirming.",
+        "formInvalid": "Please correct the product creation errors before confirming."
+      },
+      "errors": {
+        "aliasConflict": "Alias Conflict: This supplier wording is already assigned to a different product in your catalogue.",
+        "notReviewed": "Quotation has not reached the reviewed state yet.",
+        "invalidCandidate": "Selected candidate is not valid for this quotation line.",
+        "alreadyDecided": "This quotation line already has a recorded decision.",
+        "genericError": "Unable to resolve match decision. Please try again."
       }
     }
   }

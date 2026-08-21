@@ -12,6 +12,13 @@ import type {
   ImportResult,
   Invitation,
   Job,
+  LandedCost,
+  MatchDecision,
+  MatchResolutionRequest,
+  MatchTask,
+  MatchTaskPriority,
+  MatchTaskReason,
+  MatchTaskStatus,
   Me,
   Member,
   PresignRequest,
@@ -22,6 +29,7 @@ import type {
   Quotation,
   QuotationCreate,
   QuotationDetail,
+  QuotationMatches,
   QuotationReviewPatch,
   ReviewTask,
   ReviewTaskPriority,
@@ -354,6 +362,50 @@ export class ApiService {
     return this.http.get<{ items: ReviewTask[]; next_cursor: string | null }>(
       `${this.base}/review-tasks${qs}`,
     );
+  }
+
+  // --- matching & normalisation (Chunk 4.4) -------------------------------
+
+  getQuotationMatches(quotationId: string): Observable<QuotationMatches> {
+    return this.http.get<QuotationMatches>(`${this.base}/quotations/${quotationId}/matches`);
+  }
+
+  getMatchTasks(params?: {
+    cursor?: string;
+    limit?: number;
+    status?: MatchTaskStatus | 'all';
+    priority?: MatchTaskPriority;
+    reason?: MatchTaskReason;
+    quotation_id?: string;
+  }): Observable<{ items: MatchTask[]; next_cursor: string | null }> {
+    const query = new URLSearchParams();
+    if (params?.cursor) query.set('cursor', params.cursor);
+    if (params?.limit) query.set('limit', String(params.limit));
+    if (params?.status) query.set('status', params.status);
+    if (params?.priority) query.set('priority', params.priority);
+    if (params?.reason) query.set('reason', params.reason);
+    if (params?.quotation_id) query.set('quotation_id', params.quotation_id);
+    const qs = query.toString() ? `?${query.toString()}` : '';
+    return this.http.get<{ items: MatchTask[]; next_cursor: string | null }>(
+      `${this.base}/match-tasks${qs}`,
+    );
+  }
+
+  resolveMatch(
+    lineId: string,
+    body: MatchResolutionRequest,
+    idempotencyKey?: string,
+  ): Observable<MatchDecision> {
+    const headers = idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined;
+    return this.http.post<MatchDecision>(
+      `${this.base}/quotation-lines/${lineId}/match`,
+      body,
+      { headers },
+    );
+  }
+
+  getLandedCost(lineId: string): Observable<LandedCost> {
+    return this.http.get<LandedCost>(`${this.base}/quotation-lines/${lineId}/landed-cost`);
   }
 }
 

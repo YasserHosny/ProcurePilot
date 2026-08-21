@@ -434,6 +434,99 @@ Every monetary value is a `Money` object with `amount` as a decimal string and e
 
 ---
 
+## Delivered Matching and Normalisation API
+
+The following endpoints are delivered for chunk 4.4 and mirror
+`specs/004-matching-normalisation/contracts/matching.openapi.yaml`. All routes require bearer
+auth. Tenant scope is resolved from the token. Owner and buyer may resolve matches and create
+products from a no-match decision; branch manager, approver, and viewer are read-only.
+Cross-tenant records return `404`, deliberately indistinguishable from records that do not exist.
+
+Every monetary value is a `Money` object with `amount` as a decimal string and explicit
+`currency`; the API has no bare money numbers.
+
+### `GET /quotations/{quotation_id}/matches`
+
+- Requires bearer auth.
+- Reads match state for every line of a reviewed quotation.
+- Returns `200` with `QuotationMatches`: `quotation_id` and `lines`.
+- Each line state includes `line`, ranked `candidates`, optional open or resolved `task`,
+  optional final `decision`, and optional `landed_cost` once computed.
+- Line summaries include `id`, `line_number`, `original_text`, optional decimal-string
+  `quantity`, optional `pack`, optional `unit_price`, optional decimal-string `vat_rate`,
+  optional `delivery_fee`, and optional `discount`.
+- Candidate fields include `id`, `quotation_line_id`, `candidate_product`, decimal-string
+  `confidence`, structured `reasons`, `rank`, `scoring_version`, optional `embedding_model`, and
+  `created_at`.
+- `reasons` includes `alias_hit`, `gtin_match`, `supplier_code_match`, decimal-string
+  `lexical_similarity`, decimal-string `semantic_similarity`, and `feature_score` components for
+  brand, variant, pack unit, pack size, and price plausibility.
+- Returns `404` when the quotation is not in the caller's workspace; this is deliberately
+  indistinguishable from a quotation that exists in another workspace.
+- Returns `409` when the quotation is not in the reviewed state yet.
+
+### `GET /match-tasks`
+
+- Requires bearer auth.
+- Lists outstanding match-resolution work in the active workspace.
+- Query parameters: optional `cursor`, optional `limit` capped at 100 and defaulting to 50,
+  optional `status` (`open`, `in_progress`, `resolved`, or `all`) defaulting to `open`, optional
+  `priority` (`low`, `normal`, or `high`), optional `reason` (`low_confidence`,
+  `close_candidates`, `no_candidate`, or `alias_conflict`), and optional `quotation_id`.
+- Returns `200` with `items` containing `MatchTask` resources and nullable `next_cursor`.
+- Match task fields include `id`, optional `quotation_id`, `quotation_line`, `status`, `priority`,
+  `reason`, ranked `candidates`, optional `decision`, `created_at`, and optional `resolved_at`.
+- `MatchTask.quotation_line` uses the same `QuotationLineSummary` shape returned by quotation match
+  state.
+
+### `POST /quotation-lines/{line_id}/match`
+
+- Requires bearer auth and owner or buyer role; accepts `Idempotency-Key`.
+- Resolves one quotation line's match.
+- Request fields: `outcome`, optional `selected_match_candidate_id`, optional `create_product`.
+- `outcome` is one of `same_product`, `different_pack`, `different_variant`,
+  `compatible_alternative`, or `no_match_new_product`.
+- `selected_match_candidate_id` is required unless `outcome` is `no_match_new_product`.
+- `create_product` is required when `outcome` is `no_match_new_product` and uses the same shape as
+  chunk 4.2 product creation: `tenant_name`, `base_unit`, `pack`; optional `brand`,
+  `canonical_name`, `variant`, `gtin`, and `preferred_supplier_id`.
+- `pack` fields are `pack_count` and decimal-string `unit_size`; `base_quantity` is returned
+  read-only and supplying it is an error.
+- The exact quotation line wording is inserted or reused as a `ProductAlias`. If that lowercased
+  wording already belongs to the same product, the alias is reused. If it belongs to a different
+  product, the request returns `409` and the existing alias is not overwritten.
+- Returns `200` with a `MatchDecision`.
+- Match decision fields include `id`, `quotation_line_id`, `matched_product`,
+  optional `selected_match_candidate_id`, `outcome`, `is_automatic`, optional `decided_by`,
+  `decided_at`, decimal-string `confidence`, and optional `alias_id`.
+- Returns `403` when the caller's role may not resolve matches.
+- Returns `404` when the line is not in the caller's workspace; this is deliberately
+  indistinguishable from a line that exists in another workspace.
+- Returns `409` when the line is not matchable, already has a decision, the selected candidate is
+  not valid for the line, or the exact alias wording already belongs to another product.
+- Returns `422` when validation fails.
+
+### `GET /quotation-lines/{line_id}/landed-cost`
+
+- Requires bearer auth.
+- Reads landed cost, rule version, and replay inputs for one matched quotation line.
+- Returns `200` with `LandedCost`.
+- Landed cost fields include `id`, `quotation_line_id`, `match_decision_id`, decimal-string
+  `quantity`, decimal-string `normalised_base_quantity`, `base_unit`, `unit_price`, `vat_amount`,
+  `delivery_fee`, `discount`, `other_charges`, `total`, `raw_inputs`, `rule_version`,
+  `valid_from`, optional `valid_to`, `recorded_at`, and `created_at`.
+- `unit_price`, `vat_amount`, `delivery_fee`, `discount`, `other_charges`, and `total` are all
+  `Money { amount, currency }`; `amount` is a decimal string.
+- `vat_amount` is derived from `unit_price_amount * quantity * vat_rate`. `other_charges` is
+  always zero in chunk 4.4 because quotation lines do not model other charges yet.
+- `raw_inputs` is the complete replay snapshot used by the pinned `rule_version`; recomputation
+  uses these stored inputs rather than live quotation, supplier, or catalogue state.
+- Returns `404` when the line is not in the caller's workspace; this is deliberately
+  indistinguishable from a line that exists in another workspace.
+- Returns `409` when the line has not been matched yet, so landed cost is not available.
+
+---
+
 ## Offers & Compare
 
 ### `GET /offers`

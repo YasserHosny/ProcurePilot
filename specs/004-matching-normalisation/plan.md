@@ -128,3 +128,83 @@ No violations. Unlike chunk 4.3, this chunk introduces neither a new deployable 
 infrastructure dependency — the one architectural question it raised (a possible `matching-worker`
 service, per `engineering-spec.md`) was resolved by *not* introducing it, per the Constitution Check
 above, rather than by justifying it.
+
+## Constitution Check — re-run against delivered code (T058)
+
+Run at the close of chunk 4.4, against what was built, verified directly against a real local
+Supabase Postgres (all migrations through `20260821000001` applied) — not accepted from either
+delegate's self-report.
+
+| Principle | Verdict | Evidence |
+|---|---|---|
+| **I. Evidence Over Assertion** | ✅ PASS | Every `match_candidate` row carries a decimal-string `confidence` and a structured `reasons` jsonb — alias hit, GTIN match, supplier code match, lexical similarity, semantic similarity, and per-feature scores — never a bare number. Confirmed live against a real database: a candidate produced by the new `match_candidate_search` SQL function carries real `lexical_similarity`/`semantic_similarity` values, not placeholders. |
+| **II. Deterministic, Replayable Normalisation** | ✅ PASS | `landed_cost` is computed by a pinned `rule_version` (`landed-cost-v1`) from stored `raw_inputs`; `vat_amount = unit_price_amount * quantity * vat_rate`, `total_amount` sums unit price, VAT, and delivery fee, less discount, plus zero `other_charges`. Bitemporal (`valid_from`/`valid_to`/`recorded_at`) and append-only — a recomputation under a future rule version inserts a new row rather than mutating history, confirmed by `test_landed_cost_replay.py`. |
+| **III. Human Authority Over Automation** | ✅ PASS | `_route_or_accept` in `matching/service.py` only creates an automatic `match_decision` when confidence clears `MATCHING_AUTO_ACCEPT_THRESHOLD` (0.92) **and** the top two candidates aren't within `MATCHING_REVIEW_MARGIN` (0.05) of each other; anything else — including zero candidates — creates a `match_task` instead. All five human outcomes (`same_product`, `different_pack`, `different_variant`, `compatible_alternative`, `no_match_new_product`) are selectable from the match-resolution screen, keyboard-first per FR-012, with every selection (candidate, outcome, inline product-creation fields) verified — by direct code review, not the delegate's own claim — to be included in the resolution payload every time, the same bug class chunk 4.3 found and this chunk did not repeat. |
+| **IV. Every Insight Ends in an Action** | ✅ PASS | The resolution queue (`/matching`) is the only surface for outstanding match work; every task links to its per-line resolution screen, which is the only place a decision is recorded. No passive dashboard. |
+| **V. Tenant Isolation by Construction** | ✅ PASS | `match_candidate`, `match_task`, `match_decision`, and `landed_cost` all show RLS `ENABLED`/`FORCED` with `tenant_isolation` `USING`/`WITH CHECK` policies, queried directly. `test_tenant_isolation.py` exercises real cross-workspace reads and a real cross-workspace write denial on all four tables, plus the two-embedding split (`canonical_product.canonical_embedding` correctly readable as the shared-spine exception; `workspace_product.tenant_name_embedding` correctly invisible cross-tenant). 36/36 isolation tests pass against a real database. |
+| **VI. Modular Monolith Until Scale Demands Otherwise** | ✅ PASS | No new deployable was introduced — `matching` and `landed_cost` are `apps/api` modules only, confirmed by diff (no `services/` additions, no `docker-compose.yml` changes). |
+| **VII. Money, Tax, Language from the Schema Up** | ✅ PASS | Every `landed_cost` monetary field is an explicit amount+currency pair; a database CHECK constraint requires every currency column to equal `total_currency` (no silent conversion). `matching.*` and landed-cost display strings are in `packages/i18n` at exact parity — 733/733 keys in both `en.json` and `ar.json`, confirmed by an independent key-diff, not the delegate's claim. |
+
+**Workflow gates**: delegated work reviewed ✅ — backend (Codex), frontend (Antigravity), and docs
+(Codex) lanes were dispatched, and every diff was re-verified against a live local Postgres and the
+real frontend toolchain (Karma, `ng lint`) rather than accepted from self-reports. This chunk's
+delegation runs were also interrupted mid-flight by external process kills on all three lanes at
+once (see the Operational note below) — real, load-bearing gaps surfaced by re-verification, not
+by either delegate's own sandbox:
+
+- **The centerpiece gap**: the backend lane's first pass scored "lexical" and "semantic" similarity
+  entirely in Python — `difflib.SequenceMatcher` and a hand-rolled cosine calculation recomputed
+  from scratch on every call — and never read or wrote `canonical_product.canonical_embedding` or
+  `workspace_product.tenant_name_embedding`, the two columns migration `20260819000026` built
+  specifically for this chunk. It also loaded the entire `workspace_product` table into application
+  memory per match attempt. This is exactly what research.md R3/R4 said not to do, and the delegate
+  itself flagged the gap honestly in its own report rather than claiming a false pass. Fixed with a
+  new orchestrator-authored migration (`20260821000001_matching_candidate_search.sql`) defining a
+  `security invoker` SQL function doing real `pg_trgm` `similarity()` and real `pgvector` `<=>`
+  cosine-distance queries against the persisted embedding columns, callable via
+  `client.rpc("match_candidate_search", …)` so RLS still applies with no new policy needed; a
+  scoped delta had the backend lane wire it in and add embedding write-back to the catalogue
+  service. Verified with three new tests I wrote directly against the real database, proving a
+  supplier-wording typo is caught by trigram similarity, unrelated text is excluded, and a missing
+  embedding scores the neutral 0.5 (not 0, not a false match) per research.md R5.
+- **A false "clean lint" claim**: the frontend lane's self-report claimed `ng lint` was clean; a
+  real run found two real errors (`JsonPipe` and `RoleDirective` imported but never used in
+  `match-resolution.component.ts`). Fixed directly — both were genuinely dead imports, the
+  read-only/role gating that screen needs is enforced in component logic (`isWriter()`), not the
+  template directive.
+- **Operational note, not a code defect**: all three delegate dispatches (backend, frontend, docs)
+  were killed by an external `SIGTERM` mid-run at least once; the frontend lane specifically failed
+  twice with "timeout waiting for response" before the actual cause was found — `apps/web/.angular`
+  had grown to 794MB, the same class of workspace-scan timeout chunk 4.2 already hit once. Clearing
+  the gitignored cache before the third dispatch resolved it. Recorded to memory so a future session
+  checks cache size before assuming the delegation tool itself is broken.
+
+### Quality gates
+
+| Gate | Threshold | Status |
+|---|---|---|
+| Cross-tenant isolation | Proven on every change | ✅ 36/36 against a real database, including the two-embedding shared/tenant-scoped split |
+| Candidate evidence (Principle I) | Confidence + structured reasons, not a bare score | ✅ Verified live: `match_candidate_search` returns real `lexical_similarity`/`semantic_similarity`, combined with deterministic and feature scores per R5's exact weights |
+| Human routing (Principle III) | Low-confidence or close calls never auto-decided | ✅ `_route_or_accept` threshold + close-call margin logic verified by direct code review and `test_matching_rbac.py`/unit tests |
+| Landed-cost replay (Principle II) | Bit-identical recomputation at a pinned rule version | ✅ `test_landed_cost_replay.py` passes against a real database; a new rule version inserts rather than mutates |
+| Backend test suite | All passing | ✅ 320 passed, 1 skipped (unrelated, pre-existing), ruff clean, against a real local Postgres |
+| Frontend test suite | All passing | ✅ 72 passed, `ng lint` clean (after the fix above), i18n 733/733 exact parity — all confirmed by an independent re-run, not the delegate's report |
+| Keyboard-only resolution (FR-012) | Candidate select + confirm without a mouse | ✅ Verified by direct code review of the keyboard handler (digits 1–9 select by rank, arrows navigate, `O` cycles outcome, `Enter`/`Ctrl+Enter` confirms) and the dedicated Playwright spec; **not** re-driven through a live browser this session (see honest gaps) |
+
+### The honest gaps
+
+- **No live browser walkthrough this chunk.** Every prior chunk's live walkthrough caught a real bug
+  static review and automated tests missed (chunk 4.2's `[object Object]` rendering, chunk 4.3's
+  dropped-supplier-selection bug). This chunk relied instead on real-database-backed automated tests
+  (backend) and a real, unmocked Karma/`ng lint` run (frontend) plus direct reading of the exact
+  payload-construction and keyboard-handling code, under this session's explicit instruction to
+  economise on Claude usage. This is a real, disclosed gap, not a silent skip — a future session
+  should drive the actual `/matching` and `/matching/:id` screens against a live stack before fully
+  trusting the UI layer.
+- **`ml/evals/product_matching/run_eval.py` cannot honestly report the ≥92% precision / ≤8% review
+  band gates**, for the same reason chunk 4.3's extraction accuracy couldn't: no real held-out
+  labelled benchmark with hard negatives exists yet. The harness itself runs and is labelled
+  accordingly — mechanical correctness, not a real accuracy claim.
+- **The DB-side search is an exact scan, not ANN-indexed** — per research.md R4, acceptable at pilot
+  catalogue size; an HNSW index is additive future work once volume demands it, not a correctness
+  gap today.

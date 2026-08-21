@@ -8,11 +8,14 @@ real migrations, as the real `authenticated` role, carrying a real JWT claim.
 FR-030 requires this to run on every proposed change. It is wired into CI as its own named check
 so that its failure is never mistaken for an unrelated test failure.
 
-Set TEST_DATABASE_URL to a database with migrations 0001-0021 applied — extended for
+Set TEST_DATABASE_URL to a database with migrations 0001-0027 applied — extended for
 002-catalogue-suppliers (T038) to cover workspace_product, pack_definition, supplier,
 product_alias and import_job, plus the canonical_product exception; extended again for
 003-quotation-inbox-extraction (T063) to cover document, quotation, quotation_line,
-field_extraction, extraction_job, review_task, and the Supabase Storage object policy.
+field_extraction, extraction_job, review_task, and the Supabase Storage object policy; extended
+again for 004-matching-normalisation (T052) to cover match_candidate, match_task, match_decision
+and landed_cost, plus the tenant-scoped and shared embedding columns added to workspace_product
+and canonical_product respectively.
 """
 
 from __future__ import annotations
@@ -47,6 +50,7 @@ class Workspace:
         document_id: UUID,
         quotation_id: UUID,
         storage_path: str,
+        quotation_line_id: UUID,
     ) -> None:
         self.tenant_id = tenant_id
         self.user_id = user_id
@@ -58,6 +62,7 @@ class Workspace:
         self.document_id = document_id
         self.quotation_id = quotation_id
         self.storage_path = storage_path
+        self.quotation_line_id = quotation_line_id
 
     def claims(self) -> str:
         return (
@@ -181,6 +186,47 @@ def make_workspace(cur: psycopg.Cursor, label: str) -> Workspace:
         (storage_path, user_id),
     )
 
+    # Matching and normalisation — chunk 4.4 (004-matching-normalisation), T052.
+    match_candidate_id, match_task_id, match_decision_id, landed_cost_id = (
+        uuid4(), uuid4(), uuid4(), uuid4()
+    )
+    cur.execute(
+        "insert into match_candidate "
+        "(id,tenant_id,quotation_line_id,candidate_workspace_product_id,confidence,reasons,"
+        "rank,scoring_version) "
+        "values (%s,%s,%s,%s,0.5,'{}'::jsonb,1,'test-fixture-v1')",
+        (match_candidate_id, tenant_id, quotation_line_id, workspace_product_id),
+    )
+    cur.execute(
+        "insert into match_task (id,tenant_id,quotation_line_id,reason) "
+        "values (%s,%s,%s,'low_confidence')",
+        (match_task_id, tenant_id, quotation_line_id),
+    )
+    cur.execute(
+        "insert into match_decision "
+        "(id,tenant_id,quotation_line_id,matched_workspace_product_id,"
+        "selected_match_candidate_id,outcome,is_automatic,confidence) "
+        "values (%s,%s,%s,%s,%s,'same_product',true,0.5)",
+        (
+            match_decision_id,
+            tenant_id,
+            quotation_line_id,
+            workspace_product_id,
+            match_candidate_id,
+        ),
+    )
+    cur.execute(
+        "insert into landed_cost "
+        "(id,tenant_id,quotation_line_id,match_decision_id,quantity,normalised_base_quantity,"
+        "base_unit,unit_price_amount,unit_price_currency,vat_amount,vat_currency,"
+        "delivery_fee_amount,delivery_fee_currency,discount_amount,discount_currency,"
+        "other_charges_amount,other_charges_currency,total_amount,total_currency,raw_inputs,"
+        "rule_version,valid_from) "
+        "values (%s,%s,%s,%s,10,10,'each',10,'GBP',2,'GBP',0,'GBP',0,'GBP',0,'GBP',12,'GBP',"
+        "'{}'::jsonb,'landed-cost-v1',now())",
+        (landed_cost_id, tenant_id, quotation_line_id, match_decision_id),
+    )
+
     return Workspace(
         tenant_id,
         user_id,
@@ -192,6 +238,7 @@ def make_workspace(cur: psycopg.Cursor, label: str) -> Workspace:
         document_id,
         quotation_id,
         storage_path,
+        quotation_line_id,
     )
 
 
@@ -598,6 +645,122 @@ def test_storage_object_from_another_workspace_is_invisible(
         assert cur.fetchall() == [(alpha.storage_path,)]
 
 
+# --- matching and normalisation (004-matching-normalisation, T052) ---------
+
+
+def test_another_workspaces_match_candidates_are_invisible(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        cur.execute(
+            "select count(*) from match_candidate where quotation_line_id = %s",
+            (beta.quotation_line_id,),
+        )
+        row = cur.fetchone()
+    assert row is not None and row[0] == 0
+
+
+def test_another_workspaces_match_tasks_are_invisible(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    """FR-011: the match-resolution queue is standalone, but still tenant-private."""
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        cur.execute(
+            "select count(*) from match_task where quotation_line_id = %s",
+            (beta.quotation_line_id,),
+        )
+        row = cur.fetchone()
+    assert row is not None and row[0] == 0
+
+
+def test_another_workspaces_match_decisions_are_invisible(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        cur.execute(
+            "select count(*) from match_decision where quotation_line_id = %s",
+            (beta.quotation_line_id,),
+        )
+        row = cur.fetchone()
+    assert row is not None and row[0] == 0
+
+
+def test_another_workspaces_landed_costs_are_invisible(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        cur.execute(
+            "select count(*) from landed_cost where quotation_line_id = %s",
+            (beta.quotation_line_id,),
+        )
+        row = cur.fetchone()
+    assert row is not None and row[0] == 0
+
+
+def test_a_member_cannot_write_a_match_decision_into_another_workspace(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            cur.execute(
+                "insert into match_decision "
+                "(tenant_id,quotation_line_id,matched_workspace_product_id,outcome,"
+                "is_automatic,confidence) "
+                "values (%s,%s,%s,'no_match_new_product',true,0.9)",
+                (beta.tenant_id, beta.quotation_line_id, beta.workspace_product_id),
+            )
+
+
+def test_workspace_products_tenant_name_embedding_stays_tenant_scoped(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    """The tenant-scoped half of research.md R4's two-embedding design: no new policy needed,
+    since tenant_name_embedding is just another column on the already tenant-isolated
+    workspace_product table — this confirms that, rather than assuming it."""
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        dummy_vector = "[" + ",".join("0.1" for _ in range(256)) + "]"
+        cur.execute(
+            "update workspace_product set tenant_name_embedding = %s where id = %s",
+            (dummy_vector, beta.workspace_product_id),
+        )
+        assert cur.rowcount == 0
+        cur.execute(
+            "select id from workspace_product where id = %s", (beta.workspace_product_id,)
+        )
+        assert cur.fetchall() == []
+
+
+def test_canonical_products_embedding_is_shared_by_design_not_a_leak(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    """The shared half of research.md R4's two-embedding design: canonical_embedding lives on
+    canonical_product, which is deliberately shared across workspaces (chunk 4.2), because it is
+    derived only from brand/name/variant — fields canonical_product already legitimately holds.
+    Both workspaces' canonical products must remain readable, same as the plain canonical_product
+    exception test above; this must stay an exception, not a leak of anything workspace-specific."""
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        cur.execute(
+            "select id from canonical_product where id = any(%s)",
+            ([alpha.canonical_product_id, beta.canonical_product_id],),
+        )
+        seen = {r[0] for r in cur.fetchall()}
+    assert seen == {alpha.canonical_product_id, beta.canonical_product_id}
+
+
 def test_platform_invitations_are_unreadable_by_members(
     workspaces: tuple[psycopg.Connection, Workspace, Workspace],
 ) -> None:
@@ -626,6 +789,7 @@ def test_rls_is_enabled_and_forced_on_every_tenant_scoped_table(
         "product_alias", "import_job", "canonical_product",
         "document", "quotation", "quotation_line", "field_extraction", "extraction_job",
         "review_task",
+        "match_candidate", "match_task", "match_decision", "landed_cost",
     }
     with conn.cursor() as cur:
         cur.execute(

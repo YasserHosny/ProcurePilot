@@ -360,3 +360,139 @@ export interface ReviewTask {
   readonly resolved_at?: string | null;
 }
 
+// --- Matching and Normalisation (Chunk 4.4) ---
+
+export type MatchOutcome =
+  | 'same_product'
+  | 'different_pack'
+  | 'different_variant'
+  | 'compatible_alternative'
+  | 'no_match_new_product';
+
+export type MatchTaskStatus = 'open' | 'in_progress' | 'resolved';
+export type MatchTaskPriority = 'low' | 'normal' | 'high';
+export type MatchTaskReason =
+  | 'low_confidence'
+  | 'close_candidates'
+  | 'no_candidate'
+  | 'alias_conflict';
+
+export interface ProductSummary {
+  readonly id: string;
+  readonly tenant_name: string;
+  readonly brand?: string | null;
+  readonly canonical_name: string;
+  readonly variant?: string | null;
+  readonly gtin?: string | null;
+  readonly base_unit: string;
+  readonly status: 'active' | 'archived';
+}
+
+export interface QuotationLineSummary {
+  readonly id: string;
+  readonly line_number: number;
+  readonly original_text: string;
+  readonly quantity?: string | null;
+  readonly pack?: QuotationPack | null;
+  readonly unit_price?: Money | null;
+  readonly vat_rate?: string | null;
+  readonly delivery_fee?: Money | null;
+  readonly discount?: Money | null;
+}
+
+export interface FeatureScore {
+  readonly brand_match: string;
+  readonly variant_match: string;
+  readonly pack_unit_match: string;
+  readonly pack_size_plausibility: string;
+  readonly price_plausibility: string;
+}
+
+export interface MatchReason {
+  readonly alias_hit: boolean;
+  readonly gtin_match: boolean;
+  readonly supplier_code_match: boolean;
+  readonly lexical_similarity: string;
+  readonly semantic_similarity: string;
+  readonly feature_score: FeatureScore;
+}
+
+export interface MatchCandidate {
+  readonly id: string;
+  readonly quotation_line_id: string;
+  readonly candidate_product: ProductSummary;
+  readonly confidence: string; // decimal string 0.0000 to 1.0000
+  readonly reasons: MatchReason;
+  readonly rank: number;
+  readonly scoring_version: string;
+  readonly embedding_model?: string | null;
+  readonly created_at: string;
+}
+
+export interface MatchDecision {
+  readonly id: string;
+  readonly quotation_line_id: string;
+  readonly matched_product: ProductSummary;
+  readonly selected_match_candidate_id?: string | null;
+  readonly outcome: MatchOutcome;
+  readonly is_automatic: boolean;
+  readonly decided_by?: string | null;
+  readonly decided_at: string;
+  readonly confidence: string;
+  readonly alias_id?: string | null;
+}
+
+export interface MatchTask {
+  readonly id: string;
+  readonly quotation_id: string;
+  readonly quotation_line: QuotationLineSummary;
+  readonly status: MatchTaskStatus;
+  readonly priority: MatchTaskPriority;
+  readonly reason: MatchTaskReason;
+  readonly candidates: readonly MatchCandidate[];
+  readonly decision?: MatchDecision | null;
+  readonly created_at: string;
+  readonly resolved_at?: string | null;
+}
+
+export interface MatchResolutionRequest {
+  readonly outcome: MatchOutcome;
+  readonly selected_match_candidate_id?: string | null;
+  readonly create_product?: ProductCreate | null;
+}
+
+export interface LandedCost {
+  readonly id: string;
+  readonly quotation_line_id: string;
+  readonly match_decision_id: string;
+  readonly quantity: string;
+  readonly normalised_base_quantity: string;
+  readonly base_unit: string;
+  readonly unit_price: Money;
+  readonly vat_amount: Money;
+  readonly delivery_fee: Money;
+  readonly discount: Money;
+  readonly other_charges: Money;
+  readonly total: Money;
+  readonly raw_inputs: Record<string, unknown>;
+  readonly rule_version: string;
+  readonly valid_from: string;
+  readonly valid_to?: string | null;
+  readonly recorded_at: string;
+  readonly created_at: string;
+}
+
+export interface QuotationLineMatchState {
+  readonly line: QuotationLineSummary;
+  readonly candidates: readonly MatchCandidate[];
+  readonly task?: MatchTask | null;
+  readonly decision?: MatchDecision | null;
+  readonly landed_cost?: LandedCost | null;
+}
+
+export interface QuotationMatches {
+  readonly quotation_id: string;
+  readonly lines: readonly QuotationLineMatchState[];
+}
+
+

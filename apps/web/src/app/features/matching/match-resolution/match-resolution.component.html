@@ -1,0 +1,564 @@
+<div class="match-resolution-container">
+  <!-- Page Header -->
+  <header class="page-header">
+    <div class="header-info">
+      <h1 class="page-title">{{ 'matching.resolution.title' | translate }}</h1>
+      <p class="page-subtitle">{{ 'matching.resolution.subtitle' | translate }}</p>
+    </div>
+
+    <a mat-stroked-button routerLink="/matching" class="back-btn">
+      <mat-icon aria-hidden="true">arrow_back</mat-icon>
+      <span>{{ 'matching.resolution.backToQueue' | translate }}</span>
+    </a>
+  </header>
+
+  <!-- Read-Only Banner for non-writers -->
+  @if (!isWriter()) {
+    <div class="read-only-banner" role="status">
+      <mat-icon class="banner-icon" aria-hidden="true">info</mat-icon>
+      <span>{{ 'matching.resolution.readOnlyBanner' | translate }}</span>
+    </div>
+  }
+
+  <!-- Error Alert -->
+  @if (errorMessage()) {
+    <div class="error-banner" role="alert">
+      <mat-icon class="error-icon" aria-hidden="true">error_outline</mat-icon>
+      <div class="error-content">
+        <span class="error-text">{{ errorMessage() }}</span>
+        @if (errorTraceId()) {
+          <span class="error-trace">{{ 'common.traceId' | translate }}: {{ errorTraceId() }}</span>
+        }
+      </div>
+    </div>
+  }
+
+  @if (isLoading()) {
+    <div class="loading-state" aria-live="polite">
+      <mat-spinner diameter="40"></mat-spinner>
+      <span>{{ 'common.loading' | translate }}</span>
+    </div>
+  } @else {
+    <!-- Keyboard Shortcuts Helper Bar (FR-012) -->
+    @if (isWriter() && !decision()) {
+      <div class="keyboard-shortcuts-bar" role="region" [attr.aria-label]="'matching.resolution.keyboardShortcutsTitle' | translate">
+        <div class="shortcut-header">
+          <mat-icon aria-hidden="true">keyboard</mat-icon>
+          <span class="shortcut-title">{{ 'matching.resolution.keyboardShortcutsTitle' | translate }}:</span>
+        </div>
+        <div class="shortcut-pills">
+          <span class="shortcut-pill"><kbd>1</kbd>–<kbd>9</kbd> {{ 'matching.resolution.shortcuts.selectCandidate' | translate }}</span>
+          <span class="shortcut-pill"><kbd>↑</kbd> <kbd>↓</kbd> {{ 'matching.resolution.shortcuts.navigate' | translate }}</span>
+          <span class="shortcut-pill"><kbd>O</kbd> {{ 'matching.resolution.shortcuts.toggleOutcome' | translate }}</span>
+          <span class="shortcut-pill"><kbd>Enter</kbd> {{ 'matching.resolution.shortcuts.confirm' | translate }}</span>
+        </div>
+      </div>
+    }
+
+    <!-- Quotation Line Details Card -->
+    @if (line(); as l) {
+      <mat-card class="line-card">
+        <mat-card-header>
+          <mat-card-title class="card-title-row">
+            <span class="line-badge">{{ 'matching.resolution.lineDetails.lineNumber' | translate: { line: l.line_number } }}</span>
+            <span class="original-wording">{{ l.original_text }}</span>
+          </mat-card-title>
+        </mat-card-header>
+        <mat-card-content class="line-metrics-grid">
+          <div class="metric-item">
+            <span class="metric-label">{{ 'matching.resolution.lineDetails.quantity' | translate }}</span>
+            <span class="metric-value">{{ l.quantity || '1' }}</span>
+          </div>
+          @if (l.pack) {
+            <div class="metric-item">
+              <span class="metric-label">{{ 'matching.resolution.lineDetails.pack' | translate }}</span>
+              <span class="metric-value">{{ l.pack.pack_count }} × {{ l.pack.unit_size }} {{ l.pack.unit || '' }}</span>
+            </div>
+          }
+          @if (l.unit_price) {
+            <div class="metric-item">
+              <span class="metric-label">{{ 'matching.resolution.lineDetails.unitPrice' | translate }}</span>
+              <span class="metric-value">{{ l.unit_price | formatMoney }}</span>
+            </div>
+          }
+          @if (l.vat_rate) {
+            <div class="metric-item">
+              <span class="metric-label">{{ 'matching.resolution.lineDetails.vatRate' | translate }}</span>
+              <span class="metric-value">{{ formatScore(l.vat_rate) }}%</span>
+            </div>
+          }
+          @if (l.delivery_fee) {
+            <div class="metric-item">
+              <span class="metric-label">{{ 'matching.resolution.lineDetails.deliveryFee' | translate }}</span>
+              <span class="metric-value">{{ l.delivery_fee | formatMoney }}</span>
+            </div>
+          }
+          @if (l.discount) {
+            <div class="metric-item">
+              <span class="metric-label">{{ 'matching.resolution.lineDetails.discount' | translate }}</span>
+              <span class="metric-value">{{ l.discount | formatMoney }}</span>
+            </div>
+          }
+        </mat-card-content>
+      </mat-card>
+    }
+
+    <!-- Already Resolved Decision Banner -->
+    @if (decision(); as dec) {
+      <div class="decision-banner" role="region">
+        <div class="decision-header">
+          <mat-icon class="decision-icon" aria-hidden="true">check_circle</mat-icon>
+          <div class="decision-title-group">
+            <h2 class="decision-title">{{ 'matching.resolution.decision.title' | translate }}</h2>
+            <span class="decision-tag" [class.auto-tag]="dec.is_automatic" [class.human-tag]="!dec.is_automatic">
+              {{ (dec.is_automatic ? 'matching.resolution.decision.automatic' : 'matching.resolution.decision.human') | translate }}
+            </span>
+          </div>
+        </div>
+        <div class="decision-details-grid">
+          <div>
+            <strong>{{ 'matching.resolution.decision.matchedProduct' | translate }}</strong>
+            <span>{{ dec.matched_product.tenant_name }}</span>
+          </div>
+          <div>
+            <strong>{{ 'matching.resolution.decision.outcome' | translate }}</strong>
+            <span>{{ 'matching.resolution.outcomes.' + dec.outcome + '.label' | translate }}</span>
+          </div>
+          <div>
+            <strong>{{ 'matching.resolution.decision.confidence' | translate }}</strong>
+            <span>{{ formatScore(dec.confidence) }}%</span>
+          </div>
+          <div>
+            <strong>{{ 'matching.resolution.decision.decidedAt' | translate }}</strong>
+            <span>{{ dec.decided_at | formatDate }}</span>
+          </div>
+        </div>
+      </div>
+    }
+
+    <!-- Landed Cost Component (US3) -->
+    @if (landedCost(); as lc) {
+      <mat-card class="landed-cost-card" role="region">
+        <mat-card-header>
+          <div class="cost-header-row">
+            <div>
+              <mat-card-title class="cost-title">{{ 'matching.resolution.landedCost.title' | translate }}</mat-card-title>
+              <mat-card-subtitle>{{ 'matching.resolution.landedCost.subtitle' | translate }}</mat-card-subtitle>
+            </div>
+            <span class="rule-version-badge">{{ lc.rule_version }}</span>
+          </div>
+        </mat-card-header>
+        <mat-card-content>
+          <div class="cost-breakdown-grid">
+            <div class="cost-item">
+              <span class="cost-label">{{ 'matching.resolution.landedCost.unitPrice' | translate }}</span>
+              <span class="cost-val">{{ lc.unit_price | formatMoney }}</span>
+            </div>
+            <div class="cost-item">
+              <span class="cost-label">{{ 'matching.resolution.landedCost.vatAmount' | translate }}</span>
+              <span class="cost-val">{{ lc.vat_amount | formatMoney }}</span>
+            </div>
+            <div class="cost-item">
+              <span class="cost-label">{{ 'matching.resolution.landedCost.deliveryFee' | translate }}</span>
+              <span class="cost-val">{{ lc.delivery_fee | formatMoney }}</span>
+            </div>
+            <div class="cost-item">
+              <span class="cost-label">{{ 'matching.resolution.landedCost.discount' | translate }}</span>
+              <span class="cost-val discount-val">-{{ lc.discount | formatMoney }}</span>
+            </div>
+            <div class="cost-item">
+              <span class="cost-label">{{ 'matching.resolution.landedCost.otherCharges' | translate }}</span>
+              <span class="cost-val">{{ lc.other_charges | formatMoney }}</span>
+            </div>
+            <div class="cost-item total-item">
+              <span class="cost-label">{{ 'matching.resolution.landedCost.total' | translate }}</span>
+              <strong class="cost-val total-val">{{ lc.total | formatMoney }}</strong>
+            </div>
+          </div>
+
+          <mat-divider class="cost-divider"></mat-divider>
+
+          <div class="cost-normalisation-row">
+            <div class="norm-info">
+              <span class="norm-label">{{ 'matching.resolution.landedCost.normalisedQuantity' | translate }}:</span>
+              <strong class="norm-val">{{ lc.normalised_base_quantity }} {{ lc.base_unit }}</strong>
+            </div>
+            <div class="replay-notice">
+              <mat-icon aria-hidden="true">lock</mat-icon>
+              <span>{{ 'matching.resolution.landedCost.replayableNotice' | translate: { version: lc.rule_version } }}</span>
+            </div>
+          </div>
+        </mat-card-content>
+      </mat-card>
+    }
+
+    <!-- Candidates Section -->
+    <section class="candidates-section" aria-labelledby="candidates-section-title">
+      <div class="section-header">
+        <h2 id="candidates-section-title" class="section-title">{{ 'matching.resolution.candidates.title' | translate }}</h2>
+        <p class="section-desc">{{ 'matching.resolution.candidates.subtitle' | translate }}</p>
+      </div>
+
+      @if (candidates().length === 0) {
+        <mat-card class="no-candidates-card">
+          <mat-card-content>
+            <mat-icon class="no-cands-icon" aria-hidden="true">search_off</mat-icon>
+            <p class="no-cands-text">{{ 'matching.resolution.candidates.noCandidates' | translate }}</p>
+            <p class="no-cands-hint">{{ 'matching.resolution.outcomes.no_match_new_product.description' | translate }}</p>
+          </mat-card-content>
+        </mat-card>
+      } @else {
+        <div class="candidates-grid">
+          @for (cand of candidates(); track cand.id) {
+            <div
+              class="candidate-card"
+              [class.selected]="selectedCandidateId() === cand.id && selectedOutcome() !== 'no_match_new_product'"
+              [class.rank-first]="cand.rank === 1"
+              (click)="isWriter() && !decision() && selectCandidate(cand.id)"
+              tabindex="0"
+              role="button"
+              [attr.aria-pressed]="selectedCandidateId() === cand.id && selectedOutcome() !== 'no_match_new_product'"
+            >
+              <!-- Candidate Card Header -->
+              <div class="cand-header">
+                <div class="cand-rank-group">
+                  <span class="cand-rank-badge">#{{ cand.rank }}</span>
+                  <span class="cand-key-hint"><kbd>{{ cand.rank }}</kbd></span>
+                </div>
+                <div class="cand-confidence-badge" [class.high]="formatScore(cand.confidence) >= 90" [class.medium]="formatScore(cand.confidence) >= 70 && formatScore(cand.confidence) < 90" [class.low]="formatScore(cand.confidence) < 70">
+                  <span class="conf-score">{{ formatScore(cand.confidence) }}%</span>
+                  <span class="conf-label">{{ 'matching.resolution.candidates.confidence' | translate }}</span>
+                </div>
+              </div>
+
+              <!-- Product Overview -->
+              <div class="cand-product-info">
+                <h3 class="cand-product-name">{{ cand.candidate_product.tenant_name }}</h3>
+                <div class="cand-attributes">
+                  @if (cand.candidate_product.brand) {
+                    <span class="attr-item"><strong>{{ 'matching.resolution.candidates.product.brand' | translate }}:</strong> {{ cand.candidate_product.brand }}</span>
+                  }
+                  @if (cand.candidate_product.variant) {
+                    <span class="attr-item"><strong>{{ 'matching.resolution.candidates.product.variant' | translate }}:</strong> {{ cand.candidate_product.variant }}</span>
+                  }
+                  @if (cand.candidate_product.gtin) {
+                    <span class="attr-item"><strong>{{ 'matching.resolution.candidates.product.gtin' | translate }}:</strong> {{ cand.candidate_product.gtin }}</span>
+                  }
+                  <span class="attr-item"><strong>{{ 'matching.resolution.candidates.product.baseUnit' | translate }}:</strong> {{ cand.candidate_product.base_unit }}</span>
+                </div>
+
+                @if (cand.candidate_product.status === 'archived') {
+                  <div class="archived-notice" role="alert">
+                    <mat-icon aria-hidden="true">archive</mat-icon>
+                    <span>{{ 'matching.resolution.candidates.product.archivedWarning' | translate }}</span>
+                  </div>
+                }
+              </div>
+
+              <mat-divider></mat-divider>
+
+              <!-- Reason Breakdown & Signals -->
+              <div class="cand-signals">
+                <div class="signals-title">{{ 'matching.resolution.candidates.signalsTitle' | translate }}</div>
+
+                <div class="signal-badges">
+                  @if (cand.reasons.alias_hit) {
+                    <span class="signal-badge hit" [matTooltip]="'matching.resolution.candidates.signals.aliasHitDesc' | translate">
+                      <mat-icon aria-hidden="true">check</mat-icon>
+                      {{ 'matching.resolution.candidates.signals.aliasHit' | translate }}
+                    </span>
+                  }
+                  @if (cand.reasons.gtin_match) {
+                    <span class="signal-badge hit" [matTooltip]="'matching.resolution.candidates.signals.gtinMatchDesc' | translate">
+                      <mat-icon aria-hidden="true">qr_code_2</mat-icon>
+                      {{ 'matching.resolution.candidates.signals.gtinMatch' | translate }}
+                    </span>
+                  }
+                  @if (cand.reasons.supplier_code_match) {
+                    <span class="signal-badge hit" [matTooltip]="'matching.resolution.candidates.signals.supplierCodeMatchDesc' | translate">
+                      <mat-icon aria-hidden="true">tag</mat-icon>
+                      {{ 'matching.resolution.candidates.signals.supplierCodeMatch' | translate }}
+                    </span>
+                  }
+                </div>
+
+                <!-- Similarity Scores -->
+                <div class="similarity-meters">
+                  <div class="sim-row">
+                    <span class="sim-name">{{ 'matching.resolution.candidates.signals.lexicalSimilarity' | translate }}</span>
+                    <span class="sim-score">{{ formatScore(cand.reasons.lexical_similarity) }}%</span>
+                  </div>
+                  <div class="sim-row">
+                    <span class="sim-name">{{ 'matching.resolution.candidates.signals.semanticSimilarity' | translate }}</span>
+                    <span class="sim-score">{{ formatScore(cand.reasons.semantic_similarity) }}%</span>
+                  </div>
+                </div>
+
+                <!-- Feature Scores -->
+                <div class="feature-scores-grid">
+                  <div class="feat-item" [matTooltip]="'matching.resolution.candidates.signals.brandMatch' | translate">
+                    <span class="feat-lbl">Brand:</span>
+                    <span class="feat-val">{{ formatScore(cand.reasons.feature_score.brand_match) }}%</span>
+                  </div>
+                  <div class="feat-item" [matTooltip]="'matching.resolution.candidates.signals.variantMatch' | translate">
+                    <span class="feat-lbl">Variant:</span>
+                    <span class="feat-val">{{ formatScore(cand.reasons.feature_score.variant_match) }}%</span>
+                  </div>
+                  <div class="feat-item" [matTooltip]="'matching.resolution.candidates.signals.packUnitMatch' | translate">
+                    <span class="feat-lbl">Pack Unit:</span>
+                    <span class="feat-val">{{ formatScore(cand.reasons.feature_score.pack_unit_match) }}%</span>
+                  </div>
+                  <div class="feat-item" [matTooltip]="'matching.resolution.candidates.signals.packSizePlausibility' | translate">
+                    <span class="feat-lbl">Pack Size:</span>
+                    <span class="feat-val">{{ formatScore(cand.reasons.feature_score.pack_size_plausibility) }}%</span>
+                  </div>
+                  <div class="feat-item" [matTooltip]="'matching.resolution.candidates.signals.pricePlausibility' | translate">
+                    <span class="feat-lbl">Price:</span>
+                    <span class="feat-val">{{ formatScore(cand.reasons.feature_score.price_plausibility) }}%</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Select Radio / Check -->
+              @if (isWriter() && !decision()) {
+                <div class="cand-select-footer">
+                  <button
+                    mat-stroked-button
+                    type="button"
+                    [color]="selectedCandidateId() === cand.id && selectedOutcome() !== 'no_match_new_product' ? 'primary' : undefined"
+                    (click)="selectCandidate(cand.id); $event.stopPropagation()"
+                    class="cand-select-btn"
+                  >
+                    <mat-icon aria-hidden="true">{{ selectedCandidateId() === cand.id && selectedOutcome() !== 'no_match_new_product' ? 'check_circle' : 'radio_button_unchecked' }}</mat-icon>
+                    <span>{{ (selectedCandidateId() === cand.id && selectedOutcome() !== 'no_match_new_product' ? 'matching.resolution.decision.matchedProduct' : 'matching.queue.actions.resolve') | translate }}</span>
+                  </button>
+                </div>
+              }
+            </div>
+          }
+        </div>
+      }
+    </section>
+
+    <!-- Outcomes Selection Section -->
+    @if (isWriter() && !decision()) {
+      <section class="outcomes-section" aria-labelledby="outcomes-section-title">
+        <div class="section-header">
+          <h2 id="outcomes-section-title" class="section-title">{{ 'matching.resolution.outcomes.title' | translate }}</h2>
+          <p class="section-desc">{{ 'matching.resolution.outcomes.subtitle' | translate }}</p>
+        </div>
+
+        <mat-card class="outcomes-card">
+          <mat-card-content>
+            <mat-radio-group
+              [ngModel]="selectedOutcome()"
+              (ngModelChange)="selectOutcome($event)"
+              class="outcomes-radio-group"
+            >
+              @for (opt of outcomeOptions; track opt.value) {
+                <mat-radio-button [value]="opt.value" class="outcome-radio-item" [disabled]="opt.value !== 'no_match_new_product' && candidates().length === 0">
+                  <div class="outcome-text">
+                    <strong class="outcome-label">{{ opt.labelKey | translate }}</strong>
+                    <span class="outcome-desc">{{ opt.descKey | translate }}</span>
+                  </div>
+                </mat-radio-button>
+              }
+            </mat-radio-group>
+          </mat-card-content>
+        </mat-card>
+      </section>
+
+      <!-- Inline Product Form when "no_match_new_product" is selected -->
+      @if (selectedOutcome() === 'no_match_new_product') {
+        <section class="new-product-section" aria-labelledby="new-product-title">
+          <mat-card class="new-product-card">
+            <mat-card-header>
+              <mat-card-title id="new-product-title">{{ 'matching.resolution.newProduct.title' | translate }}</mat-card-title>
+              <mat-card-subtitle>{{ 'matching.resolution.newProduct.subtitle' | translate }}</mat-card-subtitle>
+            </mat-card-header>
+
+            <mat-card-content>
+              <form [formGroup]="productForm" class="product-creation-form">
+                <div class="form-row">
+                  <mat-form-field appearance="outline" class="form-field full-width">
+                    <mat-label>{{ 'matching.resolution.newProduct.tenantNameLabel' | translate }}</mat-label>
+                    <input
+                      matInput
+                      formControlName="tenant_name"
+                      [placeholder]="'matching.resolution.newProduct.tenantNamePlaceholder' | translate"
+                      required
+                    />
+                    @if (productForm.get('tenant_name')?.hasError('required') && productForm.get('tenant_name')?.touched) {
+                      <mat-error>{{ 'matching.resolution.newProduct.tenantNameRequired' | translate }}</mat-error>
+                    }
+                    @if (productForm.get('tenant_name')?.hasError('maxlength')) {
+                      <mat-error>{{ 'matching.resolution.newProduct.tenantNameMaxLength' | translate }}</mat-error>
+                    }
+                  </mat-form-field>
+                </div>
+
+                <div class="form-row two-col">
+                  <mat-form-field appearance="outline" class="form-field">
+                    <mat-label>{{ 'matching.resolution.newProduct.brandLabel' | translate }}</mat-label>
+                    <input
+                      matInput
+                      formControlName="brand"
+                      [placeholder]="'matching.resolution.newProduct.brandPlaceholder' | translate"
+                    />
+                  </mat-form-field>
+
+                  <mat-form-field appearance="outline" class="form-field">
+                    <mat-label>{{ 'matching.resolution.newProduct.variantLabel' | translate }}</mat-label>
+                    <input
+                      matInput
+                      formControlName="variant"
+                      [placeholder]="'matching.resolution.newProduct.variantPlaceholder' | translate"
+                    />
+                  </mat-form-field>
+                </div>
+
+                <div class="form-row two-col">
+                  <mat-form-field appearance="outline" class="form-field">
+                    <mat-label>{{ 'matching.resolution.newProduct.gtinLabel' | translate }}</mat-label>
+                    <input
+                      matInput
+                      formControlName="gtin"
+                      [placeholder]="'matching.resolution.newProduct.gtinPlaceholder' | translate"
+                    />
+                    @if (productForm.get('gtin')?.hasError('pattern') && productForm.get('gtin')?.touched) {
+                      <mat-error>{{ 'matching.resolution.newProduct.gtinInvalid' | translate }}</mat-error>
+                    }
+                  </mat-form-field>
+
+                  <mat-form-field appearance="outline" class="form-field">
+                    <mat-label>{{ 'matching.resolution.newProduct.baseUnitLabel' | translate }}</mat-label>
+                    <mat-select formControlName="base_unit" required>
+                      @for (unit of baseUnits(); track unit.code) {
+                        <mat-option [value]="unit.code">
+                          {{ unit.label_en }} ({{ unit.code }})
+                        </mat-option>
+                      }
+                    </mat-select>
+                    @if (productForm.get('base_unit')?.hasError('required') && productForm.get('base_unit')?.touched) {
+                      <mat-error>{{ 'matching.resolution.newProduct.baseUnitRequired' | translate }}</mat-error>
+                    }
+                  </mat-form-field>
+                </div>
+
+                <div class="form-row">
+                  <mat-form-field appearance="outline" class="form-field full-width">
+                    <mat-label>{{ 'matching.resolution.newProduct.canonicalNameLabel' | translate }}</mat-label>
+                    <input
+                      matInput
+                      formControlName="canonical_name"
+                      [placeholder]="'matching.resolution.newProduct.canonicalNamePlaceholder' | translate"
+                    />
+                    <mat-hint>{{ 'matching.resolution.newProduct.canonicalNameHint' | translate }}</mat-hint>
+                  </mat-form-field>
+                </div>
+
+                <mat-divider class="form-divider"></mat-divider>
+
+                <!-- Pack Definition & Normalisation -->
+                <div class="pack-definition-section">
+                  <h3 class="pack-title">{{ 'matching.resolution.newProduct.packSectionTitle' | translate }}</h3>
+                  <p class="pack-desc">{{ 'matching.resolution.newProduct.packSectionDescription' | translate }}</p>
+
+                  <div class="form-row two-col">
+                    <mat-form-field appearance="outline" class="form-field">
+                      <mat-label>{{ 'matching.resolution.newProduct.packCountLabel' | translate }}</mat-label>
+                      <input
+                        matInput
+                        type="number"
+                        min="1"
+                        step="1"
+                        formControlName="pack_count"
+                        [placeholder]="'matching.resolution.newProduct.packCountPlaceholder' | translate"
+                        required
+                      />
+                      @if (productForm.get('pack_count')?.hasError('required') && productForm.get('pack_count')?.touched) {
+                        <mat-error>{{ 'matching.resolution.newProduct.packCountRequired' | translate }}</mat-error>
+                      }
+                      @if (productForm.get('pack_count')?.hasError('min')) {
+                        <mat-error>{{ 'matching.resolution.newProduct.packCountMin' | translate }}</mat-error>
+                      }
+                    </mat-form-field>
+
+                    <mat-form-field appearance="outline" class="form-field">
+                      <mat-label>{{ 'matching.resolution.newProduct.unitSizeLabel' | translate }}</mat-label>
+                      <input
+                        matInput
+                        formControlName="unit_size"
+                        [placeholder]="'matching.resolution.newProduct.unitSizePlaceholder' | translate"
+                        required
+                      />
+                      @if (productForm.get('unit_size')?.hasError('required') && productForm.get('unit_size')?.touched) {
+                        <mat-error>{{ 'matching.resolution.newProduct.unitSizeRequired' | translate }}</mat-error>
+                      }
+                      @if (productForm.get('unit_size')?.hasError('pattern') && productForm.get('unit_size')?.touched) {
+                        <mat-error>{{ 'matching.resolution.newProduct.unitSizePositive' | translate }}</mat-error>
+                      }
+                    </mat-form-field>
+                  </div>
+
+                  <!-- Live Normalised Quantity Display -->
+                  <div class="normalisation-preview" role="region" aria-live="polite">
+                    <mat-icon aria-hidden="true">calculate</mat-icon>
+                    <div class="norm-preview-body">
+                      <span class="norm-preview-label">{{ 'matching.resolution.newProduct.liveNormalisedLabel' | translate }}:</span>
+                      @if (liveNormalisedQuantity(); as normQty) {
+                        <strong class="norm-preview-val">{{ livePackCount() }} × {{ liveUnitSize() }} = {{ normQty }} {{ liveBaseUnit() }}</strong>
+                      } @else {
+                        <span class="norm-preview-val">—</span>
+                      }
+                    </div>
+                  </div>
+                </div>
+
+                <mat-divider class="form-divider"></mat-divider>
+
+                <!-- Preferred Supplier -->
+                <div class="form-row">
+                  <mat-form-field appearance="outline" class="form-field full-width">
+                    <mat-label>{{ 'matching.resolution.newProduct.preferredSupplierLabel' | translate }}</mat-label>
+                    <mat-select formControlName="preferred_supplier_id">
+                      <mat-option [value]="null">{{ 'matching.resolution.newProduct.noPreferredSupplier' | translate }}</mat-option>
+                      @for (sup of suppliers(); track sup.id) {
+                        <mat-option [value]="sup.id">{{ sup.name }}</mat-option>
+                      }
+                    </mat-select>
+                  </mat-form-field>
+                </div>
+              </form>
+            </mat-card-content>
+          </mat-card>
+        </section>
+      }
+
+      <!-- Actions Bar -->
+      <div class="actions-bar">
+        <a mat-button routerLink="/matching" class="cancel-btn">
+          {{ 'matching.resolution.backToQueue' | translate }}
+        </a>
+
+        <button
+          mat-flat-button
+          color="primary"
+          (click)="confirmResolution()"
+          [disabled]="isSubmitting() || (selectedOutcome() === 'no_match_new_product' && productForm.invalid) || (selectedOutcome() !== 'no_match_new_product' && !selectedCandidateId())"
+          class="confirm-resolution-btn"
+        >
+          @if (isSubmitting()) {
+            <mat-spinner diameter="18" class="btn-spinner"></mat-spinner>
+            <span>{{ 'matching.resolution.actions.confirming' | translate }}</span>
+          } @else {
+            <span class="btn-content">
+              <mat-icon aria-hidden="true">check</mat-icon>
+              <span>{{ 'matching.resolution.actions.confirm' | translate }}</span>
+            </span>
+          }
+        </button>
+      </div>
+    }
+  }
+</div>

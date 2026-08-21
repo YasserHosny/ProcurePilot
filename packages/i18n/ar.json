@@ -133,6 +133,7 @@
     "navSuppliers": "الموردون",
     "navImport": "استيراد الدليل",
     "navQuotations": "صندوق عروض الأسعار",
+    "navMatching": "مطابقة البنود",
     "navCompare": "المقارنة الذكية",
     "navSavings": "سجل الوفورات",
     "navTeam": "إدارة الفريق",
@@ -675,6 +676,215 @@
         "in_review": "قيد المراجعة",
         "reviewed": "تمت المراجعة والاعتماد",
         "refused": "مرفوض"
+      }
+    }
+  },
+  "matching": {
+    "queue": {
+      "title": "قائمة مهام مطابقة البنود",
+      "subtitle": "مراجعة وتسوية بنود عروض الأسعار التي تتطلب قرارات مطابقة بشرية أو إضافة منتجات جديدة.",
+      "readOnlyBadge": "صلاحية للقراءة فقط",
+      "readOnlyNotice": "تمتلك صلاحية القراءة فقط. يمكنك استعراض مهام المطابقة والمرشحين دون إمكانية اعتماد القرارات أو إنشاء منتجات.",
+      "filterStatus": "الحالة",
+      "filterPriority": "الأولوية",
+      "filterReason": "سبب التوجيه",
+      "status": {
+        "open": "مفتوحة",
+        "in_progress": "قيد المعالجة",
+        "resolved": "تمت التسوية",
+        "all": "جميع الحالات"
+      },
+      "priority": {
+        "low": "منخفضة",
+        "normal": "عادية",
+        "high": "عالية",
+        "all": "جميع الأولويات"
+      },
+      "reason": {
+        "low_confidence": "ثقة منخفضة",
+        "close_candidates": "مرشحون متقاربون",
+        "no_candidate": "لا يوجد مرشح",
+        "alias_conflict": "تعارض في الاسم المرادف",
+        "all": "جميع الأسباب"
+      },
+      "columns": {
+        "quotation": "عرض السعر",
+        "line": "البند",
+        "originalText": "نص المورد الأصلي",
+        "reason": "السبب",
+        "priority": "الأولوية",
+        "status": "الحالة",
+        "candidates": "المرشحون",
+        "createdAt": "تاريخ الإدراج",
+        "actions": "الإجراءات"
+      },
+      "actions": {
+        "resolve": "تسوية المطابقة",
+        "view": "عرض التفاصيل"
+      },
+      "emptyTitle": "لا توجد مهام مطابقة",
+      "emptyMessage": "لا توجد بنود عروض أسعار بانتظار تسوية المطابقة حالياً."
+    },
+    "resolution": {
+      "title": "تسوية المطابقة",
+      "subtitle": "مراجعة المنتجات المرشحة وتقييم مؤشرات المطابقة واعتماد تسوية البند.",
+      "backToQueue": "العودة إلى القائمة",
+      "readOnlyBanner": "لديك صلاحية العرض فقط. مالك مساحة العمل والمشتري فقط يمكنهما تسوية المطابقة وإنشاء المنتجات.",
+      "keyboardShortcutsTitle": "أزرار التحكم بلوحة المفاتيح (FR-012)",
+      "shortcuts": {
+        "selectCandidate": "1–9: اختيار المرشح",
+        "navigate": "↑ / ↓: التنقل بين المرشحين",
+        "confirm": "Enter: تأكيد القرار",
+        "toggleOutcome": "O: التبديل بين الخيارات"
+      },
+      "lineDetails": {
+        "title": "تفاصيل بند عرض السعر",
+        "lineNumber": "بند رقم {{line}}",
+        "quotation": "عرض السعر",
+        "originalText": "صياغة المورد للبند",
+        "quantity": "الكمية",
+        "pack": "عبوة المورد",
+        "unitPrice": "سعر الوحدة",
+        "vatRate": "نسبة الضريبة",
+        "deliveryFee": "رسوم التوصيل",
+        "discount": "الخصم"
+      },
+      "candidates": {
+        "title": "المنتجات المرشحة حسب الأولوية",
+        "subtitle": "تم التقييم عبر المفاتيح المحددة، التشابه اللفظي (pg_trgm)، التشابه الدلالي (pgvector)، ومعقولية السمات.",
+        "rank": "الترتيب #{{rank}}",
+        "confidence": "درجة الثقة",
+        "noCandidates": "لم يتم العثور على مرشحين لهذا البند.",
+        "signalsTitle": "تفاصيل أسباب المطابقة",
+        "signals": {
+          "aliasHit": "تطابق مرادف مباشر",
+          "aliasHitDesc": "يطابق اسماً مرادفاً معتمداً مسبقاً للمورد",
+          "gtinMatch": "تطابق الباركود GTIN",
+          "gtinMatchDesc": "يطابق الباركود الدولي للمنتج في الدليل",
+          "supplierCodeMatch": "تطابق كود المورد",
+          "supplierCodeMatchDesc": "يطابق كود المنتج الخاص بالمورد",
+          "lexicalSimilarity": "التشابه اللفظي",
+          "semanticSimilarity": "التشابه الدلالي",
+          "featureScores": "تفاصيل معقولية السمات",
+          "brandMatch": "تطابق العلامة التجارية",
+          "variantMatch": "تطابق الصنف",
+          "packUnitMatch": "تطابق وحدة العبوة",
+          "packSizePlausibility": "معقولية حجم العبوة",
+          "pricePlausibility": "معقولية السعر",
+          "scoringVersion": "إصدار التقييم",
+          "embeddingModel": "نموذج التضمين"
+        },
+        "product": {
+          "brand": "العلامة التجارية",
+          "variant": "الصنف / المواصفة",
+          "gtin": "الباركود GTIN",
+          "baseUnit": "الوحدة الأساسية",
+          "pack": "مواصفات العبوة",
+          "status": {
+            "active": "نشط",
+            "archived": "مؤرشف"
+          },
+          "archivedWarning": "هذا المنتج مؤرشف في دليل منتجاتك."
+        }
+      },
+      "outcomes": {
+        "title": "تحديد نتيجة التسوية",
+        "subtitle": "حدد كيفية مطابقة هذا البند مع الدليل أو أنشئ منتجاً جديداً.",
+        "same_product": {
+          "label": "نفس المنتج تماماً",
+          "description": "البند يطابق المنتج المختار تماماً في الهوية والتركيب وحجم العبوة."
+        },
+        "different_pack": {
+          "label": "حجم عبوة مختلف",
+          "description": "نفس المنتج تماماً ولكن معروض بحجم أو كمية عبوة مختلفة."
+        },
+        "different_variant": {
+          "label": "صنف / نوع مختلف",
+          "description": "نفس عائلة المنتج ولكن بنوع أو نكهة أو مواصفة مختلفة."
+        },
+        "compatible_alternative": {
+          "label": "بديل متوافق",
+          "description": "بديل وظيفي مناسب للمنتج المرشح."
+        },
+        "no_match_new_product": {
+          "label": "لا يوجد تطابق — إنشاء منتج جديد",
+          "description": "لا يوجد مرشح مناسب. أنشئ منتجاً جديداً في الدليل واربط هذا البند به."
+        }
+      },
+      "newProduct": {
+        "title": "منتج دليل جديد",
+        "subtitle": "إنشاء منتج مباشرة من بند عرض السعر، وستُحفظ صياغة المورد كمرادف تلقائياً.",
+        "tenantNameLabel": "اسم المنتج (في مساحة العمل)",
+        "tenantNamePlaceholder": "مثال: حليب كامل الدسم 2 لتر",
+        "tenantNameRequired": "اسم المنتج مطلوب",
+        "tenantNameMaxLength": "لا يمكن أن يتجاوز اسم المنتج 200 حرف",
+        "brandLabel": "العلامة التجارية (اختياري)",
+        "brandPlaceholder": "مثال: المراعي",
+        "canonicalNameLabel": "الاسم المعياري (اختياري)",
+        "canonicalNamePlaceholder": "يُستخدم اسم مساحة العمل افتراضياً",
+        "canonicalNameHint": "اتركه فارغاً لمطابقة اسم مساحة العمل",
+        "variantLabel": "الصنف / الوصف (اختياري)",
+        "variantPlaceholder": "مثال: عبوة عائلية 2 لتر",
+        "gtinLabel": "الباركود GTIN (اختياري)",
+        "gtinPlaceholder": "8 أو 12 أو 13 أو 14 رقماً",
+        "gtinInvalid": "يجب أن يتكون الباركود من 8 أو 12 أو 13 أو 14 رقماً",
+        "baseUnitLabel": "الوحدة الأساسية",
+        "baseUnitRequired": "الوحدة الأساسية مطلوبة",
+        "packSectionTitle": "تعريف العبوة",
+        "packSectionDescription": "حدد عدد وحجم الوحدات لتمكين توحيد الكميات عبر الموردين.",
+        "packCountLabel": "عدد العبوات",
+        "packCountPlaceholder": "مثال: 1",
+        "packCountRequired": "عدد العبوات مطلوب",
+        "packCountMin": "يجب أن يكون عدد العبوات 1 على الأقل",
+        "unitSizeLabel": "حجم الوحدة",
+        "unitSizePlaceholder": "مثال: 2.0",
+        "unitSizeRequired": "حجم الوحدة مطلوب",
+        "unitSizePositive": "يجب أن يكون حجم الوحدة رقماً موجباً",
+        "liveNormalisedLabel": "الكمية الأساسية الموحدة",
+        "liveNormalisedHelp": "تُحسب تلقائياً كـ (عدد العبوات × حجم الوحدة) بالوحدة الأساسية",
+        "preferredSupplierLabel": "المورد المفضل (اختياري)",
+        "noPreferredSupplier": "لا يوجد (بدون مورد مفضل)"
+      },
+      "landedCost": {
+        "title": "التكلفة الإجمالية الواصلة (US3)",
+        "subtitle": "تكلفة واصلة قابلة لإعادة الاحتساب وموحدة حسب الوحدة الأساسية في الدليل.",
+        "unitPrice": "سعر الوحدة",
+        "vatAmount": "ضريبة القيمة المضافة المحسوبة",
+        "vatRate": "نسبة الضريبة: {{rate}}%",
+        "deliveryFee": "رسوم التوصيل",
+        "discount": "الخصم",
+        "otherCharges": "رسوم أخرى",
+        "total": "إجمالي التكلفة الواصلة",
+        "normalisedQuantity": "الكمية الموحدة",
+        "baseUnit": "الوحدة الأساسية",
+        "ruleVersion": "إصدار القاعدة الحسابية",
+        "validFrom": "ساري من",
+        "recordedAt": "تاريخ التسجيل",
+        "replayableNotice": "حساب حتمي وموثق ومثبت على قاعدة رقم {{version}}."
+      },
+      "decision": {
+        "title": "قرار التسوية",
+        "matchedProduct": "المنتج المطابق:",
+        "outcome": "النتيجة:",
+        "decidedBy": "تمت التسوية بواسطة:",
+        "decidedAt": "تاريخ التسوية:",
+        "automatic": "مطابقة تلقائية",
+        "human": "تسوية يدوية",
+        "confidence": "درجة ثقة القرار:"
+      },
+      "actions": {
+        "confirm": "تأكيد قرار المطابقة",
+        "confirming": "جاري التأكيد...",
+        "saveSuccess": "تم تأكيد قرار المطابقة وحفظ الاسم المرادف بنجاح.",
+        "candidateRequired": "يُرجى اختيار منتج مرشح قبل التأكيد.",
+        "formInvalid": "يُرجى تصحيح أخطاء إنشاء المنتج قبل التأكيد."
+      },
+      "errors": {
+        "aliasConflict": "تعارض في المرادفات: صياغة المورد هذه مرتبطة بالفعل بمنتج مختلف في دليلك.",
+        "notReviewed": "عرض السعر لم يصل إلى حالة المراجعة والاعتماد بعد.",
+        "invalidCandidate": "المرشح المختار غير صالح لبند عرض السعر هذا.",
+        "alreadyDecided": "تم تسجيل قرار مطابقة مسبقاً لهذا البند.",
+        "genericError": "تعذر تسوية قرار المطابقة. يُرجى المحاولة مرة أخرى."
       }
     }
   }

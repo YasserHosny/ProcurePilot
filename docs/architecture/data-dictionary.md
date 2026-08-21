@@ -143,12 +143,18 @@ users and writable by the service role only.
 | `variant` | text | Optional variant, for example `unscented` |
 | `gtin` | text | Optional global trade item number; unique where present and shape-validated |
 | `base_unit` | text | Required FK -> `supported_base_unit.code` |
+| `canonical_embedding` | vector(256) | Optional semantic vector built only from `brand`, `name`, and `variant` |
+| `canonical_embedding_model` | text | Optional model identifier for `canonical_embedding`, for example `stub-hash-v1` |
 | `created_at` | timestamptz | Audit field |
 
 `CanonicalProduct` is the deliberate asymmetry in this chunk: it has no `tenant_id` because it is
 the shared product spine across workspaces. It must not contain workspace-specific names,
 suppliers, substitutes, or preferences. RLS allows authenticated reads; application writes happen
 through the product creation path that also creates the workspace-scoped overlay.
+
+`canonical_embedding` is safe to store on the shared spine only because it is derived exclusively
+from canonical fields already present on this table. It must not include `tenant_name`, supplier
+wording, aliases, preferences, or any other workspace-specific text.
 
 ## `WorkspaceProduct`
 
@@ -160,6 +166,8 @@ through the product creation path that also creates the workspace-scoped overlay
 | `tenant_name` | text | Required name used inside this workspace |
 | `preferred_supplier_id` | uuid | Optional FK -> Supplier |
 | `status` | enum | `active` or `archived`; default `active` |
+| `tenant_name_embedding` | vector(256) | Optional tenant-scoped semantic vector built only from `tenant_name` |
+| `tenant_name_embedding_model` | text | Optional model identifier for `tenant_name_embedding`, for example `stub-hash-v1` |
 | `created_at` | timestamptz | Audit field |
 
 Constraints:
@@ -167,6 +175,12 @@ Constraints:
 - Unique `(tenant_id, canonical_product_id)`: one workspace view per canonical product.
 - Duplicate `tenant_name` values are allowed inside a workspace; the application warns instead of
   refusing them.
+
+The two embedding columns deliberately stay split. `canonical_product.canonical_embedding` carries
+shareable brand/name/variant meaning, while `workspace_product.tenant_name_embedding` carries
+workspace vocabulary and remains tenant-scoped under `workspace_product` RLS. Matching combines the
+two similarities at query time rather than merging tenant-specific text into the shared
+`CanonicalProduct` spine.
 
 ## `PackDefinition`
 
@@ -448,6 +462,142 @@ approver, and viewer are read-only. Cross-tenant reads return not found, never f
 also requires private Supabase Storage policies that compare the path tenant segment and related
 document row to the caller's JWT tenant claim.
 
+## Implemented matching and normalisation entities
+
+## `MatchCandidate`
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | uuid | PK |
+| `tenant_id` | uuid | Required FK -> Tenant; RLS key |
+| `quotation_line_id` | uuid | Required FK -> QuotationLine |
+| `candidate_workspace_product_id` | uuid | Required FK -> WorkspaceProduct proposed for the line |
+| `confidence` | numeric(5,4) | Required calibrated confidence score; check `0 <= confidence <= 1` |
+| `reasons` | jsonb | Required structured evidence breakdown, not free prose |
+| `rank` | integer | Required candidate rank within the line and scoring version; check `> 0` |
+| `scoring_version` | text | Required scoring rule identifier, for example `matching-score-v1` |
+| `embedding_model` | text | Optional embedding model identifier used for semantic evidence |
+| `created_at` | timestamptz | Audit field |
+
+`MatchCandidate` records evidence for a proposed product match. Deterministic matches still create
+a candidate row so the system can show confidence and reasons for the result.
+
+Constraints:
+
+- Unique `(tenant_id, quotation_line_id, candidate_workspace_product_id, scoring_version)`: one
+  candidate per product per scoring run.
+- Unique `(tenant_id, quotation_line_id, scoring_version, rank)`: stable ranks within a line and
+  scoring version.
+- `reasons` contains deterministic, lexical, semantic, and feature-score signals such as
+  `alias_hit`, `gtin_match`, `supplier_code_match`, `lexical_similarity`,
+  `semantic_similarity`, and `feature_score`.
+
+## `MatchTask`
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | uuid | PK |
+| `tenant_id` | uuid | Required FK -> Tenant; RLS key |
+| `quotation_line_id` | uuid | Required FK -> QuotationLine needing human resolution |
+| `status` | enum | `open`, `in_progress`, or `resolved`; default `open` |
+| `priority` | enum | `low`, `normal`, or `high`; default `normal` |
+| `reason` | enum | `low_confidence`, `close_candidates`, `no_candidate`, or `alias_conflict` |
+| `created_at` | timestamptz | Audit field |
+| `resolved_at` | timestamptz | Optional resolution timestamp |
+
+`MatchTask` is the standalone queue resource for human match resolution. It is not a view over
+candidates; task state is separate from candidate evidence and immutable match decisions.
+
+Constraints:
+
+- Partial unique `(tenant_id, quotation_line_id) where status in ('open', 'in_progress')`: one
+  outstanding match task per line.
+- `resolved_at` is present only when `status = 'resolved'`.
+
+## `MatchDecision`
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | uuid | PK |
+| `tenant_id` | uuid | Required FK -> Tenant; RLS key |
+| `quotation_line_id` | uuid | Required FK -> QuotationLine |
+| `matched_workspace_product_id` | uuid | Required FK -> WorkspaceProduct that the line resolved to |
+| `selected_match_candidate_id` | uuid | Optional FK -> MatchCandidate; required unless outcome is `no_match_new_product` |
+| `outcome` | enum | `same_product`, `different_pack`, `different_variant`, `compatible_alternative`, or `no_match_new_product` |
+| `is_automatic` | boolean | Required; true when the system accepted the match without a human |
+| `decided_by` | uuid | Optional FK -> Membership; required for human decisions and null for automatic decisions |
+| `decided_at` | timestamptz | Required decision timestamp; default `now()` |
+| `confidence` | numeric(5,4) | Required accepted confidence score; check `0 <= confidence <= 1` |
+| `alias_id` | uuid | Optional FK -> ProductAlias learned or reused by the decision |
+| `created_at` | timestamptz | Audit field |
+
+One decision resolves one quotation line. `no_match_new_product` means no existing product fit and
+the newly created workspace product is the match; the line is not left unmatched.
+
+Constraints:
+
+- Unique `(tenant_id, quotation_line_id)`: one final decision per line in this chunk.
+- Automatic decisions have no `decided_by`; human decisions must name the deciding membership.
+- `selected_match_candidate_id` is null exactly when `outcome = 'no_match_new_product'`.
+
+`MatchDecision` is append-only outcome history for this chunk. Correcting a previously confirmed
+match is out of scope and requires a future supersession model, not an update to this row.
+
+Human decisions create or reuse `product_alias` from the exact `quotation_line.original_text`. If
+the lowercased wording already exists for the same product, the alias is reused. If it exists for a
+different product, the alias write is refused with a conflict and the existing alias is not
+overwritten.
+
+## `LandedCost`
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | uuid | PK |
+| `tenant_id` | uuid | Required FK -> Tenant; RLS key |
+| `quotation_line_id` | uuid | Required FK -> QuotationLine |
+| `match_decision_id` | uuid | Required FK -> MatchDecision |
+| `quantity` | numeric(18,6) | Required source line quantity used by the rule; check `> 0` |
+| `normalised_base_quantity` | numeric(18,6) | Required quantity normalised to the product base unit; check `> 0` |
+| `base_unit` | text | Required FK -> `supported_base_unit.code` |
+| `unit_price_amount` | numeric(18,4) | Required unit price amount |
+| `unit_price_currency` | text | Required FK -> `supported_currency.code` |
+| `vat_amount` | numeric(18,4) | Required VAT amount derived from unit price, quantity, and VAT rate |
+| `vat_currency` | text | Required FK -> `supported_currency.code` |
+| `delivery_fee_amount` | numeric(18,4) | Required delivery fee amount |
+| `delivery_fee_currency` | text | Required FK -> `supported_currency.code` |
+| `discount_amount` | numeric(18,4) | Required discount amount |
+| `discount_currency` | text | Required FK -> `supported_currency.code` |
+| `other_charges_amount` | numeric(18,4) | Required other-charges amount; default `0` in this chunk |
+| `other_charges_currency` | text | Required FK -> `supported_currency.code` |
+| `total_amount` | numeric(18,4) | Required computed landed-cost total |
+| `total_currency` | text | Required FK -> `supported_currency.code` |
+| `raw_inputs` | jsonb | Required complete replay snapshot used by the pinned rule version |
+| `rule_version` | text | Required landed-cost rule identifier, for example `landed-cost-v1` |
+| `valid_from` | timestamptz | Required valid-time start: when the price or cost applies |
+| `valid_to` | timestamptz | Optional valid-time end |
+| `recorded_at` | timestamptz | Required record-time: when the workspace learned or stored this cost |
+| `created_at` | timestamptz | Audit field |
+
+Money follows the established amount/currency pair rule. The API exposes these fields as
+`Money { amount, currency }` with amount as a decimal string; there are no bare money numbers.
+
+Constraints:
+
+- Unique `(tenant_id, match_decision_id, rule_version)`: one stored computation per decision and
+  rule version in this chunk.
+- All currency columns must equal `total_currency`; this chunk performs no currency conversion.
+- Check `valid_to is null or valid_to >= valid_from`.
+
+`landed-cost-v1` computes `vat_amount = unit_price_amount * quantity * vat_rate`, then
+`total_amount = (unit_price_amount * quantity) + vat_amount + delivery_fee_amount -
+discount_amount + 0 other_charges`. Missing `vat_rate` is treated as zero. `other_charges` is
+stored as zero because quotation lines do not model it in this chunk.
+
+All tenant-scoped matching and landed-cost tables have RLS enabled and forced with tenant-claim
+`USING` and `WITH CHECK` policies. Owner and buyer may resolve matches and create products from
+no-match decisions; branch manager, approver, and viewer are read-only. Cross-tenant reads return
+not found, never forbidden.
+
 ## Planned later domain entities
 
 ## `Branch` / `CostCentre`
@@ -466,9 +616,10 @@ document row to the caller's JWT tenant claim.
 |---|---|---|
 | `id` | uuid | PK |
 | `tenant_id` | uuid | FK → Tenant |
-| `tenant_product_id` | uuid | FK → TenantProduct |
+| `workspace_product_id` | uuid | FK → WorkspaceProduct |
 | `quotation_line_id` | uuid | FK → QuotationLine |
-| `landed_cost` | money | Computed total |
+| `landed_cost_amount` | numeric(18,4) | Computed total amount |
+| `landed_cost_currency` | text | FK -> `supported_currency.code`; explicit currency for the computed total |
 | `valid_from` | timestamptz | |
 | `valid_to` | timestamptz | |
 | `recorded_at` | timestamptz | Bitemporal record time |

@@ -147,6 +147,27 @@ export const routes: Routes = [
             (m) => m.QuotationReviewComponent,
           ),
       },
+      {
+        path: 'matching',
+        loadComponent: () =>
+          import('./features/matching/resolution-queue/resolution-queue.component').then(
+            (m) => m.ResolutionQueueComponent,
+          ),
+      },
+      {
+        path: 'matching/tasks/:id',
+        loadComponent: () =>
+          import('./features/matching/match-resolution/match-resolution.component').then(
+            (m) => m.MatchResolutionComponent,
+          ),
+      },
+      {
+        path: 'matching/:id',
+        loadComponent: () =>
+          import('./features/matching/match-resolution/match-resolution.component').then(
+            (m) => m.MatchResolutionComponent,
+          ),
+      },
     ],
   },
 

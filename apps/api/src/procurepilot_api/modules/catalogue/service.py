@@ -53,6 +53,7 @@ from procurepilot_api.modules.catalogue.models import (
     money_columns,
 )
 from procurepilot_api.modules.catalogue.normalisation import decimal_to_string
+from procurepilot_api.modules.matching.embeddings import StubEmbeddingProvider, vector_literal
 from procurepilot_api.modules.members.service import authenticated_client
 from procurepilot_api.shared.audit import AuditEventCreate, get_audit_writer
 
@@ -126,6 +127,10 @@ class CatalogueService:
             "tenant_id": str(member.tenant_id),
             "canonical_product_id": str(canonical["id"]),
             "tenant_name": payload.tenant_name,
+            "tenant_name_embedding": _embedding_literal(
+                self._embedding_provider(), payload.tenant_name
+            ),
+            "tenant_name_embedding_model": self._embedding_provider().model,
             "preferred_supplier_id": (
                 str(payload.preferred_supplier_id) if payload.preferred_supplier_id else None
             ),
@@ -167,6 +172,11 @@ class CatalogueService:
         updates: dict[str, object] = {}
         if "tenant_name" in patch.model_fields_set:
             updates["tenant_name"] = patch.tenant_name
+            if patch.tenant_name is not None:
+                updates["tenant_name_embedding"] = _embedding_literal(
+                    self._embedding_provider(), patch.tenant_name
+                )
+                updates["tenant_name_embedding_model"] = self._embedding_provider().model
         if "preferred_supplier_id" in patch.model_fields_set:
             self._require_supplier_visible(client, patch.preferred_supplier_id)
             updates["preferred_supplier_id"] = (
@@ -723,6 +733,7 @@ class CatalogueService:
             base_unit=base_unit,
         )
         if row is not None:
+            self._ensure_canonical_embedding(row)
             return row
         try:
             response = self._service_role_client().table("canonical_product").insert(
@@ -732,6 +743,15 @@ class CatalogueService:
                     "variant": variant,
                     "gtin": gtin,
                     "base_unit": base_unit,
+                    "canonical_embedding": _embedding_literal(
+                        self._embedding_provider(),
+                        _canonical_embedding_text(
+                            brand=brand,
+                            name=name,
+                            variant=variant,
+                        ),
+                    ),
+                    "canonical_embedding_model": self._embedding_provider().model,
                 }
             ).execute()
         except APIError as exc:
@@ -744,6 +764,7 @@ class CatalogueService:
                     base_unit=base_unit,
                 )
                 if row is not None:
+                    self._ensure_canonical_embedding(row)
                     return row
             raise _write_error(exc, duplicate_reason="canonical_product_conflict") from exc
         return _one_row(response.data, reason="canonical_product_write_failed")
@@ -804,6 +825,28 @@ class CatalogueService:
             self._settings.supabase_url,
             self._settings.supabase_service_role_key.get_secret_value(),
         )
+
+    def _embedding_provider(self) -> StubEmbeddingProvider:
+        return StubEmbeddingProvider(self._settings.matching_embedding_model)
+
+    def _ensure_canonical_embedding(self, canonical: dict[str, object]) -> None:
+        provider = self._embedding_provider()
+        try:
+            self._service_role_client().table("canonical_product").update(
+                {
+                    "canonical_embedding": _embedding_literal(
+                        provider,
+                        _canonical_embedding_text(
+                            brand=_nullable_str(canonical.get("brand")),
+                            name=str(canonical["name"]),
+                            variant=_nullable_str(canonical.get("variant")),
+                        ),
+                    ),
+                    "canonical_embedding_model": provider.model,
+                }
+            ).eq("id", str(canonical["id"])).execute()
+        except APIError as exc:
+            raise ServiceUnavailableError(details={"dependency": "database"}) from exc
 
     def _record(
         self,
@@ -927,6 +970,19 @@ def _money(amount: object, currency: object) -> Money | None:
 
 def _nullable_str(value: object) -> str | None:
     return str(value) if value is not None else None
+
+
+def _embedding_literal(provider: StubEmbeddingProvider, text: str) -> str:
+    return vector_literal(provider.embed(text))
+
+
+def _canonical_embedding_text(
+    *,
+    brand: str | None,
+    name: str,
+    variant: str | None,
+) -> str:
+    return " ".join(part for part in (brand, name, variant) if part).strip()
 
 
 def _rows(data: object) -> list[dict[str, object]]:
