@@ -169,11 +169,35 @@
         <span class="nav-label">{{ 'shell.navMatching' | translate }}</span>
       </a>
 
-      <div class="nav-item disabled" aria-disabled="true">
-        <mat-icon aria-hidden="true">compare_arrows</mat-icon>
+      <a
+        mat-list-item
+        routerLink="/offers/compare"
+        routerLinkActive="active"
+        class="nav-item"
+      >
+        <mat-icon aria-hidden="true">auto_awesome</mat-icon>
         <span class="nav-label">{{ 'shell.navCompare' | translate }}</span>
-        <span class="soon-badge">{{ 'common.comingSoon' | translate }}</span>
-      </div>
+      </a>
+
+      <a
+        mat-list-item
+        routerLink="/offers/basket-split"
+        routerLinkActive="active"
+        class="nav-item"
+      >
+        <mat-icon aria-hidden="true">call_split</mat-icon>
+        <span class="nav-label">{{ 'shell.navBasketSplit' | translate }}</span>
+      </a>
+
+      <a
+        mat-list-item
+        routerLink="/alerts"
+        routerLinkActive="active"
+        class="nav-item"
+      >
+        <mat-icon aria-hidden="true">notifications</mat-icon>
+        <span class="nav-label">{{ 'shell.navAlerts' | translate }}</span>
+      </a>
 
       <div class="nav-item disabled" aria-disabled="true">
         <mat-icon aria-hidden="true">savings</mat-icon>

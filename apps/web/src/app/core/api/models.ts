@@ -495,4 +495,198 @@ export interface QuotationMatches {
   readonly lines: readonly QuotationLineMatchState[];
 }
 
+// --- Smart Compare and Intelligence (Chunk 4.5) ---
+
+export interface ProductRef {
+  readonly id: string;
+  readonly tenant_name: string;
+}
+
+export type StockSignal = 'in_stock' | 'low_stock' | 'out_of_stock' | 'unknown';
+
+export interface Offer {
+  readonly id: string;
+  readonly workspace_product_id: string;
+  readonly supplier_id: string;
+  readonly supplier_name: string;
+  readonly quotation_line_id: string;
+  readonly match_decision_id: string;
+  readonly landed_cost: Money;
+  readonly normalised_unit_price: Money;
+  readonly requested_quantity: string;
+  readonly base_unit: string;
+  readonly lead_time_days?: number | null;
+  readonly reliability_score?: string | null;
+  readonly stock_signal?: StockSignal | null;
+  readonly match_confidence: string;
+  readonly valid_from: string;
+  readonly valid_to?: string | null;
+  readonly is_expired: boolean;
+  readonly rule_version: string;
+  readonly recorded_at: string;
+}
+
+export type RecommendationConfidence = 'high' | 'medium' | 'low';
+export type RecommendationRiskNote =
+  | 'price_expiring_soon'
+  | 'low_match_confidence'
+  | 'low_supplier_reliability';
+
+export interface RecommendationWeights {
+  readonly cost: string;
+  readonly match_confidence: string;
+  readonly reliability: string;
+  readonly lead_time: string;
+}
+
+export interface RecommendationTieBreak {
+  readonly applied: boolean;
+  readonly rule: readonly string[];
+}
+
+export interface RecommendationEvidence {
+  readonly weights: RecommendationWeights;
+  readonly components: Record<string, string>;
+  readonly winning_margin?: string | null;
+  readonly tie_break: RecommendationTieBreak;
+}
+
+export interface Recommendation {
+  readonly recommended_offer_id: string;
+  readonly score: string;
+  readonly confidence: RecommendationConfidence;
+  readonly valid_from: string;
+  readonly valid_to?: string | null;
+  readonly risk_notes: readonly RecommendationRiskNote[];
+  readonly evidence: RecommendationEvidence;
+}
+
+export interface OfferComparison {
+  readonly product: ProductRef;
+  readonly requested_quantity: string;
+  readonly offers: readonly Offer[];
+  readonly recommendation: Recommendation | null;
+}
+
+export interface PriceHistoryPoint {
+  readonly landed_cost_id: string;
+  readonly workspace_product_id: string;
+  readonly supplier_id: string;
+  readonly supplier_name: string;
+  readonly recorded_at: string;
+  readonly valid_from: string;
+  readonly valid_to?: string | null;
+  readonly normalised_unit_price: Money;
+  readonly landed_cost_total: Money;
+  readonly quantity: string;
+  readonly base_unit: string;
+}
+
+export interface PriceHistoryMetric {
+  readonly value: Money;
+  readonly source_landed_cost_ids: readonly string[];
+}
+
+export interface PriceHistorySummary {
+  readonly last_paid: PriceHistoryMetric | null;
+  readonly average_paid_rolling_window: PriceHistoryMetric | null;
+  readonly best_price: PriceHistoryMetric | null;
+}
+
+export interface PriceHistoryResponse {
+  readonly product: ProductRef;
+  readonly window_months: number;
+  readonly points: readonly PriceHistoryPoint[];
+  readonly summary: PriceHistorySummary;
+  readonly next_cursor: string | null;
+}
+
+export interface BasketItemRequest {
+  readonly workspace_product_id: string;
+  readonly quantity: string;
+}
+
+export interface BasketOptimiseRequest {
+  readonly supplier_ids: readonly [string, string] | readonly string[];
+  readonly items: readonly BasketItemRequest[];
+}
+
+export interface AllocatedBasketLine {
+  readonly workspace_product_id: string;
+  readonly quantity: string;
+  readonly offer_id: string;
+  readonly landed_cost: Money;
+}
+
+export interface SupplierAllocation {
+  readonly supplier_id: string;
+  readonly lines: readonly AllocatedBasketLine[];
+  readonly total_landed_cost: Money;
+}
+
+export interface SingleSupplierBaseline {
+  readonly supplier_id: string;
+  readonly feasible: boolean;
+  readonly total_landed_cost: Money | null;
+}
+
+export interface InfeasibleBasketItem {
+  readonly workspace_product_id: string;
+  readonly requested_quantity: string;
+  readonly reason: 'no_offer_from_named_suppliers';
+  readonly missing_supplier_ids: readonly string[];
+}
+
+export interface BasketSplitResult {
+  readonly feasible: boolean;
+  readonly allocation: readonly SupplierAllocation[];
+  readonly total_landed_cost: Money | null;
+  readonly single_supplier_baselines?: readonly SingleSupplierBaseline[];
+  readonly infeasible_items: readonly InfeasibleBasketItem[];
+  readonly solver_version?: string | null;
+  readonly computed_at: string;
+}
+
+export type BasketSplitJobStatus = 'queued' | 'running' | 'completed' | 'failed';
+
+export interface BasketSplitJob {
+  readonly id: string;
+  readonly supplier_ids: readonly string[];
+  readonly items: readonly BasketItemRequest[];
+  readonly status: BasketSplitJobStatus;
+  readonly result?: BasketSplitResult | null;
+  readonly error?: Record<string, unknown> | null;
+  readonly result_url: string;
+  readonly created_at: string;
+  readonly started_at?: string | null;
+  readonly completed_at?: string | null;
+}
+
+export type AlertKind =
+  | 'recommended_price_expiring'
+  | 'preferred_supplier_offer_disappeared'
+  | 'price_swing';
+
+export type AlertSeverity = 'info' | 'warning' | 'critical';
+
+export type AlertAction = 'compare_product' | 'review_supplier' | 'view_price_history';
+
+export interface Alert {
+  readonly id: string;
+  readonly kind: AlertKind;
+  readonly workspace_product_id: string;
+  readonly supplier_id?: string | null;
+  readonly severity: AlertSeverity;
+  readonly evidence: Record<string, unknown>;
+  readonly action: AlertAction;
+  readonly created_from_current_data_at: string;
+  readonly dismissed: boolean;
+}
+
+export interface AlertDismissal {
+  readonly alert_id: string;
+  readonly dismissed_at: string;
+}
+
+
 

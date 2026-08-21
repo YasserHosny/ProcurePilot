@@ -1,0 +1,154 @@
+<div class="alerts-container">
+  <div class="page-header">
+    <div class="header-content">
+      <h1 class="page-title">{{ 'alerts.title' | translate }}</h1>
+      <p class="page-subtitle">{{ 'alerts.subtitle' | translate }}</p>
+    </div>
+  </div>
+
+  <!-- Read-Only Notice for Non-Writers -->
+  @if (!isWriter()) {
+    <div class="readonly-banner">
+      <mat-icon aria-hidden="true">info</mat-icon>
+      <span>{{ 'alerts.readOnlyNotice' | translate }}</span>
+    </div>
+  }
+
+  <!-- Filter Card -->
+  <mat-card class="filter-card">
+    <div class="filter-grid">
+      <mat-form-field appearance="outline" class="kind-filter-field">
+        <mat-label>{{ 'alerts.filterKind' | translate }}</mat-label>
+        <mat-select
+          [value]="selectedKind()"
+          (selectionChange)="onKindFilterChange($event.value)"
+        >
+          <mat-option value="">{{ 'alerts.allKinds' | translate }}</mat-option>
+          <mat-option value="recommended_price_expiring">
+            {{ 'alerts.kinds.recommended_price_expiring' | translate }}
+          </mat-option>
+          <mat-option value="preferred_supplier_offer_disappeared">
+            {{ 'alerts.kinds.preferred_supplier_offer_disappeared' | translate }}
+          </mat-option>
+          <mat-option value="price_swing">
+            {{ 'alerts.kinds.price_swing' | translate }}
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
+    </div>
+  </mat-card>
+
+  <!-- Loading State -->
+  @if (isLoading()) {
+    <div class="loading-container">
+      <mat-spinner diameter="48"></mat-spinner>
+      <p>{{ 'common.loading' | translate }}</p>
+    </div>
+  }
+
+  <!-- Alerts List -->
+  @if (!isLoading()) {
+    @if (filteredAlerts().length > 0) {
+      <div class="alerts-list">
+        @for (alert of filteredAlerts(); track alert.id) {
+          <mat-card class="alert-card" [ngClass]="alert.severity">
+            <div class="card-top-row">
+              <div class="alert-badge-group">
+                <span class="severity-badge" [ngClass]="alert.severity">
+                  <mat-icon aria-hidden="true">{{ getSeverityIcon(alert.severity) }}</mat-icon>
+                  {{ 'alerts.severities.' + alert.severity | translate }}
+                </span>
+                <span class="kind-badge">
+                  {{ 'alerts.kinds.' + alert.kind | translate }}
+                </span>
+              </div>
+
+              <div class="alert-actions-group">
+                <!-- Action Link Button (compare_product, review_supplier, view_price_history) -->
+                <button
+                  mat-flat-button
+                  color="primary"
+                  (click)="onActionClick(alert)"
+                  class="action-link-btn"
+                >
+                  <mat-icon aria-hidden="true">{{ getActionIcon(alert.action) }}</mat-icon>
+                  <span>{{ 'alerts.actions.' + alert.action | translate }}</span>
+                </button>
+
+                <!-- Dismiss Button (Role gated to owner/buyer per FR-013) -->
+                @if (isWriter()) {
+                  <button
+                    mat-button
+                    color="warn"
+                    (click)="dismissAlert(alert)"
+                    [disabled]="dismissingAlertIds().has(alert.id)"
+                    class="dismiss-btn"
+                  >
+                    @if (dismissingAlertIds().has(alert.id)) {
+                      <mat-spinner diameter="16" class="btn-spinner"></mat-spinner>
+                      <span>{{ 'alerts.card.dismissing' | translate }}</span>
+                    } @else {
+                      <mat-icon aria-hidden="true">check</mat-icon>
+                      <span>{{ 'alerts.card.dismiss' | translate }}</span>
+                    }
+                  </button>
+                }
+              </div>
+            </div>
+
+            <!-- Alert Body -->
+            <div class="alert-body">
+              <div class="product-info">
+                <span class="product-name">{{ getProductName(alert.workspace_product_id) }}</span>
+                @if (alert.supplier_id) {
+                  <span class="supplier-name">
+                    · {{ 'alerts.card.supplier' | translate: { supplier: getSupplierName(alert.supplier_id) } }}
+                  </span>
+                }
+              </div>
+
+              <!-- Evidence Text Breakdown -->
+              <div class="evidence-text">
+                @if (alert.kind === 'recommended_price_expiring') {
+                  <p>
+                    {{ 'alerts.card.evidence.expiringSoon' | translate: {
+                      supplier: getSupplierName(alert.supplier_id),
+                      validTo: (alert.evidence['valid_to'] | formatDate)
+                    } }}
+                  </p>
+                } @else if (alert.kind === 'preferred_supplier_offer_disappeared') {
+                  <p>
+                    {{ 'alerts.card.evidence.disappeared' | translate: {
+                      supplier: getSupplierName(alert.supplier_id)
+                    } }}
+                  </p>
+                } @else if (alert.kind === 'price_swing') {
+                  <p>
+                    {{ 'alerts.card.evidence.priceSwing' | translate: {
+                      currentPrice: (alert.evidence['current_price'] | formatMoney),
+                      swingPercent: alert.evidence['swing_percent'],
+                      avgPrice: (alert.evidence['average_price'] | formatMoney)
+                    } }}
+                  </p>
+                }
+              </div>
+
+              <div class="timestamp-meta">
+                {{ 'alerts.card.detectedAt' | translate: { time: (alert.created_from_current_data_at | formatDate) } }}
+              </div>
+            </div>
+          </mat-card>
+        }
+      </div>
+    } @else {
+      <!-- Empty State: All Clear (US4 Scenario 3, SC-005) -->
+      <mat-card class="empty-state-card">
+        <div class="empty-state">
+          <mat-icon class="empty-icon all-clear" aria-hidden="true">check_circle</mat-icon>
+          <h2 class="empty-title">{{ 'alerts.empty.title' | translate }}</h2>
+          <p class="empty-message">{{ 'alerts.empty.message' | translate }}</p>
+        </div>
+      </mat-card>
+    }
+  }
+</div>

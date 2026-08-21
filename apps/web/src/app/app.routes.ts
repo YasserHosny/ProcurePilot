@@ -168,6 +168,62 @@ export const routes: Routes = [
             (m) => m.MatchResolutionComponent,
           ),
       },
+      // --- smart compare and intelligence (Chunk 4.5) ---
+      {
+        path: 'offers/compare',
+        loadComponent: () =>
+          import('./features/offers/compare/compare.component').then((m) => m.CompareComponent),
+      },
+      {
+        path: 'offers/compare/:id',
+        loadComponent: () =>
+          import('./features/offers/compare/compare.component').then((m) => m.CompareComponent),
+      },
+      {
+        path: 'compare',
+        redirectTo: 'offers/compare',
+        pathMatch: 'full',
+      },
+      {
+        path: 'compare/:id',
+        loadComponent: () =>
+          import('./features/offers/compare/compare.component').then((m) => m.CompareComponent),
+      },
+      {
+        path: 'offers/product-intelligence',
+        loadComponent: () =>
+          import('./features/offers/product-intelligence/product-intelligence.component').then(
+            (m) => m.ProductIntelligenceComponent,
+          ),
+      },
+      {
+        path: 'offers/product-intelligence/:id',
+        loadComponent: () =>
+          import('./features/offers/product-intelligence/product-intelligence.component').then(
+            (m) => m.ProductIntelligenceComponent,
+          ),
+      },
+      {
+        path: 'offers/basket-split',
+        loadComponent: () =>
+          import('./features/offers/basket-split/basket-split.component').then(
+            (m) => m.BasketSplitComponent,
+          ),
+      },
+      {
+        path: 'offers/basket-split/:id',
+        loadComponent: () =>
+          import('./features/offers/basket-split/basket-split.component').then(
+            (m) => m.BasketSplitComponent,
+          ),
+      },
+      {
+        path: 'alerts',
+        loadComponent: () =>
+          import('./features/alerts/alerts-inbox/alerts-inbox.component').then(
+            (m) => m.AlertsInboxComponent,
+          ),
+      },
     ],
   },
 

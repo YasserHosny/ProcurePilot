@@ -147,7 +147,10 @@
     "mfaEnabledBadge": "المصادقة الثنائية نشطة",
     "signOut": "تسجيل الخروج",
     "language": "اللغة",
-    "selectLanguage": "اختر اللغة"
+    "selectLanguage": "اختر اللغة",
+    "navBasketSplit": "تقسيم السلة",
+    "navAlerts": "صندوق التنبيهات",
+    "navIntelligence": "ذكاء الأسعار"
   },
   "home": {
     "welcomePrefix": "مرحباً بك في",
@@ -886,6 +889,215 @@
         "alreadyDecided": "تم تسجيل قرار مطابقة مسبقاً لهذا البند.",
         "genericError": "تعذر تسوية قرار المطابقة. يُرجى المحاولة مرة أخرى."
       }
+    }
+  },
+  "compare": {
+    "title": "مقارنة العروض الذكية",
+    "subtitle": "مقارنة عروض الموردين جنباً إلى جنب مع إجمالي التكلفة الحقيقية وتوصيات مبنية على أدلة واضحة.",
+    "selectProductPrompt": "اختر منتجاً من القائمة لمقارنة عروض الموردين.",
+    "productLabel": "المنتج",
+    "quantityLabel": "الكمية المطلوبة",
+    "quantityPlaceholder": "مثال: 10",
+    "quantityRequired": "يجب أن تكون الكمية أكبر من 0",
+    "includeExpired": "تضمين العروض منتهية الصلاحية",
+    "recomputing": "جاري إعادة الحساب...",
+    "unitLabel": "الوحدة: {{unit}}",
+    "recommendation": {
+      "title": "العرض الموصى به",
+      "noRecommendation": "لا توجد توصية مؤهلة حالياً",
+      "scoreLabel": "درجة التوصية",
+      "confidenceLabel": "مستوى الثقة",
+      "confidence": {
+        "high": "ثقة عالية",
+        "medium": "ثقة متوسطة",
+        "low": "ثقة منخفضة"
+      },
+      "validityWindow": "السعر صالح من {{from}} إلى {{to}}",
+      "validityOpenEnded": "السعر صالح من {{from}} (بدون تاريخ انتهاء)",
+      "winningMargin": "هامش التوفير: {{margin}}%",
+      "evidenceTitle": "تفاصيل أدلة التقييم",
+      "weightsTitle": "أوزان المعايير",
+      "weights": {
+        "cost": "التكلفة الإجمالية ({{weight}}%)",
+        "matchConfidence": "دقة المطابقة ({{weight}}%)",
+        "reliability": "موثوقية المورد ({{weight}}%)",
+        "leadTime": "مدة التوريد ({{weight}}%)"
+      },
+      "riskNotesTitle": "ملاحظات المخاطر",
+      "riskNotes": {
+        "price_expiring_soon": "السعر سينتهي خلال 7 أيام. يُوصى باتخاذ إجراء سريع.",
+        "low_match_confidence": "دقة مطابقة المنتج أقل من 85%. يُرجى التحقق من مواصفات المنتج.",
+        "low_supplier_reliability": "تقييم موثوقية المورد أقل من 60%."
+      },
+      "tieBreakTitle": "تم تطبيق معيار كسر التعادل الحتمي",
+      "tieBreakNote": "تساوت درجات العروض؛ تم كسر التعادل بالترتيب: {{rule}}"
+    },
+    "table": {
+      "supplier": "المورد",
+      "normalisedUnitPrice": "سعر الوحدة",
+      "landedCostTotal": "إجمالي التكلفة الواصلة",
+      "leadTime": "مدة التوريد",
+      "leadTimeDays": "{{days}} يوم",
+      "leadTimeUnknown": "غير محدد",
+      "reliability": "الموثوقية",
+      "reliabilityUnknown": "بدون تقييم",
+      "stockSignal": "حالة المخزون",
+      "stockUnknown": "غير معروف",
+      "matchConfidence": "دقة المطابقة",
+      "validUntil": "صالح حتى",
+      "validOpenEnded": "مفتوح المدة",
+      "status": "الحالة",
+      "statusActive": "نشط",
+      "statusExpired": "منتهي الصلاحية",
+      "recommendedBadge": "موصى به"
+    },
+    "empty": {
+      "title": "لا توجد عروض موردين مسجلة",
+      "message": "لا توجد عروض أسعار تمت مراجعتها ومطابقتها لهذا المنتج بعد. قم برفع ومراجعة عروض الأسعار لتوليد عروض الموردين.",
+      "selectProduct": "يُرجى اختيار منتج من الكتالوج لعرض مقارنة الموردين."
+    },
+    "actions": {
+      "viewIntelligence": "سجل الأسعار",
+      "viewProduct": "عرض المنتج",
+      "backToCatalogue": "العودة إلى الكتالوج"
+    }
+  },
+  "productIntelligence": {
+    "title": "ذكاء أسعار المنتج",
+    "subtitle": "اتجاهات التكلفة التاريخية والمؤشرات المرجعية المستمدة من سجل مشتريات مساحة العمل.",
+    "filterSupplier": "تصفية حسب المورد",
+    "allSuppliers": "جميع الموردين",
+    "timeWindow": "النطاق الزمني",
+    "windowMonths": "{{months}} أشهر",
+    "metrics": {
+      "lastPaid": "آخر سعر مدفوع",
+      "lastPaidSubtitle": "أحدث سعر وحدة واصلة مسجل",
+      "averagePaid": "متوسط السعر المدفوع",
+      "averagePaidSubtitle": "متوسط حسابي متجدد لـ {{months}} أشهر",
+      "bestPrice": "أفضل سعر مسجل",
+      "bestPriceSubtitle": "أدنى سعر وحدة قياسي تاريخياً",
+      "noData": "لا توجد بيانات",
+      "sourceRecord": "السجل المصدري: {{id}}",
+      "sourceRecords": "{{count}} سجلات مصدرية"
+    },
+    "chart": {
+      "title": "مسار سعر الوحدة عبر الوقت",
+      "xAxis": "تاريخ التسجيل",
+      "yAxis": "سعر الوحدة القياسي ({{currency}})",
+      "legend": "الموردون",
+      "pointTooltip": "{{supplier}}: {{price}} (الكمية: {{quantity}} {{unit}}) في {{date}}",
+      "noPoints": "لا توجد نقاط سعرية في النطاق الزمني المحدد"
+    },
+    "historyTable": {
+      "title": "السجلات التاريخية",
+      "recordedAt": "تاريخ التسجيل",
+      "supplier": "المورد",
+      "unitPrice": "سعر الوحدة القياسي",
+      "totalCost": "إجمالي التكلفة الواصلة",
+      "quantity": "الكمية",
+      "validFrom": "صالح من",
+      "validTo": "صالح حتى"
+    },
+    "empty": {
+      "title": "لا يوجد سجل مشتريات بعد",
+      "message": "يتم بناء ذكاء الأسعار تلقائياً عند مراجعة عروض الأسعار ومطابقتها واحتساب تكلفتها لهذا المنتج."
+    },
+    "actions": {
+      "compare": "مقارنة العروض الذكية",
+      "backToCatalogue": "العودة إلى الكتالوج"
+    }
+  },
+  "basketSplit": {
+    "title": "تقسيم السلة بين موردين",
+    "subtitle": "تحسين المشتريات عبر موردين اثنين للحصول على أدنى إجمالي تكلفة واصلة.",
+    "readOnlyNotice": "لديك صلاحية عرض فقط. يمكن لمالكي ومشتري مساحة العمل إعداد وإرسال طلبات تقسيم السلة.",
+    "form": {
+      "suppliersSectionTitle": "اختر موردين اثنين",
+      "supplier1": "المورد الأول",
+      "supplier2": "المورد الثاني",
+      "selectSupplier": "اختر المورد...",
+      "sameSupplierError": "يُرجى اختيار موردين مختلفين.",
+      "itemsSectionTitle": "منتجات السلة",
+      "product": "المنتج",
+      "quantity": "الكمية",
+      "addItem": "إضافة منتج",
+      "removeItem": "حذف المنتج",
+      "submitButton": "تحسين تقسيم السلة",
+      "submitting": "جاري إرسال السلة...",
+      "validationError": "يُرجى تحديد موردين مختلفين ومنتج واحد على الأقل بكمية موجبة."
+    },
+    "status": {
+      "queued": "طلب تقسيم السلة في قائمة الانتظار للتحسين...",
+      "running": "جاري تحسين التوزيع عبر الموردين...",
+      "polling": "جاري التحقق من حالة الطلب...",
+      "completed": "اكتمل التحسين",
+      "failed": "فشل طلب التحسين",
+      "failedMessage": "حدث خطأ أثناء تنفيذ عملية التحسين. يُرجى المحاولة مرة أخرى."
+    },
+    "result": {
+      "feasibleTitle": "التوزيع الموصى به للسلة",
+      "feasibleSubtitle": "أدنى تكلفة واصلة مقسمة بين الموردين المحددين.",
+      "totalLandedCost": "إجمالي التكلفة الواصلة المحسنة",
+      "supplierAllocation": "الحصة المخصصة لـ {{supplier}}",
+      "supplierTotal": "إجمالي المورد: {{total}}",
+      "productColumn": "المنتج",
+      "quantityColumn": "الكمية المخصصة",
+      "costColumn": "التكلفة الواصلة المتوقعة",
+      "baselinesTitle": "مقارنة الأساس مع مورد فردي",
+      "baselineSubtitle": "تقييم ما إذا كان التقسيم يوفر المال مقارنة بالشراء الكامل من مورد واحد.",
+      "splitSavings": "التقسيم يوفر {{amount}} مقارنة بالشراء الحصري من {{cheaperSupplier}}.",
+      "noSplitSavings": "التقسيم لا يقدم ميزة سعرية؛ الشراء الكامل من {{cheaperSupplier}} مساوٍ أو أقل تكلفة.",
+      "singleSupplierOnly": "فقط {{supplier}} يمكنه توفير كامل السلة.",
+      "neitherSingleFeasible": "لا يستطيع أي من الموردين توفير كامل السلة بمفرده.",
+      "infeasibleTitle": "تقرير عدم الجدوى التجارية",
+      "infeasibleSubtitle": "اكتملت معالجة التحسين بنجاح، ولكن لا يمكن تحقيق توزيع مجدٍ مع الموردين المحددين.",
+      "infeasibleReason": "المنتج/المنتجات التالية لا تملك عروضاً مؤهلة من الموردين المحددين:",
+      "missingSuppliers": "عروض غير متوفرة من: {{suppliers}}",
+      "solverVersion": "إصدار نظام التحسين: {{version}}",
+      "computedAt": "تم الحساب في {{time}}"
+    },
+    "actions": {
+      "newSplit": "بدء تقسيم سلة جديد",
+      "viewCompare": "مقارنة عروض المنتج"
+    }
+  },
+  "alerts": {
+    "title": "صندوق التنبيهات الإجرائية",
+    "subtitle": "إشارات تجارية استباقية تُحسب مباشرة من عروض الأسعار وسجل الأسعار الحالي.",
+    "readOnlyNotice": "لديك صلاحية عرض فقط. يمكن لمالكي ومشتري مساحة العمل استبعاد التنبيهات.",
+    "filterKind": "تصفية حسب نوع التنبيه",
+    "allKinds": "جميع أنواع التنبيهات",
+    "kinds": {
+      "recommended_price_expiring": "سعر موصى به يقترب من الانتهاء",
+      "preferred_supplier_offer_disappeared": "اختفاء عرض المورد المفضل",
+      "price_swing": "تم رصد تقلب في السعر"
+    },
+    "severities": {
+      "critical": "حرج",
+      "warning": "تحذير",
+      "info": "معلومات"
+    },
+    "card": {
+      "dismiss": "استبعاد",
+      "dismissing": "جاري الاستبعاد...",
+      "dismissSuccess": "تم استبعاد التنبيه.",
+      "product": "المنتج: {{product}}",
+      "supplier": "المورد: {{supplier}}",
+      "detectedAt": "تم التقييم في {{time}}",
+      "evidence": {
+        "expiringSoon": "العرض الموصى به من {{supplier}} ينتهي في {{validTo}}.",
+        "disappeared": "المورد المفضل {{supplier}} لم يعد لديه عرض نشط لهذا المنتج.",
+        "priceSwing": "سعر الوحدة الموصى به ({{currentPrice}}) تغير بنسبة {{swingPercent}}% مقارنة بالمتوسط التاريخي لـ 6 أشهر ({{avgPrice}})."
+      }
+    },
+    "actions": {
+      "compare_product": "مقارنة العروض",
+      "review_supplier": "مراجعة المورد",
+      "view_price_history": "عرض سجل الأسعار"
+    },
+    "empty": {
+      "title": "كل شيء على ما يرام — لا توجد تنبيهات نشطة",
+      "message": "لم يتم رصد أي شروط تجارية تتطلب تدخلاً فورياً في بيانات مساحة العمل الحالية."
     }
   }
 }

@@ -41,6 +41,9 @@ class Settings(BaseSettings):
     extraction_queue_name: str = Field(
         default="quotation-extraction", validation_alias="EXTRACTION_QUEUE_NAME"
     )
+    basket_split_queue_name: str = Field(
+        default="basket-split", validation_alias="BASKET_SPLIT_QUEUE_NAME"
+    )
     extraction_provider_mode: Literal["stub", "bedrock", "azure_di"] = Field(
         default="stub", validation_alias="EXTRACTION_PROVIDER_MODE"
     )

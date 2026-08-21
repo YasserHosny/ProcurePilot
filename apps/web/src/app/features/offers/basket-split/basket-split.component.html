@@ -1,0 +1,354 @@
+<div class="basket-container">
+  <div class="page-header">
+    <div class="header-content">
+      <h1 class="page-title">{{ 'basketSplit.title' | translate }}</h1>
+      <p class="page-subtitle">{{ 'basketSplit.subtitle' | translate }}</p>
+    </div>
+
+    @if (currentJob()) {
+      <div class="header-actions">
+        <button mat-stroked-button (click)="resetForm()" class="action-btn">
+          <mat-icon aria-hidden="true">add</mat-icon>
+          <span>{{ 'basketSplit.actions.newSplit' | translate }}</span>
+        </button>
+      </div>
+    }
+  </div>
+
+  <!-- Read-Only Access Notice for Non-Writers (FR-018) -->
+  @if (!isWriter()) {
+    <div class="readonly-banner">
+      <mat-icon aria-hidden="true">info</mat-icon>
+      <span>{{ 'basketSplit.readOnlyNotice' | translate }}</span>
+    </div>
+  }
+
+  <!-- Loading Initial Data -->
+  @if (isLoading() && !currentJob()) {
+    <div class="loading-container">
+      <mat-spinner diameter="48"></mat-spinner>
+      <p>{{ 'common.loading' | translate }}</p>
+    </div>
+  }
+
+  <!-- Form View (When No Active Job / Result Displayed) -->
+  @if (!currentJob() && !isLoading()) {
+    <mat-card class="form-card">
+      <form (ngSubmit)="submitBasket()" #basketForm="ngForm">
+        <!-- Section 1: Exactly Two Named Suppliers (FR-008, Research R5) -->
+        <div class="form-section">
+          <h2 class="section-title">{{ 'basketSplit.form.suppliersSectionTitle' | translate }}</h2>
+          <div class="suppliers-grid">
+            <mat-form-field appearance="outline" class="supplier-field">
+              <mat-label>{{ 'basketSplit.form.supplier1' | translate }}</mat-label>
+              <mat-select
+                [value]="supplierId1()"
+                (selectionChange)="supplierId1.set($event.value)"
+                required
+              >
+                @for (supp of suppliers(); track supp.id) {
+                  <mat-option [value]="supp.id" [disabled]="supp.id === supplierId2()">
+                    {{ supp.name }}
+                  </mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" class="supplier-field">
+              <mat-label>{{ 'basketSplit.form.supplier2' | translate }}</mat-label>
+              <mat-select
+                [value]="supplierId2()"
+                (selectionChange)="supplierId2.set($event.value)"
+                required
+              >
+                @for (supp of suppliers(); track supp.id) {
+                  <mat-option [value]="supp.id" [disabled]="supp.id === supplierId1()">
+                    {{ supp.name }}
+                  </mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+          </div>
+          @if (supplierId1() && supplierId2() && supplierId1() === supplierId2()) {
+            <p class="error-text">{{ 'basketSplit.form.sameSupplierError' | translate }}</p>
+          }
+        </div>
+
+        <mat-divider></mat-divider>
+
+        <!-- Section 2: Basket Items & Quantities -->
+        <div class="form-section">
+          <div class="section-header-row">
+            <h2 class="section-title">{{ 'basketSplit.form.itemsSectionTitle' | translate }}</h2>
+            <button
+              mat-stroked-button
+              type="button"
+              (click)="addItem()"
+              class="add-item-btn"
+              [disabled]="!isWriter()"
+            >
+              <mat-icon aria-hidden="true">add</mat-icon>
+              <span>{{ 'basketSplit.form.addItem' | translate }}</span>
+            </button>
+          </div>
+
+          <div class="items-list">
+            @for (item of items(); track $index; let i = $index) {
+              <div class="item-row">
+                <!-- Product Selector -->
+                <mat-form-field appearance="outline" class="item-product-field">
+                  <mat-label>{{ 'basketSplit.form.product' | translate }}</mat-label>
+                  <mat-select
+                    [value]="item.workspace_product_id"
+                    (selectionChange)="onProductSelect(i, $event.value)"
+                    required
+                  >
+                    @for (prod of products(); track prod.id) {
+                      <mat-option [value]="prod.id">
+                        {{ prod.tenant_name }}
+                        @if (prod.variant) { ({{ prod.variant }}) }
+                      </mat-option>
+                    }
+                  </mat-select>
+                </mat-form-field>
+
+                <!-- Quantity Input -->
+                <mat-form-field appearance="outline" class="item-qty-field">
+                  <mat-label>{{ 'basketSplit.form.quantity' | translate }}</mat-label>
+                  <input
+                    matInput
+                    type="number"
+                    min="1"
+                    step="1"
+                    [value]="item.quantity"
+                    (input)="onQuantityChange(i, $any($event.target).value)"
+                    required
+                  />
+                </mat-form-field>
+
+                <!-- Remove Item Button -->
+                @if (items().length > 1) {
+                  <button
+                    mat-icon-button
+                    type="button"
+                    color="warn"
+                    (click)="removeItem(i)"
+                    [attr.aria-label]="'basketSplit.form.removeItem' | translate"
+                    class="remove-item-btn"
+                  >
+                    <mat-icon aria-hidden="true">delete</mat-icon>
+                  </button>
+                }
+              </div>
+            }
+          </div>
+        </div>
+
+        @if (errorMessage()) {
+          <div class="error-banner">
+            <mat-icon aria-hidden="true">error_outline</mat-icon>
+            <span>{{ errorMessage() }}</span>
+          </div>
+        }
+
+        <div class="form-actions">
+          <button
+            mat-flat-button
+            color="primary"
+            type="submit"
+            [disabled]="!isFormValid() || !isWriter() || isSubmitting()"
+            class="submit-btn"
+          >
+            @if (isSubmitting()) {
+              <mat-spinner diameter="20" class="btn-spinner"></mat-spinner>
+              <span>{{ 'basketSplit.form.submitting' | translate }}</span>
+            } @else {
+              <mat-icon aria-hidden="true">call_split</mat-icon>
+              <span>{{ 'basketSplit.form.submitButton' | translate }}</span>
+            }
+          </button>
+        </div>
+      </form>
+    </mat-card>
+  }
+
+  <!-- Progress / Polling State (FR-009, SC-004) -->
+  @if (uiState() === 'queued' || uiState() === 'running' || uiState() === 'submitting') {
+    <mat-card class="job-progress-card">
+      <div class="progress-content">
+        <mat-spinner diameter="56"></mat-spinner>
+        <h2 class="progress-title">
+          @if (uiState() === 'queued') {
+            {{ 'basketSplit.status.queued' | translate }}
+          } @else {
+            {{ 'basketSplit.status.running' | translate }}
+          }
+        </h2>
+        <p class="progress-sub">{{ 'basketSplit.status.polling' | translate }}</p>
+        <mat-progress-bar mode="indeterminate" class="progress-bar"></mat-progress-bar>
+      </div>
+    </mat-card>
+  }
+
+  <!-- Case A: Feasible Completed Result -->
+  @if (uiState() === 'completed_feasible'; as feasibleState) {
+    @if (currentJob()?.result; as res) {
+      <div class="result-container">
+        <!-- Result Summary Banner -->
+        <mat-card class="result-summary-card">
+          <div class="summary-header">
+            <div class="title-group">
+              <span class="status-pill feasible">
+                <mat-icon aria-hidden="true">check_circle</mat-icon>
+                {{ 'basketSplit.status.completed' | translate }}
+              </span>
+              <h2 class="result-title">{{ 'basketSplit.result.feasibleTitle' | translate }}</h2>
+              <p class="result-subtitle">{{ 'basketSplit.result.feasibleSubtitle' | translate }}</p>
+            </div>
+
+            @if (res.total_landed_cost) {
+              <div class="total-cost-box">
+                <span class="total-label">{{ 'basketSplit.result.totalLandedCost' | translate }}</span>
+                <span class="total-val">{{ res.total_landed_cost | formatMoney }}</span>
+              </div>
+            }
+          </div>
+
+          <!-- Single-Supplier Baseline Comparison (FR-008, US3 Scenario 2) -->
+          @if (getSingleSupplierSavings(); as baselineInfo) {
+            <div class="baseline-comparison-box" [ngClass]="baselineInfo.type">
+              <mat-icon aria-hidden="true">
+                {{ baselineInfo.type === 'split_saves' ? 'savings' : 'info' }}
+              </mat-icon>
+              <div class="baseline-text">
+                @if (baselineInfo.type === 'split_saves') {
+                  <span>
+                    {{ 'basketSplit.result.splitSavings' | translate: {
+                      amount: (baselineInfo.savingsAmount + ' ' + baselineInfo.currency),
+                      cheaperSupplier: baselineInfo.cheaperSupplierName
+                    } }}
+                  </span>
+                } @else if (baselineInfo.type === 'no_savings') {
+                  <span>
+                    {{ 'basketSplit.result.noSplitSavings' | translate: {
+                      cheaperSupplier: baselineInfo.cheaperSupplierName
+                    } }}
+                  </span>
+                } @else if (baselineInfo.type === 'single_only') {
+                  <span>
+                    {{ 'basketSplit.result.singleSupplierOnly' | translate: {
+                      supplier: baselineInfo.cheaperSupplierName
+                    } }}
+                  </span>
+                } @else {
+                  <span>{{ 'basketSplit.result.neitherSingleFeasible' | translate }}</span>
+                }
+              </div>
+            </div>
+          }
+        </mat-card>
+
+        <!-- Per-Supplier Allocations Grid -->
+        <div class="allocations-grid">
+          @for (alloc of res.allocation; track alloc.supplier_id) {
+            <mat-card class="allocation-card">
+              <div class="alloc-header">
+                <div class="alloc-supplier-info">
+                  <mat-icon class="supplier-icon" aria-hidden="true">storefront</mat-icon>
+                  <h3 class="alloc-supplier-name">{{ getSupplierName(alloc.supplier_id) }}</h3>
+                </div>
+                <span class="alloc-total">{{ alloc.total_landed_cost | formatMoney }}</span>
+              </div>
+
+              <table class="alloc-table" aria-label="Allocated Items Table">
+                <thead>
+                  <tr>
+                    <th>{{ 'basketSplit.result.productColumn' | translate }}</th>
+                    <th>{{ 'basketSplit.result.quantityColumn' | translate }}</th>
+                    <th>{{ 'basketSplit.result.costColumn' | translate }}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (line of alloc.lines; track line.workspace_product_id) {
+                    <tr>
+                      <td class="product-cell">
+                        {{ getProductName(line.workspace_product_id) }}
+                      </td>
+                      <td>{{ line.quantity }}</td>
+                      <td><strong>{{ line.landed_cost | formatMoney }}</strong></td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </mat-card>
+          }
+        </div>
+      </div>
+    }
+  }
+
+  <!-- Case B: Infeasible Completed Result (FR-010, Research R5, Distinct from Failed!) -->
+  @if (uiState() === 'completed_infeasible') {
+    @if (currentJob()?.result; as res) {
+      <mat-card class="infeasible-card">
+        <div class="infeasible-header">
+          <div class="infeasible-icon-wrapper">
+            <mat-icon class="infeasible-icon" aria-hidden="true">block</mat-icon>
+          </div>
+          <div class="infeasible-title-group">
+            <h2 class="infeasible-title">{{ 'basketSplit.result.infeasibleTitle' | translate }}</h2>
+            <p class="infeasible-subtitle">{{ 'basketSplit.result.infeasibleSubtitle' | translate }}</p>
+          </div>
+        </div>
+
+        <div class="infeasible-body">
+          <p class="infeasible-lead">{{ 'basketSplit.result.infeasibleReason' | translate }}</p>
+
+          <div class="infeasible-items-list">
+            @for (item of res.infeasible_items; track item.workspace_product_id) {
+              <div class="infeasible-item-row">
+                <div class="item-name">
+                  <mat-icon aria-hidden="true">warning</mat-icon>
+                  <strong>{{ getProductName(item.workspace_product_id) }}</strong>
+                  <span>(Qty: {{ item.requested_quantity }})</span>
+                </div>
+                <div class="missing-suppliers">
+                  {{ 'basketSplit.result.missingSuppliers' | translate: {
+                    suppliers: item.missing_supplier_ids.map(getSupplierName.bind(this)).join(', ')
+                  } }}
+                </div>
+              </div>
+            }
+          </div>
+        </div>
+
+        <mat-divider></mat-divider>
+        <div class="infeasible-actions">
+          <button mat-flat-button color="primary" (click)="resetForm()">
+            <mat-icon aria-hidden="true">refresh</mat-icon>
+            <span>{{ 'basketSplit.actions.newSplit' | translate }}</span>
+          </button>
+        </div>
+      </mat-card>
+    }
+  }
+
+  <!-- Case C: Actual System Failure (Distinct from Commercial Infeasibility!) -->
+  @if (uiState() === 'failed') {
+    <mat-card class="failed-card">
+      <div class="failed-content">
+        <mat-icon class="failed-icon" aria-hidden="true">error</mat-icon>
+        <h2 class="failed-title">{{ 'basketSplit.status.failed' | translate }}</h2>
+        <p class="failed-message">
+          {{ errorMessage() || ('basketSplit.status.failedMessage' | translate) }}
+        </p>
+        <div class="failed-actions">
+          <button mat-flat-button color="primary" (click)="resetForm()">
+            <mat-icon aria-hidden="true">refresh</mat-icon>
+            <span>{{ 'basketSplit.actions.newSplit' | translate }}</span>
+          </button>
+        </div>
+      </div>
+    </mat-card>
+  }
+</div>

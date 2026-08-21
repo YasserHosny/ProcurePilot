@@ -1,0 +1,249 @@
+<div class="intelligence-container">
+  <div class="page-header">
+    <div class="header-content">
+      <h1 class="page-title">{{ 'productIntelligence.title' | translate }}</h1>
+      <p class="page-subtitle">{{ 'productIntelligence.subtitle' | translate }}</p>
+    </div>
+
+    <div class="header-actions">
+      @if (selectedProductId()) {
+        <a
+          mat-flat-button
+          color="primary"
+          [routerLink]="['/offers/compare', selectedProductId()]"
+          class="action-btn"
+        >
+          <mat-icon aria-hidden="true">compare_arrows</mat-icon>
+          <span>{{ 'productIntelligence.actions.compare' | translate }}</span>
+        </a>
+
+        <a
+          mat-stroked-button
+          [routerLink]="['/products', selectedProductId()]"
+          class="action-btn"
+        >
+          <mat-icon aria-hidden="true">inventory_2</mat-icon>
+          <span>{{ 'compare.actions.viewProduct' | translate }}</span>
+        </a>
+      }
+    </div>
+  </div>
+
+  <!-- Filter Controls Card -->
+  <mat-card class="controls-card">
+    <div class="controls-grid">
+      <!-- Product Selector -->
+      <mat-form-field appearance="outline" class="filter-field product-select">
+        <mat-label>{{ 'compare.productLabel' | translate }}</mat-label>
+        <mat-select
+          [value]="selectedProductId()"
+          (selectionChange)="onProductChange($event.value)"
+        >
+          @for (prod of products(); track prod.id) {
+            <mat-option [value]="prod.id">
+              {{ prod.tenant_name }}
+              @if (prod.variant) { ({{ prod.variant }}) }
+            </mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+
+      <!-- Supplier Filter -->
+      <mat-form-field appearance="outline" class="filter-field supplier-select">
+        <mat-label>{{ 'productIntelligence.filterSupplier' | translate }}</mat-label>
+        <mat-select
+          [value]="selectedSupplierId()"
+          (selectionChange)="onSupplierChange($event.value)"
+        >
+          <mat-option value="">{{ 'productIntelligence.allSuppliers' | translate }}</mat-option>
+          @for (supp of suppliers(); track supp.id) {
+            <mat-option [value]="supp.id">{{ supp.name }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+
+      <!-- Window Months -->
+      <mat-form-field appearance="outline" class="filter-field window-select">
+        <mat-label>{{ 'productIntelligence.timeWindow' | translate }}</mat-label>
+        <mat-select
+          [value]="selectedWindowMonths()"
+          (selectionChange)="onWindowChange($event.value)"
+        >
+          @for (w of windowOptions; track w) {
+            <mat-option [value]="w">
+              {{ 'productIntelligence.windowMonths' | translate: { months: w } }}
+            </mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+    </div>
+  </mat-card>
+
+  <!-- Loading State -->
+  @if (isLoading()) {
+    <div class="loading-container">
+      <mat-spinner diameter="48"></mat-spinner>
+      <p>{{ 'common.loading' | translate }}</p>
+    </div>
+  }
+
+  <!-- Populated Content -->
+  @if (!isLoading() && history(); as hist) {
+    @if (hist.points.length > 0) {
+      <!-- Summary Metrics Cards (US2 Scenario 1, FR-007) -->
+      <div class="metrics-grid">
+        <!-- Last Paid Metric Card -->
+        <mat-card class="metric-card">
+          <div class="metric-header">
+            <span class="metric-title">{{ 'productIntelligence.metrics.lastPaid' | translate }}</span>
+            <mat-icon class="metric-icon" aria-hidden="true">receipt</mat-icon>
+          </div>
+          @if (hist.summary.last_paid; as last) {
+            <div class="metric-value">{{ last.value | formatMoney }}</div>
+            <div class="metric-sub">{{ 'productIntelligence.metrics.lastPaidSubtitle' | translate }}</div>
+            @if (last.source_landed_cost_ids.length > 0) {
+              <div class="metric-trace">
+                <span [matTooltip]="'Source: ' + last.source_landed_cost_ids[0]">
+                  {{ 'productIntelligence.metrics.sourceRecord' | translate: { id: last.source_landed_cost_ids[0].slice(0, 8) + '...' } }}
+                </span>
+              </div>
+            }
+          } @else {
+            <div class="metric-value muted">{{ 'productIntelligence.metrics.noData' | translate }}</div>
+          }
+        </mat-card>
+
+        <!-- Average Paid Metric Card -->
+        <mat-card class="metric-card">
+          <div class="metric-header">
+            <span class="metric-title">{{ 'productIntelligence.metrics.averagePaid' | translate }}</span>
+            <mat-icon class="metric-icon" aria-hidden="true">functions</mat-icon>
+          </div>
+          @if (hist.summary.average_paid_rolling_window; as avg) {
+            <div class="metric-value">{{ avg.value | formatMoney }}</div>
+            <div class="metric-sub">
+              {{ 'productIntelligence.metrics.averagePaidSubtitle' | translate: { months: hist.window_months } }}
+            </div>
+            <div class="metric-trace">
+              {{ 'productIntelligence.metrics.sourceRecords' | translate: { count: avg.source_landed_cost_ids.length } }}
+            </div>
+          } @else {
+            <div class="metric-value muted">{{ 'productIntelligence.metrics.noData' | translate }}</div>
+          }
+        </mat-card>
+
+        <!-- Best Price Metric Card -->
+        <mat-card class="metric-card">
+          <div class="metric-header">
+            <span class="metric-title">{{ 'productIntelligence.metrics.bestPrice' | translate }}</span>
+            <mat-icon class="metric-icon highlight" aria-hidden="true">trending_down</mat-icon>
+          </div>
+          @if (hist.summary.best_price; as best) {
+            <div class="metric-value highlight">{{ best.value | formatMoney }}</div>
+            <div class="metric-sub">{{ 'productIntelligence.metrics.bestPriceSubtitle' | translate }}</div>
+            @if (best.source_landed_cost_ids.length > 0) {
+              <div class="metric-trace">
+                <span [matTooltip]="'Source: ' + best.source_landed_cost_ids[0]">
+                  {{ 'productIntelligence.metrics.sourceRecord' | translate: { id: best.source_landed_cost_ids[0].slice(0, 8) + '...' } }}
+                </span>
+              </div>
+            }
+          } @else {
+            <div class="metric-value muted">{{ 'productIntelligence.metrics.noData' | translate }}</div>
+          }
+        </mat-card>
+      </div>
+
+      <!-- Price History Chart Card -->
+      <mat-card class="chart-card">
+        <div class="card-header">
+          <h2 class="card-title">{{ 'productIntelligence.chart.title' | translate }}</h2>
+        </div>
+        <div class="chart-body">
+          <app-price-history-chart
+            [points]="hist.points"
+            [currency]="hist.points[0].normalised_unit_price.currency"
+          ></app-price-history-chart>
+        </div>
+      </mat-card>
+
+      <!-- Historical Records Table -->
+      <mat-card class="table-card">
+        <div class="card-header">
+          <h2 class="card-title">{{ 'productIntelligence.historyTable.title' | translate }}</h2>
+        </div>
+        <table mat-table [dataSource]="hist.points" class="history-table" aria-label="Historical price records">
+          <!-- Recorded At Column -->
+          <ng-container matColumnDef="recordedAt">
+            <th mat-header-cell *matHeaderCellDef>{{ 'productIntelligence.historyTable.recordedAt' | translate }}</th>
+            <td mat-cell *matCellDef="let pt">{{ pt.recorded_at | formatDate }}</td>
+          </ng-container>
+
+          <!-- Supplier Column -->
+          <ng-container matColumnDef="supplier">
+            <th mat-header-cell *matHeaderCellDef>{{ 'productIntelligence.historyTable.supplier' | translate }}</th>
+            <td mat-cell *matCellDef="let pt" class="supplier-cell">{{ pt.supplier_name }}</td>
+          </ng-container>
+
+          <!-- Normalised Unit Price Column -->
+          <ng-container matColumnDef="unitPrice">
+            <th mat-header-cell *matHeaderCellDef>{{ 'productIntelligence.historyTable.unitPrice' | translate }}</th>
+            <td mat-cell *matCellDef="let pt">
+              <strong>{{ pt.normalised_unit_price | formatMoney }}</strong> / {{ pt.base_unit }}
+            </td>
+          </ng-container>
+
+          <!-- Landed Total Cost Column -->
+          <ng-container matColumnDef="totalCost">
+            <th mat-header-cell *matHeaderCellDef>{{ 'productIntelligence.historyTable.totalCost' | translate }}</th>
+            <td mat-cell *matCellDef="let pt">{{ pt.landed_cost_total | formatMoney }}</td>
+          </ng-container>
+
+          <!-- Quantity Column -->
+          <ng-container matColumnDef="quantity">
+            <th mat-header-cell *matHeaderCellDef>{{ 'productIntelligence.historyTable.quantity' | translate }}</th>
+            <td mat-cell *matCellDef="let pt">{{ pt.quantity }} {{ pt.base_unit }}</td>
+          </ng-container>
+
+          <!-- Validity Column -->
+          <ng-container matColumnDef="validity">
+            <th mat-header-cell *matHeaderCellDef>{{ 'compare.table.validUntil' | translate }}</th>
+            <td mat-cell *matCellDef="let pt">
+              @if (pt.valid_to) {
+                {{ pt.valid_to | formatDate }}
+              } @else {
+                <span class="text-muted">{{ 'compare.table.validOpenEnded' | translate }}</span>
+              }
+            </td>
+          </ng-container>
+
+          <tr mat-header-row *matHeaderRowDef="tableColumns"></tr>
+          <tr mat-row *matRowDef="let row; columns: tableColumns"></tr>
+        </table>
+      </mat-card>
+    } @else {
+      <!-- Empty State (FR-006, US2 Scenario 2) -->
+      <mat-card class="empty-state-card">
+        <div class="empty-state">
+          <mat-icon class="empty-icon" aria-hidden="true">insights</mat-icon>
+          <h2 class="empty-title">{{ 'productIntelligence.empty.title' | translate }}</h2>
+          <p class="empty-message">{{ 'productIntelligence.empty.message' | translate }}</p>
+          <div class="empty-actions">
+            <a mat-flat-button color="primary" routerLink="/quotations">
+              <mat-icon aria-hidden="true">receipt_long</mat-icon>
+              <span>{{ 'shell.navQuotations' | translate }}</span>
+            </a>
+          </div>
+        </div>
+      </mat-card>
+    }
+  } @else if (!isLoading() && !selectedProductId()) {
+    <mat-card class="empty-state-card">
+      <div class="empty-state">
+        <mat-icon class="empty-icon" aria-hidden="true">timeline</mat-icon>
+        <h2 class="empty-title">{{ 'productIntelligence.title' | translate }}</h2>
+        <p class="empty-message">{{ 'compare.empty.selectProduct' | translate }}</p>
+      </div>
+    </mat-card>
+  }
+</div>

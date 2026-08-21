@@ -4,8 +4,13 @@ import { Observable } from 'rxjs';
 
 import { environment } from '../../../environments/environment';
 import type {
+  Alert,
+  AlertDismissal,
+  AlertKind,
   Alias,
   BaseUnit,
+  BasketOptimiseRequest,
+  BasketSplitJob,
   ConfigOptions,
   Document,
   ImportPreview,
@@ -21,8 +26,11 @@ import type {
   MatchTaskStatus,
   Me,
   Member,
+  Offer,
+  OfferComparison,
   PresignRequest,
   PresignResponse,
+  PriceHistoryResponse,
   Product,
   ProductCreate,
   ProductUpdate,
@@ -407,5 +415,98 @@ export class ApiService {
   getLandedCost(lineId: string): Observable<LandedCost> {
     return this.http.get<LandedCost>(`${this.base}/quotation-lines/${lineId}/landed-cost`);
   }
+
+  // --- smart compare & intelligence (Chunk 4.5) ----------------------------
+
+  getOffers(params: {
+    product_id: string;
+    quantity: string;
+    include_expired?: boolean;
+    cursor?: string;
+    limit?: number;
+  }): Observable<{ items: Offer[]; next_cursor: string | null }> {
+    const query = new URLSearchParams();
+    query.set('product_id', params.product_id);
+    query.set('quantity', params.quantity);
+    if (params.include_expired !== undefined) {
+      query.set('include_expired', String(params.include_expired));
+    }
+    if (params.cursor) query.set('cursor', params.cursor);
+    if (params.limit) query.set('limit', String(params.limit));
+    return this.http.get<{ items: Offer[]; next_cursor: string | null }>(
+      `${this.base}/offers?${query.toString()}`,
+    );
+  }
+
+  compareOffers(params: {
+    product_id: string;
+    quantity: string;
+  }): Observable<OfferComparison> {
+    const query = new URLSearchParams();
+    query.set('product_id', params.product_id);
+    query.set('quantity', params.quantity);
+    return this.http.get<OfferComparison>(
+      `${this.base}/offers/compare?${query.toString()}`,
+    );
+  }
+
+  getPriceHistory(
+    productId: string,
+    params?: {
+      supplier_id?: string;
+      window_months?: number;
+      cursor?: string;
+      limit?: number;
+    },
+  ): Observable<PriceHistoryResponse> {
+    const query = new URLSearchParams();
+    if (params?.supplier_id) query.set('supplier_id', params.supplier_id);
+    if (params?.window_months !== undefined) {
+      query.set('window_months', String(params.window_months));
+    }
+    if (params?.cursor) query.set('cursor', params.cursor);
+    if (params?.limit !== undefined) query.set('limit', String(params.limit));
+    const qs = query.toString() ? `?${query.toString()}` : '';
+    return this.http.get<PriceHistoryResponse>(
+      `${this.base}/products/${productId}/price-history${qs}`,
+    );
+  }
+
+  optimiseBasket(
+    body: BasketOptimiseRequest,
+    idempotencyKey?: string,
+  ): Observable<BasketSplitJob> {
+    const headers = idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined;
+    return this.http.post<BasketSplitJob>(`${this.base}/baskets/optimise`, body, { headers });
+  }
+
+  getBasketSplitJob(id: string): Observable<BasketSplitJob> {
+    return this.http.get<BasketSplitJob>(`${this.base}/baskets/${id}`);
+  }
+
+  getAlerts(params?: {
+    kind?: AlertKind;
+    cursor?: string;
+    limit?: number;
+  }): Observable<{ items: Alert[]; next_cursor: string | null }> {
+    const query = new URLSearchParams();
+    if (params?.kind) query.set('kind', params.kind);
+    if (params?.cursor) query.set('cursor', params.cursor);
+    if (params?.limit !== undefined) query.set('limit', String(params.limit));
+    const qs = query.toString() ? `?${query.toString()}` : '';
+    return this.http.get<{ items: Alert[]; next_cursor: string | null }>(
+      `${this.base}/alerts${qs}`,
+    );
+  }
+
+  dismissAlert(id: string, idempotencyKey?: string): Observable<AlertDismissal> {
+    const headers = idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined;
+    return this.http.post<AlertDismissal>(
+      `${this.base}/alerts/${encodeURIComponent(id)}/dismiss`,
+      {},
+      { headers },
+    );
+  }
 }
+
 

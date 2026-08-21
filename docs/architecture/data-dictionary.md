@@ -598,6 +598,167 @@ All tenant-scoped matching and landed-cost tables have RLS enabled and forced wi
 no-match decisions; branch manager, approver, and viewer are read-only. Cross-tenant reads return
 not found, never forbidden.
 
+## Implemented smart compare and intelligence entities
+
+Smart compare reuses chunk 4.2 catalogue/supplier rows and chunk 4.4 match and landed-cost rows.
+It does not introduce a second offer, recommendation, price-history, or alert-condition source of
+truth.
+
+## `basket_split_job`
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | uuid | PK, default `gen_random_uuid()` |
+| `tenant_id` | uuid | Required FK -> Tenant; RLS key |
+| `requested_by` | uuid | Required FK -> Membership that submitted the solve |
+| `supplier_ids` | uuid[] | Required exactly two distinct supplier ids |
+| `items` | jsonb | Required request snapshot: array of `{workspace_product_id, quantity}` |
+| `status` | enum | `queued`, `running`, `completed`, or `failed`; default `queued` |
+| `result` | jsonb | Optional completed allocation or infeasible result |
+| `error` | jsonb | Optional worker/system failure payload |
+| `created_at` | timestamptz | Audit field; default `now()` |
+| `started_at` | timestamptz | Optional worker start timestamp |
+| `completed_at` | timestamptz | Required exactly for terminal `completed` or `failed` jobs |
+
+Constraints and indexes:
+
+- Check `cardinality(supplier_ids) = 2 and supplier_ids[1] <> supplier_ids[2]`: this chunk is
+  exactly a two-supplier solve, and the two ids must be distinct.
+- Check `(status in ('completed', 'failed')) = (completed_at is not null)`: terminal jobs carry a
+  completion timestamp; queued/running jobs do not.
+- Indexes on `tenant_id` and `requested_by`.
+- Postgres cannot enforce an FK over `supplier_ids`; the application validates both suppliers are
+  visible in the caller's tenant before insert.
+
+`result` uses JSON because the optimiser returns a structured solve snapshot rather than a single
+scalar. The completed shape is:
+
+- `feasible`: boolean.
+- `allocation`: array of per-supplier allocation objects.
+- `total_landed_cost`: `Money { amount, currency }` or null.
+- `single_supplier_baselines`: array comparing all-items-with-one-supplier totals where available.
+- `infeasible_items`: array of `{workspace_product_id, requested_quantity, reason,
+  missing_supplier_ids}` blockers.
+- `solver_version`: optimiser version string.
+- `computed_at`: solve timestamp.
+
+An infeasible commercial outcome is `status = 'completed'` with `result.feasible = false`.
+`status = 'failed'` is reserved for worker, database, queue, or unexpected solver failures and is
+described by `error`.
+
+## `alert_dismissal`
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | uuid | PK, default `gen_random_uuid()` |
+| `tenant_id` | uuid | Required FK -> Tenant; RLS key |
+| `alert_fingerprint` | text | Required deterministic alert id from the live condition |
+| `kind` | text | Required alert kind at dismissal time |
+| `workspace_product_id` | uuid | Required FK -> WorkspaceProduct concerned by the alert |
+| `supplier_id` | uuid | Optional FK -> Supplier concerned by the alert |
+| `dismissed_by` | uuid | Required FK -> Membership that dismissed the alert |
+| `dismissed_at` | timestamptz | Audit field; default `now()` |
+
+Constraints and indexes:
+
+- Unique `(tenant_id, alert_fingerprint)`: one dismissal per exact live-computed alert recurrence.
+- Index `(tenant_id, kind, workspace_product_id)`.
+
+`alert_dismissal` stores only the dismissal fingerprint. Alert conditions themselves are never
+persisted: `GET /alerts` recomputes conditions from current `workspace_product`, `supplier`,
+`match_decision`, and `landed_cost` data on every request, then filters out matching dismissed
+fingerprints. If the underlying condition changes, its fingerprint changes and the alert can appear
+again.
+
+All tenant-scoped smart compare tables have RLS enabled and forced with tenant-claim `USING` and
+`WITH CHECK` policies. Owner and buyer may submit basket split jobs and dismiss alerts; branch
+manager, approver, and viewer are read-only. Cross-tenant reads return not found, never forbidden.
+
+## Response-only smart compare entities
+
+These entities are API response shapes only. They are computed at request time from existing
+chunk 4.2/4.4 data, especially `workspace_product`, `supplier`, `match_decision`, and
+`landed_cost`; they are not tables and must not be treated as a new source of truth.
+
+## `Offer`
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | uuid | Stable response id; current `landed_cost.id` |
+| `workspace_product_id` | uuid | Matched product id from `match_decision.matched_workspace_product_id` |
+| `supplier_id` | uuid | Supplier reached through `quotation_line` -> `quotation` |
+| `supplier_name` | text | Supplier display name |
+| `quotation_line_id` | uuid | Source quotation line |
+| `match_decision_id` | uuid | Source accepted match decision |
+| `landed_cost` | Money | Projected total for the requested quantity, using chunk 4.4 replay inputs and rule version |
+| `normalised_unit_price` | Money | Projected total divided by requested base quantity |
+| `requested_quantity` | decimal string | Caller-supplied quantity |
+| `base_unit` | text | Product base unit from landed-cost normalisation |
+| `lead_time_days` | integer | Optional supplier-level lead time |
+| `reliability_score` | decimal string | Optional supplier-level 0-1 reliability score |
+| `stock_signal` | enum | Nullable; always null in this chunk because no stock source exists |
+| `match_confidence` | decimal string | Accepted `match_decision.confidence` |
+| `valid_from` | timestamptz | Source landed-cost validity start |
+| `valid_to` | timestamptz | Optional source landed-cost validity end |
+| `is_expired` | boolean | True when `valid_to` is before request time |
+| `rule_version` | text | Source landed-cost rule version |
+| `recorded_at` | timestamptz | Source landed-cost record time |
+
+`Offer` reuses reviewed quotations, accepted match decisions, and stored landed-cost replay inputs.
+It does not persist a second landed-cost row and does not reimplement landed-cost rules.
+
+## `Recommendation`
+
+| Field | Type | Notes |
+|---|---|---|
+| `recommended_offer_id` | uuid | Selected offer id from the same response |
+| `score` | decimal string | Weighted deterministic score rounded to 4 decimals |
+| `confidence` | enum | `high`, `medium`, or `low` |
+| `valid_from` | timestamptz | Recommended offer validity start |
+| `valid_to` | timestamptz | Optional recommended offer validity end |
+| `risk_notes` | text[] | Fixed risk codes such as `price_expiring_soon` |
+| `evidence` | json object | Score weights, score components, winning margin, and tie-break evidence |
+
+`Recommendation` is computed for one product and requested quantity. It is not stored as a buyer
+decision; durable outcome and savings records are a later chunk.
+
+## `PriceHistoryPoint`
+
+| Field | Type | Notes |
+|---|---|---|
+| `landed_cost_id` | uuid | Source landed-cost row |
+| `workspace_product_id` | uuid | Matched product id |
+| `supplier_id` | uuid | Supplier reached through quotation joins |
+| `supplier_name` | text | Supplier display name |
+| `recorded_at` | timestamptz | Record-time x-axis |
+| `valid_from` | timestamptz | Price valid-time start |
+| `valid_to` | timestamptz | Optional price valid-time end |
+| `normalised_unit_price` | Money | `landed_cost.total_amount / landed_cost.normalised_base_quantity` |
+| `landed_cost_total` | Money | Source `landed_cost.total_amount/total_currency` |
+| `quantity` | decimal string | Source landed-cost quantity |
+| `base_unit` | text | Source landed-cost base unit |
+
+`PriceHistoryPoint` is derived entirely from historical `landed_cost` rows and related joins.
+It is not a separate purchase ledger.
+
+## `Alert`
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | text | Deterministic alert fingerprint |
+| `kind` | enum | `recommended_price_expiring`, `preferred_supplier_offer_disappeared`, or `price_swing` |
+| `workspace_product_id` | uuid | Product concerned |
+| `supplier_id` | uuid | Optional supplier concerned |
+| `severity` | enum | `info`, `warning`, or `critical` |
+| `evidence` | json object | Current condition facts only |
+| `action` | enum | `compare_product`, `review_supplier`, or `view_price_history` |
+| `created_from_current_data_at` | timestamptz | Request evaluation timestamp, not a persisted condition timestamp |
+| `dismissed` | boolean | False in alert listings; dismissal responses identify the dismissed fingerprint |
+
+`Alert` conditions are live-computed and suppressed by `alert_dismissal` fingerprints. The
+conditions themselves are not persisted, so resolved or changed conditions do not leave stale inbox
+rows behind.
+
 ## Planned later domain entities
 
 ## `Branch` / `CostCentre`
@@ -610,31 +771,20 @@ not found, never forbidden.
 | `code` | text | Short code for requests |
 | `parent_id` | uuid | Optional hierarchy |
 
-## `SupplierOffer`
-
-| Field | Type | Notes |
-|---|---|---|
-| `id` | uuid | PK |
-| `tenant_id` | uuid | FK → Tenant |
-| `workspace_product_id` | uuid | FK → WorkspaceProduct |
-| `quotation_line_id` | uuid | FK → QuotationLine |
-| `landed_cost_amount` | numeric(18,4) | Computed total amount |
-| `landed_cost_currency` | text | FK -> `supported_currency.code`; explicit currency for the computed total |
-| `valid_from` | timestamptz | |
-| `valid_to` | timestamptz | |
-| `recorded_at` | timestamptz | Bitemporal record time |
-
 ## `SavingRecord`
 
 | Field | Type | Notes |
 |---|---|---|
 | `id` | uuid | PK |
 | `tenant_id` | uuid | FK → Tenant |
-| `tenant_product_id` | uuid | FK |
+| `workspace_product_id` | uuid | FK -> WorkspaceProduct |
 | `baseline_policy` | text | e.g. last_paid, rolling_avg |
-| `baseline_value` | money | |
-| `actual_value` | money | |
-| `delta` | money | Verified saving |
+| `baseline_amount` | numeric(18,4) | Baseline monetary amount |
+| `baseline_currency` | text | FK -> `supported_currency.code`; required with `baseline_amount` |
+| `actual_amount` | numeric(18,4) | Actual monetary amount |
+| `actual_currency` | text | FK -> `supported_currency.code`; required with `actual_amount` |
+| `delta_amount` | numeric(18,4) | Verified saving amount |
+| `delta_currency` | text | FK -> `supported_currency.code`; required with `delta_amount` |
 | `verified_at` | timestamptz | Immutable after verify |
 
 ## `PurchaseRequest`

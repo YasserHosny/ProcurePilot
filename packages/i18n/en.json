@@ -147,7 +147,10 @@
     "mfaEnabledBadge": "MFA Active",
     "signOut": "Sign out",
     "language": "Language",
-    "selectLanguage": "Select language"
+    "selectLanguage": "Select language",
+    "navBasketSplit": "Basket Split",
+    "navAlerts": "Alerts Inbox",
+    "navIntelligence": "Price Intelligence"
   },
   "home": {
     "welcomePrefix": "Welcome to",
@@ -886,6 +889,215 @@
         "alreadyDecided": "This quotation line already has a recorded decision.",
         "genericError": "Unable to resolve match decision. Please try again."
       }
+    }
+  },
+  "compare": {
+    "title": "Smart Compare",
+    "subtitle": "Compare supplier offers side-by-side with true landed cost and evidence-backed recommendations.",
+    "selectProductPrompt": "Select a product from the list to compare supplier offers.",
+    "productLabel": "Product",
+    "quantityLabel": "Required Quantity",
+    "quantityPlaceholder": "e.g. 10",
+    "quantityRequired": "Quantity must be greater than 0",
+    "includeExpired": "Include expired offers",
+    "recomputing": "Recalculating...",
+    "unitLabel": "Unit: {{unit}}",
+    "recommendation": {
+      "title": "Recommended Offer",
+      "noRecommendation": "No eligible recommendation available",
+      "scoreLabel": "Recommendation Score",
+      "confidenceLabel": "Confidence",
+      "confidence": {
+        "high": "High Confidence",
+        "medium": "Medium Confidence",
+        "low": "Low Confidence"
+      },
+      "validityWindow": "Price valid from {{from}} to {{to}}",
+      "validityOpenEnded": "Price valid from {{from}} (no expiry date)",
+      "winningMargin": "Winning margin: {{margin}}%",
+      "evidenceTitle": "Scoring Evidence Breakdown",
+      "weightsTitle": "Criteria Weights",
+      "weights": {
+        "cost": "Landed Cost ({{weight}}%)",
+        "matchConfidence": "Match Confidence ({{weight}}%)",
+        "reliability": "Supplier Reliability ({{weight}}%)",
+        "leadTime": "Lead Time ({{weight}}%)"
+      },
+      "riskNotesTitle": "Risk Considerations",
+      "riskNotes": {
+        "price_expiring_soon": "Price is expiring within 7 days. Prompt action recommended.",
+        "low_match_confidence": "Product match confidence is below 85%. Verify product specifications.",
+        "low_supplier_reliability": "Supplier reliability score is below 60%."
+      },
+      "tieBreakTitle": "Deterministic Tie-Break Applied",
+      "tieBreakNote": "Offers scored equally; tie-break applied in order: {{rule}}"
+    },
+    "table": {
+      "supplier": "Supplier",
+      "normalisedUnitPrice": "Unit Price",
+      "landedCostTotal": "Total Landed Cost",
+      "leadTime": "Lead Time",
+      "leadTimeDays": "{{days}} days",
+      "leadTimeUnknown": "Not specified",
+      "reliability": "Reliability",
+      "reliabilityUnknown": "No rating",
+      "stockSignal": "Stock Availability",
+      "stockUnknown": "Unknown",
+      "matchConfidence": "Match Confidence",
+      "validUntil": "Valid Until",
+      "validOpenEnded": "Open-ended",
+      "status": "Status",
+      "statusActive": "Active",
+      "statusExpired": "Expired",
+      "recommendedBadge": "Recommended"
+    },
+    "empty": {
+      "title": "No supplier offers on file",
+      "message": "No reviewed and matched quotation lines exist for this product yet. Upload and review quotations to generate supplier offers.",
+      "selectProduct": "Please select a product from your catalogue to view supplier comparison."
+    },
+    "actions": {
+      "viewIntelligence": "Price History",
+      "viewProduct": "View Product",
+      "backToCatalogue": "Back to Catalogue"
+    }
+  },
+  "productIntelligence": {
+    "title": "Product Price Intelligence",
+    "subtitle": "Historical landed cost trends and benchmark metrics derived from your workspace purchase history.",
+    "filterSupplier": "Filter by Supplier",
+    "allSuppliers": "All Suppliers",
+    "timeWindow": "Time Window",
+    "windowMonths": "{{months}} Months",
+    "metrics": {
+      "lastPaid": "Last Paid",
+      "lastPaidSubtitle": "Most recently recorded landed unit price",
+      "averagePaid": "Average Paid",
+      "averagePaidSubtitle": "Rolling {{months}}-month arithmetic mean",
+      "bestPrice": "Best Price",
+      "bestPriceSubtitle": "Lowest historical normalised unit price",
+      "noData": "No data",
+      "sourceRecord": "Source Record: {{id}}",
+      "sourceRecords": "{{count}} Source Records"
+    },
+    "chart": {
+      "title": "Unit Price Trend Over Time",
+      "xAxis": "Recorded Date",
+      "yAxis": "Normalised Unit Price ({{currency}})",
+      "legend": "Suppliers",
+      "pointTooltip": "{{supplier}}: {{price}} (Qty: {{quantity}} {{unit}}) on {{date}}",
+      "noPoints": "No price points in selected window"
+    },
+    "historyTable": {
+      "title": "Historical Records",
+      "recordedAt": "Recorded Date",
+      "supplier": "Supplier",
+      "unitPrice": "Normalised Unit Price",
+      "totalCost": "Landed Total",
+      "quantity": "Quantity",
+      "validFrom": "Valid From",
+      "validTo": "Valid To"
+    },
+    "empty": {
+      "title": "No purchase history yet",
+      "message": "Price intelligence builds up automatically as quotations are reviewed, matched, and costed for this product."
+    },
+    "actions": {
+      "compare": "Smart Compare",
+      "backToCatalogue": "Back to Catalogue"
+    }
+  },
+  "basketSplit": {
+    "title": "Two-Supplier Basket Split",
+    "subtitle": "Optimise purchasing across exactly two suppliers for minimum total landed cost.",
+    "readOnlyNotice": "You have view-only access. Workspace owners and buyers can configure and submit basket splits.",
+    "form": {
+      "suppliersSectionTitle": "Select Two Suppliers",
+      "supplier1": "First Supplier",
+      "supplier2": "Second Supplier",
+      "selectSupplier": "Select supplier...",
+      "sameSupplierError": "Please select two different suppliers.",
+      "itemsSectionTitle": "Basket Items",
+      "product": "Product",
+      "quantity": "Quantity",
+      "addItem": "Add Item",
+      "removeItem": "Remove Item",
+      "submitButton": "Optimise Basket Split",
+      "submitting": "Submitting Basket...",
+      "validationError": "Please specify two distinct suppliers and at least one item with positive quantity."
+    },
+    "status": {
+      "queued": "Basket split queued for optimisation...",
+      "running": "Optimising allocation across suppliers...",
+      "polling": "Checking job status...",
+      "completed": "Optimisation Completed",
+      "failed": "Optimisation Job Failed",
+      "failedMessage": "An error occurred during solver execution. Please try again."
+    },
+    "result": {
+      "feasibleTitle": "Recommended Basket Allocation",
+      "feasibleSubtitle": "Minimum landed cost split across the two selected suppliers.",
+      "totalLandedCost": "Optimised Total Landed Cost",
+      "supplierAllocation": "Allocation for {{supplier}}",
+      "supplierTotal": "Supplier Total: {{total}}",
+      "productColumn": "Product",
+      "quantityColumn": "Allocated Quantity",
+      "costColumn": "Projected Landed Cost",
+      "baselinesTitle": "Single-Supplier Baseline Comparison",
+      "baselineSubtitle": "Evaluates whether splitting saves money compared to buying everything from one supplier.",
+      "splitSavings": "Splitting saves {{amount}} versus buying exclusively from {{cheaperSupplier}}.",
+      "noSplitSavings": "Splitting offers no cost advantage; purchasing all items from {{cheaperSupplier}} is equal or cheaper.",
+      "singleSupplierOnly": "Only {{supplier}} can fulfill the entire basket.",
+      "neitherSingleFeasible": "Neither supplier can fulfill the entire basket alone.",
+      "infeasibleTitle": "Commercial Infeasibility Report",
+      "infeasibleSubtitle": "The solver completed successfully, but a feasible allocation cannot be made with the selected suppliers.",
+      "infeasibleReason": "The following item(s) have no eligible offers from the selected suppliers:",
+      "missingSuppliers": "Missing offers from: {{suppliers}}",
+      "solverVersion": "Solver Version: {{version}}",
+      "computedAt": "Computed at {{time}}"
+    },
+    "actions": {
+      "newSplit": "Start New Basket Split",
+      "viewCompare": "Compare Product Offers"
+    }
+  },
+  "alerts": {
+    "title": "Actionable Alerts Inbox",
+    "subtitle": "Proactive commercial signals computed live from your current quotations and price history.",
+    "readOnlyNotice": "You have view-only access. Workspace owners and buyers can dismiss alerts.",
+    "filterKind": "Filter by Alert Type",
+    "allKinds": "All Alert Types",
+    "kinds": {
+      "recommended_price_expiring": "Expiring Recommended Price",
+      "preferred_supplier_offer_disappeared": "Preferred Supplier Offer Disappeared",
+      "price_swing": "Price Swing Detected"
+    },
+    "severities": {
+      "critical": "Critical",
+      "warning": "Warning",
+      "info": "Info"
+    },
+    "card": {
+      "dismiss": "Dismiss",
+      "dismissing": "Dismissing...",
+      "dismissSuccess": "Alert dismissed.",
+      "product": "Product: {{product}}",
+      "supplier": "Supplier: {{supplier}}",
+      "detectedAt": "Evaluated at {{time}}",
+      "evidence": {
+        "expiringSoon": "Recommended offer from {{supplier}} expires on {{validTo}}.",
+        "disappeared": "Preferred supplier {{supplier}} no longer has an active offer for this product.",
+        "priceSwing": "Recommended unit price ({{currentPrice}}) has shifted by {{swingPercent}}% compared to the 6-month historical average ({{avgPrice}})."
+      }
+    },
+    "actions": {
+      "compare_product": "Compare Offers",
+      "review_supplier": "Review Supplier",
+      "view_price_history": "View Price History"
+    },
+    "empty": {
+      "title": "All clear — No active alerts",
+      "message": "No commercial conditions requiring immediate attention were detected in your current workspace data."
     }
   }
 }

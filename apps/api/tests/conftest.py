@@ -27,6 +27,7 @@ TEST_ENV: dict[str, str] = {
     "PLATFORM_INVITATION_TTL_DAYS": "7",
     "MEMBER_INVITATION_TTL_DAYS": "7",
     "RATE_LIMIT_AUTH": "10/minute",
+    "BASKET_SPLIT_QUEUE_NAME": "basket-split",
     "WEB_API_BASE_URL": "http://localhost:8000/api/v1",
     "WEB_DEFAULT_LOCALE": "en",
 }

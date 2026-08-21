@@ -1,0 +1,340 @@
+<div class="compare-container">
+  <div class="page-header">
+    <div class="header-content">
+      <h1 class="page-title">{{ 'compare.title' | translate }}</h1>
+      <p class="page-subtitle">{{ 'compare.subtitle' | translate }}</p>
+    </div>
+
+    <div class="header-actions">
+      @if (selectedProductId()) {
+        <a
+          mat-stroked-button
+          [routerLink]="['/offers/product-intelligence', selectedProductId()]"
+          class="action-btn"
+        >
+          <mat-icon aria-hidden="true">timeline</mat-icon>
+          <span>{{ 'compare.actions.viewIntelligence' | translate }}</span>
+        </a>
+
+        <a
+          mat-stroked-button
+          [routerLink]="['/products', selectedProductId()]"
+          class="action-btn"
+        >
+          <mat-icon aria-hidden="true">visibility</mat-icon>
+          <span>{{ 'compare.actions.viewProduct' | translate }}</span>
+        </a>
+      }
+    </div>
+  </div>
+
+  <!-- Filter & Controls Card -->
+  <mat-card class="controls-card">
+    <div class="controls-grid">
+      <!-- Product Selector -->
+      <mat-form-field appearance="outline" class="product-field">
+        <mat-label>{{ 'compare.productLabel' | translate }}</mat-label>
+        <mat-select
+          [value]="selectedProductId()"
+          (selectionChange)="onProductChange($event.value)"
+          [placeholder]="'compare.selectProductPrompt' | translate"
+        >
+          @for (prod of products(); track prod.id) {
+            <mat-option [value]="prod.id">
+              {{ prod.tenant_name }}
+              @if (prod.variant) { ({{ prod.variant }}) }
+            </mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+
+      <!-- Instant Quantity Input (SC-002: <150ms client-side recompute) -->
+      <mat-form-field appearance="outline" class="quantity-field">
+        <mat-label>{{ 'compare.quantityLabel' | translate }}</mat-label>
+        <input
+          matInput
+          type="number"
+          min="1"
+          step="1"
+          [value]="quantityInput()"
+          (input)="onQuantityChange($any($event.target).value)"
+          [placeholder]="'compare.quantityPlaceholder' | translate"
+          class="quantity-input"
+        />
+        <mat-icon matSuffix aria-hidden="true">calculate</mat-icon>
+      </mat-form-field>
+
+      <!-- Include Expired Checkbox -->
+      <div class="checkbox-wrapper">
+        <mat-checkbox
+          [checked]="includeExpired()"
+          (change)="toggleIncludeExpired()"
+          color="primary"
+        >
+          {{ 'compare.includeExpired' | translate }}
+        </mat-checkbox>
+      </div>
+    </div>
+  </mat-card>
+
+  <!-- Loading State -->
+  @if (isLoading()) {
+    <div class="loading-container">
+      <mat-spinner diameter="48"></mat-spinner>
+      <p>{{ 'common.loading' | translate }}</p>
+    </div>
+  }
+
+  <!-- Populated Content -->
+  @if (!isLoading() && projected(); as proj) {
+    @if (proj.offers.length > 0) {
+      <!-- Recommended Offer Highlight Banner (US1) -->
+      @if (proj.recommendation; as rec) {
+        <mat-card class="recommendation-card" [ngClass]="getConfidenceClass(rec.confidence)">
+          <div class="rec-header">
+            <div class="badge-group">
+              <span class="recommendation-badge">
+                <mat-icon aria-hidden="true">verified</mat-icon>
+                {{ 'compare.recommendation.title' | translate }}
+              </span>
+              <span class="confidence-badge" [ngClass]="getConfidenceClass(rec.confidence)">
+                {{ 'compare.recommendation.confidence.' + rec.confidence | translate }}
+              </span>
+              <span class="score-badge">
+                {{ 'compare.recommendation.scoreLabel' | translate }}: {{ formatScore(rec.score) }}
+              </span>
+            </div>
+
+            @if (rec.evidence.winning_margin) {
+              <span class="margin-badge">
+                {{ 'compare.recommendation.winningMargin' | translate: { margin: formatPercent(rec.evidence.winning_margin) } }}
+              </span>
+            }
+          </div>
+
+          @if (recommendedOffer(); as bestOffer) {
+            <div class="rec-main-info">
+              <div class="supplier-section">
+                <span class="supplier-title">{{ bestOffer.supplier_name }}</span>
+                <span class="unit-price-sub">
+                  {{ 'compare.table.normalisedUnitPrice' | translate }}:
+                  <strong>{{ bestOffer.projected_unit_price | formatMoney }}</strong>
+                </span>
+              </div>
+
+              <div class="cost-section">
+                <span class="cost-label">{{ 'compare.table.landedCostTotal' | translate }}</span>
+                <span class="cost-amount">{{ bestOffer.projected_landed_cost | formatMoney }}</span>
+              </div>
+            </div>
+          }
+
+          <!-- Risk Notes (FR-003) -->
+          @if (rec.risk_notes.length > 0) {
+            <div class="risk-notes-box">
+              <div class="risk-title">
+                <mat-icon aria-hidden="true">warning_amber</mat-icon>
+                <span>{{ 'compare.recommendation.riskNotesTitle' | translate }}</span>
+              </div>
+              <ul class="risk-list">
+                @for (note of rec.risk_notes; track note) {
+                  <li>{{ 'compare.recommendation.riskNotes.' + note | translate }}</li>
+                }
+              </ul>
+            </div>
+          }
+
+          <!-- Validity Window -->
+          <div class="validity-row">
+            <mat-icon aria-hidden="true">event</mat-icon>
+            @if (rec.valid_to) {
+              <span>
+                {{ 'compare.recommendation.validityWindow' | translate: {
+                  from: (rec.valid_from | formatDate),
+                  to: (rec.valid_to | formatDate)
+                } }}
+              </span>
+            } @else {
+              <span>
+                {{ 'compare.recommendation.validityOpenEnded' | translate: {
+                  from: (rec.valid_from | formatDate)
+                } }}
+              </span>
+            }
+          </div>
+
+          <!-- Tie-Break Note (FR-005, Research R3) -->
+          @if (rec.evidence.tie_break.applied) {
+            <div class="tie-break-banner">
+              <mat-icon aria-hidden="true">info</mat-icon>
+              <span>
+                {{ 'compare.recommendation.tieBreakNote' | translate: {
+                  rule: rec.evidence.tie_break.rule.join(', ')
+                } }}
+              </span>
+            </div>
+          }
+
+          <!-- Evidence Criteria Weights Breakdown -->
+          <mat-divider></mat-divider>
+          <div class="evidence-section">
+            <span class="evidence-title">{{ 'compare.recommendation.evidenceTitle' | translate }}</span>
+            <div class="evidence-chips">
+              <span class="evidence-chip">
+                {{ 'compare.recommendation.weights.cost' | translate: { weight: '55' } }}:
+                {{ formatScore(rec.evidence.components['cost']) }}
+              </span>
+              <span class="evidence-chip">
+                {{ 'compare.recommendation.weights.matchConfidence' | translate: { weight: '20' } }}:
+                {{ formatScore(rec.evidence.components['match_confidence']) }}
+              </span>
+              <span class="evidence-chip">
+                {{ 'compare.recommendation.weights.reliability' | translate: { weight: '15' } }}:
+                {{ formatScore(rec.evidence.components['reliability']) }}
+              </span>
+              <span class="evidence-chip">
+                {{ 'compare.recommendation.weights.leadTime' | translate: { weight: '10' } }}:
+                {{ formatScore(rec.evidence.components['lead_time']) }}
+              </span>
+            </div>
+          </div>
+        </mat-card>
+      }
+
+      <!-- Comparison Grid (FR-001) -->
+      <mat-card class="table-card">
+        <table mat-table [dataSource]="visibleOffers()" class="offers-table" aria-label="Supplier Offers Comparison">
+          <!-- Supplier Column -->
+          <ng-container matColumnDef="supplier">
+            <th mat-header-cell *matHeaderCellDef>{{ 'compare.table.supplier' | translate }}</th>
+            <td mat-cell *matCellDef="let offer" class="supplier-cell">
+              <span class="supplier-name">{{ offer.supplier_name }}</span>
+              @if (offer.id === proj.recommendation?.recommended_offer_id) {
+                <span class="mini-rec-badge">
+                  <mat-icon aria-hidden="true">star</mat-icon>
+                  {{ 'compare.table.recommendedBadge' | translate }}
+                </span>
+              }
+            </td>
+          </ng-container>
+
+          <!-- Unit Price Column -->
+          <ng-container matColumnDef="unitPrice">
+            <th mat-header-cell *matHeaderCellDef>{{ 'compare.table.normalisedUnitPrice' | translate }}</th>
+            <td mat-cell *matCellDef="let offer">
+              {{ offer.projected_unit_price | formatMoney }}
+            </td>
+          </ng-container>
+
+          <!-- Projected Landed Cost Column -->
+          <ng-container matColumnDef="landedCost">
+            <th mat-header-cell *matHeaderCellDef>{{ 'compare.table.landedCostTotal' | translate }}</th>
+            <td mat-cell *matCellDef="let offer" class="landed-cost-cell">
+              <strong>{{ offer.projected_landed_cost | formatMoney }}</strong>
+            </td>
+          </ng-container>
+
+          <!-- Lead Time Column -->
+          <ng-container matColumnDef="leadTime">
+            <th mat-header-cell *matHeaderCellDef>{{ 'compare.table.leadTime' | translate }}</th>
+            <td mat-cell *matCellDef="let offer">
+              @if (offer.lead_time_days !== null && offer.lead_time_days !== undefined) {
+                {{ 'compare.table.leadTimeDays' | translate: { days: offer.lead_time_days } }}
+              } @else {
+                <span class="text-muted">{{ 'compare.table.leadTimeUnknown' | translate }}</span>
+              }
+            </td>
+          </ng-container>
+
+          <!-- Reliability Column -->
+          <ng-container matColumnDef="reliability">
+            <th mat-header-cell *matHeaderCellDef>{{ 'compare.table.reliability' | translate }}</th>
+            <td mat-cell *matCellDef="let offer">
+              @if (offer.reliability_score !== null && offer.reliability_score !== undefined) {
+                {{ formatPercent(offer.reliability_score) }}
+              } @else {
+                <span class="text-muted">{{ 'compare.table.reliabilityUnknown' | translate }}</span>
+              }
+            </td>
+          </ng-container>
+
+          <!-- Stock Signal (Always Unknown in Chunk 4.5 per R4) -->
+          <ng-container matColumnDef="stockSignal">
+            <th mat-header-cell *matHeaderCellDef>{{ 'compare.table.stockSignal' | translate }}</th>
+            <td mat-cell *matCellDef="let offer">
+              <span class="stock-unknown-badge">
+                {{ 'compare.table.stockUnknown' | translate }}
+              </span>
+            </td>
+          </ng-container>
+
+          <!-- Match Confidence Column -->
+          <ng-container matColumnDef="matchConfidence">
+            <th mat-header-cell *matHeaderCellDef>{{ 'compare.table.matchConfidence' | translate }}</th>
+            <td mat-cell *matCellDef="let offer">
+              {{ formatPercent(offer.match_confidence) }}
+            </td>
+          </ng-container>
+
+          <!-- Validity Column -->
+          <ng-container matColumnDef="validity">
+            <th mat-header-cell *matHeaderCellDef>{{ 'compare.table.validUntil' | translate }}</th>
+            <td mat-cell *matCellDef="let offer">
+              @if (offer.valid_to) {
+                {{ offer.valid_to | formatDate }}
+              } @else {
+                <span class="text-muted">{{ 'compare.table.validOpenEnded' | translate }}</span>
+              }
+            </td>
+          </ng-container>
+
+          <!-- Status Column -->
+          <ng-container matColumnDef="status">
+            <th mat-header-cell *matHeaderCellDef>{{ 'compare.table.status' | translate }}</th>
+            <td mat-cell *matCellDef="let offer">
+              @if (offer.is_expired) {
+                <span class="status-badge expired">{{ 'compare.table.statusExpired' | translate }}</span>
+              } @else {
+                <span class="status-badge active">{{ 'compare.table.statusActive' | translate }}</span>
+              }
+            </td>
+          </ng-container>
+
+          <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+          <tr
+            mat-row
+            *matRowDef="let row; columns: displayedColumns"
+            [ngClass]="{
+              'recommended-row': row.id === proj.recommendation?.recommended_offer_id,
+              'expired-row': row.is_expired
+            }"
+          ></tr>
+        </table>
+      </mat-card>
+    } @else {
+      <!-- Empty State When No Offers Exist (FR-001, US1 Scenario 4) -->
+      <mat-card class="empty-state-card">
+        <div class="empty-state">
+          <mat-icon class="empty-icon" aria-hidden="true">inventory</mat-icon>
+          <h2 class="empty-title">{{ 'compare.empty.title' | translate }}</h2>
+          <p class="empty-message">{{ 'compare.empty.message' | translate }}</p>
+          <div class="empty-actions">
+            <a mat-flat-button color="primary" routerLink="/quotations/upload">
+              <mat-icon aria-hidden="true">upload_file</mat-icon>
+              <span>{{ 'shell.navQuotations' | translate }}</span>
+            </a>
+          </div>
+        </div>
+      </mat-card>
+    }
+  } @else if (!isLoading() && !selectedProductId()) {
+    <!-- Empty State Before Product Selection -->
+    <mat-card class="empty-state-card">
+      <div class="empty-state">
+        <mat-icon class="empty-icon" aria-hidden="true">compare_arrows</mat-icon>
+        <h2 class="empty-title">{{ 'compare.title' | translate }}</h2>
+        <p class="empty-message">{{ 'compare.empty.selectProduct' | translate }}</p>
+      </div>
+    </mat-card>
+  }
+</div>

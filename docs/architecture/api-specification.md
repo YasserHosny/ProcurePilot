@@ -527,83 +527,251 @@ Every monetary value is a `Money` object with `amount` as a decimal string and e
 
 ---
 
-## Offers & Compare
+## Delivered Smart Compare and Intelligence API
+
+The following endpoints are delivered for chunk 4.5 and mirror
+`specs/005-smart-compare-intelligence/contracts/offers-and-baskets.openapi.yaml`. All routes
+require bearer auth. Tenant scope is resolved from the token. Owner and buyer may submit basket
+splits and dismiss alerts; branch manager, approver, and viewer are read-only. Cross-tenant
+records return `404`, deliberately indistinguishable from records that do not exist.
+
+Every monetary value is a `Money` object with `amount` as a decimal string and explicit
+`currency`; the API has no bare money numbers. Offers, recommendations, price history, and alert
+conditions are computed at request time from existing catalogue, supplier, match, and landed-cost
+data. They are not new persisted sources of price or match truth.
 
 ### `GET /offers`
 
-Query: `?product_id=uuid&quantity=10&include_expired=false`
+- Requires bearer auth.
+- Lists current supplier offers for one workspace product and requested quantity.
+- Query parameters: required `product_id`, required decimal-string `quantity`, optional
+  `include_expired` defaulting to `false`, optional `cursor`, optional `limit` capped at 100 and
+  defaulting to 50.
+- Returns `200` with `items` containing `Offer` resources and nullable `next_cursor`.
+- Offer fields include `id`, `workspace_product_id`, `supplier_id`, `supplier_name`,
+  `quotation_line_id`, `match_decision_id`, `landed_cost`, `normalised_unit_price`,
+  decimal-string `requested_quantity`, `base_unit`, optional `lead_time_days`, optional
+  decimal-string `reliability_score`, nullable `stock_signal`, decimal-string
+  `match_confidence`, `valid_from`, optional `valid_to`, `is_expired`, `rule_version`, and
+  `recorded_at`.
+- `landed_cost` and `normalised_unit_price` are `Money { amount, currency }`; `amount` is a
+  decimal string.
+- `stock_signal` is nullable and always null in chunk 4.5 because no stock, availability, or
+  inventory source field exists yet.
+- Returns `404` when the product is not in the caller's workspace.
+- Returns `422` when validation fails.
 
-Response:
+Example:
+
 ```json
 {
-  "data": [
+  "items": [
     {
-      "id": "uuid",
-      "supplier_id": "uuid",
-      "landed_cost": 145.00,
-      "unit_price_normalised": 2.42,
+      "id": "00000000-0000-4000-8000-000000000001",
+      "workspace_product_id": "00000000-0000-4000-8000-000000000010",
+      "supplier_id": "00000000-0000-4000-8000-000000000020",
+      "supplier_name": "Acme Supplies",
+      "quotation_line_id": "00000000-0000-4000-8000-000000000030",
+      "match_decision_id": "00000000-0000-4000-8000-000000000040",
+      "landed_cost": { "amount": "145.0000", "currency": "GBP" },
+      "normalised_unit_price": { "amount": "2.4167", "currency": "GBP" },
+      "requested_quantity": "10.000000",
+      "base_unit": "each",
       "lead_time_days": 3,
-      "valid_to": "...",
-      "confidence": 0.96
+      "reliability_score": "0.920",
+      "stock_signal": null,
+      "match_confidence": "0.9600",
+      "valid_from": "2026-08-21T00:00:00Z",
+      "valid_to": "2026-08-28T00:00:00Z",
+      "is_expired": false,
+      "rule_version": "landed-cost-v1",
+      "recorded_at": "2026-08-21T09:00:00Z"
     }
-  ]
+  ],
+  "next_cursor": null
 }
 ```
 
 ### `GET /offers/compare`
 
-Query: `?product_id=uuid&quantity=10`
+- Requires bearer auth.
+- Compares offers for one workspace product and requested quantity, then returns one current
+  recommendation when at least one eligible non-expired offer exists.
+- Query parameters: required `product_id`, required decimal-string `quantity`.
+- Returns `200` with `product`, decimal-string `requested_quantity`, `offers`, and nullable
+  `recommendation`.
+- `product` includes `id` and `tenant_name`.
+- `recommendation` fields include `recommended_offer_id`, decimal-string `score`, `confidence`
+  (`high`, `medium`, or `low`), `valid_from`, optional `valid_to`, `risk_notes`, and structured
+  `evidence`.
+- Recommendation evidence includes score weights, score components, winning margin, and tie-break
+  evidence. The deterministic tie-break is disclosed when applied.
+- Returns `404` when the product is not in the caller's workspace.
+- Returns `422` when validation fails.
 
-Response:
-```json
-{
-  "product": { "id": "uuid", "name": "..." },
-  "offers": [...],
-  "recommendation": {
-    "recommended_offer_id": "uuid",
-    "expected_saving": 12.50,
-    "confidence": 0.91,
-    "risk": "price_valid_until_tomorrow",
-    "valid_until": "..."
-  }
-}
-```
+### `GET /products/{product_id}/price-history`
 
----
-
-## Baskets
+- Requires bearer auth.
+- Reads product price-history intelligence derived from historical landed-cost rows.
+- Path parameter: `product_id`.
+- Query parameters: optional `supplier_id`, optional `window_months` from 1 to 24 defaulting to 6,
+  optional `cursor`, optional `limit` capped at 100 and defaulting to 100.
+- Returns `200` with `product`, `window_months`, `points`, `summary`, and nullable `next_cursor`.
+- Each `PriceHistoryPoint` includes `landed_cost_id`, `workspace_product_id`, `supplier_id`,
+  `supplier_name`, `recorded_at`, `valid_from`, optional `valid_to`, `normalised_unit_price`,
+  `landed_cost_total`, decimal-string `quantity`, and `base_unit`.
+- `summary` includes nullable `last_paid`, `average_paid_rolling_window`, and `best_price`
+  metrics. Each metric has `value: Money` and `source_landed_cost_ids`.
+- Returns `404` when the product is not in the caller's workspace.
+- Returns `422` when validation fails.
 
 ### `POST /baskets/optimise`
 
+- Requires bearer auth and owner or buyer role; accepts `Idempotency-Key`.
+- Submits an asynchronous two-supplier basket split. This chunk accepts exactly two named
+  suppliers and optimises only for minimum total landed cost.
+- The request does not accept MOV, delivery-tier, branch, budget, urgency, preference-weight, or
+  risk-tolerance constraints in chunk 4.5.
+- Request fields: `supplier_ids` with exactly two unique supplier ids, and `items`.
+- Each item has `workspace_product_id` and decimal-string `quantity`.
+- Returns `202` with a `BasketSplitJob` resource.
+- Returns `403` when the caller's role may not submit basket splits.
+- Returns `404` when a product, supplier, or job reference is not in the caller's workspace.
+- Returns `409` when an equivalent basket split is already queued or running.
+- Returns `422` when validation fails.
+
 Request:
+
 ```json
 {
-  "items": [
-    { "tenant_product_id": "uuid", "quantity": 10 }
+  "supplier_ids": [
+    "00000000-0000-4000-8000-000000000020",
+    "00000000-0000-4000-8000-000000000021"
   ],
-  "constraints": {
-    "urgency": "standard",
-    "preferred_supplier_ids": ["uuid"],
-    "risk_tolerance": "low"
-  }
+  "items": [
+    {
+      "workspace_product_id": "00000000-0000-4000-8000-000000000010",
+      "quantity": "10.000000"
+    }
+  ]
 }
 ```
 
-Response: `Job` resource.
+Response:
+
+```json
+{
+  "id": "00000000-0000-4000-8000-000000000100",
+  "supplier_ids": [
+    "00000000-0000-4000-8000-000000000020",
+    "00000000-0000-4000-8000-000000000021"
+  ],
+  "items": [
+    {
+      "workspace_product_id": "00000000-0000-4000-8000-000000000010",
+      "quantity": "10.000000"
+    }
+  ],
+  "status": "queued",
+  "result": null,
+  "error": null,
+  "result_url": "/api/v1/baskets/00000000-0000-4000-8000-000000000100",
+  "created_at": "2026-08-21T09:00:00Z",
+  "started_at": null,
+  "completed_at": null
+}
+```
 
 ### `GET /baskets/{id}`
 
-Response:
+- Requires bearer auth.
+- Polls basket split job status and result in the active workspace.
+- Returns `200` with `BasketSplitJob`.
+- Job statuses are `queued`, `running`, `completed`, and `failed`.
+- `result` is null until a solve completes. Completed result fields include `feasible`,
+  `allocation`, nullable `total_landed_cost`, optional `single_supplier_baselines`,
+  `infeasible_items`, optional `solver_version`, and `computed_at`.
+- Allocation lines include `workspace_product_id`, decimal-string `quantity`, `offer_id`, and
+  `landed_cost: Money`.
+- An infeasible solve is still `status = "completed"` with `result.feasible = false` and
+  structured `infeasible_items`; `status = "failed"` is reserved for worker, database, queue, or
+  unexpected solver failures and carries `error`.
+- Returns `404` when the job is not in the caller's workspace.
+
+Completed feasible result:
+
 ```json
 {
-  "id": "uuid",
-  "status": "completed",
-  "allocation": [
-    { "supplier_id": "uuid", "lines": [...], "total_landed_cost": 245.00 }
+  "id": "00000000-0000-4000-8000-000000000100",
+  "supplier_ids": [
+    "00000000-0000-4000-8000-000000000020",
+    "00000000-0000-4000-8000-000000000021"
   ],
-  "policy_exceptions": [...]
+  "items": [
+    {
+      "workspace_product_id": "00000000-0000-4000-8000-000000000010",
+      "quantity": "10.000000"
+    }
+  ],
+  "status": "completed",
+  "result": {
+    "feasible": true,
+    "allocation": [
+      {
+        "supplier_id": "00000000-0000-4000-8000-000000000020",
+        "lines": [
+          {
+            "workspace_product_id": "00000000-0000-4000-8000-000000000010",
+            "quantity": "10.000000",
+            "offer_id": "00000000-0000-4000-8000-000000000001",
+            "landed_cost": { "amount": "145.0000", "currency": "GBP" }
+          }
+        ],
+        "total_landed_cost": { "amount": "145.0000", "currency": "GBP" }
+      }
+    ],
+    "total_landed_cost": { "amount": "145.0000", "currency": "GBP" },
+    "single_supplier_baselines": [
+      {
+        "supplier_id": "00000000-0000-4000-8000-000000000020",
+        "feasible": true,
+        "total_landed_cost": { "amount": "145.0000", "currency": "GBP" }
+      }
+    ],
+    "infeasible_items": [],
+    "solver_version": "basket-split-v1",
+    "computed_at": "2026-08-21T09:01:00Z"
+  },
+  "error": null,
+  "result_url": "/api/v1/baskets/00000000-0000-4000-8000-000000000100",
+  "created_at": "2026-08-21T09:00:00Z",
+  "started_at": "2026-08-21T09:00:05Z",
+  "completed_at": "2026-08-21T09:01:00Z"
 }
 ```
+
+### `GET /alerts`
+
+- Requires bearer auth.
+- Lists currently true actionable alerts in the active workspace, excluding dismissed
+  fingerprints.
+- Query parameters: optional `kind` (`recommended_price_expiring`,
+  `preferred_supplier_offer_disappeared`, or `price_swing`), optional `cursor`, optional `limit`
+  capped at 100 and defaulting to 50.
+- Returns `200` with `items` containing `Alert` resources and nullable `next_cursor`.
+- Alert fields include deterministic fingerprint `id`, `kind`, `workspace_product_id`, optional
+  `supplier_id`, `severity`, structured `evidence`, `action`, `created_from_current_data_at`, and
+  `dismissed`.
+- Alert conditions are recomputed from current data on every request; only dismissals are stored.
+
+### `POST /alerts/{id}/dismiss`
+
+- Requires bearer auth and owner or buyer role; accepts `Idempotency-Key`.
+- Dismisses one currently true alert fingerprint.
+- Stores the fingerprint in `alert_dismissal`, not the alert condition itself.
+- Returns `200` with `AlertDismissal` fields `alert_id` and `dismissed_at`.
+- Returns `403` when the caller's role may not dismiss alerts.
+- Returns `404` when the alert fingerprint is not currently visible in the caller's workspace.
 
 ---
 
@@ -622,7 +790,11 @@ Response:
   "quotation": { ... },
   "competing_offers": [...],
   "purchase_record": { ... },
-  "calculation": { "baseline_value": 100.00, "actual_value": 88.00, "delta": 12.00 }
+  "calculation": {
+    "baseline_value": { "amount": "100.0000", "currency": "GBP" },
+    "actual_value": { "amount": "88.0000", "currency": "GBP" },
+    "delta": { "amount": "12.0000", "currency": "GBP" }
+  }
 }
 ```
 
@@ -639,7 +811,7 @@ Request:
   "cost_centre_id": "uuid",
   "required_by_date": "2026-10-01",
   "lines": [
-    { "tenant_product_id": "uuid", "quantity": 10, "note": "..." }
+    { "workspace_product_id": "uuid", "quantity": "10.000000", "note": "..." }
   ]
 }
 ```

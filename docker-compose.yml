@@ -222,6 +222,32 @@ services:
     restart: unless-stopped
 
   # ---------------------------------------------------------------------------
+  # Basket Split Optimiser Worker (RQ)
+  # ---------------------------------------------------------------------------
+  optimiser:
+    image: python:3.12-slim
+    container_name: procurepilot-optimiser
+    working_dir: /workspace/services/optimiser
+    volumes:
+      - .:/workspace
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/postgres
+      REDIS_URL: redis://redis:6379/0
+      BASKET_SPLIT_QUEUE_NAME: ${BASKET_SPLIT_QUEUE_NAME:-basket-split}
+      PYTHONPATH: /workspace/services/optimiser/src
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    command: >
+      sh -c "pip install -e /workspace/services/optimiser
+      && python -m procurepilot_optimiser_worker"
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
   # Frontend Web SPA (Angular behind Nginx)
   # ---------------------------------------------------------------------------
   web:

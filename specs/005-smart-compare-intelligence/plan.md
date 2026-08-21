@@ -145,3 +145,95 @@ and RQ pattern chunk 4.3 already stood up.
 | Violation | Why Needed | Simpler Alternative Rejected Because |
 |---|---|---|
 | New deployable: `services/optimiser` | OR-Tools CP-SAT basket allocation is CPU-bound combinatorial search of non-trivial duration; running it in-process would risk blocking the request-serving monolith under load. Explicitly pre-authorised by name in the constitution's Principle VI, conditioned on load justifying the extraction — justified here by the CPU-bound blocking-risk argument, not merely cited by name. | Running the solve synchronously in-process inside `apps/api` was rejected: unlike chunk 4.4's matching (fast, declarative, no blocking risk), CP-SAT solves can take long enough to starve unrelated request handling, the same class of problem chunk 4.3 already solved for extraction by moving slow work to its own worker. |
+
+## Constitution Check — re-run against delivered code (T075)
+
+Run at the close of chunk 4.5, against what was built, verified directly against a real local
+Supabase Postgres (all migrations through `20260821000029` applied) and a real isolated
+`services/optimiser` venv with genuine network access (`uv sync --group dev`, no `apps/api` on
+the path) — not accepted from either delegate's self-report.
+
+| Principle | Verdict | Evidence |
+|---|---|---|
+| **I. Evidence Over Assertion** | ✅ PASS | Every `Recommendation` carries a calibrated `confidence`, `risk_notes`, a validity window, and structured `evidence` (weights, per-signal components, winning margin, applied tie-break rule) — confirmed live: `test_recommendation_scorer.py` and `test_recommendation_tie_break.py` construct real `Offer` objects and assert on the actual computed evidence, not a placeholder. Alerts carry the same discipline: `test_alerts.py` proves a real expiring-price and a real price-swing condition each produce structured, traceable evidence (`evidence["landed_cost_id"]` ties back to the specific row). |
+| **II. Deterministic, Replayable Normalisation** | ✅ PASS | Confirmed by direct code review: `OfferService`'s offer/compare/price-history queries and the optimiser's `read_current_offers` all read chunk 4.4's `match_decision`/`landed_cost` directly (parameterized SQL joins, verified in `apps/api/src/procurepilot_api/modules/offers/service.py` and `services/optimiser/src/procurepilot_optimiser_worker/repository.py`); no second landed-cost or match computation exists anywhere in this chunk. |
+| **III. Human Authority Over Automation** | ✅ PASS | Nothing in this chunk's scope writes a purchase, request, or order — the compare recommendation and basket split are both advisory-only outputs, confirmed by reading every mutation path in `offers/router.py` and `alerts/router.py` (the only writes are `basket_split_job` and `alert_dismissal`, both purely advisory/bookkeeping). |
+| **IV. Every Insight Ends in an Action** | ✅ PASS | `GET /alerts` computes conditions live every call (verified live: `test_alerts.py` shows a changed condition produces a new fingerprint and the old one does not recur) and each alert carries a `compare_product`/`review_supplier`/`view_price_history` action; `POST /alerts/{id}/dismiss` stores only the fingerprint, confirmed against a real database. |
+| **V. Tenant Isolation by Construction** | ✅ PASS | The two new tables (`basket_split_job`, `alert_dismissal`) carry RLS `ENABLED`/`FORCED` with the uniform `tenant_isolation` policy, applied and verified before this lane started; `test_tenant_isolation.py` covers both (39/39 passing). All new read/write paths in `offers`/`alerts`/`basket_service` run through `_authenticated_db`, which sets `role authenticated` and `request.jwt.claims` before every query, so RLS stays load-bearing rather than bypassed by a service-role connection. |
+| **VI. Modular Monolith Until Scale Demands Otherwise** | ✅ PASS | `services/optimiser` is the only new deployable, confirmed to import nothing from `apps/api` (`grep` for `procurepilot_api` across its source returns nothing) and to install cleanly in full isolation — verified in a fresh `uv sync --group dev` with real network access, mirroring `services/extraction-worker`'s exact isolation discipline. |
+| **VII. Money, Tax, Language from the Schema Up** | ✅ PASS | Every offer, recommendation, price-history, and basket-allocation monetary field is an explicit `{amount, currency}` pair, confirmed by reading `offers/schemas.py` and the OpenAPI contract; no currency conversion exists anywhere in this chunk. i18n: 893/893 keys at exact parity in `en.json`/`ar.json`, confirmed by an independent key-diff, not the delegate's claim. |
+
+**Workflow gates**: delegated work reviewed ✅ — backend (Codex), frontend (Antigravity), and docs
+(Codex) lanes were dispatched, and every diff was re-verified against a live local Postgres, a
+real isolated optimiser venv, and the real frontend toolchain (Karma, `ng lint`) rather than
+accepted from self-reports. Real, load-bearing gaps surfaced only by this re-verification:
+
+- **A proven double-rollback bug, present in two independent places.** The backend's first pass
+  wrote a compensating "mark failed" UPDATE and then re-raised the same exception through the
+  connection that ran it. In psycopg3, `with psycopg.connect(...) as conn:` rolls back the
+  *entire* transaction on exception exit — including the compensating UPDATE just written. I
+  proved this empirically against the real database before reporting it (insert a row, run a
+  compensating update, raise, reconnect fresh: row count 0 — both writes vanished together). This
+  hit both `BasketService.create_job`'s Redis-enqueue-failure path and the optimiser worker's
+  `process_basket_split_job` exception handler — meaning a Redis outage or a worker-side failure
+  would have silently left either no job row at all, or a job stuck at `queued` forever, exactly
+  the failure mode the compensation logic was supposed to prevent. Fixed via a scoped delta: an
+  explicit `conn.commit()` immediately after each status-transition write and before the
+  subsequent `raise`, in both `basket_service.py` and `worker.py`. Re-verified with real
+  regression tests that force the failure path and then check the persisted status **from a
+  separate connection** — proving durability, not merely "no exception escaped."
+- **Seven test files asserted almost nothing about real behaviour**, despite being labelled and
+  `skipif`-gated as real database-backed integration coverage — the same failure class chunk 4.3
+  hit ("eight inert placeholder tests"). Bodies like `assert "join landed_cost" in
+  PRICE_HISTORY_SQL` (a substring check on a SQL constant, never executed), `assert
+  callable(_compensate_failed_enqueue)` (true even if the function does nothing), and `assert
+  set(expected) == {...}` (a hardcoded dict checked against itself) would all pass regardless of
+  whether the underlying behaviour was correct. Fixed via the same delta: a new
+  `apps/api/tests/integration/smart_compare_helpers.py` fixture chain (mirroring
+  `catalogue_helpers.py`/`quotation_helpers.py`'s established convention) now backs real,
+  committed fixture data and calls the actual `OfferService`, `AlertService`, and `BasketService`
+  methods, asserting on real computed output.
+- **The delta's own new test fixtures reintroduced a previously-solved bug**: the owner-guard
+  trigger that refuses to delete a workspace's last active owner (even via cascade from a tenant
+  delete) blocked test teardown in both `smart_compare_helpers.py::cleanup_workspace` and the
+  optimiser's own `test_worker.py` regression test — the exact same class of bug chunk 4.2 already
+  fixed once in `test_import_atomicity.py`. Fixed directly (by the orchestrator) with the same
+  `set session_replication_role = replica` / `default` bracket around the teardown delete in both
+  places; re-ran the full suite twice consecutively to confirm the fix is genuinely idempotent,
+  not merely passing once by accident of ordering.
+
+### Quality gates
+
+| Gate | Threshold | Status |
+|---|---|---|
+| Recommendation evidence | Confidence + structured evidence, never bare label | ✅ Verified live: real `Offer` fixtures produce real scored evidence with weights, margin, and tie-break rule |
+| Scoring determinism | R2 weights and R3 seven-step tie-break exactly | ✅ `0.55/0.20/0.15/0.10` and the full seven-step tie-break confirmed by direct code and test review |
+| Offer read scalability | Bounded DB query, not full-table Python scan | ✅ `OFFER_READ_SQL` is a product-rooted, parameterized SQL join with `row_number() over (partition by ...)` — confirmed by direct code review, not a Python-side filter over a full table |
+| Basket enqueue/worker durability | A Redis or worker failure cannot leave a silent or vanished job row | ✅ Proven from a separate connection after a forced failure, both at enqueue time and at worker-processing time |
+| Cross-tenant isolation | Proven on every change | ✅ 39/39 against a real database (`basket_split_job`, `alert_dismissal`) |
+| Backend test suite | All passing, twice consecutively | ✅ 384 passed, 1 skipped (pre-existing, unrelated), ruff clean, against a real local Postgres |
+| Optimiser worker suite | All passing, in isolation, twice consecutively | ✅ 5 passed, ruff clean, in a venv containing only the worker's own declared dependencies (no `apps/api` on the path) |
+| Frontend test suite | All passing | ✅ 95 passed, `ng lint` clean, i18n 893/893 exact parity — all confirmed by an independent re-run |
+| Client-side compare recalculation (SC-002) | No server round-trip per quantity change | ✅ Verified directly in code: `onQuantityChange` only updates a local signal; the comparison recomputes via a `computed()` signal |
+| Feasible vs. infeasible vs. failed basket states | Rendered as three visibly distinct states | ✅ Verified directly in code: `basket-split-state.ts` and the component template branch on `completed_feasible`/`completed_infeasible`/`failed` separately |
+
+### The honest gaps
+
+- **`ml/evals`-style recommendation-acceptance harness does not exist this chunk.** SC-006 (80% of
+  recommendations accepted without manual override) cannot be measured honestly until chunk 4.6's
+  outcome capture exists — the same honest-gap treatment already established for chunk 4.3's
+  extraction accuracy and chunk 4.4's matching precision. Deterministic scoring, thresholds, and
+  tie-breaks are covered by real unit tests instead of a misleading benchmark.
+- **No live browser walkthrough this chunk**, for the same reason as chunk 4.4: relied instead on
+  real-database-backed automated tests (backend, optimiser) and a real, unmocked Karma/`ng lint`
+  run plus direct code review of the highest-risk claims (SC-002's client-side recompute, the
+  feasible/infeasible/failed basket distinction). A future session should drive the actual
+  `/offers/compare`, `/offers/product-intelligence`, `/offers/basket-split`, and `/alerts` screens
+  against a live stack before fully trusting the UI layer end-to-end.
+- **The offer/price-history/basket read paths use direct `psycopg` connections with `set local
+  role authenticated`, not this codebase's usual PostgREST/`supabase-py` client.** This is a
+  deliberate, disclosed architectural choice (the same class of choice chunk 4.4 made for its
+  `match_candidate_search` RPC function): the multi-table joins and window functions these reads
+  need are impractical over plain PostgREST. RLS is still fully load-bearing (confirmed above),
+  but this is worth a future ADR if this pattern recurs in later chunks, rather than silently
+  becoming a second, undocumented data-access convention.
