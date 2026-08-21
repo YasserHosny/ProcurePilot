@@ -1,0 +1,410 @@
+openapi: 3.1.0
+info:
+  title: ProcurePilot Matching and Normalisation API
+  version: 0.4.0
+  description: >
+    Chunk 4.4. Conventions unchanged from earlier chunks: base path /api/v1, Supabase JWT bearer
+    auth, tenant scope resolved server-side from the token and never from a parameter, cursor
+    pagination capped at 100, Idempotency-Key on mutations, and the {code, message, details,
+    trace_id} error envelope.
+
+    Role gate: owner and buyer may resolve matches and create products from a no-match decision.
+    Branch manager, approver and viewer may read match state and landed costs only. Cross-tenant
+    records return not found, never forbidden. Every monetary value is a Money object with amount
+    decimal string plus explicit currency.
+
+servers:
+  - url: /api/v1
+
+security:
+  - bearerAuth: []
+
+paths:
+  /quotations/{quotation_id}/matches:
+    parameters:
+      - { name: quotation_id, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      summary: Read match state for every line of a reviewed quotation
+      description: >
+        Returns each quotation line with ranked candidates, any final decision, any open match
+        task, and landed cost once computed. Only reviewed quotations are eligible for matching.
+      responses:
+        '200':
+          description: Quotation match state
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/QuotationMatches' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: Quotation is not in reviewed state yet
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /match-tasks:
+    get:
+      summary: List outstanding match-resolution work
+      parameters:
+        - { name: cursor, in: query, schema: { type: string } }
+        - { name: limit, in: query, schema: { type: integer, maximum: 100, default: 50 } }
+        - name: status
+          in: query
+          schema: { type: string, enum: [open, in_progress, resolved, all], default: open }
+        - name: priority
+          in: query
+          schema: { type: string, enum: [low, normal, high] }
+        - name: reason
+          in: query
+          schema:
+            type: string
+            enum: [low_confidence, close_candidates, no_candidate, alias_conflict]
+        - name: quotation_id
+          in: query
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Match tasks
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/MatchTask' } }
+                  next_cursor: { type: string, nullable: true }
+
+  /quotation-lines/{line_id}/match:
+    parameters:
+      - { name: line_id, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      summary: Resolve one quotation line's match
+      description: >
+        Owner or buyer only. Select an existing candidate, or mark no_match_new_product and create
+        a catalogue product inline using the same shape as chunk 4.2 ProductCreate. The exact
+        quotation line wording is inserted or reused as a product alias.
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MatchResolutionRequest' }
+      responses:
+        '200':
+          description: Match resolved
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MatchDecision' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: >
+            Line is not matchable, already has a decision, selected candidate is not valid for the
+            line, or the exact alias wording already belongs to another product.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+
+  /quotation-lines/{line_id}/landed-cost:
+    parameters:
+      - { name: line_id, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      summary: Read landed cost, rule version and replay inputs for one matched line
+      responses:
+        '200':
+          description: Landed cost
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LandedCost' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: Line has not been matched yet, so landed cost is not available
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: false
+      schema: { type: string, format: uuid }
+
+  responses:
+    Forbidden:
+      description: The caller's role may not perform this action (owner or buyer required)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    NotFound:
+      description: >
+        No such record in this workspace. Deliberately indistinguishable from a record that exists
+        in another workspace.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Unprocessable:
+      description: Validation failed
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+
+  schemas:
+    Error:
+      type: object
+      required: [code, message, trace_id]
+      properties:
+        code: { type: string }
+        message: { type: string }
+        details: { type: object, additionalProperties: true }
+        trace_id: { type: string }
+
+    Money:
+      type: object
+      description: >
+        There is no bare number for money in this API. `amount` is a DECIMAL STRING, never a JSON
+        number.
+      required: [amount, currency]
+      properties:
+        amount: { type: string, pattern: '^-?\d+(\.\d{1,4})?$', example: '250.00' }
+        currency: { type: string, pattern: '^[A-Z]{3}$', example: 'GBP' }
+
+    ProductCreate:
+      type: object
+      description: Same request shape as chunk 4.2 catalogue product creation.
+      required: [tenant_name, base_unit, pack]
+      properties:
+        tenant_name: { type: string, minLength: 1, maxLength: 200 }
+        brand: { type: string, nullable: true }
+        canonical_name: { type: string, nullable: true, description: Defaults to tenant_name }
+        variant: { type: string, nullable: true }
+        gtin: { type: string, nullable: true }
+        base_unit: { type: string }
+        pack: { $ref: '#/components/schemas/PackDefinition' }
+        preferred_supplier_id: { type: string, format: uuid, nullable: true }
+
+    PackDefinition:
+      type: object
+      required: [pack_count, unit_size]
+      properties:
+        pack_count: { type: integer, minimum: 1, example: 6 }
+        unit_size: { type: string, description: Decimal string, example: '5.000000' }
+        base_quantity:
+          type: string
+          readOnly: true
+          description: Derived by the database as pack_count x unit_size; supplying it is an error.
+
+    ProductSummary:
+      type: object
+      required: [id, tenant_name, base_unit, status]
+      properties:
+        id: { type: string, format: uuid }
+        tenant_name: { type: string }
+        brand: { type: string, nullable: true }
+        canonical_name: { type: string }
+        variant: { type: string, nullable: true }
+        gtin: { type: string, nullable: true }
+        base_unit: { type: string }
+        status: { type: string, enum: [active, archived] }
+
+    QuotationLineSummary:
+      type: object
+      required: [id, line_number, original_text]
+      properties:
+        id: { type: string, format: uuid }
+        line_number: { type: integer, minimum: 1 }
+        original_text: { type: string }
+        quantity: { type: string, nullable: true, description: Decimal string }
+        pack:
+          type: object
+          nullable: true
+          properties:
+            pack_count: { type: integer, minimum: 1 }
+            unit_size: { type: string, description: Decimal string }
+            unit: { type: string, nullable: true }
+        unit_price: { allOf: [{ $ref: '#/components/schemas/Money' }], nullable: true }
+        vat_rate:
+          type: string
+          nullable: true
+          description: Decimal string in the range 0 to 1; missing means zero VAT for cost v1.
+        delivery_fee: { allOf: [{ $ref: '#/components/schemas/Money' }], nullable: true }
+        discount: { allOf: [{ $ref: '#/components/schemas/Money' }], nullable: true }
+
+    MatchReason:
+      type: object
+      required:
+        - alias_hit
+        - gtin_match
+        - supplier_code_match
+        - lexical_similarity
+        - semantic_similarity
+        - feature_score
+      properties:
+        alias_hit: { type: boolean }
+        gtin_match: { type: boolean }
+        supplier_code_match: { type: boolean }
+        lexical_similarity: { type: string, pattern: '^(0(\.\d{1,4})?|1(\.0{1,4})?)$' }
+        semantic_similarity: { type: string, pattern: '^(0(\.\d{1,4})?|1(\.0{1,4})?)$' }
+        feature_score:
+          type: object
+          required: [brand_match, variant_match, pack_unit_match, pack_size_plausibility, price_plausibility]
+          properties:
+            brand_match: { type: string }
+            variant_match: { type: string }
+            pack_unit_match: { type: string }
+            pack_size_plausibility: { type: string }
+            price_plausibility: { type: string }
+
+    MatchCandidate:
+      type: object
+      required: [id, quotation_line_id, candidate_product, confidence, reasons, rank, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        quotation_line_id: { type: string, format: uuid }
+        candidate_product: { $ref: '#/components/schemas/ProductSummary' }
+        confidence: { type: string, pattern: '^(0(\.\d{1,4})?|1(\.0{1,4})?)$' }
+        reasons: { $ref: '#/components/schemas/MatchReason' }
+        rank: { type: integer, minimum: 1 }
+        scoring_version: { type: string }
+        embedding_model: { type: string, nullable: true }
+        created_at: { type: string, format: date-time }
+
+    MatchTask:
+      type: object
+      required: [id, quotation_line, status, priority, reason, candidates, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        quotation_id: { type: string, format: uuid }
+        quotation_line: { $ref: '#/components/schemas/QuotationLineSummary' }
+        status: { type: string, enum: [open, in_progress, resolved] }
+        priority: { type: string, enum: [low, normal, high] }
+        reason: { type: string, enum: [low_confidence, close_candidates, no_candidate, alias_conflict] }
+        candidates:
+          type: array
+          items: { $ref: '#/components/schemas/MatchCandidate' }
+        decision:
+          allOf: [{ $ref: '#/components/schemas/MatchDecision' }]
+          nullable: true
+        created_at: { type: string, format: date-time }
+        resolved_at: { type: string, format: date-time, nullable: true }
+
+    MatchDecision:
+      type: object
+      required:
+        - id
+        - quotation_line_id
+        - matched_product
+        - outcome
+        - is_automatic
+        - decided_at
+        - confidence
+      properties:
+        id: { type: string, format: uuid }
+        quotation_line_id: { type: string, format: uuid }
+        matched_product: { $ref: '#/components/schemas/ProductSummary' }
+        selected_match_candidate_id: { type: string, format: uuid, nullable: true }
+        outcome:
+          type: string
+          enum: [same_product, different_pack, different_variant, compatible_alternative, no_match_new_product]
+        is_automatic: { type: boolean }
+        decided_by: { type: string, format: uuid, nullable: true }
+        decided_at: { type: string, format: date-time }
+        confidence: { type: string, pattern: '^(0(\.\d{1,4})?|1(\.0{1,4})?)$' }
+        alias_id: { type: string, format: uuid, nullable: true }
+
+    MatchResolutionRequest:
+      type: object
+      required: [outcome]
+      properties:
+        outcome:
+          type: string
+          enum: [same_product, different_pack, different_variant, compatible_alternative, no_match_new_product]
+        selected_match_candidate_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: Required unless outcome is no_match_new_product.
+        create_product:
+          allOf: [{ $ref: '#/components/schemas/ProductCreate' }]
+          nullable: true
+          description: Required when outcome is no_match_new_product.
+
+    LandedCost:
+      type: object
+      required:
+        - id
+        - quotation_line_id
+        - match_decision_id
+        - quantity
+        - normalised_base_quantity
+        - base_unit
+        - unit_price
+        - vat_amount
+        - delivery_fee
+        - discount
+        - other_charges
+        - total
+        - raw_inputs
+        - rule_version
+        - valid_from
+        - recorded_at
+      properties:
+        id: { type: string, format: uuid }
+        quotation_line_id: { type: string, format: uuid }
+        match_decision_id: { type: string, format: uuid }
+        quantity: { type: string, description: Decimal string }
+        normalised_base_quantity: { type: string, description: Decimal string in the product base unit }
+        base_unit: { type: string }
+        unit_price: { $ref: '#/components/schemas/Money' }
+        vat_amount:
+          allOf: [{ $ref: '#/components/schemas/Money' }]
+          description: Derived from unit_price x quantity x vat_rate.
+        delivery_fee: { $ref: '#/components/schemas/Money' }
+        discount: { $ref: '#/components/schemas/Money' }
+        other_charges:
+          allOf: [{ $ref: '#/components/schemas/Money' }]
+          description: Always zero in chunk 4.4; other charges are not modelled yet.
+        total: { $ref: '#/components/schemas/Money' }
+        raw_inputs:
+          type: object
+          additionalProperties: true
+          description: Complete replay input snapshot used by the pinned rule version.
+        rule_version: { type: string, example: landed-cost-v1 }
+        valid_from: { type: string, format: date-time }
+        valid_to: { type: string, format: date-time, nullable: true }
+        recorded_at: { type: string, format: date-time }
+        created_at: { type: string, format: date-time }
+
+    QuotationLineMatchState:
+      type: object
+      required: [line, candidates]
+      properties:
+        line: { $ref: '#/components/schemas/QuotationLineSummary' }
+        candidates:
+          type: array
+          items: { $ref: '#/components/schemas/MatchCandidate' }
+        task:
+          allOf: [{ $ref: '#/components/schemas/MatchTask' }]
+          nullable: true
+        decision:
+          allOf: [{ $ref: '#/components/schemas/MatchDecision' }]
+          nullable: true
+        landed_cost:
+          allOf: [{ $ref: '#/components/schemas/LandedCost' }]
+          nullable: true
+
+    QuotationMatches:
+      type: object
+      required: [quotation_id, lines]
+      properties:
+        quotation_id: { type: string, format: uuid }
+        lines:
+          type: array
+          items: { $ref: '#/components/schemas/QuotationLineMatchState' }
