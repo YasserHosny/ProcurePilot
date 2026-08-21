@@ -8,14 +8,17 @@ real migrations, as the real `authenticated` role, carrying a real JWT claim.
 FR-030 requires this to run on every proposed change. It is wired into CI as its own named check
 so that its failure is never mistaken for an unrelated test failure.
 
-Set TEST_DATABASE_URL to a database with migrations 0001-0027 applied — extended for
+Set TEST_DATABASE_URL to a database with migrations 0001-0029 applied — extended for
 002-catalogue-suppliers (T038) to cover workspace_product, pack_definition, supplier,
 product_alias and import_job, plus the canonical_product exception; extended again for
 003-quotation-inbox-extraction (T063) to cover document, quotation, quotation_line,
 field_extraction, extraction_job, review_task, and the Supabase Storage object policy; extended
 again for 004-matching-normalisation (T052) to cover match_candidate, match_task, match_decision
 and landed_cost, plus the tenant-scoped and shared embedding columns added to workspace_product
-and canonical_product respectively.
+and canonical_product respectively; extended again for 005-smart-compare-intelligence to cover
+basket_split_job and alert_dismissal — the only two real tables that chunk adds, since offers,
+recommendations, price history, and live alert conditions are computed at request time from
+already-isolated rows and add no new storage surface.
 """
 
 from __future__ import annotations
@@ -26,6 +29,7 @@ from uuid import UUID, uuid4
 
 import psycopg
 import pytest
+from psycopg.types.json import Jsonb
 
 TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL")
 
@@ -51,6 +55,8 @@ class Workspace:
         quotation_id: UUID,
         storage_path: str,
         quotation_line_id: UUID,
+        basket_split_job_id: UUID,
+        alert_dismissal_id: UUID,
     ) -> None:
         self.tenant_id = tenant_id
         self.user_id = user_id
@@ -63,6 +69,8 @@ class Workspace:
         self.quotation_id = quotation_id
         self.storage_path = storage_path
         self.quotation_line_id = quotation_line_id
+        self.basket_split_job_id = basket_split_job_id
+        self.alert_dismissal_id = alert_dismissal_id
 
     def claims(self) -> str:
         return (
@@ -227,6 +235,39 @@ def make_workspace(cur: psycopg.Cursor, label: str) -> Workspace:
         (landed_cost_id, tenant_id, quotation_line_id, match_decision_id),
     )
 
+    # Smart Compare + Intelligence — chunk 4.5 (005-smart-compare-intelligence). Offers,
+    # recommendations, price history and live alert conditions add no storage of their own; only
+    # these two tables are real.
+    second_supplier_id, basket_split_job_id, alert_dismissal_id = uuid4(), uuid4(), uuid4()
+    cur.execute(
+        "insert into supplier (id,tenant_id,name) values (%s,%s,%s)",
+        (second_supplier_id, tenant_id, f"{label} Second Supplier Co"),
+    )
+    cur.execute(
+        "insert into basket_split_job "
+        "(id,tenant_id,requested_by,supplier_ids,items,status) "
+        "values (%s,%s,%s,%s,%s,'queued')",
+        (
+            basket_split_job_id,
+            tenant_id,
+            membership_id,
+            [supplier_id, second_supplier_id],
+            Jsonb([{"workspace_product_id": str(workspace_product_id), "quantity": "10.000000"}]),
+        ),
+    )
+    cur.execute(
+        "insert into alert_dismissal "
+        "(id,tenant_id,alert_fingerprint,kind,workspace_product_id,dismissed_by) "
+        "values (%s,%s,%s,'recommended_price_expiring',%s,%s)",
+        (
+            alert_dismissal_id,
+            tenant_id,
+            f"{label}-fingerprint",
+            workspace_product_id,
+            membership_id,
+        ),
+    )
+
     return Workspace(
         tenant_id,
         user_id,
@@ -239,6 +280,8 @@ def make_workspace(cur: psycopg.Cursor, label: str) -> Workspace:
         quotation_id,
         storage_path,
         quotation_line_id,
+        basket_split_job_id,
+        alert_dismissal_id,
     )
 
 
@@ -761,6 +804,55 @@ def test_canonical_products_embedding_is_shared_by_design_not_a_leak(
     assert seen == {alpha.canonical_product_id, beta.canonical_product_id}
 
 
+def test_another_workspaces_basket_split_jobs_are_invisible(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        cur.execute(
+            "select count(*) from basket_split_job where id = %s", (beta.basket_split_job_id,)
+        )
+        row = cur.fetchone()
+    assert row is not None and row[0] == 0
+
+
+def test_another_workspaces_alert_dismissals_are_invisible(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        cur.execute(
+            "select count(*) from alert_dismissal where id = %s", (beta.alert_dismissal_id,)
+        )
+        row = cur.fetchone()
+    assert row is not None and row[0] == 0
+
+
+def test_a_member_cannot_write_a_basket_split_job_into_another_workspace(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    """FR-018 restricts submission to owner/buyer, but tenant isolation is the database's job
+    regardless of role — a cross-tenant insert must fail even carrying a valid membership id."""
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            cur.execute(
+                "insert into basket_split_job (tenant_id,requested_by,supplier_ids,items) "
+                "values (%s,%s,%s,%s)",
+                (
+                    beta.tenant_id,
+                    beta.membership_id,
+                    [beta.supplier_id, alpha.supplier_id],
+                    Jsonb(
+                        [{"workspace_product_id": str(beta.workspace_product_id), "quantity": "1"}]
+                    ),
+                ),
+            )
+
+
 def test_platform_invitations_are_unreadable_by_members(
     workspaces: tuple[psycopg.Connection, Workspace, Workspace],
 ) -> None:
@@ -790,6 +882,7 @@ def test_rls_is_enabled_and_forced_on_every_tenant_scoped_table(
         "document", "quotation", "quotation_line", "field_extraction", "extraction_job",
         "review_task",
         "match_candidate", "match_task", "match_decision", "landed_cost",
+        "basket_split_job", "alert_dismissal",
     }
     with conn.cursor() as cur:
         cur.execute(

@@ -1,0 +1,569 @@
+openapi: 3.1.0
+info:
+  title: ProcurePilot Smart Compare and Intelligence API
+  version: 0.5.0
+  description: >
+    Chunk 4.5. Base path /api/v1, Supabase JWT bearer auth, tenant resolved server-side
+    from the token, cursor pagination capped at 100, Idempotency-Key on mutations, and
+    the {code, message, details, trace_id} error envelope.
+
+    Offers, recommendations, price history and alert conditions are derived at request time from
+    existing tenant-scoped data. They are not a second source of price or match truth. Owner and
+    buyer may submit basket optimisations and dismiss alerts; other roles may read compare,
+    intelligence, basket status and alerts. Cross-tenant references return not found.
+
+servers:
+  - url: /api/v1
+
+security:
+  - bearerAuth: []
+
+paths:
+  /offers:
+    get:
+      summary: List supplier offers for one workspace product
+      parameters:
+        - $ref: '#/components/parameters/ProductId'
+        - $ref: '#/components/parameters/Quantity'
+        - name: include_expired
+          in: query
+          schema: { type: boolean, default: false }
+        - name: cursor
+          in: query
+          schema: { type: string }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+      responses:
+        '200':
+          description: Current offer list
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/Offer' }
+                  next_cursor: { type: string, nullable: true }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+
+  /offers/compare:
+    get:
+      summary: Compare offers and return one recommendation
+      parameters:
+        - $ref: '#/components/parameters/ProductId'
+        - $ref: '#/components/parameters/Quantity'
+      responses:
+        '200':
+          description: Compare grid payload
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OfferComparison' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+
+  /products/{product_id}/price-history:
+    parameters:
+      - name: product_id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      summary: Read product price-history intelligence
+      parameters:
+        - name: supplier_id
+          in: query
+          schema: { type: string, format: uuid }
+        - name: window_months
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 24, default: 6 }
+        - name: cursor
+          in: query
+          schema: { type: string }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 100 }
+      responses:
+        '200':
+          description: Price history
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PriceHistoryResponse' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+
+  /baskets/optimise:
+    post:
+      summary: Submit an async two-supplier basket optimisation
+      description: >
+        Owner or buyer only. This chunk accepts exactly two named suppliers and optimises only for
+        minimum total landed cost. It does not apply MOV, delivery tiers, branch, budget or
+        preference constraints.
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BasketOptimiseRequest' }
+      responses:
+        '202':
+          description: Basket split job queued
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BasketSplitJob' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: Equivalent basket split is already queued or running
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+
+  /baskets/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      summary: Poll basket split job status and result
+      responses:
+        '200':
+          description: Basket split job
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BasketSplitJob' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /alerts:
+    get:
+      summary: List currently true actionable alerts
+      parameters:
+        - name: kind
+          in: query
+          schema:
+            type: string
+            enum:
+              - recommended_price_expiring
+              - preferred_supplier_offer_disappeared
+              - price_swing
+        - name: cursor
+          in: query
+          schema: { type: string }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+      responses:
+        '200':
+          description: Live alerts, excluding dismissed fingerprints
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/Alert' }
+                  next_cursor: { type: string, nullable: true }
+
+  /alerts/{id}/dismiss:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    post:
+      summary: Dismiss one currently true alert fingerprint
+      description: Owner or buyer only. Dismissal stores the fingerprint, not the alert condition.
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      responses:
+        '200':
+          description: Alert dismissed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AlertDismissal' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: false
+      schema: { type: string, format: uuid }
+    ProductId:
+      name: product_id
+      in: query
+      required: true
+      schema: { type: string, format: uuid }
+    Quantity:
+      name: quantity
+      in: query
+      required: true
+      schema:
+        type: string
+        pattern: '^\d+(\.\d{1,6})?$'
+        example: '10.000000'
+
+  responses:
+    Forbidden:
+      description: The caller's role may not perform this action
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    NotFound:
+      description: No such record in this workspace; cross-tenant records are indistinguishable
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Unprocessable:
+      description: Validation failed
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+
+  schemas:
+    Error:
+      type: object
+      required: [code, message, trace_id]
+      properties:
+        code: { type: string }
+        message: { type: string }
+        details: { type: object, additionalProperties: true, nullable: true }
+        trace_id: { type: string }
+
+    Money:
+      type: object
+      required: [amount, currency]
+      properties:
+        amount: { type: string, pattern: '^-?\d+(\.\d{1,4})?$', example: '145.0000' }
+        currency: { type: string, pattern: '^[A-Z]{3}$', example: 'GBP' }
+
+    ProductRef:
+      type: object
+      required: [id, tenant_name]
+      properties:
+        id: { type: string, format: uuid }
+        tenant_name: { type: string }
+
+    Offer:
+      type: object
+      required:
+        - id
+        - workspace_product_id
+        - supplier_id
+        - supplier_name
+        - quotation_line_id
+        - match_decision_id
+        - landed_cost
+        - normalised_unit_price
+        - requested_quantity
+        - base_unit
+        - stock_signal
+        - match_confidence
+        - valid_from
+        - is_expired
+        - rule_version
+        - recorded_at
+      properties:
+        id: { type: string, format: uuid, description: Current landed_cost row id }
+        workspace_product_id: { type: string, format: uuid }
+        supplier_id: { type: string, format: uuid }
+        supplier_name: { type: string }
+        quotation_line_id: { type: string, format: uuid }
+        match_decision_id: { type: string, format: uuid }
+        landed_cost: { $ref: '#/components/schemas/Money' }
+        normalised_unit_price: { $ref: '#/components/schemas/Money' }
+        requested_quantity: { type: string, pattern: '^\d+(\.\d{1,6})?$' }
+        base_unit: { type: string }
+        lead_time_days: { type: integer, minimum: 0, nullable: true }
+        reliability_score: { type: string, pattern: '^0(\.\d{1,3})?|1(\.0{1,3})?$', nullable: true }
+        stock_signal:
+          type: string
+          enum: [in_stock, low_stock, out_of_stock, unknown]
+          nullable: true
+          description: Always null in chunk 4.5; no stock source exists yet.
+        match_confidence: { type: string, pattern: '^0(\.\d{1,4})?|1(\.0{1,4})?$' }
+        valid_from: { type: string, format: date-time }
+        valid_to: { type: string, format: date-time, nullable: true }
+        is_expired: { type: boolean }
+        rule_version: { type: string }
+        recorded_at: { type: string, format: date-time }
+
+    OfferComparison:
+      type: object
+      required: [product, requested_quantity, offers, recommendation]
+      properties:
+        product: { $ref: '#/components/schemas/ProductRef' }
+        requested_quantity: { type: string, pattern: '^\d+(\.\d{1,6})?$' }
+        offers:
+          type: array
+          items: { $ref: '#/components/schemas/Offer' }
+        recommendation:
+          oneOf:
+            - $ref: '#/components/schemas/Recommendation'
+            - type: 'null'
+
+    Recommendation:
+      type: object
+      required:
+        - recommended_offer_id
+        - score
+        - confidence
+        - valid_from
+        - valid_to
+        - risk_notes
+        - evidence
+      properties:
+        recommended_offer_id: { type: string, format: uuid }
+        score: { type: string, pattern: '^0(\.\d{1,4})?|1(\.0{1,4})?$' }
+        confidence: { type: string, enum: [high, medium, low] }
+        valid_from: { type: string, format: date-time }
+        valid_to: { type: string, format: date-time, nullable: true }
+        risk_notes:
+          type: array
+          items:
+            type: string
+            enum: [price_expiring_soon, low_match_confidence, low_supplier_reliability]
+        evidence:
+          type: object
+          required: [weights, components, winning_margin, tie_break]
+          properties:
+            weights:
+              type: object
+              required: [cost, match_confidence, reliability, lead_time]
+              properties:
+                cost: { type: string, example: '0.55' }
+                match_confidence: { type: string, example: '0.20' }
+                reliability: { type: string, example: '0.15' }
+                lead_time: { type: string, example: '0.10' }
+            components:
+              type: object
+              additionalProperties: { type: string }
+            winning_margin: { type: string, nullable: true }
+            tie_break:
+              type: object
+              required: [applied, rule]
+              properties:
+                applied: { type: boolean }
+                rule:
+                  type: array
+                  items: { type: string }
+
+    PriceHistoryResponse:
+      type: object
+      required: [product, window_months, points, summary, next_cursor]
+      properties:
+        product: { $ref: '#/components/schemas/ProductRef' }
+        window_months: { type: integer }
+        points:
+          type: array
+          items: { $ref: '#/components/schemas/PriceHistoryPoint' }
+        summary: { $ref: '#/components/schemas/PriceHistorySummary' }
+        next_cursor: { type: string, nullable: true }
+
+    PriceHistoryPoint:
+      type: object
+      required:
+        - landed_cost_id
+        - workspace_product_id
+        - supplier_id
+        - supplier_name
+        - recorded_at
+        - valid_from
+        - normalised_unit_price
+        - landed_cost_total
+        - quantity
+        - base_unit
+      properties:
+        landed_cost_id: { type: string, format: uuid }
+        workspace_product_id: { type: string, format: uuid }
+        supplier_id: { type: string, format: uuid }
+        supplier_name: { type: string }
+        recorded_at: { type: string, format: date-time }
+        valid_from: { type: string, format: date-time }
+        valid_to: { type: string, format: date-time, nullable: true }
+        normalised_unit_price: { $ref: '#/components/schemas/Money' }
+        landed_cost_total: { $ref: '#/components/schemas/Money' }
+        quantity: { type: string }
+        base_unit: { type: string }
+
+    PriceHistorySummary:
+      type: object
+      required: [last_paid, average_paid_rolling_window, best_price]
+      properties:
+        last_paid:
+          oneOf:
+            - $ref: '#/components/schemas/PriceHistoryMetric'
+            - type: 'null'
+        average_paid_rolling_window:
+          oneOf:
+            - $ref: '#/components/schemas/PriceHistoryMetric'
+            - type: 'null'
+        best_price:
+          oneOf:
+            - $ref: '#/components/schemas/PriceHistoryMetric'
+            - type: 'null'
+
+    PriceHistoryMetric:
+      type: object
+      required: [value, source_landed_cost_ids]
+      properties:
+        value: { $ref: '#/components/schemas/Money' }
+        source_landed_cost_ids:
+          type: array
+          items: { type: string, format: uuid }
+
+    BasketOptimiseRequest:
+      type: object
+      required: [supplier_ids, items]
+      properties:
+        supplier_ids:
+          type: array
+          minItems: 2
+          maxItems: 2
+          uniqueItems: true
+          items: { type: string, format: uuid }
+        items:
+          type: array
+          minItems: 1
+          items: { $ref: '#/components/schemas/BasketItemRequest' }
+
+    BasketItemRequest:
+      type: object
+      required: [workspace_product_id, quantity]
+      properties:
+        workspace_product_id: { type: string, format: uuid }
+        quantity: { type: string, pattern: '^\d+(\.\d{1,6})?$' }
+
+    BasketSplitJob:
+      type: object
+      required: [id, supplier_ids, items, status, created_at, result_url]
+      properties:
+        id: { type: string, format: uuid }
+        supplier_ids:
+          type: array
+          minItems: 2
+          maxItems: 2
+          items: { type: string, format: uuid }
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/BasketItemRequest' }
+        status: { type: string, enum: [queued, running, completed, failed] }
+        result:
+          oneOf:
+            - $ref: '#/components/schemas/BasketSplitResult'
+            - type: 'null'
+        error: { type: object, additionalProperties: true, nullable: true }
+        result_url: { type: string, example: '/api/v1/baskets/00000000-0000-4000-8000-000000000000' }
+        created_at: { type: string, format: date-time }
+        started_at: { type: string, format: date-time, nullable: true }
+        completed_at: { type: string, format: date-time, nullable: true }
+
+    BasketSplitResult:
+      type: object
+      required: [feasible, allocation, total_landed_cost, infeasible_items, computed_at]
+      properties:
+        feasible: { type: boolean }
+        allocation:
+          type: array
+          items: { $ref: '#/components/schemas/SupplierAllocation' }
+        total_landed_cost:
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+        single_supplier_baselines:
+          type: array
+          items: { $ref: '#/components/schemas/SingleSupplierBaseline' }
+        infeasible_items:
+          type: array
+          items: { $ref: '#/components/schemas/InfeasibleBasketItem' }
+        solver_version: { type: string, nullable: true }
+        computed_at: { type: string, format: date-time }
+
+    SupplierAllocation:
+      type: object
+      required: [supplier_id, lines, total_landed_cost]
+      properties:
+        supplier_id: { type: string, format: uuid }
+        lines:
+          type: array
+          items: { $ref: '#/components/schemas/AllocatedBasketLine' }
+        total_landed_cost: { $ref: '#/components/schemas/Money' }
+
+    AllocatedBasketLine:
+      type: object
+      required: [workspace_product_id, quantity, offer_id, landed_cost]
+      properties:
+        workspace_product_id: { type: string, format: uuid }
+        quantity: { type: string, pattern: '^\d+(\.\d{1,6})?$' }
+        offer_id: { type: string, format: uuid }
+        landed_cost: { $ref: '#/components/schemas/Money' }
+
+    SingleSupplierBaseline:
+      type: object
+      required: [supplier_id, feasible, total_landed_cost]
+      properties:
+        supplier_id: { type: string, format: uuid }
+        feasible: { type: boolean }
+        total_landed_cost:
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+
+    InfeasibleBasketItem:
+      type: object
+      required: [workspace_product_id, requested_quantity, reason, missing_supplier_ids]
+      properties:
+        workspace_product_id: { type: string, format: uuid }
+        requested_quantity: { type: string }
+        reason: { type: string, enum: [no_offer_from_named_suppliers] }
+        missing_supplier_ids:
+          type: array
+          items: { type: string, format: uuid }
+
+    Alert:
+      type: object
+      required:
+        - id
+        - kind
+        - workspace_product_id
+        - severity
+        - evidence
+        - action
+        - created_from_current_data_at
+        - dismissed
+      properties:
+        id: { type: string, description: Deterministic alert fingerprint }
+        kind:
+          type: string
+          enum:
+            - recommended_price_expiring
+            - preferred_supplier_offer_disappeared
+            - price_swing
+        workspace_product_id: { type: string, format: uuid }
+        supplier_id: { type: string, format: uuid, nullable: true }
+        severity: { type: string, enum: [info, warning, critical] }
+        evidence: { type: object, additionalProperties: true }
+        action: { type: string, enum: [compare_product, review_supplier, view_price_history] }
+        created_from_current_data_at: { type: string, format: date-time }
+        dismissed: { type: boolean }
+
+    AlertDismissal:
+      type: object
+      required: [alert_id, dismissed_at]
+      properties:
+        alert_id: { type: string }
+        dismissed_at: { type: string, format: date-time }
