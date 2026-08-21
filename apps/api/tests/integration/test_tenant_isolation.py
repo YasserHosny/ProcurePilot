@@ -8,7 +8,7 @@ real migrations, as the real `authenticated` role, carrying a real JWT claim.
 FR-030 requires this to run on every proposed change. It is wired into CI as its own named check
 so that its failure is never mistaken for an unrelated test failure.
 
-Set TEST_DATABASE_URL to a database with migrations 0001-0029 applied — extended for
+Set TEST_DATABASE_URL to a database with migrations 0001-0035 applied — extended for
 002-catalogue-suppliers (T038) to cover workspace_product, pack_definition, supplier,
 product_alias and import_job, plus the canonical_product exception; extended again for
 003-quotation-inbox-extraction (T063) to cover document, quotation, quotation_line,
@@ -18,7 +18,10 @@ and landed_cost, plus the tenant-scoped and shared embedding columns added to wo
 and canonical_product respectively; extended again for 005-smart-compare-intelligence to cover
 basket_split_job and alert_dismissal — the only two real tables that chunk adds, since offers,
 recommendations, price history, and live alert conditions are computed at request time from
-already-isolated rows and add no new storage surface.
+already-isolated rows and add no new storage surface; extended again for
+006-value-proof-launch to cover purchase_record, saving_record and billing_account, plus the
+shared plan exception (mirroring canonical_product — see research.md R5) and the two
+Principle-critical immutability triggers a verified saving_record depends on.
 """
 
 from __future__ import annotations
@@ -57,6 +60,10 @@ class Workspace:
         quotation_line_id: UUID,
         basket_split_job_id: UUID,
         alert_dismissal_id: UUID,
+        purchase_record_id: UUID,
+        saving_record_id: UUID,
+        billing_account_id: UUID,
+        export_job_id: UUID,
     ) -> None:
         self.tenant_id = tenant_id
         self.user_id = user_id
@@ -71,6 +78,10 @@ class Workspace:
         self.quotation_line_id = quotation_line_id
         self.basket_split_job_id = basket_split_job_id
         self.alert_dismissal_id = alert_dismissal_id
+        self.purchase_record_id = purchase_record_id
+        self.saving_record_id = saving_record_id
+        self.billing_account_id = billing_account_id
+        self.export_job_id = export_job_id
 
     def claims(self) -> str:
         return (
@@ -268,6 +279,39 @@ def make_workspace(cur: psycopg.Cursor, label: str) -> Workspace:
         ),
     )
 
+    # Value Proof + Launch Readiness — chunk 4.6 (006-value-proof-launch). purchase_record and
+    # saving_record are the product's second append-only entity; kept pending (not verified) here
+    # so cleanup can rely on the ordinary cascade rather than the immutability trigger.
+    purchase_record_id, saving_record_id, billing_account_id = uuid4(), uuid4(), uuid4()
+    cur.execute(
+        "insert into purchase_record "
+        "(id,tenant_id,workspace_product_id,recorded_by,quantity,base_unit,"
+        "unit_price_amount,unit_price_currency,total_paid_amount,total_paid_currency,"
+        "delivery_result) "
+        "values (%s,%s,%s,%s,10,'each',5,'GBP',50,'GBP','delivered')",
+        (purchase_record_id, tenant_id, workspace_product_id, membership_id),
+    )
+    cur.execute(
+        "insert into saving_record "
+        "(id,tenant_id,purchase_record_id,workspace_product_id,baseline_policy,"
+        "actual_value_amount,actual_value_currency,calculation_version,calculation_inputs,"
+        "recorded_by) "
+        "values (%s,%s,%s,%s,'none_available',50,'GBP','test-fixture-v1','{}'::jsonb,%s)",
+        (saving_record_id, tenant_id, purchase_record_id, workspace_product_id, membership_id),
+    )
+    cur.execute(
+        "insert into billing_account "
+        "(id,tenant_id,plan_code,provider_customer_id) "
+        "values (%s,%s,'starter',%s)",
+        (billing_account_id, tenant_id, f"stub_customer:{tenant_id}"),
+    )
+    export_job_id = uuid4()
+    cur.execute(
+        "insert into export_job (id,tenant_id,requested_by,format,filters) "
+        "values (%s,%s,%s,'xlsx','{}'::jsonb)",
+        (export_job_id, tenant_id, membership_id),
+    )
+
     return Workspace(
         tenant_id,
         user_id,
@@ -282,6 +326,10 @@ def make_workspace(cur: psycopg.Cursor, label: str) -> Workspace:
         quotation_line_id,
         basket_split_job_id,
         alert_dismissal_id,
+        purchase_record_id,
+        saving_record_id,
+        billing_account_id,
+        export_job_id,
     )
 
 
@@ -853,6 +901,123 @@ def test_a_member_cannot_write_a_basket_split_job_into_another_workspace(
             )
 
 
+# --- value proof and launch readiness (006-value-proof-launch) ------------
+
+
+def test_another_workspaces_purchase_records_are_invisible(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        cur.execute(
+            "select count(*) from purchase_record where id = %s", (beta.purchase_record_id,)
+        )
+        row = cur.fetchone()
+    assert row is not None and row[0] == 0
+
+
+def test_another_workspaces_saving_records_are_invisible(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        cur.execute(
+            "select count(*) from saving_record where id = %s", (beta.saving_record_id,)
+        )
+        row = cur.fetchone()
+    assert row is not None and row[0] == 0
+
+
+def test_another_workspaces_billing_account_is_invisible(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        cur.execute(
+            "select count(*) from billing_account where id = %s", (beta.billing_account_id,)
+        )
+        row = cur.fetchone()
+    assert row is not None and row[0] == 0
+
+
+def test_another_workspaces_export_jobs_are_invisible(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        cur.execute("select count(*) from export_job where id = %s", (beta.export_job_id,))
+        row = cur.fetchone()
+    assert row is not None and row[0] == 0
+
+
+def test_a_member_cannot_write_a_saving_record_into_another_workspace(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            cur.execute(
+                "insert into saving_record "
+                "(tenant_id,purchase_record_id,workspace_product_id,baseline_policy,"
+                "actual_value_amount,actual_value_currency,calculation_version,"
+                "calculation_inputs,recorded_by) "
+                "values (%s,%s,%s,'none_available',1,'GBP','test-fixture-v1','{}'::jsonb,%s)",
+                (
+                    beta.tenant_id,
+                    beta.purchase_record_id,
+                    beta.workspace_product_id,
+                    beta.membership_id,
+                ),
+            )
+
+
+def test_plan_is_a_shared_read_only_reference_table(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    """The shared exception (research.md R5): both workspaces must see the same plan rows —
+    this must stay an exception, not a leak of anything workspace-specific — and neither may
+    write to it directly."""
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        cur.execute("select code from plan order by code")
+        codes = {row[0] for row in cur.fetchall()}
+        assert codes == {"starter", "growth"}
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            cur.execute(
+                "insert into plan (code,name,monthly_price_amount,monthly_price_currency,limits) "
+                "values ('rogue','Rogue',0,'GBP','{}'::jsonb)"
+            )
+
+
+def test_verified_saving_record_is_immutable_to_every_role(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    """FR-004 / research.md R7: once verified, no role — not even the recording buyer, not even
+    a service-role connection — may update or delete the row. Verified here as the authenticated
+    role would exercise it; a second check confirms even the migration-owning role is blocked
+    (FORCE ROW LEVEL SECURITY only matters for RLS, this trigger has no role exception at all)."""
+    conn, alpha, _beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        cur.execute(
+            "update saving_record set status='verified', verified_at=now(), verified_by=%s "
+            "where id = %s",
+            (alpha.membership_id, alpha.saving_record_id),
+        )
+        with pytest.raises(psycopg.errors.RestrictViolation, match="immutable"):
+            cur.execute(
+                "update saving_record set actual_value_amount = 999 where id = %s",
+                (alpha.saving_record_id,),
+            )
+        conn.rollback()
+
+
 def test_platform_invitations_are_unreadable_by_members(
     workspaces: tuple[psycopg.Connection, Workspace, Workspace],
 ) -> None:
@@ -883,6 +1048,7 @@ def test_rls_is_enabled_and_forced_on_every_tenant_scoped_table(
         "review_task",
         "match_candidate", "match_task", "match_decision", "landed_cost",
         "basket_split_job", "alert_dismissal",
+        "purchase_record", "saving_record", "export_job", "billing_account", "plan",
     }
     with conn.cursor() as cur:
         cur.execute(
