@@ -62,6 +62,9 @@
           class="quantity-input"
         />
         <mat-icon matSuffix aria-hidden="true">calculate</mat-icon>
+        @if (selectedProduct()?.base_unit) {
+          <mat-hint>{{ 'compare.unitLabel' | translate:{ unit: selectedProduct()?.base_unit } }}</mat-hint>
+        }
       </mat-form-field>
 
       <!-- Include Expired Checkbox -->

@@ -78,7 +78,7 @@ def _match_decision(conn: object, match_decision_id: UUID | None) -> dict[str, o
         cur.execute(
             """
             select id, quotation_line_id, matched_workspace_product_id, outcome,
-                   confidence, decided_by, decided_at, reasons
+                   confidence, decided_by, decided_at
             from match_decision
             where id = %s
             """,

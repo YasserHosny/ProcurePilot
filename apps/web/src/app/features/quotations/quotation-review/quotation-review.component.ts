@@ -426,6 +426,11 @@ export class QuotationReviewComponent implements OnInit {
             undefined,
             { duration: 4000 },
           );
+          // A confirmed quotation is the only trusted source matching may read (FR-016). This
+          // is the one place in the product that ever calls the matches endpoint, which is what
+          // actually runs the matching pipeline and populates the match resolution queue —
+          // without this call a confirmed quotation's lines would never reach it.
+          this.api.getQuotationMatches(confirmed.id).subscribe({ error: () => undefined });
         },
         error: (err: unknown) => {
           this.isConfirming.set(false);

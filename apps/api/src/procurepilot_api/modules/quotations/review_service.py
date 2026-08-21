@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from decimal import Decimal
 from uuid import UUID
 
 from postgrest.exceptions import APIError
@@ -10,7 +11,14 @@ from procurepilot_api.deps import CurrentMember
 from procurepilot_api.errors import ConflictError, ServiceUnavailableError
 from procurepilot_api.modules.members.service import authenticated_client
 from procurepilot_api.modules.quotations.schemas import QuotationDetail, QuotationReviewPatch
-from procurepilot_api.modules.quotations.service import FIELD_COLUMNS, QuotationService, _one_row
+from procurepilot_api.modules.quotations.service import (
+    FIELD_COLUMNS,
+    QuotationService,
+    _one_row,
+    _rows,
+)
+
+ARITHMETIC_TOLERANCE = Decimal("0.01")
 
 
 class QuotationReviewService:
@@ -74,11 +82,95 @@ class QuotationReviewService:
                         "corrected_at": datetime.now(UTC).isoformat(),
                     }
                 ).eq("id", str(correction.field_extraction_id)).execute()
+                _apply_correction_to_canonical_row(client, field, correction.corrected_value)
+            _recompute_arithmetic_status(client, quotation_id)
         except APIError as exc:
             raise ServiceUnavailableError(details={"dependency": "database"}) from exc
         return QuotationService(self._settings).get_quotation(
             bearer_token=bearer_token, quotation_id=quotation_id
         )
+
+
+def _apply_correction_to_canonical_row(
+    client: object, field: dict[str, object], corrected_value: object
+) -> None:
+    """Mirror a field_extraction correction onto the row matching/costing actually reads.
+
+    quotation_line's own comment describes it as "as extracted, plus whatever a reviewer
+    corrected" — the correction endpoint only ever wrote the overlay in field_extraction,
+    never the quotation_line or quotation columns themselves, so a reviewer's fix silently
+    never reached arithmetic validation, matching, or landed cost.
+    """
+    entity_type = field.get("entity_type")
+    entity_id = str(field["entity_id"])
+    field_name = field.get("field_name")
+    if entity_type == "quotation_line":
+        if field_name == "quantity":
+            client.table("quotation_line").update({"quantity": corrected_value}).eq(
+                "id", entity_id
+            ).execute()
+        elif field_name == "unit_price" and isinstance(corrected_value, dict):
+            amount = corrected_value.get("amount")
+            currency = corrected_value.get("currency")
+            if amount is not None and currency is not None:
+                client.table("quotation_line").update(
+                    {"unit_price_amount": amount, "unit_price_currency": currency}
+                ).eq("id", entity_id).execute()
+    elif entity_type == "quotation":
+        if field_name in {"currency", "issue_date", "expiry_date"} and isinstance(
+            corrected_value, str
+        ):
+            client.table("quotation").update({field_name: corrected_value}).eq(
+                "id", entity_id
+            ).execute()
+        elif field_name == "stated_total" and isinstance(corrected_value, dict):
+            amount = corrected_value.get("amount")
+            currency = corrected_value.get("currency")
+            if amount is not None and currency is not None:
+                client.table("quotation").update(
+                    {"stated_total_amount": amount, "stated_total_currency": currency}
+                ).eq("id", entity_id).execute()
+
+
+def _recompute_arithmetic_status(client: object, quotation_id: UUID) -> None:
+    quote = _one_row(
+        client.table("quotation")
+        .select("id,stated_total_amount,arithmetic_status")
+        .eq("id", str(quotation_id))
+        .limit(2)
+        .execute()
+        .data,
+        resource="quotation",
+    )
+    stated_amount = quote.get("stated_total_amount")
+    if stated_amount is None:
+        return
+    lines = _rows(
+        client.table("quotation_line")
+        .select("quantity,unit_price_amount,discount_amount,delivery_fee_amount")
+        .eq("quotation_id", str(quotation_id))
+        .execute()
+        .data
+    )
+    computed = Decimal("0")
+    has_line_total = False
+    for line in lines:
+        if line.get("quantity") is None or line.get("unit_price_amount") is None:
+            continue
+        has_line_total = True
+        quantity = Decimal(str(line["quantity"]))
+        unit_price = Decimal(str(line["unit_price_amount"]))
+        discount = Decimal(str(line["discount_amount"] or "0"))
+        delivery_fee = Decimal(str(line["delivery_fee_amount"] or "0"))
+        computed += quantity * unit_price - discount + delivery_fee
+    if not has_line_total:
+        return
+    stated = Decimal(str(stated_amount))
+    status = "reconciled" if abs(computed - stated) <= ARITHMETIC_TOLERANCE else "mismatch"
+    if status != quote.get("arithmetic_status"):
+        client.table("quotation").update({"arithmetic_status": status}).eq(
+            "id", str(quotation_id)
+        ).execute()
 
 
 def get_quotation_review_service() -> QuotationReviewService:

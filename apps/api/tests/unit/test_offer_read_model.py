@@ -36,11 +36,13 @@ def test_offer_projection_uses_row_data_and_never_fabricates_stock_signal() -> N
         "pack_base_quantity": Decimal("30.000000"),
     }
 
-    offer = _offer(row, quantity=Decimal("2.000000"))
+    # requested quantity is expressed in the product's normalised base unit (litre here), the
+    # same unit as pack_base_quantity — 30 litres is exactly this fixture's one pack.
+    offer = _offer(row, quantity=Decimal("30.000000"))
 
     assert offer.id == landed_cost_id
-    assert offer.landed_cost.amount == "8.0000"
+    assert offer.landed_cost.amount == "4.0000"
     assert offer.normalised_unit_price.amount == "0.1333"
-    assert offer.requested_quantity == "2.000000"
+    assert offer.requested_quantity == "30.000000"
     assert offer.match_confidence == "0.9500"
     assert offer.stock_signal is None

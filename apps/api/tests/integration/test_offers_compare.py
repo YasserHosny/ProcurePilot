@@ -99,6 +99,44 @@ def test_unreviewed_quotation_never_produces_an_offer(
         assert compare.recommendation is None
 
 
+def test_requested_quantity_is_in_the_products_normalised_base_unit_not_packs(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Every other figure on the compare screen (base_unit, normalised_unit_price) is expressed
+    in the product's normalised base unit. requested_quantity must mean the same thing, or a
+    user asking for "30" (litres, matching this fixture's pack of 6x5L) silently gets priced as
+    30 packs instead — exactly the mismatch that corrupted a real purchase-outcome saving during
+    manual verification."""
+    settings = settings_for_test_db(monkeypatch)
+    with committed_smart_context("offers-base-unit") as context:
+        offer = add_costed_offer(
+            context,
+            supplier_id=context.supplier_ids[0],
+            amount=Decimal("5.0000"),
+        )
+
+        # This fixture's product has a 6x5L pack (base_quantity=30 litre). Requesting exactly
+        # 30 litres is exactly one pack, so it must reproduce that single pack's total (£5.00),
+        # not 30 packs' worth (£150.00, the pre-fix behaviour).
+        one_pack = OfferService(settings).compare_offers(
+            member=context.member,
+            product_id=context.product_id,
+            quantity=Decimal("30.000000"),
+        )
+        priced = next(o for o in one_pack.offers if o.id == offer.landed_cost_id)
+        assert priced.landed_cost.amount == "5.0000"
+        assert priced.normalised_unit_price.amount == "0.1667"
+
+        # Half a pack's worth of base units must price to half the pack's total.
+        half_pack = OfferService(settings).compare_offers(
+            member=context.member,
+            product_id=context.product_id,
+            quantity=Decimal("15.000000"),
+        )
+        half_priced = next(o for o in half_pack.offers if o.id == offer.landed_cost_id)
+        assert half_priced.landed_cost.amount == "2.5000"
+
+
 def test_cross_tenant_product_reference_returns_not_found(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

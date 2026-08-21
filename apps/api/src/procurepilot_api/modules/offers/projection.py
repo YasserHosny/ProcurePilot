@@ -26,13 +26,17 @@ def project_landed_cost(
     requested_quantity: Decimal,
     pack_base_quantity: Decimal,
 ) -> ProjectedCost:
+    # requested_quantity is expressed in the product's normalised base unit (kg/litre/each) —
+    # the same unit every other figure on the compare screen (normalised_unit_price, base_unit)
+    # is already in — so convert it to the number of original supplier pack units the landed-cost
+    # formula itself prices against, rather than treating it as a pack count.
     requested = requested_quantity.quantize(QUANTITY_QUANT, rounding=ROUND_HALF_UP)
-    normalised = (requested * pack_base_quantity).quantize(QUANTITY_QUANT, rounding=ROUND_HALF_UP)
+    packs_needed = (requested / pack_base_quantity).quantize(QUANTITY_QUANT, rounding=ROUND_HALF_UP)
     projected_inputs = dict(raw_inputs)
-    projected_inputs["quantity"] = _quantity_string(requested)
-    projected_inputs["normalised_base_quantity"] = _quantity_string(normalised)
+    projected_inputs["quantity"] = _quantity_string(packs_needed)
+    projected_inputs["normalised_base_quantity"] = _quantity_string(requested)
     result = replay_landed_cost(projected_inputs, rule_version=rule_version)
-    unit_amount = (result.total.amount / normalised).quantize(MONEY_QUANT, rounding=ROUND_HALF_UP)
+    unit_amount = (result.total.amount / requested).quantize(MONEY_QUANT, rounding=ROUND_HALF_UP)
     return ProjectedCost(
         total=Money(amount=format(result.total.amount, "f"), currency=result.total.currency),
         normalised_unit_price=Money(
@@ -40,7 +44,7 @@ def project_landed_cost(
             currency=result.total.currency,
         ),
         requested_quantity=_quantity_string(requested),
-        normalised_base_quantity=_quantity_string(normalised),
+        normalised_base_quantity=_quantity_string(requested),
     )
 
 

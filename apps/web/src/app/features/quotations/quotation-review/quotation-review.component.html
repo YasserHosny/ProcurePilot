@@ -308,10 +308,14 @@
                   <mat-label>{{ 'quotations.review.header.currencyLabel' | translate }}</mat-label>
                   <input
                     matInput
-                    [value]="q.currency || ''"
-                    readonly
+                    [value]="getEffectiveValue('quotation', q.id, 'currency', q.currency || '')"
+                    (change)="getFieldExtraction('quotation', q.id, 'currency') && updateCorrection(getFieldExtraction('quotation', q.id, 'currency')!.id, $any($event.target).value)"
+                    [readonly]="!isWriter() || q.status === 'reviewed'"
                   />
                 </mat-form-field>
+                @if (isFieldCorrected('quotation', q.id, 'currency')) {
+                  <span class="corrected-tag">{{ 'quotations.review.corrections.correctedBadge' | translate }}</span>
+                }
                 @if (getFieldExtraction('quotation', q.id, 'currency'); as fe) {
                   <span class="confidence-pill" [class.low-conf]="getFieldConfidence('quotation', q.id, 'currency') < 0.85">
                     {{ formatConfidence(fe.confidence) }}%
@@ -332,10 +336,14 @@
                   <mat-label>{{ 'quotations.review.header.issueDateLabel' | translate }}</mat-label>
                   <input
                     matInput
-                    [value]="q.issue_date || ''"
-                    readonly
+                    [value]="getEffectiveValue('quotation', q.id, 'issue_date', q.issue_date || '')"
+                    (change)="getFieldExtraction('quotation', q.id, 'issue_date') && updateCorrection(getFieldExtraction('quotation', q.id, 'issue_date')!.id, $any($event.target).value)"
+                    [readonly]="!isWriter() || q.status === 'reviewed'"
                   />
                 </mat-form-field>
+                @if (isFieldCorrected('quotation', q.id, 'issue_date')) {
+                  <span class="corrected-tag">{{ 'quotations.review.corrections.correctedBadge' | translate }}</span>
+                }
                 @if (getFieldExtraction('quotation', q.id, 'issue_date'); as fe) {
                   <span class="confidence-pill" [class.low-conf]="getFieldConfidence('quotation', q.id, 'issue_date') < 0.85">
                     {{ formatConfidence(fe.confidence) }}%
@@ -356,10 +364,14 @@
                   <mat-label>{{ 'quotations.review.header.expiryDateLabel' | translate }}</mat-label>
                   <input
                     matInput
-                    [value]="q.expiry_date || ''"
-                    readonly
+                    [value]="getEffectiveValue('quotation', q.id, 'expiry_date', q.expiry_date || '')"
+                    (change)="getFieldExtraction('quotation', q.id, 'expiry_date') && updateCorrection(getFieldExtraction('quotation', q.id, 'expiry_date')!.id, $any($event.target).value)"
+                    [readonly]="!isWriter() || q.status === 'reviewed'"
                   />
                 </mat-form-field>
+                @if (isFieldCorrected('quotation', q.id, 'expiry_date')) {
+                  <span class="corrected-tag">{{ 'quotations.review.corrections.correctedBadge' | translate }}</span>
+                }
                 @if (getFieldExtraction('quotation', q.id, 'expiry_date'); as fe) {
                   <span class="confidence-pill" [class.low-conf]="getFieldConfidence('quotation', q.id, 'expiry_date') < 0.85">
                     {{ formatConfidence(fe.confidence) }}%
@@ -380,10 +392,15 @@
                   <mat-label>{{ 'quotations.review.header.statedTotalLabel' | translate }}</mat-label>
                   <input
                     matInput
-                    [value]="q.stated_total?.amount ? (q.stated_total | formatMoney) : '—'"
-                    readonly
+                    [value]="q.stated_total?.amount || '0.00'"
+                    (change)="getFieldExtraction('quotation', q.id, 'stated_total') && updateCorrection(getFieldExtraction('quotation', q.id, 'stated_total')!.id, { amount: $any($event.target).value, currency: q.stated_total?.currency || q.currency || 'USD' })"
+                    [readonly]="!isWriter() || q.status === 'reviewed'"
                   />
+                  <span matTextSuffix class="currency-suffix">{{ q.stated_total?.currency || q.currency }}</span>
                 </mat-form-field>
+                @if (isFieldCorrected('quotation', q.id, 'stated_total')) {
+                  <span class="corrected-tag">{{ 'quotations.review.corrections.correctedBadge' | translate }}</span>
+                }
                 @if (getFieldExtraction('quotation', q.id, 'stated_total'); as fe) {
                   <span class="confidence-pill" [class.low-conf]="getFieldConfidence('quotation', q.id, 'stated_total') < 0.85">
                     {{ formatConfidence(fe.confidence) }}%
