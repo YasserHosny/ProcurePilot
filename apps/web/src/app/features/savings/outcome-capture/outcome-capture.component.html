@@ -1,0 +1,218 @@
+<div class="outcome-capture-container">
+  <div class="page-header">
+    <div class="header-info">
+      <h1 class="page-title">{{ 'savings.outcomeCapture.title' | translate }}</h1>
+      <p class="page-subtitle">{{ 'savings.outcomeCapture.subtitle' | translate }}</p>
+    </div>
+
+    <div class="header-actions">
+      <a mat-stroked-button routerLink="/savings" class="action-btn">
+        <mat-icon aria-hidden="true">arrow_back</mat-icon>
+        <span>{{ 'savings.evidence.backToLedger' | translate }}</span>
+      </a>
+    </div>
+  </div>
+
+  @if (errorMessage()) {
+    <div class="error-banner" role="alert">
+      <mat-icon class="error-icon" aria-hidden="true">error_outline</mat-icon>
+      <div class="error-text-wrap">
+        <div class="error-title">{{ 'common.traceId' | translate }}</div>
+        <div class="error-message">{{ errorMessage() }}</div>
+        @if (errorTraceId(); as traceId) {
+          <div class="error-trace">{{ traceId }}</div>
+        }
+      </div>
+    </div>
+  }
+
+  @if (isLoading()) {
+    <div class="loading-state" aria-live="polite">
+      <mat-spinner [attr.aria-label]="'common.loading' | translate" diameter="40"></mat-spinner>
+      <span>{{ 'common.loading' | translate }}</span>
+    </div>
+  } @else {
+    <mat-card class="form-card">
+      <form [formGroup]="form" (ngSubmit)="onSubmit()" class="outcome-form">
+        <!-- Baseline Policy Info Notice -->
+        <div class="info-banner" role="status">
+          <mat-icon class="info-icon" aria-hidden="true">insights</mat-icon>
+          <div class="info-text">
+            <span class="info-title">{{ 'savings.outcomeCapture.baselineNoticeTitle' | translate }}</span>
+            <span class="info-desc">
+              {{ 'savings.outcomeCapture.baselineAvailable' | translate: { policy: ('savings.evidence.baselinePolicies.last_paid' | translate) } }}
+            </span>
+          </div>
+        </div>
+
+        <div class="form-grid">
+          <!-- Product Selection -->
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>{{ 'savings.outcomeCapture.productLabel' | translate }}</mat-label>
+            <mat-select
+              formControlName="workspace_product_id"
+              [placeholder]="'savings.outcomeCapture.selectProductPrompt' | translate"
+            >
+              @for (prod of products(); track prod.id) {
+                <mat-option [value]="prod.id">
+                  {{ prod.tenant_name }}
+                  @if (prod.variant) { ({{ prod.variant }}) }
+                </mat-option>
+              }
+            </mat-select>
+            @if (form.get('workspace_product_id')?.hasError('required') && form.get('workspace_product_id')?.touched) {
+              <mat-error>{{ 'savings.outcomeCapture.validation.productRequired' | translate }}</mat-error>
+            }
+          </mat-form-field>
+
+          <!-- Supplier Selection -->
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>{{ 'savings.outcomeCapture.supplierLabel' | translate }}</mat-label>
+            <mat-select
+              formControlName="supplier_id"
+              [placeholder]="'savings.outcomeCapture.selectSupplierPrompt' | translate"
+            >
+              <mat-option [value]="''">{{ 'savings.ledger.filters.allSuppliers' | translate }}</mat-option>
+              @for (supp of suppliers(); track supp.id) {
+                <mat-option [value]="supp.id">
+                  {{ supp.name }}
+                </mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+
+          <!-- Quantity -->
+          <mat-form-field appearance="outline" class="col-half">
+            <mat-label>{{ 'savings.outcomeCapture.quantityLabel' | translate }}</mat-label>
+            <input
+              matInput
+              type="text"
+              formControlName="quantity"
+              placeholder="10"
+            />
+            @if (form.get('quantity')?.hasError('required') && form.get('quantity')?.touched) {
+              <mat-error>{{ 'savings.outcomeCapture.validation.quantityRequired' | translate }}</mat-error>
+            } @else if (form.get('quantity')?.hasError('pattern') && form.get('quantity')?.touched) {
+              <mat-error>{{ 'savings.outcomeCapture.validation.quantityMin' | translate }}</mat-error>
+            }
+          </mat-form-field>
+
+          <!-- Base Unit -->
+          <mat-form-field appearance="outline" class="col-half">
+            <mat-label>{{ 'savings.outcomeCapture.baseUnitLabel' | translate }}</mat-label>
+            <input
+              matInput
+              type="text"
+              formControlName="base_unit"
+              placeholder="each"
+            />
+            @if (form.get('base_unit')?.hasError('required') && form.get('base_unit')?.touched) {
+              <mat-error>{{ 'savings.outcomeCapture.validation.baseUnitRequired' | translate }}</mat-error>
+            }
+          </mat-form-field>
+
+          <!-- Unit Price Amount -->
+          <mat-form-field appearance="outline" class="col-third">
+            <mat-label>{{ 'savings.outcomeCapture.unitPriceAmountLabel' | translate }}</mat-label>
+            <input
+              matInput
+              type="text"
+              formControlName="unit_price_amount"
+              placeholder="8.80"
+            />
+            @if (form.get('unit_price_amount')?.hasError('required') && form.get('unit_price_amount')?.touched) {
+              <mat-error>{{ 'savings.outcomeCapture.validation.unitPriceRequired' | translate }}</mat-error>
+            }
+          </mat-form-field>
+
+          <!-- Currency -->
+          <mat-form-field appearance="outline" class="col-third">
+            <mat-label>{{ 'savings.outcomeCapture.currencyLabel' | translate }}</mat-label>
+            <input
+              matInput
+              type="text"
+              formControlName="currency"
+              placeholder="GBP"
+              maxlength="3"
+            />
+            @if (form.get('currency')?.hasError('required') && form.get('currency')?.touched) {
+              <mat-error>{{ 'savings.outcomeCapture.validation.currencyRequired' | translate }}</mat-error>
+            }
+          </mat-form-field>
+
+          <!-- Total Paid Amount -->
+          <mat-form-field appearance="outline" class="col-third">
+            <mat-label>{{ 'savings.outcomeCapture.totalPaidAmountLabel' | translate }}</mat-label>
+            <input
+              matInput
+              type="text"
+              formControlName="total_paid_amount"
+              placeholder="88.00"
+            />
+            @if (form.get('total_paid_amount')?.hasError('required') && form.get('total_paid_amount')?.touched) {
+              <mat-error>{{ 'savings.outcomeCapture.validation.totalPaidRequired' | translate }}</mat-error>
+            }
+          </mat-form-field>
+
+          <!-- Delivery Result -->
+          <mat-form-field appearance="outline" class="col-half">
+            <mat-label>{{ 'savings.outcomeCapture.deliveryResultLabel' | translate }}</mat-label>
+            <mat-select formControlName="delivery_result">
+              @for (result of deliveryResults; track result) {
+                <mat-option [value]="result">
+                  {{ 'savings.outcomeCapture.deliveryResults.' + result | translate }}
+                </mat-option>
+              }
+            </mat-select>
+            @if (form.get('delivery_result')?.hasError('required') && form.get('delivery_result')?.touched) {
+              <mat-error>{{ 'savings.outcomeCapture.validation.deliveryResultRequired' | translate }}</mat-error>
+            }
+          </mat-form-field>
+
+          <!-- Order Date -->
+          <mat-form-field appearance="outline" class="col-half">
+            <mat-label>{{ 'savings.outcomeCapture.orderedAtLabel' | translate }}</mat-label>
+            <input matInput [matDatepicker]="orderPicker" formControlName="ordered_at" />
+            <mat-datepicker-toggle matIconSuffix [for]="orderPicker"></mat-datepicker-toggle>
+            <mat-datepicker #orderPicker></mat-datepicker>
+          </mat-form-field>
+
+          <!-- Notes / Reference -->
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>{{ 'savings.outcomeCapture.notesLabel' | translate }}</mat-label>
+            <textarea
+              matInput
+              rows="3"
+              formControlName="notes"
+              [placeholder]="'savings.outcomeCapture.notesPlaceholder' | translate"
+            ></textarea>
+          </mat-form-field>
+        </div>
+
+        <mat-divider></mat-divider>
+
+        <div class="form-actions">
+          <a mat-stroked-button routerLink="/savings" class="cancel-btn">
+            {{ 'savings.outcomeCapture.cancelButton' | translate }}
+          </a>
+
+          <button
+            mat-flat-button
+            color="primary"
+            type="submit"
+            [disabled]="isSubmitting() || !isWriter()"
+            class="submit-btn"
+          >
+            @if (isSubmitting()) {
+              <mat-spinner [attr.aria-label]="'common.loading' | translate" diameter="18" class="button-spinner"></mat-spinner>
+              <span>{{ 'savings.outcomeCapture.submittingButton' | translate }}</span>
+            } @else {
+              <mat-icon aria-hidden="true">check_circle</mat-icon>
+              <span>{{ 'savings.outcomeCapture.submitButton' | translate }}</span>
+            }
+          </button>
+        </div>
+      </form>
+    </mat-card>
+  }
+</div>

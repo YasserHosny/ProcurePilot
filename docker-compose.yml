@@ -248,6 +248,32 @@ services:
     restart: unless-stopped
 
   # ---------------------------------------------------------------------------
+  # Savings Export Worker (apps/api-owned RQ entrypoint)
+  # ---------------------------------------------------------------------------
+  export-worker:
+    build:
+      context: .
+      dockerfile: infra/docker/api.Dockerfile
+    container_name: procurepilot-export-worker
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/postgres
+      SUPABASE_URL: http://kong:8000
+      SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY:-replace-with-local-anon-key}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:-replace-with-local-service-role-key}
+      REDIS_URL: redis://redis:6379/0
+      EXPORT_QUEUE_NAME: ${EXPORT_QUEUE_NAME:-exports}
+      SUPABASE_EXPORTS_BUCKET: ${SUPABASE_EXPORTS_BUCKET:-exports}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    command: python -m procurepilot_api.workers.export_worker
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
   # Frontend Web SPA (Angular behind Nginx)
   # ---------------------------------------------------------------------------
   web:

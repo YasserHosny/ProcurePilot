@@ -1,0 +1,257 @@
+<div class="saving-evidence-container">
+  <div class="page-header">
+    <div class="header-info">
+      <h1 class="page-title">{{ 'savings.evidence.title' | translate }}</h1>
+      <p class="page-subtitle">{{ 'savings.evidence.subtitle' | translate }}</p>
+    </div>
+
+    <div class="header-actions">
+      <a mat-stroked-button routerLink="/savings" class="action-btn">
+        <mat-icon aria-hidden="true">arrow_back</mat-icon>
+        <span>{{ 'savings.evidence.backToLedger' | translate }}</span>
+      </a>
+    </div>
+  </div>
+
+  @if (errorMessage()) {
+    <div class="error-banner" role="alert">
+      <mat-icon class="error-icon" aria-hidden="true">error_outline</mat-icon>
+      <div class="error-text-wrap">
+        <div class="error-title">{{ 'common.traceId' | translate }}</div>
+        <div class="error-message">{{ errorMessage() }}</div>
+        @if (errorTraceId(); as traceId) {
+          <div class="error-trace">{{ traceId }}</div>
+        }
+      </div>
+    </div>
+  }
+
+  @if (isLoading()) {
+    <div class="loading-state" aria-live="polite">
+      <mat-spinner [attr.aria-label]="'common.loading' | translate" diameter="40"></mat-spinner>
+      <span>{{ 'common.loading' | translate }}</span>
+    </div>
+  } @else {
+    @if (savingEvidence(); as evidence) {
+      <!-- Status & Immutability / Verification Banner -->
+    @if (isVerified()) {
+      <div class="immutable-banner" role="status">
+        <mat-icon class="banner-icon" aria-hidden="true">lock</mat-icon>
+        <div class="banner-text">
+          <span class="banner-title">{{ 'savings.evidence.statusVerified' | translate }}</span>
+          <span class="banner-desc">{{ 'savings.evidence.immutableBanner' | translate }}</span>
+        </div>
+      </div>
+    } @else {
+      <div class="pending-banner" role="status">
+        <div class="pending-banner-content">
+          <mat-icon class="banner-icon" aria-hidden="true">hourglass_empty</mat-icon>
+          <div class="banner-text">
+            <span class="banner-title">{{ 'savings.evidence.statusPending' | translate }}</span>
+            <span class="banner-desc">{{ 'savings.evidence.pendingBanner' | translate }}</span>
+          </div>
+        </div>
+
+        @if (isWriter()) {
+          <button
+            mat-flat-button
+            color="primary"
+            type="button"
+            (click)="onVerify()"
+            [disabled]="isVerifying()"
+            class="verify-action-btn"
+          >
+            @if (isVerifying()) {
+              <mat-spinner [attr.aria-label]="'common.loading' | translate" diameter="18"></mat-spinner>
+              <span>{{ 'savings.evidence.verifyingButton' | translate }}</span>
+            } @else {
+              <mat-icon aria-hidden="true">verified</mat-icon>
+              <span>{{ 'savings.evidence.verifyButton' | translate }}</span>
+            }
+          </button>
+        }
+      </div>
+    }
+
+    <!-- Top Grid: Saving Calculation Summary & Purchase Record -->
+    <div class="evidence-grid">
+      <!-- Saving Summary Card -->
+      <mat-card class="evidence-card saving-summary-card">
+        <div class="card-header">
+          <mat-icon aria-hidden="true" class="card-header-icon">calculate</mat-icon>
+          <h2 class="card-title">{{ 'savings.evidence.summaryCard' | translate }}</h2>
+        </div>
+        <mat-divider></mat-divider>
+        <div class="card-content">
+          <div class="detail-row highlight-row">
+            <span class="detail-label">{{ 'savings.evidence.delta' | translate }}</span>
+            @if (evidence.saving_record.delta; as d) {
+              <span class="delta-amount" [ngClass]="getDeltaClass(d)">
+                {{ isPositive(d) ? '+' : '' }}{{ d | formatMoney }}
+              </span>
+            } @else {
+              <span class="text-muted">—</span>
+            }
+          </div>
+
+          <div class="detail-row">
+            <span class="detail-label">{{ 'savings.evidence.actualValue' | translate }}</span>
+            <span class="detail-val strong">{{ evidence.saving_record.actual_value | formatMoney }}</span>
+          </div>
+
+          <div class="detail-row">
+            <span class="detail-label">{{ 'savings.evidence.baselineValue' | translate }}</span>
+            @if (evidence.saving_record.baseline_value; as bVal) {
+              <span class="detail-val">{{ bVal | formatMoney }}</span>
+            } @else {
+              <span class="text-muted">{{ 'savings.evidence.baselinePolicies.none_available' | translate }}</span>
+            }
+          </div>
+
+          @if (evidence.saving_record.baseline_unit_price; as bUnit) {
+            <div class="detail-row">
+              <span class="detail-label">{{ 'savings.evidence.baselineUnitPrice' | translate }}</span>
+              <span class="detail-val">{{ bUnit | formatMoney }}</span>
+            </div>
+          }
+
+          <div class="detail-row">
+            <span class="detail-label">{{ 'savings.evidence.baselinePolicy' | translate }}</span>
+            <span class="policy-chip" [ngClass]="getPolicyClass(evidence.saving_record.baseline_policy)">
+              {{ 'savings.evidence.baselinePolicies.' + evidence.saving_record.baseline_policy | translate }}
+            </span>
+          </div>
+
+          <mat-divider></mat-divider>
+
+          <div class="detail-row">
+            <span class="detail-label">{{ 'savings.evidence.statusLabel' | translate }}</span>
+            <span class="status-pill" [ngClass]="getStatusClass(evidence.saving_record.status)">
+              <mat-icon aria-hidden="true" class="mini-icon">
+                {{ evidence.saving_record.status === 'verified' ? 'verified' : 'hourglass_empty' }}
+              </mat-icon>
+              {{ (evidence.saving_record.status === 'verified' ? 'savings.evidence.statusVerified' : 'savings.evidence.statusPending') | translate }}
+            </span>
+          </div>
+
+          <div class="detail-row">
+            <span class="detail-label">{{ 'savings.evidence.recordedAt' | translate }}</span>
+            <span class="detail-val">{{ evidence.saving_record.recorded_at | formatDate }}</span>
+          </div>
+
+          @if (evidence.saving_record.verified_at) {
+            <div class="detail-row">
+              <span class="detail-label">{{ 'savings.evidence.verifiedAt' | translate }}</span>
+              <span class="detail-val">{{ evidence.saving_record.verified_at | formatDate }}</span>
+            </div>
+          }
+
+          <div class="detail-row">
+            <span class="detail-label">{{ 'savings.evidence.calculationVersion' | translate }}</span>
+            <span class="detail-val version-code">{{ evidence.saving_record.calculation_version }}</span>
+          </div>
+        </div>
+      </mat-card>
+
+      <!-- Purchase Details Card -->
+      <mat-card class="evidence-card purchase-details-card">
+        <div class="card-header">
+          <mat-icon aria-hidden="true" class="card-header-icon">shopping_bag</mat-icon>
+          <h2 class="card-title">{{ 'savings.evidence.purchaseCard' | translate }}</h2>
+        </div>
+        <mat-divider></mat-divider>
+        <div class="card-content">
+          <div class="detail-row">
+            <span class="detail-label">{{ 'savings.outcomeCapture.productLabel' | translate }}</span>
+            <span class="detail-val strong">{{ getProductName(evidence.purchase_record.workspace_product_id) }}</span>
+          </div>
+
+          <div class="detail-row">
+            <span class="detail-label">{{ 'savings.outcomeCapture.supplierLabel' | translate }}</span>
+            <span class="detail-val">{{ getSupplierName(evidence.purchase_record.supplier_id) }}</span>
+          </div>
+
+          <div class="detail-row">
+            <span class="detail-label">{{ 'savings.outcomeCapture.quantityLabel' | translate }}</span>
+            <span class="detail-val">{{ evidence.purchase_record.quantity }} {{ evidence.purchase_record.base_unit }}</span>
+          </div>
+
+          <div class="detail-row">
+            <span class="detail-label">{{ 'savings.outcomeCapture.unitPriceAmountLabel' | translate }}</span>
+            <span class="detail-val">{{ evidence.purchase_record.unit_price | formatMoney }}</span>
+          </div>
+
+          <div class="detail-row">
+            <span class="detail-label">{{ 'savings.outcomeCapture.totalPaidAmountLabel' | translate }}</span>
+            <span class="detail-val strong">{{ evidence.purchase_record.total_paid | formatMoney }}</span>
+          </div>
+
+          <div class="detail-row">
+            <span class="detail-label">{{ 'savings.outcomeCapture.deliveryResultLabel' | translate }}</span>
+            <span class="delivery-badge" [ngClass]="getDeliveryClass(evidence.purchase_record.delivery_result)">
+              {{ 'savings.outcomeCapture.deliveryResults.' + evidence.purchase_record.delivery_result | translate }}
+            </span>
+          </div>
+
+          @if (evidence.purchase_record.ordered_at) {
+            <div class="detail-row">
+              <span class="detail-label">{{ 'savings.outcomeCapture.orderedAtLabel' | translate }}</span>
+              <span class="detail-val">{{ evidence.purchase_record.ordered_at | formatDate }}</span>
+            </div>
+          }
+
+          @if (evidence.purchase_record.delivered_at) {
+            <div class="detail-row">
+              <span class="detail-label">{{ 'savings.outcomeCapture.deliveredAtLabel' | translate }}</span>
+              <span class="detail-val">{{ evidence.purchase_record.delivered_at | formatDate }}</span>
+            </div>
+          }
+
+          @if (evidence.purchase_record.notes) {
+            <div class="notes-box">
+              <span class="notes-label">{{ 'savings.outcomeCapture.notesLabel' | translate }}:</span>
+              <p class="notes-content">{{ evidence.purchase_record.notes }}</p>
+            </div>
+          }
+        </div>
+      </mat-card>
+    </div>
+
+    <!-- Calculation Snapshot & Competing Offers Card -->
+    <mat-card class="evidence-card full-width-card">
+      <div class="card-header">
+        <mat-icon aria-hidden="true" class="card-header-icon">analytics</mat-icon>
+        <h2 class="card-title">{{ 'savings.evidence.calculationCard' | translate }}</h2>
+      </div>
+      <mat-divider></mat-divider>
+      <div class="card-content">
+        <div class="formula-box">
+          <mat-icon aria-hidden="true">functions</mat-icon>
+          <span class="formula-text">{{ 'savings.evidence.formula' | translate }}</span>
+        </div>
+
+        @if (evidence.competing_offers.length > 0) {
+          <div class="competing-section">
+            <h3 class="section-title">{{ 'savings.evidence.competingOffersCard' | translate }}</h3>
+            <div class="offers-list">
+              @for (off of evidence.competing_offers; track $index) {
+                <div class="competing-offer-row">
+                  <span class="offer-supplier">{{ off['supplier_name'] || off['supplier_id'] || 'Supplier' }}</span>
+                  @if (off['unit_price']) {
+                    <span class="offer-price">{{ $any(off['unit_price']) | formatMoney }}</span>
+                  }
+                </div>
+              }
+            </div>
+          </div>
+        } @else {
+          <div class="empty-competing-notice">
+            <mat-icon aria-hidden="true">history_toggle_drop_down</mat-icon>
+            <span>{{ 'savings.evidence.noCompetingOffers' | translate }}</span>
+          </div>
+        }
+      </div>
+    </mat-card>
+  }
+}
+</div>

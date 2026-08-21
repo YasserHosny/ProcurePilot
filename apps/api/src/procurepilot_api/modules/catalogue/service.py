@@ -16,6 +16,7 @@ from procurepilot_api.errors import (
     UnprocessableEntityError,
     UnsupportedMediaTypeError,
 )
+from procurepilot_api.modules.billing.service import BillingService
 from procurepilot_api.modules.catalogue.csv_import import (
     DuplicateAction,
     ImportErrorDetail,
@@ -120,6 +121,7 @@ class CatalogueService:
         member: CurrentMember,
         payload: ProductCreate,
     ) -> Product:
+        BillingService(self._settings).ensure_can_add_active_product(member=member)
         client = authenticated_client(self._settings, bearer_token)
         self._require_supplier_visible(client, payload.preferred_supplier_id)
         canonical = self._resolve_or_create_canonical(payload)

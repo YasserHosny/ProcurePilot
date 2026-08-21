@@ -222,4 +222,19 @@ describe('CompareComponent (US1, SC-002, T020)', () => {
     expect(component.visibleOffers().length).toBe(0);
     expect(component.recommendedOffer()).toBeNull();
   });
+
+  it('should generate correct record purchase query params passing only product/evidence identifiers (T034)', () => {
+    const offer = component.visibleOffers()[0];
+    const params = component.getRecordPurchaseParams(offer);
+
+    expect(params['product_id']).toBe('00000000-0000-4000-8000-000000000001');
+    expect(params['supplier_id']).toBe('supp-1');
+    expect(params['quotation_line_id']).toBe('ql-1');
+    expect(params['match_decision_id']).toBe('md-1');
+    expect(params['quantity']).toBe('10');
+    expect(params['unit_price']).toBe('12.0000');
+    expect(params['currency']).toBe('GBP');
+    expect(params['tenant_id']).toBeUndefined(); // Never pass tenant id
+  });
 });
+

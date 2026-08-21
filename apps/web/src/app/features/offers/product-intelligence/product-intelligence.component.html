@@ -82,7 +82,7 @@
   <!-- Loading State -->
   @if (isLoading()) {
     <div class="loading-container">
-      <mat-spinner diameter="48"></mat-spinner>
+      <mat-spinner [attr.aria-label]="'common.loading' | translate" diameter="48"></mat-spinner>
       <p>{{ 'common.loading' | translate }}</p>
     </div>
   }

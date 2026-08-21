@@ -44,6 +44,7 @@ class Settings(BaseSettings):
     basket_split_queue_name: str = Field(
         default="basket-split", validation_alias="BASKET_SPLIT_QUEUE_NAME"
     )
+    export_queue_name: str = Field(default="exports", validation_alias="EXPORT_QUEUE_NAME")
     extraction_provider_mode: Literal["stub", "bedrock", "azure_di"] = Field(
         default="stub", validation_alias="EXTRACTION_PROVIDER_MODE"
     )
@@ -52,6 +53,9 @@ class Settings(BaseSettings):
     )
     quotation_documents_bucket: str = Field(
         default="quotation-documents", validation_alias="QUOTATION_DOCUMENTS_BUCKET"
+    )
+    supabase_exports_bucket: str = Field(
+        default="exports", validation_alias="SUPABASE_EXPORTS_BUCKET"
     )
     matching_auto_accept_threshold: float = Field(
         default=0.9200, validation_alias="MATCHING_AUTO_ACCEPT_THRESHOLD", ge=0, le=1

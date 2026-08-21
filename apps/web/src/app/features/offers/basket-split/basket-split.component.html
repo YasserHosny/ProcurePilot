@@ -26,7 +26,7 @@
   <!-- Loading Initial Data -->
   @if (isLoading() && !currentJob()) {
     <div class="loading-container">
-      <mat-spinner diameter="48"></mat-spinner>
+      <mat-spinner [attr.aria-label]="'common.loading' | translate" diameter="48"></mat-spinner>
       <p>{{ 'common.loading' | translate }}</p>
     </div>
   }
@@ -160,7 +160,7 @@
             class="submit-btn"
           >
             @if (isSubmitting()) {
-              <mat-spinner diameter="20" class="btn-spinner"></mat-spinner>
+              <mat-spinner [attr.aria-label]="'common.loading' | translate" diameter="20" class="btn-spinner"></mat-spinner>
               <span>{{ 'basketSplit.form.submitting' | translate }}</span>
             } @else {
               <mat-icon aria-hidden="true">call_split</mat-icon>
@@ -176,7 +176,7 @@
   @if (uiState() === 'queued' || uiState() === 'running' || uiState() === 'submitting') {
     <mat-card class="job-progress-card">
       <div class="progress-content">
-        <mat-spinner diameter="56"></mat-spinner>
+        <mat-spinner [attr.aria-label]="'common.loading' | translate" diameter="56"></mat-spinner>
         <h2 class="progress-title">
           @if (uiState() === 'queued') {
             {{ 'basketSplit.status.queued' | translate }}

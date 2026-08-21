@@ -69,7 +69,7 @@
 
     @if (isLoading()) {
       <div class="loading-state" aria-live="polite">
-        <mat-spinner diameter="40"></mat-spinner>
+        <mat-spinner [attr.aria-label]="'common.loading' | translate" diameter="40"></mat-spinner>
         <span>{{ 'common.loading' | translate }}</span>
       </div>
     } @else if (suppliers().length === 0) {

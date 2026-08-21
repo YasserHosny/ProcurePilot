@@ -221,8 +221,23 @@ def cleanup_workspace(workspace: Workspace) -> None:
             reset_role(cur)
             # The owner-guard trigger refuses to delete the last active owner's membership row,
             # even via cascade from a tenant delete — same fix as test_import_atomicity.py.
+            # Replica mode also disables FK cascade triggers, so value-proof children must be
+            # removed explicitly before deleting the tenant.
             cur.execute("set session_replication_role = replica")
             try:
+                cur.execute(
+                    "delete from saving_record where tenant_id = %s",
+                    (workspace.tenant_id,),
+                )
+                cur.execute(
+                    "delete from purchase_record where tenant_id = %s",
+                    (workspace.tenant_id,),
+                )
+                cur.execute("delete from export_job where tenant_id = %s", (workspace.tenant_id,))
+                cur.execute(
+                    "delete from billing_account where tenant_id = %s",
+                    (workspace.tenant_id,),
+                )
                 cur.execute("delete from tenant where id = %s", (workspace.tenant_id,))
                 cur.execute("delete from auth.users where id = %s", (workspace.user_id,))
                 cur.execute(

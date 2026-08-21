@@ -759,6 +759,161 @@ It is not a separate purchase ledger.
 conditions themselves are not persisted, so resolved or changed conditions do not leave stale inbox
 rows behind.
 
+## Implemented value proof and launch-readiness entities
+
+## `PurchaseRecord`
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | uuid | PK, default `gen_random_uuid()` |
+| `tenant_id` | uuid | Required FK -> Tenant; RLS key |
+| `workspace_product_id` | uuid | Required FK -> WorkspaceProduct |
+| `supplier_id` | uuid | Optional FK -> Supplier; nullable when no supplier row exists |
+| `quotation_line_id` | uuid | Optional FK -> QuotationLine; evidence link when the purchase followed a quoted line |
+| `match_decision_id` | uuid | Optional FK -> MatchDecision; evidence link when the purchase followed a confirmed match |
+| `landed_cost_id` | uuid | Optional FK -> LandedCost; evidence link to the compared offer when present |
+| `recorded_by` | uuid | Required FK -> Membership; human who recorded the outcome |
+| `quantity` | numeric(18,6) | Required actual ordered quantity; check `> 0` |
+| `base_unit` | text | Required FK -> `supported_base_unit.code` |
+| `unit_price_amount` | numeric(18,4) | Required actual paid unit price |
+| `unit_price_currency` | text | Required FK -> `supported_currency.code` |
+| `total_paid_amount` | numeric(18,4) | Required actual total paid |
+| `total_paid_currency` | text | Required FK -> `supported_currency.code` |
+| `delivery_result` | enum | `ordered`, `partially_delivered`, `delivered`, `cancelled`, or `disputed` |
+| `ordered_at` | timestamptz | Optional real-world order time |
+| `delivered_at` | timestamptz | Optional real-world delivery time |
+| `recorded_at` | timestamptz | Required outcome record time; default `now()` |
+| `notes` | text | Optional internal note; not a substitute for evidence links |
+| `created_at` | timestamptz | Audit field |
+| `updated_at` | timestamptz | Audit field |
+
+Money is stored as amount/currency pairs. `unit_price_currency` must equal `total_paid_currency`;
+Phase 1 performs no currency conversion. `delivered_at` cannot be before `ordered_at` when both are
+known.
+
+`PurchaseRecord` is tenant-scoped with forced RLS. Owner and buyer may record outcomes through the
+API; branch manager, approver, and viewer are read-only. After the paired `SavingRecord` is
+verified, the database trigger `purchase_record_locked_by_verified_saving` refuses update or delete
+of the purchase evidence row.
+
+## `SavingRecord`
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | uuid | PK, default `gen_random_uuid()` |
+| `tenant_id` | uuid | Required FK -> Tenant; RLS key |
+| `purchase_record_id` | uuid | Required unique FK -> PurchaseRecord |
+| `workspace_product_id` | uuid | Required FK -> WorkspaceProduct; copied for filtering and ledger display |
+| `supplier_id` | uuid | Optional FK -> Supplier; copied from the purchase record |
+| `status` | enum | `pending` or `verified`; default `pending` |
+| `baseline_policy` | enum | `last_paid`, `rolling_average_6m`, or `none_available`; actual policy used at record time |
+| `baseline_source_landed_cost_ids` | uuid[] | Source landed-cost rows from the price-history summary; empty only when no baseline exists |
+| `baseline_unit_price_amount` | numeric(18,4) | Optional normalised unit baseline amount |
+| `baseline_unit_price_currency` | text | Optional FK -> `supported_currency.code`; required with `baseline_unit_price_amount` |
+| `baseline_value_amount` | numeric(18,4) | Optional baseline unit price multiplied by recorded quantity |
+| `baseline_value_currency` | text | Optional FK -> `supported_currency.code`; required with `baseline_value_amount` |
+| `actual_value_amount` | numeric(18,4) | Required copied `purchase_record.total_paid_amount` |
+| `actual_value_currency` | text | Required FK -> `supported_currency.code` |
+| `delta_amount` | numeric(18,4) | Optional signed saving, `baseline_value - actual_value`; positive, zero, and negative values are valid |
+| `delta_currency` | text | Optional FK -> `supported_currency.code`; required with `delta_amount` |
+| `calculation_version` | text | Required calculation identifier, for example `saving-baseline-v1` |
+| `calculation_inputs` | jsonb | Required replay snapshot: quantity, selected policy, source point ids, window months, and actual total |
+| `recorded_by` | uuid | Required FK -> Membership; copied from the purchase record |
+| `recorded_at` | timestamptz | Required time the baseline, actual, and delta were captured |
+| `verified_by` | uuid | Optional FK -> Membership; set only by explicit verification |
+| `verified_at` | timestamptz | Optional verification timestamp; set only by explicit verification |
+| `created_at` | timestamptz | Audit field |
+
+`SavingRecord` captures `baseline_policy`, baseline money, actual money, delta money, and calculation
+inputs at purchase-record time from chunk 4.5's price-history read model. Verification is a later
+explicit human action and does not re-read price history or recompute any money value.
+
+Baseline and delta money fields are nullable only when `baseline_policy = 'none_available'`.
+Whenever a baseline exists, baseline, actual, and delta currencies must match. Verified metadata is
+consistent by constraint: `status = 'verified'` exactly when both `verified_at` and `verified_by`
+are present.
+
+`SavingRecord` is tenant-scoped with forced RLS. Active roles may read; owner and buyer may create
+pending rows and verify them through the API. The database trigger
+`saving_record_verified_immutability` refuses update or delete once `status = 'verified'`, for any
+role. Verification is the final allowed mutation and changes only `status`, `verified_at`, and
+`verified_by`.
+
+## `ExportJob`
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | uuid | PK, default `gen_random_uuid()` |
+| `tenant_id` | uuid | Required FK -> Tenant; RLS key |
+| `requested_by` | uuid | Required FK -> Membership |
+| `kind` | text | Const-like value `savings_ledger` for chunk 4.6 |
+| `format` | enum | `xlsx` or `pdf` |
+| `filters` | jsonb | Required export filters: `period_start`, `period_end`, optional `supplier_id`, optional `branch_id` |
+| `status` | enum | `queued`, `running`, `completed`, or `failed`; default `queued` |
+| `storage_bucket` | text | Optional storage bucket set when completed |
+| `storage_path` | text | Optional storage path set when completed |
+| `download_url` | text | Optional signed URL or API download URL |
+| `row_count` | integer | Optional number of verified savings rendered; zero is valid |
+| `error` | jsonb | Optional structured failure details for failed jobs |
+| `created_at` | timestamptz | Job creation time |
+| `started_at` | timestamptz | Optional worker start time |
+| `completed_at` | timestamptz | Required for completed or failed jobs |
+
+`ExportJob` is the durable polling resource for savings-ledger exports. Only verified savings are
+rendered; an empty export is represented by `row_count = 0`, not a failed job. Completed jobs must
+carry storage metadata and `row_count`; failed jobs must carry structured `error` details.
+
+`ExportJob` is tenant-scoped with forced RLS. Owner and buyer may request exports through the API;
+active workspace roles may read export status for jobs in their workspace.
+
+## `Plan`
+
+| Field | Type | Notes |
+|---|---|---|
+| `code` | text | PK, for example `starter` or `growth` |
+| `name` | text | Plan name source value; UI strings still come from `packages/i18n` |
+| `status` | enum | `active` or `archived`; default `active` |
+| `monthly_price_amount` | numeric(18,4) | Required monthly price amount; seeded as `0.0000` for stub plans |
+| `monthly_price_currency` | text | Required FK -> `supported_currency.code` |
+| `limits` | jsonb | Required plan limits, including `active_catalogue_products` |
+| `features` | jsonb | Required feature flags or included capabilities for display |
+| `created_at` | timestamptz | Audit field |
+| `updated_at` | timestamptz | Audit field |
+
+Seeded plans are `starter` with `active_catalogue_products = 100` and `growth` with
+`active_catalogue_products = 1000`; both are `0.0000 GBP` while the stub billing provider is in
+use.
+
+`Plan` is a deliberate shared reference table exception. It has no `tenant_id` because it contains
+only global product-tier definitions and no workspace-specific data. It mirrors
+`CanonicalProduct`: authenticated users may select rows, authenticated users have no insert,
+update, or delete policy, and the service role seeds and updates plan definitions.
+
+## `BillingAccount`
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | uuid | PK, default `gen_random_uuid()` |
+| `tenant_id` | uuid | Required unique FK -> Tenant; RLS key |
+| `plan_code` | text | Required FK -> Plan |
+| `provider` | text | Required billing provider; constrained to `stub` in chunk 4.6 |
+| `provider_customer_id` | text | Required provider customer reference, for example `stub_customer:{tenant_id}` |
+| `provider_subscription_id` | text | Optional provider subscription reference, for example `stub_subscription:{tenant_id}:starter` |
+| `status` | enum | `active`, `past_due`, or `cancelled`; default `active` |
+| `current_period_start` | timestamptz | Optional current billing period start; nullable for stub |
+| `current_period_end` | timestamptz | Optional current billing period end; nullable for stub |
+| `assigned_at` | timestamptz | Required plan assignment time; default `now()` |
+| `created_at` | timestamptz | Audit field |
+| `updated_at` | timestamptz | Audit field |
+
+`BillingAccount` is the tenant-scoped assignment from a workspace to a shared plan through the
+billing-provider abstraction. In chunk 4.6 the provider is stub-only; no real Stripe SDK,
+credentials, payment collection, or financial transaction exists.
+
+`BillingAccount` is tenant-scoped with forced RLS. Active roles may read their workspace's billing
+account and plan. Plan assignment normally happens during workspace creation through the provider
+abstraction; future provider changes should populate this table without changing plan-gating reads.
+
 ## Planned later domain entities
 
 ## `Branch` / `CostCentre`
@@ -770,22 +925,6 @@ rows behind.
 | `name` | text | |
 | `code` | text | Short code for requests |
 | `parent_id` | uuid | Optional hierarchy |
-
-## `SavingRecord`
-
-| Field | Type | Notes |
-|---|---|---|
-| `id` | uuid | PK |
-| `tenant_id` | uuid | FK → Tenant |
-| `workspace_product_id` | uuid | FK -> WorkspaceProduct |
-| `baseline_policy` | text | e.g. last_paid, rolling_avg |
-| `baseline_amount` | numeric(18,4) | Baseline monetary amount |
-| `baseline_currency` | text | FK -> `supported_currency.code`; required with `baseline_amount` |
-| `actual_amount` | numeric(18,4) | Actual monetary amount |
-| `actual_currency` | text | FK -> `supported_currency.code`; required with `actual_amount` |
-| `delta_amount` | numeric(18,4) | Verified saving amount |
-| `delta_currency` | text | FK -> `supported_currency.code`; required with `delta_amount` |
-| `verified_at` | timestamptz | Immutable after verify |
 
 ## `PurchaseRequest`
 

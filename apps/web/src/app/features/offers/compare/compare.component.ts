@@ -94,6 +94,7 @@ export class CompareComponent implements OnInit {
     'matchConfidence',
     'validity',
     'status',
+    'actions',
   ];
 
   readonly visibleOffers = computed<readonly ProjectedOffer[]>(() => {
@@ -216,4 +217,27 @@ export class CompareComponent implements OnInit {
     if (isNaN(n)) return '—';
     return `${(n * 100).toFixed(0)}%`;
   }
+
+  getRecordPurchaseParams(offer: ProjectedOffer): Record<string, string> {
+    const params: Record<string, string> = {
+      product_id: this.selectedProductId(),
+      supplier_id: offer.supplier_id,
+      quantity: this.quantityInput() || '10',
+      unit_price: offer.projected_unit_price.amount,
+      currency: offer.projected_unit_price.currency,
+      total_paid: offer.projected_landed_cost.amount,
+      base_unit: this.selectedProduct()?.base_unit || 'each',
+    };
+    if (offer.quotation_line_id) {
+      params['quotation_line_id'] = offer.quotation_line_id;
+    }
+    if (offer.match_decision_id) {
+      params['match_decision_id'] = offer.match_decision_id;
+    }
+    if (offer.id) {
+      params['landed_cost_id'] = offer.id;
+    }
+    return params;
+  }
 }
+

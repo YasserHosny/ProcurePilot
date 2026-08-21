@@ -688,5 +688,167 @@ export interface AlertDismissal {
   readonly dismissed_at: string;
 }
 
+// --- value proof, exports & billing (Chunk 4.6) ---------------------------
+
+export type SavingStatus = 'pending' | 'verified';
+
+export type BaselinePolicy = 'last_paid' | 'rolling_average_6m' | 'none_available';
+
+export type PurchaseDeliveryResult =
+  | 'ordered'
+  | 'partially_delivered'
+  | 'delivered'
+  | 'cancelled'
+  | 'disputed';
+
+export interface PurchaseOutcomeCreate {
+  readonly workspace_product_id: string;
+  readonly supplier_id?: string | null;
+  readonly quotation_line_id?: string | null;
+  readonly match_decision_id?: string | null;
+  readonly landed_cost_id?: string | null;
+  readonly quantity: string;
+  readonly base_unit: string;
+  readonly unit_price: Money;
+  readonly total_paid: Money;
+  readonly delivery_result: PurchaseDeliveryResult;
+  readonly ordered_at?: string | null;
+  readonly delivered_at?: string | null;
+  readonly notes?: string | null;
+}
+
+export interface PurchaseRecord {
+  readonly id: string;
+  readonly workspace_product_id: string;
+  readonly supplier_id?: string | null;
+  readonly quotation_line_id?: string | null;
+  readonly match_decision_id?: string | null;
+  readonly landed_cost_id?: string | null;
+  readonly quantity: string;
+  readonly base_unit: string;
+  readonly unit_price: Money;
+  readonly total_paid: Money;
+  readonly delivery_result: PurchaseDeliveryResult;
+  readonly ordered_at?: string | null;
+  readonly delivered_at?: string | null;
+  readonly recorded_by: string;
+  readonly recorded_at: string;
+  readonly notes?: string | null;
+}
+
+export interface SavingRecord {
+  readonly id: string;
+  readonly purchase_record_id: string;
+  readonly workspace_product_id: string;
+  readonly supplier_id?: string | null;
+  readonly status: SavingStatus;
+  readonly baseline_policy: BaselinePolicy;
+  readonly baseline_source_landed_cost_ids: readonly string[];
+  readonly baseline_unit_price?: Money | null;
+  readonly baseline_value?: Money | null;
+  readonly actual_value: Money;
+  readonly delta?: Money | null;
+  readonly calculation_version: string;
+  readonly calculation_inputs: Record<string, unknown>;
+  readonly recorded_by: string;
+  readonly recorded_at: string;
+  readonly verified_by?: string | null;
+  readonly verified_at?: string | null;
+}
+
+export interface PurchaseOutcomeCreated {
+  readonly purchase_record: PurchaseRecord;
+  readonly saving_record: SavingRecord;
+}
+
+export interface SavingList {
+  readonly items: readonly SavingRecord[];
+  readonly next_cursor: string | null;
+}
+
+export interface SavingCalculationEvidence {
+  readonly baseline_policy: BaselinePolicy;
+  readonly baseline_value: Money | null;
+  readonly actual_value: Money;
+  readonly delta: Money | null;
+  readonly source_landed_cost_ids: readonly string[];
+  readonly calculation_inputs?: Record<string, unknown>;
+}
+
+export interface SavingEvidence {
+  readonly saving_record: SavingRecord;
+  readonly purchase_record: PurchaseRecord;
+  readonly quotation?: Record<string, unknown> | null;
+  readonly match_decision?: Record<string, unknown> | null;
+  readonly competing_offers: readonly Record<string, unknown>[];
+  readonly calculation: SavingCalculationEvidence;
+}
+
+export type ExportFormat = 'xlsx' | 'pdf';
+
+export type ExportStatus = 'queued' | 'running' | 'completed' | 'failed';
+
+export interface ExportFilters {
+  readonly period_start: string;
+  readonly period_end: string;
+  readonly supplier_id?: string | null;
+  readonly branch_id?: string | null;
+}
+
+export interface ExportCreate {
+  readonly kind: 'savings_ledger';
+  readonly format: ExportFormat;
+  readonly filters: ExportFilters;
+}
+
+export interface ExportJob {
+  readonly id: string;
+  readonly kind: 'savings_ledger';
+  readonly format: ExportFormat;
+  readonly filters: ExportFilters;
+  readonly status: ExportStatus;
+  readonly row_count?: number | null;
+  readonly download_url?: string | null;
+  readonly error?: Record<string, unknown> | null;
+  readonly created_at: string;
+  readonly started_at?: string | null;
+  readonly completed_at?: string | null;
+}
+
+export interface PlanLimits {
+  readonly active_catalogue_products: number;
+}
+
+export interface Plan {
+  readonly code: string;
+  readonly name: string;
+  readonly status: 'active' | 'archived';
+  readonly monthly_price: Money;
+  readonly limits: PlanLimits;
+  readonly features: Record<string, unknown>;
+}
+
+export interface BillingAccount {
+  readonly id: string;
+  readonly plan: Plan;
+  readonly provider: 'stub';
+  readonly provider_customer_id: string;
+  readonly provider_subscription_id?: string | null;
+  readonly status: 'active' | 'past_due' | 'cancelled';
+  readonly current_period_start?: string | null;
+  readonly current_period_end?: string | null;
+  readonly assigned_at: string;
+}
+
+export interface LimitCheck {
+  readonly resource: 'active_catalogue_products';
+  readonly plan_code: string;
+  readonly limit: number | null;
+  readonly used: number;
+  readonly allowed: boolean;
+  readonly remaining: number | null;
+}
+
+
 
 

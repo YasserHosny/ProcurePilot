@@ -123,6 +123,24 @@
       "backToSignIn": "العودة لتسجيل الدخول",
       "showPassword": "عرض كلمة المرور",
       "hidePassword": "إخفاء كلمة المرور"
+    },
+    "planDisplay": {
+      "title": "خطة مساحة العمل الخاصة بك",
+      "subtitle": "تم إعداد مساحة عملك المعزولة على خطة البداية مع تفعيل كافة ميزات ذكاء المشتريات.",
+      "planCardTitle": "الخطة المعينة",
+      "priceFree": "مجاناً خلال الفترة التجريبية",
+      "featuresIncluded": "الميزات المضمنة",
+      "features": {
+        "aiMatching": "استخراج عروض الأسعار ومطابقتها آلياً",
+        "smartCompare": "المقارنة الذكية بين الموردين وحساب التكلفة الإجمالية",
+        "basketSplit": "تحسين وتقسيم السلة بين موردين",
+        "savingsLedger": "سجل الوفورات المعتمد وتصدير Excel/PDF",
+        "alerts": "تنبيهات المخاطر التجارية الاستباقية"
+      },
+      "limitsCardTitle": "حدود الموارد",
+      "catalogueLimit": "حتى 100 منتج نشط في الكتالوج",
+      "continueButton": "الدخول إلى مساحة العمل",
+      "errorLoading": "تعذر تحميل تفاصيل الخطة. مساحة عملك نشطة وجاهزة."
     }
   },
   "shell": {
@@ -358,6 +376,11 @@
         "createSuccess": "تم إنشاء المنتج بنجاح.",
         "updateSuccess": "تم تحديث المنتج بنجاح.",
         "genericError": "تعذر حفظ المنتج. يُرجى التحقق من البيانات والمحاولة مرة أخرى."
+      },
+      "limit": {
+        "title": "تم الوصول إلى الحد الأقصى للمنتجات النشطة",
+        "message": "تتيح خطة البداية الحالية ما يصل إلى 100 منتج نشط في الكتالوج (تم استخدام {{used}}/{{limit}}). قم بأرشفة المنتجات غير المستخدمة أو ترقية خطتك لإضافة المزيد.",
+        "badge": "حد الخطة: {{used}}/{{limit}}"
       }
     },
     "suppliers": {
@@ -959,7 +982,8 @@
     "actions": {
       "viewIntelligence": "سجل الأسعار",
       "viewProduct": "عرض المنتج",
-      "backToCatalogue": "العودة إلى الكتالوج"
+      "backToCatalogue": "العودة إلى الكتالوج",
+      "recordPurchase": "تسجيل الشراء"
     }
   },
   "productIntelligence": {
@@ -1098,6 +1122,195 @@
     "empty": {
       "title": "كل شيء على ما يرام — لا توجد تنبيهات نشطة",
       "message": "لم يتم رصد أي شروط تجارية تتطلب تدخلاً فورياً في بيانات مساحة العمل الحالية."
+    }
+  },
+  "savings": {
+    "ledger": {
+      "title": "سجل الوفورات",
+      "subtitle": "سجل معتمد للوفورات المحققة في المشتريات والمحسوبة وفق خطوط أساس تاريخية موثقة.",
+      "recordPurchase": "تسجيل نتيجة شراء",
+      "exportSavings": "تصدير الوفورات",
+      "filters": {
+        "statusLabel": "تصفية حسب الحالة",
+        "allStatuses": "جميع الحالات",
+        "statusPending": "قيد التحقق",
+        "statusVerified": "تم التحقق",
+        "periodStart": "تاريخ البدء",
+        "periodEnd": "تاريخ الانتهاء",
+        "supplierLabel": "المورد",
+        "allSuppliers": "جميع الموردين",
+        "clear": "إعادة ضبط التصفيات"
+      },
+      "table": {
+        "product": "المنتج",
+        "supplier": "المورد",
+        "baseline": "قيمة خط الأساس",
+        "actual": "المبلغ المدفوع فعلياً",
+        "delta": "الوفر المتحقق (الفارق)",
+        "status": "الحالة",
+        "recordedAt": "تاريخ التسجيل",
+        "actions": "الإجراءات",
+        "viewEvidence": "عرض الأدلة",
+        "verifyAction": "تحقق",
+        "statusPending": "قيد التحقق",
+        "statusVerified": "تم التحقق",
+        "noBaseline": "لا يوجد خط أساس"
+      },
+      "empty": {
+        "title": "لم يتم تسجيل أي وفورات بعد",
+        "message": "قارن عروض المنتجات وسجّل مشترياتك الفعلية للبدء في بناء سجل الوفورات المعتمد.",
+        "recordButton": "تسجيل أول عملية شراء"
+      },
+      "stats": {
+        "totalVerified": "إجمالي الوفورات المعتمدة",
+        "pendingCount": "نتائج قيد التحقق",
+        "verifiedCount": "نتائج تم التحقق منها"
+      }
+    },
+    "outcomeCapture": {
+      "title": "تسجيل نتيجة الشراء",
+      "subtitle": "توثيق ما تم طلبه ودفعه فعلياً لحساب الوفر المعتمد مقارنة بخط الأساس.",
+      "productLabel": "المنتج",
+      "selectProductPrompt": "اختر المنتج...",
+      "supplierLabel": "المورد",
+      "selectSupplierPrompt": "اختر المورد...",
+      "quantityLabel": "الكمية المطلوبة فعلياً",
+      "baseUnitLabel": "الوحدة الأساسية",
+      "unitPriceAmountLabel": "سعر الوحدة الفعلي",
+      "currencyLabel": "العملة",
+      "totalPaidAmountLabel": "إجمالي المبلغ المدفوع",
+      "deliveryResultLabel": "نتيجة التوريد",
+      "orderedAtLabel": "تاريخ الطلب",
+      "deliveredAtLabel": "تاريخ التوريد",
+      "notesLabel": "ملاحظات / رقم المرجع",
+      "notesPlaceholder": "مثال: أمر شراء رقم 12345، إشعار استلام...",
+      "baselineNoticeTitle": "ملاحظة خط الأساس التاريخي",
+      "baselineUnavailable": "لا يوجد سجل أسعار سابق لهذا المنتج. سيتم تسجيل الشراء بسياسة خط أساس 'غير متوفر'.",
+      "baselineAvailable": "سيتم حساب خط الأساس بناءً على سجل الأسعار الموثق ({{policy}}).",
+      "deliveryResults": {
+        "ordered": "تم الطلب",
+        "partially_delivered": "تم التوريد جزئياً",
+        "delivered": "تم التوريد",
+        "cancelled": "تم الإلغاء",
+        "disputed": "محل نزاع"
+      },
+      "submitButton": "تسجيل النتيجة وحساب الوفر",
+      "submittingButton": "جاري التسجيل...",
+      "cancelButton": "إلغاء",
+      "successMessage": "تم تسجيل نتيجة الشراء بنجاح. الوفر قيد التحقق.",
+      "validation": {
+        "productRequired": "المنتج مطلوب",
+        "quantityRequired": "الكمية مطلوبة",
+        "quantityMin": "يجب أن تكون الكمية أكبر من 0",
+        "unitPriceRequired": "سعر الوحدة مطلوب",
+        "totalPaidRequired": "إجمالي المدفوع مطلوب",
+        "currencyRequired": "العملة مطلوبة",
+        "deliveryResultRequired": "نتيجة التوريد مطلوبة",
+        "baseUnitRequired": "الوحدة الأساسية مطلوبة"
+      }
+    },
+    "evidence": {
+      "title": "أدلة وحسابات الوفر",
+      "subtitle": "سلسلة موثقة تربط هذا الوفر بنتائج الشراء وعروض الأسعار والعروض المنافسة.",
+      "backToLedger": "العودة إلى سجل الوفورات",
+      "summaryCard": "ملخص الوفر",
+      "statusLabel": "الحالة",
+      "statusPending": "قيد التحقق",
+      "statusVerified": "معتمد (غير قابل للتعديل)",
+      "baselinePolicy": "سياسة خط الأساس",
+      "baselinePolicies": {
+        "last_paid": "آخر سعر مدفوع",
+        "rolling_average_6m": "متوسط 6 أشهر المتداول",
+        "none_available": "لا يوجد خط أساس متوفر"
+      },
+      "baselineUnitPrice": "سعر وحدة خط الأساس",
+      "baselineValue": "إجمالي قيمة خط الأساس",
+      "actualValue": "إجمالي القيمة الفعلية",
+      "delta": "صافي الوفر (الفارق)",
+      "positiveDeltaExplanation": "مبلغ تم توفيره مقارنة بخط الأساس الموثق.",
+      "negativeDeltaExplanation": "التكلفة الفعلية تجاوزت خط الأساس التاريخي.",
+      "calculationVersion": "إصدار الحساب",
+      "recordedBy": "سُجل بواسطة",
+      "recordedAt": "تاريخ التسجيل",
+      "verifiedBy": "تم التحقق بواسطة",
+      "verifiedAt": "تاريخ التحقق",
+      "immutableBanner": "سجل الوفر هذا معتمد وغير قابل للتعديل. لا يمكن تعديل أو حذف الحسابات أو خط الأساس أو الأدلة.",
+      "pendingBanner": "هذا الوفر قيد التحقق البشري. يمكن لمالك أو مشتري مساحة العمل اعتماد هذا السجل لتثبيت حساباته وإدراجه في عمليات التصدير.",
+      "verifyButton": "اعتماد الوفر",
+      "verifyingButton": "جاري الاعتماد...",
+      "verifySuccess": "تم اعتماد سجل الوفر بنجاح.",
+      "purchaseCard": "تفاصيل الشراء",
+      "quotationCard": "عرض السعر الأصلي",
+      "noQuotation": "لا يوجد عرض سعر أصلي مرتبط بعملية الشراء هذه.",
+      "competingOffersCard": "العروض المنافسة وقت المقارنة",
+      "noCompetingOffers": "لا توجد عروض منافسة مسجلة في سياق المقارنة.",
+      "calculationCard": "لقطة بيانات الحساب",
+      "formula": "المعادلة: قيمة خط الأساس − المبلغ المدفوع فعلياً = صافي الوفر"
+    }
+  },
+  "exports": {
+    "title": "تصدير سجل الوفورات",
+    "subtitle": "إنشاء تقارير وفورات معتمدة بصيغة Excel أو PDF جاهزة للتدقيق المالي والمحاسبي.",
+    "backToLedger": "العودة إلى سجل الوفورات",
+    "formCard": "إعدادات التصدير",
+    "formatLabel": "صيغة التصدير",
+    "formatXlsx": "جدول بيانات Excel (.xlsx)",
+    "formatPdf": "تقرير ملخص PDF (.pdf)",
+    "periodStart": "تاريخ بدء الفترة",
+    "periodEnd": "تاريخ نهاية الفترة",
+    "supplierLabel": "تصفية حسب المورد (اختياري)",
+    "allSuppliers": "جميع الموردين",
+    "submitButton": "إنشاء التصدير",
+    "submittingButton": "جاري تقديم الطلب...",
+    "verifiedOnlyNote": "ملاحظة: يتضمن التصدير الوفورات المعتمدة فقط. تُستثنى السجلات قيد التحقق وفقاً لمعايير الامتثال والتدقيق.",
+    "statusCard": "حالة طلب التصدير",
+    "status": {
+      "queued": "في قائمة الانتظار",
+      "queuedDesc": "طلب التصدير في قائمة الانتظار بانتظار بدء المعالجة.",
+      "running": "جاري المعالجة",
+      "runningDesc": "جاري جمع سجلات الوفورات المعتمدة وإنشاء الملف...",
+      "completed": "جاهز للتنزيل",
+      "completedDesc": "اكتمل التصدير بنجاح. انقر أدناه لتنزيل الملف.",
+      "failed": "فشل التصدير",
+      "failedDesc": "حدث خطأ أثناء إنشاء ملف التصدير."
+    },
+    "rowCount": "عدد السجلات المضمنة: {{count}}",
+    "emptyResult": "لم تطابق أي وفورات معتمدة التصفيات المحددة. يحتوي ملف التصدير على رؤوس الجداول فقط.",
+    "downloadButton": "تنزيل ملف التصدير",
+    "newExportButton": "بدء تصدير آخر",
+    "validation": {
+      "periodStartRequired": "تاريخ بدء الفترة مطلوب",
+      "periodEndRequired": "تاريخ نهاية الفترة مطلوب",
+      "invalidDateRange": "يجب أن يكون تاريخ البدء قبل أو يطابق تاريخ النهاية"
+    }
+  },
+  "billing": {
+    "title": "الخطة والفوترة",
+    "subtitle": "عرض خطة مساحة العمل والحدود النشطة وحالة الحساب.",
+    "accountStatus": "حالة الحساب",
+    "statuses": {
+      "active": "نشط",
+      "past_due": "متأخر السداد",
+      "cancelled": "ملغى"
+    },
+    "currentPlan": "الخطة الحالية",
+    "providerNotice": "مزود الفوترة: تجريبي (وضع تقييم المرحلة الأولى — لا يتطلب أي عمليات دفع فعلية)",
+    "limits": {
+      "title": "الاستخدام وحدود الخطة",
+      "activeCatalogueProducts": "منتجات الكتالوج النشطة",
+      "usedOfLimit": "تم استخدام {{used}} من أصل {{limit}}",
+      "remaining": "المتبقي: {{remaining}}",
+      "unlimited": "غير محدود"
+    }
+  },
+  "plans": {
+    "starter": {
+      "name": "البداية",
+      "description": "مثالية لفرق المشتريات الصغيرة لإثبات الوفورات الأولية."
+    },
+    "growth": {
+      "name": "النمو",
+      "description": "للعمليات المتنامية التي تتطلب حدود منتجات أعلى."
     }
   }
 }

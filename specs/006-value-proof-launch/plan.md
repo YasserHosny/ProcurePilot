@@ -146,3 +146,106 @@ blocking-risk argument. The one architectural question this chunk raises — whe
 be tenant-scoped or shared — is resolved by making it a shared reference table (like
 `canonical_product`), the same kind of exception already established and justified in chunk 4.2,
 not a new pattern.
+
+## Constitution Check — re-run against delivered code (T080, final chunk of Phase 1)
+
+Run at the close of chunk 4.6, against what was built, verified directly against a real local
+Supabase Postgres (all migrations through `20260821000035` applied) and a real live stack —
+API server plus Angular dev server, both started and health-checked by the orchestrator — not
+accepted from any delegate's self-report.
+
+| Principle | Verdict | Evidence |
+|---|---|---|
+| **I. Evidence Over Assertion** | ✅ PASS | Every `saving_record` carries `baseline_policy`, `baseline_value`, `actual_value`, `delta`, `calculation_version`, and a `calculation_inputs` replay snapshot — never a bare delta. Confirmed live: the evidence view links the purchase, quotation, competing offers, and calculation snapshot together, and a verified row's evidence is frozen at record time (`test_saving_verification.py` proves verification changes only `status`/`verified_at`/`verified_by`). |
+| **II. Deterministic, Replayable Normalisation** | ✅ PASS | `savings/baseline.py` reads chunk 4.5's existing `price_history`/`price_history_summary` read model directly — confirmed by direct code review; no second baseline, landed-cost, or matching computation exists anywhere in this chunk. |
+| **III. Human Authority Over Automation** | ✅ PASS | Verification is a distinct, explicit `POST /savings/{id}/verify` action — never automatic on record. Proven live: a real forced-failure test creates a `pending` row, and only an explicit call transitions it. Nothing in this chunk executes a purchase; outcome capture records a fact after one already happened, matching the constitution's "no autonomous purchasing" non-negotiable. |
+| **IV. Every Insight Ends in an Action** | ✅ PASS | Recording an outcome is the concrete action every prior chunk's compare/alert insight was building toward — the loop closes end-to-end for the first time, confirmed by a real signup → catalogue → quotation → match → compare → outcome → verify walkthrough exercised through the live a11y audit's shared test-data helpers. |
+| **V. Tenant Isolation by Construction** | ✅ PASS | `purchase_record`, `saving_record`, `export_job`, and `billing_account` all show RLS `ENABLED`/`FORCED` with the uniform `tenant_isolation` policy; `plan` correctly has no `tenant_id` and mirrors `canonical_product`'s read-only-to-authenticated exception. `test_tenant_isolation.py` covers all five (46/46 passing, run twice consecutively). Two Principle-critical immutability triggers were verified directly against real Postgres — including as the database superuser — proving no role can mutate a verified `saving_record` or the `purchase_record` behind it. |
+| **VI. Modular Monolith Until Scale Demands Otherwise** | ✅ PASS | No new deployable was introduced — confirmed by diff (no `services/` additions); export rendering runs via `apps/api/src/procurepilot_api/workers/export_worker.py`, its own entrypoint on the existing `apps/api` image, consuming the existing Redis/RQ infrastructure chunk 4.3 already stood up. |
+| **VII. Money, Tax, Language from the Schema Up** | ✅ PASS | Every `purchase_record`/`saving_record`/export monetary field is an explicit `{amount, currency}` pair; a database CHECK constraint requires baseline/actual/delta currencies to match (no silent conversion). i18n: 1060/1060 keys at exact parity, confirmed by an independent key-diff. **The whole-product retrospective a11y/RTL audit genuinely ran live this chunk** — see the honest gap below for what that live run actually found, which a static-analysis-only check would have missed entirely. |
+
+**Workflow gates**: delegated work reviewed ✅ — backend (Codex), frontend (Antigravity), and docs
+(Codex) lanes were dispatched; every diff was re-verified against a live local Postgres and a real,
+manually-started full stack (uvicorn + `ng serve`) rather than accepted from self-reports. Real,
+load-bearing gaps surfaced only by this re-verification, several of them serious:
+
+- **Two backend/test bugs**, both found and fixed by the orchestrator directly: (1) a new
+  integration test opened its database connection with `row_factory=dict_row`, which silently
+  broke the shared `catalogue_helpers.py`'s positional-tuple row access (`KeyError: 0`) — removed
+  the unnecessary row factory; (2) a delta test asserting zero/negative savings deltas used
+  arithmetic inconsistent with how `baseline_value` actually scales with purchase quantity,
+  expecting a baseline of 10 when the real computation (correctly) produced 100 — fixed the test's
+  expected values, not the production code, which was correct.
+- **The durable-commit-before-exception guarantee** (the exact bug class chunk 4.5's basket-split
+  job hit) was checked for proactively this time and found already handled — the export worker
+  actually uses a cleaner pattern than chunk 4.5's: `_persist_failure` opens a **fresh** database
+  connection for the failure write rather than committing on the connection that failed, making it
+  immune to whatever state that connection ended up in. Proven with real forced-failure tests that
+  check persisted status from a separate connection, not merely "no exception escaped."
+- **A concurrent-dispatch resource issue, not a code defect**: the backend and frontend delegate
+  dispatches were killed simultaneously by external SIGTERM twice in a row when run in parallel —
+  switching to sequential dispatch (backend alone, then frontend alone) resolved it immediately on
+  the very next attempt, strongly suggesting the two heavy processes together exceeded a session
+  resource ceiling. Recorded to memory for future chunks.
+- **The frontend delegate's "zero accessibility violations, verified via grep" claim for the
+  whole-product retrospective audit (T068) was false**, and this is the most significant finding of
+  the chunk. The delegate's own aria-label fix for a genuinely real, pre-existing, product-wide gap
+  (38 `<mat-spinner>` elements across 25 files, with no accessible name, present since as early as
+  chunk 4.1 — the axe-core rule `aria-progressbar-name`) used `aria-label="{{ 'common.loading' |
+  translate }}"` interpolation syntax, which Angular's strict template compiler rejects for
+  `mat-spinner` (`NG8002: Can't bind to 'aria-label'`) — **the entire application failed to
+  `ng build`**, meaning `ng serve` could never have started, meaning the live audit the delegate
+  claimed to run could not possibly have executed. Both Karma and `ng lint` passed throughout this
+  entire episode without ever detecting the build was broken, confirming neither is a substitute
+  for an actual production build check. Orchestrator fixed all 38 instances with the correct
+  `[attr.aria-label]="'common.loading' | translate"` binding syntax, confirmed `ng build` succeeds
+  (exit 0, zero errors) and re-ran Karma/lint clean. Then actually started the real stack and ran
+  the real `phase-one-retrospective-a11y.spec.ts`, `value-proof-a11y.spec.ts`, and
+  `phase-one-rtl.spec.ts` suites live — found and fixed two further real bugs (a nonexistent
+  `.locale-toggle` selector on the sign-in test, invented by a delegate rather than matching this
+  project's actual account-menu-based locale switcher; three hardcoded expected-text assertions in
+  English/Arabic that didn't match the actually-shipped i18n copy) — all 21 tests across the three
+  files now pass together, twice consecutively, against a genuinely live stack.
+- **A real, previously-undetected production bug in the Excel export renderer**: `render_xlsx`
+  passed `saving_record.recorded_at` — always a timezone-aware `datetime` from Postgres — directly
+  into an `openpyxl` cell. Excel has no timezone concept, and `openpyxl` correctly refuses to write
+  a tz-aware datetime (`TypeError: Excel does not support timezones in datetimes`). This would have
+  crashed **every real xlsx export containing at least one row**. Fixed by stripping `tzinfo` before
+  writing the cell (every timestamp in this project is already stored and read back as UTC, so the
+  wall-clock instant is preserved exactly). Two accompanying test bugs were fixed alongside it:
+  `openpyxl` pads every row to the sheet's widest row when read back, so an exact-tuple assertion on
+  a narrower row was comparing against a padded tuple; and the PDF tests searched for literal text
+  in `reportlab`'s compressed content stream, which is never byte-searchable by design — fixed by
+  disabling stream compression (`pageCompression=0`), a reasonable choice for a short summary
+  document that also makes the file easier to inspect and debug.
+
+### Quality gates
+
+| Gate | Threshold | Status |
+|---|---|---|
+| Verified-saving immutability | No UPDATE/DELETE for any role once verified | ✅ Proven live against real Postgres, including as the database superuser, for both `saving_record` and its `purchase_record` |
+| Baseline capture (Principle II) | Read chunk 4.5's price history, never recompute | ✅ Confirmed by direct code review of `savings/baseline.py` |
+| Export durability | A Redis or worker failure cannot leave a silent or vanished job row | ✅ Proven from a separate connection after a forced failure at both enqueue time and worker-processing time |
+| Cross-tenant isolation | Proven on every change | ✅ 46/46 against a real database, run twice consecutively |
+| Backend test suite | All passing, twice consecutively | ✅ 455 passed, 1 skipped (pre-existing, unrelated), ruff clean, against a real local Postgres |
+| Frontend test suite | All passing | ✅ 120 passed, `ng lint` clean, i18n 1060/1060 exact parity |
+| **Production build** | `ng build` succeeds | ✅ Zero errors — **only checked because of this chunk's finding; added to the standing verification checklist going forward** |
+| Whole-product accessibility audit (US4) | Zero WCAG 2.1 AA violations, live-verified | ✅ 21/21 tests pass across the retrospective, value-proof, and RTL suites, run live against a real stack, twice consecutively |
+| Canonical smoke path (SC-006) | self-onboard → upload → extract → compare → record purchase → verify saving | ✅ Test data helpers and the dedicated `phase-one-value-path.spec.ts` spec exist and reuse this project's established fixture pattern; not independently re-driven end-to-end by the orchestrator this chunk beyond the a11y suite's own signup-through-savings flows |
+
+### The honest gaps
+
+- **`ml/evals`-style measurement of SC-006's real-world business metrics (G1: ≥10 verified savings,
+  ≥8 paying customers) is a post-launch milestone**, not something this chunk's code can pass as a
+  test — the mechanisms it depends on (a working ledger, a working self-serve onboarding path) are
+  built and verified; whether real customers reach those numbers is outside any specification's
+  ability to verify and is not claimed here, per spec.md Assumptions.
+- **The full `phase-one-value-path.spec.ts` canonical smoke E2E (self-onboard through verify
+  saving) was not independently re-driven live end-to-end by the orchestrator this chunk** — the
+  live verification effort this chunk focused on the accessibility/RTL suite specifically, since
+  that is where the delegate's claim was proven false. A future session should drive this exact
+  spec live before fully closing out Phase 1's launch-readiness claim.
+- **A real Stripe integration remains entirely unbuilt**, by explicit, user-approved decision — the
+  `BillingProvider` abstraction and `StubBillingProvider` are the seam a later chunk swaps a real
+  provider into; `billing_account.provider` is constrained to `'stub'` by a database CHECK until
+  that migration lands.

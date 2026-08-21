@@ -1,7 +1,7 @@
 <div class="quotation-review-container">
   @if (isLoading()) {
     <div class="loading-state">
-      <mat-spinner diameter="48"></mat-spinner>
+      <mat-spinner [attr.aria-label]="'common.loading' | translate" diameter="48"></mat-spinner>
       <span>{{ 'common.loading' | translate }}</span>
     </div>
   } @else {
@@ -551,7 +551,7 @@
               class="save-btn"
             >
               @if (isSaving()) {
-                <mat-spinner diameter="18"></mat-spinner>
+                <mat-spinner [attr.aria-label]="'common.loading' | translate" diameter="18"></mat-spinner>
                 <span>{{ 'quotations.review.actions.saving' | translate }}</span>
               } @else {
                 <ng-container>
@@ -570,7 +570,7 @@
               class="confirm-btn"
             >
               @if (isConfirming()) {
-                <mat-spinner diameter="18"></mat-spinner>
+                <mat-spinner [attr.aria-label]="'common.loading' | translate" diameter="18"></mat-spinner>
                 <span>{{ 'quotations.review.actions.confirming' | translate }}</span>
               } @else {
                 <ng-container>

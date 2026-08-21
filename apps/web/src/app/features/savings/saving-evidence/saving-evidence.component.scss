@@ -1,0 +1,347 @@
+.saving-evidence-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  padding: 1.5rem;
+  max-width: 1000px;
+  margin-inline: auto;
+}
+
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 1rem;
+
+  .page-title {
+    font-size: 1.75rem;
+    font-weight: 700;
+    margin: 0 0 0.25rem 0;
+    color: var(--mat-sys-on-surface, #1e293b);
+  }
+
+  .page-subtitle {
+    margin: 0;
+    color: var(--mat-sys-on-surface-variant, #64748b);
+    font-size: 0.95rem;
+  }
+}
+
+.immutable-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 1rem 1.25rem;
+  background-color: #f0fdf4;
+  border: 1px solid #86efac;
+  border-radius: 10px;
+
+  .banner-icon {
+    color: #166534;
+    flex-shrink: 0;
+  }
+
+  .banner-text {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+
+    .banner-title {
+      font-weight: 700;
+      color: #166534;
+      font-size: 0.95rem;
+    }
+
+    .banner-desc {
+      color: #14532d;
+      font-size: 0.85rem;
+    }
+  }
+}
+
+.pending-banner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+  background-color: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: 10px;
+
+  .pending-banner-content {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    flex: 1;
+
+    .banner-icon {
+      color: #b45309;
+      flex-shrink: 0;
+    }
+
+    .banner-text {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+
+      .banner-title {
+        font-weight: 700;
+        color: #92400e;
+        font-size: 0.95rem;
+      }
+
+      .banner-desc {
+        color: #78350f;
+        font-size: 0.85rem;
+      }
+    }
+  }
+
+  .verify-action-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-shrink: 0;
+  }
+}
+
+.evidence-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+
+  @media (max-width: 768px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.evidence-card {
+  padding: 1.25rem;
+  border-radius: 12px;
+
+  .card-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-block-end: 0.75rem;
+
+    .card-header-icon {
+      color: var(--mat-sys-primary, #0284c7);
+    }
+
+    .card-title {
+      font-size: 1.15rem;
+      font-weight: 600;
+      margin: 0;
+      color: var(--mat-sys-on-surface, #1e293b);
+    }
+  }
+
+  .card-content {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    padding-block-start: 1rem;
+  }
+}
+
+.detail-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.9rem;
+
+  .detail-label {
+    color: var(--mat-sys-on-surface-variant, #64748b);
+  }
+
+  .detail-val {
+    color: var(--mat-sys-on-surface, #0f172a);
+
+    &.strong {
+      font-weight: 600;
+    }
+
+    &.version-code {
+      font-family: monospace;
+      font-size: 0.8rem;
+      background-color: #f1f5f9;
+      padding-inline: 0.4rem;
+      padding-block: 0.1rem;
+      border-radius: 4px;
+    }
+  }
+
+  &.highlight-row {
+    padding-block-end: 0.5rem;
+    border-block-end: 1px solid var(--mat-sys-outline-variant, #e2e8f0);
+
+    .detail-label {
+      font-weight: 600;
+      font-size: 1rem;
+      color: var(--mat-sys-on-surface, #1e293b);
+    }
+
+    .delta-amount {
+      font-size: 1.25rem;
+      font-weight: 700;
+
+      &.positive-delta {
+        color: #15803d;
+      }
+      &.negative-delta {
+        color: #b91c1c;
+      }
+      &.zero-delta {
+        color: #475569;
+      }
+    }
+  }
+}
+
+.policy-chip {
+  font-size: 0.8rem;
+  padding-inline: 0.5rem;
+  padding-block: 0.2rem;
+  border-radius: 6px;
+  background-color: #e0f2fe;
+  color: #0369a1;
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding-inline: 0.5rem;
+  padding-block: 0.15rem;
+  border-radius: 9999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+
+  .mini-icon {
+    font-size: 14px;
+    width: 14px;
+    height: 14px;
+  }
+
+  &.status-verified {
+    background-color: #dcfce7;
+    color: #15803d;
+  }
+
+  &.status-pending {
+    background-color: #fef3c7;
+    color: #b45309;
+  }
+}
+
+.delivery-badge {
+  font-size: 0.8rem;
+  padding-inline: 0.5rem;
+  padding-block: 0.2rem;
+  border-radius: 6px;
+
+  &.delivery-delivered {
+    background-color: #dcfce7;
+    color: #166534;
+  }
+  &.delivery-partial {
+    background-color: #fef3c7;
+    color: #92400e;
+  }
+  &.delivery-ordered {
+    background-color: #e0f2fe;
+    color: #0369a1;
+  }
+  &.delivery-cancelled,
+  &.delivery-disputed {
+    background-color: #fee2e2;
+    color: #991b1b;
+  }
+}
+
+.notes-box {
+  background-color: #f8fafc;
+  padding: 0.75rem;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  margin-block-start: 0.5rem;
+
+  .notes-label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #64748b;
+  }
+
+  .notes-content {
+    margin: 0.25rem 0 0 0;
+    font-size: 0.85rem;
+    color: #1e293b;
+  }
+}
+
+.formula-box {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  background-color: #f8fafc;
+  border: 1px dashed #cbd5e1;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #334155;
+}
+
+.competing-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-block-start: 0.75rem;
+
+  .section-title {
+    font-size: 0.95rem;
+    font-weight: 600;
+    margin: 0;
+    color: #475569;
+  }
+
+  .offers-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+
+    .competing-offer-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.5rem 0.75rem;
+      background-color: #f8fafc;
+      border-radius: 6px;
+      font-size: 0.85rem;
+    }
+  }
+}
+
+.empty-competing-notice {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  color: #94a3b8;
+  font-style: italic;
+  padding-block: 0.5rem;
+}
+
+.loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  padding: 4rem 2rem;
+  color: var(--mat-sys-on-surface-variant, #64748b);
+}

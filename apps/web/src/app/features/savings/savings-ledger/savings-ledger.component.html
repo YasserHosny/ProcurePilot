@@ -1,0 +1,243 @@
+<div class="savings-ledger-container">
+  <div class="page-header">
+    <div class="header-info">
+      <h1 class="page-title">{{ 'savings.ledger.title' | translate }}</h1>
+      <p class="page-subtitle">{{ 'savings.ledger.subtitle' | translate }}</p>
+    </div>
+
+    <div class="header-actions">
+      <a
+        mat-stroked-button
+        routerLink="/savings/export"
+        class="action-btn"
+        *appRole="['owner', 'buyer']"
+      >
+        <mat-icon aria-hidden="true">download</mat-icon>
+        <span>{{ 'savings.ledger.exportSavings' | translate }}</span>
+      </a>
+
+      <a
+        mat-flat-button
+        color="primary"
+        routerLink="/savings/outcome-capture"
+        class="action-btn"
+        *appRole="['owner', 'buyer']"
+      >
+        <mat-icon aria-hidden="true">add</mat-icon>
+        <span>{{ 'savings.ledger.recordPurchase' | translate }}</span>
+      </a>
+    </div>
+  </div>
+
+  @if (errorMessage()) {
+    <div class="error-banner" role="alert">
+      <mat-icon class="error-icon" aria-hidden="true">error_outline</mat-icon>
+      <div class="error-text-wrap">
+        <div class="error-title">{{ 'common.traceId' | translate }}</div>
+        <div class="error-message">{{ errorMessage() }}</div>
+        @if (errorTraceId(); as traceId) {
+          <div class="error-trace">{{ traceId }}</div>
+        }
+      </div>
+    </div>
+  }
+
+  <!-- Stats Cards -->
+  <div class="stats-grid">
+    <mat-card class="stat-card total-savings-card">
+      <div class="stat-icon-wrap">
+        <mat-icon aria-hidden="true">savings</mat-icon>
+      </div>
+      <div class="stat-content">
+        <span class="stat-label">{{ 'savings.ledger.stats.totalVerified' | translate }}</span>
+        <span class="stat-value">
+          @if (totalVerifiedAmount(); as total) {
+            {{ total | formatMoney }}
+          } @else {
+            —
+          }
+        </span>
+      </div>
+    </mat-card>
+
+    <mat-card class="stat-card verified-card">
+      <div class="stat-icon-wrap">
+        <mat-icon aria-hidden="true">verified</mat-icon>
+      </div>
+      <div class="stat-content">
+        <span class="stat-label">{{ 'savings.ledger.stats.verifiedCount' | translate }}</span>
+        <span class="stat-value">{{ verifiedSavingsCount() }}</span>
+      </div>
+    </mat-card>
+
+    <mat-card class="stat-card pending-card">
+      <div class="stat-icon-wrap">
+        <mat-icon aria-hidden="true">hourglass_empty</mat-icon>
+      </div>
+      <div class="stat-content">
+        <span class="stat-label">{{ 'savings.ledger.stats.pendingCount' | translate }}</span>
+        <span class="stat-value">{{ pendingSavingsCount() }}</span>
+      </div>
+    </mat-card>
+  </div>
+
+  <!-- Filters & Ledger Card -->
+  <mat-card class="ledger-card">
+    <div class="filter-toolbar">
+      <!-- Status Filter -->
+      <mat-form-field appearance="outline" class="filter-field" subscriptSizing="dynamic">
+        <mat-label>{{ 'savings.ledger.filters.statusLabel' | translate }}</mat-label>
+        <mat-select [value]="statusFilter()" (selectionChange)="statusFilter.set($event.value); onFilterChange()">
+          <mat-option value="all">{{ 'savings.ledger.filters.allStatuses' | translate }}</mat-option>
+          <mat-option value="verified">{{ 'savings.ledger.filters.statusVerified' | translate }}</mat-option>
+          <mat-option value="pending">{{ 'savings.ledger.filters.statusPending' | translate }}</mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      <!-- Supplier Filter -->
+      <mat-form-field appearance="outline" class="filter-field" subscriptSizing="dynamic">
+        <mat-label>{{ 'savings.ledger.filters.supplierLabel' | translate }}</mat-label>
+        <mat-select [value]="selectedSupplierId()" (selectionChange)="selectedSupplierId.set($event.value); onFilterChange()">
+          <mat-option value="">{{ 'savings.ledger.filters.allSuppliers' | translate }}</mat-option>
+          @for (s of suppliers(); track s.id) {
+            <mat-option [value]="s.id">{{ s.name }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+
+      <!-- Start Date Filter -->
+      <mat-form-field appearance="outline" class="filter-field" subscriptSizing="dynamic">
+        <mat-label>{{ 'savings.ledger.filters.periodStart' | translate }}</mat-label>
+        <input matInput [matDatepicker]="startPicker" [ngModel]="periodStartDate()" (ngModelChange)="periodStartDate.set($event); onFilterChange()" />
+        <mat-datepicker-toggle matIconSuffix [for]="startPicker"></mat-datepicker-toggle>
+        <mat-datepicker #startPicker></mat-datepicker>
+      </mat-form-field>
+
+      <!-- End Date Filter -->
+      <mat-form-field appearance="outline" class="filter-field" subscriptSizing="dynamic">
+        <mat-label>{{ 'savings.ledger.filters.periodEnd' | translate }}</mat-label>
+        <input matInput [matDatepicker]="endPicker" [ngModel]="periodEndDate()" (ngModelChange)="periodEndDate.set($event); onFilterChange()" />
+        <mat-datepicker-toggle matIconSuffix [for]="endPicker"></mat-datepicker-toggle>
+        <mat-datepicker #endPicker></mat-datepicker>
+      </mat-form-field>
+
+      <button mat-button type="button" (click)="clearFilters()" class="clear-btn">
+        <mat-icon aria-hidden="true">filter_alt_off</mat-icon>
+        <span>{{ 'savings.ledger.filters.clear' | translate }}</span>
+      </button>
+    </div>
+
+    @if (isLoading()) {
+      <div class="loading-state" aria-live="polite">
+        <mat-spinner [attr.aria-label]="'common.loading' | translate" diameter="40"></mat-spinner>
+        <span>{{ 'common.loading' | translate }}</span>
+      </div>
+    } @else if (savings().length === 0) {
+      <div class="empty-state">
+        <mat-icon class="empty-icon" aria-hidden="true">savings</mat-icon>
+        <h2 class="empty-title">{{ 'savings.ledger.empty.title' | translate }}</h2>
+        <p class="empty-message">{{ 'savings.ledger.empty.message' | translate }}</p>
+        <div class="empty-actions">
+          <a mat-flat-button color="primary" routerLink="/savings/outcome-capture" *appRole="['owner', 'buyer']">
+            <mat-icon aria-hidden="true">add</mat-icon>
+            <span>{{ 'savings.ledger.empty.recordButton' | translate }}</span>
+          </a>
+        </div>
+      </div>
+    } @else {
+      <div class="table-responsive">
+        <table mat-table [dataSource]="savings()" class="savings-table" aria-label="Savings Ledger Table">
+          <!-- Product Column -->
+          <ng-container matColumnDef="product">
+            <th mat-header-cell *matHeaderCellDef>{{ 'savings.ledger.table.product' | translate }}</th>
+            <td mat-cell *matCellDef="let saving" class="product-cell">
+              <span class="product-name">{{ getProductName(saving.workspace_product_id) }}</span>
+            </td>
+          </ng-container>
+
+          <!-- Supplier Column -->
+          <ng-container matColumnDef="supplier">
+            <th mat-header-cell *matHeaderCellDef>{{ 'savings.ledger.table.supplier' | translate }}</th>
+            <td mat-cell *matCellDef="let saving" class="supplier-cell">
+              <span>{{ getSupplierName(saving.supplier_id) }}</span>
+            </td>
+          </ng-container>
+
+          <!-- Baseline Column -->
+          <ng-container matColumnDef="baseline">
+            <th mat-header-cell *matHeaderCellDef>{{ 'savings.ledger.table.baseline' | translate }}</th>
+            <td mat-cell *matCellDef="let saving" class="baseline-cell">
+              @if (saving.baseline_value) {
+                <span>{{ saving.baseline_value | formatMoney }}</span>
+              } @else {
+                <span class="no-baseline-badge">{{ 'savings.ledger.table.noBaseline' | translate }}</span>
+              }
+            </td>
+          </ng-container>
+
+          <!-- Actual Paid Column -->
+          <ng-container matColumnDef="actual">
+            <th mat-header-cell *matHeaderCellDef>{{ 'savings.ledger.table.actual' | translate }}</th>
+            <td mat-cell *matCellDef="let saving" class="actual-cell">
+              <span>{{ saving.actual_value | formatMoney }}</span>
+            </td>
+          </ng-container>
+
+          <!-- Delta Column -->
+          <ng-container matColumnDef="delta">
+            <th mat-header-cell *matHeaderCellDef>{{ 'savings.ledger.table.delta' | translate }}</th>
+            <td mat-cell *matCellDef="let saving" class="delta-cell">
+              @if (saving.delta) {
+                <span class="delta-badge" [ngClass]="getDeltaClass(saving.delta)">
+                  {{ isPositive(saving.delta) ? '+' : '' }}{{ saving.delta | formatMoney }}
+                </span>
+              } @else {
+                <span class="text-muted">—</span>
+              }
+            </td>
+          </ng-container>
+
+          <!-- Status Column -->
+          <ng-container matColumnDef="status">
+            <th mat-header-cell *matHeaderCellDef>{{ 'savings.ledger.table.status' | translate }}</th>
+            <td mat-cell *matCellDef="let saving" class="status-cell">
+              <span class="status-pill" [ngClass]="getStatusClass(saving.status)">
+                <mat-icon aria-hidden="true" class="status-icon">
+                  {{ saving.status === 'verified' ? 'verified' : 'hourglass_empty' }}
+                </mat-icon>
+                <span>{{ (saving.status === 'verified' ? 'savings.ledger.table.statusVerified' : 'savings.ledger.table.statusPending') | translate }}</span>
+              </span>
+            </td>
+          </ng-container>
+
+          <!-- Recorded Date Column -->
+          <ng-container matColumnDef="recordedAt">
+            <th mat-header-cell *matHeaderCellDef>{{ 'savings.ledger.table.recordedAt' | translate }}</th>
+            <td mat-cell *matCellDef="let saving" class="date-cell">
+              <span>{{ saving.recorded_at | formatDate }}</span>
+            </td>
+          </ng-container>
+
+          <!-- Actions Column -->
+          <ng-container matColumnDef="actions">
+            <th mat-header-cell *matHeaderCellDef>{{ 'savings.ledger.table.actions' | translate }}</th>
+            <td mat-cell *matCellDef="let saving" class="actions-cell">
+              <a
+                mat-stroked-button
+                [routerLink]="['/savings', saving.id, 'evidence']"
+                class="evidence-btn"
+                [attr.aria-label]="('savings.ledger.table.viewEvidence' | translate)"
+              >
+                <mat-icon aria-hidden="true">description</mat-icon>
+                <span>{{ 'savings.ledger.table.viewEvidence' | translate }}</span>
+              </a>
+            </td>
+          </ng-container>
+
+          <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+          <tr mat-row *matRowDef="let row; columns: displayedColumns"></tr>
+        </table>
+      </div>
+    }
+  </mat-card>
+</div>

@@ -775,26 +775,330 @@ Completed feasible result:
 
 ---
 
-## Savings
+## Delivered Value Proof and Launch Readiness API
+
+The following endpoints are delivered for chunk 4.6 and mirror
+`specs/006-value-proof-launch/contracts/savings-and-billing.openapi.yaml`. All routes require
+bearer auth. Tenant scope is resolved from the token. Owner and buyer may record purchase outcomes,
+verify savings, and request exports; branch manager, approver, and viewer are read-only.
+Cross-tenant records return `404`, deliberately indistinguishable from records that do not exist.
+
+Every monetary value is a `Money` object with `amount` as a decimal string and explicit
+`currency`; the API has no bare money numbers. Purchase outcome capture creates one
+`PurchaseRecord` and one paired pending `SavingRecord` in a single transaction. Baseline, actual,
+delta, and calculation inputs are captured at record time from chunk 4.5 price history; verification
+later changes only `status`, `verified_at`, and `verified_by`.
+
+### `POST /purchases`
+
+- Requires bearer auth and owner or buyer role; accepts `Idempotency-Key`.
+- Records an actual purchase outcome and creates its paired pending saving record.
+- Request fields: `workspace_product_id`, decimal-string `quantity`, `base_unit`, `unit_price`,
+  `total_paid`, and `delivery_result`; optional `supplier_id`, `quotation_line_id`,
+  `match_decision_id`, `landed_cost_id`, `ordered_at`, `delivered_at`, and `notes`.
+- `unit_price` and `total_paid` are `Money { amount, currency }`; both currencies must match.
+- `delivery_result` is `ordered`, `partially_delivered`, `delivered`, `cancelled`, or `disputed`.
+- Returns `201` with `purchase_record` and `saving_record`.
+- Returns `403` when the caller's role may not record outcomes.
+- Returns `404` when any referenced product, supplier, quotation line, match decision, or landed
+  cost is not in the caller's workspace.
+- Returns `409` for idempotency or state conflicts.
+- Returns `422` when validation fails.
+
+Request:
+
+```json
+{
+  "workspace_product_id": "00000000-0000-4000-8000-000000000010",
+  "supplier_id": "00000000-0000-4000-8000-000000000020",
+  "quotation_line_id": "00000000-0000-4000-8000-000000000030",
+  "match_decision_id": "00000000-0000-4000-8000-000000000040",
+  "landed_cost_id": "00000000-0000-4000-8000-000000000050",
+  "quantity": "10.000000",
+  "base_unit": "each",
+  "unit_price": { "amount": "8.8000", "currency": "GBP" },
+  "total_paid": { "amount": "88.0000", "currency": "GBP" },
+  "delivery_result": "delivered",
+  "ordered_at": "2026-08-21T09:00:00Z",
+  "delivered_at": "2026-08-22T09:00:00Z",
+  "notes": "Delivered in full."
+}
+```
+
+Response:
+
+```json
+{
+  "purchase_record": {
+    "id": "00000000-0000-4000-8000-000000000060",
+    "workspace_product_id": "00000000-0000-4000-8000-000000000010",
+    "supplier_id": "00000000-0000-4000-8000-000000000020",
+    "quotation_line_id": "00000000-0000-4000-8000-000000000030",
+    "match_decision_id": "00000000-0000-4000-8000-000000000040",
+    "landed_cost_id": "00000000-0000-4000-8000-000000000050",
+    "quantity": "10.000000",
+    "base_unit": "each",
+    "unit_price": { "amount": "8.8000", "currency": "GBP" },
+    "total_paid": { "amount": "88.0000", "currency": "GBP" },
+    "delivery_result": "delivered",
+    "ordered_at": "2026-08-21T09:00:00Z",
+    "delivered_at": "2026-08-22T09:00:00Z",
+    "recorded_by": "00000000-0000-4000-8000-000000000070",
+    "recorded_at": "2026-08-21T09:05:00Z",
+    "notes": "Delivered in full."
+  },
+  "saving_record": {
+    "id": "00000000-0000-4000-8000-000000000080",
+    "purchase_record_id": "00000000-0000-4000-8000-000000000060",
+    "workspace_product_id": "00000000-0000-4000-8000-000000000010",
+    "supplier_id": "00000000-0000-4000-8000-000000000020",
+    "status": "pending",
+    "baseline_policy": "last_paid",
+    "baseline_source_landed_cost_ids": ["00000000-0000-4000-8000-000000000090"],
+    "baseline_unit_price": { "amount": "10.0000", "currency": "GBP" },
+    "baseline_value": { "amount": "100.0000", "currency": "GBP" },
+    "actual_value": { "amount": "88.0000", "currency": "GBP" },
+    "delta": { "amount": "12.0000", "currency": "GBP" },
+    "calculation_version": "saving-baseline-v1",
+    "calculation_inputs": {
+      "quantity": "10.000000",
+      "selected_policy": "last_paid",
+      "window_months": 6
+    },
+    "recorded_by": "00000000-0000-4000-8000-000000000070",
+    "recorded_at": "2026-08-21T09:05:00Z",
+    "verified_by": null,
+    "verified_at": null
+  }
+}
+```
 
 ### `GET /savings`
 
-Query: `?period=&branch_id=&supplier_id=&cursor=&limit=`
+- Requires bearer auth.
+- Lists pending and verified savings for the active workspace.
+- Query parameters: optional `status` (`pending` or `verified`), optional `period_start`, optional
+  `period_end`, optional `supplier_id`, optional `branch_id`, optional `cursor`, optional `limit`
+  capped at 100 and defaulting to 50.
+- `branch_id` is accepted for future-compatible filtering, but Phase 1 has no Branch entity; the
+  only meaningful current value is null or omitted.
+- Returns `200` with `items` containing `SavingRecord` resources and nullable `next_cursor`.
+- Returns `422` when validation fails.
+
+### `GET /savings/{id}`
+
+- Requires bearer auth.
+- Returns one saving record in the active workspace.
+- `SavingRecord` fields include `id`, `purchase_record_id`, `workspace_product_id`, optional
+  `supplier_id`, `status`, `baseline_policy`, `baseline_source_landed_cost_ids`, nullable
+  `baseline_unit_price`, nullable `baseline_value`, `actual_value`, nullable `delta`,
+  `calculation_version`, `calculation_inputs`, `recorded_by`, `recorded_at`, nullable
+  `verified_by`, and nullable `verified_at`.
+- `baseline_policy` is `last_paid`, `rolling_average_6m`, or `none_available`. When no baseline
+  exists, `baseline_unit_price`, `baseline_value`, and `delta` are null.
+- Returns `404` when the saving record is not in the caller's workspace.
 
 ### `GET /savings/{id}/evidence`
 
+- Requires bearer auth.
+- Returns the evidence view for one saving record in the active workspace.
+- Response fields: `saving_record`, `purchase_record`, nullable `quotation`, nullable
+  `match_decision`, `competing_offers`, and `calculation`.
+- `calculation` includes `baseline_policy`, nullable `baseline_value`, `actual_value`, nullable
+  `delta`, `source_landed_cost_ids`, and `calculation_inputs`.
+- Returns `404` when the saving record is not in the caller's workspace.
+
 Response:
+
 ```json
 {
-  "saving_record": { ... },
-  "quotation": { ... },
-  "competing_offers": [...],
-  "purchase_record": { ... },
-  "calculation": {
+  "saving_record": {
+    "id": "00000000-0000-4000-8000-000000000080",
+    "purchase_record_id": "00000000-0000-4000-8000-000000000060",
+    "workspace_product_id": "00000000-0000-4000-8000-000000000010",
+    "supplier_id": "00000000-0000-4000-8000-000000000020",
+    "status": "verified",
+    "baseline_policy": "last_paid",
+    "baseline_source_landed_cost_ids": ["00000000-0000-4000-8000-000000000090"],
+    "baseline_unit_price": { "amount": "10.0000", "currency": "GBP" },
     "baseline_value": { "amount": "100.0000", "currency": "GBP" },
     "actual_value": { "amount": "88.0000", "currency": "GBP" },
-    "delta": { "amount": "12.0000", "currency": "GBP" }
+    "delta": { "amount": "12.0000", "currency": "GBP" },
+    "calculation_version": "saving-baseline-v1",
+    "calculation_inputs": { "selected_policy": "last_paid" },
+    "recorded_by": "00000000-0000-4000-8000-000000000070",
+    "recorded_at": "2026-08-21T09:05:00Z",
+    "verified_by": "00000000-0000-4000-8000-000000000070",
+    "verified_at": "2026-08-21T09:10:00Z"
+  },
+  "purchase_record": {
+    "id": "00000000-0000-4000-8000-000000000060",
+    "workspace_product_id": "00000000-0000-4000-8000-000000000010",
+    "supplier_id": "00000000-0000-4000-8000-000000000020",
+    "quotation_line_id": "00000000-0000-4000-8000-000000000030",
+    "match_decision_id": "00000000-0000-4000-8000-000000000040",
+    "landed_cost_id": "00000000-0000-4000-8000-000000000050",
+    "quantity": "10.000000",
+    "base_unit": "each",
+    "unit_price": { "amount": "8.8000", "currency": "GBP" },
+    "total_paid": { "amount": "88.0000", "currency": "GBP" },
+    "delivery_result": "delivered",
+    "ordered_at": "2026-08-21T09:00:00Z",
+    "delivered_at": "2026-08-22T09:00:00Z",
+    "recorded_by": "00000000-0000-4000-8000-000000000070",
+    "recorded_at": "2026-08-21T09:05:00Z",
+    "notes": "Delivered in full."
+  },
+  "quotation": {
+    "id": "00000000-0000-4000-8000-000000000031",
+    "quotation_line_id": "00000000-0000-4000-8000-000000000030"
+  },
+  "match_decision": {
+    "id": "00000000-0000-4000-8000-000000000040",
+    "status": "accepted"
+  },
+  "competing_offers": [],
+  "calculation": {
+    "baseline_policy": "last_paid",
+    "baseline_value": { "amount": "100.0000", "currency": "GBP" },
+    "actual_value": { "amount": "88.0000", "currency": "GBP" },
+    "delta": { "amount": "12.0000", "currency": "GBP" },
+    "source_landed_cost_ids": ["00000000-0000-4000-8000-000000000090"],
+    "calculation_inputs": { "selected_policy": "last_paid" }
   }
+}
+```
+
+### `POST /savings/{id}/verify`
+
+- Requires bearer auth and owner or buyer role; accepts `Idempotency-Key`.
+- Explicitly verifies a pending saving. The recording buyer may self-verify.
+- Verification changes only `status`, `verified_at`, and `verified_by`; it never recomputes
+  baseline, actual, delta, or evidence.
+- Returns `200` with the verified `SavingRecord`.
+- Returns `403` when the caller's role may not verify savings.
+- Returns `404` when the saving record is not in the caller's workspace.
+- Returns `409` when the saving is already verified or cannot be verified in its current state.
+
+### `POST /exports`
+
+- Requires bearer auth and owner or buyer role; accepts `Idempotency-Key`.
+- Requests an asynchronous savings-ledger export.
+- Request fields: `kind` fixed to `savings_ledger`, `format` (`xlsx` or `pdf`), and `filters`.
+- `filters` fields: required `period_start`, required `period_end`, optional `supplier_id`, and
+  optional `branch_id`. Phase 1 has no Branch entity; non-null `branch_id` is future-compatible
+  input only.
+- Only verified savings are included in savings-ledger exports.
+- Returns `202` with an `ExportJob`.
+- Returns `403` when the caller's role may not request exports.
+- Returns `404` when a filter reference is not in the caller's workspace.
+- Returns `409` when an equivalent export is already queued or running.
+- Returns `422` when validation fails.
+
+Request:
+
+```json
+{
+  "kind": "savings_ledger",
+  "format": "xlsx",
+  "filters": {
+    "period_start": "2026-08-01",
+    "period_end": "2026-08-31",
+    "supplier_id": "00000000-0000-4000-8000-000000000020",
+    "branch_id": null
+  }
+}
+```
+
+### `GET /exports/{id}`
+
+- Requires bearer auth.
+- Polls export job status and result in the active workspace.
+- Returns `200` with `ExportJob`.
+- Job statuses are `queued`, `running`, `completed`, and `failed`.
+- `row_count`, `download_url`, and storage-backed result metadata are null until completion. A
+  completed empty export has `row_count = 0`.
+- Failed jobs carry structured `error`.
+- Returns `404` when the export job is not in the caller's workspace.
+
+Response:
+
+```json
+{
+  "id": "00000000-0000-4000-8000-000000000100",
+  "kind": "savings_ledger",
+  "format": "xlsx",
+  "filters": {
+    "period_start": "2026-08-01",
+    "period_end": "2026-08-31",
+    "supplier_id": "00000000-0000-4000-8000-000000000020",
+    "branch_id": null
+  },
+  "status": "completed",
+  "row_count": 1,
+  "download_url": "/api/v1/exports/00000000-0000-4000-8000-000000000100/download",
+  "error": null,
+  "created_at": "2026-08-21T09:00:00Z",
+  "started_at": "2026-08-21T09:00:05Z",
+  "completed_at": "2026-08-21T09:01:00Z"
+}
+```
+
+### `GET /billing/account`
+
+- Requires bearer auth.
+- Returns the active workspace's billing account and assigned plan.
+- Billing uses the stub provider in chunk 4.6. No real payment provider credentials, Stripe SDK, or
+  financial transaction exists.
+- `BillingAccount` fields include `id`, `plan`, `provider`, `provider_customer_id`, nullable
+  `provider_subscription_id`, `status`, nullable `current_period_start`, nullable
+  `current_period_end`, and `assigned_at`.
+- `plan` fields include `code`, `name`, `status`, `monthly_price`, `limits`, and `features`.
+- Returns `404` when no billing account is configured for the workspace.
+
+Response:
+
+```json
+{
+  "id": "00000000-0000-4000-8000-000000000110",
+  "plan": {
+    "code": "starter",
+    "name": "Starter",
+    "status": "active",
+    "monthly_price": { "amount": "0.0000", "currency": "GBP" },
+    "limits": { "active_catalogue_products": 100 },
+    "features": {}
+  },
+  "provider": "stub",
+  "provider_customer_id": "stub_customer:00000000-0000-4000-8000-000000000001",
+  "provider_subscription_id": "stub_subscription:00000000-0000-4000-8000-000000000001:starter",
+  "status": "active",
+  "current_period_start": null,
+  "current_period_end": null,
+  "assigned_at": "2026-08-21T09:00:00Z"
+}
+```
+
+### `GET /billing/limits/active-catalogue-products`
+
+- Requires bearer auth.
+- Checks the active catalogue product limit for the current plan.
+- The check reads the caller's tenant-scoped active `workspace_product` count and the assigned
+  plan. The seeded `starter` plan allows 100 active catalogue products; `growth` allows 1000.
+- Returns `200` with `resource`, `plan_code`, nullable `limit`, `used`, `allowed`, and nullable
+  `remaining`.
+- Returns `404` when no billing account is configured for the workspace.
+
+Response:
+
+```json
+{
+  "resource": "active_catalogue_products",
+  "plan_code": "starter",
+  "limit": 100,
+  "used": 42,
+  "allowed": true,
+  "remaining": 58
 }
 ```
 
@@ -833,23 +1137,6 @@ Request:
 ### `GET /approvals/pending`
 
 List pending approvals for the current approver.
-
----
-
-## Reports
-
-### `POST /reports/export`
-
-Request:
-```json
-{
-  "type": "savings_ledger",
-  "format": "xlsx",
-  "filters": { "period": "2026-09" }
-}
-```
-
-Response: `Job` resource; result URL returned on completion.
 
 ---
 

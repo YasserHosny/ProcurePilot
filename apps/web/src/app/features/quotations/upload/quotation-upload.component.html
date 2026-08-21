@@ -99,7 +99,7 @@
 
         @case ('uploading') {
           <div class="progress-container">
-            <mat-spinner diameter="48"></mat-spinner>
+            <mat-spinner [attr.aria-label]="'common.loading' | translate" diameter="48"></mat-spinner>
             <h2 class="progress-title">{{ 'quotations.upload.uploading' | translate }}</h2>
             <mat-progress-bar mode="indeterminate" class="progress-bar"></mat-progress-bar>
             @if (selectedFile(); as file) {
@@ -110,7 +110,7 @@
 
         @case ('processing') {
           <div class="progress-container">
-            <mat-spinner diameter="48"></mat-spinner>
+            <mat-spinner [attr.aria-label]="'common.loading' | translate" diameter="48"></mat-spinner>
             <h2 class="progress-title">{{ 'quotations.upload.processing' | translate }}</h2>
             <p class="progress-hint">{{ 'quotations.upload.processingHint' | translate }}</p>
             <mat-progress-bar mode="indeterminate" class="progress-bar"></mat-progress-bar>

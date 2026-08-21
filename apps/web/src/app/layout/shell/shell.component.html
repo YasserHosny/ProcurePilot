@@ -199,11 +199,15 @@
         <span class="nav-label">{{ 'shell.navAlerts' | translate }}</span>
       </a>
 
-      <div class="nav-item disabled" aria-disabled="true">
+      <a
+        mat-list-item
+        routerLink="/savings"
+        routerLinkActive="active"
+        class="nav-item"
+      >
         <mat-icon aria-hidden="true">savings</mat-icon>
         <span class="nav-label">{{ 'shell.navSavings' | translate }}</span>
-        <span class="soon-badge">{{ 'common.comingSoon' | translate }}</span>
-      </div>
+      </a>
 
       <a
         mat-list-item

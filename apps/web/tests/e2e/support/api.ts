@@ -167,3 +167,148 @@ export function mintPlatformInvitation(forEmail: string): {
   );
   return JSON.parse(raw.trim().split('\n').pop() ?? '{}');
 }
+
+/**
+ * Value-proof helpers (T006).
+ */
+export async function createTestProduct(
+  token: string,
+  data?: Partial<{
+    tenant_name: string;
+    base_unit: string;
+    pack_count: number;
+    unit_size: string;
+    brand?: string;
+  }>,
+): Promise<{ id: string; tenant_name: string }> {
+  const uniqueName = data?.tenant_name ?? `Product ${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+  return call<{ id: string; tenant_name: string }>('/products', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({
+      tenant_name: uniqueName,
+      base_unit: data?.base_unit ?? 'each',
+      pack: {
+        pack_count: data?.pack_count ?? 1,
+        unit_size: data?.unit_size ?? '1',
+      },
+      brand: data?.brand ?? null,
+    }),
+  });
+}
+
+export async function createTestSupplier(
+  token: string,
+  name?: string,
+): Promise<{ id: string; name: string }> {
+  const uniqueName = name ?? `Supplier ${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+  return call<{ id: string; name: string }>('/suppliers', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({
+      name: uniqueName,
+      status: 'active',
+    }),
+  });
+}
+
+export async function recordPurchaseOutcome(
+  token: string,
+  data: {
+    workspace_product_id: string;
+    supplier_id?: string | null;
+    quotation_line_id?: string | null;
+    match_decision_id?: string | null;
+    landed_cost_id?: string | null;
+    quantity: string;
+    base_unit: string;
+    unit_price: { amount: string; currency: string };
+    total_paid: { amount: string; currency: string };
+    delivery_result: string;
+    ordered_at?: string | null;
+    delivered_at?: string | null;
+    notes?: string | null;
+  },
+): Promise<{
+  purchase_record: { id: string; workspace_product_id: string; quantity: string };
+  saving_record: {
+    id: string;
+    status: string;
+    baseline_policy: string;
+    actual_value: { amount: string; currency: string };
+    delta: { amount: string; currency: string } | null;
+  };
+}> {
+  return call('/purchases', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(data),
+  });
+}
+
+export async function verifySaving(
+  token: string,
+  savingId: string,
+): Promise<{ id: string; status: string; verified_at: string; verified_by: string }> {
+  return call(`/savings/${encodeURIComponent(savingId)}/verify`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export async function createExportJob(
+  token: string,
+  data: {
+    kind: 'savings_ledger';
+    format: 'xlsx' | 'pdf';
+    filters: {
+      period_start: string;
+      period_end: string;
+      supplier_id?: string | null;
+      branch_id?: string | null;
+    };
+  },
+): Promise<{
+  id: string;
+  kind: string;
+  format: string;
+  status: string;
+  row_count?: number | null;
+  download_url?: string | null;
+}> {
+  return call('/exports', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(data),
+  });
+}
+
+export async function fetchBillingAccount(token: string): Promise<{
+  id: string;
+  plan: {
+    code: string;
+    name: string;
+    limits: { active_catalogue_products: number };
+  };
+  status: string;
+}> {
+  return call('/billing/account', {
+    method: 'GET',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export async function fetchLimitCheck(token: string): Promise<{
+  resource: string;
+  plan_code: string;
+  limit: number | null;
+  used: number;
+  allowed: boolean;
+  remaining: number | null;
+}> {
+  return call('/billing/limits/active-catalogue-products', {
+    method: 'GET',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+

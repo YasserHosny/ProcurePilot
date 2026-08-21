@@ -123,6 +123,24 @@
       "backToSignIn": "Back to sign in",
       "showPassword": "Show password",
       "hidePassword": "Hide password"
+    },
+    "planDisplay": {
+      "title": "Your Workspace Plan",
+      "subtitle": "Your isolated workspace is provisioned on the Starter plan with full intelligence features enabled.",
+      "planCardTitle": "Assigned Plan",
+      "priceFree": "Free during Pilot",
+      "featuresIncluded": "What's Included",
+      "features": {
+        "aiMatching": "Automated Quotation Extraction & Matching",
+        "smartCompare": "Smart Multi-Supplier Compare & Landed Cost",
+        "basketSplit": "Two-Supplier Basket Split Optimization",
+        "savingsLedger": "Verified Savings Ledger & Excel/PDF Exports",
+        "alerts": "Proactive Commercial Risk Alerts"
+      },
+      "limitsCardTitle": "Resource Limits",
+      "catalogueLimit": "Up to 100 active catalogue products",
+      "continueButton": "Enter Workspace",
+      "errorLoading": "Unable to load plan details. Your workspace is active and ready."
     }
   },
   "shell": {
@@ -358,6 +376,11 @@
         "createSuccess": "Product created successfully.",
         "updateSuccess": "Product updated successfully.",
         "genericError": "Unable to save product. Please check the details and try again."
+      },
+      "limit": {
+        "title": "Active Product Limit Reached",
+        "message": "Your current Starter plan allows up to 100 active catalogue products ({{used}}/{{limit}} used). Archive unused products or upgrade your plan to add more.",
+        "badge": "Plan Limit: {{used}}/{{limit}}"
       }
     },
     "suppliers": {
@@ -959,7 +982,8 @@
     "actions": {
       "viewIntelligence": "Price History",
       "viewProduct": "View Product",
-      "backToCatalogue": "Back to Catalogue"
+      "backToCatalogue": "Back to Catalogue",
+      "recordPurchase": "Record Purchase"
     }
   },
   "productIntelligence": {
@@ -1098,6 +1122,195 @@
     "empty": {
       "title": "All clear — No active alerts",
       "message": "No commercial conditions requiring immediate attention were detected in your current workspace data."
+    }
+  },
+  "savings": {
+    "ledger": {
+      "title": "Savings Ledger",
+      "subtitle": "Defensible record of procurement savings calculated against verified historical baselines.",
+      "recordPurchase": "Record Purchase Outcome",
+      "exportSavings": "Export Savings",
+      "filters": {
+        "statusLabel": "Filter by Status",
+        "allStatuses": "All Statuses",
+        "statusPending": "Pending Verification",
+        "statusVerified": "Verified",
+        "periodStart": "Start Date",
+        "periodEnd": "End Date",
+        "supplierLabel": "Supplier",
+        "allSuppliers": "All Suppliers",
+        "clear": "Clear Filters"
+      },
+      "table": {
+        "product": "Product",
+        "supplier": "Supplier",
+        "baseline": "Baseline Value",
+        "actual": "Actual Paid",
+        "delta": "Verified Saving (Delta)",
+        "status": "Status",
+        "recordedAt": "Recorded",
+        "actions": "Actions",
+        "viewEvidence": "View Evidence",
+        "verifyAction": "Verify",
+        "statusPending": "Pending",
+        "statusVerified": "Verified",
+        "noBaseline": "No Baseline"
+      },
+      "empty": {
+        "title": "No savings recorded yet",
+        "message": "Compare product offers and record your actual purchases to start building your verified savings ledger.",
+        "recordButton": "Record First Purchase"
+      },
+      "stats": {
+        "totalVerified": "Total Verified Savings",
+        "pendingCount": "Pending Outcomes",
+        "verifiedCount": "Verified Outcomes"
+      }
+    },
+    "outcomeCapture": {
+      "title": "Record Purchase Outcome",
+      "subtitle": "Document what was actually ordered and paid to compute your verified saving against baseline.",
+      "productLabel": "Product",
+      "selectProductPrompt": "Select product...",
+      "supplierLabel": "Supplier",
+      "selectSupplierPrompt": "Select supplier...",
+      "quantityLabel": "Actual Quantity Ordered",
+      "baseUnitLabel": "Base Unit",
+      "unitPriceAmountLabel": "Actual Unit Price",
+      "currencyLabel": "Currency",
+      "totalPaidAmountLabel": "Total Amount Paid",
+      "deliveryResultLabel": "Delivery Outcome",
+      "orderedAtLabel": "Order Date",
+      "deliveredAtLabel": "Delivery Date",
+      "notesLabel": "Notes / Reference ID",
+      "notesPlaceholder": "e.g., PO #12345, delivery note...",
+      "baselineNoticeTitle": "Historical Baseline Note",
+      "baselineUnavailable": "No previous price history exists for this product. The purchase will be recorded with 'none_available' baseline policy.",
+      "baselineAvailable": "Baseline will be computed from documented price history ({{policy}}).",
+      "deliveryResults": {
+        "ordered": "Ordered",
+        "partially_delivered": "Partially Delivered",
+        "delivered": "Delivered",
+        "cancelled": "Cancelled",
+        "disputed": "Disputed"
+      },
+      "submitButton": "Record Outcome & Compute Saving",
+      "submittingButton": "Recording...",
+      "cancelButton": "Cancel",
+      "successMessage": "Purchase outcome recorded successfully. Saving is pending verification.",
+      "validation": {
+        "productRequired": "Product is required",
+        "quantityRequired": "Quantity is required",
+        "quantityMin": "Quantity must be greater than 0",
+        "unitPriceRequired": "Unit price is required",
+        "totalPaidRequired": "Total paid is required",
+        "currencyRequired": "Currency is required",
+        "deliveryResultRequired": "Delivery outcome is required",
+        "baseUnitRequired": "Base unit is required"
+      }
+    },
+    "evidence": {
+      "title": "Saving Evidence & Calculation",
+      "subtitle": "Documented lineage linking this saving to purchase outcomes, quotations, and competing offers.",
+      "backToLedger": "Back to Savings Ledger",
+      "summaryCard": "Saving Summary",
+      "statusLabel": "Status",
+      "statusPending": "Pending Verification",
+      "statusVerified": "Verified (Immutable)",
+      "baselinePolicy": "Baseline Policy",
+      "baselinePolicies": {
+        "last_paid": "Last Paid Price",
+        "rolling_average_6m": "6-Month Rolling Average",
+        "none_available": "No Baseline Available"
+      },
+      "baselineUnitPrice": "Baseline Unit Price",
+      "baselineValue": "Baseline Total Value",
+      "actualValue": "Actual Total Value",
+      "delta": "Net Saving (Delta)",
+      "positiveDeltaExplanation": "Money saved compared to documented baseline.",
+      "negativeDeltaExplanation": "Actual cost exceeded historical baseline.",
+      "calculationVersion": "Calculation Version",
+      "recordedBy": "Recorded By",
+      "recordedAt": "Recorded At",
+      "verifiedBy": "Verified By",
+      "verifiedAt": "Verified At",
+      "immutableBanner": "This saving record is verified and immutable. The calculation, baseline, and evidence cannot be modified or deleted.",
+      "pendingBanner": "This saving is pending human verification. An owner or buyer can verify this record to lock its calculations and include it in exports.",
+      "verifyButton": "Verify Saving",
+      "verifyingButton": "Verifying...",
+      "verifySuccess": "Saving record successfully verified.",
+      "purchaseCard": "Purchase Details",
+      "quotationCard": "Originating Quotation",
+      "noQuotation": "No originating quotation linked to this purchase.",
+      "competingOffersCard": "Competing Offers at Compare Time",
+      "noCompetingOffers": "No competing offers recorded in the comparison context.",
+      "calculationCard": "Calculation Snapshot",
+      "formula": "Formula: Baseline Value − Actual Paid = Net Saving"
+    }
+  },
+  "exports": {
+    "title": "Export Savings Ledger",
+    "subtitle": "Generate audit-ready Excel spreadsheet or PDF summary reports of verified savings.",
+    "backToLedger": "Back to Savings Ledger",
+    "formCard": "Export Settings",
+    "formatLabel": "Export Format",
+    "formatXlsx": "Excel Spreadsheet (.xlsx)",
+    "formatPdf": "PDF Summary Report (.pdf)",
+    "periodStart": "Period Start Date",
+    "periodEnd": "Period End Date",
+    "supplierLabel": "Filter by Supplier (Optional)",
+    "allSuppliers": "All Suppliers",
+    "submitButton": "Generate Export",
+    "submittingButton": "Submitting Request...",
+    "verifiedOnlyNote": "Note: Only verified savings are included in the export. Pending rows are excluded per audit compliance rules.",
+    "statusCard": "Export Job Status",
+    "status": {
+      "queued": "Queued",
+      "queuedDesc": "Your export request is queued and waiting for worker processing.",
+      "running": "Processing",
+      "runningDesc": "Gathering verified savings records and rendering file...",
+      "completed": "Ready for Download",
+      "completedDesc": "Export completed successfully. Click below to download your file.",
+      "failed": "Export Failed",
+      "failedDesc": "An error occurred while generating the export file."
+    },
+    "rowCount": "Rendered Records: {{count}}",
+    "emptyResult": "Zero verified savings matched the selected filters. The export file contains empty headers.",
+    "downloadButton": "Download Export File",
+    "newExportButton": "Start Another Export",
+    "validation": {
+      "periodStartRequired": "Period start date is required",
+      "periodEndRequired": "Period end date is required",
+      "invalidDateRange": "Start date must be before or equal to end date"
+    }
+  },
+  "billing": {
+    "title": "Plan & Billing",
+    "subtitle": "View your workspace plan, active limits, and account status.",
+    "accountStatus": "Account Status",
+    "statuses": {
+      "active": "Active",
+      "past_due": "Past Due",
+      "cancelled": "Cancelled"
+    },
+    "currentPlan": "Current Plan",
+    "providerNotice": "Billing provider: Stub (Phase 1 evaluation mode — no real payment transaction required)",
+    "limits": {
+      "title": "Usage & Plan Limits",
+      "activeCatalogueProducts": "Active Catalogue Products",
+      "usedOfLimit": "{{used}} of {{limit}} used",
+      "remaining": "{{remaining}} remaining",
+      "unlimited": "Unlimited"
+    }
+  },
+  "plans": {
+    "starter": {
+      "name": "Starter",
+      "description": "Ideal for small procurement teams proving initial savings."
+    },
+    "growth": {
+      "name": "Growth",
+      "description": "For growing operations requiring higher product limits."
     }
   }
 }

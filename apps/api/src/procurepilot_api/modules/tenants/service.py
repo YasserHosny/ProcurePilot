@@ -12,6 +12,7 @@ from procurepilot_api.config import Settings, get_settings
 from procurepilot_api.errors import ServiceUnavailableError, UnprocessableEntityError
 from procurepilot_api.modules.auth.jwt import MemberRole
 from procurepilot_api.modules.auth.service import AuthService
+from procurepilot_api.modules.billing.service import assign_default_plan_in_signup
 from procurepilot_api.modules.members.models import SessionResponse
 from procurepilot_api.modules.tenants.invitations import (
     PlatformInvitationStore,
@@ -114,6 +115,7 @@ class TenantSignupRepository:
                             user_id=user_id,
                             email=request.email,
                         )
+                        assign_default_plan_in_signup(cur, tenant_id=tenant.id)
                         invitation_store.mark_spent(invitation)
                         self._record_tenant_created(cur, tenant, membership_id, request.email)
                         return WorkspaceCreated(

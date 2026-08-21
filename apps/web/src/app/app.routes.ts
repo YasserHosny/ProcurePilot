@@ -43,6 +43,13 @@ export const routes: Routes = [
             (m) => m.AcceptInvitationComponent,
           ),
       },
+      {
+        path: 'plan',
+        loadComponent: () =>
+          import('./features/onboarding/plan-display/plan-display.component').then(
+            (m) => m.PlanDisplayComponent,
+          ),
+      },
       { path: '', pathMatch: 'full', redirectTo: 'signup' },
     ],
   },
@@ -222,6 +229,59 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./features/alerts/alerts-inbox/alerts-inbox.component').then(
             (m) => m.AlertsInboxComponent,
+          ),
+      },
+      // --- value proof & savings (Chunk 4.6) ---
+      {
+        path: 'savings',
+        loadComponent: () =>
+          import('./features/savings/savings-ledger/savings-ledger.component').then(
+            (m) => m.SavingsLedgerComponent,
+          ),
+      },
+      {
+        path: 'savings/outcome-capture',
+        canActivate: [roleGuard('owner', 'buyer')],
+        loadComponent: () =>
+          import('./features/savings/outcome-capture/outcome-capture.component').then(
+            (m) => m.OutcomeCaptureComponent,
+          ),
+      },
+      {
+        path: 'savings/export',
+        canActivate: [roleGuard('owner', 'buyer')],
+        loadComponent: () =>
+          import('./features/savings/export-savings/export-savings.component').then(
+            (m) => m.ExportSavingsComponent,
+          ),
+      },
+      {
+        path: 'savings/export/:id',
+        canActivate: [roleGuard('owner', 'buyer')],
+        loadComponent: () =>
+          import('./features/savings/export-savings/export-savings.component').then(
+            (m) => m.ExportSavingsComponent,
+          ),
+      },
+      {
+        path: 'savings/:id/evidence',
+        loadComponent: () =>
+          import('./features/savings/saving-evidence/saving-evidence.component').then(
+            (m) => m.SavingEvidenceComponent,
+          ),
+      },
+      {
+        path: 'savings/:id',
+        loadComponent: () =>
+          import('./features/savings/saving-evidence/saving-evidence.component').then(
+            (m) => m.SavingEvidenceComponent,
+          ),
+      },
+      {
+        path: 'plan',
+        loadComponent: () =>
+          import('./features/onboarding/plan-display/plan-display.component').then(
+            (m) => m.PlanDisplayComponent,
           ),
       },
     ],

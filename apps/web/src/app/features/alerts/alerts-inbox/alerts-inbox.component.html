@@ -41,7 +41,7 @@
   <!-- Loading State -->
   @if (isLoading()) {
     <div class="loading-container">
-      <mat-spinner diameter="48"></mat-spinner>
+      <mat-spinner [attr.aria-label]="'common.loading' | translate" diameter="48"></mat-spinner>
       <p>{{ 'common.loading' | translate }}</p>
     </div>
   }
@@ -85,7 +85,7 @@
                     class="dismiss-btn"
                   >
                     @if (dismissingAlertIds().has(alert.id)) {
-                      <mat-spinner diameter="16" class="btn-spinner"></mat-spinner>
+                      <mat-spinner [attr.aria-label]="'common.loading' | translate" diameter="16" class="btn-spinner"></mat-spinner>
                       <span>{{ 'alerts.card.dismissing' | translate }}</span>
                     } @else {
                       <mat-icon aria-hidden="true">check</mat-icon>
@@ -113,7 +113,7 @@
                   <p>
                     {{ 'alerts.card.evidence.expiringSoon' | translate: {
                       supplier: getSupplierName(alert.supplier_id),
-                      validTo: (alert.evidence['valid_to'] | formatDate)
+                      validTo: ($any(alert.evidence['valid_to']) | formatDate)
                     } }}
                   </p>
                 } @else if (alert.kind === 'preferred_supplier_offer_disappeared') {
@@ -125,9 +125,9 @@
                 } @else if (alert.kind === 'price_swing') {
                   <p>
                     {{ 'alerts.card.evidence.priceSwing' | translate: {
-                      currentPrice: (alert.evidence['current_price'] | formatMoney),
+                      currentPrice: ($any(alert.evidence['current_price']) | formatMoney),
                       swingPercent: alert.evidence['swing_percent'],
-                      avgPrice: (alert.evidence['average_price'] | formatMoney)
+                      avgPrice: ($any(alert.evidence['average_price']) | formatMoney)
                     } }}
                   </p>
                 }

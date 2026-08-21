@@ -14,7 +14,7 @@ import { ActivatedRoute, Router, RouterLink } from "@angular/router";
 import { TranslatePipe, TranslateService } from "@ngx-translate/core";
 
 import { ApiService } from "../../../core/api/api.service";
-import type { ApiError, BaseUnit, Product, ProductCreate, ProductUpdate, Supplier } from "../../../core/api/models";
+import type { ApiError, BaseUnit, LimitCheck, Product, ProductCreate, ProductUpdate, Supplier } from "../../../core/api/models";
 import { SessionService } from "../../../core/auth/session.service";
 import { I18nService } from "../../../core/i18n/i18n.service";
 import { computeBaseQuantity } from "../normalisation";
@@ -55,6 +55,8 @@ export class ProductFormComponent implements OnInit {
   readonly isSaving = signal<boolean>(false);
   readonly errorMessage = signal<string | null>(null);
   readonly errorTraceId = signal<string | null>(null);
+  readonly planLimitExceeded = signal<boolean>(false);
+  readonly planLimitCheck = signal<LimitCheck | null>(null);
 
   readonly isWriter = computed<boolean>(() => this.session.hasRole("owner", "buyer"));
 
@@ -95,6 +97,18 @@ export class ProductFormComponent implements OnInit {
       this.liveUnitSize.set(vals.unit_size ? String(vals.unit_size) : "");
       this.liveBaseUnit.set(vals.base_unit ? String(vals.base_unit) : "");
     });
+
+    if (!this.isEditMode() && this.api.checkActiveCatalogueProductsLimit) {
+      this.api.checkActiveCatalogueProductsLimit().subscribe({
+        next: (check) => {
+          this.planLimitCheck.set(check);
+          if (!check.allowed || (check.limit !== null && check.used >= check.limit)) {
+            this.planLimitExceeded.set(true);
+          }
+        },
+        error: () => undefined,
+      });
+    }
 
     this.loadReferenceData();
   }
@@ -247,6 +261,14 @@ export class ProductFormComponent implements OnInit {
     if (err instanceof HttpErrorResponse) {
       const apiError = err.error as ApiError | undefined;
       this.errorTraceId.set(apiError?.trace_id ?? null);
+      if (
+        err.status === 403 ||
+        err.status === 422 ||
+        apiError?.code === "plan_limit_exceeded" ||
+        apiError?.message?.toLowerCase().includes("limit")
+      ) {
+        this.planLimitExceeded.set(true);
+      }
       this.errorMessage.set(
         apiError?.message ??
           err.message ??

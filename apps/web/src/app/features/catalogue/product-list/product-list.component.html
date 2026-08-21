@@ -37,6 +37,20 @@
     </div>
   }
 
+  @if (planLimitCheck(); as check) {
+    @if (!check.allowed || (check.limit !== null && check.used >= check.limit)) {
+      <div class="limit-banner" role="alert">
+        <mat-icon class="warning-icon" aria-hidden="true">warning_amber</mat-icon>
+        <div class="limit-text-wrap">
+          <div class="limit-title">{{ 'catalogue.products.limit.title' | translate }}</div>
+          <div class="limit-message">
+            {{ 'catalogue.products.limit.message' | translate: { used: check.used, limit: check.limit } }}
+          </div>
+        </div>
+      </div>
+    }
+  }
+
   @if (errorMessage()) {
     <div class="error-banner" role="alert">
       <mat-icon class="error-icon" aria-hidden="true">error_outline</mat-icon>
@@ -88,7 +102,7 @@
 
     @if (isLoading()) {
       <div class="loading-state" aria-live="polite">
-        <mat-spinner diameter="40"></mat-spinner>
+        <mat-spinner [attr.aria-label]="'common.loading' | translate" diameter="40"></mat-spinner>
         <span>{{ 'common.loading' | translate }}</span>
       </div>
     } @else if (products().length === 0) {

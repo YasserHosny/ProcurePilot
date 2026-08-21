@@ -129,7 +129,7 @@ export class SignupComponent implements OnInit {
         next: (session) => {
           this.isSubmitting.set(false);
           this.session.adopt(session);
-          void this.router.navigate(['/home']);
+          void this.router.navigate(['/onboarding/plan']);
         },
         error: (err: unknown) => {
           this.isSubmitting.set(false);

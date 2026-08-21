@@ -218,6 +218,18 @@
         color: #047857;
       }
     }
+
+    .rec-action-section {
+      display: flex;
+      align-items: center;
+
+      .record-purchase-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-weight: 600;
+      }
+    }
   }
 
   .risk-notes-box {

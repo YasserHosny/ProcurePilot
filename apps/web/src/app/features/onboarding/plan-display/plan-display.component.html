@@ -1,0 +1,123 @@
+<div class="plan-display-container">
+  <div class="plan-header">
+    <div class="brand-icon-wrap">
+      <mat-icon class="brand-icon" aria-hidden="true">verified</mat-icon>
+    </div>
+    <h1 class="page-title">{{ 'onboarding.planDisplay.title' | translate }}</h1>
+    <p class="page-subtitle">{{ 'onboarding.planDisplay.subtitle' | translate }}</p>
+  </div>
+
+  @if (errorMessage()) {
+    <div class="error-banner" role="alert">
+      <mat-icon class="error-icon" aria-hidden="true">error_outline</mat-icon>
+      <div class="error-text-wrap">
+        <div class="error-title">{{ 'common.traceId' | translate }}</div>
+        <div class="error-message">{{ errorMessage() }}</div>
+        @if (errorTraceId(); as traceId) {
+          <div class="error-trace">{{ traceId }}</div>
+        }
+      </div>
+    </div>
+  }
+
+  @if (isLoading()) {
+    <div class="loading-state" aria-live="polite">
+      <mat-spinner [attr.aria-label]="'common.loading' | translate" diameter="40"></mat-spinner>
+      <span>{{ 'common.loading' | translate }}</span>
+    </div>
+  } @else {
+    @if (billingAccount(); as account) {
+      <div class="plan-content-grid">
+      <!-- Main Plan Card -->
+      <mat-card class="plan-card">
+        <div class="plan-card-header">
+          <div class="plan-identity">
+            <span class="plan-badge">{{ 'onboarding.planDisplay.planCardTitle' | translate }}</span>
+            <h2 class="plan-name">{{ account.plan.name }}</h2>
+          </div>
+
+          <div class="price-tag">
+            <span class="price-amount">{{ 'onboarding.planDisplay.priceFree' | translate }}</span>
+            <span class="price-cycle">{{ 'billing.statuses.active' | translate }}</span>
+          </div>
+        </div>
+
+        <mat-divider></mat-divider>
+
+        <!-- Included Features Checklist -->
+        <div class="features-section">
+          <h3 class="section-title">{{ 'onboarding.planDisplay.featuresIncluded' | translate }}</h3>
+          <ul class="features-list">
+            <li class="feature-item">
+              <mat-icon aria-hidden="true" class="check-icon">check_circle</mat-icon>
+              <span>{{ 'onboarding.planDisplay.features.aiMatching' | translate }}</span>
+            </li>
+            <li class="feature-item">
+              <mat-icon aria-hidden="true" class="check-icon">check_circle</mat-icon>
+              <span>{{ 'onboarding.planDisplay.features.smartCompare' | translate }}</span>
+            </li>
+            <li class="feature-item">
+              <mat-icon aria-hidden="true" class="check-icon">check_circle</mat-icon>
+              <span>{{ 'onboarding.planDisplay.features.basketSplit' | translate }}</span>
+            </li>
+            <li class="feature-item">
+              <mat-icon aria-hidden="true" class="check-icon">check_circle</mat-icon>
+              <span>{{ 'onboarding.planDisplay.features.savingsLedger' | translate }}</span>
+            </li>
+            <li class="feature-item">
+              <mat-icon aria-hidden="true" class="check-icon">check_circle</mat-icon>
+              <span>{{ 'onboarding.planDisplay.features.alerts' | translate }}</span>
+            </li>
+          </ul>
+        </div>
+
+        <mat-divider></mat-divider>
+
+        <!-- Limits Section -->
+        <div class="limits-section">
+          <h3 class="section-title">{{ 'onboarding.planDisplay.limitsCardTitle' | translate }}</h3>
+          <div class="limit-box">
+            <div class="limit-info">
+              <mat-icon aria-hidden="true" class="limit-icon">inventory_2</mat-icon>
+              <div class="limit-details">
+                <span class="limit-name">{{ 'billing.limits.activeCatalogueProducts' | translate }}</span>
+                <span class="limit-desc">
+                  {{ 'onboarding.planDisplay.catalogueLimit' | translate }}
+                </span>
+              </div>
+            </div>
+
+            @if (limitCheck(); as check) {
+              <span class="limit-usage">
+                {{ 'billing.limits.usedOfLimit' | translate: { used: check.used, limit: check.limit } }}
+              </span>
+            }
+          </div>
+        </div>
+
+        <mat-divider></mat-divider>
+
+        <!-- Provider Note -->
+        <div class="provider-note">
+          <mat-icon aria-hidden="true" class="info-icon">info</mat-icon>
+          <span>{{ 'billing.providerNotice' | translate }}</span>
+        </div>
+
+        <!-- Enter Workspace Action -->
+        <div class="card-actions">
+          <button
+            mat-flat-button
+            color="primary"
+            type="button"
+            (click)="continueToWorkspace()"
+            class="continue-btn"
+          >
+            <span>{{ 'onboarding.planDisplay.continueButton' | translate }}</span>
+            <mat-icon aria-hidden="true">arrow_forward</mat-icon>
+          </button>
+        </div>
+      </mat-card>
+    </div>
+  }
+}
+</div>

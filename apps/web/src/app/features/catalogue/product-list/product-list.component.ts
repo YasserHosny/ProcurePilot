@@ -18,7 +18,7 @@ import { RouterLink } from "@angular/router";
 import { TranslatePipe, TranslateService } from "@ngx-translate/core";
 
 import { ApiService } from "../../../core/api/api.service";
-import type { ApiError, Product } from "../../../core/api/models";
+import type { ApiError, LimitCheck, Product } from "../../../core/api/models";
 import { RoleDirective } from "../../../core/auth/role.directive";
 import { SessionService } from "../../../core/auth/session.service";
 import { CatalogueConfirmDialogComponent } from "../confirm-dialog/confirm-dialog.component";
@@ -62,6 +62,7 @@ export class ProductListComponent implements OnInit {
   readonly searchQuery = signal<string>("");
   readonly errorMessage = signal<string | null>(null);
   readonly errorTraceId = signal<string | null>(null);
+  readonly planLimitCheck = signal<LimitCheck | null>(null);
 
   readonly isWriter = computed<boolean>(() => this.session.hasRole("owner", "buyer"));
 
@@ -86,6 +87,13 @@ export class ProductListComponent implements OnInit {
 
     const q = this.searchQuery().trim() || undefined;
     const status = this.statusFilter();
+
+    if (this.api.checkActiveCatalogueProductsLimit) {
+      this.api.checkActiveCatalogueProductsLimit().subscribe({
+        next: (check) => this.planLimitCheck.set(check),
+        error: () => undefined,
+      });
+    }
 
     this.api.products({ status, q }).subscribe({
       next: (res) => {

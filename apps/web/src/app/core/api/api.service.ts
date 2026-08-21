@@ -11,13 +11,17 @@ import type {
   BaseUnit,
   BasketOptimiseRequest,
   BasketSplitJob,
+  BillingAccount,
   ConfigOptions,
   Document,
+  ExportCreate,
+  ExportJob,
   ImportPreview,
   ImportResult,
   Invitation,
   Job,
   LandedCost,
+  LimitCheck,
   MatchDecision,
   MatchResolutionRequest,
   MatchTask,
@@ -34,6 +38,8 @@ import type {
   Product,
   ProductCreate,
   ProductUpdate,
+  PurchaseOutcomeCreate,
+  PurchaseOutcomeCreated,
   Quotation,
   QuotationCreate,
   QuotationDetail,
@@ -43,6 +49,10 @@ import type {
   ReviewTaskPriority,
   ReviewTaskStatus,
   Role,
+  SavingEvidence,
+  SavingList,
+  SavingRecord,
+  SavingStatus,
   Session,
   Supplier,
   SupplierCreate,
@@ -507,6 +517,78 @@ export class ApiService {
       { headers },
     );
   }
+
+  // --- value proof, exports & billing (Chunk 4.6) ---------------------------
+
+  recordPurchase(
+    body: PurchaseOutcomeCreate,
+    idempotencyKey?: string,
+  ): Observable<PurchaseOutcomeCreated> {
+    const headers = idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined;
+    return this.http.post<PurchaseOutcomeCreated>(`${this.base}/purchases`, body, { headers });
+  }
+
+  getSavings(params?: {
+    status?: SavingStatus;
+    period_start?: string;
+    period_end?: string;
+    supplier_id?: string;
+    branch_id?: string | null;
+    cursor?: string;
+    limit?: number;
+  }): Observable<SavingList> {
+    const query = new URLSearchParams();
+    if (params?.status) query.set('status', params.status);
+    if (params?.period_start) query.set('period_start', params.period_start);
+    if (params?.period_end) query.set('period_end', params.period_end);
+    if (params?.supplier_id) query.set('supplier_id', params.supplier_id);
+    if (params?.branch_id !== undefined && params?.branch_id !== null) {
+      query.set('branch_id', params.branch_id);
+    }
+    if (params?.cursor) query.set('cursor', params.cursor);
+    if (params?.limit !== undefined) query.set('limit', String(params.limit));
+    const qs = query.toString() ? `?${query.toString()}` : '';
+    return this.http.get<SavingList>(`${this.base}/savings${qs}`);
+  }
+
+  getSaving(id: string): Observable<SavingRecord> {
+    return this.http.get<SavingRecord>(`${this.base}/savings/${encodeURIComponent(id)}`);
+  }
+
+  getSavingEvidence(id: string): Observable<SavingEvidence> {
+    return this.http.get<SavingEvidence>(
+      `${this.base}/savings/${encodeURIComponent(id)}/evidence`,
+    );
+  }
+
+  verifySaving(id: string, idempotencyKey?: string): Observable<SavingRecord> {
+    const headers = idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined;
+    return this.http.post<SavingRecord>(
+      `${this.base}/savings/${encodeURIComponent(id)}/verify`,
+      {},
+      { headers },
+    );
+  }
+
+  createExport(body: ExportCreate, idempotencyKey?: string): Observable<ExportJob> {
+    const headers = idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined;
+    return this.http.post<ExportJob>(`${this.base}/exports`, body, { headers });
+  }
+
+  getExportJob(id: string): Observable<ExportJob> {
+    return this.http.get<ExportJob>(`${this.base}/exports/${encodeURIComponent(id)}`);
+  }
+
+  getBillingAccount(): Observable<BillingAccount> {
+    return this.http.get<BillingAccount>(`${this.base}/billing/account`);
+  }
+
+  checkActiveCatalogueProductsLimit(): Observable<LimitCheck> {
+    return this.http.get<LimitCheck>(
+      `${this.base}/billing/limits/active-catalogue-products`,
+    );
+  }
 }
+
 
 
