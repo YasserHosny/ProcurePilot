@@ -113,8 +113,8 @@ description: "Task list for Organisation Model implementation"
 
 ### Implementation for User Story 3
 
-- [ ] T032 [US3] Implement budget create/list in `apps/api/src/procurepilot_api/modules/organisation/service.py`, validating the scope/reference pairing, computing the `overlap_warning` flag against existing budgets for the same scope, and enforcing owner-only writes
-- [ ] T033 [US3] Expose `GET/POST /organisation/budgets` in `apps/api/src/procurepilot_api/modules/organisation/router.py`
+- [x] T032 [US3] Implement budget create/list in `apps/api/src/procurepilot_api/modules/organisation/service.py`, validating the scope/reference pairing, computing the `overlap_warning` flag against existing budgets for the same scope, and enforcing owner-only writes
+- [x] T033 [US3] Expose `GET/POST /organisation/budgets` in `apps/api/src/procurepilot_api/modules/organisation/router.py`
 - [ ] T034 [P] [US3] Build the budget list/create UI in `apps/web/src/app/features/settings/budget-list/budget-list.component.ts`, `.html`, and `.scss`, with scope-dependent branch/cost-centre pickers and explicit currency selection
 
 **Checkpoint**: US3 is independently testable once US1/US2 exist to provide branch/cost-centre scope targets (organisation-wide budgets need neither).

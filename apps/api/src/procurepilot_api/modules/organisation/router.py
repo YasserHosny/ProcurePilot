@@ -13,6 +13,10 @@ from procurepilot_api.modules.organisation.schemas import (
     BranchCreate,
     BranchList,
     BranchUpdate,
+    BudgetCreate,
+    BudgetCreated,
+    BudgetList,
+    BudgetScope,
     CostCentre,
     CostCentreCreate,
     CostCentreList,
@@ -122,3 +126,39 @@ def update_cost_centre(
         cost_centre_id=cost_centre_id,
         patch=payload,
     )
+
+
+@router.get("/organisation/budgets", response_model=BudgetList)
+def list_budgets(
+    token: Annotated[str, Depends(bearer_token)],
+    _member: Annotated[CurrentMember, Depends(current_member)],
+    service: Annotated[OrganisationService, Depends(get_organisation_service)],
+    scope: Annotated[BudgetScope | None, Query()] = None,
+    branch_id: Annotated[UUID | None, Query()] = None,
+    cost_centre_id: Annotated[UUID | None, Query()] = None,
+    cursor: Annotated[str | None, Query()] = None,
+    limit: Annotated[int, Query(le=100)] = 50,
+) -> BudgetList:
+    return service.list_budgets(
+        bearer_token=token,
+        scope=scope,
+        branch_id=branch_id,
+        cost_centre_id=cost_centre_id,
+        cursor=cursor,
+        limit=limit,
+    )
+
+
+@router.post(
+    "/organisation/budgets",
+    status_code=status.HTTP_201_CREATED,
+    response_model=BudgetCreated,
+)
+def create_budget(
+    payload: Annotated[BudgetCreate, Body()],
+    token: Annotated[str, Depends(bearer_token)],
+    member: Annotated[CurrentMember, Depends(require_role(MemberRole.owner))],
+    service: Annotated[OrganisationService, Depends(get_organisation_service)],
+    _idempotency_key: Annotated[UUID | None, Header(alias="Idempotency-Key")] = None,
+) -> BudgetCreated:
+    return service.create_budget(bearer_token=token, member=member, payload=payload)
