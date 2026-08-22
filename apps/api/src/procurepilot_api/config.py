@@ -37,6 +37,41 @@ class Settings(BaseSettings):
     member_invitation_ttl_days: int = Field(validation_alias="MEMBER_INVITATION_TTL_DAYS", gt=0)
 
     rate_limit_auth: str = Field(validation_alias="RATE_LIMIT_AUTH")
+    redis_url: str = Field(default="redis://localhost:6379/0", validation_alias="REDIS_URL")
+    extraction_queue_name: str = Field(
+        default="quotation-extraction", validation_alias="EXTRACTION_QUEUE_NAME"
+    )
+    basket_split_queue_name: str = Field(
+        default="basket-split", validation_alias="BASKET_SPLIT_QUEUE_NAME"
+    )
+    export_queue_name: str = Field(default="exports", validation_alias="EXPORT_QUEUE_NAME")
+    extraction_provider_mode: Literal["stub", "bedrock", "azure_di"] = Field(
+        default="stub", validation_alias="EXTRACTION_PROVIDER_MODE"
+    )
+    extraction_confidence_threshold: float = Field(
+        default=0.85, validation_alias="EXTRACTION_CONFIDENCE_THRESHOLD", ge=0, le=1
+    )
+    quotation_documents_bucket: str = Field(
+        default="quotation-documents", validation_alias="QUOTATION_DOCUMENTS_BUCKET"
+    )
+    supabase_exports_bucket: str = Field(
+        default="exports", validation_alias="SUPABASE_EXPORTS_BUCKET"
+    )
+    matching_auto_accept_threshold: float = Field(
+        default=0.9200, validation_alias="MATCHING_AUTO_ACCEPT_THRESHOLD", ge=0, le=1
+    )
+    matching_auto_reject_threshold: float = Field(
+        default=0.2500, validation_alias="MATCHING_AUTO_REJECT_THRESHOLD", ge=0, le=1
+    )
+    matching_review_margin: float = Field(
+        default=0.0500, validation_alias="MATCHING_REVIEW_MARGIN", ge=0, le=1
+    )
+    matching_trigram_threshold: float = Field(
+        default=0.30, validation_alias="MATCHING_TRIGRAM_THRESHOLD", ge=0, le=1
+    )
+    matching_embedding_model: str = Field(
+        default="stub-hash-v1", validation_alias="MATCHING_EMBEDDING_MODEL"
+    )
 
     web_api_base_url: str = Field(validation_alias="WEB_API_BASE_URL")
     web_default_locale: Locale = Field(validation_alias="WEB_DEFAULT_LOCALE")

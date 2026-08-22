@@ -123,13 +123,35 @@
       "backToSignIn": "العودة لتسجيل الدخول",
       "showPassword": "عرض كلمة المرور",
       "hidePassword": "إخفاء كلمة المرور"
+    },
+    "planDisplay": {
+      "title": "خطة مساحة العمل الخاصة بك",
+      "subtitle": "تم إعداد مساحة عملك المعزولة على خطة البداية مع تفعيل كافة ميزات ذكاء المشتريات.",
+      "planCardTitle": "الخطة المعينة",
+      "priceFree": "مجاناً خلال الفترة التجريبية",
+      "featuresIncluded": "الميزات المضمنة",
+      "features": {
+        "aiMatching": "استخراج عروض الأسعار ومطابقتها آلياً",
+        "smartCompare": "المقارنة الذكية بين الموردين وحساب التكلفة الإجمالية",
+        "basketSplit": "تحسين وتقسيم السلة بين موردين",
+        "savingsLedger": "سجل الوفورات المعتمد وتصدير Excel/PDF",
+        "alerts": "تنبيهات المخاطر التجارية الاستباقية"
+      },
+      "limitsCardTitle": "حدود الموارد",
+      "catalogueLimit": "حتى 100 منتج نشط في الكتالوج",
+      "continueButton": "الدخول إلى مساحة العمل",
+      "errorLoading": "تعذر تحميل تفاصيل الخطة. مساحة عملك نشطة وجاهزة."
     }
   },
   "shell": {
     "toggleNav": "تبديل شريط التنقل",
     "navSectionMain": "التنقل الرئيسي",
     "navHome": "نظرة عامة",
+    "navProducts": "المنتجات",
+    "navSuppliers": "الموردون",
+    "navImport": "استيراد الدليل",
     "navQuotations": "صندوق عروض الأسعار",
+    "navMatching": "مطابقة البنود",
     "navCompare": "المقارنة الذكية",
     "navSavings": "سجل الوفورات",
     "navTeam": "إدارة الفريق",
@@ -143,7 +165,10 @@
     "mfaEnabledBadge": "المصادقة الثنائية نشطة",
     "signOut": "تسجيل الخروج",
     "language": "اللغة",
-    "selectLanguage": "اختر اللغة"
+    "selectLanguage": "اختر اللغة",
+    "navBasketSplit": "تقسيم السلة",
+    "navAlerts": "صندوق التنبيهات",
+    "navIntelligence": "ذكاء الأسعار"
   },
   "home": {
     "welcomePrefix": "مرحباً بك في",
@@ -268,6 +293,1025 @@
       "confirmButton": "إلغاء الدعوة",
       "cancelButton": "إلغاء",
       "revokingButton": "جاري الإلغاء..."
+    }
+  },
+  "catalogue": {
+    "products": {
+      "title": "دليل المنتجات",
+      "subtitle": "إدارة منتجات مساحة العمل وأحجام العبوات ووحدات القياس المعيارية.",
+      "createButton": "منتج جديد",
+      "importButton": "استيراد منتجات",
+      "searchPlaceholder": "البحث عن المنتجات بالاسم...",
+      "filterStatus": "تصفية حسب الحالة",
+      "statusAll": "الكل",
+      "statusActive": "نشط",
+      "statusArchived": "مؤرشف",
+      "emptyList": "لم يتم العثور على منتجات في مساحة العمل هذه.",
+      "emptySearch": "لا توجد منتجات مطابقة لبحثك.",
+      "readOnlyBanner": "لديك صلاحية عرض فقط لدليل المنتجات. تتطلب إضافة أو تعديل المنتجات صلاحية مشتري أو مالك.",
+      "columns": {
+        "name": "اسم المنتج",
+        "brand": "العلامة / النوع",
+        "gtin": "الرمز العالمي GTIN",
+        "pack": "تعريف العبوة",
+        "normalised": "الكمية الأساسية",
+        "status": "الحالة",
+        "actions": "الإجراءات"
+      },
+      "actions": {
+        "view": "عرض التفاصيل",
+        "edit": "تعديل المنتج",
+        "archive": "أرشفة المنتج"
+      },
+      "archiveDialog": {
+        "title": "أرشفة المنتج",
+        "message": "هل أنت متأكد من رغبتك في أرشفة هذا المنتج؟ سيتوقف عن الظهور في القوائم النشطة مع الاحتفاظ بسجل عملياته التاريخية.",
+        "confirmButton": "أرشفة المنتج",
+        "cancelButton": "إلغاء",
+        "archivingButton": "جاري الأرشفة..."
+      },
+      "archiveSuccess": "تمت أرشفة المنتج بنجاح.",
+      "form": {
+        "createTitle": "إنشاء منتج جديد",
+        "editTitle": "تعديل المنتج",
+        "viewTitle": "تفاصيل المنتج",
+        "subtitle": "تحديد مواصفات المنتج وتوحيد مقاس العبوة.",
+        "tenantNameLabel": "اسم المنتج",
+        "tenantNamePlaceholder": "مثلاً: حليب قليل الدسم",
+        "tenantNameRequired": "اسم المنتج مطلوب",
+        "tenantNameMaxLength": "لا يمكن أن يتجاوز اسم المنتج 200 حرف",
+        "brandLabel": "العلامة التجارية",
+        "brandPlaceholder": "مثلاً: المراعي (اختياري)",
+        "canonicalNameLabel": "الاسم المعياري",
+        "canonicalNamePlaceholder": "الاسم في الدليل العام (اختياري)",
+        "canonicalNameHint": "يتم استخدام اسم المنتج تلقائياً في حال تركه فارغاً",
+        "variantLabel": "النوع / الصنف",
+        "variantPlaceholder": "مثلاً: قليل الدسم / عضوي (اختياري)",
+        "gtinLabel": "رمز الباركود العالمي (GTIN)",
+        "gtinPlaceholder": "مثلاً: 5012345678900 (اختياري)",
+        "gtinInvalid": "يجب أن يتكون رمز GTIN من 8 أو 12 أو 13 أو 14 رقماً",
+        "baseUnitLabel": "وحدة القياس الأساسية",
+        "baseUnitPlaceholder": "اختر وحدة القياس...",
+        "baseUnitRequired": "وحدة القياس الأساسية مطلوبة",
+        "packSectionTitle": "تعريف العبوة وتوحيد المقاس",
+        "packSectionDescription": "حدد كيفية تغليف هذا المنتج لاحتساب كميته الأساسية الموحدة.",
+        "packCountLabel": "عدد الوحدات في العبوة",
+        "packCountPlaceholder": "مثلاً: 6",
+        "packCountRequired": "عدد الوحدات مطلوب",
+        "packCountMin": "يجب أن يكون عدد الوحدات 1 على الأقل",
+        "unitSizeLabel": "حجم الوحدة",
+        "unitSizePlaceholder": "مثلاً: 5.0",
+        "unitSizeRequired": "حجم الوحدة مطلوب",
+        "unitSizePositive": "يجب أن يكون حجم الوحدة أكبر من صفر",
+        "liveNormalisedLabel": "الكمية الأساسية الموحدة",
+        "liveNormalisedHelp": "تُحتسب آلياً: عدد الوحدات × حجم الوحدة",
+        "preferredSupplierLabel": "المورد المفضل",
+        "preferredSupplierPlaceholder": "اختر المورد المفضل (اختياري)...",
+        "noPreferredSupplier": "لا يوجد",
+        "submitCreate": "إنشاء المنتج",
+        "submitEdit": "حفظ التغييرات",
+        "submitting": "جاري الحفظ...",
+        "cancel": "إلغاء",
+        "backToList": "العودة إلى المنتجات",
+        "createSuccess": "تم إنشاء المنتج بنجاح.",
+        "updateSuccess": "تم تحديث المنتج بنجاح.",
+        "genericError": "تعذر حفظ المنتج. يُرجى التحقق من البيانات والمحاولة مرة أخرى."
+      },
+      "limit": {
+        "title": "تم الوصول إلى الحد الأقصى للمنتجات النشطة",
+        "message": "تتيح خطة البداية الحالية ما يصل إلى 100 منتج نشط في الكتالوج (تم استخدام {{used}}/{{limit}}). قم بأرشفة المنتجات غير المستخدمة أو ترقية خطتك لإضافة المزيد.",
+        "badge": "حد الخطة: {{used}}/{{limit}}"
+      }
+    },
+    "suppliers": {
+      "title": "الموردون",
+      "subtitle": "إدارة الموردين والشروط التجارية والحد الأدنى للطلب ورسوم التوصيل.",
+      "createButton": "مورد جديد",
+      "importButton": "استيراد موردين",
+      "filterStatus": "تصفية حسب الحالة",
+      "statusAll": "الكل",
+      "statusActive": "نشط",
+      "statusPreferred": "مفضل",
+      "statusBlocked": "محظور",
+      "statusArchived": "مؤرشف",
+      "emptyList": "لم يتم العثور على موردين في مساحة العمل هذه.",
+      "readOnlyBanner": "لديك صلاحية عرض فقط للموردين. تتطلب إضافة أو تعديل الموردين صلاحية مشتري أو مالك.",
+      "daysUnit": "أيام",
+      "notSet": "غير محدد",
+      "columns": {
+        "name": "اسم المورد",
+        "paymentTerms": "شروط الدفع",
+        "leadTime": "مدة التوريد",
+        "minOrderValue": "الحد الأدنى للطلب",
+        "deliveryFee": "رسوم التوصيل",
+        "status": "الحالة",
+        "actions": "الإجراءات"
+      },
+      "actions": {
+        "view": "عرض التفاصيل",
+        "edit": "تعديل المورد",
+        "archive": "أرشفة المورد"
+      },
+      "archiveDialog": {
+        "title": "أرشفة المورد",
+        "message": "هل أنت متأكد من رغبتك في أرشفة هذا المورد؟ سيتم استبعاده من توصيات الشراء المستقبلية مع الحفاظ على سجلاته التاريخية.",
+        "confirmButton": "أرشفة المورد",
+        "cancelButton": "إلغاء",
+        "archivingButton": "جاري الأرشفة..."
+      },
+      "archiveSuccess": "تمت أرشفة المورد بنجاح.",
+      "archiveConflictTitle": "تعذر حذف المورد",
+      "archiveConflictMessage": "هذا المورد مرتبط بسجلات شراء أو منتجات موجودة ولا يمكن حذفه نهائياً. تمت أرشفته بدلاً من ذلك.",
+      "form": {
+        "createTitle": "إنشاء مورد جديد",
+        "editTitle": "تعديل المورد",
+        "viewTitle": "تفاصيل المورد",
+        "subtitle": "إعداد الشروط التجارية وشروط التوصيل لهذا المورد.",
+        "nameLabel": "اسم المورد",
+        "namePlaceholder": "مثلاً: شركة الأغذية الطازجة المحدودة",
+        "nameRequired": "اسم المورد مطلوب",
+        "nameMaxLength": "لا يمكن أن يتجاوز اسم المورد 200 حرف",
+        "paymentTermsLabel": "شروط الدفع",
+        "paymentTermsPlaceholder": "مثلاً: الدفع بعد 30 يوماً (اختياري)",
+        "leadTimeLabel": "مدة التوريد (بالأيام)",
+        "leadTimePlaceholder": "مثلاً: 3 (اختياري)",
+        "leadTimeMin": "لا يمكن أن تكون مدة التوريد سالبة",
+        "statusLabel": "حالة المورد",
+        "termsSectionTitle": "الشروط التجارية والمالية",
+        "termsSectionDescription": "يجب أن يقترن كل مبلغ مالي برمز عملة صريح.",
+        "minOrderAmountLabel": "مبلغ الحد الأدنى للطلب",
+        "minOrderAmountPlaceholder": "مثلاً: 150.00",
+        "minOrderCurrencyLabel": "عملة الحد الأدنى",
+        "minOrderCurrencyPlaceholder": "اختر العملة...",
+        "deliveryFeeAmountLabel": "مبلغ رسوم التوصيل",
+        "deliveryFeeAmountPlaceholder": "مثلاً: 15.00",
+        "deliveryFeeCurrencyLabel": "عملة رسوم التوصيل",
+        "deliveryFeeCurrencyPlaceholder": "اختر العملة...",
+        "currencyRequiredWithAmount": "رمز العملة مطلوب عند إدخال المبلغ",
+        "amountRequiredWithCurrency": "المبلغ مطلوب عند تحديد العملة",
+        "amountInvalid": "يجب أن يكون المبلغ رقماً عشرياً صالحاً وموجباً",
+        "submitCreate": "إنشاء المورد",
+        "submitEdit": "حفظ التغييرات",
+        "submitting": "جاري الحفظ...",
+        "cancel": "إلغاء",
+        "backToList": "العودة إلى الموردين",
+        "createSuccess": "تم إنشاء المورد بنجاح.",
+        "updateSuccess": "تم تحديث المورد بنجاح.",
+        "genericError": "تعذر حفظ المورد. يُرجى التحقق من البيانات والمحاولة مرة أخرى."
+      }
+    },
+    "import": {
+      "title": "معالج استيراد الدليل والموردين",
+      "subtitle": "رفع المنتجات أو الموردين مجمعة من ملف جداول CSV مع التحقق المسبق الشامل.",
+      "stepUpload": "1. رفع الملف",
+      "stepPreview": "2. التحقق والمعاينة",
+      "stepResult": "3. التأكيد",
+      "selectKindLabel": "ما الذي ترغب في استيراده؟",
+      "kindProducts": "دليل المنتجات",
+      "kindSuppliers": "قائمة الموردين",
+      "fileLabel": "اختر ملف CSV",
+      "dropzonePrompt": "اسحب وأفلت ملف CSV هنا، أو انقر للاختيار",
+      "dropzoneHint": "يقبل ملفات .csv مفصولة بفواصل وتحتوي على صف ترويسة",
+      "selectedFile": "الملف المحدد:",
+      "uploadAndValidate": "رفع والتحقق من الملف",
+      "validating": "جاري التحقق من الملف...",
+      "nothingSavedNotice": "لا يتم حفظ أي بيانات أثناء التحقق. ستتمكن من معاينة وتأكيد الاستيراد قبل إنشاء أي سجلات.",
+      "previewTitle": "ملخص التحقق",
+      "rowCountLabel": "إجمالي الصفوف المكتشفة:",
+      "statusValid": "جاهز للاستيراد",
+      "statusInvalid": "توجد أخطاء في التحقق",
+      "missingColumnsTitle": "أعمدة مطلوبة مفقودة",
+      "missingColumnsDescription": "الملف المرفوع يفتقر إلى الأعمدة الإلزامية التالية:",
+      "unrecognisedColumnsTitle": "أعمدة غير معروفة",
+      "unrecognisedColumnsDescription": "تم العثور على الأعمدة التالية في الملف ولكنها غير معتمدة:",
+      "rowErrorsTitle": "أخطاء على مستوى الصفوف (لم يتم حفظ شيء)",
+      "rowErrorsDescription": "تم اكتشاف الأخطاء التالية في ملفك. يجب تصحيح كل صف قبل إتمام الاستيراد.",
+      "colLine": "رقم السطر",
+      "colColumn": "العمود",
+      "colReason": "سبب الخطأ",
+      "duplicatesTitle": "سجلات مكررة مكتشفة",
+      "duplicatesDescription": "الصفوف التالية تطابق سجلات موجودة مسبقاً في مساحة العمل الخاصة بك:",
+      "onDuplicateLabel": "كيف ترغب في معالجة السجلات المكررة؟",
+      "onDuplicateSkip": "تخطي الصفوف المكررة (الاحتفاظ بالسجلات الحالية)",
+      "onDuplicateUpdate": "تحديث السجلات الحالية بالبيانات الجديدة",
+      "previewTableTitle": "معاينة البيانات (الصفوف الأولى)",
+      "confirmImport": "تأكيد وحفظ الاستيراد",
+      "confirming": "جاري استيراد السجلات...",
+      "cancelImport": "إلغاء الاستيراد",
+      "resultTitle": "اكتمل الاستيراد بنجاح",
+      "resultSubtitle": "تم حفظ سجلات الدليل الخاصة بك بنجاح.",
+      "createdCount": "سجلات تم إنشاؤها",
+      "updatedCount": "سجلات تم تحديثها",
+      "skippedCount": "سجلات تم تخطيها",
+      "importAnother": "استيراد ملف آخر",
+      "viewProducts": "الانتقال إلى المنتجات",
+      "viewSuppliers": "الانتقال إلى الموردين",
+      "emptyFileError": "الملف المرفوع فارغ أو يحتوي على ترويسة فقط.",
+      "unsupportedFileError": "صيغة الملف غير مدعومة. يُرجى رفع ملف CSV صالح.",
+      "genericError": "تعذر معالجة الاستيراد. يُرجى المحاولة مرة أخرى."
+    }
+  },
+  "quotations": {
+    "nav": {
+      "queue": "قائمة المراجعة",
+      "upload": "رفع عرض سعر"
+    },
+    "upload": {
+      "title": "رفع عرض أسعار المورد",
+      "subtitle": "رفع عروض الأسعار بصيغة PDF أو صور ممسوحة ضوئياً أو جداول إلكترونية للاستخراج الآلي للبنود.",
+      "dropzonePrompt": "اسحب وأفلت ملف عرض السعر هنا، أو انقر للاختيار",
+      "dropzoneHint": "الصيغ المدعومة: PDF و PNG و JPEG و TIFF و CSV و XLS و XLSX (الحد الأقصى 25 ميجابايت)",
+      "fileLabel": "اختر ملفاً",
+      "selectedFile": "الملف المحدد:",
+      "fileSize": "الحجم:",
+      "fileType": "النوع:",
+      "unsupportedFormatError": "صيغة الملف غير مدعومة. يُرجى رفع ملف PDF أو PNG أو JPEG أو TIFF أو CSV أو XLS أو XLSX.",
+      "fileTooLargeError": "حجم الملف يتجاوز الحد المسموح به (25 ميجابايت).",
+      "emptyFileError": "الملف المحدد فارغ.",
+      "uploadButton": "رفع واستخراج البيانات",
+      "uploading": "جاري رفع المستند...",
+      "processing": "جاري استخراج بنود عرض السعر...",
+      "processingHint": "يقوم الذكاء الاصطناعي بقراءة بيانات الترويسة والأسعار والبنود. يستغرق هذا عادةً بضع ثوانٍ.",
+      "extractionSuccess": "تم استخراج البيانات بنجاح!",
+      "goToReview": "الانتقال إلى المراجعة",
+      "uploadAnother": "رفع عرض سعر آخر",
+      "failedTitle": "فشل استخراج البيانات",
+      "failedMessage": "تعذر معالجة المستند. يُرجى التأكد من وضوح المستند والمحاولة مرة أخرى.",
+      "retryButton": "إعادة المحاولة",
+      "directStorageNotice": "يتم رفع المستندات بأمان ومباشرةً إلى وحدة التخزين المشفرة.",
+      "status": {
+        "uploading": "جاري الرفع",
+        "processing": "جاري الاستخراج",
+        "extracted": "تم الاستخراج",
+        "failed": "فشلت المعالجة"
+      }
+    },
+    "queue": {
+      "title": "قائمة مراجعة عروض الأسعار",
+      "subtitle": "مراجعة واعتماد عروض الأسعار المستخرجة للموردين قبل اعتمادها كبيانات تجارية موثوقة.",
+      "uploadNew": "رفع عرض سعر",
+      "filterStatus": "تصفية حسب الحالة",
+      "filterPriority": "تصفية حسب الأولوية",
+      "status": {
+        "all": "جميع الحالات",
+        "open": "مفتوحة",
+        "in_progress": "قيد المعالجة",
+        "resolved": "مكتملة"
+      },
+      "priority": {
+        "all": "جميع الأولويات",
+        "low": "منخفضة",
+        "normal": "عادية",
+        "high": "عالية"
+      },
+      "reason": {
+        "low_confidence": "استخراج منخفض الثقة",
+        "arithmetic_mismatch": "عدم تطابق حسابي",
+        "read_failure": "تعذر قراءة المستند",
+        "review_required": "تتطلب مراجعة بشرية"
+      },
+      "columns": {
+        "id": "معرف عرض السعر",
+        "supplier": "المورد",
+        "reason": "سبب المراجعة",
+        "priority": "الأولوية",
+        "status": "الحالة",
+        "createdAt": "تاريخ الرفع",
+        "actions": "الإجراءات"
+      },
+      "actions": {
+        "review": "مراجعة واعتماد",
+        "view": "عرض (للقراءة فقط)"
+      },
+      "readOnlyBadge": "صلاحية قراءة فقط",
+      "readOnlyNotice": "دورك يتيح صلاحية القراءة فقط. يملك المالكون والمشترون فقط صلاحية تصحيح واعتماد عروض الأسعار.",
+      "emptyTitle": "لا توجد مهام مراجعة",
+      "emptyMessage": "لا توجد مهام مراجعة لعروض الأسعار تطابق خيارات التصفية الحالية."
+    },
+    "review": {
+      "title": "مراجعة واعتماد عرض السعر",
+      "subtitle": "فحص الحقول المستخرجة جنباً إلى جنب مع المستند الأصلي. تحقق من المورد وعالج أي فروقات.",
+      "backToQueue": "العودة إلى قائمة المراجعة",
+      "readOnlyNotice": "وضع القراءة فقط. يمكنك الاطلاع على أدلة الاستخراج، ولكن التعديل والاعتماد يتطلبان صلاحيات المالك أو المشتري.",
+      "panels": {
+        "document": "أدلة المستند الأصلي",
+        "extractedData": "البيانات التجارية المستخرجة"
+      },
+      "keyboardNav": {
+        "title": "التنقل بين الحقول (FR-014)",
+        "hint": "الانتقال المباشر بين الحقول التي تتطلب اهتماماً (منخفضة الثقة أو بيانات مفقودة)",
+        "nextField": "الحقل التالي المنبه",
+        "prevField": "الحقل السابق المنبه",
+        "flaggedCount": "{{current}} من {{total}} حقول تتطلب الانتباه"
+      },
+      "header": {
+        "title": "تفاصيل عرض السعر",
+        "supplierLabel": "المورد (مطلوب)",
+        "supplierPlaceholder": "اختر المورد المعتمد...",
+        "supplierRequired": "تأكيد المورد إلزامي قبل اعتماد عرض السعر",
+        "currencyLabel": "العملة",
+        "currencyPlaceholder": "مثال: USD, EUR, SAR",
+        "currencyRequired": "العملة مطلوبة",
+        "issueDateLabel": "تاريخ الإصدار",
+        "expiryDateLabel": "تاريخ الانتهاء",
+        "statedTotalLabel": "إجمالي المبلغ المذكور",
+        "statedTotalCurrency": "عملة المبلغ المذكور",
+        "statusLabel": "الحالة"
+      },
+      "lines": {
+        "title": "بنود عرض السعر المستخرجة",
+        "colLine": "#",
+        "colOriginalText": "النص الأصلي من المستند",
+        "colQuantity": "الكمية",
+        "colPack": "تفاصيل العبوة",
+        "colUnitPrice": "سعر الوحدة",
+        "colVat": "ضريبة القيمة المضافة %",
+        "colDeliveryFee": "رسوم التوصيل",
+        "colDiscount": "الخصم",
+        "colConfidence": "مستوى الثقة",
+        "colActions": "الإجراءات",
+        "packCount": "عدد العبوات",
+        "unitSize": "حجم الوحدة",
+        "unit": "الوحدة",
+        "noLines": "لم يتم استخراج بنود لعرض السعر هذا."
+      },
+      "confidence": {
+        "high": "ثقة عالية",
+        "medium": "ثقة متوسطة",
+        "low": "ثقة منخفضة — تتطلب مراجعة",
+        "flaggedBadge": "تتطلب انتباهاً",
+        "scoreTooltip": "درجة ثقة الذكاء الاصطناعي: {{score}}% عبر {{method}} ({{model}})"
+      },
+      "provenance": {
+        "title": "مصدر استخراج الحقل",
+        "method": "الطريقة:",
+        "model": "النموذج:",
+        "page": "الصفحة:",
+        "originalValue": "القيمة الأصلية المستخرجة:",
+        "correctedValue": "القيمة المصححة:",
+        "correctedBy": "تم التصحيح بواسطة:",
+        "correctedAt": "تاريخ التصحيح:",
+        "showSource": "عرض في المستند"
+      },
+      "corrections": {
+        "title": "تصحيح الحقل",
+        "saveCorrection": "حفظ التصحيح",
+        "cancelCorrection": "إلغاء",
+        "editTooltip": "تصحيح قيمة هذا الحقل",
+        "correctedBadge": "تم التصحيح يدوياً"
+      },
+      "arithmetic": {
+        "mismatchTitle": "تم اكتشاف عدم تطابق حسابي (US3)",
+        "mismatchDescription": "مجموع قيم البنود المستخرجة لا يطابق المبلغ الإجمالي المذكور في المستند. لا يمكن اعتماد عرض السعر حتى تتم تسوية هذا الفارق أو تصحيحه.",
+        "statedTotal": "الإجمالي المذكور في المستند:",
+        "computedTotal": "الإجمالي المحسوب للبنود:",
+        "difference": "الفارق الحسابي:",
+        "reconciled": "قيم البنود متطابقة تماماً مع الإجمالي المذكور في المستند.",
+        "statusMismatch": "عدم تطابق غير محلول",
+        "statusReconciled": "متطابق"
+      },
+      "versioning": {
+        "title": "إصدارات عروض الأسعار (US4)",
+        "isRequoteLabel": "هذا العرض هو تحديث لعرض سعر سابق",
+        "selectPreviousLabel": "اختر عرض السعر السابق لاستبداله",
+        "selectPreviousPlaceholder": "اختر عرض السعر السابق...",
+        "bannerTitle": "سجل الإصدارات",
+        "isUpdateOf": "عرض السعر هذا هو إصدار محدث من",
+        "hasNewerVersion": "يوجد إصدار أحدث لعرض السعر هذا:",
+        "viewPriorVersion": "عرض الإصدار السابق",
+        "viewNewerVersion": "عرض الإصدار الأحدث",
+        "versionId": "عرض سعر #{{id}}"
+      },
+      "actions": {
+        "saveChanges": "حفظ التصحيحات",
+        "saving": "جاري حفظ التصحيحات...",
+        "confirmButton": "تأكيد واعتماد عرض السعر",
+        "confirming": "جاري اعتماد عرض السعر...",
+        "confirmSuccess": "تم تأكيد واعتماد عرض السعر كبيانات تجارية موثوقة.",
+        "saveSuccess": "تم حفظ التصحيحات بنجاح.",
+        "confirmBlockedTitle": "تعذر تأكيد عرض السعر",
+        "confirmBlockedMissingSupplier": "يُرجى تحديد وتأكيد المورد قبل الاعتماد.",
+        "confirmBlockedArithmetic": "يوجد عدم تطابق حسابي غير معالج. يُرجى تصحيح البنود أو الإجمالي المذكور.",
+        "confirmBlockedConfidence": "توجد حقول منخفضة الثقة تتطلب التصحيح قبل الاعتماد.",
+        "genericError": "تعذر تحديث عرض السعر. يُرجى التحقق من المدخلات والمحاولة مرة أخرى."
+      },
+      "status": {
+        "pending": "بانتظار الاستخراج",
+        "extracting": "جاري الاستخراج",
+        "extracted": "تم الاستخراج (بانتظار المراجعة)",
+        "in_review": "قيد المراجعة",
+        "reviewed": "تمت المراجعة والاعتماد",
+        "refused": "مرفوض"
+      }
+    }
+  },
+  "matching": {
+    "queue": {
+      "title": "قائمة مهام مطابقة البنود",
+      "subtitle": "مراجعة وتسوية بنود عروض الأسعار التي تتطلب قرارات مطابقة بشرية أو إضافة منتجات جديدة.",
+      "readOnlyBadge": "صلاحية للقراءة فقط",
+      "readOnlyNotice": "تمتلك صلاحية القراءة فقط. يمكنك استعراض مهام المطابقة والمرشحين دون إمكانية اعتماد القرارات أو إنشاء منتجات.",
+      "filterStatus": "الحالة",
+      "filterPriority": "الأولوية",
+      "filterReason": "سبب التوجيه",
+      "status": {
+        "open": "مفتوحة",
+        "in_progress": "قيد المعالجة",
+        "resolved": "تمت التسوية",
+        "all": "جميع الحالات"
+      },
+      "priority": {
+        "low": "منخفضة",
+        "normal": "عادية",
+        "high": "عالية",
+        "all": "جميع الأولويات"
+      },
+      "reason": {
+        "low_confidence": "ثقة منخفضة",
+        "close_candidates": "مرشحون متقاربون",
+        "no_candidate": "لا يوجد مرشح",
+        "alias_conflict": "تعارض في الاسم المرادف",
+        "all": "جميع الأسباب"
+      },
+      "columns": {
+        "quotation": "عرض السعر",
+        "line": "البند",
+        "originalText": "نص المورد الأصلي",
+        "reason": "السبب",
+        "priority": "الأولوية",
+        "status": "الحالة",
+        "candidates": "المرشحون",
+        "createdAt": "تاريخ الإدراج",
+        "actions": "الإجراءات"
+      },
+      "actions": {
+        "resolve": "تسوية المطابقة",
+        "view": "عرض التفاصيل"
+      },
+      "emptyTitle": "لا توجد مهام مطابقة",
+      "emptyMessage": "لا توجد بنود عروض أسعار بانتظار تسوية المطابقة حالياً."
+    },
+    "resolution": {
+      "title": "تسوية المطابقة",
+      "subtitle": "مراجعة المنتجات المرشحة وتقييم مؤشرات المطابقة واعتماد تسوية البند.",
+      "backToQueue": "العودة إلى القائمة",
+      "readOnlyBanner": "لديك صلاحية العرض فقط. مالك مساحة العمل والمشتري فقط يمكنهما تسوية المطابقة وإنشاء المنتجات.",
+      "keyboardShortcutsTitle": "أزرار التحكم بلوحة المفاتيح (FR-012)",
+      "shortcuts": {
+        "selectCandidate": "1–9: اختيار المرشح",
+        "navigate": "↑ / ↓: التنقل بين المرشحين",
+        "confirm": "Enter: تأكيد القرار",
+        "toggleOutcome": "O: التبديل بين الخيارات"
+      },
+      "lineDetails": {
+        "title": "تفاصيل بند عرض السعر",
+        "lineNumber": "بند رقم {{line}}",
+        "quotation": "عرض السعر",
+        "originalText": "صياغة المورد للبند",
+        "quantity": "الكمية",
+        "pack": "عبوة المورد",
+        "unitPrice": "سعر الوحدة",
+        "vatRate": "نسبة الضريبة",
+        "deliveryFee": "رسوم التوصيل",
+        "discount": "الخصم"
+      },
+      "candidates": {
+        "title": "المنتجات المرشحة حسب الأولوية",
+        "subtitle": "تم التقييم عبر المفاتيح المحددة، التشابه اللفظي (pg_trgm)، التشابه الدلالي (pgvector)، ومعقولية السمات.",
+        "rank": "الترتيب #{{rank}}",
+        "confidence": "درجة الثقة",
+        "noCandidates": "لم يتم العثور على مرشحين لهذا البند.",
+        "signalsTitle": "تفاصيل أسباب المطابقة",
+        "signals": {
+          "aliasHit": "تطابق مرادف مباشر",
+          "aliasHitDesc": "يطابق اسماً مرادفاً معتمداً مسبقاً للمورد",
+          "gtinMatch": "تطابق الباركود GTIN",
+          "gtinMatchDesc": "يطابق الباركود الدولي للمنتج في الدليل",
+          "supplierCodeMatch": "تطابق كود المورد",
+          "supplierCodeMatchDesc": "يطابق كود المنتج الخاص بالمورد",
+          "lexicalSimilarity": "التشابه اللفظي",
+          "semanticSimilarity": "التشابه الدلالي",
+          "featureScores": "تفاصيل معقولية السمات",
+          "brandMatch": "تطابق العلامة التجارية",
+          "variantMatch": "تطابق الصنف",
+          "packUnitMatch": "تطابق وحدة العبوة",
+          "packSizePlausibility": "معقولية حجم العبوة",
+          "pricePlausibility": "معقولية السعر",
+          "scoringVersion": "إصدار التقييم",
+          "embeddingModel": "نموذج التضمين"
+        },
+        "product": {
+          "brand": "العلامة التجارية",
+          "variant": "الصنف / المواصفة",
+          "gtin": "الباركود GTIN",
+          "baseUnit": "الوحدة الأساسية",
+          "pack": "مواصفات العبوة",
+          "status": {
+            "active": "نشط",
+            "archived": "مؤرشف"
+          },
+          "archivedWarning": "هذا المنتج مؤرشف في دليل منتجاتك."
+        }
+      },
+      "outcomes": {
+        "title": "تحديد نتيجة التسوية",
+        "subtitle": "حدد كيفية مطابقة هذا البند مع الدليل أو أنشئ منتجاً جديداً.",
+        "same_product": {
+          "label": "نفس المنتج تماماً",
+          "description": "البند يطابق المنتج المختار تماماً في الهوية والتركيب وحجم العبوة."
+        },
+        "different_pack": {
+          "label": "حجم عبوة مختلف",
+          "description": "نفس المنتج تماماً ولكن معروض بحجم أو كمية عبوة مختلفة."
+        },
+        "different_variant": {
+          "label": "صنف / نوع مختلف",
+          "description": "نفس عائلة المنتج ولكن بنوع أو نكهة أو مواصفة مختلفة."
+        },
+        "compatible_alternative": {
+          "label": "بديل متوافق",
+          "description": "بديل وظيفي مناسب للمنتج المرشح."
+        },
+        "no_match_new_product": {
+          "label": "لا يوجد تطابق — إنشاء منتج جديد",
+          "description": "لا يوجد مرشح مناسب. أنشئ منتجاً جديداً في الدليل واربط هذا البند به."
+        }
+      },
+      "newProduct": {
+        "title": "منتج دليل جديد",
+        "subtitle": "إنشاء منتج مباشرة من بند عرض السعر، وستُحفظ صياغة المورد كمرادف تلقائياً.",
+        "tenantNameLabel": "اسم المنتج (في مساحة العمل)",
+        "tenantNamePlaceholder": "مثال: حليب كامل الدسم 2 لتر",
+        "tenantNameRequired": "اسم المنتج مطلوب",
+        "tenantNameMaxLength": "لا يمكن أن يتجاوز اسم المنتج 200 حرف",
+        "brandLabel": "العلامة التجارية (اختياري)",
+        "brandPlaceholder": "مثال: المراعي",
+        "canonicalNameLabel": "الاسم المعياري (اختياري)",
+        "canonicalNamePlaceholder": "يُستخدم اسم مساحة العمل افتراضياً",
+        "canonicalNameHint": "اتركه فارغاً لمطابقة اسم مساحة العمل",
+        "variantLabel": "الصنف / الوصف (اختياري)",
+        "variantPlaceholder": "مثال: عبوة عائلية 2 لتر",
+        "gtinLabel": "الباركود GTIN (اختياري)",
+        "gtinPlaceholder": "8 أو 12 أو 13 أو 14 رقماً",
+        "gtinInvalid": "يجب أن يتكون الباركود من 8 أو 12 أو 13 أو 14 رقماً",
+        "baseUnitLabel": "الوحدة الأساسية",
+        "baseUnitRequired": "الوحدة الأساسية مطلوبة",
+        "packSectionTitle": "تعريف العبوة",
+        "packSectionDescription": "حدد عدد وحجم الوحدات لتمكين توحيد الكميات عبر الموردين.",
+        "packCountLabel": "عدد العبوات",
+        "packCountPlaceholder": "مثال: 1",
+        "packCountRequired": "عدد العبوات مطلوب",
+        "packCountMin": "يجب أن يكون عدد العبوات 1 على الأقل",
+        "unitSizeLabel": "حجم الوحدة",
+        "unitSizePlaceholder": "مثال: 2.0",
+        "unitSizeRequired": "حجم الوحدة مطلوب",
+        "unitSizePositive": "يجب أن يكون حجم الوحدة رقماً موجباً",
+        "liveNormalisedLabel": "الكمية الأساسية الموحدة",
+        "liveNormalisedHelp": "تُحسب تلقائياً كـ (عدد العبوات × حجم الوحدة) بالوحدة الأساسية",
+        "preferredSupplierLabel": "المورد المفضل (اختياري)",
+        "noPreferredSupplier": "لا يوجد (بدون مورد مفضل)"
+      },
+      "landedCost": {
+        "title": "التكلفة الإجمالية الواصلة (US3)",
+        "subtitle": "تكلفة واصلة قابلة لإعادة الاحتساب وموحدة حسب الوحدة الأساسية في الدليل.",
+        "unitPrice": "سعر الوحدة",
+        "vatAmount": "ضريبة القيمة المضافة المحسوبة",
+        "vatRate": "نسبة الضريبة: {{rate}}%",
+        "deliveryFee": "رسوم التوصيل",
+        "discount": "الخصم",
+        "otherCharges": "رسوم أخرى",
+        "total": "إجمالي التكلفة الواصلة",
+        "normalisedQuantity": "الكمية الموحدة",
+        "baseUnit": "الوحدة الأساسية",
+        "ruleVersion": "إصدار القاعدة الحسابية",
+        "validFrom": "ساري من",
+        "recordedAt": "تاريخ التسجيل",
+        "replayableNotice": "حساب حتمي وموثق ومثبت على قاعدة رقم {{version}}."
+      },
+      "decision": {
+        "title": "قرار التسوية",
+        "matchedProduct": "المنتج المطابق:",
+        "outcome": "النتيجة:",
+        "decidedBy": "تمت التسوية بواسطة:",
+        "decidedAt": "تاريخ التسوية:",
+        "automatic": "مطابقة تلقائية",
+        "human": "تسوية يدوية",
+        "confidence": "درجة ثقة القرار:"
+      },
+      "actions": {
+        "confirm": "تأكيد قرار المطابقة",
+        "confirming": "جاري التأكيد...",
+        "saveSuccess": "تم تأكيد قرار المطابقة وحفظ الاسم المرادف بنجاح.",
+        "candidateRequired": "يُرجى اختيار منتج مرشح قبل التأكيد.",
+        "formInvalid": "يُرجى تصحيح أخطاء إنشاء المنتج قبل التأكيد."
+      },
+      "errors": {
+        "aliasConflict": "تعارض في المرادفات: صياغة المورد هذه مرتبطة بالفعل بمنتج مختلف في دليلك.",
+        "notReviewed": "عرض السعر لم يصل إلى حالة المراجعة والاعتماد بعد.",
+        "invalidCandidate": "المرشح المختار غير صالح لبند عرض السعر هذا.",
+        "alreadyDecided": "تم تسجيل قرار مطابقة مسبقاً لهذا البند.",
+        "genericError": "تعذر تسوية قرار المطابقة. يُرجى المحاولة مرة أخرى."
+      }
+    }
+  },
+  "compare": {
+    "title": "مقارنة العروض الذكية",
+    "subtitle": "مقارنة عروض الموردين جنباً إلى جنب مع إجمالي التكلفة الحقيقية وتوصيات مبنية على أدلة واضحة.",
+    "selectProductPrompt": "اختر منتجاً من القائمة لمقارنة عروض الموردين.",
+    "productLabel": "المنتج",
+    "quantityLabel": "الكمية المطلوبة",
+    "quantityPlaceholder": "مثال: 10",
+    "quantityRequired": "يجب أن تكون الكمية أكبر من 0",
+    "includeExpired": "تضمين العروض منتهية الصلاحية",
+    "recomputing": "جاري إعادة الحساب...",
+    "unitLabel": "الوحدة: {{unit}}",
+    "recommendation": {
+      "title": "العرض الموصى به",
+      "noRecommendation": "لا توجد توصية مؤهلة حالياً",
+      "scoreLabel": "درجة التوصية",
+      "confidenceLabel": "مستوى الثقة",
+      "confidence": {
+        "high": "ثقة عالية",
+        "medium": "ثقة متوسطة",
+        "low": "ثقة منخفضة"
+      },
+      "validityWindow": "السعر صالح من {{from}} إلى {{to}}",
+      "validityOpenEnded": "السعر صالح من {{from}} (بدون تاريخ انتهاء)",
+      "winningMargin": "هامش التوفير: {{margin}}%",
+      "evidenceTitle": "تفاصيل أدلة التقييم",
+      "weightsTitle": "أوزان المعايير",
+      "weights": {
+        "cost": "التكلفة الإجمالية ({{weight}}%)",
+        "matchConfidence": "دقة المطابقة ({{weight}}%)",
+        "reliability": "موثوقية المورد ({{weight}}%)",
+        "leadTime": "مدة التوريد ({{weight}}%)"
+      },
+      "riskNotesTitle": "ملاحظات المخاطر",
+      "riskNotes": {
+        "price_expiring_soon": "السعر سينتهي خلال 7 أيام. يُوصى باتخاذ إجراء سريع.",
+        "low_match_confidence": "دقة مطابقة المنتج أقل من 85%. يُرجى التحقق من مواصفات المنتج.",
+        "low_supplier_reliability": "تقييم موثوقية المورد أقل من 60%."
+      },
+      "tieBreakTitle": "تم تطبيق معيار كسر التعادل الحتمي",
+      "tieBreakNote": "تساوت درجات العروض؛ تم كسر التعادل بالترتيب: {{rule}}"
+    },
+    "table": {
+      "supplier": "المورد",
+      "normalisedUnitPrice": "سعر الوحدة",
+      "landedCostTotal": "إجمالي التكلفة الواصلة",
+      "leadTime": "مدة التوريد",
+      "leadTimeDays": "{{days}} يوم",
+      "leadTimeUnknown": "غير محدد",
+      "reliability": "الموثوقية",
+      "reliabilityUnknown": "بدون تقييم",
+      "stockSignal": "حالة المخزون",
+      "stockUnknown": "غير معروف",
+      "matchConfidence": "دقة المطابقة",
+      "validUntil": "صالح حتى",
+      "validOpenEnded": "مفتوح المدة",
+      "status": "الحالة",
+      "statusActive": "نشط",
+      "statusExpired": "منتهي الصلاحية",
+      "recommendedBadge": "موصى به"
+    },
+    "empty": {
+      "title": "لا توجد عروض موردين مسجلة",
+      "message": "لا توجد عروض أسعار تمت مراجعتها ومطابقتها لهذا المنتج بعد. قم برفع ومراجعة عروض الأسعار لتوليد عروض الموردين.",
+      "selectProduct": "يُرجى اختيار منتج من الكتالوج لعرض مقارنة الموردين."
+    },
+    "actions": {
+      "viewIntelligence": "سجل الأسعار",
+      "viewProduct": "عرض المنتج",
+      "backToCatalogue": "العودة إلى الكتالوج",
+      "recordPurchase": "تسجيل الشراء"
+    }
+  },
+  "productIntelligence": {
+    "title": "ذكاء أسعار المنتج",
+    "subtitle": "اتجاهات التكلفة التاريخية والمؤشرات المرجعية المستمدة من سجل مشتريات مساحة العمل.",
+    "filterSupplier": "تصفية حسب المورد",
+    "allSuppliers": "جميع الموردين",
+    "timeWindow": "النطاق الزمني",
+    "windowMonths": "{{months}} أشهر",
+    "metrics": {
+      "lastPaid": "آخر سعر مدفوع",
+      "lastPaidSubtitle": "أحدث سعر وحدة واصلة مسجل",
+      "averagePaid": "متوسط السعر المدفوع",
+      "averagePaidSubtitle": "متوسط حسابي متجدد لـ {{months}} أشهر",
+      "bestPrice": "أفضل سعر مسجل",
+      "bestPriceSubtitle": "أدنى سعر وحدة قياسي تاريخياً",
+      "noData": "لا توجد بيانات",
+      "sourceRecord": "السجل المصدري: {{id}}",
+      "sourceRecords": "{{count}} سجلات مصدرية"
+    },
+    "chart": {
+      "title": "مسار سعر الوحدة عبر الوقت",
+      "xAxis": "تاريخ التسجيل",
+      "yAxis": "سعر الوحدة القياسي ({{currency}})",
+      "legend": "الموردون",
+      "pointTooltip": "{{supplier}}: {{price}} (الكمية: {{quantity}} {{unit}}) في {{date}}",
+      "noPoints": "لا توجد نقاط سعرية في النطاق الزمني المحدد"
+    },
+    "historyTable": {
+      "title": "السجلات التاريخية",
+      "recordedAt": "تاريخ التسجيل",
+      "supplier": "المورد",
+      "unitPrice": "سعر الوحدة القياسي",
+      "totalCost": "إجمالي التكلفة الواصلة",
+      "quantity": "الكمية",
+      "validFrom": "صالح من",
+      "validTo": "صالح حتى"
+    },
+    "empty": {
+      "title": "لا يوجد سجل مشتريات بعد",
+      "message": "يتم بناء ذكاء الأسعار تلقائياً عند مراجعة عروض الأسعار ومطابقتها واحتساب تكلفتها لهذا المنتج."
+    },
+    "actions": {
+      "compare": "مقارنة العروض الذكية",
+      "backToCatalogue": "العودة إلى الكتالوج"
+    }
+  },
+  "basketSplit": {
+    "title": "تقسيم السلة بين موردين",
+    "subtitle": "تحسين المشتريات عبر موردين اثنين للحصول على أدنى إجمالي تكلفة واصلة.",
+    "readOnlyNotice": "لديك صلاحية عرض فقط. يمكن لمالكي ومشتري مساحة العمل إعداد وإرسال طلبات تقسيم السلة.",
+    "form": {
+      "suppliersSectionTitle": "اختر موردين اثنين",
+      "supplier1": "المورد الأول",
+      "supplier2": "المورد الثاني",
+      "selectSupplier": "اختر المورد...",
+      "sameSupplierError": "يُرجى اختيار موردين مختلفين.",
+      "itemsSectionTitle": "منتجات السلة",
+      "product": "المنتج",
+      "quantity": "الكمية",
+      "unitLabel": "الوحدة: {{unit}}",
+      "addItem": "إضافة منتج",
+      "removeItem": "حذف المنتج",
+      "submitButton": "تحسين تقسيم السلة",
+      "submitting": "جاري إرسال السلة...",
+      "validationError": "يُرجى تحديد موردين مختلفين ومنتج واحد على الأقل بكمية موجبة."
+    },
+    "status": {
+      "queued": "طلب تقسيم السلة في قائمة الانتظار للتحسين...",
+      "running": "جاري تحسين التوزيع عبر الموردين...",
+      "polling": "جاري التحقق من حالة الطلب...",
+      "completed": "اكتمل التحسين",
+      "failed": "فشل طلب التحسين",
+      "failedMessage": "حدث خطأ أثناء تنفيذ عملية التحسين. يُرجى المحاولة مرة أخرى."
+    },
+    "result": {
+      "feasibleTitle": "التوزيع الموصى به للسلة",
+      "feasibleSubtitle": "أدنى تكلفة واصلة مقسمة بين الموردين المحددين.",
+      "totalLandedCost": "إجمالي التكلفة الواصلة المحسنة",
+      "supplierAllocation": "الحصة المخصصة لـ {{supplier}}",
+      "supplierTotal": "إجمالي المورد: {{total}}",
+      "productColumn": "المنتج",
+      "quantityColumn": "الكمية المخصصة",
+      "costColumn": "التكلفة الواصلة المتوقعة",
+      "baselinesTitle": "مقارنة الأساس مع مورد فردي",
+      "baselineSubtitle": "تقييم ما إذا كان التقسيم يوفر المال مقارنة بالشراء الكامل من مورد واحد.",
+      "splitSavings": "التقسيم يوفر {{amount}} مقارنة بالشراء الحصري من {{cheaperSupplier}}.",
+      "noSplitSavings": "التقسيم لا يقدم ميزة سعرية؛ الشراء الكامل من {{cheaperSupplier}} مساوٍ أو أقل تكلفة.",
+      "singleSupplierOnly": "فقط {{supplier}} يمكنه توفير كامل السلة.",
+      "neitherSingleFeasible": "لا يستطيع أي من الموردين توفير كامل السلة بمفرده.",
+      "infeasibleTitle": "تقرير عدم الجدوى التجارية",
+      "infeasibleSubtitle": "اكتملت معالجة التحسين بنجاح، ولكن لا يمكن تحقيق توزيع مجدٍ مع الموردين المحددين.",
+      "infeasibleReason": "المنتج/المنتجات التالية لا تملك عروضاً مؤهلة من الموردين المحددين:",
+      "missingSuppliers": "عروض غير متوفرة من: {{suppliers}}",
+      "solverVersion": "إصدار نظام التحسين: {{version}}",
+      "computedAt": "تم الحساب في {{time}}"
+    },
+    "actions": {
+      "newSplit": "بدء تقسيم سلة جديد",
+      "viewCompare": "مقارنة عروض المنتج"
+    }
+  },
+  "alerts": {
+    "title": "صندوق التنبيهات الإجرائية",
+    "subtitle": "إشارات تجارية استباقية تُحسب مباشرة من عروض الأسعار وسجل الأسعار الحالي.",
+    "readOnlyNotice": "لديك صلاحية عرض فقط. يمكن لمالكي ومشتري مساحة العمل استبعاد التنبيهات.",
+    "filterKind": "تصفية حسب نوع التنبيه",
+    "allKinds": "جميع أنواع التنبيهات",
+    "kinds": {
+      "recommended_price_expiring": "سعر موصى به يقترب من الانتهاء",
+      "preferred_supplier_offer_disappeared": "اختفاء عرض المورد المفضل",
+      "price_swing": "تم رصد تقلب في السعر"
+    },
+    "severities": {
+      "critical": "حرج",
+      "warning": "تحذير",
+      "info": "معلومات"
+    },
+    "card": {
+      "dismiss": "استبعاد",
+      "dismissing": "جاري الاستبعاد...",
+      "dismissSuccess": "تم استبعاد التنبيه.",
+      "product": "المنتج: {{product}}",
+      "supplier": "المورد: {{supplier}}",
+      "detectedAt": "تم التقييم في {{time}}",
+      "evidence": {
+        "expiringSoon": "العرض الموصى به من {{supplier}} ينتهي في {{validTo}}.",
+        "disappeared": "المورد المفضل {{supplier}} لم يعد لديه عرض نشط لهذا المنتج.",
+        "priceSwing": "سعر الوحدة الموصى به ({{currentPrice}}) تغير بنسبة {{swingPercent}}% مقارنة بالمتوسط التاريخي لـ 6 أشهر ({{avgPrice}})."
+      }
+    },
+    "actions": {
+      "compare_product": "مقارنة العروض",
+      "review_supplier": "مراجعة المورد",
+      "view_price_history": "عرض سجل الأسعار"
+    },
+    "empty": {
+      "title": "كل شيء على ما يرام — لا توجد تنبيهات نشطة",
+      "message": "لم يتم رصد أي شروط تجارية تتطلب تدخلاً فورياً في بيانات مساحة العمل الحالية."
+    }
+  },
+  "savings": {
+    "ledger": {
+      "title": "سجل الوفورات",
+      "subtitle": "سجل معتمد للوفورات المحققة في المشتريات والمحسوبة وفق خطوط أساس تاريخية موثقة.",
+      "recordPurchase": "تسجيل نتيجة شراء",
+      "exportSavings": "تصدير الوفورات",
+      "filters": {
+        "statusLabel": "تصفية حسب الحالة",
+        "allStatuses": "جميع الحالات",
+        "statusPending": "قيد التحقق",
+        "statusVerified": "تم التحقق",
+        "periodStart": "تاريخ البدء",
+        "periodEnd": "تاريخ الانتهاء",
+        "supplierLabel": "المورد",
+        "allSuppliers": "جميع الموردين",
+        "clear": "إعادة ضبط التصفيات"
+      },
+      "table": {
+        "product": "المنتج",
+        "supplier": "المورد",
+        "baseline": "قيمة خط الأساس",
+        "actual": "المبلغ المدفوع فعلياً",
+        "delta": "الوفر المتحقق (الفارق)",
+        "status": "الحالة",
+        "recordedAt": "تاريخ التسجيل",
+        "actions": "الإجراءات",
+        "viewEvidence": "عرض الأدلة",
+        "verifyAction": "تحقق",
+        "statusPending": "قيد التحقق",
+        "statusVerified": "تم التحقق",
+        "noBaseline": "لا يوجد خط أساس"
+      },
+      "empty": {
+        "title": "لم يتم تسجيل أي وفورات بعد",
+        "message": "قارن عروض المنتجات وسجّل مشترياتك الفعلية للبدء في بناء سجل الوفورات المعتمد.",
+        "recordButton": "تسجيل أول عملية شراء"
+      },
+      "stats": {
+        "totalVerified": "إجمالي الوفورات المعتمدة",
+        "pendingCount": "نتائج قيد التحقق",
+        "verifiedCount": "نتائج تم التحقق منها"
+      }
+    },
+    "outcomeCapture": {
+      "title": "تسجيل نتيجة الشراء",
+      "subtitle": "توثيق ما تم طلبه ودفعه فعلياً لحساب الوفر المعتمد مقارنة بخط الأساس.",
+      "productLabel": "المنتج",
+      "selectProductPrompt": "اختر المنتج...",
+      "supplierLabel": "المورد",
+      "selectSupplierPrompt": "اختر المورد...",
+      "quantityLabel": "الكمية المطلوبة فعلياً",
+      "baseUnitLabel": "الوحدة الأساسية",
+      "unitPriceAmountLabel": "سعر الوحدة الفعلي",
+      "currencyLabel": "العملة",
+      "totalPaidAmountLabel": "إجمالي المبلغ المدفوع",
+      "deliveryResultLabel": "نتيجة التوريد",
+      "orderedAtLabel": "تاريخ الطلب",
+      "deliveredAtLabel": "تاريخ التوريد",
+      "notesLabel": "ملاحظات / رقم المرجع",
+      "notesPlaceholder": "مثال: أمر شراء رقم 12345، إشعار استلام...",
+      "baselineNoticeTitle": "ملاحظة خط الأساس التاريخي",
+      "baselineUnavailable": "لا يوجد سجل أسعار سابق لهذا المنتج. سيتم تسجيل الشراء بسياسة خط أساس 'غير متوفر'.",
+      "baselineAvailable": "سيتم حساب خط الأساس بناءً على سجل الأسعار الموثق ({{policy}}).",
+      "deliveryResults": {
+        "ordered": "تم الطلب",
+        "partially_delivered": "تم التوريد جزئياً",
+        "delivered": "تم التوريد",
+        "cancelled": "تم الإلغاء",
+        "disputed": "محل نزاع"
+      },
+      "submitButton": "تسجيل النتيجة وحساب الوفر",
+      "submittingButton": "جاري التسجيل...",
+      "cancelButton": "إلغاء",
+      "successMessage": "تم تسجيل نتيجة الشراء بنجاح. الوفر قيد التحقق.",
+      "validation": {
+        "productRequired": "المنتج مطلوب",
+        "quantityRequired": "الكمية مطلوبة",
+        "quantityMin": "يجب أن تكون الكمية أكبر من 0",
+        "unitPriceRequired": "سعر الوحدة مطلوب",
+        "totalPaidRequired": "إجمالي المدفوع مطلوب",
+        "currencyRequired": "العملة مطلوبة",
+        "deliveryResultRequired": "نتيجة التوريد مطلوبة",
+        "baseUnitRequired": "الوحدة الأساسية مطلوبة"
+      }
+    },
+    "evidence": {
+      "title": "أدلة وحسابات الوفر",
+      "subtitle": "سلسلة موثقة تربط هذا الوفر بنتائج الشراء وعروض الأسعار والعروض المنافسة.",
+      "backToLedger": "العودة إلى سجل الوفورات",
+      "summaryCard": "ملخص الوفر",
+      "statusLabel": "الحالة",
+      "statusPending": "قيد التحقق",
+      "statusVerified": "معتمد (غير قابل للتعديل)",
+      "baselinePolicy": "سياسة خط الأساس",
+      "baselinePolicies": {
+        "last_paid": "آخر سعر مدفوع",
+        "rolling_average_6m": "متوسط 6 أشهر المتداول",
+        "none_available": "لا يوجد خط أساس متوفر"
+      },
+      "baselineUnitPrice": "سعر وحدة خط الأساس",
+      "baselineValue": "إجمالي قيمة خط الأساس",
+      "actualValue": "إجمالي القيمة الفعلية",
+      "delta": "صافي الوفر (الفارق)",
+      "positiveDeltaExplanation": "مبلغ تم توفيره مقارنة بخط الأساس الموثق.",
+      "negativeDeltaExplanation": "التكلفة الفعلية تجاوزت خط الأساس التاريخي.",
+      "calculationVersion": "إصدار الحساب",
+      "recordedBy": "سُجل بواسطة",
+      "recordedAt": "تاريخ التسجيل",
+      "verifiedBy": "تم التحقق بواسطة",
+      "verifiedAt": "تاريخ التحقق",
+      "immutableBanner": "سجل الوفر هذا معتمد وغير قابل للتعديل. لا يمكن تعديل أو حذف الحسابات أو خط الأساس أو الأدلة.",
+      "pendingBanner": "هذا الوفر قيد التحقق البشري. يمكن لمالك أو مشتري مساحة العمل اعتماد هذا السجل لتثبيت حساباته وإدراجه في عمليات التصدير.",
+      "verifyButton": "اعتماد الوفر",
+      "verifyingButton": "جاري الاعتماد...",
+      "verifySuccess": "تم اعتماد سجل الوفر بنجاح.",
+      "purchaseCard": "تفاصيل الشراء",
+      "quotationCard": "عرض السعر الأصلي",
+      "noQuotation": "لا يوجد عرض سعر أصلي مرتبط بعملية الشراء هذه.",
+      "competingOffersCard": "العروض المنافسة وقت المقارنة",
+      "noCompetingOffers": "لا توجد عروض منافسة مسجلة في سياق المقارنة.",
+      "calculationCard": "لقطة بيانات الحساب",
+      "formula": "المعادلة: قيمة خط الأساس − المبلغ المدفوع فعلياً = صافي الوفر"
+    }
+  },
+  "exports": {
+    "title": "تصدير سجل الوفورات",
+    "subtitle": "إنشاء تقارير وفورات معتمدة بصيغة Excel أو PDF جاهزة للتدقيق المالي والمحاسبي.",
+    "backToLedger": "العودة إلى سجل الوفورات",
+    "formCard": "إعدادات التصدير",
+    "formatLabel": "صيغة التصدير",
+    "formatXlsx": "جدول بيانات Excel (.xlsx)",
+    "formatPdf": "تقرير ملخص PDF (.pdf)",
+    "periodStart": "تاريخ بدء الفترة",
+    "periodEnd": "تاريخ نهاية الفترة",
+    "supplierLabel": "تصفية حسب المورد (اختياري)",
+    "allSuppliers": "جميع الموردين",
+    "submitButton": "إنشاء التصدير",
+    "submittingButton": "جاري تقديم الطلب...",
+    "verifiedOnlyNote": "ملاحظة: يتضمن التصدير الوفورات المعتمدة فقط. تُستثنى السجلات قيد التحقق وفقاً لمعايير الامتثال والتدقيق.",
+    "statusCard": "حالة طلب التصدير",
+    "status": {
+      "queued": "في قائمة الانتظار",
+      "queuedDesc": "طلب التصدير في قائمة الانتظار بانتظار بدء المعالجة.",
+      "running": "جاري المعالجة",
+      "runningDesc": "جاري جمع سجلات الوفورات المعتمدة وإنشاء الملف...",
+      "completed": "جاهز للتنزيل",
+      "completedDesc": "اكتمل التصدير بنجاح. انقر أدناه لتنزيل الملف.",
+      "failed": "فشل التصدير",
+      "failedDesc": "حدث خطأ أثناء إنشاء ملف التصدير."
+    },
+    "rowCount": "عدد السجلات المضمنة: {{count}}",
+    "emptyResult": "لم تطابق أي وفورات معتمدة التصفيات المحددة. يحتوي ملف التصدير على رؤوس الجداول فقط.",
+    "downloadButton": "تنزيل ملف التصدير",
+    "newExportButton": "بدء تصدير آخر",
+    "validation": {
+      "periodStartRequired": "تاريخ بدء الفترة مطلوب",
+      "periodEndRequired": "تاريخ نهاية الفترة مطلوب",
+      "invalidDateRange": "يجب أن يكون تاريخ البدء قبل أو يطابق تاريخ النهاية"
+    }
+  },
+  "billing": {
+    "title": "الخطة والفوترة",
+    "subtitle": "عرض خطة مساحة العمل والحدود النشطة وحالة الحساب.",
+    "accountStatus": "حالة الحساب",
+    "statuses": {
+      "active": "نشط",
+      "past_due": "متأخر السداد",
+      "cancelled": "ملغى"
+    },
+    "currentPlan": "الخطة الحالية",
+    "providerNotice": "مزود الفوترة: تجريبي (وضع تقييم المرحلة الأولى — لا يتطلب أي عمليات دفع فعلية)",
+    "limits": {
+      "title": "الاستخدام وحدود الخطة",
+      "activeCatalogueProducts": "منتجات الكتالوج النشطة",
+      "usedOfLimit": "تم استخدام {{used}} من أصل {{limit}}",
+      "remaining": "المتبقي: {{remaining}}",
+      "unlimited": "غير محدود"
+    }
+  },
+  "plans": {
+    "starter": {
+      "name": "البداية",
+      "description": "مثالية لفرق المشتريات الصغيرة لإثبات الوفورات الأولية."
+    },
+    "growth": {
+      "name": "النمو",
+      "description": "للعمليات المتنامية التي تتطلب حدود منتجات أعلى."
     }
   }
 }

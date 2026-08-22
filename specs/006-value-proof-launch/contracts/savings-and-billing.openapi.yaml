@@ -1,0 +1,530 @@
+openapi: 3.1.0
+info:
+  title: ProcurePilot Savings, Exports, and Billing API
+  version: 0.6.0
+  description: >
+    Chunk 4.6. Base path /api/v1, Supabase JWT bearer auth, tenant resolved
+    server-side from the token, cursor pagination capped at 100, Idempotency-Key on
+    mutations, and the {code, message, details, trace_id} error envelope.
+
+    Purchase outcomes create pending savings records with baseline, actual, and delta captured
+    from chunk 4.5 price history at record time. Verification is a later explicit human action
+    that changes only status metadata. Exports are asynchronous jobs. Billing uses a stub provider
+    behind an abstraction; no real payment transaction exists in this chunk.
+
+servers:
+  - url: /api/v1
+
+security:
+  - bearerAuth: []
+
+paths:
+  /purchases:
+    post:
+      summary: Record an actual purchase outcome and create a pending saving
+      description: >
+        Owner or buyer only. Creates one purchase_record and one paired saving_record in a single
+        transaction. Baseline values are read from the existing price-history model and stored at
+        record time; they are not recomputed during verification.
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PurchaseOutcomeCreate' }
+      responses:
+        '201':
+          description: Purchase outcome recorded; saving is pending verification
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PurchaseOutcomeCreated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+
+  /savings:
+    get:
+      summary: List savings ledger rows
+      description: >
+        Lists pending and verified savings for the caller's workspace. Exports and verified totals
+        include only rows with status=verified.
+      parameters:
+        - name: status
+          in: query
+          schema: { $ref: '#/components/schemas/SavingStatus' }
+        - name: period_start
+          in: query
+          schema: { type: string, format: date }
+        - name: period_end
+          in: query
+          schema: { type: string, format: date }
+        - name: supplier_id
+          in: query
+          schema: { type: string, format: uuid }
+        - name: branch_id
+          in: query
+          description: >
+            Accepted for future-compatible filtering. Phase 1 has no Branch entity; the only
+            meaningful current value is null/omitted.
+          schema: { type: string, format: uuid, nullable: true }
+        - name: cursor
+          in: query
+          schema: { type: string }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+      responses:
+        '200':
+          description: Savings ledger page
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SavingList' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+
+  /savings/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      summary: Read one saving record
+      responses:
+        '200':
+          description: Saving record
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SavingRecord' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /savings/{id}/evidence:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      summary: Read evidence behind one saving
+      description: >
+        Returns the saving record, its purchase record, available quotation and match references,
+        competing offers from the compare context, and the stored calculation snapshot. Cross-tenant
+        evidence references are indistinguishable from missing records.
+      responses:
+        '200':
+          description: Evidence view
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SavingEvidence' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /savings/{id}/verify:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      summary: Verify a pending saving
+      description: >
+        Owner or buyer only. Verification is explicit and human; the recording buyer may
+        self-verify. This transition changes only status, verified_at, and verified_by. It never
+        recomputes baseline, actual, delta, or evidence.
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: Saving verified
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SavingRecord' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /exports:
+    post:
+      summary: Request an asynchronous export
+      description: >
+        Owner or buyer only. Creates an export_job and enqueues rendering to the apps/api export
+        worker. Only verified savings are included in savings_ledger exports.
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ExportCreate' }
+      responses:
+        '202':
+          description: Export job queued
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ExportJob' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+
+  /exports/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      summary: Poll export job status and result
+      responses:
+        '200':
+          description: Export job
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ExportJob' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /billing/account:
+    get:
+      summary: Read the active workspace billing account and plan
+      responses:
+        '200':
+          description: Billing account
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BillingAccount' }
+        '404':
+          description: Billing account not configured for this workspace
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /billing/limits/active-catalogue-products:
+    get:
+      summary: Check the active catalogue product limit for the current plan
+      description: >
+        Frontend-facing plan-limit check for FR-011. Starter allows 100 active workspace_product
+        rows. The check reads the caller's tenant-scoped catalogue count and the assigned plan.
+      responses:
+        '200':
+          description: Limit status
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LimitCheck' }
+        '404':
+          description: Billing account not configured for this workspace
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: false
+      schema: { type: string, format: uuid }
+
+  responses:
+    Forbidden:
+      description: The caller's role may not perform this action
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    NotFound:
+      description: No such record in this workspace; cross-tenant records are indistinguishable
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Conflict:
+      description: State conflict, such as already verified or equivalent export already queued
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Unprocessable:
+      description: Validation failed
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+
+  schemas:
+    Error:
+      type: object
+      required: [code, message, trace_id]
+      properties:
+        code: { type: string }
+        message: { type: string }
+        details: { type: object, additionalProperties: true, nullable: true }
+        trace_id: { type: string }
+
+    Money:
+      type: object
+      required: [amount, currency]
+      additionalProperties: false
+      properties:
+        amount: { type: string, pattern: '^-?\d+(\.\d{1,4})?$', example: '88.0000' }
+        currency: { type: string, pattern: '^[A-Z]{3}$', example: 'GBP' }
+
+    SavingStatus:
+      type: string
+      enum: [pending, verified]
+
+    BaselinePolicy:
+      type: string
+      enum: [last_paid, rolling_average_6m, none_available]
+
+    PurchaseDeliveryResult:
+      type: string
+      enum: [ordered, partially_delivered, delivered, cancelled, disputed]
+
+    PurchaseOutcomeCreate:
+      type: object
+      required:
+        - workspace_product_id
+        - quantity
+        - base_unit
+        - unit_price
+        - total_paid
+        - delivery_result
+      additionalProperties: false
+      properties:
+        workspace_product_id: { type: string, format: uuid }
+        supplier_id: { type: string, format: uuid, nullable: true }
+        quotation_line_id: { type: string, format: uuid, nullable: true }
+        match_decision_id: { type: string, format: uuid, nullable: true }
+        landed_cost_id: { type: string, format: uuid, nullable: true }
+        quantity:
+          type: string
+          pattern: '^\d+(\.\d{1,6})?$'
+          example: '10.000000'
+        base_unit: { type: string, example: each }
+        unit_price: { $ref: '#/components/schemas/Money' }
+        total_paid: { $ref: '#/components/schemas/Money' }
+        delivery_result: { $ref: '#/components/schemas/PurchaseDeliveryResult' }
+        ordered_at: { type: string, format: date-time, nullable: true }
+        delivered_at: { type: string, format: date-time, nullable: true }
+        notes: { type: string, maxLength: 2000, nullable: true }
+
+    PurchaseOutcomeCreated:
+      type: object
+      required: [purchase_record, saving_record]
+      properties:
+        purchase_record: { $ref: '#/components/schemas/PurchaseRecord' }
+        saving_record: { $ref: '#/components/schemas/SavingRecord' }
+
+    PurchaseRecord:
+      type: object
+      required:
+        - id
+        - workspace_product_id
+        - quantity
+        - base_unit
+        - unit_price
+        - total_paid
+        - delivery_result
+        - recorded_by
+        - recorded_at
+      properties:
+        id: { type: string, format: uuid }
+        workspace_product_id: { type: string, format: uuid }
+        supplier_id: { type: string, format: uuid, nullable: true }
+        quotation_line_id: { type: string, format: uuid, nullable: true }
+        match_decision_id: { type: string, format: uuid, nullable: true }
+        landed_cost_id: { type: string, format: uuid, nullable: true }
+        quantity: { type: string, pattern: '^\d+(\.\d{1,6})?$' }
+        base_unit: { type: string }
+        unit_price: { $ref: '#/components/schemas/Money' }
+        total_paid: { $ref: '#/components/schemas/Money' }
+        delivery_result: { $ref: '#/components/schemas/PurchaseDeliveryResult' }
+        ordered_at: { type: string, format: date-time, nullable: true }
+        delivered_at: { type: string, format: date-time, nullable: true }
+        recorded_by: { type: string, format: uuid }
+        recorded_at: { type: string, format: date-time }
+        notes: { type: string, nullable: true }
+
+    SavingRecord:
+      type: object
+      required:
+        - id
+        - purchase_record_id
+        - workspace_product_id
+        - status
+        - baseline_policy
+        - baseline_source_landed_cost_ids
+        - actual_value
+        - calculation_version
+        - calculation_inputs
+        - recorded_by
+        - recorded_at
+      properties:
+        id: { type: string, format: uuid }
+        purchase_record_id: { type: string, format: uuid }
+        workspace_product_id: { type: string, format: uuid }
+        supplier_id: { type: string, format: uuid, nullable: true }
+        status: { $ref: '#/components/schemas/SavingStatus' }
+        baseline_policy: { $ref: '#/components/schemas/BaselinePolicy' }
+        baseline_source_landed_cost_ids:
+          type: array
+          items: { type: string, format: uuid }
+        baseline_unit_price:
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+        baseline_value:
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+        actual_value: { $ref: '#/components/schemas/Money' }
+        delta:
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+        calculation_version: { type: string, example: saving-baseline-v1 }
+        calculation_inputs: { type: object, additionalProperties: true }
+        recorded_by: { type: string, format: uuid }
+        recorded_at: { type: string, format: date-time }
+        verified_by: { type: string, format: uuid, nullable: true }
+        verified_at: { type: string, format: date-time, nullable: true }
+
+    SavingList:
+      type: object
+      required: [items, next_cursor]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/SavingRecord' }
+        next_cursor: { type: string, nullable: true }
+
+    SavingEvidence:
+      type: object
+      required: [saving_record, purchase_record, competing_offers, calculation]
+      properties:
+        saving_record: { $ref: '#/components/schemas/SavingRecord' }
+        purchase_record: { $ref: '#/components/schemas/PurchaseRecord' }
+        quotation:
+          type: object
+          nullable: true
+          additionalProperties: true
+          description: Originating quotation and line summary when the purchase references one.
+        match_decision:
+          type: object
+          nullable: true
+          additionalProperties: true
+        competing_offers:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+          description: Offer summaries from the same compare context where available.
+        calculation:
+          type: object
+          required: [baseline_policy, baseline_value, actual_value, delta, source_landed_cost_ids]
+          properties:
+            baseline_policy: { $ref: '#/components/schemas/BaselinePolicy' }
+            baseline_value:
+              oneOf:
+                - $ref: '#/components/schemas/Money'
+                - type: 'null'
+            actual_value: { $ref: '#/components/schemas/Money' }
+            delta:
+              oneOf:
+                - $ref: '#/components/schemas/Money'
+                - type: 'null'
+            source_landed_cost_ids:
+              type: array
+              items: { type: string, format: uuid }
+            calculation_inputs: { type: object, additionalProperties: true }
+
+    ExportFormat:
+      type: string
+      enum: [xlsx, pdf]
+
+    ExportStatus:
+      type: string
+      enum: [queued, running, completed, failed]
+
+    ExportFilters:
+      type: object
+      required: [period_start, period_end]
+      additionalProperties: false
+      properties:
+        period_start: { type: string, format: date }
+        period_end: { type: string, format: date }
+        supplier_id: { type: string, format: uuid, nullable: true }
+        branch_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: Future-compatible; Phase 1 has no Branch entity.
+
+    ExportCreate:
+      type: object
+      required: [kind, format, filters]
+      additionalProperties: false
+      properties:
+        kind: { type: string, const: savings_ledger }
+        format: { $ref: '#/components/schemas/ExportFormat' }
+        filters: { $ref: '#/components/schemas/ExportFilters' }
+
+    ExportJob:
+      type: object
+      required: [id, kind, format, filters, status, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        kind: { type: string, const: savings_ledger }
+        format: { $ref: '#/components/schemas/ExportFormat' }
+        filters: { $ref: '#/components/schemas/ExportFilters' }
+        status: { $ref: '#/components/schemas/ExportStatus' }
+        row_count: { type: integer, minimum: 0, nullable: true }
+        download_url: { type: string, nullable: true }
+        error: { type: object, additionalProperties: true, nullable: true }
+        created_at: { type: string, format: date-time }
+        started_at: { type: string, format: date-time, nullable: true }
+        completed_at: { type: string, format: date-time, nullable: true }
+
+    Plan:
+      type: object
+      required: [code, name, status, monthly_price, limits, features]
+      properties:
+        code: { type: string, example: starter }
+        name: { type: string, example: Starter }
+        status: { type: string, enum: [active, archived] }
+        monthly_price: { $ref: '#/components/schemas/Money' }
+        limits:
+          type: object
+          required: [active_catalogue_products]
+          properties:
+            active_catalogue_products: { type: integer, minimum: 0, example: 100 }
+        features:
+          type: object
+          additionalProperties: true
+
+    BillingAccount:
+      type: object
+      required: [id, plan, provider, provider_customer_id, status, assigned_at]
+      properties:
+        id: { type: string, format: uuid }
+        plan: { $ref: '#/components/schemas/Plan' }
+        provider: { type: string, const: stub }
+        provider_customer_id: { type: string, example: 'stub_customer:tenant_uuid' }
+        provider_subscription_id: { type: string, nullable: true }
+        status: { type: string, enum: [active, past_due, cancelled] }
+        current_period_start: { type: string, format: date-time, nullable: true }
+        current_period_end: { type: string, format: date-time, nullable: true }
+        assigned_at: { type: string, format: date-time }
+
+    LimitCheck:
+      type: object
+      required: [resource, plan_code, limit, used, allowed, remaining]
+      properties:
+        resource: { type: string, const: active_catalogue_products }
+        plan_code: { type: string, example: starter }
+        limit: { type: integer, minimum: 0, nullable: true, example: 100 }
+        used: { type: integer, minimum: 0, example: 42 }
+        allowed: { type: boolean, example: true }
+        remaining: { type: integer, minimum: 0, nullable: true, example: 58 }

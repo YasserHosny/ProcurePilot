@@ -5,9 +5,21 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from procurepilot_api.config import Settings, get_settings
 from procurepilot_api.errors import register_exception_handlers
+from procurepilot_api.modules.alerts.router import router as alerts_router
 from procurepilot_api.modules.auth.router import router as auth_router
+from procurepilot_api.modules.billing.router import router as billing_router
+from procurepilot_api.modules.catalogue.router import router as catalogue_router
+from procurepilot_api.modules.documents.router import router as documents_router
+from procurepilot_api.modules.exports.router import router as exports_router
+from procurepilot_api.modules.extraction.router import router as extraction_router
 from procurepilot_api.modules.health.router import router as health_router
+from procurepilot_api.modules.jobs.router import router as jobs_router
+from procurepilot_api.modules.landed_cost.router import router as landed_cost_router
+from procurepilot_api.modules.matching.router import router as matching_router
 from procurepilot_api.modules.members.router import router as members_router
+from procurepilot_api.modules.offers.router import router as offers_router
+from procurepilot_api.modules.quotations.router import router as quotations_router
+from procurepilot_api.modules.savings.router import router as savings_router
 from procurepilot_api.modules.tenants.router import router as tenants_router
 from procurepilot_api.shared.logging import TraceIdMiddleware, configure_logging
 from procurepilot_api.shared.observability import init_error_reporting
@@ -39,6 +51,18 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(auth_router, prefix=API_PREFIX)
     app.include_router(tenants_router, prefix=API_PREFIX)
     app.include_router(members_router, prefix=API_PREFIX)
+    app.include_router(catalogue_router, prefix=API_PREFIX)
+    app.include_router(documents_router, prefix=API_PREFIX)
+    app.include_router(quotations_router, prefix=API_PREFIX)
+    app.include_router(extraction_router, prefix=API_PREFIX)
+    app.include_router(jobs_router, prefix=API_PREFIX)
+    app.include_router(matching_router, prefix=API_PREFIX)
+    app.include_router(landed_cost_router, prefix=API_PREFIX)
+    app.include_router(offers_router, prefix=API_PREFIX)
+    app.include_router(alerts_router, prefix=API_PREFIX)
+    app.include_router(savings_router, prefix=API_PREFIX)
+    app.include_router(exports_router, prefix=API_PREFIX)
+    app.include_router(billing_router, prefix=API_PREFIX)
     return app
 
 

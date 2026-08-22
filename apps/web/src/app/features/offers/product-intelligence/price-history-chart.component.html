@@ -1,0 +1,127 @@
+<div class="chart-container">
+  @if (points.length > 0) {
+    <!-- Legend -->
+    <div class="chart-legend">
+      <span class="legend-title">{{ 'productIntelligence.chart.legend' | translate }}:</span>
+      @for (series of seriesList(); track series.supplierId) {
+        <div class="legend-item">
+          <span class="legend-color-dot" [style.background-color]="series.color"></span>
+          <span class="legend-name">{{ series.supplierName }}</span>
+        </div>
+      }
+    </div>
+
+    <!-- SVG Visualisation -->
+    <div class="svg-wrapper">
+      <svg
+        [attr.viewBox]="'0 0 ' + width + ' ' + height"
+        class="chart-svg"
+        preserveAspectRatio="xMidYMid meet"
+        role="img"
+        [attr.aria-label]="'productIntelligence.chart.title' | translate"
+      >
+        <!-- Grid lines & Y Axis -->
+        <g class="grid-lines">
+          @for (tick of yTicks(); track tick.y) {
+            <line
+              [attr.x1]="padding.left"
+              [attr.y1]="tick.y"
+              [attr.x2]="width - padding.right"
+              [attr.y2]="tick.y"
+              class="grid-line"
+            />
+            <text
+              [attr.x]="padding.left - 10"
+              [attr.y]="tick.y + 4"
+              class="axis-label y-axis-label"
+              text-anchor="end"
+            >
+              {{ tick.label }}
+            </text>
+          }
+        </g>
+
+        <!-- X Axis -->
+        <g class="x-axis">
+          @for (tick of xTicks(); track tick.x) {
+            <line
+              [attr.x1]="tick.x"
+              [attr.y1]="height - padding.bottom"
+              [attr.x2]="tick.x"
+              [attr.y2]="height - padding.bottom + 6"
+              class="tick-line"
+            />
+            <text
+              [attr.x]="tick.x"
+              [attr.y]="height - padding.bottom + 20"
+              class="axis-label x-axis-label"
+              text-anchor="middle"
+            >
+              {{ tick.label }}
+            </text>
+          }
+        </g>
+
+        <!-- Series Lines -->
+        <g class="series-lines">
+          @for (series of seriesList(); track series.supplierId) {
+            @if (series.pathD) {
+              <path
+                [attr.d]="series.pathD"
+                [attr.stroke]="series.color"
+                class="series-path"
+                fill="none"
+                stroke-width="2.5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            }
+          }
+        </g>
+
+        <!-- Series Points -->
+        <g class="series-points">
+          @for (series of seriesList(); track series.supplierId) {
+            @for (pt of series.points; track pt.raw.landed_cost_id) {
+              <circle
+                [attr.cx]="pt.x"
+                [attr.cy]="pt.y"
+                [attr.r]="hoveredPoint() === pt ? 6 : 4.5"
+                [attr.fill]="pt.color"
+                stroke="#ffffff"
+                stroke-width="2"
+                class="point-circle"
+                (mouseenter)="onPointHover(pt)"
+                (mouseleave)="onPointHover(null)"
+                tabindex="0"
+                [attr.aria-label]="pt.raw.supplier_name + ' ' + (pt.raw.normalised_unit_price | formatMoney) + ' on ' + (pt.raw.recorded_at | formatDate)"
+              />
+            }
+          }
+        </g>
+      </svg>
+
+      <!-- Active Point Tooltip -->
+      @if (hoveredPoint(); as active) {
+        <div
+          class="point-tooltip"
+          [style.left.px]="active.x"
+          [style.top.px]="active.y - 12"
+        >
+          <div class="tooltip-supplier">{{ active.raw.supplier_name }}</div>
+          <div class="tooltip-price">
+            {{ active.raw.normalised_unit_price | formatMoney }} / {{ active.raw.base_unit }}
+          </div>
+          <div class="tooltip-meta">
+            {{ 'productIntelligence.historyTable.quantity' | translate }}: {{ active.raw.quantity }}
+            · {{ active.raw.recorded_at | formatDate }}
+          </div>
+        </div>
+      }
+    </div>
+  } @else {
+    <div class="chart-empty">
+      <p>{{ 'productIntelligence.chart.noPoints' | translate }}</p>
+    </div>
+  }
+</div>

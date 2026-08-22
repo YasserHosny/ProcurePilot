@@ -1,0 +1,246 @@
+<div class="export-savings-container">
+  <div class="page-header">
+    <div class="header-info">
+      <h1 class="page-title">{{ 'exports.title' | translate }}</h1>
+      <p class="page-subtitle">{{ 'exports.subtitle' | translate }}</p>
+    </div>
+
+    <div class="header-actions">
+      <a mat-stroked-button routerLink="/savings" class="action-btn">
+        <mat-icon aria-hidden="true">arrow_back</mat-icon>
+        <span>{{ 'exports.backToLedger' | translate }}</span>
+      </a>
+    </div>
+  </div>
+
+  @if (errorMessage()) {
+    <div class="error-banner" role="alert">
+      <mat-icon class="error-icon" aria-hidden="true">error_outline</mat-icon>
+      <div class="error-text-wrap">
+        <div class="error-title">{{ 'common.traceId' | translate }}</div>
+        <div class="error-message">{{ errorMessage() }}</div>
+        @if (errorTraceId(); as traceId) {
+          <div class="error-trace">{{ traceId }}</div>
+        }
+      </div>
+    </div>
+  }
+
+  <!-- Active Job State Panel -->
+  @if (uiState() !== 'idle') {
+    <mat-card class="job-status-card" [ngClass]="uiState()">
+      <!-- Queued State -->
+      @if (uiState() === 'queued' || uiState() === 'submitting') {
+        <div class="status-box">
+          <mat-spinner [attr.aria-label]="'common.loading' | translate" diameter="40"></mat-spinner>
+          <div class="status-text">
+            <h2 class="status-title">{{ 'exports.status.queued' | translate }}</h2>
+            <p class="status-desc">{{ 'exports.status.queuedDesc' | translate }}</p>
+          </div>
+        </div>
+      }
+
+      <!-- Running State -->
+      @if (uiState() === 'running') {
+        <div class="status-box">
+          <mat-progress-bar mode="indeterminate" class="job-progress"></mat-progress-bar>
+          <div class="status-text">
+            <h2 class="status-title">{{ 'exports.status.running' | translate }}</h2>
+            <p class="status-desc">{{ 'exports.status.runningDesc' | translate }}</p>
+          </div>
+        </div>
+      }
+
+      <!-- Completed State with Rows -->
+      @if (uiState() === 'completed') {
+        <div class="status-box completed-box">
+          <div class="success-icon-wrap">
+            <mat-icon aria-hidden="true">task_alt</mat-icon>
+          </div>
+          <div class="status-text">
+            <h2 class="status-title">{{ 'exports.status.completed' | translate }}</h2>
+            <p class="status-desc">{{ 'exports.status.completedDesc' | translate }}</p>
+            @if (currentJob(); as job) {
+              <div class="job-meta">
+                <span class="row-count-badge">
+                  {{ 'exports.rowCount' | translate: { count: job.row_count ?? 0 } }}
+                </span>
+                <span class="format-badge">{{ job.format.toUpperCase() }}</span>
+              </div>
+
+              @if (job.download_url) {
+                <div class="download-actions">
+                  <a
+                    mat-flat-button
+                    color="primary"
+                    [href]="job.download_url"
+                    target="_blank"
+                    download
+                    class="download-btn"
+                  >
+                    <mat-icon aria-hidden="true">download</mat-icon>
+                    <span>{{ 'exports.downloadButton' | translate }}</span>
+                  </a>
+
+                  <button mat-stroked-button type="button" (click)="resetExport()">
+                    {{ 'exports.newExportButton' | translate }}
+                  </button>
+                </div>
+              }
+            }
+          </div>
+        </div>
+      }
+
+      <!-- Completed State with Zero Rows (Empty Result) -->
+      @if (uiState() === 'completed_empty') {
+        <div class="status-box empty-box">
+          <div class="info-icon-wrap">
+            <mat-icon aria-hidden="true">info</mat-icon>
+          </div>
+          <div class="status-text">
+            <h2 class="status-title">{{ 'exports.status.completed' | translate }}</h2>
+            <p class="status-desc">{{ 'exports.emptyResult' | translate }}</p>
+            @if (currentJob(); as job) {
+              <div class="job-meta">
+                <span class="row-count-badge">
+                  {{ 'exports.rowCount' | translate: { count: 0 } }}
+                </span>
+                <span class="format-badge">{{ job.format.toUpperCase() }}</span>
+              </div>
+
+              @if (job.download_url) {
+                <div class="download-actions">
+                  <a
+                    mat-stroked-button
+                    [href]="job.download_url"
+                    target="_blank"
+                    download
+                    class="download-btn"
+                  >
+                    <mat-icon aria-hidden="true">download</mat-icon>
+                    <span>{{ 'exports.downloadButton' | translate }}</span>
+                  </a>
+
+                  <button mat-button type="button" (click)="resetExport()">
+                    {{ 'exports.newExportButton' | translate }}
+                  </button>
+                </div>
+              }
+            }
+          </div>
+        </div>
+      }
+
+      <!-- Failed State -->
+      @if (uiState() === 'failed') {
+        <div class="status-box failed-box">
+          <div class="failed-icon-wrap">
+            <mat-icon aria-hidden="true">error</mat-icon>
+          </div>
+          <div class="status-text">
+            <h2 class="status-title">{{ 'exports.status.failed' | translate }}</h2>
+            <p class="status-desc">{{ 'exports.status.failedDesc' | translate }}</p>
+            <div class="failed-actions">
+              <button mat-flat-button color="primary" type="button" (click)="resetExport()">
+                {{ 'exports.newExportButton' | translate }}
+              </button>
+            </div>
+          </div>
+        </div>
+      }
+    </mat-card>
+  }
+
+  <!-- Export Request Form (Visible when idle) -->
+  @if (uiState() === 'idle') {
+    <mat-card class="form-card">
+      <form [formGroup]="form" (ngSubmit)="submitExport()" class="export-form">
+        <!-- Audit Compliance Note -->
+        <div class="compliance-note" role="status">
+          <mat-icon class="note-icon" aria-hidden="true">verified_user</mat-icon>
+          <span>{{ 'exports.verifiedOnlyNote' | translate }}</span>
+        </div>
+
+        <div class="form-grid">
+          <!-- Format Selection -->
+          <div class="format-section full-width">
+            <span class="section-label" id="format-label">{{ 'exports.formatLabel' | translate }}</span>
+            <mat-radio-group formControlName="format" aria-labelledby="format-label" class="format-radio-group">
+              <mat-radio-button value="xlsx" color="primary">
+                <div class="radio-label-content">
+                  <mat-icon aria-hidden="true" class="format-icon excel-icon">table_chart</mat-icon>
+                  <span>{{ 'exports.formatXlsx' | translate }}</span>
+                </div>
+              </mat-radio-button>
+
+              <mat-radio-button value="pdf" color="primary">
+                <div class="radio-label-content">
+                  <mat-icon aria-hidden="true" class="format-icon pdf-icon">picture_as_pdf</mat-icon>
+                  <span>{{ 'exports.formatPdf' | translate }}</span>
+                </div>
+              </mat-radio-button>
+            </mat-radio-group>
+          </div>
+
+          <!-- Period Start Date -->
+          <mat-form-field appearance="outline" class="col-half">
+            <mat-label>{{ 'exports.periodStart' | translate }}</mat-label>
+            <input matInput [matDatepicker]="startPicker" formControlName="period_start" />
+            <mat-datepicker-toggle matIconSuffix [for]="startPicker"></mat-datepicker-toggle>
+            <mat-datepicker #startPicker></mat-datepicker>
+            @if (form.get('period_start')?.hasError('required') && form.get('period_start')?.touched) {
+              <mat-error>{{ 'exports.validation.periodStartRequired' | translate }}</mat-error>
+            }
+          </mat-form-field>
+
+          <!-- Period End Date -->
+          <mat-form-field appearance="outline" class="col-half">
+            <mat-label>{{ 'exports.periodEnd' | translate }}</mat-label>
+            <input matInput [matDatepicker]="endPicker" formControlName="period_end" />
+            <mat-datepicker-toggle matIconSuffix [for]="endPicker"></mat-datepicker-toggle>
+            <mat-datepicker #endPicker></mat-datepicker>
+            @if (form.get('period_end')?.hasError('required') && form.get('period_end')?.touched) {
+              <mat-error>{{ 'exports.validation.periodEndRequired' | translate }}</mat-error>
+            }
+          </mat-form-field>
+
+          <!-- Supplier Filter -->
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>{{ 'exports.supplierLabel' | translate }}</mat-label>
+            <mat-select formControlName="supplier_id">
+              <mat-option [value]="''">{{ 'exports.allSuppliers' | translate }}</mat-option>
+              @for (supp of suppliers(); track supp.id) {
+                <mat-option [value]="supp.id">{{ supp.name }}</mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+        </div>
+
+        <mat-divider></mat-divider>
+
+        <div class="form-actions">
+          <a mat-stroked-button routerLink="/savings">
+            {{ 'savings.outcomeCapture.cancelButton' | translate }}
+          </a>
+
+          <button
+            mat-flat-button
+            color="primary"
+            type="submit"
+            [disabled]="isSubmitting() || !isWriter()"
+            class="submit-btn"
+          >
+            @if (isSubmitting()) {
+              <mat-spinner [attr.aria-label]="'common.loading' | translate" diameter="18" class="btn-spinner"></mat-spinner>
+              <span>{{ 'exports.submittingButton' | translate }}</span>
+            } @else {
+              <mat-icon aria-hidden="true">download</mat-icon>
+              <span>{{ 'exports.submitButton' | translate }}</span>
+            }
+          </button>
+        </div>
+      </form>
+    </mat-card>
+  }
+</div>

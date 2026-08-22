@@ -1,0 +1,251 @@
+<div class="form-container">
+  <div class="page-header">
+    <div class="header-info">
+      <h1 class="page-title">
+        {{
+          (isWriter()
+            ? (isEditMode() ? 'catalogue.products.form.editTitle' : 'catalogue.products.form.createTitle')
+            : 'catalogue.products.form.viewTitle') | translate
+        }}
+      </h1>
+      <p class="page-subtitle">{{ 'catalogue.products.form.subtitle' | translate }}</p>
+    </div>
+
+    <a mat-stroked-button routerLink="/products" class="back-btn">
+      <mat-icon aria-hidden="true">arrow_back</mat-icon>
+      <span>{{ 'catalogue.products.form.backToList' | translate }}</span>
+    </a>
+  </div>
+
+  @if (!isWriter()) {
+    <div class="read-only-banner" role="status">
+      <mat-icon class="info-icon" aria-hidden="true">info</mat-icon>
+      <span>{{ 'catalogue.products.readOnlyBanner' | translate }}</span>
+    </div>
+  }
+
+  @if (planLimitExceeded()) {
+    <div class="limit-banner" role="alert">
+      <mat-icon class="warning-icon" aria-hidden="true">warning_amber</mat-icon>
+      <div class="limit-text-wrap">
+        <div class="limit-title">{{ 'catalogue.products.limit.title' | translate }}</div>
+        <div class="limit-message">
+          {{ 'catalogue.products.limit.message' | translate: { used: planLimitCheck()?.used ?? 100, limit: planLimitCheck()?.limit ?? 100 } }}
+        </div>
+      </div>
+    </div>
+  }
+
+  @if (errorMessage()) {
+    <div class="error-banner" role="alert">
+      <mat-icon class="error-icon" aria-hidden="true">error_outline</mat-icon>
+      <div class="error-text-wrap">
+        <div class="error-title">{{ 'common.traceId' | translate }}</div>
+        <div class="error-message">{{ errorMessage() }}</div>
+        @if (errorTraceId(); as traceId) {
+          <div class="error-trace">{{ traceId }}</div>
+        }
+      </div>
+    </div>
+  }
+
+  @if (isLoading()) {
+    <div class="loading-state" aria-live="polite">
+      <mat-spinner [attr.aria-label]="'common.loading' | translate" diameter="40"></mat-spinner>
+      <span>{{ 'common.loading' | translate }}</span>
+    </div>
+  } @else {
+    <form [formGroup]="form" (ngSubmit)="onSubmit()" class="product-form">
+      <mat-card class="form-card">
+        <!-- Basic Specifications -->
+        <div class="form-section">
+          <div class="form-row">
+            <mat-form-field appearance="outline" class="form-field full-width">
+              <mat-label>{{ 'catalogue.products.form.tenantNameLabel' | translate }}</mat-label>
+              <input
+                matInput
+                formControlName="tenant_name"
+                [placeholder]="'catalogue.products.form.tenantNamePlaceholder' | translate"
+                required
+              />
+              @if (form.get('tenant_name')?.hasError('required') && form.get('tenant_name')?.touched) {
+                <mat-error>{{ 'catalogue.products.form.tenantNameRequired' | translate }}</mat-error>
+              }
+              @if (form.get('tenant_name')?.hasError('maxlength')) {
+                <mat-error>{{ 'catalogue.products.form.tenantNameMaxLength' | translate }}</mat-error>
+              }
+            </mat-form-field>
+          </div>
+
+          <div class="form-row two-col">
+            <mat-form-field appearance="outline" class="form-field">
+              <mat-label>{{ 'catalogue.products.form.brandLabel' | translate }}</mat-label>
+              <input
+                matInput
+                formControlName="brand"
+                [placeholder]="'catalogue.products.form.brandPlaceholder' | translate"
+              />
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" class="form-field">
+              <mat-label>{{ 'catalogue.products.form.variantLabel' | translate }}</mat-label>
+              <input
+                matInput
+                formControlName="variant"
+                [placeholder]="'catalogue.products.form.variantPlaceholder' | translate"
+              />
+            </mat-form-field>
+          </div>
+
+          <div class="form-row two-col">
+            <mat-form-field appearance="outline" class="form-field">
+              <mat-label>{{ 'catalogue.products.form.gtinLabel' | translate }}</mat-label>
+              <input
+                matInput
+                formControlName="gtin"
+                [placeholder]="'catalogue.products.form.gtinPlaceholder' | translate"
+              />
+              @if (form.get('gtin')?.hasError('pattern') && form.get('gtin')?.touched) {
+                <mat-error>{{ 'catalogue.products.form.gtinInvalid' | translate }}</mat-error>
+              }
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" class="form-field">
+              <mat-label>{{ 'catalogue.products.form.baseUnitLabel' | translate }}</mat-label>
+              <mat-select formControlName="base_unit" required>
+                @for (unit of baseUnits(); track unit.code) {
+                  <mat-option [value]="unit.code">
+                    {{ (i18n.currentLocale() === 'ar' ? unit.label_ar : unit.label_en) || unit.code }} ({{ unit.code }})
+                  </mat-option>
+                }
+              </mat-select>
+              @if (form.get('base_unit')?.hasError('required') && form.get('base_unit')?.touched) {
+                <mat-error>{{ 'catalogue.products.form.baseUnitRequired' | translate }}</mat-error>
+              }
+            </mat-form-field>
+          </div>
+
+          @if (!isEditMode()) {
+            <div class="form-row">
+              <mat-form-field appearance="outline" class="form-field full-width">
+                <mat-label>{{ 'catalogue.products.form.canonicalNameLabel' | translate }}</mat-label>
+                <input
+                  matInput
+                  formControlName="canonical_name"
+                  [placeholder]="'catalogue.products.form.canonicalNamePlaceholder' | translate"
+                />
+                <mat-hint>{{ 'catalogue.products.form.canonicalNameHint' | translate }}</mat-hint>
+              </mat-form-field>
+            </div>
+          }
+        </div>
+
+        <mat-divider></mat-divider>
+
+        <!-- Pack Definition & Normalisation -->
+        <div class="form-section pack-section">
+          <div class="section-header">
+            <h2 class="section-title">{{ 'catalogue.products.form.packSectionTitle' | translate }}</h2>
+            <p class="section-desc">{{ 'catalogue.products.form.packSectionDescription' | translate }}</p>
+          </div>
+
+          <div class="form-row two-col">
+            <mat-form-field appearance="outline" class="form-field">
+              <mat-label>{{ 'catalogue.products.form.packCountLabel' | translate }}</mat-label>
+              <input
+                matInput
+                type="number"
+                min="1"
+                step="1"
+                formControlName="pack_count"
+                [placeholder]="'catalogue.products.form.packCountPlaceholder' | translate"
+                required
+              />
+              @if (form.get('pack_count')?.hasError('required') && form.get('pack_count')?.touched) {
+                <mat-error>{{ 'catalogue.products.form.packCountRequired' | translate }}</mat-error>
+              }
+              @if (form.get('pack_count')?.hasError('min')) {
+                <mat-error>{{ 'catalogue.products.form.packCountMin' | translate }}</mat-error>
+              }
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" class="form-field">
+              <mat-label>{{ 'catalogue.products.form.unitSizeLabel' | translate }}</mat-label>
+              <input
+                matInput
+                formControlName="unit_size"
+                [placeholder]="'catalogue.products.form.unitSizePlaceholder' | translate"
+                required
+              />
+              @if (form.get('unit_size')?.hasError('required') && form.get('unit_size')?.touched) {
+                <mat-error>{{ 'catalogue.products.form.unitSizeRequired' | translate }}</mat-error>
+              }
+              @if (form.get('unit_size')?.hasError('pattern') && form.get('unit_size')?.touched) {
+                <mat-error>{{ 'catalogue.products.form.unitSizePositive' | translate }}</mat-error>
+              }
+            </mat-form-field>
+          </div>
+
+          <!-- Live Normalised Quantity Display (SC-001, FR-002) -->
+          <div class="normalisation-preview-card" role="region" aria-live="polite">
+            <div class="preview-icon-wrap">
+              <mat-icon aria-hidden="true">calculate</mat-icon>
+            </div>
+            <div class="preview-content">
+              <div class="preview-label">{{ 'catalogue.products.form.liveNormalisedLabel' | translate }}</div>
+              <div class="preview-value" data-testid="live-normalised-quantity">
+                @if (liveNormalisedQuantity(); as normQty) {
+                  <span class="formula">
+                    {{ livePackCount() }} × {{ liveUnitSize() }} {{ liveBaseUnit() }} =
+                  </span>
+                  <strong class="total-qty">{{ normQty }} {{ liveBaseUnit() }}</strong>
+                } @else {
+                  <span class="placeholder-text">—</span>
+                }
+              </div>
+              <div class="preview-hint">{{ 'catalogue.products.form.liveNormalisedHelp' | translate }}</div>
+            </div>
+          </div>
+        </div>
+
+        <mat-divider></mat-divider>
+
+        <!-- Preferred Supplier -->
+        <div class="form-section">
+          <div class="form-row">
+            <mat-form-field appearance="outline" class="form-field full-width">
+              <mat-label>{{ 'catalogue.products.form.preferredSupplierLabel' | translate }}</mat-label>
+              <mat-select formControlName="preferred_supplier_id">
+                <mat-option [value]="null">{{ 'catalogue.products.form.noPreferredSupplier' | translate }}</mat-option>
+                @for (sup of suppliers(); track sup.id) {
+                  <mat-option [value]="sup.id">{{ sup.name }}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+          </div>
+        </div>
+
+        @if (isWriter()) {
+          <div class="form-actions">
+            <a mat-button routerLink="/products" type="button">
+              {{ 'catalogue.products.form.cancel' | translate }}
+            </a>
+            <button
+              mat-flat-button
+              color="primary"
+              type="submit"
+              [disabled]="form.invalid || isSaving()"
+            >
+              @if (isSaving()) {
+                <mat-spinner [attr.aria-label]="'common.loading' | translate" diameter="18" class="btn-spinner"></mat-spinner>
+                <span>{{ 'catalogue.products.form.submitting' | translate }}</span>
+              } @else {
+                <span>{{ (isEditMode() ? 'catalogue.products.form.submitEdit' : 'catalogue.products.form.submitCreate') | translate }}</span>
+              }
+            </button>
+          </div>
+        }
+      </mat-card>
+    </form>
+  }
+</div>

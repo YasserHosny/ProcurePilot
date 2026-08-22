@@ -1,0 +1,203 @@
+<div class="form-container">
+  <div class="page-header">
+    <div class="header-info">
+      <h1 class="page-title">
+        {{
+          (isWriter()
+            ? (isEditMode() ? 'catalogue.suppliers.form.editTitle' : 'catalogue.suppliers.form.createTitle')
+            : 'catalogue.suppliers.form.viewTitle') | translate
+        }}
+      </h1>
+      <p class="page-subtitle">{{ 'catalogue.suppliers.form.subtitle' | translate }}</p>
+    </div>
+
+    <a mat-stroked-button routerLink="/suppliers" class="back-btn">
+      <mat-icon aria-hidden="true">arrow_back</mat-icon>
+      <span>{{ 'catalogue.suppliers.form.backToList' | translate }}</span>
+    </a>
+  </div>
+
+  @if (!isWriter()) {
+    <div class="read-only-banner" role="status">
+      <mat-icon class="info-icon" aria-hidden="true">info</mat-icon>
+      <span>{{ 'catalogue.suppliers.readOnlyBanner' | translate }}</span>
+    </div>
+  }
+
+  @if (errorMessage()) {
+    <div class="error-banner" role="alert">
+      <mat-icon class="error-icon" aria-hidden="true">error_outline</mat-icon>
+      <div class="error-text-wrap">
+        <div class="error-title">{{ 'common.traceId' | translate }}</div>
+        <div class="error-message">{{ errorMessage() }}</div>
+        @if (errorTraceId(); as traceId) {
+          <div class="error-trace">{{ traceId }}</div>
+        }
+      </div>
+    </div>
+  }
+
+  @if (isLoading()) {
+    <div class="loading-state" aria-live="polite">
+      <mat-spinner [attr.aria-label]="'common.loading' | translate" diameter="40"></mat-spinner>
+      <span>{{ 'common.loading' | translate }}</span>
+    </div>
+  } @else {
+    <form [formGroup]="form" (ngSubmit)="onSubmit()" class="supplier-form">
+      <mat-card class="form-card">
+        <!-- Identity & Operational Terms -->
+        <div class="form-section">
+          <div class="form-row">
+            <mat-form-field appearance="outline" class="form-field full-width">
+              <mat-label>{{ 'catalogue.suppliers.form.nameLabel' | translate }}</mat-label>
+              <input
+                matInput
+                formControlName="name"
+                [placeholder]="'catalogue.suppliers.form.namePlaceholder' | translate"
+                required
+              />
+              @if (form.get('name')?.hasError('required') && form.get('name')?.touched) {
+                <mat-error>{{ 'catalogue.suppliers.form.nameRequired' | translate }}</mat-error>
+              }
+              @if (form.get('name')?.hasError('maxlength')) {
+                <mat-error>{{ 'catalogue.suppliers.form.nameMaxLength' | translate }}</mat-error>
+              }
+            </mat-form-field>
+          </div>
+
+          <div class="form-row two-col">
+            <mat-form-field appearance="outline" class="form-field">
+              <mat-label>{{ 'catalogue.suppliers.form.paymentTermsLabel' | translate }}</mat-label>
+              <input
+                matInput
+                formControlName="payment_terms"
+                [placeholder]="'catalogue.suppliers.form.paymentTermsPlaceholder' | translate"
+              />
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" class="form-field">
+              <mat-label>{{ 'catalogue.suppliers.form.leadTimeLabel' | translate }}</mat-label>
+              <input
+                matInput
+                type="number"
+                min="0"
+                formControlName="lead_time_days"
+                [placeholder]="'catalogue.suppliers.form.leadTimePlaceholder' | translate"
+              />
+              @if (form.get('lead_time_days')?.hasError('min')) {
+                <mat-error>{{ 'catalogue.suppliers.form.leadTimeMin' | translate }}</mat-error>
+              }
+            </mat-form-field>
+          </div>
+
+          @if (isEditMode()) {
+            <div class="form-row">
+              <mat-form-field appearance="outline" class="form-field full-width">
+                <mat-label>{{ 'catalogue.suppliers.form.statusLabel' | translate }}</mat-label>
+                <mat-select formControlName="status">
+                  <mat-option value="active">{{ 'catalogue.suppliers.statusActive' | translate }}</mat-option>
+                  <mat-option value="preferred">{{ 'catalogue.suppliers.statusPreferred' | translate }}</mat-option>
+                  <mat-option value="blocked">{{ 'catalogue.suppliers.statusBlocked' | translate }}</mat-option>
+                  <mat-option value="archived">{{ 'catalogue.suppliers.statusArchived' | translate }}</mat-option>
+                </mat-select>
+              </mat-form-field>
+            </div>
+          }
+        </div>
+
+        <mat-divider></mat-divider>
+
+        <!-- Financial Terms & Money Requirements (Constitution VII) -->
+        <div class="form-section">
+          <div class="section-header">
+            <h2 class="section-title">{{ 'catalogue.suppliers.form.termsSectionTitle' | translate }}</h2>
+            <p class="section-desc">{{ 'catalogue.suppliers.form.termsSectionDescription' | translate }}</p>
+          </div>
+
+          <!-- Minimum Order Value -->
+          <div class="form-row two-col">
+            <mat-form-field appearance="outline" class="form-field">
+              <mat-label>{{ 'catalogue.suppliers.form.minOrderAmountLabel' | translate }}</mat-label>
+              <input
+                matInput
+                formControlName="min_order_amount"
+                [placeholder]="'catalogue.suppliers.form.minOrderAmountPlaceholder' | translate"
+              />
+              @if (form.get('min_order_amount')?.hasError('pattern')) {
+                <mat-error>{{ 'catalogue.suppliers.form.amountInvalid' | translate }}</mat-error>
+              }
+              @if (form.get('min_order_amount')?.hasError('amountRequired')) {
+                <mat-error>{{ 'catalogue.suppliers.form.amountRequiredWithCurrency' | translate }}</mat-error>
+              }
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" class="form-field">
+              <mat-label>{{ 'catalogue.suppliers.form.minOrderCurrencyLabel' | translate }}</mat-label>
+              <mat-select formControlName="min_order_currency">
+                <mat-option value="">—</mat-option>
+                @for (c of currencies(); track c.code) {
+                  <mat-option [value]="c.code">{{ (i18n.currentLocale() === 'ar' ? c.label_ar : c.label_en) || c.code }} ({{ c.code }})</mat-option>
+                }
+              </mat-select>
+              @if (form.get('min_order_currency')?.hasError('currencyRequired')) {
+                <mat-error>{{ 'catalogue.suppliers.form.currencyRequiredWithAmount' | translate }}</mat-error>
+              }
+            </mat-form-field>
+          </div>
+
+          <!-- Delivery Fee -->
+          <div class="form-row two-col">
+            <mat-form-field appearance="outline" class="form-field">
+              <mat-label>{{ 'catalogue.suppliers.form.deliveryFeeAmountLabel' | translate }}</mat-label>
+              <input
+                matInput
+                formControlName="delivery_fee_amount"
+                [placeholder]="'catalogue.suppliers.form.deliveryFeeAmountPlaceholder' | translate"
+              />
+              @if (form.get('delivery_fee_amount')?.hasError('pattern')) {
+                <mat-error>{{ 'catalogue.suppliers.form.amountInvalid' | translate }}</mat-error>
+              }
+              @if (form.get('delivery_fee_amount')?.hasError('amountRequired')) {
+                <mat-error>{{ 'catalogue.suppliers.form.amountRequiredWithCurrency' | translate }}</mat-error>
+              }
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" class="form-field">
+              <mat-label>{{ 'catalogue.suppliers.form.deliveryFeeCurrencyLabel' | translate }}</mat-label>
+              <mat-select formControlName="delivery_fee_currency">
+                <mat-option value="">—</mat-option>
+                @for (c of currencies(); track c.code) {
+                  <mat-option [value]="c.code">{{ (i18n.currentLocale() === 'ar' ? c.label_ar : c.label_en) || c.code }} ({{ c.code }})</mat-option>
+                }
+              </mat-select>
+              @if (form.get('delivery_fee_currency')?.hasError('currencyRequired')) {
+                <mat-error>{{ 'catalogue.suppliers.form.currencyRequiredWithAmount' | translate }}</mat-error>
+              }
+            </mat-form-field>
+          </div>
+        </div>
+
+        @if (isWriter()) {
+          <div class="form-actions">
+            <a mat-button routerLink="/suppliers" type="button">
+              {{ 'catalogue.suppliers.form.cancel' | translate }}
+            </a>
+            <button
+              mat-flat-button
+              color="primary"
+              type="submit"
+              [disabled]="form.invalid || isSaving()"
+            >
+              @if (isSaving()) {
+                <mat-spinner [attr.aria-label]="'common.loading' | translate" diameter="18" class="btn-spinner"></mat-spinner>
+                <span>{{ 'catalogue.suppliers.form.submitting' | translate }}</span>
+              } @else {
+                <span>{{ (isEditMode() ? 'catalogue.suppliers.form.submitEdit' : 'catalogue.suppliers.form.submitCreate') | translate }}</span>
+              }
+            </button>
+          </div>
+        }
+      </mat-card>
+    </form>
+  }
+</div>

@@ -1,0 +1,296 @@
+<div class="wizard-container">
+  <div class="page-header">
+    <div class="header-info">
+      <h1 class="page-title">{{ 'catalogue.import.title' | translate }}</h1>
+      <p class="page-subtitle">{{ 'catalogue.import.subtitle' | translate }}</p>
+    </div>
+
+    <!-- Stepper indicator -->
+    <div class="step-indicator" role="navigation" [attr.aria-label]="'catalogue.import.title' | translate">
+      <div class="step-badge" [class.active]="currentStep() === 'upload'" [class.completed]="currentStep() !== 'upload'">
+        <span class="step-number">1</span>
+        <span class="step-name">{{ 'catalogue.import.stepUpload' | translate }}</span>
+      </div>
+      <div class="step-separator"></div>
+      <div class="step-badge" [class.active]="currentStep() === 'preview'" [class.completed]="currentStep() === 'result'">
+        <span class="step-number">2</span>
+        <span class="step-name">{{ 'catalogue.import.stepPreview' | translate }}</span>
+      </div>
+      <div class="step-separator"></div>
+      <div class="step-badge" [class.active]="currentStep() === 'result'">
+        <span class="step-number">3</span>
+        <span class="step-name">{{ 'catalogue.import.stepResult' | translate }}</span>
+      </div>
+    </div>
+  </div>
+
+  @if (!isWriter()) {
+    <div class="read-only-banner" role="status">
+      <mat-icon class="info-icon" aria-hidden="true">info</mat-icon>
+      <span>{{ 'catalogue.products.readOnlyBanner' | translate }}</span>
+    </div>
+  }
+
+  @if (errorMessage()) {
+    <div class="error-banner" role="alert">
+      <mat-icon class="error-icon" aria-hidden="true">error_outline</mat-icon>
+      <div class="error-text-wrap">
+        <div class="error-title">{{ 'common.traceId' | translate }}</div>
+        <div class="error-message">{{ errorMessage() }}</div>
+        @if (errorTraceId(); as traceId) {
+          <div class="error-trace">{{ traceId }}</div>
+        }
+      </div>
+    </div>
+  }
+
+  <!-- STEP 1: UPLOAD -->
+  @if (currentStep() === 'upload') {
+    <mat-card class="wizard-card">
+      <div class="upload-section">
+        <div class="kind-selector">
+          <span class="section-label">{{ 'catalogue.import.selectKindLabel' | translate }}</span>
+          <mat-radio-group [(ngModel)]="importKind" class="kind-radio-group">
+            <mat-radio-button value="products">{{ 'catalogue.import.kindProducts' | translate }}</mat-radio-button>
+            <mat-radio-button value="suppliers">{{ 'catalogue.import.kindSuppliers' | translate }}</mat-radio-button>
+          </mat-radio-group>
+        </div>
+
+        <div
+          class="dropzone"
+          (dragover)="onDragOver($event)"
+          (drop)="onDropFile($event)"
+          (click)="fileInput.click()"
+          tabindex="0"
+          role="button"
+          [attr.aria-label]="'catalogue.import.dropzonePrompt' | translate"
+        >
+          <input
+            #fileInput
+            type="file"
+            accept=".csv,text/csv"
+            class="hidden-file-input"
+            (change)="onFileSelected($event)"
+          />
+          <mat-icon class="dropzone-icon" aria-hidden="true">cloud_upload</mat-icon>
+          <div class="dropzone-text">{{ 'catalogue.import.dropzonePrompt' | translate }}</div>
+          <div class="dropzone-hint">{{ 'catalogue.import.dropzoneHint' | translate }}</div>
+
+          @if (selectedFile(); as file) {
+            <div class="selected-file-chip">
+              <mat-icon aria-hidden="true">insert_drive_file</mat-icon>
+              <span class="file-name">{{ file.name }}</span>
+              <span class="file-size">({{ (file.size / 1024).toFixed(1) }} KB)</span>
+            </div>
+          }
+        </div>
+
+        <div class="info-note">
+          <mat-icon aria-hidden="true">verified_user</mat-icon>
+          <span>{{ 'catalogue.import.nothingSavedNotice' | translate }}</span>
+        </div>
+
+        <div class="wizard-actions">
+          <button
+            mat-flat-button
+            color="primary"
+            type="button"
+            [disabled]="!selectedFile() || isUploading() || !isWriter()"
+            (click)="uploadAndValidate()"
+          >
+            @if (isUploading()) {
+              <mat-spinner [attr.aria-label]="'common.loading' | translate" diameter="18" class="btn-spinner"></mat-spinner>
+              <span>{{ 'catalogue.import.validating' | translate }}</span>
+            } @else {
+              <span>{{ 'catalogue.import.uploadAndValidate' | translate }}</span>
+            }
+          </button>
+        </div>
+      </div>
+    </mat-card>
+  }
+
+  <!-- STEP 2: PREVIEW & ERROR REPORT -->
+  @if (currentStep() === 'preview' && previewData(); as preview) {
+    <mat-card class="wizard-card">
+      <div class="preview-header">
+        <div class="preview-status-badge" [class.status-valid]="preview.valid" [class.status-invalid]="!preview.valid">
+          <mat-icon aria-hidden="true">{{ preview.valid ? 'check_circle' : 'error' }}</mat-icon>
+          <span>{{ (preview.valid ? 'catalogue.import.statusValid' : 'catalogue.import.statusInvalid') | translate }}</span>
+        </div>
+        <div class="row-count">
+          <strong>{{ 'catalogue.import.rowCountLabel' | translate }}</strong> {{ preview.row_count }}
+        </div>
+      </div>
+
+      <!-- Missing columns report -->
+      @if (preview.missing_columns && preview.missing_columns.length > 0) {
+        <div class="error-block column-error" role="alert">
+          <h2 class="error-block-title">{{ 'catalogue.import.missingColumnsTitle' | translate }}</h2>
+          <p class="error-block-desc">{{ 'catalogue.import.missingColumnsDescription' | translate }}</p>
+          <div class="chips-list">
+            @for (col of preview.missing_columns; track col) {
+              <span class="bad-chip">{{ col }}</span>
+            }
+          </div>
+        </div>
+      }
+
+      <!-- Unrecognised columns report -->
+      @if (preview.unrecognised_columns && preview.unrecognised_columns.length > 0) {
+        <div class="warning-block column-warning">
+          <h2 class="warning-block-title">{{ 'catalogue.import.unrecognisedColumnsTitle' | translate }}</h2>
+          <p class="warning-block-desc">{{ 'catalogue.import.unrecognisedColumnsDescription' | translate }}</p>
+          <div class="chips-list">
+            @for (col of preview.unrecognised_columns; track col) {
+              <span class="warn-chip">{{ col }}</span>
+            }
+          </div>
+        </div>
+      }
+
+      <!-- Row-level errors report with explicit line numbers (FR-018) -->
+      @if (preview.errors && preview.errors.length > 0) {
+        <div class="error-block" role="alert">
+          <h2 class="error-block-title">{{ 'catalogue.import.rowErrorsTitle' | translate }}</h2>
+          <p class="error-block-desc">{{ 'catalogue.import.rowErrorsDescription' | translate }}</p>
+
+          <div class="table-responsive">
+            <table mat-table [dataSource]="preview.errors" class="errors-table">
+              <ng-container matColumnDef="line">
+                <th mat-header-cell *matHeaderCellDef>{{ 'catalogue.import.colLine' | translate }}</th>
+                <td mat-cell *matCellDef="let err" class="line-cell">
+                  <span class="line-badge">{{ err.line }}</span>
+                </td>
+              </ng-container>
+
+              <ng-container matColumnDef="column">
+                <th mat-header-cell *matHeaderCellDef>{{ 'catalogue.import.colColumn' | translate }}</th>
+                <td mat-cell *matCellDef="let err">{{ err.column || '—' }}</td>
+              </ng-container>
+
+              <ng-container matColumnDef="reason">
+                <th mat-header-cell *matHeaderCellDef>{{ 'catalogue.import.colReason' | translate }}</th>
+                <td mat-cell *matCellDef="let err" class="reason-cell">{{ err.reason }}</td>
+              </ng-container>
+
+              <tr mat-header-row *matHeaderRowDef="errorColumns"></tr>
+              <tr mat-row *matRowDef="let row; columns: errorColumns"></tr>
+            </table>
+          </div>
+        </div>
+      }
+
+      <!-- Duplicates handling -->
+      @if (preview.duplicates && preview.duplicates.length > 0) {
+        <div class="duplicates-block">
+          <h2 class="block-title">{{ 'catalogue.import.duplicatesTitle' | translate }} ({{ preview.duplicates.length }})</h2>
+          <p class="block-desc">{{ 'catalogue.import.duplicatesDescription' | translate }}</p>
+
+          <div class="on-duplicate-picker">
+            <span class="picker-label">{{ 'catalogue.import.onDuplicateLabel' | translate }}</span>
+            <mat-radio-group [(ngModel)]="onDuplicate" class="duplicate-radios">
+              <mat-radio-button value="skip">{{ 'catalogue.import.onDuplicateSkip' | translate }}</mat-radio-button>
+              <mat-radio-button value="update">{{ 'catalogue.import.onDuplicateUpdate' | translate }}</mat-radio-button>
+            </mat-radio-group>
+          </div>
+        </div>
+      }
+
+      <!-- Data Preview Table (when valid) -->
+      @if (preview.valid && preview.preview && preview.preview.length > 0) {
+        <div class="preview-table-section">
+          <h2 class="section-title">{{ 'catalogue.import.previewTableTitle' | translate }}</h2>
+          <div class="table-responsive">
+            <table class="simple-preview-table">
+              <thead>
+                <tr>
+                  @for (col of getPreviewObjectKeys(preview.preview); track col) {
+                    <th>{{ col }}</th>
+                  }
+                </tr>
+              </thead>
+              <tbody>
+                @for (row of preview.preview; track $index) {
+                  <tr>
+                    @for (col of getPreviewObjectKeys(preview.preview); track col) {
+                      <td>{{ formatPreviewCell(row[col]) }}</td>
+                    }
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        </div>
+      }
+
+      <div class="wizard-actions">
+        <button mat-button type="button" (click)="resetWizard()">
+          {{ 'catalogue.import.cancelImport' | translate }}
+        </button>
+
+        @if (preview.valid) {
+          <button
+            mat-flat-button
+            color="primary"
+            type="button"
+            [disabled]="isCommitting() || !isWriter()"
+            (click)="confirmImport()"
+          >
+            @if (isCommitting()) {
+              <mat-spinner [attr.aria-label]="'common.loading' | translate" diameter="18" class="btn-spinner"></mat-spinner>
+              <span>{{ 'catalogue.import.confirming' | translate }}</span>
+            } @else {
+              <span>{{ 'catalogue.import.confirmImport' | translate }}</span>
+            }
+          </button>
+        }
+      </div>
+    </mat-card>
+  }
+
+  <!-- STEP 3: RESULT -->
+  @if (currentStep() === 'result' && importResult(); as res) {
+    <mat-card class="wizard-card result-card">
+      <div class="success-icon-wrap">
+        <mat-icon aria-hidden="true">task_alt</mat-icon>
+      </div>
+
+      <h2 class="result-title">{{ 'catalogue.import.resultTitle' | translate }}</h2>
+      <p class="result-subtitle">{{ 'catalogue.import.resultSubtitle' | translate }}</p>
+
+      <div class="stats-grid">
+        <div class="stat-box created">
+          <div class="stat-num">{{ res.created }}</div>
+          <div class="stat-label">{{ 'catalogue.import.createdCount' | translate }}</div>
+        </div>
+
+        <div class="stat-box updated">
+          <div class="stat-num">{{ res.updated }}</div>
+          <div class="stat-label">{{ 'catalogue.import.updatedCount' | translate }}</div>
+        </div>
+
+        <div class="stat-box skipped">
+          <div class="stat-num">{{ res.skipped }}</div>
+          <div class="stat-label">{{ 'catalogue.import.skippedCount' | translate }}</div>
+        </div>
+      </div>
+
+      <div class="result-actions">
+        <button mat-stroked-button type="button" (click)="resetWizard()">
+          {{ 'catalogue.import.importAnother' | translate }}
+        </button>
+
+        @if (importKind() === 'products') {
+          <a mat-flat-button color="primary" routerLink="/products">
+            {{ 'catalogue.import.viewProducts' | translate }}
+          </a>
+        } @else {
+          <a mat-flat-button color="primary" routerLink="/suppliers">
+            {{ 'catalogue.import.viewSuppliers' | translate }}
+          </a>
+        }
+      </div>
+    </mat-card>
+  }
+</div>

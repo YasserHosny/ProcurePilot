@@ -123,13 +123,35 @@
       "backToSignIn": "Back to sign in",
       "showPassword": "Show password",
       "hidePassword": "Hide password"
+    },
+    "planDisplay": {
+      "title": "Your Workspace Plan",
+      "subtitle": "Your isolated workspace is provisioned on the Starter plan with full intelligence features enabled.",
+      "planCardTitle": "Assigned Plan",
+      "priceFree": "Free during Pilot",
+      "featuresIncluded": "What's Included",
+      "features": {
+        "aiMatching": "Automated Quotation Extraction & Matching",
+        "smartCompare": "Smart Multi-Supplier Compare & Landed Cost",
+        "basketSplit": "Two-Supplier Basket Split Optimization",
+        "savingsLedger": "Verified Savings Ledger & Excel/PDF Exports",
+        "alerts": "Proactive Commercial Risk Alerts"
+      },
+      "limitsCardTitle": "Resource Limits",
+      "catalogueLimit": "Up to 100 active catalogue products",
+      "continueButton": "Enter Workspace",
+      "errorLoading": "Unable to load plan details. Your workspace is active and ready."
     }
   },
   "shell": {
     "toggleNav": "Toggle navigation",
     "navSectionMain": "Main Navigation",
     "navHome": "Overview",
+    "navProducts": "Products",
+    "navSuppliers": "Suppliers",
+    "navImport": "Import Catalogue",
     "navQuotations": "Quotation Inbox",
+    "navMatching": "Match Resolution",
     "navCompare": "Smart Compare",
     "navSavings": "Savings Ledger",
     "navTeam": "Team Management",
@@ -143,7 +165,10 @@
     "mfaEnabledBadge": "MFA Active",
     "signOut": "Sign out",
     "language": "Language",
-    "selectLanguage": "Select language"
+    "selectLanguage": "Select language",
+    "navBasketSplit": "Basket Split",
+    "navAlerts": "Alerts Inbox",
+    "navIntelligence": "Price Intelligence"
   },
   "home": {
     "welcomePrefix": "Welcome to",
@@ -268,6 +293,1025 @@
       "confirmButton": "Revoke Invitation",
       "cancelButton": "Cancel",
       "revokingButton": "Revoking..."
+    }
+  },
+  "catalogue": {
+    "products": {
+      "title": "Product Master",
+      "subtitle": "Manage workspace products, pack sizes, and normalised measurement units.",
+      "createButton": "New Product",
+      "importButton": "Import Products",
+      "searchPlaceholder": "Search products by name...",
+      "filterStatus": "Filter by status",
+      "statusAll": "All",
+      "statusActive": "Active",
+      "statusArchived": "Archived",
+      "emptyList": "No products found in this workspace.",
+      "emptySearch": "No products match your search.",
+      "readOnlyBanner": "You have read-only access to the product master. Creating and editing products requires buyer or owner authority.",
+      "columns": {
+        "name": "Product Name",
+        "brand": "Brand / Variant",
+        "gtin": "GTIN",
+        "pack": "Pack Definition",
+        "normalised": "Base Quantity",
+        "status": "Status",
+        "actions": "Actions"
+      },
+      "actions": {
+        "view": "View details",
+        "edit": "Edit product",
+        "archive": "Archive product"
+      },
+      "archiveDialog": {
+        "title": "Archive Product",
+        "message": "Are you sure you want to archive this product? It will stop appearing in active lists but its history will be retained.",
+        "confirmButton": "Archive Product",
+        "cancelButton": "Cancel",
+        "archivingButton": "Archiving..."
+      },
+      "archiveSuccess": "Product archived successfully.",
+      "form": {
+        "createTitle": "Create Product",
+        "editTitle": "Edit Product",
+        "viewTitle": "Product Details",
+        "subtitle": "Define product specifications and pack-size normalisation.",
+        "tenantNameLabel": "Product Name",
+        "tenantNamePlaceholder": "e.g. Semi-Skimmed Milk",
+        "tenantNameRequired": "Product name is required",
+        "tenantNameMaxLength": "Product name cannot exceed 200 characters",
+        "brandLabel": "Brand",
+        "brandPlaceholder": "e.g. Dairy Crest (optional)",
+        "canonicalNameLabel": "Canonical Name",
+        "canonicalNamePlaceholder": "Shared catalog name (optional)",
+        "canonicalNameHint": "Defaults to product name if left blank",
+        "variantLabel": "Variant",
+        "variantPlaceholder": "e.g. Low Fat / Organic (optional)",
+        "gtinLabel": "GTIN / Barcode",
+        "gtinPlaceholder": "e.g. 5012345678900 (optional)",
+        "gtinInvalid": "GTIN must be 8, 12, 13, or 14 numeric digits",
+        "baseUnitLabel": "Base Measurement Unit",
+        "baseUnitPlaceholder": "Select base unit...",
+        "baseUnitRequired": "Base unit is required",
+        "packSectionTitle": "Pack Definition & Normalisation",
+        "packSectionDescription": "Specify how this product is packaged to calculate its normalised base quantity.",
+        "packCountLabel": "Pack Count",
+        "packCountPlaceholder": "e.g. 6",
+        "packCountRequired": "Pack count is required",
+        "packCountMin": "Pack count must be at least 1",
+        "unitSizeLabel": "Unit Size",
+        "unitSizePlaceholder": "e.g. 5.0",
+        "unitSizeRequired": "Unit size is required",
+        "unitSizePositive": "Unit size must be greater than zero",
+        "liveNormalisedLabel": "Normalised Base Quantity",
+        "liveNormalisedHelp": "Derived automatically: pack count × unit size",
+        "preferredSupplierLabel": "Preferred Supplier",
+        "preferredSupplierPlaceholder": "Select preferred supplier (optional)...",
+        "noPreferredSupplier": "None",
+        "submitCreate": "Create Product",
+        "submitEdit": "Save Changes",
+        "submitting": "Saving...",
+        "cancel": "Cancel",
+        "backToList": "Back to products",
+        "createSuccess": "Product created successfully.",
+        "updateSuccess": "Product updated successfully.",
+        "genericError": "Unable to save product. Please check the details and try again."
+      },
+      "limit": {
+        "title": "Active Product Limit Reached",
+        "message": "Your current Starter plan allows up to 100 active catalogue products ({{used}}/{{limit}} used). Archive unused products or upgrade your plan to add more.",
+        "badge": "Plan Limit: {{used}}/{{limit}}"
+      }
+    },
+    "suppliers": {
+      "title": "Suppliers",
+      "subtitle": "Manage suppliers, commercial terms, minimum order values, and delivery fees.",
+      "createButton": "New Supplier",
+      "importButton": "Import Suppliers",
+      "filterStatus": "Filter by status",
+      "statusAll": "All",
+      "statusActive": "Active",
+      "statusPreferred": "Preferred",
+      "statusBlocked": "Blocked",
+      "statusArchived": "Archived",
+      "emptyList": "No suppliers found in this workspace.",
+      "readOnlyBanner": "You have read-only access to suppliers. Creating and editing suppliers requires buyer or owner authority.",
+      "daysUnit": "days",
+      "notSet": "Not configured",
+      "columns": {
+        "name": "Supplier Name",
+        "paymentTerms": "Payment Terms",
+        "leadTime": "Lead Time",
+        "minOrderValue": "Min. Order Value",
+        "deliveryFee": "Delivery Fee",
+        "status": "Status",
+        "actions": "Actions"
+      },
+      "actions": {
+        "view": "View details",
+        "edit": "Edit supplier",
+        "archive": "Archive supplier"
+      },
+      "archiveDialog": {
+        "title": "Archive Supplier",
+        "message": "Are you sure you want to archive this supplier? It will be excluded from future purchasing recommendations but historical records are preserved.",
+        "confirmButton": "Archive Supplier",
+        "cancelButton": "Cancel",
+        "archivingButton": "Archiving..."
+      },
+      "archiveSuccess": "Supplier archived successfully.",
+      "archiveConflictTitle": "Cannot Delete Supplier",
+      "archiveConflictMessage": "This supplier is referenced by existing purchase records or products and cannot be deleted. It has been archived instead.",
+      "form": {
+        "createTitle": "Create Supplier",
+        "editTitle": "Edit Supplier",
+        "viewTitle": "Supplier Details",
+        "subtitle": "Configure commercial and delivery terms for this supplier.",
+        "nameLabel": "Supplier Name",
+        "namePlaceholder": "e.g. Fresh Foods Wholesale Ltd",
+        "nameRequired": "Supplier name is required",
+        "nameMaxLength": "Supplier name cannot exceed 200 characters",
+        "paymentTermsLabel": "Payment Terms",
+        "paymentTermsPlaceholder": "e.g. Net 30 days (optional)",
+        "leadTimeLabel": "Lead Time (Days)",
+        "leadTimePlaceholder": "e.g. 3 (optional)",
+        "leadTimeMin": "Lead time cannot be negative",
+        "statusLabel": "Supplier Status",
+        "termsSectionTitle": "Commercial & Financial Terms",
+        "termsSectionDescription": "Every monetary amount must include an explicit currency code.",
+        "minOrderAmountLabel": "Minimum Order Amount",
+        "minOrderAmountPlaceholder": "e.g. 150.00",
+        "minOrderCurrencyLabel": "Min Order Currency",
+        "minOrderCurrencyPlaceholder": "Select currency...",
+        "deliveryFeeAmountLabel": "Delivery Fee Amount",
+        "deliveryFeeAmountPlaceholder": "e.g. 15.00",
+        "deliveryFeeCurrencyLabel": "Delivery Fee Currency",
+        "deliveryFeeCurrencyPlaceholder": "Select currency...",
+        "currencyRequiredWithAmount": "Currency is required when an amount is entered",
+        "amountRequiredWithCurrency": "Amount is required when a currency is selected",
+        "amountInvalid": "Amount must be a valid positive decimal",
+        "submitCreate": "Create Supplier",
+        "submitEdit": "Save Changes",
+        "submitting": "Saving...",
+        "cancel": "Cancel",
+        "backToList": "Back to suppliers",
+        "createSuccess": "Supplier created successfully.",
+        "updateSuccess": "Supplier updated successfully.",
+        "genericError": "Unable to save supplier. Please check the details and try again."
+      }
+    },
+    "import": {
+      "title": "Catalogue & Supplier Import Wizard",
+      "subtitle": "Bulk upload products or suppliers from a spreadsheet CSV file with complete pre-validation.",
+      "stepUpload": "1. Upload File",
+      "stepPreview": "2. Validate & Preview",
+      "stepResult": "3. Confirmation",
+      "selectKindLabel": "What would you like to import?",
+      "kindProducts": "Products Catalogue",
+      "kindSuppliers": "Suppliers List",
+      "fileLabel": "Choose CSV File",
+      "dropzonePrompt": "Drag and drop your CSV file here, or click to browse",
+      "dropzoneHint": "Accepts comma-delimited .csv files with a header row",
+      "selectedFile": "Selected file:",
+      "uploadAndValidate": "Upload & Validate File",
+      "validating": "Validating file...",
+      "nothingSavedNotice": "No data is saved during validation. You will preview and confirm the import before any records are created.",
+      "previewTitle": "Validation Summary",
+      "rowCountLabel": "Total Rows Detected:",
+      "statusValid": "Ready for Import",
+      "statusInvalid": "Validation Issues Found",
+      "missingColumnsTitle": "Missing Required Columns",
+      "missingColumnsDescription": "The uploaded file is missing the following required columns:",
+      "unrecognisedColumnsTitle": "Unrecognised Columns",
+      "unrecognisedColumnsDescription": "The following columns were found in the file but are not recognised:",
+      "rowErrorsTitle": "Row-Level Errors (Nothing Saved)",
+      "rowErrorsDescription": "The following errors were detected in your file. Each row must be fixed before importing.",
+      "colLine": "Line #",
+      "colColumn": "Column",
+      "colReason": "Error Reason",
+      "duplicatesTitle": "Duplicate Records Detected",
+      "duplicatesDescription": "The following rows match existing records in your workspace:",
+      "onDuplicateLabel": "How should duplicate records be handled?",
+      "onDuplicateSkip": "Skip duplicate rows (keep existing records)",
+      "onDuplicateUpdate": "Update existing records with new data",
+      "previewTableTitle": "Data Preview (First Rows)",
+      "confirmImport": "Confirm & Save Import",
+      "confirming": "Importing records...",
+      "cancelImport": "Cancel Import",
+      "resultTitle": "Import Complete",
+      "resultSubtitle": "Your catalogue records have been successfully saved.",
+      "createdCount": "Records Created",
+      "updatedCount": "Records Updated",
+      "skippedCount": "Records Skipped",
+      "importAnother": "Import Another File",
+      "viewProducts": "Go to Products",
+      "viewSuppliers": "Go to Suppliers",
+      "emptyFileError": "The uploaded file is empty or contains only headers.",
+      "unsupportedFileError": "File format not supported. Please upload a valid CSV file.",
+      "genericError": "Unable to process import. Please try again."
+    }
+  },
+  "quotations": {
+    "nav": {
+      "queue": "Review Queue",
+      "upload": "Upload Quotation"
+    },
+    "upload": {
+      "title": "Upload Supplier Quotation",
+      "subtitle": "Upload PDF, scanned image, or spreadsheet quotations for automated line-item extraction.",
+      "dropzonePrompt": "Drag and drop quotation file here, or click to browse",
+      "dropzoneHint": "Supported formats: PDF, PNG, JPEG, TIFF, CSV, XLS, XLSX (Max 25MB)",
+      "fileLabel": "Choose File",
+      "selectedFile": "Selected File:",
+      "fileSize": "Size:",
+      "fileType": "Type:",
+      "unsupportedFormatError": "Unsupported file format. Please upload a PDF, PNG, JPEG, TIFF, CSV, XLS, or XLSX file.",
+      "fileTooLargeError": "File size exceeds the 25MB limit.",
+      "emptyFileError": "The selected file is empty.",
+      "uploadButton": "Upload & Extract",
+      "uploading": "Uploading document...",
+      "processing": "Extracting line items...",
+      "processingHint": "AI is reading header fields, pricing, and line items. This typically takes a few seconds.",
+      "extractionSuccess": "Extraction completed successfully!",
+      "goToReview": "Proceed to Review",
+      "uploadAnother": "Upload Another Quotation",
+      "failedTitle": "Extraction Failed",
+      "failedMessage": "The document could not be processed. Please verify the document is legible and try again.",
+      "retryButton": "Try Again",
+      "directStorageNotice": "Documents are uploaded securely and directly to encrypted storage.",
+      "status": {
+        "uploading": "Uploading",
+        "processing": "Extracting",
+        "extracted": "Extracted",
+        "failed": "Failed"
+      }
+    },
+    "queue": {
+      "title": "Quotation Review Queue",
+      "subtitle": "Review and authorize extracted supplier quotations before they become trusted commercial data.",
+      "uploadNew": "Upload Quotation",
+      "filterStatus": "Filter by Status",
+      "filterPriority": "Filter by Priority",
+      "status": {
+        "all": "All Statuses",
+        "open": "Open",
+        "in_progress": "In Progress",
+        "resolved": "Resolved"
+      },
+      "priority": {
+        "all": "All Priorities",
+        "low": "Low",
+        "normal": "Normal",
+        "high": "High"
+      },
+      "reason": {
+        "low_confidence": "Low Confidence Extraction",
+        "arithmetic_mismatch": "Arithmetic Mismatch",
+        "read_failure": "Read Failure",
+        "review_required": "Review Required"
+      },
+      "columns": {
+        "id": "Quotation ID",
+        "supplier": "Supplier",
+        "reason": "Reason for Review",
+        "priority": "Priority",
+        "status": "Status",
+        "createdAt": "Uploaded At",
+        "actions": "Actions"
+      },
+      "actions": {
+        "review": "Review & Authorize",
+        "view": "View (Read-Only)"
+      },
+      "readOnlyBadge": "Read-Only Access",
+      "readOnlyNotice": "Your role has read-only access. Only Owners and Buyers can correct and confirm quotations.",
+      "emptyTitle": "No Review Tasks Found",
+      "emptyMessage": "There are no quotation review tasks matching your current filters."
+    },
+    "review": {
+      "title": "Quotation Review & Authorization",
+      "subtitle": "Inspect extracted fields side by side with the source document. Verify supplier and resolve any discrepancies.",
+      "backToQueue": "Back to Review Queue",
+      "readOnlyNotice": "Read-only mode. You can view extraction evidence, but editing and confirmation require Owner or Buyer permissions.",
+      "panels": {
+        "document": "Source Document Evidence",
+        "extractedData": "Extracted Commercial Data"
+      },
+      "keyboardNav": {
+        "title": "Attention Navigation (FR-014)",
+        "hint": "Jump directly between fields needing attention (low confidence or missing data)",
+        "nextField": "Next Flagged Field",
+        "prevField": "Previous Flagged Field",
+        "flaggedCount": "{{current}} of {{total}} flagged fields needing attention"
+      },
+      "header": {
+        "title": "Quotation Details",
+        "supplierLabel": "Supplier (Required)",
+        "supplierPlaceholder": "Select confirmed supplier...",
+        "supplierRequired": "Supplier confirmation is required before authorizing this quotation",
+        "currencyLabel": "Currency",
+        "currencyPlaceholder": "e.g. USD, EUR, GBP",
+        "currencyRequired": "Currency is required",
+        "issueDateLabel": "Issue Date",
+        "expiryDateLabel": "Expiry Date",
+        "statedTotalLabel": "Stated Total Amount",
+        "statedTotalCurrency": "Stated Total Currency",
+        "statusLabel": "Status"
+      },
+      "lines": {
+        "title": "Extracted Line Items",
+        "colLine": "#",
+        "colOriginalText": "Original Document Text",
+        "colQuantity": "Qty",
+        "colPack": "Pack Details",
+        "colUnitPrice": "Unit Price",
+        "colVat": "VAT %",
+        "colDeliveryFee": "Delivery Fee",
+        "colDiscount": "Discount",
+        "colConfidence": "Confidence",
+        "colActions": "Actions",
+        "packCount": "Pack Count",
+        "unitSize": "Unit Size",
+        "unit": "Unit",
+        "noLines": "No line items extracted for this quotation."
+      },
+      "confidence": {
+        "high": "High Confidence",
+        "medium": "Medium Confidence",
+        "low": "Low Confidence — Needs Review",
+        "flaggedBadge": "Needs Attention",
+        "scoreTooltip": "AI confidence score: {{score}}% via {{method}} ({{model}})"
+      },
+      "provenance": {
+        "title": "Field Extraction Provenance",
+        "method": "Method:",
+        "model": "Model:",
+        "page": "Page:",
+        "originalValue": "Original AI Value:",
+        "correctedValue": "Corrected Value:",
+        "correctedBy": "Corrected By:",
+        "correctedAt": "Corrected At:",
+        "showSource": "Show in Document"
+      },
+      "corrections": {
+        "title": "Correct Field",
+        "saveCorrection": "Save Correction",
+        "cancelCorrection": "Cancel",
+        "editTooltip": "Correct this field value",
+        "correctedBadge": "Corrected by Human"
+      },
+      "arithmetic": {
+        "mismatchTitle": "Arithmetic Discrepancy Detected (US3)",
+        "mismatchDescription": "The sum of the extracted line totals does not match the stated document total. This quotation cannot be confirmed until this discrepancy is reconciled or corrected.",
+        "statedTotal": "Stated Document Total:",
+        "computedTotal": "Computed Line Total:",
+        "difference": "Discrepancy:",
+        "reconciled": "Line items match the stated document total perfectly.",
+        "statusMismatch": "Discrepancy Unresolved",
+        "statusReconciled": "Reconciled"
+      },
+      "versioning": {
+        "title": "Quotation Versioning (US4)",
+        "isRequoteLabel": "This is an updated re-quote of an existing quotation",
+        "selectPreviousLabel": "Select Prior Quotation to Supersede",
+        "selectPreviousPlaceholder": "Select previous quotation...",
+        "bannerTitle": "Version History",
+        "isUpdateOf": "This quotation is an updated version of",
+        "hasNewerVersion": "A newer version of this quotation exists:",
+        "viewPriorVersion": "View Prior Version",
+        "viewNewerVersion": "View Newer Version",
+        "versionId": "Quotation #{{id}}"
+      },
+      "actions": {
+        "saveChanges": "Save Corrections",
+        "saving": "Saving corrections...",
+        "confirmButton": "Confirm & Authorize Quotation",
+        "confirming": "Authorizing quotation...",
+        "confirmSuccess": "Quotation confirmed and authorized as trusted commercial data.",
+        "saveSuccess": "Corrections saved successfully.",
+        "confirmBlockedTitle": "Cannot Confirm Quotation",
+        "confirmBlockedMissingSupplier": "Please select and confirm a supplier before authorizing.",
+        "confirmBlockedArithmetic": "Unresolved arithmetic mismatch. Please correct the lines or stated total.",
+        "confirmBlockedConfidence": "Unresolved low-confidence fields require correction.",
+        "genericError": "Unable to update quotation. Please check your inputs and try again."
+      },
+      "status": {
+        "pending": "Pending Extraction",
+        "extracting": "Extracting",
+        "extracted": "Extracted (Awaiting Review)",
+        "in_review": "In Review",
+        "reviewed": "Reviewed & Authorized",
+        "refused": "Refused"
+      }
+    }
+  },
+  "matching": {
+    "queue": {
+      "title": "Match Resolution Queue",
+      "subtitle": "Review and resolve quotation lines requiring product matching decisions or catalogue additions.",
+      "readOnlyBadge": "Read-Only Access",
+      "readOnlyNotice": "Your role has read-only access. You can inspect match tasks and candidates, but cannot confirm decisions or create products.",
+      "filterStatus": "Status",
+      "filterPriority": "Priority",
+      "filterReason": "Routing Reason",
+      "status": {
+        "open": "Open",
+        "in_progress": "In Progress",
+        "resolved": "Resolved",
+        "all": "All Statuses"
+      },
+      "priority": {
+        "low": "Low",
+        "normal": "Normal",
+        "high": "High",
+        "all": "All Priorities"
+      },
+      "reason": {
+        "low_confidence": "Low Confidence",
+        "close_candidates": "Close Candidates",
+        "no_candidate": "No Candidate",
+        "alias_conflict": "Alias Conflict",
+        "all": "All Reasons"
+      },
+      "columns": {
+        "quotation": "Quotation",
+        "line": "Line",
+        "originalText": "Original Supplier Wording",
+        "reason": "Reason",
+        "priority": "Priority",
+        "status": "Status",
+        "candidates": "Candidates",
+        "createdAt": "Queued At",
+        "actions": "Actions"
+      },
+      "actions": {
+        "resolve": "Resolve Match",
+        "view": "View Details"
+      },
+      "emptyTitle": "No match tasks found",
+      "emptyMessage": "There are no quotation lines currently awaiting match resolution."
+    },
+    "resolution": {
+      "title": "Match Resolution",
+      "subtitle": "Review candidate matches, evaluate signal evidence, and resolve the quotation line.",
+      "backToQueue": "Back to Queue",
+      "readOnlyBanner": "You have view-only access. Only workspace owners and buyers can resolve matches and create catalogue products.",
+      "keyboardShortcutsTitle": "Keyboard Controls (FR-012)",
+      "shortcuts": {
+        "selectCandidate": "1–9: Select Candidate",
+        "navigate": "↑ / ↓: Navigate Candidates",
+        "confirm": "Enter: Confirm Decision",
+        "toggleOutcome": "O: Cycle Outcomes"
+      },
+      "lineDetails": {
+        "title": "Quotation Line Details",
+        "lineNumber": "Line #{{line}}",
+        "quotation": "Quotation",
+        "originalText": "Supplier Line Wording",
+        "quantity": "Quantity",
+        "pack": "Supplier Pack",
+        "unitPrice": "Unit Price",
+        "vatRate": "VAT Rate",
+        "deliveryFee": "Delivery Fee",
+        "discount": "Discount"
+      },
+      "candidates": {
+        "title": "Ranked Product Candidates",
+        "subtitle": "Evaluated through deterministic keys, lexical (pg_trgm), semantic (pgvector), and feature plausibility scoring.",
+        "rank": "Rank #{{rank}}",
+        "confidence": "Match Confidence",
+        "noCandidates": "No candidates found for this line item.",
+        "signalsTitle": "Reason Breakdown",
+        "signals": {
+          "aliasHit": "Alias Hit",
+          "aliasHitDesc": "Matches existing confirmed alias",
+          "gtinMatch": "GTIN Match",
+          "gtinMatchDesc": "Matches product barcode/GTIN",
+          "supplierCodeMatch": "Supplier Code Match",
+          "supplierCodeMatchDesc": "Matches supplier catalog code",
+          "lexicalSimilarity": "Lexical Similarity",
+          "semanticSimilarity": "Semantic Similarity",
+          "featureScores": "Feature Plausibility Breakdown",
+          "brandMatch": "Brand Match",
+          "variantMatch": "Variant Match",
+          "packUnitMatch": "Pack Unit Match",
+          "packSizePlausibility": "Pack Size Plausibility",
+          "pricePlausibility": "Price Plausibility",
+          "scoringVersion": "Scoring Version",
+          "embeddingModel": "Embedding Model"
+        },
+        "product": {
+          "brand": "Brand",
+          "variant": "Variant",
+          "gtin": "GTIN",
+          "baseUnit": "Base Unit",
+          "pack": "Pack Definition",
+          "status": {
+            "active": "Active",
+            "archived": "Archived"
+          },
+          "archivedWarning": "This catalogue product is archived."
+        }
+      },
+      "outcomes": {
+        "title": "Select Resolution Outcome",
+        "subtitle": "Select how this line resolves against the catalogue or create a new product.",
+        "same_product": {
+          "label": "Same Product",
+          "description": "Line matches the chosen product exactly in identity, formulation, and pack."
+        },
+        "different_pack": {
+          "label": "Different Pack Size",
+          "description": "Same product, but supplied in a different pack size, unit, or quantity packaging."
+        },
+        "different_variant": {
+          "label": "Different Variant",
+          "description": "Same product family, but a distinct variant (e.g. flavor, color, specification)."
+        },
+        "compatible_alternative": {
+          "label": "Compatible Alternative",
+          "description": "Functional substitute or compatible alternative to the candidate product."
+        },
+        "no_match_new_product": {
+          "label": "No Match — Create New Product",
+          "description": "No candidate fits. Create a new product in the catalogue and map this line."
+        }
+      },
+      "newProduct": {
+        "title": "New Catalogue Product",
+        "subtitle": "Create a product directly from this quotation line. The supplier wording will be saved as an alias.",
+        "tenantNameLabel": "Product Name (Workspace)",
+        "tenantNamePlaceholder": "e.g. Semi-Skimmed Milk 2L",
+        "tenantNameRequired": "Product name is required",
+        "tenantNameMaxLength": "Product name cannot exceed 200 characters",
+        "brandLabel": "Brand (Optional)",
+        "brandPlaceholder": "e.g. Arla",
+        "canonicalNameLabel": "Canonical Name (Optional)",
+        "canonicalNamePlaceholder": "Defaults to workspace product name",
+        "canonicalNameHint": "Leave blank to match workspace product name",
+        "variantLabel": "Variant / Description (Optional)",
+        "variantPlaceholder": "e.g. 2L Bottle",
+        "gtinLabel": "GTIN / Barcode (Optional)",
+        "gtinPlaceholder": "8, 12, 13, or 14 digits",
+        "gtinInvalid": "GTIN must be 8, 12, 13, or 14 digits",
+        "baseUnitLabel": "Base Unit",
+        "baseUnitRequired": "Base unit is required",
+        "packSectionTitle": "Pack Definition",
+        "packSectionDescription": "Specify packaging count and size for cross-supplier normalisation.",
+        "packCountLabel": "Pack Count",
+        "packCountPlaceholder": "e.g. 1",
+        "packCountRequired": "Pack count is required",
+        "packCountMin": "Pack count must be at least 1",
+        "unitSizeLabel": "Unit Size",
+        "unitSizePlaceholder": "e.g. 2.0",
+        "unitSizeRequired": "Unit size is required",
+        "unitSizePositive": "Unit size must be a positive number",
+        "liveNormalisedLabel": "Normalised Base Quantity",
+        "liveNormalisedHelp": "Derived as Pack Count × Unit Size in the selected base unit",
+        "preferredSupplierLabel": "Preferred Supplier (Optional)",
+        "noPreferredSupplier": "None (No preferred supplier)"
+      },
+      "landedCost": {
+        "title": "Deterministic Landed Cost (US3)",
+        "subtitle": "Replayable landed cost normalised to the catalogue base unit.",
+        "unitPrice": "Unit Price",
+        "vatAmount": "Derived VAT",
+        "vatRate": "VAT Rate: {{rate}}%",
+        "deliveryFee": "Delivery Fee",
+        "discount": "Discount",
+        "otherCharges": "Other Charges",
+        "total": "Total Landed Cost",
+        "normalisedQuantity": "Normalised Quantity",
+        "baseUnit": "Base Unit",
+        "ruleVersion": "Rule Version",
+        "validFrom": "Valid From",
+        "recordedAt": "Recorded At",
+        "replayableNotice": "Deterministic calculation pinned to rule version {{version}}."
+      },
+      "decision": {
+        "title": "Resolution Decision",
+        "matchedProduct": "Matched Product:",
+        "outcome": "Outcome:",
+        "decidedBy": "Decided By:",
+        "decidedAt": "Decided At:",
+        "automatic": "Automatic Match",
+        "human": "Human Resolution",
+        "confidence": "Decision Confidence:"
+      },
+      "actions": {
+        "confirm": "Confirm Match Decision",
+        "confirming": "Confirming...",
+        "saveSuccess": "Match decision confirmed and alias saved successfully.",
+        "candidateRequired": "Please select a candidate before confirming.",
+        "formInvalid": "Please correct the product creation errors before confirming."
+      },
+      "errors": {
+        "aliasConflict": "Alias Conflict: This supplier wording is already assigned to a different product in your catalogue.",
+        "notReviewed": "Quotation has not reached the reviewed state yet.",
+        "invalidCandidate": "Selected candidate is not valid for this quotation line.",
+        "alreadyDecided": "This quotation line already has a recorded decision.",
+        "genericError": "Unable to resolve match decision. Please try again."
+      }
+    }
+  },
+  "compare": {
+    "title": "Smart Compare",
+    "subtitle": "Compare supplier offers side-by-side with true landed cost and evidence-backed recommendations.",
+    "selectProductPrompt": "Select a product from the list to compare supplier offers.",
+    "productLabel": "Product",
+    "quantityLabel": "Required Quantity",
+    "quantityPlaceholder": "e.g. 10",
+    "quantityRequired": "Quantity must be greater than 0",
+    "includeExpired": "Include expired offers",
+    "recomputing": "Recalculating...",
+    "unitLabel": "Unit: {{unit}}",
+    "recommendation": {
+      "title": "Recommended Offer",
+      "noRecommendation": "No eligible recommendation available",
+      "scoreLabel": "Recommendation Score",
+      "confidenceLabel": "Confidence",
+      "confidence": {
+        "high": "High Confidence",
+        "medium": "Medium Confidence",
+        "low": "Low Confidence"
+      },
+      "validityWindow": "Price valid from {{from}} to {{to}}",
+      "validityOpenEnded": "Price valid from {{from}} (no expiry date)",
+      "winningMargin": "Winning margin: {{margin}}%",
+      "evidenceTitle": "Scoring Evidence Breakdown",
+      "weightsTitle": "Criteria Weights",
+      "weights": {
+        "cost": "Landed Cost ({{weight}}%)",
+        "matchConfidence": "Match Confidence ({{weight}}%)",
+        "reliability": "Supplier Reliability ({{weight}}%)",
+        "leadTime": "Lead Time ({{weight}}%)"
+      },
+      "riskNotesTitle": "Risk Considerations",
+      "riskNotes": {
+        "price_expiring_soon": "Price is expiring within 7 days. Prompt action recommended.",
+        "low_match_confidence": "Product match confidence is below 85%. Verify product specifications.",
+        "low_supplier_reliability": "Supplier reliability score is below 60%."
+      },
+      "tieBreakTitle": "Deterministic Tie-Break Applied",
+      "tieBreakNote": "Offers scored equally; tie-break applied in order: {{rule}}"
+    },
+    "table": {
+      "supplier": "Supplier",
+      "normalisedUnitPrice": "Unit Price",
+      "landedCostTotal": "Total Landed Cost",
+      "leadTime": "Lead Time",
+      "leadTimeDays": "{{days}} days",
+      "leadTimeUnknown": "Not specified",
+      "reliability": "Reliability",
+      "reliabilityUnknown": "No rating",
+      "stockSignal": "Stock Availability",
+      "stockUnknown": "Unknown",
+      "matchConfidence": "Match Confidence",
+      "validUntil": "Valid Until",
+      "validOpenEnded": "Open-ended",
+      "status": "Status",
+      "statusActive": "Active",
+      "statusExpired": "Expired",
+      "recommendedBadge": "Recommended"
+    },
+    "empty": {
+      "title": "No supplier offers on file",
+      "message": "No reviewed and matched quotation lines exist for this product yet. Upload and review quotations to generate supplier offers.",
+      "selectProduct": "Please select a product from your catalogue to view supplier comparison."
+    },
+    "actions": {
+      "viewIntelligence": "Price History",
+      "viewProduct": "View Product",
+      "backToCatalogue": "Back to Catalogue",
+      "recordPurchase": "Record Purchase"
+    }
+  },
+  "productIntelligence": {
+    "title": "Product Price Intelligence",
+    "subtitle": "Historical landed cost trends and benchmark metrics derived from your workspace purchase history.",
+    "filterSupplier": "Filter by Supplier",
+    "allSuppliers": "All Suppliers",
+    "timeWindow": "Time Window",
+    "windowMonths": "{{months}} Months",
+    "metrics": {
+      "lastPaid": "Last Paid",
+      "lastPaidSubtitle": "Most recently recorded landed unit price",
+      "averagePaid": "Average Paid",
+      "averagePaidSubtitle": "Rolling {{months}}-month arithmetic mean",
+      "bestPrice": "Best Price",
+      "bestPriceSubtitle": "Lowest historical normalised unit price",
+      "noData": "No data",
+      "sourceRecord": "Source Record: {{id}}",
+      "sourceRecords": "{{count}} Source Records"
+    },
+    "chart": {
+      "title": "Unit Price Trend Over Time",
+      "xAxis": "Recorded Date",
+      "yAxis": "Normalised Unit Price ({{currency}})",
+      "legend": "Suppliers",
+      "pointTooltip": "{{supplier}}: {{price}} (Qty: {{quantity}} {{unit}}) on {{date}}",
+      "noPoints": "No price points in selected window"
+    },
+    "historyTable": {
+      "title": "Historical Records",
+      "recordedAt": "Recorded Date",
+      "supplier": "Supplier",
+      "unitPrice": "Normalised Unit Price",
+      "totalCost": "Landed Total",
+      "quantity": "Quantity",
+      "validFrom": "Valid From",
+      "validTo": "Valid To"
+    },
+    "empty": {
+      "title": "No purchase history yet",
+      "message": "Price intelligence builds up automatically as quotations are reviewed, matched, and costed for this product."
+    },
+    "actions": {
+      "compare": "Smart Compare",
+      "backToCatalogue": "Back to Catalogue"
+    }
+  },
+  "basketSplit": {
+    "title": "Two-Supplier Basket Split",
+    "subtitle": "Optimise purchasing across exactly two suppliers for minimum total landed cost.",
+    "readOnlyNotice": "You have view-only access. Workspace owners and buyers can configure and submit basket splits.",
+    "form": {
+      "suppliersSectionTitle": "Select Two Suppliers",
+      "supplier1": "First Supplier",
+      "supplier2": "Second Supplier",
+      "selectSupplier": "Select supplier...",
+      "sameSupplierError": "Please select two different suppliers.",
+      "itemsSectionTitle": "Basket Items",
+      "product": "Product",
+      "quantity": "Quantity",
+      "unitLabel": "Unit: {{unit}}",
+      "addItem": "Add Item",
+      "removeItem": "Remove Item",
+      "submitButton": "Optimise Basket Split",
+      "submitting": "Submitting Basket...",
+      "validationError": "Please specify two distinct suppliers and at least one item with positive quantity."
+    },
+    "status": {
+      "queued": "Basket split queued for optimisation...",
+      "running": "Optimising allocation across suppliers...",
+      "polling": "Checking job status...",
+      "completed": "Optimisation Completed",
+      "failed": "Optimisation Job Failed",
+      "failedMessage": "An error occurred during solver execution. Please try again."
+    },
+    "result": {
+      "feasibleTitle": "Recommended Basket Allocation",
+      "feasibleSubtitle": "Minimum landed cost split across the two selected suppliers.",
+      "totalLandedCost": "Optimised Total Landed Cost",
+      "supplierAllocation": "Allocation for {{supplier}}",
+      "supplierTotal": "Supplier Total: {{total}}",
+      "productColumn": "Product",
+      "quantityColumn": "Allocated Quantity",
+      "costColumn": "Projected Landed Cost",
+      "baselinesTitle": "Single-Supplier Baseline Comparison",
+      "baselineSubtitle": "Evaluates whether splitting saves money compared to buying everything from one supplier.",
+      "splitSavings": "Splitting saves {{amount}} versus buying exclusively from {{cheaperSupplier}}.",
+      "noSplitSavings": "Splitting offers no cost advantage; purchasing all items from {{cheaperSupplier}} is equal or cheaper.",
+      "singleSupplierOnly": "Only {{supplier}} can fulfill the entire basket.",
+      "neitherSingleFeasible": "Neither supplier can fulfill the entire basket alone.",
+      "infeasibleTitle": "Commercial Infeasibility Report",
+      "infeasibleSubtitle": "The solver completed successfully, but a feasible allocation cannot be made with the selected suppliers.",
+      "infeasibleReason": "The following item(s) have no eligible offers from the selected suppliers:",
+      "missingSuppliers": "Missing offers from: {{suppliers}}",
+      "solverVersion": "Solver Version: {{version}}",
+      "computedAt": "Computed at {{time}}"
+    },
+    "actions": {
+      "newSplit": "Start New Basket Split",
+      "viewCompare": "Compare Product Offers"
+    }
+  },
+  "alerts": {
+    "title": "Actionable Alerts Inbox",
+    "subtitle": "Proactive commercial signals computed live from your current quotations and price history.",
+    "readOnlyNotice": "You have view-only access. Workspace owners and buyers can dismiss alerts.",
+    "filterKind": "Filter by Alert Type",
+    "allKinds": "All Alert Types",
+    "kinds": {
+      "recommended_price_expiring": "Expiring Recommended Price",
+      "preferred_supplier_offer_disappeared": "Preferred Supplier Offer Disappeared",
+      "price_swing": "Price Swing Detected"
+    },
+    "severities": {
+      "critical": "Critical",
+      "warning": "Warning",
+      "info": "Info"
+    },
+    "card": {
+      "dismiss": "Dismiss",
+      "dismissing": "Dismissing...",
+      "dismissSuccess": "Alert dismissed.",
+      "product": "Product: {{product}}",
+      "supplier": "Supplier: {{supplier}}",
+      "detectedAt": "Evaluated at {{time}}",
+      "evidence": {
+        "expiringSoon": "Recommended offer from {{supplier}} expires on {{validTo}}.",
+        "disappeared": "Preferred supplier {{supplier}} no longer has an active offer for this product.",
+        "priceSwing": "Recommended unit price ({{currentPrice}}) has shifted by {{swingPercent}}% compared to the 6-month historical average ({{avgPrice}})."
+      }
+    },
+    "actions": {
+      "compare_product": "Compare Offers",
+      "review_supplier": "Review Supplier",
+      "view_price_history": "View Price History"
+    },
+    "empty": {
+      "title": "All clear — No active alerts",
+      "message": "No commercial conditions requiring immediate attention were detected in your current workspace data."
+    }
+  },
+  "savings": {
+    "ledger": {
+      "title": "Savings Ledger",
+      "subtitle": "Defensible record of procurement savings calculated against verified historical baselines.",
+      "recordPurchase": "Record Purchase Outcome",
+      "exportSavings": "Export Savings",
+      "filters": {
+        "statusLabel": "Filter by Status",
+        "allStatuses": "All Statuses",
+        "statusPending": "Pending Verification",
+        "statusVerified": "Verified",
+        "periodStart": "Start Date",
+        "periodEnd": "End Date",
+        "supplierLabel": "Supplier",
+        "allSuppliers": "All Suppliers",
+        "clear": "Clear Filters"
+      },
+      "table": {
+        "product": "Product",
+        "supplier": "Supplier",
+        "baseline": "Baseline Value",
+        "actual": "Actual Paid",
+        "delta": "Verified Saving (Delta)",
+        "status": "Status",
+        "recordedAt": "Recorded",
+        "actions": "Actions",
+        "viewEvidence": "View Evidence",
+        "verifyAction": "Verify",
+        "statusPending": "Pending",
+        "statusVerified": "Verified",
+        "noBaseline": "No Baseline"
+      },
+      "empty": {
+        "title": "No savings recorded yet",
+        "message": "Compare product offers and record your actual purchases to start building your verified savings ledger.",
+        "recordButton": "Record First Purchase"
+      },
+      "stats": {
+        "totalVerified": "Total Verified Savings",
+        "pendingCount": "Pending Outcomes",
+        "verifiedCount": "Verified Outcomes"
+      }
+    },
+    "outcomeCapture": {
+      "title": "Record Purchase Outcome",
+      "subtitle": "Document what was actually ordered and paid to compute your verified saving against baseline.",
+      "productLabel": "Product",
+      "selectProductPrompt": "Select product...",
+      "supplierLabel": "Supplier",
+      "selectSupplierPrompt": "Select supplier...",
+      "quantityLabel": "Actual Quantity Ordered",
+      "baseUnitLabel": "Base Unit",
+      "unitPriceAmountLabel": "Actual Unit Price",
+      "currencyLabel": "Currency",
+      "totalPaidAmountLabel": "Total Amount Paid",
+      "deliveryResultLabel": "Delivery Outcome",
+      "orderedAtLabel": "Order Date",
+      "deliveredAtLabel": "Delivery Date",
+      "notesLabel": "Notes / Reference ID",
+      "notesPlaceholder": "e.g., PO #12345, delivery note...",
+      "baselineNoticeTitle": "Historical Baseline Note",
+      "baselineUnavailable": "No previous price history exists for this product. The purchase will be recorded with 'none_available' baseline policy.",
+      "baselineAvailable": "Baseline will be computed from documented price history ({{policy}}).",
+      "deliveryResults": {
+        "ordered": "Ordered",
+        "partially_delivered": "Partially Delivered",
+        "delivered": "Delivered",
+        "cancelled": "Cancelled",
+        "disputed": "Disputed"
+      },
+      "submitButton": "Record Outcome & Compute Saving",
+      "submittingButton": "Recording...",
+      "cancelButton": "Cancel",
+      "successMessage": "Purchase outcome recorded successfully. Saving is pending verification.",
+      "validation": {
+        "productRequired": "Product is required",
+        "quantityRequired": "Quantity is required",
+        "quantityMin": "Quantity must be greater than 0",
+        "unitPriceRequired": "Unit price is required",
+        "totalPaidRequired": "Total paid is required",
+        "currencyRequired": "Currency is required",
+        "deliveryResultRequired": "Delivery outcome is required",
+        "baseUnitRequired": "Base unit is required"
+      }
+    },
+    "evidence": {
+      "title": "Saving Evidence & Calculation",
+      "subtitle": "Documented lineage linking this saving to purchase outcomes, quotations, and competing offers.",
+      "backToLedger": "Back to Savings Ledger",
+      "summaryCard": "Saving Summary",
+      "statusLabel": "Status",
+      "statusPending": "Pending Verification",
+      "statusVerified": "Verified (Immutable)",
+      "baselinePolicy": "Baseline Policy",
+      "baselinePolicies": {
+        "last_paid": "Last Paid Price",
+        "rolling_average_6m": "6-Month Rolling Average",
+        "none_available": "No Baseline Available"
+      },
+      "baselineUnitPrice": "Baseline Unit Price",
+      "baselineValue": "Baseline Total Value",
+      "actualValue": "Actual Total Value",
+      "delta": "Net Saving (Delta)",
+      "positiveDeltaExplanation": "Money saved compared to documented baseline.",
+      "negativeDeltaExplanation": "Actual cost exceeded historical baseline.",
+      "calculationVersion": "Calculation Version",
+      "recordedBy": "Recorded By",
+      "recordedAt": "Recorded At",
+      "verifiedBy": "Verified By",
+      "verifiedAt": "Verified At",
+      "immutableBanner": "This saving record is verified and immutable. The calculation, baseline, and evidence cannot be modified or deleted.",
+      "pendingBanner": "This saving is pending human verification. An owner or buyer can verify this record to lock its calculations and include it in exports.",
+      "verifyButton": "Verify Saving",
+      "verifyingButton": "Verifying...",
+      "verifySuccess": "Saving record successfully verified.",
+      "purchaseCard": "Purchase Details",
+      "quotationCard": "Originating Quotation",
+      "noQuotation": "No originating quotation linked to this purchase.",
+      "competingOffersCard": "Competing Offers at Compare Time",
+      "noCompetingOffers": "No competing offers recorded in the comparison context.",
+      "calculationCard": "Calculation Snapshot",
+      "formula": "Formula: Baseline Value − Actual Paid = Net Saving"
+    }
+  },
+  "exports": {
+    "title": "Export Savings Ledger",
+    "subtitle": "Generate audit-ready Excel spreadsheet or PDF summary reports of verified savings.",
+    "backToLedger": "Back to Savings Ledger",
+    "formCard": "Export Settings",
+    "formatLabel": "Export Format",
+    "formatXlsx": "Excel Spreadsheet (.xlsx)",
+    "formatPdf": "PDF Summary Report (.pdf)",
+    "periodStart": "Period Start Date",
+    "periodEnd": "Period End Date",
+    "supplierLabel": "Filter by Supplier (Optional)",
+    "allSuppliers": "All Suppliers",
+    "submitButton": "Generate Export",
+    "submittingButton": "Submitting Request...",
+    "verifiedOnlyNote": "Note: Only verified savings are included in the export. Pending rows are excluded per audit compliance rules.",
+    "statusCard": "Export Job Status",
+    "status": {
+      "queued": "Queued",
+      "queuedDesc": "Your export request is queued and waiting for worker processing.",
+      "running": "Processing",
+      "runningDesc": "Gathering verified savings records and rendering file...",
+      "completed": "Ready for Download",
+      "completedDesc": "Export completed successfully. Click below to download your file.",
+      "failed": "Export Failed",
+      "failedDesc": "An error occurred while generating the export file."
+    },
+    "rowCount": "Rendered Records: {{count}}",
+    "emptyResult": "Zero verified savings matched the selected filters. The export file contains empty headers.",
+    "downloadButton": "Download Export File",
+    "newExportButton": "Start Another Export",
+    "validation": {
+      "periodStartRequired": "Period start date is required",
+      "periodEndRequired": "Period end date is required",
+      "invalidDateRange": "Start date must be before or equal to end date"
+    }
+  },
+  "billing": {
+    "title": "Plan & Billing",
+    "subtitle": "View your workspace plan, active limits, and account status.",
+    "accountStatus": "Account Status",
+    "statuses": {
+      "active": "Active",
+      "past_due": "Past Due",
+      "cancelled": "Cancelled"
+    },
+    "currentPlan": "Current Plan",
+    "providerNotice": "Billing provider: Stub (Phase 1 evaluation mode — no real payment transaction required)",
+    "limits": {
+      "title": "Usage & Plan Limits",
+      "activeCatalogueProducts": "Active Catalogue Products",
+      "usedOfLimit": "{{used}} of {{limit}} used",
+      "remaining": "{{remaining}} remaining",
+      "unlimited": "Unlimited"
+    }
+  },
+  "plans": {
+    "starter": {
+      "name": "Starter",
+      "description": "Ideal for small procurement teams proving initial savings."
+    },
+    "growth": {
+      "name": "Growth",
+      "description": "For growing operations requiring higher product limits."
     }
   }
 }

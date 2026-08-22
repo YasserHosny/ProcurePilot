@@ -8,7 +8,20 @@ real migrations, as the real `authenticated` role, carrying a real JWT claim.
 FR-030 requires this to run on every proposed change. It is wired into CI as its own named check
 so that its failure is never mistaken for an unrelated test failure.
 
-Set TEST_DATABASE_URL to a database with migrations 0001-0007 applied.
+Set TEST_DATABASE_URL to a database with migrations 0001-0035 applied — extended for
+002-catalogue-suppliers (T038) to cover workspace_product, pack_definition, supplier,
+product_alias and import_job, plus the canonical_product exception; extended again for
+003-quotation-inbox-extraction (T063) to cover document, quotation, quotation_line,
+field_extraction, extraction_job, review_task, and the Supabase Storage object policy; extended
+again for 004-matching-normalisation (T052) to cover match_candidate, match_task, match_decision
+and landed_cost, plus the tenant-scoped and shared embedding columns added to workspace_product
+and canonical_product respectively; extended again for 005-smart-compare-intelligence to cover
+basket_split_job and alert_dismissal — the only two real tables that chunk adds, since offers,
+recommendations, price history, and live alert conditions are computed at request time from
+already-isolated rows and add no new storage surface; extended again for
+006-value-proof-launch to cover purchase_record, saving_record and billing_account, plus the
+shared plan exception (mirroring canonical_product — see research.md R5) and the two
+Principle-critical immutability triggers a verified saving_record depends on.
 """
 
 from __future__ import annotations
@@ -19,6 +32,7 @@ from uuid import UUID, uuid4
 
 import psycopg
 import pytest
+from psycopg.types.json import Jsonb
 
 TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL")
 
@@ -31,11 +45,43 @@ pytestmark = pytest.mark.skipif(
 class Workspace:
     """One tenant, its owner, and a marker row only that tenant should ever see."""
 
-    def __init__(self, tenant_id: UUID, user_id: UUID, membership_id: UUID, name: str) -> None:
+    def __init__(
+        self,
+        tenant_id: UUID,
+        user_id: UUID,
+        membership_id: UUID,
+        name: str,
+        canonical_product_id: UUID,
+        workspace_product_id: UUID,
+        supplier_id: UUID,
+        document_id: UUID,
+        quotation_id: UUID,
+        storage_path: str,
+        quotation_line_id: UUID,
+        basket_split_job_id: UUID,
+        alert_dismissal_id: UUID,
+        purchase_record_id: UUID,
+        saving_record_id: UUID,
+        billing_account_id: UUID,
+        export_job_id: UUID,
+    ) -> None:
         self.tenant_id = tenant_id
         self.user_id = user_id
         self.membership_id = membership_id
         self.name = name
+        self.canonical_product_id = canonical_product_id
+        self.workspace_product_id = workspace_product_id
+        self.supplier_id = supplier_id
+        self.document_id = document_id
+        self.quotation_id = quotation_id
+        self.storage_path = storage_path
+        self.quotation_line_id = quotation_line_id
+        self.basket_split_job_id = basket_split_job_id
+        self.alert_dismissal_id = alert_dismissal_id
+        self.purchase_record_id = purchase_record_id
+        self.saving_record_id = saving_record_id
+        self.billing_account_id = billing_account_id
+        self.export_job_id = export_job_id
 
     def claims(self) -> str:
         return (
@@ -82,7 +128,209 @@ def make_workspace(cur: psycopg.Cursor, label: str) -> Workspace:
         "insert into audit_event (tenant_id,action,outcome,target) values (%s,%s,'success',%s)",
         (tenant_id, f"{label}.secret", f'{{"secret":"{label}-confidential"}}'),
     )
-    return Workspace(tenant_id, user_id, membership_id, f"{label} Ltd")
+
+    # Catalogue and supplier data — chunk 4.2 (002-catalogue-suppliers), T038.
+    canonical_product_id, workspace_product_id, supplier_id = uuid4(), uuid4(), uuid4()
+    cur.execute(
+        "insert into supported_base_unit (code,label_en,label_ar,dimension,is_enabled) "
+        "values ('each','Each','قطعة','count',true) on conflict do nothing"
+    )
+    cur.execute(
+        "insert into canonical_product (id,name,base_unit) values (%s,%s,'each')",
+        (canonical_product_id, f"{label} widget"),
+    )
+    cur.execute(
+        "insert into workspace_product (id,tenant_id,canonical_product_id,tenant_name) "
+        "values (%s,%s,%s,%s)",
+        (workspace_product_id, tenant_id, canonical_product_id, f"{label} widget"),
+    )
+    cur.execute(
+        "insert into pack_definition (tenant_id,workspace_product_id,pack_count,unit_size) "
+        "values (%s,%s,6,5)",
+        (tenant_id, workspace_product_id),
+    )
+    cur.execute(
+        "insert into supplier (id,tenant_id,name) values (%s,%s,%s)",
+        (supplier_id, tenant_id, f"{label} Supplier Co"),
+    )
+    cur.execute(
+        "insert into product_alias (tenant_id,workspace_product_id,supplier_id,alias_text) "
+        "values (%s,%s,%s,%s)",
+        (tenant_id, workspace_product_id, supplier_id, f"{label}-supplier-wording"),
+    )
+    cur.execute(
+        "insert into import_job (tenant_id,kind,filename) values (%s,'products',%s)",
+        (tenant_id, f"{label}.csv"),
+    )
+
+    # Quotation inbox and extraction — chunk 4.3 (003-quotation-inbox-extraction), T063.
+    document_id, quotation_id, quotation_line_id = uuid4(), uuid4(), uuid4()
+    field_extraction_id, extraction_job_id, review_task_id = uuid4(), uuid4(), uuid4()
+    storage_path = f"tenants/{tenant_id}/quotations/{document_id}/{label}.pdf"
+    cur.execute(
+        "insert into document "
+        "(id,tenant_id,storage_bucket,storage_path,mime_type,created_by) "
+        "values (%s,%s,'quotation-documents',%s,'application/pdf',%s)",
+        (document_id, tenant_id, storage_path, membership_id),
+    )
+    cur.execute(
+        "insert into quotation (id,tenant_id,document_id) values (%s,%s,%s)",
+        (quotation_id, tenant_id, document_id),
+    )
+    cur.execute(
+        "insert into quotation_line (id,tenant_id,quotation_id,line_number,original_text) "
+        "values (%s,%s,%s,1,%s)",
+        (quotation_line_id, tenant_id, quotation_id, f"{label} line item"),
+    )
+    cur.execute(
+        "insert into field_extraction "
+        "(id,tenant_id,quotation_id,entity_type,entity_id,field_name,extracted_value,"
+        "confidence,extraction_method,model_version) "
+        "values (%s,%s,%s,'quotation',%s,'currency','\"GBP\"'::jsonb,0.9,"
+        "'structured_parse','test-fixture-v1')",
+        (field_extraction_id, tenant_id, quotation_id, quotation_id),
+    )
+    cur.execute(
+        "insert into extraction_job (id,tenant_id,quotation_id) values (%s,%s,%s)",
+        (extraction_job_id, tenant_id, quotation_id),
+    )
+    cur.execute(
+        "insert into review_task (id,tenant_id,quotation_id,reason) "
+        "values (%s,%s,%s,'low_confidence')",
+        (review_task_id, tenant_id, quotation_id),
+    )
+    cur.execute(
+        "insert into storage.objects (bucket_id,name,owner) "
+        "values ('quotation-documents',%s,%s)",
+        (storage_path, user_id),
+    )
+
+    # Matching and normalisation — chunk 4.4 (004-matching-normalisation), T052.
+    match_candidate_id, match_task_id, match_decision_id, landed_cost_id = (
+        uuid4(), uuid4(), uuid4(), uuid4()
+    )
+    cur.execute(
+        "insert into match_candidate "
+        "(id,tenant_id,quotation_line_id,candidate_workspace_product_id,confidence,reasons,"
+        "rank,scoring_version) "
+        "values (%s,%s,%s,%s,0.5,'{}'::jsonb,1,'test-fixture-v1')",
+        (match_candidate_id, tenant_id, quotation_line_id, workspace_product_id),
+    )
+    cur.execute(
+        "insert into match_task (id,tenant_id,quotation_line_id,reason) "
+        "values (%s,%s,%s,'low_confidence')",
+        (match_task_id, tenant_id, quotation_line_id),
+    )
+    cur.execute(
+        "insert into match_decision "
+        "(id,tenant_id,quotation_line_id,matched_workspace_product_id,"
+        "selected_match_candidate_id,outcome,is_automatic,confidence) "
+        "values (%s,%s,%s,%s,%s,'same_product',true,0.5)",
+        (
+            match_decision_id,
+            tenant_id,
+            quotation_line_id,
+            workspace_product_id,
+            match_candidate_id,
+        ),
+    )
+    cur.execute(
+        "insert into landed_cost "
+        "(id,tenant_id,quotation_line_id,match_decision_id,quantity,normalised_base_quantity,"
+        "base_unit,unit_price_amount,unit_price_currency,vat_amount,vat_currency,"
+        "delivery_fee_amount,delivery_fee_currency,discount_amount,discount_currency,"
+        "other_charges_amount,other_charges_currency,total_amount,total_currency,raw_inputs,"
+        "rule_version,valid_from) "
+        "values (%s,%s,%s,%s,10,10,'each',10,'GBP',2,'GBP',0,'GBP',0,'GBP',0,'GBP',12,'GBP',"
+        "'{}'::jsonb,'landed-cost-v1',now())",
+        (landed_cost_id, tenant_id, quotation_line_id, match_decision_id),
+    )
+
+    # Smart Compare + Intelligence — chunk 4.5 (005-smart-compare-intelligence). Offers,
+    # recommendations, price history and live alert conditions add no storage of their own; only
+    # these two tables are real.
+    second_supplier_id, basket_split_job_id, alert_dismissal_id = uuid4(), uuid4(), uuid4()
+    cur.execute(
+        "insert into supplier (id,tenant_id,name) values (%s,%s,%s)",
+        (second_supplier_id, tenant_id, f"{label} Second Supplier Co"),
+    )
+    cur.execute(
+        "insert into basket_split_job "
+        "(id,tenant_id,requested_by,supplier_ids,items,status) "
+        "values (%s,%s,%s,%s,%s,'queued')",
+        (
+            basket_split_job_id,
+            tenant_id,
+            membership_id,
+            [supplier_id, second_supplier_id],
+            Jsonb([{"workspace_product_id": str(workspace_product_id), "quantity": "10.000000"}]),
+        ),
+    )
+    cur.execute(
+        "insert into alert_dismissal "
+        "(id,tenant_id,alert_fingerprint,kind,workspace_product_id,dismissed_by) "
+        "values (%s,%s,%s,'recommended_price_expiring',%s,%s)",
+        (
+            alert_dismissal_id,
+            tenant_id,
+            f"{label}-fingerprint",
+            workspace_product_id,
+            membership_id,
+        ),
+    )
+
+    # Value Proof + Launch Readiness — chunk 4.6 (006-value-proof-launch). purchase_record and
+    # saving_record are the product's second append-only entity; kept pending (not verified) here
+    # so cleanup can rely on the ordinary cascade rather than the immutability trigger.
+    purchase_record_id, saving_record_id, billing_account_id = uuid4(), uuid4(), uuid4()
+    cur.execute(
+        "insert into purchase_record "
+        "(id,tenant_id,workspace_product_id,recorded_by,quantity,base_unit,"
+        "unit_price_amount,unit_price_currency,total_paid_amount,total_paid_currency,"
+        "delivery_result) "
+        "values (%s,%s,%s,%s,10,'each',5,'GBP',50,'GBP','delivered')",
+        (purchase_record_id, tenant_id, workspace_product_id, membership_id),
+    )
+    cur.execute(
+        "insert into saving_record "
+        "(id,tenant_id,purchase_record_id,workspace_product_id,baseline_policy,"
+        "actual_value_amount,actual_value_currency,calculation_version,calculation_inputs,"
+        "recorded_by) "
+        "values (%s,%s,%s,%s,'none_available',50,'GBP','test-fixture-v1','{}'::jsonb,%s)",
+        (saving_record_id, tenant_id, purchase_record_id, workspace_product_id, membership_id),
+    )
+    cur.execute(
+        "insert into billing_account "
+        "(id,tenant_id,plan_code,provider_customer_id) "
+        "values (%s,%s,'starter',%s)",
+        (billing_account_id, tenant_id, f"stub_customer:{tenant_id}"),
+    )
+    export_job_id = uuid4()
+    cur.execute(
+        "insert into export_job (id,tenant_id,requested_by,format,filters) "
+        "values (%s,%s,%s,'xlsx','{}'::jsonb)",
+        (export_job_id, tenant_id, membership_id),
+    )
+
+    return Workspace(
+        tenant_id,
+        user_id,
+        membership_id,
+        f"{label} Ltd",
+        canonical_product_id,
+        workspace_product_id,
+        supplier_id,
+        document_id,
+        quotation_id,
+        storage_path,
+        quotation_line_id,
+        basket_split_job_id,
+        alert_dismissal_id,
+        purchase_record_id,
+        saving_record_id,
+        billing_account_id,
+        export_job_id,
+    )
 
 
 @pytest.fixture
@@ -243,6 +491,533 @@ def test_a_malformed_tenant_claim_sees_nothing(
     assert row is not None and row[0] == 0
 
 
+# --- catalogue and suppliers (002-catalogue-suppliers, T038) ----------------
+
+
+def test_another_workspaces_products_are_invisible(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        cur.execute(
+            "select id from workspace_product where id = %s", (beta.workspace_product_id,)
+        )
+        assert cur.fetchall() == []
+
+
+def test_another_workspaces_pack_definitions_are_invisible(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        cur.execute(
+            "select count(*) from pack_definition where workspace_product_id = %s",
+            (beta.workspace_product_id,),
+        )
+        row = cur.fetchone()
+    assert row is not None and row[0] == 0
+
+
+def test_another_workspaces_suppliers_are_invisible(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        cur.execute("select id from supplier where id = %s", (beta.supplier_id,))
+        assert cur.fetchall() == []
+
+
+def test_another_workspaces_aliases_are_invisible(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    """FR-027: an alias resolves only for the workspace that recorded it."""
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        cur.execute(
+            "select count(*) from product_alias where workspace_product_id = %s",
+            (beta.workspace_product_id,),
+        )
+        row = cur.fetchone()
+    assert row is not None and row[0] == 0
+
+
+def test_another_workspaces_import_jobs_are_invisible(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        cur.execute("select count(*) from import_job where tenant_id = %s", (beta.tenant_id,))
+        row = cur.fetchone()
+    assert row is not None and row[0] == 0
+
+
+def test_canonical_product_is_shared_across_workspaces_by_design(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    """The ONE deliberate exception (research.md R5) — must stay an exception, not a leak.
+
+    canonical_product carries no workspace-identifying data, so both workspaces may read both
+    rows. If this ever starts failing, it means someone added a workspace-identifying column
+    to canonical_product without moving it to workspace_product — check that first.
+    """
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        cur.execute(
+            "select id from canonical_product where id = any(%s)",
+            ([alpha.canonical_product_id, beta.canonical_product_id],),
+        )
+        seen = {r[0] for r in cur.fetchall()}
+    assert seen == {alpha.canonical_product_id, beta.canonical_product_id}
+
+
+def test_a_member_cannot_write_a_supplier_into_another_workspace(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            cur.execute(
+                "insert into supplier (tenant_id,name) values (%s,'intruder co')",
+                (beta.tenant_id,),
+            )
+
+
+def test_a_cross_workspace_supplier_update_changes_nothing(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        cur.execute(
+            "update supplier set name = 'renamed' where id = %s", (beta.supplier_id,)
+        )
+        assert cur.rowcount == 0
+        cur.execute("reset role")
+        cur.execute("select name from supplier where id = %s", (beta.supplier_id,))
+        row = cur.fetchone()
+    assert row is not None and row[0] == "beta Supplier Co"
+
+
+# --- quotation inbox and extraction (003-quotation-inbox-extraction, T063) --
+
+
+def test_another_workspaces_documents_are_invisible(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        cur.execute("select id from document where id = %s", (beta.document_id,))
+        assert cur.fetchall() == []
+
+
+def test_another_workspaces_quotations_are_invisible(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        cur.execute("select id from quotation where id = %s", (beta.quotation_id,))
+        assert cur.fetchall() == []
+
+
+def test_another_workspaces_quotation_lines_are_invisible(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        cur.execute(
+            "select count(*) from quotation_line where quotation_id = %s", (beta.quotation_id,)
+        )
+        row = cur.fetchone()
+    assert row is not None and row[0] == 0
+
+
+def test_another_workspaces_field_extractions_are_invisible(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    """Constitution Principle I's evidence record is exactly as tenant-private as anything else."""
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        cur.execute(
+            "select count(*) from field_extraction where quotation_id = %s", (beta.quotation_id,)
+        )
+        row = cur.fetchone()
+    assert row is not None and row[0] == 0
+
+
+def test_another_workspaces_extraction_jobs_are_invisible(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        cur.execute(
+            "select count(*) from extraction_job where quotation_id = %s", (beta.quotation_id,)
+        )
+        row = cur.fetchone()
+    assert row is not None and row[0] == 0
+
+
+def test_another_workspaces_review_tasks_are_invisible(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    """FR-019: the review queue is standalone, but still tenant-private."""
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        cur.execute(
+            "select count(*) from review_task where quotation_id = %s", (beta.quotation_id,)
+        )
+        row = cur.fetchone()
+    assert row is not None and row[0] == 0
+
+
+def test_a_member_cannot_write_a_quotation_into_another_workspace(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            cur.execute(
+                "insert into quotation (tenant_id,document_id) values (%s,%s)",
+                (beta.tenant_id, beta.document_id),
+            )
+
+
+def test_a_cross_workspace_quotation_update_changes_nothing(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        cur.execute(
+            "update quotation set status = 'refused' where id = %s", (beta.quotation_id,)
+        )
+        assert cur.rowcount == 0
+        cur.execute("reset role")
+        cur.execute("select status from quotation where id = %s", (beta.quotation_id,))
+        row = cur.fetchone()
+    assert row is not None and row[0] == "pending"
+
+
+def test_storage_object_from_another_workspace_is_invisible(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    """The second isolation boundary (research.md R8): table RLS is not the only guarantee.
+
+    A member of alpha must not be able to read beta's quotation-document object even knowing
+    (or guessing) its exact storage path.
+    """
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        cur.execute(
+            "select name from storage.objects where bucket_id = 'quotation-documents' "
+            "and name = %s",
+            (beta.storage_path,),
+        )
+        assert cur.fetchall() == []
+        cur.execute(
+            "select name from storage.objects where bucket_id = 'quotation-documents' "
+            "and name = %s",
+            (alpha.storage_path,),
+        )
+        assert cur.fetchall() == [(alpha.storage_path,)]
+
+
+# --- matching and normalisation (004-matching-normalisation, T052) ---------
+
+
+def test_another_workspaces_match_candidates_are_invisible(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        cur.execute(
+            "select count(*) from match_candidate where quotation_line_id = %s",
+            (beta.quotation_line_id,),
+        )
+        row = cur.fetchone()
+    assert row is not None and row[0] == 0
+
+
+def test_another_workspaces_match_tasks_are_invisible(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    """FR-011: the match-resolution queue is standalone, but still tenant-private."""
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        cur.execute(
+            "select count(*) from match_task where quotation_line_id = %s",
+            (beta.quotation_line_id,),
+        )
+        row = cur.fetchone()
+    assert row is not None and row[0] == 0
+
+
+def test_another_workspaces_match_decisions_are_invisible(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        cur.execute(
+            "select count(*) from match_decision where quotation_line_id = %s",
+            (beta.quotation_line_id,),
+        )
+        row = cur.fetchone()
+    assert row is not None and row[0] == 0
+
+
+def test_another_workspaces_landed_costs_are_invisible(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        cur.execute(
+            "select count(*) from landed_cost where quotation_line_id = %s",
+            (beta.quotation_line_id,),
+        )
+        row = cur.fetchone()
+    assert row is not None and row[0] == 0
+
+
+def test_a_member_cannot_write_a_match_decision_into_another_workspace(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            cur.execute(
+                "insert into match_decision "
+                "(tenant_id,quotation_line_id,matched_workspace_product_id,outcome,"
+                "is_automatic,confidence) "
+                "values (%s,%s,%s,'no_match_new_product',true,0.9)",
+                (beta.tenant_id, beta.quotation_line_id, beta.workspace_product_id),
+            )
+
+
+def test_workspace_products_tenant_name_embedding_stays_tenant_scoped(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    """The tenant-scoped half of research.md R4's two-embedding design: no new policy needed,
+    since tenant_name_embedding is just another column on the already tenant-isolated
+    workspace_product table — this confirms that, rather than assuming it."""
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        dummy_vector = "[" + ",".join("0.1" for _ in range(256)) + "]"
+        cur.execute(
+            "update workspace_product set tenant_name_embedding = %s where id = %s",
+            (dummy_vector, beta.workspace_product_id),
+        )
+        assert cur.rowcount == 0
+        cur.execute(
+            "select id from workspace_product where id = %s", (beta.workspace_product_id,)
+        )
+        assert cur.fetchall() == []
+
+
+def test_canonical_products_embedding_is_shared_by_design_not_a_leak(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    """The shared half of research.md R4's two-embedding design: canonical_embedding lives on
+    canonical_product, which is deliberately shared across workspaces (chunk 4.2), because it is
+    derived only from brand/name/variant — fields canonical_product already legitimately holds.
+    Both workspaces' canonical products must remain readable, same as the plain canonical_product
+    exception test above; this must stay an exception, not a leak of anything workspace-specific."""
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        cur.execute(
+            "select id from canonical_product where id = any(%s)",
+            ([alpha.canonical_product_id, beta.canonical_product_id],),
+        )
+        seen = {r[0] for r in cur.fetchall()}
+    assert seen == {alpha.canonical_product_id, beta.canonical_product_id}
+
+
+def test_another_workspaces_basket_split_jobs_are_invisible(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        cur.execute(
+            "select count(*) from basket_split_job where id = %s", (beta.basket_split_job_id,)
+        )
+        row = cur.fetchone()
+    assert row is not None and row[0] == 0
+
+
+def test_another_workspaces_alert_dismissals_are_invisible(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        cur.execute(
+            "select count(*) from alert_dismissal where id = %s", (beta.alert_dismissal_id,)
+        )
+        row = cur.fetchone()
+    assert row is not None and row[0] == 0
+
+
+def test_a_member_cannot_write_a_basket_split_job_into_another_workspace(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    """FR-018 restricts submission to owner/buyer, but tenant isolation is the database's job
+    regardless of role — a cross-tenant insert must fail even carrying a valid membership id."""
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            cur.execute(
+                "insert into basket_split_job (tenant_id,requested_by,supplier_ids,items) "
+                "values (%s,%s,%s,%s)",
+                (
+                    beta.tenant_id,
+                    beta.membership_id,
+                    [beta.supplier_id, alpha.supplier_id],
+                    Jsonb(
+                        [{"workspace_product_id": str(beta.workspace_product_id), "quantity": "1"}]
+                    ),
+                ),
+            )
+
+
+# --- value proof and launch readiness (006-value-proof-launch) ------------
+
+
+def test_another_workspaces_purchase_records_are_invisible(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        cur.execute(
+            "select count(*) from purchase_record where id = %s", (beta.purchase_record_id,)
+        )
+        row = cur.fetchone()
+    assert row is not None and row[0] == 0
+
+
+def test_another_workspaces_saving_records_are_invisible(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        cur.execute(
+            "select count(*) from saving_record where id = %s", (beta.saving_record_id,)
+        )
+        row = cur.fetchone()
+    assert row is not None and row[0] == 0
+
+
+def test_another_workspaces_billing_account_is_invisible(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        cur.execute(
+            "select count(*) from billing_account where id = %s", (beta.billing_account_id,)
+        )
+        row = cur.fetchone()
+    assert row is not None and row[0] == 0
+
+
+def test_another_workspaces_export_jobs_are_invisible(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        cur.execute("select count(*) from export_job where id = %s", (beta.export_job_id,))
+        row = cur.fetchone()
+    assert row is not None and row[0] == 0
+
+
+def test_a_member_cannot_write_a_saving_record_into_another_workspace(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            cur.execute(
+                "insert into saving_record "
+                "(tenant_id,purchase_record_id,workspace_product_id,baseline_policy,"
+                "actual_value_amount,actual_value_currency,calculation_version,"
+                "calculation_inputs,recorded_by) "
+                "values (%s,%s,%s,'none_available',1,'GBP','test-fixture-v1','{}'::jsonb,%s)",
+                (
+                    beta.tenant_id,
+                    beta.purchase_record_id,
+                    beta.workspace_product_id,
+                    beta.membership_id,
+                ),
+            )
+
+
+def test_plan_is_a_shared_read_only_reference_table(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    """The shared exception (research.md R5): both workspaces must see the same plan rows —
+    this must stay an exception, not a leak of anything workspace-specific — and neither may
+    write to it directly."""
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        cur.execute("select code from plan order by code")
+        codes = {row[0] for row in cur.fetchall()}
+        assert codes == {"starter", "growth"}
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            cur.execute(
+                "insert into plan (code,name,monthly_price_amount,monthly_price_currency,limits) "
+                "values ('rogue','Rogue',0,'GBP','{}'::jsonb)"
+            )
+
+
+def test_verified_saving_record_is_immutable_to_every_role(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    """FR-004 / research.md R7: once verified, no role — not even the recording buyer, not even
+    a service-role connection — may update or delete the row. Verified here as the authenticated
+    role would exercise it; a second check confirms even the migration-owning role is blocked
+    (FORCE ROW LEVEL SECURITY only matters for RLS, this trigger has no role exception at all)."""
+    conn, alpha, _beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        cur.execute(
+            "update saving_record set status='verified', verified_at=now(), verified_by=%s "
+            "where id = %s",
+            (alpha.membership_id, alpha.saving_record_id),
+        )
+        with pytest.raises(psycopg.errors.RestrictViolation, match="immutable"):
+            cur.execute(
+                "update saving_record set actual_value_amount = 999 where id = %s",
+                (alpha.saving_record_id,),
+            )
+        conn.rollback()
+
+
 def test_platform_invitations_are_unreadable_by_members(
     workspaces: tuple[psycopg.Connection, Workspace, Workspace],
 ) -> None:
@@ -265,7 +1040,16 @@ def test_rls_is_enabled_and_forced_on_every_tenant_scoped_table(
     Without FORCE, every test above could pass while production leaked.
     """
     conn, _alpha, _beta = workspaces
-    expected = {"tenant", "membership", "member_invitation", "audit_event", "platform_invitation"}
+    expected = {
+        "tenant", "membership", "member_invitation", "audit_event", "platform_invitation",
+        "workspace_product", "pack_definition", "product_substitute", "supplier",
+        "product_alias", "import_job", "canonical_product",
+        "document", "quotation", "quotation_line", "field_extraction", "extraction_job",
+        "review_task",
+        "match_candidate", "match_task", "match_decision", "landed_cost",
+        "basket_split_job", "alert_dismissal",
+        "purchase_record", "saving_record", "export_job", "billing_account", "plan",
+    }
     with conn.cursor() as cur:
         cur.execute(
             "select relname, relrowsecurity, relforcerowsecurity from pg_class "

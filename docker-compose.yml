@@ -179,6 +179,98 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_started
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # Redis (RQ broker for quotation extraction jobs)
+  # ---------------------------------------------------------------------------
+  redis:
+    image: redis:7.4-alpine
+    container_name: procurepilot-redis
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # Quotation Extraction Worker (RQ)
+  # ---------------------------------------------------------------------------
+  extraction-worker:
+    image: python:3.12-slim
+    container_name: procurepilot-extraction-worker
+    working_dir: /workspace/services/extraction-worker
+    volumes:
+      - .:/workspace
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/postgres
+      REDIS_URL: redis://redis:6379/0
+      EXTRACTION_QUEUE_NAME: ${EXTRACTION_QUEUE_NAME:-quotation-extraction}
+      EXTRACTION_PROVIDER_MODE: ${EXTRACTION_PROVIDER_MODE:-stub}
+      EXTRACTION_CONFIDENCE_THRESHOLD: ${EXTRACTION_CONFIDENCE_THRESHOLD:-0.85}
+      PYTHONPATH: /workspace/services/extraction-worker/src
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    command: >
+      sh -c "pip install -e /workspace/services/extraction-worker
+      && python -m procurepilot_extraction_worker"
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # Basket Split Optimiser Worker (RQ)
+  # ---------------------------------------------------------------------------
+  optimiser:
+    image: python:3.12-slim
+    container_name: procurepilot-optimiser
+    working_dir: /workspace/services/optimiser
+    volumes:
+      - .:/workspace
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/postgres
+      REDIS_URL: redis://redis:6379/0
+      BASKET_SPLIT_QUEUE_NAME: ${BASKET_SPLIT_QUEUE_NAME:-basket-split}
+      PYTHONPATH: /workspace/services/optimiser/src
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    command: >
+      sh -c "pip install -e /workspace/services/optimiser
+      && python -m procurepilot_optimiser_worker"
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # Savings Export Worker (apps/api-owned RQ entrypoint)
+  # ---------------------------------------------------------------------------
+  export-worker:
+    build:
+      context: .
+      dockerfile: infra/docker/api.Dockerfile
+    container_name: procurepilot-export-worker
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/postgres
+      SUPABASE_URL: http://kong:8000
+      SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY:-replace-with-local-anon-key}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:-replace-with-local-service-role-key}
+      REDIS_URL: redis://redis:6379/0
+      EXPORT_QUEUE_NAME: ${EXPORT_QUEUE_NAME:-exports}
+      SUPABASE_EXPORTS_BUCKET: ${SUPABASE_EXPORTS_BUCKET:-exports}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    command: python -m procurepilot_api.workers.export_worker
     restart: unless-stopped
 
   # ---------------------------------------------------------------------------

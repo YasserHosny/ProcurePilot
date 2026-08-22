@@ -62,7 +62,7 @@
       [disabled]="isSubmitting() || form.invalid"
     >
       @if (isSubmitting()) {
-        <mat-spinner diameter="18" class="spinner"></mat-spinner>
+        <mat-spinner [attr.aria-label]="'common.loading' | translate" diameter="18" class="spinner"></mat-spinner>
         <span>{{ 'team.inviteDialog.submittingButton' | translate }}</span>
       } @else {
         <span>{{ 'team.inviteDialog.submitButton' | translate }}</span>

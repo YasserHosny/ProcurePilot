@@ -75,7 +75,7 @@
           [disabled]="isLoading()"
         >
           @if (isLoading()) {
-            <mat-spinner diameter="20" class="button-spinner"></mat-spinner>
+            <mat-spinner [attr.aria-label]="'common.loading' | translate" diameter="20" class="button-spinner"></mat-spinner>
             <span>{{ 'auth.signin.submittingButton' | translate }}</span>
           } @else {
             <span>{{ 'auth.signin.submitButton' | translate }}</span>

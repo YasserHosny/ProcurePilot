@@ -28,6 +28,64 @@ export function credentials(): Credentials {
   ) as Credentials;
 }
 
+const REPO_ROOT = join(__dirname, '..', '..', '..', '..', '..');
+
+/**
+ * Creates a brand-new business + owner, isolated from the shared global-setup workspace every
+ * other spec file signs in as.
+ *
+ * Specs that mutate real membership rows (role changes, removals) must not share the global
+ * owner: a run that exercises those mutations against the one workspace every other file also
+ * signs in as risks leaving that shared owner in a state later files cannot recover from. One
+ * extra sign-up per FILE (not per test) keeps this well within the auth rate limit.
+ */
+export async function createIsolatedWorkspace(): Promise<Credentials> {
+  const stamp = `${Date.now()}.${Math.floor(Math.random() * 10000)}`;
+  const creds: Credentials = {
+    ownerEmail: `e2e.isolated.owner.${stamp}@example.test`,
+    ownerPassword: 'E2eIsolatedPassword123!',
+    businessName: `E2E Isolated Co ${stamp}`,
+  };
+
+  const raw = execFileSync(
+    'uv',
+    ['run', '--project', 'apps/api', 'python', 'apps/api/scripts/seed.py', '--json'],
+    {
+      cwd: REPO_ROOT,
+      env: {
+        ...process.env,
+        DATABASE_URL:
+          process.env['E2E_DATABASE_URL'] ??
+          'postgresql://postgres:postgres@localhost:54322/postgres',
+        SEED_INVITATION_EMAIL: creds.ownerEmail,
+      },
+      encoding: 'utf-8',
+    },
+  );
+  const invitation = JSON.parse(raw.trim().split('\n').pop() ?? '{}') as {
+    invitation_token: string;
+    region: string;
+    currency: string;
+    tax_model: string;
+  };
+
+  await call('/auth/signup', {
+    method: 'POST',
+    body: JSON.stringify({
+      invitation_token: invitation.invitation_token,
+      email: creds.ownerEmail,
+      password: creds.ownerPassword,
+      business_name: creds.businessName,
+      region: invitation.region,
+      currency: invitation.currency,
+      tax_model: invitation.tax_model,
+      default_locale: 'en',
+    }),
+  });
+
+  return creds;
+}
+
 async function call<T>(path: string, init: RequestInit): Promise<T> {
   const response = await fetch(`${API}${path}`, {
     ...init,
@@ -75,8 +133,8 @@ export interface CreatedMember {
  * The address is unique per call: the server allows only one pending invitation per address per
  * workspace, so reusing a fixed address makes a suite that passes once and 409s ever after.
  */
-export async function createMember(role = 'buyer'): Promise<CreatedMember> {
-  const ownerToken = await signInOwner();
+export async function createMember(role = 'buyer', ownerTokenOverride?: string): Promise<CreatedMember> {
+  const ownerToken = ownerTokenOverride ?? (await signInOwner());
   const email = `e2e.member.${Date.now()}.${Math.floor(Math.random() * 10000)}@example.test`;
   const password = 'E2eMemberPassword123!';
 
@@ -101,8 +159,9 @@ export async function createMember(role = 'buyer'): Promise<CreatedMember> {
 /** Invite without accepting — for tests about pending invitations rather than members. */
 export async function createPendingInvitation(
   role = 'buyer',
+  ownerTokenOverride?: string,
 ): Promise<{ email: string; id: string; token: string }> {
-  const ownerToken = await signInOwner();
+  const ownerToken = ownerTokenOverride ?? (await signInOwner());
   const email = `e2e.pending.${Date.now()}.${Math.floor(Math.random() * 10000)}@example.test`;
   const invitation = await call<{ id: string; token?: string }>('/invitations', {
     method: 'POST',
@@ -167,3 +226,192 @@ export function mintPlatformInvitation(forEmail: string): {
   );
   return JSON.parse(raw.trim().split('\n').pop() ?? '{}');
 }
+
+/**
+ * Value-proof helpers (T006).
+ */
+export async function createTestProduct(
+  token: string,
+  data?: Partial<{
+    tenant_name: string;
+    base_unit: string;
+    pack_count: number;
+    unit_size: string;
+    brand?: string;
+  }>,
+): Promise<{ id: string; tenant_name: string }> {
+  const uniqueName = data?.tenant_name ?? `Product ${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+  return call<{ id: string; tenant_name: string }>('/products', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({
+      tenant_name: uniqueName,
+      base_unit: data?.base_unit ?? 'each',
+      pack: {
+        pack_count: data?.pack_count ?? 1,
+        unit_size: data?.unit_size ?? '1',
+      },
+      brand: data?.brand ?? null,
+    }),
+  });
+}
+
+export async function createTestSupplier(
+  token: string,
+  name?: string,
+): Promise<{ id: string; name: string }> {
+  const uniqueName = name ?? `Supplier ${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+  // No status field: SupplierCreate is a strict model and rejects it, and the supplier table
+  // defaults to 'active' anyway.
+  return call<{ id: string; name: string }>('/suppliers', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({
+      name: uniqueName,
+    }),
+  });
+}
+
+export async function recordPurchaseOutcome(
+  token: string,
+  data: {
+    workspace_product_id: string;
+    supplier_id?: string | null;
+    quotation_line_id?: string | null;
+    match_decision_id?: string | null;
+    landed_cost_id?: string | null;
+    quantity: string;
+    base_unit: string;
+    unit_price: { amount: string; currency: string };
+    total_paid: { amount: string; currency: string };
+    delivery_result: string;
+    ordered_at?: string | null;
+    delivered_at?: string | null;
+    notes?: string | null;
+  },
+): Promise<{
+  purchase_record: { id: string; workspace_product_id: string; quantity: string };
+  saving_record: {
+    id: string;
+    status: string;
+    baseline_policy: string;
+    actual_value: { amount: string; currency: string };
+    delta: { amount: string; currency: string } | null;
+  };
+}> {
+  return call('/purchases', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(data),
+  });
+}
+
+export async function verifySaving(
+  token: string,
+  savingId: string,
+): Promise<{ id: string; status: string; verified_at: string; verified_by: string }> {
+  return call(`/savings/${encodeURIComponent(savingId)}/verify`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export async function createExportJob(
+  token: string,
+  data: {
+    kind: 'savings_ledger';
+    format: 'xlsx' | 'pdf';
+    filters: {
+      period_start: string;
+      period_end: string;
+      supplier_id?: string | null;
+      branch_id?: string | null;
+    };
+  },
+): Promise<{
+  id: string;
+  kind: string;
+  format: string;
+  status: string;
+  row_count?: number | null;
+  download_url?: string | null;
+}> {
+  return call('/exports', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(data),
+  });
+}
+
+export async function fetchBillingAccount(token: string): Promise<{
+  id: string;
+  plan: {
+    code: string;
+    name: string;
+    limits: { active_catalogue_products: number };
+  };
+  status: string;
+}> {
+  return call('/billing/account', {
+    method: 'GET',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export async function fetchLimitCheck(token: string): Promise<{
+  resource: string;
+  plan_code: string;
+  limit: number | null;
+  used: number;
+  allowed: boolean;
+  remaining: number | null;
+}> {
+  return call('/billing/limits/active-catalogue-products', {
+    method: 'GET',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+/**
+ * Canonical-path helpers (T075): read back the state a confirmed quotation produced, so a spec
+ * can link a purchase to the exact quotation line / match decision / landed cost the pipeline
+ * created — the same ids the Smart Compare "Record Purchase" button passes along.
+ */
+export interface QuotationMatchLineState {
+  line: { id: string; line_number: number; original_text: string };
+  task: { id: string; status: string } | null;
+  decision: {
+    id: string;
+    outcome: string;
+    matched_product: { id: string; tenant_name: string };
+  } | null;
+  landed_cost: { id: string } | null;
+}
+
+export async function fetchQuotationMatches(
+  token: string,
+  quotationId: string,
+): Promise<{ quotation_id: string; lines: QuotationMatchLineState[] }> {
+  return call(`/quotations/${encodeURIComponent(quotationId)}/matches`, {
+    method: 'GET',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export async function findProductByName(
+  token: string,
+  tenantName: string,
+): Promise<{ id: string; tenant_name: string; base_unit: string }> {
+  const res = await call<{
+    items: Array<{ id: string; tenant_name: string; base_unit: string }>;
+  }>('/products?limit=100&status=active', {
+    method: 'GET',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const found = res.items.find((p) => p.tenant_name === tenantName);
+  if (!found) {
+    throw new Error(`No active product named "${tenantName}" exists in the workspace`);
+  }
+  return found;
+}
+

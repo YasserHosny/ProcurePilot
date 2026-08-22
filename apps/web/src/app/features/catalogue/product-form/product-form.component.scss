@@ -1,0 +1,265 @@
+.form-container {
+  max-inline-size: 780px;
+  margin-inline: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.header-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.page-title {
+  margin: 0;
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.page-subtitle {
+  margin: 0;
+  font-size: 0.9375rem;
+  color: #475569;
+}
+
+.back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.read-only-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding-inline: 1rem;
+  padding-block: 0.75rem;
+  background-color: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  color: #334155;
+  font-size: 0.875rem;
+
+  .info-icon {
+    color: #4f46e5;
+  }
+}
+
+.limit-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding-inline: 1rem;
+  padding-block: 0.75rem;
+  background-color: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: 8px;
+  color: #92400e;
+
+  .warning-icon {
+    color: #b45309;
+    flex-shrink: 0;
+  }
+
+  .limit-text-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+
+    .limit-title {
+      font-weight: 600;
+      font-size: 0.875rem;
+    }
+
+    .limit-message {
+      font-size: 0.875rem;
+    }
+  }
+}
+
+.error-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding-inline: 1rem;
+  padding-block: 0.75rem;
+  background-color: #fef2f2;
+  border: 1px solid #fee2e2;
+  border-radius: 8px;
+  color: #991b1b;
+
+  .error-icon {
+    color: #ef4444;
+    font-size: 24px;
+    inline-size: 24px;
+    block-size: 24px;
+  }
+
+  .error-text-wrap {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .error-title {
+    font-weight: 600;
+    font-size: 0.9375rem;
+  }
+
+  .error-message {
+    font-size: 0.875rem;
+  }
+
+  .error-trace {
+    font-size: 0.75rem;
+    color: #b91c1c;
+    font-family: monospace;
+  }
+}
+
+.loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding-block: 4rem;
+  gap: 1rem;
+  color: #475569;
+}
+
+.form-card {
+  border-radius: 12px;
+  background-color: #ffffff;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.form-section {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.section-header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.section-title {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.section-desc {
+  margin: 0;
+  font-size: 0.875rem;
+  color: #475569;
+}
+
+.form-row {
+  display: flex;
+  gap: 1rem;
+
+  &.two-col {
+    .form-field {
+      flex: 1;
+    }
+  }
+
+  .full-width {
+    inline-size: 100%;
+  }
+}
+
+.normalisation-preview-card {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding-inline: 1.25rem;
+  padding-block: 1rem;
+  background-color: #e0e7ff;
+  border: 1px solid #c7d2fe;
+  border-radius: 8px;
+
+  .preview-icon-wrap {
+    inline-size: 40px;
+    block-size: 40px;
+    border-radius: 8px;
+    background-color: #4f46e5;
+    color: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .preview-content {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .preview-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: #3730a3;
+    letter-spacing: 0.05em;
+  }
+
+  .preview-value {
+    font-size: 1.25rem;
+    color: #1e1b4b;
+
+    .formula {
+      color: #4338ca;
+      font-size: 1rem;
+      margin-inline-end: 0.375rem;
+    }
+
+    .total-qty {
+      font-weight: 700;
+    }
+
+    .placeholder-text {
+      color: #6b7280;
+    }
+  }
+
+  .preview-hint {
+    font-size: 0.75rem;
+    color: #4338ca;
+  }
+}
+
+.form-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 1rem;
+  padding-block-start: 1rem;
+}
+
+.btn-spinner {
+  display: inline-block;
+  margin-inline-end: 0.5rem;
+}

@@ -87,3 +87,768 @@ export interface ApiError {
   readonly details?: Record<string, unknown>;
   readonly trace_id: string;
 }
+
+// --- Catalogue and Suppliers (Chunk 4.2) ---
+
+export interface BaseUnit {
+  readonly code: string;
+  readonly label_en: string;
+  readonly label_ar: string;
+  readonly dimension: 'volume' | 'mass' | 'count';
+}
+
+export interface PackDefinition {
+  readonly pack_count: number;
+  readonly unit_size: string; // decimal string
+  readonly base_quantity?: string; // read-only derived decimal string
+}
+
+export interface Product {
+  readonly id: string;
+  readonly tenant_name: string;
+  readonly brand?: string | null;
+  readonly canonical_name: string;
+  readonly variant?: string | null;
+  readonly gtin?: string | null;
+  readonly base_unit: string;
+  readonly pack: PackDefinition;
+  readonly preferred_supplier_id?: string | null;
+  readonly substitute_ids?: readonly string[];
+  readonly status: 'active' | 'archived';
+  readonly created_at: string;
+}
+
+export interface ProductCreate {
+  readonly tenant_name: string;
+  readonly brand?: string | null;
+  readonly canonical_name?: string | null;
+  readonly variant?: string | null;
+  readonly gtin?: string | null;
+  readonly base_unit: string;
+  readonly pack: PackDefinition;
+  readonly preferred_supplier_id?: string | null;
+}
+
+export interface ProductUpdate {
+  readonly tenant_name?: string;
+  readonly gtin?: string | null;
+  readonly pack?: PackDefinition;
+  readonly preferred_supplier_id?: string | null;
+}
+
+export interface Supplier {
+  readonly id: string;
+  readonly name: string;
+  readonly payment_terms?: string | null;
+  readonly lead_time_days?: number | null;
+  readonly minimum_order_value?: Money | null;
+  readonly delivery_fee?: Money | null;
+  readonly reliability_score?: string | null;
+  readonly status: 'active' | 'preferred' | 'blocked' | 'archived';
+  readonly created_at: string;
+}
+
+export interface SupplierCreate {
+  readonly name: string;
+  readonly payment_terms?: string | null;
+  readonly lead_time_days?: number | null;
+  readonly minimum_order_value?: Money | null;
+  readonly delivery_fee?: Money | null;
+}
+
+export interface SupplierUpdate {
+  readonly name?: string;
+  readonly payment_terms?: string | null;
+  readonly lead_time_days?: number | null;
+  readonly minimum_order_value?: Money | null;
+  readonly delivery_fee?: Money | null;
+  readonly status?: 'active' | 'preferred' | 'blocked' | 'archived';
+}
+
+export interface Alias {
+  readonly id: string;
+  readonly workspace_product_id: string;
+  readonly supplier_id?: string | null;
+  readonly alias_text: string;
+  readonly created_at: string;
+}
+
+export interface ImportError {
+  readonly line: number;
+  readonly column?: string | null;
+  readonly reason: string;
+}
+
+export interface ImportPreview {
+  readonly import_id: string;
+  readonly kind: 'products' | 'suppliers';
+  readonly row_count: number;
+  readonly valid: boolean;
+  readonly missing_columns?: readonly string[];
+  readonly unrecognised_columns?: readonly string[];
+  readonly duplicates?: readonly ImportError[];
+  readonly errors: readonly ImportError[];
+  readonly preview?: readonly Record<string, unknown>[];
+}
+
+export interface ImportResult {
+  readonly import_id: string;
+  readonly created: number;
+  readonly skipped: number;
+  readonly updated: number;
+}
+
+// --- Quotation Inbox and Extraction (Chunk 4.3) ---
+
+export type PresignMimeType =
+  | 'application/pdf'
+  | 'image/png'
+  | 'image/jpeg'
+  | 'image/tiff'
+  | 'text/csv'
+  | 'application/vnd.ms-excel'
+  | 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+
+export interface PresignRequest {
+  readonly filename: string;
+  readonly mime_type: PresignMimeType;
+  readonly size_bytes: number;
+  readonly content_hash?: string | null;
+}
+
+export interface PresignResponse {
+  readonly document_id: string;
+  readonly storage_bucket: string;
+  readonly storage_path: string;
+  readonly upload_url: string;
+  readonly upload_fields?: Record<string, string>;
+  readonly expires_at: string;
+}
+
+export interface Document {
+  readonly id: string;
+  readonly storage_bucket: string;
+  readonly storage_path: string;
+  readonly mime_type: string;
+  readonly content_hash?: string | null;
+  readonly source_channel: 'upload';
+  readonly status: 'uploaded' | 'failed_to_read';
+  readonly created_at: string;
+  readonly created_by?: string;
+}
+
+export interface QuotationCreate {
+  readonly document_id: string;
+  readonly supplier_id?: string | null;
+}
+
+export type QuotationStatus =
+  | 'pending'
+  | 'extracting'
+  | 'extracted'
+  | 'in_review'
+  | 'reviewed'
+  | 'refused';
+
+export type ArithmeticStatus = 'not_applicable' | 'reconciled' | 'mismatch';
+
+export interface Quotation {
+  readonly id: string;
+  readonly document_id: string;
+  readonly supplier_id?: string | null;
+  readonly currency?: string | null;
+  readonly issue_date?: string | null;
+  readonly expiry_date?: string | null;
+  readonly status: QuotationStatus;
+  readonly previous_quotation_id?: string | null;
+  readonly stated_total?: Money | null;
+  readonly arithmetic_status?: ArithmeticStatus | null;
+  readonly created_at: string;
+  readonly reviewed_by?: string | null;
+  readonly reviewed_at?: string | null;
+}
+
+export interface QuotationPack {
+  readonly pack_count: number;
+  readonly unit_size: string; // decimal string
+  readonly unit?: string | null;
+}
+
+export interface QuotationLine {
+  readonly id: string;
+  readonly line_number: number;
+  readonly original_text: string;
+  readonly quantity?: string | null; // decimal string
+  readonly pack?: QuotationPack | null;
+  readonly unit_price?: Money | null;
+  readonly vat_rate?: string | null; // decimal string 0 to 1
+  readonly delivery_fee?: Money | null;
+  readonly discount?: Money | null;
+}
+
+export type ExtractionMethod = 'structured_parse' | 'bedrock' | 'azure_di';
+
+export interface SourceRegion {
+  readonly page?: number;
+  readonly bbox?: readonly [number, number, number, number] | readonly number[];
+  readonly [key: string]: unknown;
+}
+
+export interface FieldExtraction {
+  readonly id: string;
+  readonly quotation_id: string;
+  readonly entity_type: 'quotation' | 'quotation_line';
+  readonly entity_id: string;
+  readonly field_name: string;
+  readonly extracted_value: unknown;
+  readonly confidence: string; // decimal string 0.0000 to 1.0000
+  readonly source_page?: number | null;
+  readonly source_region?: Record<string, unknown> | null;
+  readonly extraction_method: ExtractionMethod;
+  readonly model_version: string;
+  readonly corrected_value?: unknown | null;
+  readonly corrected_by?: string | null;
+  readonly corrected_at?: string | null;
+}
+
+export interface FieldCorrection {
+  readonly field_extraction_id: string;
+  readonly corrected_value: unknown;
+}
+
+export interface QuotationReviewPatch {
+  readonly supplier_id?: string | null;
+  readonly corrections?: readonly FieldCorrection[];
+}
+
+export interface QuotationDetail extends Quotation {
+  readonly document: Document;
+  readonly lines: readonly QuotationLine[];
+  readonly field_extractions: readonly FieldExtraction[];
+  readonly review_task?: ReviewTask | null;
+}
+
+export type JobStatus = 'queued' | 'running' | 'succeeded' | 'failed';
+
+export interface Job {
+  readonly id: string;
+  readonly quotation_id: string;
+  readonly status: JobStatus;
+  readonly attempted_provider?: ExtractionMethod | null;
+  readonly error?: Record<string, unknown> | null;
+  readonly result_url?: string | null;
+  readonly created_at: string;
+  readonly started_at?: string | null;
+  readonly completed_at?: string | null;
+}
+
+export type ReviewTaskStatus = 'open' | 'in_progress' | 'resolved';
+export type ReviewTaskPriority = 'low' | 'normal' | 'high';
+export type ReviewTaskReason =
+  | 'low_confidence'
+  | 'arithmetic_mismatch'
+  | 'read_failure'
+  | 'review_required';
+
+export interface ReviewTask {
+  readonly id: string;
+  readonly quotation_id: string;
+  readonly status: ReviewTaskStatus;
+  readonly priority: ReviewTaskPriority;
+  readonly reason: ReviewTaskReason;
+  readonly created_at: string;
+  readonly resolved_at?: string | null;
+}
+
+// --- Matching and Normalisation (Chunk 4.4) ---
+
+export type MatchOutcome =
+  | 'same_product'
+  | 'different_pack'
+  | 'different_variant'
+  | 'compatible_alternative'
+  | 'no_match_new_product';
+
+export type MatchTaskStatus = 'open' | 'in_progress' | 'resolved';
+export type MatchTaskPriority = 'low' | 'normal' | 'high';
+export type MatchTaskReason =
+  | 'low_confidence'
+  | 'close_candidates'
+  | 'no_candidate'
+  | 'alias_conflict';
+
+export interface ProductSummary {
+  readonly id: string;
+  readonly tenant_name: string;
+  readonly brand?: string | null;
+  readonly canonical_name: string;
+  readonly variant?: string | null;
+  readonly gtin?: string | null;
+  readonly base_unit: string;
+  readonly status: 'active' | 'archived';
+}
+
+export interface QuotationLineSummary {
+  readonly id: string;
+  readonly line_number: number;
+  readonly original_text: string;
+  readonly quantity?: string | null;
+  readonly pack?: QuotationPack | null;
+  readonly unit_price?: Money | null;
+  readonly vat_rate?: string | null;
+  readonly delivery_fee?: Money | null;
+  readonly discount?: Money | null;
+}
+
+export interface FeatureScore {
+  readonly brand_match: string;
+  readonly variant_match: string;
+  readonly pack_unit_match: string;
+  readonly pack_size_plausibility: string;
+  readonly price_plausibility: string;
+}
+
+export interface MatchReason {
+  readonly alias_hit: boolean;
+  readonly gtin_match: boolean;
+  readonly supplier_code_match: boolean;
+  readonly lexical_similarity: string;
+  readonly semantic_similarity: string;
+  readonly feature_score: FeatureScore;
+}
+
+export interface MatchCandidate {
+  readonly id: string;
+  readonly quotation_line_id: string;
+  readonly candidate_product: ProductSummary;
+  readonly confidence: string; // decimal string 0.0000 to 1.0000
+  readonly reasons: MatchReason;
+  readonly rank: number;
+  readonly scoring_version: string;
+  readonly embedding_model?: string | null;
+  readonly created_at: string;
+}
+
+export interface MatchDecision {
+  readonly id: string;
+  readonly quotation_line_id: string;
+  readonly matched_product: ProductSummary;
+  readonly selected_match_candidate_id?: string | null;
+  readonly outcome: MatchOutcome;
+  readonly is_automatic: boolean;
+  readonly decided_by?: string | null;
+  readonly decided_at: string;
+  readonly confidence: string;
+  readonly alias_id?: string | null;
+}
+
+export interface MatchTask {
+  readonly id: string;
+  readonly quotation_id: string;
+  readonly quotation_line: QuotationLineSummary;
+  readonly status: MatchTaskStatus;
+  readonly priority: MatchTaskPriority;
+  readonly reason: MatchTaskReason;
+  readonly candidates: readonly MatchCandidate[];
+  readonly decision?: MatchDecision | null;
+  readonly created_at: string;
+  readonly resolved_at?: string | null;
+}
+
+export interface MatchResolutionRequest {
+  readonly outcome: MatchOutcome;
+  readonly selected_match_candidate_id?: string | null;
+  readonly create_product?: ProductCreate | null;
+}
+
+export interface LandedCost {
+  readonly id: string;
+  readonly quotation_line_id: string;
+  readonly match_decision_id: string;
+  readonly quantity: string;
+  readonly normalised_base_quantity: string;
+  readonly base_unit: string;
+  readonly unit_price: Money;
+  readonly vat_amount: Money;
+  readonly delivery_fee: Money;
+  readonly discount: Money;
+  readonly other_charges: Money;
+  readonly total: Money;
+  readonly raw_inputs: Record<string, unknown>;
+  readonly rule_version: string;
+  readonly valid_from: string;
+  readonly valid_to?: string | null;
+  readonly recorded_at: string;
+  readonly created_at: string;
+}
+
+export interface QuotationLineMatchState {
+  readonly line: QuotationLineSummary;
+  readonly candidates: readonly MatchCandidate[];
+  readonly task?: MatchTask | null;
+  readonly decision?: MatchDecision | null;
+  readonly landed_cost?: LandedCost | null;
+}
+
+export interface QuotationMatches {
+  readonly quotation_id: string;
+  readonly lines: readonly QuotationLineMatchState[];
+}
+
+// --- Smart Compare and Intelligence (Chunk 4.5) ---
+
+export interface ProductRef {
+  readonly id: string;
+  readonly tenant_name: string;
+}
+
+export type StockSignal = 'in_stock' | 'low_stock' | 'out_of_stock' | 'unknown';
+
+export interface Offer {
+  readonly id: string;
+  readonly workspace_product_id: string;
+  readonly supplier_id: string;
+  readonly supplier_name: string;
+  readonly quotation_line_id: string;
+  readonly match_decision_id: string;
+  readonly landed_cost: Money;
+  readonly normalised_unit_price: Money;
+  readonly requested_quantity: string;
+  readonly base_unit: string;
+  readonly lead_time_days?: number | null;
+  readonly reliability_score?: string | null;
+  readonly stock_signal?: StockSignal | null;
+  readonly match_confidence: string;
+  readonly valid_from: string;
+  readonly valid_to?: string | null;
+  readonly is_expired: boolean;
+  readonly rule_version: string;
+  readonly recorded_at: string;
+}
+
+export type RecommendationConfidence = 'high' | 'medium' | 'low';
+export type RecommendationRiskNote =
+  | 'price_expiring_soon'
+  | 'low_match_confidence'
+  | 'low_supplier_reliability';
+
+export interface RecommendationWeights {
+  readonly cost: string;
+  readonly match_confidence: string;
+  readonly reliability: string;
+  readonly lead_time: string;
+}
+
+export interface RecommendationTieBreak {
+  readonly applied: boolean;
+  readonly rule: readonly string[];
+}
+
+export interface RecommendationEvidence {
+  readonly weights: RecommendationWeights;
+  readonly components: Record<string, string>;
+  readonly winning_margin?: string | null;
+  readonly tie_break: RecommendationTieBreak;
+}
+
+export interface Recommendation {
+  readonly recommended_offer_id: string;
+  readonly score: string;
+  readonly confidence: RecommendationConfidence;
+  readonly valid_from: string;
+  readonly valid_to?: string | null;
+  readonly risk_notes: readonly RecommendationRiskNote[];
+  readonly evidence: RecommendationEvidence;
+}
+
+export interface OfferComparison {
+  readonly product: ProductRef;
+  readonly requested_quantity: string;
+  readonly offers: readonly Offer[];
+  readonly recommendation: Recommendation | null;
+}
+
+export interface PriceHistoryPoint {
+  readonly landed_cost_id: string;
+  readonly workspace_product_id: string;
+  readonly supplier_id: string;
+  readonly supplier_name: string;
+  readonly recorded_at: string;
+  readonly valid_from: string;
+  readonly valid_to?: string | null;
+  readonly normalised_unit_price: Money;
+  readonly landed_cost_total: Money;
+  readonly quantity: string;
+  readonly base_unit: string;
+}
+
+export interface PriceHistoryMetric {
+  readonly value: Money;
+  readonly source_landed_cost_ids: readonly string[];
+}
+
+export interface PriceHistorySummary {
+  readonly last_paid: PriceHistoryMetric | null;
+  readonly average_paid_rolling_window: PriceHistoryMetric | null;
+  readonly best_price: PriceHistoryMetric | null;
+}
+
+export interface PriceHistoryResponse {
+  readonly product: ProductRef;
+  readonly window_months: number;
+  readonly points: readonly PriceHistoryPoint[];
+  readonly summary: PriceHistorySummary;
+  readonly next_cursor: string | null;
+}
+
+export interface BasketItemRequest {
+  readonly workspace_product_id: string;
+  readonly quantity: string;
+}
+
+export interface BasketOptimiseRequest {
+  readonly supplier_ids: readonly [string, string] | readonly string[];
+  readonly items: readonly BasketItemRequest[];
+}
+
+export interface AllocatedBasketLine {
+  readonly workspace_product_id: string;
+  readonly quantity: string;
+  readonly offer_id: string;
+  readonly landed_cost: Money;
+}
+
+export interface SupplierAllocation {
+  readonly supplier_id: string;
+  readonly lines: readonly AllocatedBasketLine[];
+  readonly total_landed_cost: Money;
+}
+
+export interface SingleSupplierBaseline {
+  readonly supplier_id: string;
+  readonly feasible: boolean;
+  readonly total_landed_cost: Money | null;
+}
+
+export interface InfeasibleBasketItem {
+  readonly workspace_product_id: string;
+  readonly requested_quantity: string;
+  readonly reason: 'no_offer_from_named_suppliers';
+  readonly missing_supplier_ids: readonly string[];
+}
+
+export interface BasketSplitResult {
+  readonly feasible: boolean;
+  readonly allocation: readonly SupplierAllocation[];
+  readonly total_landed_cost: Money | null;
+  readonly single_supplier_baselines?: readonly SingleSupplierBaseline[];
+  readonly infeasible_items: readonly InfeasibleBasketItem[];
+  readonly solver_version?: string | null;
+  readonly computed_at: string;
+}
+
+export type BasketSplitJobStatus = 'queued' | 'running' | 'completed' | 'failed';
+
+export interface BasketSplitJob {
+  readonly id: string;
+  readonly supplier_ids: readonly string[];
+  readonly items: readonly BasketItemRequest[];
+  readonly status: BasketSplitJobStatus;
+  readonly result?: BasketSplitResult | null;
+  readonly error?: Record<string, unknown> | null;
+  readonly result_url: string;
+  readonly created_at: string;
+  readonly started_at?: string | null;
+  readonly completed_at?: string | null;
+}
+
+export type AlertKind =
+  | 'recommended_price_expiring'
+  | 'preferred_supplier_offer_disappeared'
+  | 'price_swing';
+
+export type AlertSeverity = 'info' | 'warning' | 'critical';
+
+export type AlertAction = 'compare_product' | 'review_supplier' | 'view_price_history';
+
+export interface Alert {
+  readonly id: string;
+  readonly kind: AlertKind;
+  readonly workspace_product_id: string;
+  readonly supplier_id?: string | null;
+  readonly severity: AlertSeverity;
+  readonly evidence: Record<string, unknown>;
+  readonly action: AlertAction;
+  readonly created_from_current_data_at: string;
+  readonly dismissed: boolean;
+}
+
+export interface AlertDismissal {
+  readonly alert_id: string;
+  readonly dismissed_at: string;
+}
+
+// --- value proof, exports & billing (Chunk 4.6) ---------------------------
+
+export type SavingStatus = 'pending' | 'verified';
+
+export type BaselinePolicy = 'last_paid' | 'rolling_average_6m' | 'none_available';
+
+export type PurchaseDeliveryResult =
+  | 'ordered'
+  | 'partially_delivered'
+  | 'delivered'
+  | 'cancelled'
+  | 'disputed';
+
+export interface PurchaseOutcomeCreate {
+  readonly workspace_product_id: string;
+  readonly supplier_id?: string | null;
+  readonly quotation_line_id?: string | null;
+  readonly match_decision_id?: string | null;
+  readonly landed_cost_id?: string | null;
+  readonly quantity: string;
+  readonly base_unit: string;
+  readonly unit_price: Money;
+  readonly total_paid: Money;
+  readonly delivery_result: PurchaseDeliveryResult;
+  readonly ordered_at?: string | null;
+  readonly delivered_at?: string | null;
+  readonly notes?: string | null;
+}
+
+export interface PurchaseRecord {
+  readonly id: string;
+  readonly workspace_product_id: string;
+  readonly supplier_id?: string | null;
+  readonly quotation_line_id?: string | null;
+  readonly match_decision_id?: string | null;
+  readonly landed_cost_id?: string | null;
+  readonly quantity: string;
+  readonly base_unit: string;
+  readonly unit_price: Money;
+  readonly total_paid: Money;
+  readonly delivery_result: PurchaseDeliveryResult;
+  readonly ordered_at?: string | null;
+  readonly delivered_at?: string | null;
+  readonly recorded_by: string;
+  readonly recorded_at: string;
+  readonly notes?: string | null;
+}
+
+export interface SavingRecord {
+  readonly id: string;
+  readonly purchase_record_id: string;
+  readonly workspace_product_id: string;
+  readonly supplier_id?: string | null;
+  readonly status: SavingStatus;
+  readonly baseline_policy: BaselinePolicy;
+  readonly baseline_source_landed_cost_ids: readonly string[];
+  readonly baseline_unit_price?: Money | null;
+  readonly baseline_value?: Money | null;
+  readonly actual_value: Money;
+  readonly delta?: Money | null;
+  readonly calculation_version: string;
+  readonly calculation_inputs: Record<string, unknown>;
+  readonly recorded_by: string;
+  readonly recorded_at: string;
+  readonly verified_by?: string | null;
+  readonly verified_at?: string | null;
+}
+
+export interface PurchaseOutcomeCreated {
+  readonly purchase_record: PurchaseRecord;
+  readonly saving_record: SavingRecord;
+}
+
+export interface SavingList {
+  readonly items: readonly SavingRecord[];
+  readonly next_cursor: string | null;
+}
+
+export interface SavingCalculationEvidence {
+  readonly baseline_policy: BaselinePolicy;
+  readonly baseline_value: Money | null;
+  readonly actual_value: Money;
+  readonly delta: Money | null;
+  readonly source_landed_cost_ids: readonly string[];
+  readonly calculation_inputs?: Record<string, unknown>;
+}
+
+export interface SavingEvidence {
+  readonly saving_record: SavingRecord;
+  readonly purchase_record: PurchaseRecord;
+  readonly quotation?: Record<string, unknown> | null;
+  readonly match_decision?: Record<string, unknown> | null;
+  readonly competing_offers: readonly Record<string, unknown>[];
+  readonly calculation: SavingCalculationEvidence;
+}
+
+export type ExportFormat = 'xlsx' | 'pdf';
+
+export type ExportStatus = 'queued' | 'running' | 'completed' | 'failed';
+
+export interface ExportFilters {
+  readonly period_start: string;
+  readonly period_end: string;
+  readonly supplier_id?: string | null;
+  readonly branch_id?: string | null;
+}
+
+export interface ExportCreate {
+  readonly kind: 'savings_ledger';
+  readonly format: ExportFormat;
+  readonly filters: ExportFilters;
+}
+
+export interface ExportJob {
+  readonly id: string;
+  readonly kind: 'savings_ledger';
+  readonly format: ExportFormat;
+  readonly filters: ExportFilters;
+  readonly status: ExportStatus;
+  readonly row_count?: number | null;
+  readonly download_url?: string | null;
+  readonly error?: Record<string, unknown> | null;
+  readonly created_at: string;
+  readonly started_at?: string | null;
+  readonly completed_at?: string | null;
+}
+
+export interface PlanLimits {
+  readonly active_catalogue_products: number;
+}
+
+export interface Plan {
+  readonly code: string;
+  readonly name: string;
+  readonly status: 'active' | 'archived';
+  readonly monthly_price: Money;
+  readonly limits: PlanLimits;
+  readonly features: Record<string, unknown>;
+}
+
+export interface BillingAccount {
+  readonly id: string;
+  readonly plan: Plan;
+  readonly provider: 'stub';
+  readonly provider_customer_id: string;
+  readonly provider_subscription_id?: string | null;
+  readonly status: 'active' | 'past_due' | 'cancelled';
+  readonly current_period_start?: string | null;
+  readonly current_period_end?: string | null;
+  readonly assigned_at: string;
+}
+
+export interface LimitCheck {
+  readonly resource: 'active_catalogue_products';
+  readonly plan_code: string;
+  readonly limit: number | null;
+  readonly used: number;
+  readonly allowed: boolean;
+  readonly remaining: number | null;
+}
+
+
+
+

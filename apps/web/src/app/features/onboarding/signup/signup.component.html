@@ -158,7 +158,7 @@
           [disabled]="isSubmitting() || isLoadingConfig()"
         >
           @if (isSubmitting()) {
-            <mat-spinner diameter="20" class="button-spinner"></mat-spinner>
+            <mat-spinner [attr.aria-label]="'common.loading' | translate" diameter="20" class="button-spinner"></mat-spinner>
             <span>{{ 'onboarding.signup.submittingButton' | translate }}</span>
           } @else {
             <span>{{ 'onboarding.signup.submitButton' | translate }}</span>

@@ -23,10 +23,17 @@ TEST_ENV: dict[str, str] = {
     "SUPABASE_JWT_SECRET": "test-secret-value-not-used-anywhere-real",
     "SUPABASE_JWT_AUDIENCE": "authenticated",
     "SUPABASE_JWT_ISSUER": "http://localhost:54321/auth/v1",
-    "DATABASE_URL": "postgresql://postgres:postgres@localhost:54322/postgres",
+    # Falls back to the local Supabase CLI's default port, but a caller that already has its own
+    # Postgres (CI's ephemeral service, a throwaway container) sets TEST_DATABASE_URL — respect
+    # it, or every get_settings()-based repository silently reconnects to a local Supabase CLI
+    # stack, if one happens to be running, instead of the database migrations were just applied to.
+    "DATABASE_URL": os.environ.get(
+        "TEST_DATABASE_URL", "postgresql://postgres:postgres@localhost:54322/postgres"
+    ),
     "PLATFORM_INVITATION_TTL_DAYS": "7",
     "MEMBER_INVITATION_TTL_DAYS": "7",
     "RATE_LIMIT_AUTH": "10/minute",
+    "BASKET_SPLIT_QUEUE_NAME": "basket-split",
     "WEB_API_BASE_URL": "http://localhost:8000/api/v1",
     "WEB_DEFAULT_LOCALE": "en",
 }

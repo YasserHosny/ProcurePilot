@@ -1,0 +1,508 @@
+openapi: 3.1.0
+info:
+  title: ProcurePilot Catalogue and Suppliers API
+  version: 0.2.0
+  description: >
+    Chunk 4.2. Conventions unchanged from chunk 4.1: base path /api/v1, Supabase JWT bearer auth,
+    tenant scope resolved server-side from the token and never from a parameter, cursor pagination
+    capped at 100, Idempotency-Key on mutations, and the {code, message, details, trace_id} error
+    envelope.
+
+    Role gate: owner and buyer may mutate; branch_manager, approver and viewer read only.
+    Every monetary value is an object with an amount and an explicit currency — there are no bare
+    numbers for money in this API.
+
+servers:
+  - url: /api/v1
+
+security:
+  - bearerAuth: []
+
+paths:
+  /products:
+    get:
+      summary: List workspace products
+      parameters:
+        - { name: cursor, in: query, schema: { type: string } }
+        - { name: limit, in: query, schema: { type: integer, maximum: 100, default: 50 } }
+        - name: status
+          in: query
+          description: Defaults to active only. Archived products are excluded unless asked for.
+          schema: { type: string, enum: [active, archived, all], default: active }
+        - { name: q, in: query, description: Free-text filter on the workspace's own name, schema: { type: string } }
+      responses:
+        '200':
+          description: Products
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/Product' } }
+                  next_cursor: { type: string, nullable: true }
+    post:
+      summary: Create a product
+      description: Owner or buyer only.
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ProductCreate' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Product' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+
+  /products/{product_id}:
+    parameters:
+      - { name: product_id, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      summary: Read a product
+      responses:
+        '200':
+          description: Product
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Product' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      summary: Update a product
+      description: Owner or buyer only. Pack changes recompute the normalised quantity.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ProductUpdate' }
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Product' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    delete:
+      summary: Archive a product
+      description: >
+        Archives; never deletes. The record stays resolvable by anything referencing it, because a
+        savings claim in a later chunk must remain explicable.
+      responses:
+        '204': { description: Archived }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /products/{product_id}/substitutes:
+    parameters:
+      - { name: product_id, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      summary: Approve a substitute
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [substitute_product_id]
+              properties:
+                substitute_product_id: { type: string, format: uuid }
+      responses:
+        '201': { description: Substitute recorded }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422':
+          description: A product cannot be its own substitute
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /suppliers:
+    get:
+      summary: List suppliers
+      parameters:
+        - { name: cursor, in: query, schema: { type: string } }
+        - { name: limit, in: query, schema: { type: integer, maximum: 100, default: 50 } }
+        - name: status
+          in: query
+          schema: { type: string, enum: [active, preferred, blocked, archived, all], default: active }
+      responses:
+        '200':
+          description: Suppliers
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/Supplier' } }
+                  next_cursor: { type: string, nullable: true }
+    post:
+      summary: Create a supplier
+      description: Owner or buyer only.
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SupplierCreate' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Supplier' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+
+  /suppliers/{supplier_id}:
+    parameters:
+      - { name: supplier_id, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      summary: Read a supplier
+      responses:
+        '200':
+          description: Supplier
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Supplier' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      summary: Update a supplier, including its status
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SupplierUpdate' }
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Supplier' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    delete:
+      summary: Archive a supplier
+      responses:
+        '204': { description: Archived }
+        '409':
+          description: >
+            Referenced by other records and cannot be deleted. Archiving is offered instead.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /aliases:
+    get:
+      summary: List the workspace's supplier-wording aliases
+      responses:
+        '200':
+          description: Aliases
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/Alias' } }
+    post:
+      summary: Record that a supplier's wording refers to a product
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [workspace_product_id, alias_text]
+              properties:
+                workspace_product_id: { type: string, format: uuid }
+                supplier_id: { type: string, format: uuid, nullable: true }
+                alias_text: { type: string, minLength: 1 }
+      responses:
+        '201':
+          description: Recorded
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Alias' }
+        '409':
+          description: That wording already resolves to a product in this workspace
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /aliases/{alias_id}:
+    parameters:
+      - { name: alias_id, in: path, required: true, schema: { type: string, format: uuid } }
+    delete:
+      summary: Remove an alias
+      responses:
+        '204': { description: Removed }
+
+  /imports:
+    post:
+      summary: Upload a file and validate it, WITHOUT saving anything
+      description: >
+        Validates the whole file and returns a preview plus an error report. Nothing is written.
+        Committing is a separate, explicit call — FR-020.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [kind, file]
+              properties:
+                kind: { type: string, enum: [products, suppliers] }
+                file: { type: string, format: binary }
+      responses:
+        '200':
+          description: Validation outcome. A 200 here means "the file was read", not "the file was valid".
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ImportPreview' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '415':
+          description: Not an accepted file type. Refused before any parsing is attempted.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /imports/{import_id}/commit:
+    parameters:
+      - { name: import_id, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      summary: Commit a previously validated import
+      description: >
+        All or nothing. If any row fails at commit time the entire import is rolled back and the
+        catalogue is left exactly as it was — FR-017.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                on_duplicate:
+                  type: string
+                  enum: [skip, update]
+                  default: skip
+                  description: What to do with rows matching an existing record — FR-021.
+      responses:
+        '200':
+          description: Committed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ImportResult' }
+        '409':
+          description: The import had errors, or was already committed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /reference/base-units:
+    get:
+      summary: The enabled base units a product may be measured in
+      responses:
+        '200':
+          description: Base units
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/BaseUnit' } }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: false
+      schema: { type: string, format: uuid }
+
+  responses:
+    Forbidden:
+      description: The caller's role may not perform this action (owner or buyer required)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    NotFound:
+      description: >
+        No such record in this workspace. Deliberately indistinguishable from a record that exists
+        in another workspace — existence is itself information.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Unprocessable:
+      description: Validation failed
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+
+  schemas:
+    Error:
+      type: object
+      required: [code, message, trace_id]
+      properties:
+        code: { type: string }
+        message: { type: string }
+        details: { type: object, additionalProperties: true }
+        trace_id: { type: string }
+
+    Money:
+      type: object
+      description: >
+        There is no bare number for money in this API. `amount` is a DECIMAL STRING, never a JSON
+        number — binary floating point cannot represent 0.1, and a product whose north-star metric
+        is verified savings cannot inherit that error.
+      required: [amount, currency]
+      properties:
+        amount: { type: string, pattern: '^-?\d+(\.\d{1,4})?$', example: '250.00' }
+        currency: { type: string, pattern: '^[A-Z]{3}$', example: 'GBP' }
+
+    BaseUnit:
+      type: object
+      properties:
+        code: { type: string, example: litre }
+        label_en: { type: string }
+        label_ar: { type: string }
+        dimension: { type: string, enum: [volume, mass, count] }
+
+    PackDefinition:
+      type: object
+      required: [pack_count, unit_size, base_quantity]
+      properties:
+        pack_count: { type: integer, minimum: 1, example: 6 }
+        unit_size: { type: string, description: Decimal string, example: '5.000000' }
+        base_quantity:
+          type: string
+          readOnly: true
+          description: >
+            Derived as pack_count x unit_size and computed by the database, so it cannot drift from
+            its inputs. Read-only — supplying it is an error.
+          example: '30.000000'
+
+    Product:
+      type: object
+      required: [id, tenant_name, base_unit, status]
+      properties:
+        id: { type: string, format: uuid }
+        tenant_name: { type: string }
+        brand: { type: string, nullable: true }
+        canonical_name: { type: string }
+        variant: { type: string, nullable: true }
+        gtin: { type: string, nullable: true }
+        base_unit: { type: string }
+        pack: { $ref: '#/components/schemas/PackDefinition' }
+        preferred_supplier_id: { type: string, format: uuid, nullable: true }
+        substitute_ids: { type: array, items: { type: string, format: uuid } }
+        status: { type: string, enum: [active, archived] }
+        created_at: { type: string, format: date-time }
+
+    ProductCreate:
+      type: object
+      required: [tenant_name, base_unit, pack]
+      properties:
+        tenant_name: { type: string, minLength: 1, maxLength: 200 }
+        brand: { type: string, nullable: true }
+        canonical_name: { type: string, nullable: true, description: Defaults to tenant_name }
+        variant: { type: string, nullable: true }
+        gtin: { type: string, nullable: true }
+        base_unit: { type: string }
+        pack: { $ref: '#/components/schemas/PackDefinition' }
+        preferred_supplier_id: { type: string, format: uuid, nullable: true }
+
+    ProductUpdate:
+      type: object
+      properties:
+        tenant_name: { type: string }
+        gtin: { type: string, nullable: true }
+        pack: { $ref: '#/components/schemas/PackDefinition' }
+        preferred_supplier_id: { type: string, format: uuid, nullable: true }
+
+    Supplier:
+      type: object
+      required: [id, name, status]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        payment_terms: { type: string, nullable: true }
+        lead_time_days: { type: integer, nullable: true, minimum: 0 }
+        minimum_order_value: { $ref: '#/components/schemas/Money' }
+        delivery_fee: { $ref: '#/components/schemas/Money' }
+        reliability_score:
+          type: string
+          nullable: true
+          description: Populated from recorded outcomes in a later chunk; null here.
+        status: { type: string, enum: [active, preferred, blocked, archived] }
+        created_at: { type: string, format: date-time }
+
+    SupplierCreate:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 200 }
+        payment_terms: { type: string, nullable: true }
+        lead_time_days: { type: integer, nullable: true, minimum: 0 }
+        minimum_order_value: { $ref: '#/components/schemas/Money' }
+        delivery_fee: { $ref: '#/components/schemas/Money' }
+
+    SupplierUpdate:
+      type: object
+      properties:
+        name: { type: string }
+        payment_terms: { type: string, nullable: true }
+        lead_time_days: { type: integer, nullable: true }
+        minimum_order_value: { $ref: '#/components/schemas/Money' }
+        delivery_fee: { $ref: '#/components/schemas/Money' }
+        status: { type: string, enum: [active, preferred, blocked, archived] }
+
+    Alias:
+      type: object
+      required: [id, workspace_product_id, alias_text]
+      properties:
+        id: { type: string, format: uuid }
+        workspace_product_id: { type: string, format: uuid }
+        supplier_id: { type: string, format: uuid, nullable: true }
+        alias_text: { type: string }
+        created_at: { type: string, format: date-time }
+
+    ImportError:
+      type: object
+      required: [line, reason]
+      properties:
+        line:
+          type: integer
+          description: Line number as it appears in the uploaded file, so the user can find it.
+        column: { type: string, nullable: true }
+        reason: { type: string }
+
+    ImportPreview:
+      type: object
+      required: [import_id, kind, row_count, valid, errors]
+      properties:
+        import_id: { type: string, format: uuid }
+        kind: { type: string, enum: [products, suppliers] }
+        row_count: { type: integer }
+        valid: { type: boolean, description: False when any row or column failed. Nothing was saved either way. }
+        missing_columns: { type: array, items: { type: string } }
+        unrecognised_columns: { type: array, items: { type: string } }
+        duplicates:
+          type: array
+          description: Rows matching an existing record. The user chooses skip or update at commit.
+          items: { $ref: '#/components/schemas/ImportError' }
+        errors: { type: array, items: { $ref: '#/components/schemas/ImportError' } }
+        preview: { type: array, items: { type: object, additionalProperties: true } }
+
+    ImportResult:
+      type: object
+      required: [import_id, created, skipped, updated]
+      properties:
+        import_id: { type: string, format: uuid }
+        created: { type: integer }
+        skipped: { type: integer }
+        updated: { type: integer }

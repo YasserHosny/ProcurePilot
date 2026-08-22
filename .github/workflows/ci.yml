@@ -87,6 +87,10 @@ jobs:
         env:
           PGPASSWORD: postgres
         run: |
+          # Migration 0001 enables pgcrypto (gen_random_uuid()), which the storage.objects stand-in
+          # below needs as a column default. Idempotent (`if not exists`), so the full migration
+          # loop re-applying it afterward is a no-op.
+          psql -h localhost -U postgres -v ON_ERROR_STOP=1 -q -f supabase/migrations/20260819000001_extensions.sql
           psql -h localhost -U postgres -v ON_ERROR_STOP=1 <<'SQL'
           create schema if not exists auth;
           create table if not exists auth.users (id uuid primary key, email text);
@@ -97,6 +101,31 @@ jobs:
           do $$ begin create role supabase_admin superuser; exception when duplicate_object then null; end $$;
           grant usage on schema public, auth to anon, authenticated, service_role;
           grant anon, authenticated, service_role to postgres;
+          -- Supabase Storage stand-in: migration 20260819000020 (chunk 4.3) seeds a bucket and
+          -- adds a policy on storage.objects. Hosted Supabase and the local CLI both provide this
+          -- schema already; a bare Postgres service does not.
+          create schema if not exists storage;
+          create table if not exists storage.buckets (
+            id text primary key,
+            name text not null,
+            public boolean not null default false,
+            file_size_limit bigint
+          );
+          create table if not exists storage.objects (
+            id uuid primary key default gen_random_uuid(),
+            bucket_id text references storage.buckets(id),
+            name text,
+            owner uuid
+          );
+          -- Real Supabase ships storage.objects with RLS already enabled and forced (see
+          -- migration 20260819000020's own comment) — replicate that, or the tenant-isolation
+          -- policy that migration adds never actually filters anything against this stand-in.
+          alter table storage.objects enable row level security;
+          alter table storage.objects force row level security;
+          create or replace function storage.foldername(name text) returns text[] as $$
+            select (string_to_array(name, '/'))[1 : array_length(string_to_array(name, '/'), 1) - 1];
+          $$ language sql immutable;
+          grant usage on schema storage to anon, authenticated, service_role;
           SQL
           for f in supabase/migrations/*.sql; do
             psql -h localhost -U postgres -v ON_ERROR_STOP=1 -q -f "$f"
@@ -136,6 +165,10 @@ jobs:
         env:
           PGPASSWORD: postgres
         run: |
+          # Migration 0001 enables pgcrypto (gen_random_uuid()), which the storage.objects stand-in
+          # below needs as a column default. Idempotent (`if not exists`), so the full migration
+          # loop re-applying it afterward is a no-op.
+          psql -h localhost -U postgres -v ON_ERROR_STOP=1 -q -f supabase/migrations/20260819000001_extensions.sql
           psql -h localhost -U postgres -v ON_ERROR_STOP=1 <<'SQL'
           create schema if not exists auth;
           create table if not exists auth.users (id uuid primary key, email text);
@@ -146,6 +179,31 @@ jobs:
           do $$ begin create role supabase_admin superuser; exception when duplicate_object then null; end $$;
           grant usage on schema public, auth to anon, authenticated, service_role;
           grant anon, authenticated, service_role to postgres;
+          -- Supabase Storage stand-in: migration 20260819000020 (chunk 4.3) seeds a bucket and
+          -- adds a policy on storage.objects. Hosted Supabase and the local CLI both provide this
+          -- schema already; a bare Postgres service does not.
+          create schema if not exists storage;
+          create table if not exists storage.buckets (
+            id text primary key,
+            name text not null,
+            public boolean not null default false,
+            file_size_limit bigint
+          );
+          create table if not exists storage.objects (
+            id uuid primary key default gen_random_uuid(),
+            bucket_id text references storage.buckets(id),
+            name text,
+            owner uuid
+          );
+          -- Real Supabase ships storage.objects with RLS already enabled and forced (see
+          -- migration 20260819000020's own comment) — replicate that, or the tenant-isolation
+          -- policy that migration adds never actually filters anything against this stand-in.
+          alter table storage.objects enable row level security;
+          alter table storage.objects force row level security;
+          create or replace function storage.foldername(name text) returns text[] as $$
+            select (string_to_array(name, '/'))[1 : array_length(string_to_array(name, '/'), 1) - 1];
+          $$ language sql immutable;
+          grant usage on schema storage to anon, authenticated, service_role;
           SQL
       - name: Apply migrations
         env:
@@ -186,6 +244,16 @@ jobs:
   e2e:
     name: End-to-end
     runs-on: ubuntu-latest
+    services:
+      # The quotation extraction pipeline (services/extraction-worker) is an RQ consumer over
+      # Redis — nothing in this job started either, so every real quotation upload has been
+      # silently unprocessable: the UI polls a job that no worker will ever pick up, and every
+      # spec needing extraction to finish times out, forever, from the first such upload onward,
+      # no matter how generous the wait. Nothing before this job's first real upload needed it,
+      # which is why this went unnoticed.
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
@@ -261,6 +329,18 @@ jobs:
             sleep 2
           done
           curl -sf http://localhost:8000/api/v1/health
+
+      - name: Start the extraction worker
+        # Consumes the quotation-extraction RQ queue over the redis service above. Every default
+        # (redis_url, queue_name, provider_mode=stub, confidence_threshold) already matches this
+        # job's environment; only the Supabase connection needs to come from this job's own
+        # credentials, already exported to GITHUB_ENV by "Export Supabase credentials".
+        run: |
+          uv run --project services/extraction-worker python -m procurepilot_extraction_worker &
+          sleep 5
+          pgrep -f procurepilot_extraction_worker >/dev/null || {
+            echo "::error::extraction worker did not start or exited immediately"; exit 1;
+          }
 
       - name: Install web dependencies
         working-directory: apps/web
