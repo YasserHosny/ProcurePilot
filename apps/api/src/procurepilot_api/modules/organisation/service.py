@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import json
+import logging
 from uuid import UUID
 
 from postgrest.exceptions import APIError
@@ -21,10 +22,20 @@ from procurepilot_api.modules.organisation.schemas import (
     BranchCreate,
     BranchList,
     BranchUpdate,
+    CostCentre,
+    CostCentreCreate,
+    CostCentreList,
+    CostCentreUpdate,
 )
 from procurepilot_api.shared.audit import AuditEventCreate, get_audit_writer
 
 BRANCH_COLUMNS = "id,name,address,region,is_active,created_at,updated_at"
+COST_CENTRE_COLUMNS = (
+    "id,name,code,budget_owner_membership_id,branch_id,is_orphaned,is_archived,"
+    "created_at,updated_at"
+)
+
+logger = logging.getLogger(__name__)
 
 
 class OrganisationService:
@@ -128,6 +139,17 @@ class OrganisationService:
             raise _write_error(exc, duplicate_reason="branch_update_conflict") from exc
 
         branch = _branch(_one_row_or_not_found(response.data, resource="branch"))
+        if "is_active" in patch.model_fields_set and patch.is_active is False:
+            try:
+                client.table("cost_centre").update({"is_orphaned": True}).eq(
+                    "branch_id", str(branch_id)
+                ).execute()
+            except APIError:
+                logger.warning(
+                    "Could not mark branch cost centres orphaned",
+                    extra={"branch_id": str(branch_id)},
+                    exc_info=True,
+                )
         self._record(
             bearer_token=bearer_token,
             member=member,
@@ -135,6 +157,124 @@ class OrganisationService:
             target={"branch_id": str(branch_id)},
         )
         return branch
+
+    def list_cost_centres(
+        self,
+        *,
+        bearer_token: str,
+        branch_id: UUID | None = None,
+        is_archived: bool | None = None,
+        cursor: str | None = None,
+        limit: int = 50,
+    ) -> CostCentreList:
+        client = authenticated_client(self._settings, bearer_token)
+        capped_limit = _cap_limit(limit)
+        offset = _decode_cursor(cursor)
+        try:
+            query = client.table("cost_centre").select(COST_CENTRE_COLUMNS)
+            if branch_id is not None:
+                query = query.eq("branch_id", str(branch_id))
+            if is_archived is not None:
+                query = query.eq("is_archived", is_archived)
+            response = query.order("created_at").order("id").range(
+                offset,
+                offset + capped_limit,
+            ).execute()
+        except APIError as exc:
+            raise ServiceUnavailableError(details={"dependency": "database"}) from exc
+
+        rows = _rows(response.data)
+        visible_rows = rows[:capped_limit]
+        next_cursor = _encode_cursor(offset + capped_limit) if len(rows) > capped_limit else None
+        return CostCentreList(
+            items=[_cost_centre(row) for row in self._with_orphan_reasons(client, visible_rows)],
+            next_cursor=next_cursor,
+        )
+
+    def create_cost_centre(
+        self,
+        *,
+        bearer_token: str,
+        member: CurrentMember,
+        payload: CostCentreCreate,
+    ) -> CostCentre:
+        client = authenticated_client(self._settings, bearer_token)
+        try:
+            response = client.table("cost_centre").insert(
+                {
+                    "tenant_id": str(member.tenant_id),
+                    "name": payload.name,
+                    "code": payload.code,
+                    "budget_owner_membership_id": (
+                        str(payload.budget_owner_membership_id)
+                        if payload.budget_owner_membership_id is not None
+                        else None
+                    ),
+                    "branch_id": str(payload.branch_id) if payload.branch_id is not None else None,
+                }
+            ).execute()
+        except APIError as exc:
+            raise _write_error(exc, duplicate_reason="cost_centre_conflict") from exc
+
+        cost_centre = _cost_centre(
+            _one_row(response.data, reason="cost_centre_write_failed")
+            | {"orphan_reason": None}
+        )
+        self._record(
+            bearer_token=bearer_token,
+            member=member,
+            action="organisation.cost_centre_created",
+            target={"cost_centre_id": str(cost_centre.id)},
+        )
+        return cost_centre
+
+    def update_cost_centre(
+        self,
+        *,
+        bearer_token: str,
+        member: CurrentMember,
+        cost_centre_id: UUID,
+        patch: CostCentreUpdate,
+    ) -> CostCentre:
+        client = authenticated_client(self._settings, bearer_token)
+        existing = self._cost_centre_row(client, cost_centre_id)
+        updates: dict[str, object] = {}
+        for field in (
+            "name",
+            "code",
+            "budget_owner_membership_id",
+            "branch_id",
+            "is_archived",
+        ):
+            if field in patch.model_fields_set:
+                value = getattr(patch, field)
+                if isinstance(value, UUID):
+                    updates[field] = str(value)
+                else:
+                    updates[field] = value
+
+        if not updates:
+            return _cost_centre(self._with_orphan_reasons(client, [existing])[0])
+
+        try:
+            response = (
+                client.table("cost_centre")
+                .update(updates)
+                .eq("id", str(cost_centre_id))
+                .execute()
+            )
+        except APIError as exc:
+            raise _write_error(exc, duplicate_reason="cost_centre_update_conflict") from exc
+
+        cost_centre_row = _one_row_or_not_found(response.data, resource="cost_centre")
+        cost_centre = _cost_centre(self._with_orphan_reasons(client, [cost_centre_row])[0])
+        self._record(
+            bearer_token=bearer_token,
+            member=member,
+            action="organisation.cost_centre_updated",
+            target={"cost_centre_id": str(cost_centre_id)},
+        )
+        return cost_centre
 
     def _branch_row(self, client: Client, branch_id: UUID) -> dict[str, object]:
         try:
@@ -172,6 +312,85 @@ class OrganisationService:
             "branch_role_assignment_count": len(branch_role_assignments),
         }
 
+    def _cost_centre_row(self, client: Client, cost_centre_id: UUID) -> dict[str, object]:
+        try:
+            response = (
+                client.table("cost_centre")
+                .select(COST_CENTRE_COLUMNS)
+                .eq("id", str(cost_centre_id))
+                .limit(2)
+                .execute()
+            )
+        except APIError as exc:
+            raise ServiceUnavailableError(details={"dependency": "database"}) from exc
+        return _one_row_or_not_found(response.data, resource="cost_centre")
+
+    def _with_orphan_reasons(
+        self,
+        client: Client,
+        rows: list[dict[str, object]],
+    ) -> list[dict[str, object]]:
+        orphaned_rows = [row for row in rows if row.get("is_orphaned") is True]
+        branch_ids = {
+            str(row["branch_id"])
+            for row in orphaned_rows
+            if row.get("branch_id") is not None
+        }
+        membership_ids = {
+            str(row["budget_owner_membership_id"])
+            for row in orphaned_rows
+            if row.get("budget_owner_membership_id") is not None
+        }
+
+        branch_active_by_id: dict[str, bool] = {}
+        membership_status_by_id: dict[str, str] = {}
+        try:
+            if branch_ids:
+                branch_rows = _rows(
+                    client.table("branch")
+                    .select("id,is_active")
+                    .in_("id", sorted(branch_ids))
+                    .execute()
+                    .data
+                )
+                branch_active_by_id = {
+                    str(row["id"]): bool(row["is_active"]) for row in branch_rows
+                }
+            if membership_ids:
+                membership_rows = _rows(
+                    client.table("membership")
+                    .select("id,status")
+                    .in_("id", sorted(membership_ids))
+                    .execute()
+                    .data
+                )
+                membership_status_by_id = {
+                    str(row["id"]): str(row["status"]) for row in membership_rows
+                }
+        except APIError as exc:
+            raise ServiceUnavailableError(details={"dependency": "database"}) from exc
+
+        enriched_rows: list[dict[str, object]] = []
+        for row in rows:
+            enriched = dict(row)
+            orphan_reason = None
+            if row.get("is_orphaned") is True:
+                branch_id = row.get("branch_id")
+                membership_id = row.get("budget_owner_membership_id")
+                if (
+                    branch_id is not None
+                    and branch_active_by_id.get(str(branch_id)) is False
+                ):
+                    orphan_reason = "branch_deactivated"
+                elif (
+                    membership_id is not None
+                    and membership_status_by_id.get(str(membership_id)) not in {None, "active"}
+                ):
+                    orphan_reason = "owner_removed"
+            enriched["orphan_reason"] = orphan_reason
+            enriched_rows.append(enriched)
+        return enriched_rows
+
     def _record(
         self,
         *,
@@ -195,6 +414,10 @@ class OrganisationService:
 
 def _branch(row: dict[str, object]) -> Branch:
     return Branch.model_validate(row)
+
+
+def _cost_centre(row: dict[str, object]) -> CostCentre:
+    return CostCentre.model_validate(row)
 
 
 def _rows(data: object) -> list[dict[str, object]]:

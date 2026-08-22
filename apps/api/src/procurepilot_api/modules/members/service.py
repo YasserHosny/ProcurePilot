@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import json
+import logging
 from uuid import UUID
 
 from postgrest.exceptions import APIError
@@ -31,6 +32,8 @@ from procurepilot_api.modules.organisation.schemas import (
 )
 from procurepilot_api.modules.tenants.models import Tenant
 from procurepilot_api.shared.audit import AuditEventCreate, get_audit_writer
+
+logger = logging.getLogger(__name__)
 
 
 def authenticated_client(settings: Settings, bearer_token: str) -> Client:
@@ -227,6 +230,16 @@ class MemberService:
             raise _member_update_error(exc) from exc
 
         _one_member(response.data)
+        try:
+            client.table("cost_centre").update({"is_orphaned": True}).eq(
+                "budget_owner_membership_id", str(member_id)
+            ).execute()
+        except APIError:
+            logger.warning(
+                "Could not mark cost centres orphaned after member removal",
+                extra={"member_id": str(member_id)},
+                exc_info=True,
+            )
         get_audit_writer().record(
             AuditEventCreate(
                 tenant_id=actor.tenant_id,

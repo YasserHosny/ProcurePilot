@@ -13,6 +13,10 @@ from procurepilot_api.modules.organisation.schemas import (
     BranchCreate,
     BranchList,
     BranchUpdate,
+    CostCentre,
+    CostCentreCreate,
+    CostCentreList,
+    CostCentreUpdate,
 )
 from procurepilot_api.modules.organisation.service import (
     OrganisationService,
@@ -66,5 +70,55 @@ def update_branch(
         bearer_token=token,
         member=member,
         branch_id=branch_id,
+        patch=payload,
+    )
+
+
+@router.get("/organisation/cost-centres", response_model=CostCentreList)
+def list_cost_centres(
+    token: Annotated[str, Depends(bearer_token)],
+    _member: Annotated[CurrentMember, Depends(current_member)],
+    service: Annotated[OrganisationService, Depends(get_organisation_service)],
+    branch_id: Annotated[UUID | None, Query()] = None,
+    is_archived: Annotated[bool | None, Query()] = None,
+    cursor: Annotated[str | None, Query()] = None,
+    limit: Annotated[int, Query(le=100)] = 50,
+) -> CostCentreList:
+    return service.list_cost_centres(
+        bearer_token=token,
+        branch_id=branch_id,
+        is_archived=is_archived,
+        cursor=cursor,
+        limit=limit,
+    )
+
+
+@router.post(
+    "/organisation/cost-centres",
+    status_code=status.HTTP_201_CREATED,
+    response_model=CostCentre,
+)
+def create_cost_centre(
+    payload: Annotated[CostCentreCreate, Body()],
+    token: Annotated[str, Depends(bearer_token)],
+    member: Annotated[CurrentMember, Depends(require_role(MemberRole.owner))],
+    service: Annotated[OrganisationService, Depends(get_organisation_service)],
+    _idempotency_key: Annotated[UUID | None, Header(alias="Idempotency-Key")] = None,
+) -> CostCentre:
+    return service.create_cost_centre(bearer_token=token, member=member, payload=payload)
+
+
+@router.patch("/organisation/cost-centres/{cost_centre_id}", response_model=CostCentre)
+def update_cost_centre(
+    cost_centre_id: UUID,
+    payload: Annotated[CostCentreUpdate, Body()],
+    token: Annotated[str, Depends(bearer_token)],
+    member: Annotated[CurrentMember, Depends(require_role(MemberRole.owner))],
+    service: Annotated[OrganisationService, Depends(get_organisation_service)],
+) -> CostCentre:
+    return service.update_cost_centre(
+        bearer_token=token,
+        member=member,
+        cost_centre_id=cost_centre_id,
         patch=payload,
     )

@@ -90,8 +90,8 @@ description: "Task list for Organisation Model implementation"
 
 ### Implementation for User Story 2
 
-- [ ] T025 [US2] Implement cost-centre create/edit/list/archive in `apps/api/src/procurepilot_api/modules/organisation/service.py`, enforcing the unique-code constraint, owner-only writes, and orphan-flagging when a linked branch is deactivated or a budget owner is removed (FR-010)
-- [ ] T026 [US2] Expose `GET/POST /organisation/cost-centres` and `PATCH /organisation/cost-centres/{id}` in `apps/api/src/procurepilot_api/modules/organisation/router.py`
+- [x] T025 [US2] Implement cost-centre create/edit/list/archive in `apps/api/src/procurepilot_api/modules/organisation/service.py`, enforcing the unique-code constraint, owner-only writes, and orphan-flagging when a linked branch is deactivated or a budget owner is removed (FR-010)
+- [x] T026 [US2] Expose `GET/POST /organisation/cost-centres` and `PATCH /organisation/cost-centres/{id}` in `apps/api/src/procurepilot_api/modules/organisation/router.py`
 - [ ] T027 [P] [US2] Build the cost-centre list/create/edit UI in `apps/web/src/app/features/settings/cost-centre-list/cost-centre-list.component.ts`, `.html`, and `.scss`, including a budget-owner picker sourced from the existing member list and an optional branch picker
 
 **Checkpoint**: US2 is independently testable alongside US1's branches, or on its own using only organisation-wide cost centres.
