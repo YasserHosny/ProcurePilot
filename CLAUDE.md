@@ -1,6 +1,6 @@
 # ProcurePilot — Development Guidelines
 
-Last updated: 2026-08-21 · Active feature: `001-platform-foundation`
+Last updated: 2026-08-22 · Active feature: `007-organisation-model`
 
 ProcurePilot turns fragmented supplier information into trusted, comparable purchasing
 decisions and proves the money saved. Read `.specify/memory/constitution.md` before writing
@@ -110,9 +110,14 @@ directions.
 
 ## Current phase
 
-Phase 1 (Procurement Intelligence MVP, web). Chunk 4.1 of 4.1–4.6. **Do not implement Phase 2+
-features** — requests, approvals, branches, budgets, mobile, integrations — until the
-corresponding stage gate is passed. Sketching is allowed; building is not.
+Phase 1 (chunks 4.1–4.6 / R1.0–R1.5, Procurement Intelligence MVP) shipped to `main` on
+2026-08-22 (PR #2). The roadmap's G1 → Phase 2 gate (≥10 verified savings, ≥8 paying customers,
+accuracy targets against the Phase 0 benchmark) has not been independently evidenced in this repo
+— the user explicitly chose to proceed into Phase 2 build work anyway on 2026-08-22, overriding
+the gate rather than waiting for it. Phase 2 (Team Workflow + Mobile) is now active, starting with
+release R2.0 — Organisation model (branches, cost centres, roles/permissions, budgets, org
+settings) — see `docs/roadmap/procurepilot_roadmap.md` §7 for the full Phase 2 scope and release
+breakdown (R2.0–R2.5).
 
 <!-- MANUAL ADDITIONS START -->
 <!-- MANUAL ADDITIONS END -->
@@ -122,6 +127,8 @@ corresponding stage gate is passed. Sketching is allowed; building is not.
 - Supabase Postgres 17 via the Supabase CLI local stack. Migrations continue in (002-catalogue-suppliers)
 - unchanged — Python 3.12 (`apps/api` and the new `services/extraction-worker`), + unchanged from chunks 4.1–4.2 for `apps/api`, plus a Redis client (003-quotation-inbox-extraction)
 - Supabase Postgres 17 (unchanged) for `document`, `quotation`, `quotation_line`, (003-quotation-inbox-extraction)
+- unchanged — Python 3.12 (`apps/api`), TypeScript 5.6 / Angular 19 (web), SQL + unchanged. No new library. This chunk is schema, RLS, and CRUD over the (007-organisation-model)
+- Supabase Postgres 17 (unchanged). New tables: `branch`, `cost_centre`, `budget`, (007-organisation-model)
 
 ## Recent Changes
 - 002-catalogue-suppliers: Added unchanged — Python 3.12 (backend), TypeScript 5.6 / Angular 19 (web), SQL + unchanged from chunk 4.1. One addition under consideration for CSV
