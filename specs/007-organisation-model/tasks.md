@@ -42,8 +42,8 @@ description: "Task list for Organisation Model implementation"
 
 ⚠️ **Everything else depends on this phase.**
 
-- [ ] T009 Create the organisation module skeleton in `apps/api/src/procurepilot_api/modules/organisation/__init__.py`, `schemas.py`, `service.py`, and `router.py`, and register its router in `apps/api/src/procurepilot_api/main.py`
-- [ ] T010 [P] Create Pydantic schemas for `Branch`, `CostCentre`, `Budget`, and `BranchRoleAssignment` (create/update/list variants) in `apps/api/src/procurepilot_api/modules/organisation/schemas.py`, matching `specs/007-organisation-model/contracts/organisation.openapi.yaml` exactly, with `Money` as `{amount, currency}`
+- [x] T009 Create the organisation module skeleton in `apps/api/src/procurepilot_api/modules/organisation/__init__.py`, `schemas.py`, `service.py`, and `router.py`, and register its router in `apps/api/src/procurepilot_api/main.py`
+- [x] T010 [P] Create Pydantic schemas for `Branch`, `CostCentre`, `Budget`, and `BranchRoleAssignment` (create/update/list variants) in `apps/api/src/procurepilot_api/modules/organisation/schemas.py`, matching `specs/007-organisation-model/contracts/organisation.openapi.yaml` exactly, with `Money` as `{amount, currency}`
 - [ ] T011 Extend `apps/api/src/procurepilot_api/modules/members/service.py` and `router.py` with branch-role-assignment create/delete, validating the target member currently holds `branch_manager` or `approver` before allowing an assignment (422 otherwise, per the contract)
 - [ ] T012 [P] Add a typed frontend API client in `apps/web/src/app/features/settings/organisation-api.ts`, using decimal strings for money and the exact OpenAPI endpoint paths
 - [ ] T013 [P] Add backend contract drift coverage in `apps/api/tests/contract/test_organisation_openapi_drift.py`, verifying implemented route paths and response models against `specs/007-organisation-model/contracts/organisation.openapi.yaml`
