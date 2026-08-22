@@ -127,7 +127,9 @@
       font-weight: 700;
       text-transform: uppercase;
       letter-spacing: 0.5px;
-      color: var(--mat-sys-primary, #0284c7);
+      // #0284c7 fails WCAG 2.1 AA color-contrast at this size/weight (4.09:1, needs 4.5:1);
+      // #0369a1 gives ~5.9:1 against a white card background.
+      color: var(--mat-sys-primary, #0369a1);
     }
 
     .plan-name {
