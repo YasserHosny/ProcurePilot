@@ -29,7 +29,7 @@ description: "Task list for Organisation Model implementation"
 - [x] T004 Create `budget` with the `budget_scope_target` check constraint, composite FKs to `branch(tenant_id, id)`, `cost_centre(tenant_id, id)`, and `membership(tenant_id, id)`, RLS `ENABLE`+`FORCE`, and the branch-scoped visibility policy in `supabase/migrations/20260822000039_budget.sql`
 - [x] T005 Create `branch_role_assignment` with composite FKs to `membership(tenant_id, id)` and `branch(tenant_id, id)`, the `unique (tenant_id, membership_id, branch_id)` constraint, and RLS `ENABLE`+`FORCE` (owner writes, assigned member reads own rows) in `supabase/migrations/20260822000040_branch_role_assignment.sql`
 - [x] T006 [P] Add `organisation.*` i18n keys (branch, cost centre, budget, and org-settings-screen strings) to `packages/i18n/en.json` and `packages/i18n/ar.json`, keeping English/Arabic key parity
-- [ ] T007 [P] Add shell route entries for the organisation settings screen in `apps/web/src/app/app.routes.ts`, following the existing settings-area route style
+- [x] T007 [P] Add shell route entries for the organisation settings screen in `apps/web/src/app/app.routes.ts`, following the existing settings-area route style
 - [x] T008 [P] Extend `apps/api/tests/integration/test_tenant_isolation.py` with cross-tenant cases for `branch`, `cost_centre`, `budget`, and `branch_role_assignment`, matching the existing uniform pattern for every prior tenant-scoped table
 
 **Checkpoint**: schema, RLS (including branch-scoped visibility), and cross-tenant isolation proof are complete before any module code is written.
