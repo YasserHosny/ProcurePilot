@@ -25,6 +25,14 @@ comment on table plan is
   'Shared product-tier definitions, readable by every workspace, writable by none of them
    directly — mirrors canonical_product''s exception exactly. See research.md R4/R5.';
 
+-- Plan pricing is denominated in GBP. supported_currency's rows are otherwise dev-seed data
+-- (pnpm db:seed, "local development only" per its own docstring), which a fresh environment
+-- that has only run migrations cannot assume has happened yet — ensure the one row this
+-- migration itself depends on, rather than assume it.
+insert into supported_currency (code, label_en, label_ar)
+values ('GBP', 'Pound Sterling', 'جنيه إسترليني')
+on conflict (code) do nothing;
+
 insert into plan (code, name, monthly_price_amount, monthly_price_currency, limits, features)
 values
   ('starter', 'Starter', 0.0000, 'GBP',

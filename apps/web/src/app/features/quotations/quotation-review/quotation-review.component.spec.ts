@@ -101,9 +101,11 @@ describe('QuotationReviewComponent (T051, T057, T062)', () => {
       'suppliers',
       'patchQuotation',
       'confirmQuotation',
+      'getQuotationMatches',
     ]);
     apiService.getQuotation.and.returnValue(of(mockQuotationDetail));
     apiService.suppliers.and.returnValue(of({ items: mockSuppliers, next_cursor: null }));
+    apiService.getQuotationMatches.and.returnValue(of({ quotation_id: 'q-review-1', lines: [] }));
 
     const mockSession = {
       hasRole: jasmine.createSpy('hasRole').and.returnValue(true),
