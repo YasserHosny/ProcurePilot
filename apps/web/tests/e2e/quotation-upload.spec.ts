@@ -67,7 +67,7 @@ test.describe('Quotation Upload & Extraction (T037, US1)', () => {
 
     // Eventually transition to extracted state. Generous: under full-suite CI load, a single
     // real RQ worker can have a backlog from every earlier upload in the run.
-    await expect(page.locator('.result-container.success')).toBeVisible({ timeout: 45000 });
+    await expect(page.locator('.result-container.success')).toBeVisible({ timeout: 90000 });
     await expect(page.locator('.result-title')).toContainText('Extraction completed successfully');
 
     // Proceed to review link

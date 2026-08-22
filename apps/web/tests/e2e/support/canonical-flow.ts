@@ -54,7 +54,7 @@ export async function uploadQuotationAndOpenReview(
   await page.click('.start-upload-btn');
   // Generous: under full-suite CI load, a single real RQ worker can have a backlog from every
   // earlier upload in the run, even though the stub provider itself processes near-instantly.
-  await expect(page.locator('.result-container.success')).toBeVisible({ timeout: 45000 });
+  await expect(page.locator('.result-container.success')).toBeVisible({ timeout: 90000 });
   await page.click('a:has-text("Proceed to Review")');
   await page.waitForURL('**/quotations/**/review');
   return page.url().split('/quotations/')[1].split('/')[0];

@@ -29,7 +29,7 @@ test.describe('Quotation Versioning & Re-quotes (T059, US4)', () => {
       buffer: Buffer.from(validPdfContent),
     });
     await page.click('.start-upload-btn');
-    await expect(page.locator('.result-container.success')).toBeVisible({ timeout: 15000 });
+    await expect(page.locator('.result-container.success')).toBeVisible({ timeout: 90000 });
     await page.click('a:has-text("Proceed to Review")');
     await page.waitForURL('**/quotations/**/review');
 

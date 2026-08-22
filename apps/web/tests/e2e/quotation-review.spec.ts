@@ -54,7 +54,7 @@ test.describe('Quotation Review & Confirmation (T053, US2)', () => {
     await page.click('.start-upload-btn');
 
     // Wait for extraction to complete
-    await expect(page.locator('.result-container.success')).toBeVisible({ timeout: 15000 });
+    await expect(page.locator('.result-container.success')).toBeVisible({ timeout: 90000 });
     await page.click('a:has-text("Proceed to Review")');
     await page.waitForURL('**/quotations/**/review');
 
