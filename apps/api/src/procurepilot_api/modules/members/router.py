@@ -33,6 +33,10 @@ from procurepilot_api.modules.members.service import (
     load_me_for_token,
     require_refresh_token,
 )
+from procurepilot_api.modules.organisation.schemas import (
+    BranchRoleAssignment,
+    BranchRoleAssignmentCreate,
+)
 from procurepilot_api.shared.audit import AuditEventCreate, get_audit_writer
 
 router = APIRouter(tags=["members"])
@@ -116,6 +120,42 @@ def remove_member(
     service: Annotated[MemberService, Depends(get_member_service)],
 ) -> Response:
     service.remove_member(bearer_token=token, actor=member, member_id=member_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post(
+    "/organisation/branch-role-assignments",
+    status_code=status.HTTP_201_CREATED,
+    response_model=BranchRoleAssignment,
+)
+def create_branch_role_assignment(
+    payload: Annotated[BranchRoleAssignmentCreate, Body()],
+    token: Annotated[str, Depends(bearer_token)],
+    member: Annotated[CurrentMember, Depends(require_role(MemberRole.owner))],
+    service: Annotated[MemberService, Depends(get_member_service)],
+) -> BranchRoleAssignment:
+    return service.create_branch_role_assignment(
+        bearer_token=token,
+        actor=member,
+        payload=payload,
+    )
+
+
+@router.delete(
+    "/organisation/branch-role-assignments/{assignment_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def remove_branch_role_assignment(
+    assignment_id: UUID,
+    token: Annotated[str, Depends(bearer_token)],
+    member: Annotated[CurrentMember, Depends(require_role(MemberRole.owner))],
+    service: Annotated[MemberService, Depends(get_member_service)],
+) -> Response:
+    service.remove_branch_role_assignment(
+        bearer_token=token,
+        actor=member,
+        assignment_id=assignment_id,
+    )
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
