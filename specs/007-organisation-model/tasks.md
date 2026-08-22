@@ -106,8 +106,8 @@ description: "Task list for Organisation Model implementation"
 
 ### Tests for User Story 3
 
-- [ ] T028 [P] [US3] Write contract tests for `GET/POST /organisation/budgets` in `apps/api/tests/contract/test_budgets_contract.py`, covering all three scopes, the `budget_scope_target` constraint's 422 shape, and 403/404 envelopes
-- [ ] T029 [P] [US3] Write budget integration tests in `apps/api/tests/integration/test_budgets.py`, proving each scope stores and lists correctly, overlapping-period budgets for the same scope are allowed with the `overlap_warning` flag set, and currency is never inferred from `tenant.currency` (research.md R3)
+- [x] T028 [P] [US3] Write contract tests for `GET/POST /organisation/budgets` in `apps/api/tests/contract/test_budgets_contract.py`, covering all three scopes, the `budget_scope_target` constraint's 422 shape, and 403/404 envelopes
+- [x] T029 [P] [US3] Write budget integration tests in `apps/api/tests/integration/test_budgets.py`, proving each scope stores and lists correctly, overlapping-period budgets for the same scope are allowed with the `overlap_warning` flag set, and currency is never inferred from `tenant.currency` (research.md R3)
 - [ ] T030 [P] [US3] Write frontend unit tests for the budget list/form in `apps/web/src/app/features/settings/budget-list/budget-list.component.spec.ts`, covering scope selection, the overlap warning, and explicit currency entry
 - [ ] T031 [P] [US3] Write budget-management E2E coverage in `apps/web/tests/e2e/organisation-budgets.spec.ts`, proving all three scopes and the overlap warning, plus Arabic RTL layout
 
