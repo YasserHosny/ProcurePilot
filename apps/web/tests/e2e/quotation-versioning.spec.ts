@@ -29,7 +29,9 @@ test.describe('Quotation Versioning & Re-quotes (T059, US4)', () => {
       buffer: Buffer.from(validPdfContent),
     });
     await page.click('.start-upload-btn');
-    await expect(page.locator('.result-container.success')).toBeVisible({ timeout: 90000 });
+    // 30s: a genuine RQ round trip, not a client-side state change, but still safely under the
+    // 60s per-test default.
+    await expect(page.locator('.result-container.success')).toBeVisible({ timeout: 30000 });
     await page.click('a:has-text("Proceed to Review")');
     await page.waitForURL('**/quotations/**/review');
 

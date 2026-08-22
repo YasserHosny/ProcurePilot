@@ -65,9 +65,11 @@ test.describe('Quotation Upload & Extraction (T037, US1)', () => {
       page.locator('.progress-container, .result-container.success')
     ).toBeVisible();
 
-    // Eventually transition to extracted state. Generous: under full-suite CI load, a single
-    // real RQ worker can have a backlog from every earlier upload in the run.
-    await expect(page.locator('.result-container.success')).toBeVisible({ timeout: 90000 });
+    // Eventually transition to extracted state. 30s, not the framework default 10s: real
+    // extraction (a genuine RQ round trip) is slower than a client-side state change, but must
+    // stay under the 60s per-test default so a real failure here surfaces as this assertion
+    // rather than an opaque outer test timeout.
+    await expect(page.locator('.result-container.success')).toBeVisible({ timeout: 30000 });
     await expect(page.locator('.result-title')).toContainText('Extraction completed successfully');
 
     // Proceed to review link

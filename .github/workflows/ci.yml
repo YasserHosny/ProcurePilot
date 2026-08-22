@@ -244,6 +244,16 @@ jobs:
   e2e:
     name: End-to-end
     runs-on: ubuntu-latest
+    services:
+      # The quotation extraction pipeline (services/extraction-worker) is an RQ consumer over
+      # Redis — nothing in this job started either, so every real quotation upload has been
+      # silently unprocessable: the UI polls a job that no worker will ever pick up, and every
+      # spec needing extraction to finish times out, forever, from the first such upload onward,
+      # no matter how generous the wait. Nothing before this job's first real upload needed it,
+      # which is why this went unnoticed.
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
@@ -319,6 +329,18 @@ jobs:
             sleep 2
           done
           curl -sf http://localhost:8000/api/v1/health
+
+      - name: Start the extraction worker
+        # Consumes the quotation-extraction RQ queue over the redis service above. Every default
+        # (redis_url, queue_name, provider_mode=stub, confidence_threshold) already matches this
+        # job's environment; only the Supabase connection needs to come from this job's own
+        # credentials, already exported to GITHUB_ENV by "Export Supabase credentials".
+        run: |
+          uv run --project services/extraction-worker python -m procurepilot_extraction_worker &
+          sleep 5
+          pgrep -f procurepilot_extraction_worker >/dev/null || {
+            echo "::error::extraction worker did not start or exited immediately"; exit 1;
+          }
 
       - name: Install web dependencies
         working-directory: apps/web

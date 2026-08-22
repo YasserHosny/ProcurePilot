@@ -53,8 +53,9 @@ test.describe('Quotation Review & Confirmation (T053, US2)', () => {
     });
     await page.click('.start-upload-btn');
 
-    // Wait for extraction to complete
-    await expect(page.locator('.result-container.success')).toBeVisible({ timeout: 90000 });
+    // Wait for extraction to complete. 30s: a genuine RQ round trip, not a client-side state
+    // change, but still safely under the 60s per-test default.
+    await expect(page.locator('.result-container.success')).toBeVisible({ timeout: 30000 });
     await page.click('a:has-text("Proceed to Review")');
     await page.waitForURL('**/quotations/**/review');
 

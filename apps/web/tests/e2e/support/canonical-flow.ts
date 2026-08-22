@@ -52,9 +52,10 @@ export async function uploadQuotationAndOpenReview(
     buffer: Buffer.from(STUB_PDF),
   });
   await page.click('.start-upload-btn');
-  // Generous: under full-suite CI load, a single real RQ worker can have a backlog from every
-  // earlier upload in the run, even though the stub provider itself processes near-instantly.
-  await expect(page.locator('.result-container.success')).toBeVisible({ timeout: 90000 });
+  // 30s, not the framework default 10s: real extraction (a genuine RQ round trip) is slower
+  // than a client-side state change, but must stay under the 60s per-test default so a real
+  // failure here surfaces as this assertion rather than an opaque outer test timeout.
+  await expect(page.locator('.result-container.success')).toBeVisible({ timeout: 30000 });
   await page.click('a:has-text("Proceed to Review")');
   await page.waitForURL('**/quotations/**/review');
   return page.url().split('/quotations/')[1].split('/')[0];
