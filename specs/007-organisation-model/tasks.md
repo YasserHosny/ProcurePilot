@@ -23,14 +23,14 @@ description: "Task list for Organisation Model implementation"
 
 **Purpose**: schema, RLS (including branch-scoped policies from the same migration that creates each table, per this repo's own convention), and i18n/routing scaffolding.
 
-- [ ] T001 Add `unique (tenant_id, id)` to the existing `membership` table via a new additive migration `supabase/migrations/20260822000036_membership_composite_key.sql`, changing no existing column, data, or behaviour
-- [ ] T002 Create `branch` with `unique (tenant_id, id)`, RLS `ENABLE`+`FORCE`, and the branch-visibility policy from research.md R1 (including the `current_membership_id()` and `current_member_role()` helper functions it depends on) in `supabase/migrations/20260822000037_branch.sql`
-- [ ] T003 Create `cost_centre` with `unique (tenant_id, id)`, `unique (tenant_id, code)`, composite FKs to `branch(tenant_id, id)` and `membership(tenant_id, id)`, RLS `ENABLE`+`FORCE`, and the same branch-scoped visibility policy shape evaluated against `cost_centre.branch_id` in `supabase/migrations/20260822000038_cost_centre.sql`
-- [ ] T004 Create `budget` with the `budget_scope_target` check constraint, composite FKs to `branch(tenant_id, id)`, `cost_centre(tenant_id, id)`, and `membership(tenant_id, id)`, RLS `ENABLE`+`FORCE`, and the branch-scoped visibility policy in `supabase/migrations/20260822000039_budget.sql`
-- [ ] T005 Create `branch_role_assignment` with composite FKs to `membership(tenant_id, id)` and `branch(tenant_id, id)`, the `unique (tenant_id, membership_id, branch_id)` constraint, and RLS `ENABLE`+`FORCE` (owner writes, assigned member reads own rows) in `supabase/migrations/20260822000040_branch_role_assignment.sql`
+- [x] T001 Add `unique (tenant_id, id)` to the existing `membership` table via a new additive migration `supabase/migrations/20260822000036_membership_composite_key.sql`, changing no existing column, data, or behaviour
+- [x] T002 Create `branch` with `unique (tenant_id, id)`, RLS `ENABLE`+`FORCE`, and the branch-visibility policy from research.md R1 (including the `current_membership_id()` and `current_member_role()` helper functions it depends on) in `supabase/migrations/20260822000037_branch.sql`
+- [x] T003 Create `cost_centre` with `unique (tenant_id, id)`, `unique (tenant_id, code)`, composite FKs to `branch(tenant_id, id)` and `membership(tenant_id, id)`, RLS `ENABLE`+`FORCE`, and the same branch-scoped visibility policy shape evaluated against `cost_centre.branch_id` in `supabase/migrations/20260822000038_cost_centre.sql`
+- [x] T004 Create `budget` with the `budget_scope_target` check constraint, composite FKs to `branch(tenant_id, id)`, `cost_centre(tenant_id, id)`, and `membership(tenant_id, id)`, RLS `ENABLE`+`FORCE`, and the branch-scoped visibility policy in `supabase/migrations/20260822000039_budget.sql`
+- [x] T005 Create `branch_role_assignment` with composite FKs to `membership(tenant_id, id)` and `branch(tenant_id, id)`, the `unique (tenant_id, membership_id, branch_id)` constraint, and RLS `ENABLE`+`FORCE` (owner writes, assigned member reads own rows) in `supabase/migrations/20260822000040_branch_role_assignment.sql`
 - [ ] T006 [P] Add `organisation.*` i18n keys (branch, cost centre, budget, and org-settings-screen strings) to `packages/i18n/en.json` and `packages/i18n/ar.json`, keeping English/Arabic key parity
 - [ ] T007 [P] Add shell route entries for the organisation settings screen in `apps/web/src/app/app.routes.ts`, following the existing settings-area route style
-- [ ] T008 [P] Extend `apps/api/tests/integration/test_tenant_isolation.py` with cross-tenant cases for `branch`, `cost_centre`, `budget`, and `branch_role_assignment`, matching the existing uniform pattern for every prior tenant-scoped table
+- [x] T008 [P] Extend `apps/api/tests/integration/test_tenant_isolation.py` with cross-tenant cases for `branch`, `cost_centre`, `budget`, and `branch_role_assignment`, matching the existing uniform pattern for every prior tenant-scoped table
 
 **Checkpoint**: schema, RLS (including branch-scoped visibility), and cross-tenant isolation proof are complete before any module code is written.
 

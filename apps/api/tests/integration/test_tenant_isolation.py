@@ -21,7 +21,10 @@ recommendations, price history, and live alert conditions are computed at reques
 already-isolated rows and add no new storage surface; extended again for
 006-value-proof-launch to cover purchase_record, saving_record and billing_account, plus the
 shared plan exception (mirroring canonical_product — see research.md R5) and the two
-Principle-critical immutability triggers a verified saving_record depends on.
+Principle-critical immutability triggers a verified saving_record depends on; extended again for
+007-organisation-model (T008) to cover branch, cost_centre, budget and branch_role_assignment —
+cross-tenant isolation only, since the within-tenant branch-scoped visibility these tables also
+enforce (research.md R1) has its own dedicated proof in test_branch_scoped_visibility.py (T036).
 """
 
 from __future__ import annotations
@@ -64,6 +67,10 @@ class Workspace:
         saving_record_id: UUID,
         billing_account_id: UUID,
         export_job_id: UUID,
+        branch_id: UUID,
+        cost_centre_id: UUID,
+        budget_id: UUID,
+        branch_role_assignment_id: UUID,
     ) -> None:
         self.tenant_id = tenant_id
         self.user_id = user_id
@@ -82,6 +89,10 @@ class Workspace:
         self.saving_record_id = saving_record_id
         self.billing_account_id = billing_account_id
         self.export_job_id = export_job_id
+        self.branch_id = branch_id
+        self.cost_centre_id = cost_centre_id
+        self.budget_id = budget_id
+        self.branch_role_assignment_id = branch_role_assignment_id
 
     def claims(self) -> str:
         return (
@@ -312,6 +323,31 @@ def make_workspace(cur: psycopg.Cursor, label: str) -> Workspace:
         (export_job_id, tenant_id, membership_id),
     )
 
+    # Organisation Model — chunk R2.0 (007-organisation-model), T008.
+    branch_id, cost_centre_id, budget_id, branch_role_assignment_id = (
+        uuid4(), uuid4(), uuid4(), uuid4()
+    )
+    cur.execute(
+        "insert into branch (id,tenant_id,name,region) values (%s,%s,%s,'GB')",
+        (branch_id, tenant_id, f"{label} Branch"),
+    )
+    cur.execute(
+        "insert into cost_centre (id,tenant_id,name,code,branch_id) "
+        "values (%s,%s,%s,%s,%s)",
+        (cost_centre_id, tenant_id, f"{label} Cost Centre", f"{label}-cc", branch_id),
+    )
+    cur.execute(
+        "insert into budget "
+        "(id,tenant_id,amount,currency,period,period_start,scope,branch_id,created_by) "
+        "values (%s,%s,1000,'GBP','monthly',date_trunc('month', now()),'branch',%s,%s)",
+        (budget_id, tenant_id, branch_id, membership_id),
+    )
+    cur.execute(
+        "insert into branch_role_assignment (id,tenant_id,membership_id,branch_id) "
+        "values (%s,%s,%s,%s)",
+        (branch_role_assignment_id, tenant_id, membership_id, branch_id),
+    )
+
     return Workspace(
         tenant_id,
         user_id,
@@ -330,6 +366,10 @@ def make_workspace(cur: psycopg.Cursor, label: str) -> Workspace:
         saving_record_id,
         billing_account_id,
         export_job_id,
+        branch_id,
+        cost_centre_id,
+        budget_id,
+        branch_role_assignment_id,
     )
 
 
@@ -1029,6 +1069,97 @@ def test_platform_invitations_are_unreadable_by_members(
             cur.execute("select count(*) from platform_invitation")
 
 
+# --- organisation model (007-organisation-model, T008) ---------------------
+
+
+def test_another_workspaces_branches_are_invisible(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        cur.execute("select id from branch where id = %s", (beta.branch_id,))
+        assert cur.fetchall() == []
+
+
+def test_another_workspaces_cost_centres_are_invisible(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        cur.execute("select count(*) from cost_centre where id = %s", (beta.cost_centre_id,))
+        row = cur.fetchone()
+    assert row is not None and row[0] == 0
+
+
+def test_another_workspaces_budgets_are_invisible(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        cur.execute("select count(*) from budget where id = %s", (beta.budget_id,))
+        row = cur.fetchone()
+    assert row is not None and row[0] == 0
+
+
+def test_another_workspaces_branch_role_assignments_are_invisible(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        cur.execute(
+            "select count(*) from branch_role_assignment where id = %s",
+            (beta.branch_role_assignment_id,),
+        )
+        row = cur.fetchone()
+    assert row is not None and row[0] == 0
+
+
+def test_a_member_cannot_write_a_branch_into_another_workspace(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    """WITH CHECK on branch_tenant_isolation, not just the scoped-visibility RESTRICTIVE policy."""
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            cur.execute(
+                "insert into branch (tenant_id,name) values (%s,'intruder branch')",
+                (beta.tenant_id,),
+            )
+
+
+def test_a_cross_workspace_budget_update_changes_nothing(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        cur.execute("update budget set amount = 1 where id = %s", (beta.budget_id,))
+        assert cur.rowcount == 0
+        cur.execute("reset role")
+        cur.execute("select amount from budget where id = %s", (beta.budget_id,))
+        row = cur.fetchone()
+    assert row is not None and row[0] == 1000
+
+
+def test_a_cross_workspace_branch_delete_removes_nothing(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        cur.execute("delete from branch where id = %s", (beta.branch_id,))
+        assert cur.rowcount == 0
+        cur.execute("reset role")
+        cur.execute("select count(*) from branch where id = %s", (beta.branch_id,))
+        row = cur.fetchone()
+    assert row is not None and row[0] == 1
+
+
 # --- the guarantee itself ---------------------------------------------------
 
 
@@ -1049,6 +1180,7 @@ def test_rls_is_enabled_and_forced_on_every_tenant_scoped_table(
         "match_candidate", "match_task", "match_decision", "landed_cost",
         "basket_split_job", "alert_dismissal",
         "purchase_record", "saving_record", "export_job", "billing_account", "plan",
+        "branch", "cost_centre", "budget", "branch_role_assignment",
     }
     with conn.cursor() as cur:
         cur.execute(
