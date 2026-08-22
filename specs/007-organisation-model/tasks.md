@@ -67,8 +67,8 @@ description: "Task list for Organisation Model implementation"
 
 ### Implementation for User Story 1
 
-- [ ] T018 [US1] Implement branch create/edit/list/deactivate in `apps/api/src/procurepilot_api/modules/organisation/service.py`, enforcing owner-only writes, the dependent-confirmation flow (FR-009), and cross-tenant/cross-branch not-found semantics (FR-008)
-- [ ] T019 [US1] Expose `GET/POST /organisation/branches` and `PATCH /organisation/branches/{id}` in `apps/api/src/procurepilot_api/modules/organisation/router.py`
+- [x] T018 [US1] Implement branch create/edit/list/deactivate in `apps/api/src/procurepilot_api/modules/organisation/service.py`, enforcing owner-only writes, the dependent-confirmation flow (FR-009), and cross-tenant/cross-branch not-found semantics (FR-008)
+- [x] T019 [US1] Expose `GET/POST /organisation/branches` and `PATCH /organisation/branches/{id}` in `apps/api/src/procurepilot_api/modules/organisation/router.py`
 - [ ] T020 [P] [US1] Build the branch list/create/edit UI in `apps/web/src/app/features/settings/branch-list/branch-list.component.ts`, `.html`, and `.scss`, using only `packages/i18n` strings and CSS logical properties
 
 **Checkpoint**: US1 is independently testable — branches can be fully managed with no other entity required.
