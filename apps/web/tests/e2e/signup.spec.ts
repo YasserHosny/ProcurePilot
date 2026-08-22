@@ -58,6 +58,10 @@ test.describe('Workspace sign-up (US1)', () => {
     await chooseFirstOption(page, 'tax_model');
 
     await page.click('button[type="submit"]');
+
+    // Sign-up lands on the assigned-plan screen first, not directly in the shell.
+    await page.waitForURL('**/onboarding/plan');
+    await page.click('.continue-btn');
     await page.waitForURL('**/home');
 
     const elapsedSeconds = (Date.now() - started) / 1000;

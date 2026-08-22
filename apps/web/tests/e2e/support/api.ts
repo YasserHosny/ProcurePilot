@@ -28,6 +28,64 @@ export function credentials(): Credentials {
   ) as Credentials;
 }
 
+const REPO_ROOT = join(__dirname, '..', '..', '..', '..', '..');
+
+/**
+ * Creates a brand-new business + owner, isolated from the shared global-setup workspace every
+ * other spec file signs in as.
+ *
+ * Specs that mutate real membership rows (role changes, removals) must not share the global
+ * owner: a run that exercises those mutations against the one workspace every other file also
+ * signs in as risks leaving that shared owner in a state later files cannot recover from. One
+ * extra sign-up per FILE (not per test) keeps this well within the auth rate limit.
+ */
+export async function createIsolatedWorkspace(): Promise<Credentials> {
+  const stamp = `${Date.now()}.${Math.floor(Math.random() * 10000)}`;
+  const creds: Credentials = {
+    ownerEmail: `e2e.isolated.owner.${stamp}@example.test`,
+    ownerPassword: 'E2eIsolatedPassword123!',
+    businessName: `E2E Isolated Co ${stamp}`,
+  };
+
+  const raw = execFileSync(
+    'uv',
+    ['run', '--project', 'apps/api', 'python', 'apps/api/scripts/seed.py', '--json'],
+    {
+      cwd: REPO_ROOT,
+      env: {
+        ...process.env,
+        DATABASE_URL:
+          process.env['E2E_DATABASE_URL'] ??
+          'postgresql://postgres:postgres@localhost:54322/postgres',
+        SEED_INVITATION_EMAIL: creds.ownerEmail,
+      },
+      encoding: 'utf-8',
+    },
+  );
+  const invitation = JSON.parse(raw.trim().split('\n').pop() ?? '{}') as {
+    invitation_token: string;
+    region: string;
+    currency: string;
+    tax_model: string;
+  };
+
+  await call('/auth/signup', {
+    method: 'POST',
+    body: JSON.stringify({
+      invitation_token: invitation.invitation_token,
+      email: creds.ownerEmail,
+      password: creds.ownerPassword,
+      business_name: creds.businessName,
+      region: invitation.region,
+      currency: invitation.currency,
+      tax_model: invitation.tax_model,
+      default_locale: 'en',
+    }),
+  });
+
+  return creds;
+}
+
 async function call<T>(path: string, init: RequestInit): Promise<T> {
   const response = await fetch(`${API}${path}`, {
     ...init,
@@ -75,8 +133,8 @@ export interface CreatedMember {
  * The address is unique per call: the server allows only one pending invitation per address per
  * workspace, so reusing a fixed address makes a suite that passes once and 409s ever after.
  */
-export async function createMember(role = 'buyer'): Promise<CreatedMember> {
-  const ownerToken = await signInOwner();
+export async function createMember(role = 'buyer', ownerTokenOverride?: string): Promise<CreatedMember> {
+  const ownerToken = ownerTokenOverride ?? (await signInOwner());
   const email = `e2e.member.${Date.now()}.${Math.floor(Math.random() * 10000)}@example.test`;
   const password = 'E2eMemberPassword123!';
 
@@ -101,8 +159,9 @@ export async function createMember(role = 'buyer'): Promise<CreatedMember> {
 /** Invite without accepting — for tests about pending invitations rather than members. */
 export async function createPendingInvitation(
   role = 'buyer',
+  ownerTokenOverride?: string,
 ): Promise<{ email: string; id: string; token: string }> {
-  const ownerToken = await signInOwner();
+  const ownerToken = ownerTokenOverride ?? (await signInOwner());
   const email = `e2e.pending.${Date.now()}.${Math.floor(Math.random() * 10000)}@example.test`;
   const invitation = await call<{ id: string; token?: string }>('/invitations', {
     method: 'POST',

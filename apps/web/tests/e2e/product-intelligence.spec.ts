@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { createMember, type CreatedMember } from './support/api';
+import { createMember, createTestProduct, signInOwner, type CreatedMember } from './support/api';
 
 /**
  * End-to-End test suite for Product Price Intelligence (T040, US2).
@@ -44,7 +44,12 @@ test.describe('Product Price Intelligence Screen (T040, US2)', () => {
   });
 
   test('displays empty state when product has no purchase history', async ({ page }) => {
-    await page.goto('/offers/product-intelligence?product_id=00000000-0000-0000-0000-000000000000');
-    await expect(page.locator('.empty-state-card, .empty-state')).toBeVisible();
+    // A real catalogue product with zero purchase records — a nonexistent product id fails to
+    // resolve at all client-side and never reaches the empty-state branch this test means to check.
+    const ownerToken = await signInOwner();
+    const product = await createTestProduct(ownerToken);
+    await page.goto(`/offers/product-intelligence?product_id=${product.id}`);
+    // .empty-state nests inside .empty-state-card, so the combined selector matches both.
+    await expect(page.locator('.empty-state-card')).toBeVisible();
   });
 });

@@ -45,6 +45,9 @@ test.describe('Matching Accessibility @a11y', () => {
     await signIn(page);
     await page.goto('/matching');
     await expect(page.locator('.page-title')).toContainText('Match Resolution Queue');
+    // The title renders before the task list's own async fetch resolves; scanning too early can
+    // catch a transient loading skeleton with poor contrast, especially under CI/full-suite load.
+    await page.waitForLoadState('networkidle');
     const results = await scan(page);
     expect(results.violations, describeViolations(results)).toEqual([]);
   });
@@ -55,6 +58,7 @@ test.describe('Matching Accessibility @a11y', () => {
     await page.click('button:has-text("العربية")');
     await page.goto('/matching');
     await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
+    await page.waitForLoadState('networkidle');
     const results = await scan(page);
     expect(results.violations, describeViolations(results)).toEqual([]);
   });

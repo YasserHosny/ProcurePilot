@@ -54,7 +54,7 @@ test.describe('Value Proof Keyboard Navigation (T074)', () => {
 
   test('navigates subscription plan display via keyboard', async ({ page }) => {
     await page.goto('/plan');
-    await expect(page.locator('.page-title')).toContainText('Your Subscription Plan');
+    await expect(page.locator('.page-title')).toContainText('Your Workspace Plan');
 
     await page.focus('.continue-btn');
     await page.keyboard.press('Enter');

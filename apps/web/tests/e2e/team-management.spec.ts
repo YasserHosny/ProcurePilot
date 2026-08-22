@@ -1,18 +1,12 @@
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
-
 import { test, expect } from '@playwright/test';
 
-import { createMember, createPendingInvitation } from './support/api';
-
-/**
- * Credentials come from global-setup, which creates a real workspace through the sign-up
- * endpoint. They used to be hardcoded to an account nothing created, which is why every test
- * here failed at sign-in the first time the suite was ever executed.
- */
-const credentials = JSON.parse(
-  readFileSync(join(__dirname, '.credentials.json'), 'utf-8'),
-) as { ownerEmail: string; ownerPassword: string; businessName: string };
+import {
+  createIsolatedWorkspace,
+  createMember,
+  createPendingInvitation,
+  signIn,
+  type Credentials,
+} from './support/api';
 
 /**
  * End-to-End test suite for User Story 2: Team Management (T061).
@@ -24,10 +18,15 @@ const credentials = JSON.parse(
  * - FR-011: Owner changes member role and removes members.
  * - FR-012: System prevents any action that would leave a workspace with no owner (409 Conflict).
  * - FR-013: Non-owners cannot access team management or perform administrative mutations.
+ *
+ * This is the one file that mutates real membership rows — role changes, removals, and a
+ * deliberate attempt to demote/remove the sole owner. It gets its OWN isolated workspace rather
+ * than the shared one every other spec signs in as: a suite-wide shared owner left every later
+ * file unable to invite once anything here went sideways.
  */
 test.describe('ProcurePilot Team Management (T061)', () => {
-  const ownerEmail = credentials.ownerEmail;
-  const ownerPassword = credentials.ownerPassword;
+  let credentials: Credentials;
+  let ownerToken: string;
   // Unique per run. A fixed address makes the suite pass once and fail forever after: the
   // server allows only ONE pending invitation per address per workspace (a deliberate rule), so
   // the second run gets a 409 from residue the first run left behind. CI reruns the same
@@ -35,11 +34,16 @@ test.describe('ProcurePilot Team Management (T061)', () => {
   const colleagueEmail = `buyer.colleague.${Date.now()}@example.test`;
   const colleaguePassword = 'ColleaguePassword123!';
 
+  test.beforeAll(async () => {
+    credentials = await createIsolatedWorkspace();
+    ownerToken = await signIn(credentials.ownerEmail, credentials.ownerPassword);
+  });
+
   test.beforeEach(async ({ page }) => {
     // Sign in as owner
     await page.goto('/auth/sign-in');
-    await page.fill('input[formControlName="email"]', ownerEmail);
-    await page.fill('input[formControlName="password"]', ownerPassword);
+    await page.fill('input[formControlName="email"]', credentials.ownerEmail);
+    await page.fill('input[formControlName="password"]', credentials.ownerPassword);
     await page.click('button[type="submit"]');
     await page.waitForURL('**/home');
   });
@@ -92,7 +96,7 @@ test.describe('ProcurePilot Team Management (T061)', () => {
     // A real pending invitation, and the real token that came with it. This test previously used
     // a fabricated token string, so it exercised nothing: the invitation it claimed to accept
     // never existed, and the member the next three tests depended on was never created.
-    const { email, token } = await createPendingInvitation('buyer');
+    const { email, token } = await createPendingInvitation('buyer', ownerToken);
 
     const inviteeContext = await browser.newContext();
     const inviteePage = await inviteeContext.newPage();
@@ -114,7 +118,7 @@ test.describe('ProcurePilot Team Management (T061)', () => {
   test('should allow owner to change a member role', async ({ page }) => {
     // This test used to act on a member the two tests above were supposed to have created, so a
     // failure there took this one with it and it could never be run alone. It now makes its own.
-    const member = await createMember('buyer');
+    const member = await createMember('buyer', ownerToken);
     await page.goto('/team');
 
     const memberRow = page.locator('tr[mat-row]', { hasText: member.email });
@@ -137,7 +141,7 @@ test.describe('ProcurePilot Team Management (T061)', () => {
     await page.goto('/team');
 
     // Attempt to change owner's role to Viewer
-    const ownerRow = page.locator('tr[mat-row]', { hasText: ownerEmail });
+    const ownerRow = page.locator('tr[mat-row]', { hasText: credentials.ownerEmail });
     await ownerRow.locator('.action-menu-btn').click();
     await page.click('button:has-text("Change role")');
 
@@ -151,7 +155,7 @@ test.describe('ProcurePilot Team Management (T061)', () => {
   });
 
   test('should allow owner to remove a member from the workspace', async ({ page }) => {
-    const member = await createMember('buyer');
+    const member = await createMember('buyer', ownerToken);
     await page.goto('/team');
 
     const memberRow = page.locator('tr[mat-row]', { hasText: member.email });

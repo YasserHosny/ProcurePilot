@@ -25,7 +25,7 @@ test.describe('Self-Onboarding & Plan Display (T057, US3)', () => {
   test('displays assigned Starter plan details and feature checklist', async ({ page }) => {
     await page.goto('/plan');
 
-    await expect(page.locator('.page-title')).toContainText('Your Subscription Plan');
+    await expect(page.locator('.page-title')).toContainText('Your Workspace Plan');
     await expect(page.locator('.plan-name')).toContainText('Starter');
 
     // Verify feature checklist
@@ -49,6 +49,6 @@ test.describe('Self-Onboarding & Plan Display (T057, US3)', () => {
     await page.goto('/plan');
 
     await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
-    await expect(page.locator('.page-title')).toContainText('خطة اشتراكك');
+    await expect(page.locator('.page-title')).toContainText('خطة مساحة العمل الخاصة بك');
   });
 });

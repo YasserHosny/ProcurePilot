@@ -182,7 +182,9 @@
 
 .line-number-badge {
   font-weight: 600;
-  color: #0284c7;
+  // #0284c7 fails WCAG 2.1 AA color-contrast on this background (3.56:1, needs 4.5:1);
+  // #0369a1 gives ~5.2:1.
+  color: #0369a1;
   background: #e0f2fe;
   padding: 0.2rem 0.4rem;
   border-radius: 4px;

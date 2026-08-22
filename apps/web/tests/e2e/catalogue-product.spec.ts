@@ -36,8 +36,9 @@ test.describe("Catalogue Product Master (T018)", () => {
     const productName = `Whole Milk 5L ${Date.now()}`;
     await page.fill('input[formControlName="tenant_name"]', productName);
 
-    // Select base unit
-    await page.click('mat-select[formControlName="base_unit"]');
+    // Select base unit. The select trigger collapses under the floating label on this form, so
+    // click the whole form field — Material opens the option panel for a click anywhere in it.
+    await page.locator('mat-form-field', { hasText: 'Base Measurement Unit' }).click();
     await page.click('mat-option:has-text("Litre")');
 
     // Enter pack definition: 6 x 5.0
