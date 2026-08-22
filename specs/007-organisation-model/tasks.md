@@ -60,8 +60,8 @@ description: "Task list for Organisation Model implementation"
 
 ### Tests for User Story 1
 
-- [ ] T014 [P] [US1] Write contract tests for `GET/POST /organisation/branches` and `PATCH /organisation/branches/{id}` in `apps/api/tests/contract/test_branches_contract.py`, covering OpenAPI shapes, 403/404/422 envelopes, and cursor limits
-- [ ] T015 [P] [US1] Write branch CRUD integration tests in `apps/api/tests/integration/test_branches.py`, proving create/edit/deactivate, the no-hard-delete guarantee (FR-009), the `confirm_dependents` flow when a branch has cost centres or role assignments attached, and owner-only write access
+- [x] T014 [P] [US1] Write contract tests for `GET/POST /organisation/branches` and `PATCH /organisation/branches/{id}` in `apps/api/tests/contract/test_branches_contract.py`, covering OpenAPI shapes, 403/404/422 envelopes, and cursor limits
+- [x] T015 [P] [US1] Write branch CRUD integration tests in `apps/api/tests/integration/test_branches.py`, proving create/edit/deactivate, the no-hard-delete guarantee (FR-009), the `confirm_dependents` flow when a branch has cost centres or role assignments attached, and owner-only write access
 - [ ] T016 [P] [US1] Write frontend unit tests for the branch list/form in `apps/web/src/app/features/settings/branch-list/branch-list.component.spec.ts`, covering create, edit, deactivate-with-dependents confirmation, and owner-only action visibility
 - [ ] T017 [P] [US1] Write branch-management E2E coverage in `apps/web/tests/e2e/organisation-branches.spec.ts`, proving create, edit, deactivate with a dependent cost centre, and Arabic RTL layout
 
