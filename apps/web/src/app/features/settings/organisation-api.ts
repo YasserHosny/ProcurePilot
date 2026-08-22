@@ -19,6 +19,7 @@ import type {
   CostCentreCreate,
   CostCentreList,
   CostCentreUpdate,
+  OrphanReason,
 } from '../../core/api/models';
 
 export type {
@@ -38,6 +39,7 @@ export type {
   CostCentreCreate,
   CostCentreList,
   CostCentreUpdate,
+  OrphanReason,
 };
 
 @Injectable({ providedIn: 'root' })

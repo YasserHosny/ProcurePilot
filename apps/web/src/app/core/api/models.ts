@@ -884,6 +884,8 @@ export interface BranchList {
   readonly next_cursor: string | null;
 }
 
+export type OrphanReason = 'branch_deactivated' | 'owner_removed';
+
 export interface CostCentre {
   readonly id: string;
   readonly name: string;
@@ -891,6 +893,8 @@ export interface CostCentre {
   readonly budget_owner_membership_id?: string | null;
   readonly branch_id?: string | null;
   readonly is_orphaned: boolean;
+  /** Computed at read time by the API — never stored. Null whenever is_orphaned is false. */
+  readonly orphan_reason?: OrphanReason | null;
   readonly is_archived: boolean;
   readonly created_at: string;
   readonly updated_at?: string;
