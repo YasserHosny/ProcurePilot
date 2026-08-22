@@ -1,5 +1,14 @@
 import { test, expect } from '@playwright/test';
 import { createMember, type CreatedMember } from './support/api';
+import {
+  confirmQuotation,
+  correctIssueDate,
+  correctStatedTotal,
+  createE2ESupplier,
+  saveCorrections,
+  selectReviewSupplier,
+  uploadQuotationAndOpenReview,
+} from './support/canonical-flow';
 
 /**
  * End-to-End test suite for Quotation Side-by-Side Review & Confirmation (T053, US2).
@@ -55,57 +64,31 @@ test.describe('Quotation Review & Confirmation (T053, US2)', () => {
 
     // Test clicking a field highlights its source region in the document canvas
     const currencyField = page.locator('.field-box', { hasText: 'Currency' });
-    if (await currencyField.isVisible()) {
-      await currencyField.click();
-      await expect(page.locator('.provenance-card, .bounding-box-highlight')).toBeVisible();
-    }
+    await currencyField.click();
+    // Both the highlighted region and the provenance card render for the active extraction.
+    await expect(page.locator('.bounding-box-highlight')).toBeVisible();
+    await expect(page.locator('.provenance-card')).toBeVisible();
 
-    // Test Keyboard navigation between flagged fields (FR-014)
+    // Test Keyboard navigation between flagged fields (FR-014): the stub provider always
+    // extracts a sub-threshold issue date, so the nav bar is present on every review.
     const keyboardNavBar = page.locator('.keyboard-nav-bar');
-    if (await keyboardNavBar.isVisible()) {
-      await page.keyboard.press('Alt+KeyN');
-      await expect(page.locator('.bounding-box-highlight')).toBeVisible();
-    }
+    await expect(keyboardNavBar).toBeVisible();
+    await page.keyboard.press('Alt+KeyN');
+    await expect(page.locator('.bounding-box-highlight')).toBeVisible();
   });
 
-  test('correct extracted field, select supplier, and confirm quotation', async ({ page }) => {
-    await page.goto('/quotations/upload');
-    const validPdfContent = '%PDF-1.4\n1 0 obj\n<< /Title (Quote) >>\nendobj\ntrailer\n<< /Root 1 0 R >>\n%%EOF';
-    await page.setInputFiles('input.file-input', {
-      name: 'quote_confirm.pdf',
-      mimeType: 'application/pdf',
-      buffer: Buffer.from(validPdfContent),
-    });
-    await page.click('.start-upload-btn');
-    await expect(page.locator('.result-container.success')).toBeVisible({ timeout: 15000 });
-    await page.click('a:has-text("Proceed to Review")');
-    await page.waitForURL('**/quotations/**/review');
+  test('corrects header fields, selects supplier, saves corrections, and confirms quotation', async ({ page }) => {
+    const supplier = await createE2ESupplier();
+    await uploadQuotationAndOpenReview(page, 'quote_confirm.pdf');
 
-    // Make an inline correction if line items are present
-    const quantityInput = page.locator('.line-field input').first();
-    if (await quantityInput.isVisible()) {
-      await quantityInput.fill('15');
-      // Save corrections
-      const saveBtn = page.locator('button.save-btn');
-      if (await saveBtn.isEnabled()) {
-        await saveBtn.click();
-        await expect(page.locator('.corrected-tag')).toBeVisible();
-      }
-    }
+    // The stub provider always leaves a stated/computed mismatch and a low-confidence issue
+    // date; both must be corrected by a human before the quotation can be confirmed.
+    await selectReviewSupplier(page, supplier.name);
+    await correctStatedTotal(page);
+    await correctIssueDate(page);
+    await saveCorrections(page);
 
-    // Select Supplier from dropdown if suppliers exist
-    const supplierSelect = page.locator('mat-select[required]');
-    await supplierSelect.click();
-    const firstOption = page.locator('mat-option').nth(1); // skip placeholder
-    if (await firstOption.isVisible()) {
-      await firstOption.click();
-    }
-
-    // If confirm button is enabled, click Confirm & Authorize
-    const confirmBtn = page.locator('button.confirm-btn');
-    if (await confirmBtn.isEnabled()) {
-      await confirmBtn.click();
-      await expect(page.locator('.status-pill.status-reviewed')).toBeVisible();
-    }
+    // FR-016: human authorization via POST /confirm flips the quotation to reviewed.
+    await confirmQuotation(page);
   });
 });

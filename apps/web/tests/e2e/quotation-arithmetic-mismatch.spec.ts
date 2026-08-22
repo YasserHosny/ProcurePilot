@@ -1,5 +1,13 @@
 import { test, expect } from '@playwright/test';
 import { createMember, type CreatedMember } from './support/api';
+import {
+  correctIssueDate,
+  correctStatedTotal,
+  saveCorrections,
+  selectReviewSupplier,
+  createE2ESupplier,
+  uploadQuotationAndOpenReview,
+} from './support/canonical-flow';
 
 /**
  * End-to-End test suite for Arithmetic Mismatch Presentation & Confirmation Guardrail (T055, US3).
@@ -7,6 +15,9 @@ import { createMember, type CreatedMember } from './support/api';
  * Requirements:
  * - FR-010: System MUST validate line totals against stated total and force review when they differ.
  * - SC-003: 100% of mismatched-total quotations are held in mandatory review and cannot skip human review.
+ *
+ * The stub extraction provider always states £88.00 or £77.00 against a computed line total of
+ * exactly £75.00, so every upload lands in mandatory review — no branching needed.
  */
 test.describe('Quotation Arithmetic Mismatch (T055, US3)', () => {
   let buyer: CreatedMember;
@@ -21,25 +32,33 @@ test.describe('Quotation Arithmetic Mismatch (T055, US3)', () => {
   });
 
   test('surfaces arithmetic mismatch banner with stated vs computed total breakdown and blocks confirmation', async ({ page }) => {
-    // Navigate to quotation review queue
-    await page.goto('/quotations');
-    await expect(page.locator('.page-title')).toContainText('Quotation Review Queue');
+    const supplier = await createE2ESupplier();
+    await uploadQuotationAndOpenReview(page, 'arithmetic_mismatch.pdf');
 
-    // Filter by reason: arithmetic_mismatch if any exist in the queue
-    const mismatchChip = page.locator('.reason-chip.reason-arithmetic_mismatch').first();
-    if (await mismatchChip.isVisible()) {
-      const reviewLink = page.locator('a:has-text("Review & Authorize")').first();
-      await reviewLink.click();
-      await page.waitForURL('**/quotations/**/review');
+    // The mismatch banner is present on every stub upload — stated total is never 75.00.
+    const banner = page.locator('.arithmetic-mismatch-banner');
+    await expect(banner).toBeVisible();
+    await expect(page.locator('.mismatch-title')).toContainText('Arithmetic Discrepancy Detected');
 
-      // Verify the prominent arithmetic mismatch alert banner
-      await expect(page.locator('.arithmetic-mismatch-banner')).toBeVisible();
-      await expect(page.locator('.mismatch-title')).toContainText('Arithmetic Discrepancy Detected');
-      await expect(page.locator('.breakdown-item.diff-item')).toBeVisible();
+    // Breakdown: stated (88.00 or 77.00, hash-chosen) vs computed (always 75.00).
+    const statedValue = page.locator('.breakdown-item').first().locator('.breakdown-val');
+    await expect(statedValue).toHaveText(/^\s*£(88|77)\.00\s*$/);
+    const computedValue = page.locator('.breakdown-item').nth(1).locator('.breakdown-val');
+    await expect(computedValue).toHaveText(/^\s*£75\.00\s*$/);
+    await expect(page.locator('.breakdown-item.diff-item')).toBeVisible();
 
-      // Verify confirmation is disabled while mismatch persists
-      const confirmBtn = page.locator('button.confirm-btn');
-      await expect(confirmBtn).toBeDisabled();
-    }
+    // SC-003: confirmation is genuinely blocked while the mismatch persists.
+    await expect(page.locator('button.confirm-btn')).toBeDisabled();
+
+    // A human reconciles the discrepancy (stated → computed) and resolves the low-confidence
+    // issue date; only then is the guardrail released.
+    await selectReviewSupplier(page, supplier.name);
+    await correctStatedTotal(page);
+    await correctIssueDate(page);
+    await saveCorrections(page);
+
+    // The banner (and its breakdown) only renders while the mismatch persists.
+    await expect(banner).toBeHidden();
+    await expect(page.locator('button.confirm-btn')).toBeEnabled();
   });
 });

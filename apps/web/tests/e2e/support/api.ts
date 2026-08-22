@@ -202,12 +202,13 @@ export async function createTestSupplier(
   name?: string,
 ): Promise<{ id: string; name: string }> {
   const uniqueName = name ?? `Supplier ${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+  // No status field: SupplierCreate is a strict model and rejects it, and the supplier table
+  // defaults to 'active' anyway.
   return call<{ id: string; name: string }>('/suppliers', {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}` },
     body: JSON.stringify({
       name: uniqueName,
-      status: 'active',
     }),
   });
 }
@@ -310,5 +311,48 @@ export async function fetchLimitCheck(token: string): Promise<{
     method: 'GET',
     headers: { Authorization: `Bearer ${token}` },
   });
+}
+
+/**
+ * Canonical-path helpers (T075): read back the state a confirmed quotation produced, so a spec
+ * can link a purchase to the exact quotation line / match decision / landed cost the pipeline
+ * created — the same ids the Smart Compare "Record Purchase" button passes along.
+ */
+export interface QuotationMatchLineState {
+  line: { id: string; line_number: number; original_text: string };
+  task: { id: string; status: string } | null;
+  decision: {
+    id: string;
+    outcome: string;
+    matched_product: { id: string; tenant_name: string };
+  } | null;
+  landed_cost: { id: string } | null;
+}
+
+export async function fetchQuotationMatches(
+  token: string,
+  quotationId: string,
+): Promise<{ quotation_id: string; lines: QuotationMatchLineState[] }> {
+  return call(`/quotations/${encodeURIComponent(quotationId)}/matches`, {
+    method: 'GET',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export async function findProductByName(
+  token: string,
+  tenantName: string,
+): Promise<{ id: string; tenant_name: string; base_unit: string }> {
+  const res = await call<{
+    items: Array<{ id: string; tenant_name: string; base_unit: string }>;
+  }>('/products?limit=100&status=active', {
+    method: 'GET',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const found = res.items.find((p) => p.tenant_name === tenantName);
+  if (!found) {
+    throw new Error(`No active product named "${tenantName}" exists in the workspace`);
+  }
+  return found;
 }
 
