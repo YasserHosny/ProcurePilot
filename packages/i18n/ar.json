@@ -1338,8 +1338,23 @@
         "edit": "تعديل الفرع",
         "deactivate": "تعطيل الفرع"
       },
+      "form": {
+        "createTitle": "فرع جديد",
+        "editTitle": "تعديل الفرع",
+        "nameLabel": "اسم الفرع",
+        "namePlaceholder": "مثال: مستودع الإسكندرية",
+        "nameRequired": "اسم الفرع مطلوب.",
+        "addressLabel": "العنوان",
+        "addressPlaceholder": "عنوان الشارع (اختياري)",
+        "regionLabel": "المنطقة",
+        "regionPlaceholder": "رمز المنطقة (اختياري)",
+        "cancelButton": "إلغاء",
+        "submitButton": "حفظ الفرع",
+        "submittingButton": "جاري الحفظ..."
+      },
       "empty": "لم يتم إنشاء أي فروع بعد. أضف أول فرع لتبدأ في هيكلة منشأتك.",
       "deactivateSuccess": "تم تعطيل الفرع بنجاح.",
+      "createSuccess": "تم إنشاء الفرع بنجاح.",
       "genericError": "تعذر حفظ الفرع. يُرجى المحاولة مرة أخرى.",
       "deactivateDialog": {
         "title": "تعطيل الفرع",

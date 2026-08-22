@@ -1338,8 +1338,23 @@
         "edit": "Edit branch",
         "deactivate": "Deactivate branch"
       },
+      "form": {
+        "createTitle": "New Branch",
+        "editTitle": "Edit Branch",
+        "nameLabel": "Branch Name",
+        "namePlaceholder": "e.g. Alexandria Warehouse",
+        "nameRequired": "Branch name is required.",
+        "addressLabel": "Address",
+        "addressPlaceholder": "Street address (optional)",
+        "regionLabel": "Region",
+        "regionPlaceholder": "Region code (optional)",
+        "cancelButton": "Cancel",
+        "submitButton": "Save Branch",
+        "submittingButton": "Saving..."
+      },
       "empty": "No branches have been created yet. Add your first branch to start structuring your organisation.",
       "deactivateSuccess": "Branch deactivated successfully.",
+      "createSuccess": "Branch created successfully.",
       "genericError": "Unable to save the branch. Please try again.",
       "deactivateDialog": {
         "title": "Deactivate Branch",

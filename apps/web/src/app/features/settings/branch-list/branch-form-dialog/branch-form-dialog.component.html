@@ -1,0 +1,71 @@
+<h2 mat-dialog-title>{{ titleKey | translate }}</h2>
+
+<mat-dialog-content>
+  @if (errorMessage()) {
+    <div class="error-banner" role="alert">
+      <mat-icon aria-hidden="true">error</mat-icon>
+      <div class="error-content">
+        <span class="error-message">{{ errorMessage() }}</span>
+        @if (errorTraceId()) {
+          <span class="error-trace">{{ 'common.traceId' | translate }}: {{ errorTraceId() }}</span>
+        }
+      </div>
+    </div>
+  }
+
+  <form [formGroup]="form" id="branch-form" (ngSubmit)="onSubmit()" class="dialog-form">
+    <mat-form-field appearance="outline" class="full-width">
+      <mat-label>{{ 'organisation.branches.form.nameLabel' | translate }}</mat-label>
+      <input
+        matInput
+        type="text"
+        formControlName="name"
+        [placeholder]="'organisation.branches.form.namePlaceholder' | translate"
+        required
+      />
+      @if (form.controls.name.hasError('required')) {
+        <mat-error>{{ 'organisation.branches.form.nameRequired' | translate }}</mat-error>
+      }
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="full-width">
+      <mat-label>{{ 'organisation.branches.form.addressLabel' | translate }}</mat-label>
+      <input
+        matInput
+        type="text"
+        formControlName="address"
+        [placeholder]="'organisation.branches.form.addressPlaceholder' | translate"
+      />
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="full-width">
+      <mat-label>{{ 'organisation.branches.form.regionLabel' | translate }}</mat-label>
+      <input
+        matInput
+        type="text"
+        formControlName="region"
+        [placeholder]="'organisation.branches.form.regionPlaceholder' | translate"
+      />
+    </mat-form-field>
+  </form>
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button mat-button type="button" (click)="onCancel()" [disabled]="isSubmitting()">
+    {{ 'organisation.branches.form.cancelButton' | translate }}
+  </button>
+  <button
+    mat-flat-button
+    color="primary"
+    type="submit"
+    form="branch-form"
+    [disabled]="isSubmitting() || form.invalid"
+  >
+    @if (isSubmitting()) {
+      <mat-spinner [attr.aria-label]="'common.loading' | translate" diameter="18" class="spinner"></mat-spinner>
+      <span>{{ 'organisation.branches.form.submittingButton' | translate }}</span>
+    } @else {
+      <span>{{ 'organisation.branches.form.submitButton' | translate }}</span>
+    }
+  </button>
+</mat-dialog-actions>

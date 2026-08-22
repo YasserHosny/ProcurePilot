@@ -1,0 +1,25 @@
+<h2 mat-dialog-title>
+  <mat-icon class="warning-icon" aria-hidden="true">warning</mat-icon>
+  {{ 'organisation.branches.deactivateDialog.title' | translate }}
+</h2>
+
+<mat-dialog-content>
+  <p class="dialog-message">
+    {{ 'organisation.branches.deactivateDialog.message' | translate }}
+  </p>
+
+  @if (data.dependentCount > 0) {
+    <p class="dialog-warning" role="alert">
+      {{ 'organisation.branches.deactivateDialog.dependentsWarning' | translate: warningParams }}
+    </p>
+  }
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button mat-button type="button" (click)="onCancel()">
+    {{ 'organisation.branches.deactivateDialog.cancelButton' | translate }}
+  </button>
+  <button mat-flat-button color="warn" type="button" (click)="onConfirm()">
+    {{ 'organisation.branches.deactivateDialog.confirmButton' | translate }}
+  </button>
+</mat-dialog-actions>

@@ -1,0 +1,134 @@
+<div class="settings-container">
+  <div class="section-header">
+    <h2 class="section-title">{{ 'organisation.branchesSectionTitle' | translate }}</h2>
+
+    <button
+      mat-flat-button
+      color="primary"
+      type="button"
+      (click)="openCreateDialog()"
+      class="action-btn"
+      *appRole="['owner']"
+    >
+      <mat-icon aria-hidden="true">add</mat-icon>
+      <span>{{ 'organisation.branches.createButton' | translate }}</span>
+    </button>
+  </div>
+
+  @if (errorMessage()) {
+    <div class="error-banner" role="alert">
+      <mat-icon class="error-icon" aria-hidden="true">error_outline</mat-icon>
+      <div class="error-text-wrap">
+        <div class="error-title">{{ 'common.traceId' | translate }}</div>
+        <div class="error-message">{{ errorMessage() }}</div>
+        @if (errorTraceId(); as traceId) {
+          <div class="error-trace">{{ traceId }}</div>
+        }
+      </div>
+    </div>
+  }
+
+  <mat-card class="branches-card">
+    @if (isLoading()) {
+      <div class="loading-state" aria-live="polite">
+        <mat-spinner [attr.aria-label]="'common.loading' | translate" diameter="40"></mat-spinner>
+        <span>{{ 'common.loading' | translate }}</span>
+      </div>
+    } @else if (branches().length === 0) {
+      <div class="empty-state">
+        <mat-icon class="empty-icon" aria-hidden="true">corporate_fare</mat-icon>
+        <p class="empty-message">
+          {{ 'organisation.branches.empty' | translate }}
+        </p>
+      </div>
+    } @else {
+      <div class="table-responsive">
+        <table mat-table [dataSource]="branches()" class="branches-table">
+          <ng-container matColumnDef="name">
+            <th mat-header-cell *matHeaderCellDef>
+              {{ 'organisation.branches.columns.name' | translate }}
+            </th>
+            <td mat-cell *matCellDef="let branch">
+              <span class="branch-name">{{ branch.name }}</span>
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="address">
+            <th mat-header-cell *matHeaderCellDef>
+              {{ 'organisation.branches.columns.address' | translate }}
+            </th>
+            <td mat-cell *matCellDef="let branch">
+              {{ branch.address || '—' }}
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="region">
+            <th mat-header-cell *matHeaderCellDef>
+              {{ 'organisation.branches.columns.region' | translate }}
+            </th>
+            <td mat-cell *matCellDef="let branch">
+              {{ branch.region || '—' }}
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="status">
+            <th mat-header-cell *matHeaderCellDef>
+              {{ 'organisation.branches.columns.status' | translate }}
+            </th>
+            <td mat-cell *matCellDef="let branch">
+              <span
+                class="status-indicator"
+                [class.status-active]="branch.is_active"
+                [class.status-inactive]="!branch.is_active"
+              >
+                <span class="dot"></span>
+                <span>
+                  {{
+                    (branch.is_active
+                      ? 'organisation.status.active'
+                      : 'organisation.status.inactive') | translate
+                  }}
+                </span>
+              </span>
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="actions">
+            <th mat-header-cell *matHeaderCellDef>
+              {{ 'organisation.branches.columns.actions' | translate }}
+            </th>
+            <td mat-cell *matCellDef="let branch">
+              <div class="actions-cell" *appRole="['owner']">
+                <button
+                  mat-icon-button
+                  type="button"
+                  (click)="openEditDialog(branch)"
+                  [attr.aria-label]="'organisation.branches.actions.edit' | translate"
+                  [matTooltip]="'organisation.branches.actions.edit' | translate"
+                >
+                  <mat-icon aria-hidden="true">edit</mat-icon>
+                </button>
+
+                @if (branch.is_active) {
+                  <button
+                    mat-icon-button
+                    type="button"
+                    (click)="deactivateBranch(branch)"
+                    class="danger-action"
+                    [attr.aria-label]="'organisation.branches.actions.deactivate' | translate"
+                    [matTooltip]="'organisation.branches.actions.deactivate' | translate"
+                  >
+                    <mat-icon aria-hidden="true">block</mat-icon>
+                  </button>
+                }
+              </div>
+            </td>
+          </ng-container>
+
+          <tr mat-header-row *matHeaderRowDef="displayedColumns()"></tr>
+          <tr mat-row *matRowDef="let row; columns: displayedColumns()"></tr>
+        </table>
+      </div>
+    }
+  </mat-card>
+</div>

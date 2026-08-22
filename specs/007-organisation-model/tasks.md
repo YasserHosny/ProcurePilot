@@ -62,14 +62,14 @@ description: "Task list for Organisation Model implementation"
 
 - [x] T014 [P] [US1] Write contract tests for `GET/POST /organisation/branches` and `PATCH /organisation/branches/{id}` in `apps/api/tests/contract/test_branches_contract.py`, covering OpenAPI shapes, 403/404/422 envelopes, and cursor limits
 - [x] T015 [P] [US1] Write branch CRUD integration tests in `apps/api/tests/integration/test_branches.py`, proving create/edit/deactivate, the no-hard-delete guarantee (FR-009), the `confirm_dependents` flow when a branch has cost centres or role assignments attached, and owner-only write access
-- [ ] T016 [P] [US1] Write frontend unit tests for the branch list/form in `apps/web/src/app/features/settings/branch-list/branch-list.component.spec.ts`, covering create, edit, deactivate-with-dependents confirmation, and owner-only action visibility
+- [x] T016 [P] [US1] Write frontend unit tests for the branch list/form in `apps/web/src/app/features/settings/branch-list/branch-list.component.spec.ts`, covering create, edit, deactivate-with-dependents confirmation, and owner-only action visibility
 - [ ] T017 [P] [US1] Write branch-management E2E coverage in `apps/web/tests/e2e/organisation-branches.spec.ts`, proving create, edit, deactivate with a dependent cost centre, and Arabic RTL layout
 
 ### Implementation for User Story 1
 
 - [x] T018 [US1] Implement branch create/edit/list/deactivate in `apps/api/src/procurepilot_api/modules/organisation/service.py`, enforcing owner-only writes, the dependent-confirmation flow (FR-009), and cross-tenant/cross-branch not-found semantics (FR-008)
 - [x] T019 [US1] Expose `GET/POST /organisation/branches` and `PATCH /organisation/branches/{id}` in `apps/api/src/procurepilot_api/modules/organisation/router.py`
-- [ ] T020 [P] [US1] Build the branch list/create/edit UI in `apps/web/src/app/features/settings/branch-list/branch-list.component.ts`, `.html`, and `.scss`, using only `packages/i18n` strings and CSS logical properties
+- [x] T020 [P] [US1] Build the branch list/create/edit UI in `apps/web/src/app/features/settings/branch-list/branch-list.component.ts`, `.html`, and `.scss`, using only `packages/i18n` strings and CSS logical properties
 
 **Checkpoint**: US1 is independently testable — branches can be fully managed with no other entity required.
 
