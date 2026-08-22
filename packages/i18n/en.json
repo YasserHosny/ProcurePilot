@@ -1313,5 +1313,97 @@
       "name": "Growth",
       "description": "For growing operations requiring higher product limits."
     }
+  },
+  "organisation": {
+    "title": "Organisation Settings",
+    "subtitle": "Manage your organisation's branches, cost centres, and budgets in one place.",
+    "branchesSectionTitle": "Branches",
+    "costCentresSectionTitle": "Cost Centres",
+    "budgetsSectionTitle": "Budgets",
+    "status": {
+      "active": "Active",
+      "inactive": "Inactive",
+      "archived": "Archived"
+    },
+    "branches": {
+      "createButton": "New Branch",
+      "columns": {
+        "name": "Branch Name",
+        "address": "Address",
+        "region": "Region",
+        "status": "Status",
+        "actions": "Actions"
+      },
+      "actions": {
+        "edit": "Edit branch",
+        "deactivate": "Deactivate branch"
+      },
+      "empty": "No branches have been created yet. Add your first branch to start structuring your organisation.",
+      "deactivateSuccess": "Branch deactivated successfully.",
+      "genericError": "Unable to save the branch. Please try again.",
+      "deactivateDialog": {
+        "title": "Deactivate Branch",
+        "message": "Are you sure you want to deactivate this branch? A deactivated branch stops appearing as an assignable option, while its historical records remain attributed to it.",
+        "dependentsWarning": "This branch still has {{count}} cost centre(s)/assignment(s) linked to it. Hard deletion is never permitted once records depend on a branch; deactivation preserves their history.",
+        "confirmButton": "Deactivate Branch",
+        "cancelButton": "Cancel",
+        "deactivatingButton": "Deactivating..."
+      }
+    },
+    "costCentres": {
+      "createButton": "New Cost Centre",
+      "columns": {
+        "name": "Cost Centre Name",
+        "code": "Code",
+        "budgetOwner": "Budget Owner",
+        "branch": "Branch",
+        "status": "Status",
+        "actions": "Actions"
+      },
+      "allBranchesValue": "Organisation-wide",
+      "actions": {
+        "edit": "Edit cost centre",
+        "archive": "Archive cost centre"
+      },
+      "empty": "No cost centres have been defined yet.",
+      "duplicateCodeError": "This code is already in use by another cost centre in your organisation. Cost centre codes must be unique.",
+      "orphanedBadge": "Orphaned",
+      "orphanReasons": {
+        "branch_deactivated": "The branch linked to this cost centre has been deactivated. Reassign it to an active branch or archive it.",
+        "owner_removed": "The budget owner assigned to this cost centre has been removed from the workspace. Assign a new budget owner or archive it."
+      },
+      "archiveSuccess": "Cost centre archived successfully.",
+      "genericError": "Unable to save the cost centre. Please try again.",
+      "archiveDialog": {
+        "title": "Archive Cost Centre",
+        "message": "Are you sure you want to archive this cost centre? Archived cost centres can no longer receive assignments, while their historical records remain intact.",
+        "confirmButton": "Archive Cost Centre",
+        "cancelButton": "Cancel",
+        "archivingButton": "Archiving..."
+      }
+    },
+    "budgets": {
+      "createButton": "Define Budget",
+      "columns": {
+        "amount": "Amount",
+        "currency": "Currency",
+        "period": "Period",
+        "scope": "Scope",
+        "scopeTarget": "Applies To"
+      },
+      "scopeOptions": {
+        "organisation": "Whole organisation",
+        "branch": "Branch",
+        "cost_centre": "Cost centre"
+      },
+      "overlapWarning": "A budget already exists for this scope during part of the selected period. Multiple budgets may legitimately coexist — review the overlap before saving.",
+      "empty": "No budgets have been defined yet.",
+      "createSuccess": "Budget defined successfully.",
+      "genericError": "Unable to save the budget. Please try again."
+    },
+    "roleScoping": {
+      "branchScopedBadge": "Branch-scoped",
+      "notFoundMessage": "This branch does not exist or is not available."
+    }
   }
 }
