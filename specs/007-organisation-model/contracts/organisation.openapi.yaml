@@ -385,6 +385,14 @@ components:
         budget_owner_membership_id: { type: string, format: uuid, nullable: true }
         branch_id: { type: string, format: uuid, nullable: true }
         is_orphaned: { type: boolean }
+        orphan_reason:
+          type: string
+          nullable: true
+          enum: [branch_deactivated, owner_removed]
+          description: >
+            Computed at read time from the linked branch's is_active / the budget owner's
+            membership status — never stored. Always null when is_orphaned is false. When both
+            causes are simultaneously true, branch_deactivated takes priority (FR-010).
         is_archived: { type: boolean }
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }

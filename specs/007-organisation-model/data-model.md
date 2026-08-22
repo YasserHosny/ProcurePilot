@@ -71,9 +71,9 @@ A budget-tracking grouping within a tenant, independent of physical location.
 | `tenant_id` | uuid | yes | FK -> `tenant(id)`, RLS isolation boundary |
 | `name` | text | yes | |
 | `code` | text | yes | Unique per tenant (FR-003) |
-| `budget_owner_membership_id` | uuid | no | Composite FK -> `membership(tenant_id, id)`; nullable when the owner has been removed from the workspace (FR-010 orphan-flagging) |
+| `budget_owner_membership_id` | uuid | no | Composite FK -> `membership(tenant_id, id)`; kept pointing at the row even after removal, since member removal is a soft delete (`status='removed'`) — the FK's `on delete set null` never fires for this path in practice |
 | `branch_id` | uuid | no | Composite FK -> `branch(tenant_id, id)`; null = organisation-wide cost centre |
-| `is_orphaned` | boolean | yes | Default `false`; set `true` by application logic when `branch_id`'s branch is deactivated or `budget_owner_membership_id`'s member is removed (FR-010) — a flag, not a derived/computed column, so the orphan state is visible even after the branch or member row itself changes further |
+| `is_orphaned` | boolean | yes | Default `false`; set `true` by application logic when `branch_id`'s branch is deactivated or `budget_owner_membership_id`'s member is removed (FR-010) — a flag, not a derived/computed column, so the orphan state is visible even after the branch or member row itself changes further. Why it stays a boolean rather than storing the cause: the cause (which branch/which member) is recoverable at any time by re-checking `branch.is_active` / `membership.status` through the existing FKs, so a separate stored reason column would just be a second source of truth to keep in sync — the API's `orphan_reason` response field (contract only, not a column) derives it live at read time instead. |
 | `is_archived` | boolean | yes | Default `false` |
 | `created_at` | timestamptz | yes | Default `now()` |
 | `updated_at` | timestamptz | yes | Default `now()` |

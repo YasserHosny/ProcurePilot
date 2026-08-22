@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field, StrictStr
 
 type BudgetScope = Literal["organisation", "branch", "cost_centre"]
 type BudgetPeriod = Literal["monthly", "quarterly", "annual"]
+type OrphanReason = Literal["branch_deactivated", "owner_removed"]
 
 
 class StrictApiModel(BaseModel):
@@ -55,6 +56,7 @@ class CostCentre(BaseModel):
     budget_owner_membership_id: UUID | None = None
     branch_id: UUID | None = None
     is_orphaned: bool
+    orphan_reason: OrphanReason | None = None
     is_archived: bool
     created_at: datetime
     updated_at: datetime | None = None
