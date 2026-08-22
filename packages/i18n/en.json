@@ -1376,11 +1376,28 @@
         "actions": "Actions"
       },
       "allBranchesValue": "Organisation-wide",
-      "actions": {
-        "edit": "Edit cost centre",
-        "archive": "Archive cost centre"
-      },
-      "empty": "No cost centres have been defined yet.",
+    "actions": {
+      "edit": "Edit cost centre",
+      "archive": "Archive cost centre"
+    },
+    "form": {
+      "createTitle": "New Cost Centre",
+      "editTitle": "Edit Cost Centre",
+      "nameLabel": "Cost Centre Name",
+      "namePlaceholder": "e.g. Marketing",
+      "nameRequired": "Cost centre name is required.",
+      "codeLabel": "Code",
+      "codePlaceholder": "e.g. MKT-001",
+      "codeRequired": "Code is required.",
+      "budgetOwnerLabel": "Budget Owner",
+      "budgetOwnerNoneValue": "No budget owner",
+      "branchLabel": "Branch",
+      "cancelButton": "Cancel",
+      "submitButton": "Save Cost Centre",
+      "submittingButton": "Saving...",
+      "createSuccess": "Cost centre created successfully."
+    },
+    "empty": "No cost centres have been defined yet.",
       "duplicateCodeError": "This code is already in use by another cost centre in your organisation. Cost centre codes must be unique.",
       "orphanedBadge": "Orphaned",
       "orphanReasons": {

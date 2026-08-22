@@ -85,14 +85,14 @@ description: "Task list for Organisation Model implementation"
 
 - [x] T021 [P] [US2] Write contract tests for `GET/POST /organisation/cost-centres` and `PATCH /organisation/cost-centres/{id}` in `apps/api/tests/contract/test_cost_centres_contract.py`, covering OpenAPI shapes, the duplicate-code 409, and 403/404/422 envelopes
 - [x] T022 [P] [US2] Write cost-centre integration tests in `apps/api/tests/integration/test_cost_centres.py`, proving duplicate-code rejection (FR-003), the orphan-flagging behaviour when a linked branch is deactivated or the budget owner is removed (FR-010), and owner-only write access
-- [ ] T023 [P] [US2] Write frontend unit tests for the cost-centre list/form in `apps/web/src/app/features/settings/cost-centre-list/cost-centre-list.component.spec.ts`, covering create, duplicate-code error display, and orphaned-flag messaging
+- [x] T023 [P] [US2] Write frontend unit tests for the cost-centre list/form in `apps/web/src/app/features/settings/cost-centre-list/cost-centre-list.component.spec.ts`, covering create, duplicate-code error display, and orphaned-flag messaging
 - [ ] T024 [P] [US2] Write cost-centre-management E2E coverage in `apps/web/tests/e2e/organisation-cost-centres.spec.ts`, proving create with a budget owner and branch link, a duplicate-code rejection, and Arabic RTL layout
 
 ### Implementation for User Story 2
 
 - [x] T025 [US2] Implement cost-centre create/edit/list/archive in `apps/api/src/procurepilot_api/modules/organisation/service.py`, enforcing the unique-code constraint, owner-only writes, and orphan-flagging when a linked branch is deactivated or a budget owner is removed (FR-010)
 - [x] T026 [US2] Expose `GET/POST /organisation/cost-centres` and `PATCH /organisation/cost-centres/{id}` in `apps/api/src/procurepilot_api/modules/organisation/router.py`
-- [ ] T027 [P] [US2] Build the cost-centre list/create/edit UI in `apps/web/src/app/features/settings/cost-centre-list/cost-centre-list.component.ts`, `.html`, and `.scss`, including a budget-owner picker sourced from the existing member list and an optional branch picker
+- [x] T027 [P] [US2] Build the cost-centre list/create/edit UI in `apps/web/src/app/features/settings/cost-centre-list/cost-centre-list.component.ts`, `.html`, and `.scss`, including a budget-owner picker sourced from the existing member list and an optional branch picker
 
 **Checkpoint**: US2 is independently testable alongside US1's branches, or on its own using only organisation-wide cost centres.
 

@@ -1,0 +1,89 @@
+<h2 mat-dialog-title>{{ titleKey | translate }}</h2>
+
+<mat-dialog-content>
+  @if (errorMessage()) {
+    <div class="error-banner" role="alert">
+      <mat-icon aria-hidden="true">error</mat-icon>
+      <div class="error-content">
+        <span class="error-message">{{ errorMessage() }}</span>
+        @if (errorTraceId()) {
+          <span class="error-trace">{{ 'common.traceId' | translate }}: {{ errorTraceId() }}</span>
+        }
+      </div>
+    </div>
+  }
+
+  <form [formGroup]="form" id="cost-centre-form" (ngSubmit)="onSubmit()" class="dialog-form">
+    <mat-form-field appearance="outline" class="full-width">
+      <mat-label>{{ 'organisation.costCentres.form.nameLabel' | translate }}</mat-label>
+      <input
+        matInput
+        type="text"
+        formControlName="name"
+        [placeholder]="'organisation.costCentres.form.namePlaceholder' | translate"
+        required
+      />
+      @if (form.controls.name.hasError('required')) {
+        <mat-error>{{ 'organisation.costCentres.form.nameRequired' | translate }}</mat-error>
+      }
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="full-width">
+      <mat-label>{{ 'organisation.costCentres.form.codeLabel' | translate }}</mat-label>
+      <input
+        matInput
+        type="text"
+        formControlName="code"
+        [placeholder]="'organisation.costCentres.form.codePlaceholder' | translate"
+        required
+      />
+      @if (form.controls.code.hasError('required')) {
+        <mat-error>{{ 'organisation.costCentres.form.codeRequired' | translate }}</mat-error>
+      }
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="full-width">
+      <mat-label>{{ 'organisation.costCentres.form.budgetOwnerLabel' | translate }}</mat-label>
+      <mat-select formControlName="budget_owner_membership_id">
+        <mat-option [value]="null">
+          {{ 'organisation.costCentres.form.budgetOwnerNoneValue' | translate }}
+        </mat-option>
+        @for (member of members(); track member.id) {
+          <mat-option [value]="member.id">{{ member.email }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="full-width">
+      <mat-label>{{ 'organisation.costCentres.form.branchLabel' | translate }}</mat-label>
+      <mat-select formControlName="branch_id">
+        <mat-option [value]="null">{{ allBranchesKey | translate }}</mat-option>
+        @for (branch of branches(); track branch.id) {
+          <mat-option [value]="branch.id" [disabled]="!branch.is_active">
+            {{ branch.name }}
+          </mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+  </form>
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button mat-button type="button" (click)="onCancel()" [disabled]="isSubmitting()">
+    {{ 'organisation.costCentres.form.cancelButton' | translate }}
+  </button>
+  <button
+    mat-flat-button
+    color="primary"
+    type="submit"
+    form="cost-centre-form"
+    [disabled]="isSubmitting() || form.invalid"
+  >
+    @if (isSubmitting()) {
+      <mat-spinner [attr.aria-label]="'common.loading' | translate" diameter="18" class="spinner"></mat-spinner>
+      <span>{{ 'organisation.costCentres.form.submittingButton' | translate }}</span>
+    } @else {
+      <span>{{ 'organisation.costCentres.form.submitButton' | translate }}</span>
+    }
+  </button>
+</mat-dialog-actions>

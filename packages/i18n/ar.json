@@ -1380,6 +1380,23 @@
         "edit": "تعديل مركز التكلفة",
         "archive": "أرشفة مركز التكلفة"
       },
+      "form": {
+        "createTitle": "مركز تكلفة جديد",
+        "editTitle": "تعديل مركز التكلفة",
+        "nameLabel": "اسم مركز التكلفة",
+        "namePlaceholder": "مثال: التسويق",
+        "nameRequired": "اسم مركز التكلفة مطلوب.",
+        "codeLabel": "الرمز",
+        "codePlaceholder": "مثال: MKT-001",
+        "codeRequired": "الرمز مطلوب.",
+        "budgetOwnerLabel": "مالك الميزانية",
+        "budgetOwnerNoneValue": "بدون مالك ميزانية",
+        "branchLabel": "الفرع",
+        "cancelButton": "إلغاء",
+        "submitButton": "حفظ مركز التكلفة",
+        "submittingButton": "جارٍ الحفظ...",
+        "createSuccess": "تم إنشاء مركز التكلفة بنجاح."
+      },
       "empty": "لم يتم تعريف أي مراكز تكلفة بعد.",
       "duplicateCodeError": "هذا الرمز مستخدم بالفعل بواسطة مركز تكلفة آخر في منشأتك. يجب أن تكون رموز مراكز التكلفة فريدة.",
       "orphanedBadge": "يتيم",
