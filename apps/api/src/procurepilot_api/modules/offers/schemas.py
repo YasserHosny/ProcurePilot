@@ -114,6 +114,8 @@ class PriceHistoryResponse(BaseModel):
 
 class BasketItemRequest(StrictApiModel):
     workspace_product_id: UUID
+    # Denominated in the product's normalised base unit, never a count of the supplier's
+    # original pack/case — same convention as the compare `quantity` query parameter.
     quantity: StrictStr = Field(pattern=r"^\d+(\.\d{1,6})?$")
 
 

@@ -162,6 +162,10 @@ export class BasketSplitComponent implements OnInit {
     });
   }
 
+  baseUnitFor(workspaceProductId: string): string | undefined {
+    return this.products().find((product) => product.id === workspaceProductId)?.base_unit;
+  }
+
   isFormValid(): boolean {
     const s1 = this.supplierId1();
     const s2 = this.supplierId2();

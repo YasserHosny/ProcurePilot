@@ -5,6 +5,7 @@ from uuid import UUID
 
 import psycopg
 from psycopg.rows import dict_row
+from psycopg.types.json import Jsonb
 
 from procurepilot_optimiser_worker.models import BasketJob, Money, OfferInput
 
@@ -41,7 +42,10 @@ def read_current_offers(conn: psycopg.Connection, *, job: BasketJob) -> list[Off
                 q.supplier_id,
                 req.quantity as requested_quantity,
                 lc.total_currency,
-                (lc.total_amount / lc.quantity * req.quantity) as projected_total,
+                -- req.quantity is denominated in the product's normalised base unit (matching
+                -- offers/compare in apps/api), never the supplier's original pack/case count, so
+                -- project from normalised_base_quantity rather than the raw pack quantity.
+                (lc.total_amount / lc.normalised_base_quantity * req.quantity) as projected_total,
                 row_number() over (
                   partition by md.matched_workspace_product_id, q.supplier_id, lc.rule_version
                   order by lc.recorded_at desc, lc.id desc
@@ -61,7 +65,7 @@ def read_current_offers(conn: psycopg.Connection, *, job: BasketJob) -> list[Off
             select * from ranked where rn = 1
             """,
             (
-                [item.model_dump(mode="json") for item in job.items],
+                Jsonb([item.model_dump(mode="json") for item in job.items]),
                 job.tenant_id,
                 [str(supplier_id) for supplier_id in job.supplier_ids],
             ),
@@ -79,8 +83,6 @@ def mark_running(conn: psycopg.Connection, *, job_id: UUID) -> None:
 
 
 def mark_completed(conn: psycopg.Connection, *, job_id: UUID, result: object) -> None:
-    from psycopg.types.json import Jsonb
-
     with conn.cursor() as cur:
         cur.execute(
             """
@@ -93,8 +95,6 @@ def mark_completed(conn: psycopg.Connection, *, job_id: UUID, result: object) ->
 
 
 def mark_failed(conn: psycopg.Connection, *, job_id: UUID, error: dict[str, object]) -> None:
-    from psycopg.types.json import Jsonb
-
     with conn.cursor() as cur:
         cur.execute(
             """

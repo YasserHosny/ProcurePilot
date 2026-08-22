@@ -124,6 +124,9 @@
                     (input)="onQuantityChange(i, $any($event.target).value)"
                     required
                   />
+                  @if (baseUnitFor(item.workspace_product_id); as unit) {
+                    <mat-hint>{{ 'basketSplit.form.unitLabel' | translate:{ unit } }}</mat-hint>
+                  }
                 </mat-form-field>
 
                 <!-- Remove Item Button -->

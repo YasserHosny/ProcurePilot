@@ -547,6 +547,12 @@ data. They are not new persisted sources of price or match truth.
 - Query parameters: required `product_id`, required decimal-string `quantity`, optional
   `include_expired` defaulting to `false`, optional `cursor`, optional `limit` capped at 100 and
   defaulting to 50.
+- `quantity` is expressed in the product's normalised base unit (the same unit returned as
+  `base_unit` on every offer) — e.g. kilograms for a product whose catalogue pack is defined in
+  kg — never a count of the supplier's original pack/case. A quantity of `10` for a product packed
+  6×5L means "10 litres", not "10 cases". This was previously ambiguous and silently misread as a
+  pack count, corrupting landed cost and downstream purchase/saving totals by the pack-size
+  factor; the API and every client must treat `quantity` as base-unit-denominated.
 - Returns `200` with `items` containing `Offer` resources and nullable `next_cursor`.
 - Offer fields include `id`, `workspace_product_id`, `supplier_id`, `supplier_name`,
   `quotation_line_id`, `match_decision_id`, `landed_cost`, `normalised_unit_price`,
@@ -597,7 +603,8 @@ Example:
 - Requires bearer auth.
 - Compares offers for one workspace product and requested quantity, then returns one current
   recommendation when at least one eligible non-expired offer exists.
-- Query parameters: required `product_id`, required decimal-string `quantity`.
+- Query parameters: required `product_id`, required decimal-string `quantity`, denominated in the
+  product's normalised base unit — see the equivalent note on `GET /offers` above.
 - Returns `200` with `product`, decimal-string `requested_quantity`, `offers`, and nullable
   `recommendation`.
 - `product` includes `id` and `tenant_name`.
@@ -633,7 +640,9 @@ Example:
 - The request does not accept MOV, delivery-tier, branch, budget, urgency, preference-weight, or
   risk-tolerance constraints in chunk 4.5.
 - Request fields: `supplier_ids` with exactly two unique supplier ids, and `items`.
-- Each item has `workspace_product_id` and decimal-string `quantity`.
+- Each item has `workspace_product_id` and decimal-string `quantity`, denominated in the product's
+  normalised base unit — same convention as `quantity` on `GET /offers` and `GET /offers/compare`,
+  never a count of the supplier's original pack/case.
 - Returns `202` with a `BasketSplitJob` resource.
 - Returns `403` when the caller's role may not submit basket splits.
 - Returns `404` when a product, supplier, or job reference is not in the caller's workspace.

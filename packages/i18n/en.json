@@ -1044,6 +1044,7 @@
       "itemsSectionTitle": "Basket Items",
       "product": "Product",
       "quantity": "Quantity",
+      "unitLabel": "Unit: {{unit}}",
       "addItem": "Add Item",
       "removeItem": "Remove Item",
       "submitButton": "Optimise Basket Split",

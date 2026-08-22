@@ -612,7 +612,7 @@ truth.
 | `tenant_id` | uuid | Required FK -> Tenant; RLS key |
 | `requested_by` | uuid | Required FK -> Membership that submitted the solve |
 | `supplier_ids` | uuid[] | Required exactly two distinct supplier ids |
-| `items` | jsonb | Required request snapshot: array of `{workspace_product_id, quantity}` |
+| `items` | jsonb | Required request snapshot: array of `{workspace_product_id, quantity}`; `quantity` is denominated in the product's normalised base unit, never a count of the supplier's original pack/case (same convention as `Offer.requested_quantity`) |
 | `status` | enum | `queued`, `running`, `completed`, or `failed`; default `queued` |
 | `result` | jsonb | Optional completed allocation or infeasible result |
 | `error` | jsonb | Optional worker/system failure payload |
@@ -692,7 +692,7 @@ chunk 4.2/4.4 data, especially `workspace_product`, `supplier`, `match_decision`
 | `match_decision_id` | uuid | Source accepted match decision |
 | `landed_cost` | Money | Projected total for the requested quantity, using chunk 4.4 replay inputs and rule version |
 | `normalised_unit_price` | Money | Projected total divided by requested base quantity |
-| `requested_quantity` | decimal string | Caller-supplied quantity |
+| `requested_quantity` | decimal string | Caller-supplied quantity, denominated in `base_unit` (the product's normalised base unit) — never a supplier pack/case count |
 | `base_unit` | text | Product base unit from landed-cost normalisation |
 | `lead_time_days` | integer | Optional supplier-level lead time |
 | `reliability_score` | decimal string | Optional supplier-level 0-1 reliability score |

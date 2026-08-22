@@ -19,6 +19,8 @@ class Money(StrictModel):
 
 class BasketItem(StrictModel):
     workspace_product_id: UUID
+    # Denominated in the product's normalised base unit, never a count of the supplier's
+    # original pack/case — see repository.read_current_offers.
     quantity: StrictStr
 
     @property

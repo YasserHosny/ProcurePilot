@@ -1044,6 +1044,7 @@
       "itemsSectionTitle": "منتجات السلة",
       "product": "المنتج",
       "quantity": "الكمية",
+      "unitLabel": "الوحدة: {{unit}}",
       "addItem": "إضافة منتج",
       "removeItem": "حذف المنتج",
       "submitButton": "تحسين تقسيم السلة",

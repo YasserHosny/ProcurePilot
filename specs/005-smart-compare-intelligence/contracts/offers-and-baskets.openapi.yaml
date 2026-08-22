@@ -212,6 +212,10 @@ components:
       name: quantity
       in: query
       required: true
+      description: >-
+        Denominated in the product's normalised base unit (the same unit returned as base_unit
+        on every offer), never a count of the supplier's original pack/case. A value of 10 for a
+        product packed 6x5L means 10 litres, not 10 cases.
       schema:
         type: string
         pattern: '^\d+(\.\d{1,6})?$'
@@ -446,7 +450,12 @@ components:
       required: [workspace_product_id, quantity]
       properties:
         workspace_product_id: { type: string, format: uuid }
-        quantity: { type: string, pattern: '^\d+(\.\d{1,6})?$' }
+        quantity:
+          type: string
+          pattern: '^\d+(\.\d{1,6})?$'
+          description: >-
+            Denominated in the product's normalised base unit, never a count of the supplier's
+            original pack/case — same convention as the Quantity parameter on /offers/compare.
 
     BasketSplitJob:
       type: object
