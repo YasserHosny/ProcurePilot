@@ -1,0 +1,137 @@
+<h2 mat-dialog-title>{{ titleKey | translate }}</h2>
+
+<mat-dialog-content>
+  @if (errorMessage()) {
+    <div class="error-banner" role="alert">
+      <mat-icon aria-hidden="true">error</mat-icon>
+      <div class="error-content">
+        <span class="error-message">{{ errorMessage() }}</span>
+        @if (errorTraceId()) {
+          <span class="error-trace">{{ 'common.traceId' | translate }}: {{ errorTraceId() }}</span>
+        }
+      </div>
+    </div>
+  }
+
+  <form [formGroup]="form" id="budget-form" (ngSubmit)="onSubmit()" class="dialog-form">
+    <mat-form-field appearance="outline" class="full-width">
+      <mat-label>{{ 'organisation.budgets.form.amountLabel' | translate }}</mat-label>
+      <input
+        matInput
+        type="text"
+        inputmode="decimal"
+        formControlName="amount"
+        [placeholder]="'organisation.budgets.form.amountPlaceholder' | translate"
+        required
+      />
+      @if (form.controls.amount.hasError('required')) {
+        <mat-error>{{ 'organisation.budgets.form.amountRequired' | translate }}</mat-error>
+      } @else if (form.controls.amount.hasError('pattern')) {
+        <mat-error>{{ 'organisation.budgets.form.amountInvalid' | translate }}</mat-error>
+      }
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="full-width">
+      <mat-label>{{ 'organisation.budgets.form.currencyLabel' | translate }}</mat-label>
+      <mat-select formControlName="currency">
+        @for (currency of currencies(); track currency.code) {
+          <mat-option [value]="currency.code">{{ currencyLabel(currency) }}</mat-option>
+        }
+      </mat-select>
+      @if (form.controls.currency.hasError('required')) {
+        <mat-error>{{ 'organisation.budgets.form.currencyRequired' | translate }}</mat-error>
+      }
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="full-width">
+      <mat-label>{{ 'organisation.budgets.form.periodLabel' | translate }}</mat-label>
+      <mat-select formControlName="period">
+        @for (period of periods; track period) {
+          <mat-option [value]="period">
+            {{ 'organisation.budgets.periodOptions.' + period | translate }}
+          </mat-option>
+        }
+      </mat-select>
+      @if (form.controls.period.hasError('required')) {
+        <mat-error>{{ 'organisation.budgets.form.periodRequired' | translate }}</mat-error>
+      }
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="full-width">
+      <mat-label>{{ 'organisation.budgets.form.periodStartLabel' | translate }}</mat-label>
+      <input
+        matInput
+        type="date"
+        formControlName="period_start"
+        required
+      />
+      @if (form.controls.period_start.hasError('required')) {
+        <mat-error>{{ 'organisation.budgets.form.periodStartRequired' | translate }}</mat-error>
+      }
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="full-width">
+      <mat-label>{{ 'organisation.budgets.form.scopeLabel' | translate }}</mat-label>
+      <mat-select formControlName="scope">
+        @for (scope of scopes; track scope) {
+          <mat-option [value]="scope">
+            {{ 'organisation.budgets.scopeOptions.' + scope | translate }}
+          </mat-option>
+        }
+      </mat-select>
+      @if (form.controls.scope.hasError('required')) {
+        <mat-error>{{ 'organisation.budgets.form.scopeRequired' | translate }}</mat-error>
+      }
+    </mat-form-field>
+
+    @if (selectedScope() === 'branch') {
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>{{ 'organisation.budgets.form.branchLabel' | translate }}</mat-label>
+        <mat-select formControlName="branch_id">
+          @for (branch of branches(); track branch.id) {
+            <mat-option [value]="branch.id" [disabled]="!branch.is_active">
+              {{ branch.name }}
+            </mat-option>
+          }
+        </mat-select>
+        @if (form.controls.branch_id.hasError('required')) {
+          <mat-error>{{ 'organisation.budgets.form.branchRequired' | translate }}</mat-error>
+        }
+      </mat-form-field>
+    } @else if (selectedScope() === 'cost_centre') {
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>{{ 'organisation.budgets.form.costCentreLabel' | translate }}</mat-label>
+        <mat-select formControlName="cost_centre_id">
+          @for (costCentre of costCentres(); track costCentre.id) {
+            <mat-option [value]="costCentre.id" [disabled]="costCentre.is_archived">
+              {{ costCentre.name }}
+            </mat-option>
+          }
+        </mat-select>
+        @if (form.controls.cost_centre_id.hasError('required')) {
+          <mat-error>{{ 'organisation.budgets.form.costCentreRequired' | translate }}</mat-error>
+        }
+      </mat-form-field>
+    }
+  </form>
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button mat-button type="button" (click)="onCancel()" [disabled]="isSubmitting()">
+    {{ 'organisation.budgets.form.cancelButton' | translate }}
+  </button>
+  <button
+    mat-flat-button
+    color="primary"
+    type="submit"
+    form="budget-form"
+    [disabled]="isSubmitting() || form.invalid"
+  >
+    @if (isSubmitting()) {
+      <mat-spinner [attr.aria-label]="'common.loading' | translate" diameter="18" class="spinner"></mat-spinner>
+      <span>{{ 'organisation.budgets.form.submittingButton' | translate }}</span>
+    } @else {
+      <span>{{ 'organisation.budgets.form.submitButton' | translate }}</span>
+    }
+  </button>
+</mat-dialog-actions>

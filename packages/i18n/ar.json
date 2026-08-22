@@ -1428,6 +1428,33 @@
         "branch": "فرع",
         "cost_centre": "مركز تكلفة"
       },
+      "periodOptions": {
+        "monthly": "شهري",
+        "quarterly": "ربع سنوي",
+        "annual": "سنوي"
+      },
+      "form": {
+        "createTitle": "تحديد ميزانية",
+        "amountLabel": "المبلغ",
+        "amountPlaceholder": "مثال: 25000 أو 25000.50",
+        "amountRequired": "المبلغ مطلوب.",
+        "amountInvalid": "أدخل مبلغاً موجباً بحد أقصى أربع خانات عشرية.",
+        "currencyLabel": "العملة",
+        "currencyRequired": "العملة مطلوبة.",
+        "periodLabel": "الفترة",
+        "periodRequired": "الفترة مطلوبة.",
+        "periodStartLabel": "بداية الفترة",
+        "periodStartRequired": "تاريخ بداية الفترة مطلوب.",
+        "scopeLabel": "النطاق",
+        "scopeRequired": "النطاق مطلوب.",
+        "branchLabel": "الفرع",
+        "branchRequired": "الفرع مطلوب.",
+        "costCentreLabel": "مركز التكلفة",
+        "costCentreRequired": "مركز التكلفة مطلوب.",
+        "cancelButton": "إلغاء",
+        "submitButton": "تحديد الميزانية",
+        "submittingButton": "جارٍ الحفظ..."
+      },
       "overlapWarning": "توجد ميزانية أخرى لهذا النطاق تغطي جزءاً من الفترة المحددة. يمكن أن تتواجد عدة ميزانيات معاً بشكل مشروع — يُرجى مراجعة التداخل قبل الحفظ.",
       "empty": "لم يتم تحديد أي ميزانيات بعد.",
       "createSuccess": "تم تحديد الميزانية بنجاح.",

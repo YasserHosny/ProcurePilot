@@ -1428,6 +1428,33 @@
         "branch": "Branch",
         "cost_centre": "Cost centre"
       },
+      "periodOptions": {
+        "monthly": "Monthly",
+        "quarterly": "Quarterly",
+        "annual": "Annual"
+      },
+      "form": {
+        "createTitle": "Define Budget",
+        "amountLabel": "Amount",
+        "amountPlaceholder": "e.g. 25000 or 25000.50",
+        "amountRequired": "Amount is required.",
+        "amountInvalid": "Enter a positive amount with up to four decimal places.",
+        "currencyLabel": "Currency",
+        "currencyRequired": "Currency is required.",
+        "periodLabel": "Period",
+        "periodRequired": "Period is required.",
+        "periodStartLabel": "Period Start",
+        "periodStartRequired": "Period start date is required.",
+        "scopeLabel": "Scope",
+        "scopeRequired": "Scope is required.",
+        "branchLabel": "Branch",
+        "branchRequired": "Branch is required.",
+        "costCentreLabel": "Cost Centre",
+        "costCentreRequired": "Cost centre is required.",
+        "cancelButton": "Cancel",
+        "submitButton": "Define Budget",
+        "submittingButton": "Saving..."
+      },
       "overlapWarning": "A budget already exists for this scope during part of the selected period. Multiple budgets may legitimately coexist — review the overlap before saving.",
       "empty": "No budgets have been defined yet.",
       "createSuccess": "Budget defined successfully.",

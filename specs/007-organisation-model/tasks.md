@@ -108,14 +108,14 @@ description: "Task list for Organisation Model implementation"
 
 - [x] T028 [P] [US3] Write contract tests for `GET/POST /organisation/budgets` in `apps/api/tests/contract/test_budgets_contract.py`, covering all three scopes, the `budget_scope_target` constraint's 422 shape, and 403/404 envelopes
 - [x] T029 [P] [US3] Write budget integration tests in `apps/api/tests/integration/test_budgets.py`, proving each scope stores and lists correctly, overlapping-period budgets for the same scope are allowed with the `overlap_warning` flag set, and currency is never inferred from `tenant.currency` (research.md R3)
-- [ ] T030 [P] [US3] Write frontend unit tests for the budget list/form in `apps/web/src/app/features/settings/budget-list/budget-list.component.spec.ts`, covering scope selection, the overlap warning, and explicit currency entry
+- [x] T030 [P] [US3] Write frontend unit tests for the budget list/form in `apps/web/src/app/features/settings/budget-list/budget-list.component.spec.ts`, covering scope selection, the overlap warning, and explicit currency entry
 - [ ] T031 [P] [US3] Write budget-management E2E coverage in `apps/web/tests/e2e/organisation-budgets.spec.ts`, proving all three scopes and the overlap warning, plus Arabic RTL layout
 
 ### Implementation for User Story 3
 
 - [x] T032 [US3] Implement budget create/list in `apps/api/src/procurepilot_api/modules/organisation/service.py`, validating the scope/reference pairing, computing the `overlap_warning` flag against existing budgets for the same scope, and enforcing owner-only writes
 - [x] T033 [US3] Expose `GET/POST /organisation/budgets` in `apps/api/src/procurepilot_api/modules/organisation/router.py`
-- [ ] T034 [P] [US3] Build the budget list/create UI in `apps/web/src/app/features/settings/budget-list/budget-list.component.ts`, `.html`, and `.scss`, with scope-dependent branch/cost-centre pickers and explicit currency selection
+- [x] T034 [P] [US3] Build the budget list/create UI in `apps/web/src/app/features/settings/budget-list/budget-list.component.ts`, `.html`, and `.scss`, with scope-dependent branch/cost-centre pickers and explicit currency selection
 
 **Checkpoint**: US3 is independently testable once US1/US2 exist to provide branch/cost-centre scope targets (organisation-wide budgets need neither).
 
