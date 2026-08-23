@@ -129,7 +129,7 @@ description: "Task list for Organisation Model implementation"
 
 ### Tests for User Story 4
 
-- [ ] T035 [P] [US4] Write contract tests for `POST /organisation/branch-role-assignments` and `DELETE /organisation/branch-role-assignments/{id}` in `apps/api/tests/contract/test_branch_role_assignments_contract.py`, covering the 422 when the target member does not hold a branch-scopable role, the 409 on duplicate assignment, and 403/404 envelopes
+- [x] T035 [P] [US4] Write contract tests for `POST /organisation/branch-role-assignments` and `DELETE /organisation/branch-role-assignments/{id}` in `apps/api/tests/contract/test_branch_role_assignments_contract.py`, covering the 422 when the target member does not hold a branch-scopable role, the 409 on duplicate assignment, and 403/404 envelopes
 - [ ] T036 [P] [US4] Write branch-scoped-visibility integration tests in `apps/api/tests/integration/test_branch_scoped_visibility.py`, proving a member assigned to Branch A sees only Branch A's branch/cost-centre/budget rows, an owner sees everything, a direct request for Branch B resolves not-found (never forbidden, FR-008), and removing the last assignment returns the member to unscoped (tenant-wide) visibility
 - [ ] T037 [P] [US4] Extend `apps/web/src/app/features/team/change-role-dialog/change-role-dialog.component.spec.ts` with tests for the new branch picker shown when the selected role is `branch_manager` or `approver`
 - [ ] T038 [P] [US4] Write branch-scoped-visibility E2E coverage in `apps/web/tests/e2e/organisation-branch-scoping.spec.ts`, proving a branch-scoped member's organisation screens show only their own branch's data and a guessed Branch B URL resolves as not found
