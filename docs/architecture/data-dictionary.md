@@ -914,17 +914,113 @@ credentials, payment collection, or financial transaction exists.
 account and plan. Plan assignment normally happens during workspace creation through the provider
 abstraction; future provider changes should populate this table without changing plan-gating reads.
 
-## Planned later domain entities
+## Implemented organisation model entities (chunk R2.0)
 
-## `Branch` / `CostCentre`
+## `Branch`
 
 | Field | Type | Notes |
 |---|---|---|
-| `id` | uuid | PK |
-| `tenant_id` | uuid | FK -> Tenant |
-| `name` | text | |
-| `code` | text | Short code for requests |
-| `parent_id` | uuid | Optional hierarchy |
+| `id` | uuid | PK, default `gen_random_uuid()` |
+| `tenant_id` | uuid | Required FK -> Tenant; RLS key |
+| `name` | text | Required |
+| `address` | text | Optional |
+| `region` | text | Optional FK -> `supported_region.code` |
+| `is_active` | boolean | Required; default `true` |
+| `created_at` | timestamptz | Audit field |
+| `updated_at` | timestamptz | Audit field |
+
+Also carries `unique (tenant_id, id)`, enabling composite tenant-scoped FK references from
+`CostCentre`, `Budget`, and `BranchRoleAssignment`. No hard-delete path: `is_active = false` is the
+only retirement path, permitted even with dependents attached (FR-009) — the API surfaces an
+explicit confirmation naming what is still attached rather than blocking the deactivation.
+
+`Branch` is tenant-scoped with forced RLS, plus a second, RESTRICTIVE visibility layer within the
+tenant (research.md R1, `007-organisation-model`): an owner sees every branch; a member holding a
+branch-scoped role (`branch_manager`, `approver`) sees only the branch(es) named in their own
+`BranchRoleAssignment` rows; a member with no assignment at all (unscoped) sees every branch, same
+as owner. Owner-only writes.
+
+## `CostCentre`
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | uuid | PK, default `gen_random_uuid()` |
+| `tenant_id` | uuid | Required FK -> Tenant; RLS key |
+| `name` | text | Required |
+| `code` | text | Required; unique per tenant (FR-003) |
+| `budget_owner_membership_id` | uuid | Optional FK -> Membership; kept pointing at the row even after removal, since member removal is a soft delete |
+| `branch_id` | uuid | Optional FK -> Branch; null = organisation-wide cost centre |
+| `is_orphaned` | boolean | Required; default `false`; set by application logic when the linked branch is deactivated or the budget owner is removed (FR-010) |
+| `is_archived` | boolean | Required; default `false` |
+| `created_at` | timestamptz | Audit field |
+| `updated_at` | timestamptz | Audit field |
+
+`is_orphaned` is a real, persisted flag; the API additionally exposes a computed, never-stored
+`orphan_reason` (`branch_deactivated` or `owner_removed`) on read, derived live from the linked
+branch's `is_active` / the budget owner's membership `status` — a second stored cause column would
+just be a second source of truth to keep in sync with facts already recoverable through the
+existing FKs. No hard-delete path: archival is the only retirement path.
+
+`CostCentre` is tenant-scoped with forced RLS, plus the same RESTRICTIVE branch-scoped visibility
+as `Branch`, evaluated against `branch_id` (a `null` branch_id — organisation-wide — is always
+visible regardless of scoping). Owner-only writes.
+
+## `Budget`
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | uuid | PK, default `gen_random_uuid()` |
+| `tenant_id` | uuid | Required FK -> Tenant; RLS key |
+| `amount` | numeric(18,4) | Required; check `>= 0` |
+| `currency` | text | Required FK -> `supported_currency.code`; never inferred from `tenant.currency` (research.md R3) |
+| `period` | enum | `monthly`, `quarterly`, or `annual` |
+| `period_start` | date | Required |
+| `scope` | enum | `organisation`, `branch`, or `cost_centre` |
+| `branch_id` | uuid | Required iff `scope = 'branch'`; FK -> Branch |
+| `cost_centre_id` | uuid | Required iff `scope = 'cost_centre'`; FK -> CostCentre |
+| `created_by` | uuid | Required FK -> Membership |
+| `created_at` | timestamptz | Audit field |
+| `updated_at` | timestamptz | Audit field |
+
+The `budget_scope_target` check constraint enforces the scope/reference pairing at the database
+level (exactly one of branch_id/cost_centre_id populated, matching scope; neither for
+`organisation`). Deliberately no uniqueness constraint preventing overlapping periods for the same
+scope (spec.md User Story 3, Acceptance Scenario 3: a running annual budget plus a supplementary
+quarterly top-up may legitimately coexist) — the API computes an `overlap_warning` flag by
+comparing each budget's `[period_start, period_start + period)` range against existing budgets for
+the same scope/target, and surfaces it as a warning, never a rejection. This chunk defines and
+stores budgets only; checking real spend against them is R2.1's job.
+
+`Budget` is tenant-scoped with forced RLS, plus the same RESTRICTIVE branch-scoped visibility as
+`Branch`/`CostCentre`, evaluated against `branch_id`/`cost_centre_id` depending on `scope`
+(`organisation`-scoped budgets are always visible once tenant matches). Owner-only writes; no
+update/delete endpoint in this chunk.
+
+## `BranchRoleAssignment`
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | uuid | PK, default `gen_random_uuid()` |
+| `tenant_id` | uuid | Required FK -> Tenant; RLS key |
+| `membership_id` | uuid | Required FK -> Membership |
+| `branch_id` | uuid | Required FK -> Branch |
+| `created_at` | timestamptz | Audit field |
+
+Composite `(tenant_id, id)` FKs throughout this chunk's schema (including this table's own
+references to `Membership`/`Branch`) close the class of gap where a tenant-A row could reference a
+tenant-B row while still passing its own table's tenant_id RLS check. `unique (tenant_id,
+membership_id, branch_id)`: a member cannot be assigned to the same branch twice, but IS supported
+scoped to multiple branches as separate rows (research.md R2). No soft-delete column: removing an
+assignment is a real row delete — the historical record of the change lives in `audit_event`, not
+here. Creating a row requires the target membership to already hold `branch_manager` or `approver`
+(422 otherwise) — this extends the existing role, it does not itself change what role a member
+holds.
+
+`BranchRoleAssignment` is tenant-scoped with forced RLS, plus its own RESTRICTIVE visibility: an
+owner sees every assignment in the tenant; a non-owner sees only their own row(s). Owner-only
+writes.
+
+## Planned later domain entities
 
 ## `PurchaseRequest`
 

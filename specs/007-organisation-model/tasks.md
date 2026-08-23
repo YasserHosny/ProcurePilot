@@ -150,8 +150,8 @@ description: "Task list for Organisation Model implementation"
 
 - [x] T042 [P] Build the organisation settings shell screen in `apps/web/src/app/features/settings/settings.component.ts`, `.html`, and `.scss`, composing the branch-list, cost-centre-list, and budget-list components into one screen per FR-011
 - [ ] T043 [P] Add organisation-settings accessibility coverage in `apps/web/tests/e2e/organisation-a11y.spec.ts`, scanning the settings screen in English and Arabic with zero axe-core WCAG 2.1 AA violations
-- [ ] T044 [P] Update `docs/architecture/data-dictionary.md` for the delivered `Branch`, `CostCentre`, `Budget`, and `BranchRoleAssignment` entities
-- [ ] T045 [P] Update `docs/architecture/api-specification.md` for the `/organisation/*` endpoints, replacing any existing sketch-only organisation-model section
+- [x] T044 [P] Update `docs/architecture/data-dictionary.md` for the delivered `Branch`, `CostCentre`, `Budget`, and `BranchRoleAssignment` entities
+- [x] T045 [P] Update `docs/architecture/api-specification.md` for the `/organisation/*` endpoints, replacing any existing sketch-only organisation-model section
 - [ ] T046 [P] Add an audit-log coverage test in `apps/api/tests/integration/test_organisation_audit.py`, proving every branch/cost-centre/budget/branch-role-assignment create, edit, deactivation, and archival appears in `audit_event` (FR-012)
 
 **Checkpoint**: every screen this chunk ships has automated a11y coverage, docs reflect the real delivered API/data model, and every administrative action is audited.
