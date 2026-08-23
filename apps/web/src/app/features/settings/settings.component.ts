@@ -6,8 +6,10 @@ import { BudgetListComponent } from './budget-list/budget-list.component';
 import { CostCentreListComponent } from './cost-centre-list/cost-centre-list.component';
 
 /**
- * Interim composition: renders all three list components directly until T042 (Phase 7)
- * replaces this with the full composed screen per FR-011. All of US1-US3 now land here.
+ * The organisation settings screen (FR-011): branches, cost centres, and budgets managed from
+ * one place. Each section is a fully independent feature component (its own data loading, its
+ * own owner-gated write actions) — this shell only composes them and provides the page-level
+ * title and spacing.
  */
 @Component({
   selector: 'app-settings',
