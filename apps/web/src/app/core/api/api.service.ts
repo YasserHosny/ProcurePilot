@@ -8,6 +8,10 @@ import type {
   AlertDismissal,
   AlertKind,
   Alias,
+  ApprovalDecisionInput,
+  ApprovalDelegation,
+  ApprovalDelegationCreate,
+  ApprovalDelegationList,
   BaseUnit,
   BasketOptimiseRequest,
   BasketSplitJob,
@@ -54,6 +58,11 @@ import type {
   ProductUpdate,
   PurchaseOutcomeCreate,
   PurchaseOutcomeCreated,
+  PurchaseRequest,
+  PurchaseRequestCreate,
+  PurchaseRequestList,
+  PurchaseRequestStatus,
+  PurchaseRequestUpdate,
   Quotation,
   QuotationCreate,
   QuotationDetail,
@@ -72,6 +81,10 @@ import type {
   SupplierCreate,
   SupplierUpdate,
   Tenant,
+  ThresholdRule,
+  ThresholdRuleCreate,
+  ThresholdRuleList,
+  ThresholdRuleUpdate,
   WorkspaceSummary,
 } from './models';
 
@@ -704,6 +717,130 @@ export class ApiService {
     return this.http.delete<void>(
       `${this.base}/organisation/branch-role-assignments/${assignmentId}`,
     );
+  }
+
+  // --- requests + approvals (008) --------------------------------------------
+
+  listRequests(params?: {
+    status?: PurchaseRequestStatus;
+    branch_id?: string;
+    cursor?: string;
+    limit?: number;
+  }): Observable<PurchaseRequestList> {
+    const query = new URLSearchParams();
+    if (params?.status) query.set('status', params.status);
+    if (params?.branch_id) query.set('branch_id', params.branch_id);
+    if (params?.cursor) query.set('cursor', params.cursor);
+    if (params?.limit !== undefined) query.set('limit', String(params.limit));
+    const qs = query.toString() ? `?${query.toString()}` : '';
+    return this.http.get<PurchaseRequestList>(`${this.base}/requests${qs}`);
+  }
+
+  getRequest(requestId: string): Observable<PurchaseRequest> {
+    return this.http.get<PurchaseRequest>(`${this.base}/requests/${requestId}`);
+  }
+
+  createRequest(
+    body: PurchaseRequestCreate,
+    idempotencyKey?: string,
+  ): Observable<PurchaseRequest> {
+    const headers = idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined;
+    return this.http.post<PurchaseRequest>(`${this.base}/requests`, body, { headers });
+  }
+
+  updateRequest(requestId: string, body: PurchaseRequestUpdate): Observable<PurchaseRequest> {
+    return this.http.patch<PurchaseRequest>(`${this.base}/requests/${requestId}`, body);
+  }
+
+  submitRequest(requestId: string, idempotencyKey?: string): Observable<PurchaseRequest> {
+    const headers = idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined;
+    return this.http.post<PurchaseRequest>(
+      `${this.base}/requests/${requestId}/submit`,
+      null,
+      { headers },
+    );
+  }
+
+  withdrawRequest(requestId: string): Observable<PurchaseRequest> {
+    return this.http.post<PurchaseRequest>(`${this.base}/requests/${requestId}/withdraw`, null);
+  }
+
+  approveRequest(
+    requestId: string,
+    body: ApprovalDecisionInput,
+  ): Observable<PurchaseRequest> {
+    return this.http.post<PurchaseRequest>(`${this.base}/requests/${requestId}/approve`, body);
+  }
+
+  rejectRequest(
+    requestId: string,
+    body: ApprovalDecisionInput,
+  ): Observable<PurchaseRequest> {
+    return this.http.post<PurchaseRequest>(`${this.base}/requests/${requestId}/reject`, body);
+  }
+
+  listPendingApprovals(params?: {
+    cursor?: string;
+    limit?: number;
+  }): Observable<PurchaseRequestList> {
+    const query = new URLSearchParams();
+    if (params?.cursor) query.set('cursor', params.cursor);
+    if (params?.limit !== undefined) query.set('limit', String(params.limit));
+    const qs = query.toString() ? `?${query.toString()}` : '';
+    return this.http.get<PurchaseRequestList>(`${this.base}/approvals/pending${qs}`);
+  }
+
+  listThresholdRules(params?: {
+    cursor?: string;
+    limit?: number;
+  }): Observable<ThresholdRuleList> {
+    const query = new URLSearchParams();
+    if (params?.cursor) query.set('cursor', params.cursor);
+    if (params?.limit !== undefined) query.set('limit', String(params.limit));
+    const qs = query.toString() ? `?${query.toString()}` : '';
+    return this.http.get<ThresholdRuleList>(`${this.base}/approvals/threshold-rules${qs}`);
+  }
+
+  createThresholdRule(
+    body: ThresholdRuleCreate,
+    idempotencyKey?: string,
+  ): Observable<ThresholdRule> {
+    const headers = idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined;
+    return this.http.post<ThresholdRule>(`${this.base}/approvals/threshold-rules`, body, {
+      headers,
+    });
+  }
+
+  updateThresholdRule(ruleId: string, body: ThresholdRuleUpdate): Observable<ThresholdRule> {
+    return this.http.patch<ThresholdRule>(
+      `${this.base}/approvals/threshold-rules/${ruleId}`,
+      body,
+    );
+  }
+
+  deleteThresholdRule(ruleId: string): Observable<void> {
+    return this.http.delete<void>(`${this.base}/approvals/threshold-rules/${ruleId}`);
+  }
+
+  listApprovalDelegations(params?: { membership_id?: string }): Observable<ApprovalDelegationList> {
+    const query = new URLSearchParams();
+    if (params?.membership_id) query.set('membership_id', params.membership_id);
+    const qs = query.toString() ? `?${query.toString()}` : '';
+    return this.http.get<ApprovalDelegationList>(`${this.base}/approvals/delegations${qs}`);
+  }
+
+  createApprovalDelegation(
+    body: ApprovalDelegationCreate,
+    idempotencyKey?: string,
+  ): Observable<ApprovalDelegation> {
+    const headers = idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined;
+    return this.http.post<ApprovalDelegation>(`${this.base}/approvals/delegations`, body, {
+      headers,
+    });
+  }
+
+  cancelApprovalDelegation(delegationId: string): Observable<void> {
+    return this.http.delete<void>(`${this.base}/approvals/delegations/${delegationId}`);
   }
 }
 
