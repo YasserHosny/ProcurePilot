@@ -1381,28 +1381,28 @@
         "actions": "Actions"
       },
       "allBranchesValue": "Organisation-wide",
-    "actions": {
-      "edit": "Edit cost centre",
-      "archive": "Archive cost centre"
-    },
-    "form": {
-      "createTitle": "New Cost Centre",
-      "editTitle": "Edit Cost Centre",
-      "nameLabel": "Cost Centre Name",
-      "namePlaceholder": "e.g. Marketing",
-      "nameRequired": "Cost centre name is required.",
-      "codeLabel": "Code",
-      "codePlaceholder": "e.g. MKT-001",
-      "codeRequired": "Code is required.",
-      "budgetOwnerLabel": "Budget Owner",
-      "budgetOwnerNoneValue": "No budget owner",
-      "branchLabel": "Branch",
-      "cancelButton": "Cancel",
-      "submitButton": "Save Cost Centre",
-      "submittingButton": "Saving...",
-      "createSuccess": "Cost centre created successfully."
-    },
-    "empty": "No cost centres have been defined yet.",
+      "actions": {
+        "edit": "Edit cost centre",
+        "archive": "Archive cost centre"
+      },
+      "form": {
+        "createTitle": "New Cost Centre",
+        "editTitle": "Edit Cost Centre",
+        "nameLabel": "Cost Centre Name",
+        "namePlaceholder": "e.g. Marketing",
+        "nameRequired": "Cost centre name is required.",
+        "codeLabel": "Code",
+        "codePlaceholder": "e.g. MKT-001",
+        "codeRequired": "Code is required.",
+        "budgetOwnerLabel": "Budget Owner",
+        "budgetOwnerNoneValue": "No budget owner",
+        "branchLabel": "Branch",
+        "cancelButton": "Cancel",
+        "submitButton": "Save Cost Centre",
+        "submittingButton": "Saving...",
+        "createSuccess": "Cost centre created successfully."
+      },
+      "empty": "No cost centres have been defined yet.",
       "duplicateCodeError": "This code is already in use by another cost centre in your organisation. Cost centre codes must be unique.",
       "orphanedBadge": "Orphaned",
       "orphanReasons": {
@@ -1468,6 +1468,145 @@
     "roleScoping": {
       "branchScopedBadge": "Branch-scoped",
       "notFoundMessage": "This branch does not exist or is not available."
+    }
+  },
+  "requests": {
+    "title": "Purchase Requests",
+    "subtitle": "Create and track purchase requests for your branches and cost centres.",
+    "status": {
+      "draft": "Draft",
+      "submitted": "Submitted",
+      "approved": "Approved",
+      "rejected": "Rejected",
+      "withdrawn": "Withdrawn"
+    },
+    "columns": {
+      "branch": "Branch",
+      "costCentre": "Cost Centre",
+      "requiredByDate": "Required By",
+      "status": "Status",
+      "estimatedTotal": "Estimated Total",
+      "actions": "Actions"
+    },
+    "actions": {
+      "view": "View request",
+      "edit": "Edit request",
+      "withdraw": "Withdraw request"
+    },
+    "form": {
+      "createTitle": "New Purchase Request",
+      "editTitle": "Edit Purchase Request",
+      "branchLabel": "Branch",
+      "costCentreLabel": "Cost Centre (optional)",
+      "requiredByDateLabel": "Required By",
+      "linesTitle": "Line Items",
+      "addLineButton": "Add Line",
+      "removeLineButton": "Remove line",
+      "productLabel": "Product",
+      "quantityLabel": "Quantity",
+      "quantityRequired": "Quantity must be greater than zero.",
+      "noteLabel": "Note (optional)",
+      "estimatedUnitPriceLabel": "Estimated Unit Price",
+      "noEstimateAvailable": "No price history available for this product.",
+      "cancelButton": "Cancel",
+      "saveDraftButton": "Save Draft",
+      "submitButton": "Submit Request",
+      "submittingButton": "Submitting...",
+      "atLeastOneLineRequired": "At least one line item is required."
+    },
+    "empty": "No purchase requests yet. Create your first request to get started.",
+    "createSuccess": "Purchase request saved as a draft.",
+    "submitSuccess": "Purchase request submitted for approval.",
+    "withdrawSuccess": "Purchase request withdrawn.",
+    "genericError": "Unable to save the purchase request. Please try again.",
+    "withdrawDialog": {
+      "title": "Withdraw Purchase Request",
+      "message": "Are you sure you want to withdraw this request? This cannot be undone.",
+      "confirmButton": "Withdraw Request",
+      "cancelButton": "Cancel"
+    },
+    "incompleteEstimateBadge": "Estimate incomplete",
+    "budgetStatus": {
+      "remainingLabel": "Remaining budget",
+      "exceedsWarning": "This request would exceed the remaining budget for its scope."
+    }
+  },
+  "approvals": {
+    "title": "Approval Queue",
+    "subtitle": "Requests awaiting your decision.",
+    "columns": {
+      "requester": "Requester",
+      "branch": "Branch",
+      "costCentre": "Cost Centre",
+      "requiredByDate": "Required By",
+      "estimatedTotal": "Estimated Total",
+      "budgetStatus": "Budget Status",
+      "actions": "Actions"
+    },
+    "actions": {
+      "approve": "Approve",
+      "reject": "Reject"
+    },
+    "decisionDialog": {
+      "approveTitle": "Approve Purchase Request",
+      "rejectTitle": "Reject Purchase Request",
+      "commentLabel": "Comment (optional)",
+      "commentPlaceholder": "Add a comment for the requester...",
+      "confirmButton": "Confirm",
+      "cancelButton": "Cancel"
+    },
+    "approveSuccess": "Request approved.",
+    "rejectSuccess": "Request rejected.",
+    "genericError": "Unable to record the decision. Please try again.",
+    "empty": "No requests are currently awaiting your decision.",
+    "thresholdRules": {
+      "sectionTitle": "Approval Threshold Rules",
+      "createButton": "New Threshold Rule",
+      "columns": {
+        "branch": "Branch",
+        "minAmount": "From",
+        "maxAmount": "Up To",
+        "currency": "Currency",
+        "approver": "Approver",
+        "actions": "Actions"
+      },
+      "form": {
+        "createTitle": "New Threshold Rule",
+        "editTitle": "Edit Threshold Rule",
+        "branchLabel": "Branch (optional — tenant-wide default if omitted)",
+        "minAmountLabel": "From Amount",
+        "maxAmountLabel": "Up To Amount (optional — uncapped if omitted)",
+        "currencyLabel": "Currency",
+        "approverLabel": "Approver",
+        "cancelButton": "Cancel",
+        "submitButton": "Save Rule"
+      },
+      "empty": "No threshold rules defined yet. Requests will route to the owner until rules are added.",
+      "createSuccess": "Threshold rule created.",
+      "deleteSuccess": "Threshold rule deleted.",
+      "genericError": "Unable to save the threshold rule. Please try again."
+    },
+    "delegations": {
+      "sectionTitle": "Approval Delegations",
+      "createButton": "New Delegation",
+      "columns": {
+        "delegate": "Delegate",
+        "startsOn": "Starts On",
+        "endsOn": "Ends On",
+        "actions": "Actions"
+      },
+      "form": {
+        "createTitle": "New Delegation",
+        "delegateLabel": "Delegate To",
+        "startsOnLabel": "Starts On",
+        "endsOnLabel": "Ends On",
+        "cancelButton": "Cancel",
+        "submitButton": "Save Delegation"
+      },
+      "empty": "No active delegations.",
+      "createSuccess": "Delegation created.",
+      "cancelSuccess": "Delegation cancelled.",
+      "genericError": "Unable to save the delegation. Please try again."
     }
   }
 }

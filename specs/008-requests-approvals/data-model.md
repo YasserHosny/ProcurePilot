@@ -17,6 +17,13 @@ in this artifact.
 - Every FK from one tenant-scoped table to another is a composite `(tenant_id, id)` foreign key,
   continuing R2.0's convention (closes the GitHub issue #7 existence-oracle gap). Every table
   below that is referenced by another new table also carries `unique (tenant_id, id)`.
+- **New in this chunk**: `purchase_request_line` references two pre-existing tables
+  (`workspace_product`, `landed_cost`) that predate R2.0's composite-FK convention and were never
+  retrofitted with a `unique (tenant_id, id)` constraint the way `membership` was. This chunk adds
+  that constraint to both via one additive migration (mirroring R2.0's own `membership` migration
+  exactly), rather than reverting to a bare single-column FK for these two references alone —
+  keeping the convention uniform across every new FK this chunk introduces, not just the ones
+  pointing at genuinely-new tables.
 
 ## Enumerations
 
