@@ -276,6 +276,10 @@
       "title": "Change Member Role",
       "description": "Select a new role for this member:",
       "roleLabel": "New Role",
+      "branchLabel": "Assign to Branch",
+      "branchOptionalHint": "Optional — pick a branch if this role should be scoped to one.",
+      "duplicateAssignmentError": "This member is already assigned to that branch.",
+      "assignmentError": "Unable to assign the member to the branch. Please try again.",
       "confirmButton": "Update Role",
       "cancelButton": "Cancel",
       "updatingButton": "Updating..."

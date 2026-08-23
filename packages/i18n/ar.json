@@ -276,6 +276,10 @@
       "title": "تغيير دور العضو",
       "description": "اختر دوراً جديداً لهذا العضو:",
       "roleLabel": "الدور الجديد",
+      "branchLabel": "تعيين إلى فرع",
+      "branchOptionalHint": "اختياري — اختر فرعاً إذا كان هذا الدور مرتبطاً بفرع محدد.",
+      "duplicateAssignmentError": "هذا العضو معيّن بالفعل إلى هذا الفرع.",
+      "assignmentError": "تعذر تعيين العضو إلى الفرع. يُرجى المحاولة مرة أخرى.",
       "confirmButton": "تحديث الدور",
       "cancelButton": "إلغاء",
       "updatingButton": "جاري التحديث..."

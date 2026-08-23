@@ -131,13 +131,13 @@ description: "Task list for Organisation Model implementation"
 
 - [x] T035 [P] [US4] Write contract tests for `POST /organisation/branch-role-assignments` and `DELETE /organisation/branch-role-assignments/{id}` in `apps/api/tests/contract/test_branch_role_assignments_contract.py`, covering the 422 when the target member does not hold a branch-scopable role, the 409 on duplicate assignment, and 403/404 envelopes
 - [x] T036 [P] [US4] Write branch-scoped-visibility integration tests in `apps/api/tests/integration/test_branch_scoped_visibility.py`, proving a member assigned to Branch A sees only Branch A's branch/cost-centre/budget rows, an owner sees everything, a direct request for Branch B resolves not-found (never forbidden, FR-008), and removing the last assignment returns the member to unscoped (tenant-wide) visibility
-- [ ] T037 [P] [US4] Extend `apps/web/src/app/features/team/change-role-dialog/change-role-dialog.component.spec.ts` with tests for the new branch picker shown when the selected role is `branch_manager` or `approver`
+- [x] T037 [P] [US4] Extend `apps/web/src/app/features/team/change-role-dialog/change-role-dialog.component.spec.ts` with tests for the new branch picker shown when the selected role is `branch_manager` or `approver`
 - [ ] T038 [P] [US4] Write branch-scoped-visibility E2E coverage in `apps/web/tests/e2e/organisation-branch-scoping.spec.ts`, proving a branch-scoped member's organisation screens show only their own branch's data and a guessed Branch B URL resolves as not found
 
 ### Implementation for User Story 4
 
 - [x] T039 [US4] Confirm and, if needed, correct the branch-visibility RLS policies from T002-T004 against the integration tests in T036 — this phase is primarily a proof phase, since the enforcement mechanism itself (research.md R1) was built as part of Phase 1 Setup, matching this repo's own convention of shipping a table's RLS policy in the same migration that creates it
-- [ ] T040 [P] [US4] Add the branch picker to `apps/web/src/app/features/team/change-role-dialog/change-role-dialog.component.ts` and `.html`, calling the new branch-role-assignment endpoints, shown only when the selected role is `branch_manager` or `approver`
+- [x] T040 [P] [US4] Add the branch picker to `apps/web/src/app/features/team/change-role-dialog/change-role-dialog.component.ts` and `.html`, calling the new branch-role-assignment endpoints, shown only when the selected role is `branch_manager` or `approver`
 - [x] T041 [P] [US4] Wire branch-scoped filtering into `apps/web/src/app/features/settings/branch-list/`, `cost-centre-list/`, and `budget-list/` components so a branch-scoped member's own screens correctly reflect what the API already returns, with no client-side re-filtering of data the API should not have sent in the first place
 
 **Checkpoint**: the whole chunk's actual payoff — branch-scoped visibility — is proven end to end, not just present as an unenforced label on a role.
