@@ -1,18 +1,6 @@
 <h2 mat-dialog-title>{{ 'team.changeRoleDialog.title' | translate }}</h2>
 
 <mat-dialog-content>
-  @if (errorMessage()) {
-    <div class="error-banner" role="alert">
-      <mat-icon aria-hidden="true">error</mat-icon>
-      <div class="error-content">
-        <span class="error-message">{{ errorMessage() }}</span>
-        @if (errorTraceId()) {
-          <span class="error-trace">{{ 'common.traceId' | translate }}: {{ errorTraceId() }}</span>
-        }
-      </div>
-    </div>
-  }
-
   <p class="dialog-description">
     {{ 'team.changeRoleDialog.description' | translate }}
     <strong>{{ data.member.email }}</strong>
@@ -48,7 +36,7 @@
 </mat-dialog-content>
 
 <mat-dialog-actions align="end">
-  <button mat-button type="button" (click)="onCancel()" [disabled]="isSubmitting()">
+  <button mat-button type="button" (click)="onCancel()">
     {{ 'team.changeRoleDialog.cancelButton' | translate }}
   </button>
   <button
@@ -56,12 +44,8 @@
     color="primary"
     type="submit"
     form="change-role-form"
-    [disabled]="isSubmitting() || form.invalid || form.getRawValue().role === data.member.role"
+    [disabled]="form.invalid || form.getRawValue().role === data.member.role"
   >
-    @if (isSubmitting()) {
-      {{ 'team.changeRoleDialog.updatingButton' | translate }}
-    } @else {
-      {{ 'team.changeRoleDialog.confirmButton' | translate }}
-    }
+    {{ 'team.changeRoleDialog.confirmButton' | translate }}
   </button>
 </mat-dialog-actions>

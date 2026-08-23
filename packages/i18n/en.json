@@ -280,6 +280,7 @@
       "branchOptionalHint": "Optional — pick a branch if this role should be scoped to one.",
       "duplicateAssignmentError": "This member is already assigned to that branch.",
       "assignmentError": "Unable to assign the member to the branch. Please try again.",
+      "branchAssignmentSuccess": "Member assigned to the branch successfully.",
       "confirmButton": "Update Role",
       "cancelButton": "Cancel",
       "updatingButton": "Updating..."

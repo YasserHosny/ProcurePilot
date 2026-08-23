@@ -280,6 +280,7 @@
       "branchOptionalHint": "اختياري — اختر فرعاً إذا كان هذا الدور مرتبطاً بفرع محدد.",
       "duplicateAssignmentError": "هذا العضو معيّن بالفعل إلى هذا الفرع.",
       "assignmentError": "تعذر تعيين العضو إلى الفرع. يُرجى المحاولة مرة أخرى.",
+      "branchAssignmentSuccess": "تم تعيين العضو إلى الفرع بنجاح.",
       "confirmButton": "تحديث الدور",
       "cancelButton": "إلغاء",
       "updatingButton": "جاري التحديث..."

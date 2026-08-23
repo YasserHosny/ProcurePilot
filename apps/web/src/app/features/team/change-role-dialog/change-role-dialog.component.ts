@@ -1,4 +1,3 @@
-import { HttpErrorResponse } from '@angular/common/http';
 import { Component, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -6,28 +5,31 @@ import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/materia
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatSelectModule } from '@angular/material/select';
-import { TranslatePipe, TranslateService } from '@ngx-translate/core';
+import { TranslatePipe } from '@ngx-translate/core';
 import { of } from 'rxjs';
 import { catchError } from 'rxjs/operators';
 
 import { ApiService } from '../../../core/api/api.service';
-import type {
-  ApiError,
-  Branch,
-  BranchList,
-  BranchRoleAssignmentCreate,
-  Member,
-  Role,
-} from '../../../core/api/models';
+import type { Branch, BranchList, Member, Role } from '../../../core/api/models';
 
 export interface ChangeRoleDialogData {
   readonly member: Member;
 }
 
+/**
+ * What this dialog collects — never what it does. The backend requires a membership to
+ * ALREADY hold branch_manager/approver before an assignment can be created (FR-006), so the
+ * role change and the branch assignment must be two sequential, server-round-tripped steps in
+ * that exact order — a dialog closing with a bare Role can't express that sequencing, so the
+ * parent (TeamComponent) owns both API calls, in order, after this dialog closes.
+ */
+export interface ChangeRoleDialogResult {
+  readonly role: Role;
+  readonly branchId: string | null;
+}
+
 /** Roles that CAN be scoped to a branch — these get the branch picker in this dialog. */
 const BRANCH_SCOPED_ROLES: readonly Role[] = ['branch_manager', 'approver'];
-
-const DIALOG_I18N = 'team.changeRoleDialog';
 
 @Component({
   selector: 'app-change-role-dialog',
@@ -47,16 +49,14 @@ const DIALOG_I18N = 'team.changeRoleDialog';
 export class ChangeRoleDialogComponent {
   private readonly fb = inject(FormBuilder);
   private readonly api = inject(ApiService);
-  private readonly translate = inject(TranslateService);
-  private readonly dialogRef = inject(MatDialogRef<ChangeRoleDialogComponent, Role>);
+  private readonly dialogRef = inject(
+    MatDialogRef<ChangeRoleDialogComponent, ChangeRoleDialogResult>,
+  );
   readonly data: ChangeRoleDialogData = inject(MAT_DIALOG_DATA);
 
   readonly roles: readonly Role[] = ['owner', 'buyer', 'branch_manager', 'approver', 'viewer'];
 
   readonly branches = signal<Branch[]>([]);
-  readonly isSubmitting = signal<boolean>(false);
-  readonly errorMessage = signal<string | null>(null);
-  readonly errorTraceId = signal<string | null>(null);
 
   /** Drives branch-picker visibility; kept in step via the role control's events. */
   readonly selectedRole = signal<Role>(this.data.member.role);
@@ -79,32 +79,11 @@ export class ChangeRoleDialogComponent {
     if (this.form.invalid) return;
 
     const { role, branch_id } = this.form.getRawValue();
-
-    // Assigning a branch is optional: a plain role change closes exactly as before and
-    // the parent's contract (close value === selected Role) is untouched.
+    // Assigning a branch is optional even when the role is branch-scopable — a plain role
+    // change with no branch picked closes with branchId: null, and the parent skips the
+    // assignment step entirely.
     const branchId = this.isBranchScopedRole(role) ? branch_id : null;
-    if (branchId === null) {
-      this.dialogRef.close(role);
-      return;
-    }
-
-    this.errorMessage.set(null);
-    this.errorTraceId.set(null);
-    this.isSubmitting.set(true);
-
-    const payload: BranchRoleAssignmentCreate = {
-      membership_id: this.data.member.id,
-      branch_id: branchId,
-    };
-
-    // The assignment is the dialog's own second action; it happens here, not in team.component.
-    this.api.createBranchRoleAssignment(payload).subscribe({
-      next: () => {
-        this.isSubmitting.set(false);
-        this.dialogRef.close(role);
-      },
-      error: (err: unknown) => this.handleAssignmentError(err),
-    });
+    this.dialogRef.close({ role, branchId });
   }
 
   onCancel(): void {
@@ -131,26 +110,5 @@ export class ChangeRoleDialogComponent {
     branchControl.setValue(null);
     branchControl.clearValidators();
     branchControl.updateValueAndValidity();
-  }
-
-  private handleAssignmentError(err: unknown): void {
-    this.isSubmitting.set(false);
-    if (!(err instanceof HttpErrorResponse)) {
-      this.errorMessage.set(this.translate.instant(`${DIALOG_I18N}.assignmentError`));
-      return;
-    }
-    const apiError = err.error as ApiError | undefined;
-    this.errorTraceId.set(apiError?.trace_id ?? null);
-    if (err.status === 409) {
-      this.errorMessage.set(
-        this.translate.instant(`${DIALOG_I18N}.duplicateAssignmentError`),
-      );
-      return;
-    }
-    this.errorMessage.set(
-      apiError?.message ??
-        err.message ??
-        this.translate.instant(`${DIALOG_I18N}.assignmentError`),
-    );
   }
 }
