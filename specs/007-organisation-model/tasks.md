@@ -138,7 +138,7 @@ description: "Task list for Organisation Model implementation"
 
 - [x] T039 [US4] Confirm and, if needed, correct the branch-visibility RLS policies from T002-T004 against the integration tests in T036 — this phase is primarily a proof phase, since the enforcement mechanism itself (research.md R1) was built as part of Phase 1 Setup, matching this repo's own convention of shipping a table's RLS policy in the same migration that creates it
 - [ ] T040 [P] [US4] Add the branch picker to `apps/web/src/app/features/team/change-role-dialog/change-role-dialog.component.ts` and `.html`, calling the new branch-role-assignment endpoints, shown only when the selected role is `branch_manager` or `approver`
-- [ ] T041 [P] [US4] Wire branch-scoped filtering into `apps/web/src/app/features/settings/branch-list/`, `cost-centre-list/`, and `budget-list/` components so a branch-scoped member's own screens correctly reflect what the API already returns, with no client-side re-filtering of data the API should not have sent in the first place
+- [x] T041 [P] [US4] Wire branch-scoped filtering into `apps/web/src/app/features/settings/branch-list/`, `cost-centre-list/`, and `budget-list/` components so a branch-scoped member's own screens correctly reflect what the API already returns, with no client-side re-filtering of data the API should not have sent in the first place
 
 **Checkpoint**: the whole chunk's actual payoff — branch-scoped visibility — is proven end to end, not just present as an unenforced label on a role.
 
