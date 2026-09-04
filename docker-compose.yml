@@ -175,6 +175,10 @@ services:
       SUPABASE_URL: http://kong:8000
       SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY:-replace-with-local-anon-key}
       SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:-replace-with-local-service-role-key}
+      # Same reasoning again: .env points at localhost:6379 for host tools; in-network it is
+      # redis:6379. Without this override, extraction enqueue fails with a Redis connection error
+      # that surfaces to the reviewer as "Extraction Failed — Service is unavailable."
+      REDIS_URL: redis://redis:6379/0
       SUPABASE_JWT_SECRET: ${SUPABASE_JWT_SECRET:-replace-with-local-jwt-secret}
     depends_on:
       db:
