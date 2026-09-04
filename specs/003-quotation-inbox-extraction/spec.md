@@ -164,6 +164,12 @@ the new one is linked to the prior version and both remain visible and distingui
   confirmed (or refused, if it could never be read).
 - **FR-004**: System MUST refuse a file that is not an accepted format immediately, before any
   extraction is attempted, with a clear reason given to the uploader.
+- **FR-004a**: System MUST offer downloadable sample quotation files so users can test the
+  extraction pipeline without needing a real supplier document.
+- **FR-004b**: System MUST allow an authenticated user to download the original uploaded document
+  from the quotation review page via a short-lived signed URL. The URL is generated server-side
+  using a service-role Supabase Storage client; tenant isolation is enforced by RLS on the
+  `document` table before the URL is issued.
 - **FR-005**: System MUST extract, for every quotation, a header (at minimum: supplier, currency,
   issue date, and expiry date where present) and one or more line items (at minimum: the original
   wording as it appeared in the document, quantity, pack information, and unit price).

@@ -1,0 +1,582 @@
+openapi: 3.1.0
+info:
+  title: ProcurePilot Requests + Approvals API
+  version: 0.8.0
+  description: >
+    Chunk R2.1 (second Phase 2 chunk). Base path /api/v1, Supabase JWT bearer auth, tenant
+    resolved server-side from the token, cursor pagination capped at 100, Idempotency-Key on
+    mutations, and the {code, message, details, trace_id} error envelope.
+
+    A purchase request moves draft -> submitted -> (approved | rejected | withdrawn). Submission
+    resolves an approver via threshold rules, active delegation, and an owner fallback
+    (research.md R3), captures the request's estimated value from price history (research.md R2),
+    and creates one approval_step. A same-tenant, different-branch reference for a branch-scoped
+    member resolves as not_found, never forbidden, extending R2.0's convention.
+
+servers:
+  - url: /api/v1
+
+security:
+  - bearerAuth: []
+
+paths:
+  /requests:
+    get:
+      summary: List purchase requests visible to the caller
+      description: >
+        Owner sees every request in the tenant. A member holding a branch-scoped role sees only
+        requests for their assigned branch(es). A requester always sees their own requests
+        regardless of branch scoping.
+      parameters:
+        - name: status
+          in: query
+          schema: { $ref: '#/components/schemas/PurchaseRequestStatus' }
+        - name: branch_id
+          in: query
+          schema: { type: string, format: uuid }
+        - name: cursor
+          in: query
+          schema: { type: string }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+      responses:
+        '200':
+          description: Purchase request list
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PurchaseRequestList' }
+    post:
+      summary: Create a purchase request (draft)
+      description: >
+        Creates a request in status=draft with its lines. Each line's estimated value is
+        computed live from price history at creation time (research.md R2); nothing is frozen
+        until POST /requests/{id}/submit.
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PurchaseRequestCreate' }
+      responses:
+        '201':
+          description: Draft request created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PurchaseRequest' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+
+  /requests/{request_id}:
+    get:
+      summary: Get a purchase request
+      parameters:
+        - $ref: '#/components/parameters/RequestId'
+      responses:
+        '200':
+          description: Purchase request
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PurchaseRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      summary: Edit a draft request
+      description: >
+        Requester only, and only while status=draft (FR-004). Replaces branch, cost centre,
+        required-by date, and/or the full lines array; each line's estimate is recomputed live.
+      parameters:
+        - $ref: '#/components/parameters/RequestId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PurchaseRequestUpdate' }
+      responses:
+        '200':
+          description: Draft request updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PurchaseRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+
+  /requests/{request_id}/submit:
+    post:
+      summary: Submit a draft request
+      description: >
+        Moves draft -> submitted (FR-002). Freezes every line's estimated value (research.md R2),
+        resolves and creates the approval_step via threshold rules / delegation / owner fallback
+        (research.md R3), and records requests.purchase_request_submitted (and
+        requests.approval_step_escalated when routing fell through to the owner) in the audit log.
+      parameters:
+        - $ref: '#/components/parameters/RequestId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: Request submitted
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PurchaseRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+
+  /requests/{request_id}/withdraw:
+    post:
+      summary: Withdraw a not-yet-decided request
+      description: Requester only. Refused once status is approved/rejected/withdrawn (FR-004).
+      parameters:
+        - $ref: '#/components/parameters/RequestId'
+      responses:
+        '200':
+          description: Request withdrawn
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PurchaseRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /requests/{request_id}/approve:
+    post:
+      summary: Approve a request
+      description: >
+        The request's currently-resolved approver, or an owner acting as standing override
+        (FR-007), only. Requires a recorded human decision (FR-006) — there is no
+        system-originated approval path.
+      parameters:
+        - $ref: '#/components/parameters/RequestId'
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ApprovalDecisionInput' }
+      responses:
+        '200':
+          description: Request approved
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PurchaseRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /requests/{request_id}/reject:
+    post:
+      summary: Reject a request
+      description: Same authorisation rule as approve (FR-007).
+      parameters:
+        - $ref: '#/components/parameters/RequestId'
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ApprovalDecisionInput' }
+      responses:
+        '200':
+          description: Request rejected
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PurchaseRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /approvals/pending:
+    get:
+      summary: List requests awaiting the signed-in approver's decision
+      description: >
+        Every field an approver needs to decide (requester, branch, cost centre, lines,
+        required-by date, budget status) is embedded directly in each item (FR-005) — no further
+        navigation required.
+      parameters:
+        - name: cursor
+          in: query
+          schema: { type: string }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+      responses:
+        '200':
+          description: Pending approval queue
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PurchaseRequestList' }
+
+  /approvals/threshold-rules:
+    get:
+      summary: List threshold rules
+      description: Readable by every member (routing outcomes are not a secret); see research.md R1.
+      parameters:
+        - name: cursor
+          in: query
+          schema: { type: string }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+      responses:
+        '200':
+          description: Threshold rule list
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ThresholdRuleList' }
+    post:
+      summary: Create a threshold rule
+      description: Owner only.
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ThresholdRuleCreate' }
+      responses:
+        '201':
+          description: Threshold rule created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ThresholdRule' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+
+  /approvals/threshold-rules/{rule_id}:
+    patch:
+      summary: Edit a threshold rule
+      description: Owner only.
+      parameters:
+        - name: rule_id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ThresholdRuleUpdate' }
+      responses:
+        '200':
+          description: Threshold rule updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ThresholdRule' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      summary: Delete a threshold rule
+      description: >
+        Owner only. Deleting a rule never affects an already-submitted request's captured
+        routing (research.md R3) — only future submissions are affected.
+      parameters:
+        - name: rule_id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '204': { description: Deleted }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /approvals/delegations:
+    get:
+      summary: List the signed-in approver's own delegations
+      description: An owner may pass ?membership_id= to view any member's delegations.
+      parameters:
+        - name: membership_id
+          in: query
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Delegation list
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApprovalDelegationList' }
+    post:
+      summary: Create a delegation
+      description: >
+        The delegator themselves, or an owner on their behalf. delegate_membership_id must hold
+        an approver-eligible role (approver, branch_manager, or owner).
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ApprovalDelegationCreate' }
+      responses:
+        '201':
+          description: Delegation created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApprovalDelegation' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+
+  /approvals/delegations/{delegation_id}:
+    delete:
+      summary: Cancel a delegation
+      description: The delegator themselves, or an owner.
+      parameters:
+        - name: delegation_id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '204': { description: Cancelled }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: false
+      schema: { type: string, format: uuid }
+    RequestId:
+      name: request_id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+
+  responses:
+    Forbidden:
+      description: The caller's role may not perform this action
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    NotFound:
+      description: >
+        No such record in this workspace, or the record exists but belongs to a branch outside
+        the caller's own branch-scoped visibility — the two cases are indistinguishable, per
+        FR-014 extending R2.0's FR-008.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Conflict:
+      description: >
+        The action does not apply to the request's current status (e.g. submitting an
+        already-submitted request, editing a non-draft request, deciding on an already-decided
+        request).
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Unprocessable:
+      description: Validation failed
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+
+  schemas:
+    Error:
+      type: object
+      required: [code, message, trace_id]
+      properties:
+        code: { type: string }
+        message: { type: string }
+        details: { type: object, additionalProperties: true, nullable: true }
+        trace_id: { type: string }
+
+    Money:
+      type: object
+      required: [amount, currency]
+      additionalProperties: false
+      properties:
+        amount: { type: string, pattern: '^-?\d+(\.\d{1,4})?$', example: '250.0000' }
+        currency: { type: string, pattern: '^[A-Z]{3}$', example: 'GBP' }
+
+    PurchaseRequestStatus:
+      type: string
+      enum: [draft, submitted, approved, rejected, withdrawn]
+
+    ApprovalStepStatus:
+      type: string
+      enum: [pending, approved, rejected]
+
+    ApprovalStepSource:
+      type: string
+      enum: [threshold_match, delegate, owner_fallback]
+
+    BudgetStatus:
+      type: object
+      description: >
+        Present only when an R2.0 budget applies to the request's scope (FR-012); absent
+        entirely otherwise — never a misleading zero.
+      required: [remaining_amount, exceeds]
+      properties:
+        remaining_amount: { $ref: '#/components/schemas/Money' }
+        exceeds:
+          type: boolean
+          description: true when the request's estimated total would exceed remaining_amount (FR-011) — informational only, never a block
+
+    PurchaseRequestLine:
+      type: object
+      required: [id, workspace_product_id, quantity]
+      properties:
+        id: { type: string, format: uuid }
+        workspace_product_id: { type: string, format: uuid }
+        quantity: { type: string, pattern: '^\d+(\.\d{1,6})?$' }
+        note: { type: string, nullable: true }
+        estimated_unit_price: { $ref: '#/components/schemas/Money' }
+        estimated_unit_price_source_landed_cost_id: { type: string, format: uuid, nullable: true }
+
+    PurchaseRequestLineInput:
+      type: object
+      required: [workspace_product_id, quantity]
+      additionalProperties: false
+      properties:
+        workspace_product_id: { type: string, format: uuid }
+        quantity: { type: string, pattern: '^\d+(\.\d{1,6})?$' }
+        note: { type: string, nullable: true }
+
+    ApprovalStep:
+      type: object
+      required: [id, assigned_membership_id, source, status]
+      properties:
+        id: { type: string, format: uuid }
+        assigned_membership_id: { type: string, format: uuid }
+        source: { $ref: '#/components/schemas/ApprovalStepSource' }
+        status: { $ref: '#/components/schemas/ApprovalStepStatus' }
+        comment: { type: string, nullable: true }
+        decided_by_membership_id: { type: string, format: uuid, nullable: true }
+        decided_at: { type: string, format: date-time, nullable: true }
+
+    PurchaseRequest:
+      type: object
+      required: [id, branch_id, requested_by_membership_id, required_by_date, status, lines, has_incomplete_estimate, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        branch_id: { type: string, format: uuid }
+        cost_centre_id: { type: string, format: uuid, nullable: true }
+        requested_by_membership_id: { type: string, format: uuid }
+        required_by_date: { type: string, format: date }
+        status: { $ref: '#/components/schemas/PurchaseRequestStatus' }
+        lines:
+          type: array
+          items: { $ref: '#/components/schemas/PurchaseRequestLine' }
+        estimated_total: { $ref: '#/components/schemas/Money' }
+        has_incomplete_estimate:
+          type: boolean
+          description: true when any line has no price-history estimate, or lines span more than one currency (FR-015)
+        budget_status: { $ref: '#/components/schemas/BudgetStatus' }
+        approval_step: { $ref: '#/components/schemas/ApprovalStep' }
+        submitted_at: { type: string, format: date-time, nullable: true }
+        withdrawn_at: { type: string, format: date-time, nullable: true }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    PurchaseRequestCreate:
+      type: object
+      required: [branch_id, required_by_date, lines]
+      additionalProperties: false
+      properties:
+        branch_id: { type: string, format: uuid }
+        cost_centre_id: { type: string, format: uuid, nullable: true }
+        required_by_date: { type: string, format: date }
+        lines:
+          type: array
+          minItems: 1
+          items: { $ref: '#/components/schemas/PurchaseRequestLineInput' }
+
+    PurchaseRequestUpdate:
+      type: object
+      additionalProperties: false
+      properties:
+        branch_id: { type: string, format: uuid }
+        cost_centre_id: { type: string, format: uuid, nullable: true }
+        required_by_date: { type: string, format: date }
+        lines:
+          type: array
+          minItems: 1
+          items: { $ref: '#/components/schemas/PurchaseRequestLineInput' }
+
+    PurchaseRequestList:
+      type: object
+      required: [items, next_cursor]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/PurchaseRequest' }
+        next_cursor: { type: string, nullable: true }
+
+    ApprovalDecisionInput:
+      type: object
+      additionalProperties: false
+      properties:
+        comment: { type: string, nullable: true }
+
+    ThresholdRule:
+      type: object
+      required: [id, min_amount, currency, approver_membership_id, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        branch_id: { type: string, format: uuid, nullable: true }
+        min_amount: { type: string, pattern: '^\d+(\.\d{1,4})?$' }
+        max_amount: { type: string, pattern: '^\d+(\.\d{1,4})?$', nullable: true }
+        currency: { type: string, pattern: '^[A-Z]{3}$' }
+        approver_membership_id: { type: string, format: uuid }
+        created_by: { type: string, format: uuid }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    ThresholdRuleCreate:
+      type: object
+      required: [min_amount, currency, approver_membership_id]
+      additionalProperties: false
+      properties:
+        branch_id: { type: string, format: uuid, nullable: true, description: "Omit for a tenant-wide default rule" }
+        min_amount: { type: string, pattern: '^\d+(\.\d{1,4})?$' }
+        max_amount: { type: string, pattern: '^\d+(\.\d{1,4})?$', nullable: true, description: "Omit for the top, uncapped tier" }
+        currency: { type: string, pattern: '^[A-Z]{3}$' }
+        approver_membership_id: { type: string, format: uuid }
+
+    ThresholdRuleUpdate:
+      type: object
+      additionalProperties: false
+      properties:
+        branch_id: { type: string, format: uuid, nullable: true }
+        min_amount: { type: string, pattern: '^\d+(\.\d{1,4})?$' }
+        max_amount: { type: string, pattern: '^\d+(\.\d{1,4})?$', nullable: true }
+        currency: { type: string, pattern: '^[A-Z]{3}$' }
+        approver_membership_id: { type: string, format: uuid }
+
+    ThresholdRuleList:
+      type: object
+      required: [items, next_cursor]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/ThresholdRule' }
+        next_cursor: { type: string, nullable: true }
+
+    ApprovalDelegation:
+      type: object
+      required: [id, delegator_membership_id, delegate_membership_id, starts_on, ends_on, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        delegator_membership_id: { type: string, format: uuid }
+        delegate_membership_id: { type: string, format: uuid }
+        starts_on: { type: string, format: date }
+        ends_on: { type: string, format: date }
+        created_at: { type: string, format: date-time }
+
+    ApprovalDelegationCreate:
+      type: object
+      required: [delegate_membership_id, starts_on, ends_on]
+      additionalProperties: false
+      properties:
+        delegator_membership_id: { type: string, format: uuid, nullable: true, description: "Owner only; omit to delegate your own decisions" }
+        delegate_membership_id: { type: string, format: uuid }
+        starts_on: { type: string, format: date }
+        ends_on: { type: string, format: date }
+
+    ApprovalDelegationList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/ApprovalDelegation' }

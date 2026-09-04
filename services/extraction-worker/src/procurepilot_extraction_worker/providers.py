@@ -64,7 +64,7 @@ class FakeExtractionProvider:
                         "quantity": ExtractedField("quantity", "3", 0.96, 1, None),
                         "pack_count": ExtractedField("pack_count", 1, 0.91, 1, None),
                         "unit_size": ExtractedField("unit_size", "10", 0.9, 1, None),
-                        "pack_unit": ExtractedField("pack_unit", "kg", 0.88, 1, None),
+                        "pack_unit": ExtractedField("pack_unit", "kilogram", 0.88, 1, None),
                         "unit_price": ExtractedField(
                             "unit_price",
                             {"amount": "12.00", "currency": "GBP"},

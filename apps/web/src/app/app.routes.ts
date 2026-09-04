@@ -289,6 +289,35 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./features/settings/settings.component').then((m) => m.SettingsComponent),
       },
+      // --- requests & approvals (Chunk R2.1) ---
+      {
+        path: 'requests',
+        loadComponent: () =>
+          import('./features/requests/request-list/request-list.component').then(
+            (m) => m.RequestListComponent,
+          ),
+      },
+      {
+        path: 'requests/new',
+        loadComponent: () =>
+          import('./features/requests/request-form/request-form.component').then(
+            (m) => m.RequestFormComponent,
+          ),
+      },
+      {
+        path: 'requests/:id',
+        loadComponent: () =>
+          import('./features/requests/request-form/request-form.component').then(
+            (m) => m.RequestFormComponent,
+          ),
+      },
+      {
+        path: 'approvals',
+        loadComponent: () =>
+          import('./features/approvals/approval-queue/approval-queue.component').then(
+            (m) => m.ApprovalQueueComponent,
+          ),
+      },
     ],
   },
 

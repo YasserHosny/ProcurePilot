@@ -40,7 +40,10 @@ FIELD_COLUMNS = (
     "id,quotation_id,entity_type,entity_id,field_name,extracted_value,confidence,source_page,"
     "source_region,extraction_method,model_version,corrected_value,corrected_by,corrected_at"
 )
-TASK_COLUMNS = "id,quotation_id,status,priority,reason,created_at,resolved_at"
+TASK_COLUMNS = (
+    "id,quotation_id,status,priority,reason,created_at,resolved_at,"
+    "quotation(stated_total_amount,stated_total_currency,supplier(name))"
+)
 
 
 class QuotationService:
@@ -308,7 +311,18 @@ def _field(row: dict[str, object]) -> FieldExtraction:
 
 
 def _task(row: dict[str, object]) -> ReviewTask:
-    return ReviewTask.model_validate(row)
+    quotation_data = row.pop("quotation", None)
+    supplier_name: str | None = None
+    stated_total: Money | None = None
+    if isinstance(quotation_data, dict):
+        supplier_obj = quotation_data.get("supplier")
+        if isinstance(supplier_obj, dict):
+            supplier_name = supplier_obj.get("name")
+        stated_total = _money(quotation_data, "stated_total")
+    task = ReviewTask.model_validate(row)
+    task.supplier_name = supplier_name
+    task.stated_total = stated_total
+    return task
 
 
 def _version_reference(row: dict[str, object]) -> QuotationVersionReference:

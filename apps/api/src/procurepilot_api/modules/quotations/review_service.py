@@ -90,6 +90,49 @@ class QuotationReviewService:
             bearer_token=bearer_token, quotation_id=quotation_id
         )
 
+    def refuse_quotation(
+        self,
+        *,
+        bearer_token: str,
+        member: CurrentMember,
+        quotation_id: UUID,
+        reason: str | None,
+    ) -> dict[str, object]:
+        client = authenticated_client(self._settings, bearer_token)
+        quotation = _one_row(
+            client.table("quotation")
+            .select("id,status")
+            .eq("id", str(quotation_id))
+            .limit(2)
+            .execute()
+            .data,
+            resource="quotation",
+        )
+        if quotation["status"] not in {"extracted", "in_review"}:
+            raise ConflictError(details={"reason": "quotation_not_refusable"})
+
+        try:
+            row = _one_row(
+                client.table("quotation")
+                .update({
+                    "status": "refused",
+                    "reviewed_by": str(member.membership_id),
+                    "reviewed_at": datetime.now(UTC).isoformat(),
+                })
+                .eq("id", str(quotation_id))
+                .execute()
+                .data,
+                resource="quotation",
+            )
+            client.table("review_task").update(
+                {"status": "resolved", "resolved_at": datetime.now(UTC).isoformat()}
+            ).eq("quotation_id", str(quotation_id)).in_(
+                "status", ["open", "in_progress"]
+            ).execute()
+        except APIError as exc:
+            raise ServiceUnavailableError(details={"dependency": "database"}) from exc
+        return row
+
 
 def _apply_correction_to_canonical_row(
     client: object, field: dict[str, object], corrected_value: object
@@ -147,13 +190,14 @@ def _recompute_arithmetic_status(client: object, quotation_id: UUID) -> None:
         return
     lines = _rows(
         client.table("quotation_line")
-        .select("quantity,unit_price_amount,discount_amount,delivery_fee_amount")
+        .select("quantity,unit_price_amount,discount_amount,delivery_fee_amount,vat_rate")
         .eq("quotation_id", str(quotation_id))
         .execute()
         .data
     )
-    computed = Decimal("0")
+    subtotal = Decimal("0")
     has_line_total = False
+    has_any_vat = False
     for line in lines:
         if line.get("quantity") is None or line.get("unit_price_amount") is None:
             continue
@@ -162,11 +206,35 @@ def _recompute_arithmetic_status(client: object, quotation_id: UUID) -> None:
         unit_price = Decimal(str(line["unit_price_amount"]))
         discount = Decimal(str(line["discount_amount"] or "0"))
         delivery_fee = Decimal(str(line["delivery_fee_amount"] or "0"))
-        computed += quantity * unit_price - discount + delivery_fee
+        line_net = quantity * unit_price - discount + delivery_fee
+        raw_vat = line.get("vat_rate")
+        if raw_vat is not None:
+            has_any_vat = True
+            vat_rate = Decimal(str(raw_vat))
+        else:
+            vat_rate = Decimal("0")
+        subtotal += line_net * (1 + vat_rate)
     if not has_line_total:
         return
     stated = Decimal(str(stated_amount))
-    status = "reconciled" if abs(computed - stated) <= ARITHMETIC_TOLERANCE else "mismatch"
+    if abs(subtotal - stated) <= ARITHMETIC_TOLERANCE:
+        status = "reconciled"
+    elif not has_any_vat and subtotal > 0 and stated > subtotal:
+        inferred_pct = round(
+            float((stated - subtotal) / subtotal) * 100
+        )
+        if 0 < inferred_pct <= 30:
+            recomputed = subtotal * (
+                1 + Decimal(str(inferred_pct)) / 100
+            )
+            if abs(recomputed - stated) <= ARITHMETIC_TOLERANCE:
+                status = "reconciled"
+            else:
+                status = "mismatch"
+        else:
+            status = "mismatch"
+    else:
+        status = "mismatch"
     if status != quote.get("arithmetic_status"):
         client.table("quotation").update({"arithmetic_status": status}).eq(
             "id", str(quotation_id)

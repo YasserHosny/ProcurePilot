@@ -1,0 +1,158 @@
+<div class="form-container">
+  <h1 class="form-title">
+    {{ (isEditMode() ? 'requests.form.editTitle' : 'requests.form.createTitle') | translate }}
+  </h1>
+
+  @if (errorMessage()) {
+    <div class="error-banner" role="alert">
+      <mat-icon class="error-icon" aria-hidden="true">error_outline</mat-icon>
+      <span>{{ errorMessage() }}</span>
+    </div>
+  }
+
+  @if (isLoading()) {
+    <div class="loading-state" aria-live="polite">
+      <mat-spinner [attr.aria-label]="'common.loading' | translate" diameter="40"></mat-spinner>
+    </div>
+  } @else {
+    <mat-card class="form-card">
+      <form [formGroup]="form" (ngSubmit)="saveDraft()">
+        <div class="form-fields">
+          <mat-form-field appearance="outline">
+            <mat-label>{{ 'requests.form.branchLabel' | translate }}</mat-label>
+            <mat-select formControlName="branch_id">
+              @for (branch of branches(); track branch.id) {
+                <mat-option [value]="branch.id">{{ branch.name }}</mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>{{ 'requests.form.costCentreLabel' | translate }}</mat-label>
+            <mat-select formControlName="cost_centre_id">
+              <mat-option value="">—</mat-option>
+              @for (cc of costCentres(); track cc.id) {
+                <mat-option [value]="cc.id">{{ cc.name }}</mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>{{ 'requests.form.requiredByDateLabel' | translate }}</mat-label>
+            <input matInput type="date" formControlName="required_by_date" />
+          </mat-form-field>
+        </div>
+
+        <div class="lines-section">
+          <div class="lines-header">
+            <h2 class="lines-title">{{ 'requests.form.linesTitle' | translate }}</h2>
+
+            @if (!form.disabled) {
+              <button
+                mat-stroked-button
+                type="button"
+                (click)="addLine()"
+                class="add-line-btn"
+              >
+                <mat-icon aria-hidden="true">add</mat-icon>
+                {{ 'requests.form.addLineButton' | translate }}
+              </button>
+            }
+          </div>
+
+          @if (lines.length === 0) {
+            <p class="lines-empty">{{ 'requests.form.atLeastOneLineRequired' | translate }}</p>
+          }
+
+          @for (lineGroup of lines.controls; track $index; let i = $index) {
+            <div class="line-row">
+              <mat-form-field appearance="outline" class="line-product">
+                <mat-label>{{ 'requests.form.productLabel' | translate }}</mat-label>
+                <input matInput [formControl]="lineGroup.controls.workspace_product_id" />
+              </mat-form-field>
+
+              <mat-form-field appearance="outline" class="line-quantity">
+                <mat-label>{{ 'requests.form.quantityLabel' | translate }}</mat-label>
+                <input matInput [formControl]="lineGroup.controls.quantity" type="number" min="0" step="any" />
+              </mat-form-field>
+
+              <mat-form-field appearance="outline" class="line-note">
+                <mat-label>{{ 'requests.form.noteLabel' | translate }}</mat-label>
+                <input matInput [formControl]="lineGroup.controls.note" />
+              </mat-form-field>
+
+              @if (existingRequest(); as req) {
+                @if (req.lines[i]; as line) {
+                  <span class="line-estimate">
+                    {{ formatEstimate(line) }}
+                  </span>
+                }
+              }
+
+              @if (!form.disabled) {
+                <button
+                  mat-icon-button
+                  type="button"
+                  (click)="removeLine(i)"
+                  class="remove-line-btn"
+                  [attr.aria-label]="'requests.form.removeLineButton' | translate"
+                >
+                  <mat-icon aria-hidden="true">close</mat-icon>
+                </button>
+              }
+            </div>
+          }
+        </div>
+
+        @if (existingRequest(); as req) {
+          @if (req.estimated_total) {
+            <div class="total-row">
+              <span class="total-label">{{ 'requests.columns.estimatedTotal' | translate }}</span>
+              <span class="total-value">
+                {{ req.estimated_total.currency }} {{ req.estimated_total.amount }}
+              </span>
+            </div>
+          }
+          @if (req.has_incomplete_estimate) {
+            <div class="incomplete-warning">
+              <mat-icon aria-hidden="true">warning</mat-icon>
+              {{ 'requests.incompleteEstimateBadge' | translate }}
+            </div>
+          }
+        }
+
+        <div class="form-actions">
+          <button mat-stroked-button type="button" (click)="cancel()">
+            {{ 'requests.form.cancelButton' | translate }}
+          </button>
+
+          @if (!form.disabled) {
+            <button
+              mat-flat-button
+              color="primary"
+              type="submit"
+              [disabled]="isSaving() || form.invalid || lines.length === 0"
+            >
+              {{ 'requests.form.saveDraftButton' | translate }}
+            </button>
+
+            @if (existingRequest()) {
+              <button
+                mat-flat-button
+                color="accent"
+                type="button"
+                (click)="submitRequest()"
+                [disabled]="isSubmitting()"
+              >
+                {{
+                  (isSubmitting() ? 'requests.form.submittingButton' : 'requests.form.submitButton')
+                    | translate
+                }}
+              </button>
+            }
+          }
+        </div>
+      </form>
+    </mat-card>
+  }
+</div>

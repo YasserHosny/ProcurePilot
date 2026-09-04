@@ -80,7 +80,6 @@
       @if (isLoading()) {
         <div class="loading-state">
           <mat-spinner [attr.aria-label]="'common.loading' | translate" diameter="40"></mat-spinner>
-          <span>{{ 'common.loading' | translate }}</span>
         </div>
       } @else if (tasks().length === 0) {
         <div class="empty-state">
@@ -91,11 +90,19 @@
       } @else {
         <div class="table-responsive">
           <table mat-table [dataSource]="tasks()" class="tasks-table">
-            <!-- Quotation ID Column -->
+            <!-- Quotation ID Column (Q4: truncated) -->
             <ng-container matColumnDef="quotation_id">
               <th mat-header-cell *matHeaderCellDef>{{ 'quotations.queue.columns.id' | translate }}</th>
               <td mat-cell *matCellDef="let task" class="mono-cell">
-                <span class="id-badge">{{ task.quotation_id }}</span>
+                <span class="id-badge" [matTooltip]="task.quotation_id">{{ truncateId(task.quotation_id) }}</span>
+              </td>
+            </ng-container>
+
+            <!-- Supplier Name Column (Q3) -->
+            <ng-container matColumnDef="supplier_name">
+              <th mat-header-cell *matHeaderCellDef>{{ 'quotations.queue.columns.supplier' | translate }}</th>
+              <td mat-cell *matCellDef="let task">
+                {{ task.supplier_name || '—' }}
               </td>
             </ng-container>
 
@@ -129,7 +136,19 @@
               </td>
             </ng-container>
 
-            <!-- Created At Column -->
+            <!-- Stated Total Column (Q5) -->
+            <ng-container matColumnDef="stated_total">
+              <th mat-header-cell *matHeaderCellDef>{{ 'quotations.queue.columns.statedTotal' | translate }}</th>
+              <td mat-cell *matCellDef="let task">
+                @if (task.stated_total) {
+                  {{ task.stated_total | formatMoney }}
+                } @else {
+                  <span class="muted-dash">—</span>
+                }
+              </td>
+            </ng-container>
+
+            <!-- Created At Column (Q2: fixed label) -->
             <ng-container matColumnDef="created_at">
               <th mat-header-cell *matHeaderCellDef>{{ 'quotations.queue.columns.createdAt' | translate }}</th>
               <td mat-cell *matCellDef="let task">
@@ -168,6 +187,24 @@
             <tr mat-row *matRowDef="let row; columns: displayedColumns"></tr>
           </table>
         </div>
+
+        <!-- Pagination: Load More (Q1) -->
+        @if (nextCursor()) {
+          <div class="load-more-bar">
+            <button
+              mat-stroked-button
+              type="button"
+              (click)="loadMore()"
+              [disabled]="isLoadingMore()"
+              class="load-more-btn"
+            >
+              @if (isLoadingMore()) {
+                <mat-spinner diameter="18"></mat-spinner>
+              }
+              <span>{{ 'quotations.queue.loadMore' | translate }}</span>
+            </button>
+          </div>
+        }
       }
     </mat-card-content>
   </mat-card>

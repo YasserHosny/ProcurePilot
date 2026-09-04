@@ -8,7 +8,12 @@ from fastapi import APIRouter, Body, Depends, Header, status
 from procurepilot_api.deps import CurrentMember, bearer_token, current_member
 from procurepilot_api.modules.auth.jwt import MemberRole
 from procurepilot_api.modules.auth.rbac import require_role
-from procurepilot_api.modules.documents.schemas import Document, PresignRequest, PresignResponse
+from procurepilot_api.modules.documents.schemas import (
+    Document,
+    DownloadUrlResponse,
+    PresignRequest,
+    PresignResponse,
+)
 from procurepilot_api.modules.documents.service import DocumentService, get_document_service
 
 router = APIRouter(tags=["documents"])
@@ -38,3 +43,13 @@ def get_document(
     service: Annotated[DocumentService, Depends(get_document_service)],
 ) -> Document:
     return service.get_document(bearer_token=token, document_id=document_id)
+
+
+@router.get("/documents/{document_id}/download", response_model=DownloadUrlResponse)
+def get_document_download_url(
+    document_id: UUID,
+    token: Annotated[str, Depends(bearer_token)],
+    _member: Annotated[CurrentMember, Depends(current_member)],
+    service: Annotated[DocumentService, Depends(get_document_service)],
+) -> DownloadUrlResponse:
+    return service.create_download_url(bearer_token=token, document_id=document_id)

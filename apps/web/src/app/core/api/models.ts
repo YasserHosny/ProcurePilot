@@ -237,6 +237,10 @@ export interface Document {
   readonly created_by?: string;
 }
 
+export interface DocumentDownloadResponse {
+  readonly download_url: string;
+}
+
 export interface QuotationCreate {
   readonly document_id: string;
   readonly supplier_id?: string | null;
@@ -358,6 +362,8 @@ export interface ReviewTask {
   readonly reason: ReviewTaskReason;
   readonly created_at: string;
   readonly resolved_at?: string | null;
+  readonly supplier_name?: string | null;
+  readonly stated_total?: Money | null;
 }
 
 // --- Matching and Normalisation (Chunk 4.4) ---
@@ -963,6 +969,134 @@ export interface BranchRoleAssignmentCreate {
   readonly branch_id: string;
 }
 
+// --- requests + approvals (008) ---------------------------------------------
 
+export type PurchaseRequestStatus = 'draft' | 'submitted' | 'approved' | 'rejected' | 'withdrawn';
+export type ApprovalStepStatus = 'pending' | 'approved' | 'rejected';
+export type ApprovalStepSource = 'threshold_match' | 'delegate' | 'owner_fallback';
+
+export interface BudgetStatus {
+  readonly remaining_amount: Money;
+  readonly exceeds: boolean;
+}
+
+export interface PurchaseRequestLine {
+  readonly id: string;
+  readonly workspace_product_id: string;
+  readonly quantity: string;
+  readonly note?: string | null;
+  readonly estimated_unit_price?: Money | null;
+  readonly estimated_unit_price_source_landed_cost_id?: string | null;
+}
+
+export interface PurchaseRequestLineInput {
+  readonly workspace_product_id: string;
+  readonly quantity: string;
+  readonly note?: string | null;
+}
+
+export interface ApprovalStep {
+  readonly id: string;
+  readonly assigned_membership_id: string;
+  readonly source: ApprovalStepSource;
+  readonly status: ApprovalStepStatus;
+  readonly comment?: string | null;
+  readonly decided_by_membership_id?: string | null;
+  readonly decided_at?: string | null;
+}
+
+export interface PurchaseRequest {
+  readonly id: string;
+  readonly branch_id: string;
+  readonly cost_centre_id?: string | null;
+  readonly requested_by_membership_id: string;
+  readonly required_by_date: string;
+  readonly status: PurchaseRequestStatus;
+  readonly lines: readonly PurchaseRequestLine[];
+  readonly estimated_total?: Money | null;
+  readonly has_incomplete_estimate: boolean;
+  readonly budget_status?: BudgetStatus | null;
+  readonly approval_step?: ApprovalStep | null;
+  readonly submitted_at?: string | null;
+  readonly withdrawn_at?: string | null;
+  readonly created_at: string;
+  readonly updated_at?: string;
+}
+
+export interface PurchaseRequestCreate {
+  readonly branch_id: string;
+  readonly cost_centre_id?: string | null;
+  readonly required_by_date: string;
+  readonly lines: readonly PurchaseRequestLineInput[];
+}
+
+export interface PurchaseRequestUpdate {
+  readonly branch_id?: string;
+  readonly cost_centre_id?: string | null;
+  readonly required_by_date?: string;
+  readonly lines?: readonly PurchaseRequestLineInput[];
+}
+
+export interface PurchaseRequestList {
+  readonly items: readonly PurchaseRequest[];
+  readonly next_cursor: string | null;
+}
+
+export interface ApprovalDecisionInput {
+  readonly comment?: string | null;
+}
+
+export interface ThresholdRule {
+  readonly id: string;
+  readonly branch_id?: string | null;
+  readonly min_amount: string;
+  readonly max_amount?: string | null;
+  readonly currency: string;
+  readonly approver_membership_id: string;
+  readonly created_by: string;
+  readonly created_at: string;
+  readonly updated_at?: string;
+}
+
+export interface ThresholdRuleCreate {
+  readonly branch_id?: string | null;
+  readonly min_amount: string;
+  readonly max_amount?: string | null;
+  readonly currency: string;
+  readonly approver_membership_id: string;
+}
+
+export interface ThresholdRuleUpdate {
+  readonly branch_id?: string | null;
+  readonly min_amount?: string;
+  readonly max_amount?: string | null;
+  readonly currency?: string;
+  readonly approver_membership_id?: string;
+}
+
+export interface ThresholdRuleList {
+  readonly items: readonly ThresholdRule[];
+  readonly next_cursor: string | null;
+}
+
+export interface ApprovalDelegation {
+  readonly id: string;
+  readonly delegator_membership_id: string;
+  readonly delegate_membership_id: string;
+  readonly starts_on: string;
+  readonly ends_on: string;
+  readonly created_at: string;
+}
+
+export interface ApprovalDelegationCreate {
+  readonly delegator_membership_id?: string | null;
+  readonly delegate_membership_id: string;
+  readonly starts_on: string;
+  readonly ends_on: string;
+}
+
+export interface ApprovalDelegationList {
+  readonly items: readonly ApprovalDelegation[];
+}
 
 

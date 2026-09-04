@@ -588,7 +588,7 @@ Everything else in Phase 1 is optional polish.
 | **Database** | Supabase Postgres 17 + `pgvector` + `pg_trgm` | Managed Postgres 17 with Auth, Storage and Realtime; relational integrity, semantic search and fuzzy matching in one engine |
 | **Object storage** | Supabase Storage (S3-compatible) | Source documents retained for audit; MIME/size filters |
 | **Cache / queue** | Redis | Sessions, rate limits, lightweight job queue |
-| **Background jobs** | Celery (or ARQ) | Extraction, matching, refresh, digests |
+| **Background jobs** | RQ (Redis Queue) | Extraction, matching, refresh, digests |
 | **Workflow orchestration** | Temporal (Phase 3+, if needed) | Long-running integration and reconciliation flows |
 | **Document AI** | AWS Bedrock (Claude 3 Haiku) primary + Azure Document Intelligence fallback | Template-free extraction; fallback for cost and resilience |
 | **Optimisation** | OR-Tools (CP-SAT / MIP) | Basket allocation with thresholds, MOVs, and discount tiers is a constrained optimisation problem, not a heuristic |
@@ -599,7 +599,7 @@ Everything else in Phase 1 is optional polish.
 | **Error tracking** | Sentry | Web, mobile, backend |
 | **Monorepo** | Turborepo + pnpm (JS) · uv (Python) | Shared types, one CI pipeline |
 | **CI/CD** | GitHub Actions · Docker Buildx · GHCR · BunnyWay/container-update-image | Path-filtered backend/frontend/mobile workflows; secrets `BUNNY_API_KEY`, `BUNNY_*_APP_ID` |
-| **Hosting** | bunny.net Magic Containers — Web FE (port 80) + Backend (port 8000) + Mobile build; shared network namespace with `BACKEND_HOST=localhost` | Minimise ops headcount pre-scale; mobile container is build-only |
+| **Hosting** | bunny.net Magic Containers — **Production app:** Web FE (port 80) + Backend (port 8000), shared network namespace with `BACKEND_HOST=localhost`. **Workers app:** Extraction worker + Redis (port 6379), shared namespace; cross-app communication via Anycast IP | Two-app topology isolates background AI inference from HTTP serving; independent scaling and deployment |
 | **IaC** | Terraform | Reproducible environments |
 
 **Platform note:** Supabase (Postgres + Auth + Storage + Realtime) is the Phase 1 platform, materially reducing initial infrastructure work. A future path to self-managed Postgres + custom Auth/Storage remains available if residency, scale, or pricing require it.
@@ -735,8 +735,9 @@ Extends the conceptual model in the context document with the entities implement
 2. **Evidence always one click away.** Any number can be expanded to its calculation and source document.
 3. **Confidence made visible, never hidden.** Low-confidence values are visually distinct and correctable inline.
 4. **Density where experts work.** Comparison grids and review queues are dense and keyboard-navigable; dashboards are calm.
-5. **Bilingual and RTL from the first component.** Direction-aware layout primitives, no hard-coded left/right spacing.
-6. **Accessibility baseline WCAG 2.1 AA.** Contrast, focus order, keyboard operability, screen-reader labels.
+5. **Bilingual and RTL from the first component.** Direction-aware layout primitives, no hard-coded left/right spacing. CSS logical properties (`margin-inline-start`, `padding-block-end`) are mandatory.
+6. **Responsive across mobile, tablet, and desktop.** Shared SCSS breakpoints (mobile ≤ 599px, tablet 600–959px, desktop ≥ 960px); layouts collapse gracefully with no horizontal overflow. Procurement users access the system from phones and tablets on the shop floor.
+7. **Accessibility baseline WCAG 2.1 AA.** Contrast, focus order, keyboard operability, screen-reader labels.
 
 ### 11.2 Information Architecture
 

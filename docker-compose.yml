@@ -217,7 +217,8 @@ services:
       redis:
         condition: service_started
     command: >
-      sh -c "pip install -e /workspace/services/extraction-worker
+      sh -c "pip install -e /workspace/packages/py-logging
+      && pip install -e /workspace/services/extraction-worker
       && python -m procurepilot_extraction_worker"
     restart: unless-stopped
 

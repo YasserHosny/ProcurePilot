@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from datetime import UTC, datetime
 from urllib.error import URLError
 from urllib.parse import quote
@@ -7,6 +8,7 @@ from urllib.request import Request, urlopen
 from uuid import UUID
 
 import psycopg
+from procurepilot_logging import get_trace_id, new_trace_id, set_trace_id
 
 from procurepilot_extraction_worker.azure_di import AzureDocumentIntelligenceProvider
 from procurepilot_extraction_worker.bedrock import BedrockExtractionProvider
@@ -16,13 +18,20 @@ from procurepilot_extraction_worker.settings import WorkerSettings, get_settings
 from procurepilot_extraction_worker.structured_parse import is_structured_mime_type
 from procurepilot_extraction_worker.validation import low_confidence_fields, validate_arithmetic
 
+logger = logging.getLogger(__name__)
+
 
 def process_extraction_job(payload: dict[str, str]) -> None:
+    set_trace_id(new_trace_id())
     settings = get_settings()
     job_id = UUID(payload["job_id"])
     tenant_id = UUID(payload["tenant_id"])
     quotation_id = UUID(payload["quotation_id"])
     document_id = UUID(payload["document_id"])
+    logger.info(
+        "extraction job started",
+        extra={"job_id": str(job_id), "document_id": str(document_id)},
+    )
     with psycopg.connect(settings.database_url) as conn:
         document = _document(conn, tenant_id, document_id)
         _mark_running(conn, job_id)
@@ -44,9 +53,24 @@ def process_extraction_job(payload: dict[str, str]) -> None:
                 result,
             )
             _mark_succeeded(conn, job_id, result.method)
+            logger.info(
+                "extraction job succeeded",
+                extra={
+                    "job_id": str(job_id),
+                    "method": result.method,
+                    "lines": len(result.lines),
+                    "arithmetic": arithmetic.status,
+                    "quotation_status": quotation_status,
+                },
+            )
         except Exception as exc:
+            conn.rollback()
             _mark_failed(conn, job_id, {"code": "extraction_failed", "message": str(exc)})
             _refuse_quotation(conn, quotation_id)
+            logger.exception(
+                "extraction job failed",
+                extra={"job_id": str(job_id), "document_id": str(document_id)},
+            )
             raise
 
 
@@ -58,31 +82,34 @@ def _extract(
 ) -> ExtractionResult:
     mime_type = str(document["mime_type"])
     storage_path = str(document["storage_path"])
+    bucket = str(document["storage_bucket"])
     if is_structured_mime_type(mime_type):
         from procurepilot_extraction_worker.structured_parse import parse_structured_content
 
-        content = _download_storage_object(
-            settings,
-            bucket=str(document["storage_bucket"]),
-            path=storage_path,
-        )
+        logger.info("using structured parser", extra={"mime_type": mime_type})
+        content = _download_storage_object(settings, bucket=bucket, path=storage_path)
         return parse_structured_content(content, mime_type=mime_type)
     if settings.provider_mode == "stub":
+        logger.info("using stub provider")
         return FakeExtractionProvider().extract(
             document_id=str(document_id), mime_type=mime_type, storage_path=storage_path
         )
+    doc_bytes = _download_storage_object(settings, bucket=bucket, path=storage_path)
+    common = dict(
+        document_id=str(document_id),
+        mime_type=mime_type,
+        storage_path=storage_path,
+        document_bytes=doc_bytes,
+    )
     if settings.provider_mode == "azure_di":
-        return AzureDocumentIntelligenceProvider().extract(
-            document_id=str(document_id), mime_type=mime_type, storage_path=storage_path
-        )
+        logger.info("using azure_di provider")
+        return AzureDocumentIntelligenceProvider(settings).extract(**common)
+    logger.info("using bedrock provider")
     try:
-        return BedrockExtractionProvider().extract(
-            document_id=str(document_id), mime_type=mime_type, storage_path=storage_path
-        )
+        return BedrockExtractionProvider(settings).extract(**common)
     except Exception:
-        return AzureDocumentIntelligenceProvider().extract(
-            document_id=str(document_id), mime_type=mime_type, storage_path=storage_path
-        )
+        logger.warning("bedrock failed, falling back to azure_di", exc_info=True)
+        return AzureDocumentIntelligenceProvider(settings).extract(**common)
 
 
 def _persist_result(
@@ -102,6 +129,11 @@ def _persist_result(
             (tenant_id, quotation_id),
         )
         for line in result.lines:
+            pack_count = _safe_numeric(_field_value(line, "pack_count"))
+            unit_size = _safe_numeric(_field_value(line, "unit_size"))
+            if (pack_count is None) != (unit_size is None):
+                pack_count = None
+                unit_size = None
             cur.execute(
                 """
                 insert into quotation_line (
@@ -116,13 +148,13 @@ def _persist_result(
                     quotation_id,
                     line.line_number,
                     line.original_text,
-                    _field_value(line, "quantity"),
-                    _field_value(line, "pack_count"),
-                    _field_value(line, "unit_size"),
-                    _field_value(line, "pack_unit"),
+                    _safe_numeric(_field_value(line, "quantity")),
+                    pack_count,
+                    unit_size,
+                    _normalise_pack_unit(_field_value(line, "pack_unit")),
                     _money_amount(line, "unit_price"),
                     _money_currency(line, "unit_price"),
-                    _field_value(line, "vat_rate"),
+                    _safe_numeric(_field_value(line, "vat_rate")),
                     _money_amount(line, "delivery_fee"),
                     _money_currency(line, "delivery_fee"),
                     _money_amount(line, "discount"),
@@ -333,6 +365,59 @@ def _mark_failed(conn: psycopg.Connection, job_id: UUID, error: dict[str, object
 def _refuse_quotation(conn: psycopg.Connection, quotation_id: UUID) -> None:
     with conn.cursor() as cur:
         cur.execute("update quotation set status = 'refused' where id = %s", (quotation_id,))
+
+
+_UNIT_ALIASES: dict[str, str] = {
+    "box": "each",
+    "boxes": "each",
+    "bag": "each",
+    "bags": "each",
+    "bottle": "each",
+    "bottles": "each",
+    "can": "each",
+    "cans": "each",
+    "pack": "each",
+    "packs": "each",
+    "packet": "each",
+    "piece": "each",
+    "pieces": "each",
+    "pcs": "each",
+    "unit": "each",
+    "units": "each",
+    "ea": "each",
+    "each": "each",
+    "kg": "kilogram",
+    "kilogram": "kilogram",
+    "kilograms": "kilogram",
+    "kgs": "kilogram",
+    "g": "gram",
+    "gram": "gram",
+    "grams": "gram",
+    "l": "litre",
+    "litre": "litre",
+    "litres": "litre",
+    "liter": "litre",
+    "liters": "litre",
+    "ml": "millilitre",
+    "millilitre": "millilitre",
+    "millilitres": "millilitre",
+    "milliliter": "millilitre",
+}
+
+
+def _normalise_pack_unit(raw: object) -> str | None:
+    if raw is None:
+        return None
+    return _UNIT_ALIASES.get(str(raw).strip().lower())
+
+
+def _safe_numeric(raw: object) -> object | None:
+    if raw is None:
+        return None
+    try:
+        return float(str(raw))
+    except (ValueError, TypeError):
+        return None
 
 
 def _field_value(line: ExtractedLine, name: str) -> object | None:

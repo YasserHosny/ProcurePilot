@@ -65,7 +65,7 @@ resource "bunnynet_dns_record" "backend" {
 
 resource "bunnynet_dns_record" "frontend" {
   zone  = bunnynet_dns_zone.primary.id
-  name  = var.environment == "production" ? "@" : var.environment
+  name  = var.environment == "production" ? "" : var.environment
   type  = "CNAME"
   value = "${local.app_name}.b-cdn.net"
   ttl   = 300

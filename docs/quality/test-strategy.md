@@ -84,7 +84,38 @@
 - **Product designer:** accessibility and UX acceptance.
 - **Founder:** prioritises E2E scenarios based on pilot feedback.
 
-## 8. Open Decisions
+## 8. Responsive & RTL Testing
+
+All UI changes must be verified at three viewport widths:
+
+| Tier | Width | Key checks |
+|---|---|---|
+| Mobile | < 600px | Single-column layout, no horizontal scrollbar, reduced padding |
+| Tablet | 600–959px | Intermediate layouts, flex-wrap correct |
+| Desktop | ≥ 960px | Multi-column grids, side-by-side panels |
+
+RTL verification: switch locale to Arabic and confirm:
+- Logical properties flip correctly (margins, paddings).
+- Text alignment reverses.
+- Navigation and action buttons reorder.
+- No text clipping or overflow.
+
+## 9. Production Smoke Testing
+
+After every deployment, run the end-to-end flow on the live production URL:
+
+1. Sign in or sign up.
+2. Upload a real document (not stub mode) → verify extraction provenance shows the expected
+   AI provider (not `stub-provider-v1`).
+3. Review and confirm the quotation.
+4. Verify the review queue, Smart Compare, and savings flows.
+5. Resize the browser to mobile width and verify responsive layout.
+
+This catches issues that local tests cannot: misconfigured container env vars (e.g.
+`EXTRACTION_PROVIDER_MODE` still set to `stub`), cross-app Redis connectivity failures,
+and GHCR image pull issues.
+
+## 10. Open Decisions
 
 1. Which Flutter testing framework (integration tests vs. Maestro).
 2. Whether to add synthetic data generation for performance testing.

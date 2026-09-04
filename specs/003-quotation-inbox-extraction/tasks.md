@@ -87,6 +87,8 @@ description: "Task list for Quotation Inbox and Extraction Review implementation
 - [x] T035 [US1] Implement `POST /quotations/{quotation_id}/extract` in `apps/api/src/procurepilot_api/modules/extraction/router.py`, returning a pollable Job and preventing duplicate active extraction jobs
 - [x] T036 [P] [US1] Build the upload screen in `apps/web/src/app/features/quotations/upload/`, including accepted-format validation, direct Storage upload progress and job polling copy from `packages/i18n`
 - [x] T037 [P] [US1] Write upload and extraction E2E coverage in `apps/web/tests/e2e/quotation-upload.spec.ts`, proving the browser flow creates a quotation and shows processing/extracted states
+- [x] T037a [US1] Add sample quotation files to `apps/web/public/samples/` and a "Try with a sample quotation" section on the upload screen (FR-004a) — two CSV samples (Acme Foods 5-line, Fresh Direct 6-line) plus one PDF sample (Al-Faisal Trading 6-line), download links, i18n keys (en + ar)
+- [x] T037b [US2] Add document download endpoint `GET /documents/{id}/download` returning a 5-minute signed Supabase Storage URL (FR-004b) — backend service + router + schema, Angular API method + review page download button, i18n keys (en + ar), OpenAPI contract updated
 
 **Checkpoint**: a buyer can upload a quotation, trigger extraction, poll the job, and inspect extracted fields with confidence and provenance.
 

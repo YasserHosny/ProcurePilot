@@ -15,7 +15,8 @@
     "languages": {
       "en": "English",
       "ar": "العربية"
-    }
+    },
+    "all": "الكل"
   },
   "auth": {
     "signin": {
@@ -154,6 +155,8 @@
     "navMatching": "مطابقة البنود",
     "navCompare": "المقارنة الذكية",
     "navSavings": "سجل الوفورات",
+    "navRequests": "طلبات الشراء",
+    "navApprovals": "قائمة الموافقات",
     "navTeam": "إدارة الفريق",
     "navSettings": "الإعدادات",
     "switchWorkspace": "تبديل مساحة العمل",
@@ -544,6 +547,11 @@
       "failedMessage": "تعذر معالجة المستند. يُرجى التأكد من وضوح المستند والمحاولة مرة أخرى.",
       "retryButton": "إعادة المحاولة",
       "directStorageNotice": "يتم رفع المستندات بأمان ومباشرةً إلى وحدة التخزين المشفرة.",
+      "sampleQuotationsTitle": "جرّب باستخدام عرض أسعار تجريبي",
+      "sampleQuotationsHint": "قم بتحميل نموذج عرض أسعار لاختبار خط أنابيب الاستخراج دون الحاجة إلى مستند حقيقي.",
+      "sampleAcmeFoods": "Acme Foods — ٥ بنود (CSV)",
+      "sampleFreshDirect": "Fresh Direct — ٦ بنود (CSV)",
+      "sampleAlFaisalTrading": "Al-Faisal Trading — ٦ بنود (PDF)",
       "status": {
         "uploading": "جاري الرفع",
         "processing": "جاري الاستخراج",
@@ -581,7 +589,8 @@
         "reason": "سبب المراجعة",
         "priority": "الأولوية",
         "status": "الحالة",
-        "createdAt": "تاريخ الرفع",
+        "createdAt": "تاريخ الإنشاء",
+        "statedTotal": "الإجمالي المعلن",
         "actions": "الإجراءات"
       },
       "actions": {
@@ -590,6 +599,7 @@
       },
       "readOnlyBadge": "صلاحية قراءة فقط",
       "readOnlyNotice": "دورك يتيح صلاحية القراءة فقط. يملك المالكون والمشترون فقط صلاحية تصحيح واعتماد عروض الأسعار.",
+      "loadMore": "تحميل المزيد",
       "emptyTitle": "لا توجد مهام مراجعة",
       "emptyMessage": "لا توجد مهام مراجعة لعروض الأسعار تطابق خيارات التصفية الحالية."
     },
@@ -597,6 +607,7 @@
       "title": "مراجعة واعتماد عرض السعر",
       "subtitle": "فحص الحقول المستخرجة جنباً إلى جنب مع المستند الأصلي. تحقق من المورد وعالج أي فروقات.",
       "backToQueue": "العودة إلى قائمة المراجعة",
+      "downloadOriginal": "تحميل المستند الأصلي",
       "readOnlyNotice": "وضع القراءة فقط. يمكنك الاطلاع على أدلة الاستخراج، ولكن التعديل والاعتماد يتطلبان صلاحيات المالك أو المشتري.",
       "panels": {
         "document": "أدلة المستند الأصلي",
@@ -614,6 +625,8 @@
         "supplierLabel": "المورد (مطلوب)",
         "supplierPlaceholder": "اختر المورد المعتمد...",
         "supplierRequired": "تأكيد المورد إلزامي قبل اعتماد عرض السعر",
+        "supplierEmptyState": "لا يوجد موردون في مساحة العمل هذه حتى الآن.",
+        "supplierEmptyAction": "إضافة مورد",
         "currencyLabel": "العملة",
         "currencyPlaceholder": "مثال: USD, EUR, SAR",
         "currencyRequired": "العملة مطلوبة",
@@ -638,7 +651,8 @@
         "packCount": "عدد العبوات",
         "unitSize": "حجم الوحدة",
         "unit": "الوحدة",
-        "noLines": "لم يتم استخراج بنود لعرض السعر هذا."
+        "noLines": "لم يتم استخراج بنود لعرض السعر هذا.",
+        "colLineTotal": "إجمالي السطر"
       },
       "confidence": {
         "high": "ثقة عالية",
@@ -673,7 +687,12 @@
         "difference": "الفارق الحسابي:",
         "reconciled": "قيم البنود متطابقة تماماً مع الإجمالي المذكور في المستند.",
         "statusMismatch": "عدم تطابق غير محلول",
-        "statusReconciled": "متطابق"
+        "statusReconciled": "متطابق",
+        "acknowledgeLabel": "لقد راجعت التباين وأرغب في المتابعة بالتأكيد رغم وجود فرق حسابي",
+        "reconciledTitle": "التحقق الحسابي ناجح",
+        "reconciledDescription": "إجمالي البنود المحسوب يطابق الإجمالي المعلن في المستند.",
+        "reconciledVatNote": "إجمالي البنود يتطابق بعد تطبيق ضريبة القيمة المضافة بنسبة {{pct}}% على مستوى المستند.",
+        "inferredVat": "ضريبة القيمة المضافة المستنتجة:"
       },
       "versioning": {
         "title": "إصدارات عروض الأسعار (US4)",
@@ -698,7 +717,15 @@
         "confirmBlockedMissingSupplier": "يُرجى تحديد وتأكيد المورد قبل الاعتماد.",
         "confirmBlockedArithmetic": "يوجد عدم تطابق حسابي غير معالج. يُرجى تصحيح البنود أو الإجمالي المذكور.",
         "confirmBlockedConfidence": "توجد حقول منخفضة الثقة تتطلب التصحيح قبل الاعتماد.",
-        "genericError": "تعذر تحديث عرض السعر. يُرجى التحقق من المدخلات والمحاولة مرة أخرى."
+        "genericError": "تعذر تحديث عرض السعر. يُرجى التحقق من المدخلات والمحاولة مرة أخرى.",
+        "refuseButton": "رفض عرض السعر",
+        "refusing": "جاري رفض عرض السعر...",
+        "refuseSuccess": "تم رفض عرض السعر وإزالته من قائمة المراجعة.",
+        "confirmDialogTitle": "تأكيد واعتماد عرض السعر",
+        "confirmDialogMessage": "سيتم وضع علامة على عرض السعر كمُراجَع ومعتمد. سيصبح بيانات تجارية موثوقة تُستخدم في المطابقة والتسعير ومقارنة التكاليف. لا يمكن التراجع عن هذا الإجراء.",
+        "confirmDialogMismatchWarn": "تحذير: أنت تؤكد عرض السعر هذا مع وجود تباين حسابي غير محلول.",
+        "confirmDialogCancel": "إلغاء",
+        "confirmDialogProceed": "تأكيد واعتماد"
       },
       "status": {
         "pending": "بانتظار الاستخراج",
@@ -1468,6 +1495,145 @@
     "roleScoping": {
       "branchScopedBadge": "بنطاق فرع محدد",
       "notFoundMessage": "هذا الفرع غير موجود أو غير متاح."
+    }
+  },
+  "requests": {
+    "title": "طلبات الشراء",
+    "subtitle": "أنشئ وتابع طلبات الشراء لفروعك ومراكز التكلفة.",
+    "status": {
+      "draft": "مسودة",
+      "submitted": "مقدمة",
+      "approved": "معتمدة",
+      "rejected": "مرفوضة",
+      "withdrawn": "مسحوبة"
+    },
+    "columns": {
+      "branch": "الفرع",
+      "costCentre": "مركز التكلفة",
+      "requiredByDate": "مطلوب بحلول",
+      "status": "الحالة",
+      "estimatedTotal": "الإجمالي المقدر",
+      "actions": "إجراءات"
+    },
+    "actions": {
+      "view": "عرض الطلب",
+      "edit": "تعديل الطلب",
+      "withdraw": "سحب الطلب"
+    },
+    "form": {
+      "createTitle": "طلب شراء جديد",
+      "editTitle": "تعديل طلب الشراء",
+      "branchLabel": "الفرع",
+      "costCentreLabel": "مركز التكلفة (اختياري)",
+      "requiredByDateLabel": "مطلوب بحلول",
+      "linesTitle": "البنود",
+      "addLineButton": "إضافة بند",
+      "removeLineButton": "إزالة البند",
+      "productLabel": "المنتج",
+      "quantityLabel": "الكمية",
+      "quantityRequired": "يجب أن تكون الكمية أكبر من صفر.",
+      "noteLabel": "ملاحظة (اختيارية)",
+      "estimatedUnitPriceLabel": "سعر الوحدة المقدر",
+      "noEstimateAvailable": "لا توجد بيانات أسعار سابقة لهذا المنتج.",
+      "cancelButton": "إلغاء",
+      "saveDraftButton": "حفظ كمسودة",
+      "submitButton": "إرسال الطلب",
+      "submittingButton": "جاري الإرسال...",
+      "atLeastOneLineRequired": "مطلوب بند واحد على الأقل."
+    },
+    "empty": "لا توجد طلبات شراء بعد. أنشئ أول طلب للبدء.",
+    "createSuccess": "تم حفظ طلب الشراء كمسودة.",
+    "submitSuccess": "تم إرسال طلب الشراء للاعتماد.",
+    "withdrawSuccess": "تم سحب طلب الشراء.",
+    "genericError": "تعذر حفظ طلب الشراء. يرجى المحاولة مرة أخرى.",
+    "withdrawDialog": {
+      "title": "سحب طلب الشراء",
+      "message": "هل أنت متأكد من رغبتك في سحب هذا الطلب؟ لا يمكن التراجع عن ذلك.",
+      "confirmButton": "سحب الطلب",
+      "cancelButton": "إلغاء"
+    },
+    "incompleteEstimateBadge": "التقدير غير مكتمل",
+    "budgetStatus": {
+      "remainingLabel": "الميزانية المتبقية",
+      "exceedsWarning": "سيتجاوز هذا الطلب الميزانية المتبقية لنطاقه."
+    }
+  },
+  "approvals": {
+    "title": "قائمة الاعتماد",
+    "subtitle": "الطلبات التي تنتظر قرارك.",
+    "columns": {
+      "requester": "مقدم الطلب",
+      "branch": "الفرع",
+      "costCentre": "مركز التكلفة",
+      "requiredByDate": "مطلوب بحلول",
+      "estimatedTotal": "الإجمالي المقدر",
+      "budgetStatus": "حالة الميزانية",
+      "actions": "إجراءات"
+    },
+    "actions": {
+      "approve": "اعتماد",
+      "reject": "رفض"
+    },
+    "decisionDialog": {
+      "approveTitle": "اعتماد طلب الشراء",
+      "rejectTitle": "رفض طلب الشراء",
+      "commentLabel": "تعليق (اختياري)",
+      "commentPlaceholder": "أضف تعليقًا لمقدم الطلب...",
+      "confirmButton": "تأكيد",
+      "cancelButton": "إلغاء"
+    },
+    "approveSuccess": "تم اعتماد الطلب.",
+    "rejectSuccess": "تم رفض الطلب.",
+    "genericError": "تعذر تسجيل القرار. يرجى المحاولة مرة أخرى.",
+    "empty": "لا توجد طلبات تنتظر قرارك حاليًا.",
+    "thresholdRules": {
+      "sectionTitle": "قواعد عتبات الاعتماد",
+      "createButton": "قاعدة عتبة جديدة",
+      "columns": {
+        "branch": "الفرع",
+        "minAmount": "من",
+        "maxAmount": "إلى",
+        "currency": "العملة",
+        "approver": "المعتمد",
+        "actions": "إجراءات"
+      },
+      "form": {
+        "createTitle": "قاعدة عتبة جديدة",
+        "editTitle": "تعديل قاعدة العتبة",
+        "branchLabel": "الفرع (اختياري — قاعدة افتراضية للمؤسسة إذا ترك فارغًا)",
+        "minAmountLabel": "من مبلغ",
+        "maxAmountLabel": "إلى مبلغ (اختياري — بلا حد أقصى إذا ترك فارغًا)",
+        "currencyLabel": "العملة",
+        "approverLabel": "المعتمد",
+        "cancelButton": "إلغاء",
+        "submitButton": "حفظ القاعدة"
+      },
+      "empty": "لا توجد قواعد عتبات معرفة بعد. ستوجّه الطلبات إلى المالك حتى إضافة القواعد.",
+      "createSuccess": "تم إنشاء قاعدة العتبة.",
+      "deleteSuccess": "تم حذف قاعدة العتبة.",
+      "genericError": "تعذر حفظ قاعدة العتبة. يرجى المحاولة مرة أخرى."
+    },
+    "delegations": {
+      "sectionTitle": "تفويضات الاعتماد",
+      "createButton": "تفويض جديد",
+      "columns": {
+        "delegate": "المفوض إليه",
+        "startsOn": "يبدأ في",
+        "endsOn": "ينتهي في",
+        "actions": "إجراءات"
+      },
+      "form": {
+        "createTitle": "تفويض جديد",
+        "delegateLabel": "التفويض إلى",
+        "startsOnLabel": "يبدأ في",
+        "endsOnLabel": "ينتهي في",
+        "cancelButton": "إلغاء",
+        "submitButton": "حفظ التفويض"
+      },
+      "empty": "لا توجد تفويضات نشطة.",
+      "createSuccess": "تم إنشاء التفويض.",
+      "cancelSuccess": "تم إلغاء التفويض.",
+      "genericError": "تعذر حفظ التفويض. يرجى المحاولة مرة أخرى."
     }
   }
 }

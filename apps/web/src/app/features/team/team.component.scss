@@ -1,3 +1,5 @@
+@use '../../../styles/breakpoints' as bp;
+
 .team-container {
   max-inline-size: 1100px;
   margin-inline: auto;
@@ -25,6 +27,10 @@
   font-size: 1.75rem;
   font-weight: 700;
   color: #0f172a;
+
+  @include bp.mobile {
+    font-size: 1.25rem;
+  }
 }
 
 .page-subtitle {
@@ -114,6 +120,11 @@
 .tab-body {
   padding-inline: 1.5rem;
   padding-block: 1.5rem;
+
+  @include bp.mobile {
+    padding-inline: 0.75rem;
+    padding-block: 1rem;
+  }
 }
 
 .loading-state,

@@ -1,0 +1,23 @@
+// Responsive breakpoints — consistent across the app.
+// Usage: @include bp.mobile { ... }  or  @include bp.tablet-down { ... }
+
+$mobile-max: 599px;
+$tablet-min: 600px;
+$tablet-max: 959px;
+$desktop-min: 960px;
+
+@mixin mobile {
+  @media (max-width: $mobile-max) { @content; }
+}
+
+@mixin tablet-down {
+  @media (max-width: $tablet-max) { @content; }
+}
+
+@mixin tablet-only {
+  @media (min-width: $tablet-min) and (max-width: $tablet-max) { @content; }
+}
+
+@mixin desktop {
+  @media (min-width: $desktop-min) { @content; }
+}

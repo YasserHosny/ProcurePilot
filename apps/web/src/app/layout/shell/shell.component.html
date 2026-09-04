@@ -105,7 +105,7 @@
   </mat-toolbar>
 
   <mat-sidenav-container class="sidenav-container">
-    <mat-sidenav #sidenav mode="side" opened class="shell-sidenav">
+    <mat-sidenav #sidenav [mode]="sidenavMode()" [opened]="sidenavOpened()" class="shell-sidenav">
       <div class="nav-section-title">{{ 'shell.navSectionMain' | translate }}</div>
 
       <a
@@ -207,6 +207,26 @@
       >
         <mat-icon aria-hidden="true">savings</mat-icon>
         <span class="nav-label">{{ 'shell.navSavings' | translate }}</span>
+      </a>
+
+      <a
+        mat-list-item
+        routerLink="/requests"
+        routerLinkActive="active"
+        class="nav-item"
+      >
+        <mat-icon aria-hidden="true">shopping_cart</mat-icon>
+        <span class="nav-label">{{ 'shell.navRequests' | translate }}</span>
+      </a>
+
+      <a
+        mat-list-item
+        routerLink="/approvals"
+        routerLinkActive="active"
+        class="nav-item"
+      >
+        <mat-icon aria-hidden="true">approval</mat-icon>
+        <span class="nav-label">{{ 'shell.navApprovals' | translate }}</span>
       </a>
 
       <a

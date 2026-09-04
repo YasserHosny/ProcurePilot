@@ -136,9 +136,120 @@ landed_cost = (unit_price × quantity)
 - Nginx adds security headers; FastAPI adds CORS and audit headers.
 - Secrets in GitHub Actions; no secrets committed.
 
-## 8. Error Handling & Observability
+## 8. Responsive & RTL Design
 
-- Structured logging to stdout; aggregated by Sentry and PostHog.
-- Every mutation writes `AuditEvent`.
+The web SPA is designed mobile-first with three breakpoint tiers:
+
+| Tier | Width | Behaviour |
+|---|---|---|
+| Mobile | ≤ 599px | Single column, reduced padding (0.75rem), condensed typography |
+| Tablet | 600–959px | Intermediate layouts, some multi-column |
+| Desktop | ≥ 960px | Full multi-column grids, side-by-side panels |
+
+Breakpoints are defined in `apps/web/src/styles/_breakpoints.scss` and imported as SCSS
+mixins (`@include bp.mobile { ... }`).
+
+**RTL support:** CSS logical properties (`margin-inline-start`, `padding-block-end`) are used
+instead of physical properties. All UI is tested in both English (LTR) and Arabic (RTL).
+
+## 9. Database Strategy
+
+The application uses **hosted Supabase** exclusively. There is no local database to build or
+maintain.
+
+- **Local development** uses `supabase start` (Supabase CLI) for a local Postgres + Auth +
+  Storage stack, or connects directly to the hosted project.
+- **Docker Compose** does not include a Postgres service. It orchestrates the API and frontend
+  containers only; database services are external.
+- **Migrations** are versioned SQL files in `supabase/migrations/`, applied via
+  `supabase db push`. Forward-only; never edit after merge.
+- **RLS** on every tenant-scoped table with `USING` and `WITH CHECK` clauses from JWT claims.
+- **Connection pooling** via Supabase PgBouncer (transaction mode) for production.
+
+## 10. Logging & Observability
+
+### 10.1 Structured JSON Logging (API)
+
+All API log output is structured JSON written to **stdout** — the only transport. The
+implementation lives in `apps/api/src/procurepilot_api/shared/logging.py`.
+
+**Log record fields:**
+
+| Field | Source |
+|---|---|
+| `timestamp` | ISO 8601, UTC |
+| `level` | debug / info / warning / error / critical |
+| `logger` | Python logger name (`__name__`) |
+| `message` | Log message |
+| `trace_id` | Request-scoped trace ID (see §10.2) |
+| `exception` | Formatted traceback, if present |
+| `extra.*` | Any extra fields passed to the log call |
+
+**Log level** is set via the `API_LOG_LEVEL` environment variable (default `info`). Changing
+it requires a container redeployment (see runbook §7.6).
+
+**Module convention:** every module uses `logger = logging.getLogger(__name__)`, giving a
+natural hierarchy (`procurepilot_api.modules.quotations.service`, etc.).
+
+### 10.2 Trace ID Propagation
+
+`TraceIdMiddleware` (FastAPI middleware) reads an incoming `X-Trace-Id` header or generates a
+UUID4. The ID is stored in a `ContextVar` and:
+
+1. Injected into every JSON log record.
+2. Returned in the response `X-Trace-Id` header.
+3. Included in every `ErrorEnvelope` response body.
+
+This gives end-to-end request correlation from the frontend through logs and error reports.
+
+### 10.3 Secret Redaction
+
+The `redact()` function in `shared/logging.py` scrubs sensitive data before it reaches stdout:
+
+- **Dict keys** matching `password`, `token`, `secret`, `api_key`, `authorization` (and
+  variants) are replaced with `***REDACTED***`.
+- **String values** containing `Bearer <token>` or `key=<value>` patterns are masked.
+- Redaction is applied to log messages, exception tracebacks, and extra fields.
+
+### 10.4 Error Reporting (Sentry)
+
+Optional integration in `shared/observability.py`. Activated when `SENTRY_DSN` is set.
+
+- Traces disabled by default (`traces_sample_rate=0.0`).
+- PII sending disabled (`send_default_pii=False`).
+- Initialised before the app factory so startup errors are captured.
+- Environment tag from `API_ENV`.
+
+### 10.5 Extraction Worker Logging
+
+The extraction worker uses the same shared `procurepilot-logging` package as the API,
+configured in `__main__.py` at startup. It emits the same structured JSON format with
+trace IDs and secret redaction.
+
+Key log events:
+- **Job start** — `info` with `job_id`, `document_id`.
+- **Provider selection** — `info` naming the provider (`stub`, `bedrock`, `azure_di`,
+  or `structured`).
+- **Bedrock fallback** — `warning` with full exception traceback when Bedrock fails and
+  Azure DI takes over. This makes the previously silent fallback visible in container logs.
+- **Job success** — `info` with `method`, line count, arithmetic status, quotation status.
+- **Job failure** — `error` with full traceback.
+
+Log level is controlled by the `LOG_LEVEL` environment variable (default `info`).
+
+### 10.6 Accessing Production Logs
+
+bunny.net Magic Containers expose container stdout/stderr via the dashboard:
+
+1. Go to bunny.net → App → Container → **Logs** tab.
+2. Logs are structured JSON from both the API and extraction worker.
+3. Filter by trace ID: search for `"trace_id":"<value>"` in the log viewer.
+
+For persistent log aggregation, configure a log drain to an external service (Datadog,
+Logflare, etc.) — not yet set up.
+
+### 10.7 Audit Trail
+
+- Every mutation writes an `AuditEvent` (append-only, no UPDATE/DELETE).
 - Health endpoint: `GET /api/health`.
 - Extraction and matching metrics emitted per document.

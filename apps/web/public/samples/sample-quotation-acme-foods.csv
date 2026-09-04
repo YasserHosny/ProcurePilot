@@ -1,0 +1,6 @@
+supplier,currency,quotation_date,valid_until,product,quantity,pack_size,unit_size,unit,unit_price,vat_percent,delivery_fee,discount_percent
+Acme Foods Ltd,GBP,2026-08-25,2026-09-25,"Chopped Tomatoes, 400g",48,24,400,g,0.45,20,15.00,0
+Acme Foods Ltd,GBP,2026-08-25,2026-09-25,Extra Virgin Olive Oil 1L,12,6,1,litre,4.20,20,15.00,5
+Acme Foods Ltd,GBP,2026-08-25,2026-09-25,Basmati Rice 5kg,20,4,5,kg,3.85,20,15.00,0
+Acme Foods Ltd,GBP,2026-08-25,2026-09-25,Penne Pasta 500g,36,12,500,g,0.78,20,15.00,0
+Acme Foods Ltd,GBP,2026-08-25,2026-09-25,Sunflower Oil 2L,18,6,2,litre,2.95,20,15.00,10

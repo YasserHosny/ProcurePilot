@@ -15,7 +15,8 @@
     "languages": {
       "en": "English",
       "ar": "العربية"
-    }
+    },
+    "all": "All"
   },
   "auth": {
     "signin": {
@@ -154,6 +155,8 @@
     "navMatching": "Match Resolution",
     "navCompare": "Smart Compare",
     "navSavings": "Savings Ledger",
+    "navRequests": "Purchase Requests",
+    "navApprovals": "Approval Queue",
     "navTeam": "Team Management",
     "navSettings": "Settings",
     "switchWorkspace": "Switch workspace",
@@ -544,6 +547,11 @@
       "failedMessage": "The document could not be processed. Please verify the document is legible and try again.",
       "retryButton": "Try Again",
       "directStorageNotice": "Documents are uploaded securely and directly to encrypted storage.",
+      "sampleQuotationsTitle": "Try with a sample quotation",
+      "sampleQuotationsHint": "Download a sample quotation to test the extraction pipeline without needing a real document.",
+      "sampleAcmeFoods": "Acme Foods — 5 items (CSV)",
+      "sampleFreshDirect": "Fresh Direct — 6 items (CSV)",
+      "sampleAlFaisalTrading": "Al-Faisal Trading — 6 items (PDF)",
       "status": {
         "uploading": "Uploading",
         "processing": "Extracting",
@@ -581,7 +589,8 @@
         "reason": "Reason for Review",
         "priority": "Priority",
         "status": "Status",
-        "createdAt": "Uploaded At",
+        "createdAt": "Created",
+        "statedTotal": "Stated Total",
         "actions": "Actions"
       },
       "actions": {
@@ -590,6 +599,7 @@
       },
       "readOnlyBadge": "Read-Only Access",
       "readOnlyNotice": "Your role has read-only access. Only Owners and Buyers can correct and confirm quotations.",
+      "loadMore": "Load More",
       "emptyTitle": "No Review Tasks Found",
       "emptyMessage": "There are no quotation review tasks matching your current filters."
     },
@@ -597,6 +607,7 @@
       "title": "Quotation Review & Authorization",
       "subtitle": "Inspect extracted fields side by side with the source document. Verify supplier and resolve any discrepancies.",
       "backToQueue": "Back to Review Queue",
+      "downloadOriginal": "Download original document",
       "readOnlyNotice": "Read-only mode. You can view extraction evidence, but editing and confirmation require Owner or Buyer permissions.",
       "panels": {
         "document": "Source Document Evidence",
@@ -614,6 +625,8 @@
         "supplierLabel": "Supplier (Required)",
         "supplierPlaceholder": "Select confirmed supplier...",
         "supplierRequired": "Supplier confirmation is required before authorizing this quotation",
+        "supplierEmptyState": "No suppliers in this workspace yet.",
+        "supplierEmptyAction": "Add a supplier",
         "currencyLabel": "Currency",
         "currencyPlaceholder": "e.g. USD, EUR, GBP",
         "currencyRequired": "Currency is required",
@@ -638,7 +651,8 @@
         "packCount": "Pack Count",
         "unitSize": "Unit Size",
         "unit": "Unit",
-        "noLines": "No line items extracted for this quotation."
+        "noLines": "No line items extracted for this quotation.",
+        "colLineTotal": "Line Total"
       },
       "confidence": {
         "high": "High Confidence",
@@ -673,7 +687,12 @@
         "difference": "Discrepancy:",
         "reconciled": "Line items match the stated document total perfectly.",
         "statusMismatch": "Discrepancy Unresolved",
-        "statusReconciled": "Reconciled"
+        "statusReconciled": "Reconciled",
+        "acknowledgeLabel": "I have reviewed the discrepancy and wish to proceed with confirmation despite the mismatch",
+        "reconciledTitle": "Arithmetic Verified",
+        "reconciledDescription": "The computed line totals match the stated document total.",
+        "reconciledVatNote": "Line subtotals match after applying {{pct}}% document-level VAT.",
+        "inferredVat": "Inferred VAT:"
       },
       "versioning": {
         "title": "Quotation Versioning (US4)",
@@ -698,7 +717,15 @@
         "confirmBlockedMissingSupplier": "Please select and confirm a supplier before authorizing.",
         "confirmBlockedArithmetic": "Unresolved arithmetic mismatch. Please correct the lines or stated total.",
         "confirmBlockedConfidence": "Unresolved low-confidence fields require correction.",
-        "genericError": "Unable to update quotation. Please check your inputs and try again."
+        "genericError": "Unable to update quotation. Please check your inputs and try again.",
+        "refuseButton": "Refuse Quotation",
+        "refusing": "Refusing quotation...",
+        "refuseSuccess": "Quotation refused and removed from the review queue.",
+        "confirmDialogTitle": "Confirm & Authorize Quotation",
+        "confirmDialogMessage": "This will mark the quotation as reviewed and authorized. It will become trusted commercial data used for matching, pricing, and cost comparison. This action cannot be undone.",
+        "confirmDialogMismatchWarn": "Warning: You are confirming this quotation with an unresolved arithmetic discrepancy.",
+        "confirmDialogCancel": "Cancel",
+        "confirmDialogProceed": "Confirm & Authorize"
       },
       "status": {
         "pending": "Pending Extraction",
@@ -1381,28 +1408,28 @@
         "actions": "Actions"
       },
       "allBranchesValue": "Organisation-wide",
-    "actions": {
-      "edit": "Edit cost centre",
-      "archive": "Archive cost centre"
-    },
-    "form": {
-      "createTitle": "New Cost Centre",
-      "editTitle": "Edit Cost Centre",
-      "nameLabel": "Cost Centre Name",
-      "namePlaceholder": "e.g. Marketing",
-      "nameRequired": "Cost centre name is required.",
-      "codeLabel": "Code",
-      "codePlaceholder": "e.g. MKT-001",
-      "codeRequired": "Code is required.",
-      "budgetOwnerLabel": "Budget Owner",
-      "budgetOwnerNoneValue": "No budget owner",
-      "branchLabel": "Branch",
-      "cancelButton": "Cancel",
-      "submitButton": "Save Cost Centre",
-      "submittingButton": "Saving...",
-      "createSuccess": "Cost centre created successfully."
-    },
-    "empty": "No cost centres have been defined yet.",
+      "actions": {
+        "edit": "Edit cost centre",
+        "archive": "Archive cost centre"
+      },
+      "form": {
+        "createTitle": "New Cost Centre",
+        "editTitle": "Edit Cost Centre",
+        "nameLabel": "Cost Centre Name",
+        "namePlaceholder": "e.g. Marketing",
+        "nameRequired": "Cost centre name is required.",
+        "codeLabel": "Code",
+        "codePlaceholder": "e.g. MKT-001",
+        "codeRequired": "Code is required.",
+        "budgetOwnerLabel": "Budget Owner",
+        "budgetOwnerNoneValue": "No budget owner",
+        "branchLabel": "Branch",
+        "cancelButton": "Cancel",
+        "submitButton": "Save Cost Centre",
+        "submittingButton": "Saving...",
+        "createSuccess": "Cost centre created successfully."
+      },
+      "empty": "No cost centres have been defined yet.",
       "duplicateCodeError": "This code is already in use by another cost centre in your organisation. Cost centre codes must be unique.",
       "orphanedBadge": "Orphaned",
       "orphanReasons": {
@@ -1468,6 +1495,145 @@
     "roleScoping": {
       "branchScopedBadge": "Branch-scoped",
       "notFoundMessage": "This branch does not exist or is not available."
+    }
+  },
+  "requests": {
+    "title": "Purchase Requests",
+    "subtitle": "Create and track purchase requests for your branches and cost centres.",
+    "status": {
+      "draft": "Draft",
+      "submitted": "Submitted",
+      "approved": "Approved",
+      "rejected": "Rejected",
+      "withdrawn": "Withdrawn"
+    },
+    "columns": {
+      "branch": "Branch",
+      "costCentre": "Cost Centre",
+      "requiredByDate": "Required By",
+      "status": "Status",
+      "estimatedTotal": "Estimated Total",
+      "actions": "Actions"
+    },
+    "actions": {
+      "view": "View request",
+      "edit": "Edit request",
+      "withdraw": "Withdraw request"
+    },
+    "form": {
+      "createTitle": "New Purchase Request",
+      "editTitle": "Edit Purchase Request",
+      "branchLabel": "Branch",
+      "costCentreLabel": "Cost Centre (optional)",
+      "requiredByDateLabel": "Required By",
+      "linesTitle": "Line Items",
+      "addLineButton": "Add Line",
+      "removeLineButton": "Remove line",
+      "productLabel": "Product",
+      "quantityLabel": "Quantity",
+      "quantityRequired": "Quantity must be greater than zero.",
+      "noteLabel": "Note (optional)",
+      "estimatedUnitPriceLabel": "Estimated Unit Price",
+      "noEstimateAvailable": "No price history available for this product.",
+      "cancelButton": "Cancel",
+      "saveDraftButton": "Save Draft",
+      "submitButton": "Submit Request",
+      "submittingButton": "Submitting...",
+      "atLeastOneLineRequired": "At least one line item is required."
+    },
+    "empty": "No purchase requests yet. Create your first request to get started.",
+    "createSuccess": "Purchase request saved as a draft.",
+    "submitSuccess": "Purchase request submitted for approval.",
+    "withdrawSuccess": "Purchase request withdrawn.",
+    "genericError": "Unable to save the purchase request. Please try again.",
+    "withdrawDialog": {
+      "title": "Withdraw Purchase Request",
+      "message": "Are you sure you want to withdraw this request? This cannot be undone.",
+      "confirmButton": "Withdraw Request",
+      "cancelButton": "Cancel"
+    },
+    "incompleteEstimateBadge": "Estimate incomplete",
+    "budgetStatus": {
+      "remainingLabel": "Remaining budget",
+      "exceedsWarning": "This request would exceed the remaining budget for its scope."
+    }
+  },
+  "approvals": {
+    "title": "Approval Queue",
+    "subtitle": "Requests awaiting your decision.",
+    "columns": {
+      "requester": "Requester",
+      "branch": "Branch",
+      "costCentre": "Cost Centre",
+      "requiredByDate": "Required By",
+      "estimatedTotal": "Estimated Total",
+      "budgetStatus": "Budget Status",
+      "actions": "Actions"
+    },
+    "actions": {
+      "approve": "Approve",
+      "reject": "Reject"
+    },
+    "decisionDialog": {
+      "approveTitle": "Approve Purchase Request",
+      "rejectTitle": "Reject Purchase Request",
+      "commentLabel": "Comment (optional)",
+      "commentPlaceholder": "Add a comment for the requester...",
+      "confirmButton": "Confirm",
+      "cancelButton": "Cancel"
+    },
+    "approveSuccess": "Request approved.",
+    "rejectSuccess": "Request rejected.",
+    "genericError": "Unable to record the decision. Please try again.",
+    "empty": "No requests are currently awaiting your decision.",
+    "thresholdRules": {
+      "sectionTitle": "Approval Threshold Rules",
+      "createButton": "New Threshold Rule",
+      "columns": {
+        "branch": "Branch",
+        "minAmount": "From",
+        "maxAmount": "Up To",
+        "currency": "Currency",
+        "approver": "Approver",
+        "actions": "Actions"
+      },
+      "form": {
+        "createTitle": "New Threshold Rule",
+        "editTitle": "Edit Threshold Rule",
+        "branchLabel": "Branch (optional — tenant-wide default if omitted)",
+        "minAmountLabel": "From Amount",
+        "maxAmountLabel": "Up To Amount (optional — uncapped if omitted)",
+        "currencyLabel": "Currency",
+        "approverLabel": "Approver",
+        "cancelButton": "Cancel",
+        "submitButton": "Save Rule"
+      },
+      "empty": "No threshold rules defined yet. Requests will route to the owner until rules are added.",
+      "createSuccess": "Threshold rule created.",
+      "deleteSuccess": "Threshold rule deleted.",
+      "genericError": "Unable to save the threshold rule. Please try again."
+    },
+    "delegations": {
+      "sectionTitle": "Approval Delegations",
+      "createButton": "New Delegation",
+      "columns": {
+        "delegate": "Delegate",
+        "startsOn": "Starts On",
+        "endsOn": "Ends On",
+        "actions": "Actions"
+      },
+      "form": {
+        "createTitle": "New Delegation",
+        "delegateLabel": "Delegate To",
+        "startsOnLabel": "Starts On",
+        "endsOnLabel": "Ends On",
+        "cancelButton": "Cancel",
+        "submitButton": "Save Delegation"
+      },
+      "empty": "No active delegations.",
+      "createSuccess": "Delegation created.",
+      "cancelSuccess": "Delegation cancelled.",
+      "genericError": "Unable to save the delegation. Please try again."
     }
   }
 }

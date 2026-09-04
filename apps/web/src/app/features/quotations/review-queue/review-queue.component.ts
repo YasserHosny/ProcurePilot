@@ -18,6 +18,7 @@ import type { ApiError, ReviewTask, ReviewTaskPriority, ReviewTaskStatus } from 
 import { RoleDirective } from '../../../core/auth/role.directive';
 import { SessionService } from '../../../core/auth/session.service';
 import { FormatDatePipe } from '../../../core/format/date.pipe';
+import { FormatMoneyPipe } from '../../../core/format/money.pipe';
 
 @Component({
   selector: 'app-review-queue',
@@ -37,6 +38,7 @@ import { FormatDatePipe } from '../../../core/format/date.pipe';
     TranslatePipe,
     RoleDirective,
     FormatDatePipe,
+    FormatMoneyPipe,
   ],
   templateUrl: './review-queue.component.html',
   styleUrl: './review-queue.component.scss',
@@ -47,7 +49,9 @@ export class ReviewQueueComponent implements OnInit {
   private readonly translate = inject(TranslateService);
 
   readonly isLoading = signal<boolean>(true);
+  readonly isLoadingMore = signal<boolean>(false);
   readonly tasks = signal<ReviewTask[]>([]);
+  readonly nextCursor = signal<string | null>(null);
   readonly statusFilter = signal<ReviewTaskStatus | 'all'>('open');
   readonly priorityFilter = signal<ReviewTaskPriority | 'all'>('all');
   readonly errorMessage = signal<string | null>(null);
@@ -57,9 +61,11 @@ export class ReviewQueueComponent implements OnInit {
 
   readonly displayedColumns: readonly string[] = [
     'quotation_id',
+    'supplier_name',
     'reason',
     'priority',
     'status',
+    'stated_total',
     'created_at',
     'actions',
   ];
@@ -72,6 +78,7 @@ export class ReviewQueueComponent implements OnInit {
     this.isLoading.set(true);
     this.errorMessage.set(null);
     this.errorTraceId.set(null);
+    this.nextCursor.set(null);
 
     const status = this.statusFilter();
     const priority = this.priorityFilter();
@@ -84,6 +91,7 @@ export class ReviewQueueComponent implements OnInit {
       .subscribe({
         next: (res) => {
           this.tasks.set(res.items);
+          this.nextCursor.set(res.next_cursor);
           this.isLoading.set(false);
         },
         error: (err: unknown) => {
@@ -91,6 +99,38 @@ export class ReviewQueueComponent implements OnInit {
           this.handleError(err);
         },
       });
+  }
+
+  loadMore(): void {
+    const cursor = this.nextCursor();
+    if (!cursor) return;
+
+    this.isLoadingMore.set(true);
+
+    const status = this.statusFilter();
+    const priority = this.priorityFilter();
+
+    this.api
+      .getReviewTasks({
+        cursor,
+        status: status === 'all' ? undefined : status,
+        priority: priority === 'all' ? undefined : priority,
+      })
+      .subscribe({
+        next: (res) => {
+          this.tasks.set([...this.tasks(), ...res.items]);
+          this.nextCursor.set(res.next_cursor);
+          this.isLoadingMore.set(false);
+        },
+        error: (err: unknown) => {
+          this.isLoadingMore.set(false);
+          this.handleError(err);
+        },
+      });
+  }
+
+  truncateId(id: string): string {
+    return id.slice(0, 8);
   }
 
   onStatusChange(status: ReviewTaskStatus | 'all'): void {

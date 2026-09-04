@@ -1,13 +1,17 @@
 import { JsonPipe, PercentPipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, HostListener, OnInit, computed, inject, signal } from '@angular/core';
+import { DomSanitizer, type SafeResourceUrl } from '@angular/platform-browser';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatChipsModule } from '@angular/material/chips';
+import { MatNativeDateModule } from '@angular/material/core';
+import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatDialogModule } from '@angular/material/dialog';
 import { MatDividerModule } from '@angular/material/divider';
+import { MatExpansionModule } from '@angular/material/expansion';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
@@ -59,6 +63,9 @@ interface FlaggedField {
     MatInputModule,
     MatSelectModule,
     MatCheckboxModule,
+    MatDatepickerModule,
+    MatNativeDateModule,
+    MatExpansionModule,
     MatTableModule,
     MatProgressSpinnerModule,
     MatSnackBarModule,
@@ -78,10 +85,14 @@ export class QuotationReviewComponent implements OnInit {
   private readonly session = inject(SessionService);
   private readonly snackBar = inject(MatSnackBar);
   private readonly translate = inject(TranslateService);
+  private readonly sanitizer = inject(DomSanitizer);
 
   readonly isLoading = signal<boolean>(true);
   readonly isSaving = signal<boolean>(false);
   readonly isConfirming = signal<boolean>(false);
+  readonly isRefusing = signal<boolean>(false);
+  readonly mismatchAcknowledged = signal<boolean>(false);
+  readonly confirmDialogVisible = signal<boolean>(false);
   readonly quotationId = signal<string>('');
   readonly quotation = signal<QuotationDetail | null>(null);
   readonly suppliers = signal<Supplier[]>([]);
@@ -97,6 +108,13 @@ export class QuotationReviewComponent implements OnInit {
   // Currently active/highlighted field extraction
   readonly activeExtraction = signal<FieldExtraction | null>(null);
 
+  // PDF preview URL (signed)
+  readonly documentPreviewUrl = signal<string | null>(null);
+  readonly safePreviewUrl = computed<SafeResourceUrl | null>(() => {
+    const url = this.documentPreviewUrl();
+    return url ? this.sanitizer.bypassSecurityTrustResourceUrl(url) : null;
+  });
+
   // Keyboard navigation through flagged items
   readonly currentFlaggedIndex = signal<number>(0);
 
@@ -106,12 +124,21 @@ export class QuotationReviewComponent implements OnInit {
 
   readonly isWriter = computed<boolean>(() => this.session.hasRole('owner', 'buyer'));
 
+  readonly currencyOptions: readonly string[] = [
+    'USD', 'EUR', 'GBP', 'AED', 'SAR', 'EGP', 'QAR', 'KWD', 'BHD',
+    'OMR', 'JOD', 'CHF', 'JPY', 'CNY', 'INR', 'AUD', 'CAD',
+  ];
+
   readonly displayedLineColumns: readonly string[] = [
     'line_number',
     'original_text',
     'quantity',
     'pack',
     'unit_price',
+    'delivery_fee',
+    'discount',
+    'vat_rate',
+    'line_total',
     'confidence',
     'actions',
   ];
@@ -153,7 +180,9 @@ export class QuotationReviewComponent implements OnInit {
         const price = parseFloat(line.unit_price.amount);
         const delivery = parseFloat(line.delivery_fee?.amount || '0');
         const discount = parseFloat(line.discount?.amount || '0');
-        total += qty * price + delivery - discount;
+        const vatRate = parseFloat(line.vat_rate || '0');
+        const lineNet = qty * price + delivery - discount;
+        total += lineNet * (1 + vatRate);
       }
     }
 
@@ -163,21 +192,59 @@ export class QuotationReviewComponent implements OnInit {
     };
   });
 
-  // Whether there is an arithmetic mismatch
+  // Whether there is an arithmetic mismatch (client-side authoritative)
   readonly hasArithmeticMismatch = computed<boolean>(() => {
     const q = this.quotation();
     if (!q) return false;
-    if (q.arithmetic_status === 'mismatch') return true;
 
-    if (q.stated_total?.amount) {
-      const stated = parseFloat(q.stated_total.amount);
-      const computedTotal = this.computedLinesTotal();
-      if (computedTotal) {
-        const computedAmount = parseFloat(computedTotal.amount);
-        return Math.abs(stated - computedAmount) > 0.01;
+    const computedTotal = this.computedLinesTotal();
+    if (!q.stated_total?.amount || !computedTotal) return false;
+
+    const stated = parseFloat(q.stated_total.amount);
+    const computed = parseFloat(computedTotal.amount);
+    if (Math.abs(stated - computed) <= 0.01) return false;
+
+    // If gap is explainable by document-level VAT, not a mismatch
+    const hasLineVat = q.lines?.some(
+      (l) => l.vat_rate != null && parseFloat(l.vat_rate) > 0,
+    );
+    if (!hasLineVat && computed > 0 && stated > computed) {
+      const inferredPct = Math.round(((stated - computed) / computed) * 100);
+      if (inferredPct > 0 && inferredPct <= 30) {
+        const recomputed = computed * (1 + inferredPct / 100);
+        if (Math.abs(recomputed - stated) <= 0.01) return false;
       }
     }
-    return false;
+    return true;
+  });
+
+  readonly isArithmeticReconciled = computed<boolean>(() => {
+    const q = this.quotation();
+    if (!q) return false;
+    const computedTotal = this.computedLinesTotal();
+    if (!q.stated_total?.amount || !computedTotal) return false;
+    return !this.hasArithmeticMismatch();
+  });
+
+  readonly inferredVatPct = computed<number | null>(() => {
+    const q = this.quotation();
+    if (!q) return null;
+    const computedTotal = this.computedLinesTotal();
+    if (!q.stated_total?.amount || !computedTotal) return null;
+    const stated = parseFloat(q.stated_total.amount);
+    const computed = parseFloat(computedTotal.amount);
+    if (Math.abs(stated - computed) <= 0.01) return null;
+    const hasLineVat = q.lines?.some(
+      (l) => l.vat_rate != null && parseFloat(l.vat_rate) > 0,
+    );
+    if (!hasLineVat && computed > 0 && stated > computed) {
+      const pct = Math.round(((stated - computed) / computed) * 100);
+      if (pct > 0 && pct <= 30) {
+        const recomputed = computed * (1 + pct / 100);
+        if (Math.abs(recomputed - stated) <= 0.01) return pct;
+      }
+    }
+    return null;
   });
 
   readonly arithmeticDifference = computed<string | null>(() => {
@@ -221,10 +288,22 @@ export class QuotationReviewComponent implements OnInit {
         }
 
         this.isLoading.set(false);
+        this.loadDocumentPreview(q.document.id);
       },
       error: (err: unknown) => {
         this.isLoading.set(false);
         this.handleError(err);
+      },
+    });
+  }
+
+  private loadDocumentPreview(documentId: string): void {
+    this.api.getDocumentDownloadUrl(documentId).subscribe({
+      next: ({ download_url }) => {
+        this.documentPreviewUrl.set(download_url);
+      },
+      error: () => {
+        // Non-fatal — falls back to text simulation
       },
     });
   }
@@ -246,6 +325,29 @@ export class QuotationReviewComponent implements OnInit {
     return q.field_extractions.find(
       (fe) => fe.entity_type === entityType && fe.entity_id === entityId && fe.field_name === fieldName,
     );
+  }
+
+  documentFileName(): string {
+    const path = this.quotation()?.document.storage_path || '';
+    const parts = path.split('/');
+    return parts[parts.length - 1] || path;
+  }
+
+  fieldLabel(fieldName: string): string {
+    const labels: Record<string, string> = {
+      currency: 'Currency',
+      issue_date: 'Issue Date',
+      expiry_date: 'Expiry Date',
+      stated_total: 'Stated Total',
+      quantity: 'Quantity',
+      unit_price: 'Unit Price',
+      discount: 'Discount',
+      delivery_fee: 'Delivery Fee',
+      vat_rate: 'VAT Rate',
+      original_text: 'Description',
+      pack_details: 'Pack Details',
+    };
+    return labels[fieldName] || fieldName.replace(/_/g, ' ');
   }
 
   getEffectiveValue(entityType: 'quotation' | 'quotation_line', entityId: string, fieldName: string, defaultValue: unknown): unknown {
@@ -271,6 +373,11 @@ export class QuotationReviewComponent implements OnInit {
     const fe = this.getFieldExtraction(entityType, entityId, fieldName);
     if (!fe) return 1.0;
     return parseFloat(fe.confidence);
+  }
+
+  normalizeMoneyInput(value: string): string {
+    const normalised = value.replace(/[^0-9.-]/g, '');
+    return normalised || '0';
   }
 
   selectField(entityType: 'quotation' | 'quotation_line', entityId: string, fieldName: string): void {
@@ -321,11 +428,40 @@ export class QuotationReviewComponent implements OnInit {
   }
 
   private scrollToField(extractionId: string): void {
-    const el = document.getElementById(`field-${extractionId}`);
-    if (el) {
+    setTimeout(() => {
+      const el = document.getElementById(`field-${extractionId}`);
+      if (!el) return;
       el.scrollIntoView({ behavior: 'smooth', block: 'center' });
       el.focus();
+      const ff = el.querySelector('mat-form-field') as HTMLElement | null;
+      const target = ff ?? el;
+      target.classList.add('flagged-highlight');
+      setTimeout(() => target.classList.remove('flagged-highlight'), 2000);
+    }, 300);
+  }
+
+  downloadDocument(): void {
+    const documentId = this.quotation()?.document.id;
+    if (!documentId) return;
+
+    const downloadWindow = window.open('about:blank', '_blank');
+    if (downloadWindow) {
+      downloadWindow.opener = null;
     }
+
+    this.api.getDocumentDownloadUrl(documentId).subscribe({
+      next: ({ download_url }) => {
+        if (downloadWindow) {
+          downloadWindow.location.href = download_url;
+        } else {
+          window.location.href = download_url;
+        }
+      },
+      error: (err: unknown) => {
+        downloadWindow?.close();
+        this.handleError(err);
+      },
+    });
   }
 
   saveCorrections(): void {
@@ -364,25 +500,29 @@ export class QuotationReviewComponent implements OnInit {
       });
   }
 
-  confirmQuotation(): void {
-    const q = this.quotation();
-    if (!q) return;
-
-    // Check pre-conditions before submitting confirm
+  requestConfirm(): void {
     if (!this.selectedSupplierId()) {
       this.confirmBlockedReason.set(
         this.translate.instant('quotations.review.actions.confirmBlockedMissingSupplier'),
       );
       return;
     }
+    this.confirmDialogVisible.set(true);
+  }
 
+  cancelConfirm(): void {
+    this.confirmDialogVisible.set(false);
+  }
+
+  confirmQuotation(): void {
+    const q = this.quotation();
+    if (!q) return;
+
+    this.confirmDialogVisible.set(false);
     this.isConfirming.set(true);
     this.errorMessage.set(null);
     this.confirmBlockedReason.set(null);
 
-    // Save pending corrections first if any exist, or if the supplier selection hasn't been
-    // persisted yet — selecting a supplier with no other correction must still be saved before
-    // confirming, or the backend still sees supplier_id as null and refuses with 409.
     const supplierNeedsSaving = q.supplier_id !== this.selectedSupplierId();
     if (this.pendingCorrections().size > 0 || supplierNeedsSaving) {
       const corrections: FieldCorrection[] = [];
@@ -410,12 +550,68 @@ export class QuotationReviewComponent implements OnInit {
     }
   }
 
+  refuseQuotation(): void {
+    const q = this.quotation();
+    if (!q) return;
+
+    this.isRefusing.set(true);
+    this.errorMessage.set(null);
+
+    this.api.refuseQuotation(q.id).subscribe({
+      next: () => {
+        this.isRefusing.set(false);
+        this.loadQuotation(q.id);
+        this.snackBar.open(
+          this.translate.instant('quotations.review.actions.refuseSuccess'),
+          undefined,
+          { duration: 4000 },
+        );
+      },
+      error: (err: unknown) => {
+        this.isRefusing.set(false);
+        this.handleError(err);
+      },
+    });
+  }
+
+  computeLineTotal(line: QuotationDetail['lines'][number]): string | null {
+    if (!line.unit_price?.amount) return null;
+    const qty = parseFloat(line.quantity || '1');
+    const price = parseFloat(line.unit_price.amount);
+    const delivery = parseFloat(line.delivery_fee?.amount || '0');
+    const discount = parseFloat(line.discount?.amount || '0');
+    const vatRate = parseFloat(line.vat_rate || '0');
+    const lineNet = qty * price + delivery - discount;
+    return (lineNet * (1 + vatRate)).toFixed(2);
+  }
+
+  revertToAiValue(feId: string): void {
+    const current = new Map(this.pendingCorrections());
+    current.delete(feId);
+    this.pendingCorrections.set(current);
+  }
+
+  toDate(value: unknown): Date | null {
+    if (!value || typeof value !== 'string') return null;
+    const d = new Date(value);
+    return isNaN(d.getTime()) ? null : d;
+  }
+
+  toIsoDate(date: Date | null): string {
+    if (!date) return '';
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
+
   private executeConfirm(quotationId: string): void {
     const previousQuotationId = this.isRequote() ? this.selectedPreviousQuotationId() : null;
 
     this.api
       .confirmQuotation(quotationId, {
         previous_quotation_id: previousQuotationId,
+        acknowledge_mismatch: this.mismatchAcknowledged() || undefined,
       })
       .subscribe({
         next: (confirmed) => {

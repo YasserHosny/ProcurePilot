@@ -24,7 +24,10 @@ shared plan exception (mirroring canonical_product — see research.md R5) and t
 Principle-critical immutability triggers a verified saving_record depends on; extended again for
 007-organisation-model (T008) to cover branch, cost_centre, budget and branch_role_assignment —
 cross-tenant isolation only, since the within-tenant branch-scoped visibility these tables also
-enforce (research.md R1) has its own dedicated proof in test_branch_scoped_visibility.py (T036).
+enforce (research.md R1) has its own dedicated proof in test_branch_scoped_visibility.py (T036);
+extended again for 008-requests-approvals (T008) to cover purchase_request,
+purchase_request_line, approval_step, threshold_rule and approval_delegation — cross-tenant
+isolation only, same split as R2.0.
 """
 
 from __future__ import annotations
@@ -71,6 +74,11 @@ class Workspace:
         cost_centre_id: UUID,
         budget_id: UUID,
         branch_role_assignment_id: UUID,
+        purchase_request_id: UUID,
+        purchase_request_line_id: UUID,
+        approval_step_id: UUID,
+        threshold_rule_id: UUID,
+        approval_delegation_id: UUID,
     ) -> None:
         self.tenant_id = tenant_id
         self.user_id = user_id
@@ -93,6 +101,11 @@ class Workspace:
         self.cost_centre_id = cost_centre_id
         self.budget_id = budget_id
         self.branch_role_assignment_id = branch_role_assignment_id
+        self.purchase_request_id = purchase_request_id
+        self.purchase_request_line_id = purchase_request_line_id
+        self.approval_step_id = approval_step_id
+        self.threshold_rule_id = threshold_rule_id
+        self.approval_delegation_id = approval_delegation_id
 
     def claims(self) -> str:
         return (
@@ -348,6 +361,64 @@ def make_workspace(cur: psycopg.Cursor, label: str) -> Workspace:
         (branch_role_assignment_id, tenant_id, membership_id, branch_id),
     )
 
+    # Requests + Approvals — chunk R2.1 (008-requests-approvals), T008.
+    (
+        purchase_request_id,
+        purchase_request_line_id,
+        approval_step_id,
+        threshold_rule_id,
+        approval_delegation_id,
+        delegate_user_id,
+        delegate_membership_id,
+    ) = (uuid4(), uuid4(), uuid4(), uuid4(), uuid4(), uuid4(), uuid4())
+    cur.execute(
+        "insert into purchase_request "
+        "(id,tenant_id,branch_id,cost_centre_id,requested_by_membership_id,required_by_date) "
+        "values (%s,%s,%s,%s,%s, current_date + interval '7 days')",
+        (purchase_request_id, tenant_id, branch_id, cost_centre_id, membership_id),
+    )
+    cur.execute(
+        "insert into purchase_request_line "
+        "(id,tenant_id,purchase_request_id,workspace_product_id,quantity,"
+        "estimated_unit_price_amount,estimated_unit_price_currency,"
+        "estimated_unit_price_source_landed_cost_id) "
+        "values (%s,%s,%s,%s,10,10,'GBP',%s)",
+        (
+            purchase_request_line_id,
+            tenant_id,
+            purchase_request_id,
+            workspace_product_id,
+            landed_cost_id,
+        ),
+    )
+    cur.execute(
+        "insert into approval_step "
+        "(id,tenant_id,purchase_request_id,assigned_membership_id,source,status) "
+        "values (%s,%s,%s,%s,'owner_fallback','pending')",
+        (approval_step_id, tenant_id, purchase_request_id, membership_id),
+    )
+    cur.execute(
+        "insert into threshold_rule "
+        "(id,tenant_id,branch_id,min_amount,currency,approver_membership_id,created_by) "
+        "values (%s,%s,%s,0,'GBP',%s,%s)",
+        (threshold_rule_id, tenant_id, branch_id, membership_id, membership_id),
+    )
+    cur.execute(
+        "insert into auth.users (id,email) values (%s,%s)",
+        (delegate_user_id, f"{label}-delegate@example.test"),
+    )
+    cur.execute(
+        "insert into membership (id,tenant_id,user_id,email,role,is_active_workspace) "
+        "values (%s,%s,%s,%s,'approver',false)",
+        (delegate_membership_id, tenant_id, delegate_user_id, f"{label}-delegate@example.test"),
+    )
+    cur.execute(
+        "insert into approval_delegation "
+        "(id,tenant_id,delegator_membership_id,delegate_membership_id,starts_on,ends_on) "
+        "values (%s,%s,%s,%s,current_date,current_date + interval '7 days')",
+        (approval_delegation_id, tenant_id, membership_id, delegate_membership_id),
+    )
+
     return Workspace(
         tenant_id,
         user_id,
@@ -370,6 +441,11 @@ def make_workspace(cur: psycopg.Cursor, label: str) -> Workspace:
         cost_centre_id,
         budget_id,
         branch_role_assignment_id,
+        purchase_request_id,
+        purchase_request_line_id,
+        approval_step_id,
+        threshold_rule_id,
+        approval_delegation_id,
     )
 
 
@@ -472,6 +548,9 @@ def test_a_member_cannot_write_into_another_workspace(
 def test_a_cross_workspace_update_changes_nothing(
     workspaces: tuple[psycopg.Connection, Workspace, Workspace],
 ) -> None:
+    """Scoped by id, not tenant_id: beta now carries two membership rows (owner + the
+    approval-delegation delegate added for 008-requests-approvals, T008), so a tenant_id-only
+    filter no longer identifies a single row to assert against."""
     conn, alpha, beta = workspaces
     with conn.cursor() as cur:
         act_as(cur, alpha)
@@ -480,9 +559,7 @@ def test_a_cross_workspace_update_changes_nothing(
         )
         assert cur.rowcount == 0
         cur.execute("reset role")
-        cur.execute(
-            "select role from membership where tenant_id = %s", (beta.tenant_id,)
-        )
+        cur.execute("select role from membership where id = %s", (beta.membership_id,))
         row = cur.fetchone()
     assert row is not None and row[0] == "owner"
 
@@ -490,6 +567,7 @@ def test_a_cross_workspace_update_changes_nothing(
 def test_a_cross_workspace_delete_removes_nothing(
     workspaces: tuple[psycopg.Connection, Workspace, Workspace],
 ) -> None:
+    """beta carries two membership rows (owner + delegate, T008) — both must survive."""
     conn, alpha, beta = workspaces
     with conn.cursor() as cur:
         act_as(cur, alpha)
@@ -498,7 +576,7 @@ def test_a_cross_workspace_delete_removes_nothing(
         cur.execute("reset role")
         cur.execute("select count(*) from membership where tenant_id = %s", (beta.tenant_id,))
         row = cur.fetchone()
-    assert row is not None and row[0] == 1
+    assert row is not None and row[0] == 2
 
 
 # --- absent or forged claims ------------------------------------------------
@@ -1160,6 +1238,121 @@ def test_a_cross_workspace_branch_delete_removes_nothing(
     assert row is not None and row[0] == 1
 
 
+# --- requests + approvals (008-requests-approvals, T008) --------------------
+
+
+def test_another_workspaces_purchase_requests_are_invisible(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        cur.execute(
+            "select count(*) from purchase_request where id = %s", (beta.purchase_request_id,)
+        )
+        row = cur.fetchone()
+    assert row is not None and row[0] == 0
+
+
+def test_another_workspaces_purchase_request_lines_are_invisible(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        cur.execute(
+            "select count(*) from purchase_request_line where id = %s",
+            (beta.purchase_request_line_id,),
+        )
+        row = cur.fetchone()
+    assert row is not None and row[0] == 0
+
+
+def test_another_workspaces_approval_steps_are_invisible(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        cur.execute("select count(*) from approval_step where id = %s", (beta.approval_step_id,))
+        row = cur.fetchone()
+    assert row is not None and row[0] == 0
+
+
+def test_another_workspaces_threshold_rules_are_invisible(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        cur.execute("select count(*) from threshold_rule where id = %s", (beta.threshold_rule_id,))
+        row = cur.fetchone()
+    assert row is not None and row[0] == 0
+
+
+def test_another_workspaces_approval_delegations_are_invisible(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        cur.execute(
+            "select count(*) from approval_delegation where id = %s",
+            (beta.approval_delegation_id,),
+        )
+        row = cur.fetchone()
+    assert row is not None and row[0] == 0
+
+
+def test_a_member_cannot_write_a_purchase_request_into_another_workspace(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    """WITH CHECK on purchase_request_tenant_isolation, not just the scoped-visibility policy."""
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            cur.execute(
+                "insert into purchase_request "
+                "(tenant_id,branch_id,requested_by_membership_id,required_by_date) "
+                "values (%s,%s,%s, current_date)",
+                (beta.tenant_id, beta.branch_id, alpha.membership_id),
+            )
+
+
+def test_a_cross_workspace_threshold_rule_update_changes_nothing(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        cur.execute(
+            "update threshold_rule set min_amount = 999 where id = %s",
+            (beta.threshold_rule_id,),
+        )
+        assert cur.rowcount == 0
+        cur.execute("reset role")
+        cur.execute(
+            "select min_amount from threshold_rule where id = %s", (beta.threshold_rule_id,)
+        )
+        row = cur.fetchone()
+    assert row is not None and row[0] == 0
+
+
+def test_a_cross_workspace_approval_step_delete_removes_nothing(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        cur.execute("delete from approval_step where id = %s", (beta.approval_step_id,))
+        assert cur.rowcount == 0
+        cur.execute("reset role")
+        cur.execute("select count(*) from approval_step where id = %s", (beta.approval_step_id,))
+        row = cur.fetchone()
+    assert row is not None and row[0] == 1
+
+
 # --- the guarantee itself ---------------------------------------------------
 
 
@@ -1181,6 +1374,8 @@ def test_rls_is_enabled_and_forced_on_every_tenant_scoped_table(
         "basket_split_job", "alert_dismissal",
         "purchase_record", "saving_record", "export_job", "billing_account", "plan",
         "branch", "cost_centre", "budget", "branch_role_assignment",
+        "purchase_request", "purchase_request_line", "approval_step", "threshold_rule",
+        "approval_delegation",
     }
     with conn.cursor() as cur:
         cur.execute(

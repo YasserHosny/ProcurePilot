@@ -1,9 +1,15 @@
+@use '../../../../styles/breakpoints' as bp;
+
 .catalogue-container {
   max-inline-size: 1100px;
   margin-inline: auto;
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
+
+  @include bp.mobile {
+    gap: 1rem;
+  }
 }
 
 .page-header {
@@ -25,6 +31,10 @@
   font-size: 1.75rem;
   font-weight: 700;
   color: #0f172a;
+
+  @include bp.mobile {
+    font-size: 1.25rem;
+  }
 }
 
 .page-subtitle {
