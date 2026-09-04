@@ -22,13 +22,16 @@ ENV PATH="/app/.venv/bin:$PATH" \
     PYTHONUNBUFFERED=1 \
     PYTHONPATH=/app/src
 
+# Copy shared logging package and install it first
+COPY --chown=appuser:appgroup packages/py-logging/ /shared/py-logging/
+
 # Copy API workspace files
 COPY --chown=appuser:appgroup apps/api/ /app/
 
 USER appuser
 
-# Install dependencies and project in editable mode via uv
-RUN uv pip install --no-cache -e .
+# Install shared package, then API in editable mode via uv
+RUN uv pip install --no-cache /shared/py-logging && uv pip install --no-cache -e .
 
 EXPOSE 8000
 

@@ -28,6 +28,7 @@ to bunny.net Magic Containers using the following secrets.
 | `BUNNY_API_KEY` | Account-level API key for bunny.net; grants authorization to update container images via `BunnyWay/actions/container-update-image`. | GitHub Repository Secrets (or GitHub Organization Secrets). |
 | `BUNNY_BACKEND_APP_ID` | The Magic Containers Application ID corresponding to the backend API (`procurepilot-backend`). | GitHub Environment / Repository Secrets. |
 | `BUNNY_FRONTEND_APP_ID` | The Magic Containers Application ID corresponding to the frontend SPA (`procurepilot-frontend`). | GitHub Environment / Repository Secrets. |
+| `BUNNY_WORKERS_APP_ID` | The Magic Containers Application ID for the workers app (`procurepilot-extraction-worker`, `shared-redis`). | GitHub Environment / Repository Secrets. |
 | `GITHUB_TOKEN` *(built-in)* | Automatically supplied by GitHub Actions runtime. Used to authenticate to `ghcr.io` for pushing Docker images (`packages: write`). | Handled automatically by GitHub Actions. |
 
 ---
