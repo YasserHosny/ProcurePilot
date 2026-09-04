@@ -18,7 +18,7 @@
 ## Technical
 
 - [`architecture/tech-stack-blueprint.md`](architecture/tech-stack-blueprint.md) — Reusable blueprint for the Angular + FastAPI + Supabase + Bunny stack.
-- [`architecture/adrs.md`](architecture/adrs.md) — Architecture Decision Records (Angular, Flutter, Supabase, Bedrock/Azure DI, Bunny, Nginx, migrations, monorepo, AI eval).
+- [`architecture/adrs.md`](architecture/adrs.md) — Architecture Decision Records (Angular, Flutter, Supabase, Bedrock/Azure DI, Bunny, Nginx, migrations, monorepo, AI eval, workers app, responsive design, remote DB, extraction fallback, structured logging).
 - [`architecture/engineering-spec.md`](architecture/engineering-spec.md) — Low-Level Design: service boundaries, API patterns, data layer, algorithms, state management, security model.
 - [`architecture/api-specification.md`](architecture/api-specification.md) — OpenAPI-style contract for Phase 1–2 endpoints.
 - [`architecture/data-dictionary.md`](architecture/data-dictionary.md) — Field-level definitions for core entities.
@@ -29,8 +29,9 @@
 ## Quality & Operations
 
 - [`quality/test-strategy.md`](quality/test-strategy.md) — Test pyramid, AI eval plan, E2E scenarios, performance targets.
-- [`operations/deployment-plan.md`](operations/deployment-plan.md) — CI/CD, environments, Bunny Magic Containers, rollback, secrets, IaC.
-- [`operations/runbook.md`](operations/runbook.md) — Operations manual, incident response, scaling, backup/restore.
+- [`quality/quotation-upload-review-findings.md`](quality/quotation-upload-review-findings.md) — Manual QA walkthrough of the quotation upload + review flow (staging, 2026-09-04): bugs, missing functions, UX improvements, suggested additions.
+- [`operations/release-plan.md`](operations/release-plan.md) — CI/CD, environments, Bunny Magic Containers (production + workers apps), rollback, secrets, IaC.
+- [`operations/runbook.md`](operations/runbook.md) — Operations manual, production topology, extraction provider operations, logging & diagnostics, incident response, scaling, backup/restore.
 
 ## User-facing
 

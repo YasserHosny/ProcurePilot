@@ -123,3 +123,89 @@
     accepted at this decision point, not discovered late.
   - Future phase transitions (G2 → Phase 3, G3 → Phase 4) still default to requiring their gates
     unless a similar explicit, recorded exception is granted.
+
+## ADR-011 — Separate bunny.net App for Background Workers
+
+- **Status:** Accepted
+- **Context:** The extraction worker and Redis need to run alongside the API but should not
+  share compute resources or restart cycles with the production app.
+- **Options considered:** (a) Add worker + Redis containers to the production app — simplest
+  but couples deployments and shares CPU/RAM. (b) Separate bunny.net app — independent scaling,
+  isolated restarts, but requires cross-app networking. (c) External VPS — full control but
+  more ops overhead.
+- **Decision:** Separate bunny.net app (`procurepilot-workers`) with the extraction worker and
+  Redis in a shared network namespace. The production app's backend connects to Redis via the
+  workers app's Anycast IP.
+- **Consequences:**
+  - Worker deployments do not restart the API or frontend.
+  - Cross-app communication uses bunny.net Anycast IPs, not DNS names.
+  - A fourth GitHub secret (`BUNNY_WORKERS_APP_ID`) is required.
+  - The `REDIS_URL` on the backend container differs from the worker's `REDIS_URL`
+    (`<anycast-ip>:6379` vs `localhost:6379`).
+
+## ADR-012 — Responsive-First Web Design with Shared Breakpoints
+
+- **Status:** Accepted
+- **Context:** The web SPA must be usable on mobile, tablet, and desktop viewports. Many
+  procurement users access the system from phones or tablets on the shop floor.
+- **Decision:** A shared SCSS breakpoints mixin (`apps/web/src/styles/_breakpoints.scss`)
+  defines three tiers: mobile (≤ 599px), tablet (600–959px), desktop (≥ 960px). CSS logical
+  properties are mandatory for RTL support.
+- **Consequences:**
+  - Every component includes responsive adjustments via `@include bp.mobile { ... }`.
+  - Layouts collapse gracefully: side-by-side → single column, reduced padding, condensed
+    fonts.
+  - No horizontal overflow on any viewport width.
+  - RTL (Arabic) layout is a first-class citizen, not an afterthought.
+
+## ADR-013 — Remote-Only Database (No Local DB Build)
+
+- **Status:** Accepted
+- **Context:** Supabase provides Postgres, Auth, Storage, and Realtime as a hosted service.
+  Building and maintaining a local Postgres instance duplicates infrastructure that Supabase
+  already manages.
+- **Decision:** The application uses hosted Supabase exclusively. Local development uses the
+  Supabase CLI (`supabase start`) for a local stack, or connects directly to the hosted
+  project. Docker Compose does not include a Postgres service.
+- **Consequences:**
+  - Developers run `supabase start` instead of `docker compose up` for database services.
+  - Migrations are the single source of truth for schema.
+  - No database container to build, version, or maintain in Docker Compose.
+  - Development requires internet access (for hosted project) or the Supabase CLI (for local).
+
+## ADR-014 — Extraction Provider Fallback Chain
+
+- **Status:** Accepted
+- **Context:** The extraction worker supports multiple AI providers. Bedrock (Claude 3 Haiku)
+  is the primary provider; Azure Document Intelligence is the fallback. Provider failures
+  should not block extraction entirely.
+- **Decision:** When `EXTRACTION_PROVIDER_MODE=bedrock`, the worker tries Bedrock first. If
+  Bedrock throws any exception, it silently falls back to Azure DI. The provenance metadata
+  records which provider actually performed the extraction.
+- **Consequences:**
+  - Extraction continues even when Bedrock credentials are misconfigured or the service is
+    unavailable.
+  - The fallback is silent — operators must check provenance metadata to know which provider
+    ran. Monitoring should alert when `method != bedrock` despite the mode being `bedrock`.
+  - The stub provider (`FakeExtractionProvider`) misleadingly sets `method: "bedrock"` in
+    provenance — always verify `model_version` is not `stub-provider-v1`.
+
+## ADR-015 — Structured JSON Logging with Trace IDs and Secret Redaction
+
+- **Status:** Accepted
+- **Context:** Container-based deployments write to stdout; structured logs are essential for
+  filtering, correlation, and aggregation. Sensitive data (tokens, API keys) must never appear
+  in log output.
+- **Options considered:** (a) Plain text logging with grep. (b) Structured JSON with manual
+  field construction. (c) Structured JSON via a custom `logging.Formatter` with middleware-
+  injected trace IDs and automatic secret redaction.
+- **Decision:** Option (c). A `JsonFormatter` in `shared/logging.py` emits one JSON object
+  per log record to stdout. `TraceIdMiddleware` propagates or generates a UUID4 trace ID per
+  request via `ContextVar`, included in every log record and every error response. A `redact()`
+  function scrubs sensitive dict keys and string patterns before output.
+- **Consequences:**
+  - Every API log record is machine-parseable and carries a trace ID for request correlation.
+  - Secrets are scrubbed automatically — no per-call redaction needed by module code.
+  - Both the API and the extraction worker share the `procurepilot-logging` package,
+    ensuring identical log format across all services.
+  - Log level is configurable at deploy time via `API_LOG_LEVEL` without code changes.
