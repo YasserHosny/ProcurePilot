@@ -5,6 +5,7 @@ from pathlib import PurePosixPath
 from uuid import UUID, uuid4
 
 from postgrest.exceptions import APIError
+from supabase import create_client
 
 from procurepilot_api.config import Settings, get_settings
 from procurepilot_api.deps import CurrentMember
@@ -13,7 +14,12 @@ from procurepilot_api.errors import (
     ServiceUnavailableError,
     UnsupportedMediaTypeError,
 )
-from procurepilot_api.modules.documents.schemas import Document, PresignRequest, PresignResponse
+from procurepilot_api.modules.documents.schemas import (
+    Document,
+    DownloadUrlResponse,
+    PresignRequest,
+    PresignResponse,
+)
 from procurepilot_api.modules.members.service import authenticated_client
 
 ACCEPTED_MIME_TYPES = {
@@ -95,6 +101,22 @@ class DocumentService:
         except APIError as exc:
             raise ServiceUnavailableError(details={"dependency": "database"}) from exc
         return Document.model_validate(_one_row(response.data, resource="document"))
+
+    def create_download_url(self, *, bearer_token: str, document_id: UUID) -> DownloadUrlResponse:
+        doc = self.get_document(bearer_token=bearer_token, document_id=document_id)
+        try:
+            client = create_client(
+                self._settings.supabase_url,
+                self._settings.supabase_service_role_key.get_secret_value(),
+            )
+            result = client.storage.from_(doc.storage_bucket).create_signed_url(
+                doc.storage_path,
+                expires_in=300,
+            )
+        except Exception as exc:
+            raise ServiceUnavailableError(details={"dependency": "supabase_storage"}) from exc
+
+        return DownloadUrlResponse(download_url=str(result["signedURL"]))
 
 
 def get_document_service() -> DocumentService:

@@ -54,6 +54,19 @@ paths:
               schema: { $ref: '#/components/schemas/Document' }
         '404': { $ref: '#/components/responses/NotFound' }
 
+  /documents/{document_id}/download:
+    parameters:
+      - { name: document_id, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      summary: Get a short-lived signed download URL for the original document
+      responses:
+        '200':
+          description: Signed URL valid for 5 minutes
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DownloadUrlResponse' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
   /quotations:
     post:
       summary: Create a quotation for an uploaded document
@@ -321,6 +334,12 @@ components:
         status: { type: string, enum: [uploaded, failed_to_read] }
         created_at: { type: string, format: date-time }
         created_by: { type: string, format: uuid }
+
+    DownloadUrlResponse:
+      type: object
+      required: [download_url]
+      properties:
+        download_url: { type: string, format: uri }
 
     QuotationCreate:
       type: object

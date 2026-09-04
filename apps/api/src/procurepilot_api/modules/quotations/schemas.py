@@ -39,6 +39,11 @@ class QuotationCreate(StrictApiModel):
 
 class ConfirmRequest(StrictApiModel):
     previous_quotation_id: UUID | None = None
+    acknowledge_mismatch: bool = False
+
+
+class RefuseRequest(StrictApiModel):
+    reason: str | None = None
 
 
 class Pack(BaseModel):
@@ -94,6 +99,8 @@ class ReviewTask(BaseModel):
     reason: ReviewTaskReason
     created_at: datetime
     resolved_at: datetime | None = None
+    supplier_name: str | None = None
+    stated_total: Money | None = None
 
 
 class ReviewTaskList(BaseModel):

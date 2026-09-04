@@ -237,6 +237,10 @@ export interface Document {
   readonly created_by?: string;
 }
 
+export interface DocumentDownloadResponse {
+  readonly download_url: string;
+}
+
 export interface QuotationCreate {
   readonly document_id: string;
   readonly supplier_id?: string | null;
@@ -358,6 +362,8 @@ export interface ReviewTask {
   readonly reason: ReviewTaskReason;
   readonly created_at: string;
   readonly resolved_at?: string | null;
+  readonly supplier_name?: string | null;
+  readonly stated_total?: Money | null;
 }
 
 // --- Matching and Normalisation (Chunk 4.4) ---
@@ -1092,6 +1098,5 @@ export interface ApprovalDelegationCreate {
 export interface ApprovalDelegationList {
   readonly items: readonly ApprovalDelegation[];
 }
-
 
 

@@ -293,7 +293,23 @@ export const routes: Routes = [
       {
         path: 'requests',
         loadComponent: () =>
-          import('./features/requests/requests.component').then((m) => m.RequestsComponent),
+          import('./features/requests/request-list/request-list.component').then(
+            (m) => m.RequestListComponent,
+          ),
+      },
+      {
+        path: 'requests/new',
+        loadComponent: () =>
+          import('./features/requests/request-form/request-form.component').then(
+            (m) => m.RequestFormComponent,
+          ),
+      },
+      {
+        path: 'requests/:id',
+        loadComponent: () =>
+          import('./features/requests/request-form/request-form.component').then(
+            (m) => m.RequestFormComponent,
+          ),
       },
       {
         path: 'approvals',

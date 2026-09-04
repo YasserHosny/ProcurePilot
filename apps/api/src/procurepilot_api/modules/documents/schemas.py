@@ -38,6 +38,10 @@ class PresignResponse(BaseModel):
     expires_at: datetime
 
 
+class DownloadUrlResponse(BaseModel):
+    download_url: str
+
+
 class Document(BaseModel):
     id: UUID
     storage_bucket: str

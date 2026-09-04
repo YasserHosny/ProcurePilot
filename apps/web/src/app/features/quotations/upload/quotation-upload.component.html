@@ -95,6 +95,44 @@
             <mat-icon aria-hidden="true">lock</mat-icon>
             <span>{{ 'quotations.upload.directStorageNotice' | translate }}</span>
           </div>
+
+          <!-- Sample Quotations -->
+          <div class="sample-quotations">
+            <div class="sample-header">
+              <mat-icon aria-hidden="true">science</mat-icon>
+              <span class="sample-title">{{ 'quotations.upload.sampleQuotationsTitle' | translate }}</span>
+            </div>
+            <p class="sample-hint">{{ 'quotations.upload.sampleQuotationsHint' | translate }}</p>
+            <div class="sample-links">
+              <a
+                mat-stroked-button
+                href="/samples/sample-quotation-acme-foods.csv"
+                download="sample-quotation-acme-foods.csv"
+                class="sample-link-btn"
+              >
+                <mat-icon aria-hidden="true">download</mat-icon>
+                <span>{{ 'quotations.upload.sampleAcmeFoods' | translate }}</span>
+              </a>
+              <a
+                mat-stroked-button
+                href="/samples/sample-quotation-fresh-direct.csv"
+                download="sample-quotation-fresh-direct.csv"
+                class="sample-link-btn"
+              >
+                <mat-icon aria-hidden="true">download</mat-icon>
+                <span>{{ 'quotations.upload.sampleFreshDirect' | translate }}</span>
+              </a>
+              <a
+                mat-stroked-button
+                href="/samples/sample-quotation-al-faisal-trading.pdf"
+                download="sample-quotation-al-faisal-trading.pdf"
+                class="sample-link-btn"
+              >
+                <mat-icon aria-hidden="true">download</mat-icon>
+                <span>{{ 'quotations.upload.sampleAlFaisalTrading' | translate }}</span>
+              </a>
+            </div>
+          </div>
         }
 
         @case ('uploading') {
@@ -128,9 +166,6 @@
                 <span class="detail-badge">
                   <mat-icon aria-hidden="true">tag</mat-icon>
                   {{ q.id }}
-                </span>
-                <span class="detail-badge status-extracted">
-                  {{ 'quotations.review.status.' + q.status | translate }}
                 </span>
               </div>
             }

@@ -44,7 +44,8 @@ class QuotationConfirmationService:
         if quote.get("supplier_id") is None:
             raise ConflictError(details={"reason": "supplier_not_confirmed"})
         if quote.get("arithmetic_status") == "mismatch":
-            raise ConflictError(details={"reason": "arithmetic_mismatch_unresolved"})
+            if not (payload and payload.acknowledge_mismatch):
+                raise ConflictError(details={"reason": "arithmetic_mismatch_unresolved"})
 
         threshold = self._settings.extraction_confidence_threshold
         try:

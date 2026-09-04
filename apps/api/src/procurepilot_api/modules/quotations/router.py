@@ -22,6 +22,7 @@ from procurepilot_api.modules.quotations.schemas import (
     QuotationCreate,
     QuotationDetail,
     QuotationReviewPatch,
+    RefuseRequest,
     ReviewTaskList,
     ReviewTaskPriority,
 )
@@ -78,6 +79,26 @@ def confirm_quotation(
     return service.confirm(
         bearer_token=token, member=member, quotation_id=quotation_id, payload=payload
     )
+
+
+@router.post("/quotations/{quotation_id}/refuse", response_model=Quotation)
+def refuse_quotation(
+    quotation_id: UUID,
+    token: Annotated[str, Depends(bearer_token)],
+    member: Annotated[CurrentMember, Depends(require_role(*WRITE_ROLES))],
+    service: Annotated[QuotationReviewService, Depends(get_quotation_review_service)],
+    payload: Annotated[RefuseRequest | None, Body()] = None,
+    _idempotency_key: Annotated[UUID | None, Header(alias="Idempotency-Key")] = None,
+) -> Quotation:
+    from procurepilot_api.modules.quotations.service import _quotation
+
+    row = service.refuse_quotation(
+        bearer_token=token,
+        member=member,
+        quotation_id=quotation_id,
+        reason=payload.reason if payload else None,
+    )
+    return _quotation(row)
 
 
 @router.get("/review-tasks", response_model=ReviewTaskList)

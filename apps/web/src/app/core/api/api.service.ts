@@ -32,6 +32,7 @@ import type {
   CostCentreList,
   CostCentreUpdate,
   Document,
+  DocumentDownloadResponse,
   ExportCreate,
   ExportJob,
   ImportPreview,
@@ -350,6 +351,10 @@ export class ApiService {
     return this.http.get<Document>(`${this.base}/documents/${documentId}`);
   }
 
+  getDocumentDownloadUrl(documentId: string): Observable<DocumentDownloadResponse> {
+    return this.http.get<DocumentDownloadResponse>(`${this.base}/documents/${documentId}/download`);
+  }
+
   createQuotation(body: QuotationCreate, idempotencyKey?: string): Observable<Quotation> {
     const headers = idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined;
     return this.http.post<Quotation>(`${this.base}/quotations`, body, { headers });
@@ -377,12 +382,25 @@ export class ApiService {
 
   confirmQuotation(
     quotationId: string,
-    body?: { previous_quotation_id?: string | null },
+    body?: { previous_quotation_id?: string | null; acknowledge_mismatch?: boolean },
     idempotencyKey?: string,
   ): Observable<Quotation> {
     const headers = idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined;
     return this.http.post<Quotation>(
       `${this.base}/quotations/${quotationId}/confirm`,
+      body ?? {},
+      { headers },
+    );
+  }
+
+  refuseQuotation(
+    quotationId: string,
+    body?: { reason?: string | null },
+    idempotencyKey?: string,
+  ): Observable<Quotation> {
+    const headers = idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined;
+    return this.http.post<Quotation>(
+      `${this.base}/quotations/${quotationId}/refuse`,
       body ?? {},
       { headers },
     );
@@ -843,6 +861,5 @@ export class ApiService {
     return this.http.delete<void>(`${this.base}/approvals/delegations/${delegationId}`);
   }
 }
-
 
 

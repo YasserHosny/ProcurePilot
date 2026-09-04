@@ -63,7 +63,7 @@ def validate_arithmetic(
     if not totals:
         return ArithmeticValidation("not_applicable", None, stated, currency, tuple(warnings))
     computed = sum(totals, Decimal("0"))
-    status = "reconciled" if abs(computed - stated) <= tolerance else "mismatch"
+    status = _arithmetic_status(computed, stated, result.lines, tolerance)
     return ArithmeticValidation(status, computed, stated, currency, tuple(warnings))
 
 
@@ -119,3 +119,28 @@ def _currency(result: ExtractionResult) -> str | None:
         value = result.stated_total.value.get("currency")
         return str(value) if value else None
     return None
+
+
+def _arithmetic_status(
+    subtotal: Decimal,
+    stated: Decimal,
+    lines: list[ExtractedLine],
+    tolerance: Decimal,
+) -> str:
+    if abs(subtotal - stated) <= tolerance:
+        return "reconciled"
+
+    has_line_vat = any(
+        line.fields.get("vat_rate") is not None
+        and line.fields["vat_rate"].value is not None
+        for line in lines
+    )
+    if has_line_vat or subtotal <= 0 or stated <= subtotal:
+        return "mismatch"
+
+    inferred_pct = round(float((stated - subtotal) / subtotal) * 100)
+    if not 0 < inferred_pct <= 30:
+        return "mismatch"
+
+    recomputed = subtotal * (1 + Decimal(str(inferred_pct)) / 100)
+    return "reconciled" if abs(recomputed - stated) <= tolerance else "mismatch"
