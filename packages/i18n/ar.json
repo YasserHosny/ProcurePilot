@@ -552,6 +552,16 @@
       "sampleAcmeFoods": "Acme Foods — ٥ بنود (CSV)",
       "sampleFreshDirect": "Fresh Direct — ٦ بنود (CSV)",
       "sampleAlFaisalTrading": "Al-Faisal Trading — ٦ بنود (PDF)",
+      "duplicateWarning": {
+        "title": "تم اكتشاف احتمال تكرار",
+        "message": "تم رفع مستند بالمحتوى نفسه إلى مساحة العمل هذه من قبل.",
+        "quotation": "عرض السعر",
+        "uploaded": "تم رفعه في",
+        "supplier": "المورد",
+        "total": "الإجمالي",
+        "cancel": "إلغاء الرفع",
+        "proceed": "الرفع على أي حال"
+      },
       "status": {
         "uploading": "جاري الرفع",
         "processing": "جاري الاستخراج",
@@ -779,6 +789,11 @@
         "confirmDialogCancel": "إلغاء",
         "confirmDialogProceed": "تأكيد واعتماد",
         "createRequote": "إنشاء عرض أسعار بديل"
+      },
+      "replaceDocument": {
+        "tooltip": "استبدال المستند المصدر",
+        "unsupportedType": "نوع الملف غير مدعوم. يرجى تحميل ملف PDF أو صورة أو جدول بيانات.",
+        "success": "تم استبدال المستند المصدر. سيبدأ الاستخراج قريبًا."
       },
       "archiveConfirm": "أرشفة هذا العرض؟",
       "retryConfirm": "إعادة تشغيل الاستخراج؟ سيتم استبدال البيانات المستخرجة الحالية.",

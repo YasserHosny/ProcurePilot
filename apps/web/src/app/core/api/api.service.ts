@@ -434,6 +434,19 @@ export class ApiService {
     );
   }
 
+  replaceDocument(
+    quotationId: string,
+    documentId: string,
+    idempotencyKey?: string,
+  ): Observable<Quotation> {
+    const headers = idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined;
+    return this.http.post<Quotation>(
+      `${this.base}/quotations/${quotationId}/replace-document`,
+      { document_id: documentId },
+      { headers },
+    );
+  }
+
   exportQuotation(quotationId: string): Observable<Blob> {
     return this.http.get(`${this.base}/quotations/${quotationId}/export?format=csv`, {
       responseType: 'blob',

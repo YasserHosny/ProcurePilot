@@ -25,6 +25,7 @@ from procurepilot_api.modules.quotations.schemas import (
     QuotationDetail,
     QuotationReviewPatch,
     RefuseRequest,
+    ReplaceDocumentRequest,
     ReviewTaskList,
     ReviewTaskPriority,
 )
@@ -103,6 +104,23 @@ def retry_extraction(
 ) -> Quotation:
     return service.retry_extraction(
         bearer_token=token, member=member, quotation_id=quotation_id
+    )
+
+
+@router.post("/quotations/{quotation_id}/replace-document", response_model=Quotation)
+def replace_document(
+    quotation_id: UUID,
+    payload: Annotated[ReplaceDocumentRequest, Body()],
+    token: Annotated[str, Depends(bearer_token)],
+    member: Annotated[CurrentMember, Depends(require_role(*WRITE_ROLES))],
+    service: Annotated[QuotationService, Depends(get_quotation_service)],
+    _idempotency_key: Annotated[UUID | None, Header(alias="Idempotency-Key")] = None,
+) -> Quotation:
+    return service.replace_document(
+        bearer_token=token,
+        member=member,
+        quotation_id=quotation_id,
+        new_document_id=payload.document_id,
     )
 
 

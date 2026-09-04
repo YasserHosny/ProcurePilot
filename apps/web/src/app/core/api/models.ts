@@ -216,6 +216,15 @@ export interface PresignRequest {
   readonly content_hash?: string | null;
 }
 
+export interface PotentialDuplicate {
+  readonly quotation_id: string;
+  readonly document_id: string;
+  readonly created_at: string;
+  readonly supplier_name?: string | null;
+  readonly stated_total_amount?: string | null;
+  readonly stated_total_currency?: string | null;
+}
+
 export interface PresignResponse {
   readonly document_id: string;
   readonly storage_bucket: string;
@@ -223,6 +232,7 @@ export interface PresignResponse {
   readonly upload_url: string;
   readonly upload_fields?: Record<string, string>;
   readonly expires_at: string;
+  readonly potential_duplicates?: readonly PotentialDuplicate[];
 }
 
 export interface Document {

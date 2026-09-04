@@ -106,6 +106,7 @@ export class QuotationReviewComponent implements OnInit {
   readonly isRefusing = signal<boolean>(false);
   readonly isArchiving = signal<boolean>(false);
   readonly isRetryingExtraction = signal<boolean>(false);
+  readonly isReplacingDocument = signal<boolean>(false);
   readonly isExporting = signal<boolean>(false);
   readonly mismatchAcknowledged = signal<boolean>(false);
   readonly confirmDialogVisible = signal<boolean>(false);
@@ -754,6 +755,57 @@ export class QuotationReviewComponent implements OnInit {
       },
       error: (err: unknown) => {
         this.isRetryingExtraction.set(false);
+        this.handleError(err);
+      },
+    });
+  }
+
+  onReplaceDocumentSelected(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = '';
+    if (!file) return;
+
+    const q = this.quotation();
+    if (!q) return;
+
+    const mimeType = file.type as import('../../../core/api/models').PresignMimeType;
+    if (!mimeType) {
+      this.errorMessage.set(this.translate.instant('quotations.review.replaceDocument.unsupportedType'));
+      return;
+    }
+
+    this.isReplacingDocument.set(true);
+    this.errorMessage.set(null);
+
+    this.api.presignDocument({ filename: file.name, mime_type: mimeType, size_bytes: file.size }).subscribe({
+      next: (presign) => {
+        this.api.uploadFileToStorage(presign.upload_url, file, presign.upload_fields).subscribe({
+          next: () => {
+            this.api.replaceDocument(q.id, presign.document_id).subscribe({
+              next: () => {
+                this.isReplacingDocument.set(false);
+                this.loadQuotation(q.id);
+                this.snackBar.open(
+                  this.translate.instant('quotations.review.replaceDocument.success'),
+                  undefined,
+                  { duration: 3000 },
+                );
+              },
+              error: (err: unknown) => {
+                this.isReplacingDocument.set(false);
+                this.handleError(err);
+              },
+            });
+          },
+          error: (err: unknown) => {
+            this.isReplacingDocument.set(false);
+            this.handleError(err);
+          },
+        });
+      },
+      error: (err: unknown) => {
+        this.isReplacingDocument.set(false);
         this.handleError(err);
       },
     });

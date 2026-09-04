@@ -307,6 +307,73 @@ class QuotationService:
         )
         return _quotation(row)
 
+    def replace_document(
+        self,
+        *,
+        bearer_token: str,
+        member: CurrentMember,
+        quotation_id: UUID,
+        new_document_id: UUID,
+    ) -> Quotation:
+        client = authenticated_client(self._settings, bearer_token)
+        quote = _quotation_row(client, quotation_id)
+        if quote["status"] in {"pending", "extracting"}:
+            raise ConflictError(details={"reason": "quotation_extraction_already_active"})
+        _document_row(client, new_document_id)
+        old_document_id = str(quote["document_id"])
+        try:
+            active = (
+                client.table("extraction_job")
+                .select("id")
+                .eq("quotation_id", str(quotation_id))
+                .in_("status", ["queued", "running"])
+                .limit(1)
+                .execute()
+            )
+            if active.data:
+                raise ConflictError(details={"reason": "extraction_already_running"})
+            client.table("field_extraction").delete().eq(
+                "quotation_id", str(quotation_id)
+            ).execute()
+            client.table("quotation_line").delete().eq(
+                "quotation_id", str(quotation_id)
+            ).execute()
+            job_row = _one_row(
+                client.table("extraction_job")
+                .insert(
+                    {
+                        "tenant_id": str(member.tenant_id),
+                        "quotation_id": str(quotation_id),
+                        "status": "queued",
+                    }
+                )
+                .execute()
+                .data,
+                resource="job",
+            )
+            row = _one_row(
+                client.table("quotation")
+                .update({"document_id": str(new_document_id), "status": "pending"})
+                .eq("id", str(quotation_id))
+                .execute()
+                .data,
+                resource="quotation",
+            )
+        except APIError as exc:
+            raise ServiceUnavailableError(details={"dependency": "database"}) from exc
+        _enqueue_extraction(self._settings, job_row, {**quote, "document_id": str(new_document_id)}, member)
+        self._record(
+            bearer_token=bearer_token,
+            member=member,
+            action="quotation.document_replaced",
+            target={
+                "quotation_id": str(quotation_id),
+                "old_document_id": old_document_id,
+                "new_document_id": str(new_document_id),
+            },
+        )
+        return _quotation(row)
+
     def export_quotation_csv(
         self,
         *,

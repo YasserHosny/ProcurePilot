@@ -17,6 +17,7 @@ from procurepilot_api.errors import (
 from procurepilot_api.modules.documents.schemas import (
     Document,
     DownloadUrlResponse,
+    PotentialDuplicate,
     PresignRequest,
     PresignResponse,
 )
@@ -78,6 +79,11 @@ class DocumentService:
         except APIError as exc:
             raise ServiceUnavailableError(details={"dependency": "database"}) from exc
 
+        potential_duplicates = _potential_duplicates(
+            client=client,
+            content_hash=payload.content_hash,
+            document_id=document_id,
+        )
         expires_at = datetime.now(UTC) + timedelta(minutes=15)
         return PresignResponse(
             document_id=UUID(str(row["id"])),
@@ -86,6 +92,7 @@ class DocumentService:
             upload_url=_signed_upload_url(self._settings, bucket, str(row["storage_path"])),
             upload_fields={},
             expires_at=expires_at,
+            potential_duplicates=potential_duplicates,
         )
 
     def get_document(self, *, bearer_token: str, document_id: UUID) -> Document:
@@ -139,3 +146,70 @@ def _one_row(data: object, *, resource: str) -> dict[str, object]:
     if isinstance(data, list) and len(data) == 1 and isinstance(data[0], dict):
         return data[0]
     raise NotFoundError(details={"resource": resource})
+
+
+def _potential_duplicates(
+    *,
+    client: object,
+    content_hash: str | None,
+    document_id: UUID,
+) -> list[PotentialDuplicate]:
+    if not content_hash:
+        return []
+
+    try:
+        document_response = (
+            client.table("document")
+            .select("id")
+            .eq("content_hash", content_hash)
+            .neq("id", str(document_id))
+            .limit(5)
+            .execute()
+        )
+        document_ids = [
+            str(row["id"])
+            for row in _rows(document_response.data)
+            if isinstance(row.get("id"), str)
+        ]
+        if not document_ids:
+            return []
+
+        quotation_response = (
+            client.table("quotation")
+            .select(
+                "id,document_id,created_at,stated_total_amount,stated_total_currency,supplier(name)"
+            )
+            .in_("document_id", document_ids)
+            .order("created_at", desc=True)
+            .limit(5)
+            .execute()
+        )
+    except APIError:
+        return []
+
+    return [_potential_duplicate(row) for row in _rows(quotation_response.data)]
+
+
+def _potential_duplicate(row: dict[str, object]) -> PotentialDuplicate:
+    supplier = row.get("supplier")
+    supplier_name = supplier.get("name") if isinstance(supplier, dict) else None
+    return PotentialDuplicate(
+        quotation_id=UUID(str(row["id"])),
+        document_id=UUID(str(row["document_id"])),
+        created_at=datetime.fromisoformat(str(row["created_at"]).replace("Z", "+00:00")),
+        supplier_name=str(supplier_name) if supplier_name else None,
+        stated_total_amount=_string_or_none(row.get("stated_total_amount")),
+        stated_total_currency=_string_or_none(row.get("stated_total_currency")),
+    )
+
+
+def _rows(data: object) -> list[dict[str, object]]:
+    if isinstance(data, list):
+        return [row for row in data if isinstance(row, dict)]
+    return []
+
+
+def _string_or_none(value: object) -> str | None:
+    if value is None:
+        return None
+    return str(value)

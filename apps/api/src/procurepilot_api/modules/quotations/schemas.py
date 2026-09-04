@@ -42,6 +42,10 @@ class ConfirmRequest(StrictApiModel):
     acknowledge_mismatch: bool = False
 
 
+class ReplaceDocumentRequest(StrictApiModel):
+    document_id: UUID
+
+
 class RefuseRequest(StrictApiModel):
     reason: str | None = None
 

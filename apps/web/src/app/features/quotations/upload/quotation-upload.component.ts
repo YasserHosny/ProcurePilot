@@ -1,4 +1,5 @@
 import { HttpErrorResponse } from '@angular/common/http';
+import { DatePipe, SlicePipe } from '@angular/common';
 import { Component, DestroyRef, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
@@ -15,10 +16,23 @@ import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { Subscription, interval, switchMap } from 'rxjs';
 
 import { ApiService } from '../../../core/api/api.service';
-import type { ApiError, Job, PresignMimeType, Quotation } from '../../../core/api/models';
+import type {
+  ApiError,
+  Job,
+  PotentialDuplicate,
+  PresignMimeType,
+  PresignResponse,
+  Quotation,
+} from '../../../core/api/models';
 import { SessionService } from '../../../core/auth/session.service';
 
-export type UploadState = 'idle' | 'uploading' | 'processing' | 'extracted' | 'failed';
+export type UploadState =
+  | 'idle'
+  | 'uploading'
+  | 'duplicate-warning'
+  | 'processing'
+  | 'extracted'
+  | 'failed';
 
 const SUPPORTED_MIME_MAP: Record<string, PresignMimeType> = {
   'application/pdf': 'application/pdf',
@@ -59,6 +73,8 @@ const MAX_FILE_SIZE_BYTES = 25 * 1024 * 1024; // 25 MB
     MatProgressBarModule,
     MatProgressSpinnerModule,
     MatSnackBarModule,
+    DatePipe,
+    SlicePipe,
     TranslatePipe,
   ],
   templateUrl: './quotation-upload.component.html',
@@ -80,10 +96,12 @@ export class QuotationUploadComponent {
 
   readonly createdQuotation = signal<Quotation | null>(null);
   readonly currentJob = signal<Job | null>(null);
+  readonly potentialDuplicates = signal<readonly PotentialDuplicate[]>([]);
 
   readonly isWriter = computed<boolean>(() => this.session.hasRole('owner', 'buyer'));
 
   private pollSubscription: Subscription | null = null;
+  private pendingPresign = signal<PresignResponse | null>(null);
 
   onFileSelected(event: Event): void {
     const input = event.target as HTMLInputElement;
@@ -113,6 +131,8 @@ export class QuotationUploadComponent {
   private validateAndSetFile(file: File): void {
     this.errorMessage.set(null);
     this.errorTraceId.set(null);
+    this.potentialDuplicates.set([]);
+    this.pendingPresign.set(null);
 
     if (file.size === 0) {
       this.errorMessage.set(this.translate.instant('quotations.upload.emptyFileError'));
@@ -148,6 +168,23 @@ export class QuotationUploadComponent {
   }
 
   startUpload(): void {
+    void this.presignSelectedFile();
+  }
+
+  proceedDespiteDuplicate(): void {
+    const file = this.selectedFile();
+    const presign = this.pendingPresign();
+    if (!file || !presign) return;
+
+    this.potentialDuplicates.set([]);
+    this.uploadPresignedFile(file, presign);
+  }
+
+  cancelUpload(): void {
+    this.resetUpload();
+  }
+
+  private async presignSelectedFile(): Promise<void> {
     const file = this.selectedFile();
     if (!file) return;
 
@@ -160,24 +197,53 @@ export class QuotationUploadComponent {
     this.uploadState.set('uploading');
     this.errorMessage.set(null);
     this.errorTraceId.set(null);
+    this.potentialDuplicates.set([]);
+    this.pendingPresign.set(null);
+
+    let contentHash: string;
+    try {
+      contentHash = await this.computeContentHash(file);
+    } catch (err: unknown) {
+      this.uploadState.set('failed');
+      this.handleError(err);
+      return;
+    }
 
     this.api
       .presignDocument({
         filename: file.name,
         mime_type: mimeType,
         size_bytes: file.size,
+        content_hash: contentHash,
       })
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (presign) => {
+          const duplicates = presign.potential_duplicates ?? [];
+          this.pendingPresign.set(presign);
+          this.potentialDuplicates.set(duplicates);
+          if (duplicates.length > 0) {
+            this.uploadState.set('duplicate-warning');
+            return;
+          }
+          this.uploadPresignedFile(file, presign);
+        },
+        error: (err: unknown) => {
+          this.uploadState.set('failed');
+          this.handleError(err);
+        },
+      });
+  }
+
+  private uploadPresignedFile(file: File, presign: PresignResponse): void {
+    this.uploadState.set('uploading');
+    this.api
+      .uploadFileToStorage(presign.upload_url, file, presign.upload_fields)
       .pipe(
-        switchMap((presign) =>
-          this.api
-            .uploadFileToStorage(presign.upload_url, file, presign.upload_fields)
-            .pipe(
-              switchMap(() =>
-                this.api.createQuotation({
-                  document_id: presign.document_id,
-                }),
-              ),
-            ),
+        switchMap(() =>
+          this.api.createQuotation({
+            document_id: presign.document_id,
+          }),
         ),
         switchMap((quotation) => {
           this.createdQuotation.set(quotation);
@@ -196,6 +262,13 @@ export class QuotationUploadComponent {
           this.handleError(err);
         },
       });
+  }
+
+  private async computeContentHash(file: File): Promise<string> {
+    const buffer = await file.arrayBuffer();
+    const hashBuffer = await crypto.subtle.digest('SHA-256', buffer);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
   }
 
   private pollJob(jobId: string): void {
@@ -239,6 +312,8 @@ export class QuotationUploadComponent {
     this.selectedFile.set(null);
     this.createdQuotation.set(null);
     this.currentJob.set(null);
+    this.potentialDuplicates.set([]);
+    this.pendingPresign.set(null);
     this.errorMessage.set(null);
     this.errorTraceId.set(null);
   }

@@ -552,6 +552,16 @@
       "sampleAcmeFoods": "Acme Foods — 5 items (CSV)",
       "sampleFreshDirect": "Fresh Direct — 6 items (CSV)",
       "sampleAlFaisalTrading": "Al-Faisal Trading — 6 items (PDF)",
+      "duplicateWarning": {
+        "title": "Possible Duplicate Detected",
+        "message": "A document with the same content has already been uploaded to this workspace.",
+        "quotation": "Quotation",
+        "uploaded": "uploaded",
+        "supplier": "supplier",
+        "total": "total",
+        "cancel": "Cancel Upload",
+        "proceed": "Upload Anyway"
+      },
       "status": {
         "uploading": "Uploading",
         "processing": "Extracting",
@@ -779,6 +789,11 @@
         "confirmDialogCancel": "Cancel",
         "confirmDialogProceed": "Confirm & Authorize",
         "createRequote": "Create Re-Quote"
+      },
+      "replaceDocument": {
+        "tooltip": "Replace source document",
+        "unsupportedType": "This file type is not supported. Please upload a PDF, image, or spreadsheet.",
+        "success": "Source document replaced. Extraction will begin shortly."
       },
       "archiveConfirm": "Archive this quotation?",
       "retryConfirm": "Re-run extraction? Existing extracted data will be replaced.",
