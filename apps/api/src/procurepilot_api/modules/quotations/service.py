@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import base64
+import csv
+from datetime import UTC, datetime
+from io import StringIO
 from typing import Literal
 from uuid import UUID
 
@@ -27,10 +30,12 @@ from procurepilot_api.modules.quotations.schemas import (
     ReviewTaskStatus,
     decimal_string,
 )
+from procurepilot_api.shared.audit import AuditEventCreate, get_audit_writer
 
 QUOTATION_COLUMNS = (
     "id,document_id,supplier_id,currency,issue_date,expiry_date,status,previous_quotation_id,"
-    "stated_total_amount,stated_total_currency,arithmetic_status,created_at,reviewed_by,reviewed_at"
+    "stated_total_amount,stated_total_currency,arithmetic_status,created_at,reviewed_by,"
+    "reviewed_at,deleted_at"
 )
 LINE_COLUMNS = (
     "id,line_number,original_text,quantity,pack_count,unit_size,pack_unit,unit_price_amount,"
@@ -43,7 +48,7 @@ FIELD_COLUMNS = (
 )
 TASK_COLUMNS = (
     "id,quotation_id,status,priority,reason,created_at,resolved_at,"
-    "quotation(stated_total_amount,stated_total_currency,supplier(name))"
+    "quotation(deleted_at,stated_total_amount,stated_total_currency,supplier(name))"
 )
 
 
@@ -131,6 +136,7 @@ class QuotationService:
         except APIError as exc:
             raise ServiceUnavailableError(details={"dependency": "database"}) from exc
         rows = _rows(response.data)
+        rows = [row for row in rows if not _task_quotation_deleted(row)]
         if clean_search:
             rows = [
                 r for r in rows
@@ -140,7 +146,209 @@ class QuotationService:
         visible = rows[:capped_limit]
         return ReviewTaskList(
             items=[_task(row) for row in visible],
-            next_cursor=_encode_cursor(offset + capped_limit) if len(rows) > capped_limit else None,
+            next_cursor=(
+                _encode_cursor(offset + capped_limit)
+                if len(rows) > capped_limit
+                else None
+            ),
+        )
+
+    def archive_quotation(
+        self,
+        *,
+        bearer_token: str,
+        member: CurrentMember,
+        quotation_id: UUID,
+    ) -> Quotation:
+        client = authenticated_client(self._settings, bearer_token)
+        _quotation_row(client, quotation_id)
+        archived_at = datetime.now(UTC).isoformat()
+        try:
+            row = _one_row(
+                client.table("quotation")
+                .update({"deleted_at": archived_at})
+                .eq("id", str(quotation_id))
+                .execute()
+                .data,
+                resource="quotation",
+            )
+            client.table("review_task").update(
+                {"status": "resolved", "resolved_at": archived_at}
+            ).eq("quotation_id", str(quotation_id)).in_(
+                "status", ["open", "in_progress"]
+            ).execute()
+        except APIError as exc:
+            raise ServiceUnavailableError(details={"dependency": "database"}) from exc
+        self._record(
+            bearer_token=bearer_token,
+            member=member,
+            action="quotation.archived",
+            target={"quotation_id": str(quotation_id)},
+        )
+        return _quotation(row)
+
+    def restore_quotation(
+        self,
+        *,
+        bearer_token: str,
+        member: CurrentMember,
+        quotation_id: UUID,
+    ) -> Quotation:
+        client = authenticated_client(self._settings, bearer_token)
+        _quotation_row(client, quotation_id)
+        try:
+            row = _one_row(
+                client.table("quotation")
+                .update({"deleted_at": None})
+                .eq("id", str(quotation_id))
+                .execute()
+                .data,
+                resource="quotation",
+            )
+        except APIError as exc:
+            raise ServiceUnavailableError(details={"dependency": "database"}) from exc
+        self._record(
+            bearer_token=bearer_token,
+            member=member,
+            action="quotation.restored",
+            target={"quotation_id": str(quotation_id)},
+        )
+        return _quotation(row)
+
+    def retry_extraction(
+        self,
+        *,
+        bearer_token: str,
+        member: CurrentMember,
+        quotation_id: UUID,
+    ) -> Quotation:
+        client = authenticated_client(self._settings, bearer_token)
+        quote = _quotation_row(client, quotation_id)
+        if quote["status"] in {"pending", "extracting"}:
+            raise ConflictError(details={"reason": "quotation_extraction_already_active"})
+        try:
+            active = (
+                client.table("extraction_job")
+                .select("id")
+                .eq("quotation_id", str(quotation_id))
+                .in_("status", ["queued", "running"])
+                .limit(1)
+                .execute()
+            )
+            if active.data:
+                raise ConflictError(details={"reason": "extraction_already_running"})
+            client.table("field_extraction").delete().eq(
+                "quotation_id", str(quotation_id)
+            ).execute()
+            client.table("quotation_line").delete().eq(
+                "quotation_id", str(quotation_id)
+            ).execute()
+            client.table("extraction_job").insert(
+                {
+                    "tenant_id": str(member.tenant_id),
+                    "quotation_id": str(quotation_id),
+                    "status": "queued",
+                }
+            ).execute()
+            row = _one_row(
+                client.table("quotation")
+                .update({"status": "pending"})
+                .eq("id", str(quotation_id))
+                .execute()
+                .data,
+                resource="quotation",
+            )
+        except APIError as exc:
+            raise ServiceUnavailableError(details={"dependency": "database"}) from exc
+        self._record(
+            bearer_token=bearer_token,
+            member=member,
+            action="quotation.extraction_retried",
+            target={"quotation_id": str(quotation_id)},
+        )
+        return _quotation(row)
+
+    def export_quotation_csv(
+        self,
+        *,
+        bearer_token: str,
+        member: CurrentMember,
+        quotation_id: UUID,
+    ) -> str:
+        client = authenticated_client(self._settings, bearer_token)
+        quote = _quotation_row(client, quotation_id)
+        lines = _line_rows(client, quotation_id)
+        supplier_name = (
+            _supplier_name(client, UUID(str(quote["supplier_id"])))
+            if quote.get("supplier_id")
+            else ""
+        )
+
+        output = StringIO()
+        writer = csv.writer(output)
+        writer.writerow(["supplier_name", supplier_name])
+        writer.writerow(["issue_date", quote.get("issue_date") or ""])
+        writer.writerow(
+            ["stated_total", decimal_string(quote.get("stated_total_amount")) or ""]
+        )
+        writer.writerow(
+            [
+                "currency",
+                quote.get("stated_total_currency") or quote.get("currency") or "",
+            ]
+        )
+        writer.writerow([])
+        writer.writerow(
+            [
+                "line_number",
+                "original_text",
+                "quantity",
+                "unit_price_amount",
+                "unit_price_currency",
+                "vat_rate",
+                "delivery_fee_amount",
+                "discount_amount",
+            ]
+        )
+        for line in lines:
+            writer.writerow(
+                [
+                    line.get("line_number") or "",
+                    line.get("original_text") or "",
+                    decimal_string(line.get("quantity")) or "",
+                    decimal_string(line.get("unit_price_amount")) or "",
+                    line.get("unit_price_currency") or "",
+                    decimal_string(line.get("vat_rate")) or "",
+                    decimal_string(line.get("delivery_fee_amount")) or "",
+                    decimal_string(line.get("discount_amount")) or "",
+                ]
+            )
+        self._record(
+            bearer_token=bearer_token,
+            member=member,
+            action="quotation.exported",
+            target={"quotation_id": str(quotation_id), "format": "csv"},
+        )
+        return output.getvalue()
+
+    def _record(
+        self,
+        *,
+        bearer_token: str,
+        member: CurrentMember,
+        action: str,
+        target: dict[str, object],
+    ) -> None:
+        get_audit_writer().record(
+            AuditEventCreate(
+                tenant_id=member.tenant_id,
+                actor_membership_id=member.membership_id,
+                actor_email=member.email,
+                action=action,
+                target=target,
+                outcome="success",
+            ),
+            bearer_token=bearer_token,
         )
 
 
@@ -188,6 +396,20 @@ def _supplier_row(client: object, supplier_id: UUID) -> dict[str, object]:
     except APIError as exc:
         raise ServiceUnavailableError(details={"dependency": "database"}) from exc
     return _one_row(response.data, resource="supplier")
+
+
+def _supplier_name(client: object, supplier_id: UUID) -> str:
+    try:
+        response = (
+            client.table("supplier")
+            .select("name")
+            .eq("id", str(supplier_id))
+            .limit(2)
+            .execute()
+        )
+    except APIError as exc:
+        raise ServiceUnavailableError(details={"dependency": "database"}) from exc
+    return str(_one_row(response.data, resource="supplier").get("name") or "")
 
 
 def _active_or_existing_quotation_for_document(client: object, document_id: UUID) -> bool:
@@ -281,6 +503,7 @@ def _quotation(row: dict[str, object]) -> Quotation:
         created_at=row["created_at"],
         reviewed_by=UUID(str(row["reviewed_by"])) if row.get("reviewed_by") else None,
         reviewed_at=row.get("reviewed_at"),
+        deleted_at=row.get("deleted_at"),
     )
 
 
@@ -331,6 +554,11 @@ def _nested_supplier_name(row: dict[str, object]) -> str:
         if isinstance(s, dict):
             return str(s.get("name", ""))
     return ""
+
+
+def _task_quotation_deleted(row: dict[str, object]) -> bool:
+    q = row.get("quotation")
+    return isinstance(q, dict) and q.get("deleted_at") is not None
 
 
 def _task(row: dict[str, object]) -> ReviewTask:

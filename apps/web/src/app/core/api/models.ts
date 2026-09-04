@@ -270,6 +270,7 @@ export interface Quotation {
   readonly created_at: string;
   readonly reviewed_by?: string | null;
   readonly reviewed_at?: string | null;
+  readonly deleted_at?: string | null;
 }
 
 export interface QuotationPack {
@@ -1098,5 +1099,4 @@ export interface ApprovalDelegationCreate {
 export interface ApprovalDelegationList {
   readonly items: readonly ApprovalDelegation[];
 }
-
 

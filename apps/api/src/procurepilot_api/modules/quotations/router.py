@@ -4,6 +4,7 @@ from typing import Annotated, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Body, Depends, Header, Query, status
+from fastapi.responses import StreamingResponse
 
 from procurepilot_api.deps import CurrentMember, bearer_token, current_member
 from procurepilot_api.modules.auth.jwt import MemberRole
@@ -51,6 +52,67 @@ def get_quotation(
     service: Annotated[QuotationService, Depends(get_quotation_service)],
 ) -> QuotationDetail:
     return service.get_quotation(bearer_token=token, quotation_id=quotation_id)
+
+
+@router.post("/quotations/{quotation_id}/archive", response_model=Quotation)
+def archive_quotation(
+    quotation_id: UUID,
+    token: Annotated[str, Depends(bearer_token)],
+    member: Annotated[CurrentMember, Depends(require_role(*WRITE_ROLES))],
+    service: Annotated[QuotationService, Depends(get_quotation_service)],
+    _idempotency_key: Annotated[UUID | None, Header(alias="Idempotency-Key")] = None,
+) -> Quotation:
+    return service.archive_quotation(
+        bearer_token=token, member=member, quotation_id=quotation_id
+    )
+
+
+@router.post("/quotations/{quotation_id}/restore", response_model=Quotation)
+def restore_quotation(
+    quotation_id: UUID,
+    token: Annotated[str, Depends(bearer_token)],
+    member: Annotated[CurrentMember, Depends(require_role(*WRITE_ROLES))],
+    service: Annotated[QuotationService, Depends(get_quotation_service)],
+    _idempotency_key: Annotated[UUID | None, Header(alias="Idempotency-Key")] = None,
+) -> Quotation:
+    return service.restore_quotation(
+        bearer_token=token, member=member, quotation_id=quotation_id
+    )
+
+
+@router.post("/quotations/{quotation_id}/retry-extraction", response_model=Quotation)
+def retry_extraction(
+    quotation_id: UUID,
+    token: Annotated[str, Depends(bearer_token)],
+    member: Annotated[CurrentMember, Depends(require_role(*WRITE_ROLES))],
+    service: Annotated[QuotationService, Depends(get_quotation_service)],
+    _idempotency_key: Annotated[UUID | None, Header(alias="Idempotency-Key")] = None,
+) -> Quotation:
+    return service.retry_extraction(
+        bearer_token=token, member=member, quotation_id=quotation_id
+    )
+
+
+@router.get("/quotations/{quotation_id}/export")
+def export_quotation(
+    quotation_id: UUID,
+    token: Annotated[str, Depends(bearer_token)],
+    member: Annotated[CurrentMember, Depends(current_member)],
+    service: Annotated[QuotationService, Depends(get_quotation_service)],
+    format: Annotated[Literal["csv"], Query()] = "csv",
+) -> StreamingResponse:
+    csv_body = service.export_quotation_csv(
+        bearer_token=token, member=member, quotation_id=quotation_id
+    )
+    return StreamingResponse(
+        iter([csv_body]),
+        media_type="text/csv",
+        headers={
+            "Content-Disposition": (
+                f'attachment; filename="quotation-{quotation_id}.csv"'
+            )
+        },
+    )
 
 
 @router.patch("/quotations/{quotation_id}", response_model=QuotationDetail)

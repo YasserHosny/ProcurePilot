@@ -66,6 +66,7 @@ export class ReviewQueueComponent implements OnInit {
   readonly sortOrder = signal<ReviewTaskSortOrder>('desc');
   readonly errorMessage = signal<string | null>(null);
   readonly errorTraceId = signal<string | null>(null);
+  readonly archivingTaskId = signal<string | null>(null);
   private searchDebounce: ReturnType<typeof setTimeout> | null = null;
 
   readonly isWriter = computed<boolean>(() => this.session.hasRole('owner', 'buyer'));
@@ -192,6 +193,24 @@ export class ReviewQueueComponent implements OnInit {
     this.priorityFilter.set('all');
     this.searchQuery.set('');
     this.loadTasks();
+  }
+
+  archiveTask(task: ReviewTask, event: MouseEvent): void {
+    event.stopPropagation();
+    if (!window.confirm(this.translate.instant('quotations.queue.archiveConfirm'))) {
+      return;
+    }
+    this.archivingTaskId.set(task.id);
+    this.api.archiveQuotation(task.quotation_id).subscribe({
+      next: () => {
+        this.tasks.set(this.tasks().filter((item) => item.id !== task.id));
+        this.archivingTaskId.set(null);
+      },
+      error: (err: unknown) => {
+        this.archivingTaskId.set(null);
+        this.handleError(err);
+      },
+    });
   }
 
   ageLabel(createdAt: string): string {

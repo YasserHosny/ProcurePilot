@@ -217,6 +217,16 @@
                     <mat-icon aria-hidden="true">fact_check</mat-icon>
                     <span>{{ 'quotations.queue.actions.review' | translate }}</span>
                   </a>
+                  <button
+                    mat-icon-button
+                    type="button"
+                    (click)="archiveTask(task, $event)"
+                    [disabled]="archivingTaskId() === task.id"
+                    [matTooltip]="'quotations.queue.actions.archive' | translate"
+                    [attr.aria-label]="'quotations.queue.actions.archive' | translate"
+                  >
+                    <mat-icon aria-hidden="true">archive</mat-icon>
+                  </button>
                 } @else {
                   <a
                     mat-stroked-button

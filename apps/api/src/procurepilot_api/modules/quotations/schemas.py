@@ -122,6 +122,7 @@ class Quotation(BaseModel):
     created_at: datetime
     reviewed_by: UUID | None = None
     reviewed_at: datetime | None = None
+    deleted_at: datetime | None = None
 
 
 class QuotationVersionReference(BaseModel):

@@ -102,6 +102,9 @@ export class QuotationReviewComponent implements OnInit {
   readonly isSaving = signal<boolean>(false);
   readonly isConfirming = signal<boolean>(false);
   readonly isRefusing = signal<boolean>(false);
+  readonly isArchiving = signal<boolean>(false);
+  readonly isRetryingExtraction = signal<boolean>(false);
+  readonly isExporting = signal<boolean>(false);
   readonly mismatchAcknowledged = signal<boolean>(false);
   readonly confirmDialogVisible = signal<boolean>(false);
   readonly quotationId = signal<string>('');
@@ -617,6 +620,81 @@ export class QuotationReviewComponent implements OnInit {
         this.handleError(err);
       },
     });
+  }
+
+  archiveQuotation(): void {
+    const q = this.quotation();
+    if (!q) return;
+    if (!window.confirm(this.translate.instant('quotations.review.archiveConfirm'))) {
+      return;
+    }
+
+    this.isArchiving.set(true);
+    this.errorMessage.set(null);
+
+    this.api.archiveQuotation(q.id).subscribe({
+      next: () => {
+        this.isArchiving.set(false);
+        this.snackBar.open(this.translate.instant('quotations.review.archived'), undefined, {
+          duration: 3000,
+        });
+        this.router.navigate(['/quotations']);
+      },
+      error: (err: unknown) => {
+        this.isArchiving.set(false);
+        this.handleError(err);
+      },
+    });
+  }
+
+  retryExtraction(): void {
+    const q = this.quotation();
+    if (!q) return;
+    if (!window.confirm(this.translate.instant('quotations.review.retryConfirm'))) {
+      return;
+    }
+
+    this.isRetryingExtraction.set(true);
+    this.errorMessage.set(null);
+
+    this.api.retryExtraction(q.id).subscribe({
+      next: (updated) => {
+        this.isRetryingExtraction.set(false);
+        this.loadQuotation(updated.id);
+      },
+      error: (err: unknown) => {
+        this.isRetryingExtraction.set(false);
+        this.handleError(err);
+      },
+    });
+  }
+
+  exportQuotation(): void {
+    const q = this.quotation();
+    if (!q) return;
+
+    this.isExporting.set(true);
+    this.errorMessage.set(null);
+
+    this.api.exportQuotation(q.id).subscribe({
+      next: (blob) => {
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `quotation-${q.id}.csv`;
+        link.click();
+        window.URL.revokeObjectURL(url);
+        this.isExporting.set(false);
+      },
+      error: (err: unknown) => {
+        this.isExporting.set(false);
+        this.handleError(err);
+      },
+    });
+  }
+
+  canRetryExtraction(q: QuotationDetail): boolean {
+    return q.status === 'extracted' || q.status === 'in_review' || q.status === 'refused';
   }
 
   computeLineTotal(line: QuotationDetail['lines'][number]): string | null {

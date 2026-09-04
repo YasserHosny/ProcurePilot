@@ -406,6 +406,39 @@ export class ApiService {
     );
   }
 
+  archiveQuotation(quotationId: string, idempotencyKey?: string): Observable<Quotation> {
+    const headers = idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined;
+    return this.http.post<Quotation>(
+      `${this.base}/quotations/${quotationId}/archive`,
+      {},
+      { headers },
+    );
+  }
+
+  restoreQuotation(quotationId: string, idempotencyKey?: string): Observable<Quotation> {
+    const headers = idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined;
+    return this.http.post<Quotation>(
+      `${this.base}/quotations/${quotationId}/restore`,
+      {},
+      { headers },
+    );
+  }
+
+  retryExtraction(quotationId: string, idempotencyKey?: string): Observable<Quotation> {
+    const headers = idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined;
+    return this.http.post<Quotation>(
+      `${this.base}/quotations/${quotationId}/retry-extraction`,
+      {},
+      { headers },
+    );
+  }
+
+  exportQuotation(quotationId: string): Observable<Blob> {
+    return this.http.get(`${this.base}/quotations/${quotationId}/export?format=csv`, {
+      responseType: 'blob',
+    });
+  }
+
   getJob(jobId: string): Observable<Job> {
     return this.http.get<Job>(`${this.base}/jobs/${jobId}`);
   }
@@ -867,4 +900,3 @@ export class ApiService {
     return this.http.delete<void>(`${this.base}/approvals/delegations/${delegationId}`);
   }
 }
-

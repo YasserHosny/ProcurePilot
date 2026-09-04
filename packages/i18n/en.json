@@ -604,8 +604,10 @@
       },
       "actions": {
         "review": "Review & Authorize",
-        "view": "View (Read-Only)"
+        "view": "View (Read-Only)",
+        "archive": "Archive"
       },
+      "archiveConfirm": "Archive this quotation? It can be restored later.",
       "readOnlyBadge": "Read-Only Access",
       "readOnlyNotice": "Your role has read-only access. Only Owners and Buyers can correct and confirm quotations.",
       "loadMore": "Load More",
@@ -727,6 +729,9 @@
         "versionId": "Quotation #{{id}}"
       },
       "actions": {
+        "archive": "Archive",
+        "retryExtraction": "Retry Extraction",
+        "export": "Export CSV",
         "saveChanges": "Save Corrections",
         "saving": "Saving corrections...",
         "confirmButton": "Confirm & Authorize Quotation",
@@ -747,6 +752,9 @@
         "confirmDialogCancel": "Cancel",
         "confirmDialogProceed": "Confirm & Authorize"
       },
+      "archiveConfirm": "Archive this quotation?",
+      "retryConfirm": "Re-run extraction? Existing extracted data will be replaced.",
+      "archived": "Quotation archived",
       "status": {
         "pending": "Pending Extraction",
         "extracting": "Extracting",

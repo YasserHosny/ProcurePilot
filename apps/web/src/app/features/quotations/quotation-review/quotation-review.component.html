@@ -19,6 +19,38 @@
       </div>
 
       <div class="header-actions">
+        <button
+          mat-stroked-button
+          type="button"
+          (click)="exportQuotation()"
+          [disabled]="isExporting()"
+        >
+          <mat-icon aria-hidden="true">download</mat-icon>
+          <span>{{ 'quotations.review.actions.export' | translate }}</span>
+        </button>
+        @if (isWriter() && canRetryExtraction(q)) {
+          <button
+            mat-stroked-button
+            type="button"
+            (click)="retryExtraction()"
+            [disabled]="isRetryingExtraction()"
+          >
+            <mat-icon aria-hidden="true">refresh</mat-icon>
+            <span>{{ 'quotations.review.actions.retryExtraction' | translate }}</span>
+          </button>
+        }
+        @if (isWriter()) {
+          <button
+            mat-stroked-button
+            color="warn"
+            type="button"
+            (click)="archiveQuotation()"
+            [disabled]="isArchiving()"
+          >
+            <mat-icon aria-hidden="true">archive</mat-icon>
+            <span>{{ 'quotations.review.actions.archive' | translate }}</span>
+          </button>
+        }
         <a mat-button routerLink="/quotations" class="back-link">
           <mat-icon aria-hidden="true">arrow_back</mat-icon>
           <span>{{ 'quotations.review.backToQueue' | translate }}</span>
