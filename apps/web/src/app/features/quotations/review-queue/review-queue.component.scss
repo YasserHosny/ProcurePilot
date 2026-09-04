@@ -141,6 +141,25 @@
   border-radius: 12px;
 }
 
+.bulk-actions-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding-block-end: 1rem;
+  flex-wrap: wrap;
+
+  button {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+  }
+}
+
+.bulk-count {
+  font-weight: 600;
+  color: var(--mat-sys-on-surface, #1e293b);
+}
+
 .loading-state {
   display: flex;
   flex-direction: column;
@@ -196,6 +215,11 @@
 
 .tasks-table {
   width: 100%;
+
+  .select-cell {
+    width: 48px;
+    padding-inline: 0.5rem;
+  }
 
   .mono-cell {
     font-family: monospace;

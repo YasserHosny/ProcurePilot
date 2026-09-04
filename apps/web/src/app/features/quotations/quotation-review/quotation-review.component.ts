@@ -116,6 +116,7 @@ export class QuotationReviewComponent implements OnInit {
   readonly priorQuotations = signal<{ id: string; created_at: string; supplier_id: string | null }[]>([]);
 
   readonly selectedSupplierId = signal<string | null>(null);
+  readonly reviewerNotes = signal<string>('');
   readonly isRequote = signal<boolean>(false);
   readonly selectedPreviousQuotationId = signal<string | null>(null);
 
@@ -277,6 +278,11 @@ export class QuotationReviewComponent implements OnInit {
     return diff.toFixed(2);
   });
 
+  readonly hasPendingReviewChanges = computed<boolean>(() => {
+    const q = this.quotation();
+    return this.pendingCorrections().size > 0 || this.reviewerNotes() !== (q?.reviewer_notes || '');
+  });
+
   ngOnInit(): void {
     const id = this.route.snapshot.paramMap.get('id');
     if (id) {
@@ -294,6 +300,7 @@ export class QuotationReviewComponent implements OnInit {
     this.api.getQuotation(id).subscribe({
       next: (q) => {
         this.quotation.set(q);
+        this.reviewerNotes.set(q.reviewer_notes || '');
         this.selectedSupplierId.set(q.supplier_id || null);
         if (q.previous_quotation_id) {
           this.isRequote.set(true);
@@ -545,6 +552,10 @@ export class QuotationReviewComponent implements OnInit {
     });
   }
 
+  onNotesChange(value: string): void {
+    this.reviewerNotes.set(value);
+  }
+
   saveCorrections(): void {
     const q = this.quotation();
     if (!q) return;
@@ -561,6 +572,7 @@ export class QuotationReviewComponent implements OnInit {
     this.api
       .patchQuotation(q.id, {
         supplier_id: this.selectedSupplierId(),
+        reviewer_notes: this.reviewerNotes() || null,
         corrections,
       })
       .subscribe({
@@ -605,7 +617,8 @@ export class QuotationReviewComponent implements OnInit {
     this.confirmBlockedReason.set(null);
 
     const supplierNeedsSaving = q.supplier_id !== this.selectedSupplierId();
-    if (this.pendingCorrections().size > 0 || supplierNeedsSaving) {
+    const notesNeedSaving = this.reviewerNotes() !== (q.reviewer_notes || '');
+    if (this.pendingCorrections().size > 0 || supplierNeedsSaving || notesNeedSaving) {
       const corrections: FieldCorrection[] = [];
       for (const [field_extraction_id, corrected_value] of this.pendingCorrections().entries()) {
         corrections.push({ field_extraction_id, corrected_value });
@@ -614,6 +627,7 @@ export class QuotationReviewComponent implements OnInit {
       this.api
         .patchQuotation(q.id, {
           supplier_id: this.selectedSupplierId(),
+          reviewer_notes: this.reviewerNotes() || null,
           corrections,
         })
         .subscribe({

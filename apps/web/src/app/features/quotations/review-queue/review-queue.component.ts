@@ -3,6 +3,7 @@ import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
+import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
@@ -34,6 +35,7 @@ type ReviewTaskSortOrder = 'asc' | 'desc';
     MatCardModule,
     MatTableModule,
     MatButtonModule,
+    MatCheckboxModule,
     MatIconModule,
     MatInputModule,
     MatChipsModule,
@@ -58,6 +60,7 @@ export class ReviewQueueComponent implements OnInit {
   readonly isLoading = signal<boolean>(true);
   readonly isLoadingMore = signal<boolean>(false);
   readonly tasks = signal<ReviewTask[]>([]);
+  readonly selectedTaskIds = signal<Set<string>>(new Set());
   readonly nextCursor = signal<string | null>(null);
   readonly statusFilter = signal<ReviewTaskStatus | 'all'>('open');
   readonly priorityFilter = signal<ReviewTaskPriority | 'all'>('all');
@@ -69,9 +72,14 @@ export class ReviewQueueComponent implements OnInit {
   readonly errorMessage = signal<string | null>(null);
   readonly errorTraceId = signal<string | null>(null);
   readonly archivingTaskId = signal<string | null>(null);
+  readonly isBulkArchiving = signal<boolean>(false);
   private searchDebounce: ReturnType<typeof setTimeout> | null = null;
 
   readonly isWriter = computed<boolean>(() => this.session.hasRole('owner', 'buyer'));
+  readonly hasSelection = computed<boolean>(() => this.selectedTaskIds().size > 0);
+  readonly allSelected = computed<boolean>(
+    () => this.tasks().length > 0 && this.selectedTaskIds().size === this.tasks().length,
+  );
   readonly hasActiveFilters = computed<boolean>(
     () =>
       this.statusFilter() !== 'open' ||
@@ -82,6 +90,7 @@ export class ReviewQueueComponent implements OnInit {
   );
 
   readonly displayedColumns: readonly string[] = [
+    'select',
     'quotation_id',
     'supplier_name',
     'reason',
@@ -120,6 +129,7 @@ export class ReviewQueueComponent implements OnInit {
       .subscribe({
         next: (res) => {
           this.tasks.set(res.items);
+          this.selectedTaskIds.set(new Set());
           this.nextCursor.set(res.next_cursor);
           this.isLoading.set(false);
         },
@@ -233,6 +243,60 @@ export class ReviewQueueComponent implements OnInit {
     });
   }
 
+  toggleTask(taskId: string): void {
+    const selected = new Set(this.selectedTaskIds());
+    if (selected.has(taskId)) {
+      selected.delete(taskId);
+    } else {
+      selected.add(taskId);
+    }
+    this.selectedTaskIds.set(selected);
+  }
+
+  toggleAll(): void {
+    if (this.allSelected()) {
+      this.clearSelection();
+      return;
+    }
+    this.selectedTaskIds.set(new Set(this.tasks().map((task) => task.id)));
+  }
+
+  clearSelection(): void {
+    this.selectedTaskIds.set(new Set());
+  }
+
+  bulkArchive(): void {
+    const selected = this.selectedTaskIds();
+    if (selected.size === 0) return;
+    if (
+      !window.confirm(
+        this.translate.instant('quotations.queue.bulkArchiveConfirm', { count: selected.size }),
+      )
+    ) {
+      return;
+    }
+    this.isBulkArchiving.set(true);
+    const tasks = this.tasks().filter((task) => selected.has(task.id));
+    let completed = 0;
+    let errors = 0;
+    for (const task of tasks) {
+      this.api.archiveQuotation(task.quotation_id).subscribe({
+        next: () => {
+          completed++;
+          if (completed + errors === tasks.length) {
+            this.finishBulkArchive(completed, errors);
+          }
+        },
+        error: () => {
+          errors++;
+          if (completed + errors === tasks.length) {
+            this.finishBulkArchive(completed, errors);
+          }
+        },
+      });
+    }
+  }
+
   ageLabel(createdAt: string): string {
     const created = new Date(createdAt);
     const diffMs = Date.now() - created.getTime();
@@ -270,6 +334,12 @@ export class ReviewQueueComponent implements OnInit {
 
   private isSortableColumn(value: string): value is ReviewTaskSortBy {
     return ['created_at', 'stated_total', 'priority', 'status'].includes(value);
+  }
+
+  private finishBulkArchive(_completed: number, _errors: number): void {
+    this.isBulkArchiving.set(false);
+    this.selectedTaskIds.set(new Set());
+    this.loadTasks();
   }
 
   private handleError(err: unknown): void {

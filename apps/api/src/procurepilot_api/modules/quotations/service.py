@@ -38,7 +38,7 @@ from procurepilot_api.shared.logging import get_trace_id
 QUOTATION_COLUMNS = (
     "id,document_id,supplier_id,currency,issue_date,expiry_date,status,previous_quotation_id,"
     "stated_total_amount,stated_total_currency,arithmetic_status,created_at,reviewed_by,"
-    "reviewed_at,deleted_at"
+    "reviewed_at,deleted_at,reviewer_notes"
 )
 LINE_COLUMNS = (
     "id,line_number,original_text,quantity,pack_count,unit_size,pack_unit,unit_price_amount,"
@@ -544,6 +544,7 @@ def _quotation(row: dict[str, object]) -> Quotation:
         reviewed_by=UUID(str(row["reviewed_by"])) if row.get("reviewed_by") else None,
         reviewed_at=row.get("reviewed_at"),
         deleted_at=row.get("deleted_at"),
+        reviewer_notes=row.get("reviewer_notes"),
     )
 
 

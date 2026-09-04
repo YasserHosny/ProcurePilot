@@ -612,6 +612,10 @@
         "archive": "Archive"
       },
       "archiveConfirm": "Archive this quotation? It can be restored later.",
+      "bulkSelected": "{{count}} selected",
+      "bulkArchiveButton": "Archive Selected",
+      "bulkArchiveConfirm": "Archive {{count}} quotation(s)? This cannot be undone easily.",
+      "bulkClear": "Clear Selection",
       "readOnlyBadge": "Read-Only Access",
       "readOnlyNotice": "Your role has read-only access. Only Owners and Buyers can correct and confirm quotations.",
       "loadMore": "Load More",
@@ -638,6 +642,13 @@
       },
       "information": {
         "title": "Information"
+      },
+      "notes": {
+        "title": "Reviewer Notes",
+        "label": "Notes",
+        "placeholder": "Add notes about this quotation…",
+        "hint": "Notes are saved when you save corrections",
+        "empty": "No reviewer notes"
       },
       "keyboardNav": {
         "title": "Attention Navigation (FR-014)",

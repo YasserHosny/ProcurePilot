@@ -271,6 +271,7 @@ export interface Quotation {
   readonly reviewed_by?: string | null;
   readonly reviewed_at?: string | null;
   readonly deleted_at?: string | null;
+  readonly reviewer_notes?: string | null;
 }
 
 export interface QuotationPack {
@@ -323,6 +324,7 @@ export interface FieldCorrection {
 
 export interface QuotationReviewPatch {
   readonly supplier_id?: string | null;
+  readonly reviewer_notes?: string | null;
   readonly corrections?: readonly FieldCorrection[];
 }
 

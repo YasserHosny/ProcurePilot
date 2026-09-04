@@ -88,6 +88,7 @@ class FieldCorrection(StrictApiModel):
 
 class QuotationReviewPatch(StrictApiModel):
     supplier_id: UUID | None = None
+    reviewer_notes: str | None = None
     corrections: list[FieldCorrection] = Field(default_factory=list)
 
 
@@ -137,6 +138,7 @@ class Quotation(BaseModel):
     reviewed_by: UUID | None = None
     reviewed_at: datetime | None = None
     deleted_at: datetime | None = None
+    reviewer_notes: str | None = None
 
 
 class QuotationVersionReference(BaseModel):

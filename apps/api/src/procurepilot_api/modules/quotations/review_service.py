@@ -62,6 +62,9 @@ class QuotationReviewService:
                 )
             updates["supplier_id"] = str(patch.supplier_id) if patch.supplier_id else None
 
+        if "reviewer_notes" in patch.model_fields_set:
+            updates["reviewer_notes"] = patch.reviewer_notes
+
         try:
             client.table("quotation").update(updates).eq("id", str(quotation_id)).execute()
             for correction in patch.corrections:

@@ -742,6 +742,35 @@
           </mat-card-content>
         </mat-card>
 
+        <!-- Reviewer Notes -->
+        <mat-card class="panel-card notes-card">
+          <mat-card-header>
+            <mat-card-title class="panel-title">
+              <mat-icon aria-hidden="true">notes</mat-icon>
+              <span>{{ 'quotations.review.notes.title' | translate }}</span>
+            </mat-card-title>
+          </mat-card-header>
+          <mat-card-content>
+            @if (isWriter() && q.status !== 'reviewed') {
+              <mat-form-field appearance="outline" class="notes-field form-col-full">
+                <mat-label>{{ 'quotations.review.notes.label' | translate }}</mat-label>
+                <textarea
+                  matInput
+                  [value]="reviewerNotes()"
+                  (input)="onNotesChange($any($event.target).value)"
+                  rows="3"
+                  [placeholder]="'quotations.review.notes.placeholder' | translate"
+                ></textarea>
+                <mat-hint>{{ 'quotations.review.notes.hint' | translate }}</mat-hint>
+              </mat-form-field>
+            } @else if (reviewerNotes()) {
+              <p class="notes-readonly">{{ reviewerNotes() }}</p>
+            } @else {
+              <p class="notes-empty">{{ 'quotations.review.notes.empty' | translate }}</p>
+            }
+          </mat-card-content>
+        </mat-card>
+
         <!-- Actions Bar -->
         @if (isWriter() && q.status !== 'reviewed' && q.status !== 'refused') {
           <div class="review-footer-bar">
@@ -768,7 +797,7 @@
               mat-stroked-button
               type="button"
               (click)="saveCorrections()"
-              [disabled]="isSaving() || isConfirming() || pendingCorrections().size === 0"
+              [disabled]="isSaving() || isConfirming() || !hasPendingReviewChanges()"
               class="save-btn"
             >
               @if (isSaving()) {
