@@ -25,6 +25,7 @@ import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
 import { ApiService } from '../../../core/api/api.service';
 import type {
+  AuditTrailEntry,
   ApiError,
   FieldCorrection,
   FieldExtraction,
@@ -109,6 +110,8 @@ export class QuotationReviewComponent implements OnInit {
   readonly confirmDialogVisible = signal<boolean>(false);
   readonly quotationId = signal<string>('');
   readonly quotation = signal<QuotationDetail | null>(null);
+  readonly auditTrail = signal<AuditTrailEntry[]>([]);
+  readonly isLoadingAudit = signal<boolean>(false);
   readonly suppliers = signal<Supplier[]>([]);
   readonly priorQuotations = signal<{ id: string; created_at: string; supplier_id: string | null }[]>([]);
 
@@ -307,6 +310,7 @@ export class QuotationReviewComponent implements OnInit {
 
         this.isLoading.set(false);
         this.loadDocumentPreview(q.document.id);
+        this.loadAuditTrail(q.id);
       },
       error: (err: unknown) => {
         this.isLoading.set(false);
@@ -335,6 +339,35 @@ export class QuotationReviewComponent implements OnInit {
         // Non-fatal, suppliers dropdown will be empty
       },
     });
+  }
+
+  loadAuditTrail(quotationId = this.quotationId()): void {
+    if (!quotationId) return;
+    this.isLoadingAudit.set(true);
+
+    this.api.getAuditTrail(quotationId).subscribe({
+      next: (res) => {
+        this.auditTrail.set(res.items);
+        this.isLoadingAudit.set(false);
+      },
+      error: (err: unknown) => {
+        this.isLoadingAudit.set(false);
+        this.handleError(err);
+      },
+    });
+  }
+
+  auditActionLabel(action: string): string {
+    const actionKeys: Record<string, string> = {
+      'quotation.archived': 'quotations.audit.actions.archived',
+      'quotation.restored': 'quotations.audit.actions.restored',
+      'quotation.extraction_retried': 'quotations.audit.actions.extraction_retried',
+      'quotation.exported': 'quotations.audit.actions.exported',
+      'quotation.confirmed': 'quotations.audit.actions.confirmed',
+      'quotation.refused': 'quotations.audit.actions.refused',
+      'quotation.reviewed': 'quotations.audit.actions.reviewed',
+    };
+    return this.translate.instant(actionKeys[action] ?? 'quotations.audit.actions.unknown');
   }
 
   getFieldExtraction(entityType: 'quotation' | 'quotation_line', entityId: string, fieldName: string): FieldExtraction | undefined {

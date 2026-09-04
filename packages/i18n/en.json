@@ -566,6 +566,10 @@
       "searchPlaceholder": "Search by supplier or ID…",
       "filterStatus": "Filter by Status",
       "filterPriority": "Filter by Priority",
+      "filters": {
+        "dateFrom": "From date",
+        "dateTo": "To date"
+      },
       "status": {
         "all": "All Statuses",
         "open": "Open",
@@ -762,6 +766,21 @@
         "in_review": "In Review",
         "reviewed": "Reviewed & Authorized",
         "refused": "Refused"
+      }
+    },
+    "audit": {
+      "title": "Audit Trail",
+      "empty": "No audit events recorded",
+      "system": "System",
+      "actions": {
+        "archived": "Quotation archived",
+        "restored": "Quotation restored",
+        "extraction_retried": "Extraction retried",
+        "exported": "Data exported",
+        "confirmed": "Quotation confirmed",
+        "refused": "Quotation refused",
+        "reviewed": "Review submitted",
+        "unknown": "Action performed"
       }
     }
   },

@@ -16,6 +16,8 @@ from procurepilot_api.modules.documents.schemas import Document
 from procurepilot_api.modules.documents.service import DOCUMENT_COLUMNS
 from procurepilot_api.modules.members.service import authenticated_client
 from procurepilot_api.modules.quotations.schemas import (
+    AuditTrailEntry,
+    AuditTrailResponse,
     FieldExtraction,
     Money,
     Pack,
@@ -31,6 +33,7 @@ from procurepilot_api.modules.quotations.schemas import (
     decimal_string,
 )
 from procurepilot_api.shared.audit import AuditEventCreate, get_audit_writer
+from procurepilot_api.shared.logging import get_trace_id
 
 QUOTATION_COLUMNS = (
     "id,document_id,supplier_id,currency,issue_date,expiry_date,status,previous_quotation_id,"
@@ -114,6 +117,8 @@ class QuotationService:
         status: ReviewTaskStatus | str = "open",
         priority: ReviewTaskPriority | None = None,
         search: str | None = None,
+        date_from: str | None = None,
+        date_to: str | None = None,
         sort_by: Literal["created_at", "stated_total", "priority", "status"] = "created_at",
         sort_order: Literal["asc", "desc"] = "desc",
     ) -> ReviewTaskList:
@@ -127,6 +132,10 @@ class QuotationService:
                 query = query.eq("status", status)
             if priority is not None:
                 query = query.eq("priority", priority)
+            if date_from is not None:
+                query = query.gte("created_at", date_from)
+            if date_to is not None:
+                query = query.lte("created_at", date_to)
             response = (
                 query.order(sort_by, desc=sort_order == "desc")
                 .order("id")
@@ -152,6 +161,29 @@ class QuotationService:
                 else None
             ),
         )
+
+    def get_audit_trail(
+        self,
+        *,
+        bearer_token: str,
+        member: CurrentMember,
+        quotation_id: UUID,
+    ) -> AuditTrailResponse:
+        client = authenticated_client(self._settings, bearer_token)
+        try:
+            response = (
+                client.table("audit_event")
+                .select("id,action,actor_email,outcome,target,trace_id,occurred_at")
+                .eq("tenant_id", str(member.tenant_id))
+                .eq("target->>quotation_id", str(quotation_id))
+                .order("occurred_at", desc=True)
+                .limit(100)
+                .execute()
+            )
+        except APIError as exc:
+            raise ServiceUnavailableError(details={"dependency": "database"}) from exc
+        items = [AuditTrailEntry.model_validate(row) for row in _rows(response.data)]
+        return AuditTrailResponse(items=items)
 
     def archive_quotation(
         self,
@@ -243,13 +275,19 @@ class QuotationService:
             client.table("quotation_line").delete().eq(
                 "quotation_id", str(quotation_id)
             ).execute()
-            client.table("extraction_job").insert(
-                {
-                    "tenant_id": str(member.tenant_id),
-                    "quotation_id": str(quotation_id),
-                    "status": "queued",
-                }
-            ).execute()
+            job_row = _one_row(
+                client.table("extraction_job")
+                .insert(
+                    {
+                        "tenant_id": str(member.tenant_id),
+                        "quotation_id": str(quotation_id),
+                        "status": "queued",
+                    }
+                )
+                .execute()
+                .data,
+                resource="job",
+            )
             row = _one_row(
                 client.table("quotation")
                 .update({"status": "pending"})
@@ -260,6 +298,7 @@ class QuotationService:
             )
         except APIError as exc:
             raise ServiceUnavailableError(details={"dependency": "database"}) from exc
+        _enqueue_extraction(self._settings, job_row, quote, member)
         self._record(
             bearer_token=bearer_token,
             member=member,
@@ -347,6 +386,7 @@ class QuotationService:
                 action=action,
                 target=target,
                 outcome="success",
+                trace_id=get_trace_id(),
             ),
             bearer_token=bearer_token,
         )
@@ -614,3 +654,30 @@ def _decode_cursor(cursor: str | None) -> int:
         return int(base64.urlsafe_b64decode(cursor.encode()).decode())
     except (ValueError, UnicodeDecodeError) as exc:
         raise NotFoundError(details={"cursor": "invalid"}) from exc
+
+
+def _enqueue_extraction(
+    settings: Settings,
+    job_row: dict[str, object],
+    quote: dict[str, object],
+    member: CurrentMember,
+) -> None:
+    try:
+        from redis import Redis
+        from rq import Queue
+    except ImportError:
+        return
+    try:
+        queue = Queue(settings.extraction_queue_name, connection=Redis.from_url(settings.redis_url))
+        queue.enqueue(
+            "procurepilot_extraction_worker.worker.process_extraction_job",
+            {
+                "job_id": str(job_row["id"]),
+                "tenant_id": str(member.tenant_id),
+                "quotation_id": str(quote["id"]),
+                "document_id": str(quote["document_id"]),
+            },
+            job_id=str(job_row["id"]),
+        )
+    except Exception:
+        pass

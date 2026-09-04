@@ -11,6 +11,8 @@ from procurepilot_api.errors import ConflictError, ServiceUnavailableError
 from procurepilot_api.modules.members.service import authenticated_client
 from procurepilot_api.modules.quotations.schemas import ConfirmRequest, Quotation
 from procurepilot_api.modules.quotations.service import _one_row, _quotation
+from procurepilot_api.shared.audit import AuditEventCreate, get_audit_writer
+from procurepilot_api.shared.logging import get_trace_id
 
 
 class QuotationConfirmationService:
@@ -93,6 +95,18 @@ class QuotationConfirmationService:
             ).eq("quotation_id", str(quotation_id)).in_("status", ["open", "in_progress"]).execute()
         except APIError as exc:
             raise ServiceUnavailableError(details={"dependency": "database"}) from exc
+        get_audit_writer().record(
+            AuditEventCreate(
+                tenant_id=member.tenant_id,
+                actor_membership_id=member.membership_id,
+                actor_email=member.email,
+                action="quotation.confirmed",
+                target={"quotation_id": str(quotation_id)},
+                outcome="success",
+                trace_id=get_trace_id(),
+            ),
+            bearer_token=bearer_token,
+        )
         return _quotation(rows)
 
 

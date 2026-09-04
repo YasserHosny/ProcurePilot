@@ -566,6 +566,10 @@
       "searchPlaceholder": "البحث حسب المورد أو المعرف…",
       "filterStatus": "تصفية حسب الحالة",
       "filterPriority": "تصفية حسب الأولوية",
+      "filters": {
+        "dateFrom": "من تاريخ",
+        "dateTo": "إلى تاريخ"
+      },
       "status": {
         "all": "جميع الحالات",
         "open": "مفتوحة",
@@ -762,6 +766,21 @@
         "in_review": "قيد المراجعة",
         "reviewed": "تمت المراجعة والاعتماد",
         "refused": "مرفوض"
+      }
+    },
+    "audit": {
+      "title": "سجل المراجعة",
+      "empty": "لا توجد أحداث مسجلة",
+      "system": "النظام",
+      "actions": {
+        "archived": "تم أرشفة العرض",
+        "restored": "تم استعادة العرض",
+        "extraction_retried": "تم إعادة الاستخراج",
+        "exported": "تم تصدير البيانات",
+        "confirmed": "تم تأكيد العرض",
+        "refused": "تم رفض العرض",
+        "reviewed": "تم تقديم المراجعة",
+        "unknown": "تم تنفيذ إجراء"
       }
     }
   },

@@ -12,6 +12,7 @@ import type {
   ApprovalDelegation,
   ApprovalDelegationCreate,
   ApprovalDelegationList,
+  AuditTrailEntry,
   BaseUnit,
   BasketOptimiseRequest,
   BasketSplitJob,
@@ -439,6 +440,12 @@ export class ApiService {
     });
   }
 
+  getAuditTrail(quotationId: string): Observable<{ items: AuditTrailEntry[] }> {
+    return this.http.get<{ items: AuditTrailEntry[] }>(
+      `${this.base}/quotations/${quotationId}/audit-trail`,
+    );
+  }
+
   getJob(jobId: string): Observable<Job> {
     return this.http.get<Job>(`${this.base}/jobs/${jobId}`);
   }
@@ -449,6 +456,8 @@ export class ApiService {
     status?: ReviewTaskStatus | 'all';
     priority?: ReviewTaskPriority;
     search?: string;
+    date_from?: string;
+    date_to?: string;
     sort_by?: 'created_at' | 'stated_total' | 'priority' | 'status';
     sort_order?: 'asc' | 'desc';
   }): Observable<{ items: ReviewTask[]; next_cursor: string | null }> {
@@ -458,6 +467,8 @@ export class ApiService {
     if (params?.status) query.set('status', params.status);
     if (params?.priority) query.set('priority', params.priority);
     if (params?.search) query.set('search', params.search);
+    if (params?.date_from) query.set('date_from', params.date_from);
+    if (params?.date_to) query.set('date_to', params.date_to);
     if (params?.sort_by) query.set('sort_by', params.sort_by);
     if (params?.sort_order) query.set('sort_order', params.sort_order);
     const qs = query.toString() ? `?${query.toString()}` : '';

@@ -333,6 +333,16 @@ export interface QuotationDetail extends Quotation {
   readonly review_task?: ReviewTask | null;
 }
 
+export interface AuditTrailEntry {
+  readonly id: number;
+  readonly action: string;
+  readonly actor_email: string | null;
+  readonly outcome: string;
+  readonly target: Record<string, unknown> | null;
+  readonly trace_id: string | null;
+  readonly occurred_at: string;
+}
+
 export type JobStatus = 'queued' | 'running' | 'succeeded' | 'failed';
 
 export interface Job {
@@ -1099,4 +1109,3 @@ export interface ApprovalDelegationCreate {
 export interface ApprovalDelegationList {
   readonly items: readonly ApprovalDelegation[];
 }
-

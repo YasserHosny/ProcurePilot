@@ -108,6 +108,20 @@ class ReviewTaskList(BaseModel):
     next_cursor: str | None = None
 
 
+class AuditTrailEntry(BaseModel):
+    id: int
+    action: str
+    actor_email: str | None = None
+    outcome: str
+    target: dict[str, object] | None = None
+    trace_id: str | None = None
+    occurred_at: str
+
+
+class AuditTrailResponse(BaseModel):
+    items: list[AuditTrailEntry]
+
+
 class Quotation(BaseModel):
     id: UUID
     document_id: UUID

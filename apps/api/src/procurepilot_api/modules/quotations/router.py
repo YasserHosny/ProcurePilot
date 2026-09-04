@@ -18,6 +18,7 @@ from procurepilot_api.modules.quotations.review_service import (
     get_quotation_review_service,
 )
 from procurepilot_api.modules.quotations.schemas import (
+    AuditTrailResponse,
     ConfirmRequest,
     Quotation,
     QuotationCreate,
@@ -52,6 +53,18 @@ def get_quotation(
     service: Annotated[QuotationService, Depends(get_quotation_service)],
 ) -> QuotationDetail:
     return service.get_quotation(bearer_token=token, quotation_id=quotation_id)
+
+
+@router.get("/quotations/{quotation_id}/audit-trail", response_model=AuditTrailResponse)
+def get_quotation_audit_trail(
+    quotation_id: UUID,
+    token: Annotated[str, Depends(bearer_token)],
+    member: Annotated[CurrentMember, Depends(current_member)],
+    service: Annotated[QuotationService, Depends(get_quotation_service)],
+) -> AuditTrailResponse:
+    return service.get_audit_trail(
+        bearer_token=token, member=member, quotation_id=quotation_id
+    )
 
 
 @router.post("/quotations/{quotation_id}/archive", response_model=Quotation)
@@ -173,6 +186,8 @@ def list_review_tasks(
     status: Annotated[Literal["open", "in_progress", "resolved", "all"], Query()] = "open",
     priority: Annotated[ReviewTaskPriority | None, Query()] = None,
     search: Annotated[str | None, Query(max_length=200)] = None,
+    date_from: Annotated[str | None, Query()] = None,
+    date_to: Annotated[str | None, Query()] = None,
     sort_by: Annotated[
         Literal["created_at", "stated_total", "priority", "status"], Query()
     ] = "created_at",
@@ -185,6 +200,8 @@ def list_review_tasks(
         status=status,
         priority=priority,
         search=search,
+        date_from=date_from,
+        date_to=date_to,
         sort_by=sort_by,
         sort_order=sort_order,
     )

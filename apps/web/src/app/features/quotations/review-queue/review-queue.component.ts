@@ -62,6 +62,8 @@ export class ReviewQueueComponent implements OnInit {
   readonly statusFilter = signal<ReviewTaskStatus | 'all'>('open');
   readonly priorityFilter = signal<ReviewTaskPriority | 'all'>('all');
   readonly searchQuery = signal<string>('');
+  readonly dateFrom = signal<string | null>(null);
+  readonly dateTo = signal<string | null>(null);
   readonly sortBy = signal<ReviewTaskSortBy>('created_at');
   readonly sortOrder = signal<ReviewTaskSortOrder>('desc');
   readonly errorMessage = signal<string | null>(null);
@@ -74,7 +76,9 @@ export class ReviewQueueComponent implements OnInit {
     () =>
       this.statusFilter() !== 'open' ||
       this.priorityFilter() !== 'all' ||
-      this.searchQuery().trim().length > 0,
+      this.searchQuery().trim().length > 0 ||
+      this.dateFrom() !== null ||
+      this.dateTo() !== null,
   );
 
   readonly displayedColumns: readonly string[] = [
@@ -108,6 +112,8 @@ export class ReviewQueueComponent implements OnInit {
         status: status === 'all' ? undefined : status,
         priority: priority === 'all' ? undefined : priority,
         search,
+        date_from: this.dateFrom() ?? undefined,
+        date_to: this.dateTo() ?? undefined,
         sort_by: this.sortBy(),
         sort_order: this.sortOrder(),
       })
@@ -140,6 +146,8 @@ export class ReviewQueueComponent implements OnInit {
         status: status === 'all' ? undefined : status,
         priority: priority === 'all' ? undefined : priority,
         search,
+        date_from: this.dateFrom() ?? undefined,
+        date_to: this.dateTo() ?? undefined,
         sort_by: this.sortBy(),
         sort_order: this.sortOrder(),
       })
@@ -180,6 +188,16 @@ export class ReviewQueueComponent implements OnInit {
     }, 300);
   }
 
+  onDateFromChange(value: string | null): void {
+    this.dateFrom.set(value || null);
+    this.loadTasks();
+  }
+
+  onDateToChange(value: string | null): void {
+    this.dateTo.set(value || null);
+    this.loadTasks();
+  }
+
   onSortChange(sort: Sort): void {
     if (this.isSortableColumn(sort.active)) {
       this.sortBy.set(sort.active);
@@ -192,6 +210,8 @@ export class ReviewQueueComponent implements OnInit {
     this.statusFilter.set('open');
     this.priorityFilter.set('all');
     this.searchQuery.set('');
+    this.dateFrom.set(null);
+    this.dateTo.set(null);
     this.loadTasks();
   }
 
