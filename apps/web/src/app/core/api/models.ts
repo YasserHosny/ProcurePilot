@@ -352,6 +352,8 @@ export interface QuotationDetail extends Quotation {
   readonly lines: readonly QuotationLine[];
   readonly field_extractions: readonly FieldExtraction[];
   readonly review_task?: ReviewTask | null;
+  readonly uploaded_by_email?: string | null;
+  readonly reviewed_by_email?: string | null;
 }
 
 export interface AuditTrailEntry {

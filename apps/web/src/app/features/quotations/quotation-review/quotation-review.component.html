@@ -385,6 +385,12 @@
 
           <mat-card-content>
             <div class="information-grid">
+              @if (q.uploaded_by_email) {
+                <div class="information-item">
+                  <span class="information-label">{{ 'quotations.review.uploadedBy' | translate }}</span>
+                  <span class="information-value">{{ q.uploaded_by_email }}</span>
+                </div>
+              }
               <div class="information-item">
                 <span class="information-label">{{ 'quotations.review.uploadedAt' | translate }}</span>
                 <span class="information-value" [matTooltip]="q.document.created_at">
@@ -402,6 +408,20 @@
                   <span class="information-label">{{ 'quotations.review.lastModified' | translate }}</span>
                   <span class="information-value" [matTooltip]="modifiedAt">
                     {{ modifiedAt | formatDate: dateTimeOptions }}
+                  </span>
+                </div>
+              }
+              @if (q.reviewed_by_email) {
+                <div class="information-item">
+                  <span class="information-label">{{ 'quotations.review.reviewedBy' | translate }}</span>
+                  <span class="information-value">{{ q.reviewed_by_email }}</span>
+                </div>
+              }
+              @if (q.reviewed_at) {
+                <div class="information-item">
+                  <span class="information-label">{{ 'quotations.review.reviewedAt' | translate }}</span>
+                  <span class="information-value" [matTooltip]="q.reviewed_at">
+                    {{ q.reviewed_at | formatDate: dateTimeOptions }}
                   </span>
                 </div>
               }

@@ -167,6 +167,8 @@ class QuotationDetail(Quotation):
     review_task: ReviewTask | None = None
     previous_version: QuotationVersionReference | None = None
     next_versions: list[QuotationVersionReference] = Field(default_factory=list)
+    uploaded_by_email: str | None = None
+    reviewed_by_email: str | None = None
 
 
 def decimal_string(value: object, *, scale: int | None = None) -> str | None:

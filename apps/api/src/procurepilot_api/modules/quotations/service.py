@@ -98,6 +98,12 @@ class QuotationService:
             else None
         )
         next_versions = _next_versions(client, quotation_id)
+        uploaded_by_email = _membership_email(client, document.created_by) if document.created_by else None
+        reviewed_by_email = (
+            _membership_email(client, UUID(str(quote["reviewed_by"])))
+            if quote.get("reviewed_by")
+            else None
+        )
         return QuotationDetail(
             **_quotation(quote).model_dump(),
             document=document,
@@ -106,6 +112,8 @@ class QuotationService:
             review_task=_task(task) if task else None,
             previous_version=previous,
             next_versions=next_versions,
+            uploaded_by_email=uploaded_by_email,
+            reviewed_by_email=reviewed_by_email,
         )
 
     def list_review_tasks(
@@ -722,6 +730,23 @@ def _decode_cursor(cursor: str | None) -> int:
         return int(base64.urlsafe_b64decode(cursor.encode()).decode())
     except (ValueError, UnicodeDecodeError) as exc:
         raise NotFoundError(details={"cursor": "invalid"}) from exc
+
+
+def _membership_email(client: object, membership_id: UUID) -> str | None:
+    try:
+        response = (
+            client.table("membership")
+            .select("email")
+            .eq("id", str(membership_id))
+            .limit(1)
+            .execute()
+        )
+    except APIError:
+        return None
+    rows = response.data if isinstance(response.data, list) else []
+    if rows and isinstance(rows[0], dict):
+        return str(rows[0].get("email") or "")
+    return None
 
 
 def _enqueue_extraction(
