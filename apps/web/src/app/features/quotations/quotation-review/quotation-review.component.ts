@@ -113,7 +113,7 @@ export class QuotationReviewComponent implements OnInit {
   readonly auditTrail = signal<AuditTrailEntry[]>([]);
   readonly isLoadingAudit = signal<boolean>(false);
   readonly suppliers = signal<Supplier[]>([]);
-  readonly priorQuotations = signal<{ id: string; created_at: string; supplier_id: string | null }[]>([]);
+  readonly priorQuotations = signal<{ id: string; created_at: string; supplier_name: string | null }[]>([]);
 
   readonly selectedSupplierId = signal<string | null>(null);
   readonly reviewerNotes = signal<string>('');
@@ -289,6 +289,7 @@ export class QuotationReviewComponent implements OnInit {
       this.quotationId.set(id);
       this.loadQuotation(id);
       this.loadSuppliers();
+      this.loadPriorQuotations();
     }
   }
 
@@ -344,6 +345,30 @@ export class QuotationReviewComponent implements OnInit {
       },
       error: () => {
         // Non-fatal, suppliers dropdown will be empty
+      },
+    });
+  }
+
+  loadPriorQuotations(): void {
+    this.api.getReviewTasks({ status: 'all', limit: 100 }).subscribe({
+      next: (res) => {
+        const currentId = this.quotationId();
+        const seen = new Set<string>();
+        const items: { id: string; created_at: string; supplier_name: string | null }[] = [];
+        for (const task of res.items) {
+          if (task.quotation_id !== currentId && !seen.has(task.quotation_id)) {
+            seen.add(task.quotation_id);
+            items.push({
+              id: task.quotation_id,
+              created_at: task.created_at,
+              supplier_name: task.supplier_name ?? null,
+            });
+          }
+        }
+        this.priorQuotations.set(items);
+      },
+      error: () => {
+        // Non-fatal
       },
     });
   }

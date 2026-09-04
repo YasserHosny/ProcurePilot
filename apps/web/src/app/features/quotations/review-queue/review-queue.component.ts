@@ -73,6 +73,7 @@ export class ReviewQueueComponent implements OnInit {
   readonly errorTraceId = signal<string | null>(null);
   readonly archivingTaskId = signal<string | null>(null);
   readonly isBulkArchiving = signal<boolean>(false);
+  readonly isBulkRefusing = signal<boolean>(false);
   private searchDebounce: ReturnType<typeof setTimeout> | null = null;
 
   readonly isWriter = computed<boolean>(() => this.session.hasRole('owner', 'buyer'));
@@ -297,6 +298,38 @@ export class ReviewQueueComponent implements OnInit {
     }
   }
 
+  bulkRefuse(): void {
+    const selected = this.selectedTaskIds();
+    if (selected.size === 0) return;
+    if (
+      !window.confirm(
+        this.translate.instant('quotations.queue.bulkRefuseConfirm', { count: selected.size }),
+      )
+    ) {
+      return;
+    }
+    this.isBulkRefusing.set(true);
+    const tasks = this.tasks().filter((task) => selected.has(task.id));
+    let completed = 0;
+    let errors = 0;
+    for (const task of tasks) {
+      this.api.refuseQuotation(task.quotation_id).subscribe({
+        next: () => {
+          completed++;
+          if (completed + errors === tasks.length) {
+            this.finishBulkRefuse(completed, errors);
+          }
+        },
+        error: () => {
+          errors++;
+          if (completed + errors === tasks.length) {
+            this.finishBulkRefuse(completed, errors);
+          }
+        },
+      });
+    }
+  }
+
   ageLabel(createdAt: string): string {
     const created = new Date(createdAt);
     const diffMs = Date.now() - created.getTime();
@@ -338,6 +371,12 @@ export class ReviewQueueComponent implements OnInit {
 
   private finishBulkArchive(_completed: number, _errors: number): void {
     this.isBulkArchiving.set(false);
+    this.selectedTaskIds.set(new Set());
+    this.loadTasks();
+  }
+
+  private finishBulkRefuse(_completed: number, _errors: number): void {
+    this.isBulkRefusing.set(false);
     this.selectedTaskIds.set(new Set());
     this.loadTasks();
   }

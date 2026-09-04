@@ -139,7 +139,7 @@
               color="warn"
               type="button"
               (click)="bulkArchive()"
-              [disabled]="isBulkArchiving()"
+              [disabled]="isBulkArchiving() || isBulkRefusing()"
             >
               @if (isBulkArchiving()) {
                 <mat-spinner diameter="18"></mat-spinner>
@@ -149,10 +149,24 @@
               <span>{{ 'quotations.queue.bulkArchiveButton' | translate }}</span>
             </button>
             <button
+              mat-stroked-button
+              color="warn"
+              type="button"
+              (click)="bulkRefuse()"
+              [disabled]="isBulkArchiving() || isBulkRefusing()"
+            >
+              @if (isBulkRefusing()) {
+                <mat-spinner diameter="18"></mat-spinner>
+              } @else {
+                <mat-icon aria-hidden="true">block</mat-icon>
+              }
+              <span>{{ 'quotations.queue.bulkRefuseButton' | translate }}</span>
+            </button>
+            <button
               mat-button
               type="button"
               (click)="clearSelection()"
-              [disabled]="isBulkArchiving()"
+              [disabled]="isBulkArchiving() || isBulkRefusing()"
             >
               {{ 'quotations.queue.bulkClear' | translate }}
             </button>
@@ -175,7 +189,7 @@
                   [checked]="allSelected()"
                   [indeterminate]="hasSelection() && !allSelected()"
                   (change)="toggleAll()"
-                  [disabled]="isBulkArchiving()"
+                  [disabled]="isBulkArchiving() || isBulkRefusing()"
                   color="primary"
                 ></mat-checkbox>
               </th>
@@ -184,7 +198,7 @@
                   [checked]="selectedTaskIds().has(task.id)"
                   (change)="toggleTask(task.id)"
                   (click)="$event.stopPropagation()"
-                  [disabled]="isBulkArchiving()"
+                  [disabled]="isBulkArchiving() || isBulkRefusing()"
                   color="primary"
                 ></mat-checkbox>
               </td>

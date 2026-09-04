@@ -565,13 +565,28 @@
                 @if (isRequote()) {
                   <mat-form-field appearance="outline" class="version-select">
                     <mat-label>{{ 'quotations.review.versioning.selectPreviousLabel' | translate }}</mat-label>
-                    <input
-                      matInput
-                      [value]="selectedPreviousQuotationId() || ''"
-                      (input)="selectedPreviousQuotationId.set($any($event.target).value)"
-                      [placeholder]="'quotations.review.versioning.selectPreviousPlaceholder' | translate"
-                    />
+                    <mat-select
+                      [value]="selectedPreviousQuotationId()"
+                      (selectionChange)="selectedPreviousQuotationId.set($event.value)"
+                      [disabled]="!isWriter() || quotation()?.status === 'reviewed'"
+                    >
+                      <mat-option [value]="null">
+                        {{ 'quotations.review.versioning.selectPreviousPlaceholder' | translate }}
+                      </mat-option>
+                      @for (pq of priorQuotations(); track pq.id) {
+                        <mat-option [value]="pq.id">
+                          {{ pq.id.slice(0, 8) }}
+                          @if (pq.supplier_name) {
+                            — {{ pq.supplier_name }}
+                          }
+                          ({{ pq.created_at | formatDate }})
+                        </mat-option>
+                      }
+                    </mat-select>
                   </mat-form-field>
+                  @if (priorQuotations().length === 0) {
+                    <p class="versioning-empty">{{ 'quotations.review.versioning.noPriorQuotations' | translate }}</p>
+                  }
                 }
               </div>
             }
