@@ -61,16 +61,16 @@ description: "Task list for Requests + Approvals implementation"
 
 ### Tests for User Story 1
 
-- [ ] T015 [P] [US1] Write contract tests for `POST/GET/PATCH /requests` and `POST /requests/{id}/submit`+`/withdraw` in `apps/api/tests/contract/test_requests_contract.py`, covering OpenAPI shapes, the zero-lines 422, and 404/409 envelopes
-- [ ] T016 [P] [US1] Write purchase-request integration tests in `apps/api/tests/integration/test_purchase_requests.py`, proving draft creation with live-recomputed line estimates, submit freezing those estimates (`estimated_at` stops changing even after a price-history change), the zero-lines rejection (FR-003), no-edit-after-submit (FR-004), and withdraw from `submitted` but not from `approved`/`rejected`
-- [ ] T017 [P] [US1] Write frontend unit tests for the request creation form and list in `apps/web/src/app/features/requests/request-form/request-form.component.spec.ts`, covering line add/remove, the live estimate display, submit, and withdraw
-- [ ] T018 [P] [US1] Write request-creation E2E coverage in `apps/web/tests/e2e/purchase-request-submission.spec.ts`, proving create-draft, submit, and withdraw through the real UI, plus Arabic RTL layout
+- [x] T015 [P] [US1] Write contract tests for `POST/GET/PATCH /requests` and `POST /requests/{id}/submit`+`/withdraw` in `apps/api/tests/contract/test_requests_contract.py`, covering OpenAPI shapes, the zero-lines 422, and 404/409 envelopes
+- [x] T016 [P] [US1] Write purchase-request integration tests in `apps/api/tests/integration/test_purchase_requests.py`, proving draft creation with live-recomputed line estimates, submit freezing those estimates (`estimated_at` stops changing even after a price-history change), the zero-lines rejection (FR-003), no-edit-after-submit (FR-004), and withdraw from `submitted` but not from `approved`/`rejected`
+- [x] T017 [P] [US1] Write frontend unit tests for the request creation form and list in `apps/web/src/app/features/requests/request-form/request-form.component.spec.ts`, covering line add/remove, the live estimate display, submit, and withdraw
+- [x] T018 [P] [US1] Write request-creation E2E coverage in `apps/web/tests/e2e/purchase-request-submission.spec.ts`, proving create-draft, submit, and withdraw through the real UI, plus Arabic RTL layout
 
 ### Implementation for User Story 1
 
-- [ ] T019 [US1] Implement draft create/edit/submit/withdraw in `apps/api/src/procurepilot_api/modules/requests/service.py`, wiring in `valuation.py` (T012) for live line estimates on draft, freezing them on submit, and enforcing FR-003/FR-004
-- [ ] T020 [US1] Expose `POST/GET/PATCH /requests` and `POST /requests/{id}/submit`+`/withdraw` in `apps/api/src/procurepilot_api/modules/requests/router.py`
-- [ ] T021 [P] [US1] Build the request creation form, list, and detail UI in `apps/web/src/app/features/requests/`, using only `packages/i18n` strings and CSS logical properties, and add a real, enabled `shell.component.html` nav entry to `/requests` in the same task — not a disabled "coming soon" placeholder, which is how R2.0's own Settings screen shipped fully built but unreachable from navigation (a gap found and left unfixed pending a decision on `main`/PR #8; do not repeat it here)
+- [x] T019 [US1] Implement draft create/edit/submit/withdraw in `apps/api/src/procurepilot_api/modules/requests/service.py`, wiring in `valuation.py` (T012) for live line estimates on draft, freezing them on submit, and enforcing FR-003/FR-004
+- [x] T020 [US1] Expose `POST/GET/PATCH /requests` and `POST /requests/{id}/submit`+`/withdraw` in `apps/api/src/procurepilot_api/modules/requests/router.py`
+- [x] T021 [P] [US1] Build the request creation form, list, and detail UI in `apps/web/src/app/features/requests/`, using only `packages/i18n` strings and CSS logical properties, and add a real, enabled `shell.component.html` nav entry to `/requests` in the same task — not a disabled "coming soon" placeholder, which is how R2.0's own Settings screen shipped fully built but unreachable from navigation (a gap found and left unfixed pending a decision on `main`/PR #8; do not repeat it here)
 
 **Checkpoint**: US1 is independently testable — a request can be created, submitted, and withdrawn with no approver or routing logic required to observe the behaviour.
 
