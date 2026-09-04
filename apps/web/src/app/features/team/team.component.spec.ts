@@ -54,6 +54,7 @@ describe('TeamComponent (T057)', () => {
       'members',
       'invitations',
       'changeMemberRole',
+      'createBranchRoleAssignment',
       'removeMember',
       'revokeInvitation',
     ]);
@@ -104,7 +105,7 @@ describe('TeamComponent (T057)', () => {
     apiService.changeMemberRole.and.returnValue(of(updatedMember));
 
     dialogSpy.open.and.returnValue({
-      afterClosed: () => of('approver' as Role),
+      afterClosed: () => of({ role: 'approver' as Role, branchId: null }),
     } as MatDialogRef<unknown, unknown>);
 
     component.openChangeRoleDialog(mockMembers[1]);
@@ -112,6 +113,7 @@ describe('TeamComponent (T057)', () => {
     expect(apiService.changeMemberRole).toHaveBeenCalledWith('m2', 'approver');
     expect(component.members().find((m) => m.id === 'm2')?.role).toBe('approver');
     expect(snackBarSpy.open).toHaveBeenCalled();
+    expect(apiService.createBranchRoleAssignment).not.toHaveBeenCalled();
   });
 
   it('should display specific 409 error message when server refuses last owner demotion/removal', () => {
@@ -126,13 +128,86 @@ describe('TeamComponent (T057)', () => {
     apiService.changeMemberRole.and.returnValue(throwError(() => error409));
 
     dialogSpy.open.and.returnValue({
-      afterClosed: () => of('viewer' as Role),
+      afterClosed: () => of({ role: 'viewer' as Role, branchId: null }),
     } as MatDialogRef<unknown, unknown>);
 
     component.openChangeRoleDialog(mockMembers[0]);
 
     expect(component.errorMessage()).toContain('must retain at least one active owner');
     expect(component.errorTraceId()).toBe('tr_409');
+  });
+
+  it('should assign the branch only AFTER the role change succeeds, in that order', () => {
+    // The backend requires the membership to already hold branch_manager/approver before an
+    // assignment can be created — so the role PATCH must complete first, never alongside it.
+    const updatedMember: Member = { ...mockMembers[1], role: 'branch_manager' };
+    apiService.changeMemberRole.and.returnValue(of(updatedMember));
+    apiService.createBranchRoleAssignment.and.returnValue(
+      of({ id: 'bra1', membership_id: 'm2', branch_id: 'b1', created_at: '2026-08-23T09:00:00Z' }),
+    );
+
+    dialogSpy.open.and.returnValue({
+      afterClosed: () => of({ role: 'branch_manager' as Role, branchId: 'b1' }),
+    } as MatDialogRef<unknown, unknown>);
+
+    component.openChangeRoleDialog(mockMembers[1]);
+
+    expect(apiService.changeMemberRole).toHaveBeenCalledWith('m2', 'branch_manager');
+    expect(apiService.createBranchRoleAssignment).toHaveBeenCalledWith({
+      membership_id: 'm2',
+      branch_id: 'b1',
+    });
+    expect(component.members().find((m) => m.id === 'm2')?.role).toBe('branch_manager');
+  });
+
+  it('should not attempt a branch assignment when the role change itself fails', () => {
+    apiService.changeMemberRole.and.returnValue(
+      throwError(
+        () =>
+          new HttpErrorResponse({
+            status: 500,
+            error: { code: 'internal', message: 'Boom', trace_id: 'tr_500' },
+          }),
+      ),
+    );
+
+    dialogSpy.open.and.returnValue({
+      afterClosed: () => of({ role: 'branch_manager' as Role, branchId: 'b1' }),
+    } as MatDialogRef<unknown, unknown>);
+
+    component.openChangeRoleDialog(mockMembers[1]);
+
+    expect(apiService.createBranchRoleAssignment).not.toHaveBeenCalled();
+  });
+
+  it('should surface a duplicate-assignment message via a snack bar without touching the role-change error state', () => {
+    const updatedMember: Member = { ...mockMembers[1], role: 'branch_manager' };
+    apiService.changeMemberRole.and.returnValue(of(updatedMember));
+    apiService.createBranchRoleAssignment.and.returnValue(
+      throwError(
+        () =>
+          new HttpErrorResponse({
+            status: 409,
+            error: { code: 'conflict', message: 'duplicate', trace_id: 'tr_409b' },
+          }),
+      ),
+    );
+
+    dialogSpy.open.and.returnValue({
+      afterClosed: () => of({ role: 'branch_manager' as Role, branchId: 'b1' }),
+    } as MatDialogRef<unknown, unknown>);
+
+    component.openChangeRoleDialog(mockMembers[1]);
+
+    // The role change DID succeed — that's not treated as a failure just because the
+    // subsequent assignment failed.
+    expect(component.members().find((m) => m.id === 'm2')?.role).toBe('branch_manager');
+    expect(component.errorMessage()).toBeNull();
+    expect(snackBarSpy.open).toHaveBeenCalledWith(
+      enCatalog.team.changeRoleDialog.duplicateAssignmentError,
+      undefined,
+      { duration: 5000 },
+    );
   });
 
   it('should remove member when confirmed', () => {

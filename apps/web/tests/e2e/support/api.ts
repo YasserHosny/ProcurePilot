@@ -121,6 +121,31 @@ export async function signInOwner(): Promise<string> {
   return cachedOwnerToken;
 }
 
+/**
+ * Authenticated API call AS AN ARBITRARY MEMBER — the caller supplies whose token to use.
+ *
+ * Everything else here either acts as the global owner or creates state; this is for proving
+ * what a SPECIFIC member's own session can and cannot see at the enforcement point itself
+ * (branch-scoped visibility, T038), where signing in through the UI first would prove nothing
+ * extra — the token IS the session.
+ */
+export async function apiAsUser<T>(
+  token: string,
+  method: 'GET' | 'POST' | 'PATCH',
+  path: string,
+  body?: unknown,
+): Promise<T> {
+  const response = await fetch(`${API}${path}`, {
+    method,
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  if (!response.ok) {
+    throw new Error(`${method} ${path} → ${response.status}: ${await response.text()}`);
+  }
+  return response.status === 204 ? (undefined as T) : ((await response.json()) as T);
+}
+
 export interface CreatedMember {
   email: string;
   password: string;

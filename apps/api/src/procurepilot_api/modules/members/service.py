@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import json
+import logging
 from uuid import UUID
 
 from postgrest.exceptions import APIError
@@ -15,6 +16,7 @@ from procurepilot_api.errors import (
     ServiceUnavailableError,
     UnprocessableEntityError,
 )
+from procurepilot_api.modules.auth.jwt import MemberRole
 from procurepilot_api.modules.members.models import (
     Me,
     Member,
@@ -24,8 +26,14 @@ from procurepilot_api.modules.members.models import (
     WorkspaceList,
     WorkspaceSummary,
 )
+from procurepilot_api.modules.organisation.schemas import (
+    BranchRoleAssignment,
+    BranchRoleAssignmentCreate,
+)
 from procurepilot_api.modules.tenants.models import Tenant
 from procurepilot_api.shared.audit import AuditEventCreate, get_audit_writer
+
+logger = logging.getLogger(__name__)
 
 
 def authenticated_client(settings: Settings, bearer_token: str) -> Client:
@@ -222,6 +230,16 @@ class MemberService:
             raise _member_update_error(exc) from exc
 
         _one_member(response.data)
+        try:
+            client.table("cost_centre").update({"is_orphaned": True}).eq(
+                "budget_owner_membership_id", str(member_id)
+            ).execute()
+        except APIError:
+            logger.warning(
+                "Could not mark cost centres orphaned after member removal",
+                extra={"member_id": str(member_id)},
+                exc_info=True,
+            )
         get_audit_writer().record(
             AuditEventCreate(
                 tenant_id=actor.tenant_id,
@@ -229,6 +247,125 @@ class MemberService:
                 actor_email=actor.email,
                 action="member.removed",
                 target={"member_id": str(member_id)},
+                outcome="success",
+            ),
+            bearer_token=bearer_token,
+        )
+
+    def create_branch_role_assignment(
+        self,
+        *,
+        bearer_token: str,
+        actor: CurrentMember,
+        payload: BranchRoleAssignmentCreate,
+    ) -> BranchRoleAssignment:
+        client = authenticated_client(self._settings, bearer_token)
+        try:
+            membership_response = (
+                client.table("membership")
+                .select("id,tenant_id,role")
+                .eq("id", str(payload.membership_id))
+                .limit(2)
+                .execute()
+            )
+        except APIError as exc:
+            raise ServiceUnavailableError(details={"dependency": "database"}) from exc
+
+        membership = _one_row(
+            _rows(membership_response.data),
+            resource="member",
+            ambiguous_reason="member_read_ambiguous",
+        )
+        if str(membership.get("role", "")) not in {
+            MemberRole.branch_manager.value,
+            MemberRole.approver.value,
+        }:
+            raise UnprocessableEntityError(
+                details={"reason": "branch_scopable_role_required"}
+            )
+
+        try:
+            branch_response = (
+                client.table("branch")
+                .select("id")
+                .eq("id", str(payload.branch_id))
+                .limit(2)
+                .execute()
+            )
+        except APIError as exc:
+            raise ServiceUnavailableError(details={"dependency": "database"}) from exc
+
+        _one_row(
+            _rows(branch_response.data),
+            resource="branch",
+            ambiguous_reason="branch_read_ambiguous",
+        )
+
+        try:
+            response = (
+                client.table("branch_role_assignment")
+                .insert(
+                    {
+                        "tenant_id": str(membership["tenant_id"]),
+                        "membership_id": str(payload.membership_id),
+                        "branch_id": str(payload.branch_id),
+                    }
+                )
+                .execute()
+            )
+        except APIError as exc:
+            raise _branch_role_assignment_insert_error(exc) from exc
+
+        assignment = _one_branch_role_assignment(response.data)
+        get_audit_writer().record(
+            AuditEventCreate(
+                tenant_id=actor.tenant_id,
+                actor_membership_id=actor.membership_id,
+                actor_email=actor.email,
+                action="member.branch_role_assignment_created",
+                target={
+                    "assignment_id": str(assignment.id),
+                    "member_id": str(payload.membership_id),
+                    "branch_id": str(payload.branch_id),
+                },
+                outcome="success",
+            ),
+            bearer_token=bearer_token,
+        )
+        return assignment
+
+    def remove_branch_role_assignment(
+        self,
+        *,
+        bearer_token: str,
+        actor: CurrentMember,
+        assignment_id: UUID,
+    ) -> None:
+        client = authenticated_client(self._settings, bearer_token)
+        try:
+            response = (
+                client.table("branch_role_assignment")
+                # No `.select()` after `.update()`/`.delete()` — unsupported by the pinned
+                # supabase-py builder; `.execute()` returns the affected representation anyway.
+                .delete()
+                .eq("id", str(assignment_id))
+                .execute()
+            )
+        except APIError as exc:
+            raise ServiceUnavailableError(details={"dependency": "database"}) from exc
+
+        assignment = _one_branch_role_assignment(response.data)
+        get_audit_writer().record(
+            AuditEventCreate(
+                tenant_id=actor.tenant_id,
+                actor_membership_id=actor.membership_id,
+                actor_email=actor.email,
+                action="member.branch_role_assignment_removed",
+                target={
+                    "assignment_id": str(assignment.id),
+                    "member_id": str(assignment.membership_id),
+                    "branch_id": str(assignment.branch_id),
+                },
                 outcome="success",
             ),
             bearer_token=bearer_token,
@@ -247,6 +384,19 @@ def _rows(data: object) -> list[dict[str, object]]:
     raise ServiceUnavailableError(details={"dependency": "database"})
 
 
+def _one_row(
+    rows: list[dict[str, object]],
+    *,
+    resource: str,
+    ambiguous_reason: str,
+) -> dict[str, object]:
+    if len(rows) == 0:
+        raise NotFoundError(details={"resource": resource})
+    if len(rows) != 1:
+        raise ServiceUnavailableError(details={"reason": ambiguous_reason})
+    return rows[0]
+
+
 def _one_member(data: object) -> Member:
     rows = _rows(data)
     if len(rows) == 0:
@@ -254,6 +404,15 @@ def _one_member(data: object) -> Member:
     if len(rows) != 1:
         raise ServiceUnavailableError(details={"reason": "member_write_ambiguous"})
     return Member.model_validate(rows[0])
+
+
+def _one_branch_role_assignment(data: object) -> BranchRoleAssignment:
+    rows = _rows(data)
+    if len(rows) == 0:
+        raise NotFoundError(details={"resource": "branch_role_assignment"})
+    if len(rows) != 1:
+        raise ServiceUnavailableError(details={"reason": "branch_role_assignment_write_ambiguous"})
+    return BranchRoleAssignment.model_validate(rows[0])
 
 
 def _encode_cursor(offset: int) -> str:
@@ -280,6 +439,14 @@ def _member_update_error(exc: APIError) -> ConflictError | ServiceUnavailableErr
     message = str(getattr(exc, "message", ""))
     if code == "23001" or "retain at least one active owner" in message:
         return ConflictError(details={"reason": "last_owner"})
+    return ServiceUnavailableError(details={"dependency": "database"})
+
+
+def _branch_role_assignment_insert_error(
+    exc: APIError,
+) -> ConflictError | ServiceUnavailableError:
+    if str(getattr(exc, "code", "")) == "23505":
+        return ConflictError(details={"reason": "already_assigned_to_branch"})
     return ServiceUnavailableError(details={"dependency": "database"})
 
 

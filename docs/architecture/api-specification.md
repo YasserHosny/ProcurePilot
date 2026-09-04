@@ -889,7 +889,9 @@ Response:
 - Query parameters: optional `status` (`pending` or `verified`), optional `period_start`, optional
   `period_end`, optional `supplier_id`, optional `branch_id`, optional `cursor`, optional `limit`
   capped at 100 and defaulting to 50.
-- `branch_id` is accepted for future-compatible filtering, but Phase 1 has no Branch entity; the
+- `branch_id` is accepted for future-compatible filtering. `Branch` now exists as a real entity
+  (chunk R2.0, `007-organisation-model`), but `SavingRecord` itself carries no `branch_id` column
+  yet — wiring savings to branch scoping is separate, later work, not delivered by this chunk; the
   only meaningful current value is null or omitted.
 - Returns `200` with `items` containing `SavingRecord` resources and nullable `next_cursor`.
 - Returns `422` when validation fails.
@@ -995,8 +997,9 @@ Response:
 - Requests an asynchronous savings-ledger export.
 - Request fields: `kind` fixed to `savings_ledger`, `format` (`xlsx` or `pdf`), and `filters`.
 - `filters` fields: required `period_start`, required `period_end`, optional `supplier_id`, and
-  optional `branch_id`. Phase 1 has no Branch entity; non-null `branch_id` is future-compatible
-  input only.
+  optional `branch_id`. `Branch` now exists as a real entity (chunk R2.0,
+  `007-organisation-model`), but `SavingRecord` itself carries no `branch_id` column yet — a
+  non-null `branch_id` here remains future-compatible input only, not yet meaningful filtering.
 - Only verified savings are included in savings-ledger exports.
 - Returns `202` with an `ExportJob`.
 - Returns `403` when the caller's role may not request exports.
@@ -1110,6 +1113,170 @@ Response:
   "remaining": 58
 }
 ```
+
+---
+
+## Delivered Organisation Model API (chunk R2.0, `007-organisation-model`)
+
+Branches, cost centres, and budgets are the organisational structure later Phase 2 releases
+(purchase requests and approval routing, R2.1) assign against. A member holding a branch-scoped
+role (`branch_manager`, `approver`) sees only their own assigned branch(es) and organisation-wide
+entities; an owner sees everything; a same-tenant, different-branch reference resolves as
+`not_found`, never forbidden, extending the existing cross-tenant convention to this new axis
+(FR-008). Full contract: `specs/007-organisation-model/contracts/organisation.openapi.yaml`.
+
+### `GET /organisation/branches`
+
+- Requires bearer auth. Owner sees every branch in the tenant; a branch-scoped member sees only
+  their assigned branch(es); a member holding an unscoped role (or a branch-scoped role with no
+  assignment yet) sees every branch, same as owner (research.md R1).
+- Query parameters: optional `is_active`, optional `cursor`, optional `limit` capped at 100 and
+  defaulting to 50.
+- Returns `200` with `items` containing `Branch` resources and nullable `next_cursor`.
+
+### `POST /organisation/branches`
+
+- Requires bearer auth and owner role; accepts `Idempotency-Key`.
+- Request fields: required `name`, optional `address`, optional `region`.
+- Returns `201` with the created `Branch`.
+- Returns `403` when the caller's role is not owner.
+- Returns `422` when validation fails.
+
+### `PATCH /organisation/branches/{branch_id}`
+
+- Requires bearer auth and owner role.
+- Request fields: all optional — `name`, `address`, `region`, `is_active`, and
+  `confirm_dependents` (boolean).
+- Deactivating (`is_active: false`) a branch that still has dependents (linked cost centres or
+  branch role assignments) requires `confirm_dependents: true`; without it, returns `422` with
+  `details.reason = "dependents_confirmation_required"` and `cost_centre_count`/
+  `branch_role_assignment_count` naming what is still attached (FR-009 — deactivation is always
+  permitted, this is a confirmation step, never a hard block). No hard-delete route exists.
+- Returns `200` with the updated `Branch`.
+- Returns `403` when the caller's role is not owner.
+- Returns `404` when the branch is not in the caller's workspace or branch-scoped visibility.
+- Returns `422` on the dependents-confirmation case above or other validation failures.
+
+Request (deactivating with dependents already confirmed):
+
+```json
+{ "is_active": false, "confirm_dependents": true }
+```
+
+### `GET /organisation/cost-centres`
+
+- Requires bearer auth. Same branch-scoped visibility as branches, evaluated against the cost
+  centre's own `branch_id` (a `null` branch_id — organisation-wide — is always visible).
+- Query parameters: optional `branch_id`, optional `is_archived`, optional `cursor`, optional
+  `limit` capped at 100 and defaulting to 50.
+- Returns `200` with `items` containing `CostCentre` resources and nullable `next_cursor`.
+
+### `POST /organisation/cost-centres`
+
+- Requires bearer auth and owner role; accepts `Idempotency-Key`.
+- Request fields: required `name`, required `code`, optional `budget_owner_membership_id`,
+  optional `branch_id` (omit for an organisation-wide cost centre).
+- Returns `201` with the created `CostCentre`.
+- Returns `403` when the caller's role is not owner.
+- Returns `409` when `code` is already in use elsewhere in the tenant (FR-003).
+- Returns `422` when validation fails.
+
+### `PATCH /organisation/cost-centres/{cost_centre_id}`
+
+- Requires bearer auth and owner role.
+- Request fields: all optional — `name`, `code`, `budget_owner_membership_id`, `branch_id`,
+  `is_archived`.
+- Returns `200` with the updated `CostCentre`, including a computed `orphan_reason`
+  (`branch_deactivated` | `owner_removed` | `null`) alongside the stored `is_orphaned` flag —
+  derived live from the linked branch's `is_active` / the budget owner's membership status, never
+  stored itself.
+- Returns `403` when the caller's role is not owner.
+- Returns `404` when the cost centre is not in the caller's workspace or branch-scoped visibility.
+- Returns `409` when `code` collides with another cost centre in the tenant.
+- Returns `422` when validation fails.
+
+### `GET /organisation/budgets`
+
+- Requires bearer auth. Same branch-scoped visibility, evaluated against `scope`/`branch_id`/
+  `cost_centre_id`; `organisation`-scoped budgets are always visible once tenant matches.
+- Query parameters: optional `scope`, optional `branch_id`, optional `cost_centre_id`, optional
+  `cursor`, optional `limit` capped at 100 and defaulting to 50.
+- Returns `200` with `items` containing `Budget` resources (`amount` as nested `Money`) and
+  nullable `next_cursor`.
+
+### `POST /organisation/budgets`
+
+- Requires bearer auth and owner role; accepts `Idempotency-Key`.
+- Request fields: required decimal-string `amount` (non-negative only, unlike `Money`'s own
+  pattern), required `currency`, required `period` (`monthly` | `quarterly` | `annual`), required
+  `period_start`, required `scope` (`organisation` | `branch` | `cost_centre`), and `branch_id`/
+  `cost_centre_id` required if and only if the matching scope is chosen.
+- `currency` is never inferred from `tenant.currency` (research.md R3) — always explicit.
+- Multiple budgets may coexist for the same scope with overlapping periods (spec.md User Story 3,
+  Acceptance Scenario 3); an overlap with any existing budget for the same scope/target is
+  reported via `overlap_warning`, never rejected.
+- Returns `201` with the created `Budget` plus `overlap_warning: boolean`.
+- Returns `403` when the caller's role is not owner.
+- Returns `404` when the referenced branch or cost centre is not in the caller's workspace.
+- Returns `422` when validation fails (including the `budget_scope_target` database constraint on
+  a mismatched scope/reference pairing).
+
+Request:
+
+```json
+{
+  "amount": "5000.0000",
+  "currency": "GBP",
+  "period": "annual",
+  "period_start": "2026-01-01",
+  "scope": "organisation"
+}
+```
+
+Response:
+
+```json
+{
+  "id": "00000000-0000-4000-8000-000000000100",
+  "amount": { "amount": "5000.0000", "currency": "GBP" },
+  "period": "annual",
+  "period_start": "2026-01-01",
+  "scope": "organisation",
+  "branch_id": null,
+  "cost_centre_id": null,
+  "created_by": "00000000-0000-4000-8000-000000000070",
+  "created_at": "2026-08-22T09:05:00Z",
+  "overlap_warning": false
+}
+```
+
+No `PATCH`/`DELETE` route exists for budgets in this chunk — list and create only.
+
+### `POST /organisation/branch-role-assignments`
+
+- Requires bearer auth and owner role; accepts `Idempotency-Key`.
+- Assigns a member's branch-scoped role (`branch_manager` or `approver`) to a specific branch —
+  this endpoint adds branch scope on top of an existing role, it does not itself change what role
+  the member holds.
+- Request fields: required `membership_id`, required `branch_id`.
+- Returns `201` with the created `BranchRoleAssignment`.
+- Returns `403` when the caller's role is not owner.
+- Returns `404` when the referenced membership or branch is not in the caller's workspace.
+- Returns `409` when this member is already assigned to this branch.
+- Returns `422` with `details.reason = "branch_scopable_role_required"` when `membership_id` does
+  not currently hold `branch_manager` or `approver` — the caller must change the member's role
+  first; the two are always two separate, sequential API calls (a role change must succeed before
+  an assignment referencing that role can be created), never a single combined operation.
+
+### `DELETE /organisation/branch-role-assignments/{assignment_id}`
+
+- Requires bearer auth and owner role.
+- Removing the last assignment for a member returns them to unscoped (tenant-wide) visibility,
+  per research.md R1 — there is no separate "unassign" state, only the presence or absence of
+  assignment rows.
+- Returns `204` on success.
+- Returns `403` when the caller's role is not owner.
+- Returns `404` when the assignment is not in the caller's workspace.
 
 ---
 

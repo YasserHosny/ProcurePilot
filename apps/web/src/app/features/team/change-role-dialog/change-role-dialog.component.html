@@ -18,6 +18,20 @@
       </mat-select>
       <mat-icon matPrefix aria-hidden="true">admin_panel_settings</mat-icon>
     </mat-form-field>
+
+    @if (isBranchScopedRole(selectedRole())) {
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>{{ 'team.changeRoleDialog.branchLabel' | translate }}</mat-label>
+        <mat-select formControlName="branch_id">
+          @for (branch of branches(); track branch.id) {
+            <mat-option [value]="branch.id" [disabled]="!branch.is_active">
+              {{ branch.name }}
+            </mat-option>
+          }
+        </mat-select>
+        <mat-hint>{{ 'team.changeRoleDialog.branchOptionalHint' | translate }}</mat-hint>
+      </mat-form-field>
+    }
   </form>
 </mat-dialog-content>
 

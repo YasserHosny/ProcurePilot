@@ -276,6 +276,11 @@
       "title": "Change Member Role",
       "description": "Select a new role for this member:",
       "roleLabel": "New Role",
+      "branchLabel": "Assign to Branch",
+      "branchOptionalHint": "Optional — pick a branch if this role should be scoped to one.",
+      "duplicateAssignmentError": "This member is already assigned to that branch.",
+      "assignmentError": "Unable to assign the member to the branch. Please try again.",
+      "branchAssignmentSuccess": "Member assigned to the branch successfully.",
       "confirmButton": "Update Role",
       "cancelButton": "Cancel",
       "updatingButton": "Updating..."
@@ -1312,6 +1317,157 @@
     "growth": {
       "name": "Growth",
       "description": "For growing operations requiring higher product limits."
+    }
+  },
+  "organisation": {
+    "title": "Organisation Settings",
+    "subtitle": "Manage your organisation's branches, cost centres, and budgets in one place.",
+    "branchesSectionTitle": "Branches",
+    "costCentresSectionTitle": "Cost Centres",
+    "budgetsSectionTitle": "Budgets",
+    "status": {
+      "active": "Active",
+      "inactive": "Inactive",
+      "archived": "Archived"
+    },
+    "branches": {
+      "createButton": "New Branch",
+      "columns": {
+        "name": "Branch Name",
+        "address": "Address",
+        "region": "Region",
+        "status": "Status",
+        "actions": "Actions"
+      },
+      "actions": {
+        "edit": "Edit branch",
+        "deactivate": "Deactivate branch"
+      },
+      "form": {
+        "createTitle": "New Branch",
+        "editTitle": "Edit Branch",
+        "nameLabel": "Branch Name",
+        "namePlaceholder": "e.g. Alexandria Warehouse",
+        "nameRequired": "Branch name is required.",
+        "addressLabel": "Address",
+        "addressPlaceholder": "Street address (optional)",
+        "regionLabel": "Region",
+        "regionPlaceholder": "Region code (optional)",
+        "cancelButton": "Cancel",
+        "submitButton": "Save Branch",
+        "submittingButton": "Saving..."
+      },
+      "empty": "No branches have been created yet. Add your first branch to start structuring your organisation.",
+      "deactivateSuccess": "Branch deactivated successfully.",
+      "createSuccess": "Branch created successfully.",
+      "genericError": "Unable to save the branch. Please try again.",
+      "deactivateDialog": {
+        "title": "Deactivate Branch",
+        "message": "Are you sure you want to deactivate this branch? A deactivated branch stops appearing as an assignable option, while its historical records remain attributed to it.",
+        "dependentsWarning": "This branch still has {{count}} cost centre(s)/assignment(s) linked to it. Hard deletion is never permitted once records depend on a branch; deactivation preserves their history.",
+        "confirmButton": "Deactivate Branch",
+        "cancelButton": "Cancel",
+        "deactivatingButton": "Deactivating..."
+      }
+    },
+    "costCentres": {
+      "createButton": "New Cost Centre",
+      "columns": {
+        "name": "Cost Centre Name",
+        "code": "Code",
+        "budgetOwner": "Budget Owner",
+        "branch": "Branch",
+        "status": "Status",
+        "actions": "Actions"
+      },
+      "allBranchesValue": "Organisation-wide",
+    "actions": {
+      "edit": "Edit cost centre",
+      "archive": "Archive cost centre"
+    },
+    "form": {
+      "createTitle": "New Cost Centre",
+      "editTitle": "Edit Cost Centre",
+      "nameLabel": "Cost Centre Name",
+      "namePlaceholder": "e.g. Marketing",
+      "nameRequired": "Cost centre name is required.",
+      "codeLabel": "Code",
+      "codePlaceholder": "e.g. MKT-001",
+      "codeRequired": "Code is required.",
+      "budgetOwnerLabel": "Budget Owner",
+      "budgetOwnerNoneValue": "No budget owner",
+      "branchLabel": "Branch",
+      "cancelButton": "Cancel",
+      "submitButton": "Save Cost Centre",
+      "submittingButton": "Saving...",
+      "createSuccess": "Cost centre created successfully."
+    },
+    "empty": "No cost centres have been defined yet.",
+      "duplicateCodeError": "This code is already in use by another cost centre in your organisation. Cost centre codes must be unique.",
+      "orphanedBadge": "Orphaned",
+      "orphanReasons": {
+        "branch_deactivated": "The branch linked to this cost centre has been deactivated. Reassign it to an active branch or archive it.",
+        "owner_removed": "The budget owner assigned to this cost centre has been removed from the workspace. Assign a new budget owner or archive it."
+      },
+      "archiveSuccess": "Cost centre archived successfully.",
+      "genericError": "Unable to save the cost centre. Please try again.",
+      "archiveDialog": {
+        "title": "Archive Cost Centre",
+        "message": "Are you sure you want to archive this cost centre? Archived cost centres can no longer receive assignments, while their historical records remain intact.",
+        "confirmButton": "Archive Cost Centre",
+        "cancelButton": "Cancel",
+        "archivingButton": "Archiving..."
+      }
+    },
+    "budgets": {
+      "createButton": "Define Budget",
+      "columns": {
+        "amount": "Amount",
+        "currency": "Currency",
+        "period": "Period",
+        "scope": "Scope",
+        "scopeTarget": "Applies To"
+      },
+      "scopeOptions": {
+        "organisation": "Whole organisation",
+        "branch": "Branch",
+        "cost_centre": "Cost centre"
+      },
+      "periodOptions": {
+        "monthly": "Monthly",
+        "quarterly": "Quarterly",
+        "annual": "Annual"
+      },
+      "form": {
+        "createTitle": "Define Budget",
+        "amountLabel": "Amount",
+        "amountPlaceholder": "e.g. 25000 or 25000.50",
+        "amountRequired": "Amount is required.",
+        "amountInvalid": "Enter a positive amount with up to four decimal places.",
+        "currencyLabel": "Currency",
+        "currencyRequired": "Currency is required.",
+        "periodLabel": "Period",
+        "periodRequired": "Period is required.",
+        "periodStartLabel": "Period Start",
+        "periodStartRequired": "Period start date is required.",
+        "scopeLabel": "Scope",
+        "scopeRequired": "Scope is required.",
+        "branchLabel": "Branch",
+        "branchRequired": "Branch is required.",
+        "costCentreLabel": "Cost Centre",
+        "costCentreRequired": "Cost centre is required.",
+        "cancelButton": "Cancel",
+        "submitButton": "Define Budget",
+        "submittingButton": "Saving..."
+      },
+      "overlapWarning": "A budget already exists for this scope during part of the selected period. Multiple budgets may legitimately coexist — review the overlap before saving.",
+      "empty": "No budgets have been defined yet.",
+      "createSuccess": "Budget defined successfully.",
+      "genericError": "Unable to save the budget. Please try again."
+    },
+    "roleScoping": {
+      "branchScopedBadge": "Branch-scoped",
+      "notFoundMessage": "This branch does not exist or is not available."
     }
   }
 }

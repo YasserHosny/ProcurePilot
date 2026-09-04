@@ -220,11 +220,15 @@
         <span class="nav-label">{{ 'shell.navTeam' | translate }}</span>
       </a>
 
-      <div class="nav-item disabled" aria-disabled="true">
+      <a
+        mat-list-item
+        routerLink="/settings"
+        routerLinkActive="active"
+        class="nav-item"
+      >
         <mat-icon aria-hidden="true">settings</mat-icon>
         <span class="nav-label">{{ 'shell.navSettings' | translate }}</span>
-        <span class="soon-badge">{{ 'common.comingSoon' | translate }}</span>
-      </div>
+      </a>
     </mat-sidenav>
 
     <!--

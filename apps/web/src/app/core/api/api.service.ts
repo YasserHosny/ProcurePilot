@@ -12,7 +12,21 @@ import type {
   BasketOptimiseRequest,
   BasketSplitJob,
   BillingAccount,
+  Branch,
+  BranchCreate,
+  BranchList,
+  BranchRoleAssignment,
+  BranchRoleAssignmentCreate,
+  BranchUpdate,
+  BudgetCreate,
+  BudgetCreated,
+  BudgetList,
+  BudgetScope,
   ConfigOptions,
+  CostCentre,
+  CostCentreCreate,
+  CostCentreList,
+  CostCentreUpdate,
   Document,
   ExportCreate,
   ExportJob,
@@ -586,6 +600,109 @@ export class ApiService {
   checkActiveCatalogueProductsLimit(): Observable<LimitCheck> {
     return this.http.get<LimitCheck>(
       `${this.base}/billing/limits/active-catalogue-products`,
+    );
+  }
+
+  // --- organisation model (007) ---------------------------------------------
+
+  listBranches(params?: {
+    is_active?: boolean;
+    cursor?: string;
+    limit?: number;
+  }): Observable<BranchList> {
+    const query = new URLSearchParams();
+    if (params?.is_active !== undefined) query.set('is_active', String(params.is_active));
+    if (params?.cursor) query.set('cursor', params.cursor);
+    if (params?.limit !== undefined) query.set('limit', String(params.limit));
+    const qs = query.toString() ? `?${query.toString()}` : '';
+    return this.http.get<BranchList>(`${this.base}/organisation/branches${qs}`);
+  }
+
+  createBranch(body: BranchCreate, idempotencyKey?: string): Observable<Branch> {
+    const headers = idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined;
+    return this.http.post<Branch>(`${this.base}/organisation/branches`, body, { headers });
+  }
+
+  updateBranch(branchId: string, body: BranchUpdate): Observable<Branch> {
+    return this.http.patch<Branch>(
+      `${this.base}/organisation/branches/${branchId}`,
+      body,
+    );
+  }
+
+  listCostCentres(params?: {
+    branch_id?: string;
+    is_archived?: boolean;
+    cursor?: string;
+    limit?: number;
+  }): Observable<CostCentreList> {
+    const query = new URLSearchParams();
+    if (params?.branch_id) query.set('branch_id', params.branch_id);
+    if (params?.is_archived !== undefined) {
+      query.set('is_archived', String(params.is_archived));
+    }
+    if (params?.cursor) query.set('cursor', params.cursor);
+    if (params?.limit !== undefined) query.set('limit', String(params.limit));
+    const qs = query.toString() ? `?${query.toString()}` : '';
+    return this.http.get<CostCentreList>(`${this.base}/organisation/cost-centres${qs}`);
+  }
+
+  createCostCentre(body: CostCentreCreate, idempotencyKey?: string): Observable<CostCentre> {
+    const headers = idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined;
+    return this.http.post<CostCentre>(`${this.base}/organisation/cost-centres`, body, {
+      headers,
+    });
+  }
+
+  updateCostCentre(
+    costCentreId: string,
+    body: CostCentreUpdate,
+  ): Observable<CostCentre> {
+    return this.http.patch<CostCentre>(
+      `${this.base}/organisation/cost-centres/${costCentreId}`,
+      body,
+    );
+  }
+
+  listBudgets(params?: {
+    scope?: BudgetScope;
+    branch_id?: string;
+    cost_centre_id?: string;
+    cursor?: string;
+    limit?: number;
+  }): Observable<BudgetList> {
+    const query = new URLSearchParams();
+    if (params?.scope) query.set('scope', params.scope);
+    if (params?.branch_id) query.set('branch_id', params.branch_id);
+    if (params?.cost_centre_id) query.set('cost_centre_id', params.cost_centre_id);
+    if (params?.cursor) query.set('cursor', params.cursor);
+    if (params?.limit !== undefined) query.set('limit', String(params.limit));
+    const qs = query.toString() ? `?${query.toString()}` : '';
+    return this.http.get<BudgetList>(`${this.base}/organisation/budgets${qs}`);
+  }
+
+  createBudget(body: BudgetCreate, idempotencyKey?: string): Observable<BudgetCreated> {
+    const headers = idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined;
+    return this.http.post<BudgetCreated>(`${this.base}/organisation/budgets`, body, {
+      headers,
+    });
+  }
+
+  createBranchRoleAssignment(
+    body: BranchRoleAssignmentCreate,
+    idempotencyKey?: string,
+  ): Observable<BranchRoleAssignment> {
+    const headers = idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined;
+    return this.http.post<BranchRoleAssignment>(
+      `${this.base}/organisation/branch-role-assignments`,
+      body,
+      { headers },
+    );
+  }
+
+  removeBranchRoleAssignment(assignmentId: string): Observable<void> {
+    return this.http.delete<void>(
+      `${this.base}/organisation/branch-role-assignments/${assignmentId}`,
     );
   }
 }

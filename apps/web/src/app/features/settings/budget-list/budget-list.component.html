@@ -1,0 +1,107 @@
+<div class="settings-container">
+  <div class="section-header">
+    <h2 class="section-title">{{ 'organisation.budgetsSectionTitle' | translate }}</h2>
+
+    <button
+      mat-flat-button
+      color="primary"
+      type="button"
+      (click)="openCreateDialog()"
+      class="action-btn"
+      *appRole="['owner']"
+    >
+      <mat-icon aria-hidden="true">add</mat-icon>
+      <span>{{ 'organisation.budgets.createButton' | translate }}</span>
+    </button>
+  </div>
+
+  @if (overlapWarningVisible()) {
+    <div class="info-banner" role="status">
+      <mat-icon class="info-icon" aria-hidden="true">info</mat-icon>
+      <span class="info-message">
+        {{ 'organisation.budgets.overlapWarning' | translate }}
+      </span>
+    </div>
+  }
+
+  @if (errorMessage()) {
+    <div class="error-banner" role="alert">
+      <mat-icon class="error-icon" aria-hidden="true">error_outline</mat-icon>
+      <div class="error-text-wrap">
+        <div class="error-title">{{ 'common.traceId' | translate }}</div>
+        <div class="error-message">{{ errorMessage() }}</div>
+        @if (errorTraceId(); as traceId) {
+          <div class="error-trace">{{ traceId }}</div>
+        }
+      </div>
+    </div>
+  }
+
+  <mat-card class="budgets-card">
+    @if (isLoading()) {
+      <div class="loading-state" aria-live="polite">
+        <mat-spinner [attr.aria-label]="'common.loading' | translate" diameter="40"></mat-spinner>
+        <span>{{ 'common.loading' | translate }}</span>
+      </div>
+    } @else if (budgets().length === 0) {
+      <div class="empty-state">
+        <mat-icon class="empty-icon" aria-hidden="true">savings</mat-icon>
+        <p class="empty-message">
+          {{ 'organisation.budgets.empty' | translate }}
+        </p>
+      </div>
+    } @else {
+      <div class="table-responsive">
+        <table mat-table [dataSource]="budgets()" class="budgets-table">
+          <ng-container matColumnDef="amount">
+            <th mat-header-cell *matHeaderCellDef>
+              {{ 'organisation.budgets.columns.amount' | translate }}
+            </th>
+            <td mat-cell *matCellDef="let budget">
+              <span class="budget-amount">{{ budget.amount | formatMoney }}</span>
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="currency">
+            <th mat-header-cell *matHeaderCellDef>
+              {{ 'organisation.budgets.columns.currency' | translate }}
+            </th>
+            <td mat-cell *matCellDef="let budget">
+              {{ budget.amount.currency }}
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="period">
+            <th mat-header-cell *matHeaderCellDef>
+              {{ 'organisation.budgets.columns.period' | translate }}
+            </th>
+            <td mat-cell *matCellDef="let budget">
+              {{ 'organisation.budgets.periodOptions.' + budget.period | translate }}
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="scope">
+            <th mat-header-cell *matHeaderCellDef>
+              {{ 'organisation.budgets.columns.scope' | translate }}
+            </th>
+            <td mat-cell *matCellDef="let budget">
+              {{ 'organisation.budgets.scopeOptions.' + budget.scope | translate }}
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="scopeTarget">
+            <th mat-header-cell *matHeaderCellDef>
+              {{ 'organisation.budgets.columns.scopeTarget' | translate }}
+            </th>
+            <td mat-cell *matCellDef="let budget">
+              {{ scopeTargetLabel(budget) }}
+            </td>
+          </ng-container>
+
+          <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+          <tr mat-row *matRowDef="let row; columns: displayedColumns"></tr>
+        </table>
+      </div>
+    }
+  </mat-card>
+</div>

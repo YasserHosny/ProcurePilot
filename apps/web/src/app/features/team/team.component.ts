@@ -19,7 +19,10 @@ import type { ApiError, Invitation, Member, Role } from '../../core/api/models';
 import { RoleDirective } from '../../core/auth/role.directive';
 import { SessionService } from '../../core/auth/session.service';
 import { FormatDatePipe } from '../../core/format';
-import { ChangeRoleDialogComponent } from './change-role-dialog/change-role-dialog.component';
+import {
+  ChangeRoleDialogComponent,
+  type ChangeRoleDialogResult,
+} from './change-role-dialog/change-role-dialog.component';
 import { ConfirmDialogComponent } from './confirm-dialog/confirm-dialog.component';
 import { InviteDialogComponent } from './invite-dialog/invite-dialog.component';
 
@@ -140,14 +143,20 @@ export class TeamComponent implements OnInit {
       data: { member },
     });
 
-    dialogRef.afterClosed().subscribe((newRole: Role | undefined) => {
-      if (newRole && newRole !== member.role) {
-        this.changeRole(member, newRole);
+    dialogRef.afterClosed().subscribe((result: ChangeRoleDialogResult | undefined) => {
+      if (result && result.role !== member.role) {
+        this.changeRole(member, result.role, result.branchId);
       }
     });
   }
 
-  private changeRole(member: Member, newRole: Role): void {
+  /**
+   * The role change and the branch assignment are two separate, sequential API calls — the
+   * backend requires a membership to ALREADY hold branch_manager/approver before an assignment
+   * can be created (FR-006), so the assignment can only be attempted AFTER the role change has
+   * actually succeeded, never alongside or before it.
+   */
+  private changeRole(member: Member, newRole: Role, branchId: string | null): void {
     this.errorMessage.set(null);
     this.errorTraceId.set(null);
 
@@ -157,9 +166,37 @@ export class TeamComponent implements OnInit {
         this.snackBar.open(this.translate.instant('team.roleChangeSuccess'), undefined, {
           duration: 3500,
         });
+        if (branchId) {
+          this.assignBranch(updated.id, branchId);
+        }
       },
       error: (err: unknown) => {
         this.handleError(err);
+      },
+    });
+  }
+
+  /**
+   * Runs only after a successful role change (see changeRole). The role change is already
+   * committed by this point, so a failure here is reported as its own, separate notification
+   * rather than rolled into the role-change error state — the role DID change even if the
+   * assignment didn't.
+   */
+  private assignBranch(membershipId: string, branchId: string): void {
+    this.api.createBranchRoleAssignment({ membership_id: membershipId, branch_id: branchId }).subscribe({
+      next: () => {
+        this.snackBar.open(
+          this.translate.instant('team.changeRoleDialog.branchAssignmentSuccess'),
+          undefined,
+          { duration: 3500 },
+        );
+      },
+      error: (err: unknown) => {
+        const message =
+          err instanceof HttpErrorResponse && err.status === 409
+            ? this.translate.instant('team.changeRoleDialog.duplicateAssignmentError')
+            : this.translate.instant('team.changeRoleDialog.assignmentError');
+        this.snackBar.open(message, undefined, { duration: 5000 });
       },
     });
   }

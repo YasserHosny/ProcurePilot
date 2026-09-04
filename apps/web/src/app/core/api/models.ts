@@ -849,6 +849,120 @@ export interface LimitCheck {
   readonly remaining: number | null;
 }
 
+// --- Organisation Model (007) ----------------------------------------------
+
+export type BudgetScope = 'organisation' | 'branch' | 'cost_centre';
+
+export type BudgetPeriod = 'monthly' | 'quarterly' | 'annual';
+
+export interface Branch {
+  readonly id: string;
+  readonly name: string;
+  readonly address?: string | null;
+  readonly region?: string | null;
+  readonly is_active: boolean;
+  readonly created_at: string;
+  readonly updated_at?: string;
+}
+
+export interface BranchCreate {
+  readonly name: string;
+  readonly address?: string | null;
+  readonly region?: string | null;
+}
+
+export interface BranchUpdate {
+  readonly name?: string;
+  readonly address?: string | null;
+  readonly region?: string | null;
+  readonly is_active?: boolean;
+  readonly confirm_dependents?: boolean;
+}
+
+export interface BranchList {
+  readonly items: readonly Branch[];
+  readonly next_cursor: string | null;
+}
+
+export type OrphanReason = 'branch_deactivated' | 'owner_removed';
+
+export interface CostCentre {
+  readonly id: string;
+  readonly name: string;
+  readonly code: string;
+  readonly budget_owner_membership_id?: string | null;
+  readonly branch_id?: string | null;
+  readonly is_orphaned: boolean;
+  /** Computed at read time by the API — never stored. Null whenever is_orphaned is false. */
+  readonly orphan_reason?: OrphanReason | null;
+  readonly is_archived: boolean;
+  readonly created_at: string;
+  readonly updated_at?: string;
+}
+
+export interface CostCentreCreate {
+  readonly name: string;
+  readonly code: string;
+  readonly budget_owner_membership_id?: string | null;
+  readonly branch_id?: string | null;
+}
+
+export interface CostCentreUpdate {
+  readonly name?: string;
+  readonly code?: string;
+  readonly budget_owner_membership_id?: string | null;
+  readonly branch_id?: string | null;
+  readonly is_archived?: boolean;
+}
+
+export interface CostCentreList {
+  readonly items: readonly CostCentre[];
+  readonly next_cursor: string | null;
+}
+
+export interface Budget {
+  readonly id: string;
+  readonly amount: Money; // nested Money on read
+  readonly period: BudgetPeriod;
+  readonly period_start: string;
+  readonly scope: BudgetScope;
+  readonly branch_id?: string | null;
+  readonly cost_centre_id?: string | null;
+  readonly created_by?: string;
+  readonly created_at: string;
+}
+
+export interface BudgetCreate {
+  readonly amount: string; // flat decimal string on create — deliberate contract asymmetry
+  readonly currency: string; // ISO 4217
+  readonly period: BudgetPeriod;
+  readonly period_start: string;
+  readonly scope: BudgetScope;
+  readonly branch_id?: string | null;
+  readonly cost_centre_id?: string | null;
+}
+
+export interface BudgetCreated extends Budget {
+  readonly overlap_warning: boolean;
+}
+
+export interface BudgetList {
+  readonly items: readonly Budget[];
+  readonly next_cursor: string | null;
+}
+
+export interface BranchRoleAssignment {
+  readonly id: string;
+  readonly membership_id: string;
+  readonly branch_id: string;
+  readonly created_at: string;
+}
+
+export interface BranchRoleAssignmentCreate {
+  readonly membership_id: string;
+  readonly branch_id: string;
+}
+
 
 
 

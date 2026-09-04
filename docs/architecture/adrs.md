@@ -100,3 +100,26 @@
 - **Consequences:**
   - Quality of AI outputs is measurable and enforced.
   - Dataset grows continuously from review-queue corrections.
+
+## ADR-010 — Recorded exception: proceeding to Phase 2 without a passed G1 gate
+
+- **Status:** Accepted (exception, not a principle amendment)
+- **Context:** The constitution's Development Workflow and Phase Discipline section states stage
+  gates are binding — "Phase N+1 code MUST NOT be written until gate G(N-1) is passed and
+  recorded" — and non-compliance blocks merge "unless an explicit, recorded exception is granted
+  by the project owner." Phase 1 (chunks 4.1–4.6 / R1.0–R1.5) merged to `main` on 2026-08-22 (PR
+  #2), completing Phase 1's engineering scope. The roadmap's G1 → Phase 2 exit criteria (§2.3) —
+  matching precision and extraction accuracy targets met against the Phase 0 benchmark datasets,
+  ≥10 verified savings, ≥8 paying customers on the self-serve product — are business/usage
+  milestones that have not been independently evidenced anywhere in this repo.
+- **Decision:** The project owner explicitly chose to proceed into Phase 2 build work on
+  2026-08-22 without that evidence, overriding the gate rather than waiting for it. This is
+  recorded here per the constitution's own exception-granting mechanism, not treated as the gate
+  having been passed.
+- **Consequences:**
+  - `CLAUDE.md`'s Current phase section reflects this exception and Phase 2 as active.
+  - The G1 exit criteria remain unmet; if usage data later contradicts the product assumptions
+    Phase 2 is being built on (accuracy, retention, willingness to pay), that risk was knowingly
+    accepted at this decision point, not discovered late.
+  - Future phase transitions (G2 → Phase 3, G3 → Phase 4) still default to requiring their gates
+    unless a similar explicit, recorded exception is granted.

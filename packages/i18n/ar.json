@@ -276,6 +276,11 @@
       "title": "تغيير دور العضو",
       "description": "اختر دوراً جديداً لهذا العضو:",
       "roleLabel": "الدور الجديد",
+      "branchLabel": "تعيين إلى فرع",
+      "branchOptionalHint": "اختياري — اختر فرعاً إذا كان هذا الدور مرتبطاً بفرع محدد.",
+      "duplicateAssignmentError": "هذا العضو معيّن بالفعل إلى هذا الفرع.",
+      "assignmentError": "تعذر تعيين العضو إلى الفرع. يُرجى المحاولة مرة أخرى.",
+      "branchAssignmentSuccess": "تم تعيين العضو إلى الفرع بنجاح.",
       "confirmButton": "تحديث الدور",
       "cancelButton": "إلغاء",
       "updatingButton": "جاري التحديث..."
@@ -1312,6 +1317,157 @@
     "growth": {
       "name": "النمو",
       "description": "للعمليات المتنامية التي تتطلب حدود منتجات أعلى."
+    }
+  },
+  "organisation": {
+    "title": "إعدادات المنشأة",
+    "subtitle": "إدارة فروع منشأتك ومراكز التكلفة والميزانيات من مكان واحد.",
+    "branchesSectionTitle": "الفروع",
+    "costCentresSectionTitle": "مراكز التكلفة",
+    "budgetsSectionTitle": "الميزانيات",
+    "status": {
+      "active": "نشط",
+      "inactive": "غير نشط",
+      "archived": "مؤرشف"
+    },
+    "branches": {
+      "createButton": "فرع جديد",
+      "columns": {
+        "name": "اسم الفرع",
+        "address": "العنوان",
+        "region": "المنطقة",
+        "status": "الحالة",
+        "actions": "الإجراءات"
+      },
+      "actions": {
+        "edit": "تعديل الفرع",
+        "deactivate": "تعطيل الفرع"
+      },
+      "form": {
+        "createTitle": "فرع جديد",
+        "editTitle": "تعديل الفرع",
+        "nameLabel": "اسم الفرع",
+        "namePlaceholder": "مثال: مستودع الإسكندرية",
+        "nameRequired": "اسم الفرع مطلوب.",
+        "addressLabel": "العنوان",
+        "addressPlaceholder": "عنوان الشارع (اختياري)",
+        "regionLabel": "المنطقة",
+        "regionPlaceholder": "رمز المنطقة (اختياري)",
+        "cancelButton": "إلغاء",
+        "submitButton": "حفظ الفرع",
+        "submittingButton": "جاري الحفظ..."
+      },
+      "empty": "لم يتم إنشاء أي فروع بعد. أضف أول فرع لتبدأ في هيكلة منشأتك.",
+      "deactivateSuccess": "تم تعطيل الفرع بنجاح.",
+      "createSuccess": "تم إنشاء الفرع بنجاح.",
+      "genericError": "تعذر حفظ الفرع. يُرجى المحاولة مرة أخرى.",
+      "deactivateDialog": {
+        "title": "تعطيل الفرع",
+        "message": "هل أنت متأكد من رغبتك في تعطيل هذا الفرع؟ لن يظهر الفرع المعطل كخيار قابل للإسناد، مع بقاء سجلاته التاريخية منسوبة إليه.",
+        "dependentsWarning": "ما زال هناك {{count}} من مراكز التكلفة أو الإسنادات مرتبطة بهذا الفرع. لا يُسمح بالحذف النهائي أبداً طالما توجد سجلات تعتمد على الفرع؛ والتعطيل يحافظ على سجلاتها كاملة.",
+        "confirmButton": "تعطيل الفرع",
+        "cancelButton": "إلغاء",
+        "deactivatingButton": "جاري التعطيل..."
+      }
+    },
+    "costCentres": {
+      "createButton": "مركز تكلفة جديد",
+      "columns": {
+        "name": "اسم مركز التكلفة",
+        "code": "الرمز",
+        "budgetOwner": "مالك الميزانية",
+        "branch": "الفرع",
+        "status": "الحالة",
+        "actions": "الإجراءات"
+      },
+      "allBranchesValue": "على مستوى المنشأة",
+      "actions": {
+        "edit": "تعديل مركز التكلفة",
+        "archive": "أرشفة مركز التكلفة"
+      },
+      "form": {
+        "createTitle": "مركز تكلفة جديد",
+        "editTitle": "تعديل مركز التكلفة",
+        "nameLabel": "اسم مركز التكلفة",
+        "namePlaceholder": "مثال: التسويق",
+        "nameRequired": "اسم مركز التكلفة مطلوب.",
+        "codeLabel": "الرمز",
+        "codePlaceholder": "مثال: MKT-001",
+        "codeRequired": "الرمز مطلوب.",
+        "budgetOwnerLabel": "مالك الميزانية",
+        "budgetOwnerNoneValue": "بدون مالك ميزانية",
+        "branchLabel": "الفرع",
+        "cancelButton": "إلغاء",
+        "submitButton": "حفظ مركز التكلفة",
+        "submittingButton": "جارٍ الحفظ...",
+        "createSuccess": "تم إنشاء مركز التكلفة بنجاح."
+      },
+      "empty": "لم يتم تعريف أي مراكز تكلفة بعد.",
+      "duplicateCodeError": "هذا الرمز مستخدم بالفعل بواسطة مركز تكلفة آخر في منشأتك. يجب أن تكون رموز مراكز التكلفة فريدة.",
+      "orphanedBadge": "يتيم",
+      "orphanReasons": {
+        "branch_deactivated": "تم تعطيل الفرع المرتبط بمركز التكلفة هذا. يُرجى إعادة إسناده إلى فرع نشط أو أرشفته.",
+        "owner_removed": "تمت إزالة مالك الميزانية المعين لمركز التكلفة هذا من مساحة العمل. يُرجى تعيين مالك ميزانية جديد أو أرشفته."
+      },
+      "archiveSuccess": "تمت أرشفة مركز التكلفة بنجاح.",
+      "genericError": "تعذر حفظ مركز التكلفة. يُرجى المحاولة مرة أخرى.",
+      "archiveDialog": {
+        "title": "أرشفة مركز التكلفة",
+        "message": "هل أنت متأكد من رغبتك في أرشفة مركز التكلفة هذا؟ لن يستقبل مركز التكلفة المؤرشف أي إسنادات جديدة، مع بقاء سجلاته التاريخية سليمة.",
+        "confirmButton": "أرشفة مركز التكلفة",
+        "cancelButton": "إلغاء",
+        "archivingButton": "جاري الأرشفة..."
+      }
+    },
+    "budgets": {
+      "createButton": "تحديد ميزانية",
+      "columns": {
+        "amount": "المبلغ",
+        "currency": "العملة",
+        "period": "الفترة",
+        "scope": "النطاق",
+        "scopeTarget": "يُطبَّق على"
+      },
+      "scopeOptions": {
+        "organisation": "المنشأة بأكملها",
+        "branch": "فرع",
+        "cost_centre": "مركز تكلفة"
+      },
+      "periodOptions": {
+        "monthly": "شهري",
+        "quarterly": "ربع سنوي",
+        "annual": "سنوي"
+      },
+      "form": {
+        "createTitle": "تحديد ميزانية",
+        "amountLabel": "المبلغ",
+        "amountPlaceholder": "مثال: 25000 أو 25000.50",
+        "amountRequired": "المبلغ مطلوب.",
+        "amountInvalid": "أدخل مبلغاً موجباً بحد أقصى أربع خانات عشرية.",
+        "currencyLabel": "العملة",
+        "currencyRequired": "العملة مطلوبة.",
+        "periodLabel": "الفترة",
+        "periodRequired": "الفترة مطلوبة.",
+        "periodStartLabel": "بداية الفترة",
+        "periodStartRequired": "تاريخ بداية الفترة مطلوب.",
+        "scopeLabel": "النطاق",
+        "scopeRequired": "النطاق مطلوب.",
+        "branchLabel": "الفرع",
+        "branchRequired": "الفرع مطلوب.",
+        "costCentreLabel": "مركز التكلفة",
+        "costCentreRequired": "مركز التكلفة مطلوب.",
+        "cancelButton": "إلغاء",
+        "submitButton": "تحديد الميزانية",
+        "submittingButton": "جارٍ الحفظ..."
+      },
+      "overlapWarning": "توجد ميزانية أخرى لهذا النطاق تغطي جزءاً من الفترة المحددة. يمكن أن تتواجد عدة ميزانيات معاً بشكل مشروع — يُرجى مراجعة التداخل قبل الحفظ.",
+      "empty": "لم يتم تحديد أي ميزانيات بعد.",
+      "createSuccess": "تم تحديد الميزانية بنجاح.",
+      "genericError": "تعذر حفظ الميزانية. يُرجى المحاولة مرة أخرى."
+    },
+    "roleScoping": {
+      "branchScopedBadge": "بنطاق فرع محدد",
+      "notFoundMessage": "هذا الفرع غير موجود أو غير متاح."
     }
   }
 }
