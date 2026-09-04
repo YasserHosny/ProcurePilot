@@ -26,8 +26,10 @@ from procurepilot_api.modules.quotations.schemas import (
     QuotationReviewPatch,
     RefuseRequest,
     ReplaceDocumentRequest,
+    ReviewTask,
     ReviewTaskList,
     ReviewTaskPriority,
+    ReviewTaskPriorityPatch,
 )
 from procurepilot_api.modules.quotations.service import QuotationService, get_quotation_service
 
@@ -222,4 +224,17 @@ def list_review_tasks(
         date_to=date_to,
         sort_by=sort_by,
         sort_order=sort_order,
+    )
+
+
+@router.patch("/review-tasks/{task_id}/priority", response_model=ReviewTask)
+def update_review_task_priority(
+    task_id: UUID,
+    payload: Annotated[ReviewTaskPriorityPatch, Body()],
+    token: Annotated[str, Depends(bearer_token)],
+    member: Annotated[CurrentMember, Depends(require_role(*WRITE_ROLES))],
+    service: Annotated[QuotationService, Depends(get_quotation_service)],
+) -> ReviewTask:
+    return service.update_review_task_priority(
+        bearer_token=token, member=member, task_id=task_id, priority=payload.priority
     )

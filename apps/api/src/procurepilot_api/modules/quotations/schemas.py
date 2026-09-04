@@ -105,6 +105,10 @@ class QuotationReviewPatch(StrictApiModel):
     remove_line_ids: list[UUID] = Field(default_factory=list, max_length=50)
 
 
+class ReviewTaskPriorityPatch(StrictApiModel):
+    priority: ReviewTaskPriority
+
+
 class ReviewTask(BaseModel):
     id: UUID
     quotation_id: UUID

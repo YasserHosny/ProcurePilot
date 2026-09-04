@@ -524,6 +524,9 @@
       "queue": "Review Queue",
       "upload": "Upload Quotation"
     },
+    "breadcrumb": {
+      "inbox": "Quotation Inbox"
+    },
     "upload": {
       "title": "Upload Supplier Quotation",
       "subtitle": "Upload PDF, scanned image, or spreadsheet quotations for automated line-item extraction.",
@@ -627,6 +630,7 @@
       "bulkArchiveConfirm": "Archive {{count}} quotation(s)? This cannot be undone easily.",
       "bulkRefuseButton": "Refuse Selected",
       "bulkRefuseConfirm": "Refuse {{count}} quotation(s)? This action marks them as refused.",
+      "bulkReprioritiseButton": "Set Priority",
       "bulkClear": "Clear Selection",
       "readOnlyBadge": "Read-Only Access",
       "readOnlyNotice": "Your role has read-only access. Only Owners and Buyers can correct and confirm quotations.",

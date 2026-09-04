@@ -175,6 +175,10 @@ export class QuotationReviewComponent implements OnInit {
     timeStyle: 'short',
   };
 
+  truncateId(id: string): string {
+    return id.slice(0, 8);
+  }
+
   // List of all low confidence (<0.85) extractions needing attention
   readonly flaggedFields = computed<FlaggedField[]>(() => {
     const q = this.quotation();

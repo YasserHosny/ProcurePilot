@@ -8,6 +8,7 @@ import { MatChipsModule } from '@angular/material/chips';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
+import { MatMenuModule } from '@angular/material/menu';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSortModule, type Sort } from '@angular/material/sort';
@@ -40,6 +41,7 @@ type ReviewTaskSortOrder = 'asc' | 'desc';
     MatInputModule,
     MatChipsModule,
     MatFormFieldModule,
+    MatMenuModule,
     MatSelectModule,
     MatSortModule,
     MatProgressSpinnerModule,
@@ -74,6 +76,8 @@ export class ReviewQueueComponent implements OnInit {
   readonly archivingTaskId = signal<string | null>(null);
   readonly isBulkArchiving = signal<boolean>(false);
   readonly isBulkRefusing = signal<boolean>(false);
+  readonly isBulkReprioritising = signal<boolean>(false);
+  readonly bulkPriorityTarget = signal<ReviewTaskPriority | null>(null);
   private searchDebounce: ReturnType<typeof setTimeout> | null = null;
 
   readonly isWriter = computed<boolean>(() => this.session.hasRole('owner', 'buyer'));
@@ -330,6 +334,32 @@ export class ReviewQueueComponent implements OnInit {
     }
   }
 
+  bulkReprioritise(priority: ReviewTaskPriority): void {
+    const selected = this.selectedTaskIds();
+    if (selected.size === 0) return;
+    this.isBulkReprioritising.set(true);
+    this.bulkPriorityTarget.set(priority);
+    const tasks = this.tasks().filter((task) => selected.has(task.id));
+    let completed = 0;
+    let errors = 0;
+    for (const task of tasks) {
+      this.api.updateReviewTaskPriority(task.id, priority).subscribe({
+        next: () => {
+          completed++;
+          if (completed + errors === tasks.length) {
+            this.finishBulkReprioritise(completed, errors);
+          }
+        },
+        error: () => {
+          errors++;
+          if (completed + errors === tasks.length) {
+            this.finishBulkReprioritise(completed, errors);
+          }
+        },
+      });
+    }
+  }
+
   ageLabel(createdAt: string): string {
     const created = new Date(createdAt);
     const diffMs = Date.now() - created.getTime();
@@ -377,6 +407,13 @@ export class ReviewQueueComponent implements OnInit {
 
   private finishBulkRefuse(_completed: number, _errors: number): void {
     this.isBulkRefusing.set(false);
+    this.selectedTaskIds.set(new Set());
+    this.loadTasks();
+  }
+
+  private finishBulkReprioritise(_completed: number, _errors: number): void {
+    this.isBulkReprioritising.set(false);
+    this.bulkPriorityTarget.set(null);
     this.selectedTaskIds.set(new Set());
     this.loadTasks();
   }

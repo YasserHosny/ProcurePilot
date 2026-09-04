@@ -193,6 +193,34 @@ class QuotationService:
         items = [AuditTrailEntry.model_validate(row) for row in _rows(response.data)]
         return AuditTrailResponse(items=items)
 
+    def update_review_task_priority(
+        self,
+        *,
+        bearer_token: str,
+        member: CurrentMember,
+        task_id: UUID,
+        priority: ReviewTaskPriority,
+    ) -> ReviewTask:
+        client = authenticated_client(self._settings, bearer_token)
+        try:
+            response = (
+                client.table("review_task")
+                .update({"priority": priority})
+                .eq("id", str(task_id))
+                .select(TASK_COLUMNS)
+                .execute()
+            )
+        except APIError as exc:
+            raise ServiceUnavailableError(details={"dependency": "database"}) from exc
+        row = _one_row(response.data, resource="review_task")
+        self._record(
+            bearer_token=bearer_token,
+            member=member,
+            action="review_task.priority_changed",
+            target={"review_task_id": str(task_id), "priority": priority},
+        )
+        return _task(row)
+
     def archive_quotation(
         self,
         *,

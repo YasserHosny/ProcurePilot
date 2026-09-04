@@ -6,6 +6,13 @@
     </div>
   } @else {
     @if (quotation(); as q) {
+      <!-- Breadcrumb -->
+      <nav class="breadcrumb" aria-label="breadcrumb">
+        <a routerLink="/quotations" class="breadcrumb-link">{{ 'quotations.breadcrumb.inbox' | translate }}</a>
+        <mat-icon class="breadcrumb-sep" aria-hidden="true">chevron_right</mat-icon>
+        <span class="breadcrumb-current">{{ truncateId(q.id) }}</span>
+      </nav>
+
       <!-- Page Header -->
     <header class="page-header">
       <div class="header-titles">

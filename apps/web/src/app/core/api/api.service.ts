@@ -490,6 +490,10 @@ export class ApiService {
     );
   }
 
+  updateReviewTaskPriority(taskId: string, priority: ReviewTaskPriority): Observable<ReviewTask> {
+    return this.http.patch<ReviewTask>(`${this.base}/review-tasks/${taskId}/priority`, { priority });
+  }
+
   // --- matching & normalisation (Chunk 4.4) -------------------------------
 
   getQuotationMatches(quotationId: string): Observable<QuotationMatches> {

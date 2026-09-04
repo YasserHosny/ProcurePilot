@@ -139,7 +139,7 @@
               color="warn"
               type="button"
               (click)="bulkArchive()"
-              [disabled]="isBulkArchiving() || isBulkRefusing()"
+              [disabled]="isBulkArchiving() || isBulkRefusing() || isBulkReprioritising()"
             >
               @if (isBulkArchiving()) {
                 <mat-spinner diameter="18"></mat-spinner>
@@ -153,7 +153,7 @@
               color="warn"
               type="button"
               (click)="bulkRefuse()"
-              [disabled]="isBulkArchiving() || isBulkRefusing()"
+              [disabled]="isBulkArchiving() || isBulkRefusing() || isBulkReprioritising()"
             >
               @if (isBulkRefusing()) {
                 <mat-spinner diameter="18"></mat-spinner>
@@ -163,10 +163,34 @@
               <span>{{ 'quotations.queue.bulkRefuseButton' | translate }}</span>
             </button>
             <button
+              mat-stroked-button
+              type="button"
+              [matMenuTriggerFor]="priorityMenu"
+              [disabled]="isBulkArchiving() || isBulkRefusing() || isBulkReprioritising()"
+            >
+              @if (isBulkReprioritising()) {
+                <mat-spinner diameter="18"></mat-spinner>
+              } @else {
+                <mat-icon aria-hidden="true">swap_vert</mat-icon>
+              }
+              <span>{{ 'quotations.queue.bulkReprioritiseButton' | translate }}</span>
+            </button>
+            <mat-menu #priorityMenu="matMenu">
+              <button mat-menu-item (click)="bulkReprioritise('high')">
+                {{ 'quotations.queue.priority.high' | translate }}
+              </button>
+              <button mat-menu-item (click)="bulkReprioritise('normal')">
+                {{ 'quotations.queue.priority.normal' | translate }}
+              </button>
+              <button mat-menu-item (click)="bulkReprioritise('low')">
+                {{ 'quotations.queue.priority.low' | translate }}
+              </button>
+            </mat-menu>
+            <button
               mat-button
               type="button"
               (click)="clearSelection()"
-              [disabled]="isBulkArchiving() || isBulkRefusing()"
+              [disabled]="isBulkArchiving() || isBulkRefusing() || isBulkReprioritising()"
             >
               {{ 'quotations.queue.bulkClear' | translate }}
             </button>
@@ -189,7 +213,7 @@
                   [checked]="allSelected()"
                   [indeterminate]="hasSelection() && !allSelected()"
                   (change)="toggleAll()"
-                  [disabled]="isBulkArchiving() || isBulkRefusing()"
+                  [disabled]="isBulkArchiving() || isBulkRefusing() || isBulkReprioritising()"
                   color="primary"
                 ></mat-checkbox>
               </th>
@@ -198,7 +222,7 @@
                   [checked]="selectedTaskIds().has(task.id)"
                   (change)="toggleTask(task.id)"
                   (click)="$event.stopPropagation()"
-                  [disabled]="isBulkArchiving() || isBulkRefusing()"
+                  [disabled]="isBulkArchiving() || isBulkRefusing() || isBulkReprioritising()"
                   color="primary"
                 ></mat-checkbox>
               </td>
