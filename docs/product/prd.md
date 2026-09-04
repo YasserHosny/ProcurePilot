@@ -98,9 +98,11 @@
 
 - **Performance** — dashboard FCP < 1.5 s; comparison grid recalculation < 150 ms; extraction p95 < 45 s.
 - **Accessibility** — WCAG 2.1 AA across web and mobile.
+- **Responsive design** — the web SPA must be usable on mobile (< 600px), tablet (600–959px), and desktop (≥ 960px) viewports. Layouts collapse gracefully with no horizontal overflow. CSS logical properties are mandatory for RTL support.
 - **Security** — TLS 1.3 in transit, AES-256 at rest, tenant isolation via RLS, no customer data used for model training.
 - **Reliability** — 99.5% uptime in Phase 1; 99.9% by Phase 3.
 - **Localisation** — English + Arabic RTL from day one; multi-currency and configurable tax models.
+- **Database** — hosted Supabase exclusively; no local database build. Migrations are forward-only SQL files; RLS enforced on all tenant-scoped tables.
 
 ## 5. Constraints
 

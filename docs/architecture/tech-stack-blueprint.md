@@ -181,15 +181,20 @@ services:
 
 ### Bunny Magic Containers — Deployment Model
 
-Bunny groups multiple containers under a single **app**. Containers within the same app share a network namespace (they communicate via `localhost`, similar to a Kubernetes Pod).
+Bunny groups multiple containers under a single **app**. Containers within the same app share a network namespace (they communicate via `localhost`, similar to a Kubernetes Pod). **Containers in different apps** do not share a namespace — use the target app's Anycast IP for cross-app communication.
 
-| Container | Image source | Public port | Custom hostname |
-|---|---|---|---|
-| `<project>-backend` | `ghcr.io/<owner>/<project>-backend:latest` | 8000 | `<project>-api.<domain>` |
-| `<project>-frontend` | `ghcr.io/<owner>/<project>-frontend:latest` | 80 | `<project>.<domain>` |
+**Production topology uses two apps:**
 
-- Because containers share a network namespace, the frontend Nginx config uses `BACKEND_HOST=localhost` in production (not a Docker service name).
-- Each CI workflow deploys to the **same Bunny app** (`BUNNY_API_KEY` + app-specific `BUNNY_BACKEND_APP_ID` / `BUNNY_FRONTEND_APP_ID`).
+| App | Container | Image source | Port | Custom hostname |
+|---|---|---|---|---|
+| Production | `<project>-backend` | `ghcr.io/<owner>/<project>-backend:latest` | 8000 | `<project>-api.<domain>` |
+| Production | `<project>-frontend` | `ghcr.io/<owner>/<project>-frontend:latest` | 80 | `<project>.<domain>` |
+| Workers | `<project>-extraction-worker` | `ghcr.io/<owner>/<project>-extraction-worker:latest` | — | — |
+| Workers | `shared-redis` | `redis:7.4-alpine` | 6379 | — |
+
+- Frontend Nginx uses `BACKEND_HOST=localhost` in production (same app, shared namespace).
+- Backend reaches Redis in the workers app via the workers app's **Anycast IP** (not `localhost`).
+- Each CI workflow deploys to the appropriate Bunny app (`BUNNY_BACKEND_APP_ID`, `BUNNY_FRONTEND_APP_ID`, or `BUNNY_WORKERS_APP_ID`).
 
 ### CI Workflow Pattern (per service)
 
@@ -693,8 +698,9 @@ Use the CI Workflow Pattern template from Section 6 above, replacing `<project>`
 | Secret | Value |
 |---|---|
 | `BUNNY_API_KEY` | Bunny.net API key |
-| `BUNNY_BACKEND_APP_ID` | Container ID for the backend container in Bunny |
-| `BUNNY_FRONTEND_APP_ID` | Container ID for the frontend container in Bunny |
+| `BUNNY_BACKEND_APP_ID` | App ID for the production app (backend container) |
+| `BUNNY_FRONTEND_APP_ID` | App ID for the production app (frontend container) |
+| `BUNNY_WORKERS_APP_ID` | App ID for the workers app (extraction worker + Redis) |
 
 #### 6c. Configure GHCR access
 
@@ -705,7 +711,9 @@ Use the CI Workflow Pattern template from Section 6 above, replacing `<project>`
 
 ### Step 7 — Bunny Magic Containers Deployment
 
-1. **Create an app** in Bunny Dashboard → Edge Platform → Magic Containers.
+#### 7a. Production app
+
+1. **Create a "production" app** in Bunny Dashboard → Edge Platform → Magic Containers.
 2. **Add two containers** within the app:
    - `<project>-backend` — image from `ghcr.io/<owner>/<project>-backend`, public port `8000`.
    - `<project>-frontend` — image from `ghcr.io/<owner>/<project>-frontend`, public port `80`.
@@ -715,6 +723,23 @@ Use the CI Workflow Pattern template from Section 6 above, replacing `<project>`
    - Frontend endpoint: custom hostname `<project>.<domain>` → port 80.
 5. **Add a GHCR Image Registry** in Bunny (Image Registries tab) with a GitHub PAT that has `read:packages` scope.
 6. **Set regions** and scaling as needed.
+
+#### 7b. Workers app (when background jobs are needed)
+
+1. **Create a "workers" app** — separate from the production app for independent scaling.
+2. **Add containers:**
+   - `<project>-extraction-worker` — image from GHCR.
+   - `shared-redis` — image `redis:7.4-alpine`, public port `6379`.
+3. Workers within the same app reach Redis at `localhost:6379`.
+4. The production app's backend reaches Redis via the workers app's **Anycast IP** — find it
+   in the workers app's endpoint configuration in the Bunny dashboard.
+5. Set `REDIS_URL=redis://<anycast-ip>:6379/0` on the production app's backend container.
+
+#### 7c. GHCR package visibility
+
+GHCR packages default to private. Ensure the bunny.net Image Registry's GitHub PAT has
+`read:packages` scope and the GHCR packages are accessible to that PAT. If an image fails
+to pull, check the package visibility settings in GitHub → Packages.
 
 ---
 
@@ -751,7 +776,78 @@ Configure `playwright.config.ts` with `baseURL: 'http://localhost'`.
 
 ---
 
-### Step 9 — Checklist Before First Deploy
+### Step 9 — Responsive Design
+
+The frontend must be usable on mobile, tablet, and desktop viewports.
+
+#### Breakpoints
+
+Define a shared SCSS breakpoints file (e.g. `src/styles/_breakpoints.scss`):
+
+```scss
+$mobile-max: 599px;
+$tablet-min: 600px;
+$tablet-max: 959px;
+$desktop-min: 960px;
+
+@mixin mobile { @media (max-width: $mobile-max) { @content; } }
+@mixin tablet-down { @media (max-width: $tablet-max) { @content; } }
+@mixin tablet-only { @media (min-width: $tablet-min) and (max-width: $tablet-max) { @content; } }
+@mixin desktop { @media (min-width: $desktop-min) { @content; } }
+```
+
+Import as `@use 'styles/breakpoints' as bp` in component SCSS files.
+
+#### Responsive patterns
+
+- **CSS logical properties** (`margin-inline-start`, `padding-block-end`) instead of physical
+  properties (`margin-left`, `padding-bottom`) — required for RTL support.
+- **Fluid containers:** `max-width` + `margin-inline: auto` for page sections.
+- **Mobile padding:** reduce from `1.5rem` to `0.75rem` via `@include bp.mobile`.
+- **Grid → single column on mobile:** e.g. `grid-template-columns: 1fr 1fr` on desktop,
+  `1fr` on mobile.
+- **`flex-wrap: wrap`** on button rows and metadata strips to prevent horizontal overflow.
+- **Side-by-side layouts** (e.g. document preview + data form) collapse to single column
+  at 1024px via `@media (max-width: 1024px)`.
+
+#### Testing responsive layouts
+
+After any UI change, resize the browser to:
+- Mobile (< 600px) — verify single-column layout, no horizontal scrollbar.
+- Tablet (600–959px) — verify intermediate layouts.
+- Desktop (960px+) — verify multi-column layouts.
+
+---
+
+### Step 10 — Database Strategy
+
+This stack uses **hosted Supabase** as the only database. There is no local database to
+build, run, or maintain.
+
+#### Key decisions
+
+- **No local Postgres build:** Development connects to Supabase CLI-managed local services
+  (`supabase start`) or to the hosted project directly. Docker Compose does not include a
+  Postgres service.
+- **Migrations are forward-only:** Versioned SQL files in `supabase/migrations/`, applied
+  via `supabase db push`. Never edit a merged migration.
+- **RLS is mandatory:** Every tenant-scoped table has Row-Level Security policies with both
+  `USING` and `WITH CHECK` clauses. Policies use JWT claims, not application-layer filters.
+- **Connection pooling:** Use Supabase's built-in PgBouncer (transaction mode) for
+  production connections.
+
+#### Why remote-only
+
+- Supabase provides Auth, Storage, Realtime, and Edge Functions alongside the database —
+  replicating this locally adds significant complexity.
+- The Supabase CLI local stack (`supabase start`) provides a local environment that mirrors
+  production closely enough for development.
+- Migrations are the source of truth for schema; the database is a commodity, not a build
+  artefact.
+
+---
+
+### Step 11 — Checklist Before First Deploy
 
 - [ ] Backend `.env` has all Supabase credentials
 - [ ] Backend health endpoint responds at `/api/health`
