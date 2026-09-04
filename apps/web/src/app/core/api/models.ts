@@ -322,10 +322,19 @@ export interface FieldCorrection {
   readonly corrected_value: unknown;
 }
 
+export interface NewQuotationLine {
+  readonly original_text: string;
+  readonly quantity?: string | null;
+  readonly unit_price_amount?: string | null;
+  readonly unit_price_currency?: string | null;
+}
+
 export interface QuotationReviewPatch {
   readonly supplier_id?: string | null;
   readonly reviewer_notes?: string | null;
   readonly corrections?: readonly FieldCorrection[];
+  readonly add_lines?: readonly NewQuotationLine[];
+  readonly remove_line_ids?: readonly string[];
 }
 
 export interface QuotationDetail extends Quotation {

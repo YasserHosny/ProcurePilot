@@ -10,7 +10,11 @@ from procurepilot_api.config import Settings, get_settings
 from procurepilot_api.deps import CurrentMember
 from procurepilot_api.errors import ConflictError, ServiceUnavailableError
 from procurepilot_api.modules.members.service import authenticated_client
-from procurepilot_api.modules.quotations.schemas import QuotationDetail, QuotationReviewPatch
+from procurepilot_api.modules.quotations.schemas import (
+    NewQuotationLine,
+    QuotationDetail,
+    QuotationReviewPatch,
+)
 from procurepilot_api.modules.quotations.service import (
     FIELD_COLUMNS,
     QuotationService,
@@ -88,6 +92,54 @@ class QuotationReviewService:
                     }
                 ).eq("id", str(correction.field_extraction_id)).execute()
                 _apply_correction_to_canonical_row(client, field, correction.corrected_value)
+
+            for line_id in patch.remove_line_ids:
+                client.table("field_extraction").delete().eq(
+                    "entity_id", str(line_id)
+                ).eq("entity_type", "quotation_line").execute()
+                client.table("quotation_line").delete().eq(
+                    "id", str(line_id)
+                ).eq("quotation_id", str(quotation_id)).execute()
+
+            if patch.add_lines:
+                existing_lines = (
+                    client.table("quotation_line")
+                    .select("line_number")
+                    .eq("quotation_id", str(quotation_id))
+                    .order("line_number", desc=True)
+                    .limit(1)
+                    .execute()
+                    .data
+                )
+                next_number = (existing_lines[0]["line_number"] + 1) if existing_lines else 1
+
+                q_row = (
+                    client.table("quotation")
+                    .select("tenant_id")
+                    .eq("id", str(quotation_id))
+                    .limit(1)
+                    .execute()
+                    .data
+                )
+                q_tenant_id = q_row[0]["tenant_id"] if q_row else None
+                if q_tenant_id is None:
+                    raise ServiceUnavailableError(details={"reason": "quotation_not_found"})
+
+                for new_line in patch.add_lines:
+                    row_data: dict[str, object] = {
+                        "tenant_id": q_tenant_id,
+                        "quotation_id": str(quotation_id),
+                        "line_number": next_number,
+                        "original_text": new_line.original_text,
+                    }
+                    if new_line.quantity is not None:
+                        row_data["quantity"] = new_line.quantity
+                    if new_line.unit_price_amount is not None and new_line.unit_price_currency is not None:
+                        row_data["unit_price_amount"] = new_line.unit_price_amount
+                        row_data["unit_price_currency"] = new_line.unit_price_currency
+                    client.table("quotation_line").insert(row_data).execute()
+                    next_number += 1
+
             _recompute_arithmetic_status(client, quotation_id)
         except APIError as exc:
             raise ServiceUnavailableError(details={"dependency": "database"}) from exc

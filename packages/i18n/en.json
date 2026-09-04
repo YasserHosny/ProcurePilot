@@ -691,7 +691,16 @@
         "unitSize": "Unit Size",
         "unit": "Unit",
         "noLines": "No line items extracted for this quotation.",
-        "colLineTotal": "Line Total"
+        "colLineTotal": "Line Total",
+        "addLine": "Add Line Item",
+        "addLineText": "Item Description",
+        "addLineQuantity": "Quantity",
+        "addLinePrice": "Unit Price",
+        "confirmAdd": "Add",
+        "removeLine": "Remove this line",
+        "markedForRemoval": "Will be removed on save",
+        "undoRemove": "Undo removal",
+        "pendingAdd": "New — will be added on save"
       },
       "confidence": {
         "high": "High Confidence",
@@ -768,7 +777,8 @@
         "confirmDialogMessage": "This will mark the quotation as reviewed and authorized. It will become trusted commercial data used for matching, pricing, and cost comparison. This action cannot be undone.",
         "confirmDialogMismatchWarn": "Warning: You are confirming this quotation with an unresolved arithmetic discrepancy.",
         "confirmDialogCancel": "Cancel",
-        "confirmDialogProceed": "Confirm & Authorize"
+        "confirmDialogProceed": "Confirm & Authorize",
+        "createRequote": "Create Re-Quote"
       },
       "archiveConfirm": "Archive this quotation?",
       "retryConfirm": "Re-run extraction? Existing extracted data will be replaced.",

@@ -691,7 +691,16 @@
         "unitSize": "حجم الوحدة",
         "unit": "الوحدة",
         "noLines": "لم يتم استخراج بنود لعرض السعر هذا.",
-        "colLineTotal": "إجمالي السطر"
+        "colLineTotal": "إجمالي السطر",
+        "addLine": "إضافة عنصر",
+        "addLineText": "وصف العنصر",
+        "addLineQuantity": "الكمية",
+        "addLinePrice": "سعر الوحدة",
+        "confirmAdd": "إضافة",
+        "removeLine": "إزالة هذا العنصر",
+        "markedForRemoval": "سيتم إزالته عند الحفظ",
+        "undoRemove": "التراجع عن الإزالة",
+        "pendingAdd": "جديد — سيتم إضافته عند الحفظ"
       },
       "confidence": {
         "high": "ثقة عالية",
@@ -768,7 +777,8 @@
         "confirmDialogMessage": "سيتم وضع علامة على عرض السعر كمُراجَع ومعتمد. سيصبح بيانات تجارية موثوقة تُستخدم في المطابقة والتسعير ومقارنة التكاليف. لا يمكن التراجع عن هذا الإجراء.",
         "confirmDialogMismatchWarn": "تحذير: أنت تؤكد عرض السعر هذا مع وجود تباين حسابي غير محلول.",
         "confirmDialogCancel": "إلغاء",
-        "confirmDialogProceed": "تأكيد واعتماد"
+        "confirmDialogProceed": "تأكيد واعتماد",
+        "createRequote": "إنشاء عرض أسعار بديل"
       },
       "archiveConfirm": "أرشفة هذا العرض؟",
       "retryConfirm": "إعادة تشغيل الاستخراج؟ سيتم استبدال البيانات المستخرجة الحالية.",

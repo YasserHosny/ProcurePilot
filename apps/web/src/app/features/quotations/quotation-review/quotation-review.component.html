@@ -39,6 +39,16 @@
             <span>{{ 'quotations.review.actions.retryExtraction' | translate }}</span>
           </button>
         }
+        @if (isWriter() && q.status !== 'reviewed') {
+          <button
+            mat-stroked-button
+            type="button"
+            (click)="createRequote()"
+          >
+            <mat-icon aria-hidden="true">content_copy</mat-icon>
+            <span>{{ 'quotations.review.actions.createRequote' | translate }}</span>
+          </button>
+        }
         @if (isWriter()) {
           <button
             mat-stroked-button
@@ -607,6 +617,56 @@
               <div class="no-lines-notice">
                 <p>{{ 'quotations.review.lines.noLines' | translate }}</p>
               </div>
+              @if (isWriter() && q.status !== 'reviewed') {
+                @if (isAddingLine()) {
+                  <div class="add-line-form">
+                    <mat-form-field appearance="outline" class="add-line-field">
+                      <mat-label>{{ 'quotations.review.lines.addLineText' | translate }}</mat-label>
+                      <input
+                        matInput
+                        [ngModel]="newLineText()"
+                        (ngModelChange)="newLineText.set($event)"
+                        required
+                      />
+                    </mat-form-field>
+                    <mat-form-field appearance="outline" class="add-line-field-small">
+                      <mat-label>{{ 'quotations.review.lines.addLineQuantity' | translate }}</mat-label>
+                      <input
+                        matInput
+                        type="number"
+                        [ngModel]="newLineQuantity()"
+                        (ngModelChange)="newLineQuantity.set($event)"
+                      />
+                    </mat-form-field>
+                    <mat-form-field appearance="outline" class="add-line-field-small">
+                      <mat-label>{{ 'quotations.review.lines.addLinePrice' | translate }}</mat-label>
+                      <input
+                        matInput
+                        type="number"
+                        [ngModel]="newLinePriceAmount()"
+                        (ngModelChange)="newLinePriceAmount.set($event)"
+                      />
+                    </mat-form-field>
+                    <button mat-flat-button color="primary" type="button" (click)="addNewLine()" [disabled]="!newLineText()">
+                      <mat-icon aria-hidden="true">check</mat-icon>
+                      {{ 'quotations.review.lines.confirmAdd' | translate }}
+                    </button>
+                    <button mat-button type="button" (click)="cancelAddLine()">
+                      {{ 'common.cancel' | translate }}
+                    </button>
+                  </div>
+                } @else {
+                  <button
+                    mat-stroked-button
+                    type="button"
+                    (click)="showAddLineForm()"
+                    class="add-line-btn"
+                  >
+                    <mat-icon aria-hidden="true">add</mat-icon>
+                    {{ 'quotations.review.lines.addLine' | translate }}
+                  </button>
+                }
+              }
             } @else {
               <mat-accordion class="lines-accordion" multi="false">
                 @for (line of q.lines; track line.id; let idx = $index) {
@@ -625,6 +685,29 @@
                       <mat-panel-description class="line-panel-desc">
                         @if (computeLineTotal(line); as total) {
                           <span class="line-summary-total">{{ total }} {{ line.unit_price?.currency || q.currency }}</span>
+                        }
+                        @if (isWriter() && q.status !== 'reviewed' && !pendingRemoveLineIds().has(line.id)) {
+                          <button
+                            mat-icon-button
+                            type="button"
+                            (click)="markLineForRemoval(line.id); $event.stopPropagation()"
+                            [matTooltip]="'quotations.review.lines.removeLine' | translate"
+                            class="remove-line-btn"
+                          >
+                            <mat-icon aria-hidden="true">delete_outline</mat-icon>
+                          </button>
+                        }
+                        @if (pendingRemoveLineIds().has(line.id)) {
+                          <span class="removal-badge">{{ 'quotations.review.lines.markedForRemoval' | translate }}</span>
+                          <button
+                            mat-icon-button
+                            type="button"
+                            (click)="unmarkLineForRemoval(line.id); $event.stopPropagation()"
+                            [matTooltip]="'quotations.review.lines.undoRemove' | translate"
+                            class="undo-remove-btn"
+                          >
+                            <mat-icon aria-hidden="true">undo</mat-icon>
+                          </button>
                         }
                         @if (getFieldExtraction('quotation_line', line.id, 'unit_price'); as fe) {
                           <span
@@ -753,6 +836,71 @@
                   </mat-expansion-panel>
                 }
               </mat-accordion>
+
+              @for (newLine of pendingNewLines(); track $index) {
+                <div class="pending-new-line">
+                  <mat-icon aria-hidden="true">add_circle</mat-icon>
+                  <span class="new-line-text">{{ newLine.original_text }}</span>
+                  @if (newLine.quantity) {
+                    <span class="new-line-detail">&times; {{ newLine.quantity }}</span>
+                  }
+                  @if (newLine.unit_price_amount) {
+                    <span class="new-line-detail">&#64; {{ newLine.unit_price_amount }} {{ newLine.unit_price_currency }}</span>
+                  }
+                  <span class="new-line-badge">{{ 'quotations.review.lines.pendingAdd' | translate }}</span>
+                </div>
+              }
+
+              @if (isWriter() && q.status !== 'reviewed') {
+                @if (isAddingLine()) {
+                  <div class="add-line-form">
+                    <mat-form-field appearance="outline" class="add-line-field">
+                      <mat-label>{{ 'quotations.review.lines.addLineText' | translate }}</mat-label>
+                      <input
+                        matInput
+                        [ngModel]="newLineText()"
+                        (ngModelChange)="newLineText.set($event)"
+                        required
+                      />
+                    </mat-form-field>
+                    <mat-form-field appearance="outline" class="add-line-field-small">
+                      <mat-label>{{ 'quotations.review.lines.addLineQuantity' | translate }}</mat-label>
+                      <input
+                        matInput
+                        type="number"
+                        [ngModel]="newLineQuantity()"
+                        (ngModelChange)="newLineQuantity.set($event)"
+                      />
+                    </mat-form-field>
+                    <mat-form-field appearance="outline" class="add-line-field-small">
+                      <mat-label>{{ 'quotations.review.lines.addLinePrice' | translate }}</mat-label>
+                      <input
+                        matInput
+                        type="number"
+                        [ngModel]="newLinePriceAmount()"
+                        (ngModelChange)="newLinePriceAmount.set($event)"
+                      />
+                    </mat-form-field>
+                    <button mat-flat-button color="primary" type="button" (click)="addNewLine()" [disabled]="!newLineText()">
+                      <mat-icon aria-hidden="true">check</mat-icon>
+                      {{ 'quotations.review.lines.confirmAdd' | translate }}
+                    </button>
+                    <button mat-button type="button" (click)="cancelAddLine()">
+                      {{ 'common.cancel' | translate }}
+                    </button>
+                  </div>
+                } @else {
+                  <button
+                    mat-stroked-button
+                    type="button"
+                    (click)="showAddLineForm()"
+                    class="add-line-btn"
+                  >
+                    <mat-icon aria-hidden="true">add</mat-icon>
+                    {{ 'quotations.review.lines.addLine' | translate }}
+                  </button>
+                }
+              }
             }
           </mat-card-content>
         </mat-card>

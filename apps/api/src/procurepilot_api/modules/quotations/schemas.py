@@ -86,10 +86,19 @@ class FieldCorrection(StrictApiModel):
     corrected_value: Any
 
 
+class NewQuotationLine(StrictApiModel):
+    original_text: str = Field(min_length=1, max_length=500)
+    quantity: StrictStr | None = Field(default=None, pattern=r"^\d+(\.\d{1,6})?$")
+    unit_price_amount: StrictStr | None = Field(default=None, pattern=r"^-?\d+(\.\d{1,4})?$")
+    unit_price_currency: StrictStr | None = Field(default=None, pattern=r"^[A-Z]{3}$")
+
+
 class QuotationReviewPatch(StrictApiModel):
     supplier_id: UUID | None = None
     reviewer_notes: str | None = None
     corrections: list[FieldCorrection] = Field(default_factory=list)
+    add_lines: list[NewQuotationLine] = Field(default_factory=list)
+    remove_line_ids: list[UUID] = Field(default_factory=list, max_length=50)
 
 
 class ReviewTask(BaseModel):

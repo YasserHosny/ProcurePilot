@@ -29,6 +29,7 @@ import type {
   ApiError,
   FieldCorrection,
   FieldExtraction,
+  NewQuotationLine,
   QuotationDetail,
   Supplier,
 } from '../../../core/api/models';
@@ -122,6 +123,14 @@ export class QuotationReviewComponent implements OnInit {
 
   // Field corrections map: field_extraction_id -> corrected value
   readonly pendingCorrections = signal<Map<string, unknown>>(new Map());
+
+  // Line add/remove staging
+  readonly pendingNewLines = signal<NewQuotationLine[]>([]);
+  readonly pendingRemoveLineIds = signal<Set<string>>(new Set());
+  readonly isAddingLine = signal<boolean>(false);
+  readonly newLineText = signal<string>('');
+  readonly newLineQuantity = signal<string>('');
+  readonly newLinePriceAmount = signal<string>('');
 
   // Currently active/highlighted field extraction
   readonly activeExtraction = signal<FieldExtraction | null>(null);
@@ -280,7 +289,12 @@ export class QuotationReviewComponent implements OnInit {
 
   readonly hasPendingReviewChanges = computed<boolean>(() => {
     const q = this.quotation();
-    return this.pendingCorrections().size > 0 || this.reviewerNotes() !== (q?.reviewer_notes || '');
+    return (
+      this.pendingCorrections().size > 0 ||
+      this.reviewerNotes() !== (q?.reviewer_notes || '') ||
+      this.pendingNewLines().length > 0 ||
+      this.pendingRemoveLineIds().size > 0
+    );
   });
 
   ngOnInit(): void {
@@ -599,11 +613,15 @@ export class QuotationReviewComponent implements OnInit {
         supplier_id: this.selectedSupplierId(),
         reviewer_notes: this.reviewerNotes() || null,
         corrections,
+        add_lines: this.pendingNewLines(),
+        remove_line_ids: Array.from(this.pendingRemoveLineIds()),
       })
       .subscribe({
         next: (updated) => {
           this.quotation.set(updated);
           this.pendingCorrections.set(new Map());
+          this.pendingNewLines.set([]);
+          this.pendingRemoveLineIds.set(new Set());
           this.isSaving.set(false);
           this.snackBar.open(
             this.translate.instant('quotations.review.actions.saveSuccess'),
@@ -836,6 +854,55 @@ export class QuotationReviewComponent implements OnInit {
           }
         },
       });
+  }
+
+  showAddLineForm(): void {
+    this.isAddingLine.set(true);
+    this.newLineText.set('');
+    this.newLineQuantity.set('');
+    this.newLinePriceAmount.set('');
+  }
+
+  cancelAddLine(): void {
+    this.isAddingLine.set(false);
+  }
+
+  addNewLine(): void {
+    const text = this.newLineText().trim();
+    if (!text) return;
+    const q = this.quotation();
+    const currency = q?.currency || 'USD';
+    const newLine: NewQuotationLine = {
+      original_text: text,
+      quantity: this.newLineQuantity() || null,
+      unit_price_amount: this.newLinePriceAmount() || null,
+      unit_price_currency: this.newLinePriceAmount() ? currency : null,
+    };
+    this.pendingNewLines.update(lines => [...lines, newLine]);
+    this.isAddingLine.set(false);
+  }
+
+  markLineForRemoval(lineId: string): void {
+    this.pendingRemoveLineIds.update(ids => {
+      const next = new Set(ids);
+      next.add(lineId);
+      return next;
+    });
+  }
+
+  unmarkLineForRemoval(lineId: string): void {
+    this.pendingRemoveLineIds.update(ids => {
+      const next = new Set(ids);
+      next.delete(lineId);
+      return next;
+    });
+  }
+
+  createRequote(): void {
+    const id = this.quotationId();
+    this.router.navigate(['/quotations/upload'], {
+      queryParams: { requote_from: id },
+    });
   }
 
   formatConfidence(score: string | number): number {
