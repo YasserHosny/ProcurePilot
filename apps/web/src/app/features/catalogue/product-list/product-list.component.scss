@@ -1,9 +1,15 @@
+@use '../../../../styles/breakpoints' as bp;
+
 .catalogue-container {
   max-inline-size: 1100px;
   margin-inline: auto;
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
+
+  @include bp.mobile {
+    gap: 1rem;
+  }
 }
 
 .page-header {
@@ -25,6 +31,10 @@
   font-size: 1.75rem;
   font-weight: 700;
   color: #0f172a;
+
+  @include bp.mobile {
+    font-size: 1.25rem;
+  }
 }
 
 .page-subtitle {
@@ -159,13 +169,26 @@
   border-block-end: 1px solid #f1f5f9;
   flex-wrap: wrap;
 
+  @include bp.mobile {
+    padding-inline: 0.75rem;
+    gap: 0.5rem;
+  }
+
   .search-field {
     flex: 1;
     min-inline-size: 240px;
+
+    @include bp.mobile {
+      min-inline-size: 100%;
+    }
   }
 
   .status-field {
     inline-size: 160px;
+
+    @include bp.mobile {
+      inline-size: 100%;
+    }
   }
 }
 

@@ -1,5 +1,4 @@
 @use "@angular/material" as mat;
-@use "material-icons/iconfont/material-icons.css";
 
 @include mat.core();
 
@@ -11,6 +10,10 @@ body {
   margin: 0;
   font-family: Roboto, "Helvetica Neue", sans-serif;
   text-align: start;
+}
+
+mat-icon {
+  overflow: hidden;
 }
 
 [dir="rtl"] {

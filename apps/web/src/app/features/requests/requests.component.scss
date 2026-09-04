@@ -1,3 +1,5 @@
+@use '../../../styles/breakpoints' as bp;
+
 .requests-container {
   max-inline-size: 1100px;
   margin-inline: auto;
@@ -9,6 +11,10 @@
   font-size: 1.75rem;
   font-weight: 700;
   letter-spacing: -0.02em;
+
+  @include bp.mobile {
+    font-size: 1.25rem;
+  }
 }
 
 .requests-subtitle {

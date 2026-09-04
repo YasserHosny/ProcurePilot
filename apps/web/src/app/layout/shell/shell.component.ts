@@ -1,14 +1,16 @@
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, OnInit, ViewChild, computed, inject, signal } from '@angular/core';
+import { BreakpointObserver } from '@angular/cdk/layout';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatIconModule } from '@angular/material/icon';
 import { MatListModule } from '@angular/material/list';
 import { MatMenuModule } from '@angular/material/menu';
-import { MatSidenavModule } from '@angular/material/sidenav';
+import { MatSidenav, MatSidenavModule } from '@angular/material/sidenav';
 import { MatToolbarModule } from '@angular/material/toolbar';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
+import { filter } from 'rxjs';
 
 import type { Locale, Role, WorkspaceSummary } from '../../core/api/models';
 import { RoleDirective } from '../../core/auth/role.directive';
@@ -39,15 +41,22 @@ import { I18nService } from '../../core/i18n';
 export class ShellComponent implements OnInit {
   private readonly session = inject(SessionService);
   private readonly router = inject(Router);
+  private readonly breakpoint = inject(BreakpointObserver);
   readonly i18n = inject(I18nService);
   private readonly translate = inject(TranslateService);
+
+  @ViewChild('sidenav') sidenav!: MatSidenav;
 
   readonly member = this.session.currentMember;
   readonly tenant = this.session.tenant;
   readonly currentLocale = this.i18n.currentLocale;
 
+  readonly isMobile = signal(false);
   readonly workspaces = signal<WorkspaceSummary[]>([]);
   readonly isSwitchingWorkspace = signal<boolean>(false);
+
+  readonly sidenavMode = computed(() => this.isMobile() ? 'over' as const : 'side' as const);
+  readonly sidenavOpened = computed(() => !this.isMobile());
 
   readonly userInitials = computed<string>(() => {
     const email = this.member()?.email;
@@ -57,6 +66,18 @@ export class ShellComponent implements OnInit {
 
   ngOnInit(): void {
     this.loadWorkspaces();
+
+    this.breakpoint.observe('(max-width: 959px)').subscribe((result) => {
+      this.isMobile.set(result.matches);
+    });
+
+    this.router.events
+      .pipe(filter((e): e is NavigationEnd => e instanceof NavigationEnd))
+      .subscribe(() => {
+        if (this.isMobile() && this.sidenav?.opened) {
+          this.sidenav.close();
+        }
+      });
   }
 
   loadWorkspaces(): void {
