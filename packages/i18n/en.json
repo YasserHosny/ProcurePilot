@@ -563,6 +563,7 @@
       "title": "Quotation Review Queue",
       "subtitle": "Review and authorize extracted supplier quotations before they become trusted commercial data.",
       "uploadNew": "Upload Quotation",
+      "searchPlaceholder": "Search by supplier or ID…",
       "filterStatus": "Filter by Status",
       "filterPriority": "Filter by Priority",
       "status": {
@@ -590,8 +591,16 @@
         "priority": "Priority",
         "status": "Status",
         "createdAt": "Created",
+        "age": "Age",
         "statedTotal": "Stated Total",
         "actions": "Actions"
+      },
+      "age": {
+        "justNow": "just now",
+        "hoursAgo": "{{count}}h ago",
+        "daysAgo": "{{count}}d ago",
+        "weeksAgo": "{{count}}w ago",
+        "monthsAgo": "{{count}}mo ago"
       },
       "actions": {
         "review": "Review & Authorize",
@@ -601,7 +610,9 @@
       "readOnlyNotice": "Your role has read-only access. Only Owners and Buyers can correct and confirm quotations.",
       "loadMore": "Load More",
       "emptyTitle": "No Review Tasks Found",
-      "emptyMessage": "There are no quotation review tasks matching your current filters."
+      "emptyMessage": "There are no quotation review tasks matching your current filters.",
+      "noFilterResults": "No results match your filters",
+      "clearFilters": "Clear filters"
     },
     "review": {
       "title": "Quotation Review & Authorization",
@@ -609,9 +620,18 @@
       "backToQueue": "Back to Review Queue",
       "downloadOriginal": "Download original document",
       "readOnlyNotice": "Read-only mode. You can view extraction evidence, but editing and confirmation require Owner or Buyer permissions.",
+      "uploadedAt": "Uploaded at:",
+      "extractedAt": "Extracted at:",
+      "lastModified": "Last modified:",
+      "expired": "Expired",
+      "expiresIn": "Expires in {{count}} days",
+      "validFor": "Valid for {{count}} days",
       "panels": {
         "document": "Source Document Evidence",
         "extractedData": "Extracted Commercial Data"
+      },
+      "information": {
+        "title": "Information"
       },
       "keyboardNav": {
         "title": "Attention Navigation (FR-014)",

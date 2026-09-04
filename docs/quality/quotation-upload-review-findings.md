@@ -118,6 +118,8 @@
 12. **Locale/currency correctness pass** across the module (dates, money, number grouping) driven by workspace settings; RTL check for Arabic.
 13. **Per-tenant confidence thresholds** and a small "extraction quality" summary on the review page (avg confidence, fields below threshold).
 14. **Multi-file / multi-page** upload with progress per file and a stated size/page limit.
+15. **Queue/detail search** — by quotation reference, supplier, total, or filename (see "No search" in §3). Without this, a friendlier identifier (#16) still leaves reviewers hunting manually; treat search as the higher-priority half of the pair.
+16. **Human-readable `reference_code`** (e.g. `QT-2026-000042`) alongside the internal UUID — immutable, server-generated, unique per `(tenant_id, reference_code)` (never globally unique, per the tenant-isolation rule), backfilled for existing quotations. Solves the "truncated UUID is impossible to cite" problem in notes, exports, support tickets, and duplicate-detection copy (the "Possible duplicate of QT‑…" text in suggestion #1 above already assumes this format exists). A separate mutable *quotation name* field was considered and deferred — weak as an audit/citation anchor on its own; revisit only if reviewers still want richer labels once #15 and #16 ship. Sequencing: after B1 (done) and alongside/just before duplicate detection (#1); not before search (#15).
 
 ---
 

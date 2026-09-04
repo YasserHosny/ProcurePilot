@@ -110,6 +110,11 @@ def list_review_tasks(
     limit: Annotated[int, Query(le=100)] = 50,
     status: Annotated[Literal["open", "in_progress", "resolved", "all"], Query()] = "open",
     priority: Annotated[ReviewTaskPriority | None, Query()] = None,
+    search: Annotated[str | None, Query(max_length=200)] = None,
+    sort_by: Annotated[
+        Literal["created_at", "stated_total", "priority", "status"], Query()
+    ] = "created_at",
+    sort_order: Annotated[Literal["asc", "desc"], Query()] = "desc",
 ) -> ReviewTaskList:
     return service.list_review_tasks(
         bearer_token=token,
@@ -117,4 +122,7 @@ def list_review_tasks(
         limit=limit,
         status=status,
         priority=priority,
+        search=search,
+        sort_by=sort_by,
+        sort_order=sort_order,
     )

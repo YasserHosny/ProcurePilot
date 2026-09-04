@@ -6,8 +6,10 @@ import { MatCardModule } from '@angular/material/card';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
+import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSelectModule } from '@angular/material/select';
+import { MatSortModule, type Sort } from '@angular/material/sort';
 import { MatTableModule } from '@angular/material/table';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { RouterLink } from '@angular/router';
@@ -20,6 +22,9 @@ import { SessionService } from '../../../core/auth/session.service';
 import { FormatDatePipe } from '../../../core/format/date.pipe';
 import { FormatMoneyPipe } from '../../../core/format/money.pipe';
 
+type ReviewTaskSortBy = 'created_at' | 'stated_total' | 'priority' | 'status';
+type ReviewTaskSortOrder = 'asc' | 'desc';
+
 @Component({
   selector: 'app-review-queue',
   standalone: true,
@@ -30,9 +35,11 @@ import { FormatMoneyPipe } from '../../../core/format/money.pipe';
     MatTableModule,
     MatButtonModule,
     MatIconModule,
+    MatInputModule,
     MatChipsModule,
     MatFormFieldModule,
     MatSelectModule,
+    MatSortModule,
     MatProgressSpinnerModule,
     MatTooltipModule,
     TranslatePipe,
@@ -54,10 +61,20 @@ export class ReviewQueueComponent implements OnInit {
   readonly nextCursor = signal<string | null>(null);
   readonly statusFilter = signal<ReviewTaskStatus | 'all'>('open');
   readonly priorityFilter = signal<ReviewTaskPriority | 'all'>('all');
+  readonly searchQuery = signal<string>('');
+  readonly sortBy = signal<ReviewTaskSortBy>('created_at');
+  readonly sortOrder = signal<ReviewTaskSortOrder>('desc');
   readonly errorMessage = signal<string | null>(null);
   readonly errorTraceId = signal<string | null>(null);
+  private searchDebounce: ReturnType<typeof setTimeout> | null = null;
 
   readonly isWriter = computed<boolean>(() => this.session.hasRole('owner', 'buyer'));
+  readonly hasActiveFilters = computed<boolean>(
+    () =>
+      this.statusFilter() !== 'open' ||
+      this.priorityFilter() !== 'all' ||
+      this.searchQuery().trim().length > 0,
+  );
 
   readonly displayedColumns: readonly string[] = [
     'quotation_id',
@@ -67,6 +84,7 @@ export class ReviewQueueComponent implements OnInit {
     'status',
     'stated_total',
     'created_at',
+    'age',
     'actions',
   ];
 
@@ -82,11 +100,15 @@ export class ReviewQueueComponent implements OnInit {
 
     const status = this.statusFilter();
     const priority = this.priorityFilter();
+    const search = this.sanitizedSearch();
 
     this.api
       .getReviewTasks({
         status: status === 'all' ? undefined : status,
         priority: priority === 'all' ? undefined : priority,
+        search,
+        sort_by: this.sortBy(),
+        sort_order: this.sortOrder(),
       })
       .subscribe({
         next: (res) => {
@@ -109,12 +131,16 @@ export class ReviewQueueComponent implements OnInit {
 
     const status = this.statusFilter();
     const priority = this.priorityFilter();
+    const search = this.sanitizedSearch();
 
     this.api
       .getReviewTasks({
         cursor,
         status: status === 'all' ? undefined : status,
         priority: priority === 'all' ? undefined : priority,
+        search,
+        sort_by: this.sortBy(),
+        sort_order: this.sortOrder(),
       })
       .subscribe({
         next: (res) => {
@@ -141,6 +167,70 @@ export class ReviewQueueComponent implements OnInit {
   onPriorityChange(priority: ReviewTaskPriority | 'all'): void {
     this.priorityFilter.set(priority);
     this.loadTasks();
+  }
+
+  onSearchChange(value: string): void {
+    this.searchQuery.set(value);
+    if (this.searchDebounce) {
+      clearTimeout(this.searchDebounce);
+    }
+    this.searchDebounce = setTimeout(() => {
+      this.loadTasks();
+    }, 300);
+  }
+
+  onSortChange(sort: Sort): void {
+    if (this.isSortableColumn(sort.active)) {
+      this.sortBy.set(sort.active);
+    }
+    this.sortOrder.set(sort.direction === 'asc' ? 'asc' : 'desc');
+    this.loadTasks();
+  }
+
+  clearFilters(): void {
+    this.statusFilter.set('open');
+    this.priorityFilter.set('all');
+    this.searchQuery.set('');
+    this.loadTasks();
+  }
+
+  ageLabel(createdAt: string): string {
+    const created = new Date(createdAt);
+    const diffMs = Date.now() - created.getTime();
+    if (isNaN(created.getTime()) || diffMs < 60 * 60 * 1000) {
+      return this.translate.instant('quotations.queue.age.justNow');
+    }
+
+    const diffHours = Math.floor(diffMs / (60 * 60 * 1000));
+    if (diffHours < 24) {
+      return this.translate.instant('quotations.queue.age.hoursAgo', { count: diffHours });
+    }
+
+    const diffDays = Math.floor(diffHours / 24);
+    if (diffDays < 7) {
+      return this.translate.instant('quotations.queue.age.daysAgo', { count: diffDays });
+    }
+    if (diffDays < 30) {
+      return this.translate.instant('quotations.queue.age.weeksAgo', {
+        count: Math.floor(diffDays / 7),
+      });
+    }
+    return this.translate.instant('quotations.queue.age.monthsAgo', {
+      count: Math.floor(diffDays / 30),
+    });
+  }
+
+  onRowClick(_task: ReviewTask): void {
+    // Navigation is handled by RouterLink on the row.
+  }
+
+  private sanitizedSearch(): string | undefined {
+    const search = this.searchQuery().trim();
+    return search ? search : undefined;
+  }
+
+  private isSortableColumn(value: string): value is ReviewTaskSortBy {
+    return ['created_at', 'stated_total', 'priority', 'status'].includes(value);
   }
 
   private handleError(err: unknown): void {

@@ -313,6 +313,40 @@
 
       <!-- Right Panel: Extracted Commercial Data -->
       <section class="data-panel" [attr.aria-label]="'quotations.review.panels.extractedData' | translate">
+        <mat-card class="panel-card information-card">
+          <mat-card-header>
+            <mat-card-title class="panel-title">
+              <mat-icon aria-hidden="true">info</mat-icon>
+              <span>{{ 'quotations.review.information.title' | translate }}</span>
+            </mat-card-title>
+          </mat-card-header>
+
+          <mat-card-content>
+            <div class="information-grid">
+              <div class="information-item">
+                <span class="information-label">{{ 'quotations.review.uploadedAt' | translate }}</span>
+                <span class="information-value" [matTooltip]="q.document.created_at">
+                  {{ q.document.created_at | formatDate: dateTimeOptions }}
+                </span>
+              </div>
+              <div class="information-item">
+                <span class="information-label">{{ 'quotations.review.extractedAt' | translate }}</span>
+                <span class="information-value" [matTooltip]="extractedAt(q)">
+                  {{ extractedAt(q) | formatDate: dateTimeOptions }}
+                </span>
+              </div>
+              @if (lastModifiedAt(q); as modifiedAt) {
+                <div class="information-item">
+                  <span class="information-label">{{ 'quotations.review.lastModified' | translate }}</span>
+                  <span class="information-value" [matTooltip]="modifiedAt">
+                    {{ modifiedAt | formatDate: dateTimeOptions }}
+                  </span>
+                </div>
+              }
+            </div>
+          </mat-card-content>
+        </mat-card>
+
         <!-- Header Information Card -->
         <mat-card class="panel-card header-card">
           <mat-card-header>
@@ -438,6 +472,11 @@
                   <mat-datepicker-toggle matIconSuffix [for]="expiryDatePicker"></mat-datepicker-toggle>
                   <mat-datepicker #expiryDatePicker [disabled]="!isWriter() || q.status === 'reviewed'"></mat-datepicker>
                 </mat-form-field>
+                @if (expiryBadge(q); as badge) {
+                  <span class="expiry-badge expiry-{{ badge.kind }}">
+                    {{ badge.labelKey | translate:{ count: badge.count } }}
+                  </span>
+                }
                 @if (isFieldCorrected('quotation', q.id, 'expiry_date')) {
                   <span class="corrected-tag">{{ 'quotations.review.corrections.correctedBadge' | translate }}</span>
                 }

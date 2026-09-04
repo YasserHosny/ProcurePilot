@@ -126,6 +126,10 @@
         min-width: 100%;
       }
     }
+
+    .search-field {
+      flex: 1 1 280px;
+    }
   }
 }
 
@@ -172,6 +176,13 @@
     color: var(--mat-sys-on-surface-variant, #64748b);
     max-width: 400px;
     margin: 0;
+  }
+
+  .clear-filters-btn {
+    margin-block-start: 1rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
   }
 }
 
@@ -277,6 +288,15 @@
 
   .muted-dash {
     color: var(--mat-sys-on-surface-variant, #94a3b8);
+  }
+
+  .clickable-row {
+    cursor: pointer;
+    transition: background-color 120ms ease;
+
+    &:hover {
+      background-color: var(--mat-sys-surface-container-low, #f8fafc);
+    }
   }
 }
 

@@ -46,6 +46,18 @@
   <!-- Filters Toolbar -->
   <mat-card class="filter-card">
     <mat-card-content class="filter-row">
+      <mat-form-field appearance="outline" class="filter-field search-field">
+        <mat-label>{{ 'quotations.queue.searchPlaceholder' | translate }}</mat-label>
+        <input
+          matInput
+          type="search"
+          [ngModel]="searchQuery()"
+          (ngModelChange)="onSearchChange($event)"
+          [placeholder]="'quotations.queue.searchPlaceholder' | translate"
+        />
+        <mat-icon matPrefix aria-hidden="true">search</mat-icon>
+      </mat-form-field>
+
       <mat-form-field appearance="outline" class="filter-field">
         <mat-label>{{ 'quotations.queue.filterStatus' | translate }}</mat-label>
         <mat-select
@@ -81,6 +93,15 @@
         <div class="loading-state">
           <mat-spinner [attr.aria-label]="'common.loading' | translate" diameter="40"></mat-spinner>
         </div>
+      } @else if (tasks().length === 0 && hasActiveFilters()) {
+        <div class="empty-state">
+          <mat-icon class="empty-icon" aria-hidden="true">filter_alt_off</mat-icon>
+          <h2 class="empty-title">{{ 'quotations.queue.noFilterResults' | translate }}</h2>
+          <button mat-stroked-button type="button" (click)="clearFilters()" class="clear-filters-btn">
+            <mat-icon aria-hidden="true">clear</mat-icon>
+            <span>{{ 'quotations.queue.clearFilters' | translate }}</span>
+          </button>
+        </div>
       } @else if (tasks().length === 0) {
         <div class="empty-state">
           <mat-icon class="empty-icon" aria-hidden="true">inbox</mat-icon>
@@ -89,7 +110,16 @@
         </div>
       } @else {
         <div class="table-responsive">
-          <table mat-table [dataSource]="tasks()" class="tasks-table">
+          <table
+            mat-table
+            matSort
+            [matSortActive]="sortBy()"
+            [matSortDirection]="sortOrder()"
+            matSortDisableClear
+            (matSortChange)="onSortChange($event)"
+            [dataSource]="tasks()"
+            class="tasks-table"
+          >
             <!-- Quotation ID Column (Q4: truncated) -->
             <ng-container matColumnDef="quotation_id">
               <th mat-header-cell *matHeaderCellDef>{{ 'quotations.queue.columns.id' | translate }}</th>
@@ -118,7 +148,9 @@
 
             <!-- Priority Column -->
             <ng-container matColumnDef="priority">
-              <th mat-header-cell *matHeaderCellDef>{{ 'quotations.queue.columns.priority' | translate }}</th>
+              <th mat-header-cell *matHeaderCellDef mat-sort-header>
+                {{ 'quotations.queue.columns.priority' | translate }}
+              </th>
               <td mat-cell *matCellDef="let task">
                 <span class="priority-badge priority-{{ task.priority }}">
                   {{ 'quotations.queue.priority.' + task.priority | translate }}
@@ -128,7 +160,9 @@
 
             <!-- Status Column -->
             <ng-container matColumnDef="status">
-              <th mat-header-cell *matHeaderCellDef>{{ 'quotations.queue.columns.status' | translate }}</th>
+              <th mat-header-cell *matHeaderCellDef mat-sort-header>
+                {{ 'quotations.queue.columns.status' | translate }}
+              </th>
               <td mat-cell *matCellDef="let task">
                 <span class="status-badge status-{{ task.status }}">
                   {{ 'quotations.queue.status.' + task.status | translate }}
@@ -138,7 +172,9 @@
 
             <!-- Stated Total Column (Q5) -->
             <ng-container matColumnDef="stated_total">
-              <th mat-header-cell *matHeaderCellDef>{{ 'quotations.queue.columns.statedTotal' | translate }}</th>
+              <th mat-header-cell *matHeaderCellDef mat-sort-header>
+                {{ 'quotations.queue.columns.statedTotal' | translate }}
+              </th>
               <td mat-cell *matCellDef="let task">
                 @if (task.stated_total) {
                   {{ task.stated_total | formatMoney }}
@@ -150,9 +186,19 @@
 
             <!-- Created At Column (Q2: fixed label) -->
             <ng-container matColumnDef="created_at">
-              <th mat-header-cell *matHeaderCellDef>{{ 'quotations.queue.columns.createdAt' | translate }}</th>
-              <td mat-cell *matCellDef="let task">
+              <th mat-header-cell *matHeaderCellDef mat-sort-header>
+                {{ 'quotations.queue.columns.createdAt' | translate }}
+              </th>
+              <td mat-cell *matCellDef="let task" [matTooltip]="task.created_at">
                 {{ task.created_at | formatDate }}
+              </td>
+            </ng-container>
+
+            <!-- Age Column -->
+            <ng-container matColumnDef="age">
+              <th mat-header-cell *matHeaderCellDef>{{ 'quotations.queue.columns.age' | translate }}</th>
+              <td mat-cell *matCellDef="let task">
+                {{ ageLabel(task.created_at) }}
               </td>
             </ng-container>
 
@@ -165,6 +211,7 @@
                     mat-stroked-button
                     color="primary"
                     [routerLink]="['/quotations', task.quotation_id, 'review']"
+                    (click)="$event.stopPropagation()"
                     class="action-btn"
                   >
                     <mat-icon aria-hidden="true">fact_check</mat-icon>
@@ -174,6 +221,7 @@
                   <a
                     mat-stroked-button
                     [routerLink]="['/quotations', task.quotation_id, 'review']"
+                    (click)="$event.stopPropagation()"
                     class="action-btn"
                   >
                     <mat-icon aria-hidden="true">visibility</mat-icon>
@@ -184,7 +232,13 @@
             </ng-container>
 
             <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
-            <tr mat-row *matRowDef="let row; columns: displayedColumns"></tr>
+            <tr
+              mat-row
+              *matRowDef="let row; columns: displayedColumns"
+              [routerLink]="['/quotations', row.quotation_id, 'review']"
+              (click)="onRowClick(row)"
+              class="clickable-row"
+            ></tr>
           </table>
         </div>
 

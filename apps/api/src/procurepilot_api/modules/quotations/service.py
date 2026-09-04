@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+from typing import Literal
 from uuid import UUID
 
 from postgrest.exceptions import APIError
@@ -107,22 +108,35 @@ class QuotationService:
         limit: int = 50,
         status: ReviewTaskStatus | str = "open",
         priority: ReviewTaskPriority | None = None,
+        search: str | None = None,
+        sort_by: Literal["created_at", "stated_total", "priority", "status"] = "created_at",
+        sort_order: Literal["asc", "desc"] = "desc",
     ) -> ReviewTaskList:
         client = authenticated_client(self._settings, bearer_token)
         capped_limit = max(1, min(limit, 100))
         offset = _decode_cursor(cursor)
+        clean_search = search.strip()[:200].lower() if search else None
         try:
             query = client.table("review_task").select(TASK_COLUMNS)
             if status != "all":
                 query = query.eq("status", status)
             if priority is not None:
                 query = query.eq("priority", priority)
-            response = query.order("created_at").order("id").range(
-                offset, offset + capped_limit
-            ).execute()
+            response = (
+                query.order(sort_by, desc=sort_order == "desc")
+                .order("id")
+                .range(offset, offset + capped_limit)
+                .execute()
+            )
         except APIError as exc:
             raise ServiceUnavailableError(details={"dependency": "database"}) from exc
         rows = _rows(response.data)
+        if clean_search:
+            rows = [
+                r for r in rows
+                if clean_search in str(r.get("quotation_id", "")).lower()
+                or clean_search in _nested_supplier_name(r).lower()
+            ]
         visible = rows[:capped_limit]
         return ReviewTaskList(
             items=[_task(row) for row in visible],
@@ -308,6 +322,15 @@ def _field(row: dict[str, object]) -> FieldExtraction:
         corrected_by=UUID(str(row["corrected_by"])) if row.get("corrected_by") else None,
         corrected_at=row.get("corrected_at"),
     )
+
+
+def _nested_supplier_name(row: dict[str, object]) -> str:
+    q = row.get("quotation")
+    if isinstance(q, dict):
+        s = q.get("supplier")
+        if isinstance(s, dict):
+            return str(s.get("name", ""))
+    return ""
 
 
 def _task(row: dict[str, object]) -> ReviewTask:

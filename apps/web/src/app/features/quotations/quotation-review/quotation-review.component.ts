@@ -45,6 +45,17 @@ interface FlaggedField {
   readonly extraction: FieldExtraction;
 }
 
+interface ExpiryBadge {
+  readonly kind: 'expired' | 'warning' | 'valid';
+  readonly labelKey: 'quotations.review.expired' | 'quotations.review.expiresIn' | 'quotations.review.validFor';
+  readonly count?: number;
+}
+
+type QuotationTimestampFields = QuotationDetail & {
+  readonly extracted_at?: string | null;
+  readonly updated_at?: string | null;
+};
+
 @Component({
   selector: 'app-quotation-review',
   standalone: true,
@@ -142,6 +153,10 @@ export class QuotationReviewComponent implements OnInit {
     'confidence',
     'actions',
   ];
+  readonly dateTimeOptions: Intl.DateTimeFormatOptions = {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  };
 
   // List of all low confidence (<0.85) extractions needing attention
   readonly flaggedFields = computed<FlaggedField[]>(() => {
@@ -333,6 +348,16 @@ export class QuotationReviewComponent implements OnInit {
     return parts[parts.length - 1] || path;
   }
 
+  extractedAt(q: QuotationDetail): string {
+    const timestampFields = q as QuotationTimestampFields;
+    return timestampFields.extracted_at ?? q.created_at;
+  }
+
+  lastModifiedAt(q: QuotationDetail): string | null {
+    const timestampFields = q as QuotationTimestampFields;
+    return timestampFields.updated_at ?? null;
+  }
+
   fieldLabel(fieldName: string): string {
     const labels: Record<string, string> = {
       currency: 'Currency',
@@ -361,6 +386,26 @@ export class QuotationReviewComponent implements OnInit {
       return fe.corrected_value;
     }
     return fe.extracted_value ?? defaultValue;
+  }
+
+  expiryBadge(q: QuotationDetail): ExpiryBadge | null {
+    const expiryValue = this.getEffectiveValue('quotation', q.id, 'expiry_date', q.expiry_date || '');
+    if (!expiryValue || typeof expiryValue !== 'string') return null;
+
+    const expiryDate = new Date(`${expiryValue}T00:00:00`);
+    if (isNaN(expiryDate.getTime())) return null;
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const diffDays = Math.ceil((expiryDate.getTime() - today.getTime()) / 86_400_000);
+
+    if (diffDays < 0) {
+      return { kind: 'expired', labelKey: 'quotations.review.expired' };
+    }
+    if (diffDays <= 7) {
+      return { kind: 'warning', labelKey: 'quotations.review.expiresIn', count: diffDays };
+    }
+    return { kind: 'valid', labelKey: 'quotations.review.validFor', count: diffDays };
   }
 
   isFieldCorrected(entityType: 'quotation' | 'quotation_line', entityId: string, fieldName: string): boolean {

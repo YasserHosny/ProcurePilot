@@ -415,12 +415,18 @@ export class ApiService {
     limit?: number;
     status?: ReviewTaskStatus | 'all';
     priority?: ReviewTaskPriority;
+    search?: string;
+    sort_by?: 'created_at' | 'stated_total' | 'priority' | 'status';
+    sort_order?: 'asc' | 'desc';
   }): Observable<{ items: ReviewTask[]; next_cursor: string | null }> {
     const query = new URLSearchParams();
     if (params?.cursor) query.set('cursor', params.cursor);
     if (params?.limit) query.set('limit', String(params.limit));
     if (params?.status) query.set('status', params.status);
     if (params?.priority) query.set('priority', params.priority);
+    if (params?.search) query.set('search', params.search);
+    if (params?.sort_by) query.set('sort_by', params.sort_by);
+    if (params?.sort_order) query.set('sort_order', params.sort_order);
     const qs = query.toString() ? `?${query.toString()}` : '';
     return this.http.get<{ items: ReviewTask[]; next_cursor: string | null }>(
       `${this.base}/review-tasks${qs}`,
@@ -861,5 +867,4 @@ export class ApiService {
     return this.http.delete<void>(`${this.base}/approvals/delegations/${delegationId}`);
   }
 }
-
 
