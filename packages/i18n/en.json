@@ -724,6 +724,9 @@
         "medium": "Medium Confidence",
         "low": "Low Confidence — Needs Review",
         "flaggedBadge": "Needs Attention",
+        "legendText": "Fields below 85% confidence are flagged for review",
+        "highBadge": "≥85%",
+        "lowBadge": "<85%",
         "scoreTooltip": "AI confidence score: {{score}}% via {{method}} ({{model}})"
       },
       "provenance": {

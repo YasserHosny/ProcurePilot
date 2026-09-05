@@ -29,6 +29,7 @@ import type {
   ApiError,
   FieldCorrection,
   FieldExtraction,
+  Money,
   NewQuotationLine,
   QuotationDetail,
   Supplier,
@@ -51,6 +52,14 @@ interface ExpiryBadge {
   readonly kind: 'expired' | 'warning' | 'valid';
   readonly labelKey: 'quotations.review.expired' | 'quotations.review.expiresIn' | 'quotations.review.validFor';
   readonly count?: number;
+}
+
+interface EffectiveLineAmounts {
+  readonly quantity: number;
+  readonly unitPrice: number;
+  readonly deliveryFee: number;
+  readonly discount: number;
+  readonly vatRate: number;
 }
 
 type QuotationTimestampFields = QuotationDetail & {
@@ -205,21 +214,23 @@ export class QuotationReviewComponent implements OnInit {
   // Computed line total sum
   readonly computedLinesTotal = computed<{ amount: string; currency: string } | null>(() => {
     const q = this.quotation();
-    if (!q || !q.lines || q.lines.length === 0) return null;
+    if (!q) return null;
+    const pendingNewLines = this.pendingNewLines();
+    if (q.lines.length === 0 && pendingNewLines.length === 0) return null;
 
     let total = 0;
-    const currency = q.currency || q.lines[0]?.unit_price?.currency || 'USD';
+    const currency = q.currency || q.lines[0]?.unit_price?.currency || pendingNewLines[0]?.unit_price_currency || 'USD';
 
     for (const line of q.lines) {
-      if (line.unit_price?.amount) {
-        const qty = parseFloat(line.quantity || '1');
-        const price = parseFloat(line.unit_price.amount);
-        const delivery = parseFloat(line.delivery_fee?.amount || '0');
-        const discount = parseFloat(line.discount?.amount || '0');
-        const vatRate = parseFloat(line.vat_rate || '0');
-        const lineNet = qty * price + delivery - discount;
-        total += lineNet * (1 + vatRate);
-      }
+      if (this.pendingRemoveLineIds().has(line.id)) continue;
+
+      total += this.calculateLineTotal(this.effectiveLineAmounts(line));
+    }
+
+    for (const line of pendingNewLines) {
+      const qty = this.parseNumericInput(line.quantity, 1);
+      const price = this.parseNumericInput(line.unit_price_amount, 0);
+      total += qty * price;
     }
 
     return {
@@ -241,9 +252,7 @@ export class QuotationReviewComponent implements OnInit {
     if (Math.abs(stated - computed) <= 0.01) return false;
 
     // If gap is explainable by document-level VAT, not a mismatch
-    const hasLineVat = q.lines?.some(
-      (l) => l.vat_rate != null && parseFloat(l.vat_rate) > 0,
-    );
+    const hasLineVat = this.hasEffectiveLineVat();
     if (!hasLineVat && computed > 0 && stated > computed) {
       const inferredPct = Math.round(((stated - computed) / computed) * 100);
       if (inferredPct > 0 && inferredPct <= 30) {
@@ -270,9 +279,7 @@ export class QuotationReviewComponent implements OnInit {
     const stated = parseFloat(q.stated_total.amount);
     const computed = parseFloat(computedTotal.amount);
     if (Math.abs(stated - computed) <= 0.01) return null;
-    const hasLineVat = q.lines?.some(
-      (l) => l.vat_rate != null && parseFloat(l.vat_rate) > 0,
-    );
+    const hasLineVat = this.hasEffectiveLineVat();
     if (!hasLineVat && computed > 0 && stated > computed) {
       const pct = Math.round(((stated - computed) / computed) * 100);
       if (pct > 0 && pct <= 30) {
@@ -844,14 +851,69 @@ export class QuotationReviewComponent implements OnInit {
   }
 
   computeLineTotal(line: QuotationDetail['lines'][number]): string | null {
-    if (!line.unit_price?.amount) return null;
-    const qty = parseFloat(line.quantity || '1');
-    const price = parseFloat(line.unit_price.amount);
-    const delivery = parseFloat(line.delivery_fee?.amount || '0');
-    const discount = parseFloat(line.discount?.amount || '0');
-    const vatRate = parseFloat(line.vat_rate || '0');
-    const lineNet = qty * price + delivery - discount;
-    return (lineNet * (1 + vatRate)).toFixed(2);
+    const amounts = this.effectiveLineAmounts(line);
+    if (amounts.unitPrice === 0 && !line.unit_price?.amount) return null;
+    return this.calculateLineTotal(amounts).toFixed(2);
+  }
+
+  private hasEffectiveLineVat(): boolean {
+    const q = this.quotation();
+    if (!q) return false;
+    return q.lines.some((line) => {
+      if (this.pendingRemoveLineIds().has(line.id)) return false;
+      return this.effectiveLineAmounts(line).vatRate > 0;
+    });
+  }
+
+  private effectiveLineAmounts(line: QuotationDetail['lines'][number]): EffectiveLineAmounts {
+    return {
+      quantity: this.effectiveNumericLineValue(line, 'quantity', line.quantity, 1),
+      unitPrice: this.effectiveNumericLineValue(line, ['unit_price_amount', 'unit_price'], line.unit_price, 0),
+      deliveryFee: this.effectiveNumericLineValue(line, ['delivery_fee_amount', 'delivery_fee'], line.delivery_fee, 0),
+      discount: this.effectiveNumericLineValue(line, ['discount_amount', 'discount'], line.discount, 0),
+      vatRate: this.effectiveNumericLineValue(line, 'vat_rate', line.vat_rate, 0),
+    };
+  }
+
+  private effectiveNumericLineValue(
+    line: QuotationDetail['lines'][number],
+    fieldNames: string | readonly string[],
+    defaultValue: unknown,
+    fallback: number,
+  ): number {
+    const names = typeof fieldNames === 'string' ? [fieldNames] : fieldNames;
+    for (const fieldName of names) {
+      const extraction = this.getFieldExtraction('quotation_line', line.id, fieldName);
+      if (extraction && this.pendingCorrections().has(extraction.id)) {
+        return this.parseNumericInput(this.pendingCorrections().get(extraction.id), fallback);
+      }
+    }
+    return this.parseNumericInput(defaultValue, fallback);
+  }
+
+  private parseNumericInput(value: unknown, fallback: number): number {
+    const rawValue = this.moneyAmount(value);
+    const parsed = typeof rawValue === 'number' ? rawValue : parseFloat(String(rawValue ?? ''));
+    return Number.isFinite(parsed) ? parsed : fallback;
+  }
+
+  private moneyAmount(value: unknown): string | number | null {
+    if (this.isMoney(value)) return value.amount;
+    return typeof value === 'string' || typeof value === 'number' ? value : null;
+  }
+
+  private isMoney(value: unknown): value is Money {
+    return (
+      typeof value === 'object' &&
+      value !== null &&
+      'amount' in value &&
+      typeof value.amount === 'string'
+    );
+  }
+
+  private calculateLineTotal(amounts: EffectiveLineAmounts): number {
+    const lineNet = amounts.quantity * amounts.unitPrice + amounts.deliveryFee - amounts.discount;
+    return lineNet * (1 + amounts.vatRate);
   }
 
   revertToAiValue(feId: string): void {

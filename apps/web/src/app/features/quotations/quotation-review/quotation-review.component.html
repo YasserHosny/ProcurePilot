@@ -258,6 +258,15 @@
       </div>
     }
 
+    <div class="confidence-legend-bar" role="note">
+      <mat-icon class="confidence-legend-icon" aria-hidden="true">info</mat-icon>
+      <span class="confidence-legend-text">{{ 'quotations.review.confidence.legendText' | translate }}</span>
+      <span class="confidence-legend-badges" aria-hidden="true">
+        <span class="confidence-legend-badge high-conf">{{ 'quotations.review.confidence.highBadge' | translate }}</span>
+        <span class="confidence-legend-badge low-conf">{{ 'quotations.review.confidence.lowBadge' | translate }}</span>
+      </span>
+    </div>
+
     <!-- Side-by-Side Main Panels -->
     <div class="side-by-side-layout">
       <!-- Left Panel: Source Document Evidence -->

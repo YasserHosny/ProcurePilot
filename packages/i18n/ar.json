@@ -724,6 +724,9 @@
         "medium": "ثقة متوسطة",
         "low": "ثقة منخفضة — تتطلب مراجعة",
         "flaggedBadge": "تتطلب انتباهاً",
+        "legendText": "يتم تمييز الحقول التي تقل ثقتها عن 85% للمراجعة",
+        "highBadge": "≥85%",
+        "lowBadge": "<85%",
         "scoreTooltip": "درجة ثقة الذكاء الاصطناعي: {{score}}% عبر {{method}} ({{model}})"
       },
       "provenance": {
