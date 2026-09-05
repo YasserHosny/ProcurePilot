@@ -197,6 +197,10 @@
       <div class="section-header">
         <h2 id="candidates-section-title" class="section-title">{{ 'matching.resolution.candidates.title' | translate }}</h2>
         <p class="section-desc">{{ 'matching.resolution.candidates.subtitle' | translate }}</p>
+        <div class="match-score-note" role="note">
+          <mat-icon aria-hidden="true">info</mat-icon>
+          <span>{{ 'matching.resolution.candidates.scoreExplainer' | translate }}</span>
+        </div>
       </div>
 
       @if (candidates().length === 0) {

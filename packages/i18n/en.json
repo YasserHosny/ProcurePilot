@@ -921,7 +921,8 @@
         "title": "Ranked Product Candidates",
         "subtitle": "Evaluated through deterministic keys, lexical (pg_trgm), semantic (pgvector), and feature plausibility scoring.",
         "rank": "Rank #{{rank}}",
-        "confidence": "Match Confidence",
+        "confidence": "Match Score",
+        "scoreExplainer": "This score ranks candidates; it is not yet a calibrated probability.",
         "noCandidates": "No candidates found for this line item.",
         "signalsTitle": "Reason Breakdown",
         "signals": {
@@ -1038,7 +1039,7 @@
         "decidedAt": "Decided At:",
         "automatic": "Automatic Match",
         "human": "Human Resolution",
-        "confidence": "Decision Confidence:"
+        "confidence": "Match Score:"
       },
       "actions": {
         "confirm": "Confirm Match Decision",

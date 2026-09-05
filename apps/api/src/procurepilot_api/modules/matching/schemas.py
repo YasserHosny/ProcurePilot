@@ -70,7 +70,12 @@ class MatchCandidate(BaseModel):
     id: UUID
     quotation_line_id: UUID
     candidate_product: ProductSummary
-    confidence: str
+    confidence: str = Field(
+        description=(
+            "Heuristic weighted match score used to rank and route candidates; "
+            "not a calibrated probability."
+        )
+    )
     reasons: MatchReason
     rank: int = Field(ge=1)
     scoring_version: str | None = None
@@ -87,7 +92,12 @@ class MatchDecision(BaseModel):
     is_automatic: bool
     decided_by: UUID | None = None
     decided_at: datetime
-    confidence: str
+    confidence: str = Field(
+        description=(
+            "Heuristic weighted match score recorded for the decision; "
+            "not a calibrated probability."
+        )
+    )
     alias_id: UUID | None = None
 
 
