@@ -555,6 +555,9 @@
       "sampleAcmeFoods": "Acme Foods — ٥ بنود (CSV)",
       "sampleFreshDirect": "Fresh Direct — ٦ بنود (CSV)",
       "sampleAlFaisalTrading": "Al-Faisal Trading — ٦ بنود (PDF)",
+      "sampleHeliosPackaging": "Helios Packaging — ٧ بنود (PDF)",
+      "sampleBrightwellElectronics": "Brightwell Electronics — ٦ بنود (PNG)",
+      "sampleOakridgeIndustrial": "Oakridge Industrial — ٨ بنود (XLSX)",
       "duplicateWarning": {
         "title": "تم اكتشاف احتمال تكرار",
         "message": "تم رفع مستند بالمحتوى نفسه إلى مساحة العمل هذه من قبل.",

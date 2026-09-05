@@ -555,6 +555,9 @@
       "sampleAcmeFoods": "Acme Foods — 5 items (CSV)",
       "sampleFreshDirect": "Fresh Direct — 6 items (CSV)",
       "sampleAlFaisalTrading": "Al-Faisal Trading — 6 items (PDF)",
+      "sampleHeliosPackaging": "Helios Packaging — 7 items (PDF)",
+      "sampleBrightwellElectronics": "Brightwell Electronics — 6 items (PNG)",
+      "sampleOakridgeIndustrial": "Oakridge Industrial — 8 items (XLSX)",
       "duplicateWarning": {
         "title": "Possible Duplicate Detected",
         "message": "A document with the same content has already been uploaded to this workspace.",
