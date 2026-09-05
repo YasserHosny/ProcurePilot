@@ -270,6 +270,8 @@ export interface Quotation {
   readonly id: string;
   readonly document_id: string;
   readonly supplier_id?: string | null;
+  readonly suggested_supplier_id?: string | null;
+  readonly supplier_match_confidence?: string | null;
   readonly currency?: string | null;
   readonly issue_date?: string | null;
   readonly expiry_date?: string | null;
@@ -354,6 +356,7 @@ export interface QuotationDetail extends Quotation {
   readonly review_task?: ReviewTask | null;
   readonly uploaded_by_email?: string | null;
   readonly reviewed_by_email?: string | null;
+  readonly suggested_supplier_name?: string | null;
 }
 
 export interface AuditTrailEntry {
@@ -386,7 +389,8 @@ export type ReviewTaskReason =
   | 'low_confidence'
   | 'arithmetic_mismatch'
   | 'read_failure'
-  | 'review_required';
+  | 'review_required'
+  | 'no_supplier_match';
 
 export interface ReviewTask {
   readonly id: string;

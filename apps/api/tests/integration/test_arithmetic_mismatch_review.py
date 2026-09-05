@@ -33,7 +33,11 @@ def test_mismatched_quotations_always_create_mandatory_review_task(conn: object)
         ExtractionResult,
     )
     from procurepilot_extraction_worker.validation import validate_arithmetic
-    from procurepilot_extraction_worker.worker import _persist_result, _update_quotation_status
+    from procurepilot_extraction_worker.worker import (
+        SupplierMatch,
+        _persist_result,
+        _update_quotation_status,
+    )
 
     with conn.cursor() as cur:
         workspace = make_workspace(cur, "arithmetic-mismatch")
@@ -67,7 +71,14 @@ def test_mismatched_quotations_always_create_mandatory_review_task(conn: object)
         arithmetic = validate_arithmetic(result)
 
         _persist_result(conn, workspace.tenant_id, quotation_id, result, arithmetic.status)
-        _update_quotation_status(conn, quotation_id, "in_review", arithmetic.status, result)
+        _update_quotation_status(
+            conn,
+            quotation_id,
+            "in_review",
+            arithmetic.status,
+            result,
+            SupplierMatch(None, None, had_candidates=False),
+        )
 
         act_as(cur, workspace)
         cur.execute("select arithmetic_status from quotation where id = %s", (quotation_id,))

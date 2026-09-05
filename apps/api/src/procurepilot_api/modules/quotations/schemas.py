@@ -20,6 +20,7 @@ ReviewTaskReason = Literal[
     "arithmetic_mismatch",
     "read_failure",
     "review_required",
+    "no_supplier_match",
 ]
 
 
@@ -144,6 +145,8 @@ class Quotation(BaseModel):
     id: UUID
     document_id: UUID
     supplier_id: UUID | None = None
+    suggested_supplier_id: UUID | None = None
+    supplier_match_confidence: str | None = None
     currency: str | None = None
     issue_date: date | None = None
     expiry_date: date | None = None
@@ -173,6 +176,7 @@ class QuotationDetail(Quotation):
     next_versions: list[QuotationVersionReference] = Field(default_factory=list)
     uploaded_by_email: str | None = None
     reviewed_by_email: str | None = None
+    suggested_supplier_name: str | None = None
 
 
 def decimal_string(value: object, *, scale: int | None = None) -> str | None:

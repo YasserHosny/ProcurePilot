@@ -36,9 +36,10 @@ from procurepilot_api.shared.audit import AuditEventCreate, get_audit_writer
 from procurepilot_api.shared.logging import get_trace_id
 
 QUOTATION_COLUMNS = (
-    "id,document_id,supplier_id,currency,issue_date,expiry_date,status,previous_quotation_id,"
-    "stated_total_amount,stated_total_currency,arithmetic_status,created_at,reviewed_by,"
-    "reviewed_at,deleted_at,reviewer_notes"
+    "id,document_id,supplier_id,suggested_supplier_id,supplier_match_confidence,currency,"
+    "issue_date,expiry_date,status,previous_quotation_id,stated_total_amount,"
+    "stated_total_currency,arithmetic_status,created_at,reviewed_by,reviewed_at,deleted_at,"
+    "reviewer_notes"
 )
 LINE_COLUMNS = (
     "id,line_number,original_text,quantity,pack_count,unit_size,pack_unit,unit_price_amount,"
@@ -98,10 +99,17 @@ class QuotationService:
             else None
         )
         next_versions = _next_versions(client, quotation_id)
-        uploaded_by_email = _membership_email(client, document.created_by) if document.created_by else None
+        uploaded_by_email = (
+            _membership_email(client, document.created_by) if document.created_by else None
+        )
         reviewed_by_email = (
             _membership_email(client, UUID(str(quote["reviewed_by"])))
             if quote.get("reviewed_by")
+            else None
+        )
+        suggested_supplier_name = (
+            _supplier_name(client, UUID(str(quote["suggested_supplier_id"])))
+            if quote.get("suggested_supplier_id")
             else None
         )
         return QuotationDetail(
@@ -114,6 +122,7 @@ class QuotationService:
             next_versions=next_versions,
             uploaded_by_email=uploaded_by_email,
             reviewed_by_email=reviewed_by_email,
+            suggested_supplier_name=suggested_supplier_name,
         )
 
     def list_review_tasks(
@@ -397,7 +406,12 @@ class QuotationService:
             )
         except APIError as exc:
             raise ServiceUnavailableError(details={"dependency": "database"}) from exc
-        _enqueue_extraction(self._settings, job_row, {**quote, "document_id": str(new_document_id)}, member)
+        _enqueue_extraction(
+            self._settings,
+            job_row,
+            {**quote, "document_id": str(new_document_id)},
+            member,
+        )
         self._record(
             bearer_token=bearer_token,
             member=member,
@@ -634,6 +648,13 @@ def _quotation(row: dict[str, object]) -> Quotation:
         id=UUID(str(row["id"])),
         document_id=UUID(str(row["document_id"])),
         supplier_id=UUID(str(row["supplier_id"])) if row.get("supplier_id") else None,
+        suggested_supplier_id=(
+            UUID(str(row["suggested_supplier_id"])) if row.get("suggested_supplier_id") else None
+        ),
+        supplier_match_confidence=decimal_string(
+            row.get("supplier_match_confidence"),
+            scale=3,
+        ),
         currency=str(row["currency"]) if row.get("currency") else None,
         issue_date=row.get("issue_date"),
         expiry_date=row.get("expiry_date"),

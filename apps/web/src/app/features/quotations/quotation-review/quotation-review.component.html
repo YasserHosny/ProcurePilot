@@ -483,6 +483,48 @@
                   </a>
                 </div>
               }
+              @if (!selectedSupplierId() && supplierSuggestion(); as suggestion) {
+                <div class="supplier-match-banner supplier-match-{{ suggestion.tier }}" role="status">
+                  <mat-icon class="supplier-match-icon" aria-hidden="true">
+                    {{ suggestion.tier === 'high' ? 'check_circle' : 'manage_search' }}
+                  </mat-icon>
+                  <span class="supplier-match-text">
+                    @if (suggestion.tier === 'high') {
+                      {{ 'quotations.review.supplierMatch.suggested' | translate:{ name: suggestion.name, pct: suggestion.confidencePct } }}
+                    } @else {
+                      {{ 'quotations.review.supplierMatch.possible' | translate:{ name: suggestion.name, pct: suggestion.confidencePct } }}
+                    }
+                  </span>
+                  <button
+                    mat-stroked-button
+                    type="button"
+                    (click)="acceptSupplierSuggestion()"
+                    [disabled]="!isWriter() || q.status === 'reviewed'"
+                  >
+                    <mat-icon aria-hidden="true">done</mat-icon>
+                    <span>
+                      {{ (suggestion.tier === 'high' ? 'quotations.review.supplierMatch.acceptButton' : 'quotations.review.supplierMatch.useButton') | translate }}
+                    </span>
+                  </button>
+                </div>
+              }
+              @if (!selectedSupplierId() && noSupplierMatchFlagged() && !supplierSuggestion()) {
+                <div class="supplier-match-banner supplier-match-missing" role="status">
+                  <mat-icon class="supplier-match-icon" aria-hidden="true">person_add</mat-icon>
+                  <span class="supplier-match-text">
+                    {{ 'quotations.review.supplierMatch.noMatch' | translate:{ name: extractedSupplierName() || ('quotations.review.supplierMatch.unknownVendor' | translate) } }}
+                  </span>
+                  <button
+                    mat-stroked-button
+                    type="button"
+                    (click)="createSupplierFromExtraction()"
+                    [disabled]="!isWriter() || q.status === 'reviewed' || isCreatingSupplierFromExtraction() || !extractedSupplierName()"
+                  >
+                    <mat-icon aria-hidden="true">add_business</mat-icon>
+                    <span>{{ 'quotations.review.supplierMatch.createButton' | translate }}</span>
+                  </button>
+                </div>
+              }
 
               <!-- Currency (B8: constrained select) -->
               <div

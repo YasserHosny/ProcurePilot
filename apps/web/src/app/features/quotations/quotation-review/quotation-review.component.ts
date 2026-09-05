@@ -62,6 +62,13 @@ interface EffectiveLineAmounts {
   readonly vatRate: number;
 }
 
+interface SupplierSuggestion {
+  readonly id: string;
+  readonly name: string;
+  readonly confidencePct: number;
+  readonly tier: 'high' | 'medium';
+}
+
 type QuotationTimestampFields = QuotationDetail & {
   readonly extracted_at?: string | null;
   readonly updated_at?: string | null;
@@ -130,6 +137,7 @@ export class QuotationReviewComponent implements OnInit {
   readonly reviewerNotes = signal<string>('');
   readonly isRequote = signal<boolean>(false);
   readonly selectedPreviousQuotationId = signal<string | null>(null);
+  readonly isCreatingSupplierFromExtraction = signal<boolean>(false);
 
   // Field corrections map: field_extraction_id -> corrected value
   readonly pendingCorrections = signal<Map<string, unknown>>(new Map());
@@ -160,6 +168,27 @@ export class QuotationReviewComponent implements OnInit {
   readonly confirmBlockedReason = signal<string | null>(null);
 
   readonly isWriter = computed<boolean>(() => this.session.hasRole('owner', 'buyer'));
+
+  readonly supplierSuggestion = computed<SupplierSuggestion | null>(() => {
+    const q = this.quotation();
+    if (!q || q.supplier_id || !q.suggested_supplier_id) return null;
+    const confidence = parseFloat(q.supplier_match_confidence ?? '0');
+    const confidencePct = Number.isFinite(confidence) ? Math.round(confidence * 100) : 0;
+    const fallbackName = this.suppliers().find((s) => s.id === q.suggested_supplier_id)?.name;
+    const name = q.suggested_supplier_name || fallbackName;
+    if (!name) return null;
+    return {
+      id: q.suggested_supplier_id,
+      name,
+      confidencePct,
+      tier: confidence >= 0.6 ? 'high' : 'medium',
+    };
+  });
+
+  readonly noSupplierMatchFlagged = computed<boolean>(() => {
+    const q = this.quotation();
+    return Boolean(!q?.supplier_id && q?.review_task?.reason === 'no_supplier_match');
+  });
 
   readonly currencyOptions: readonly string[] = [
     'USD', 'EUR', 'GBP', 'AED', 'SAR', 'EGP', 'QAR', 'KWD', 'BHD',
@@ -434,6 +463,45 @@ export class QuotationReviewComponent implements OnInit {
     return q.field_extractions.find(
       (fe) => fe.entity_type === entityType && fe.entity_id === entityId && fe.field_name === fieldName,
     );
+  }
+
+  extractedSupplierName(): string | null {
+    const q = this.quotation();
+    if (!q) return null;
+    const extracted = this.getFieldExtraction('quotation', q.id, 'supplier_name')?.extracted_value;
+    if (typeof extracted === 'string' && extracted.trim()) {
+      return extracted.trim();
+    }
+    return this.supplierSuggestion()?.name ?? null;
+  }
+
+  acceptSupplierSuggestion(): void {
+    const suggestion = this.supplierSuggestion();
+    if (!suggestion) return;
+    this.selectedSupplierId.set(suggestion.id);
+  }
+
+  createSupplierFromExtraction(): void {
+    const name = this.extractedSupplierName();
+    if (!name) return;
+    this.isCreatingSupplierFromExtraction.set(true);
+    this.errorMessage.set(null);
+    this.api.createSupplier({ name }).subscribe({
+      next: (supplier) => {
+        this.suppliers.update((items) => [...items, supplier]);
+        this.selectedSupplierId.set(supplier.id);
+        this.isCreatingSupplierFromExtraction.set(false);
+        this.snackBar.open(
+          this.translate.instant('quotations.review.supplierMatch.createSuccess'),
+          undefined,
+          { duration: 3000 },
+        );
+      },
+      error: (err: unknown) => {
+        this.isCreatingSupplierFromExtraction.set(false);
+        this.handleError(err);
+      },
+    });
   }
 
   documentFileName(): string {

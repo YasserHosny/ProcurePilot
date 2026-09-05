@@ -602,7 +602,8 @@
         "low_confidence": "استخراج منخفض الثقة",
         "arithmetic_mismatch": "عدم تطابق حسابي",
         "read_failure": "تعذر قراءة المستند",
-        "review_required": "تتطلب مراجعة بشرية"
+        "review_required": "تتطلب مراجعة بشرية",
+        "no_supplier_match": "لا يوجد تطابق مورد"
       },
       "columns": {
         "id": "معرف عرض السعر",
@@ -694,6 +695,16 @@
         "statedTotalLabel": "إجمالي المبلغ المذكور",
         "statedTotalCurrency": "عملة المبلغ المذكور",
         "statusLabel": "الحالة"
+      },
+      "supplierMatch": {
+        "suggested": "مقترح: {{name}} - تطابق {{pct}}%",
+        "possible": "تطابق محتمل: {{name}} - {{pct}}%",
+        "acceptButton": "قبول",
+        "useButton": "استخدام هذا",
+        "noMatch": "لم يتم العثور على مورد مطابق لـ {{name}}",
+        "unknownVendor": "اسم المورد المستخرج",
+        "createButton": "إنشاء مورد",
+        "createSuccess": "تم إنشاء المورد وتحديده."
       },
       "lines": {
         "title": "بنود عرض السعر المستخرجة",

@@ -602,7 +602,8 @@
         "low_confidence": "Low Confidence Extraction",
         "arithmetic_mismatch": "Arithmetic Mismatch",
         "read_failure": "Read Failure",
-        "review_required": "Review Required"
+        "review_required": "Review Required",
+        "no_supplier_match": "No Supplier Match"
       },
       "columns": {
         "id": "Quotation ID",
@@ -694,6 +695,16 @@
         "statedTotalLabel": "Stated Total Amount",
         "statedTotalCurrency": "Stated Total Currency",
         "statusLabel": "Status"
+      },
+      "supplierMatch": {
+        "suggested": "Suggested: {{name}} - {{pct}}% match",
+        "possible": "Possible match: {{name}} - {{pct}}% match",
+        "acceptButton": "Accept",
+        "useButton": "Use this",
+        "noMatch": "No supplier match found for {{name}}",
+        "unknownVendor": "the extracted vendor",
+        "createButton": "Create supplier",
+        "createSuccess": "Supplier created and selected."
       },
       "lines": {
         "title": "Extracted Line Items",
