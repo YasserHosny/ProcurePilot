@@ -13,7 +13,6 @@ from procurepilot_logging import get_trace_id, new_trace_id, set_trace_id
 from procurepilot_extraction_worker.azure_di import AzureDocumentIntelligenceProvider
 from procurepilot_extraction_worker.bedrock import BedrockExtractionProvider
 from procurepilot_extraction_worker.models import ExtractedField, ExtractedLine, ExtractionResult
-from procurepilot_extraction_worker.providers import FakeExtractionProvider
 from procurepilot_extraction_worker.settings import WorkerSettings, get_settings
 from procurepilot_extraction_worker.structured_parse import is_structured_mime_type
 from procurepilot_extraction_worker.validation import low_confidence_fields, validate_arithmetic
@@ -32,7 +31,11 @@ def process_extraction_job(payload: dict[str, str]) -> None:
         "extraction job started",
         extra={"job_id": str(job_id), "document_id": str(document_id)},
     )
-    with psycopg.connect(settings.database_url) as conn:
+    # prepare_threshold=None: DATABASE_URL runs through Supabase's transaction-mode pooler,
+    # which hands out reused backend sessions. psycopg3's default server-side prepared
+    # statements collide across connections on that shared session (DuplicatePreparedStatement:
+    # "_pg3_0" already exists) the moment a second job runs.
+    with psycopg.connect(settings.database_url, prepare_threshold=None) as conn:
         document = _document(conn, tenant_id, document_id)
         _mark_running(conn, job_id)
         try:
@@ -67,6 +70,11 @@ def process_extraction_job(payload: dict[str, str]) -> None:
             conn.rollback()
             _mark_failed(conn, job_id, {"code": "extraction_failed", "message": str(exc)})
             _refuse_quotation(conn, quotation_id)
+            # The `with` block below commits on a clean exit but rolls back on one exiting
+            # via an exception — which the `raise` below does. Without this commit, the
+            # failure bookkeeping above is silently undone and the job/quotation are left
+            # stuck at "queued"/"extracting" forever instead of recording as failed/refused.
+            conn.commit()
             logger.exception(
                 "extraction job failed",
                 extra={"job_id": str(job_id), "document_id": str(document_id)},
@@ -89,11 +97,6 @@ def _extract(
         logger.info("using structured parser", extra={"mime_type": mime_type})
         content = _download_storage_object(settings, bucket=bucket, path=storage_path)
         return parse_structured_content(content, mime_type=mime_type)
-    if settings.provider_mode == "stub":
-        logger.info("using stub provider")
-        return FakeExtractionProvider().extract(
-            document_id=str(document_id), mime_type=mime_type, storage_path=storage_path
-        )
     doc_bytes = _download_storage_object(settings, bucket=bucket, path=storage_path)
     common = dict(
         document_id=str(document_id),

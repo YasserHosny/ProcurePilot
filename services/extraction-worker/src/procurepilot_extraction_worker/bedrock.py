@@ -94,17 +94,27 @@ class BedrockExtractionProvider:
             region_name=self._settings.aws_region,
         )
 
+        if mime_type in {"image/png", "image/jpeg", "image/gif", "image/webp"}:
+            media_block: dict[str, Any] = {
+                "image": {
+                    "format": doc_format,
+                    "source": {"bytes": document_bytes},
+                }
+            }
+        else:
+            media_block = {
+                "document": {
+                    "name": "quotation",
+                    "format": doc_format,
+                    "source": {"bytes": document_bytes},
+                }
+            }
+
         messages = [
             {
                 "role": "user",
                 "content": [
-                    {
-                        "document": {
-                            "name": "quotation",
-                            "format": doc_format,
-                            "source": {"bytes": document_bytes},
-                        }
-                    },
+                    media_block,
                     {"text": EXTRACTION_PROMPT},
                 ],
             }

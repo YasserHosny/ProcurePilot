@@ -180,6 +180,9 @@ def _potential_duplicates(
                 "id,document_id,created_at,stated_total_amount,stated_total_currency,supplier(name)"
             )
             .in_("document_id", document_ids)
+            # A refused quotation was explicitly discarded — it shouldn't keep flagging a
+            # re-upload of the same file as a duplicate.
+            .neq("status", "refused")
             .order("created_at", desc=True)
             .limit(5)
             .execute()
