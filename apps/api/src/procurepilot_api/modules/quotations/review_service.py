@@ -11,7 +11,6 @@ from procurepilot_api.deps import CurrentMember
 from procurepilot_api.errors import ConflictError, ServiceUnavailableError
 from procurepilot_api.modules.members.service import authenticated_client
 from procurepilot_api.modules.quotations.schemas import (
-    NewQuotationLine,
     QuotationDetail,
     QuotationReviewPatch,
 )
@@ -134,7 +133,10 @@ class QuotationReviewService:
                     }
                     if new_line.quantity is not None:
                         row_data["quantity"] = new_line.quantity
-                    if new_line.unit_price_amount is not None and new_line.unit_price_currency is not None:
+                    if (
+                        new_line.unit_price_amount is not None
+                        and new_line.unit_price_currency is not None
+                    ):
                         row_data["unit_price_amount"] = new_line.unit_price_amount
                         row_data["unit_price_currency"] = new_line.unit_price_currency
                     client.table("quotation_line").insert(row_data).execute()

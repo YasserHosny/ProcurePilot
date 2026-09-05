@@ -429,6 +429,7 @@ dependencies = [
     { name = "fastapi" },
     { name = "httpx" },
     { name = "openpyxl" },
+    { name = "procurepilot-logging" },
     { name = "psycopg", extra = ["binary"] },
     { name = "pydantic" },
     { name = "pydantic-settings" },
@@ -455,6 +456,7 @@ requires-dist = [
     { name = "fastapi", specifier = "==0.115.6" },
     { name = "httpx", specifier = "==0.28.1" },
     { name = "openpyxl", specifier = ">=3.1,<4" },
+    { name = "procurepilot-logging", editable = "../../packages/py-logging" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.2,<4" },
     { name = "pydantic", specifier = ">=2.10,<3" },
     { name = "pydantic-settings", specifier = ">=2.7,<3" },
@@ -475,6 +477,11 @@ dev = [
     { name = "pytest-asyncio", specifier = "==0.25.2" },
     { name = "ruff" },
 ]
+
+[[package]]
+name = "procurepilot-logging"
+version = "0.1.0"
+source = { editable = "../../packages/py-logging" }
 
 [[package]]
 name = "psycopg"
