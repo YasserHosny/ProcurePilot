@@ -52,7 +52,8 @@ FIELD_COLUMNS = (
 )
 TASK_COLUMNS = (
     "id,quotation_id,status,priority,reason,created_at,resolved_at,"
-    "quotation(deleted_at,stated_total_amount,stated_total_currency,supplier(name))"
+    "quotation(deleted_at,stated_total_amount,stated_total_currency,"
+    "supplier!quotation_supplier_id_fkey(name))"
 )
 
 

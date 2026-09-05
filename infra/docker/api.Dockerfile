@@ -13,25 +13,25 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN groupadd -g 1001 appgroup && \
     useradd -u 1001 -g appgroup -m -s /bin/bash appuser
 
-WORKDIR /app
+# apps/api/pyproject.toml's [tool.uv.sources] resolves procurepilot-logging via the relative path
+# ../../packages/py-logging (matching the real repo layout, needed so `uv run --project apps/api`
+# also works from a plain checkout). This image mirrors that same two-levels-deep layout under
+# /workspace so the identical relative path resolves here too.
+WORKDIR /workspace/apps/api
 
 # Create virtual environment and set ownership
-RUN uv venv /app/.venv && chown -R appuser:appgroup /app
+RUN uv venv /workspace/apps/api/.venv && chown -R appuser:appgroup /workspace
 
-ENV PATH="/app/.venv/bin:$PATH" \
+ENV PATH="/workspace/apps/api/.venv/bin:$PATH" \
     PYTHONUNBUFFERED=1 \
-    PYTHONPATH=/app/src
+    PYTHONPATH=/workspace/apps/api/src
 
-# Copy shared logging package and install it first
-COPY --chown=appuser:appgroup packages/py-logging/ /shared/py-logging/
-
-# Copy API workspace files
-COPY --chown=appuser:appgroup apps/api/ /app/
+COPY --chown=appuser:appgroup packages/py-logging/ /workspace/packages/py-logging/
+COPY --chown=appuser:appgroup apps/api/ /workspace/apps/api/
 
 USER appuser
 
-# Install shared package, then API in editable mode via uv
-RUN uv pip install --no-cache /shared/py-logging && uv pip install --no-cache -e .
+RUN uv pip install --no-cache -e .
 
 EXPOSE 8000
 
