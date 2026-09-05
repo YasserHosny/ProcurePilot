@@ -556,6 +556,17 @@
                     {{ formatConfidence(fe.confidence) }}%
                   </span>
                 }
+                @if (getFieldConfidence('quotation', q.id, 'currency') < 0.85 && !isFieldCorrected('quotation', q.id, 'currency')) {
+                  <button
+                    mat-icon-button
+                    type="button"
+                    (click)="confirmFieldAsIs('quotation', q.id, 'currency'); $event.stopPropagation()"
+                    [matTooltip]="'quotations.review.corrections.confirmAsIsTooltip' | translate"
+                    class="confirm-as-is-btn"
+                  >
+                    <mat-icon aria-hidden="true">check_circle</mat-icon>
+                  </button>
+                }
               </div>
 
               <!-- Issue Date (B7: datepicker) -->
@@ -587,6 +598,17 @@
                   <span class="confidence-pill" [class.low-conf]="getFieldConfidence('quotation', q.id, 'issue_date') < 0.85">
                     {{ formatConfidence(fe.confidence) }}%
                   </span>
+                }
+                @if (getFieldConfidence('quotation', q.id, 'issue_date') < 0.85 && !isFieldCorrected('quotation', q.id, 'issue_date')) {
+                  <button
+                    mat-icon-button
+                    type="button"
+                    (click)="confirmFieldAsIs('quotation', q.id, 'issue_date'); $event.stopPropagation()"
+                    [matTooltip]="'quotations.review.corrections.confirmAsIsTooltip' | translate"
+                    class="confirm-as-is-btn"
+                  >
+                    <mat-icon aria-hidden="true">check_circle</mat-icon>
+                  </button>
                 }
               </div>
 
@@ -625,6 +647,17 @@
                     {{ formatConfidence(fe.confidence) }}%
                   </span>
                 }
+                @if (getFieldConfidence('quotation', q.id, 'expiry_date') < 0.85 && !isFieldCorrected('quotation', q.id, 'expiry_date')) {
+                  <button
+                    mat-icon-button
+                    type="button"
+                    (click)="confirmFieldAsIs('quotation', q.id, 'expiry_date'); $event.stopPropagation()"
+                    [matTooltip]="'quotations.review.corrections.confirmAsIsTooltip' | translate"
+                    class="confirm-as-is-btn"
+                  >
+                    <mat-icon aria-hidden="true">check_circle</mat-icon>
+                  </button>
+                }
               </div>
 
               <!-- Stated Total -->
@@ -654,6 +687,17 @@
                   <span class="confidence-pill" [class.low-conf]="getFieldConfidence('quotation', q.id, 'stated_total') < 0.85">
                     {{ formatConfidence(fe.confidence) }}%
                   </span>
+                }
+                @if (getFieldConfidence('quotation', q.id, 'stated_total') < 0.85 && !isFieldCorrected('quotation', q.id, 'stated_total')) {
+                  <button
+                    mat-icon-button
+                    type="button"
+                    (click)="confirmFieldAsIs('quotation', q.id, 'stated_total'); $event.stopPropagation()"
+                    [matTooltip]="'quotations.review.corrections.confirmAsIsTooltip' | translate"
+                    class="confirm-as-is-btn"
+                  >
+                    <mat-icon aria-hidden="true">check_circle</mat-icon>
+                  </button>
                 }
               </div>
             </div>
@@ -839,6 +883,17 @@
                         @if (isFieldCorrected('quotation_line', line.id, 'quantity')) {
                           <span class="corrected-tag">{{ 'quotations.review.corrections.correctedBadge' | translate }}</span>
                         }
+                        @if (getFieldConfidence('quotation_line', line.id, 'quantity') < 0.85 && !isFieldCorrected('quotation_line', line.id, 'quantity')) {
+                          <button
+                            mat-icon-button
+                            type="button"
+                            (click)="confirmFieldAsIs('quotation_line', line.id, 'quantity')"
+                            [matTooltip]="'quotations.review.corrections.confirmAsIsTooltip' | translate"
+                            class="confirm-as-is-btn"
+                          >
+                            <mat-icon aria-hidden="true">check_circle</mat-icon>
+                          </button>
+                        }
                       </div>
 
                       <!-- Pack Details -->
@@ -871,6 +926,17 @@
                         </mat-form-field>
                         @if (isFieldCorrected('quotation_line', line.id, 'unit_price')) {
                           <span class="corrected-tag">{{ 'quotations.review.corrections.correctedBadge' | translate }}</span>
+                        }
+                        @if (getFieldConfidence('quotation_line', line.id, 'unit_price') < 0.85 && !isFieldCorrected('quotation_line', line.id, 'unit_price')) {
+                          <button
+                            mat-icon-button
+                            type="button"
+                            (click)="confirmFieldAsIs('quotation_line', line.id, 'unit_price')"
+                            [matTooltip]="'quotations.review.corrections.confirmAsIsTooltip' | translate"
+                            class="confirm-as-is-btn"
+                          >
+                            <mat-icon aria-hidden="true">check_circle</mat-icon>
+                          </button>
                         }
                       </div>
 

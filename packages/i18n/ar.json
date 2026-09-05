@@ -759,7 +759,8 @@
         "saveCorrection": "حفظ التصحيح",
         "cancelCorrection": "إلغاء",
         "editTooltip": "تصحيح قيمة هذا الحقل",
-        "correctedBadge": "تم التصحيح يدوياً"
+        "correctedBadge": "تم التصحيح يدوياً",
+        "confirmAsIsTooltip": "تأكيد أن هذه القيمة صحيحة كما استُخرجت"
       },
       "arithmetic": {
         "mismatchTitle": "تم اكتشاف عدم تطابق حسابي (US3)",

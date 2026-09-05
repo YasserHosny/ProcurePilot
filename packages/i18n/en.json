@@ -759,7 +759,8 @@
         "saveCorrection": "Save Correction",
         "cancelCorrection": "Cancel",
         "editTooltip": "Correct this field value",
-        "correctedBadge": "Corrected by Human"
+        "correctedBadge": "Corrected by Human",
+        "confirmAsIsTooltip": "Confirm this value is correct as extracted"
       },
       "arithmetic": {
         "mismatchTitle": "Arithmetic Discrepancy Detected (US3)",

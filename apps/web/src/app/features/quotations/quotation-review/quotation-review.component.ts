@@ -600,6 +600,15 @@ export class QuotationReviewComponent implements OnInit {
     this.pendingCorrections.set(current);
   }
 
+  confirmFieldAsIs(entityType: 'quotation' | 'quotation_line', entityId: string, fieldName: string): void {
+    const fe = this.getFieldExtraction(entityType, entityId, fieldName);
+    if (!fe) return;
+    const current = this.pendingCorrections().has(fe.id)
+      ? this.pendingCorrections().get(fe.id)
+      : fe.extracted_value;
+    this.updateCorrection(fe.id, current);
+  }
+
   // FR-014: Keyboard Navigation through flagged fields
   @HostListener('window:keydown', ['$event'])
   handleKeyboardEvent(event: KeyboardEvent): void {
