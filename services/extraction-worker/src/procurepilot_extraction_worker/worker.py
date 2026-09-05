@@ -2,23 +2,29 @@ from __future__ import annotations
 
 import logging
 from datetime import UTC, datetime
+from typing import NamedTuple
 from urllib.error import URLError
 from urllib.parse import quote
 from urllib.request import Request, urlopen
 from uuid import UUID
 
 import psycopg
-from procurepilot_logging import get_trace_id, new_trace_id, set_trace_id
+from procurepilot_logging import new_trace_id, set_trace_id
 
 from procurepilot_extraction_worker.azure_di import AzureDocumentIntelligenceProvider
 from procurepilot_extraction_worker.bedrock import BedrockExtractionProvider
 from procurepilot_extraction_worker.models import ExtractedField, ExtractedLine, ExtractionResult
-from procurepilot_extraction_worker.providers import FakeExtractionProvider
 from procurepilot_extraction_worker.settings import WorkerSettings, get_settings
 from procurepilot_extraction_worker.structured_parse import is_structured_mime_type
 from procurepilot_extraction_worker.validation import low_confidence_fields, validate_arithmetic
 
 logger = logging.getLogger(__name__)
+
+
+class SupplierMatch(NamedTuple):
+    supplier_id: UUID | None
+    confidence: float | None
+    had_candidates: bool
 
 
 def process_extraction_job(payload: dict[str, str]) -> None:
@@ -32,14 +38,24 @@ def process_extraction_job(payload: dict[str, str]) -> None:
         "extraction job started",
         extra={"job_id": str(job_id), "document_id": str(document_id)},
     )
-    with psycopg.connect(settings.database_url) as conn:
+    # prepare_threshold=None: DATABASE_URL runs through Supabase's transaction-mode pooler,
+    # which hands out reused backend sessions. psycopg3's default server-side prepared
+    # statements collide across connections on that shared session (DuplicatePreparedStatement:
+    # "_pg3_0" already exists) the moment a second job runs.
+    with psycopg.connect(settings.database_url, prepare_threshold=None) as conn:
         document = _document(conn, tenant_id, document_id)
         _mark_running(conn, job_id)
         try:
             result = _extract(settings, document_id=document_id, document=document)
             arithmetic = validate_arithmetic(result)
             _persist_result(conn, tenant_id, quotation_id, result, arithmetic.status)
-            review_reason = _review_reason(result, arithmetic.status, settings.confidence_threshold)
+            supplier_match = _match_supplier(conn, tenant_id, result.header)
+            review_reason = _review_reason(
+                result,
+                arithmetic.status,
+                settings.confidence_threshold,
+                supplier_match,
+            )
             if review_reason is not None:
                 _upsert_review_task(conn, tenant_id, quotation_id, review_reason)
                 quotation_status = "in_review"
@@ -51,6 +67,7 @@ def process_extraction_job(payload: dict[str, str]) -> None:
                 quotation_status,
                 arithmetic.status,
                 result,
+                supplier_match,
             )
             _mark_succeeded(conn, job_id, result.method)
             logger.info(
@@ -67,6 +84,11 @@ def process_extraction_job(payload: dict[str, str]) -> None:
             conn.rollback()
             _mark_failed(conn, job_id, {"code": "extraction_failed", "message": str(exc)})
             _refuse_quotation(conn, quotation_id)
+            # The `with` block below commits on a clean exit but rolls back on one exiting
+            # via an exception — which the `raise` below does. Without this commit, the
+            # failure bookkeeping above is silently undone and the job/quotation are left
+            # stuck at "queued"/"extracting" forever instead of recording as failed/refused.
+            conn.commit()
             logger.exception(
                 "extraction job failed",
                 extra={"job_id": str(job_id), "document_id": str(document_id)},
@@ -89,11 +111,6 @@ def _extract(
         logger.info("using structured parser", extra={"mime_type": mime_type})
         content = _download_storage_object(settings, bucket=bucket, path=storage_path)
         return parse_structured_content(content, mime_type=mime_type)
-    if settings.provider_mode == "stub":
-        logger.info("using stub provider")
-        return FakeExtractionProvider().extract(
-            document_id=str(document_id), mime_type=mime_type, storage_path=storage_path
-        )
     doc_bytes = _download_storage_object(settings, bucket=bucket, path=storage_path)
     common = dict(
         document_id=str(document_id),
@@ -237,6 +254,7 @@ def _update_quotation_status(
     status: str,
     arithmetic_status: str,
     result: ExtractionResult,
+    supplier_match: SupplierMatch,
 ) -> None:
     stated = result.stated_total.value if result.stated_total is not None else None
     amount = stated.get("amount") if isinstance(stated, dict) else None
@@ -248,7 +266,8 @@ def _update_quotation_status(
             update quotation
             set status = %s, currency = coalesce(%s, currency), issue_date = %s,
                 expiry_date = %s, stated_total_amount = %s, stated_total_currency = %s,
-                arithmetic_status = %s
+                arithmetic_status = %s, suggested_supplier_id = %s,
+                supplier_match_confidence = %s
             where id = %s
             """,
             (
@@ -259,20 +278,58 @@ def _update_quotation_status(
                 amount,
                 currency,
                 arithmetic_status,
+                supplier_match.supplier_id,
+                supplier_match.confidence,
                 quotation_id,
             ),
         )
+
+
+def _match_supplier(
+    conn: psycopg.Connection,
+    tenant_id: UUID,
+    header: dict[str, ExtractedField],
+) -> SupplierMatch:
+    field = header.get("supplier_name")
+    raw_name = field.value if field is not None else None
+    supplier_name = str(raw_name).strip() if raw_name is not None else ""
+    if not supplier_name:
+        return SupplierMatch(None, None, had_candidates=False)
+
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            select id, similarity(name, %s) as score
+            from supplier
+            where tenant_id = %s and status != 'archived'
+            order by score desc
+            limit 1
+            """,
+            (supplier_name, tenant_id),
+        )
+        row = cur.fetchone()
+
+    if row is None:
+        return SupplierMatch(None, None, had_candidates=False)
+
+    row_id, score = row
+    confidence = round(float(score), 3)
+    supplier_id = UUID(str(row_id)) if confidence >= 0.35 else None
+    return SupplierMatch(supplier_id, confidence, had_candidates=True)
 
 
 def _review_reason(
     result: ExtractionResult,
     arithmetic_status: str,
     threshold: float,
+    supplier_match: SupplierMatch,
 ) -> str | None:
     if arithmetic_status == "mismatch":
         return "arithmetic_mismatch"
     if low_confidence_fields(result, threshold):
         return "low_confidence"
+    if supplier_match.had_candidates and supplier_match.supplier_id is None:
+        return "no_supplier_match"
     return None
 
 

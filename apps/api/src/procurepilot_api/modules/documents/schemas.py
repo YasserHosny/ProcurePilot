@@ -29,6 +29,15 @@ class PresignRequest(StrictApiModel):
     content_hash: StrictStr | None = None
 
 
+class PotentialDuplicate(BaseModel):
+    quotation_id: UUID
+    document_id: UUID
+    created_at: datetime
+    supplier_name: str | None = None
+    stated_total_amount: str | None = None
+    stated_total_currency: str | None = None
+
+
 class PresignResponse(BaseModel):
     document_id: UUID
     storage_bucket: str
@@ -36,6 +45,7 @@ class PresignResponse(BaseModel):
     upload_url: str
     upload_fields: dict[str, str] = Field(default_factory=dict)
     expires_at: datetime
+    potential_duplicates: list[PotentialDuplicate] = Field(default_factory=list)
 
 
 class DownloadUrlResponse(BaseModel):

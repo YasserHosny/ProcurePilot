@@ -69,6 +69,9 @@ describe('ReviewQueueComponent (T052)', () => {
     expect(apiService.getReviewTasks).toHaveBeenCalledWith({
       status: 'open',
       priority: undefined,
+      search: undefined,
+      sort_by: 'created_at',
+      sort_order: 'desc',
     });
     expect(component.tasks().length).toBe(2);
     expect(component.isLoading()).toBeFalse();
@@ -79,12 +82,18 @@ describe('ReviewQueueComponent (T052)', () => {
     expect(apiService.getReviewTasks).toHaveBeenCalledWith({
       status: undefined,
       priority: undefined,
+      search: undefined,
+      sort_by: 'created_at',
+      sort_order: 'desc',
     });
 
     component.onPriorityChange('high');
     expect(apiService.getReviewTasks).toHaveBeenCalledWith({
       status: undefined,
       priority: 'high',
+      search: undefined,
+      sort_by: 'created_at',
+      sort_order: 'desc',
     });
   });
 });

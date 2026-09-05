@@ -131,6 +131,33 @@
                 <mat-icon aria-hidden="true">download</mat-icon>
                 <span>{{ 'quotations.upload.sampleAlFaisalTrading' | translate }}</span>
               </a>
+              <a
+                mat-stroked-button
+                href="/samples/sample-quotation-helios-packaging.pdf"
+                download="sample-quotation-helios-packaging.pdf"
+                class="sample-link-btn"
+              >
+                <mat-icon aria-hidden="true">download</mat-icon>
+                <span>{{ 'quotations.upload.sampleHeliosPackaging' | translate }}</span>
+              </a>
+              <a
+                mat-stroked-button
+                href="/samples/sample-quotation-brightwell-electronics.png"
+                download="sample-quotation-brightwell-electronics.png"
+                class="sample-link-btn"
+              >
+                <mat-icon aria-hidden="true">download</mat-icon>
+                <span>{{ 'quotations.upload.sampleBrightwellElectronics' | translate }}</span>
+              </a>
+              <a
+                mat-stroked-button
+                href="/samples/sample-quotation-oakridge-industrial.xlsx"
+                download="sample-quotation-oakridge-industrial.xlsx"
+                class="sample-link-btn"
+              >
+                <mat-icon aria-hidden="true">download</mat-icon>
+                <span>{{ 'quotations.upload.sampleOakridgeIndustrial' | translate }}</span>
+              </a>
             </div>
           </div>
         }
@@ -143,6 +170,61 @@
             @if (selectedFile(); as file) {
               <p class="file-caption">{{ file.name }} ({{ formatFileSize(file.size) }})</p>
             }
+          </div>
+        }
+
+        @case ('duplicate-warning') {
+          <div class="duplicate-warning" role="alert">
+            <mat-icon aria-hidden="true">warning</mat-icon>
+            <h2 class="result-title">{{ 'quotations.upload.duplicateWarning.title' | translate }}</h2>
+            <p class="result-message">{{ 'quotations.upload.duplicateWarning.message' | translate }}</p>
+            <ul>
+              @for (dup of potentialDuplicates(); track dup.quotation_id) {
+                <li>
+                  <span>
+                    {{ 'quotations.upload.duplicateWarning.quotation' | translate }}
+                    {{ dup.quotation_id | slice: 0 : 8 }}...
+                  </span>
+                  <span>
+                    {{ 'quotations.upload.duplicateWarning.uploaded' | translate }}
+                    {{ dup.created_at | date }}
+                  </span>
+                  @if (dup.supplier_name) {
+                    <span>
+                      {{ 'quotations.upload.duplicateWarning.supplier' | translate }}
+                      {{ dup.supplier_name }}
+                    </span>
+                  }
+                  @if (dup.stated_total_amount && dup.stated_total_currency) {
+                    <span>
+                      {{ 'quotations.upload.duplicateWarning.total' | translate }}
+                      {{ dup.stated_total_amount }} {{ dup.stated_total_currency }}
+                    </span>
+                  }
+                </li>
+              }
+            </ul>
+            <div class="result-actions">
+              <button
+                mat-stroked-button
+                type="button"
+                (click)="cancelUpload()"
+                class="action-btn"
+              >
+                <mat-icon aria-hidden="true">close</mat-icon>
+                <span>{{ 'quotations.upload.duplicateWarning.cancel' | translate }}</span>
+              </button>
+              <button
+                mat-flat-button
+                color="warn"
+                type="button"
+                (click)="proceedDespiteDuplicate()"
+                class="action-btn"
+              >
+                <mat-icon aria-hidden="true">upload</mat-icon>
+                <span>{{ 'quotations.upload.duplicateWarning.proceed' | translate }}</span>
+              </button>
+            </div>
           </div>
         }
 

@@ -175,6 +175,10 @@ services:
       SUPABASE_URL: http://kong:8000
       SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY:-replace-with-local-anon-key}
       SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:-replace-with-local-service-role-key}
+      # Same reasoning again: .env points at localhost:6379 for host tools; in-network it is
+      # redis:6379. Without this override, extraction enqueue fails with a Redis connection error
+      # that surfaces to the reviewer as "Extraction Failed — Service is unavailable."
+      REDIS_URL: redis://redis:6379/0
       SUPABASE_JWT_SECRET: ${SUPABASE_JWT_SECRET:-replace-with-local-jwt-secret}
     depends_on:
       db:
@@ -197,29 +201,35 @@ services:
   # Quotation Extraction Worker (RQ)
   # ---------------------------------------------------------------------------
   extraction-worker:
-    image: python:3.12-slim
+    build:
+      context: .
+      dockerfile: infra/docker/extraction-worker.Dockerfile
     container_name: procurepilot-extraction-worker
-    working_dir: /workspace/services/extraction-worker
+    # Match the host user so the read-only ~/.aws mount below (owned 0600 by the host user,
+    # per the AWS CLI's own permissions) stays readable — the image's own "appuser" (uid 1001)
+    # can't read another uid's files. Local dev only; production doesn't use docker-compose.
+    user: "${UID:-1000}:${GID:-1000}"
     volumes:
-      - .:/workspace
+      # SSO/credential cache only — same AWS profile the container resolves via AWS_PROFILE.
+      # Refresh it on the host with `aws sso login --profile <name>` when it expires.
+      - ${HOME}/.aws:/home/appuser/.aws:ro
     env_file:
       - .env
     environment:
-      DATABASE_URL: postgresql://postgres:postgres@db:5432/postgres
+      # NOT a local "db:5432" override: this project's document/quotation/extraction_job
+      # tables live in the remote hosted Supabase project (see DATABASE_URL in .env) — the
+      # same one the api container reads from. There is no local Supabase/Postgres stack;
+      # the "db" service below is unrelated, empty, and not used by this worker.
       REDIS_URL: redis://redis:6379/0
       EXTRACTION_QUEUE_NAME: ${EXTRACTION_QUEUE_NAME:-quotation-extraction}
-      EXTRACTION_PROVIDER_MODE: ${EXTRACTION_PROVIDER_MODE:-stub}
+      EXTRACTION_PROVIDER_MODE: ${EXTRACTION_PROVIDER_MODE:-bedrock}
       EXTRACTION_CONFIDENCE_THRESHOLD: ${EXTRACTION_CONFIDENCE_THRESHOLD:-0.85}
-      PYTHONPATH: /workspace/services/extraction-worker/src
+      # Running as the host uid (above) means there's no /etc/passwd entry, so boto3's
+      # `~/.aws` expansion needs HOME set explicitly rather than looked up from uid.
+      HOME: /home/appuser
     depends_on:
-      db:
-        condition: service_healthy
       redis:
         condition: service_started
-    command: >
-      sh -c "pip install -e /workspace/packages/py-logging
-      && pip install -e /workspace/services/extraction-worker
-      && python -m procurepilot_extraction_worker"
     restart: unless-stopped
 
   # ---------------------------------------------------------------------------

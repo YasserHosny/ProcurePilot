@@ -524,6 +524,9 @@
       "queue": "قائمة المراجعة",
       "upload": "رفع عرض سعر"
     },
+    "breadcrumb": {
+      "inbox": "صندوق عروض الأسعار"
+    },
     "upload": {
       "title": "رفع عرض أسعار المورد",
       "subtitle": "رفع عروض الأسعار بصيغة PDF أو صور ممسوحة ضوئياً أو جداول إلكترونية للاستخراج الآلي للبنود.",
@@ -552,6 +555,19 @@
       "sampleAcmeFoods": "Acme Foods — ٥ بنود (CSV)",
       "sampleFreshDirect": "Fresh Direct — ٦ بنود (CSV)",
       "sampleAlFaisalTrading": "Al-Faisal Trading — ٦ بنود (PDF)",
+      "sampleHeliosPackaging": "Helios Packaging — ٧ بنود (PDF)",
+      "sampleBrightwellElectronics": "Brightwell Electronics — ٦ بنود (PNG)",
+      "sampleOakridgeIndustrial": "Oakridge Industrial — ٨ بنود (XLSX)",
+      "duplicateWarning": {
+        "title": "تم اكتشاف احتمال تكرار",
+        "message": "تم رفع مستند بالمحتوى نفسه إلى مساحة العمل هذه من قبل.",
+        "quotation": "عرض السعر",
+        "uploaded": "تم رفعه في",
+        "supplier": "المورد",
+        "total": "الإجمالي",
+        "cancel": "إلغاء الرفع",
+        "proceed": "الرفع على أي حال"
+      },
       "status": {
         "uploading": "جاري الرفع",
         "processing": "جاري الاستخراج",
@@ -563,8 +579,13 @@
       "title": "قائمة مراجعة عروض الأسعار",
       "subtitle": "مراجعة واعتماد عروض الأسعار المستخرجة للموردين قبل اعتمادها كبيانات تجارية موثوقة.",
       "uploadNew": "رفع عرض سعر",
+      "searchPlaceholder": "البحث حسب المورد أو المعرف…",
       "filterStatus": "تصفية حسب الحالة",
       "filterPriority": "تصفية حسب الأولوية",
+      "filters": {
+        "dateFrom": "من تاريخ",
+        "dateTo": "إلى تاريخ"
+      },
       "status": {
         "all": "جميع الحالات",
         "open": "مفتوحة",
@@ -581,7 +602,8 @@
         "low_confidence": "استخراج منخفض الثقة",
         "arithmetic_mismatch": "عدم تطابق حسابي",
         "read_failure": "تعذر قراءة المستند",
-        "review_required": "تتطلب مراجعة بشرية"
+        "review_required": "تتطلب مراجعة بشرية",
+        "no_supplier_match": "لا يوجد تطابق مورد"
       },
       "columns": {
         "id": "معرف عرض السعر",
@@ -590,18 +612,37 @@
         "priority": "الأولوية",
         "status": "الحالة",
         "createdAt": "تاريخ الإنشاء",
+        "age": "العمر",
         "statedTotal": "الإجمالي المعلن",
         "actions": "الإجراءات"
       },
+      "age": {
+        "justNow": "الآن",
+        "hoursAgo": "منذ {{count}} ساعة",
+        "daysAgo": "منذ {{count}} يوم",
+        "weeksAgo": "منذ {{count}} أسبوع",
+        "monthsAgo": "منذ {{count}} شهر"
+      },
       "actions": {
         "review": "مراجعة واعتماد",
-        "view": "عرض (للقراءة فقط)"
+        "view": "عرض (للقراءة فقط)",
+        "archive": "أرشفة"
       },
+      "archiveConfirm": "أرشفة هذا العرض؟ يمكن استعادته لاحقًا.",
+      "bulkSelected": "{{count}} محدد",
+      "bulkArchiveButton": "أرشفة المحددة",
+      "bulkArchiveConfirm": "أرشفة {{count}} عرض(ات)؟ لا يمكن التراجع عن ذلك بسهولة.",
+      "bulkRefuseButton": "رفض المحددة",
+      "bulkRefuseConfirm": "رفض {{count}} عرض(ات)؟ سيتم تمييزها كمرفوضة.",
+      "bulkReprioritiseButton": "تعيين الأولوية",
+      "bulkClear": "إلغاء التحديد",
       "readOnlyBadge": "صلاحية قراءة فقط",
       "readOnlyNotice": "دورك يتيح صلاحية القراءة فقط. يملك المالكون والمشترون فقط صلاحية تصحيح واعتماد عروض الأسعار.",
       "loadMore": "تحميل المزيد",
       "emptyTitle": "لا توجد مهام مراجعة",
-      "emptyMessage": "لا توجد مهام مراجعة لعروض الأسعار تطابق خيارات التصفية الحالية."
+      "emptyMessage": "لا توجد مهام مراجعة لعروض الأسعار تطابق خيارات التصفية الحالية.",
+      "noFilterResults": "لا توجد نتائج تطابق عوامل التصفية",
+      "clearFilters": "مسح عوامل التصفية"
     },
     "review": {
       "title": "مراجعة واعتماد عرض السعر",
@@ -609,9 +650,28 @@
       "backToQueue": "العودة إلى قائمة المراجعة",
       "downloadOriginal": "تحميل المستند الأصلي",
       "readOnlyNotice": "وضع القراءة فقط. يمكنك الاطلاع على أدلة الاستخراج، ولكن التعديل والاعتماد يتطلبان صلاحيات المالك أو المشتري.",
+      "uploadedBy": "رُفع بواسطة:",
+      "uploadedAt": "وقت الرفع:",
+      "extractedAt": "وقت الاستخراج:",
+      "lastModified": "آخر تعديل:",
+      "reviewedBy": "راجعه:",
+      "reviewedAt": "وقت المراجعة:",
+      "expired": "منتهية الصلاحية",
+      "expiresIn": "تنتهي خلال {{count}} أيام",
+      "validFor": "صالحة لمدة {{count}} أيام",
       "panels": {
         "document": "أدلة المستند الأصلي",
         "extractedData": "البيانات التجارية المستخرجة"
+      },
+      "information": {
+        "title": "معلومات"
+      },
+      "notes": {
+        "title": "ملاحظات المراجع",
+        "label": "ملاحظات",
+        "placeholder": "أضف ملاحظات حول هذا العرض…",
+        "hint": "يتم حفظ الملاحظات عند حفظ التصحيحات",
+        "empty": "لا توجد ملاحظات"
       },
       "keyboardNav": {
         "title": "التنقل بين الحقول (FR-014)",
@@ -636,6 +696,16 @@
         "statedTotalCurrency": "عملة المبلغ المذكور",
         "statusLabel": "الحالة"
       },
+      "supplierMatch": {
+        "suggested": "مقترح: {{name}} - تطابق {{pct}}%",
+        "possible": "تطابق محتمل: {{name}} - {{pct}}%",
+        "acceptButton": "قبول",
+        "useButton": "استخدام هذا",
+        "noMatch": "لم يتم العثور على مورد مطابق لـ {{name}}",
+        "unknownVendor": "اسم المورد المستخرج",
+        "createButton": "إنشاء مورد",
+        "createSuccess": "تم إنشاء المورد وتحديده."
+      },
       "lines": {
         "title": "بنود عرض السعر المستخرجة",
         "colLine": "#",
@@ -652,13 +722,25 @@
         "unitSize": "حجم الوحدة",
         "unit": "الوحدة",
         "noLines": "لم يتم استخراج بنود لعرض السعر هذا.",
-        "colLineTotal": "إجمالي السطر"
+        "colLineTotal": "إجمالي السطر",
+        "addLine": "إضافة عنصر",
+        "addLineText": "وصف العنصر",
+        "addLineQuantity": "الكمية",
+        "addLinePrice": "سعر الوحدة",
+        "confirmAdd": "إضافة",
+        "removeLine": "إزالة هذا العنصر",
+        "markedForRemoval": "سيتم إزالته عند الحفظ",
+        "undoRemove": "التراجع عن الإزالة",
+        "pendingAdd": "جديد — سيتم إضافته عند الحفظ"
       },
       "confidence": {
         "high": "ثقة عالية",
         "medium": "ثقة متوسطة",
         "low": "ثقة منخفضة — تتطلب مراجعة",
         "flaggedBadge": "تتطلب انتباهاً",
+        "legendText": "يتم تمييز الحقول التي تقل ثقتها عن 85% للمراجعة",
+        "highBadge": "≥85%",
+        "lowBadge": "<85%",
         "scoreTooltip": "درجة ثقة الذكاء الاصطناعي: {{score}}% عبر {{method}} ({{model}})"
       },
       "provenance": {
@@ -699,6 +781,7 @@
         "isRequoteLabel": "هذا العرض هو تحديث لعرض سعر سابق",
         "selectPreviousLabel": "اختر عرض السعر السابق لاستبداله",
         "selectPreviousPlaceholder": "اختر عرض السعر السابق...",
+        "noPriorQuotations": "لم يتم العثور على عروض أخرى في مساحة العمل هذه",
         "bannerTitle": "سجل الإصدارات",
         "isUpdateOf": "عرض السعر هذا هو إصدار محدث من",
         "hasNewerVersion": "يوجد إصدار أحدث لعرض السعر هذا:",
@@ -707,6 +790,9 @@
         "versionId": "عرض سعر #{{id}}"
       },
       "actions": {
+        "archive": "أرشفة",
+        "retryExtraction": "إعادة الاستخراج",
+        "export": "تصدير CSV",
         "saveChanges": "حفظ التصحيحات",
         "saving": "جاري حفظ التصحيحات...",
         "confirmButton": "تأكيد واعتماد عرض السعر",
@@ -725,8 +811,17 @@
         "confirmDialogMessage": "سيتم وضع علامة على عرض السعر كمُراجَع ومعتمد. سيصبح بيانات تجارية موثوقة تُستخدم في المطابقة والتسعير ومقارنة التكاليف. لا يمكن التراجع عن هذا الإجراء.",
         "confirmDialogMismatchWarn": "تحذير: أنت تؤكد عرض السعر هذا مع وجود تباين حسابي غير محلول.",
         "confirmDialogCancel": "إلغاء",
-        "confirmDialogProceed": "تأكيد واعتماد"
+        "confirmDialogProceed": "تأكيد واعتماد",
+        "createRequote": "إنشاء عرض أسعار بديل"
       },
+      "replaceDocument": {
+        "tooltip": "استبدال المستند المصدر",
+        "unsupportedType": "نوع الملف غير مدعوم. يرجى تحميل ملف PDF أو صورة أو جدول بيانات.",
+        "success": "تم استبدال المستند المصدر. سيبدأ الاستخراج قريبًا."
+      },
+      "archiveConfirm": "أرشفة هذا العرض؟",
+      "retryConfirm": "إعادة تشغيل الاستخراج؟ سيتم استبدال البيانات المستخرجة الحالية.",
+      "archived": "تم أرشفة العرض",
       "status": {
         "pending": "بانتظار الاستخراج",
         "extracting": "جاري الاستخراج",
@@ -734,6 +829,21 @@
         "in_review": "قيد المراجعة",
         "reviewed": "تمت المراجعة والاعتماد",
         "refused": "مرفوض"
+      }
+    },
+    "audit": {
+      "title": "سجل المراجعة",
+      "empty": "لا توجد أحداث مسجلة",
+      "system": "النظام",
+      "actions": {
+        "archived": "تم أرشفة العرض",
+        "restored": "تم استعادة العرض",
+        "extraction_retried": "تم إعادة الاستخراج",
+        "exported": "تم تصدير البيانات",
+        "confirmed": "تم تأكيد العرض",
+        "refused": "تم رفض العرض",
+        "reviewed": "تم تقديم المراجعة",
+        "unknown": "تم تنفيذ إجراء"
       }
     }
   },

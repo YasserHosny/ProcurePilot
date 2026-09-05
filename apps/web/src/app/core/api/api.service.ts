@@ -12,6 +12,7 @@ import type {
   ApprovalDelegation,
   ApprovalDelegationCreate,
   ApprovalDelegationList,
+  AuditTrailEntry,
   BaseUnit,
   BasketOptimiseRequest,
   BasketSplitJob,
@@ -406,6 +407,58 @@ export class ApiService {
     );
   }
 
+  archiveQuotation(quotationId: string, idempotencyKey?: string): Observable<Quotation> {
+    const headers = idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined;
+    return this.http.post<Quotation>(
+      `${this.base}/quotations/${quotationId}/archive`,
+      {},
+      { headers },
+    );
+  }
+
+  restoreQuotation(quotationId: string, idempotencyKey?: string): Observable<Quotation> {
+    const headers = idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined;
+    return this.http.post<Quotation>(
+      `${this.base}/quotations/${quotationId}/restore`,
+      {},
+      { headers },
+    );
+  }
+
+  retryExtraction(quotationId: string, idempotencyKey?: string): Observable<Quotation> {
+    const headers = idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined;
+    return this.http.post<Quotation>(
+      `${this.base}/quotations/${quotationId}/retry-extraction`,
+      {},
+      { headers },
+    );
+  }
+
+  replaceDocument(
+    quotationId: string,
+    documentId: string,
+    idempotencyKey?: string,
+  ): Observable<Quotation> {
+    const headers = idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined;
+    return this.http.post<Quotation>(
+      `${this.base}/quotations/${quotationId}/replace-document`,
+      { document_id: documentId },
+      { headers },
+    );
+  }
+
+  exportQuotation(quotationId: string): Observable<Blob> {
+    return this.http.get(`${this.base}/quotations/${quotationId}/export?format=csv`, {
+      responseType: 'blob',
+    });
+  }
+
+  getAuditTrail(quotationId: string): Observable<{ items: AuditTrailEntry[] }> {
+    return this.http.get<{ items: AuditTrailEntry[] }>(
+      `${this.base}/quotations/${quotationId}/audit-trail`,
+    );
+  }
+
   getJob(jobId: string): Observable<Job> {
     return this.http.get<Job>(`${this.base}/jobs/${jobId}`);
   }
@@ -415,16 +468,30 @@ export class ApiService {
     limit?: number;
     status?: ReviewTaskStatus | 'all';
     priority?: ReviewTaskPriority;
+    search?: string;
+    date_from?: string;
+    date_to?: string;
+    sort_by?: 'created_at' | 'stated_total' | 'priority' | 'status';
+    sort_order?: 'asc' | 'desc';
   }): Observable<{ items: ReviewTask[]; next_cursor: string | null }> {
     const query = new URLSearchParams();
     if (params?.cursor) query.set('cursor', params.cursor);
     if (params?.limit) query.set('limit', String(params.limit));
     if (params?.status) query.set('status', params.status);
     if (params?.priority) query.set('priority', params.priority);
+    if (params?.search) query.set('search', params.search);
+    if (params?.date_from) query.set('date_from', params.date_from);
+    if (params?.date_to) query.set('date_to', params.date_to);
+    if (params?.sort_by) query.set('sort_by', params.sort_by);
+    if (params?.sort_order) query.set('sort_order', params.sort_order);
     const qs = query.toString() ? `?${query.toString()}` : '';
     return this.http.get<{ items: ReviewTask[]; next_cursor: string | null }>(
       `${this.base}/review-tasks${qs}`,
     );
+  }
+
+  updateReviewTaskPriority(taskId: string, priority: ReviewTaskPriority): Observable<ReviewTask> {
+    return this.http.patch<ReviewTask>(`${this.base}/review-tasks/${taskId}/priority`, { priority });
   }
 
   // --- matching & normalisation (Chunk 4.4) -------------------------------
@@ -861,5 +928,3 @@ export class ApiService {
     return this.http.delete<void>(`${this.base}/approvals/delegations/${delegationId}`);
   }
 }
-
-

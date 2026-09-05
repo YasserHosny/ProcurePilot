@@ -1,6 +1,10 @@
 from __future__ import annotations
 
 import base64
+import csv
+from datetime import UTC, datetime
+from io import StringIO
+from typing import Literal
 from uuid import UUID
 
 from postgrest.exceptions import APIError
@@ -12,6 +16,8 @@ from procurepilot_api.modules.documents.schemas import Document
 from procurepilot_api.modules.documents.service import DOCUMENT_COLUMNS
 from procurepilot_api.modules.members.service import authenticated_client
 from procurepilot_api.modules.quotations.schemas import (
+    AuditTrailEntry,
+    AuditTrailResponse,
     FieldExtraction,
     Money,
     Pack,
@@ -26,10 +32,14 @@ from procurepilot_api.modules.quotations.schemas import (
     ReviewTaskStatus,
     decimal_string,
 )
+from procurepilot_api.shared.audit import AuditEventCreate, get_audit_writer
+from procurepilot_api.shared.logging import get_trace_id
 
 QUOTATION_COLUMNS = (
-    "id,document_id,supplier_id,currency,issue_date,expiry_date,status,previous_quotation_id,"
-    "stated_total_amount,stated_total_currency,arithmetic_status,created_at,reviewed_by,reviewed_at"
+    "id,document_id,supplier_id,suggested_supplier_id,supplier_match_confidence,currency,"
+    "issue_date,expiry_date,status,previous_quotation_id,stated_total_amount,"
+    "stated_total_currency,arithmetic_status,created_at,reviewed_by,reviewed_at,deleted_at,"
+    "reviewer_notes"
 )
 LINE_COLUMNS = (
     "id,line_number,original_text,quantity,pack_count,unit_size,pack_unit,unit_price_amount,"
@@ -42,7 +52,7 @@ FIELD_COLUMNS = (
 )
 TASK_COLUMNS = (
     "id,quotation_id,status,priority,reason,created_at,resolved_at,"
-    "quotation(stated_total_amount,stated_total_currency,supplier(name))"
+    "quotation(deleted_at,stated_total_amount,stated_total_currency,supplier(name))"
 )
 
 
@@ -89,6 +99,19 @@ class QuotationService:
             else None
         )
         next_versions = _next_versions(client, quotation_id)
+        uploaded_by_email = (
+            _membership_email(client, document.created_by) if document.created_by else None
+        )
+        reviewed_by_email = (
+            _membership_email(client, UUID(str(quote["reviewed_by"])))
+            if quote.get("reviewed_by")
+            else None
+        )
+        suggested_supplier_name = (
+            _supplier_name(client, UUID(str(quote["suggested_supplier_id"])))
+            if quote.get("suggested_supplier_id")
+            else None
+        )
         return QuotationDetail(
             **_quotation(quote).model_dump(),
             document=document,
@@ -97,6 +120,9 @@ class QuotationService:
             review_task=_task(task) if task else None,
             previous_version=previous,
             next_versions=next_versions,
+            uploaded_by_email=uploaded_by_email,
+            reviewed_by_email=reviewed_by_email,
+            suggested_supplier_name=suggested_supplier_name,
         )
 
     def list_review_tasks(
@@ -107,26 +133,379 @@ class QuotationService:
         limit: int = 50,
         status: ReviewTaskStatus | str = "open",
         priority: ReviewTaskPriority | None = None,
+        search: str | None = None,
+        date_from: str | None = None,
+        date_to: str | None = None,
+        sort_by: Literal["created_at", "stated_total", "priority", "status"] = "created_at",
+        sort_order: Literal["asc", "desc"] = "desc",
     ) -> ReviewTaskList:
         client = authenticated_client(self._settings, bearer_token)
         capped_limit = max(1, min(limit, 100))
         offset = _decode_cursor(cursor)
+        clean_search = search.strip()[:200].lower() if search else None
         try:
             query = client.table("review_task").select(TASK_COLUMNS)
             if status != "all":
                 query = query.eq("status", status)
             if priority is not None:
                 query = query.eq("priority", priority)
-            response = query.order("created_at").order("id").range(
-                offset, offset + capped_limit
-            ).execute()
+            if date_from is not None:
+                query = query.gte("created_at", date_from)
+            if date_to is not None:
+                query = query.lte("created_at", date_to)
+            response = (
+                query.order(sort_by, desc=sort_order == "desc")
+                .order("id")
+                .range(offset, offset + capped_limit)
+                .execute()
+            )
         except APIError as exc:
             raise ServiceUnavailableError(details={"dependency": "database"}) from exc
         rows = _rows(response.data)
+        rows = [row for row in rows if not _task_quotation_deleted(row)]
+        if clean_search:
+            rows = [
+                r for r in rows
+                if clean_search in str(r.get("quotation_id", "")).lower()
+                or clean_search in _nested_supplier_name(r).lower()
+            ]
         visible = rows[:capped_limit]
         return ReviewTaskList(
             items=[_task(row) for row in visible],
-            next_cursor=_encode_cursor(offset + capped_limit) if len(rows) > capped_limit else None,
+            next_cursor=(
+                _encode_cursor(offset + capped_limit)
+                if len(rows) > capped_limit
+                else None
+            ),
+        )
+
+    def get_audit_trail(
+        self,
+        *,
+        bearer_token: str,
+        member: CurrentMember,
+        quotation_id: UUID,
+    ) -> AuditTrailResponse:
+        client = authenticated_client(self._settings, bearer_token)
+        try:
+            response = (
+                client.table("audit_event")
+                .select("id,action,actor_email,outcome,target,trace_id,occurred_at")
+                .eq("tenant_id", str(member.tenant_id))
+                .eq("target->>quotation_id", str(quotation_id))
+                .order("occurred_at", desc=True)
+                .limit(100)
+                .execute()
+            )
+        except APIError as exc:
+            raise ServiceUnavailableError(details={"dependency": "database"}) from exc
+        items = [AuditTrailEntry.model_validate(row) for row in _rows(response.data)]
+        return AuditTrailResponse(items=items)
+
+    def update_review_task_priority(
+        self,
+        *,
+        bearer_token: str,
+        member: CurrentMember,
+        task_id: UUID,
+        priority: ReviewTaskPriority,
+    ) -> ReviewTask:
+        client = authenticated_client(self._settings, bearer_token)
+        try:
+            response = (
+                client.table("review_task")
+                .update({"priority": priority})
+                .eq("id", str(task_id))
+                .select(TASK_COLUMNS)
+                .execute()
+            )
+        except APIError as exc:
+            raise ServiceUnavailableError(details={"dependency": "database"}) from exc
+        row = _one_row(response.data, resource="review_task")
+        self._record(
+            bearer_token=bearer_token,
+            member=member,
+            action="review_task.priority_changed",
+            target={"review_task_id": str(task_id), "priority": priority},
+        )
+        return _task(row)
+
+    def archive_quotation(
+        self,
+        *,
+        bearer_token: str,
+        member: CurrentMember,
+        quotation_id: UUID,
+    ) -> Quotation:
+        client = authenticated_client(self._settings, bearer_token)
+        _quotation_row(client, quotation_id)
+        archived_at = datetime.now(UTC).isoformat()
+        try:
+            row = _one_row(
+                client.table("quotation")
+                .update({"deleted_at": archived_at})
+                .eq("id", str(quotation_id))
+                .execute()
+                .data,
+                resource="quotation",
+            )
+            client.table("review_task").update(
+                {"status": "resolved", "resolved_at": archived_at}
+            ).eq("quotation_id", str(quotation_id)).in_(
+                "status", ["open", "in_progress"]
+            ).execute()
+        except APIError as exc:
+            raise ServiceUnavailableError(details={"dependency": "database"}) from exc
+        self._record(
+            bearer_token=bearer_token,
+            member=member,
+            action="quotation.archived",
+            target={"quotation_id": str(quotation_id)},
+        )
+        return _quotation(row)
+
+    def restore_quotation(
+        self,
+        *,
+        bearer_token: str,
+        member: CurrentMember,
+        quotation_id: UUID,
+    ) -> Quotation:
+        client = authenticated_client(self._settings, bearer_token)
+        _quotation_row(client, quotation_id)
+        try:
+            row = _one_row(
+                client.table("quotation")
+                .update({"deleted_at": None})
+                .eq("id", str(quotation_id))
+                .execute()
+                .data,
+                resource="quotation",
+            )
+        except APIError as exc:
+            raise ServiceUnavailableError(details={"dependency": "database"}) from exc
+        self._record(
+            bearer_token=bearer_token,
+            member=member,
+            action="quotation.restored",
+            target={"quotation_id": str(quotation_id)},
+        )
+        return _quotation(row)
+
+    def retry_extraction(
+        self,
+        *,
+        bearer_token: str,
+        member: CurrentMember,
+        quotation_id: UUID,
+    ) -> Quotation:
+        client = authenticated_client(self._settings, bearer_token)
+        quote = _quotation_row(client, quotation_id)
+        if quote["status"] in {"pending", "extracting"}:
+            raise ConflictError(details={"reason": "quotation_extraction_already_active"})
+        try:
+            active = (
+                client.table("extraction_job")
+                .select("id")
+                .eq("quotation_id", str(quotation_id))
+                .in_("status", ["queued", "running"])
+                .limit(1)
+                .execute()
+            )
+            if active.data:
+                raise ConflictError(details={"reason": "extraction_already_running"})
+            client.table("field_extraction").delete().eq(
+                "quotation_id", str(quotation_id)
+            ).execute()
+            client.table("quotation_line").delete().eq(
+                "quotation_id", str(quotation_id)
+            ).execute()
+            job_row = _one_row(
+                client.table("extraction_job")
+                .insert(
+                    {
+                        "tenant_id": str(member.tenant_id),
+                        "quotation_id": str(quotation_id),
+                        "status": "queued",
+                    }
+                )
+                .execute()
+                .data,
+                resource="job",
+            )
+            row = _one_row(
+                client.table("quotation")
+                .update({"status": "pending"})
+                .eq("id", str(quotation_id))
+                .execute()
+                .data,
+                resource="quotation",
+            )
+        except APIError as exc:
+            raise ServiceUnavailableError(details={"dependency": "database"}) from exc
+        _enqueue_extraction(self._settings, job_row, quote, member)
+        self._record(
+            bearer_token=bearer_token,
+            member=member,
+            action="quotation.extraction_retried",
+            target={"quotation_id": str(quotation_id)},
+        )
+        return _quotation(row)
+
+    def replace_document(
+        self,
+        *,
+        bearer_token: str,
+        member: CurrentMember,
+        quotation_id: UUID,
+        new_document_id: UUID,
+    ) -> Quotation:
+        client = authenticated_client(self._settings, bearer_token)
+        quote = _quotation_row(client, quotation_id)
+        if quote["status"] in {"pending", "extracting"}:
+            raise ConflictError(details={"reason": "quotation_extraction_already_active"})
+        _document_row(client, new_document_id)
+        old_document_id = str(quote["document_id"])
+        try:
+            active = (
+                client.table("extraction_job")
+                .select("id")
+                .eq("quotation_id", str(quotation_id))
+                .in_("status", ["queued", "running"])
+                .limit(1)
+                .execute()
+            )
+            if active.data:
+                raise ConflictError(details={"reason": "extraction_already_running"})
+            client.table("field_extraction").delete().eq(
+                "quotation_id", str(quotation_id)
+            ).execute()
+            client.table("quotation_line").delete().eq(
+                "quotation_id", str(quotation_id)
+            ).execute()
+            job_row = _one_row(
+                client.table("extraction_job")
+                .insert(
+                    {
+                        "tenant_id": str(member.tenant_id),
+                        "quotation_id": str(quotation_id),
+                        "status": "queued",
+                    }
+                )
+                .execute()
+                .data,
+                resource="job",
+            )
+            row = _one_row(
+                client.table("quotation")
+                .update({"document_id": str(new_document_id), "status": "pending"})
+                .eq("id", str(quotation_id))
+                .execute()
+                .data,
+                resource="quotation",
+            )
+        except APIError as exc:
+            raise ServiceUnavailableError(details={"dependency": "database"}) from exc
+        _enqueue_extraction(
+            self._settings,
+            job_row,
+            {**quote, "document_id": str(new_document_id)},
+            member,
+        )
+        self._record(
+            bearer_token=bearer_token,
+            member=member,
+            action="quotation.document_replaced",
+            target={
+                "quotation_id": str(quotation_id),
+                "old_document_id": old_document_id,
+                "new_document_id": str(new_document_id),
+            },
+        )
+        return _quotation(row)
+
+    def export_quotation_csv(
+        self,
+        *,
+        bearer_token: str,
+        member: CurrentMember,
+        quotation_id: UUID,
+    ) -> str:
+        client = authenticated_client(self._settings, bearer_token)
+        quote = _quotation_row(client, quotation_id)
+        lines = _line_rows(client, quotation_id)
+        supplier_name = (
+            _supplier_name(client, UUID(str(quote["supplier_id"])))
+            if quote.get("supplier_id")
+            else ""
+        )
+
+        output = StringIO()
+        writer = csv.writer(output)
+        writer.writerow(["supplier_name", supplier_name])
+        writer.writerow(["issue_date", quote.get("issue_date") or ""])
+        writer.writerow(
+            ["stated_total", decimal_string(quote.get("stated_total_amount")) or ""]
+        )
+        writer.writerow(
+            [
+                "currency",
+                quote.get("stated_total_currency") or quote.get("currency") or "",
+            ]
+        )
+        writer.writerow([])
+        writer.writerow(
+            [
+                "line_number",
+                "original_text",
+                "quantity",
+                "unit_price_amount",
+                "unit_price_currency",
+                "vat_rate",
+                "delivery_fee_amount",
+                "discount_amount",
+            ]
+        )
+        for line in lines:
+            writer.writerow(
+                [
+                    line.get("line_number") or "",
+                    line.get("original_text") or "",
+                    decimal_string(line.get("quantity")) or "",
+                    decimal_string(line.get("unit_price_amount")) or "",
+                    line.get("unit_price_currency") or "",
+                    decimal_string(line.get("vat_rate")) or "",
+                    decimal_string(line.get("delivery_fee_amount")) or "",
+                    decimal_string(line.get("discount_amount")) or "",
+                ]
+            )
+        self._record(
+            bearer_token=bearer_token,
+            member=member,
+            action="quotation.exported",
+            target={"quotation_id": str(quotation_id), "format": "csv"},
+        )
+        return output.getvalue()
+
+    def _record(
+        self,
+        *,
+        bearer_token: str,
+        member: CurrentMember,
+        action: str,
+        target: dict[str, object],
+    ) -> None:
+        get_audit_writer().record(
+            AuditEventCreate(
+                tenant_id=member.tenant_id,
+                actor_membership_id=member.membership_id,
+                actor_email=member.email,
+                action=action,
+                target=target,
+                outcome="success",
+                trace_id=get_trace_id(),
+            ),
+            bearer_token=bearer_token,
         )
 
 
@@ -174,6 +553,20 @@ def _supplier_row(client: object, supplier_id: UUID) -> dict[str, object]:
     except APIError as exc:
         raise ServiceUnavailableError(details={"dependency": "database"}) from exc
     return _one_row(response.data, resource="supplier")
+
+
+def _supplier_name(client: object, supplier_id: UUID) -> str:
+    try:
+        response = (
+            client.table("supplier")
+            .select("name")
+            .eq("id", str(supplier_id))
+            .limit(2)
+            .execute()
+        )
+    except APIError as exc:
+        raise ServiceUnavailableError(details={"dependency": "database"}) from exc
+    return str(_one_row(response.data, resource="supplier").get("name") or "")
 
 
 def _active_or_existing_quotation_for_document(client: object, document_id: UUID) -> bool:
@@ -255,6 +648,13 @@ def _quotation(row: dict[str, object]) -> Quotation:
         id=UUID(str(row["id"])),
         document_id=UUID(str(row["document_id"])),
         supplier_id=UUID(str(row["supplier_id"])) if row.get("supplier_id") else None,
+        suggested_supplier_id=(
+            UUID(str(row["suggested_supplier_id"])) if row.get("suggested_supplier_id") else None
+        ),
+        supplier_match_confidence=decimal_string(
+            row.get("supplier_match_confidence"),
+            scale=3,
+        ),
         currency=str(row["currency"]) if row.get("currency") else None,
         issue_date=row.get("issue_date"),
         expiry_date=row.get("expiry_date"),
@@ -267,6 +667,8 @@ def _quotation(row: dict[str, object]) -> Quotation:
         created_at=row["created_at"],
         reviewed_by=UUID(str(row["reviewed_by"])) if row.get("reviewed_by") else None,
         reviewed_at=row.get("reviewed_at"),
+        deleted_at=row.get("deleted_at"),
+        reviewer_notes=row.get("reviewer_notes"),
     )
 
 
@@ -308,6 +710,20 @@ def _field(row: dict[str, object]) -> FieldExtraction:
         corrected_by=UUID(str(row["corrected_by"])) if row.get("corrected_by") else None,
         corrected_at=row.get("corrected_at"),
     )
+
+
+def _nested_supplier_name(row: dict[str, object]) -> str:
+    q = row.get("quotation")
+    if isinstance(q, dict):
+        s = q.get("supplier")
+        if isinstance(s, dict):
+            return str(s.get("name", ""))
+    return ""
+
+
+def _task_quotation_deleted(row: dict[str, object]) -> bool:
+    q = row.get("quotation")
+    return isinstance(q, dict) and q.get("deleted_at") is not None
 
 
 def _task(row: dict[str, object]) -> ReviewTask:
@@ -363,3 +779,47 @@ def _decode_cursor(cursor: str | None) -> int:
         return int(base64.urlsafe_b64decode(cursor.encode()).decode())
     except (ValueError, UnicodeDecodeError) as exc:
         raise NotFoundError(details={"cursor": "invalid"}) from exc
+
+
+def _membership_email(client: object, membership_id: UUID) -> str | None:
+    try:
+        response = (
+            client.table("membership")
+            .select("email")
+            .eq("id", str(membership_id))
+            .limit(1)
+            .execute()
+        )
+    except APIError:
+        return None
+    rows = response.data if isinstance(response.data, list) else []
+    if rows and isinstance(rows[0], dict):
+        return str(rows[0].get("email") or "")
+    return None
+
+
+def _enqueue_extraction(
+    settings: Settings,
+    job_row: dict[str, object],
+    quote: dict[str, object],
+    member: CurrentMember,
+) -> None:
+    try:
+        from redis import Redis
+        from rq import Queue
+    except ImportError:
+        return
+    try:
+        queue = Queue(settings.extraction_queue_name, connection=Redis.from_url(settings.redis_url))
+        queue.enqueue(
+            "procurepilot_extraction_worker.worker.process_extraction_job",
+            {
+                "job_id": str(job_row["id"]),
+                "tenant_id": str(member.tenant_id),
+                "quotation_id": str(quote["id"]),
+                "document_id": str(quote["document_id"]),
+            },
+            job_id=str(job_row["id"]),
+        )
+    except Exception:
+        pass

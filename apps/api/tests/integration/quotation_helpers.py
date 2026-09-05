@@ -224,6 +224,10 @@ class PsycopgTableQuery:
         self._where.append((column, "=", value))
         return self
 
+    def neq(self, column: str, value: object) -> PsycopgTableQuery:
+        self._where.append((column, "!=", value))
+        return self
+
     def lt(self, column: str, value: object) -> PsycopgTableQuery:
         self._where.append((column, "<", value))
         return self

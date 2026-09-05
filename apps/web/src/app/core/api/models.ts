@@ -216,6 +216,15 @@ export interface PresignRequest {
   readonly content_hash?: string | null;
 }
 
+export interface PotentialDuplicate {
+  readonly quotation_id: string;
+  readonly document_id: string;
+  readonly created_at: string;
+  readonly supplier_name?: string | null;
+  readonly stated_total_amount?: string | null;
+  readonly stated_total_currency?: string | null;
+}
+
 export interface PresignResponse {
   readonly document_id: string;
   readonly storage_bucket: string;
@@ -223,6 +232,7 @@ export interface PresignResponse {
   readonly upload_url: string;
   readonly upload_fields?: Record<string, string>;
   readonly expires_at: string;
+  readonly potential_duplicates?: readonly PotentialDuplicate[];
 }
 
 export interface Document {
@@ -260,6 +270,8 @@ export interface Quotation {
   readonly id: string;
   readonly document_id: string;
   readonly supplier_id?: string | null;
+  readonly suggested_supplier_id?: string | null;
+  readonly supplier_match_confidence?: string | null;
   readonly currency?: string | null;
   readonly issue_date?: string | null;
   readonly expiry_date?: string | null;
@@ -270,6 +282,8 @@ export interface Quotation {
   readonly created_at: string;
   readonly reviewed_by?: string | null;
   readonly reviewed_at?: string | null;
+  readonly deleted_at?: string | null;
+  readonly reviewer_notes?: string | null;
 }
 
 export interface QuotationPack {
@@ -320,9 +334,19 @@ export interface FieldCorrection {
   readonly corrected_value: unknown;
 }
 
+export interface NewQuotationLine {
+  readonly original_text: string;
+  readonly quantity?: string | null;
+  readonly unit_price_amount?: string | null;
+  readonly unit_price_currency?: string | null;
+}
+
 export interface QuotationReviewPatch {
   readonly supplier_id?: string | null;
+  readonly reviewer_notes?: string | null;
   readonly corrections?: readonly FieldCorrection[];
+  readonly add_lines?: readonly NewQuotationLine[];
+  readonly remove_line_ids?: readonly string[];
 }
 
 export interface QuotationDetail extends Quotation {
@@ -330,6 +354,19 @@ export interface QuotationDetail extends Quotation {
   readonly lines: readonly QuotationLine[];
   readonly field_extractions: readonly FieldExtraction[];
   readonly review_task?: ReviewTask | null;
+  readonly uploaded_by_email?: string | null;
+  readonly reviewed_by_email?: string | null;
+  readonly suggested_supplier_name?: string | null;
+}
+
+export interface AuditTrailEntry {
+  readonly id: number;
+  readonly action: string;
+  readonly actor_email: string | null;
+  readonly outcome: string;
+  readonly target: Record<string, unknown> | null;
+  readonly trace_id: string | null;
+  readonly occurred_at: string;
 }
 
 export type JobStatus = 'queued' | 'running' | 'succeeded' | 'failed';
@@ -352,7 +389,8 @@ export type ReviewTaskReason =
   | 'low_confidence'
   | 'arithmetic_mismatch'
   | 'read_failure'
-  | 'review_required';
+  | 'review_required'
+  | 'no_supplier_match';
 
 export interface ReviewTask {
   readonly id: string;
@@ -1098,5 +1136,3 @@ export interface ApprovalDelegationCreate {
 export interface ApprovalDelegationList {
   readonly items: readonly ApprovalDelegation[];
 }
-
-

@@ -48,76 +48,89 @@
 
 ## 3. Missing functions
 
+> Status legend: ✅ Done · 🟡 In progress · ⬜ Remaining · ⏸ Deferred
+
 ### Lifecycle / data management
-- **No delete or archive** anywhere (queue or detail). "Refuse" is a workflow state, not removal. There is no way to clear a junk/duplicate/test upload — the workspace already holds 6 near-identical £5,423.64 quotations with no cleanup path. (Soft-delete + `audit_event`.)
-- **No "re-run / retry extraction"** — if extraction is wrong there is no way to re-process the same document.
-- **No "replace source document"** — can't swap the attached file on an existing quotation.
-- **No duplicate / near-duplicate detection** — uploading a file identical to an existing one (same supplier, total, date, or file hash) produces a silent 7th copy with no warning.
-- **No export of extracted data** — you can download the *original* document, but not the extracted header + line items as CSV/JSON.
-- **No "duplicate to new quotation" / "create re-quote from this one".**
+- ✅ **Soft delete / archive** anywhere (queue or detail) — implemented, audit-logged.
+- ✅ **"Re-run / retry extraction"** — implemented.
+- ✅ **"Replace source document"** — implemented.
+- ✅ **Duplicate / near-duplicate detection** on upload — implemented.
+- ✅ **Export of extracted data** as CSV — implemented (JSON not added; CSV covers the need).
+- ✅ **"Create re-quote from this one"** — implemented.
 
 ### Review workflow
-- **Line items appear to be non-editable in structure** — fields are shown per row but there is no visible **add row / remove row** control for a missed or hallucinated line.
-- **"This is an updated re-quote of an existing quotation"** checkbox has **no linked quotation picker** — you can tick it but not say which quotation it supersedes.
-- **No review notes / comments** — no place to record why a correction was made, or to leave a note for the authorizer.
-- **No assignment / ownership** — can't assign a quotation to a reviewer; no reviewer field.
-- **No visible audit trail / history** on the quotation (uploaded by, uploaded at, extracted at, field edits, state changes) — the constitution mandates `audit_event`, but it is not surfaced in the UI.
+- ✅ **Add row / remove row** for line items — implemented, with inline recalculation of totals.
+- ✅ **Re-quote picker** — linked-quotation selection implemented.
+- ✅ **Review notes / comments** — reviewer notes field implemented.
+- ✅ **Assignment / ownership** — uploaded-by and reviewed-by now shown on the review page (no assignable-reviewer field yet — see queue bulk-assign, still ⬜).
+- ✅ **Audit trail / history** — implemented, surfaced as an expansion panel on the review page.
 
 ### Queue
-- **No search** (by quotation id, supplier, total, filename).
-- **No column sorting** (created, total, priority, status).
-- **No pagination / "load more"** controls (API has cursor pagination per project docs; no UI).
-- **No date-range filter**; only Status + Priority.
-- **No bulk actions** (bulk refuse, bulk re-prioritise, bulk assign).
-- **Row is not clickable** — only the "Review & Authorize" button / id chip navigates.
-- **No age / SLA indicator** ("open 3 days").
-- **No empty-state** copy verified for a queue with zero results.
+- ✅ **Search** (by quotation id, supplier, total, filename) — implemented.
+- ✅ **Column sorting** — implemented.
+- ✅ **Pagination / "load more"** — implemented.
+- ✅ **Date-range filter** — implemented.
+- ✅ **Bulk actions** — bulk archive, bulk refuse, bulk re-prioritise implemented. Bulk *assign* still ⬜.
+- ✅ **Row is clickable** — implemented.
+- ✅ **Age / SLA indicator** — implemented.
+- ✅ **Empty-state copy** for filtered/zero-result queue — implemented.
 
 ### Timestamps
-- **"Created" column shows date only** ("Sep 3, 2026") — no time, no timezone, no relative age, no hover tooltip with the full timestamp.
-- **Review page shows no timestamps at all** — no "uploaded at", "extracted at", or "last modified".
-- **Quote validity is not surfaced as a countdown** — Expiry Date `9/28/2026` is shown as a plain field with no "expires in N days" / "expired" badge, despite validity being business-critical for a quotation.
-- Date fields are locale-incorrect (see B3).
+- ✅ **"Created" column** — now shows time + relative age.
+- ✅ **Review page timestamps** — uploaded at / extracted at / reviewed at implemented.
+- ✅ **Quote validity countdown** — "expires in N days" / expired badge implemented.
+- ⏸ Date fields are locale-incorrect (see B3) — deferred, same reason as B3.
 
 ### Ingestion
-- The module is called **"Quotation Inbox"** but is **upload-only** here — no email-in address, no watched folder / drop inbox, no supplier-portal submission. "Inbox" implies an inbound flow that isn't present.
-- **No multi-file / batch upload**; one file at a time.
-- **No stated page limit** or guidance for large multi-page PDFs (sample is 1 page — multi-page behaviour untested/undocumented).
+- ⬜ **Email-in / watched folder / supplier-portal submission** — not started; "Quotation Inbox" is still upload-only. Larger feature, not scheduled.
+- ⬜ **Multi-file / batch upload** — not started.
+- ⬜ **Page limit guidance** for large multi-page PDFs — not started; multi-page behaviour remains untested.
 
 ---
 
 ## 4. UX improvements
 
-- **Fix the queue arithmetic check (B1)** so the "Reason for Review" and priority reflect the same VAT-aware calculation the detail page uses; reserve red/HIGH for genuine discrepancies.
-- **Document-to-field linkage:** the page claims "inspect extracted fields side by side with the source document", but the PDF is Chrome's native viewer at 46% zoom and there is no visual link. Azure DI returns bounding polygons — overlay them and highlight the region when a field is focused; fit-to-width by default.
-- **Confidence legend + threshold:** show what score triggers a flag (54% flagged, 90% not) and what the badge means; make the threshold tenant-configurable.
-- **Money & date formatting:** format `Stated Total` as `£5,423.64` everywhere; render dates per workspace locale (GB → DD/MM/YYYY or ISO); one canonical formatter.
-- **Supplier step:** inline "＋ Add supplier", and **auto-suggest** from the document letterhead ("Al‑Faisal Trading Co." is right there) with a fuzzy match against existing suppliers; show an empty-state with a link when none exist.
-- **Success screen:** drop the stale chip; show the assigned priority + the reason it was assigned; consider taking the user straight to review.
-- **Queue:** make rows clickable; add search, sort, pagination, saved filters, an age column, and a subtler "needs review" treatment; skeleton loader instead of "Loading…".
-- **Breadcrumbs** (Quotation Inbox › {id} › Review) and per-page titles.
-- **Line-item editing affordances:** visible add/remove row, "split line", inline recalculation of the computed total as fields change.
-- **Re-quote link:** when the checkbox is ticked, require selecting the superseded quotation and show a diff.
-- **Validation feedback on upload:** explicit messages for unsupported type / over 25 MB / 0-byte / encrypted PDF (not tested — worth confirming these are handled gracefully).
+> Status legend: ✅ Done · 🟡 In progress · ⬜ Remaining · ⏸ Deferred
+
+- ✅ **Fix the queue arithmetic check (B1)** — VAT-aware calculation now shared between queue and detail page.
+- ⬜ **Document-to-field linkage / bounding-box overlay** — not started; PDF viewer still has no click-to-highlight link to extracted fields. Larger feature (see §5 item 3).
+- ✅ **Confidence legend + threshold** — legend bar added explaining the 85% flag threshold with badges. Tenant-configurable threshold still ⬜ (see §5 item 13).
+- ✅ **Money & date formatting** — Stated Total now uses the shared money formatter. Date-locale half deferred (B3).
+- 🟡 **Supplier step: inline "+ Add supplier" and auto-suggest from the document** — empty-state + Add-supplier link done (B5). Auto-suggest from extracted vendor name is being implemented now (see §5 item 11).
+- ✅ **Success screen** — stale status chip removed (B2).
+- ✅ **Queue improvements** — clickable rows, search, sort, pagination, age column, filtered empty state, skeleton loader all implemented.
+- ✅ **Breadcrumbs** — implemented (Quotation Inbox › {id}).
+- ✅ **Line-item editing affordances** — add/remove row and inline recalculation implemented. "Split line" not implemented (not requested since; low priority).
+- ✅ **Re-quote link** — picker requires selecting the superseded quotation. Diff view not implemented — low priority, revisit only if reviewers ask.
+- ⬜ **Validation feedback on upload** — explicit messages for unsupported type / over 25 MB / 0-byte / encrypted PDF still untested/unconfirmed.
 
 ---
 
 ## 5. Suggested additions
 
-1. **Duplicate detection** on upload — file hash + (supplier, total, issue date) heuristic → "Possible duplicate of QT‑…, uploaded 2 days ago" with merge / keep-both / discard.
-2. **Extraction feedback loop** — "mark this field wrong" / "retry extraction" that captures corrections as training/eval signal; show which engine ran and allow re-processing.
-3. **Bounding-box overlay** on the document for every extracted field and line item (click field → scroll+highlight in the PDF).
-4. **Quotation history / audit panel** — uploaded by + at, extracted at, every field edit, authorize/refuse, with actor and timestamp (surfacing `audit_event`).
-5. **Soft delete / archive** for drafts and junk, audit-logged, with a "Discarded" filter and restore.
-6. **Export & reuse** — download extracted header + lines as CSV/JSON; "start a new quotation from this one"; push confirmed lines into Smart Compare / Basket Split.
-7. **Validity tracking** — "expires in N days" badge, expired-quotation warning, optional alert before a quotation lapses.
-8. **Inbound ingestion** — dedicated email-in address per workspace and/or a watched storage folder, so "Quotation Inbox" is a real inbox.
-9. **Bulk queue operations** + assignment + SLA/age + saved views.
-10. **Reviewer collaboration** — notes/comments per quotation, @mention a colleague to co-review, "request changes".
-11. **Supplier auto-match** from letterhead / VAT number / address, with confidence and one-click confirm-or-create.
-12. **Locale/currency correctness pass** across the module (dates, money, number grouping) driven by workspace settings; RTL check for Arabic.
-13. **Per-tenant confidence thresholds** and a small "extraction quality" summary on the review page (avg confidence, fields below threshold).
-14. **Multi-file / multi-page** upload with progress per file and a stated size/page limit.
+> Status legend: ✅ Done · 🟡 In progress · ⬜ Remaining · ⏸ Deferred
+
+1. ✅ **Duplicate detection** on upload — implemented.
+2. ✅ **Extraction feedback loop** — retry extraction implemented; "mark this field wrong" training-signal capture not implemented (corrections are already captured per-field, which covers the practical need).
+3. ⬜ **Bounding-box overlay** on the document for every extracted field and line item — not started. Meaningful scope (requires reading Azure DI's returned polygons and wiring a PDF-viewer overlay); revisit as its own chunk.
+4. ✅ **Quotation history / audit panel** — implemented.
+5. ✅ **Soft delete / archive** — implemented, with restore.
+6. ✅ **Export & reuse** — CSV export and create-re-quote implemented. Push into Smart Compare / Basket Split not implemented — no user request yet.
+7. ✅ **Validity tracking** — expiry badge implemented.
+8. ⬜ **Inbound ingestion** (email-in / watched folder) — not started. Larger feature, not scheduled.
+9. ✅ **Bulk queue operations** — archive/refuse/re-prioritise implemented. Assignment + saved views still ⬜.
+10. ✅ **Reviewer collaboration** — notes implemented. @mention / "request changes" not implemented — no user request yet.
+11. 🟡 **Supplier auto-match** from the extracted vendor name, with confidence and one-click confirm-or-create. **Design, being implemented now:**
+    - The extraction pipeline already captures the vendor/letterhead name as a `supplier_name` field extraction (Azure DI `VendorName` / structured-parse `supplier_name` column) — no new extraction work needed, only using what is already captured.
+    - At extraction time, the worker fuzzy-matches that name against the tenant's existing suppliers using Postgres `pg_trgm` `similarity()` (already an enabled extension per the constitution's stack). Two new nullable columns on `quotation`: `suggested_supplier_id`, `supplier_match_confidence`.
+    - Thresholds: confidence ≥ 0.6 → shown as a positive "Suggested supplier" banner, pre-selectable with one click; 0.35–0.6 → shown as a tentative "Possible match" banner; below 0.35 (and only when the tenant actually has suppliers to compare against, so an empty workspace doesn't get flagged) → no pre-fill, and the queue gets a new, non-blocking `no_supplier_match` review reason (normal priority, not HIGH — this is a nudge, not a data-integrity problem, learning from the B1 alarm-fatigue mistake).
+    - Review page: accept the suggestion with one click, or create the supplier directly from the review page (pre-filled with the extracted name) without navigating away — closing the B5 dead-end for the common case where the extracted name simply isn't in the workspace yet.
+    - Confirmation is never automatic — `supplier_id` is only set by an explicit reviewer action, preserving "no autonomous purchasing" (Constitution Principle VIII).
+12. ⏸ **Locale/currency correctness pass** — money formatting fixed (B4); date-locale half deferred (B3); RTL already covered elsewhere in the app, not re-verified for this module specifically.
+13. ⬜ **Per-tenant confidence thresholds** — the legend now explains the fixed 85% threshold; making it tenant-configurable is not started.
+14. ⬜ **Multi-file / multi-page upload** — not started.
+15. ✅ **Queue/detail search** — implemented.
+16. ⬜ **Human-readable `reference_code`** — not started. Per the original sequencing note, this comes after search (done) and alongside/before duplicate detection (done) — now unblocked whenever it's prioritised.
 
 ---
 

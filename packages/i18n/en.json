@@ -524,6 +524,9 @@
       "queue": "Review Queue",
       "upload": "Upload Quotation"
     },
+    "breadcrumb": {
+      "inbox": "Quotation Inbox"
+    },
     "upload": {
       "title": "Upload Supplier Quotation",
       "subtitle": "Upload PDF, scanned image, or spreadsheet quotations for automated line-item extraction.",
@@ -552,6 +555,19 @@
       "sampleAcmeFoods": "Acme Foods — 5 items (CSV)",
       "sampleFreshDirect": "Fresh Direct — 6 items (CSV)",
       "sampleAlFaisalTrading": "Al-Faisal Trading — 6 items (PDF)",
+      "sampleHeliosPackaging": "Helios Packaging — 7 items (PDF)",
+      "sampleBrightwellElectronics": "Brightwell Electronics — 6 items (PNG)",
+      "sampleOakridgeIndustrial": "Oakridge Industrial — 8 items (XLSX)",
+      "duplicateWarning": {
+        "title": "Possible Duplicate Detected",
+        "message": "A document with the same content has already been uploaded to this workspace.",
+        "quotation": "Quotation",
+        "uploaded": "uploaded",
+        "supplier": "supplier",
+        "total": "total",
+        "cancel": "Cancel Upload",
+        "proceed": "Upload Anyway"
+      },
       "status": {
         "uploading": "Uploading",
         "processing": "Extracting",
@@ -563,8 +579,13 @@
       "title": "Quotation Review Queue",
       "subtitle": "Review and authorize extracted supplier quotations before they become trusted commercial data.",
       "uploadNew": "Upload Quotation",
+      "searchPlaceholder": "Search by supplier or ID…",
       "filterStatus": "Filter by Status",
       "filterPriority": "Filter by Priority",
+      "filters": {
+        "dateFrom": "From date",
+        "dateTo": "To date"
+      },
       "status": {
         "all": "All Statuses",
         "open": "Open",
@@ -581,7 +602,8 @@
         "low_confidence": "Low Confidence Extraction",
         "arithmetic_mismatch": "Arithmetic Mismatch",
         "read_failure": "Read Failure",
-        "review_required": "Review Required"
+        "review_required": "Review Required",
+        "no_supplier_match": "No Supplier Match"
       },
       "columns": {
         "id": "Quotation ID",
@@ -590,18 +612,37 @@
         "priority": "Priority",
         "status": "Status",
         "createdAt": "Created",
+        "age": "Age",
         "statedTotal": "Stated Total",
         "actions": "Actions"
       },
+      "age": {
+        "justNow": "just now",
+        "hoursAgo": "{{count}}h ago",
+        "daysAgo": "{{count}}d ago",
+        "weeksAgo": "{{count}}w ago",
+        "monthsAgo": "{{count}}mo ago"
+      },
       "actions": {
         "review": "Review & Authorize",
-        "view": "View (Read-Only)"
+        "view": "View (Read-Only)",
+        "archive": "Archive"
       },
+      "archiveConfirm": "Archive this quotation? It can be restored later.",
+      "bulkSelected": "{{count}} selected",
+      "bulkArchiveButton": "Archive Selected",
+      "bulkArchiveConfirm": "Archive {{count}} quotation(s)? This cannot be undone easily.",
+      "bulkRefuseButton": "Refuse Selected",
+      "bulkRefuseConfirm": "Refuse {{count}} quotation(s)? This action marks them as refused.",
+      "bulkReprioritiseButton": "Set Priority",
+      "bulkClear": "Clear Selection",
       "readOnlyBadge": "Read-Only Access",
       "readOnlyNotice": "Your role has read-only access. Only Owners and Buyers can correct and confirm quotations.",
       "loadMore": "Load More",
       "emptyTitle": "No Review Tasks Found",
-      "emptyMessage": "There are no quotation review tasks matching your current filters."
+      "emptyMessage": "There are no quotation review tasks matching your current filters.",
+      "noFilterResults": "No results match your filters",
+      "clearFilters": "Clear filters"
     },
     "review": {
       "title": "Quotation Review & Authorization",
@@ -609,9 +650,28 @@
       "backToQueue": "Back to Review Queue",
       "downloadOriginal": "Download original document",
       "readOnlyNotice": "Read-only mode. You can view extraction evidence, but editing and confirmation require Owner or Buyer permissions.",
+      "uploadedBy": "Uploaded by:",
+      "uploadedAt": "Uploaded at:",
+      "extractedAt": "Extracted at:",
+      "lastModified": "Last modified:",
+      "reviewedBy": "Reviewed by:",
+      "reviewedAt": "Reviewed at:",
+      "expired": "Expired",
+      "expiresIn": "Expires in {{count}} days",
+      "validFor": "Valid for {{count}} days",
       "panels": {
         "document": "Source Document Evidence",
         "extractedData": "Extracted Commercial Data"
+      },
+      "information": {
+        "title": "Information"
+      },
+      "notes": {
+        "title": "Reviewer Notes",
+        "label": "Notes",
+        "placeholder": "Add notes about this quotation…",
+        "hint": "Notes are saved when you save corrections",
+        "empty": "No reviewer notes"
       },
       "keyboardNav": {
         "title": "Attention Navigation (FR-014)",
@@ -636,6 +696,16 @@
         "statedTotalCurrency": "Stated Total Currency",
         "statusLabel": "Status"
       },
+      "supplierMatch": {
+        "suggested": "Suggested: {{name}} - {{pct}}% match",
+        "possible": "Possible match: {{name}} - {{pct}}% match",
+        "acceptButton": "Accept",
+        "useButton": "Use this",
+        "noMatch": "No supplier match found for {{name}}",
+        "unknownVendor": "the extracted vendor",
+        "createButton": "Create supplier",
+        "createSuccess": "Supplier created and selected."
+      },
       "lines": {
         "title": "Extracted Line Items",
         "colLine": "#",
@@ -652,13 +722,25 @@
         "unitSize": "Unit Size",
         "unit": "Unit",
         "noLines": "No line items extracted for this quotation.",
-        "colLineTotal": "Line Total"
+        "colLineTotal": "Line Total",
+        "addLine": "Add Line Item",
+        "addLineText": "Item Description",
+        "addLineQuantity": "Quantity",
+        "addLinePrice": "Unit Price",
+        "confirmAdd": "Add",
+        "removeLine": "Remove this line",
+        "markedForRemoval": "Will be removed on save",
+        "undoRemove": "Undo removal",
+        "pendingAdd": "New — will be added on save"
       },
       "confidence": {
         "high": "High Confidence",
         "medium": "Medium Confidence",
         "low": "Low Confidence — Needs Review",
         "flaggedBadge": "Needs Attention",
+        "legendText": "Fields below 85% confidence are flagged for review",
+        "highBadge": "≥85%",
+        "lowBadge": "<85%",
         "scoreTooltip": "AI confidence score: {{score}}% via {{method}} ({{model}})"
       },
       "provenance": {
@@ -699,6 +781,7 @@
         "isRequoteLabel": "This is an updated re-quote of an existing quotation",
         "selectPreviousLabel": "Select Prior Quotation to Supersede",
         "selectPreviousPlaceholder": "Select previous quotation...",
+        "noPriorQuotations": "No other quotations found in this workspace",
         "bannerTitle": "Version History",
         "isUpdateOf": "This quotation is an updated version of",
         "hasNewerVersion": "A newer version of this quotation exists:",
@@ -707,6 +790,9 @@
         "versionId": "Quotation #{{id}}"
       },
       "actions": {
+        "archive": "Archive",
+        "retryExtraction": "Retry Extraction",
+        "export": "Export CSV",
         "saveChanges": "Save Corrections",
         "saving": "Saving corrections...",
         "confirmButton": "Confirm & Authorize Quotation",
@@ -725,8 +811,17 @@
         "confirmDialogMessage": "This will mark the quotation as reviewed and authorized. It will become trusted commercial data used for matching, pricing, and cost comparison. This action cannot be undone.",
         "confirmDialogMismatchWarn": "Warning: You are confirming this quotation with an unresolved arithmetic discrepancy.",
         "confirmDialogCancel": "Cancel",
-        "confirmDialogProceed": "Confirm & Authorize"
+        "confirmDialogProceed": "Confirm & Authorize",
+        "createRequote": "Create Re-Quote"
       },
+      "replaceDocument": {
+        "tooltip": "Replace source document",
+        "unsupportedType": "This file type is not supported. Please upload a PDF, image, or spreadsheet.",
+        "success": "Source document replaced. Extraction will begin shortly."
+      },
+      "archiveConfirm": "Archive this quotation?",
+      "retryConfirm": "Re-run extraction? Existing extracted data will be replaced.",
+      "archived": "Quotation archived",
       "status": {
         "pending": "Pending Extraction",
         "extracting": "Extracting",
@@ -734,6 +829,21 @@
         "in_review": "In Review",
         "reviewed": "Reviewed & Authorized",
         "refused": "Refused"
+      }
+    },
+    "audit": {
+      "title": "Audit Trail",
+      "empty": "No audit events recorded",
+      "system": "System",
+      "actions": {
+        "archived": "Quotation archived",
+        "restored": "Quotation restored",
+        "extraction_retried": "Extraction retried",
+        "exported": "Data exported",
+        "confirmed": "Quotation confirmed",
+        "refused": "Quotation refused",
+        "reviewed": "Review submitted",
+        "unknown": "Action performed"
       }
     }
   },

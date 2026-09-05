@@ -20,6 +20,7 @@ ReviewTaskReason = Literal[
     "arithmetic_mismatch",
     "read_failure",
     "review_required",
+    "no_supplier_match",
 ]
 
 
@@ -40,6 +41,10 @@ class QuotationCreate(StrictApiModel):
 class ConfirmRequest(StrictApiModel):
     previous_quotation_id: UUID | None = None
     acknowledge_mismatch: bool = False
+
+
+class ReplaceDocumentRequest(StrictApiModel):
+    document_id: UUID
 
 
 class RefuseRequest(StrictApiModel):
@@ -86,9 +91,23 @@ class FieldCorrection(StrictApiModel):
     corrected_value: Any
 
 
+class NewQuotationLine(StrictApiModel):
+    original_text: str = Field(min_length=1, max_length=500)
+    quantity: StrictStr | None = Field(default=None, pattern=r"^\d+(\.\d{1,6})?$")
+    unit_price_amount: StrictStr | None = Field(default=None, pattern=r"^-?\d+(\.\d{1,4})?$")
+    unit_price_currency: StrictStr | None = Field(default=None, pattern=r"^[A-Z]{3}$")
+
+
 class QuotationReviewPatch(StrictApiModel):
     supplier_id: UUID | None = None
+    reviewer_notes: str | None = None
     corrections: list[FieldCorrection] = Field(default_factory=list)
+    add_lines: list[NewQuotationLine] = Field(default_factory=list)
+    remove_line_ids: list[UUID] = Field(default_factory=list, max_length=50)
+
+
+class ReviewTaskPriorityPatch(StrictApiModel):
+    priority: ReviewTaskPriority
 
 
 class ReviewTask(BaseModel):
@@ -108,10 +127,26 @@ class ReviewTaskList(BaseModel):
     next_cursor: str | None = None
 
 
+class AuditTrailEntry(BaseModel):
+    id: int
+    action: str
+    actor_email: str | None = None
+    outcome: str
+    target: dict[str, object] | None = None
+    trace_id: str | None = None
+    occurred_at: str
+
+
+class AuditTrailResponse(BaseModel):
+    items: list[AuditTrailEntry]
+
+
 class Quotation(BaseModel):
     id: UUID
     document_id: UUID
     supplier_id: UUID | None = None
+    suggested_supplier_id: UUID | None = None
+    supplier_match_confidence: str | None = None
     currency: str | None = None
     issue_date: date | None = None
     expiry_date: date | None = None
@@ -122,6 +157,8 @@ class Quotation(BaseModel):
     created_at: datetime
     reviewed_by: UUID | None = None
     reviewed_at: datetime | None = None
+    deleted_at: datetime | None = None
+    reviewer_notes: str | None = None
 
 
 class QuotationVersionReference(BaseModel):
@@ -137,6 +174,9 @@ class QuotationDetail(Quotation):
     review_task: ReviewTask | None = None
     previous_version: QuotationVersionReference | None = None
     next_versions: list[QuotationVersionReference] = Field(default_factory=list)
+    uploaded_by_email: str | None = None
+    reviewed_by_email: str | None = None
+    suggested_supplier_name: str | None = None
 
 
 def decimal_string(value: object, *, scale: int | None = None) -> str | None:

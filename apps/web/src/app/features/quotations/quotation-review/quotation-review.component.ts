@@ -25,9 +25,12 @@ import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
 import { ApiService } from '../../../core/api/api.service';
 import type {
+  AuditTrailEntry,
   ApiError,
   FieldCorrection,
   FieldExtraction,
+  Money,
+  NewQuotationLine,
   QuotationDetail,
   Supplier,
 } from '../../../core/api/models';
@@ -44,6 +47,32 @@ interface FlaggedField {
   readonly confidence: number;
   readonly extraction: FieldExtraction;
 }
+
+interface ExpiryBadge {
+  readonly kind: 'expired' | 'warning' | 'valid';
+  readonly labelKey: 'quotations.review.expired' | 'quotations.review.expiresIn' | 'quotations.review.validFor';
+  readonly count?: number;
+}
+
+interface EffectiveLineAmounts {
+  readonly quantity: number;
+  readonly unitPrice: number;
+  readonly deliveryFee: number;
+  readonly discount: number;
+  readonly vatRate: number;
+}
+
+interface SupplierSuggestion {
+  readonly id: string;
+  readonly name: string;
+  readonly confidencePct: number;
+  readonly tier: 'high' | 'medium';
+}
+
+type QuotationTimestampFields = QuotationDetail & {
+  readonly extracted_at?: string | null;
+  readonly updated_at?: string | null;
+};
 
 @Component({
   selector: 'app-quotation-review',
@@ -91,19 +120,35 @@ export class QuotationReviewComponent implements OnInit {
   readonly isSaving = signal<boolean>(false);
   readonly isConfirming = signal<boolean>(false);
   readonly isRefusing = signal<boolean>(false);
+  readonly isArchiving = signal<boolean>(false);
+  readonly isRetryingExtraction = signal<boolean>(false);
+  readonly isReplacingDocument = signal<boolean>(false);
+  readonly isExporting = signal<boolean>(false);
   readonly mismatchAcknowledged = signal<boolean>(false);
   readonly confirmDialogVisible = signal<boolean>(false);
   readonly quotationId = signal<string>('');
   readonly quotation = signal<QuotationDetail | null>(null);
+  readonly auditTrail = signal<AuditTrailEntry[]>([]);
+  readonly isLoadingAudit = signal<boolean>(false);
   readonly suppliers = signal<Supplier[]>([]);
-  readonly priorQuotations = signal<{ id: string; created_at: string; supplier_id: string | null }[]>([]);
+  readonly priorQuotations = signal<{ id: string; created_at: string; supplier_name: string | null }[]>([]);
 
   readonly selectedSupplierId = signal<string | null>(null);
+  readonly reviewerNotes = signal<string>('');
   readonly isRequote = signal<boolean>(false);
   readonly selectedPreviousQuotationId = signal<string | null>(null);
+  readonly isCreatingSupplierFromExtraction = signal<boolean>(false);
 
   // Field corrections map: field_extraction_id -> corrected value
   readonly pendingCorrections = signal<Map<string, unknown>>(new Map());
+
+  // Line add/remove staging
+  readonly pendingNewLines = signal<NewQuotationLine[]>([]);
+  readonly pendingRemoveLineIds = signal<Set<string>>(new Set());
+  readonly isAddingLine = signal<boolean>(false);
+  readonly newLineText = signal<string>('');
+  readonly newLineQuantity = signal<string>('');
+  readonly newLinePriceAmount = signal<string>('');
 
   // Currently active/highlighted field extraction
   readonly activeExtraction = signal<FieldExtraction | null>(null);
@@ -124,6 +169,27 @@ export class QuotationReviewComponent implements OnInit {
 
   readonly isWriter = computed<boolean>(() => this.session.hasRole('owner', 'buyer'));
 
+  readonly supplierSuggestion = computed<SupplierSuggestion | null>(() => {
+    const q = this.quotation();
+    if (!q || q.supplier_id || !q.suggested_supplier_id) return null;
+    const confidence = parseFloat(q.supplier_match_confidence ?? '0');
+    const confidencePct = Number.isFinite(confidence) ? Math.round(confidence * 100) : 0;
+    const fallbackName = this.suppliers().find((s) => s.id === q.suggested_supplier_id)?.name;
+    const name = q.suggested_supplier_name || fallbackName;
+    if (!name) return null;
+    return {
+      id: q.suggested_supplier_id,
+      name,
+      confidencePct,
+      tier: confidence >= 0.6 ? 'high' : 'medium',
+    };
+  });
+
+  readonly noSupplierMatchFlagged = computed<boolean>(() => {
+    const q = this.quotation();
+    return Boolean(!q?.supplier_id && q?.review_task?.reason === 'no_supplier_match');
+  });
+
   readonly currencyOptions: readonly string[] = [
     'USD', 'EUR', 'GBP', 'AED', 'SAR', 'EGP', 'QAR', 'KWD', 'BHD',
     'OMR', 'JOD', 'CHF', 'JPY', 'CNY', 'INR', 'AUD', 'CAD',
@@ -142,6 +208,14 @@ export class QuotationReviewComponent implements OnInit {
     'confidence',
     'actions',
   ];
+  readonly dateTimeOptions: Intl.DateTimeFormatOptions = {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  };
+
+  truncateId(id: string): string {
+    return id.slice(0, 8);
+  }
 
   // List of all low confidence (<0.85) extractions needing attention
   readonly flaggedFields = computed<FlaggedField[]>(() => {
@@ -169,21 +243,23 @@ export class QuotationReviewComponent implements OnInit {
   // Computed line total sum
   readonly computedLinesTotal = computed<{ amount: string; currency: string } | null>(() => {
     const q = this.quotation();
-    if (!q || !q.lines || q.lines.length === 0) return null;
+    if (!q) return null;
+    const pendingNewLines = this.pendingNewLines();
+    if (q.lines.length === 0 && pendingNewLines.length === 0) return null;
 
     let total = 0;
-    const currency = q.currency || q.lines[0]?.unit_price?.currency || 'USD';
+    const currency = q.currency || q.lines[0]?.unit_price?.currency || pendingNewLines[0]?.unit_price_currency || 'USD';
 
     for (const line of q.lines) {
-      if (line.unit_price?.amount) {
-        const qty = parseFloat(line.quantity || '1');
-        const price = parseFloat(line.unit_price.amount);
-        const delivery = parseFloat(line.delivery_fee?.amount || '0');
-        const discount = parseFloat(line.discount?.amount || '0');
-        const vatRate = parseFloat(line.vat_rate || '0');
-        const lineNet = qty * price + delivery - discount;
-        total += lineNet * (1 + vatRate);
-      }
+      if (this.pendingRemoveLineIds().has(line.id)) continue;
+
+      total += this.calculateLineTotal(this.effectiveLineAmounts(line));
+    }
+
+    for (const line of pendingNewLines) {
+      const qty = this.parseNumericInput(line.quantity, 1);
+      const price = this.parseNumericInput(line.unit_price_amount, 0);
+      total += qty * price;
     }
 
     return {
@@ -205,9 +281,7 @@ export class QuotationReviewComponent implements OnInit {
     if (Math.abs(stated - computed) <= 0.01) return false;
 
     // If gap is explainable by document-level VAT, not a mismatch
-    const hasLineVat = q.lines?.some(
-      (l) => l.vat_rate != null && parseFloat(l.vat_rate) > 0,
-    );
+    const hasLineVat = this.hasEffectiveLineVat();
     if (!hasLineVat && computed > 0 && stated > computed) {
       const inferredPct = Math.round(((stated - computed) / computed) * 100);
       if (inferredPct > 0 && inferredPct <= 30) {
@@ -234,9 +308,7 @@ export class QuotationReviewComponent implements OnInit {
     const stated = parseFloat(q.stated_total.amount);
     const computed = parseFloat(computedTotal.amount);
     if (Math.abs(stated - computed) <= 0.01) return null;
-    const hasLineVat = q.lines?.some(
-      (l) => l.vat_rate != null && parseFloat(l.vat_rate) > 0,
-    );
+    const hasLineVat = this.hasEffectiveLineVat();
     if (!hasLineVat && computed > 0 && stated > computed) {
       const pct = Math.round(((stated - computed) / computed) * 100);
       if (pct > 0 && pct <= 30) {
@@ -256,12 +328,23 @@ export class QuotationReviewComponent implements OnInit {
     return diff.toFixed(2);
   });
 
+  readonly hasPendingReviewChanges = computed<boolean>(() => {
+    const q = this.quotation();
+    return (
+      this.pendingCorrections().size > 0 ||
+      this.reviewerNotes() !== (q?.reviewer_notes || '') ||
+      this.pendingNewLines().length > 0 ||
+      this.pendingRemoveLineIds().size > 0
+    );
+  });
+
   ngOnInit(): void {
     const id = this.route.snapshot.paramMap.get('id');
     if (id) {
       this.quotationId.set(id);
       this.loadQuotation(id);
       this.loadSuppliers();
+      this.loadPriorQuotations();
     }
   }
 
@@ -273,6 +356,7 @@ export class QuotationReviewComponent implements OnInit {
     this.api.getQuotation(id).subscribe({
       next: (q) => {
         this.quotation.set(q);
+        this.reviewerNotes.set(q.reviewer_notes || '');
         this.selectedSupplierId.set(q.supplier_id || null);
         if (q.previous_quotation_id) {
           this.isRequote.set(true);
@@ -289,6 +373,7 @@ export class QuotationReviewComponent implements OnInit {
 
         this.isLoading.set(false);
         this.loadDocumentPreview(q.document.id);
+        this.loadAuditTrail(q.id);
       },
       error: (err: unknown) => {
         this.isLoading.set(false);
@@ -319,6 +404,59 @@ export class QuotationReviewComponent implements OnInit {
     });
   }
 
+  loadPriorQuotations(): void {
+    this.api.getReviewTasks({ status: 'all', limit: 100 }).subscribe({
+      next: (res) => {
+        const currentId = this.quotationId();
+        const seen = new Set<string>();
+        const items: { id: string; created_at: string; supplier_name: string | null }[] = [];
+        for (const task of res.items) {
+          if (task.quotation_id !== currentId && !seen.has(task.quotation_id)) {
+            seen.add(task.quotation_id);
+            items.push({
+              id: task.quotation_id,
+              created_at: task.created_at,
+              supplier_name: task.supplier_name ?? null,
+            });
+          }
+        }
+        this.priorQuotations.set(items);
+      },
+      error: () => {
+        // Non-fatal
+      },
+    });
+  }
+
+  loadAuditTrail(quotationId = this.quotationId()): void {
+    if (!quotationId) return;
+    this.isLoadingAudit.set(true);
+
+    this.api.getAuditTrail(quotationId).subscribe({
+      next: (res) => {
+        this.auditTrail.set(res.items);
+        this.isLoadingAudit.set(false);
+      },
+      error: (err: unknown) => {
+        this.isLoadingAudit.set(false);
+        this.handleError(err);
+      },
+    });
+  }
+
+  auditActionLabel(action: string): string {
+    const actionKeys: Record<string, string> = {
+      'quotation.archived': 'quotations.audit.actions.archived',
+      'quotation.restored': 'quotations.audit.actions.restored',
+      'quotation.extraction_retried': 'quotations.audit.actions.extraction_retried',
+      'quotation.exported': 'quotations.audit.actions.exported',
+      'quotation.confirmed': 'quotations.audit.actions.confirmed',
+      'quotation.refused': 'quotations.audit.actions.refused',
+      'quotation.reviewed': 'quotations.audit.actions.reviewed',
+    };
+    return this.translate.instant(actionKeys[action] ?? 'quotations.audit.actions.unknown');
+  }
+
   getFieldExtraction(entityType: 'quotation' | 'quotation_line', entityId: string, fieldName: string): FieldExtraction | undefined {
     const q = this.quotation();
     if (!q) return undefined;
@@ -327,10 +465,59 @@ export class QuotationReviewComponent implements OnInit {
     );
   }
 
+  extractedSupplierName(): string | null {
+    const q = this.quotation();
+    if (!q) return null;
+    const extracted = this.getFieldExtraction('quotation', q.id, 'supplier_name')?.extracted_value;
+    if (typeof extracted === 'string' && extracted.trim()) {
+      return extracted.trim();
+    }
+    return this.supplierSuggestion()?.name ?? null;
+  }
+
+  acceptSupplierSuggestion(): void {
+    const suggestion = this.supplierSuggestion();
+    if (!suggestion) return;
+    this.selectedSupplierId.set(suggestion.id);
+  }
+
+  createSupplierFromExtraction(): void {
+    const name = this.extractedSupplierName();
+    if (!name) return;
+    this.isCreatingSupplierFromExtraction.set(true);
+    this.errorMessage.set(null);
+    this.api.createSupplier({ name }).subscribe({
+      next: (supplier) => {
+        this.suppliers.update((items) => [...items, supplier]);
+        this.selectedSupplierId.set(supplier.id);
+        this.isCreatingSupplierFromExtraction.set(false);
+        this.snackBar.open(
+          this.translate.instant('quotations.review.supplierMatch.createSuccess'),
+          undefined,
+          { duration: 3000 },
+        );
+      },
+      error: (err: unknown) => {
+        this.isCreatingSupplierFromExtraction.set(false);
+        this.handleError(err);
+      },
+    });
+  }
+
   documentFileName(): string {
     const path = this.quotation()?.document.storage_path || '';
     const parts = path.split('/');
     return parts[parts.length - 1] || path;
+  }
+
+  extractedAt(q: QuotationDetail): string {
+    const timestampFields = q as QuotationTimestampFields;
+    return timestampFields.extracted_at ?? q.created_at;
+  }
+
+  lastModifiedAt(q: QuotationDetail): string | null {
+    const timestampFields = q as QuotationTimestampFields;
+    return timestampFields.updated_at ?? null;
   }
 
   fieldLabel(fieldName: string): string {
@@ -361,6 +548,26 @@ export class QuotationReviewComponent implements OnInit {
       return fe.corrected_value;
     }
     return fe.extracted_value ?? defaultValue;
+  }
+
+  expiryBadge(q: QuotationDetail): ExpiryBadge | null {
+    const expiryValue = this.getEffectiveValue('quotation', q.id, 'expiry_date', q.expiry_date || '');
+    if (!expiryValue || typeof expiryValue !== 'string') return null;
+
+    const expiryDate = new Date(`${expiryValue}T00:00:00`);
+    if (isNaN(expiryDate.getTime())) return null;
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const diffDays = Math.ceil((expiryDate.getTime() - today.getTime()) / 86_400_000);
+
+    if (diffDays < 0) {
+      return { kind: 'expired', labelKey: 'quotations.review.expired' };
+    }
+    if (diffDays <= 7) {
+      return { kind: 'warning', labelKey: 'quotations.review.expiresIn', count: diffDays };
+    }
+    return { kind: 'valid', labelKey: 'quotations.review.validFor', count: diffDays };
   }
 
   isFieldCorrected(entityType: 'quotation' | 'quotation_line', entityId: string, fieldName: string): boolean {
@@ -464,6 +671,10 @@ export class QuotationReviewComponent implements OnInit {
     });
   }
 
+  onNotesChange(value: string): void {
+    this.reviewerNotes.set(value);
+  }
+
   saveCorrections(): void {
     const q = this.quotation();
     if (!q) return;
@@ -480,12 +691,17 @@ export class QuotationReviewComponent implements OnInit {
     this.api
       .patchQuotation(q.id, {
         supplier_id: this.selectedSupplierId(),
+        reviewer_notes: this.reviewerNotes() || null,
         corrections,
+        add_lines: this.pendingNewLines(),
+        remove_line_ids: Array.from(this.pendingRemoveLineIds()),
       })
       .subscribe({
         next: (updated) => {
           this.quotation.set(updated);
           this.pendingCorrections.set(new Map());
+          this.pendingNewLines.set([]);
+          this.pendingRemoveLineIds.set(new Set());
           this.isSaving.set(false);
           this.snackBar.open(
             this.translate.instant('quotations.review.actions.saveSuccess'),
@@ -524,7 +740,8 @@ export class QuotationReviewComponent implements OnInit {
     this.confirmBlockedReason.set(null);
 
     const supplierNeedsSaving = q.supplier_id !== this.selectedSupplierId();
-    if (this.pendingCorrections().size > 0 || supplierNeedsSaving) {
+    const notesNeedSaving = this.reviewerNotes() !== (q.reviewer_notes || '');
+    if (this.pendingCorrections().size > 0 || supplierNeedsSaving || notesNeedSaving) {
       const corrections: FieldCorrection[] = [];
       for (const [field_extraction_id, corrected_value] of this.pendingCorrections().entries()) {
         corrections.push({ field_extraction_id, corrected_value });
@@ -533,6 +750,7 @@ export class QuotationReviewComponent implements OnInit {
       this.api
         .patchQuotation(q.id, {
           supplier_id: this.selectedSupplierId(),
+          reviewer_notes: this.reviewerNotes() || null,
           corrections,
         })
         .subscribe({
@@ -574,15 +792,196 @@ export class QuotationReviewComponent implements OnInit {
     });
   }
 
+  archiveQuotation(): void {
+    const q = this.quotation();
+    if (!q) return;
+    if (!window.confirm(this.translate.instant('quotations.review.archiveConfirm'))) {
+      return;
+    }
+
+    this.isArchiving.set(true);
+    this.errorMessage.set(null);
+
+    this.api.archiveQuotation(q.id).subscribe({
+      next: () => {
+        this.isArchiving.set(false);
+        this.snackBar.open(this.translate.instant('quotations.review.archived'), undefined, {
+          duration: 3000,
+        });
+        this.router.navigate(['/quotations']);
+      },
+      error: (err: unknown) => {
+        this.isArchiving.set(false);
+        this.handleError(err);
+      },
+    });
+  }
+
+  retryExtraction(): void {
+    const q = this.quotation();
+    if (!q) return;
+    if (!window.confirm(this.translate.instant('quotations.review.retryConfirm'))) {
+      return;
+    }
+
+    this.isRetryingExtraction.set(true);
+    this.errorMessage.set(null);
+
+    this.api.retryExtraction(q.id).subscribe({
+      next: (updated) => {
+        this.isRetryingExtraction.set(false);
+        this.loadQuotation(updated.id);
+      },
+      error: (err: unknown) => {
+        this.isRetryingExtraction.set(false);
+        this.handleError(err);
+      },
+    });
+  }
+
+  onReplaceDocumentSelected(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = '';
+    if (!file) return;
+
+    const q = this.quotation();
+    if (!q) return;
+
+    const mimeType = file.type as import('../../../core/api/models').PresignMimeType;
+    if (!mimeType) {
+      this.errorMessage.set(this.translate.instant('quotations.review.replaceDocument.unsupportedType'));
+      return;
+    }
+
+    this.isReplacingDocument.set(true);
+    this.errorMessage.set(null);
+
+    this.api.presignDocument({ filename: file.name, mime_type: mimeType, size_bytes: file.size }).subscribe({
+      next: (presign) => {
+        this.api.uploadFileToStorage(presign.upload_url, file, presign.upload_fields).subscribe({
+          next: () => {
+            this.api.replaceDocument(q.id, presign.document_id).subscribe({
+              next: () => {
+                this.isReplacingDocument.set(false);
+                this.loadQuotation(q.id);
+                this.snackBar.open(
+                  this.translate.instant('quotations.review.replaceDocument.success'),
+                  undefined,
+                  { duration: 3000 },
+                );
+              },
+              error: (err: unknown) => {
+                this.isReplacingDocument.set(false);
+                this.handleError(err);
+              },
+            });
+          },
+          error: (err: unknown) => {
+            this.isReplacingDocument.set(false);
+            this.handleError(err);
+          },
+        });
+      },
+      error: (err: unknown) => {
+        this.isReplacingDocument.set(false);
+        this.handleError(err);
+      },
+    });
+  }
+
+  exportQuotation(): void {
+    const q = this.quotation();
+    if (!q) return;
+
+    this.isExporting.set(true);
+    this.errorMessage.set(null);
+
+    this.api.exportQuotation(q.id).subscribe({
+      next: (blob) => {
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `quotation-${q.id}.csv`;
+        link.click();
+        window.URL.revokeObjectURL(url);
+        this.isExporting.set(false);
+      },
+      error: (err: unknown) => {
+        this.isExporting.set(false);
+        this.handleError(err);
+      },
+    });
+  }
+
+  canRetryExtraction(q: QuotationDetail): boolean {
+    return q.status === 'extracted' || q.status === 'in_review' || q.status === 'refused';
+  }
+
   computeLineTotal(line: QuotationDetail['lines'][number]): string | null {
-    if (!line.unit_price?.amount) return null;
-    const qty = parseFloat(line.quantity || '1');
-    const price = parseFloat(line.unit_price.amount);
-    const delivery = parseFloat(line.delivery_fee?.amount || '0');
-    const discount = parseFloat(line.discount?.amount || '0');
-    const vatRate = parseFloat(line.vat_rate || '0');
-    const lineNet = qty * price + delivery - discount;
-    return (lineNet * (1 + vatRate)).toFixed(2);
+    const amounts = this.effectiveLineAmounts(line);
+    if (amounts.unitPrice === 0 && !line.unit_price?.amount) return null;
+    return this.calculateLineTotal(amounts).toFixed(2);
+  }
+
+  private hasEffectiveLineVat(): boolean {
+    const q = this.quotation();
+    if (!q) return false;
+    return q.lines.some((line) => {
+      if (this.pendingRemoveLineIds().has(line.id)) return false;
+      return this.effectiveLineAmounts(line).vatRate > 0;
+    });
+  }
+
+  private effectiveLineAmounts(line: QuotationDetail['lines'][number]): EffectiveLineAmounts {
+    return {
+      quantity: this.effectiveNumericLineValue(line, 'quantity', line.quantity, 1),
+      unitPrice: this.effectiveNumericLineValue(line, ['unit_price_amount', 'unit_price'], line.unit_price, 0),
+      deliveryFee: this.effectiveNumericLineValue(line, ['delivery_fee_amount', 'delivery_fee'], line.delivery_fee, 0),
+      discount: this.effectiveNumericLineValue(line, ['discount_amount', 'discount'], line.discount, 0),
+      vatRate: this.effectiveNumericLineValue(line, 'vat_rate', line.vat_rate, 0),
+    };
+  }
+
+  private effectiveNumericLineValue(
+    line: QuotationDetail['lines'][number],
+    fieldNames: string | readonly string[],
+    defaultValue: unknown,
+    fallback: number,
+  ): number {
+    const names = typeof fieldNames === 'string' ? [fieldNames] : fieldNames;
+    for (const fieldName of names) {
+      const extraction = this.getFieldExtraction('quotation_line', line.id, fieldName);
+      if (extraction && this.pendingCorrections().has(extraction.id)) {
+        return this.parseNumericInput(this.pendingCorrections().get(extraction.id), fallback);
+      }
+    }
+    return this.parseNumericInput(defaultValue, fallback);
+  }
+
+  private parseNumericInput(value: unknown, fallback: number): number {
+    const rawValue = this.moneyAmount(value);
+    const parsed = typeof rawValue === 'number' ? rawValue : parseFloat(String(rawValue ?? ''));
+    return Number.isFinite(parsed) ? parsed : fallback;
+  }
+
+  private moneyAmount(value: unknown): string | number | null {
+    if (this.isMoney(value)) return value.amount;
+    return typeof value === 'string' || typeof value === 'number' ? value : null;
+  }
+
+  private isMoney(value: unknown): value is Money {
+    return (
+      typeof value === 'object' &&
+      value !== null &&
+      'amount' in value &&
+      typeof value.amount === 'string'
+    );
+  }
+
+  private calculateLineTotal(amounts: EffectiveLineAmounts): number {
+    const lineNet = amounts.quantity * amounts.unitPrice + amounts.deliveryFee - amounts.discount;
+    return lineNet * (1 + amounts.vatRate);
   }
 
   revertToAiValue(feId: string): void {
@@ -641,6 +1040,55 @@ export class QuotationReviewComponent implements OnInit {
           }
         },
       });
+  }
+
+  showAddLineForm(): void {
+    this.isAddingLine.set(true);
+    this.newLineText.set('');
+    this.newLineQuantity.set('');
+    this.newLinePriceAmount.set('');
+  }
+
+  cancelAddLine(): void {
+    this.isAddingLine.set(false);
+  }
+
+  addNewLine(): void {
+    const text = this.newLineText().trim();
+    if (!text) return;
+    const q = this.quotation();
+    const currency = q?.currency || 'USD';
+    const newLine: NewQuotationLine = {
+      original_text: text,
+      quantity: this.newLineQuantity() || null,
+      unit_price_amount: this.newLinePriceAmount() || null,
+      unit_price_currency: this.newLinePriceAmount() ? currency : null,
+    };
+    this.pendingNewLines.update(lines => [...lines, newLine]);
+    this.isAddingLine.set(false);
+  }
+
+  markLineForRemoval(lineId: string): void {
+    this.pendingRemoveLineIds.update(ids => {
+      const next = new Set(ids);
+      next.add(lineId);
+      return next;
+    });
+  }
+
+  unmarkLineForRemoval(lineId: string): void {
+    this.pendingRemoveLineIds.update(ids => {
+      const next = new Set(ids);
+      next.delete(lineId);
+      return next;
+    });
+  }
+
+  createRequote(): void {
+    const id = this.quotationId();
+    this.router.navigate(['/quotations/upload'], {
+      queryParams: { requote_from: id },
+    });
   }
 
   formatConfidence(score: string | number): number {

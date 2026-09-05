@@ -232,6 +232,7 @@ dependencies = [
     { name = "azure-ai-documentintelligence" },
     { name = "boto3" },
     { name = "openpyxl" },
+    { name = "procurepilot-logging" },
     { name = "psycopg", extra = ["binary"] },
     { name = "pydantic" },
     { name = "redis" },
@@ -250,6 +251,7 @@ requires-dist = [
     { name = "azure-ai-documentintelligence", specifier = ">=1.0,<2" },
     { name = "boto3", specifier = ">=1.35,<2" },
     { name = "openpyxl", specifier = ">=3.1,<4" },
+    { name = "procurepilot-logging", editable = "../../packages/py-logging" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.2,<4" },
     { name = "pydantic", specifier = ">=2.10,<3" },
     { name = "redis", specifier = ">=5.2,<6" },
@@ -262,6 +264,11 @@ dev = [
     { name = "pytest-asyncio", specifier = "==0.25.2" },
     { name = "ruff" },
 ]
+
+[[package]]
+name = "procurepilot-logging"
+version = "0.1.0"
+source = { editable = "../../packages/py-logging" }
 
 [[package]]
 name = "psycopg"

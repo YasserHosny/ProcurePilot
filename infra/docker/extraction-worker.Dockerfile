@@ -7,21 +7,23 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 RUN groupadd -g 1001 appgroup && \
-    useradd -u 1001 -g appgroup -m -s /bin/bash appuser
+    useradd -u 1001 -g appgroup -m -s /bin/bash appuser && \
+    chmod o+rx /home/appuser
 
 WORKDIR /app
 
-COPY services/extraction-worker/ /app/
-
-RUN uv venv /app/.venv \
-    && . /app/.venv/bin/activate \
-    && uv pip install --no-cache -e . \
-    && chown -R appuser:appgroup /app
+RUN uv venv /app/.venv && chown -R appuser:appgroup /app
 
 ENV PATH="/app/.venv/bin:$PATH" \
     PYTHONUNBUFFERED=1 \
     PYTHONPATH=/app/src
 
+COPY --chown=appuser:appgroup packages/py-logging/ /shared/py-logging/
+COPY --chown=appuser:appgroup services/extraction-worker/ /app/
+
 USER appuser
+
+RUN uv pip install --no-cache /shared/py-logging \
+    && uv pip install --no-cache -e .
 
 CMD ["python", "-m", "procurepilot_extraction_worker"]
