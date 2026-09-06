@@ -17,6 +17,8 @@ from procurepilot_api.errors import ServiceUnavailableError
 from procurepilot_api.modules.auth.jwt import MemberRole
 from procurepilot_api.modules.extraction import service as extraction_service_module
 from procurepilot_api.modules.extraction.service import ExtractionService
+from procurepilot_api.modules.quotations import service as quotation_service_module
+from procurepilot_api.modules.quotations.service import QuotationService
 
 WORKER_SRC = Path(__file__).resolve().parents[4] / "services" / "extraction-worker" / "src"
 sys.path.insert(0, str(WORKER_SRC))
@@ -132,3 +134,59 @@ def test_redis_enqueue_failure_does_not_leave_quotation_stuck(
             quotation_id=quotation_id,
         )
         assert job.status == "queued"
+
+
+def test_retry_extraction_enqueue_failure_fails_job_without_discarding_review_data(
+    conn: object,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from integration.quotation_helpers import make_extracted_quotation
+
+    with conn.cursor() as cur:
+        workspace = make_workspace(cur, "retry-enqueue-failure")
+        fixture = make_extracted_quotation(cur, workspace)
+        act_as(cur, workspace)
+        monkeypatch.setattr(
+            quotation_service_module,
+            "authenticated_client",
+            lambda _settings, _token: PsycopgSupabaseClient(conn),
+        )
+        monkeypatch.setattr(
+            quotation_service_module,
+            "_enqueue_extraction",
+            lambda *_args, **_kwargs: (_ for _ in ()).throw(
+                ServiceUnavailableError(details={"dependency": "redis"})
+            ),
+        )
+        member = CurrentMember(
+            membership_id=workspace.membership_id,
+            tenant_id=workspace.tenant_id,
+            user_id=workspace.user_id,
+            email="buyer@example.test",
+            role=MemberRole.buyer,
+        )
+
+        with pytest.raises(ServiceUnavailableError):
+            QuotationService().retry_extraction(
+                bearer_token="test-token",
+                member=member,
+                quotation_id=fixture.quotation_id,
+            )
+
+        cur.execute("select status from quotation where id = %s", (fixture.quotation_id,))
+        assert cur.fetchone() == ("extracted",)
+        cur.execute(
+            "select status, error->>'code' from extraction_job where quotation_id = %s",
+            (fixture.quotation_id,),
+        )
+        assert cur.fetchone() == ("failed", "redis_enqueue_failed")
+        cur.execute(
+            "select count(*) from quotation_line where quotation_id = %s",
+            (fixture.quotation_id,),
+        )
+        assert cur.fetchone() == (1,)
+        cur.execute(
+            "select count(*) from field_extraction where quotation_id = %s",
+            (fixture.quotation_id,),
+        )
+        assert cur.fetchone() == (1,)
