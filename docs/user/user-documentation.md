@@ -1,12 +1,13 @@
 # ProcurePilot User Documentation
 
 > Complete system journey with annotated screenshots for every screen.
-> Last updated: 5 Sep 2026.
+> Last updated: 6 Sep 2026.
 
 ---
 
 ## Table of Contents
 
+0. [User Flow Map](#user-flow-map)
 1. [Sign In](#1-sign-in)
 2. [Dashboard](#2-dashboard)
 3. [Product Catalogue](#3-product-catalogue)
@@ -33,6 +34,56 @@
 
 ---
 
+## User Flow Map
+
+Use these breadcrumb-style paths to orient yourself before jumping into the detailed page notes.
+
+**Access and workspace setup**
+- `/auth/sign-in` → sign in → `/home`
+- `/auth/sign-in` → **Forgot password?** → `/auth/password-reset` → email reset link
+- `/auth/sign-in` → **Create workspace** → `/onboarding/signup` → invitation token + workspace details → `/onboarding/plan` → `/home`
+- `/onboarding/accept-invitation?token=...` → accept member invitation → `/home`
+- Guarded page while signed out → `/auth/sign-in?returnUrl=...` → original page after sign-in
+
+**Catalogue and supplier setup**
+- `/home` → **Products** → `/products` → **New Product** → `/products/new` → save → `/products/:id`
+- `/home` → **Products** → `/products` → row edit → `/products/:id`
+- `/home` → **Products** → `/products` → **Import Products** → `/import?kind=products` → upload CSV → preview → commit → `/products`
+- `/home` → **Suppliers** → `/suppliers` → **New Supplier** → `/suppliers/new` → save → `/suppliers/:id`
+- `/home` → **Suppliers** → `/suppliers` → row edit → `/suppliers/:id`
+- `/home` → **Suppliers** → `/suppliers` → **Import Suppliers** → `/import?kind=suppliers` → upload CSV → preview → commit → `/suppliers`
+- `/home` → **Import Catalogue** → `/import` → choose Products or Suppliers → upload CSV → preview → commit
+
+**Quotation to trusted offer**
+- `/home` → **Quotation Inbox** → `/quotations` → **Upload Quotation** → `/quotations/upload` → select file or sample → extraction complete → `/quotations/:id/review`
+- `/quotations` → search/filter/sort → **Review & Authorize** → `/quotations/:id/review`
+- `/quotations/:id/review` → inspect source evidence + fields + lines → save corrections → confirm and authorize
+- `/quotations/:id/review` → retry extraction, export CSV, archive, or create re-quote
+- `/quotations/:id` redirects to `/quotations/:id/review`
+
+**Matching, comparison, and savings**
+- `/home` → **Match Resolution** → `/matching` → search/filter/sort → **Resolve Match** → `/matching/:id` → choose outcome → confirm
+- `/matching/tasks/:id` redirects to `/matching/:id`
+- `/home` → **Smart Compare** → `/offers/compare` → select product + quantity → compare landed costs → **Record Purchase** → `/savings/outcome-capture`
+- `/offers/compare/:id` opens Smart Compare with a product preselected; `/compare` and `/compare/:id` are aliases
+- `/home` → **Smart Compare** → `/offers/product-intelligence` → select product/supplier/time window → inspect historical prices
+- `/offers/product-intelligence/:id` opens Product Price Intelligence with a product preselected
+- `/home` → **Basket Split** → `/offers/basket-split` → choose two suppliers + basket lines → optimise → `/offers/basket-split/:id`
+- `/home` → **Alerts Inbox** → `/alerts` → open alert action → Smart Compare, supplier detail, or Product Price Intelligence
+- `/home` → **Savings Ledger** → `/savings` → **Record Purchase Outcome** → `/savings/outcome-capture` → compute saving → `/savings/:id/evidence`
+- `/savings` → **View Evidence** → `/savings/:id/evidence`; `/savings/:id` is an alias
+- `/savings` → **Export Savings** → `/savings/export` → generate export → `/savings/export/:id`
+
+**Requests, approvals, and administration**
+- `/home` → **Purchase Requests** → `/requests` → **Save Draft** → `/requests/new` → save draft → `/requests/:id`
+- `/requests/:id` → submit, withdraw, or return to the queue depending on status
+- `/home` → **Approval Queue** → `/approvals` → review routed requests when approval routing is available
+- `/home` → **Team Management** → `/team` → invite member → pending invitation → accept invitation flow
+- `/home` → **Settings** → `/settings` → manage branches, cost centres, and budgets
+- Unknown routes redirect to `/`, then to `/home` for signed-in users.
+
+---
+
 ## 1. Sign In
 
 **Route:** `/auth/sign-in`
@@ -51,6 +102,30 @@
 **Tips:**
 - ProcurePilot supports English and Arabic. Language can be changed after sign-in from the account menu.
 - If you receive an "Invalid email or password" error, check your email address for typos or use **Forgot password?** to reset.
+
+### Password reset
+
+**Route:** `/auth/password-reset`
+
+![Password Reset](screenshots/01b-password-reset.jpg)
+
+Enter your work email and submit the form to request a reset email. The flow stays outside the authenticated app shell, so users who are locked out can recover access without selecting a workspace first.
+
+### Create workspace
+
+**Route:** `/onboarding/signup`
+
+![Create Workspace](screenshots/01c-workspace-signup.jpg)
+
+Workspace creation is invitation-gated during the pilot programme. The form captures the platform invitation token, business name, owner email, password, operating region, primary currency, tax model, and default locale; successful completion creates the isolated tenant and first owner account.
+
+### Accept invitation
+
+**Route:** `/onboarding/accept-invitation?token=...`
+
+![Accept Invitation](screenshots/01d-accept-invitation.jpg)
+
+Invited members arrive here from their email link. The token identifies the pending invitation, then the user signs in or creates credentials before being added to the workspace with the role assigned by the owner.
 
 ---
 
@@ -181,11 +256,11 @@ A supplier may quote "1 case of 12 x 500ml bottles" while another quotes "1 pack
 | 1 | **Page title — "Quotation Review Queue"** | Lists all quotations that have been extracted and need human review before they become trusted commercial data. |
 | 2 | **Upload Quotation button** | Opens the upload screen to add a new supplier quotation. |
 | 3 | **Search by supplier or ID** | Instant, case-insensitive search across the queue. |
-| 4 | **Filter by Status** | Open, Confirmed, or All. |
+| 4 | **Filter by Status** | Open, Resolved, or All. |
 | 5 | **Filter by Priority** | High, Medium, Low, or All — priority is set based on the reason for review (an arithmetic mismatch is always High). |
 | 6 | **From date / To date** | Filters the queue by created date range. |
 | 7 | **Select-all checkbox + row checkboxes** | Select one or more rows to reveal a bulk-action bar: bulk archive, bulk refuse, and bulk re-prioritise (set High/Normal/Low across the selection at once). |
-| 8 | **Review task table** | Each row is clickable and shows: Quotation ID, Supplier, Reason for Review, Priority, Status, Stated Total, Created date, and **Age** (a relative "3h ago" style indicator, with the full timestamp on hover). |
+| 8 | **Review task table** | Each row is clickable and shows: Quotation ID, Supplier, Reason for Review, Priority, Status, Stated Total, Created date, and **Age** (a relative "3h ago" style indicator, with the full timestamp on hover). The ID badge is shortened for scanning; the full UUID remains the backend identifier in the route and API. |
 | 9 | **Review & Authorize action** | Opens the detailed review screen for that quotation. |
 | 10 | **Empty state** | When no review tasks match the current filters, a message confirms this rather than showing a blank table. |
 
@@ -205,7 +280,7 @@ A supplier may quote "1 case of 12 x 500ml bottles" while another quotes "1 pack
 |---|---------|-------------|
 | 1 | **Page title — "Upload Supplier Quotation"** | Upload a document to start the AI extraction process. |
 | 2 | **Back to Review Queue link** | Returns to the quotation review queue without uploading. |
-| 3 | **Drag-and-drop zone** | Drag a quotation file here or click **Choose File** to browse. |
+| 3 | **Drag-and-drop zone** | Drag a quotation file here or click **Choose File** to browse. Selecting a valid file starts the upload automatically. |
 | 4 | **Supported formats** | PDF, PNG, JPEG, TIFF, CSV, XLS, XLSX — up to 25 MB. |
 | 5 | **Security notice** | "Documents are uploaded securely and directly to encrypted storage." |
 | 6 | **Try with a sample quotation** | Six pre-built sample quotations covering every supported format, so you can test the extraction pipeline without a real supplier document: **Acme Foods** (5 items, CSV), **Fresh Direct** (6 items, CSV), **Al-Faisal Trading** (6 items, PDF), **Helios Packaging** (7 items, PDF), **Brightwell Electronics** (6 items, PNG), and **Oakridge Industrial** (8 items, XLSX). |
@@ -214,7 +289,7 @@ A supplier may quote "1 case of 12 x 500ml bottles" while another quotes "1 pack
 1. The file is uploaded via a presigned URL directly to encrypted storage.
 2. An extraction job starts automatically (usually under 45 seconds per page).
 3. A progress indicator shows the extraction state (uploading → processing → extracted).
-4. When complete, a **"Go to Review"** button appears to inspect the extracted data.
+4. When complete, a **Proceed to Review** link appears with the new quotation ID. Click it to inspect the extracted data, or upload another quotation.
 
 ---
 
@@ -228,15 +303,15 @@ After AI extraction finishes, each quotation lands in the review queue. Open a r
 
 | # | Element | Description |
 |---|---------|-------------|
-| 1 | **Breadcrumb** | "Quotation Inbox › {id}" — click to return to the queue. |
+| 1 | **Breadcrumb** | "Quotation Inbox › {id}" — click to return to the queue. The visible ID is shortened; the full quotation UUID remains in the URL. |
 | 2 | **Action bar** | Export CSV (download extracted header + lines), Retry Extraction (re-run AI extraction on the same document), Create Re-Quote (start a new quotation version superseding this one), Archive, and Back to Review Queue. |
 | 3 | **Arithmetic status banner** | Green "Arithmetic Verified" when line subtotals reconcile with the stated total (after applying any inferred document-level VAT), or an amber "Arithmetic Discrepancy Detected" banner showing both figures side by side when they don't, with a checkbox to proceed anyway with an acknowledgement. |
 | 4 | **Attention-required navigation** | Counts and lets you step through fields flagged for review (low confidence or extraction warnings) with **Previous/Next Flagged Field** buttons and the Alt+N / Alt+P keyboard shortcuts. |
 | 5 | **Confidence legend** | An info bar explaining the 85% confidence threshold, with green (≥85%) and amber (<85%) badge examples, so you know what triggers a flag before you start reviewing fields. |
-| 6 | **Source document evidence panel** | The original uploaded document rendered alongside the extraction results, with page navigation, zoom, and a download button for the original file via a time-limited secure URL. |
+| 6 | **Source document evidence panel** | The original uploaded document evidence shown alongside the extraction results, with source metadata and a download button for the original file via a time-limited secure URL. Renderable formats show the document preview controls; structured CSV/XLSX uploads show the secure file evidence and extracted fields. |
 | 7 | **Quotation details form** | Editable header fields: supplier (with empty-state "+ Add supplier" link when the workspace has none, and a supplier-match suggestion banner when the extracted vendor name resembles an existing supplier — see below), currency, issue date, expiry date, and stated total. Each field shows its confidence score. |
 | 8 | **Expiry badge** | Next to the Expiry Date field, a "Valid for N days" (or "Expired") badge makes quote validity visible at a glance instead of a plain date. |
-| 9 | **Extracted line items table** | One row per line, expandable to show quantity, pack details, unit price, delivery fee, discount, VAT %, and line total. Add or remove lines with **+ Add Line Item** and the trash icon. The computed total recalculates live as you edit any field or add/remove a line — no need to save first to see the effect. |
+| 9 | **Extracted line items table** | One row per line, expandable to show quantity, pack details, unit price, delivery fee, discount, VAT %, and line total. Add or remove lines with **+ Add Line Item** and the trash icon. The computed total recalculates live as you edit any field or add/remove a line. |
 | 10 | **Field provenance panel** | For the field currently in focus, shows the extraction method, model version, source page, original AI value, and (if edited) the corrected value and who corrected it — labelled "Corrected by Human" on any field you've changed. |
 | 11 | **Reviewer Notes** | A free-text field for recording why a correction was made or leaving context for whoever authorizes the quotation. Saved together with corrections. |
 | 12 | **Audit Trail** | An expandable panel at the bottom logging every action taken on this quotation — upload, extraction, field corrections, status changes — with actor and timestamp. |
@@ -265,11 +340,14 @@ After AI extraction finishes, each quotation lands in the review queue. Open a r
 | # | Element | Description |
 |---|---------|-------------|
 | 1 | **Page title — "Match Resolution Queue"** | Lists quotation lines from **confirmed** quotations that need a human decision: which catalogue product each extracted line refers to. Matching only runs once a quotation has been authorized (section 9). |
-| 2 | **Status filter** | Open (awaiting resolution), Resolved, or All. |
-| 3 | **Priority filter** | Filter by priority. |
-| 4 | **Routing Reason filter** | Filter by why the line was routed here: Low Confidence, No Candidate, Close Candidates, etc. |
-| 5 | **Match task table** | Each row shows the quotation, line number, the original supplier wording as extracted, the routing reason, priority, status, number of candidates found, and when it was queued. |
-| 6 | **Resolve Match action** | Opens the resolution screen for that line. |
+| 2 | **Search by supplier or ID** | Filters tasks by supplier wording, supplier name, quotation ID, or line identifier. |
+| 3 | **Status filter** | Open (awaiting resolution), Resolved, or All. |
+| 4 | **Priority filter** | Filter by priority. |
+| 5 | **Routing Reason filter** | Filter by why the line was routed here: Low Confidence, No Candidate, Close Candidates, etc. |
+| 6 | **From date / To date** | Filters tasks by when they entered the matching queue. |
+| 7 | **Match task table** | Each row shows the parent quotation ID, line number, supplier, original supplier wording, unit price, routing reason, priority, status, candidate count, queued date, and **Age**. Empty queues show "No match tasks found" rather than a blank table. |
+| 8 | **Quotation / Line value** | The first badge is the quotation UUID, truncated for display (for example `b23c8b5a...` represents the full quotation ID `b23c8b5a-93ae-4f48-b412-68c214c2ce69`). The second badge is the human line number from that quotation, such as `#2`; it is not the database line UUID. |
+| 9 | **Resolve Match / View Details action** | Opens the resolution screen for that quotation line. Resolved rows switch to a detail-oriented action so reviewers can audit the saved decision. |
 
 ### Match Resolution detail
 
@@ -307,8 +385,21 @@ After AI extraction finishes, each quotation lands in the review queue. Open a r
 | 7 | **Record Purchase action** | From the banner or any table row, click "Record Purchase" to open the outcome-capture form (section 14) and have the savings automatically calculated. |
 
 **Related screens:**
-- **Product Intelligence** (`/offers/product-intelligence`) — price history view with metrics cards (last paid, average paid, best price), price history chart, and historical records table.
 - **Basket Split** — see next section.
+
+### Product Price Intelligence
+
+**Route:** `/offers/product-intelligence` or `/offers/product-intelligence/:id`
+
+![Product Price Intelligence](screenshots/10b-product-intelligence.jpg)
+
+| # | Element | Description |
+|---|---------|-------------|
+| 1 | **Product selector** | Choose the catalogue product whose price history you want to inspect. A product ID in the route preselects this field. |
+| 2 | **Supplier filter** | Restrict the history to one supplier or keep all suppliers. |
+| 3 | **Time window** | Switch between the available history windows, such as 6 months. |
+| 4 | **Price intelligence panel** | Shows landed-cost trend metrics and historical records when verified purchase history exists. Until then, the page displays a no-history state with a link back to the Quotation Inbox so you can build source data. |
+| 5 | **Smart Compare / View Product actions** | Jump back to Smart Compare or open the selected product's catalogue record. |
 
 ---
 
@@ -376,6 +467,8 @@ While the solver runs, the screen shows "Basket split queued for optimisation...
 
 Reached from **Record Purchase** on any Smart Compare offer, or **+ Record Purchase Outcome** on the ledger itself.
 
+![Record Purchase Outcome](screenshots/13b-outcome-capture.jpg)
+
 | # | Element | Description |
 |---|---------|-------------|
 | 1 | **Historical Baseline Note** | States which baseline policy will be used to compute the saving (e.g. "Last Paid Price"). |
@@ -385,7 +478,7 @@ Reached from **Record Purchase** on any Smart Compare offer, or **+ Record Purch
 | 5 | **Delivery Outcome** | Delivered, Partially Delivered, Not Delivered, etc. |
 | 6 | **Order Date** | When the order was placed. |
 | 7 | **Notes / Reference ID** | Optional free text, e.g. a PO number. |
-| 8 | **Record Outcome & Compute Saving** | Saves the outcome and immediately computes the saving against the baseline, taking you to the Saving Evidence screen. |
+| 8 | **Record Outcome & Compute Saving** | Saves the outcome and immediately computes the saving against the baseline, taking you to the Saving Evidence screen. If the selected product has no price history yet, the form flags that no baseline is available for that product. |
 
 ### Saving Evidence & Calculation
 
@@ -430,10 +523,10 @@ Reached from **Record Purchase** on any Smart Compare offer, or **+ Record Purch
 | # | Element | Description |
 |---|---------|-------------|
 | 1 | **Page title — "Purchase Requests"** | Create and track purchase requests for your branches and cost centres. |
-| 2 | **Save Draft button** | Opens the new purchase request form. |
+| 2 | **+ Save Draft button** | Opens the new purchase request form. The label currently describes the first action on the next screen rather than the navigation action. |
 | 3 | **Status filter** | All, Draft, Submitted, Approved, Rejected, or Withdrawn. |
-| 4 | **Request table** | Each row shows the request number, branch, cost centre, required-by date, estimated total, budget status, and status chip. |
-| 5 | **Empty state** | "No purchase requests yet. Create your first request to get started." |
+| 4 | **Request table** | Each row shows the required-by date, branch, status, estimated total, and row actions. Current rows can show an internal branch UUID in the list; the request detail screen resolves the branch and cost-centre names. |
+| 5 | **Row actions** | Use the eye icon to open the request. Submitted rows also expose withdrawal where allowed by status. |
 
 **Request lifecycle:**
 1. **Draft** — a request is created and can be freely edited. Lines can be added/removed.
@@ -445,21 +538,21 @@ Reached from **Record Purchase** on any Smart Compare offer, or **+ Record Purch
 
 ## 17. New Purchase Request
 
-**Route:** `/requests/new`
+**Route:** `/requests/new` or `/requests/:id`
 
-![New Purchase Request](screenshots/16-request-form.jpg)
+![Purchase Request Form](screenshots/16-request-form.jpg)
 
 | # | Element | Description |
 |---|---------|-------------|
-| 1 | **Page title — "New Purchase Request"** | Create a purchase request for a specific branch. |
-| 2 | **Branch selector** (required) | Select the branch this request is for. Branches are defined in Organisation Settings (section 20) — a request cannot be created until at least one branch exists. |
+| 1 | **Page title** | Reads "New Purchase Request" when creating a draft and "Edit Purchase Request" when opening an existing draft/submitted request. |
+| 2 | **Branch selector** (required) | Select the branch this request is for. Branches are defined in Organisation Settings (section 20) — a request cannot be created until at least one branch exists. Existing requests show the saved branch. |
 | 3 | **Cost Centre selector** (optional) | Optionally assign the request to a cost centre for budget tracking. |
 | 4 | **Required By date** (required) | The date by which the goods are needed. |
 | 5 | **Line Items section** | Each line needs a **Product**, a **Quantity**, and an optional **Note**. |
 | 6 | **+ Add Line button** | Adds another line item row. At least one line is required to submit. |
-| 7 | **Save Draft button** | Saves the request as a draft. You can return to edit it later. |
+| 7 | **Save Draft / Submit controls** | Saves the request as a draft first; submitted requests become read-only except for status-specific actions such as withdrawal. |
 
-**⚠️ Known issue with this screen:** see [§23 Known Issues](#23-known-issues) — the Product field did not offer any autocomplete suggestions in this build, and submitting with free text failed server-side validation ("Request validation failed"). Selecting a real catalogue product through this field could not be completed as of this writing.
+**Current display limitation:** existing submitted requests can show the saved product UUID in the line-item field instead of the product name. The underlying relationship is stored correctly, but the detail display still needs the same friendly-name resolution used elsewhere in the app.
 
 ---
 
@@ -473,7 +566,7 @@ Reached from **Record Purchase** on any Smart Compare offer, or **+ Record Purch
 |---|---------|-------------|
 | 1 | **Page title — "Approval Queue"** | Requests awaiting your decision. Only requests routed to you (based on approval thresholds and delegation rules) appear here. |
 
-**Note:** This screen is the least mature in the app — as of this writing it renders only the title with no request cards or empty-state messaging, even when there are no requests to show. Threshold-based routing, delegation, and the approve/reject/request-change actions described in the underlying feature spec could not be exercised because no purchase request could be successfully submitted for approval (see §17's known issue).
+**Note:** This screen is the least mature in the app — as of this writing it renders the title/subtitle with no request cards or empty-state messaging. A submitted purchase request was created in the remote-backed documentation workspace, but no approver-routed card appeared on this page during automation.
 
 ---
 
@@ -525,7 +618,7 @@ Reached from **Record Purchase** on any Smart Compare offer, or **+ Record Purch
 - Cost centres and budgets enable budget-impact visibility on purchase requests.
 - When a request's estimated total would exceed a budget, a warning is shown.
 
-**⚠️ Known display issue:** see [§23 Known Issues](#23-known-issues) — the Branch column on the Cost Centres table, and the "Applies To" column on the Budgets table, display a raw internal ID instead of the branch/cost-centre name.
+**Display note:** the Settings screen now resolves branch names in the Branch and Cost Centre tables. See [§23 Known Issues](#23-known-issues) for remaining raw-ID display issues in the Purchase Requests area.
 
 ---
 
@@ -541,8 +634,8 @@ Reached from **Record Purchase** on any Smart Compare offer, or **+ Record Purch
 
 **Notes:**
 - Roles are assigned at invitation time and can be changed by the Owner from Team Management.
-- Role-based visibility is enforced in the navigation — menu items are hidden for unauthorised roles.
-- Some actions are gated by role: Import, Upload Quotation, Record Purchase, Team Management, and Settings are restricted to authorised roles.
+- Role-based visibility is enforced for selected navigation items and route guards.
+- Current client-side route guards restrict product/supplier creation, catalogue import, quotation upload, savings outcome/export, and Team Management. Other authenticated pages still rely on backend authorization for unsafe operations.
 
 ---
 
@@ -579,13 +672,14 @@ A: Users with the Approver or Owner role. Approval routing is based on configura
 
 ## 23. Known Issues
 
-Found during this documentation pass (5 Sep 2026). None of these block the core quotation → matching → comparison → savings loop; they affect the newer Requests & Approvals area and two cosmetic display bugs.
+Found during this documentation pass (6 Sep 2026). The app was exercised against the running local web/API containers connected to the configured remote Supabase project, not a local database.
 
 | # | Where | Issue |
 |---|-------|-------|
-| 1 | New Purchase Request (§17) | The **Product** field never displayed autocomplete suggestions for any query tried (exact product name, partial name, single letter). Submitting the form with typed text failed server-side with "Request validation failed," and no way was found through the UI to select a real catalogue product. This blocks creating a valid purchase request end-to-end. |
-| 2 | Approval Queue (§18) | Because no request could be validly submitted, the approval workflow (request cards, Approve/Reject/Request Change actions, threshold routing) could not be exercised. The page itself currently renders only its title with no empty-state message. |
-| 3 | Organisation Settings (§20) | The Cost Centres table's **Branch** column, and the Budgets table's **Applies To** column, display the raw internal UUID instead of the linked branch or cost-centre name. Cosmetic only — the underlying link is stored correctly. |
+| 1 | Purchase Requests (§16) | Submitted request rows can display the raw branch UUID in the Branch column instead of the branch name. |
+| 2 | Purchase Request detail (§17) | Existing request line items can display the saved product UUID rather than the product's catalogue name. The linked product still exists and the relationship is stored correctly. |
+| 3 | Approval Queue (§18) | The page renders only its title/subtitle and did not show an empty state or a routed approval card, even after a submitted request existed in the remote-backed documentation workspace. |
+| 4 | Quotation review detail (§9) | The CSV sample upload completed and opened the review screen, but the header fields extracted from the CSV sample left some optional quotation fields blank. The PDF/image sample path depends on external extraction-provider credentials; during this pass Bedrock fell back because AWS SSO was expired, while CSV extraction still completed successfully. |
 
 If you hit any of these, it's not something wrong with your setup — flag it to the product team.
 
