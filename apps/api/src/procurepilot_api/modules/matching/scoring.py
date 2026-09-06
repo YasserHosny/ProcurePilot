@@ -3,7 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from decimal import ROUND_HALF_UP, Decimal
 
-SCORING_VERSION = "matching-score-v1"
+STUB_EMBEDDING_MODEL = "stub-hash-v1"
+SCORING_VERSION = "matching-score-v2"
 NEUTRAL_SCORE = Decimal("0.5")
 WEIGHTS: dict[str, Decimal] = {
     "deterministic": Decimal("0.30"),
@@ -14,6 +15,11 @@ WEIGHTS: dict[str, Decimal] = {
     "pack_unit": Decimal("0.06"),
     "pack_size": Decimal("0.04"),
     "price": Decimal("0.03"),
+}
+WEIGHTS_STUB_EMBEDDING: dict[str, Decimal] = {
+    **WEIGHTS,
+    "lexical": WEIGHTS["lexical"] + WEIGHTS["semantic"],
+    "semantic": Decimal("0.00"),
 }
 CONFIDENCE_QUANT = Decimal("0.0001")
 
@@ -30,16 +36,25 @@ class ScoreInputs:
     price_plausibility: Decimal | None = None
 
 
-def score_candidate(inputs: ScoreInputs) -> Decimal:
+def active_weights(embedding_model: str) -> dict[str, Decimal]:
+    if embedding_model == STUB_EMBEDDING_MODEL:
+        return WEIGHTS_STUB_EMBEDDING
+    return WEIGHTS
+
+
+def score_candidate(
+    inputs: ScoreInputs, *, embedding_model: str = STUB_EMBEDDING_MODEL
+) -> Decimal:
+    weights = active_weights(embedding_model)
     raw = (
-        WEIGHTS["deterministic"] * _clamp(inputs.deterministic_signal)
-        + WEIGHTS["lexical"] * _clamp(inputs.lexical_similarity)
-        + WEIGHTS["semantic"] * _clamp(inputs.semantic_similarity)
-        + WEIGHTS["brand"] * _optional(inputs.brand_match)
-        + WEIGHTS["variant"] * _optional(inputs.variant_match)
-        + WEIGHTS["pack_unit"] * _optional(inputs.pack_unit_match)
-        + WEIGHTS["pack_size"] * _optional(inputs.pack_size_plausibility)
-        + WEIGHTS["price"] * _optional(inputs.price_plausibility)
+        weights["deterministic"] * _clamp(inputs.deterministic_signal)
+        + weights["lexical"] * _clamp(inputs.lexical_similarity)
+        + weights["semantic"] * _clamp(inputs.semantic_similarity)
+        + weights["brand"] * _optional(inputs.brand_match)
+        + weights["variant"] * _optional(inputs.variant_match)
+        + weights["pack_unit"] * _optional(inputs.pack_unit_match)
+        + weights["pack_size"] * _optional(inputs.pack_size_plausibility)
+        + weights["price"] * _optional(inputs.price_plausibility)
     )
     return _clamp(raw).quantize(CONFIDENCE_QUANT, rounding=ROUND_HALF_UP)
 

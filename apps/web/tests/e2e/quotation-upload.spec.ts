@@ -40,7 +40,7 @@ test.describe('Quotation Upload & Extraction (T037, US1)', () => {
     await expect(page.locator('.start-upload-btn')).not.toBeVisible();
   });
 
-  test('upload valid quotation file, trigger extraction, and transition to extracted state', async ({ page }) => {
+  test('upload valid quotation file, automatically trigger extraction, and transition to extracted state', async ({ page }) => {
     await page.goto('/quotations/upload');
     await expect(page.locator('.page-title')).toContainText('Upload Supplier Quotation');
 
@@ -53,14 +53,7 @@ test.describe('Quotation Upload & Extraction (T037, US1)', () => {
       buffer: Buffer.from(validPdfContent),
     });
 
-    // Verify selected file card
-    await expect(page.locator('.selected-file-card')).toBeVisible();
-    await expect(page.locator('.file-name')).toContainText('supplier_quotation.pdf');
-
-    // Click upload and extract
-    await page.click('.start-upload-btn');
-
-    // Expect progress container or result container
+    // File selection starts import automatically; there is no manual upload step.
     await expect(
       page.locator('.progress-container, .result-container.success')
     ).toBeVisible();

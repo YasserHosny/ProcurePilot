@@ -106,7 +106,7 @@ export class QuotationUploadComponent {
   onFileSelected(event: Event): void {
     const input = event.target as HTMLInputElement;
     if (input.files && input.files.length > 0) {
-      this.validateAndSetFile(input.files[0]);
+      this.validateAndSetFile(input.files[0], { startAutomatically: true });
     }
   }
 
@@ -114,7 +114,7 @@ export class QuotationUploadComponent {
     event.preventDefault();
     this.isDragOver.set(false);
     if (event.dataTransfer?.files && event.dataTransfer.files.length > 0) {
-      this.validateAndSetFile(event.dataTransfer.files[0]);
+      this.validateAndSetFile(event.dataTransfer.files[0], { startAutomatically: true });
     }
   }
 
@@ -128,7 +128,10 @@ export class QuotationUploadComponent {
     this.isDragOver.set(false);
   }
 
-  private validateAndSetFile(file: File): void {
+  private validateAndSetFile(
+    file: File,
+    options: { startAutomatically?: boolean } = {},
+  ): void {
     this.errorMessage.set(null);
     this.errorTraceId.set(null);
     this.potentialDuplicates.set([]);
@@ -154,6 +157,9 @@ export class QuotationUploadComponent {
     }
 
     this.selectedFile.set(file);
+    if (options.startAutomatically) {
+      this.startUpload();
+    }
   }
 
   private resolveMimeType(file: File): PresignMimeType | null {

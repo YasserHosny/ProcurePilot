@@ -8,13 +8,19 @@ from postgrest.exceptions import APIError
 
 from procurepilot_api.errors import ServiceUnavailableError
 from procurepilot_api.modules.matching.embeddings import StubEmbeddingProvider, vector_literal
-from procurepilot_api.modules.matching.scoring import ScoreInputs, reason_payload, score_candidate
+from procurepilot_api.modules.matching.scoring import (
+    STUB_EMBEDDING_MODEL,
+    ScoreInputs,
+    reason_payload,
+    score_candidate,
+)
 
 PRODUCT_COLUMNS = (
     "id,tenant_id,canonical_product_id,tenant_name,preferred_supplier_id,status,created_at"
 )
 CANONICAL_COLUMNS = "id,brand,name,variant,gtin,base_unit,created_at"
 SEMANTIC_THRESHOLD = 0.10
+UNREACHABLE_SEMANTIC_THRESHOLD = 1.01
 
 
 @dataclass(frozen=True)
@@ -38,7 +44,7 @@ def build_similarity_candidates(
         line_text=line_text,
         line_embedding=vector_literal(embedding_provider.embed(line_text)),
         trigram_threshold=trigram_threshold,
-        semantic_threshold=SEMANTIC_THRESHOLD,
+        semantic_threshold=semantic_threshold_for_model(embedding_provider.model),
         limit=limit,
     )
     products = _products_by_id(
@@ -62,11 +68,17 @@ def build_similarity_candidates(
         candidates.append(
             SimilarityCandidate(
                 workspace_product_id=UUID(str(row["workspace_product_id"])),
-                confidence=score_candidate(inputs),
+                confidence=score_candidate(inputs, embedding_model=embedding_provider.model),
                 reasons=reason_payload(inputs=inputs),
             )
         )
     return sorted(candidates, key=lambda candidate: candidate.confidence, reverse=True)[:limit]
+
+
+def semantic_threshold_for_model(embedding_model: str) -> float:
+    if embedding_model == STUB_EMBEDDING_MODEL:
+        return UNREACHABLE_SEMANTIC_THRESHOLD
+    return SEMANTIC_THRESHOLD
 
 
 def _search_rows(

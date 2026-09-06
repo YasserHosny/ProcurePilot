@@ -177,7 +177,8 @@ def _potential_duplicates(
         quotation_response = (
             client.table("quotation")
             .select(
-                "id,document_id,created_at,stated_total_amount,stated_total_currency,supplier(name)"
+                "id,document_id,created_at,stated_total_amount,stated_total_currency,"
+                "supplier!quotation_supplier_id_fkey(name)"
             )
             .in_("document_id", document_ids)
             # A refused quotation was explicitly discarded — it shouldn't keep flagging a

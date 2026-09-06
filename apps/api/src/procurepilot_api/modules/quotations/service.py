@@ -52,7 +52,8 @@ FIELD_COLUMNS = (
 )
 TASK_COLUMNS = (
     "id,quotation_id,status,priority,reason,created_at,resolved_at,"
-    "quotation(deleted_at,stated_total_amount,stated_total_currency,supplier(name))"
+    "quotation(deleted_at,stated_total_amount,stated_total_currency,"
+    "supplier!quotation_supplier_id_fkey(name))"
 )
 
 
@@ -314,12 +315,6 @@ class QuotationService:
             )
             if active.data:
                 raise ConflictError(details={"reason": "extraction_already_running"})
-            client.table("field_extraction").delete().eq(
-                "quotation_id", str(quotation_id)
-            ).execute()
-            client.table("quotation_line").delete().eq(
-                "quotation_id", str(quotation_id)
-            ).execute()
             job_row = _one_row(
                 client.table("extraction_job")
                 .insert(
@@ -335,7 +330,7 @@ class QuotationService:
             )
             row = _one_row(
                 client.table("quotation")
-                .update({"status": "pending"})
+                .update({"status": "extracting"})
                 .eq("id", str(quotation_id))
                 .execute()
                 .data,
@@ -343,7 +338,16 @@ class QuotationService:
             )
         except APIError as exc:
             raise ServiceUnavailableError(details={"dependency": "database"}) from exc
-        _enqueue_extraction(self._settings, job_row, quote, member)
+        try:
+            _enqueue_extraction(self._settings, job_row, quote, member)
+        except ServiceUnavailableError:
+            _mark_extraction_enqueue_failed(
+                client=client,
+                job_id=UUID(str(job_row["id"])),
+                quotation_id=quotation_id,
+                prior_status=str(quote["status"]),
+            )
+            raise
         self._record(
             bearer_token=bearer_token,
             member=member,
@@ -377,12 +381,6 @@ class QuotationService:
             )
             if active.data:
                 raise ConflictError(details={"reason": "extraction_already_running"})
-            client.table("field_extraction").delete().eq(
-                "quotation_id", str(quotation_id)
-            ).execute()
-            client.table("quotation_line").delete().eq(
-                "quotation_id", str(quotation_id)
-            ).execute()
             job_row = _one_row(
                 client.table("extraction_job")
                 .insert(
@@ -398,7 +396,7 @@ class QuotationService:
             )
             row = _one_row(
                 client.table("quotation")
-                .update({"document_id": str(new_document_id), "status": "pending"})
+                .update({"document_id": str(new_document_id), "status": "extracting"})
                 .eq("id", str(quotation_id))
                 .execute()
                 .data,
@@ -406,12 +404,22 @@ class QuotationService:
             )
         except APIError as exc:
             raise ServiceUnavailableError(details={"dependency": "database"}) from exc
-        _enqueue_extraction(
-            self._settings,
-            job_row,
-            {**quote, "document_id": str(new_document_id)},
-            member,
-        )
+        try:
+            _enqueue_extraction(
+                self._settings,
+                job_row,
+                {**quote, "document_id": str(new_document_id)},
+                member,
+            )
+        except ServiceUnavailableError:
+            _mark_extraction_enqueue_failed(
+                client=client,
+                job_id=UUID(str(job_row["id"])),
+                quotation_id=quotation_id,
+                prior_status=str(quote["status"]),
+                document_id=UUID(old_document_id),
+            )
+            raise
         self._record(
             bearer_token=bearer_token,
             member=member,
@@ -807,8 +815,8 @@ def _enqueue_extraction(
     try:
         from redis import Redis
         from rq import Queue
-    except ImportError:
-        return
+    except ImportError as exc:
+        raise ServiceUnavailableError(details={"dependency": "rq"}) from exc
     try:
         queue = Queue(settings.extraction_queue_name, connection=Redis.from_url(settings.redis_url))
         queue.enqueue(
@@ -821,5 +829,32 @@ def _enqueue_extraction(
             },
             job_id=str(job_row["id"]),
         )
-    except Exception:
-        pass
+    except Exception as exc:
+        raise ServiceUnavailableError(details={"dependency": "redis"}) from exc
+
+
+def _mark_extraction_enqueue_failed(
+    *,
+    client: object,
+    job_id: UUID,
+    quotation_id: UUID,
+    prior_status: str,
+    document_id: UUID | None = None,
+) -> None:
+    updates: dict[str, object] = {"status": prior_status}
+    if document_id is not None:
+        updates["document_id"] = str(document_id)
+    try:
+        client.table("extraction_job").update(
+            {
+                "status": "failed",
+                "error": {
+                    "code": "redis_enqueue_failed",
+                    "message": "Extraction job could not be queued in Redis.",
+                },
+                "completed_at": datetime.now(UTC).isoformat(),
+            }
+        ).eq("id", str(job_id)).execute()
+        client.table("quotation").update(updates).eq("id", str(quotation_id)).execute()
+    except APIError as exc:
+        raise ServiceUnavailableError(details={"dependency": "database"}) from exc

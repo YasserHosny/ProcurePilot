@@ -136,6 +136,16 @@ jobs:
         env:
           TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
         run: uv run --project apps/api pytest apps/api -q
+      - name: Run product matching eval smoke gate
+        # Update this to enforce precision, review-band, and ECE thresholds as soon as ml/benchmarks/product_matching/heldout.jsonl reaches 500+ records.
+        run: |
+          uv run --project apps/api python ml/evals/product_matching/run_eval.py > /tmp/eval_result.json
+          uv run --project apps/api python -c "
+          import json
+          result = json.load(open('/tmp/eval_result.json'))
+          assert result['gate_status'] == 'not_validated_no_held_out_benchmark', result['gate_status']
+          assert 'honest_gap' in result and result['honest_gap'], 'harness must state the gap explicitly'
+          "
 
   tenant-isolation:
     name: Tenant isolation

@@ -185,6 +185,22 @@
   .section-desc { font-size: 0.875rem; color: #64748b; margin: 0; }
 }
 
+.match-score-note {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-block-start: 0.6rem;
+  color: #475569;
+  font-size: 0.8125rem;
+
+  mat-icon {
+    width: 18px;
+    height: 18px;
+    font-size: 18px;
+    color: #2563eb;
+  }
+}
+
 .candidates-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));

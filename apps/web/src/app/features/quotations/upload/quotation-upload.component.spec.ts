@@ -1,5 +1,5 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
 import { signal } from '@angular/core';
 import { provideRouter } from '@angular/router';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
@@ -98,22 +98,39 @@ describe('QuotationUploadComponent (T036)', () => {
     expect(apiService.presignDocument).not.toHaveBeenCalled();
   });
 
-  it('should accept supported formats (PDF, PNG, CSV, etc.) and store the file', () => {
+  it('should accept supported formats and start upload automatically', fakeAsync(() => {
+    apiService.presignDocument.and.returnValue(of(mockPresignResponse));
+    apiService.uploadFileToStorage.and.returnValue(of(undefined));
+    apiService.createQuotation.and.returnValue(of(mockQuotation));
+    apiService.extractQuotation.and.returnValue(of(mockJobQueued));
+    spyOn(component as unknown as { computeContentHash: (file: File) => Promise<string> }, 'computeContentHash')
+      .and.returnValue(Promise.resolve('abc123hash'));
+
     const validFile = new File(['%PDF-1.4...'], 'quote.pdf', { type: 'application/pdf' });
     const event = { target: { files: [validFile] } } as unknown as Event;
 
     component.onFileSelected(event);
+    tick();
 
     expect(component.selectedFile()).toBe(validFile);
     expect(component.errorMessage()).toBeNull();
-  });
+    expect(apiService.presignDocument).toHaveBeenCalledWith({
+      filename: 'quote.pdf',
+      mime_type: 'application/pdf',
+      size_bytes: validFile.size,
+      content_hash: 'abc123hash',
+    });
+    expect(apiService.extractQuotation).toHaveBeenCalledWith(mockQuotation.id);
+  }));
 
-  it('should execute direct-to-storage upload and poll job to extracted state', (done) => {
+  it('should execute direct-to-storage upload and poll job to extracted state', fakeAsync(() => {
     apiService.presignDocument.and.returnValue(of(mockPresignResponse));
     apiService.uploadFileToStorage.and.returnValue(of(undefined));
     apiService.createQuotation.and.returnValue(of(mockQuotation));
     apiService.extractQuotation.and.returnValue(of(mockJobQueued));
     apiService.getJob.and.returnValue(of(mockJobSucceeded));
+    spyOn(component as unknown as { computeContentHash: (file: File) => Promise<string> }, 'computeContentHash')
+      .and.returnValue(Promise.resolve('abc123hash'));
 
     const validFile = new File(['dummy pdf content'], 'supplier_quote.pdf', {
       type: 'application/pdf',
@@ -121,11 +138,13 @@ describe('QuotationUploadComponent (T036)', () => {
     component.selectedFile.set(validFile);
 
     component.startUpload();
+    tick();
 
     expect(apiService.presignDocument).toHaveBeenCalledWith({
       filename: 'supplier_quote.pdf',
       mime_type: 'application/pdf',
       size_bytes: validFile.size,
+      content_hash: 'abc123hash',
     });
     expect(apiService.uploadFileToStorage).toHaveBeenCalledWith(
       mockPresignResponse.upload_url,
@@ -138,15 +157,13 @@ describe('QuotationUploadComponent (T036)', () => {
     expect(apiService.extractQuotation).toHaveBeenCalledWith(mockQuotation.id);
 
     // Wait for the polling interval to trigger getJob
-    setTimeout(() => {
-      expect(apiService.getJob).toHaveBeenCalledWith(mockJobQueued.id);
-      expect(component.uploadState()).toBe('extracted');
-      expect(component.createdQuotation()?.id).toBe('q-123');
-      done();
-    }, 1600);
-  });
+    tick(1500);
+    expect(apiService.getJob).toHaveBeenCalledWith(mockJobQueued.id);
+    expect(component.uploadState()).toBe('extracted');
+    expect(component.createdQuotation()?.id).toBe('q-123');
+  }));
 
-  it('should transition to failed state if presign fails', () => {
+  it('should transition to failed state if presign fails', fakeAsync(() => {
     apiService.presignDocument.and.returnValue(
       throwError(
         () =>
@@ -156,14 +173,17 @@ describe('QuotationUploadComponent (T036)', () => {
           }),
       ),
     );
+    spyOn(component as unknown as { computeContentHash: (file: File) => Promise<string> }, 'computeContentHash')
+      .and.returnValue(Promise.resolve('abc123hash'));
 
     const validFile = new File(['dummy'], 'quote.pdf', { type: 'application/pdf' });
     component.selectedFile.set(validFile);
 
     component.startUpload();
+    tick();
 
     expect(component.uploadState()).toBe('failed');
     expect(component.errorMessage()).toBe('Format error');
     expect(component.errorTraceId()).toBe('tr-999');
-  });
+  }));
 });

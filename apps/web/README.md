@@ -14,8 +14,9 @@ pnpm install
 npx ng serve          # http://localhost:4200
 ```
 
-Or start the whole stack — API, web, and local Supabase — from the repo root with
-`docker compose up --build`.
+For the full local app with the API and workers, follow
+[`docs/operations/local-dev.md`](../../../docs/operations/local-dev.md). Local development uses the
+hosted Supabase project; do not start a local Supabase database.
 
 ## Test and lint
 

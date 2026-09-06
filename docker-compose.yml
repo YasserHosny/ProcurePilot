@@ -1,157 +1,5 @@
 services:
   # ---------------------------------------------------------------------------
-  # Database (PostgreSQL 17 with pgvector & pg_trgm extensions)
-  # ---------------------------------------------------------------------------
-  db:
-    image: supabase/postgres:17.6.1.136
-    container_name: procurepilot-db
-    ports:
-      - "54322:5432"
-    environment:
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-      POSTGRES_DB: postgres
-      POSTGRES_USER: postgres
-      POSTGRES_HOST: /var/run/postgresql
-      POSTGRES_PORT: 5432
-    volumes:
-      # Mounted as a single FILE inside the image's init directory. Mounting the whole
-      # directory masks supabase/postgres's own init scripts — which is what left the database
-      # with no anon/authenticated/supabase_auth_admin roles and made GoTrue and Storage
-      # crash-loop. The image creates those roles itself; we only add what it does not.
-      - ./infra/docker/initdb/99-procurepilot.sql:/docker-entrypoint-initdb.d/init-scripts/99-procurepilot.sql:ro
-      - db-data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-    restart: unless-stopped
-
-  # ---------------------------------------------------------------------------
-  # Auth Service (GoTrue)
-  # ---------------------------------------------------------------------------
-  auth:
-    image: supabase/gotrue:v2.189.0
-    container_name: procurepilot-auth
-    depends_on:
-      db:
-        condition: service_healthy
-    environment:
-      GOTRUE_API_HOST: 0.0.0.0
-      GOTRUE_API_PORT: 9999
-      API_EXTERNAL_URL: ${SUPABASE_URL:-http://localhost:54321}
-      GOTRUE_DB_DRIVER: postgres
-      # Connect as supabase_auth_admin, exactly as Supabase's own compose does. As postgres,
-      # GoTrue reported healthy but failed every query with 'relation "identities" does not
-      # exist', because postgres's search_path is "$$user", public and GoTrue queries its tables
-      # unqualified. supabase_auth_admin has the right search_path set by the image, so no
-      # search_path parameter belongs on this URL — adding one broke migrations instead.
-      GOTRUE_DB_DATABASE_URL: postgres://supabase_auth_admin:${POSTGRES_PASSWORD:-postgres}@db:5432/postgres?sslmode=disable
-      GOTRUE_SITE_URL: http://localhost:4200
-      GOTRUE_URI_ALLOW_LIST: http://localhost:4200/*
-      GOTRUE_JWT_SECRET: ${SUPABASE_JWT_SECRET:-replace-with-local-jwt-secret}
-      GOTRUE_JWT_EXP: 3600
-      GOTRUE_JWT_DEFAULT_GROUP_NAME: authenticated
-      GOTRUE_EXTERNAL_EMAIL_ENABLED: "true"
-      GOTRUE_MAILER_AUTOCONFIRM: "true"
-    healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9999/health"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-    restart: unless-stopped
-
-  # ---------------------------------------------------------------------------
-  # REST Service (PostgREST)
-  # ---------------------------------------------------------------------------
-  rest:
-    image: postgrest/postgrest:v14.12
-    container_name: procurepilot-rest
-    depends_on:
-      db:
-        condition: service_healthy
-    environment:
-      PGRST_DB_URI: postgres://postgres:${POSTGRES_PASSWORD:-postgres}@db:5432/postgres
-      PGRST_DB_SCHEMAS: public,storage
-      PGRST_DB_ANON_ROLE: anon
-      PGRST_JWT_SECRET: ${SUPABASE_JWT_SECRET:-replace-with-local-jwt-secret}
-      PGRST_DB_USE_LEGACY_GUCS: "false"
-    restart: unless-stopped
-
-  # ---------------------------------------------------------------------------
-  # Storage Service
-  # ---------------------------------------------------------------------------
-  storage:
-    image: supabase/storage-api:v1.60.4
-    container_name: procurepilot-storage
-    depends_on:
-      db:
-        condition: service_healthy
-      rest:
-        condition: service_started
-    environment:
-      ANON_KEY: ${SUPABASE_ANON_KEY:-replace-with-local-anon-key}
-      SERVICE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:-replace-with-local-service-role-key}
-      POSTGREST_URL: http://rest:3000
-      PGRST_JWT_SECRET: ${SUPABASE_JWT_SECRET:-replace-with-local-jwt-secret}
-      DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD:-postgres}@db:5432/postgres
-      FILE_STORAGE_BACKEND_PATH: /var/lib/storage
-      TENANT_ID: stub
-      REGION: stub
-      GLOBAL_S3_BUCKET: stub
-    volumes:
-      - storage-data:/var/lib/storage
-    restart: unless-stopped
-
-  # ---------------------------------------------------------------------------
-  # API Gateway (Kong)
-  # ---------------------------------------------------------------------------
-  kong:
-    image: kong:2.8.1
-    container_name: procurepilot-kong
-    depends_on:
-      auth:
-        condition: service_started
-      rest:
-        condition: service_started
-      storage:
-        condition: service_started
-    ports:
-      - "54321:8000"
-    environment:
-      KONG_DATABASE: "off"
-      KONG_DECLARATIVE_CONFIG: /etc/kong/kong.yml
-      KONG_DNS_ORDER: LAST,A,CNAME
-      KONG_PLUGINS: request-transformer,cors,key-auth,acl,basic-auth
-      KONG_NGINX_PROXY_PROXY_BUFFER_SIZE: 160k
-      KONG_NGINX_PROXY_PROXY_BUFFERS: 64 160k
-      KONG_HTTP_LISTEN: 0.0.0.0:8000, 0.0.0.0:8443 ssl
-    volumes:
-      - ./infra/docker/kong.yml:/etc/kong/kong.yml:ro
-    restart: unless-stopped
-
-  # ---------------------------------------------------------------------------
-  # Supabase Studio Dashboard
-  # ---------------------------------------------------------------------------
-  studio:
-    image: supabase/studio:2026.08.03-sha-022b374
-    container_name: procurepilot-studio
-    depends_on:
-      db:
-        condition: service_healthy
-      kong:
-        condition: service_started
-    ports:
-      - "54323:3000"
-    environment:
-      STUDIO_PG_META_URL: http://pg-meta:8080
-      SUPABASE_URL: http://kong:8000
-      SUPABASE_REST_URL: http://kong:8000/rest/v1/
-      SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY:-replace-with-local-anon-key}
-      SUPABASE_SERVICE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:-replace-with-local-service-role-key}
-    restart: unless-stopped
-
-  # ---------------------------------------------------------------------------
   # Backend API (FastAPI)
   # ---------------------------------------------------------------------------
   api:
@@ -166,23 +14,10 @@ services:
     environment:
       API_HOST: ${API_HOST:-0.0.0.0}
       API_PORT: ${API_PORT:-8000}
-      # Same reasoning: .env points at localhost:54322 for host tools; in-network it is db:5432.
-      DATABASE_URL: postgresql://postgres:postgres@db:5432/postgres
-      # NOT ${SUPABASE_URL}: .env holds the HOST address (http://localhost:54321) for host-side
-      # tools such as the seed script and the test suite. Inside this container localhost is the
-      # container itself, so inheriting it makes every Supabase call fail with a connection error
-      # that surfaces as an unhealthy database dependency.
-      SUPABASE_URL: http://kong:8000
-      SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY:-replace-with-local-anon-key}
-      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:-replace-with-local-service-role-key}
-      # Same reasoning again: .env points at localhost:6379 for host tools; in-network it is
-      # redis:6379. Without this override, extraction enqueue fails with a Redis connection error
-      # that surfaces to the reviewer as "Extraction Failed — Service is unavailable."
+      # Local development uses hosted Supabase/Postgres from .env. Redis remains local because it
+      # is only the RQ broker for background work, not the system of record.
       REDIS_URL: redis://redis:6379/0
-      SUPABASE_JWT_SECRET: ${SUPABASE_JWT_SECRET:-replace-with-local-jwt-secret}
     depends_on:
-      db:
-        condition: service_healthy
       redis:
         condition: service_started
     restart: unless-stopped
@@ -216,10 +51,6 @@ services:
     env_file:
       - .env
     environment:
-      # NOT a local "db:5432" override: this project's document/quotation/extraction_job
-      # tables live in the remote hosted Supabase project (see DATABASE_URL in .env) — the
-      # same one the api container reads from. There is no local Supabase/Postgres stack;
-      # the "db" service below is unrelated, empty, and not used by this worker.
       REDIS_URL: redis://redis:6379/0
       EXTRACTION_QUEUE_NAME: ${EXTRACTION_QUEUE_NAME:-quotation-extraction}
       EXTRACTION_PROVIDER_MODE: ${EXTRACTION_PROVIDER_MODE:-bedrock}
@@ -244,13 +75,10 @@ services:
     env_file:
       - .env
     environment:
-      DATABASE_URL: postgresql://postgres:postgres@db:5432/postgres
       REDIS_URL: redis://redis:6379/0
       BASKET_SPLIT_QUEUE_NAME: ${BASKET_SPLIT_QUEUE_NAME:-basket-split}
       PYTHONPATH: /workspace/services/optimiser/src
     depends_on:
-      db:
-        condition: service_healthy
       redis:
         condition: service_started
     command: >
@@ -269,16 +97,10 @@ services:
     env_file:
       - .env
     environment:
-      DATABASE_URL: postgresql://postgres:postgres@db:5432/postgres
-      SUPABASE_URL: http://kong:8000
-      SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY:-replace-with-local-anon-key}
-      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:-replace-with-local-service-role-key}
       REDIS_URL: redis://redis:6379/0
       EXPORT_QUEUE_NAME: ${EXPORT_QUEUE_NAME:-exports}
       SUPABASE_EXPORTS_BUCKET: ${SUPABASE_EXPORTS_BUCKET:-exports}
     depends_on:
-      db:
-        condition: service_healthy
       redis:
         condition: service_started
     command: python -m procurepilot_api.workers.export_worker
@@ -297,7 +119,3 @@ services:
     depends_on:
       - api
     restart: unless-stopped
-
-volumes:
-  db-data:
-  storage-data:
