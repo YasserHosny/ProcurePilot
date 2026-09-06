@@ -236,24 +236,24 @@ export class ResolutionQueueComponent implements OnInit {
     const created = new Date(createdAt);
     const diffMs = Date.now() - created.getTime();
     if (isNaN(created.getTime()) || diffMs < 60 * 60 * 1000) {
-      return this.translate.instant('matching.queue.age.justNow');
+      return this.translate.instant('quotations.queue.age.justNow');
     }
 
     const diffHours = Math.floor(diffMs / (60 * 60 * 1000));
     if (diffHours < 24) {
-      return this.translate.instant('matching.queue.age.hoursAgo', { count: diffHours });
+      return this.translate.instant('quotations.queue.age.hoursAgo', { count: diffHours });
     }
 
     const diffDays = Math.floor(diffHours / 24);
     if (diffDays < 7) {
-      return this.translate.instant('matching.queue.age.daysAgo', { count: diffDays });
+      return this.translate.instant('quotations.queue.age.daysAgo', { count: diffDays });
     }
     if (diffDays < 30) {
-      return this.translate.instant('matching.queue.age.weeksAgo', {
+      return this.translate.instant('quotations.queue.age.weeksAgo', {
         count: Math.floor(diffDays / 7),
       });
     }
-    return this.translate.instant('matching.queue.age.monthsAgo', {
+    return this.translate.instant('quotations.queue.age.monthsAgo', {
       count: Math.floor(diffDays / 30),
     });
   }

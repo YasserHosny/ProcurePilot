@@ -2,7 +2,7 @@ import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testin
 import { signal } from '@angular/core';
 import { provideRouter } from '@angular/router';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
-import { of, throwError } from 'rxjs';
+import { firstValueFrom, of, throwError } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
 import { By } from '@angular/platform-browser';
 
@@ -108,7 +108,7 @@ describe('ResolutionQueueComponent', () => {
 
     const translate = TestBed.inject(TranslateService);
     translate.setTranslation('en', enCatalog);
-    translate.use('en');
+    await firstValueFrom(translate.use('en'));
 
     fixture = TestBed.createComponent(ResolutionQueueComponent);
     component = fixture.componentInstance;
