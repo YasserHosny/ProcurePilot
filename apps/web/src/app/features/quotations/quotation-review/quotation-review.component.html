@@ -541,6 +541,7 @@
                   <mat-select
                     [value]="getEffectiveValue('quotation', q.id, 'currency', q.currency || '')"
                     (selectionChange)="getFieldExtraction('quotation', q.id, 'currency') && updateCorrection(getFieldExtraction('quotation', q.id, 'currency')!.id, $event.value)"
+                    (closed)="reviewFieldValue('quotation', q.id, 'currency', getEffectiveValue('quotation', q.id, 'currency', q.currency || ''))"
                     [disabled]="!isWriter() || q.status === 'reviewed'"
                   >
                     @for (c of currencyOptions; track c) {
@@ -586,10 +587,19 @@
                     [matDatepicker]="issueDatePicker"
                     [value]="toDate(getEffectiveValue('quotation', q.id, 'issue_date', q.issue_date || ''))"
                     (dateChange)="getFieldExtraction('quotation', q.id, 'issue_date') && updateCorrection(getFieldExtraction('quotation', q.id, 'issue_date')!.id, toIsoDate($event.value))"
+                    (blur)="reviewFieldValue('quotation', q.id, 'issue_date', getEffectiveValue('quotation', q.id, 'issue_date', q.issue_date || ''))"
                     [readonly]="!isWriter() || q.status === 'reviewed'"
                   />
-                  <mat-datepicker-toggle matIconSuffix [for]="issueDatePicker"></mat-datepicker-toggle>
-                  <mat-datepicker #issueDatePicker [disabled]="!isWriter() || q.status === 'reviewed'"></mat-datepicker>
+                  <mat-datepicker-toggle
+                    matIconSuffix
+                    [for]="issueDatePicker"
+                    (click)="reviewFieldValue('quotation', q.id, 'issue_date', getEffectiveValue('quotation', q.id, 'issue_date', q.issue_date || ''))"
+                  ></mat-datepicker-toggle>
+                  <mat-datepicker
+                    #issueDatePicker
+                    [disabled]="!isWriter() || q.status === 'reviewed'"
+                    (closed)="reviewFieldValue('quotation', q.id, 'issue_date', getEffectiveValue('quotation', q.id, 'issue_date', q.issue_date || ''))"
+                  ></mat-datepicker>
                 </mat-form-field>
                 @if (isFieldCorrected('quotation', q.id, 'issue_date')) {
                   <span class="corrected-tag">{{ 'quotations.review.corrections.correctedBadge' | translate }}</span>
@@ -629,10 +639,19 @@
                     [matDatepicker]="expiryDatePicker"
                     [value]="toDate(getEffectiveValue('quotation', q.id, 'expiry_date', q.expiry_date || ''))"
                     (dateChange)="getFieldExtraction('quotation', q.id, 'expiry_date') && updateCorrection(getFieldExtraction('quotation', q.id, 'expiry_date')!.id, toIsoDate($event.value))"
+                    (blur)="reviewFieldValue('quotation', q.id, 'expiry_date', getEffectiveValue('quotation', q.id, 'expiry_date', q.expiry_date || ''))"
                     [readonly]="!isWriter() || q.status === 'reviewed'"
                   />
-                  <mat-datepicker-toggle matIconSuffix [for]="expiryDatePicker"></mat-datepicker-toggle>
-                  <mat-datepicker #expiryDatePicker [disabled]="!isWriter() || q.status === 'reviewed'"></mat-datepicker>
+                  <mat-datepicker-toggle
+                    matIconSuffix
+                    [for]="expiryDatePicker"
+                    (click)="reviewFieldValue('quotation', q.id, 'expiry_date', getEffectiveValue('quotation', q.id, 'expiry_date', q.expiry_date || ''))"
+                  ></mat-datepicker-toggle>
+                  <mat-datepicker
+                    #expiryDatePicker
+                    [disabled]="!isWriter() || q.status === 'reviewed'"
+                    (closed)="reviewFieldValue('quotation', q.id, 'expiry_date', getEffectiveValue('quotation', q.id, 'expiry_date', q.expiry_date || ''))"
+                  ></mat-datepicker>
                 </mat-form-field>
                 @if (expiryBadge(q); as badge) {
                   <span class="expiry-badge expiry-{{ badge.kind }}">
@@ -676,6 +695,7 @@
                     matInput
                     [value]="q.stated_total | formatMoney"
                     (change)="getFieldExtraction('quotation', q.id, 'stated_total') && updateCorrection(getFieldExtraction('quotation', q.id, 'stated_total')!.id, { amount: normalizeMoneyInput($any($event.target).value), currency: q.stated_total?.currency || q.currency || 'USD' })"
+                    (blur)="reviewFieldValue('quotation', q.id, 'stated_total', { amount: normalizeMoneyInput($any($event.target).value), currency: q.stated_total?.currency || q.currency || 'USD' })"
                     [readonly]="!isWriter() || q.status === 'reviewed'"
                   />
                   <span matTextSuffix class="currency-suffix">{{ q.stated_total?.currency || q.currency }}</span>
@@ -877,6 +897,7 @@
                             matInput
                             [value]="getEffectiveValue('quotation_line', line.id, 'quantity', line.quantity || '1')"
                             (change)="getFieldExtraction('quotation_line', line.id, 'quantity') && updateCorrection(getFieldExtraction('quotation_line', line.id, 'quantity')!.id, $any($event.target).value)"
+                            (blur)="reviewFieldValue('quotation_line', line.id, 'quantity', $any($event.target).value)"
                             [readonly]="!isWriter() || q.status === 'reviewed'"
                           />
                         </mat-form-field>
@@ -920,6 +941,7 @@
                             matInput
                             [value]="line.unit_price?.amount || '0.00'"
                             (change)="getFieldExtraction('quotation_line', line.id, 'unit_price') && updateCorrection(getFieldExtraction('quotation_line', line.id, 'unit_price')!.id, { amount: $any($event.target).value, currency: line.unit_price?.currency || q.currency || 'USD' })"
+                            (blur)="reviewFieldValue('quotation_line', line.id, 'unit_price', { amount: $any($event.target).value, currency: line.unit_price?.currency || q.currency || 'USD' })"
                             [readonly]="!isWriter() || q.status === 'reviewed'"
                           />
                           <span matTextSuffix class="currency-suffix">{{ line.unit_price?.currency || q.currency }}</span>
@@ -1156,8 +1178,8 @@
 
           <!-- Confirmation Dialog (B5) -->
           @if (confirmDialogVisible()) {
-            <div class="confirm-dialog-overlay" (click)="cancelConfirm()">
-              <div class="confirm-dialog" (click)="$event.stopPropagation()" role="dialog" aria-modal="true">
+            <div class="confirm-dialog-overlay">
+              <div class="confirm-dialog" role="dialog" aria-modal="true">
                 <h3 class="confirm-dialog-title">{{ 'quotations.review.actions.confirmDialogTitle' | translate }}</h3>
                 <p class="confirm-dialog-message">{{ 'quotations.review.actions.confirmDialogMessage' | translate }}</p>
                 @if (hasArithmeticMismatch() && mismatchAcknowledged()) {

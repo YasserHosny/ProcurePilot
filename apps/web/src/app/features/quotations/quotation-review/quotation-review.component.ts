@@ -600,6 +600,18 @@ export class QuotationReviewComponent implements OnInit {
     this.pendingCorrections.set(current);
   }
 
+  reviewFieldValue(
+    entityType: 'quotation' | 'quotation_line',
+    entityId: string,
+    fieldName: string,
+    reviewedValue: unknown,
+  ): void {
+    const fe = this.getFieldExtraction(entityType, entityId, fieldName);
+    if (!fe || fe.corrected_by || parseFloat(fe.confidence) >= 0.85) return;
+    if (this.pendingCorrections().has(fe.id)) return;
+    this.updateCorrection(fe.id, reviewedValue);
+  }
+
   confirmFieldAsIs(entityType: 'quotation' | 'quotation_line', entityId: string, fieldName: string): void {
     const fe = this.getFieldExtraction(entityType, entityId, fieldName);
     if (!fe) return;
@@ -750,7 +762,14 @@ export class QuotationReviewComponent implements OnInit {
 
     const supplierNeedsSaving = q.supplier_id !== this.selectedSupplierId();
     const notesNeedSaving = this.reviewerNotes() !== (q.reviewer_notes || '');
-    if (this.pendingCorrections().size > 0 || supplierNeedsSaving || notesNeedSaving) {
+    const lineChangesNeedSaving =
+      this.pendingNewLines().length > 0 || this.pendingRemoveLineIds().size > 0;
+    if (
+      this.pendingCorrections().size > 0 ||
+      supplierNeedsSaving ||
+      notesNeedSaving ||
+      lineChangesNeedSaving
+    ) {
       const corrections: FieldCorrection[] = [];
       for (const [field_extraction_id, corrected_value] of this.pendingCorrections().entries()) {
         corrections.push({ field_extraction_id, corrected_value });
@@ -761,10 +780,15 @@ export class QuotationReviewComponent implements OnInit {
           supplier_id: this.selectedSupplierId(),
           reviewer_notes: this.reviewerNotes() || null,
           corrections,
+          add_lines: this.pendingNewLines(),
+          remove_line_ids: Array.from(this.pendingRemoveLineIds()),
         })
         .subscribe({
-          next: () => {
+          next: (updated) => {
+            this.quotation.set(updated);
             this.pendingCorrections.set(new Map());
+            this.pendingNewLines.set([]);
+            this.pendingRemoveLineIds.set(new Set());
             this.executeConfirm(q.id);
           },
           error: (err: unknown) => {

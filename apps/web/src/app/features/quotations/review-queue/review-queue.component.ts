@@ -289,13 +289,13 @@ export class ReviewQueueComponent implements OnInit {
         next: () => {
           completed++;
           if (completed + errors === tasks.length) {
-            this.finishBulkArchive(completed, errors);
+            this.finishBulkArchive();
           }
         },
         error: () => {
           errors++;
           if (completed + errors === tasks.length) {
-            this.finishBulkArchive(completed, errors);
+            this.finishBulkArchive();
           }
         },
       });
@@ -321,13 +321,13 @@ export class ReviewQueueComponent implements OnInit {
         next: () => {
           completed++;
           if (completed + errors === tasks.length) {
-            this.finishBulkRefuse(completed, errors);
+            this.finishBulkRefuse();
           }
         },
         error: () => {
           errors++;
           if (completed + errors === tasks.length) {
-            this.finishBulkRefuse(completed, errors);
+            this.finishBulkRefuse();
           }
         },
       });
@@ -347,13 +347,13 @@ export class ReviewQueueComponent implements OnInit {
         next: () => {
           completed++;
           if (completed + errors === tasks.length) {
-            this.finishBulkReprioritise(completed, errors);
+            this.finishBulkReprioritise();
           }
         },
         error: () => {
           errors++;
           if (completed + errors === tasks.length) {
-            this.finishBulkReprioritise(completed, errors);
+            this.finishBulkReprioritise();
           }
         },
       });
@@ -386,10 +386,6 @@ export class ReviewQueueComponent implements OnInit {
     });
   }
 
-  onRowClick(_task: ReviewTask): void {
-    // Navigation is handled by RouterLink on the row.
-  }
-
   private sanitizedSearch(): string | undefined {
     const search = this.searchQuery().trim();
     return search ? search : undefined;
@@ -399,19 +395,19 @@ export class ReviewQueueComponent implements OnInit {
     return ['created_at', 'stated_total', 'priority', 'status'].includes(value);
   }
 
-  private finishBulkArchive(_completed: number, _errors: number): void {
+  private finishBulkArchive(): void {
     this.isBulkArchiving.set(false);
     this.selectedTaskIds.set(new Set());
     this.loadTasks();
   }
 
-  private finishBulkRefuse(_completed: number, _errors: number): void {
+  private finishBulkRefuse(): void {
     this.isBulkRefusing.set(false);
     this.selectedTaskIds.set(new Set());
     this.loadTasks();
   }
 
-  private finishBulkReprioritise(_completed: number, _errors: number): void {
+  private finishBulkReprioritise(): void {
     this.isBulkReprioritising.set(false);
     this.bulkPriorityTarget.set(null);
     this.selectedTaskIds.set(new Set());

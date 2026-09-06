@@ -1,5 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
+import { By } from '@angular/platform-browser';
+import { MatDatepicker } from '@angular/material/datepicker';
 import { ActivatedRoute, provideRouter } from '@angular/router';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { of } from 'rxjs';
@@ -102,10 +104,16 @@ describe('QuotationReviewComponent (T051, T057, T062)', () => {
       'patchQuotation',
       'confirmQuotation',
       'getQuotationMatches',
+      'getDocumentDownloadUrl',
+      'getAuditTrail',
+      'getReviewTasks',
     ]);
     apiService.getQuotation.and.returnValue(of(mockQuotationDetail));
     apiService.suppliers.and.returnValue(of({ items: mockSuppliers, next_cursor: null }));
     apiService.getQuotationMatches.and.returnValue(of({ quotation_id: 'q-review-1', lines: [] }));
+    apiService.getDocumentDownloadUrl.and.returnValue(of({ download_url: 'https://storage.example.com/doc-1.pdf' }));
+    apiService.getAuditTrail.and.returnValue(of({ items: [] }));
+    apiService.getReviewTasks.and.returnValue(of({ items: [], next_cursor: null }));
 
     const mockSession = {
       hasRole: jasmine.createSpy('hasRole').and.returnValue(true),
@@ -182,14 +190,85 @@ describe('QuotationReviewComponent (T051, T057, T062)', () => {
 
     expect(apiService.patchQuotation).toHaveBeenCalledWith('q-review-1', {
       supplier_id: null,
+      reviewer_notes: null,
       corrections: [
         {
           field_extraction_id: 'fe-line1-price',
           corrected_value: { amount: '26.50', currency: 'GBP' },
         },
       ],
+      add_lines: [],
+      remove_line_ids: [],
     });
     expect(component.pendingCorrections().size).toBe(0);
+  });
+
+  it('should treat reviewing a low-confidence field without changing its value as a pending correction', () => {
+    const lowConfidenceExpiry = {
+      ...mockQuotationDetail.field_extractions[0],
+      id: 'fe-expiry',
+      field_name: 'expiry_date',
+      extracted_value: '2026-09-20',
+      confidence: '0.5400',
+    };
+    component.quotation.set({
+      ...mockQuotationDetail,
+      field_extractions: [lowConfidenceExpiry, mockQuotationDetail.field_extractions[1]],
+    });
+
+    component.reviewFieldValue('quotation', 'q-review-1', 'expiry_date', '2026-09-20');
+
+    expect(component.pendingCorrections().get('fe-expiry')).toBe('2026-09-20');
+    expect(component.hasPendingReviewChanges()).toBeTrue();
+  });
+
+  it('should stage an unchanged low-confidence expiry date when the datepicker closes', () => {
+    const lowConfidenceExpiry = {
+      ...mockQuotationDetail.field_extractions[0],
+      id: 'fe-expiry',
+      field_name: 'expiry_date',
+      extracted_value: '2026-09-20',
+      confidence: '0.5400',
+    };
+    component.quotation.set({
+      ...mockQuotationDetail,
+      field_extractions: [lowConfidenceExpiry, mockQuotationDetail.field_extractions[1]],
+    });
+    fixture.detectChanges();
+
+    const datepickers = fixture.debugElement.queryAll(By.directive(MatDatepicker));
+    expect(datepickers.length).toBeGreaterThanOrEqual(2);
+
+    const expiryDatepicker = datepickers[1].componentInstance as MatDatepicker<Date>;
+    expiryDatepicker.closedStream.emit();
+
+    expect(component.pendingCorrections().get('fe-expiry')).toBe('2026-09-20');
+    expect(component.hasPendingReviewChanges()).toBeTrue();
+  });
+
+  it('should stage an unchanged low-confidence expiry date when the datepicker toggle is opened', () => {
+    const lowConfidenceExpiry = {
+      ...mockQuotationDetail.field_extractions[0],
+      id: 'fe-expiry',
+      field_name: 'expiry_date',
+      extracted_value: '2026-09-20',
+      confidence: '0.5400',
+    };
+    component.quotation.set({
+      ...mockQuotationDetail,
+      field_extractions: [lowConfidenceExpiry, mockQuotationDetail.field_extractions[1]],
+    });
+    fixture.detectChanges();
+
+    const datepickerToggles = fixture.debugElement.queryAll(By.css('mat-datepicker-toggle'));
+    expect(datepickerToggles.length).toBeGreaterThanOrEqual(2);
+
+    datepickerToggles[1].triggerEventHandler('click', {
+      stopPropagation: () => undefined,
+    });
+
+    expect(component.pendingCorrections().get('fe-expiry')).toBe('2026-09-20');
+    expect(component.hasPendingReviewChanges()).toBeTrue();
   });
 
   it('should confirm quotation with selected supplier and previous quotation id', () => {
@@ -212,11 +291,56 @@ describe('QuotationReviewComponent (T051, T057, T062)', () => {
 
     expect(apiService.patchQuotation).toHaveBeenCalledWith('q-review-1', {
       supplier_id: 'sup-1',
+      reviewer_notes: null,
       corrections: [],
+      add_lines: [],
+      remove_line_ids: [],
     });
     expect(apiService.confirmQuotation).toHaveBeenCalledWith('q-review-1', {
       previous_quotation_id: 'q-prior-99',
+      acknowledge_mismatch: undefined,
     });
+  });
+
+  it('should save staged line changes before confirming', () => {
+    const confirmedQuotation = {
+      ...mockQuotationDetail,
+      status: 'reviewed' as const,
+      supplier_id: 'sup-1',
+    };
+    apiService.patchQuotation.and.returnValue(of({ ...mockQuotationDetail, supplier_id: 'sup-1' }));
+    apiService.confirmQuotation.and.returnValue(of(confirmedQuotation));
+
+    component.selectedSupplierId.set('sup-1');
+    component.pendingNewLines.set([
+      {
+        original_text: 'A4 paper',
+        quantity: '3',
+        unit_price_amount: '12.50',
+        unit_price_currency: 'GBP',
+      },
+    ]);
+    component.pendingRemoveLineIds.set(new Set(['line-1']));
+
+    component.confirmQuotation();
+
+    expect(apiService.patchQuotation).toHaveBeenCalledWith('q-review-1', {
+      supplier_id: 'sup-1',
+      reviewer_notes: null,
+      corrections: [],
+      add_lines: [
+        {
+          original_text: 'A4 paper',
+          quantity: '3',
+          unit_price_amount: '12.50',
+          unit_price_currency: 'GBP',
+        },
+      ],
+      remove_line_ids: ['line-1'],
+    });
+    expect(component.pendingNewLines()).toEqual([]);
+    expect(component.pendingRemoveLineIds().size).toBe(0);
+    expect(apiService.confirmQuotation).toHaveBeenCalled();
   });
 
   it('should confirm directly without a patch when the supplier was already saved', () => {
@@ -232,6 +356,7 @@ describe('QuotationReviewComponent (T051, T057, T062)', () => {
     expect(apiService.patchQuotation).not.toHaveBeenCalled();
     expect(apiService.confirmQuotation).toHaveBeenCalledWith('q-review-1', {
       previous_quotation_id: null,
+      acknowledge_mismatch: undefined,
     });
   });
 

@@ -354,7 +354,6 @@
               mat-row
               *matRowDef="let row; columns: displayedColumns"
               [routerLink]="['/quotations', row.quotation_id, 'review']"
-              (click)="onRowClick(row)"
               class="clickable-row"
             ></tr>
           </table>
