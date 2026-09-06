@@ -507,6 +507,11 @@ export class ApiService {
     priority?: MatchTaskPriority;
     reason?: MatchTaskReason;
     quotation_id?: string;
+    search?: string;
+    date_from?: string;
+    date_to?: string;
+    sort_by?: 'created_at' | 'priority' | 'status';
+    sort_order?: 'asc' | 'desc';
   }): Observable<{ items: MatchTask[]; next_cursor: string | null }> {
     const query = new URLSearchParams();
     if (params?.cursor) query.set('cursor', params.cursor);
@@ -515,6 +520,11 @@ export class ApiService {
     if (params?.priority) query.set('priority', params.priority);
     if (params?.reason) query.set('reason', params.reason);
     if (params?.quotation_id) query.set('quotation_id', params.quotation_id);
+    if (params?.search) query.set('search', params.search);
+    if (params?.date_from) query.set('date_from', params.date_from);
+    if (params?.date_to) query.set('date_to', params.date_to);
+    if (params?.sort_by) query.set('sort_by', params.sort_by);
+    if (params?.sort_order) query.set('sort_order', params.sort_order);
     const qs = query.toString() ? `?${query.toString()}` : '';
     return this.http.get<{ items: MatchTask[]; next_cursor: string | null }>(
       `${this.base}/match-tasks${qs}`,

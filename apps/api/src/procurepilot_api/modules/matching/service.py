@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 from decimal import Decimal
+from typing import Literal
 from uuid import UUID
 
 from postgrest.exceptions import APIError
@@ -89,10 +90,16 @@ class MatchingService:
         priority: MatchTaskPriority | None = None,
         reason: MatchTaskReason | None = None,
         quotation_id: UUID | None = None,
+        search: str | None = None,
+        date_from: str | None = None,
+        date_to: str | None = None,
+        sort_by: Literal["created_at", "priority", "status"] = "created_at",
+        sort_order: Literal["asc", "desc"] = "desc",
     ) -> MatchTaskList:
         client = authenticated_client(self._settings, bearer_token)
         capped_limit = max(1, min(limit, 100))
         offset = _decode_cursor(cursor)
+        clean_search = search.strip()[:200].lower() if search else None
         try:
             query = client.table("match_task").select(TASK_COLUMNS)
             if status != "all":
@@ -101,21 +108,44 @@ class MatchingService:
                 query = query.eq("priority", priority)
             if reason is not None:
                 query = query.eq("reason", reason)
+            if date_from is not None:
+                query = query.gte("created_at", date_from)
+            if date_to is not None:
+                query = query.lte("created_at", date_to)
             if quotation_id is not None:
                 line_ids = [str(row["id"]) for row in _line_rows(client, quotation_id)]
                 if not line_ids:
                     return MatchTaskList(items=[], next_cursor=None)
                 query = query.in_("quotation_line_id", line_ids)
-            response = (
-                query.order("created_at").order("id").range(offset, offset + capped_limit).execute()
-            )
+            query = query.order(sort_by, desc=sort_order == "desc").order("id")
+            if clean_search:
+                response = query.execute()
+            else:
+                response = query.range(offset, offset + capped_limit).execute()
         except APIError as exc:
             raise ServiceUnavailableError(details={"dependency": "database"}) from exc
         rows = _rows(response.data)
-        visible = rows[:capped_limit]
+        tasks = [self._task(client, row) for row in rows]
+        if clean_search:
+            tasks = [
+                t
+                for t in tasks
+                if (t.quotation_id and clean_search in str(t.quotation_id).lower())
+                or clean_search in t.quotation_line.original_text.lower()
+                or (t.supplier_name and clean_search in t.supplier_name.lower())
+                or clean_search in f"#{t.quotation_line.line_number}"
+                or clean_search in str(t.quotation_line.line_number)
+                or clean_search in t.reason.lower()
+            ]
+        start = offset if clean_search else 0
+        visible = tasks[start : start + capped_limit]
         return MatchTaskList(
-            items=[self._task(client, row) for row in visible],
-            next_cursor=_encode_cursor(offset + capped_limit) if len(rows) > capped_limit else None,
+            items=visible,
+            next_cursor=(
+                _encode_cursor(offset + capped_limit)
+                if len(tasks) > start + capped_limit
+                else None
+            ),
         )
 
     def _ensure_pipeline(
@@ -328,9 +358,18 @@ class MatchingService:
     def _task(self, client: object, row: dict[str, object]) -> MatchTask:
         line_row = _line_row(client, UUID(str(row["quotation_line_id"])))
         decision_row = _decision_for_line(client, UUID(str(row["quotation_line_id"])))
+        quotation_id = UUID(str(line_row["quotation_id"]))
+        supplier_name: str | None = None
+        try:
+            quote = _quotation_row(client, quotation_id)
+            if quote.get("supplier_id"):
+                name = _supplier_name(client, UUID(str(quote["supplier_id"])))
+                supplier_name = name or None
+        except (NotFoundError, ServiceUnavailableError):
+            supplier_name = None
         return MatchTask(
             id=UUID(str(row["id"])),
-            quotation_id=UUID(str(line_row["quotation_id"])),
+            quotation_id=quotation_id,
             quotation_line=_line(line_row),
             status=str(row["status"]),
             priority=str(row["priority"]),
@@ -342,6 +381,7 @@ class MatchingService:
             decision=_decision(client, decision_row) if decision_row else None,
             created_at=row["created_at"],
             resolved_at=row.get("resolved_at"),
+            supplier_name=supplier_name,
         )
 
     def _backfill_missing_embeddings(self, client: object) -> None:
@@ -390,6 +430,21 @@ def _quotation_row(client: object, quotation_id: UUID) -> dict[str, object]:
     except APIError as exc:
         raise ServiceUnavailableError(details={"dependency": "database"}) from exc
     return _one_row(response.data, resource="quotation")
+
+
+def _supplier_name(client: object, supplier_id: UUID) -> str:
+    try:
+        response = (
+            client.table("supplier")
+            .select("name")
+            .eq("id", str(supplier_id))
+            .limit(1)
+            .execute()
+        )
+    except APIError as exc:
+        raise ServiceUnavailableError(details={"dependency": "database"}) from exc
+    rows = _rows(response.data)
+    return str(rows[0]["name"]) if rows else ""
 
 
 def _line_rows(client: object, quotation_id: UUID) -> list[dict[str, object]]:

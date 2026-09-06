@@ -112,6 +112,7 @@ class MatchTask(BaseModel):
     decision: MatchDecision | None = None
     created_at: datetime
     resolved_at: datetime | None = None
+    supplier_name: str | None = None
 
 
 class MatchResolutionRequest(StrictApiModel):
