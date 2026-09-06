@@ -35,13 +35,13 @@
   <mat-card class="filter-card">
     <mat-card-content class="filter-row">
       <mat-form-field appearance="outline" class="filter-field search-field">
-        <mat-label>{{ 'matching.queue.searchPlaceholder' | translate }}</mat-label>
+        <mat-label>{{ 'quotations.queue.searchPlaceholder' | translate }}</mat-label>
         <input
           matInput
           type="search"
           [ngModel]="searchQuery()"
           (ngModelChange)="onSearchChange($event)"
-          [placeholder]="'matching.queue.searchPlaceholder' | translate"
+          [placeholder]="'quotations.queue.searchPlaceholder' | translate"
         />
         <mat-icon matPrefix aria-hidden="true">search</mat-icon>
       </mat-form-field>
@@ -87,7 +87,7 @@
       </mat-form-field>
 
       <mat-form-field appearance="outline" class="filter-field date-field">
-        <mat-label>{{ 'matching.queue.filters.dateFrom' | translate }}</mat-label>
+        <mat-label>{{ 'quotations.queue.filters.dateFrom' | translate }}</mat-label>
         <input
           matInput
           type="date"
@@ -97,7 +97,7 @@
       </mat-form-field>
 
       <mat-form-field appearance="outline" class="filter-field date-field">
-        <mat-label>{{ 'matching.queue.filters.dateTo' | translate }}</mat-label>
+        <mat-label>{{ 'quotations.queue.filters.dateTo' | translate }}</mat-label>
         <input
           matInput
           type="date"
@@ -172,7 +172,7 @@
 
             <!-- Unit Price Column -->
             <ng-container matColumnDef="unit_price">
-              <th mat-header-cell *matHeaderCellDef>{{ 'matching.queue.columns.unitPrice' | translate }}</th>
+              <th mat-header-cell *matHeaderCellDef>{{ 'quotations.review.lines.colUnitPrice' | translate }}</th>
               <td mat-cell *matCellDef="let task">
                 @if (task.quotation_line.unit_price) {
                   {{ task.quotation_line.unit_price | formatMoney }}
@@ -238,7 +238,7 @@
 
             <!-- Age Column -->
             <ng-container matColumnDef="age">
-              <th mat-header-cell *matHeaderCellDef>{{ 'matching.queue.columns.age' | translate }}</th>
+              <th mat-header-cell *matHeaderCellDef>{{ 'quotations.queue.columns.age' | translate }}</th>
               <td mat-cell *matCellDef="let task">
                 {{ ageLabel(task.created_at) }}
               </td>
