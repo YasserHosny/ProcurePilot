@@ -34,6 +34,7 @@
 ---
 
 For breadcrumb-style navigation paths across the app, see [ProcurePilot User Flows](user-flows.md).
+For the business/revenue value behind each major function, see [Function Business Value](../product/function-business-value.md).
 
 ---
 
@@ -121,6 +122,8 @@ Invited members arrive here from their email link. The token identifies the pend
 2. Each product needs at minimum a **name** and a **base measurement unit** (kg, litre, piece, etc.).
 3. Products can be archived (soft-deleted) — they are never hard-deleted.
 
+**Business value:** the product catalogue is the vocabulary that makes every later comparison possible. Clean product identities reduce duplicate spend, group supplier volume for negotiation, and stop teams from comparing two offers that look similar but refer to different products or pack sizes.
+
 ---
 
 ## 4. Create / Edit Product
@@ -143,6 +146,8 @@ Invited members arrive here from their email link. The token identifies the pend
 **Key concept — Pack Normalisation:**
 A supplier may quote "1 case of 12 x 500ml bottles" while another quotes "1 pack of 6 x 1L bottles." ProcurePilot normalises both to a per-litre price so you see the true cost comparison.
 
+**Business value:** pack normalisation protects margin. It exposes when a low unit price is only low because the pack, size, or base unit is different, and it gives buyers a defensible per-unit basis for supplier negotiation.
+
 ---
 
 ## 5. Suppliers
@@ -164,6 +169,8 @@ A supplier may quote "1 case of 12 x 500ml bottles" while another quotes "1 pack
 - **Preferred** — prioritised in recommendations.
 - **Blocked** — offers from this supplier are flagged in Smart Compare; purchasing requires an exception.
 - **Archived** — hidden from active workflows.
+
+**Business value:** supplier profiles turn supplier knowledge into reusable operating data. Payment terms, lead time, delivery fees, minimum order values, and status all influence the true business cost of buying, so ProcurePilot can recommend the supplier that is commercially best, not just cheapest on the line item.
 
 ### Create Supplier form
 
@@ -196,6 +203,8 @@ A supplier may quote "1 case of 12 x 500ml bottles" while another quotes "1 pack
 - Prepare your CSV with a header row matching the column names shown in the app's own product/supplier tables (product name, brand, variant, GTIN, base unit, pack details for products; name, payment terms, lead time, minimum order value/currency, delivery fee/currency for suppliers).
 - The wizard detects duplicates by GTIN (products) or name (suppliers) and lets you choose to skip or update existing records.
 
+**Business value:** import reduces time-to-value. A business can bring its existing product and supplier records into ProcurePilot quickly, while preview and validation prevent messy spreadsheet data from polluting the trusted purchasing dataset.
+
 ---
 
 ## 7. Quotation Review Queue
@@ -221,6 +230,8 @@ A supplier may quote "1 case of 12 x 500ml bottles" while another quotes "1 pack
 - Clicking anywhere on a row (not just the ID or action button) opens the review screen.
 - The "Reason for Review" shown here uses the same VAT-aware arithmetic check as the detail page, so the queue and the detail screen never disagree about whether a quotation's totals reconcile.
 
+**Business value:** the review queue protects decision quality at scale. Instead of asking buyers to inspect every field manually, it prioritises the quotations most likely to affect trust, cost, or revenue leakage: low-confidence extraction, arithmetic mismatches, and stale unresolved reviews.
+
 ---
 
 ## 8. Upload Supplier Quotation
@@ -243,6 +254,8 @@ A supplier may quote "1 case of 12 x 500ml bottles" while another quotes "1 pack
 2. An extraction job starts automatically (usually under 45 seconds per page).
 3. A progress indicator shows the extraction state (uploading → processing → extracted).
 4. When complete, a **Proceed to Review** link appears with the new quotation ID. Click it to inspect the extracted data, or upload another quotation.
+
+**Business value:** upload removes the manual retyping bottleneck. More supplier quotes can be captured before prices expire, and every extracted value remains tied to the source document so later savings claims can be defended.
 
 ---
 
@@ -279,6 +292,8 @@ After AI extraction finishes, each quotation lands in the review queue. Open a r
 3. Walk through attention-required fields, correcting any extraction errors inline — the totals and mismatch banner update as you go.
 4. Confirm or add the supplier, using the auto-match banner if one appears.
 5. Click **Save Corrections** to persist your edits, or go straight to **Confirm & Authorize Quotation** once satisfied.
+
+**Business value:** quotation review turns AI output into trusted commercial data. A wrong supplier, date, quantity, or total can create a false recommendation and a false saving; this page makes the reviewer's corrections auditable before the data affects matching, comparison, or reporting.
 
 ![Quotation Review — Line Items](screenshots/08c-quotation-review-lines.jpg)
 
@@ -319,6 +334,8 @@ After AI extraction finishes, each quotation lands in the review queue. Open a r
 | 4 | **Select Resolution Outcome** | Choose how the line resolves: **Same Product** (exact match), **Different Pack Size** (same product, different packaging), **Different Variant** (same family, different specification), **Compatible Alternative** (functional substitute), or **No Match — Create New Product** (adds a new catalogue product and maps this line to it). |
 | 5 | **Confirm Match Decision** | Saves the outcome. Confirming "Same Product" (or any outcome that selects a candidate) also learns the exact supplier wording as an alias, so an identical wording on a future quotation resolves automatically without going through this queue again. |
 
+**Business value:** matching is where supplier wording becomes business intelligence. It prevents fake comparisons, teaches the system each supplier's vocabulary, and reduces future operating work because repeated descriptions can resolve automatically once a human has confirmed them.
+
 ---
 
 ## 11. Smart Compare
@@ -337,6 +354,8 @@ After AI extraction finishes, each quotation lands in the review queue. Open a r
 | 6 | **Comparison table** | Each row is one supplier offer: unit price, total landed cost, lead time, reliability, stock availability, match confidence, validity, and status. |
 | 7 | **Record Purchase action** | From the banner or any table row, click "Record Purchase" to open the outcome-capture form (section 14) and have the savings automatically calculated. |
 
+**Business value:** Smart Compare converts cleaned data into a buying decision. It lowers recurring purchasing cost, gives buyers evidence for negotiation, and helps owners see why a recommendation was made before money is spent.
+
 **Related screens:**
 - **Basket Split** — see next section.
 
@@ -353,6 +372,8 @@ After AI extraction finishes, each quotation lands in the review queue. Open a r
 | 3 | **Time window** | Switch between the available history windows, such as 6 months. |
 | 4 | **Price intelligence panel** | Shows landed-cost trend metrics and historical records when verified purchase history exists. Until then, the page displays a no-history state with a link back to the Quotation Inbox so you can build source data. |
 | 5 | **Smart Compare / View Product actions** | Jump back to Smart Compare or open the selected product's catalogue record. |
+
+**Business value:** price intelligence gives the business purchase memory. It helps buyers challenge increases, spot supplier drift, time negotiations, and decide whether a current offer is truly good compared with actual historical landed cost.
 
 ---
 
@@ -378,6 +399,8 @@ While the solver runs, the screen shows "Basket split queued for optimisation...
 - **Infeasible result:** Shows which products are missing from which supplier.
 - **Failed result:** System error details.
 
+**Business value:** Basket Split finds savings that line-by-line comparison can miss. It accounts for supplier minimums, delivery fees, and basket-level tradeoffs so a buyer can reduce total landed cost, not just choose the cheapest-looking line.
+
 ---
 
 ## 13. Alerts Inbox
@@ -397,6 +420,8 @@ While the solver runs, the screen shows "Basket split queued for optimisation...
 - **Price Expiring** — a quotation is about to expire and no renewal has been uploaded.
 - **Supplier Disappeared** — a supplier that previously quoted for a product has not submitted a quotation in the current cycle.
 - **Price Swing** — a significant price change (up or down) compared to the previous quotation for the same product/supplier.
+
+**Business value:** alerts reduce silent leakage. They prompt action before an expired price, missing supplier quote, or price swing turns into emergency buying, margin loss, or avoidable supplier dependence.
 
 ---
 
@@ -448,6 +473,8 @@ Reached from **Record Purchase** on any Smart Compare offer, or **+ Record Purch
 - Verified savings are **immutable** — once verified, they cannot be edited or deleted. If a correction is needed, a new adjustment record is created.
 - The evidence chain traces from quotation → match → offer → purchase → saving, providing full auditability.
 
+**Business value:** savings only matter when they can be proven. The ledger connects recommendation, purchase outcome, baseline, and evidence so owners can measure real procurement impact, report it confidently, and avoid inflated or unverifiable savings claims.
+
 ---
 
 ## 15. Export Savings
@@ -464,6 +491,8 @@ Reached from **Record Purchase** on any Smart Compare offer, or **+ Record Purch
 | 4 | **Period Start Date / Period End Date** | Filters the export by recorded date; default to year-to-date. |
 | 5 | **Filter by Supplier** | Optionally restrict the export to a specific supplier. |
 | 6 | **Generate Export button** | Submits the export job. A progress indicator shows processing status, and a download link appears when complete. |
+
+**Business value:** exports make procurement value portable. Finance, owners, and external advisors can review verified savings outside the app without losing the evidence discipline that produced the numbers.
 
 ---
 
@@ -487,6 +516,8 @@ Reached from **Record Purchase** on any Smart Compare offer, or **+ Record Purch
 3. **Approved / Rejected** — decided by an approver. Cannot be withdrawn after a decision.
 4. **Withdrawn** — the requester pulled back a draft or submitted request before a decision.
 
+**Business value:** purchase requests capture demand before spend happens. That shifts procurement from reactive buying to controlled intake, giving owners visibility by branch, cost centre, need date, and estimated impact.
+
 ---
 
 ## 17. New Purchase Request
@@ -507,6 +538,8 @@ Reached from **Record Purchase** on any Smart Compare offer, or **+ Record Purch
 
 **Current display limitation:** existing submitted requests can show the saved product UUID in the line-item field instead of the product name. The underlying relationship is stored correctly, but the detail display still needs the same friendly-name resolution used elsewhere in the app.
 
+**Business value:** a structured request preserves the context that is usually lost in chat messages: who needs the item, where it is needed, when it is needed, and what budget or price history should influence the decision.
+
 ---
 
 ## 18. Approval Queue
@@ -520,6 +553,8 @@ Reached from **Record Purchase** on any Smart Compare offer, or **+ Record Purch
 | 1 | **Page title — "Approval Queue"** | Requests awaiting your decision. Only requests routed to you (based on approval thresholds and delegation rules) appear here. |
 
 **Note:** This screen is the least mature in the app — as of this writing it renders the title/subtitle with no request cards or empty-state messaging. A submitted purchase request was created in the remote-backed documentation workspace, but no approver-routed card appeared on this page during automation.
+
+**Business value:** approval routing is meant to reduce cycle time without giving up spend control. When complete, approvers should see the commercial context needed to decide quickly: branch, amount, budget impact, supplier recommendation, and expected saving.
 
 ---
 
@@ -542,6 +577,8 @@ Reached from **Record Purchase** on any Smart Compare offer, or **+ Record Purch
 2. The invitee receives an email with a link to accept the invitation.
 3. They can create a new account or sign in with an existing one.
 4. Once accepted, they appear in the Members tab with their assigned role.
+
+**Business value:** Team Management lets the owner delegate procurement work while preserving accountability. Each role creates a clear operating boundary, so buyers can move quickly and sensitive controls stay with the right people.
 
 ---
 
@@ -570,6 +607,8 @@ Reached from **Record Purchase** on any Smart Compare offer, or **+ Record Purch
 - Purchase requests require a **branch** — this determines who can see and approve the request. A branch must exist before you can create your first request (section 17).
 - Cost centres and budgets enable budget-impact visibility on purchase requests.
 - When a request's estimated total would exceed a budget, a warning is shown.
+
+**Business value:** organisation settings connect procurement activity to the way the business is managed. Branches, cost centres, and budgets turn isolated purchases into accountable spend by location, department, and financial period.
 
 **Display note:** the Settings screen now resolves branch names in the Branch and Cost Centre tables. See [§23 Known Issues](#23-known-issues) for remaining raw-ID display issues in the Purchase Requests area.
 

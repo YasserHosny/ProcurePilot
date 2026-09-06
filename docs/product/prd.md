@@ -2,6 +2,7 @@
 
 > Source of truth for product functionality from Phase 1 through Phase 2.  
 > Companion to the [Master Roadmap](../roadmap/procurepilot_roadmap.md).
+> For detailed business/revenue value by function, see [Function Business Value](function-business-value.md).
 
 ---
 

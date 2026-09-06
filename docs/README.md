@@ -7,6 +7,7 @@
 ## Product
 
 - [`product/prd.md`](product/prd.md) — Product Requirements Document (Phase 1–2): goals, personas, functional requirements, NFRs, constraints, open questions.
+- [`product/function-business-value.md`](product/function-business-value.md) — Function-by-function business/revenue value, user journey impact, and proof metrics.
 - [`product/user-stories.md`](product/user-stories.md) — Persona-driven user stories and end-to-end use cases.
 - [`product/ui-mockup-prompts.md`](product/ui-mockup-prompts.md) — Google Stitch text prompts for web and mobile screen mockups.
 - [`software-product-documentation-roadmap.md`](software-product-documentation-roadmap.md) — Standard checklist of documents from idea to release.

@@ -20,6 +20,9 @@ It can be used for:
 
 This document represents the **latest clarified version** of the ProcurePilot concept.
 
+For a function-by-function view of user value, business/revenue impact, and proof metrics, see
+[Function Business Value](function-business-value.md).
+
 ---
 
 ## 2. Product Definition
