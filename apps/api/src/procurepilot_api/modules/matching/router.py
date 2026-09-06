@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Body, Depends, Header, Query
@@ -48,6 +48,13 @@ def list_match_tasks(
     priority: Annotated[MatchTaskPriority | None, Query()] = None,
     reason: Annotated[MatchTaskReason | None, Query()] = None,
     quotation_id: Annotated[UUID | None, Query()] = None,
+    search: Annotated[str | None, Query(max_length=200)] = None,
+    date_from: Annotated[str | None, Query()] = None,
+    date_to: Annotated[str | None, Query()] = None,
+    sort_by: Annotated[
+        Literal["created_at", "priority", "status"], Query()
+    ] = "created_at",
+    sort_order: Annotated[Literal["asc", "desc"], Query()] = "desc",
 ) -> MatchTaskList:
     return service.list_match_tasks(
         bearer_token=token,
@@ -57,6 +64,11 @@ def list_match_tasks(
         priority=priority,
         reason=reason,
         quotation_id=quotation_id,
+        search=search,
+        date_from=date_from,
+        date_to=date_to,
+        sort_by=sort_by,
+        sort_order=sort_order,
     )
 
 

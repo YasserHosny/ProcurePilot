@@ -1,0 +1,371 @@
+from __future__ import annotations
+
+from datetime import UTC, datetime
+from typing import Any
+from uuid import UUID, uuid4
+
+import pytest
+
+from procurepilot_api.modules.matching import service as matching_service_module
+from procurepilot_api.modules.matching.schemas import MatchTask
+from procurepilot_api.modules.matching.service import MatchingService
+
+
+class FakeQuery:
+    def __init__(self, data: list[dict[str, Any]]) -> None:
+        self._data = data
+        self.filters: list[tuple[str, str, Any]] = []
+        self.orders: list[tuple[str, bool]] = []
+        self.range_args: tuple[int, int] | None = None
+
+    def select(self, _cols: str) -> FakeQuery:
+        return self
+
+    def eq(self, column: str, value: Any) -> FakeQuery:
+        self.filters.append(("eq", column, value))
+        return self
+
+    def in_(self, column: str, values: list[Any]) -> FakeQuery:
+        self.filters.append(("in", column, values))
+        return self
+
+    def gte(self, column: str, value: Any) -> FakeQuery:
+        self.filters.append(("gte", column, value))
+        return self
+
+    def lte(self, column: str, value: Any) -> FakeQuery:
+        self.filters.append(("lte", column, value))
+        return self
+
+    def order(self, column: str, *, desc: bool = False) -> FakeQuery:
+        self.orders.append((column, desc))
+        return self
+
+    def range(self, start: int, end: int) -> FakeQuery:
+        self.range_args = (start, end)
+        return self
+
+    def execute(self) -> Any:
+        class Result:
+            def __init__(self, data: list[dict[str, Any]]) -> None:
+                self.data = data
+
+        data = list(self._data)
+        if self.range_args is not None:
+            start, end = self.range_args
+            data = data[start : end + 1]
+        return Result(data)
+
+
+class FakeClient:
+    def __init__(self, tables: dict[str, list[dict[str, Any]]]) -> None:
+        self._tables = tables
+        self.last_query: FakeQuery | None = None
+
+    def table(self, name: str) -> FakeQuery:
+        q = FakeQuery(self._tables.get(name, []))
+        self.last_query = q
+        return q
+
+
+def test_list_match_tasks_accepts_query_params_and_enriches_supplier(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    now = datetime.now(UTC)
+    task_id = uuid4()
+    line_id = uuid4()
+    quotation_id = uuid4()
+    supplier_id = uuid4()
+
+    fake_task_row = {
+        "id": task_id,
+        "quotation_line_id": line_id,
+        "status": "open",
+        "priority": "high",
+        "reason": "low_confidence",
+        "created_at": now.isoformat(),
+        "resolved_at": None,
+    }
+    fake_line_row = {
+        "id": line_id,
+        "quotation_id": quotation_id,
+        "line_number": 1,
+        "original_text": "Organic Whole Milk 2L",
+        "quantity": "10",
+        "pack_count": 1,
+        "unit_size": "2",
+        "pack_unit": "litre",
+        "unit_price_amount": "2.5000",
+        "unit_price_currency": "GBP",
+        "vat_rate": "0.2000",
+        "delivery_fee_amount": None,
+        "delivery_fee_currency": None,
+        "discount_amount": None,
+        "discount_currency": None,
+    }
+    fake_quote_row = {
+        "id": quotation_id,
+        "tenant_id": uuid4(),
+        "supplier_id": supplier_id,
+        "status": "reviewed",
+    }
+
+    client = FakeClient({"match_task": [fake_task_row]})
+    monkeypatch.setattr(
+        matching_service_module,
+        "authenticated_client",
+        lambda _settings, _token: client,
+    )
+    monkeypatch.setattr(
+        matching_service_module,
+        "_line_row",
+        lambda _client, _lid: fake_line_row,
+    )
+    monkeypatch.setattr(
+        matching_service_module,
+        "_decision_for_line",
+        lambda _client, _lid: None,
+    )
+    monkeypatch.setattr(
+        matching_service_module,
+        "_candidate_rows",
+        lambda _client, _lid: [],
+    )
+    monkeypatch.setattr(
+        matching_service_module,
+        "_quotation_row",
+        lambda _client, _qid: fake_quote_row,
+    )
+    monkeypatch.setattr(
+        matching_service_module,
+        "_supplier_name",
+        lambda _client, _sid: "Fresh Farms Dairy",
+    )
+
+    service = MatchingService()
+    result = service.list_match_tasks(
+        bearer_token="dummy",
+        cursor=None,
+        limit=25,
+        status="open",
+        priority="high",
+        reason="low_confidence",
+        search="Organic",
+        date_from="2026-08-01",
+        date_to="2026-08-31",
+        sort_by="priority",
+        sort_order="asc",
+    )
+
+    # Check query filtering and ordering
+    assert client.last_query is not None
+    assert ("eq", "status", "open") in client.last_query.filters
+    assert ("eq", "priority", "high") in client.last_query.filters
+    assert ("eq", "reason", "low_confidence") in client.last_query.filters
+    assert ("gte", "created_at", "2026-08-01") in client.last_query.filters
+    assert ("lte", "created_at", "2026-08-31") in client.last_query.filters
+    assert ("priority", False) in client.last_query.orders  # asc -> desc=False
+    assert ("id", False) in client.last_query.orders
+
+    # Check item enrichment
+    assert len(result.items) == 1
+    task = result.items[0]
+    assert task.id == task_id
+    assert task.supplier_name == "Fresh Farms Dairy"
+    assert task.quotation_line.original_text == "Organic Whole Milk 2L"
+    assert task.quotation_line.unit_price is not None
+    assert task.quotation_line.unit_price.amount == "2.5000"
+    assert task.quotation_line.unit_price.currency == "GBP"
+
+
+def test_list_match_tasks_search_filters_by_supplier_or_quotation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    now = datetime.now(UTC)
+    task1_id, line1_id, q1_id = uuid4(), uuid4(), uuid4()
+    task2_id, line2_id, q2_id = uuid4(), uuid4(), uuid4()
+
+    rows = [
+        {
+            "id": task1_id,
+            "quotation_line_id": line1_id,
+            "status": "open",
+            "priority": "normal",
+            "reason": "low_confidence",
+            "created_at": now.isoformat(),
+            "resolved_at": None,
+        },
+        {
+            "id": task2_id,
+            "quotation_line_id": line2_id,
+            "status": "open",
+            "priority": "normal",
+            "reason": "no_candidate",
+            "created_at": now.isoformat(),
+            "resolved_at": None,
+        },
+    ]
+
+    client = FakeClient({"match_task": rows})
+    monkeypatch.setattr(
+        matching_service_module,
+        "authenticated_client",
+        lambda _settings, _token: client,
+    )
+
+    def fake_line_row(_client: Any, lid: UUID) -> dict[str, Any]:
+        if lid == line1_id:
+            return {
+                "id": line1_id,
+                "quotation_id": q1_id,
+                "line_number": 1,
+                "original_text": "Cheddar Cheese",
+                "quantity": "5",
+                "pack_count": None,
+                "unit_size": None,
+                "pack_unit": None,
+                "unit_price_amount": "4.0000",
+                "unit_price_currency": "GBP",
+                "vat_rate": None,
+                "delivery_fee_amount": None,
+                "delivery_fee_currency": None,
+                "discount_amount": None,
+                "discount_currency": None,
+            }
+        return {
+            "id": line2_id,
+            "quotation_id": q2_id,
+            "line_number": 2,
+            "original_text": "Apples",
+            "quantity": "20",
+            "pack_count": None,
+            "unit_size": None,
+            "pack_unit": None,
+            "unit_price_amount": "1.0000",
+            "unit_price_currency": "GBP",
+            "vat_rate": None,
+            "delivery_fee_amount": None,
+            "delivery_fee_currency": None,
+            "discount_amount": None,
+            "discount_currency": None,
+        }
+
+    monkeypatch.setattr(matching_service_module, "_line_row", fake_line_row)
+    monkeypatch.setattr(matching_service_module, "_decision_for_line", lambda _c, _lid: None)
+    monkeypatch.setattr(matching_service_module, "_candidate_rows", lambda _c, _lid: [])
+    monkeypatch.setattr(
+        matching_service_module,
+        "_quotation_row",
+        lambda _c, qid: {"id": qid, "tenant_id": uuid4(), "supplier_id": uuid4(), "status": "reviewed"},
+    )
+    monkeypatch.setattr(
+        matching_service_module,
+        "_supplier_name",
+        lambda _c, sid: "Somerset Dairy" if sid else "",
+    )
+
+    service = MatchingService()
+    # Search matches item 1 ("cheddar")
+    res1 = service.list_match_tasks(bearer_token="dummy", search="cheddar")
+    assert len(res1.items) == 1
+    assert res1.items[0].id == task1_id
+
+    # Search matches supplier ("somerset")
+    res2 = service.list_match_tasks(bearer_token="dummy", search="somerset")
+    assert len(res2.items) == 2  # both share mock supplier name
+
+    # Search non-matching
+    res3 = service.list_match_tasks(bearer_token="dummy", search="nonexistent")
+    assert len(res3.items) == 0
+
+
+def test_list_match_tasks_search_finds_matches_beyond_first_page_before_paginating(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    now = datetime.now(UTC)
+    first_task_id, first_line_id, first_qid = uuid4(), uuid4(), uuid4()
+    middle_task_id, middle_line_id, middle_qid = uuid4(), uuid4(), uuid4()
+    second_task_id, second_line_id, second_qid = uuid4(), uuid4(), uuid4()
+
+    rows = [
+        {
+            "id": first_task_id,
+            "quotation_line_id": first_line_id,
+            "status": "open",
+            "priority": "normal",
+            "reason": "low_confidence",
+            "created_at": now.isoformat(),
+            "resolved_at": None,
+        },
+        {
+            "id": second_task_id,
+            "quotation_line_id": second_line_id,
+            "status": "open",
+            "priority": "normal",
+            "reason": "low_confidence",
+            "created_at": now.isoformat(),
+            "resolved_at": None,
+        },
+    ]
+    rows.insert(
+        1,
+        {
+            "id": middle_task_id,
+            "quotation_line_id": middle_line_id,
+            "status": "open",
+            "priority": "normal",
+            "reason": "low_confidence",
+            "created_at": now.isoformat(),
+            "resolved_at": None,
+        },
+    )
+
+    client = FakeClient({"match_task": rows})
+    monkeypatch.setattr(
+        matching_service_module,
+        "authenticated_client",
+        lambda _settings, _token: client,
+    )
+
+    def fake_line_row(_client: Any, lid: UUID) -> dict[str, Any]:
+        text = "Needle Product" if lid == second_line_id else "Other Product"
+        qid = {
+            first_line_id: first_qid,
+            middle_line_id: middle_qid,
+            second_line_id: second_qid,
+        }[lid]
+        return {
+            "id": lid,
+            "quotation_id": qid,
+            "line_number": 2 if lid == second_line_id else 1,
+            "original_text": text,
+            "quantity": "1",
+            "pack_count": None,
+            "unit_size": None,
+            "pack_unit": None,
+            "unit_price_amount": "1.0000",
+            "unit_price_currency": "GBP",
+            "vat_rate": None,
+            "delivery_fee_amount": None,
+            "delivery_fee_currency": None,
+            "discount_amount": None,
+            "discount_currency": None,
+        }
+
+    monkeypatch.setattr(matching_service_module, "_line_row", fake_line_row)
+    monkeypatch.setattr(matching_service_module, "_decision_for_line", lambda _c, _lid: None)
+    monkeypatch.setattr(matching_service_module, "_candidate_rows", lambda _c, _lid: [])
+    monkeypatch.setattr(
+        matching_service_module,
+        "_quotation_row",
+        lambda _c, qid: {"id": qid, "tenant_id": uuid4(), "supplier_id": None, "status": "reviewed"},
+    )
+
+    result = MatchingService().list_match_tasks(
+        bearer_token="dummy",
+        limit=1,
+        search="needle",
+    )
+
+    assert [task.id for task in result.items] == [second_task_id]
+    assert result.next_cursor is None

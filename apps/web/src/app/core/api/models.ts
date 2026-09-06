@@ -497,6 +497,7 @@ export interface MatchTask {
   readonly decision?: MatchDecision | null;
   readonly created_at: string;
   readonly resolved_at?: string | null;
+  readonly supplier_name?: string | null;
 }
 
 export interface MatchResolutionRequest {

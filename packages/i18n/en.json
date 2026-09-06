@@ -854,9 +854,14 @@
       "subtitle": "Review and resolve quotation lines requiring product matching decisions or catalogue additions.",
       "readOnlyBadge": "Read-Only Access",
       "readOnlyNotice": "Your role has read-only access. You can inspect match tasks and candidates, but cannot confirm decisions or create products.",
+      "searchPlaceholder": "Search by line text, supplier, or quotation ID…",
       "filterStatus": "Status",
       "filterPriority": "Priority",
       "filterReason": "Routing Reason",
+      "filters": {
+        "dateFrom": "From date",
+        "dateTo": "To date"
+      },
       "status": {
         "open": "Open",
         "in_progress": "In Progress",
@@ -879,18 +884,31 @@
       "columns": {
         "quotation": "Quotation",
         "line": "Line",
+        "supplier": "Supplier",
         "originalText": "Original Supplier Wording",
+        "unitPrice": "Unit Price",
         "reason": "Reason",
         "priority": "Priority",
         "status": "Status",
         "candidates": "Candidates",
         "createdAt": "Queued At",
+        "age": "Age",
         "actions": "Actions"
+      },
+      "age": {
+        "justNow": "just now",
+        "hoursAgo": "{{count}}h ago",
+        "daysAgo": "{{count}}d ago",
+        "weeksAgo": "{{count}}w ago",
+        "monthsAgo": "{{count}}mo ago"
       },
       "actions": {
         "resolve": "Resolve Match",
         "view": "View Details"
       },
+      "noFilterResults": "No match tasks match the active filters",
+      "clearFilters": "Clear Filters",
+      "loadMore": "Load More",
       "emptyTitle": "No match tasks found",
       "emptyMessage": "There are no quotation lines currently awaiting match resolution."
     },
