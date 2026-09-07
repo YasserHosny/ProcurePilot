@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import date, datetime
 from decimal import Decimal
 from uuid import UUID, uuid4
 
@@ -305,19 +306,20 @@ class PsycopgTableQuery:
         clauses: list[sql.SQL] = []
         params: list[object] = []
         for column, operator, value in self._where:
+            column_sql = _column_sql(column)
             if operator == "is":
-                clauses.append(sql.SQL("{} is null").format(sql.Identifier(column)))
+                clauses.append(sql.SQL("{} is null").format(column_sql))
             elif operator == "in":
                 values = list(value) if isinstance(value, list) else []
                 placeholders = sql.SQL(",").join(sql.Placeholder() for _item in values)
                 clauses.append(
-                    sql.SQL("{} in ({})").format(sql.Identifier(column), placeholders)
+                    sql.SQL("{} in ({})").format(column_sql, placeholders)
                 )
                 params.extend(values)
             else:
                 clauses.append(
                     sql.SQL("{} {} {}").format(
-                        sql.Identifier(column),
+                        column_sql,
                         sql.SQL(operator),
                         sql.Placeholder(),
                     )
@@ -331,7 +333,10 @@ class PsycopgTableQuery:
         with self._conn.cursor(row_factory=psycopg.rows.dict_row) as cur:
             cur.execute(query, params)
             rows = cur.fetchall()
-        return [dict(row) for row in rows]
+        return [
+            {key: _adapt_response_value(value) for key, value in dict(row).items()}
+            for row in rows
+        ]
 
 
 @dataclass(frozen=True)
@@ -350,3 +355,16 @@ def _adapt_value(column: str, value: object) -> object:
     if value is not None and (isinstance(value, dict | list) or column in _JSONB_COLUMNS):
         return Jsonb(value)
     return value
+
+
+def _adapt_response_value(value: object) -> object:
+    if isinstance(value, datetime | date):
+        return value.isoformat()
+    return value
+
+
+def _column_sql(column: str) -> sql.SQL | sql.Identifier:
+    if "->>" in column:
+        json_column, json_key = column.split("->>", maxsplit=1)
+        return sql.SQL("{}->>{}").format(sql.Identifier(json_column), sql.Literal(json_key))
+    return sql.Identifier(column)

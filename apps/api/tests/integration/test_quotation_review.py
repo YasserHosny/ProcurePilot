@@ -17,6 +17,7 @@ from procurepilot_api.modules.quotations import (
     confirmation_service as confirmation_service_module,
 )
 from procurepilot_api.modules.quotations.confirmation_service import QuotationConfirmationService
+from procurepilot_api.shared.audit import AuditEventCreate
 
 pytestmark = pytest.mark.skipif(
     not TEST_DATABASE_URL,
@@ -33,6 +34,14 @@ def test_confirm_returns_409_until_required_review_work_is_resolved(
     conn: object,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    class AuditWriter:
+        def record(
+            self,
+            event: AuditEventCreate,
+            bearer_token: str | None = None,
+        ) -> None:
+            del event, bearer_token
+
     with conn.cursor() as cur:
         workspace = make_workspace(cur, "quotation-review")
         fixture = make_extracted_quotation(cur, workspace)
@@ -49,6 +58,11 @@ def test_confirm_returns_409_until_required_review_work_is_resolved(
             confirmation_service_module,
             "authenticated_client",
             lambda _settings, _token: PsycopgSupabaseClient(conn),
+        )
+        monkeypatch.setattr(
+            confirmation_service_module,
+            "get_audit_writer",
+            lambda: AuditWriter(),
         )
         member = CurrentMember(
             membership_id=workspace.membership_id,

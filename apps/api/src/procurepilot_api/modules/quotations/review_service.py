@@ -41,7 +41,7 @@ class QuotationReviewService:
         client = authenticated_client(self._settings, bearer_token)
         quotation = _one_row(
             client.table("quotation")
-            .select("id,status")
+            .select("id,status,supplier_id,reviewer_notes")
             .eq("id", str(quotation_id))
             .limit(2)
             .execute()
@@ -145,6 +145,25 @@ class QuotationReviewService:
             _recompute_arithmetic_status(client, quotation_id)
         except APIError as exc:
             raise ServiceUnavailableError(details={"dependency": "database"}) from exc
+        self._record(
+            bearer_token=bearer_token,
+            member=member,
+            action="quotation.reviewed",
+            target={
+                "quotation_id": str(quotation_id),
+                "corrections_count": len(patch.corrections),
+                "added_lines_count": len(patch.add_lines),
+                "removed_lines_count": len(patch.remove_line_ids),
+                "supplier_changed": (
+                    "supplier_id" in patch.model_fields_set
+                    and str(quotation.get("supplier_id") or "") != str(patch.supplier_id or "")
+                ),
+                "notes_changed": (
+                    "reviewer_notes" in patch.model_fields_set
+                    and (quotation.get("reviewer_notes") or "") != (patch.reviewer_notes or "")
+                ),
+            },
+        )
         return QuotationService(self._settings).get_quotation(
             bearer_token=bearer_token, quotation_id=quotation_id
         )
@@ -203,6 +222,27 @@ class QuotationReviewService:
             bearer_token=bearer_token,
         )
         return row
+
+    def _record(
+        self,
+        *,
+        bearer_token: str,
+        member: CurrentMember,
+        action: str,
+        target: dict[str, object],
+    ) -> None:
+        get_audit_writer().record(
+            AuditEventCreate(
+                tenant_id=member.tenant_id,
+                actor_membership_id=member.membership_id,
+                actor_email=member.email,
+                action=action,
+                target=target,
+                outcome="success",
+                trace_id=get_trace_id(),
+            ),
+            bearer_token=bearer_token,
+        )
 
 
 def _apply_correction_to_canonical_row(

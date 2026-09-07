@@ -103,6 +103,7 @@ describe('QuotationReviewComponent (T051, T057, T062)', () => {
       'suppliers',
       'patchQuotation',
       'confirmQuotation',
+      'exportQuotation',
       'getQuotationMatches',
       'getDocumentDownloadUrl',
       'getAuditTrail',
@@ -201,6 +202,36 @@ describe('QuotationReviewComponent (T051, T057, T062)', () => {
       remove_line_ids: [],
     });
     expect(component.pendingCorrections().size).toBe(0);
+  });
+
+  it('should refresh the audit trail after saving review changes', () => {
+    const updatedQuotation = {
+      ...mockQuotationDetail,
+      field_extractions: [
+        {
+          ...mockQuotationDetail.field_extractions[1],
+          corrected_value: { amount: '26.50', currency: 'GBP' },
+        },
+      ],
+    };
+    apiService.patchQuotation.and.returnValue(of(updatedQuotation));
+    apiService.getAuditTrail.calls.reset();
+
+    component.updateCorrection('fe-line1-price', { amount: '26.50', currency: 'GBP' });
+    component.saveCorrections();
+
+    expect(apiService.getAuditTrail).toHaveBeenCalledOnceWith('q-review-1');
+  });
+
+  it('should refresh the audit trail after exporting quotation data', () => {
+    apiService.exportQuotation.and.returnValue(of(new Blob(['csv'], { type: 'text/csv' })));
+    spyOn(window.URL, 'createObjectURL').and.returnValue('blob:quotation-export');
+    spyOn(window.URL, 'revokeObjectURL');
+    apiService.getAuditTrail.calls.reset();
+
+    component.exportQuotation();
+
+    expect(apiService.getAuditTrail).toHaveBeenCalledOnceWith('q-review-1');
   });
 
   it('should treat reviewing a low-confidence field without changing its value as a pending correction', () => {
