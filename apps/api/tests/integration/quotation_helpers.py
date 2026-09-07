@@ -206,6 +206,7 @@ class PsycopgTableQuery:
         self._payload: dict[str, object] | None = None
         self._where: list[tuple[str, str, object]] = []
         self._limit: int | None = None
+        self._offset: int | None = None
 
     def select(self, _columns: str = "*") -> PsycopgTableQuery:
         self._operation = "select"
@@ -233,6 +234,14 @@ class PsycopgTableQuery:
         self._where.append((column, "<", value))
         return self
 
+    def gte(self, column: str, value: object) -> PsycopgTableQuery:
+        self._where.append((column, ">=", value))
+        return self
+
+    def lte(self, column: str, value: object) -> PsycopgTableQuery:
+        self._where.append((column, "<=", value))
+        return self
+
     def is_(self, column: str, value: str) -> PsycopgTableQuery:
         if value != "null":
             raise NotImplementedError("test adapter only supports is_(..., 'null')")
@@ -245,6 +254,11 @@ class PsycopgTableQuery:
 
     def limit(self, value: int) -> PsycopgTableQuery:
         self._limit = value
+        return self
+
+    def range(self, start: int, end: int) -> PsycopgTableQuery:
+        self._offset = start
+        self._limit = end - start + 1
         return self
 
     def order(self, _column: str, *, desc: bool = False) -> PsycopgTableQuery:
@@ -268,6 +282,9 @@ class PsycopgTableQuery:
         if self._limit is not None:
             query += sql.SQL(" limit %s")
             params.append(self._limit)
+        if self._offset is not None:
+            query += sql.SQL(" offset %s")
+            params.append(self._offset)
         return _Response(self._fetch(query, params))
 
     def _execute_insert(self) -> object:
