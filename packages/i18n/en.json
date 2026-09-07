@@ -625,6 +625,7 @@
       },
       "actions": {
         "review": "Review & Authorize",
+        "viewReview": "View Review",
         "view": "View (Read-Only)",
         "archive": "Archive"
       },

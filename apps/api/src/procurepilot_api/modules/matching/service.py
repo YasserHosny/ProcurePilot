@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Literal
 from uuid import UUID
@@ -101,6 +102,7 @@ class MatchingService:
         offset = _decode_cursor(cursor)
         clean_search = search.strip()[:200].lower() if search else None
         try:
+            _sync_open_match_tasks(client)
             query = client.table("match_task").select(TASK_COLUMNS)
             if status != "all":
                 query = query.eq("status", status)
@@ -680,6 +682,26 @@ def _open_task_for_line(client: object, line_id: UUID) -> dict[str, object] | No
     if len(rows) > 1:
         raise ServiceUnavailableError(details={"reason": "multiple_open_match_tasks"})
     return rows[0] if rows else None
+
+
+def _sync_open_match_tasks(client: object) -> None:
+    open_tasks = _rows(
+        client.table("match_task")
+        .select(TASK_COLUMNS)
+        .in_("status", ["open", "in_progress"])
+        .execute()
+        .data
+    )
+    for task in open_tasks:
+        line = _line_row(client, UUID(str(task["quotation_line_id"])))
+        quote = _quotation_row(client, UUID(str(line["quotation_id"])))
+        if quote.get("status") == "reviewed" and _decision_for_line(
+            client, UUID(str(line["id"]))
+        ) is None:
+            continue
+        client.table("match_task").update(
+            {"status": "resolved", "resolved_at": datetime.now(UTC).isoformat()}
+        ).eq("id", str(task["id"])).execute()
 
 
 def _latest_task_for_line(client: object, line_id: UUID) -> dict[str, object] | None:

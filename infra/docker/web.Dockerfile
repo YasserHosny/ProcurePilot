@@ -39,6 +39,6 @@ ENV BACKEND_HOST=api
 EXPOSE 80
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD wget -qO- http://localhost/ || exit 1
+    CMD wget -qO- http://127.0.0.1/ || exit 1
 
 CMD ["/bin/sh", "-c", "envsubst '${BACKEND_HOST}' < /etc/nginx/templates/default.conf.template > /etc/nginx/conf.d/default.conf && nginx -g 'daemon off;'"]

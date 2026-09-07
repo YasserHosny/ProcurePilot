@@ -183,6 +183,20 @@ export class ReviewQueueComponent implements OnInit {
     return id.slice(0, 8);
   }
 
+  isResolvedTask(task: ReviewTask): boolean {
+    return task.status === 'resolved';
+  }
+
+  reviewActionIcon(task: ReviewTask): string {
+    return this.isResolvedTask(task) ? 'visibility' : 'fact_check';
+  }
+
+  reviewActionLabelKey(task: ReviewTask): string {
+    return this.isResolvedTask(task)
+      ? 'quotations.queue.actions.viewReview'
+      : 'quotations.queue.actions.review';
+  }
+
   onStatusChange(status: ReviewTaskStatus | 'all'): void {
     this.statusFilter.set(status);
     this.loadTasks();
@@ -232,6 +246,9 @@ export class ReviewQueueComponent implements OnInit {
 
   archiveTask(task: ReviewTask, event: MouseEvent): void {
     event.stopPropagation();
+    if (this.isResolvedTask(task)) {
+      return;
+    }
     if (!window.confirm(this.translate.instant('quotations.queue.archiveConfirm'))) {
       return;
     }

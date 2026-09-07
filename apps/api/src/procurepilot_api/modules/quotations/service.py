@@ -145,6 +145,7 @@ class QuotationService:
         offset = _decode_cursor(cursor)
         clean_search = search.strip()[:200].lower() if search else None
         try:
+            _sync_open_review_tasks(client, self._settings.extraction_confidence_threshold)
             query = client.table("review_task").select(TASK_COLUMNS)
             if status != "all":
                 query = query.eq("status", status)
@@ -747,6 +748,69 @@ def _task(row: dict[str, object]) -> ReviewTask:
     task.supplier_name = supplier_name
     task.stated_total = stated_total
     return task
+
+
+def _sync_open_review_tasks(client: object, confidence_threshold: float) -> None:
+    open_tasks = _rows(
+        client.table("review_task")
+        .select("id,quotation_id,reason,priority")
+        .in_("status", ["open", "in_progress"])
+        .execute()
+        .data
+    )
+    for task in open_tasks:
+        quotation_id = UUID(str(task["quotation_id"]))
+        blocker = _current_review_task_blocker(client, quotation_id, confidence_threshold)
+        if blocker is None:
+            client.table("review_task").update(
+                {"status": "resolved", "resolved_at": datetime.now(UTC).isoformat()}
+            ).eq("id", str(task["id"])).execute()
+            continue
+
+        reason, priority = blocker
+        if task.get("reason") != reason or task.get("priority") != priority:
+            client.table("review_task").update(
+                {
+                    "reason": reason,
+                    "priority": priority,
+                    "status": "open",
+                    "resolved_at": None,
+                }
+            ).eq("id", str(task["id"])).execute()
+
+
+def _current_review_task_blocker(
+    client: object,
+    quotation_id: UUID,
+    confidence_threshold: float,
+) -> tuple[str, str] | None:
+    quote = _one_row(
+        client.table("quotation")
+        .select("id,supplier_id,arithmetic_status")
+        .eq("id", str(quotation_id))
+        .limit(2)
+        .execute()
+        .data,
+        resource="quotation",
+    )
+    if quote.get("arithmetic_status") == "mismatch":
+        return ("arithmetic_mismatch", "high")
+
+    low_confidence = (
+        client.table("field_extraction")
+        .select("id")
+        .eq("quotation_id", str(quotation_id))
+        .lt("confidence", confidence_threshold)
+        .is_("corrected_by", "null")
+        .limit(1)
+        .execute()
+        .data
+    )
+    if low_confidence:
+        return ("low_confidence", "normal")
+    if quote.get("supplier_id") is None:
+        return ("no_supplier_match", "normal")
+    return None
 
 
 def _version_reference(row: dict[str, object]) -> QuotationVersionReference:

@@ -143,6 +143,12 @@ class QuotationReviewService:
                     next_number += 1
 
             _recompute_arithmetic_status(client, quotation_id)
+            _sync_review_task_after_patch(
+                client,
+                member.tenant_id,
+                quotation_id,
+                self._settings.extraction_confidence_threshold,
+            )
         except APIError as exc:
             raise ServiceUnavailableError(details={"dependency": "database"}) from exc
         self._record(
@@ -350,6 +356,82 @@ def _recompute_arithmetic_status(client: object, quotation_id: UUID) -> None:
         client.table("quotation").update({"arithmetic_status": status}).eq(
             "id", str(quotation_id)
         ).execute()
+
+
+def _sync_review_task_after_patch(
+    client: object,
+    tenant_id: UUID,
+    quotation_id: UUID,
+    confidence_threshold: float,
+) -> None:
+    blocker = _current_review_blocker(client, quotation_id, confidence_threshold)
+    open_task_query = client.table("review_task").select("id").eq(
+        "quotation_id", str(quotation_id)
+    ).in_("status", ["open", "in_progress"])
+    open_tasks = _rows(open_task_query.execute().data)
+
+    if blocker is None:
+        client.table("review_task").update(
+            {"status": "resolved", "resolved_at": datetime.now(UTC).isoformat()}
+        ).eq("quotation_id", str(quotation_id)).in_(
+            "status", ["open", "in_progress"]
+        ).execute()
+        return
+
+    reason, priority = blocker
+    payload: dict[str, object] = {
+        "reason": reason,
+        "priority": priority,
+        "status": "open",
+        "resolved_at": None,
+    }
+    if open_tasks:
+        client.table("review_task").update(payload).eq(
+            "quotation_id", str(quotation_id)
+        ).in_("status", ["open", "in_progress"]).execute()
+        return
+
+    client.table("review_task").insert(
+        {
+            "tenant_id": str(tenant_id),
+            "quotation_id": str(quotation_id),
+            **payload,
+        }
+    ).execute()
+
+
+def _current_review_blocker(
+    client: object,
+    quotation_id: UUID,
+    confidence_threshold: float,
+) -> tuple[str, str] | None:
+    quote = _one_row(
+        client.table("quotation")
+        .select("id,supplier_id,arithmetic_status")
+        .eq("id", str(quotation_id))
+        .limit(2)
+        .execute()
+        .data,
+        resource="quotation",
+    )
+    if quote.get("arithmetic_status") == "mismatch":
+        return ("arithmetic_mismatch", "high")
+
+    low_confidence = (
+        client.table("field_extraction")
+        .select("id")
+        .eq("quotation_id", str(quotation_id))
+        .lt("confidence", confidence_threshold)
+        .is_("corrected_by", "null")
+        .limit(1)
+        .execute()
+        .data
+    )
+    if low_confidence:
+        return ("low_confidence", "normal")
+    if quote.get("supplier_id") is None:
+        return ("no_supplier_match", "normal")
+    return None
 
 
 def get_quotation_review_service() -> QuotationReviewService:

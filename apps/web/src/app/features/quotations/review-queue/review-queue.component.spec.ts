@@ -70,6 +70,8 @@ describe('ReviewQueueComponent (T052)', () => {
       status: 'open',
       priority: undefined,
       search: undefined,
+      date_from: undefined,
+      date_to: undefined,
       sort_by: 'created_at',
       sort_order: 'desc',
     });
@@ -83,6 +85,8 @@ describe('ReviewQueueComponent (T052)', () => {
       status: undefined,
       priority: undefined,
       search: undefined,
+      date_from: undefined,
+      date_to: undefined,
       sort_by: 'created_at',
       sort_order: 'desc',
     });
@@ -92,8 +96,23 @@ describe('ReviewQueueComponent (T052)', () => {
       status: undefined,
       priority: 'high',
       search: undefined,
+      date_from: undefined,
+      date_to: undefined,
       sort_by: 'created_at',
       sort_order: 'desc',
     });
+  });
+
+  it('should treat resolved tasks as view-only queue history', () => {
+    const resolvedTask: ReviewTask = {
+      ...mockTasks[0],
+      status: 'resolved',
+    };
+
+    expect(component.isResolvedTask(resolvedTask)).toBeTrue();
+    expect(component.reviewActionIcon(resolvedTask)).toBe('visibility');
+    expect(component.reviewActionLabelKey(resolvedTask)).toBe('quotations.queue.actions.viewReview');
+    expect(component.reviewActionIcon(mockTasks[0])).toBe('fact_check');
+    expect(component.reviewActionLabelKey(mockTasks[0])).toBe('quotations.queue.actions.review');
   });
 });
