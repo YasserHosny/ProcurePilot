@@ -2,9 +2,8 @@ import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testin
 import { signal } from '@angular/core';
 import { provideRouter } from '@angular/router';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
-import { firstValueFrom, of, throwError } from 'rxjs';
+import { Subject, firstValueFrom, of, throwError } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
-import { By } from '@angular/platform-browser';
 
 import enCatalog from '../../../../../../../packages/i18n/en.json';
 import { ApiService } from '../../../core/api/api.service';
@@ -160,6 +159,34 @@ describe('ResolutionQueueComponent', () => {
     );
   });
 
+  it('should ignore stale loadTasks responses when filters change quickly', () => {
+    const openTask = mockTasks[0];
+    const resolvedTask: MatchTask = {
+      ...mockTasks[1],
+      id: 'task-resolved',
+      status: 'resolved',
+    };
+    const openResponse = new Subject<{ items: MatchTask[]; next_cursor: string | null }>();
+    const resolvedResponse = new Subject<{ items: MatchTask[]; next_cursor: string | null }>();
+    apiService.getMatchTasks.and.returnValues(
+      openResponse.asObservable(),
+      resolvedResponse.asObservable(),
+    );
+
+    component.loadTasks();
+    component.onStatusChange('resolved');
+
+    resolvedResponse.next({ items: [resolvedTask], next_cursor: null });
+    resolvedResponse.complete();
+    openResponse.next({ items: [openTask], next_cursor: 'open-cursor' });
+    openResponse.complete();
+
+    expect(component.statusFilter()).toBe('resolved');
+    expect(component.tasks()).toEqual([resolvedTask]);
+    expect(component.nextCursor()).toBeNull();
+    expect(component.isLoading()).toBeFalse();
+  });
+
   it('should reload tasks on onSortChange', () => {
     component.onSortChange({ active: 'priority', direction: 'asc' });
     expect(apiService.getMatchTasks).toHaveBeenCalledWith(
@@ -191,6 +218,42 @@ describe('ResolutionQueueComponent', () => {
     );
     expect(component.tasks().length).toBe(3);
     expect(component.nextCursor()).toBeNull();
+  });
+
+  it('should ignore stale loadMore responses after filters change', () => {
+    const extraTask: MatchTask = {
+      ...mockTasks[0],
+      id: 'task-extra-open',
+      quotation_id: 'q-extra-open',
+      quotation_line: {
+        ...mockTasks[0].quotation_line,
+        id: 'line-extra-open',
+      },
+    };
+    const resolvedTask: MatchTask = {
+      ...mockTasks[1],
+      id: 'task-resolved',
+      status: 'resolved',
+    };
+    const loadMoreResponse = new Subject<{ items: MatchTask[]; next_cursor: string | null }>();
+    const resolvedResponse = new Subject<{ items: MatchTask[]; next_cursor: string | null }>();
+    apiService.getMatchTasks.and.returnValues(
+      loadMoreResponse.asObservable(),
+      resolvedResponse.asObservable(),
+    );
+
+    component.loadMore();
+    component.onStatusChange('resolved');
+
+    resolvedResponse.next({ items: [resolvedTask], next_cursor: null });
+    resolvedResponse.complete();
+    loadMoreResponse.next({ items: [extraTask], next_cursor: 'stale-cursor' });
+    loadMoreResponse.complete();
+
+    expect(component.statusFilter()).toBe('resolved');
+    expect(component.tasks()).toEqual([resolvedTask]);
+    expect(component.nextCursor()).toBeNull();
+    expect(component.isLoadingMore()).toBeFalse();
   });
 
   it('should detect active filters and clear them', () => {
