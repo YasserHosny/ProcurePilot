@@ -724,6 +724,7 @@ export class QuotationReviewComponent implements OnInit {
           this.pendingNewLines.set([]);
           this.pendingRemoveLineIds.set(new Set());
           this.isSaving.set(false);
+          this.loadAuditTrail(updated.id);
           this.snackBar.open(
             this.translate.instant('quotations.review.actions.saveSuccess'),
             undefined,
@@ -939,6 +940,7 @@ export class QuotationReviewComponent implements OnInit {
         link.click();
         window.URL.revokeObjectURL(url);
         this.isExporting.set(false);
+        this.loadAuditTrail(q.id);
       },
       error: (err: unknown) => {
         this.isExporting.set(false);
