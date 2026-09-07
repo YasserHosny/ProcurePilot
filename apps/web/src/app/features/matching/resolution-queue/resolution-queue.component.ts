@@ -74,6 +74,7 @@ export class ResolutionQueueComponent implements OnInit {
   readonly errorMessage = signal<string | null>(null);
   readonly errorTraceId = signal<string | null>(null);
   private searchDebounce: ReturnType<typeof setTimeout> | null = null;
+  private latestLoadRequestId = 0;
 
   readonly isWriter = computed<boolean>(() => this.session.hasRole('owner', 'buyer'));
   readonly hasActiveFilters = computed<boolean>(
@@ -105,7 +106,9 @@ export class ResolutionQueueComponent implements OnInit {
   }
 
   loadTasks(): void {
+    const requestId = ++this.latestLoadRequestId;
     this.isLoading.set(true);
+    this.isLoadingMore.set(false);
     this.errorMessage.set(null);
     this.errorTraceId.set(null);
     this.nextCursor.set(null);
@@ -128,11 +131,13 @@ export class ResolutionQueueComponent implements OnInit {
       })
       .subscribe({
         next: (res) => {
+          if (requestId !== this.latestLoadRequestId) return;
           this.tasks.set(res.items);
           this.nextCursor.set(res.next_cursor);
           this.isLoading.set(false);
         },
         error: (err: unknown) => {
+          if (requestId !== this.latestLoadRequestId) return;
           this.isLoading.set(false);
           this.handleError(err);
         },
@@ -143,6 +148,7 @@ export class ResolutionQueueComponent implements OnInit {
     const cursor = this.nextCursor();
     if (!cursor) return;
 
+    const requestId = this.latestLoadRequestId;
     this.isLoadingMore.set(true);
 
     const status = this.statusFilter();
@@ -164,11 +170,13 @@ export class ResolutionQueueComponent implements OnInit {
       })
       .subscribe({
         next: (res) => {
+          if (requestId !== this.latestLoadRequestId) return;
           this.tasks.set([...this.tasks(), ...res.items]);
           this.nextCursor.set(res.next_cursor);
           this.isLoadingMore.set(false);
         },
         error: (err: unknown) => {
+          if (requestId !== this.latestLoadRequestId) return;
           this.isLoadingMore.set(false);
           this.handleError(err);
         },
