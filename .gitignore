@@ -33,6 +33,12 @@ htmlcov/
 playwright-report/
 test-results/
 
+# Local coding-agent configuration
+opencode.json
+
+# Local sample documents (real quotations for manual function evaluation; not part of the repo)
+samples/
+
 # Editor / OS
 .DS_Store
 *.swp

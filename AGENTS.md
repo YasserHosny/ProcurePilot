@@ -115,4 +115,18 @@ features** — requests, approvals, branches, budgets, mobile, integrations — 
 corresponding stage gate is passed. Sketching is allowed; building is not.
 
 <!-- MANUAL ADDITIONS START -->
+## Local App Restart Notes
+
+- `localhost:4200` is the Docker/nginx static web container unless an Angular dev server is
+  explicitly running. After UI/i18n changes, verify served assets with `curl -I
+  http://localhost:4200/`; an old `Last-Modified` means the browser is still seeing a stale build.
+- For user validation, run against hosted Supabase only unless the user explicitly asks for local DB.
+  Check `.env`/shell values before starting: `SUPABASE_URL`, `SUPABASE_JWT_ISSUER`, and
+  `DATABASE_URL` must not point at `localhost:54321` or `localhost:54322`.
+- Use `docker-compose -f docker-compose.yml -f docker-compose.remote.yml up -d --build redis api web`
+  for the remote-DB app path. Do not start a local Supabase stack for this workflow.
+- If legacy `docker-compose` fails with `KeyError: 'ContainerConfig'` while recreating stale
+  containers, remove only ProcurePilot containers first:
+  `docker ps -aq --filter 'name=procurepilot-' | xargs -r docker rm -f`, then rerun the remote
+  compose command.
 <!-- MANUAL ADDITIONS END -->
