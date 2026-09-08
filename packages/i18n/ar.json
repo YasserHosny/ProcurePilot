@@ -16,7 +16,8 @@
       "en": "English",
       "ar": "العربية"
     },
-    "all": "الكل"
+    "all": "الكل",
+    "cancel": "إلغاء"
   },
   "auth": {
     "signin": {
@@ -729,6 +730,7 @@
         "addLineQuantity": "الكمية",
         "addLinePrice": "سعر الوحدة",
         "confirmAdd": "إضافة",
+        "cancelAdd": "إلغاء",
         "removeLine": "إزالة هذا العنصر",
         "markedForRemoval": "سيتم إزالته عند الحفظ",
         "undoRemove": "التراجع عن الإزالة",

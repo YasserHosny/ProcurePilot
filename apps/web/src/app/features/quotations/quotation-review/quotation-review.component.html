@@ -473,11 +473,18 @@
                 @if (!selectedSupplierId()) {
                   <mat-hint class="required-hint">{{ 'quotations.review.header.supplierRequired' | translate }}</mat-hint>
                 }
+                @if (isWriter() && q.status !== 'reviewed') {
+                  <mat-hint align="end" class="supplier-manual-add-hint">
+                    <a routerLink="/suppliers/new" class="supplier-manual-add-link">
+                      {{ 'quotations.review.header.supplierEmptyAction' | translate }}
+                    </a>
+                  </mat-hint>
+                }
               </mat-form-field>
               @if (suppliers().length === 0) {
                 <div class="supplier-empty-state">
                   <span>{{ 'quotations.review.header.supplierEmptyState' | translate }}</span>
-                  <a mat-button routerLink="/suppliers">
+                  <a mat-button routerLink="/suppliers/new">
                     <mat-icon aria-hidden="true">add_business</mat-icon>
                     <span>{{ 'quotations.review.header.supplierEmptyAction' | translate }}</span>
                   </a>
@@ -508,7 +515,7 @@
                   </button>
                 </div>
               }
-              @if (!selectedSupplierId() && noSupplierMatchFlagged() && !supplierSuggestion()) {
+              @if (canCreateSupplierFromExtraction()) {
                 <div class="supplier-match-banner supplier-match-missing" role="status">
                   <mat-icon class="supplier-match-icon" aria-hidden="true">person_add</mat-icon>
                   <span class="supplier-match-text">
@@ -813,7 +820,7 @@
                       <mat-icon aria-hidden="true">check</mat-icon>
                       {{ 'quotations.review.lines.confirmAdd' | translate }}
                     </button>
-                    <button mat-button type="button" (click)="cancelAddLine()">
+                    <button mat-button type="button" (click)="cancelAddLine()" class="cancel-add-line-btn">
                       {{ 'common.cancel' | translate }}
                     </button>
                   </div>
@@ -854,6 +861,7 @@
                             type="button"
                             (click)="markLineForRemoval(line.id); $event.stopPropagation()"
                             [matTooltip]="'quotations.review.lines.removeLine' | translate"
+                            [attr.aria-label]="'quotations.review.lines.removeLine' | translate"
                             class="remove-line-btn"
                           >
                             <mat-icon aria-hidden="true">delete_outline</mat-icon>
@@ -866,6 +874,7 @@
                             type="button"
                             (click)="unmarkLineForRemoval(line.id); $event.stopPropagation()"
                             [matTooltip]="'quotations.review.lines.undoRemove' | translate"
+                            [attr.aria-label]="'quotations.review.lines.undoRemove' | translate"
                             class="undo-remove-btn"
                           >
                             <mat-icon aria-hidden="true">undo</mat-icon>
@@ -1071,7 +1080,7 @@
                       <mat-icon aria-hidden="true">check</mat-icon>
                       {{ 'quotations.review.lines.confirmAdd' | translate }}
                     </button>
-                    <button mat-button type="button" (click)="cancelAddLine()">
+                    <button mat-button type="button" (click)="cancelAddLine()" class="cancel-add-line-btn">
                       {{ 'common.cancel' | translate }}
                     </button>
                   </div>

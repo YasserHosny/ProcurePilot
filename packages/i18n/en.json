@@ -16,7 +16,8 @@
       "en": "English",
       "ar": "العربية"
     },
-    "all": "All"
+    "all": "All",
+    "cancel": "Cancel"
   },
   "auth": {
     "signin": {
@@ -729,6 +730,7 @@
         "addLineQuantity": "Quantity",
         "addLinePrice": "Unit Price",
         "confirmAdd": "Add",
+        "cancelAdd": "Cancel",
         "removeLine": "Remove this line",
         "markedForRemoval": "Will be removed on save",
         "undoRemove": "Undo removal",
