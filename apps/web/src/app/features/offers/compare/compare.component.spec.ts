@@ -38,7 +38,7 @@ describe('CompareComponent (US1, SC-002, T020)', () => {
         stock_signal: null,
         match_confidence: '0.9800',
         valid_from: '2026-08-01T00:00:00Z',
-        valid_to: '2026-09-01T00:00:00Z',
+        valid_to: '2026-10-01T00:00:00Z',
         is_expired: false,
         rule_version: '1.0',
         recorded_at: '2026-08-01T00:00:00Z',
@@ -59,7 +59,7 @@ describe('CompareComponent (US1, SC-002, T020)', () => {
         stock_signal: null,
         match_confidence: '0.9000',
         valid_from: '2026-08-01T00:00:00Z',
-        valid_to: '2026-09-01T00:00:00Z',
+        valid_to: '2026-10-01T00:00:00Z',
         is_expired: false,
         rule_version: '1.0',
         recorded_at: '2026-08-01T00:00:00Z',
@@ -91,7 +91,7 @@ describe('CompareComponent (US1, SC-002, T020)', () => {
       score: '0.9450',
       confidence: 'high',
       valid_from: '2026-08-01T00:00:00Z',
-      valid_to: '2026-09-01T00:00:00Z',
+      valid_to: '2026-10-01T00:00:00Z',
       risk_notes: [],
       evidence: {
         weights: {
@@ -237,4 +237,3 @@ describe('CompareComponent (US1, SC-002, T020)', () => {
     expect(params['tenant_id']).toBeUndefined(); // Never pass tenant id
   });
 });
-
