@@ -104,6 +104,7 @@ describe('QuotationReviewComponent (T051, T057, T062)', () => {
       'patchQuotation',
       'confirmQuotation',
       'exportQuotation',
+      'createSupplier',
       'getQuotationMatches',
       'getDocumentDownloadUrl',
       'getAuditTrail',
@@ -159,6 +160,55 @@ describe('QuotationReviewComponent (T051, T057, T062)', () => {
     expect(component.quotation()?.id).toBe('q-review-1');
     expect(component.suppliers().length).toBe(1);
     expect(component.flaggedFields().length).toBe(1);
+  });
+
+  it('should offer to create an extracted supplier even when other suppliers exist', () => {
+    component.quotation.set({
+      ...mockQuotationDetail,
+      field_extractions: [
+        ...mockQuotationDetail.field_extractions,
+        {
+          ...mockQuotationDetail.field_extractions[0],
+          id: 'fe-supplier-name',
+          field_name: 'supplier_name',
+          extracted_value: 'New Vendor Ltd',
+          confidence: '0.9200',
+        },
+      ],
+    });
+    component.selectedSupplierId.set(null);
+    fixture.detectChanges();
+
+    const createButton = fixture.debugElement.query(By.css('.supplier-match-missing button'));
+
+    expect(createButton).not.toBeNull();
+    expect(createButton.nativeElement.textContent).toContain('Create supplier');
+  });
+
+  it('should show a manual add supplier link while the supplier field is editable', () => {
+    component.quotation.set({
+      ...mockQuotationDetail,
+      field_extractions: mockQuotationDetail.field_extractions.filter((fe) => fe.field_name !== 'supplier_name'),
+    });
+    component.selectedSupplierId.set(null);
+    fixture.detectChanges();
+
+    const addSupplierLink = fixture.debugElement.query(By.css('.supplier-manual-add-link'));
+
+    expect(addSupplierLink).not.toBeNull();
+    expect(addSupplierLink.nativeElement.textContent).toContain('Add a supplier');
+    expect(addSupplierLink.nativeElement.getAttribute('href')).toBe('/suppliers/new');
+  });
+
+  it('should render the add-line cancel action with translated text', () => {
+    component.showAddLineForm();
+    fixture.detectChanges();
+
+    const addLineForm = fixture.debugElement.query(By.css('.add-line-form'));
+
+    expect(addLineForm).not.toBeNull();
+    expect(addLineForm.nativeElement.textContent).toContain('Cancel');
+    expect(addLineForm.nativeElement.textContent).not.toContain('common.cancel');
   });
 
   it('should navigate through flagged fields with keyboard navigation (FR-014)', () => {

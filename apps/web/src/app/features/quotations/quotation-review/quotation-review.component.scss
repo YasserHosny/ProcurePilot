@@ -95,6 +95,7 @@
   font-size: 0.9rem;
   flex-wrap: wrap;
 }
+.supplier-manual-add-link { color: #2563eb; font-weight: 600; text-decoration: none; }
 .supplier-match-banner {
   grid-column: 1 / -1;
   display: flex;
@@ -137,6 +138,21 @@
 .versioning-controls { display: flex; flex-direction: column; gap: 0.75rem; }
 .version-select { width: 100%; }
 .no-lines-notice { padding: 2rem 1rem; text-align: center; color: #64748b; }
+.add-line-form {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(120px, 180px) minmax(140px, 200px) auto auto;
+  gap: 0.75rem;
+  margin-block-start: 0.75rem;
+
+  @media (max-width: 900px) {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  @include bp.mobile {
+    grid-template-columns: 1fr;
+  }
+}
+.add-line-field, .add-line-field-small { width: 100%; }
 .lines-accordion { display: flex; flex-direction: column; gap: 0.5rem; }
 .line-panel { border-radius: 8px !important; }
 .line-panel.active-panel { border-color: #3b82f6; box-shadow: 0 2px 4px rgba(59, 130, 246, 0.1); }

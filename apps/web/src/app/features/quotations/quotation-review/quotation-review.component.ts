@@ -185,9 +185,16 @@ export class QuotationReviewComponent implements OnInit {
     };
   });
 
-  readonly noSupplierMatchFlagged = computed<boolean>(() => {
+  readonly canCreateSupplierFromExtraction = computed<boolean>(() => {
     const q = this.quotation();
-    return Boolean(!q?.supplier_id && q?.review_task?.reason === 'no_supplier_match');
+    return Boolean(
+      q &&
+        this.isWriter() &&
+        q.status !== 'reviewed' &&
+        !this.selectedSupplierId() &&
+        !this.supplierSuggestion() &&
+        this.extractedSupplierName(),
+    );
   });
 
   readonly currencyOptions: readonly string[] = [
