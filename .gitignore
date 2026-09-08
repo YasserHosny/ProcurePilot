@@ -35,6 +35,7 @@ test-results/
 
 # Local coding-agent configuration
 opencode.json
+.superpowers/
 
 # Local sample documents (real quotations for manual function evaluation; not part of the repo)
 samples/
