@@ -818,6 +818,15 @@
         "confirmDialogProceed": "تأكيد واعتماد",
         "createRequote": "إنشاء عرض أسعار بديل"
       },
+      "matchingSetup": {
+        "idle": "يمكن الآن تجهيز مطابقة المنتجات لعرض السعر المعتمد.",
+        "start": "تجهيز مطابقة المنتجات",
+        "loading": "جارٍ تجهيز مطابقة المنتجات…",
+        "ready": "مطابقة المنتجات جاهزة.",
+        "continue": "المتابعة إلى مطابقة المنتجات",
+        "error": "يلزم إعادة محاولة تجهيز المطابقة.",
+        "retry": "إعادة محاولة تجهيز المطابقة"
+      },
       "replaceDocument": {
         "tooltip": "استبدال المستند المصدر",
         "unsupportedType": "نوع الملف غير مدعوم. يرجى تحميل ملف PDF أو صورة أو جدول بيانات.",
@@ -847,6 +856,9 @@
         "confirmed": "تم تأكيد العرض",
         "refused": "تم رفض العرض",
         "reviewed": "تم تقديم المراجعة",
+        "matchingTaskRouted": "تم توجيه البند لمراجعة مطابقة المنتج",
+        "matchingAutoAccepted": "تم قبول مطابقة المنتج تلقائياً",
+        "matchingResolved": "تمت تسوية مطابقة المنتج بواسطة المراجع",
         "unknown": "تم تنفيذ إجراء"
       }
     }
@@ -878,7 +890,7 @@
         "all": "جميع الأولويات"
       },
       "reason": {
-        "low_confidence": "ثقة منخفضة",
+        "low_confidence": "أقل من حد المطابقة",
         "close_candidates": "مرشحون متقاربون",
         "no_candidate": "لا يوجد مرشح",
         "alias_conflict": "تعارض في الاسم المرادف",
@@ -909,6 +921,19 @@
         "resolve": "تسوية المطابقة",
         "view": "عرض التفاصيل"
       },
+      "groupsLabel": "مهام مطابقة عروض الأسعار",
+      "unknownSupplier": "لم يتم تأكيد المورد",
+      "sourceUnavailable": "مستند المصدر غير متاح",
+      "openOfTotal": "مفتوحة من إجمالي {{total}} بند",
+      "reviewedBy": "راجع عرض السعر",
+      "reviewedAt": "تاريخ مراجعة عرض السعر",
+      "issueDate": "تاريخ الإصدار",
+      "quotedExposure": "القيمة المعروضة",
+      "currencyMismatch": "عملات مختلطة",
+      "topCandidate": "أفضل مرشح",
+      "matchScore": "درجة المطابقة {{score}}",
+      "noCandidateEvidence": "لم يتم العثور على مرشح",
+      "notAvailable": "غير متاح",
       "noFilterResults": "لا توجد مهام مطابقة تطابق عوامل التصفية الحالية",
       "clearFilters": "إعادة تعيين التصفية",
       "loadMore": "تحميل المزيد",
@@ -1065,6 +1090,7 @@
       },
       "actions": {
         "confirm": "تأكيد قرار المطابقة",
+        "confirmAndNext": "تسوية والانتقال للتالي",
         "confirming": "جاري التأكيد...",
         "saveSuccess": "تم تأكيد قرار المطابقة وحفظ الاسم المرادف بنجاح.",
         "candidateRequired": "يُرجى اختيار منتج مرشح قبل التأكيد.",

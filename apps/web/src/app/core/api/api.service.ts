@@ -531,6 +531,10 @@ export class ApiService {
     );
   }
 
+  getMatchTaskForLine(lineId: string): Observable<MatchTask> {
+    return this.http.get<MatchTask>(`${this.base}/quotation-lines/${lineId}/match-task`);
+  }
+
   resolveMatch(
     lineId: string,
     body: MatchResolutionRequest,

@@ -15,6 +15,7 @@ from procurepilot_api.modules.matching.resolution_service import (
 from procurepilot_api.modules.matching.schemas import (
     MatchDecision,
     MatchResolutionRequest,
+    MatchTask,
     MatchTaskList,
     MatchTaskPriority,
     MatchTaskReason,
@@ -25,6 +26,16 @@ from procurepilot_api.modules.matching.service import MatchingService, get_match
 
 router = APIRouter(tags=["matching"])
 WRITE_ROLES = (MemberRole.owner, MemberRole.buyer)
+
+
+@router.get("/quotation-lines/{line_id}/match-task", response_model=MatchTask)
+def match_task_for_line(
+    line_id: UUID,
+    token: Annotated[str, Depends(bearer_token)],
+    _member: Annotated[CurrentMember, Depends(current_member)],
+    service: Annotated[MatchingService, Depends(get_matching_service)],
+) -> MatchTask:
+    return service.match_task_for_line(bearer_token=token, line_id=line_id)
 
 
 @router.get("/quotations/{quotation_id}/matches", response_model=QuotationMatches)

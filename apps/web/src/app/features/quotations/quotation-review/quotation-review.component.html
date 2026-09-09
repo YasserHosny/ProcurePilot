@@ -1207,6 +1207,38 @@
             </div>
           }
         }
+
+        @if (q.status === 'reviewed') {
+          <div class="review-footer-bar" role="status">
+            @if (matchingSetupStatus() === 'loading') {
+              <mat-spinner [attr.aria-label]="'common.loading' | translate" diameter="20"></mat-spinner>
+              <span>{{ 'quotations.review.matchingSetup.loading' | translate }}</span>
+            } @else if (matchingSetupStatus() === 'ready') {
+              <mat-icon aria-hidden="true">check_circle</mat-icon>
+              <span>{{ 'quotations.review.matchingSetup.ready' | translate }}</span>
+              <div class="action-spacer"></div>
+              <a mat-flat-button color="primary" [routerLink]="['/matching']" [queryParams]="{ quotation_id: q.id }">
+                <mat-icon aria-hidden="true">arrow_forward</mat-icon>
+                {{ 'quotations.review.matchingSetup.continue' | translate }}
+              </a>
+            } @else if (matchingSetupStatus() === 'error') {
+              <mat-icon color="warn" aria-hidden="true">error_outline</mat-icon>
+              <span>{{ matchingSetupError() }}</span>
+              <div class="action-spacer"></div>
+              <button mat-stroked-button type="button" (click)="initializeMatching(q.id)">
+                <mat-icon aria-hidden="true">refresh</mat-icon>
+                {{ 'quotations.review.matchingSetup.retry' | translate }}
+              </button>
+            } @else {
+              <span>{{ 'quotations.review.matchingSetup.idle' | translate }}</span>
+              <div class="action-spacer"></div>
+              <button mat-flat-button color="primary" type="button" (click)="initializeMatching(q.id)">
+                <mat-icon aria-hidden="true">rule</mat-icon>
+                {{ 'quotations.review.matchingSetup.start' | translate }}
+              </button>
+            }
+          </div>
+        }
       </section>
     </div>
 

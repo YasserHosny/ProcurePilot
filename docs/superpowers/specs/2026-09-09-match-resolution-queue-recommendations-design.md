@@ -70,7 +70,8 @@ from only loaded rows.
 
 ```text
 subtotal = quantity * unit_price
-quoted_line_total = subtotal + (subtotal * vat_rate) + delivery_fee - discount
+line_net = subtotal + delivery_fee - discount
+quoted_line_total = line_net * (1 + vat_rate)
 ```
 
 Missing VAT, delivery, and discount are zero. Missing quantity or unit price produces `null`. All

@@ -818,6 +818,15 @@
         "confirmDialogProceed": "Confirm & Authorize",
         "createRequote": "Create Re-Quote"
       },
+      "matchingSetup": {
+        "idle": "Product matching is ready to be prepared for this authorized quotation.",
+        "start": "Prepare Product Matching",
+        "loading": "Preparing product matching…",
+        "ready": "Product matching is ready.",
+        "continue": "Continue to Product Matching",
+        "error": "Matching setup needs retry.",
+        "retry": "Retry Matching Setup"
+      },
       "replaceDocument": {
         "tooltip": "Replace source document",
         "unsupportedType": "This file type is not supported. Please upload a PDF, image, or spreadsheet.",
@@ -847,6 +856,9 @@
         "confirmed": "Quotation confirmed",
         "refused": "Quotation refused",
         "reviewed": "Review submitted",
+        "matchingTaskRouted": "Line routed for product matching review",
+        "matchingAutoAccepted": "Product match accepted automatically",
+        "matchingResolved": "Product match resolved by reviewer",
         "unknown": "Action performed"
       }
     }
@@ -878,7 +890,7 @@
         "all": "All Priorities"
       },
       "reason": {
-        "low_confidence": "Low Confidence",
+        "low_confidence": "Below Match Threshold",
         "close_candidates": "Close Candidates",
         "no_candidate": "No Candidate",
         "alias_conflict": "Alias Conflict",
@@ -909,6 +921,19 @@
         "resolve": "Resolve Match",
         "view": "View Details"
       },
+      "groupsLabel": "Quotation match tasks",
+      "unknownSupplier": "Supplier not confirmed",
+      "sourceUnavailable": "Source document unavailable",
+      "openOfTotal": "open of {{total}} lines",
+      "reviewedBy": "Quotation reviewed by",
+      "reviewedAt": "Quotation reviewed at",
+      "issueDate": "Issue date",
+      "quotedExposure": "Quoted exposure",
+      "currencyMismatch": "Mixed currencies",
+      "topCandidate": "Top candidate",
+      "matchScore": "Match score {{score}}",
+      "noCandidateEvidence": "No candidate found",
+      "notAvailable": "Not available",
       "noFilterResults": "No match tasks match the active filters",
       "clearFilters": "Clear Filters",
       "loadMore": "Load More",
@@ -1065,6 +1090,7 @@
       },
       "actions": {
         "confirm": "Confirm Match Decision",
+        "confirmAndNext": "Resolve and Next",
         "confirming": "Confirming...",
         "saveSuccess": "Match decision confirmed and alias saved successfully.",
         "candidateRequired": "Please select a candidate before confirming.",

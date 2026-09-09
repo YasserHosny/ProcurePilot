@@ -41,14 +41,17 @@ test.describe('Match Resolution & Keyboard-Only Navigation (T032, US2)', () => {
 
     // The pipeline routes both stub lines to review (candidate confidence never reaches the
     // auto-accept threshold), so both must appear here as open tasks for this quotation.
-    await page.goto('/matching');
-    const ourRows = page.locator('tr.mat-mdc-row', { hasText: quotationId.slice(0, 8) });
-    await expect(ourRows).toHaveCount(2, { timeout: 30000 });
-    await expect(ourRows.filter({ hasText: 'Tomatoes case 10 kg' })).toHaveCount(1);
-    await expect(ourRows.filter({ hasText: 'Olive oil tin 5 litre' })).toHaveCount(1);
+    await page.goto(`/matching?quotation_id=${quotationId}`);
+    const quotationGroup = page.locator('.quotation-group', { hasText: quotationId.slice(0, 8) });
+    await expect(quotationGroup).toHaveCount(1, { timeout: 30000 });
+    const ourLines = quotationGroup.locator('.match-line');
+    await expect(ourLines).toHaveCount(2);
+    await expect(ourLines.filter({ hasText: 'Tomatoes case 10 kg' })).toHaveCount(1);
+    await expect(ourLines.filter({ hasText: 'Olive oil tin 5 litre' })).toHaveCount(1);
     await expect(page.locator('.filter-card')).toBeVisible();
-    await expect(ourRows.first().locator('.status-badge.status-open')).toBeVisible();
-    await expect(ourRows.first().locator('.priority-badge')).toBeVisible();
+    await expect(quotationGroup).toContainText('queue_seed.pdf');
+    await expect(quotationGroup).toContainText('Quoted exposure');
+    await expect(quotationGroup.locator('.status-badge.status-open')).toHaveCount(2);
   });
 
   test('candidate selection and confirmation work via keyboard alone (FR-012)', async ({ page }) => {
@@ -60,17 +63,17 @@ test.describe('Match Resolution & Keyboard-Only Navigation (T032, US2)', () => {
 
     const { quotationId } = await reconcileAndConfirmQuotation(page, 'keyboard_seed.pdf');
 
-    await page.goto('/matching');
+    await page.goto(`/matching?quotation_id=${quotationId}`);
     // Resolve the olive-oil line, not the tomato one: completing a resolution teaches the
     // workspace an exact-text alias for that line's wording, and later specs in the same run
     // need an un-aliased tomato line for their own canonical-path resolution.
-    const oliveRow = page
-      .locator('tr.mat-mdc-row', { hasText: quotationId.slice(0, 8) })
-      .filter({ hasText: 'Olive oil tin 5 litre' });
-    await expect(oliveRow).toHaveCount(1, { timeout: 30000 });
+    const oliveLine = page
+      .locator('.quotation-group', { hasText: quotationId.slice(0, 8) })
+      .locator('.match-line', { hasText: 'Olive oil tin 5 litre' });
+    await expect(oliveLine).toHaveCount(1, { timeout: 30000 });
 
     const candidateCards = page.locator('.candidate-card');
-    await oliveRow.locator('.resolve-btn').click();
+    await oliveLine.locator('.action-btn').click();
     await page.waitForURL('**/matching/**');
 
     await expect(page.locator('.keyboard-shortcuts-bar')).toBeVisible();
@@ -107,16 +110,16 @@ test.describe('Match Resolution & Keyboard-Only Navigation (T032, US2)', () => {
   test('inline product creation form appears on no-match outcome', async ({ page }) => {
     const { quotationId } = await reconcileAndConfirmQuotation(page, 'no_match_seed.pdf');
 
-    await page.goto('/matching');
+    await page.goto(`/matching?quotation_id=${quotationId}`);
     // Use the tomato line: the keyboard test before this one resolved the olive-oil line,
     // which taught the workspace an exact-text alias for it, so any later olive line
     // auto-matches and never reaches this queue. The tomato line still always does.
-    const tomatoRow = page
-      .locator('tr.mat-mdc-row', { hasText: quotationId.slice(0, 8) })
-      .filter({ hasText: 'Tomatoes case 10 kg' });
-    await expect(tomatoRow).toHaveCount(1, { timeout: 30000 });
+    const tomatoLine = page
+      .locator('.quotation-group', { hasText: quotationId.slice(0, 8) })
+      .locator('.match-line', { hasText: 'Tomatoes case 10 kg' });
+    await expect(tomatoLine).toHaveCount(1, { timeout: 30000 });
 
-    await tomatoRow.locator('.resolve-btn').click();
+    await tomatoLine.locator('.action-btn').click();
     await page.waitForURL('**/matching/**');
 
     // Select "no_match_new_product" outcome radio (value is a property binding, not an

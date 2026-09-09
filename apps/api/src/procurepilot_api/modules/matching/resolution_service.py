@@ -20,6 +20,8 @@ from procurepilot_api.modules.matching.service import (
     _line_row,
 )
 from procurepilot_api.modules.members.service import authenticated_client
+from procurepilot_api.shared.audit import AuditEventCreate, get_audit_writer
+from procurepilot_api.shared.logging import get_trace_id
 
 
 class MatchResolutionService:
@@ -90,6 +92,26 @@ class MatchResolutionService:
             raise ServiceUnavailableError(details={"dependency": "database"}) from exc
         decision = _decision(client, _one_row(response.data, resource="match_decision"))
         self._resolve_open_task(client, line_id)
+        get_audit_writer().record(
+            AuditEventCreate(
+                tenant_id=member.tenant_id,
+                actor_membership_id=member.membership_id,
+                actor_email=member.email,
+                action="matching.resolved",
+                target={
+                    "quotation_id": str(line["quotation_id"]),
+                    "quotation_line_id": str(line_id),
+                    "decision_id": str(decision.id),
+                    "candidate_id": str(candidate_id) if candidate_id else None,
+                    "matched_product_id": str(decision.matched_product.id),
+                    "outcome": decision.outcome,
+                    "score": decision.confidence,
+                },
+                outcome="success",
+                trace_id=get_trace_id(),
+            ),
+            bearer_token=bearer_token,
+        )
         self._landed_cost.compute_for_line_with_client(
             client=client, member=member, line_id=line_id
         )

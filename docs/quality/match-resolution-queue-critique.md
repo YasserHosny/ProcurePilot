@@ -1,6 +1,6 @@
 # Match Resolution Queue - UI and Functional Critique
 
-Status: Quality review proposal
+Status: Recommendations implemented and verified locally
 Feature anchor: `specs/004-matching-normalisation/`
 Evaluation date: 2026-09-08
 
@@ -211,3 +211,34 @@ Release priority should be:
 Until priorities 1 and 2 are complete, the page should not be treated as evidence that a reviewer can
 reliably validate every line. It can route work, but it does not yet explain that work well enough to
 support a confident, auditable human decision.
+
+### Implementation Outcome (2026-09-09)
+
+The release-blocking trust issues identified above are now addressed. The queue groups tasks by
+quotation and shows the source filename, quotation reviewer identity, review timestamp, issue date,
+authoritative open/total progress, quoted line exposure, routing reason, top candidate, match score,
+age, and one explicit action per line. `Low Confidence` is presented as `Below Match Threshold` to
+distinguish product-match scoring from extraction confidence. The layout becomes compact line details
+on narrow screens and no longer relies on a horizontally scrolling 11-column table or clickable rows
+with nested controls.
+
+The workflow is also explicit end to end. Quotation authorization now shows matching setup as loading,
+ready, or retryable failure, and success exposes a quotation-scoped `Continue to Product Matching`
+action. Match detail uses a direct tenant-scoped line-task endpoint instead of scanning the first page
+of the global queue, and `Resolve and Next` remains within the same quotation.
+
+Audit coverage now appends `matching.task_routed`, `matching.auto_accepted`, and `matching.resolved`
+events with actor, quotation, line, decision/task, product/candidate, and scoring evidence as applicable.
+These actions have explicit labels in the quotation audit trail. Focused backend tests, real hosted-
+database integration tests for event persistence and tenant isolation, the full Angular suite, and
+Angular lint validate the implemented behavior.
+
+Deferred recommendations are exposure/score server-side sorting, quick-confirm, batch product creation,
+and richer source page/region linking. Audit writes remain separate from the matching database mutation;
+transaction-level atomicity requires a future database RPC or outbox design. These residual items do not
+reintroduce the original status/data contradiction, but should remain tracked before higher-volume use.
+
+The live upload-to-matching Playwright workflow remains pending because the configured Bedrock SSO
+session is expired and the Azure fallback credentials are absent. The workflow selectors and assertions
+have been updated for the grouped queue, but a credentialed extraction provider is required to execute
+that final environment-dependent gate.

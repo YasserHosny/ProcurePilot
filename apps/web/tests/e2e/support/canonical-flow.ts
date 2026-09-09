@@ -51,7 +51,10 @@ export async function uploadQuotationAndOpenReview(
     mimeType: 'application/pdf',
     buffer: Buffer.from(STUB_PDF),
   });
-  await page.click('.start-upload-btn');
+  const startUpload = page.locator('.start-upload-btn');
+  if (await startUpload.isVisible()) {
+    await startUpload.click();
+  }
   // 30s, not the framework default 10s: real extraction (a genuine RQ round trip) is slower
   // than a client-side state change, but must stay under the 60s per-test default so a real
   // failure here surfaces as this assertion rather than an opaque outer test timeout.
@@ -96,6 +99,9 @@ export async function saveCorrections(page: Page): Promise<void> {
 export async function confirmQuotation(page: Page): Promise<void> {
   await page.locator('button.confirm-btn').click();
   await expect(page.locator('.status-pill.status-reviewed')).toBeVisible();
+  const continueLink = page.getByRole('link', { name: 'Continue to Product Matching' });
+  await expect(continueLink).toBeVisible({ timeout: 30000 });
+  await expect(continueLink).toHaveAttribute('href', /\/matching\?quotation_id=/);
 }
 
 /** The full upload → correct → confirm recipe, for specs that just need a confirmed quotation. */
@@ -117,7 +123,7 @@ export async function reconcileAndConfirmQuotation(
  * Gets one line of a known quotation to a match decision with a landed cost, by resolving it
  * from the Match Resolution Queue as a new catalogue product.
  *
- * Rows are disambiguated by the quotation-id badge shown in the queue, because earlier tests in
+ * Groups are disambiguated by the quotation-id badge shown in the queue, because earlier tests in
  * the same run leave their own open tasks behind. Resolving a line teaches the workspace an
  * exact-text alias for the stub line wording (resolution_service learns it on every outcome), so
  * an identical line on any LATER quotation deterministically auto-matches — confidence 0.93 is
@@ -140,13 +146,12 @@ export async function resolveLineAsNewProduct(
   lineTextPart: string,
   productName: string,
 ): Promise<ResolvedLineMatch> {
-  await page.goto('/matching');
-  const row = page
-    .locator('tr.mat-mdc-row', { hasText: quotationId.slice(0, 8) })
-    .filter({ hasText: lineTextPart });
+  await page.goto(`/matching?quotation_id=${quotationId}`);
+  const group = page.locator('.quotation-group', { hasText: quotationId.slice(0, 8) });
+  const line = group.locator('.match-line', { hasText: lineTextPart });
 
   try {
-    await row.waitFor({ state: 'visible', timeout: 12000 });
+    await line.waitFor({ state: 'visible', timeout: 12000 });
   } catch {
     return {
       productId: await waitForAutoAcceptedProductId(quotationId, lineTextPart),
@@ -154,8 +159,8 @@ export async function resolveLineAsNewProduct(
     };
   }
 
-  await expect(row).toHaveCount(1);
-  await row.locator('.resolve-btn').click();
+  await expect(line).toHaveCount(1);
+  await line.locator('.action-btn').click();
   await page.waitForURL('**/matching/**');
 
   // Select the outcome explicitly: with candidates present the component auto-selects rank 1

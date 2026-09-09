@@ -13,6 +13,7 @@ from integration.quotation_helpers import (
     make_quotation,
     make_supplier,
 )
+from procurepilot_api.errors import NotFoundError
 from procurepilot_api.modules.matching import service as matching_service_module
 from procurepilot_api.modules.matching.service import MatchingService
 
@@ -113,6 +114,38 @@ def test_matching_queue_cells_match_reviewed_quotation_line(
         assert task.quotation_line.unit_price.amount == "12.3400"
         assert task.quotation_line.unit_price.currency == "GBP"
         assert task.reason == "no_candidate"
+
+
+def test_direct_match_task_lookup_hides_another_tenants_line(
+    conn: object,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    with conn.cursor() as cur:
+        tenant_a = make_workspace(cur, "matching-direct-a")
+        tenant_b = make_workspace(cur, "matching-direct-b")
+        ensure_quotation_reference_data(cur)
+        quotation_id = make_quotation(
+            cur,
+            tenant_a,
+            document_id=make_document(cur, tenant_a),
+            status="reviewed",
+            arithmetic_status="reconciled",
+        )
+        line_id = make_line(cur, tenant_a, quotation_id)
+        _make_match_task(cur, tenant_a, line_id)
+
+        act_as(cur, tenant_b)
+        monkeypatch.setattr(
+            matching_service_module,
+            "authenticated_client",
+            lambda _settings, _token: PsycopgSupabaseClient(conn),
+        )
+
+        with pytest.raises(NotFoundError):
+            MatchingService().match_task_for_line(
+                bearer_token="tenant-b-token",
+                line_id=line_id,
+            )
 
 
 def _make_match_task(

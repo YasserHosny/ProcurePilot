@@ -24,6 +24,14 @@ describe('MatchResolutionComponent (T039)', () => {
   const mockTask: MatchTask = {
     id: 'task-resolve-1',
     quotation_id: 'q-99',
+    quotation: {
+      id: 'q-99',
+      status: 'reviewed',
+      source_filename: 'quotation.pdf',
+      line_count: 1,
+      open_match_task_count: 1,
+      supplier_name: 'Fresh Farms Dairy',
+    },
     quotation_line: {
       id: 'line-99',
       line_number: 1,
@@ -148,12 +156,14 @@ describe('MatchResolutionComponent (T039)', () => {
   beforeEach(async () => {
     apiService = jasmine.createSpyObj('ApiService', [
       'getMatchTasks',
+      'getMatchTaskForLine',
       'baseUnits',
       'suppliers',
       'resolveMatch',
       'getLandedCost',
     ]);
     apiService.getMatchTasks.and.returnValue(of({ items: [mockTask], next_cursor: null }));
+    apiService.getMatchTaskForLine.and.returnValue(of(mockTask));
     apiService.baseUnits.and.returnValue(
       of({
         items: [{ code: 'litre', label_en: 'Litre (L)', label_ar: 'لتر', dimension: 'volume' }],
@@ -183,7 +193,10 @@ describe('MatchResolutionComponent (T039)', () => {
           useValue: {
             snapshot: {
               paramMap: {
-                get: (k: string) => (k === 'id' ? 'task-resolve-1' : null),
+                get: (k: string) => (k === 'id' ? 'line-99' : null),
+              },
+              queryParamMap: {
+                get: (k: string) => (k === 'quotation_id' ? 'q-99' : null),
               },
             },
           },
@@ -201,7 +214,7 @@ describe('MatchResolutionComponent (T039)', () => {
   });
 
   it('should load task and candidates on init and auto-select rank 1 candidate', () => {
-    expect(apiService.getMatchTasks).toHaveBeenCalled();
+    expect(apiService.getMatchTaskForLine).toHaveBeenCalledWith('line-99');
     expect(component.task()?.id).toBe('task-resolve-1');
     expect(component.candidates().length).toBe(2);
     expect(component.selectedCandidateId()).toBe('cand-1');

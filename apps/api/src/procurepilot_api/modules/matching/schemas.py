@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any, Literal
 from uuid import UUID
 
@@ -13,6 +13,7 @@ MatchTaskStatus = Literal["open", "in_progress", "resolved"]
 MatchTaskStatusFilter = Literal["open", "in_progress", "resolved", "all"]
 MatchTaskPriority = Literal["low", "normal", "high"]
 MatchTaskReason = Literal["low_confidence", "close_candidates", "no_candidate", "alias_conflict"]
+QuotedExposureIssue = Literal["currency_mismatch"]
 MatchOutcome = Literal[
     "same_product",
     "different_pack",
@@ -64,6 +65,8 @@ class QuotationLineSummary(BaseModel):
     vat_rate: str | None = None
     delivery_fee: Money | None = None
     discount: Money | None = None
+    quoted_line_total: Money | None = None
+    quoted_line_total_issue: QuotedExposureIssue | None = None
 
 
 class MatchCandidate(BaseModel):
@@ -101,9 +104,24 @@ class MatchDecision(BaseModel):
     alias_id: UUID | None = None
 
 
+class QuotationMatchSummary(BaseModel):
+    id: UUID
+    status: str
+    document_id: UUID | None = None
+    source_filename: str | None = None
+    issue_date: date | None = None
+    reviewed_at: datetime | None = None
+    reviewed_by: UUID | None = None
+    reviewed_by_email: str | None = None
+    line_count: int = Field(ge=0)
+    open_match_task_count: int = Field(ge=0)
+    supplier_name: str | None = None
+
+
 class MatchTask(BaseModel):
     id: UUID
     quotation_id: UUID | None = None
+    quotation: QuotationMatchSummary
     quotation_line: QuotationLineSummary
     status: MatchTaskStatus
     priority: MatchTaskPriority

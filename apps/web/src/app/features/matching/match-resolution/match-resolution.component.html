@@ -541,7 +541,7 @@
 
       <!-- Actions Bar -->
       <div class="actions-bar">
-        <a mat-button routerLink="/matching" class="cancel-btn">
+        <a mat-button routerLink="/matching" [queryParams]="{ quotation_id: quotationId() }" class="cancel-btn">
           {{ 'matching.resolution.backToQueue' | translate }}
         </a>
 
@@ -561,6 +561,17 @@
               <span>{{ 'matching.resolution.actions.confirm' | translate }}</span>
             </span>
           }
+        </button>
+
+        <button
+          mat-stroked-button
+          color="primary"
+          (click)="confirmResolution(true)"
+          [disabled]="isSubmitting() || (selectedOutcome() === 'no_match_new_product' && productForm.invalid) || (selectedOutcome() !== 'no_match_new_product' && !selectedCandidateId())"
+          class="confirm-resolution-btn"
+        >
+          <mat-icon aria-hidden="true">skip_next</mat-icon>
+          <span>{{ 'matching.resolution.actions.confirmAndNext' | translate }}</span>
         </button>
       </div>
     }

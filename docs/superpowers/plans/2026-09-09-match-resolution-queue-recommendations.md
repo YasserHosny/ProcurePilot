@@ -43,11 +43,12 @@
 
 - [ ] **Step 1: Write failing calculation and contract tests**
 
-Cover quantity times unit price, VAT on subtotal, delivery addition, discount subtraction, decimal
+Cover quantity times unit price, delivery addition, discount subtraction, VAT on the resulting line
+net (matching quotation review), decimal
 precision, missing quantity/price, and mixed currencies. Assert the public shape:
 
 ```python
-assert result.total == Money(amount="34.0000", currency="GBP")
+assert result.total == Money(amount="34.8000", currency="GBP")
 assert result.issue is None
 
 mixed = quoted_exposure(

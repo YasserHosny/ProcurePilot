@@ -166,6 +166,8 @@ export class QuotationReviewComponent implements OnInit {
   readonly errorMessage = signal<string | null>(null);
   readonly errorTraceId = signal<string | null>(null);
   readonly confirmBlockedReason = signal<string | null>(null);
+  readonly matchingSetupStatus = signal<'idle' | 'loading' | 'ready' | 'error'>('idle');
+  readonly matchingSetupError = signal<string | null>(null);
 
   readonly isWriter = computed<boolean>(() => this.session.hasRole('owner', 'buyer'));
 
@@ -458,6 +460,9 @@ export class QuotationReviewComponent implements OnInit {
       'quotation.extraction_retried': 'quotations.audit.actions.extraction_retried',
       'quotation.exported': 'quotations.audit.actions.exported',
       'quotation.confirmed': 'quotations.audit.actions.confirmed',
+      'matching.task_routed': 'quotations.audit.actions.matchingTaskRouted',
+      'matching.auto_accepted': 'quotations.audit.actions.matchingAutoAccepted',
+      'matching.resolved': 'quotations.audit.actions.matchingResolved',
       'quotation.refused': 'quotations.audit.actions.refused',
       'quotation.reviewed': 'quotations.audit.actions.reviewed',
     };
@@ -1063,11 +1068,7 @@ export class QuotationReviewComponent implements OnInit {
             undefined,
             { duration: 4000 },
           );
-          // A confirmed quotation is the only trusted source matching may read (FR-016). This
-          // is the one place in the product that ever calls the matches endpoint, which is what
-          // actually runs the matching pipeline and populates the match resolution queue —
-          // without this call a confirmed quotation's lines would never reach it.
-          this.api.getQuotationMatches(confirmed.id).subscribe({ error: () => undefined });
+          this.initializeMatching(confirmed.id);
         },
         error: (err: unknown) => {
           this.isConfirming.set(false);
@@ -1082,6 +1083,22 @@ export class QuotationReviewComponent implements OnInit {
           }
         },
       });
+  }
+
+  initializeMatching(quotationId = this.quotationId()): void {
+    if (!quotationId) return;
+    this.matchingSetupStatus.set('loading');
+    this.matchingSetupError.set(null);
+    this.api.getQuotationMatches(quotationId).subscribe({
+      next: () => this.matchingSetupStatus.set('ready'),
+      error: (err: unknown) => {
+        this.matchingSetupStatus.set('error');
+        const apiError = err instanceof HttpErrorResponse ? (err.error as ApiError | undefined) : null;
+        this.matchingSetupError.set(
+          apiError?.message ?? this.translate.instant('quotations.review.matchingSetup.error'),
+        );
+      },
+    });
   }
 
   showAddLineForm(): void {

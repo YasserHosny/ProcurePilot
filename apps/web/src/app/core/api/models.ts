@@ -442,6 +442,8 @@ export interface QuotationLineSummary {
   readonly vat_rate?: string | null;
   readonly delivery_fee?: Money | null;
   readonly discount?: Money | null;
+  readonly quoted_line_total?: Money | null;
+  readonly quoted_line_total_issue?: 'currency_mismatch' | null;
 }
 
 export interface FeatureScore {
@@ -486,9 +488,24 @@ export interface MatchDecision {
   readonly alias_id?: string | null;
 }
 
+export interface QuotationMatchSummary {
+  readonly id: string;
+  readonly status: string;
+  readonly document_id?: string | null;
+  readonly source_filename?: string | null;
+  readonly issue_date?: string | null;
+  readonly reviewed_at?: string | null;
+  readonly reviewed_by?: string | null;
+  readonly reviewed_by_email?: string | null;
+  readonly line_count: number;
+  readonly open_match_task_count: number;
+  readonly supplier_name?: string | null;
+}
+
 export interface MatchTask {
   readonly id: string;
   readonly quotation_id: string;
+  readonly quotation: QuotationMatchSummary;
   readonly quotation_line: QuotationLineSummary;
   readonly status: MatchTaskStatus;
   readonly priority: MatchTaskPriority;

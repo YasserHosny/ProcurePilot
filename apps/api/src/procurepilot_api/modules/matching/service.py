@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 from datetime import UTC, datetime
 from decimal import Decimal
+from pathlib import PurePosixPath
 from typing import Literal
 from uuid import UUID
 
@@ -15,6 +16,7 @@ from procurepilot_api.errors import ConflictError, NotFoundError, ServiceUnavail
 from procurepilot_api.modules.landed_cost.service import LandedCostService
 from procurepilot_api.modules.matching.deterministic import find_deterministic_candidate
 from procurepilot_api.modules.matching.embeddings import StubEmbeddingProvider, vector_literal
+from procurepilot_api.modules.matching.quoted_exposure import quoted_exposure
 from procurepilot_api.modules.matching.schemas import (
     MatchCandidate,
     MatchDecision,
@@ -27,14 +29,19 @@ from procurepilot_api.modules.matching.schemas import (
     QuotationLineMatchState,
     QuotationLineSummary,
     QuotationMatches,
+    QuotationMatchSummary,
 )
 from procurepilot_api.modules.matching.scoring import SCORING_VERSION, decimal_string
 from procurepilot_api.modules.matching.search import build_similarity_candidates
 from procurepilot_api.modules.members.service import authenticated_client
 from procurepilot_api.modules.quotations.schemas import Money, Pack
 from procurepilot_api.modules.quotations.schemas import decimal_string as quantity_string
+from procurepilot_api.shared.audit import AuditEventCreate, get_audit_writer
+from procurepilot_api.shared.logging import get_trace_id
 
-QUOTATION_COLUMNS = "id,tenant_id,supplier_id,status"
+QUOTATION_COLUMNS = (
+    "id,tenant_id,document_id,supplier_id,status,issue_date,reviewed_at,reviewed_by"
+)
 LINE_COLUMNS = (
     "id,tenant_id,quotation_id,line_number,original_text,quantity,pack_count,unit_size,pack_unit,"
     "unit_price_amount,unit_price_currency,vat_rate,delivery_fee_amount,delivery_fee_currency,"
@@ -78,7 +85,13 @@ class MatchingService:
         lines = _line_rows(client, quotation_id)
         if not lines:
             return QuotationMatches(quotation_id=quotation_id, lines=[])
-        self._ensure_pipeline(client=client, member=member, quote=quote, lines=lines)
+        self._ensure_pipeline(
+            client=client,
+            member=member,
+            quote=quote,
+            lines=lines,
+            bearer_token=bearer_token,
+        )
         return self._build_quotation_matches(client, bearer_token, quotation_id, lines)
 
     def list_match_tasks(
@@ -150,6 +163,14 @@ class MatchingService:
             ),
         )
 
+    def match_task_for_line(self, *, bearer_token: str, line_id: UUID) -> MatchTask:
+        client = authenticated_client(self._settings, bearer_token)
+        line = _line_row(client, line_id)
+        task = _latest_task_for_line(client, line_id)
+        if task is None:
+            raise NotFoundError(details={"resource": "match_task"})
+        return self._task(client, task, line_row=line)
+
     def _ensure_pipeline(
         self,
         *,
@@ -157,6 +178,7 @@ class MatchingService:
         member: CurrentMember,
         quote: dict[str, object],
         lines: list[dict[str, object]],
+        bearer_token: str | None = None,
     ) -> None:
         self._backfill_missing_embeddings(client)
         for line in lines:
@@ -164,7 +186,9 @@ class MatchingService:
                 continue
             existing_candidates = _candidate_rows(client, UUID(str(line["id"])))
             if existing_candidates:
-                self._route_or_accept(client, member, line, existing_candidates)
+                self._route_or_accept(
+                    client, member, line, existing_candidates, bearer_token=bearer_token
+                )
                 continue
             deterministic = find_deterministic_candidate(
                 line=line,
@@ -185,7 +209,9 @@ class MatchingService:
                         }
                     ],
                 )
-                self._create_automatic_decision(client, member, line, persisted[0])
+                self._create_automatic_decision(
+                    client, member, line, persisted[0], bearer_token=bearer_token
+                )
                 continue
             candidates = build_similarity_candidates(
                 client=client,
@@ -206,7 +232,9 @@ class MatchingService:
                     for candidate in candidates
                 ],
             )
-            self._route_or_accept(client, member, line, persisted)
+            self._route_or_accept(
+                client, member, line, persisted, bearer_token=bearer_token
+            )
 
     def _persist_candidates(
         self,
@@ -247,9 +275,13 @@ class MatchingService:
         member: CurrentMember,
         line: dict[str, object],
         candidates: list[dict[str, object]],
+        *,
+        bearer_token: str | None = None,
     ) -> None:
         if not candidates:
-            self._create_task(client, member, line, reason="no_candidate")
+            self._create_task(
+                client, member, line, reason="no_candidate", bearer_token=bearer_token
+            )
             return
         top = candidates[0]
         second = candidates[1] if len(candidates) > 1 else None
@@ -261,13 +293,17 @@ class MatchingService:
             top_confidence >= Decimal(str(self._settings.matching_auto_accept_threshold))
             and not close_call
         ):
-            self._create_automatic_decision(client, member, line, top)
+            self._create_automatic_decision(
+                client, member, line, top, bearer_token=bearer_token
+            )
             return
         self._create_task(
             client,
             member,
             line,
             reason="close_candidates" if close_call else "low_confidence",
+            bearer_token=bearer_token,
+            candidate=top,
         )
 
     def _create_automatic_decision(
@@ -276,6 +312,8 @@ class MatchingService:
         member: CurrentMember,
         line: dict[str, object],
         candidate: dict[str, object],
+        *,
+        bearer_token: str | None = None,
     ) -> dict[str, object]:
         try:
             response = (
@@ -298,6 +336,27 @@ class MatchingService:
         except APIError as exc:
             raise ServiceUnavailableError(details={"dependency": "database"}) from exc
         decision = _one_row(response.data, resource="match_decision")
+        if bearer_token is not None:
+            self._record(
+                bearer_token=bearer_token,
+                member=member,
+                action="matching.auto_accepted",
+                target={
+                    "quotation_id": str(line["quotation_id"]),
+                    "quotation_line_id": str(line["id"]),
+                    "decision_id": str(decision["id"]),
+                    "candidate_id": str(candidate["id"]),
+                    "matched_product_id": str(
+                        candidate["candidate_workspace_product_id"]
+                    ),
+                    "outcome": "same_product",
+                    "score": decimal_string(candidate["confidence"]),
+                    "threshold": decimal_string(
+                        self._settings.matching_auto_accept_threshold
+                    ),
+                    "scoring_version": candidate.get("scoring_version") or SCORING_VERSION,
+                },
+            )
         self._landed_cost.compute_for_line_with_client(
             client=client, member=member, line_id=UUID(str(line["id"]))
         )
@@ -310,12 +369,14 @@ class MatchingService:
         line: dict[str, object],
         *,
         reason: MatchTaskReason,
+        bearer_token: str | None = None,
+        candidate: dict[str, object] | None = None,
     ) -> None:
         existing = _open_task_for_line(client, UUID(str(line["id"])))
         if existing is not None:
             return
         try:
-            client.table("match_task").insert(
+            response = client.table("match_task").insert(
                 {
                     "tenant_id": str(member.tenant_id),
                     "quotation_line_id": str(line["id"]),
@@ -325,6 +386,33 @@ class MatchingService:
             ).execute()
         except APIError as exc:
             raise ServiceUnavailableError(details={"dependency": "database"}) from exc
+        task = _one_row(response.data, resource="match_task")
+        if bearer_token is not None:
+            target: dict[str, object] = {
+                "quotation_id": str(line["quotation_id"]),
+                "quotation_line_id": str(line["id"]),
+                "match_task_id": str(task["id"]),
+                "reason": reason,
+                "priority": str(task.get("priority") or "normal"),
+            }
+            if candidate is not None:
+                target.update(
+                    {
+                        "candidate_id": str(candidate["id"]),
+                        "score": decimal_string(candidate["confidence"]),
+                        "threshold": decimal_string(
+                            self._settings.matching_auto_accept_threshold
+                        ),
+                        "scoring_version": candidate.get("scoring_version")
+                        or SCORING_VERSION,
+                    }
+                )
+            self._record(
+                bearer_token=bearer_token,
+                member=member,
+                action="matching.task_routed",
+                target=target,
+            )
 
     def _build_quotation_matches(
         self,
@@ -357,21 +445,51 @@ class MatchingService:
             )
         return QuotationMatches(quotation_id=quotation_id, lines=states)
 
-    def _task(self, client: object, row: dict[str, object]) -> MatchTask:
-        line_row = _line_row(client, UUID(str(row["quotation_line_id"])))
+    def _task(
+        self,
+        client: object,
+        row: dict[str, object],
+        *,
+        line_row: dict[str, object] | None = None,
+    ) -> MatchTask:
+        line_row = line_row or _line_row(client, UUID(str(row["quotation_line_id"])))
         decision_row = _decision_for_line(client, UUID(str(row["quotation_line_id"])))
         quotation_id = UUID(str(line_row["quotation_id"]))
-        supplier_name: str | None = None
-        try:
-            quote = _quotation_row(client, quotation_id)
-            if quote.get("supplier_id"):
-                name = _supplier_name(client, UUID(str(quote["supplier_id"])))
-                supplier_name = name or None
-        except (NotFoundError, ServiceUnavailableError):
-            supplier_name = None
+        quote = _quotation_row(client, quotation_id)
+        supplier_name = (
+            _supplier_name(client, UUID(str(quote["supplier_id"]))) or None
+            if quote.get("supplier_id")
+            else None
+        )
+        quotation_lines = _line_rows(client, quotation_id)
+        document_id = UUID(str(quote["document_id"])) if quote.get("document_id") else None
+        source_filename = _source_filename(client, document_id) if document_id else None
+        reviewer_email = (
+            _membership_email(client, UUID(str(quote["reviewed_by"])))
+            if quote.get("reviewed_by")
+            else None
+        )
+        quotation = QuotationMatchSummary(
+            id=quotation_id,
+            status=str(quote["status"]),
+            document_id=document_id,
+            source_filename=source_filename,
+            issue_date=quote.get("issue_date"),
+            reviewed_at=quote.get("reviewed_at"),
+            reviewed_by=(
+                UUID(str(quote["reviewed_by"])) if quote.get("reviewed_by") else None
+            ),
+            reviewed_by_email=reviewer_email,
+            line_count=len(quotation_lines),
+            open_match_task_count=_open_task_count(
+                client, [UUID(str(line["id"])) for line in quotation_lines]
+            ),
+            supplier_name=supplier_name,
+        )
         return MatchTask(
             id=UUID(str(row["id"])),
             quotation_id=quotation_id,
+            quotation=quotation,
             quotation_line=_line(line_row),
             status=str(row["status"]),
             priority=str(row["priority"]),
@@ -415,6 +533,27 @@ class MatchingService:
             self._settings.supabase_service_role_key.get_secret_value(),
         )
 
+    def _record(
+        self,
+        *,
+        bearer_token: str,
+        member: CurrentMember,
+        action: str,
+        target: dict[str, object],
+    ) -> None:
+        get_audit_writer().record(
+            AuditEventCreate(
+                tenant_id=member.tenant_id,
+                actor_membership_id=member.membership_id,
+                actor_email=member.email,
+                action=action,
+                target=target,
+                outcome="success",
+                trace_id=get_trace_id(),
+            ),
+            bearer_token=bearer_token,
+        )
+
 
 def get_matching_service() -> MatchingService:
     return MatchingService()
@@ -447,6 +586,38 @@ def _supplier_name(client: object, supplier_id: UUID) -> str:
         raise ServiceUnavailableError(details={"dependency": "database"}) from exc
     rows = _rows(response.data)
     return str(rows[0]["name"]) if rows else ""
+
+
+def _source_filename(client: object, document_id: UUID) -> str | None:
+    try:
+        response = (
+            client.table("document")
+            .select("id,storage_path")
+            .eq("id", str(document_id))
+            .limit(1)
+            .execute()
+        )
+    except APIError as exc:
+        raise ServiceUnavailableError(details={"dependency": "database"}) from exc
+    rows = _rows(response.data)
+    if not rows or not rows[0].get("storage_path"):
+        return None
+    return PurePosixPath(str(rows[0]["storage_path"])).name
+
+
+def _membership_email(client: object, membership_id: UUID) -> str | None:
+    try:
+        response = (
+            client.table("membership")
+            .select("email")
+            .eq("id", str(membership_id))
+            .limit(1)
+            .execute()
+        )
+    except APIError:
+        return None
+    rows = _rows(response.data)
+    return str(rows[0]["email"]) if rows and rows[0].get("email") else None
 
 
 def _line_rows(client: object, quotation_id: UUID) -> list[dict[str, object]]:
@@ -720,6 +891,22 @@ def _latest_task_for_line(client: object, line_id: UUID) -> dict[str, object] | 
     return rows[0] if rows else None
 
 
+def _open_task_count(client: object, line_ids: list[UUID]) -> int:
+    if not line_ids:
+        return 0
+    try:
+        response = (
+            client.table("match_task")
+            .select("id")
+            .in_("quotation_line_id", [str(line_id) for line_id in line_ids])
+            .in_("status", ["open", "in_progress"])
+            .execute()
+        )
+    except APIError as exc:
+        raise ServiceUnavailableError(details={"dependency": "database"}) from exc
+    return len(_rows(response.data))
+
+
 def _candidate(client: object, row: dict[str, object]) -> MatchCandidate:
     return MatchCandidate(
         id=UUID(str(row["id"])),
@@ -792,16 +979,30 @@ def _line(row: dict[str, object]) -> QuotationLineSummary:
             unit_size=quantity_string(row["unit_size"]) or "",
             unit=str(row["pack_unit"]) if row.get("pack_unit") else None,
         )
+    quantity = quantity_string(row.get("quantity"))
+    unit_price = _money(row, "unit_price")
+    vat_rate = quantity_string(row.get("vat_rate"))
+    delivery_fee = _money(row, "delivery_fee")
+    discount = _money(row, "discount")
+    exposure = quoted_exposure(
+        quantity=quantity,
+        unit_price=unit_price,
+        vat_rate=vat_rate,
+        delivery_fee=delivery_fee,
+        discount=discount,
+    )
     return QuotationLineSummary(
         id=UUID(str(row["id"])),
         line_number=int(row["line_number"]),
         original_text=str(row["original_text"]),
-        quantity=quantity_string(row.get("quantity")),
+        quantity=quantity,
         pack=pack,
-        unit_price=_money(row, "unit_price"),
-        vat_rate=quantity_string(row.get("vat_rate")),
-        delivery_fee=_money(row, "delivery_fee"),
-        discount=_money(row, "discount"),
+        unit_price=unit_price,
+        vat_rate=vat_rate,
+        delivery_fee=delivery_fee,
+        discount=discount,
+        quoted_line_total=exposure.total,
+        quoted_line_total_issue=exposure.issue,
     )
 
 

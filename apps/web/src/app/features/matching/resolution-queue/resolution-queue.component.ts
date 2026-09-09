@@ -10,9 +10,8 @@ import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSortModule, type Sort } from '@angular/material/sort';
-import { MatTableModule } from '@angular/material/table';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { RouterLink } from '@angular/router';
+import { ActivatedRoute, RouterLink } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
 import { ApiService } from '../../../core/api/api.service';
@@ -22,6 +21,7 @@ import type {
   MatchTaskPriority,
   MatchTaskReason,
   MatchTaskStatus,
+  QuotationMatchSummary,
 } from '../../../core/api/models';
 import { SessionService } from '../../../core/auth/session.service';
 import { FormatDatePipe } from '../../../core/format/date.pipe';
@@ -30,6 +30,11 @@ import { FormatMoneyPipe } from '../../../core/format/money.pipe';
 type MatchTaskSortBy = 'created_at' | 'priority' | 'status';
 type MatchTaskSortOrder = 'asc' | 'desc';
 
+export interface QuotationTaskGroup {
+  readonly quotation: QuotationMatchSummary;
+  readonly tasks: readonly MatchTask[];
+}
+
 @Component({
   selector: 'app-resolution-queue',
   standalone: true,
@@ -37,7 +42,6 @@ type MatchTaskSortOrder = 'asc' | 'desc';
     FormsModule,
     RouterLink,
     MatCardModule,
-    MatTableModule,
     MatButtonModule,
     MatIconModule,
     MatInputModule,
@@ -58,6 +62,7 @@ export class ResolutionQueueComponent implements OnInit {
   private readonly api = inject(ApiService);
   private readonly session = inject(SessionService);
   private readonly translate = inject(TranslateService);
+  private readonly route = inject(ActivatedRoute);
 
   readonly isLoading = signal<boolean>(true);
   readonly isLoadingMore = signal<boolean>(false);
@@ -73,6 +78,7 @@ export class ResolutionQueueComponent implements OnInit {
   readonly sortOrder = signal<MatchTaskSortOrder>('desc');
   readonly errorMessage = signal<string | null>(null);
   readonly errorTraceId = signal<string | null>(null);
+  readonly quotationId = signal<string | null>(null);
   private searchDebounce: ReturnType<typeof setTimeout> | null = null;
   private latestLoadRequestId = 0;
 
@@ -87,21 +93,18 @@ export class ResolutionQueueComponent implements OnInit {
       this.dateTo() !== null,
   );
 
-  readonly displayedColumns: readonly string[] = [
-    'quotation_line',
-    'supplier_name',
-    'original_text',
-    'unit_price',
-    'reason',
-    'priority',
-    'status',
-    'candidates_count',
-    'created_at',
-    'age',
-    'actions',
-  ];
+  readonly groups = computed<readonly QuotationTaskGroup[]>(() => {
+    const grouped = new Map<string, MatchTask[]>();
+    for (const task of this.tasks()) {
+      const items = grouped.get(task.quotation.id) ?? [];
+      items.push(task);
+      grouped.set(task.quotation.id, items);
+    }
+    return Array.from(grouped.values(), (tasks) => ({ quotation: tasks[0].quotation, tasks }));
+  });
 
   ngOnInit(): void {
+    this.quotationId.set(this.route.snapshot.queryParamMap.get('quotation_id'));
     this.loadTasks();
   }
 
@@ -123,6 +126,7 @@ export class ResolutionQueueComponent implements OnInit {
         status: status === 'all' ? undefined : status,
         priority: priority === 'all' ? undefined : priority,
         reason: reason === 'all' ? undefined : reason,
+        quotation_id: this.quotationId() ?? undefined,
         search,
         date_from: this.dateFrom() ?? undefined,
         date_to: this.dateTo() ?? undefined,
@@ -162,6 +166,7 @@ export class ResolutionQueueComponent implements OnInit {
         status: status === 'all' ? undefined : status,
         priority: priority === 'all' ? undefined : priority,
         reason: reason === 'all' ? undefined : reason,
+        quotation_id: this.quotationId() ?? undefined,
         search,
         date_from: this.dateFrom() ?? undefined,
         date_to: this.dateTo() ?? undefined,

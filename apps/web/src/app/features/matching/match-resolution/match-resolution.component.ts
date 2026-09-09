@@ -73,6 +73,7 @@ export class MatchResolutionComponent implements OnInit {
   readonly isLoading = signal<boolean>(true);
   readonly isSubmitting = signal<boolean>(false);
   readonly routeId = signal<string>('');
+  readonly quotationId = signal<string | null>(null);
 
   readonly task = signal<MatchTask | null>(null);
   readonly line = signal<QuotationLineSummary | null>(null);
@@ -151,6 +152,7 @@ export class MatchResolutionComponent implements OnInit {
 
   ngOnInit(): void {
     const id = this.route.snapshot.paramMap.get('id');
+    this.quotationId.set(this.route.snapshot.queryParamMap.get('quotation_id'));
     if (id) {
       this.routeId.set(id);
       this.loadReferenceData();
@@ -191,19 +193,10 @@ export class MatchResolutionComponent implements OnInit {
     this.errorMessage.set(null);
     this.errorTraceId.set(null);
 
-    // Fetch tasks to find the task matching either task ID or line ID
-    this.api.getMatchTasks({ status: 'all' }).subscribe({
-      next: (res) => {
-        const found = res.items.find(
-          (t) => t.id === id || t.quotation_line?.id === id,
-        );
-
-        if (found) {
-          this.applyTask(found);
-        } else {
-          // If not in match tasks list, attempt direct landed cost / state lookup
-          this.loadLineLandedCost(id);
-        }
+    this.api.getMatchTaskForLine(id).subscribe({
+      next: (task) => {
+        this.quotationId.set(task.quotation.id);
+        this.applyTask(task);
       },
       error: (err: unknown) => {
         this.isLoading.set(false);
@@ -244,19 +237,6 @@ export class MatchResolutionComponent implements OnInit {
       }
       this.isLoading.set(false);
     }
-  }
-
-  private loadLineLandedCost(lineId: string): void {
-    this.api.getLandedCost(lineId).subscribe({
-      next: (cost) => {
-        this.landedCost.set(cost);
-        this.isLoading.set(false);
-      },
-      error: (err: unknown) => {
-        this.isLoading.set(false);
-        this.handleError(err);
-      },
-    });
   }
 
   private loadLandedCost(lineId: string): void {
@@ -361,7 +341,7 @@ export class MatchResolutionComponent implements OnInit {
     this.selectOutcome(outcomes[nextIndex]);
   }
 
-  confirmResolution(): void {
+  confirmResolution(resolveNext = false): void {
     const l = this.line();
     if (!l || !this.isWriter()) return;
 
@@ -436,12 +416,45 @@ export class MatchResolutionComponent implements OnInit {
         );
         // Refresh landed cost for the resolved line
         this.loadLandedCost(l.id);
+        if (resolveNext) {
+          this.navigateToNextTask(l.id);
+        }
       },
       error: (err: unknown) => {
         this.isSubmitting.set(false);
         this.handleError(err);
       },
     });
+  }
+
+  private navigateToNextTask(resolvedLineId: string): void {
+    const quotationId = this.quotationId() ?? this.task()?.quotation.id;
+    if (!quotationId) return;
+    this.api
+      .getMatchTasks({
+        status: 'open',
+        quotation_id: quotationId,
+        limit: 100,
+        sort_by: 'created_at',
+        sort_order: 'asc',
+      })
+      .subscribe({
+        next: (response) => {
+          const next = response.items.find(
+            (task) => task.quotation_line.id !== resolvedLineId,
+          );
+          if (next) {
+            void this.router.navigate(['/matching', next.quotation_line.id], {
+              queryParams: { quotation_id: quotationId },
+            });
+            return;
+          }
+          void this.router.navigate(['/matching'], {
+            queryParams: { quotation_id: quotationId },
+          });
+        },
+        error: (err: unknown) => this.handleError(err),
+      });
   }
 
   formatScore(score: string | number | undefined | null): number {

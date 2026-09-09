@@ -20,12 +20,24 @@ describe('ResolutionQueueComponent', () => {
     {
       id: 'task-1',
       quotation_id: 'q-101',
+      quotation: {
+        id: 'q-101',
+        status: 'reviewed',
+        source_filename: 'fresh-farms.pdf',
+        reviewed_by_email: 'buyer@example.com',
+        reviewed_at: '2026-08-21T00:30:00Z',
+        issue_date: '2026-08-20',
+        line_count: 2,
+        open_match_task_count: 2,
+        supplier_name: 'Fresh Farms Dairy',
+      },
       quotation_line: {
         id: 'line-101',
         line_number: 1,
         original_text: 'Organic Whole Milk 2L',
         quantity: '10',
         unit_price: { amount: '2.5000', currency: 'GBP' },
+        quoted_line_total: { amount: '30.0000', currency: 'GBP' },
       },
       status: 'open',
       priority: 'high',
@@ -67,6 +79,14 @@ describe('ResolutionQueueComponent', () => {
     {
       id: 'task-2',
       quotation_id: 'q-102',
+      quotation: {
+        id: 'q-102',
+        status: 'reviewed',
+        source_filename: 'somerset.pdf',
+        line_count: 1,
+        open_match_task_count: 1,
+        supplier_name: 'Somerset Cheese Co',
+      },
       quotation_line: {
         id: 'line-102',
         line_number: 2,
@@ -119,6 +139,7 @@ describe('ResolutionQueueComponent', () => {
       status: 'open',
       priority: undefined,
       reason: undefined,
+      quotation_id: undefined,
       search: undefined,
       date_from: undefined,
       date_to: undefined,
@@ -128,6 +149,7 @@ describe('ResolutionQueueComponent', () => {
     expect(component.tasks().length).toBe(2);
     expect(component.nextCursor()).toBe('cursor-123');
     expect(component.isLoading()).toBeFalse();
+    expect(component.groups().length).toBe(2);
   });
 
   it('should reload tasks when search query changes with debounce', fakeAsync(() => {
@@ -283,23 +305,21 @@ describe('ResolutionQueueComponent', () => {
     expect(component.ageLabel(threeDaysAgo.toISOString())).toBe('3d ago');
   });
 
-  it('should render supplier name, unit price, and clickable rows', () => {
+  it('should render grouped quotation evidence and explicit line actions', () => {
     fixture.detectChanges();
     const compiled = fixture.nativeElement as HTMLElement;
 
-    // Check table headers
     const text = compiled.textContent || '';
-    expect(text).toContain('Supplier');
-    expect(text).toContain('Unit Price');
-    expect(text).toContain('Age');
-
-    // Check supplier name in table body
     expect(text).toContain('Fresh Farms Dairy');
     expect(text).toContain('Somerset Cheese Co');
+    expect(text).toContain('fresh-farms.pdf');
+    expect(text).toContain('buyer@example.com');
+    expect(text).toContain('Quoted exposure');
+    expect(text).toContain('£30.00');
 
-    // Check clickable row
-    const rows = compiled.querySelectorAll('tr.clickable-row');
-    expect(rows.length).toBe(2);
+    expect(compiled.querySelectorAll('article.match-line').length).toBe(2);
+    expect(compiled.querySelectorAll('a.action-btn').length).toBe(2);
+    expect(compiled.querySelectorAll('tr.clickable-row').length).toBe(0);
   });
 
   it('should show filtered empty state with clear filters button', () => {

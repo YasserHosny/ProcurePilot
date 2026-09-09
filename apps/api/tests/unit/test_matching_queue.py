@@ -7,7 +7,6 @@ from uuid import UUID, uuid4
 import pytest
 
 from procurepilot_api.modules.matching import service as matching_service_module
-from procurepilot_api.modules.matching.schemas import MatchTask
 from procurepilot_api.modules.matching.service import MatchingService
 
 
@@ -141,6 +140,16 @@ def test_list_match_tasks_accepts_query_params_and_enriches_supplier(
         "_supplier_name",
         lambda _client, _sid: "Fresh Farms Dairy",
     )
+    monkeypatch.setattr(
+        matching_service_module,
+        "_line_rows",
+        lambda _client, _qid: [fake_line_row],
+    )
+    monkeypatch.setattr(
+        matching_service_module,
+        "_open_task_count",
+        lambda _client, _line_ids: 1,
+    )
 
     service = MatchingService()
     result = service.list_match_tasks(
@@ -176,6 +185,37 @@ def test_list_match_tasks_accepts_query_params_and_enriches_supplier(
     assert task.quotation_line.unit_price is not None
     assert task.quotation_line.unit_price.amount == "2.5000"
     assert task.quotation_line.unit_price.currency == "GBP"
+    assert task.quotation_line.quoted_line_total is not None
+    assert task.quotation_line.quoted_line_total.amount == "30.0000"
+    assert task.quotation_line.quoted_line_total.currency == "GBP"
+    assert task.quotation.id == quotation_id
+    assert task.quotation.line_count == 1
+    assert task.quotation.open_match_task_count == 1
+
+
+def test_match_task_for_line_uses_direct_tenant_scoped_lookup(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    line_id = uuid4()
+    client = FakeClient({})
+    line = {"id": line_id}
+    task_row = {"id": uuid4(), "quotation_line_id": line_id}
+    expected = object()
+    monkeypatch.setattr(
+        matching_service_module,
+        "authenticated_client",
+        lambda _settings, _token: client,
+    )
+    monkeypatch.setattr(matching_service_module, "_line_row", lambda _client, _id: line)
+    monkeypatch.setattr(
+        matching_service_module,
+        "_latest_task_for_line",
+        lambda _client, _id: task_row,
+    )
+    service = MatchingService()
+    monkeypatch.setattr(service, "_task", lambda _client, _row, line_row: expected)
+
+    assert service.match_task_for_line(bearer_token="dummy", line_id=line_id) is expected
 
 
 def test_list_match_tasks_search_filters_by_supplier_or_quotation(

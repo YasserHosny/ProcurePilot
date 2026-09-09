@@ -282,7 +282,7 @@ After AI extraction finishes, each quotation lands in the review queue. Open a r
 | 11 | **Reviewer Notes** | A free-text field for recording why a correction was made or leaving context for whoever authorizes the quotation. Saved together with corrections. |
 | 12 | **Audit Trail** | An expandable panel at the bottom logging every action taken on this quotation — upload, extraction, field corrections, status changes — with actor and timestamp. |
 | 13 | **Save Corrections** | Persist manual edits without changing the quotation's status — you can return later. |
-| 14 | **Confirm & Authorize Quotation** | Marks the quotation as reviewed and releases it into the matching pipeline. A confirmation dialog states plainly that **this action cannot be undone**. |
+| 14 | **Confirm & Authorize Quotation** | Marks the quotation as reviewed. Matching setup then shows loading, ready, or a retryable error; when ready, **Continue to Product Matching** opens only this quotation's matching group. A confirmation dialog states plainly that authorization **cannot be undone**. |
 
 **Supplier auto-match:** when the extracted vendor name resembles one of your existing suppliers closely enough, a banner appears below the supplier dropdown offering to pre-select it ("Suggested: {name} — {pct}% match", or a more tentative "Possible match" wording for a lower-confidence guess) — you still confirm it explicitly, nothing is ever auto-selected. If no reasonable match is found but a vendor name was extracted, the banner can instead offer to create the supplier directly from that name without leaving the page.
 
@@ -291,7 +291,7 @@ After AI extraction finishes, each quotation lands in the review queue. Open a r
 2. Check the arithmetic status banner — if it flags a discrepancy, compare stated total against the line sum.
 3. Walk through attention-required fields, correcting any extraction errors inline — the totals and mismatch banner update as you go.
 4. Confirm or add the supplier, using the auto-match banner if one appears.
-5. Click **Save Corrections** to persist your edits, or go straight to **Confirm & Authorize Quotation** once satisfied.
+5. Click **Save Corrections** to persist your edits, or go straight to **Confirm & Authorize Quotation** once satisfied. Wait for matching setup to report ready, then use **Continue to Product Matching**; retry setup if the page reports a failure.
 
 **Business value:** quotation review turns AI output into trusted commercial data. A wrong supplier, date, quantity, or total can create a false recommendation and a false saving; this page makes the reviewer's corrections auditable before the data affects matching, comparison, or reporting.
 
@@ -313,9 +313,9 @@ After AI extraction finishes, each quotation lands in the review queue. Open a r
 | 4 | **Priority filter** | Filter by priority. |
 | 5 | **Routing Reason filter** | Filter by why the line was routed here: Low Confidence, No Candidate, Close Candidates, etc. |
 | 6 | **From date / To date** | Filters tasks by when they entered the matching queue. |
-| 7 | **Match task table** | Each row shows the parent quotation ID, line number, supplier, original supplier wording, unit price, routing reason, priority, status, candidate count, queued date, and **Age**. Empty queues show "No match tasks found" rather than a blank table. |
-| 8 | **Quotation / Line value** | The first badge is the quotation UUID, truncated for display (for example `b23c8b5a...` represents the full quotation ID `b23c8b5a-93ae-4f48-b412-68c214c2ce69`). The second badge is the human line number from that quotation, such as `#2`; it is not the database line UUID. |
-| 9 | **Resolve Match / View Details action** | Opens the resolution screen for that quotation line. Resolved rows switch to a detail-oriented action so reviewers can audit the saved decision. |
+| 7 | **Quotation groups** | Tasks are grouped by their uploaded quotation. Each group shows supplier, source filename, quotation reviewer, review time, issue date, and authoritative open/total line progress. Empty queues show "No match tasks found" rather than a blank surface. |
+| 8 | **Line evidence** | Each line shows its displayed line number, complete supplier wording, quoted exposure with currency, matching routing reason, top candidate and score, queue age, and matching status. `Below Match Threshold` refers to product matching, not OCR or quotation-review confidence. |
+| 9 | **Resolve Match / View Details action** | Opens the resolution screen for that quotation line while preserving quotation context. The line itself is not clickable, so keyboard and screen-reader users get one predictable action target. Resolved lines switch to a detail-oriented action for auditing the saved decision. |
 
 ### Match Resolution detail
 
