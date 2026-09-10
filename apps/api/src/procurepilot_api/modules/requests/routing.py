@@ -63,7 +63,7 @@ def resolve_approver(
         removed_membership_ids,
         owner_membership_id,
     )
-    delegate = _active_delegation_for(assignee, delegations, as_of)
+    delegate = _active_delegation_for(assignee, delegations, as_of, removed_membership_ids)
     if delegate is not None:
         return ResolvedApproval(assigned_membership_id=delegate, source="delegate")
     return ResolvedApproval(assigned_membership_id=assignee, source=source)
@@ -109,12 +109,18 @@ def _active_delegation_for(
     membership_id: UUID,
     delegations: Sequence[DelegationRow],
     as_of: date,
+    removed_membership_ids: Collection[UUID],
 ) -> UUID | None:
+    # A delegation whose delegate has since been removed from the workspace would route the
+    # request to a member who can no longer act on it — ignore it, the same way _resolve_threshold
+    # ignores a rule pointing at a removed approver, so resolution falls back to the original
+    # assignee (and on to the owner if that assignee is also unavailable).
     candidates = [
         delegation
         for delegation in delegations
         if delegation.delegator_membership_id == membership_id
         and delegation.starts_on <= as_of <= delegation.ends_on
+        and delegation.delegate_membership_id not in removed_membership_ids
     ]
     if not candidates:
         return None

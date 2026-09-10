@@ -1207,6 +1207,27 @@ class RequestsService:
         _require_assigned_approver_or_owner(step_row, member)
 
         now = _now_iso()
+        # Update the request BEFORE the step. supabase-py has no multi-statement transaction, so
+        # these two writes cannot be truly atomic here — a fully race-safe version needs a DB
+        # function (tracked as follow-up). Given that, the request's `status = 'submitted'` guard
+        # is the authoritative gate: if a concurrent withdrawal already flipped it, this update
+        # matches zero rows and we raise before touching the step, leaving the step `pending`
+        # rather than stranding a `decided` step on a non-submitted request (which would make the
+        # request permanently undecidable).
+        try:
+            request_response = (
+                client.table("purchase_request")
+                .update({"status": decision, "updated_at": now})
+                .eq("id", rid)
+                .eq("status", "submitted")
+                .execute()
+            )
+        except APIError as exc:
+            raise _write_error(exc) from exc
+        decided_request = _one_row_or_conflict(
+            request_response.data, reason="not_submitted"
+        )
+
         try:
             step_response = (
                 client.table("approval_step")
@@ -1228,20 +1249,6 @@ class RequestsService:
             raise _write_error(exc) from exc
         decided_step = _one_row_or_conflict(
             step_response.data, reason="no_pending_approval"
-        )
-
-        try:
-            request_response = (
-                client.table("purchase_request")
-                .update({"status": decision, "updated_at": now})
-                .eq("id", rid)
-                .eq("status", "submitted")
-                .execute()
-            )
-        except APIError as exc:
-            raise _write_error(exc) from exc
-        decided_request = _one_row_or_conflict(
-            request_response.data, reason="not_submitted"
         )
 
         line_rows = self._fetch_lines_for(client, rid)
