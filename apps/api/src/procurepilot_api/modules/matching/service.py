@@ -474,6 +474,7 @@ class MatchingService:
             status=str(quote["status"]),
             document_id=document_id,
             source_filename=source_filename,
+            supplier_id=UUID(str(quote["supplier_id"])) if quote.get("supplier_id") else None,
             issue_date=quote.get("issue_date"),
             reviewed_at=quote.get("reviewed_at"),
             reviewed_by=(

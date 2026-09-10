@@ -99,6 +99,16 @@
               <span class="metric-value">{{ l.discount | formatMoney }}</span>
             </div>
           }
+          <div class="metric-item exposure-item">
+            <span class="metric-label">{{ 'matching.resolution.lineDetails.quotedExposure' | translate }}</span>
+            @if (l.quoted_line_total) {
+              <span class="metric-value">{{ l.quoted_line_total | formatMoney }}</span>
+            } @else if (l.quoted_line_total_issue === 'currency_mismatch') {
+              <span class="metric-value warning-value">{{ 'matching.resolution.lineDetails.currencyMismatch' | translate }}</span>
+            } @else {
+              <span class="metric-value">{{ 'matching.queue.notAvailable' | translate }}</span>
+            }
+          </div>
         </mat-card-content>
       </mat-card>
     }
@@ -292,32 +302,39 @@
                     <span class="sim-name">{{ 'matching.resolution.candidates.signals.lexicalSimilarity' | translate }}</span>
                     <span class="sim-score">{{ formatScore(cand.reasons.lexical_similarity) }}%</span>
                   </div>
-                  <div class="sim-row">
-                    <span class="sim-name">{{ 'matching.resolution.candidates.signals.semanticSimilarity' | translate }}</span>
-                    <span class="sim-score">{{ formatScore(cand.reasons.semantic_similarity) }}%</span>
-                  </div>
+                  @if (shouldShowSemanticSignal(cand)) {
+                    <div class="sim-row">
+                      <span class="sim-name">{{ 'matching.resolution.candidates.signals.semanticSimilarity' | translate }}</span>
+                      <span class="sim-score">{{ formatScore(cand.reasons.semantic_similarity) }}%</span>
+                    </div>
+                  } @else {
+                    <div class="sim-row unavailable">
+                      <span class="sim-name">{{ 'matching.resolution.candidates.signals.semanticSimilarity' | translate }}</span>
+                      <span class="sim-score">{{ 'matching.resolution.candidates.signals.unavailableForStub' | translate }}</span>
+                    </div>
+                  }
                 </div>
 
                 <!-- Feature Scores -->
                 <div class="feature-scores-grid">
                   <div class="feat-item" [matTooltip]="'matching.resolution.candidates.signals.brandMatch' | translate">
-                    <span class="feat-lbl">Brand:</span>
+                    <span class="feat-lbl">{{ 'matching.resolution.candidates.product.brand' | translate }}:</span>
                     <span class="feat-val">{{ formatScore(cand.reasons.feature_score.brand_match) }}%</span>
                   </div>
                   <div class="feat-item" [matTooltip]="'matching.resolution.candidates.signals.variantMatch' | translate">
-                    <span class="feat-lbl">Variant:</span>
+                    <span class="feat-lbl">{{ 'matching.resolution.candidates.product.variant' | translate }}:</span>
                     <span class="feat-val">{{ formatScore(cand.reasons.feature_score.variant_match) }}%</span>
                   </div>
                   <div class="feat-item" [matTooltip]="'matching.resolution.candidates.signals.packUnitMatch' | translate">
-                    <span class="feat-lbl">Pack Unit:</span>
+                    <span class="feat-lbl">{{ 'matching.resolution.candidates.signals.packUnitMatch' | translate }}:</span>
                     <span class="feat-val">{{ formatScore(cand.reasons.feature_score.pack_unit_match) }}%</span>
                   </div>
                   <div class="feat-item" [matTooltip]="'matching.resolution.candidates.signals.packSizePlausibility' | translate">
-                    <span class="feat-lbl">Pack Size:</span>
+                    <span class="feat-lbl">{{ 'matching.resolution.candidates.signals.packSizePlausibility' | translate }}:</span>
                     <span class="feat-val">{{ formatScore(cand.reasons.feature_score.pack_size_plausibility) }}%</span>
                   </div>
                   <div class="feat-item" [matTooltip]="'matching.resolution.candidates.signals.pricePlausibility' | translate">
-                    <span class="feat-lbl">Price:</span>
+                    <span class="feat-lbl">{{ 'matching.resolution.candidates.signals.pricePlausibility' | translate }}:</span>
                     <span class="feat-val">{{ formatScore(cand.reasons.feature_score.price_plausibility) }}%</span>
                   </div>
                 </div>
@@ -439,7 +456,7 @@
                     <mat-select formControlName="base_unit" required>
                       @for (unit of baseUnits(); track unit.code) {
                         <mat-option [value]="unit.code">
-                          {{ unit.label_en }} ({{ unit.code }})
+                          {{ localizedUnitLabel(unit) }} ({{ unit.code }})
                         </mat-option>
                       }
                     </mat-select>

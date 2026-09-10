@@ -109,6 +109,7 @@ class QuotationMatchSummary(BaseModel):
     status: str
     document_id: UUID | None = None
     source_filename: str | None = None
+    supplier_id: UUID | None = None
     issue_date: date | None = None
     reviewed_at: datetime | None = None
     reviewed_by: UUID | None = None

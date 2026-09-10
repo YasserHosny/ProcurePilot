@@ -493,6 +493,7 @@ export interface QuotationMatchSummary {
   readonly status: string;
   readonly document_id?: string | null;
   readonly source_filename?: string | null;
+  readonly supplier_id?: string | null;
   readonly issue_date?: string | null;
   readonly reviewed_at?: string | null;
   readonly reviewed_by?: string | null;

@@ -219,20 +219,22 @@ export class MatchResolutionComponent implements OnInit {
       }
       this.loadLandedCost(t.quotation_line.id);
     } else {
-      // Auto-select rank 1 candidate if available
-      if (sortedCandidates.length > 0) {
+      if (sortedCandidates.length > 0 && t.reason !== 'close_candidates') {
         this.selectedCandidateId.set(sortedCandidates[0].id);
+        this.selectedOutcome.set('same_product');
+      } else if (sortedCandidates.length > 0) {
+        this.selectedCandidateId.set(null);
         this.selectedOutcome.set('same_product');
       } else {
         this.selectedOutcome.set('no_match_new_product');
       }
 
-      // Pre-fill product form with quotation line original text
       if (t.quotation_line) {
         this.productForm.patchValue({
           tenant_name: t.quotation_line.original_text,
           unit_size: t.quotation_line.pack?.unit_size || '1.0',
           pack_count: t.quotation_line.pack?.pack_count || 1,
+          preferred_supplier_id: t.quotation.supplier_id ?? null,
         });
       }
       this.isLoading.set(false);
@@ -461,6 +463,14 @@ export class MatchResolutionComponent implements OnInit {
     if (score === undefined || score === null) return 0;
     const num = typeof score === 'string' ? parseFloat(score) : score;
     return Math.round(num * 100);
+  }
+
+  shouldShowSemanticSignal(candidate: MatchCandidate): boolean {
+    return candidate.embedding_model !== 'stub-hash-v1';
+  }
+
+  localizedUnitLabel(unit: BaseUnit): string {
+    return this.translate.currentLang === 'ar' ? unit.label_ar : unit.label_en;
   }
 
   private handleError(err: unknown): void {

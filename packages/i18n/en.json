@@ -878,8 +878,8 @@
         "dateTo": "To date"
       },
       "status": {
-        "open": "Open",
-        "in_progress": "In Progress",
+        "open": "Awaiting Match Decision",
+        "in_progress": "Being Reviewed",
         "resolved": "Resolved",
         "all": "All Statuses"
       },
@@ -945,7 +945,7 @@
       "subtitle": "Review candidate matches, evaluate signal evidence, and resolve the quotation line.",
       "backToQueue": "Back to Queue",
       "readOnlyBanner": "You have view-only access. Only workspace owners and buyers can resolve matches and create catalogue products.",
-      "keyboardShortcutsTitle": "Keyboard Controls (FR-012)",
+      "keyboardShortcutsTitle": "Keyboard Controls",
       "shortcuts": {
         "selectCandidate": "1–9: Select Candidate",
         "navigate": "↑ / ↓: Navigate Candidates",
@@ -962,7 +962,9 @@
         "unitPrice": "Unit Price",
         "vatRate": "VAT Rate",
         "deliveryFee": "Delivery Fee",
-        "discount": "Discount"
+        "discount": "Discount",
+        "quotedExposure": "Quoted exposure",
+        "currencyMismatch": "Mixed currencies"
       },
       "candidates": {
         "title": "Ranked Product Candidates",
@@ -981,6 +983,7 @@
           "supplierCodeMatchDesc": "Matches supplier catalog code",
           "lexicalSimilarity": "Lexical Similarity",
           "semanticSimilarity": "Semantic Similarity",
+          "unavailableForStub": "Unavailable for stub model",
           "featureScores": "Feature Plausibility Breakdown",
           "brandMatch": "Brand Match",
           "variantMatch": "Variant Match",

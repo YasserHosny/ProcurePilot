@@ -61,6 +61,21 @@ paths:
         - name: quotation_id
           in: query
           schema: { type: string, format: uuid }
+        - name: search
+          in: query
+          schema: { type: string, maxLength: 200 }
+        - name: date_from
+          in: query
+          schema: { type: string }
+        - name: date_to
+          in: query
+          schema: { type: string }
+        - name: sort_by
+          in: query
+          schema: { type: string, enum: [created_at, priority, status], default: created_at }
+        - name: sort_order
+          in: query
+          schema: { type: string, enum: [asc, desc], default: desc }
       responses:
         '200':
           description: Match tasks
@@ -72,6 +87,19 @@ paths:
                 properties:
                   items: { type: array, items: { $ref: '#/components/schemas/MatchTask' } }
                   next_cursor: { type: string, nullable: true }
+
+  /quotation-lines/{line_id}/match-task:
+    parameters:
+      - { name: line_id, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      summary: Read the latest match task for one quotation line
+      responses:
+        '200':
+          description: Match task
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MatchTask' }
+        '404': { $ref: '#/components/responses/NotFound' }
 
   /quotation-lines/{line_id}/match:
     parameters:
@@ -236,6 +264,11 @@ components:
           description: Decimal string in the range 0 to 1; missing means zero VAT for cost v1.
         delivery_fee: { allOf: [{ $ref: '#/components/schemas/Money' }], nullable: true }
         discount: { allOf: [{ $ref: '#/components/schemas/Money' }], nullable: true }
+        quoted_line_total: { allOf: [{ $ref: '#/components/schemas/Money' }], nullable: true }
+        quoted_line_total_issue:
+          type: string
+          enum: [currency_mismatch]
+          nullable: true
 
     MatchReason:
       type: object
@@ -278,10 +311,11 @@ components:
 
     MatchTask:
       type: object
-      required: [id, quotation_line, status, priority, reason, candidates, created_at]
+      required: [id, quotation, quotation_line, status, priority, reason, candidates, created_at]
       properties:
         id: { type: string, format: uuid }
         quotation_id: { type: string, format: uuid }
+        quotation: { $ref: '#/components/schemas/QuotationMatchSummary' }
         quotation_line: { $ref: '#/components/schemas/QuotationLineSummary' }
         status: { type: string, enum: [open, in_progress, resolved] }
         priority: { type: string, enum: [low, normal, high] }
@@ -294,6 +328,24 @@ components:
           nullable: true
         created_at: { type: string, format: date-time }
         resolved_at: { type: string, format: date-time, nullable: true }
+        supplier_name: { type: string, nullable: true }
+
+    QuotationMatchSummary:
+      type: object
+      required: [id, status, line_count, open_match_task_count]
+      properties:
+        id: { type: string, format: uuid }
+        status: { type: string }
+        document_id: { type: string, format: uuid, nullable: true }
+        source_filename: { type: string, nullable: true }
+        supplier_id: { type: string, format: uuid, nullable: true }
+        issue_date: { type: string, format: date, nullable: true }
+        reviewed_at: { type: string, format: date-time, nullable: true }
+        reviewed_by: { type: string, format: uuid, nullable: true }
+        reviewed_by_email: { type: string, nullable: true }
+        line_count: { type: integer, minimum: 0 }
+        open_match_task_count: { type: integer, minimum: 0 }
+        supplier_name: { type: string, nullable: true }
 
     MatchDecision:
       type: object

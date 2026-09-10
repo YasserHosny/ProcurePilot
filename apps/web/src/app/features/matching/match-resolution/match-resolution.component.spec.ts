@@ -30,6 +30,7 @@ describe('MatchResolutionComponent (T039)', () => {
       source_filename: 'quotation.pdf',
       line_count: 1,
       open_match_task_count: 1,
+      supplier_id: 'supplier-1',
       supplier_name: 'Fresh Farms Dairy',
     },
     quotation_line: {
@@ -42,6 +43,7 @@ describe('MatchResolutionComponent (T039)', () => {
       vat_rate: '0.20',
       delivery_fee: { amount: '5.00', currency: 'GBP' },
       discount: { amount: '1.00', currency: 'GBP' },
+      quoted_line_total: { amount: '34.0000', currency: 'GBP' },
     },
     status: 'open',
     priority: 'normal',
@@ -169,7 +171,19 @@ describe('MatchResolutionComponent (T039)', () => {
         items: [{ code: 'litre', label_en: 'Litre (L)', label_ar: 'لتر', dimension: 'volume' }],
       }),
     );
-    apiService.suppliers.and.returnValue(of({ items: [], next_cursor: null }));
+    apiService.suppliers.and.returnValue(
+      of({
+        items: [
+          {
+            id: 'supplier-1',
+            name: 'Fresh Farms Dairy',
+            status: 'active',
+            created_at: '2026-08-21T00:00:00Z',
+          },
+        ],
+        next_cursor: null,
+      }),
+    );
     apiService.resolveMatch.and.returnValue(of(mockDecision));
     apiService.getLandedCost.and.returnValue(of(mockLandedCost));
 
@@ -219,6 +233,32 @@ describe('MatchResolutionComponent (T039)', () => {
     expect(component.candidates().length).toBe(2);
     expect(component.selectedCandidateId()).toBe('cand-1');
     expect(component.selectedOutcome()).toBe('same_product');
+  });
+
+  it('should require explicit candidate selection for close-candidate tasks', () => {
+    apiService.getMatchTaskForLine.and.returnValue(
+      of({
+        ...mockTask,
+        reason: 'close_candidates',
+      }),
+    );
+
+    component.loadTask('line-99');
+
+    expect(component.selectedCandidateId()).toBeNull();
+    expect(component.selectedOutcome()).toBe('same_product');
+  });
+
+  it('should show quoted exposure on the detail page', () => {
+    fixture.detectChanges();
+
+    const text = fixture.nativeElement.textContent as string;
+    expect(text).toContain('Quoted exposure');
+    expect(text).toContain('£34.00');
+  });
+
+  it('should prefill the quotation supplier when creating a new product', () => {
+    expect(component.productForm.get('preferred_supplier_id')?.value).toBe('supplier-1');
   });
 
   it('should support candidate selection via number keys (FR-012)', () => {

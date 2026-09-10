@@ -878,8 +878,8 @@
         "dateTo": "إلى تاريخ"
       },
       "status": {
-        "open": "مفتوحة",
-        "in_progress": "قيد المعالجة",
+        "open": "بانتظار قرار المطابقة",
+        "in_progress": "قيد المراجعة",
         "resolved": "تمت التسوية",
         "all": "جميع الحالات"
       },
@@ -945,7 +945,7 @@
       "subtitle": "مراجعة المنتجات المرشحة وتقييم مؤشرات المطابقة واعتماد تسوية البند.",
       "backToQueue": "العودة إلى القائمة",
       "readOnlyBanner": "لديك صلاحية العرض فقط. مالك مساحة العمل والمشتري فقط يمكنهما تسوية المطابقة وإنشاء المنتجات.",
-      "keyboardShortcutsTitle": "أزرار التحكم بلوحة المفاتيح (FR-012)",
+      "keyboardShortcutsTitle": "أزرار التحكم بلوحة المفاتيح",
       "shortcuts": {
         "selectCandidate": "1–9: اختيار المرشح",
         "navigate": "↑ / ↓: التنقل بين المرشحين",
@@ -962,7 +962,9 @@
         "unitPrice": "سعر الوحدة",
         "vatRate": "نسبة الضريبة",
         "deliveryFee": "رسوم التوصيل",
-        "discount": "الخصم"
+        "discount": "الخصم",
+        "quotedExposure": "القيمة المعروضة",
+        "currencyMismatch": "عملات مختلطة"
       },
       "candidates": {
         "title": "المنتجات المرشحة حسب الأولوية",
@@ -981,6 +983,7 @@
           "supplierCodeMatchDesc": "يطابق كود المنتج الخاص بالمورد",
           "lexicalSimilarity": "التشابه اللفظي",
           "semanticSimilarity": "التشابه الدلالي",
+          "unavailableForStub": "غير متاح لنموذج الاختبار",
           "featureScores": "تفاصيل معقولية السمات",
           "brandMatch": "تطابق العلامة التجارية",
           "variantMatch": "تطابق الصنف",
