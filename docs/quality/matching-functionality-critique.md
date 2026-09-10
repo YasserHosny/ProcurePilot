@@ -141,5 +141,4 @@ The match-resolution detail page now uses native radio semantics for candidate s
 - Selecting a radio candidate does not call the resolution API; confirmation remains a separate action.
 - Component coverage proves the radio controls exist and the old custom button role is gone.
 
-Remaining UI/accessibility work is broader cleanup of keyboard shortcut copy, card focus styling, and
-screen-reader labelling after the next visual QA pass.
+The Match Resolution i18n and accessibility cleanup was completed. Feature-ticket identifiers in user-facing language were removed, missing Arabic keys were provided, and accessible names for native candidate selection have been integrated using i18n keys.

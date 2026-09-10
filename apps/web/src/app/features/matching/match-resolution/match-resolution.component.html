@@ -39,7 +39,7 @@
       <span>{{ 'common.loading' | translate }}</span>
     </div>
   } @else {
-    <!-- Keyboard Shortcuts Helper Bar (FR-012) -->
+    <!-- Keyboard Shortcuts Helper Bar -->
     @if (isWriter() && !decision()) {
       <div class="keyboard-shortcuts-bar" role="region" [attr.aria-label]="'matching.resolution.keyboardShortcutsTitle' | translate">
         <div class="shortcut-header">
@@ -222,7 +222,7 @@
           </mat-card-content>
         </mat-card>
       } @else {
-        <div class="candidates-grid">
+        <div class="candidates-grid" role="radiogroup" [attr.aria-label]="'matching.resolution.candidates.radioGroupLabel' | translate">
           @for (cand of candidates(); track cand.id) {
             <label
               class="candidate-card"
@@ -233,6 +233,7 @@
                 type="radio"
                 name="candidate_selection"
                 class="cand-radio-input"
+                [attr.aria-label]="'matching.resolution.candidates.selectLabel' | translate: { rank: cand.rank, name: cand.candidate_product.tenant_name }"
                 [value]="cand.id"
                 [checked]="selectedCandidateId() === cand.id && selectedOutcome() !== 'no_match_new_product'"
                 (change)="selectCandidate(cand.id)"

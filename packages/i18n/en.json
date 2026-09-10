@@ -676,7 +676,7 @@
         "empty": "No reviewer notes"
       },
       "keyboardNav": {
-        "title": "Attention Navigation (FR-014)",
+        "title": "Attention Navigation",
         "hint": "Jump directly between fields needing attention (low confidence or missing data)",
         "nextField": "Next Flagged Field",
         "prevField": "Previous Flagged Field",
@@ -973,6 +973,8 @@
         "confidence": "Match Score",
         "scoreExplainer": "This score ranks candidates; it is not yet a calibrated probability.",
         "noCandidates": "No candidates found for this line item.",
+        "radioGroupLabel": "Match Candidates Selection",
+        "selectLabel": "Select candidate #{{rank}}: {{name}}",
         "signalsTitle": "Reason Breakdown",
         "signals": {
           "aliasHit": "Alias Hit",

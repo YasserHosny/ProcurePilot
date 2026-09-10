@@ -93,7 +93,7 @@ export class MatchResolutionComponent implements OnInit {
 
   readonly isWriter = computed<boolean>(() => this.session.hasRole('owner', 'buyer'));
 
-  // Product form for inline product creation (FR-009)
+  // Product form for inline product creation
   readonly productForm: FormGroup = this.fb.group({
     tenant_name: ['', [Validators.required, Validators.maxLength(200)]],
     brand: [''],
@@ -272,7 +272,7 @@ export class MatchResolutionComponent implements OnInit {
     }
   }
 
-  // FR-012: Keyboard navigation & confirmation
+  // Keyboard navigation & confirmation
   @HostListener('window:keydown', ['$event'])
   handleKeyboardEvent(event: KeyboardEvent): void {
     // Ignore keyboard shortcuts if the user is typing in a text input or select

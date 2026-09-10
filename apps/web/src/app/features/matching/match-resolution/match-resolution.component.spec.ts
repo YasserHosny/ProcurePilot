@@ -272,14 +272,20 @@ describe('MatchResolutionComponent (T039)', () => {
   it('should expose candidate choices as native radio controls', () => {
     fixture.detectChanges();
 
+    const radioGroup = fixture.nativeElement.querySelector('.candidates-grid');
     const candidateCards = fixture.nativeElement.querySelectorAll('.candidate-card');
     const radioInputs = fixture.nativeElement.querySelectorAll('.cand-radio-input');
 
+    expect(radioGroup.getAttribute('role')).toBe('radiogroup');
+    expect(radioGroup.getAttribute('aria-label')).toBe('Match Candidates Selection');
     expect(candidateCards.length).toBe(2);
     expect(radioInputs.length).toBe(2);
     expect(candidateCards[0].getAttribute('role')).toBeNull();
     expect(radioInputs[0].getAttribute('type')).toBe('radio');
     expect(radioInputs[0].getAttribute('name')).toBe('candidate_selection');
+    expect(radioInputs[0].getAttribute('aria-label')).toBe(
+      'Select candidate #1: Farm Whole Milk 2L',
+    );
   });
 
   it('should show quoted exposure on the detail page', () => {
