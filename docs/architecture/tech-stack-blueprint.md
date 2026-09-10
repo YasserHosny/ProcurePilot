@@ -1,861 +1,427 @@
 # Technology Stack Blueprint
 
-> Business-agnostic reference for replicating this application's architecture in a new project.
+> Reference for the technologies, versions, and structure that make up ProcurePilot, and how to
+> replicate this architecture in a new project. Business logic is out of scope — this is the stack.
+>
+> Last reviewed against the codebase: 10 Sep 2026. If a version here disagrees with a
+> `pyproject.toml` / `package.json`, the manifest wins — update this file.
 
 ---
 
 ## 1. Architecture Overview
 
-**Monorepo** with two top-level service directories and shared spec/doc folders:
+**pnpm + Turborepo monorepo.** One deployable API, one deployable SPA, three background workers,
+shared packages, and infrastructure-as-code — all in one repo.
 
 ```
-project-root/
-├── formcraft-backend/       # Python API server
-├── formcraft-frontend/      # Angular SPA
-├── e2e/                     # Playwright end-to-end tests
-├── formcraft-specs/         # Feature specifications & plans
-├── docs/                    # Documentation
-├── docker-compose.yml       # Local multi-service orchestration
-└── .github/workflows/       # CI/CD pipelines
+ProcurePilot/
+├── apps/
+│   ├── api/            FastAPI modular monolith — the only backend deployable
+│   ├── web/            Angular 19 SPA
+│   └── mobile/         Flutter — placeholder until Phase 2
+├── packages/
+│   ├── domain-types/   Shared TypeScript domain types
+│   ├── i18n/           en.json + ar.json translation catalogues (+ index.ts)
+│   ├── ui/             Shared Angular UI primitives
+│   └── py-logging/     `procurepilot-logging` — structured JSON logging (editable install)
+├── services/
+│   ├── extraction-worker/   RQ worker — quotation extraction (AWS Bedrock + Azure DI)
+│   ├── optimiser/           RQ worker — two-supplier basket split (OR-Tools CP-SAT)
+│   └── matching-worker/     README only — matching runs synchronously inside apps/api
+├── ml/
+│   ├── evals/          run_eval.py harnesses for matching + extraction (wired into CI)
+│   ├── benchmarks/     labelled-dataset placeholders (README only so far)
+│   └── notebooks/
+├── supabase/
+│   ├── migrations/     52 forward-only versioned SQL files
+│   └── config.toml     local dev stack (Supabase CLI) configuration
+├── infra/
+│   ├── docker/         api / web / extraction-worker Dockerfiles, kong.yml, initdb/
+│   ├── nginx/          nginx.conf template (envsubst BACKEND_HOST)
+│   └── terraform/      bunny.net (bunnynet provider) — container app, image registry, DNS
+├── specs/              Speckit feature specs (001-platform-foundation … 008-requests-approvals)
+├── docs/               product · architecture · roadmap · quality · operations
+├── docker-compose.yml               local whole-stack (api + workers + redis + web)
+├── docker-compose.remote.yml        override: point workers at hosted Supabase
+├── docker-compose.web-dev.yml       override: bind-mount pre-built SPA instead of in-container build
+├── pnpm-workspace.yaml · turbo.json
+└── package.json                     root scripts (turbo, db:migrate, test:*, lint:*)
 ```
 
-**Communication pattern:** Frontend → Nginx reverse-proxy → Backend REST API → Supabase (DB + Auth + Storage).
+**Runtime data path (production):**
+
+```
+Browser → bunny.net → Nginx (SPA + /api/ reverse proxy) → FastAPI (/api/v1) → hosted Supabase
+                                                              │
+                                                              └─ enqueue → Redis (RQ) → workers → Supabase
+```
+
+Nginx and FastAPI run as two containers **in the same bunny.net app**, sharing a network namespace
+(`BACKEND_HOST=localhost` in production). Workers run in a separate app and reach Redis and the API
+over the network. Supabase (Postgres 17 + Auth + Storage + Realtime) is a hosted managed service in
+every environment — there is no self-hosted database.
 
 ---
 
-## 2. Backend
+## 2. Backend — `apps/api`
+
+Python package `procurepilot-api`. A **modular monolith**: one FastAPI app, one deployable, with
+domain modules that own their routers, schemas, and services and talk to each other only through
+defined interfaces.
 
 | Concern | Technology | Version |
 |---|---|---|
-| **Language** | Python | 3.12 |
+| **Language** | Python | 3.12 (`>=3.12,<3.13`) |
 | **Web framework** | FastAPI | 0.115.6 |
-| **ASGI server** | Uvicorn (standard extras) | 0.34.0 |
-| **Data validation** | Pydantic v2 + pydantic-settings | 2.10.4 / 2.7.1 |
+| **ASGI server** | Uvicorn (`[standard]`) | 0.34.0 |
+| **Data validation** | Pydantic v2 + pydantic-settings | `>=2.10,<3` / `>=2.7,<3` |
 | **Rate limiting** | SlowAPI | 0.1.9 |
-| **JWT auth** | python-jose[cryptography] | 3.3.0 |
+| **JWT decode/verify** | python-jose (`[cryptography]`) | 3.3.0 |
 | **HTTP client** | httpx (async) | 0.28.1 |
 | **File uploads** | python-multipart | 0.0.20 |
+| **Supabase SDK** | supabase (supabase-py) | 2.11.0 |
+| **Direct Postgres** | psycopg (`[binary]`, v3) | `>=3.2,<4` |
+| **Background jobs** | Redis client + RQ | `>=5.2,<6` / `>=2.1,<3` |
+| **Error tracking** | sentry-sdk (`[fastapi]`) | `>=2.20,<3` |
+| **Excel export** | openpyxl | `>=3.1,<4` |
+| **PDF export** | reportlab | `>=4.2,<5` |
+| **Shared logging** | procurepilot-logging | local editable (`packages/py-logging`) |
+| **Build backend** | Hatchling | `>=1.27,<2` |
+| **Package/run tool** | uv | (Docker: pinned `0.6.2`) |
 
-### Backend project layout
+### Layout
 
 ```
-formcraft-backend/
-├── app/
-│   ├── main.py            # Application factory (create_app)
-│   ├── api/routes/         # FastAPI routers (one file per domain)
-│   ├── core/               # Config, middleware, DB error helpers
-│   ├── models/             # Domain models
-│   ├── schemas/            # Pydantic request/response schemas
-│   ├── services/           # Business logic layer
-│   ├── middleware/          # Custom middleware
-│   └── templates/          # Server-side templates (emails, etc.)
-├── assets/                 # Static assets (fonts, images)
-├── migrations/             # SQL migration files
-├── requirements.txt        # Pinned dependencies
-├── Dockerfile
-└── .env                    # Environment variables (not committed)
+apps/api/
+├── src/procurepilot_api/
+│   ├── main.py            FastAPI app factory, router registration, middleware
+│   ├── config.py          pydantic-settings BaseSettings
+│   ├── deps.py            FastAPI dependencies (bearer_token, CurrentMember, require_role, …)
+│   ├── errors.py          error envelope + typed exceptions (NotFoundError, ConflictError, …)
+│   ├── modules/           one directory per domain — each owns router.py, schemas.py, service.py
+│   │   ├── auth  tenants  members  organisation  requests   (identity, org, approvals)
+│   │   ├── catalogue  documents  quotations  extraction     (catalogue + quotation intake)
+│   │   ├── matching  landed_cost  offers                    (matching, pricing, Smart Compare)
+│   │   ├── savings  exports  alerts  billing  jobs          (value proof, exports, signals)
+│   │   └── health
+│   ├── shared/            audit.py · logging.py · observability.py · rate_limit.py
+│   └── workers/           export_worker.py — RQ entrypoint for savings-export jobs
+├── tests/{unit,integration,contract}/
+├── scripts/seed.py        reference data + a platform invitation token
+├── pyproject.toml
+└── README.md
 ```
+
+### Conventions
+
+- Base path `/api/v1`. `Authorization: Bearer <supabase_jwt>`; tenancy resolved **server-side from
+  the verified token**, never from a path/query/header.
+- Cursor pagination, `limit` capped at 100. `Idempotency-Key` accepted on mutations.
+- Error envelope: `{code, message, details, trace_id}`.
+- ruff-formatted, full type hints, Pydantic models at every boundary. ruff line length 100,
+  target `py312`, lint rule sets `E, F, I, B, UP, ANN`.
+- pytest `asyncio_mode = "auto"`.
 
 ### Configuration
 
-- **Environment-driven** via `pydantic-settings` (`BaseSettings`), loaded from `.env` file.
-- Key env vars: `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_KEY`, `SUPABASE_JWT_SECRET`, `CORS_ORIGINS`, AWS/Azure AI credentials.
+Environment-driven via `pydantic-settings`. Key vars (see `.env.example`): `SUPABASE_URL`,
+`SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_JWT_SECRET`, `SUPABASE_JWT_AUDIENCE`,
+`DATABASE_URL`, `REDIS_URL`, `API_CORS_ORIGINS`, `RATE_LIMIT_AUTH`, `SENTRY_DSN`, plus the
+extraction/AI credentials consumed by the workers.
 
 ---
 
-## 3. Frontend
+## 3. Frontend — `apps/web`
+
+pnpm workspace package `web`.
 
 | Concern | Technology | Version |
 |---|---|---|
-| **Framework** | Angular | 19 |
-| **Language** | TypeScript | ~5.6 |
-| **UI component library** | Angular Material + Angular CDK | ^19.0.0 |
-| **Styling** | SCSS (component-scoped) + Angular Material prebuilt theme (`indigo-pink`) |
-| **State management** | RxJS | ~7.8 |
-| **i18n** | @ngx-translate/core + http-loader | ^16.0.0 |
+| **Framework** | Angular | ^19.2 (core), CDK/Material ^19.0 |
+| **Language** | TypeScript | ~5.7.2 |
+| **Components** | **Standalone** (no NgModules), **signals** for local state, RxJS for streams | rxjs ~7.8 |
+| **UI library** | Angular Material + Angular CDK | ^19 |
+| **Styling** | Component-scoped SCSS + CSS logical properties (RTL-safe) |
+| **i18n** | @ngx-translate/core + @ngx-translate/http-loader (runtime JSON loading) | ^16.0 |
 | **Schema validation** | Zod | ^3.23 |
-| **Canvas / drawing** | Konva | ^9.3 |
 | **Supabase client** | @supabase/supabase-js | ^2.105 |
-| **Payments (client)** | @stripe/stripe-js | ^9.8 |
+| **Error tracking** | @sentry/angular | ^9 |
 | **Icons** | material-icons | ^1.13 |
-| **Build tooling** | @angular-devkit/build-angular (application builder) | ^19.0.0 |
+| **Build** | @angular-devkit/build-angular (application builder) | ^19.2 |
 
-### Frontend project layout
+### Layout & config
 
 ```
-formcraft-frontend/
-├── src/
-│   ├── app/               # Angular modules, components, services
-│   ├── assets/            # Static files (i18n JSONs, images)
-│   ├── environments/      # environment.ts / environment.prod.ts
-│   ├── styles.scss        # Global styles
-│   └── main.ts            # Bootstrap entry
-├── angular.json           # Angular workspace config
-├── proxy.conf.json        # Dev-server API proxy config
-├── package.json
-├── nginx.conf.template    # Production Nginx config (template-based)
-└── Dockerfile             # Multi-stage: Node build → Nginx serve
+apps/web/
+├── src/app/
+│   ├── core/        API client, auth/session, interceptors, guards
+│   ├── layout/      app shell, side nav, top bar
+│   ├── features/    one directory per screen area (quotations, matching, offers, savings, …)
+│   └── tests/       shared test helpers
+├── src/assets/i18n/ runtime translation JSON (served no-cache)
+├── angular.json     prefix "app"; budgets: initial 500 kB warn / 1 MB error,
+│                    anyComponentStyle 4 kB warn / 12 kB error
+└── package.json
 ```
 
-### Key configuration
-
-- **Component style:** SCSS, non-inline, non-standalone (NgModule-based).
-- **Component prefix:** `fc`.
-- **Bundle budgets:** 2 MB warning / 3 MB error (initial).
-- **Dev proxy:** `proxy.conf.json` forwards `/api/` to the backend.
+- **Strict TypeScript**, no `any`. Shared domain types from `packages/domain-types`; Zod schemas
+  co-located with the features that use them.
+- **Every user-facing string** comes from `packages/i18n` (`en.json` + `ar.json`). A key present in
+  one language and missing from the other **fails the web unit-test job** — it never reaches a user
+  as a raw key.
+- RTL: CSS logical properties only (`margin-inline-start`, not `margin-left`); both directions tested.
 
 ---
 
-## 4. Database & BaaS — Supabase
+## 4. Background Workers & Queue
+
+Redis is the **RQ broker only** — never a system of record. Three queues, three consumers:
+
+| Queue | Consumer | Package | Key deps | What it does |
+|---|---|---|---|---|
+| `quotation-extraction` | `services/extraction-worker` | `procurepilot-extraction-worker` | `boto3` `>=1.35,<2`, `azure-ai-documentintelligence` `>=1.0,<2`, `openpyxl`, `rq`, `psycopg` | Extracts quotation line items. Provider modes: **bedrock** (default, LLM), **azure_di** (OCR fallback / cost control), **structured_parse** (CSV/XLSX fast path, bypasses both). |
+| `basket-split` | `services/optimiser` | `procurepilot-optimiser-worker` | `ortools` (CP-SAT), `rq`, `psycopg` | Solves the two-supplier basket split for minimum total landed cost. |
+| `exports` | `apps/api` (`procurepilot_api.workers.export_worker`) | — (shares the API image) | Renders audit-ready savings exports (Excel via openpyxl, PDF via reportlab) to Supabase Storage. |
+
+`services/matching-worker/` is a placeholder README — product matching currently runs
+**synchronously** inside `apps/api`'s `matching` module against `pgvector` + `pg_trgm`.
+
+There is **no APScheduler / cron** in Phase 2 — worker runs are enqueue-triggered.
+
+---
+
+## 5. Data — Supabase (hosted)
 
 | Concern | Detail |
 |---|---|
-| **Database** | PostgreSQL 17 (managed by Supabase) |
-| **Auth** | Supabase Auth (JWT, email/password, OAuth providers, MFA-ready) |
-| **Storage** | Supabase Storage (S3-compatible, configurable buckets with MIME filters & size limits) |
-| **Realtime** | Supabase Realtime (enabled, WebSocket-based) |
-| **Edge Functions** | Supabase Edge Runtime (Deno 2) |
-| **Row Level Security** | RLS policies per table for tenant/org isolation |
-| **Connection pooler** | PgBouncer in transaction mode (configurable) |
-| **SDK (backend)** | `supabase` Python SDK 2.11.0 |
-| **SDK (frontend)** | `@supabase/supabase-js` ^2.105.4 |
+| **Database** | PostgreSQL **17**, managed by Supabase. Hosted in every environment — no self-hosted DB, no Postgres service in `docker-compose.yml`. |
+| **Extensions** | `pgcrypto`, `pgvector`, `pg_trgm` (enabled in migration `…0001_extensions.sql`). |
+| **Auth** | Supabase Auth — email/password, MFA (TOTP), invitation-gated sign-up. A **custom access-token hook** (`[auth.hook.custom_access_token]` in `config.toml`) injects `tenant_id` into every JWT. Without it, every tenant-scoped query returns zero rows. |
+| **Storage** | Supabase Storage (S3 protocol enabled). Tenant-scoped bucket paths; documents served via short-lived signed URLs, no public buckets. |
+| **Realtime** | Enabled. |
+| **Row-Level Security** | **Every tenant-scoped table** has `ENABLE` + `FORCE` RLS with policies supplying **both** `USING` and `WITH CHECK`. Policies read the JWT `tenant_id` claim — never an application-layer `WHERE`. A cross-tenant read returns *not found*, never *forbidden*. |
+| **Append-only tables** | `audit_event` (and, per the follow-up migrations, `match_candidate` / `match_decision` / `landed_cost`) `revoke update, delete` from `authenticated` and carry insert-only policies. |
+| **Backend access** | supabase-py `2.11.0` for PostgREST/Storage/Auth; `psycopg` v3 for direct SQL where PostgREST is a poor fit (workers, complex queries). |
 
 ### Migrations
 
-- Versioned SQL files in `formcraft-backend/migrations/` (application-managed).
-- Supabase CLI migrations in `formcraft-backend/supabase/migrations/` (for local dev).
+- **52 forward-only** versioned SQL files in `supabase/migrations/`, `YYYYMMDDHHMMSS_name.sql`.
+  Never edited after merge. Every new tenant-scoped table ships its RLS policy in the same file.
+- Applied via the Supabase CLI: `pnpm db:migrate` → `supabase migration up --db-url "$DATABASE_URL"`
+  (or `supabase db push` to a linked project).
+- **Local development uses the Supabase CLI stack** (`supabase start`), configured by
+  `supabase/config.toml` — **not** a hand-assembled docker-compose Supabase. (Reason recorded in
+  `specs/001-platform-foundation/research.md` R5: GoTrue versions would not migrate against a
+  hand-assembled stack; the CLI ships a set that works together and honours the access-token hook.)
 
 ---
 
-## 5. Containerization
+## 6. Containerization
 
-### Backend Dockerfile
-
-- **Base:** `python:3.12-slim`
-- Installs system deps: Pango, Cairo, HarfBuzz, Arabic/Noto fonts (for PDF rendering).
-- `pip install` from pinned `requirements.txt`.
-- Runs `uvicorn` on port **8000**, 1 worker.
-- Built-in healthcheck via `curl http://localhost:8000/api/health`.
-
-### Frontend Dockerfile (multi-stage)
-
-- **Stage 1 (build):** `node:20-alpine` → `npm ci` → `ng build --configuration=${BUILD_ENV}`
-- **Stage 2 (serve):** `nginx:alpine` → copies built SPA to `/usr/share/nginx/html`
-- Uses `nginx.conf.template` with envsubst for runtime `BACKEND_HOST` injection.
-- Exposes port **80**.
-- Healthcheck via `wget` on `/index.html`.
-
-### Docker Compose
-
-```yaml
-services:
-  backend:
-    build: ./formcraft-backend
-    env_file: ./formcraft-backend/.env
-    expose: ["8000"]
-    healthcheck: curl http://localhost:8000/api/health
-    restart: unless-stopped
-
-  frontend:
-    build: ./formcraft-frontend
-    ports: ["80:80"]
-    depends_on: [backend]
-    restart: unless-stopped
-```
-
-- Frontend proxies `/api/` requests to `backend:8000` via Nginx.
-
----
-
-## 6. CI/CD
-
-| Concern | Detail |
+| File | Purpose |
 |---|---|
-| **Platform** | GitHub Actions |
-| **Triggers** | Push to `main` on changed paths + manual `workflow_dispatch` |
-| **Container registry** | GitHub Container Registry (`ghcr.io`) |
-| **Build** | Docker Buildx with GHA cache (`cache-from: type=gha`) |
-| **Image tagging** | Commit SHA + `latest` on default branch |
-| **Deployment target** | **Bunny Magic Containers** (via `BunnyWay/actions/container-update-image`) |
-| **Pipelines** | Separate workflows for backend and frontend (path-filtered) |
+| `infra/docker/api.Dockerfile` | `python:3.12-slim` + the `uv` binary (from `ghcr.io/astral-sh/uv:0.6.2`). Non-root `appuser` (uid 1001). Lays the source out under `/workspace/apps/api` **with `packages/py-logging` two levels up**, so `[tool.uv.sources]`'s relative path resolves identically to a plain checkout. `uv pip install -e .`. Healthcheck `curl /api/v1/health`. `uvicorn procurepilot_api.main:app` on `8000`. Also the **export-worker** image (different `command`). |
+| `infra/docker/web.Dockerfile` | Multi-stage. **Build:** `node:20-alpine` + `corepack` `pnpm@9.15.4` → `pnpm install` → `pnpm run build` (with a fallback that normalises Angular's `dist/web/browser` output path). **Serve:** `nginx:1.27-alpine`, copies the SPA, renders `nginx.conf` via `envsubst '${BACKEND_HOST}'` at start. Healthcheck `wget /`. |
+| `infra/docker/extraction-worker.Dockerfile` | Same `/workspace` layout pattern as the API image; runs `python -m procurepilot_extraction_worker`. |
 
-### Bunny Magic Containers — Deployment Model
+### docker-compose (local only)
 
-Bunny groups multiple containers under a single **app**. Containers within the same app share a network namespace (they communicate via `localhost`, similar to a Kubernetes Pod). **Containers in different apps** do not share a namespace — use the target app's Anycast IP for cross-app communication.
+`docker-compose.yml` brings up: **api**, **redis** (`redis:7.4-alpine`), **extraction-worker**,
+**optimiser** (`python:3.12-slim` + repo bind-mount + `pip install -e`), **export-worker**
+(the API image, `procurepilot_api.workers.export_worker` entrypoint), and **web**
+(`4200:80`). Overrides:
 
-**Production topology uses two apps:**
+- `docker-compose.remote.yml` — run `api web redis` (+ workers) against a **hosted** Supabase; the
+  local Supabase CLI services are not started.
+- `docker-compose.web-dev.yml` — bind-mount `apps/web/dist/web/browser` into Nginx so a UI change
+  is one local `ng build` away, skipping the ~10-minute in-container rebuild.
 
-| App | Container | Image source | Port | Custom hostname |
-|---|---|---|---|---|
-| Production | `<project>-backend` | `ghcr.io/<owner>/<project>-backend:latest` | 8000 | `<project>-api.<domain>` |
-| Production | `<project>-frontend` | `ghcr.io/<owner>/<project>-frontend:latest` | 80 | `<project>.<domain>` |
-| Workers | `<project>-extraction-worker` | `ghcr.io/<owner>/<project>-extraction-worker:latest` | — | — |
-| Workers | `shared-redis` | `redis:7.4-alpine` | 6379 | — |
-
-- Frontend Nginx uses `BACKEND_HOST=localhost` in production (same app, shared namespace).
-- Backend reaches Redis in the workers app via the workers app's **Anycast IP** (not `localhost`).
-- Each CI workflow deploys to the appropriate Bunny app (`BUNNY_BACKEND_APP_ID`, `BUNNY_FRONTEND_APP_ID`, or `BUNNY_WORKERS_APP_ID`).
-
-### CI Workflow Pattern (per service)
-
-Each service follows an identical workflow structure:
-
-```yaml
-name: Deploy <Service>
-on:
-  push:
-    branches: [main]
-    paths:
-      - '<project>-<service>/**'
-      - '.github/workflows/deploy-<service>.yml'
-  workflow_dispatch:
-
-env:
-  REGISTRY: ghcr.io
-
-jobs:
-  build-and-deploy:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Normalize image name casing
-        id: normalize_image
-        run: echo "image_name=${GITHUB_REPOSITORY_OWNER,,}/<project>-<service>" >> "$GITHUB_OUTPUT"
-
-      - uses: docker/metadata-action@v5
-        id: meta
-        env:
-          IMAGE_NAME: ${{ steps.normalize_image.outputs.image_name }}
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          tags: |
-            type=sha,prefix=
-            type=raw,value=latest,enable={{is_default_branch}}
-
-      - uses: docker/setup-buildx-action@v3
-
-      - uses: docker/build-push-action@v5
-        env:
-          IMAGE_NAME: ${{ steps.normalize_image.outputs.image_name }}
-        with:
-          context: ./<project>-<service>
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          platforms: linux/amd64
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - uses: BunnyWay/actions/container-update-image@main
-        env:
-          IMAGE_NAME: ${{ steps.normalize_image.outputs.image_name }}
-        with:
-          api_key: ${{ secrets.BUNNY_API_KEY }}
-          app_id: ${{ secrets.BUNNY_<SERVICE>_APP_ID }}
-          container: <project>-<service>
-          image_tag: latest
-```
-
-**Required GitHub Actions secrets:**
-- `BUNNY_API_KEY` — Bunny.net API key
-- `BUNNY_BACKEND_APP_ID` — Bunny app container ID for the backend
-- `BUNNY_FRONTEND_APP_ID` — Bunny app container ID for the frontend
+In compose, Nginx's `BACKEND_HOST` defaults to `api` (the service name). In production it is
+`localhost` (shared bunny.net app namespace).
 
 ---
 
 ## 7. Reverse Proxy — Nginx
 
-- Serves SPA with `try_files $uri $uri/ /index.html` fallback.
-- Proxies `/api/` to backend with forwarded headers (`X-Real-IP`, `X-Forwarded-For`, `X-Forwarded-Proto`).
-- **Timeouts:** 120s read/send, 10s connect.
-- **Security headers:** `X-Content-Type-Options`, `X-Frame-Options DENY`, `HSTS`, `CSP`, `Referrer-Policy`.
-- **Caching:** `no-store` for `index.html`; `must-revalidate` for CSS; gzip enabled.
+`infra/nginx/nginx.conf` (rendered with `envsubst '${BACKEND_HOST}'`):
+
+- SPA fallback `try_files $uri $uri/ /index.html`.
+- `/api/` → `http://${BACKEND_HOST}:8000` with `X-Real-IP` / `X-Forwarded-For` / `X-Forwarded-Proto`;
+  read/send timeout 120 s, connect 10 s.
+- **Caching:** `no-store` for `index.html` **and** `/assets/i18n/*.json` (new translation keys must
+  never be hidden by cache); `must-revalidate` for `*.css`; gzip on.
+- **Security headers** (global + repeated on `index.html`): `X-Content-Type-Options nosniff`,
+  `X-Frame-Options DENY`, `Strict-Transport-Security`, `Referrer-Policy`, and a strict
+  **Content-Security-Policy** allowing `script-src 'self'` and `connect-src 'self' https://*.supabase.co`.
 
 ---
 
-## 8. Testing
+## 8. CI/CD — GitHub Actions
+
+### `ci.yml` — required on every PR and every push to `main`
+
+| Job | What it runs |
+|---|---|
+| **secrets** | `gitleaks/gitleaks-action` over full history — a committed secret blocks the PR. |
+| **lint** | `ruff check apps/api` + `pnpm lint` (angular-eslint) in `apps/web`. |
+| **backend-tests** | `pgvector/pgvector:pg17` service. Applies **all 52 migrations** to a bare Postgres with hand-built Supabase stand-ins (`auth.users`, the `anon`/`authenticated`/`service_role` roles, a `storage` schema with forced RLS). `uv run --project apps/api pytest apps/api -q` with `TEST_DATABASE_URL` (set so DB-backed tests **fail** rather than silently skip). Then the **product-matching eval smoke gate** (`ml/evals/product_matching/run_eval.py` must return the honest `not_validated_no_held_out_benchmark` status). |
+| **tenant-isolation** | Its own named job — migrations + `test_tenant_isolation.py` alone, so a cross-tenant leak is unambiguous when it goes red. |
+| **web-unit-tests** | `pnpm install` → `ng test --watch=false --browsers=ChromeHeadless` (includes the i18n catalogue-completeness check) → production `ng build`. |
+| **e2e** | `supabase start` (**not** compose) → seed → start API + extraction-worker + `ng serve` → Playwright: first the **a11y** specs (`@axe-core/playwright`, WCAG 2.1 AA, zero violations), then the full e2e suite (`channel: 'chrome'`). Failure artefacts uploaded. |
+
+### Deploy workflows — one per deployable
+
+`deploy-backend.yml`, `deploy-frontend.yml`, `deploy-extraction-worker.yml`. Each triggers on
+`push` to `main` touching that service's paths (or `workflow_dispatch`), then:
+
+1. `docker/build-push-action` → `ghcr.io/<owner>/procurepilot-<service>:{latest, <sha>}`
+   (`linux/amd64`, GHA layer cache).
+2. `BunnyWay/actions/container-update-image` → **bunny.net Magic Containers**, updating the named
+   container's image tag to the commit SHA.
+
+| Workflow | GHCR image | Bunny app secret | Container |
+|---|---|---|---|
+| `deploy-backend` | `procurepilot-api` | `BUNNY_BACKEND_APP_ID` | `procurepilot-backend` |
+| `deploy-frontend` | `procurepilot-web` | `BUNNY_FRONTEND_APP_ID` | `procurepilot-frontend` |
+| `deploy-extraction-worker` | `procurepilot-extraction-worker` | `BUNNY_WORKERS_APP_ID` | `procurepilot-extraction-worker` |
+
+**Required Actions secrets:** `BUNNY_API_KEY`, `BUNNY_BACKEND_APP_ID`, `BUNNY_FRONTEND_APP_ID`,
+`BUNNY_WORKERS_APP_ID` (plus the automatic `GITHUB_TOKEN` with `packages: write`).
+
+---
+
+## 9. Infrastructure as Code — Terraform
+
+`infra/terraform/` — provider `BunnyWay/bunnynet` (`~> 0.11`, lock file at `0.18.0`),
+`terraform >= 1.5.0`.
+
+| Resource | Role |
+|---|---|
+| `bunnynet_compute_container_imageregistry.ghcr` | Registers GHCR as the pull source. |
+| `bunnynet_compute_container_app.app` | The Magic Containers app(s) that host the backend/frontend/worker containers. |
+| `bunnynet_dns_zone.primary` + `bunnynet_dns_record.{backend,frontend}` | The public hostnames. |
+
+`production.tfvars` holds the concrete values and is **gitignored** (secrets rule #4).
+
+---
+
+## 10. Testing
 
 | Layer | Tool | Version |
 |---|---|---|
 | **Backend unit/integration** | pytest + pytest-asyncio | 8.3.4 / 0.25.2 |
-| **Backend HTTP testing** | httpx (TestClient) | 0.28.1 |
-| **AWS mocking** | moto[bedrock] | 5.0.27 |
-| **Frontend unit** | Karma + Jasmine | 6.4 / 5.4 |
-| **E2E** | Playwright | ^1.60 |
-| **Linting** | ruff (Python), Angular CLI lint (TS) | — |
+| **Backend DB tests** | real Postgres — `pgvector/pgvector:pg17` in CI; hosted or `supabase start` locally | — |
+| **Backend HTTP** | httpx `TestClient` | 0.28.1 |
+| **Frontend unit** | Karma + Jasmine (`jasmine-core`), ChromeHeadless | ~6.4 / ~5.6 |
+| **E2E** | Playwright (`channel: 'chrome'`) | ^1.60 |
+| **Accessibility** | @axe-core/playwright — WCAG 2.1 AA, zero violations | ^4.13 |
+| **Lint** | ruff (Python) · angular-eslint ^19 / typescript-eslint ^8 (TS) | — |
+| **Secret scan** | gitleaks | (action `@v2`) |
+| **Model evals** | `ml/evals/*/run_eval.py` smoke gates | — |
+
+Root scripts: `pnpm test` (turbo), `pnpm test:api`, `pnpm test:web`, `pnpm test:e2e`,
+`pnpm test:isolation`, `pnpm test:a11y`, `pnpm lint`.
 
 ---
 
-## 9. AI / Document Intelligence
+## 11. AI / Document Intelligence
 
-| Service | SDK | Purpose |
+| Purpose | Service | SDK |
 |---|---|---|
-| **AWS Bedrock** | boto3 1.36.4 | LLM inference (Claude 3 Haiku) |
-| **Azure Document Intelligence** | azure-ai-formrecognizer 3.3.0 | OCR / form field extraction |
+| Quotation line-item extraction (default) | **AWS Bedrock** — Claude Haiku 4.5 via a `us-east-1` inference profile, overridable with `BEDROCK_MODEL_ID` | `boto3` `>=1.35,<2` |
+| OCR / form-field extraction (fallback, cost control) | **Azure Document Intelligence** | `azure-ai-documentintelligence` `>=1.0,<2` — the current SDK, *not* the deprecated `azure-ai-formrecognizer` |
+| CSV / XLSX fast path (no model call) | structured parser | `openpyxl` |
+| Product matching — semantic candidates | pgvector | (in-DB) |
+| Product matching — lexical candidates | pg_trgm `similarity()` + GIN trigram indexes | (in-DB) |
+
+Evaluation harnesses live in `ml/evals/` — `product_matching/run_eval.py` (wired into `ci.yml` as
+a smoke gate) and `quotation_extraction/run_eval.py`. The benchmark datasets under
+`ml/benchmarks/` are README placeholders — the matching harness returns an explicit
+`not_validated_no_held_out_benchmark` status until real labelled data lands (see
+`docs/quality/matching-normalisation-audit.md`).
 
 ---
 
-## 10. PDF & Reporting
+## 12. Reporting / File Generation
 
 | Library | Version | Purpose |
 |---|---|---|
-| **WeasyPrint** | 63.1 | HTML/CSS → PDF rendering (supports Arabic via Pango/HarfBuzz) |
-| **openpyxl** | 3.1.5 | Excel workbook export |
-| **matplotlib** | 3.10.0 | Server-side chart generation for reports |
-| **ng2-charts / Chart.js** | (frontend) | Client-side charting |
-| **qrcode[pil]** | 8.0 | QR code generation |
-| **python-barcode** | 0.15.1 | Barcode generation |
-| **Pillow** | 11.1.0 | Image processing |
-| **arabic-reshaper + python-bidi** | 3.0.0 / 0.6.7 | Arabic text shaping for PDF |
+| **openpyxl** | `>=3.1,<4` | Excel export (savings ledger) and structured-quotation parsing |
+| **reportlab** | `>=4.2,<5` | PDF export (savings summary report) |
+
+No WeasyPrint, matplotlib, Chart.js, QR/barcode, or Arabic-reshaping libraries are in use — charts
+are rendered client-side in Angular, and Arabic PDF support is not a current requirement.
 
 ---
 
-## 11. Scheduling
+## 13. Security & Constitution
 
-| Library | Version | Purpose |
-|---|---|---|
-| **APScheduler** | 3.11.0 | Background job scheduling (reports, batch processing) |
+The eight non-negotiables (from `.specify/memory/constitution.md`, enforced in code and CI):
 
----
+1. **Tenant isolation lives in the database** — `ENABLE` + `FORCE` RLS, `USING` + `WITH CHECK`,
+   on every tenant-scoped table. Never an application-layer `WHERE` alone.
+2. **Tenancy comes from the verified JWT claim** — never a path, query, or header.
+3. **A cross-tenant read returns "not found"**, never "forbidden".
+4. **No secrets in the repo** — `.env.example` committed, `.env` gitignored, gitleaks blocks PRs,
+   `production.tfvars` gitignored.
+5. **Every user-facing string comes from `packages/i18n`** (en + ar). Enforced by the web unit job.
+6. **Every monetary value stores an explicit currency.** No bare numbers for money.
+7. **`audit_event` is append-only** — no `UPDATE`, no `DELETE`, for any role.
+8. **No autonomous purchasing** — automation prepares and routes; a human authorises.
 
-## 12. Security
-
-- **Auth:** Supabase JWT-based auth with RLS enforcement at database level.
-- **Rate limiting:** SlowAPI (per-endpoint configurable).
-- **CORS:** Configurable origin allowlist via env var.
-- **Security headers middleware:** Custom FastAPI middleware for response headers.
-- **Nginx hardening:** CSP, HSTS, X-Frame-Options, X-Content-Type-Options.
-- **Env management:** Secrets in `.env` (not committed); CI secrets via GitHub Actions secrets.
-
----
-
-## 13. How to Bootstrap a New Project Using This Stack
-
-> Replace `<project>` with your project name (e.g., `invoicehub`) throughout.
+Supporting mechanisms: Supabase JWT with the `tenant_id` access-token hook; SlowAPI per-endpoint
+rate limiting; Sentry on both tiers; Nginx CSP/HSTS/frame/nosniff/referrer headers.
 
 ---
 
-### Step 1 — Create the Monorepo
-
-```
-<project>/
-├── <project>-backend/
-├── <project>-frontend/
-├── e2e/
-├── docs/
-├── docker-compose.yml
-└── .github/workflows/
-```
-
-Initialize a Git repo at the root. Add a `.gitignore` covering Python (`__pycache__`, `.env`, `*.pyc`), Node (`node_modules/`, `dist/`), and IDE files.
-
----
-
-### Step 2 — Backend Setup
-
-#### 2a. Initialize the Python project
-
-```bash
-mkdir -p <project>-backend/app/{api/routes,core,models,schemas,services,middleware,templates}
-mkdir -p <project>-backend/{assets,migrations}
-cd <project>-backend
-python -m venv venv && source venv/bin/activate
-```
-
-#### 2b. Install core dependencies
-
-Create `requirements.txt` with pinned versions:
-
-```
-fastapi==0.115.6
-uvicorn[standard]==0.34.0
-pydantic==2.10.4
-pydantic-settings==2.7.1
-slowapi==0.1.9
-python-jose[cryptography]==3.3.0
-httpx==0.28.1
-python-multipart==0.0.20
-supabase==2.11.0
-```
-
-Add optional dependencies as needed (WeasyPrint, boto3, openpyxl, APScheduler, etc.).
-
-#### 2c. Application factory pattern
-
-Create `app/main.py`:
-
-```python
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-
-def create_app() -> FastAPI:
-    app = FastAPI(title="<Project>", root_path="/api")
-
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=settings.cors_origins,
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
-
-    # Register routers
-    # app.include_router(...)
-
-    return app
-
-app = create_app()
-```
-
-#### 2d. Configuration via pydantic-settings
-
-Create `app/core/config.py`:
-
-```python
-from pydantic_settings import BaseSettings
-
-class Settings(BaseSettings):
-    SUPABASE_URL: str
-    SUPABASE_ANON_KEY: str
-    SUPABASE_SERVICE_KEY: str
-    SUPABASE_JWT_SECRET: str
-    CORS_ORIGINS: list[str] = ["http://localhost:4200"]
-
-    class Config:
-        env_file = ".env"
-```
-
-#### 2e. Create `.env` (never commit)
-
-```
-SUPABASE_URL=https://<ref>.supabase.co
-SUPABASE_ANON_KEY=...
-SUPABASE_SERVICE_KEY=...
-SUPABASE_JWT_SECRET=...
-CORS_ORIGINS=["http://localhost:4200","http://localhost"]
-```
-
-#### 2f. Health check endpoint
-
-Create `app/api/routes/health.py`:
-
-```python
-from fastapi import APIRouter
-router = APIRouter()
-
-@router.get("/health")
-async def health():
-    return {"status": "ok"}
-```
-
-#### 2g. Backend Dockerfile
-
-```dockerfile
-FROM python:3.12-slim
-
-# Add system deps only if needed (e.g., PDF rendering):
-# RUN apt-get update && apt-get install -y --no-install-recommends \
-#     libpango-1.0-0 libpangocairo-1.0-0 libcairo2 fonts-noto-core curl \
-#     && rm -rf /var/lib/apt/lists/*
-
-RUN apt-get update && apt-get install -y --no-install-recommends curl \
-    && rm -rf /var/lib/apt/lists/*
-
-WORKDIR /app
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-COPY assets/ assets/
-COPY app/ app/
-
-EXPOSE 8000
-
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD curl -f http://localhost:8000/api/health || exit 1
-
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
-```
-
----
-
-### Step 3 — Frontend Setup
-
-#### 3a. Scaffold Angular project
-
-```bash
-ng new <project>-frontend --prefix=<prefix> --style=scss --standalone=false --skip-git
-cd <project>-frontend
-```
-
-#### 3b. Install dependencies
-
-```bash
-ng add @angular/material
-npm install @ngx-translate/core @ngx-translate/http-loader @supabase/supabase-js zod
-```
-
-Add optional packages as needed (`konva`, `@stripe/stripe-js`, `ng2-charts`, etc.).
-
-#### 3c. Dev proxy configuration
-
-Create `proxy.conf.json`:
-
-```json
-{
-  "/api": {
-    "target": "http://localhost:8000",
-    "secure": false,
-    "changeOrigin": true,
-    "logLevel": "info"
-  }
-}
-```
-
-Add to `angular.json` under `serve > options`:
-
-```json
-"proxyConfig": "proxy.conf.json"
-```
-
-#### 3d. Environment files
-
-`src/environments/environment.ts`:
-
-```typescript
-export const environment = {
-  production: false,
-  supabaseUrl: 'https://<ref>.supabase.co',
-  supabaseAnonKey: '...',
-  apiUrl: '/api'
-};
-```
-
-Create a matching `environment.prod.ts` with `production: true`.
-
-#### 3e. Nginx config template
-
-Create `nginx.conf.template`:
-
-```nginx
-server {
-    listen 80;
-    server_name _;
-    root /usr/share/nginx/html;
-    index index.html;
-
-    # CSS — cache with revalidation
-    location ~* \.css$ {
-        expires 0;
-        add_header Cache-Control "max-age=0, must-revalidate";
-        add_header X-Content-Type-Options nosniff always;
-        try_files $uri =404;
-    }
-
-    # index.html — never cache
-    location = /index.html {
-        add_header Cache-Control "no-store, no-cache, must-revalidate" always;
-        add_header Pragma "no-cache" always;
-        add_header X-Content-Type-Options nosniff always;
-        add_header X-Frame-Options DENY always;
-        add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
-        add_header Referrer-Policy "strict-origin-when-cross-origin" always;
-        try_files $uri =404;
-    }
-
-    # SPA fallback
-    location / {
-        try_files $uri $uri/ /index.html;
-    }
-
-    # API proxy — ${BACKEND_HOST} is replaced at runtime by envsubst
-    location /api/ {
-        proxy_pass http://${BACKEND_HOST}:8000;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_read_timeout 120s;
-        proxy_send_timeout 120s;
-        proxy_connect_timeout 10s;
-    }
-
-    # Security headers
-    add_header X-Content-Type-Options nosniff always;
-    add_header X-Frame-Options DENY always;
-    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
-    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
-
-    # Gzip
-    gzip on;
-    gzip_types text/plain text/css application/json application/javascript text/xml application/font-woff2;
-}
-```
-
-#### 3f. Frontend Dockerfile (multi-stage)
-
-```dockerfile
-FROM node:20-alpine AS build
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci
-COPY . .
-ARG BUILD_ENV=production
-RUN npm run build -- --configuration=${BUILD_ENV}
-
-FROM nginx:alpine
-COPY --from=build /app/dist/<project>-frontend/browser /usr/share/nginx/html
-# Default to "backend" for docker-compose; override to "localhost" for Bunny shared-network
-ENV BACKEND_HOST=backend
-COPY nginx.conf.template /etc/nginx/templates/default.conf.template
-EXPOSE 80
-
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD wget -qO- http://localhost/index.html || exit 1
-```
-
-> **Important:** The `COPY --from=build` path must match Angular's `outputPath` in `angular.json`. Check `dist/<project>-frontend/browser` vs `dist/<project>-frontend`.
-
----
-
-### Step 4 — Database (Supabase)
-
-1. **Create a Supabase project** at [supabase.com](https://supabase.com).
-2. **Collect credentials:** Project URL, anon key, service role key, JWT secret → put in backend `.env`.
-3. **Enable RLS** on every table for tenant/org isolation.
-4. **Migrations:** Store versioned SQL files in `<project>-backend/migrations/`. Apply them via the Supabase dashboard, CLI, or a startup migration runner.
-5. **Storage buckets:** Configure via dashboard with appropriate MIME filters and size limits.
-6. **Auth:** Configure email/password, OAuth providers, and MFA as needed.
-
----
-
-### Step 5 — Docker Compose (Local Development)
-
-Create `docker-compose.yml` at the repo root:
-
-```yaml
-services:
-  backend:
-    build:
-      context: ./<project>-backend
-    env_file:
-      - ./<project>-backend/.env
-    expose:
-      - "8000"
-    healthcheck:
-      test: ["CMD", "sh", "-c", "curl -fsS http://localhost:8000/api/health >/dev/null"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 10s
-    restart: unless-stopped
-
-  frontend:
-    build:
-      context: ./<project>-frontend
-      args:
-        - BUILD_ENV=${FRONTEND_BUILD_ENV:-development}
-    ports:
-      - "80:80"
-    depends_on:
-      - backend
-    restart: unless-stopped
-```
-
-Run locally:
-
-```bash
-docker compose up --build
-# Frontend: http://localhost
-# API proxied through Nginx: http://localhost/api/
-```
-
-- In Docker Compose, `BACKEND_HOST` defaults to `backend` (the service name).
-- Nginx resolves `/api/` → `http://backend:8000`.
-
----
-
-### Step 6 — CI/CD (GitHub Actions)
-
-#### 6a. Create two workflow files
-
-- `.github/workflows/deploy-backend.yml`
-- `.github/workflows/deploy-frontend.yml`
-
-Use the CI Workflow Pattern template from Section 6 above, replacing `<project>` and `<service>`.
-
-#### 6b. Configure GitHub repo secrets
-
-| Secret | Value |
-|---|---|
-| `BUNNY_API_KEY` | Bunny.net API key |
-| `BUNNY_BACKEND_APP_ID` | App ID for the production app (backend container) |
-| `BUNNY_FRONTEND_APP_ID` | App ID for the production app (frontend container) |
-| `BUNNY_WORKERS_APP_ID` | App ID for the workers app (extraction worker + Redis) |
-
-#### 6c. Configure GHCR access
-
-- Workflows use `GITHUB_TOKEN` (automatic) with `packages: write` permission.
-- Ensure the repo's package visibility settings allow the Bunny pull.
-
----
-
-### Step 7 — Bunny Magic Containers Deployment
-
-#### 7a. Production app
-
-1. **Create a "production" app** in Bunny Dashboard → Edge Platform → Magic Containers.
-2. **Add two containers** within the app:
-   - `<project>-backend` — image from `ghcr.io/<owner>/<project>-backend`, public port `8000`.
-   - `<project>-frontend` — image from `ghcr.io/<owner>/<project>-frontend`, public port `80`.
-3. **Set `BACKEND_HOST=localhost`** as an environment variable on the frontend container (containers share a network namespace and communicate via localhost).
-4. **Configure endpoints:**
-   - Backend endpoint: custom hostname `<project>-api.<domain>` → port 8000.
-   - Frontend endpoint: custom hostname `<project>.<domain>` → port 80.
-5. **Add a GHCR Image Registry** in Bunny (Image Registries tab) with a GitHub PAT that has `read:packages` scope.
-6. **Set regions** and scaling as needed.
-
-#### 7b. Workers app (when background jobs are needed)
-
-1. **Create a "workers" app** — separate from the production app for independent scaling.
-2. **Add containers:**
-   - `<project>-extraction-worker` — image from GHCR.
-   - `shared-redis` — image `redis:7.4-alpine`, public port `6379`.
-3. Workers within the same app reach Redis at `localhost:6379`.
-4. The production app's backend reaches Redis via the workers app's **Anycast IP** — find it
-   in the workers app's endpoint configuration in the Bunny dashboard.
-5. Set `REDIS_URL=redis://<anycast-ip>:6379/0` on the production app's backend container.
-
-#### 7c. GHCR package visibility
-
-GHCR packages default to private. Ensure the bunny.net Image Registry's GitHub PAT has
-`read:packages` scope and the GHCR packages are accessible to that PAT. If an image fails
-to pull, check the package visibility settings in GitHub → Packages.
-
----
-
-### Step 8 — Testing Setup
-
-#### 8a. Backend tests
-
-```bash
-cd <project>-backend
-pip install pytest pytest-asyncio httpx
-mkdir tests
-```
-
-Use `httpx.AsyncClient` with FastAPI's `TestClient` pattern.
-
-#### 8b. Frontend tests
-
-Angular CLI comes with Karma + Jasmine pre-configured. Run:
-
-```bash
-ng test
-```
-
-#### 8c. E2E tests (Playwright)
-
-```bash
-mkdir e2e && cd e2e
-npm init -y
-npm install -D @playwright/test
-npx playwright install
-```
-
-Configure `playwright.config.ts` with `baseURL: 'http://localhost'`.
-
----
-
-### Step 9 — Responsive Design
-
-The frontend must be usable on mobile, tablet, and desktop viewports.
-
-#### Breakpoints
-
-Define a shared SCSS breakpoints file (e.g. `src/styles/_breakpoints.scss`):
-
-```scss
-$mobile-max: 599px;
-$tablet-min: 600px;
-$tablet-max: 959px;
-$desktop-min: 960px;
-
-@mixin mobile { @media (max-width: $mobile-max) { @content; } }
-@mixin tablet-down { @media (max-width: $tablet-max) { @content; } }
-@mixin tablet-only { @media (min-width: $tablet-min) and (max-width: $tablet-max) { @content; } }
-@mixin desktop { @media (min-width: $desktop-min) { @content; } }
-```
-
-Import as `@use 'styles/breakpoints' as bp` in component SCSS files.
-
-#### Responsive patterns
-
-- **CSS logical properties** (`margin-inline-start`, `padding-block-end`) instead of physical
-  properties (`margin-left`, `padding-bottom`) — required for RTL support.
-- **Fluid containers:** `max-width` + `margin-inline: auto` for page sections.
-- **Mobile padding:** reduce from `1.5rem` to `0.75rem` via `@include bp.mobile`.
-- **Grid → single column on mobile:** e.g. `grid-template-columns: 1fr 1fr` on desktop,
-  `1fr` on mobile.
-- **`flex-wrap: wrap`** on button rows and metadata strips to prevent horizontal overflow.
-- **Side-by-side layouts** (e.g. document preview + data form) collapse to single column
-  at 1024px via `@media (max-width: 1024px)`.
-
-#### Testing responsive layouts
-
-After any UI change, resize the browser to:
-- Mobile (< 600px) — verify single-column layout, no horizontal scrollbar.
-- Tablet (600–959px) — verify intermediate layouts.
-- Desktop (960px+) — verify multi-column layouts.
-
----
-
-### Step 10 — Database Strategy
-
-This stack uses **hosted Supabase** as the only database. There is no local database to
-build, run, or maintain.
-
-#### Key decisions
-
-- **No local Postgres build:** Development connects to Supabase CLI-managed local services
-  (`supabase start`) or to the hosted project directly. Docker Compose does not include a
-  Postgres service.
-- **Migrations are forward-only:** Versioned SQL files in `supabase/migrations/`, applied
-  via `supabase db push`. Never edit a merged migration.
-- **RLS is mandatory:** Every tenant-scoped table has Row-Level Security policies with both
-  `USING` and `WITH CHECK` clauses. Policies use JWT claims, not application-layer filters.
-- **Connection pooling:** Use Supabase's built-in PgBouncer (transaction mode) for
-  production connections.
-
-#### Why remote-only
-
-- Supabase provides Auth, Storage, Realtime, and Edge Functions alongside the database —
-  replicating this locally adds significant complexity.
-- The Supabase CLI local stack (`supabase start`) provides a local environment that mirrors
-  production closely enough for development.
-- Migrations are the source of truth for schema; the database is a commodity, not a build
-  artefact.
-
----
-
-### Step 11 — Checklist Before First Deploy
-
-- [ ] Backend `.env` has all Supabase credentials
-- [ ] Backend health endpoint responds at `/api/health`
-- [ ] Frontend builds successfully with `ng build --configuration=production`
-- [ ] `docker compose up --build` runs both services and `/api/health` is reachable via `http://localhost/api/health`
-- [ ] Nginx proxies `/api/` requests correctly to backend
-- [ ] GHCR images build and push from GitHub Actions
-- [ ] Bunny app created with both containers, endpoints configured
-- [ ] `BACKEND_HOST=localhost` set on frontend container in Bunny
-- [ ] DNS records point custom hostnames to Bunny endpoints
-- [ ] RLS enabled on all Supabase tables
+## 14. Replicating This Architecture
+
+The distinctive choices, in the order they matter:
+
+1. **pnpm + Turborepo monorepo.** `pnpm-workspace.yaml` covers `apps/*` and `packages/*`;
+   `turbo.json` fans out `build` / `test` / `lint`. Root `package.json` also hosts the
+   `db:migrate` / `test:*` / `lint:*` convenience scripts.
+2. **Hosted Supabase as the only database — in every environment.** No Postgres in
+   `docker-compose.yml`. Local dev uses the Supabase **CLI** stack (`supabase start`,
+   `supabase/config.toml`), which honours the custom access-token hook. Migrations are
+   forward-only versioned SQL applied by the CLI.
+3. **Tenancy through a JWT claim + forced RLS.** A custom access-token hook injects `tenant_id`;
+   every tenant table forces RLS with `USING` + `WITH CHECK`; the API never filters by tenant in
+   application code and never reveals cross-tenant existence.
+4. **FastAPI modular monolith.** One deployable. `src/<pkg>/modules/<domain>/{router,schemas,service}.py`;
+   cross-module calls go through interfaces, not shared state. `uv` for install/run; Hatchling build.
+5. **Angular 19, standalone + signals, runtime i18n.** No NgModules. Signals for local state, RxJS
+   for streams, strict TS, no `any`. `@ngx-translate` loads JSON at runtime; a missing key in
+   either language fails CI. CSS logical properties for RTL.
+6. **RQ over Redis for background work.** Redis is the broker only. Separate worker packages under
+   `services/`, one RQ queue each. The API image doubles as a worker image with a different
+   entrypoint where the job is API-owned (exports).
+7. **Two-stage container images with a `/workspace` layout.** Python images place the app two
+   directories deep so a local editable package (`packages/py-logging`) resolves by the same
+   relative path in the container as in a checkout. The web image is `node:20-alpine` build →
+   `nginx:1.27-alpine` serve, with `envsubst '${BACKEND_HOST}'` at start.
+8. **GitHub Actions → GHCR → bunny.net Magic Containers.** One `ci.yml` (secrets, lint, backend
+   tests on a real pgvector Postgres, a dedicated tenant-isolation job, web unit + build, and a
+   full `supabase start` e2e job with axe-core a11y). One `deploy-<service>.yml` per deployable:
+   build + push `ghcr.io/<owner>/<name>:{latest,sha}`, then `BunnyWay/actions/container-update-image`.
+   `infra/terraform/` provisions the bunny.net app, image registry, and DNS with the `bunnynet`
+   provider.
+9. **Eval harnesses as CI smoke gates.** `ml/evals/product_matching/run_eval.py` runs in `ci.yml`
+   and must report an honest "not validated" status until a real benchmark exists — the harness
+   ships before the data, but it is never allowed to *claim* a passing metric it cannot measure.
+
+### Checklist before a first deploy
+
+- [ ] `.env` has all Supabase credentials (`SUPABASE_URL`, `ANON`/`SERVICE_ROLE` keys,
+      `JWT_SECRET`, `DATABASE_URL`) and `REDIS_URL`.
+- [ ] `supabase/config.toml`'s `[auth.hook.custom_access_token]` is enabled and the hook injects
+      `tenant_id`.
+- [ ] All migrations apply cleanly from empty via the Supabase CLI; every tenant table forces RLS.
+- [ ] `pnpm test` is green (turbo: api pytest, web Karma, e2e Playwright, tenant-isolation, a11y).
+- [ ] `docker compose up --build` runs the whole local stack and `/api/v1/health` is reachable
+      through Nginx on `:4200`.
+- [ ] `ci.yml` passes on a PR (secrets, lint, backend-tests, tenant-isolation, web-unit-tests, e2e).
+- [ ] `ghcr.io` images build and push from each `deploy-<service>.yml`.
+- [ ] bunny.net apps exist; `BUNNY_*` Actions secrets set; frontend container has
+      `BACKEND_HOST=localhost`; DNS records point the custom hostnames at the bunny.net endpoints.
+- [ ] `infra/terraform/production.tfvars` is populated and **not** committed.
