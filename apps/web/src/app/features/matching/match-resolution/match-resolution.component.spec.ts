@@ -249,7 +249,7 @@ describe('MatchResolutionComponent (T039)', () => {
     expect(component.selectedOutcome()).toBe('same_product');
   });
 
-  it('should select a focused candidate card with Space without confirming', () => {
+  it('should select a focused candidate radio without confirming', () => {
     apiService.getMatchTaskForLine.and.returnValue(
       of({
         ...mockTask,
@@ -261,13 +261,25 @@ describe('MatchResolutionComponent (T039)', () => {
     fixture.detectChanges();
     apiService.resolveMatch.calls.reset();
 
-    const candidateCards = fixture.nativeElement.querySelectorAll('.candidate-card');
-    candidateCards[1].dispatchEvent(
-      new KeyboardEvent('keydown', { key: ' ', bubbles: true }),
-    );
+    const radioInputs = fixture.nativeElement.querySelectorAll('.cand-radio-input');
+    radioInputs[1].checked = true;
+    radioInputs[1].dispatchEvent(new Event('change', { bubbles: true }));
 
     expect(component.selectedCandidateId()).toBe('cand-2');
     expect(apiService.resolveMatch).not.toHaveBeenCalled();
+  });
+
+  it('should expose candidate choices as native radio controls', () => {
+    fixture.detectChanges();
+
+    const candidateCards = fixture.nativeElement.querySelectorAll('.candidate-card');
+    const radioInputs = fixture.nativeElement.querySelectorAll('.cand-radio-input');
+
+    expect(candidateCards.length).toBe(2);
+    expect(radioInputs.length).toBe(2);
+    expect(candidateCards[0].getAttribute('role')).toBeNull();
+    expect(radioInputs[0].getAttribute('type')).toBe('radio');
+    expect(radioInputs[0].getAttribute('name')).toBe('candidate_selection');
   });
 
   it('should show quoted exposure on the detail page', () => {

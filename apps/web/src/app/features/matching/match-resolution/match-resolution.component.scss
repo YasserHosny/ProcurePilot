@@ -221,12 +221,28 @@
   border: 2px solid #e2e8f0;
   border-radius: 8px;
   cursor: pointer;
-  outline: none;
+  margin: 0;
 
   &:hover { border-color: #94a3b8; }
-  &:focus-visible { border-color: #3b82f6; }
+  &:has(.cand-radio-input:focus-visible) {
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 2px #eff6ff;
+  }
   &.selected { border-color: #2563eb; background: #f8faff; }
   &.rank-first { border-inline-start: 5px solid #2563eb; }
+  &.disabled { cursor: default; }
+}
+
+.cand-radio-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
 }
 
 .cand-rank-badge {
@@ -316,7 +332,35 @@
 
 .cand-select-footer {
   margin-top: auto;
-  .cand-select-btn { width: 100%; }
+
+  .cand-select-indicator {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    width: 100%;
+    padding: 0 1rem;
+    height: 36px;
+    border: 1px solid #cbd5e1;
+    border-radius: 4px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #0f172a;
+    background: transparent;
+    transition: all 0.2s;
+
+    &.selected {
+      border-color: #2563eb;
+      color: #2563eb;
+      background: rgba(37, 99, 235, 0.04);
+    }
+
+    mat-icon {
+      font-size: 1.25rem;
+      width: 1.25rem;
+      height: 1.25rem;
+    }
+  }
 }
 
 .outcomes-radio-group {

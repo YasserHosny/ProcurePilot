@@ -132,15 +132,14 @@ behavior after a completed resolution, but it is not a substitute for a future t
 outbox-backed design that can guarantee no decision exists without the required audit/cost side
 effects.
 
-## Implementation Follow-Up — 2026-09-10 Candidate Keyboard Selection
+## Implementation Follow-Up — 2026-09-10 Candidate Selection Semantics
 
-The match-resolution detail page now handles candidate-card keyboard activation locally:
+The match-resolution detail page now uses native radio semantics for candidate selection:
 
-- Focused candidate cards accept Space and Enter as selection commands.
-- The card-level handler prevents those keys from bubbling into the global confirmation shortcut,
-  so a reviewer can select a close candidate without accidentally resolving the line.
-- Component coverage proves a `close_candidates` task remains unselected until the reviewer chooses
-  a card, and that Space selection does not call the resolution API.
+- Candidate cards are backed by native radio inputs instead of custom `div role="button"` behavior.
+- Close-candidate tasks still start without a preselected candidate and require deliberate selection.
+- Selecting a radio candidate does not call the resolution API; confirmation remains a separate action.
+- Component coverage proves the radio controls exist and the old custom button role is gone.
 
-Remaining UI/accessibility work is to replace the current `div role="button"` cards with native
-radio-style selection controls when the candidate-card markup is next revisited.
+Remaining UI/accessibility work is broader cleanup of keyboard shortcut copy, card focus styling, and
+screen-reader labelling after the next visual QA pass.

@@ -260,14 +260,6 @@ export class MatchResolutionComponent implements OnInit {
     }
   }
 
-  handleCandidateCardKeydown(event: KeyboardEvent, candidateId: string): void {
-    if (!this.isWriter() || this.decision()) return;
-    if (event.key !== 'Enter' && event.key !== ' ') return;
-    event.preventDefault();
-    event.stopPropagation();
-    this.selectCandidate(candidateId);
-  }
-
   selectOutcome(outcome: MatchOutcome): void {
     this.selectedOutcome.set(outcome);
     if (outcome === 'no_match_new_product') {
@@ -283,13 +275,16 @@ export class MatchResolutionComponent implements OnInit {
   // FR-012: Keyboard navigation & confirmation
   @HostListener('window:keydown', ['$event'])
   handleKeyboardEvent(event: KeyboardEvent): void {
-    // Ignore keyboard shortcuts if the user is typing in an input or select
-    const target = event.target as HTMLElement | null;
+    // Ignore keyboard shortcuts if the user is typing in a text input or select
+    const target = event.target as HTMLInputElement | null;
     const tagName = target?.tagName?.toLowerCase();
-    const isInput = tagName === 'input' || tagName === 'textarea' || tagName === 'select';
+    const isTextInput =
+      (tagName === 'input' && target?.type !== 'radio' && target?.type !== 'checkbox') ||
+      tagName === 'textarea' ||
+      tagName === 'select';
 
     // Allow Enter inside input if Ctrl or Meta is pressed
-    if (event.key === 'Enter' && (event.ctrlKey || event.metaKey || !isInput)) {
+    if (event.key === 'Enter' && (event.ctrlKey || event.metaKey || !isTextInput)) {
       if (this.isWriter() && !this.isSubmitting() && !this.decision()) {
         event.preventDefault();
         this.confirmResolution();
@@ -297,7 +292,7 @@ export class MatchResolutionComponent implements OnInit {
       }
     }
 
-    if (isInput) return;
+    if (isTextInput) return;
 
     // Number keys 1-9: Select candidate by rank
     const digit = parseInt(event.key, 10);

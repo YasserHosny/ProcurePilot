@@ -224,16 +224,20 @@
       } @else {
         <div class="candidates-grid">
           @for (cand of candidates(); track cand.id) {
-            <div
+            <label
               class="candidate-card"
               [class.selected]="selectedCandidateId() === cand.id && selectedOutcome() !== 'no_match_new_product'"
               [class.rank-first]="cand.rank === 1"
-              (click)="isWriter() && !decision() && selectCandidate(cand.id)"
-              (keydown)="handleCandidateCardKeydown($event, cand.id)"
-              tabindex="0"
-              role="button"
-              [attr.aria-pressed]="selectedCandidateId() === cand.id && selectedOutcome() !== 'no_match_new_product'"
             >
+              <input
+                type="radio"
+                name="candidate_selection"
+                class="cand-radio-input"
+                [value]="cand.id"
+                [checked]="selectedCandidateId() === cand.id && selectedOutcome() !== 'no_match_new_product'"
+                (change)="selectCandidate(cand.id)"
+                [disabled]="!isWriter() || decision() !== null"
+              />
               <!-- Candidate Card Header -->
               <div class="cand-header">
                 <div class="cand-rank-group">
@@ -344,19 +348,16 @@
               <!-- Select Radio / Check -->
               @if (isWriter() && !decision()) {
                 <div class="cand-select-footer">
-                  <button
-                    mat-stroked-button
-                    type="button"
-                    [color]="selectedCandidateId() === cand.id && selectedOutcome() !== 'no_match_new_product' ? 'primary' : undefined"
-                    (click)="selectCandidate(cand.id); $event.stopPropagation()"
-                    class="cand-select-btn"
+                  <div
+                    class="cand-select-indicator"
+                    [class.selected]="selectedCandidateId() === cand.id && selectedOutcome() !== 'no_match_new_product'"
                   >
                     <mat-icon aria-hidden="true">{{ selectedCandidateId() === cand.id && selectedOutcome() !== 'no_match_new_product' ? 'check_circle' : 'radio_button_unchecked' }}</mat-icon>
                     <span>{{ (selectedCandidateId() === cand.id && selectedOutcome() !== 'no_match_new_product' ? 'matching.resolution.decision.matchedProduct' : 'matching.queue.actions.resolve') | translate }}</span>
-                  </button>
+                  </div>
                 </div>
               }
-            </div>
+            </label>
           }
         </div>
       }
