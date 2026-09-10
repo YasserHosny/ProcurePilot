@@ -7,6 +7,7 @@ from fastapi import APIRouter, Body, Depends, Header, Query, status
 
 from procurepilot_api.deps import CurrentMember, bearer_token, current_member
 from procurepilot_api.modules.requests.schemas import (
+    ApprovalDecisionInput,
     PurchaseRequest,
     PurchaseRequestCreate,
     PurchaseRequestList,
@@ -56,6 +57,22 @@ def list_requests(
         bearer_token=token,
         status=status_filter,
         branch_id=branch_id,
+        cursor=cursor,
+        limit=limit,
+    )
+
+
+@router.get("/approvals/pending", response_model=PurchaseRequestList)
+def list_pending_approvals(
+    token: Annotated[str, Depends(bearer_token)],
+    member: Annotated[CurrentMember, Depends(current_member)],
+    service: Annotated[RequestsService, Depends(get_requests_service)],
+    cursor: Annotated[str | None, Query()] = None,
+    limit: Annotated[int, Query(le=100)] = 50,
+) -> PurchaseRequestList:
+    return service.list_pending_approvals(
+        bearer_token=token,
+        member=member,
         cursor=cursor,
         limit=limit,
     )
@@ -119,4 +136,42 @@ def withdraw_request(
 ) -> PurchaseRequest:
     return service.withdraw_request(
         bearer_token=token, member=member, request_id=request_id
+    )
+
+
+@router.post(
+    "/requests/{request_id}/approve",
+    response_model=PurchaseRequest,
+)
+def approve_request(
+    request_id: UUID,
+    payload: Annotated[ApprovalDecisionInput, Body()],
+    token: Annotated[str, Depends(bearer_token)],
+    member: Annotated[CurrentMember, Depends(current_member)],
+    service: Annotated[RequestsService, Depends(get_requests_service)],
+) -> PurchaseRequest:
+    return service.approve_request(
+        bearer_token=token,
+        member=member,
+        request_id=request_id,
+        payload=payload,
+    )
+
+
+@router.post(
+    "/requests/{request_id}/reject",
+    response_model=PurchaseRequest,
+)
+def reject_request(
+    request_id: UUID,
+    payload: Annotated[ApprovalDecisionInput, Body()],
+    token: Annotated[str, Depends(bearer_token)],
+    member: Annotated[CurrentMember, Depends(current_member)],
+    service: Annotated[RequestsService, Depends(get_requests_service)],
+) -> PurchaseRequest:
+    return service.reject_request(
+        bearer_token=token,
+        member=member,
+        request_id=request_id,
+        payload=payload,
     )

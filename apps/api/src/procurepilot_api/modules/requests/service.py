@@ -20,8 +20,10 @@ from procurepilot_api.errors import (
     ServiceUnavailableError,
     UnprocessableEntityError,
 )
+from procurepilot_api.modules.auth.jwt import MemberRole
 from procurepilot_api.modules.members.service import authenticated_client
 from procurepilot_api.modules.requests.schemas import (
+    ApprovalDecisionInput,
     ApprovalStep,
     Money,
     PurchaseRequest,
@@ -185,6 +187,68 @@ class RequestsService:
                 steps_by_request.get(str(row["id"])),
             )
             for row in visible
+        ]
+        return PurchaseRequestList(items=items, next_cursor=next_cursor)
+
+    def list_pending_approvals(
+        self,
+        *,
+        bearer_token: str,
+        member: CurrentMember,
+        cursor: str | None = None,
+        limit: int = 50,
+    ) -> PurchaseRequestList:
+        client = authenticated_client(self._settings, bearer_token)
+        capped = _cap_limit(limit)
+        offset = _decode_cursor(cursor)
+
+        try:
+            query = (
+                client.table("approval_step")
+                .select(STEP_COLUMNS)
+                .eq("status", "pending")
+            )
+            if member.role is not MemberRole.owner:
+                query = query.eq(
+                    "assigned_membership_id", str(member.membership_id)
+                )
+            response = (
+                query.order("created_at", desc=True)
+                .order("id")
+                .range(offset, offset + capped)
+                .execute()
+            )
+        except APIError as exc:
+            raise ServiceUnavailableError(
+                details={"dependency": "database"}
+            ) from exc
+
+        step_rows = _rows(response.data)
+        visible_steps = step_rows[:capped]
+        next_cursor = (
+            _encode_cursor(offset + capped)
+            if len(step_rows) > capped
+            else None
+        )
+        if not visible_steps:
+            return PurchaseRequestList(items=[], next_cursor=next_cursor)
+
+        request_ids = [
+            str(step["purchase_request_id"]) for step in visible_steps
+        ]
+        request_rows = self._fetch_requests_batch(client, request_ids)
+        lines_by_request = self._fetch_lines_batch(client, request_ids)
+        steps_by_request = {
+            str(step["purchase_request_id"]): step for step in visible_steps
+        }
+
+        items = [
+            _purchase_request(
+                row,
+                lines_by_request.get(str(row["id"]), []),
+                steps_by_request.get(str(row["id"])),
+            )
+            for row in request_rows
         ]
         return PurchaseRequestList(items=items, next_cursor=next_cursor)
 
@@ -417,6 +481,38 @@ class RequestsService:
         )
         return _purchase_request(request_row, line_rows, step_row)
 
+    def approve_request(
+        self,
+        *,
+        bearer_token: str,
+        member: CurrentMember,
+        request_id: UUID,
+        payload: ApprovalDecisionInput,
+    ) -> PurchaseRequest:
+        return self._decide_request(
+            bearer_token=bearer_token,
+            member=member,
+            request_id=request_id,
+            payload=payload,
+            decision="approved",
+        )
+
+    def reject_request(
+        self,
+        *,
+        bearer_token: str,
+        member: CurrentMember,
+        request_id: UUID,
+        payload: ApprovalDecisionInput,
+    ) -> PurchaseRequest:
+        return self._decide_request(
+            bearer_token=bearer_token,
+            member=member,
+            request_id=request_id,
+            payload=payload,
+            decision="rejected",
+        )
+
     # ── internal helpers ──────────────────────────────────────────────
 
     def _estimate_products(self, product_ids: list[UUID]) -> list[LineEstimate]:
@@ -483,6 +579,29 @@ class RequestsService:
         return _one_row_or_not_found(
             response.data, resource="purchase_request"
         )
+
+    def _fetch_requests_batch(
+        self, client: Client, request_ids: list[str]
+    ) -> list[dict[str, object]]:
+        if not request_ids:
+            return []
+        try:
+            response = (
+                client.table("purchase_request")
+                .select(REQUEST_COLUMNS)
+                .in_("id", request_ids)
+                .execute()
+            )
+        except APIError as exc:
+            raise ServiceUnavailableError(
+                details={"dependency": "database"}
+            ) from exc
+        rows_by_id = {str(row["id"]): row for row in _rows(response.data)}
+        return [
+            rows_by_id[request_id]
+            for request_id in request_ids
+            if request_id in rows_by_id
+        ]
 
     def _fetch_lines_for(
         self, client: Client, request_id: str
@@ -592,6 +711,77 @@ class RequestsService:
             bearer_token=bearer_token,
         )
 
+    def _decide_request(
+        self,
+        *,
+        bearer_token: str,
+        member: CurrentMember,
+        request_id: UUID,
+        payload: ApprovalDecisionInput,
+        decision: str,
+    ) -> PurchaseRequest:
+        client = authenticated_client(self._settings, bearer_token)
+        request_row = self._fetch_request(client, request_id)
+        if str(request_row["status"]) != "submitted":
+            raise ConflictError(details={"reason": "not_submitted"})
+
+        rid = str(request_id)
+        step_row = self._fetch_step(client, rid)
+        if step_row is None or str(step_row["status"]) != "pending":
+            raise ConflictError(details={"reason": "no_pending_approval"})
+        _require_assigned_approver_or_owner(step_row, member)
+
+        now = _now_iso()
+        try:
+            step_response = (
+                client.table("approval_step")
+                .update(
+                    {
+                        "status": decision,
+                        "comment": payload.comment,
+                        "decided_by_membership_id": str(
+                            member.membership_id
+                        ),
+                        "decided_at": now,
+                    }
+                )
+                .eq("id", str(step_row["id"]))
+                .eq("status", "pending")
+                .execute()
+            )
+        except APIError as exc:
+            raise _write_error(exc) from exc
+        decided_step = _one_row_or_conflict(
+            step_response.data, reason="no_pending_approval"
+        )
+
+        try:
+            request_response = (
+                client.table("purchase_request")
+                .update({"status": decision, "updated_at": now})
+                .eq("id", rid)
+                .eq("status", "submitted")
+                .execute()
+            )
+        except APIError as exc:
+            raise _write_error(exc) from exc
+        decided_request = _one_row_or_conflict(
+            request_response.data, reason="not_submitted"
+        )
+
+        line_rows = self._fetch_lines_for(client, rid)
+        self._record(
+            bearer_token=bearer_token,
+            member=member,
+            action=f"requests.approval_step_{decision}",
+            target={
+                "purchase_request_id": rid,
+                "approval_step_id": str(decided_step["id"]),
+                "decided_by_membership_id": str(member.membership_id),
+            },
+        )
+        return _purchase_request(decided_request, line_rows, decided_step)
+
 
 def get_requests_service() -> RequestsService:
     return RequestsService()
@@ -607,6 +797,16 @@ def _require_requester(
         member.membership_id
     ):
         raise PermissionDeniedError(details={"reason": "not_requester"})
+
+
+def _require_assigned_approver_or_owner(
+    step_row: dict[str, object], member: CurrentMember
+) -> None:
+    if member.role is MemberRole.owner:
+        return
+    if str(step_row["assigned_membership_id"]) == str(member.membership_id):
+        return
+    raise PermissionDeniedError(details={"reason": "not_assigned_approver"})
 
 
 def _purchase_request(
@@ -754,6 +954,15 @@ def _one_row_or_not_found(
         raise ServiceUnavailableError(
             details={"reason": f"{resource}_write_ambiguous"}
         )
+    return rows[0]
+
+
+def _one_row_or_conflict(data: object, *, reason: str) -> dict[str, object]:
+    rows = _rows(data)
+    if len(rows) == 0:
+        raise ConflictError(details={"reason": reason})
+    if len(rows) != 1:
+        raise ServiceUnavailableError(details={"reason": "write_ambiguous"})
     return rows[0]
 
 

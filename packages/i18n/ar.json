@@ -1732,6 +1732,7 @@
       "requiredByDate": "مطلوب بحلول",
       "estimatedTotal": "الإجمالي المقدر",
       "budgetStatus": "حالة الميزانية",
+      "lines": "البنود",
       "actions": "إجراءات"
     },
     "actions": {
@@ -1750,6 +1751,14 @@
     "rejectSuccess": "تم رفض الطلب.",
     "genericError": "تعذر تسجيل القرار. يرجى المحاولة مرة أخرى.",
     "empty": "لا توجد طلبات تنتظر قرارك حاليًا.",
+    "notAvailable": "غير متاح",
+    "line": "بند",
+    "lines": "بنود",
+    "viewLines": "عرض البنود",
+    "hideLines": "إخفاء البنود",
+    "noLines": "لا توجد بنود.",
+    "budgetExceeded": "يتجاوز الميزانية",
+    "budgetRemaining": "المتبقي",
     "thresholdRules": {
       "sectionTitle": "قواعد عتبات الاعتماد",
       "createButton": "قاعدة عتبة جديدة",

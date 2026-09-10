@@ -1732,6 +1732,7 @@
       "requiredByDate": "Required By",
       "estimatedTotal": "Estimated Total",
       "budgetStatus": "Budget Status",
+      "lines": "Lines",
       "actions": "Actions"
     },
     "actions": {
@@ -1750,6 +1751,14 @@
     "rejectSuccess": "Request rejected.",
     "genericError": "Unable to record the decision. Please try again.",
     "empty": "No requests are currently awaiting your decision.",
+    "notAvailable": "Not available",
+    "line": "line",
+    "lines": "lines",
+    "viewLines": "View lines",
+    "hideLines": "Hide lines",
+    "noLines": "No line items.",
+    "budgetExceeded": "Exceeds budget",
+    "budgetRemaining": "Remaining",
     "thresholdRules": {
       "sectionTitle": "Approval Threshold Rules",
       "createButton": "New Threshold Rule",

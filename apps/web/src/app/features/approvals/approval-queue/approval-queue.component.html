@@ -1,4 +1,215 @@
 <div class="approval-queue-container">
-  <h1 class="approval-queue-title">{{ 'approvals.title' | translate }}</h1>
-  <p class="approval-queue-subtitle">{{ 'approvals.subtitle' | translate }}</p>
+  <div class="section-header">
+    <div>
+      <h1 class="approval-queue-title">{{ 'approvals.title' | translate }}</h1>
+      <p class="approval-queue-subtitle">{{ 'approvals.subtitle' | translate }}</p>
+    </div>
+  </div>
+
+  @if (errorMessage()) {
+    <div class="error-banner" role="alert">
+      <mat-icon class="error-icon" aria-hidden="true">error_outline</mat-icon>
+      <div class="error-text-wrap">
+        <div class="error-message">{{ errorMessage() }}</div>
+        @if (errorTraceId(); as traceId) {
+          <div class="error-trace">{{ traceId }}</div>
+        }
+      </div>
+    </div>
+  }
+
+  <mat-card class="approval-queue-card">
+    @if (isLoading()) {
+      <div class="loading-state" aria-live="polite">
+        <mat-spinner [attr.aria-label]="'common.loading' | translate" diameter="40"></mat-spinner>
+        <span>{{ 'common.loading' | translate }}</span>
+      </div>
+    } @else if (pendingRequests().length === 0) {
+      <div class="empty-state">
+        <mat-icon class="empty-icon" aria-hidden="true">inbox</mat-icon>
+        <p class="empty-message">{{ 'approvals.empty' | translate }}</p>
+      </div>
+    } @else {
+      <div class="table-responsive">
+        <table mat-table [dataSource]="pendingRequests()" multiTemplateDataRows class="approvals-table">
+          <ng-container matColumnDef="requiredByDate">
+            <th mat-header-cell *matHeaderCellDef>
+              {{ 'approvals.columns.requiredByDate' | translate }}
+            </th>
+            <td mat-cell *matCellDef="let req" class="date-cell">
+              {{ req.required_by_date }}
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="requester">
+            <th mat-header-cell *matHeaderCellDef>
+              {{ 'approvals.columns.requester' | translate }}
+            </th>
+            <td mat-cell *matCellDef="let req" class="requester-cell">
+              {{ req.requested_by_membership_id }}
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="branch">
+            <th mat-header-cell *matHeaderCellDef>
+              {{ 'approvals.columns.branch' | translate }}
+            </th>
+            <td mat-cell *matCellDef="let req" class="branch-cell">
+              {{ req.branch_id }}
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="costCentre">
+            <th mat-header-cell *matHeaderCellDef>
+              {{ 'approvals.columns.costCentre' | translate }}
+            </th>
+            <td mat-cell *matCellDef="let req" class="cost-centre-cell">
+              {{ req.cost_centre_id || ('approvals.notAvailable' | translate) }}
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="estimatedTotal">
+            <th mat-header-cell *matHeaderCellDef>
+              {{ 'approvals.columns.estimatedTotal' | translate }}
+            </th>
+            <td mat-cell *matCellDef="let req" class="total-cell">
+              <span class="total-amount">{{ formatMoney(req) }}</span>
+              @if (req.has_incomplete_estimate) {
+                <span class="incomplete-badge">
+                  {{ 'requests.incompleteEstimateBadge' | translate }}
+                </span>
+              }
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="budgetStatus">
+            <th mat-header-cell *matHeaderCellDef>
+              {{ 'approvals.columns.budgetStatus' | translate }}
+            </th>
+            <td mat-cell *matCellDef="let req" class="budget-cell">
+              @if (req.budget_status?.exceeds) {
+                <span
+                  class="budget-warning-badge"
+                  [matTooltip]="'requests.budgetStatus.exceedsWarning' | translate"
+                >
+                  <mat-icon class="warning-icon" aria-hidden="true">warning</mat-icon>
+                  <span>{{ 'approvals.budgetExceeded' | translate }}</span>
+                </span>
+              } @else if (req.budget_status) {
+                <span class="budget-remaining">
+                  {{ 'approvals.budgetRemaining' | translate }}:
+                  {{ req.budget_status.remaining_amount.currency }} {{ req.budget_status.remaining_amount.amount }}
+                </span>
+              } @else {
+                <span class="muted-text">{{ 'approvals.notAvailable' | translate }}</span>
+              }
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="lines">
+            <th mat-header-cell *matHeaderCellDef>
+              {{ 'approvals.columns.lines' | translate }}
+            </th>
+            <td mat-cell *matCellDef="let req" class="lines-cell">
+              <span class="lines-count">
+                {{ req.lines.length }} {{ (req.lines.length === 1 ? 'approvals.line' : 'approvals.lines') | translate }}
+              </span>
+              <button
+                mat-icon-button
+                type="button"
+                class="expand-lines-btn"
+                (click)="toggleExpand(req.id)"
+                [attr.aria-expanded]="isExpanded(req.id)"
+                [attr.aria-label]="(isExpanded(req.id) ? 'approvals.hideLines' : 'approvals.viewLines') | translate"
+                [matTooltip]="(isExpanded(req.id) ? 'approvals.hideLines' : 'approvals.viewLines') | translate"
+              >
+                <mat-icon aria-hidden="true">{{ isExpanded(req.id) ? 'expand_less' : 'expand_more' }}</mat-icon>
+              </button>
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="actions">
+            <th mat-header-cell *matHeaderCellDef>
+              {{ 'approvals.columns.actions' | translate }}
+            </th>
+            <td mat-cell *matCellDef="let req" class="actions-cell">
+              <button
+                mat-flat-button
+                color="primary"
+                type="button"
+                class="approve-btn"
+                [disabled]="isProcessing(req.id)"
+                (click)="openDecisionDialog(req, 'approve')"
+              >
+                <mat-icon aria-hidden="true">check</mat-icon>
+                <span>{{ 'approvals.actions.approve' | translate }}</span>
+              </button>
+              <button
+                mat-stroked-button
+                color="warn"
+                type="button"
+                class="reject-btn"
+                [disabled]="isProcessing(req.id)"
+                (click)="openDecisionDialog(req, 'reject')"
+              >
+                <mat-icon aria-hidden="true">close</mat-icon>
+                <span>{{ 'approvals.actions.reject' | translate }}</span>
+              </button>
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="expandedDetail">
+            <td mat-cell *matCellDef="let req" [attr.colspan]="displayedColumns.length" class="detail-cell">
+              @if (isExpanded(req.id)) {
+                <div class="line-details-wrapper">
+                  <div class="line-details-header">
+                    <span class="line-details-title">
+                      {{ 'requests.form.linesTitle' | translate }} ({{ req.lines.length }})
+                    </span>
+                  </div>
+                  @if (req.lines.length === 0) {
+                    <p class="no-lines-message">{{ 'approvals.noLines' | translate }}</p>
+                  } @else {
+                    <div class="nested-table-container">
+                      <table class="nested-lines-table">
+                        <thead>
+                          <tr>
+                            <th>{{ 'requests.form.productLabel' | translate }}</th>
+                            <th>{{ 'requests.form.quantityLabel' | translate }}</th>
+                            <th>{{ 'requests.form.estimatedUnitPriceLabel' | translate }}</th>
+                            <th>{{ 'requests.form.noteLabel' | translate }}</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          @for (line of req.lines; track line.id) {
+                            <tr class="line-item-row">
+                              <td class="product-col">{{ line.workspace_product_id }}</td>
+                              <td class="quantity-col">{{ line.quantity }}</td>
+                              <td class="price-col">{{ formatLinePrice(line) }}</td>
+                              <td class="note-col">
+                                {{ line.note || ('approvals.notAvailable' | translate) }}
+                              </td>
+                            </tr>
+                          }
+                        </tbody>
+                      </table>
+                    </div>
+                  }
+                </div>
+              }
+            </td>
+          </ng-container>
+
+          <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+          <tr mat-row *matRowDef="let row; columns: displayedColumns" class="request-row"></tr>
+          <tr
+            mat-row
+            *matRowDef="let row; columns: ['expandedDetail']"
+            class="detail-row"
+            [class.detail-row-collapsed]="!isExpanded(row.id)"
+          ></tr>
+        </table>
+      </div>
+    }
+  </mat-card>
 </div>
