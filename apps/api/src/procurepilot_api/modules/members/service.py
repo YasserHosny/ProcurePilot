@@ -252,6 +252,26 @@ class MemberService:
             bearer_token=bearer_token,
         )
 
+        # FR-009: a removed member may still be the assigned approver on pending requests. Re-route
+        # those to the owner now that the membership is marked removed. Best-effort — the removal
+        # itself has already committed and must not be undone if this follow-up fails; the requests
+        # module records its own audit entry per escalated step. Imported lazily because
+        # requests.service imports from this module.
+        try:
+            from procurepilot_api.modules.requests.service import RequestsService
+
+            RequestsService(self._settings).escalate_pending_steps_for_removed_member(
+                bearer_token=bearer_token,
+                actor=actor,
+                removed_membership_id=member_id,
+            )
+        except Exception:
+            logger.warning(
+                "Could not escalate pending approval steps after member removal",
+                extra={"member_id": str(member_id)},
+                exc_info=True,
+            )
+
     def create_branch_role_assignment(
         self,
         *,

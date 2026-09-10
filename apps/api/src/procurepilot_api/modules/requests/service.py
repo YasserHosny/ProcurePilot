@@ -1186,6 +1186,79 @@ class RequestsService:
             )
         return row
 
+    def escalate_pending_steps_for_removed_member(
+        self,
+        *,
+        bearer_token: str,
+        actor: CurrentMember,
+        removed_membership_id: UUID,
+    ) -> int:
+        """FR-009: a member removed from the workspace with requests still pending their decision
+        must not strand those requests. Reassign every still-pending approval_step assigned to
+        them to the owner (source ``owner_fallback``) — the same escalation routing already
+        applies at submission time to a branch with no approver.
+
+        Called from the member-removal flow (members/service.py) AFTER the membership row is
+        marked ``removed``, so ``_fetch_owner_membership_id`` already excludes the just-removed
+        member (which matters when a co-owner is the one being removed). Returns the number of
+        steps escalated; each one is audited (FR-013), mirroring the submission-time escalation.
+
+        Only ``pending`` steps are touched — a decided step is history and the request has
+        already moved on. The per-row update repeats the ``status = 'pending'`` guard so a
+        decision landing concurrently is skipped rather than overwritten.
+        """
+        client = authenticated_client(self._settings, bearer_token)
+        try:
+            pending_response = (
+                client.table("approval_step")
+                .select("id,purchase_request_id")
+                .eq("assigned_membership_id", str(removed_membership_id))
+                .eq("status", "pending")
+                .execute()
+            )
+        except APIError as exc:
+            raise ServiceUnavailableError(
+                details={"dependency": "database"}
+            ) from exc
+
+        pending_rows = _rows(pending_response.data)
+        if not pending_rows:
+            return 0
+
+        owner_membership_id = self._fetch_owner_membership_id(client)
+        escalated = 0
+        for row in pending_rows:
+            try:
+                update_response = (
+                    client.table("approval_step")
+                    .update(
+                        {
+                            "assigned_membership_id": str(owner_membership_id),
+                            "source": "owner_fallback",
+                        }
+                    )
+                    .eq("id", str(row["id"]))
+                    .eq("status", "pending")
+                    .execute()
+                )
+            except APIError as exc:
+                raise _write_error(exc) from exc
+            if not _rows(update_response.data):
+                continue
+            escalated += 1
+            self._record(
+                bearer_token=bearer_token,
+                member=actor,
+                action="requests.approval_step_escalated",
+                target={
+                    "purchase_request_id": str(row["purchase_request_id"]),
+                    "approval_step_id": str(row["id"]),
+                    "assigned_membership_id": str(owner_membership_id),
+                    "reason": "assigned_approver_removed",
+                },
+            )
+        return escalated
+
     def _decide_request(
         self,
         *,
