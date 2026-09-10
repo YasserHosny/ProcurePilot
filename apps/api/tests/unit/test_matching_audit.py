@@ -170,12 +170,16 @@ def test_human_resolution_records_actor_outcome_and_product(
         },
     )
     monkeypatch.setattr(resolution_module, "_decision_for_line", lambda _client, _id: None)
-    monkeypatch.setattr(service, "_candidate_row", lambda *_args: {
-        "id": candidate_id,
-        "quotation_line_id": line_id,
-        "candidate_workspace_product_id": product_id,
-        "confidence": "0.8000",
-    })
+    monkeypatch.setattr(
+        service,
+        "_candidate_row",
+        lambda *_args: {
+            "id": candidate_id,
+            "quotation_line_id": line_id,
+            "candidate_workspace_product_id": product_id,
+            "confidence": "0.8000",
+        },
+    )
     monkeypatch.setattr(resolution_module, "_candidate", lambda *_args: None)
     monkeypatch.setattr(resolution_module, "_decision", lambda *_args: decision)
     monkeypatch.setattr(service, "_quotation_supplier_id", lambda *_args: None)
@@ -209,9 +213,7 @@ def test_match_resolution_route_passes_idempotency_key_to_service() -> None:
     )
     captured: dict[str, object] = {}
     expected = object()
-    service = SimpleNamespace(
-        resolve=lambda **kwargs: captured.update(kwargs) or expected
-    )
+    service = SimpleNamespace(resolve=lambda **kwargs: captured.update(kwargs) or expected)
 
     result = matching_router.resolve_match(
         line_id=line_id,
@@ -331,3 +333,154 @@ def test_human_resolution_rejects_reused_idempotency_key_for_different_payload(
         )
 
     assert exc_info.value.details == {"reason": "idempotency_key_reused"}
+
+
+def test_human_resolution_retry_repairs_missing_side_effects_after_decision_exists(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    line_id, candidate_id, decision_id, product_id, idempotency_key = (
+        uuid4(),
+        uuid4(),
+        uuid4(),
+        uuid4(),
+        uuid4(),
+    )
+    current_member = member()
+    payload = MatchResolutionRequest(
+        outcome="same_product",
+        selected_match_candidate_id=candidate_id,
+    )
+    decision_row = {
+        "id": decision_id,
+        "quotation_line_id": line_id,
+        "matched_workspace_product_id": product_id,
+        "selected_match_candidate_id": candidate_id,
+        "outcome": "same_product",
+        "is_automatic": False,
+        "decided_by": current_member.membership_id,
+        "decided_at": datetime.now(UTC),
+        "confidence": "0.8000",
+        "alias_id": None,
+    }
+    decision = MatchDecision(
+        id=decision_id,
+        quotation_line_id=line_id,
+        matched_product=ProductSummary(
+            id=product_id,
+            tenant_name="Paper",
+            canonical_name="Paper",
+            base_unit="each",
+            status="active",
+        ),
+        selected_match_candidate_id=candidate_id,
+        outcome="same_product",
+        is_automatic=False,
+        decided_by=current_member.membership_id,
+        decided_at=decision_row["decided_at"],
+        confidence="0.8000",
+    )
+    side_effects: list[str] = []
+    service = MatchResolutionService()
+    service._landed_cost = SimpleNamespace(  # type: ignore[assignment] # test double
+        compute_for_line_with_client=lambda **_kwargs: side_effects.append("landed_cost")
+    )
+    monkeypatch.setattr(
+        resolution_module, "authenticated_client", lambda _settings, _token: object()
+    )
+    monkeypatch.setattr(
+        resolution_module,
+        "_idempotency_record_for_key",
+        lambda _client, _tenant_id, _key: None,
+    )
+    monkeypatch.setattr(
+        resolution_module,
+        "_line_row",
+        lambda _client, _id: {
+            "id": line_id,
+            "quotation_id": uuid4(),
+            "original_text": "Paper",
+        },
+    )
+    monkeypatch.setattr(resolution_module, "_decision_for_line", lambda _client, _id: decision_row)
+    monkeypatch.setattr(resolution_module, "_decision", lambda *_args: decision)
+    monkeypatch.setattr(service, "_resolve_open_task", lambda *_args: side_effects.append("task"))
+    monkeypatch.setattr(
+        resolution_module,
+        "_matching_resolution_audit_exists",
+        lambda *_args: False,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        resolution_module,
+        "_record_idempotency_decision",
+        lambda **_kwargs: side_effects.append("idempotency"),
+    )
+    writer = SimpleNamespace(record=lambda *_args, **_kwargs: side_effects.append("audit"))
+    monkeypatch.setattr(resolution_module, "get_audit_writer", lambda: writer)
+
+    result = service.resolve(
+        bearer_token="token",
+        member=current_member,
+        line_id=line_id,
+        payload=payload,
+        idempotency_key=idempotency_key,
+    )
+
+    assert result is decision
+    assert side_effects == ["task", "audit", "landed_cost", "idempotency"]
+
+
+def test_human_resolution_retry_rejects_different_payload_after_decision_exists(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    line_id, existing_candidate_id, requested_candidate_id, idempotency_key = (
+        uuid4(),
+        uuid4(),
+        uuid4(),
+        uuid4(),
+    )
+    current_member = member()
+    side_effects: list[str] = []
+    service = MatchResolutionService()
+    monkeypatch.setattr(
+        resolution_module, "authenticated_client", lambda _settings, _token: object()
+    )
+    monkeypatch.setattr(
+        resolution_module,
+        "_idempotency_record_for_key",
+        lambda _client, _tenant_id, _key: None,
+    )
+    monkeypatch.setattr(
+        resolution_module,
+        "_line_row",
+        lambda _client, _id: {
+            "id": line_id,
+            "quotation_id": uuid4(),
+            "original_text": "Paper",
+        },
+    )
+    monkeypatch.setattr(
+        resolution_module,
+        "_decision_for_line",
+        lambda _client, _id: {
+            "quotation_line_id": line_id,
+            "selected_match_candidate_id": existing_candidate_id,
+            "outcome": "same_product",
+        },
+    )
+    monkeypatch.setattr(service, "_resolve_open_task", lambda *_args: side_effects.append("task"))
+
+    with pytest.raises(resolution_module.ConflictError) as exc_info:
+        service.resolve(
+            bearer_token="token",
+            member=current_member,
+            line_id=line_id,
+            payload=MatchResolutionRequest(
+                outcome="same_product",
+                selected_match_candidate_id=requested_candidate_id,
+            ),
+            idempotency_key=idempotency_key,
+        )
+
+    assert exc_info.value.details == {"reason": "line_already_matched"}
+    assert side_effects == []

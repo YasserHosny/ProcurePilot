@@ -56,12 +56,27 @@ class MatchResolutionService:
                     raise ConflictError(details={"reason": "idempotency_key_reused"})
                 return _decision(
                     client,
-                    _decision_by_id(
-                        client, UUID(str(existing_request["match_decision_id"]))
-                    ),
+                    _decision_by_id(client, UUID(str(existing_request["match_decision_id"]))),
                 )
         line = _line_row(client, line_id)
-        if _decision_for_line(client, line_id) is not None:
+        existing_decision = _decision_for_line(client, line_id)
+        if existing_decision is not None:
+            if idempotency_key is not None and _decision_matches_payload(
+                existing_decision, payload
+            ):
+                decision = _decision(client, existing_decision)
+                self._complete_resolution_side_effects(
+                    client=client,
+                    bearer_token=bearer_token,
+                    member=member,
+                    line=line,
+                    line_id=line_id,
+                    decision=decision,
+                    idempotency_key=idempotency_key,
+                    request_fingerprint=fingerprint,
+                    repair_existing_decision=True,
+                )
+                return decision
             raise ConflictError(details={"reason": "line_already_matched"})
         if payload.outcome == "no_match_new_product":
             if payload.create_product is None:
@@ -111,27 +126,60 @@ class MatchResolutionService:
         except APIError as exc:
             raise ServiceUnavailableError(details={"dependency": "database"}) from exc
         decision = _decision(client, _one_row(response.data, resource="match_decision"))
-        self._resolve_open_task(client, line_id)
-        get_audit_writer().record(
-            AuditEventCreate(
-                tenant_id=member.tenant_id,
-                actor_membership_id=member.membership_id,
-                actor_email=member.email,
-                action="matching.resolved",
-                target={
-                    "quotation_id": str(line["quotation_id"]),
-                    "quotation_line_id": str(line_id),
-                    "decision_id": str(decision.id),
-                    "candidate_id": str(candidate_id) if candidate_id else None,
-                    "matched_product_id": str(decision.matched_product.id),
-                    "outcome": decision.outcome,
-                    "score": decision.confidence,
-                },
-                outcome="success",
-                trace_id=get_trace_id(),
-            ),
+        self._complete_resolution_side_effects(
+            client=client,
             bearer_token=bearer_token,
+            member=member,
+            line=line,
+            line_id=line_id,
+            decision=decision,
+            idempotency_key=idempotency_key,
+            request_fingerprint=fingerprint,
+            repair_existing_decision=False,
         )
+        return decision
+
+    def _complete_resolution_side_effects(
+        self,
+        *,
+        client: object,
+        bearer_token: str,
+        member: CurrentMember,
+        line: dict[str, object],
+        line_id: UUID,
+        decision: MatchDecision,
+        idempotency_key: UUID | None,
+        request_fingerprint: str,
+        repair_existing_decision: bool,
+    ) -> None:
+        self._resolve_open_task(client, line_id)
+        if not repair_existing_decision or not _matching_resolution_audit_exists(
+            client, decision.id
+        ):
+            get_audit_writer().record(
+                AuditEventCreate(
+                    tenant_id=member.tenant_id,
+                    actor_membership_id=member.membership_id,
+                    actor_email=member.email,
+                    action="matching.resolved",
+                    target={
+                        "quotation_id": str(line["quotation_id"]),
+                        "quotation_line_id": str(line_id),
+                        "decision_id": str(decision.id),
+                        "candidate_id": (
+                            str(decision.selected_match_candidate_id)
+                            if decision.selected_match_candidate_id
+                            else None
+                        ),
+                        "matched_product_id": str(decision.matched_product.id),
+                        "outcome": decision.outcome,
+                        "score": decision.confidence,
+                    },
+                    outcome="success",
+                    trace_id=get_trace_id(),
+                ),
+                bearer_token=bearer_token,
+            )
         self._landed_cost.compute_for_line_with_client(
             client=client, member=member, line_id=line_id
         )
@@ -141,10 +189,9 @@ class MatchResolutionService:
                 member=member,
                 idempotency_key=idempotency_key,
                 line_id=line_id,
-                request_fingerprint=fingerprint,
+                request_fingerprint=request_fingerprint,
                 decision_id=decision.id,
             )
-        return decision
 
     def _candidate_row(
         self,
@@ -189,9 +236,7 @@ class MatchResolutionService:
         try:
             client.table("match_task").update(
                 {"status": "resolved", "resolved_at": datetime.now(UTC).isoformat()}
-            ).eq("quotation_line_id", str(line_id)).in_(
-                "status", ["open", "in_progress"]
-            ).execute()
+            ).eq("quotation_line_id", str(line_id)).in_("status", ["open", "in_progress"]).execute()
         except APIError as exc:
             raise ServiceUnavailableError(details={"dependency": "database"}) from exc
 
@@ -207,6 +252,35 @@ def _request_fingerprint(payload: MatchResolutionRequest) -> str:
         separators=(",", ":"),
     ).encode()
     return hashlib.sha256(encoded).hexdigest()
+
+
+def _decision_matches_payload(
+    decision: dict[str, object],
+    payload: MatchResolutionRequest,
+) -> bool:
+    if str(decision.get("outcome")) != payload.outcome:
+        return False
+    if payload.outcome == "no_match_new_product":
+        return False
+    return str(decision.get("selected_match_candidate_id")) == str(
+        payload.selected_match_candidate_id
+    )
+
+
+def _matching_resolution_audit_exists(client: object, decision_id: UUID) -> bool:
+    try:
+        rows = _rows(
+            client.table("audit_event")
+            .select("id")
+            .eq("action", "matching.resolved")
+            .eq("target->>decision_id", str(decision_id))
+            .limit(1)
+            .execute()
+            .data
+        )
+    except APIError as exc:
+        raise ServiceUnavailableError(details={"dependency": "audit_event"}) from exc
+    return bool(rows)
 
 
 def _idempotency_record_for_key(
