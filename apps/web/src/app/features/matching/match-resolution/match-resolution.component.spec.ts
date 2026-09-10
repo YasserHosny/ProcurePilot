@@ -249,6 +249,27 @@ describe('MatchResolutionComponent (T039)', () => {
     expect(component.selectedOutcome()).toBe('same_product');
   });
 
+  it('should select a focused candidate card with Space without confirming', () => {
+    apiService.getMatchTaskForLine.and.returnValue(
+      of({
+        ...mockTask,
+        reason: 'close_candidates',
+      }),
+    );
+
+    component.loadTask('line-99');
+    fixture.detectChanges();
+    apiService.resolveMatch.calls.reset();
+
+    const candidateCards = fixture.nativeElement.querySelectorAll('.candidate-card');
+    candidateCards[1].dispatchEvent(
+      new KeyboardEvent('keydown', { key: ' ', bubbles: true }),
+    );
+
+    expect(component.selectedCandidateId()).toBe('cand-2');
+    expect(apiService.resolveMatch).not.toHaveBeenCalled();
+  });
+
   it('should show quoted exposure on the detail page', () => {
     fixture.detectChanges();
 

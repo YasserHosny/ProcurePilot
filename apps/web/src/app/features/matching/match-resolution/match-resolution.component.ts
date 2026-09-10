@@ -260,6 +260,14 @@ export class MatchResolutionComponent implements OnInit {
     }
   }
 
+  handleCandidateCardKeydown(event: KeyboardEvent, candidateId: string): void {
+    if (!this.isWriter() || this.decision()) return;
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    event.preventDefault();
+    event.stopPropagation();
+    this.selectCandidate(candidateId);
+  }
+
   selectOutcome(outcome: MatchOutcome): void {
     this.selectedOutcome.set(outcome);
     if (outcome === 'no_match_new_product') {

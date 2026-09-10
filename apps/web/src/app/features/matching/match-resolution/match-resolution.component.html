@@ -229,6 +229,7 @@
               [class.selected]="selectedCandidateId() === cand.id && selectedOutcome() !== 'no_match_new_product'"
               [class.rank-first]="cand.rank === 1"
               (click)="isWriter() && !decision() && selectCandidate(cand.id)"
+              (keydown)="handleCandidateCardKeydown($event, cand.id)"
               tabindex="0"
               role="button"
               [attr.aria-pressed]="selectedCandidateId() === cand.id && selectedOutcome() !== 'no_match_new_product'"
