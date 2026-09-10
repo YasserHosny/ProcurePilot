@@ -109,7 +109,9 @@ paths:
       description: >
         Owner or buyer only. Select an existing candidate, or mark no_match_new_product and create
         a catalogue product inline using the same shape as chunk 4.2 ProductCreate. The exact
-        quotation line wording is inserted or reused as a product alias.
+        quotation line wording is inserted or reused as a product alias. When Idempotency-Key is
+        supplied, retrying the same line and request body returns the original decision; reusing
+        that key for a different line or request body returns 409.
       parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
       requestBody:
         required: true
@@ -127,7 +129,8 @@ paths:
         '409':
           description: >
             Line is not matchable, already has a decision, selected candidate is not valid for the
-            line, or the exact alias wording already belongs to another product.
+            line, the exact alias wording already belongs to another product, or Idempotency-Key was
+            reused with a different line/request body.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }

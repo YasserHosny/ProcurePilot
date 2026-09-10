@@ -111,3 +111,23 @@ Priority order:
 4. Supplier-code live-path implementation.
 5. Detail-page exposure, supplier prefill, i18n, and accessibility cleanup.
 6. Search scalability and benchmark/feedback dataset work.
+
+## Implementation Follow-Up — 2026-09-10
+
+The backend-integrity follow-up addresses the retry and deterministic-matching parts of the
+recommendations:
+
+- `POST /quotation-lines/{line_id}/match` now passes `Idempotency-Key` into the resolution service.
+- Match resolution now records an append-only tenant-scoped idempotency mapping and replays the
+  original decision when the same line/body/key is retried.
+- Reusing an idempotency key with a different line or request body is rejected with a conflict.
+- The live matching pipeline now loads line-level `field_extraction` values and passes exact
+  supplier-code aliases into deterministic matching.
+- Integration coverage was added for supplier-code auto-matching and append-only permissions, with
+  unit coverage for the route/service idempotency behavior.
+
+One important caveat remains: match resolution still performs decision, audit, landed-cost, and
+idempotency writes as multiple API/database operations. The new retry mapping improves client retry
+behavior after a completed resolution, but it is not a substitute for a future transactional RPC or
+outbox-backed design that can guarantee no decision exists without the required audit/cost side
+effects.

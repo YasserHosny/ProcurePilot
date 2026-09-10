@@ -194,7 +194,7 @@ class MatchingService:
                 line=line,
                 products=_deterministic_products_for_line(client, line),
                 aliases=_aliases_for_line(client, line),
-                supplier_code_aliases=[],
+                supplier_code_aliases=_supplier_code_aliases_for_line(client, line),
             )
             if deterministic is not None:
                 persisted = self._persist_candidates(
@@ -632,7 +632,7 @@ def _line_rows(client: object, quotation_id: UUID) -> list[dict[str, object]]:
         )
     except APIError as exc:
         raise ServiceUnavailableError(details={"dependency": "database"}) from exc
-    return _rows(response.data)
+    return _with_line_extracted_fields(client, _rows(response.data))
 
 
 def _line_row(client: object, line_id: UUID) -> dict[str, object]:
@@ -646,7 +646,9 @@ def _line_row(client: object, line_id: UUID) -> dict[str, object]:
         )
     except APIError as exc:
         raise ServiceUnavailableError(details={"dependency": "database"}) from exc
-    return _one_row(response.data, resource="quotation_line")
+    return _with_line_extracted_fields(
+        client, [_one_row(response.data, resource="quotation_line")]
+    )[0]
 
 
 def _deterministic_products_for_line(
@@ -709,6 +711,78 @@ def _aliases_for_line(client: object, line: dict[str, object]) -> list[dict[str,
     ]
 
 
+def _supplier_code_aliases_for_line(
+    client: object,
+    line: dict[str, object],
+) -> list[dict[str, object]]:
+    supplier_code = _line_field(line, "supplier_product_code")
+    if not supplier_code:
+        return []
+    supplier_id = _quotation_supplier_id(client, UUID(str(line["quotation_id"])))
+    try:
+        response = (
+            client.table("product_alias")
+            .select(ALIAS_COLUMNS)
+            .ilike("alias_text", supplier_code)
+            .limit(10)
+            .execute()
+        )
+    except APIError as exc:
+        raise ServiceUnavailableError(details={"dependency": "database"}) from exc
+    rows = [
+        row
+        for row in _rows(response.data)
+        if str(row["alias_text"]).casefold() == supplier_code.casefold()
+    ]
+    if supplier_id is None:
+        return rows
+    return [
+        row
+        for row in rows
+        if row.get("supplier_id") is None
+        or str(row["supplier_id"]) == str(supplier_id)
+    ]
+
+
+def _with_line_extracted_fields(
+    client: object,
+    lines: list[dict[str, object]],
+) -> list[dict[str, object]]:
+    if not lines:
+        return lines
+    line_ids = [UUID(str(line["id"])) for line in lines]
+    try:
+        response = (
+            client.table("field_extraction")
+            .select("entity_id,field_name,extracted_value,confidence")
+            .eq("entity_type", "quotation_line")
+            .in_("entity_id", [str(line_id) for line_id in line_ids])
+            .execute()
+        )
+    except APIError as exc:
+        raise ServiceUnavailableError(details={"dependency": "database"}) from exc
+    extracted_by_line: dict[str, dict[str, object]] = {str(line_id): {} for line_id in line_ids}
+    confidence_by_field: dict[tuple[str, str], Decimal] = {}
+    for field in _rows(response.data):
+        entity_id = str(field.get("entity_id") or "")
+        field_name = str(field.get("field_name") or "")
+        if not entity_id or not field_name or entity_id not in extracted_by_line:
+            continue
+        key = (entity_id, field_name)
+        confidence = _decimal_or_zero(field.get("confidence"))
+        if key in confidence_by_field and confidence < confidence_by_field[key]:
+            continue
+        confidence_by_field[key] = confidence
+        extracted_by_line[entity_id][field_name] = field.get("extracted_value")
+    return [
+        {
+            **line,
+            "extracted_fields": extracted_by_line.get(str(line["id"]), {}),
+        }
+        for line in lines
+    ]
+
+
 def _line_field(line: dict[str, object], field_name: str) -> str | None:
     value = line.get(field_name)
     if value:
@@ -717,6 +791,17 @@ def _line_field(line: dict[str, object], field_name: str) -> str | None:
     if isinstance(extracted, dict) and extracted.get(field_name):
         return str(extracted[field_name])
     return None
+
+
+def _quotation_supplier_id(client: object, quotation_id: UUID) -> UUID | None:
+    quote = _quotation_row(client, quotation_id)
+    return UUID(str(quote["supplier_id"])) if quote.get("supplier_id") else None
+
+
+def _decimal_or_zero(value: object) -> Decimal:
+    if value is None:
+        return Decimal("0")
+    return Decimal(str(value))
 
 
 def _workspace_products_missing_tenant_embedding(client: object) -> list[dict[str, object]]:

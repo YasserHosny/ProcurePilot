@@ -548,6 +548,28 @@ the lowercased wording already exists for the same product, the alias is reused.
 different product, the alias write is refused with a conflict and the existing alias is not
 overwritten.
 
+## `MatchResolutionIdempotency`
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | uuid | PK |
+| `tenant_id` | uuid | Required FK -> Tenant; RLS key |
+| `idempotency_key` | uuid | Required client retry key |
+| `quotation_line_id` | uuid | Required FK -> QuotationLine |
+| `request_fingerprint` | text | Required SHA-256 hex digest of the canonical request body |
+| `match_decision_id` | uuid | Required FK -> MatchDecision created by the original request |
+| `created_at` | timestamptz | Audit field |
+
+This append-only mapping backs `POST /quotation-lines/{line_id}/match`. A repeated key with the
+same line and request body returns the original match decision. Reusing the key with another line
+or request body is a conflict.
+
+Constraints:
+
+- Unique `(tenant_id, idempotency_key)`: one replay result per key in a workspace.
+- Unique `(tenant_id, match_decision_id)`: one replay mapping per decision.
+- `request_fingerprint` is a 64-character lowercase hexadecimal SHA-256 digest.
+
 ## `LandedCost`
 
 | Field | Type | Notes |

@@ -19,6 +19,7 @@ from integration.quotation_helpers import (
     PsycopgSupabaseClient,
     ensure_quotation_reference_data,
     make_document,
+    make_field,
     make_line,
     make_quotation,
     make_supplier,
@@ -132,6 +133,58 @@ def test_human_resolution_learns_exact_alias_and_next_identical_wording_auto_mat
         assert _count(cur, "match_decision", second_line_id) == 1
 
 
+def test_supplier_product_code_extraction_auto_matches_known_supplier_alias(
+    conn: object, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    with conn.cursor() as cur:
+        ensure_quotation_reference_data(cur)
+        workspace = make_workspace(cur, "supplier-code-alias")
+        supplier_id = make_supplier(cur, workspace, name="Code Alias Supplier")
+        product_id = make_workspace_product(
+            cur, workspace, name="Known supplier-code product", supplier_id=supplier_id
+        )
+        line_id = _reviewed_line(
+            cur,
+            workspace,
+            supplier_id,
+            original_text="Supplier long wording without exact alias",
+            line_number=1,
+        )
+        _alias(cur, workspace, product_id, supplier_id, alias_text="SUP-CODE-42")
+        _line_field(
+            cur,
+            workspace,
+            quotation_id=_quotation_id_for_line(cur, line_id),
+            line_id=line_id,
+            field_name="supplier_product_code",
+            extracted_value="SUP-CODE-42",
+        )
+        monkeypatch.setattr(
+            matching_module,
+            "authenticated_client",
+            lambda _settings, _bearer_token: PsycopgSupabaseClient(conn),
+        )
+        matching = MatchingService(cast(Settings, _MatchingSettings()))
+        matching._landed_cost = _NoopLandedCost()  # noqa: SLF001
+        monkeypatch.setattr(matching, "_backfill_missing_embeddings", lambda _client: None)
+
+        act_as(cur, workspace)
+        state = matching.quotation_matches(
+            bearer_token="test-token",
+            member=_member(workspace),
+            quotation_id=_quotation_id_for_line(cur, line_id),
+        )
+
+        assert len(state.lines) == 1
+        assert state.lines[0].decision is not None
+        assert state.lines[0].decision.is_automatic is True
+        assert state.lines[0].task is None
+        assert len(state.lines[0].candidates) == 1
+        assert state.lines[0].candidates[0].reasons.supplier_code_match is True
+        assert _count(cur, "match_task", line_id) == 0
+        assert _count(cur, "match_decision", line_id) == 1
+
+
 def _member(workspace: object) -> CurrentMember:
     return CurrentMember(
         membership_id=workspace.membership_id,
@@ -211,6 +264,54 @@ def _candidate(
         ),
     )
     return candidate_id
+
+
+def _alias(
+    cur: psycopg.Cursor,
+    workspace: object,
+    product_id: UUID,
+    supplier_id: UUID,
+    *,
+    alias_text: str,
+) -> UUID:
+    alias_id = uuid4()
+    act_as(cur, workspace)
+    cur.execute(
+        """
+        insert into product_alias (
+          id, tenant_id, workspace_product_id, supplier_id, alias_text, created_by
+        ) values (%s, %s, %s, %s, %s, %s)
+        """,
+        (
+            alias_id,
+            workspace.tenant_id,
+            product_id,
+            supplier_id,
+            alias_text,
+            workspace.membership_id,
+        ),
+    )
+    return alias_id
+
+
+def _line_field(
+    cur: psycopg.Cursor,
+    workspace: object,
+    *,
+    quotation_id: UUID,
+    line_id: UUID,
+    field_name: str,
+    extracted_value: object,
+) -> None:
+    make_field(
+        cur,
+        workspace,
+        quotation_id,
+        entity_id=line_id,
+        entity_type="quotation_line",
+        field_name=field_name,
+        extracted_value=extracted_value,
+    )
 
 
 def _alias_for_text(cur: psycopg.Cursor, alias_text: str) -> dict[str, object]:

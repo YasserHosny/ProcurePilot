@@ -10,6 +10,7 @@ import pytest
 from procurepilot_api.deps import CurrentMember
 from procurepilot_api.modules.auth.jwt import MemberRole
 from procurepilot_api.modules.matching import resolution_service as resolution_module
+from procurepilot_api.modules.matching import router as matching_router
 from procurepilot_api.modules.matching import service as matching_module
 from procurepilot_api.modules.matching.resolution_service import MatchResolutionService
 from procurepilot_api.modules.matching.schemas import (
@@ -198,3 +199,135 @@ def test_human_resolution_records_actor_outcome_and_product(
     assert event.target["quotation_line_id"] == str(line_id)
     assert event.target["matched_product_id"] == str(product_id)
     assert event.target["outcome"] == "same_product"
+
+
+def test_match_resolution_route_passes_idempotency_key_to_service() -> None:
+    line_id, candidate_id, idempotency_key = uuid4(), uuid4(), uuid4()
+    payload = MatchResolutionRequest(
+        outcome="same_product",
+        selected_match_candidate_id=candidate_id,
+    )
+    captured: dict[str, object] = {}
+    expected = object()
+    service = SimpleNamespace(
+        resolve=lambda **kwargs: captured.update(kwargs) or expected
+    )
+
+    result = matching_router.resolve_match(
+        line_id=line_id,
+        payload=payload,
+        token="token",
+        member=member(),
+        service=service,
+        _idempotency_key=idempotency_key,
+    )
+
+    assert result is expected
+    assert captured["idempotency_key"] == idempotency_key
+
+
+def test_human_resolution_replays_previous_decision_for_same_idempotency_key(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    line_id, candidate_id, decision_id, product_id, idempotency_key = (
+        uuid4(),
+        uuid4(),
+        uuid4(),
+        uuid4(),
+        uuid4(),
+    )
+    current_member = member()
+    decision = MatchDecision(
+        id=decision_id,
+        quotation_line_id=line_id,
+        matched_product=ProductSummary(
+            id=product_id,
+            tenant_name="Paper",
+            canonical_name="Paper",
+            base_unit="each",
+            status="active",
+        ),
+        selected_match_candidate_id=candidate_id,
+        outcome="same_product",
+        is_automatic=False,
+        decided_by=current_member.membership_id,
+        decided_at=datetime.now(UTC),
+        confidence="0.8000",
+    )
+    payload = MatchResolutionRequest(
+        outcome="same_product",
+        selected_match_candidate_id=candidate_id,
+    )
+    monkeypatch.setattr(
+        resolution_module,
+        "authenticated_client",
+        lambda _settings, _token: object(),
+    )
+    monkeypatch.setattr(resolution_module, "_line_row", lambda _client, _id: {})
+    monkeypatch.setattr(
+        resolution_module,
+        "_idempotency_record_for_key",
+        lambda _client, _tenant_id, _key: {
+            "idempotency_key": idempotency_key,
+            "quotation_line_id": line_id,
+            "request_fingerprint": resolution_module._request_fingerprint(payload),
+            "match_decision_id": decision_id,
+        },
+        raising=False,
+    )
+    monkeypatch.setattr(
+        resolution_module,
+        "_decision_by_id",
+        lambda _client, _decision_id: {"id": decision_id},
+        raising=False,
+    )
+    monkeypatch.setattr(resolution_module, "_decision", lambda *_args: decision)
+
+    result = MatchResolutionService().resolve(
+        bearer_token="token",
+        member=current_member,
+        line_id=line_id,
+        payload=payload,
+        idempotency_key=idempotency_key,
+    )
+
+    assert result is decision
+
+
+def test_human_resolution_rejects_reused_idempotency_key_for_different_payload(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    line_id, candidate_id, idempotency_key = uuid4(), uuid4(), uuid4()
+    current_member = member()
+    payload = MatchResolutionRequest(
+        outcome="same_product",
+        selected_match_candidate_id=candidate_id,
+    )
+    monkeypatch.setattr(
+        resolution_module,
+        "authenticated_client",
+        lambda _settings, _token: object(),
+    )
+    monkeypatch.setattr(resolution_module, "_line_row", lambda _client, _id: {})
+    monkeypatch.setattr(
+        resolution_module,
+        "_idempotency_record_for_key",
+        lambda _client, _tenant_id, _key: {
+            "idempotency_key": idempotency_key,
+            "quotation_line_id": line_id,
+            "request_fingerprint": "different",
+            "match_decision_id": uuid4(),
+        },
+        raising=False,
+    )
+
+    with pytest.raises(resolution_module.ConflictError) as exc_info:
+        MatchResolutionService().resolve(
+            bearer_token="token",
+            member=current_member,
+            line_id=line_id,
+            payload=payload,
+            idempotency_key=idempotency_key,
+        )
+
+    assert exc_info.value.details == {"reason": "idempotency_key_reused"}

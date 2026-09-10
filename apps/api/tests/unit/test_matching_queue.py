@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import Any
+from typing import cast
 from uuid import UUID, uuid4
 
 import pytest
@@ -11,28 +11,28 @@ from procurepilot_api.modules.matching.service import MatchingService
 
 
 class FakeQuery:
-    def __init__(self, data: list[dict[str, Any]]) -> None:
+    def __init__(self, data: list[dict[str, object]]) -> None:
         self._data = data
-        self.filters: list[tuple[str, str, Any]] = []
+        self.filters: list[tuple[str, str, object]] = []
         self.orders: list[tuple[str, bool]] = []
         self.range_args: tuple[int, int] | None = None
 
     def select(self, _cols: str) -> FakeQuery:
         return self
 
-    def eq(self, column: str, value: Any) -> FakeQuery:
+    def eq(self, column: str, value: object) -> FakeQuery:
         self.filters.append(("eq", column, value))
         return self
 
-    def in_(self, column: str, values: list[Any]) -> FakeQuery:
+    def in_(self, column: str, values: list[object]) -> FakeQuery:
         self.filters.append(("in", column, values))
         return self
 
-    def gte(self, column: str, value: Any) -> FakeQuery:
+    def gte(self, column: str, value: object) -> FakeQuery:
         self.filters.append(("gte", column, value))
         return self
 
-    def lte(self, column: str, value: Any) -> FakeQuery:
+    def lte(self, column: str, value: object) -> FakeQuery:
         self.filters.append(("lte", column, value))
         return self
 
@@ -44,9 +44,9 @@ class FakeQuery:
         self.range_args = (start, end)
         return self
 
-    def execute(self) -> Any:
+    def execute(self) -> object:
         class Result:
-            def __init__(self, data: list[dict[str, Any]]) -> None:
+            def __init__(self, data: list[dict[str, object]]) -> None:
                 self.data = data
 
         data = list(self._data)
@@ -57,7 +57,7 @@ class FakeQuery:
 
 
 class FakeClient:
-    def __init__(self, tables: dict[str, list[dict[str, Any]]]) -> None:
+    def __init__(self, tables: dict[str, list[dict[str, object]]]) -> None:
         self._tables = tables
         self.last_query: FakeQuery | None = None
 
@@ -218,6 +218,80 @@ def test_match_task_for_line_uses_direct_tenant_scoped_lookup(
     assert service.match_task_for_line(bearer_token="dummy", line_id=line_id) is expected
 
 
+def test_matching_pipeline_passes_supplier_code_aliases_to_deterministic_matcher(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    line_id = uuid4()
+    product_id = uuid4()
+    captured_supplier_code_aliases: list[dict[str, object]] = []
+    line = {
+        "id": line_id,
+        "quotation_id": uuid4(),
+        "line_number": 1,
+        "original_text": "Long supplier wording",
+        "extracted_fields": {"supplier_product_code": "SUP-CODE-42"},
+    }
+    supplier_code_alias = {
+        "id": uuid4(),
+        "workspace_product_id": product_id,
+        "supplier_id": uuid4(),
+        "alias_text": "SUP-CODE-42",
+    }
+    member = type(
+        "Member",
+        (),
+        {"tenant_id": uuid4(), "membership_id": uuid4(), "email": "buyer@example.test"},
+    )()
+    service = MatchingService()
+
+    monkeypatch.setattr(service, "_backfill_missing_embeddings", lambda _client: None)
+    monkeypatch.setattr(matching_service_module, "_decision_for_line", lambda _c, _lid: None)
+    monkeypatch.setattr(matching_service_module, "_candidate_rows", lambda _c, _lid: [])
+    monkeypatch.setattr(
+        matching_service_module,
+        "_deterministic_products_for_line",
+        lambda _c, _line: [],
+    )
+    monkeypatch.setattr(matching_service_module, "_aliases_for_line", lambda _c, _line: [])
+    monkeypatch.setattr(
+        matching_service_module,
+        "build_similarity_candidates",
+        lambda **_kwargs: [],
+    )
+    monkeypatch.setattr(
+        service,
+        "_route_or_accept",
+        lambda *_args, **_kwargs: None,
+    )
+
+    def fake_find_deterministic_candidate(**kwargs: object) -> None:
+        captured_supplier_code_aliases.extend(
+            cast(list[dict[str, object]], kwargs["supplier_code_aliases"])
+        )
+        return None
+
+    monkeypatch.setattr(
+        matching_service_module,
+        "find_deterministic_candidate",
+        fake_find_deterministic_candidate,
+    )
+    monkeypatch.setattr(
+        matching_service_module,
+        "_supplier_code_aliases_for_line",
+        lambda _client, _line: [supplier_code_alias],
+        raising=False,
+    )
+
+    service._ensure_pipeline(  # noqa: SLF001
+        client=object(),
+        member=member,
+        quote={"id": line["quotation_id"]},
+        lines=[line],
+    )
+
+    assert captured_supplier_code_aliases == [supplier_code_alias]
+
+
 def test_list_match_tasks_search_filters_by_supplier_or_quotation(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -253,7 +327,7 @@ def test_list_match_tasks_search_filters_by_supplier_or_quotation(
         lambda _settings, _token: client,
     )
 
-    def fake_line_row(_client: Any, lid: UUID) -> dict[str, Any]:
+    def fake_line_row(_client: object, lid: UUID) -> dict[str, object]:
         if lid == line1_id:
             return {
                 "id": line1_id,
@@ -296,7 +370,12 @@ def test_list_match_tasks_search_filters_by_supplier_or_quotation(
     monkeypatch.setattr(
         matching_service_module,
         "_quotation_row",
-        lambda _c, qid: {"id": qid, "tenant_id": uuid4(), "supplier_id": uuid4(), "status": "reviewed"},
+        lambda _c, qid: {
+            "id": qid,
+            "tenant_id": uuid4(),
+            "supplier_id": uuid4(),
+            "status": "reviewed",
+        },
     )
     monkeypatch.setattr(
         matching_service_module,
@@ -367,7 +446,7 @@ def test_list_match_tasks_search_finds_matches_beyond_first_page_before_paginati
         lambda _settings, _token: client,
     )
 
-    def fake_line_row(_client: Any, lid: UUID) -> dict[str, Any]:
+    def fake_line_row(_client: object, lid: UUID) -> dict[str, object]:
         text = "Needle Product" if lid == second_line_id else "Other Product"
         qid = {
             first_line_id: first_qid,
@@ -398,7 +477,12 @@ def test_list_match_tasks_search_finds_matches_beyond_first_page_before_paginati
     monkeypatch.setattr(
         matching_service_module,
         "_quotation_row",
-        lambda _c, qid: {"id": qid, "tenant_id": uuid4(), "supplier_id": None, "status": "reviewed"},
+        lambda _c, qid: {
+            "id": qid,
+            "tenant_id": uuid4(),
+            "supplier_id": None,
+            "status": "reviewed",
+        },
     )
 
     result = MatchingService().list_match_tasks(

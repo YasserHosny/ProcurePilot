@@ -930,6 +930,46 @@ def test_a_member_cannot_write_a_match_decision_into_another_workspace(
             )
 
 
+@pytest.mark.parametrize(
+    ("table", "id_column", "set_clause"),
+    [
+        ("match_candidate", "id", "confidence = 0.6"),
+        ("match_decision", "id", "confidence = 0.6"),
+        ("landed_cost", "id", "total_amount = 13"),
+    ],
+)
+def test_match_history_tables_are_append_only_for_authenticated_members(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+    table: str,
+    id_column: str,
+    set_clause: str,
+) -> None:
+    conn, alpha, _beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        cur.execute(
+            f"select {id_column} from {table} where quotation_line_id = %s",  # noqa: S608
+            (alpha.quotation_line_id,),
+        )
+        row = cur.fetchone()
+        assert row is not None
+        row_id = row[0]
+
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            cur.execute(
+                f"update {table} set {set_clause} where {id_column} = %s",  # noqa: S608
+                (row_id,),
+            )
+        conn.rollback()
+        act_as(cur, alpha)
+
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            cur.execute(
+                f"delete from {table} where {id_column} = %s",  # noqa: S608
+                (row_id,),
+            )
+
+
 def test_workspace_products_tenant_name_embedding_stays_tenant_scoped(
     workspaces: tuple[psycopg.Connection, Workspace, Workspace],
 ) -> None:
@@ -1371,6 +1411,7 @@ def test_rls_is_enabled_and_forced_on_every_tenant_scoped_table(
         "document", "quotation", "quotation_line", "field_extraction", "extraction_job",
         "review_task",
         "match_candidate", "match_task", "match_decision", "landed_cost",
+        "match_resolution_idempotency",
         "basket_split_job", "alert_dismissal",
         "purchase_record", "saving_record", "export_job", "billing_account", "plan",
         "branch", "cost_centre", "budget", "branch_role_assignment",

@@ -92,4 +92,10 @@ def resolve_match(
     service: Annotated[MatchResolutionService, Depends(get_match_resolution_service)],
     _idempotency_key: Annotated[UUID | None, Header(alias="Idempotency-Key")] = None,
 ) -> MatchDecision:
-    return service.resolve(bearer_token=token, member=member, line_id=line_id, payload=payload)
+    return service.resolve(
+        bearer_token=token,
+        member=member,
+        line_id=line_id,
+        payload=payload,
+        idempotency_key=_idempotency_key,
+    )

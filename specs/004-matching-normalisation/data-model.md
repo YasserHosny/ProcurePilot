@@ -175,6 +175,27 @@ Constraints:
 stored as zero because it is not modelled in chunk 4.3's `quotation_line` and is explicitly outside
 this chunk's assumptions.
 
+### `match_resolution_idempotency`
+
+| Field | Type | Constraints |
+|---|---|---|
+| `id` | uuid | PK |
+| `tenant_id` | uuid | not null, FK -> `tenant.id` - RLS key |
+| `idempotency_key` | uuid | not null |
+| `quotation_line_id` | uuid | not null, FK -> `quotation_line.id` |
+| `request_fingerprint` | text | not null, SHA-256 hex of the canonical request body |
+| `match_decision_id` | uuid | not null, FK -> `match_decision.id` |
+| `created_at` | timestamptz | not null |
+
+This append-only table backs `POST /quotation-lines/{line_id}/match` retry semantics. Reusing the
+same `Idempotency-Key` with the same line and request body returns the recorded decision. Reusing
+the key with a different line or body is rejected as a conflict.
+
+Constraints:
+- **unique** `(tenant_id, idempotency_key)` - one replay result per key in a workspace.
+- **unique** `(tenant_id, match_decision_id)` - one retry mapping per decision.
+- **check** `request_fingerprint` is a 64-character lowercase hexadecimal SHA-256 digest.
+
 ---
 
 ## Existing tables reused

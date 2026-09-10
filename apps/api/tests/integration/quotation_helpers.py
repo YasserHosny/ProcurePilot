@@ -242,6 +242,10 @@ class PsycopgTableQuery:
         self._where.append((column, "<=", value))
         return self
 
+    def ilike(self, column: str, value: object) -> PsycopgTableQuery:
+        self._where.append((column, "ilike", value))
+        return self
+
     def is_(self, column: str, value: str) -> PsycopgTableQuery:
         if value != "null":
             raise NotImplementedError("test adapter only supports is_(..., 'null')")
@@ -333,6 +337,9 @@ class PsycopgTableQuery:
                     sql.SQL("{} in ({})").format(column_sql, placeholders)
                 )
                 params.extend(values)
+            elif operator == "ilike":
+                clauses.append(sql.SQL("{} ilike {}").format(column_sql, sql.Placeholder()))
+                params.append(value)
             else:
                 clauses.append(
                     sql.SQL("{} {} {}").format(
