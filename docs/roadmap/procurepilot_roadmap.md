@@ -948,6 +948,9 @@ A layered pipeline, cheapest and most certain signals first:
 5. **Calibrated confidence** — score mapped to a calibrated probability; two thresholds: auto-accept and auto-reject, with the band between routed to human review.
 6. **Feedback loop** — every human decision writes a `ProductAlias` and a labelled training example.
 
+**Current MVP note:** until a labelled benchmark and calibration model are in place, the live
+matching score is presented as a heuristic ranking/routing score, not a calibrated probability.
+
 **Non-negotiable:** human review is a permanent component, not a temporary crutch. Target is to *shrink* the review band over time, never to remove the safety net.
 
 ### 13.3 Extraction Approach (Phase 1)
@@ -1278,4 +1281,3 @@ These margins are the basis of the >75% subscription gross-margin objective in s
 ## 22. One-Paragraph Roadmap Summary
 
 ProcurePilot begins with three months of concierge validation that proves savings by hand, produces the labelled datasets that define AI correctness, and closes the schema-determining decisions — above all the savings baseline policy. Phase 1 then builds a web-first intelligence MVP whose only job is to reproduce that concierge output reliably: document ingestion, AI extraction with human review, product matching with calibrated confidence, a versioned landed-cost engine, Smart Compare, and an auditable savings ledger. Phase 2 converts the tool into the customer's purchasing system of record by adding branches, budgets, requests, approvals, supplier performance, full basket optimisation, and a deliberately narrow mobile app serving three jobs — request, approve, confirm. Phase 3 removes manual data entry through email ingestion, accounting and POS integrations, order reconciliation, and a partner API. Phase 4 turns history into foresight with forecasting, supplier risk, negotiation briefs, automated sourcing, and a grounded procurement analyst. Each phase ends in a hard gate, every recommendation carries evidence, confidence, risk, and validity, and no phase proceeds on optimism instead of measured accuracy and verified customer value.
-

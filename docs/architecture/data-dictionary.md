@@ -472,7 +472,7 @@ document row to the caller's JWT tenant claim.
 | `tenant_id` | uuid | Required FK -> Tenant; RLS key |
 | `quotation_line_id` | uuid | Required FK -> QuotationLine |
 | `candidate_workspace_product_id` | uuid | Required FK -> WorkspaceProduct proposed for the line |
-| `confidence` | numeric(5,4) | Required calibrated confidence score; check `0 <= confidence <= 1` |
+| `confidence` | numeric(5,4) | Required heuristic match score; check `0 <= confidence <= 1` |
 | `reasons` | jsonb | Required structured evidence breakdown, not free prose |
 | `rank` | integer | Required candidate rank within the line and scoring version; check `> 0` |
 | `scoring_version` | text | Required scoring rule identifier, for example `matching-score-v1` |
@@ -480,7 +480,8 @@ document row to the caller's JWT tenant claim.
 | `created_at` | timestamptz | Audit field |
 
 `MatchCandidate` records evidence for a proposed product match. Deterministic matches still create
-a candidate row so the system can show confidence and reasons for the result.
+a candidate row so the system can show score and reasons for the result; the score ranks and routes
+candidates, but is not yet a calibrated statistical probability.
 
 Constraints:
 

@@ -6,6 +6,12 @@
 > (2) an adversarial read-only critique from Codex, asked to defend or concede each contested
 > finding rather than simply agree. Nothing in this document has been fixed yet — this is the
 > findings pass, not the resolution pass. Run 2026-09-05.
+>
+> **Status update, 2026-09-10:** follow-up migrations and tests now enforce append-only
+> permissions for `match_candidate`, `match_decision`, and `landed_cost`; the live pipeline now
+> wires supplier-code aliases from line-level extracted fields; and human match resolution now
+> persists retry mappings for `Idempotency-Key`. Historical findings below are kept for traceability
+> and should be read together with this status note.
 
 ---
 
@@ -130,7 +136,7 @@ metric — neither is met by any measurable definition.
 the weighted sum. At the default `MATCHING_AUTO_ACCEPT_THRESHOLD = 0.92`, a purely fuzzy candidate
 (no deterministic hit) caps out at a theoretical maximum of 0.70 — below the auto-accept
 threshold. In practice, **auto-accept today is almost entirely deterministic-key acceptance**
-(alias, GTIN, and supplier-code if it were wired), not uncalibrated fuzzy-score acceptance. This
+(alias, GTIN, and supplier-code), not uncalibrated fuzzy-score acceptance. This
 meaningfully narrows the immediate risk from "any wrong-but-confident-looking fuzzy match can
 silently auto-accept" to "deterministic-key acceptance is the load-bearing gate, and deterministic
 keys are not infallible either" (stale aliases, bad GTINs, duplicate catalogue products, ambiguous
@@ -205,8 +211,8 @@ nothing to catch it, and (per §3.2's mitigating math) that risk currently conce
 deterministic-match correctness and review-queue quality rather than runaway fuzzy auto-accept.
 
 **Recommendation**: this doesn't block current work, but it should stay a visibly tracked
-prerequisite before raising the auto-accept threshold's confidence, before wiring supplier-code
-matching live, or before any claim that SC-002/SC-003 are met.
+prerequisite before raising the auto-accept threshold, expanding automatic acceptance beyond
+deterministic evidence, or claiming that SC-002/SC-003 are met.
 
 ### 3.6 Eval harness exists but isn't wired into CI
 
@@ -283,9 +289,10 @@ before treating any task checklist as proof of completion going forward.
 
 ## 6. Priority order for follow-up work
 
-1. **FR-017** — revoke `update`/`delete` grants on `match_candidate`, `match_task`,
-   `match_decision`, `landed_cost`; add insert-only RLS policies matching `audit_event`. Highest
-   severity, smallest fix.
+1. **FR-017** — resolved for `match_candidate`, `match_decision`, and `landed_cost` by
+   `20260905000004_matching_append_only.sql`, with authenticated update/delete regression coverage
+   added on 2026-09-10. `match_task` remains mutable by design because queue status transitions from
+   open/in-progress to resolved.
 2. **Stub embedding** — zero its scoring weight and/or exclude it from candidate generation until a
    real embedding model is wired in. Second-highest severity, also a small fix.
 3. **Label confidence honestly** in UI/API as a heuristic match score, not "calibrated confidence,"
@@ -297,9 +304,9 @@ before treating any task checklist as proof of completion going forward.
 5. **Wire the eval harness into CI** as a smoke gate now (asserting the honest
    `not_validated_no_held_out_benchmark` status), so it's load-bearing the moment a benchmark
    exists.
-6. **Decide FR-002/supplier-code matching**: either wire real supplier-code data into
-   `supplier_code_aliases` or remove the dead parameter and update the spec/tasks to reflect GTIN +
-   alias only.
+6. **FR-002 supplier-code matching** — resolved on 2026-09-10 for the live API path: matching now
+   reads line-level extracted supplier product codes and uses tenant/supplier-scoped aliases before
+   falling back to similarity.
 7. **Decide User Story 4's scope**: build a minimal rule-version registry, or explicitly narrow
    this chunk's claim to "v1-only replay," and stop presenting bitemporal `valid_to` as populated
    when it never is.

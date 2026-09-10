@@ -60,16 +60,18 @@ procurepilot/
 - Validation layer: arithmetic checks and locale handling.
 - Returns extracted header + lines with confidence and page/region refs.
 
-### 2.3 `services/matching-worker`
+### 2.3 `apps/api` matching module
 
-- Consumes `QuotationLine` ready for matching.
+- Runs once a quotation reaches the reviewed state.
 - Layered pipeline:
   1. Deterministic keys (GTIN, supplier SKU, alias hit).
   2. `pg_trgm` lexical similarity.
   3. `pgvector` semantic similarity.
   4. Feature scoring (brand, variant, pack, unit, price plausibility).
-  5. Calibrated confidence; auto-accept, auto-reject, or human-review band.
-- Writes `MatchDecision` and learned `ProductAlias`.
+  5. Heuristic match score; automatic acceptance only above threshold and outside the close-call
+     margin, otherwise a match-resolution task is created.
+- Writes append-only `MatchDecision` rows, learned `ProductAlias` rows, landed-cost outputs, and
+  retry mappings for idempotent human resolution.
 
 ### 2.4 `services/optimiser`
 

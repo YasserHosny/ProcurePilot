@@ -55,7 +55,7 @@
 
 | ID | Requirement | Acceptance Criteria | Phase |
 |---|---|---|---|
-| F14 | Product matching | Propose candidate products with calibrated confidence and reason codes | P1 |
+| F14 | Product matching | Propose candidate products with heuristic match scores and reason codes | P1 |
 | F15 | Human resolution | Reviewer picks match, marks different pack/variant, or creates new product | P1 |
 | F16 | Unit normalisation | Compare offers on a common base unit and landed cost | P1 |
 | F17 | Auto-accept threshold | Precision at auto-accept ≥ 92% on held-out benchmark | P1 |

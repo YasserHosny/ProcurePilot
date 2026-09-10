@@ -461,6 +461,9 @@ Every monetary value is a `Money` object with `amount` as a decimal string and e
 - `reasons` includes `alias_hit`, `gtin_match`, `supplier_code_match`, decimal-string
   `lexical_similarity`, decimal-string `semantic_similarity`, and `feature_score` components for
   brand, variant, pack unit, pack size, and price plausibility.
+- Deterministic matching checks exact GTIN, supplier product code, and learned supplier wording
+  before similarity search. Supplier-code matching uses line-level extracted fields and
+  tenant/supplier-scoped aliases.
 - Returns `404` when the quotation is not in the caller's workspace; this is deliberately
   indistinguishable from a quotation that exists in another workspace.
 - Returns `409` when the quotation is not in the reviewed state yet.
@@ -495,6 +498,8 @@ Every monetary value is a `Money` object with `amount` as a decimal string and e
 - The exact quotation line wording is inserted or reused as a `ProductAlias`. If that lowercased
   wording already belongs to the same product, the alias is reused. If it belongs to a different
   product, the request returns `409` and the existing alias is not overwritten.
+- When `Idempotency-Key` is supplied, retrying the same line and request body returns the original
+  decision. Reusing that key for another line or request body returns `409`.
 - Returns `200` with a `MatchDecision`.
 - Match decision fields include `id`, `quotation_line_id`, `matched_product`,
   optional `selected_match_candidate_id`, `outcome`, `is_automatic`, optional `decided_by`,

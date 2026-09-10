@@ -142,7 +142,7 @@ Run these chunks sequentially. Each chunk should produce code, tests, and docs t
 ---
 
 ### Chunk 4.4 — Matching + Normalisation (R1.3)
-**Goal:** Lines are matched to products with calibrated confidence; landed cost is computed deterministically.
+**Goal:** Lines are matched to products with evidence-backed heuristic scores; landed cost is computed deterministically.
 
 **Inputs:**
 - `docs/product/prd.md` §3.4
@@ -151,7 +151,7 @@ Run these chunks sequentially. Each chunk should produce code, tests, and docs t
 - `docs/architecture/api-specification.md` §Review Queue, §Offers & Compare
 
 **Specify / implement:**
-1. Matching pipeline: deterministic keys → `pg_trgm` → `pgvector` → feature scoring → calibrated confidence.
+1. Matching pipeline: deterministic keys → `pg_trgm` → `pgvector` → feature scoring → heuristic match score.
 2. `ProductAlias` learning from human decisions.
 3. Unit/pack normalisation engine.
 4. Landed-cost engine with rule versioning.

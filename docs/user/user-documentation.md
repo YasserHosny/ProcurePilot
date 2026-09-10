@@ -1,7 +1,7 @@
 # ProcurePilot User Documentation
 
 > Complete system journey with annotated screenshots for every screen.
-> Last updated: 6 Sep 2026.
+> Last updated: 10 Sep 2026.
 
 ---
 
@@ -280,11 +280,13 @@ After AI extraction finishes, each quotation lands in the review queue. Open a r
 | 9 | **Extracted line items table** | One row per line, expandable to show quantity, pack details, unit price, delivery fee, discount, VAT %, and line total. Add lines with **+ Add Line Item**. Remove an existing editable line with the trash icon in that line's header; removal is staged and only applied when you save corrections. The computed total recalculates live as you edit any field or add/remove a line. |
 | 10 | **Field provenance panel** | For the field currently in focus, shows the extraction method, model version, source page, original AI value, and (if edited) the corrected value and who corrected it — labelled "Corrected by Human" on any field you've changed. |
 | 11 | **Reviewer Notes** | A free-text field for recording why a correction was made or leaving context for whoever authorizes the quotation. Saved together with corrections. |
-| 12 | **Audit Trail** | An expandable panel at the bottom logging every action taken on this quotation — upload, extraction, field corrections, status changes — with actor and timestamp. |
+| 12 | **Audit Trail** | An expandable panel at the bottom logging every action taken on this quotation — upload, extraction, field corrections, status changes, matching setup, automatic match acceptance, and reviewer match decisions — with actor and timestamp. |
 | 13 | **Save Corrections** | Persist manual edits without changing the quotation's status — you can return later. |
 | 14 | **Confirm & Authorize Quotation** | Marks the quotation as reviewed. Matching setup then shows loading, ready, or a retryable error; when ready, **Continue to Product Matching** opens only this quotation's matching group. A confirmation dialog states plainly that authorization **cannot be undone**. |
 
 **Supplier auto-match:** when the extracted vendor name resembles one of your existing suppliers closely enough, a banner appears below the supplier dropdown offering to pre-select it ("Suggested: {name} — {pct}% match", or a more tentative "Possible match" wording for a lower-confidence guess) — you still confirm it explicitly, nothing is ever auto-selected. If no reasonable match is found but a vendor name was extracted, the banner can instead offer to create the supplier directly from that name without leaving the page.
+
+**After authorization:** once a quotation is confirmed, product matching runs only against that reviewed quotation. Lines with a strong deterministic match, such as a known GTIN, supplier product code, or previously learned supplier wording, can be accepted automatically. Lines that are uncertain become match-resolution tasks instead of being silently used in comparison.
 
 **Review workflow:**
 1. Open a task from the review queue (section 7).
@@ -314,7 +316,7 @@ After AI extraction finishes, each quotation lands in the review queue. Open a r
 | 5 | **Routing Reason filter** | Filter by why the line was routed here: Low Confidence, No Candidate, Close Candidates, etc. |
 | 6 | **From date / To date** | Filters tasks by when they entered the matching queue. |
 | 7 | **Quotation groups** | Tasks are grouped by their uploaded quotation. Each group shows supplier, source filename, quotation reviewer, review time, issue date, and authoritative open/total line progress. Empty queues show "No match tasks found" rather than a blank surface. |
-| 8 | **Line evidence** | Each line shows its displayed line number, complete supplier wording, quoted exposure with currency, matching routing reason, top candidate and score, queue age, and matching status. `Below Match Threshold` refers to product matching, not OCR or quotation-review confidence. |
+| 8 | **Line evidence** | Each line shows its displayed line number, complete supplier wording, quoted exposure with currency, matching routing reason, top candidate and score, queue age, and matching status. `Below Match Threshold` refers to product matching, not OCR or quotation-review confidence. A line may be fully extracted and arithmetically verified in quotation review while still needing a product-matching decision here. |
 | 9 | **Resolve Match / View Details action** | Opens the resolution screen for that quotation line while preserving quotation context. The line itself is not clickable, so keyboard and screen-reader users get one predictable action target. Resolved lines switch to a detail-oriented action for auditing the saved decision. |
 
 ### Match Resolution detail
@@ -324,17 +326,19 @@ After AI extraction finishes, each quotation lands in the review queue. Open a r
 | # | Element | Description |
 |---|---------|-------------|
 | 1 | **Keyboard Controls bar** | 1–9 selects a candidate by rank, arrow keys navigate, O cycles through outcomes, Enter confirms the decision — the whole screen is operable without a mouse. |
-| 2 | **Line detail** | The extracted line text, quantity, and unit price for context. |
-| 3 | **Ranked Product Candidates** | Each candidate card shows the product's brand, variant, GTIN, and base unit, plus a **Match Score** and a reason breakdown (lexical similarity, semantic similarity, brand/variant/pack-unit/pack-size/price agreement). An explainer states plainly that this score ranks candidates — **it is not yet a calibrated probability** — so treat it as a ranking signal, not a statistical confidence level. |
+| 2 | **Line detail** | The extracted line text, quantity, unit price, quoted line exposure, and any mixed-currency warning for context. This lets you compare the matching decision against the value that will later appear in Smart Compare. |
+| 3 | **Ranked Product Candidates** | Each candidate card shows the product's brand, variant, GTIN, and base unit, plus a **Match Score** and a reason breakdown (GTIN match, supplier-code match, alias hit, lexical similarity, brand/variant/pack-unit/pack-size/price agreement, and semantic signal where available). An explainer states plainly that this score ranks candidates — **it is not yet a calibrated probability** — so treat it as a ranking signal, not a statistical confidence level. |
 
 ![Match Resolution Outcomes](screenshots/09c-match-resolution-outcomes.jpg)
 
 | # | Element | Description |
 |---|---------|-------------|
-| 4 | **Select Resolution Outcome** | Choose how the line resolves: **Same Product** (exact match), **Different Pack Size** (same product, different packaging), **Different Variant** (same family, different specification), **Compatible Alternative** (functional substitute), or **No Match — Create New Product** (adds a new catalogue product and maps this line to it). |
-| 5 | **Confirm Match Decision** | Saves the outcome. Confirming "Same Product" (or any outcome that selects a candidate) also learns the exact supplier wording as an alias, so an identical wording on a future quotation resolves automatically without going through this queue again. |
+| 4 | **Select Resolution Outcome** | Choose how the line resolves: **Same Product** (exact match), **Different Pack Size** (same product, different packaging), **Different Variant** (same family, different specification), **Compatible Alternative** (functional substitute), or **No Match — Create New Product** (adds a new catalogue product and maps this line to it). Close-candidate tasks require an explicit candidate choice; the screen does not preselect the top ranked option for you. |
+| 5 | **Confirm Match Decision** | Saves the outcome. Confirming "Same Product" (or any outcome that selects a candidate) also learns the exact supplier wording as an alias, so an identical wording on a future quotation resolves automatically without going through this queue again. If the same save request is retried because of a network interruption, ProcurePilot reuses the original saved decision instead of creating a duplicate. |
 
 **Business value:** matching is where supplier wording becomes business intelligence. It prevents fake comparisons, teaches the system each supplier's vocabulary, and reduces future operating work because repeated descriptions can resolve automatically once a human has confirmed them.
+
+**Audit note:** match-routing, automatic acceptance, and human resolution events are written to the quotation audit trail. Matching and landed-cost history is append-only; corrections to a confirmed match require a future correction/supersession workflow rather than editing the saved decision in place.
 
 ---
 
@@ -350,11 +354,13 @@ After AI extraction finishes, each quotation lands in the review queue. Open a r
 | 2 | **Product selector** | Select a product from your catalogue to see all available supplier offers. |
 | 3 | **Required Quantity field** | Enter the quantity you need. Prices recalculate live — tiers, minimum order values, and delivery thresholds update instantly. |
 | 4 | **Include expired offers toggle** | Check to include expired quotation offers in the comparison. |
-| 5 | **Recommended Offer banner** | Shown when a matched offer exists: a confidence badge (High/Medium/Low), a recommendation score, risk considerations (e.g. "Product match confidence is below 85%. Verify product specifications."), the price's validity window, and a scoring-evidence breakdown showing how much each factor (landed cost, match confidence, supplier reliability, lead time) contributed to the recommendation. |
-| 6 | **Comparison table** | Each row is one supplier offer: unit price, total landed cost, lead time, reliability, stock availability, match confidence, validity, and status. |
+| 5 | **Recommended Offer banner** | Shown when a matched and costed offer exists: a confidence badge (High/Medium/Low), a recommendation score, risk considerations (e.g. "Product match confidence is below 85%. Verify product specifications."), the price's validity window, and a scoring-evidence breakdown showing how much each factor (landed cost, match confidence, supplier reliability, lead time) contributed to the recommendation. |
+| 6 | **Comparison table** | Each row is one supplier offer created from reviewed, matched quotation data: unit price, total landed cost, lead time, reliability, stock availability, match confidence, validity, and status. Offers from lines still awaiting match resolution are intentionally excluded until a decision exists. |
 | 7 | **Record Purchase action** | From the banner or any table row, click "Record Purchase" to open the outcome-capture form (section 14) and have the savings automatically calculated. |
 
 **Business value:** Smart Compare converts cleaned data into a buying decision. It lowers recurring purchasing cost, gives buyers evidence for negotiation, and helps owners see why a recommendation was made before money is spent.
+
+**Data readiness:** Smart Compare depends on the full chain being complete: upload quotation → review and authorize → resolve product matching where needed → compute landed cost. If an expected quote is missing from comparison, check the Quotation Review Queue and Match Resolution Queue first.
 
 **Related screens:**
 - **Basket Split** — see next section.
@@ -370,7 +376,7 @@ After AI extraction finishes, each quotation lands in the review queue. Open a r
 | 1 | **Product selector** | Choose the catalogue product whose price history you want to inspect. A product ID in the route preselects this field. |
 | 2 | **Supplier filter** | Restrict the history to one supplier or keep all suppliers. |
 | 3 | **Time window** | Switch between the available history windows, such as 6 months. |
-| 4 | **Price intelligence panel** | Shows landed-cost trend metrics and historical records when verified purchase history exists. Until then, the page displays a no-history state with a link back to the Quotation Inbox so you can build source data. |
+| 4 | **Price intelligence panel** | Shows landed-cost trend metrics and historical records once reviewed quotations have been matched and costed for the selected product. Until then, the page displays a no-history state with a link back to the Quotation Inbox so you can build source data. |
 | 5 | **Smart Compare / View Product actions** | Jump back to Smart Compare or open the selected product's catalogue record. |
 
 **Business value:** price intelligence gives the business purchase memory. It helps buyers challenge increases, spot supplier drift, time negotiations, and decide whether a current offer is truly good compared with actual historical landed cost.
