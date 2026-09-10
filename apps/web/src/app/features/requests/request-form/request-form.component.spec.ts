@@ -275,4 +275,63 @@ describe('RequestFormComponent — edit mode (T017)', () => {
 
     expect(submittedRoute.componentInstance.form.disabled).toBeTrue();
   });
+
+  it('should not display budget status block when budget_status is absent', () => {
+    const compiled = fixture.nativeElement as HTMLElement;
+    expect(compiled.querySelector('.budget-warning-banner')).toBeNull();
+    expect(compiled.querySelector('.budget-status-row')).toBeNull();
+  });
+
+  it('should display informational warning with remaining budget when budget_status.exceeds is true without disabling submit', () => {
+    const exceedingRequest: PurchaseRequest = {
+      ...mockRequest,
+      budget_status: {
+        remaining_amount: { amount: '75.0000', currency: 'GBP' },
+        exceeds: true,
+      },
+    };
+    requestsApi.getRequest.and.returnValue(of(exceedingRequest));
+
+    const hostFixture = TestBed.createComponent(RequestFormComponent);
+    hostFixture.detectChanges();
+
+    const compiled = hostFixture.nativeElement as HTMLElement;
+    const warningBanner = compiled.querySelector('.budget-warning-banner');
+    expect(warningBanner).toBeTruthy();
+    expect(warningBanner?.textContent).toContain(
+      'This request would exceed the remaining budget for its scope.',
+    );
+    expect(warningBanner?.textContent).toContain('Remaining budget');
+    expect(warningBanner?.textContent).toContain('GBP 75.0000');
+
+    const submitBtn = compiled.querySelector<HTMLButtonElement>('button[color="accent"]');
+    expect(submitBtn).toBeTruthy();
+    expect(submitBtn?.disabled).toBeFalse();
+  });
+
+  it('should display quiet remaining budget status when budget_status exists and exceeds is false', () => {
+    const withinBudgetRequest: PurchaseRequest = {
+      ...mockRequest,
+      budget_status: {
+        remaining_amount: { amount: '500.0000', currency: 'GBP' },
+        exceeds: false,
+      },
+    };
+    requestsApi.getRequest.and.returnValue(of(withinBudgetRequest));
+
+    const hostFixture = TestBed.createComponent(RequestFormComponent);
+    hostFixture.detectChanges();
+
+    const compiled = hostFixture.nativeElement as HTMLElement;
+    expect(compiled.querySelector('.budget-warning-banner')).toBeNull();
+
+    const budgetRow = compiled.querySelector('.budget-status-row');
+    expect(budgetRow).toBeTruthy();
+    expect(budgetRow?.textContent).toContain('Remaining budget');
+    expect(budgetRow?.textContent).toContain('GBP 500.0000');
+
+    const submitBtn = compiled.querySelector<HTMLButtonElement>('button[color="accent"]');
+    expect(submitBtn).toBeTruthy();
+    expect(submitBtn?.disabled).toBeFalse();
+  });
 });

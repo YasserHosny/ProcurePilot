@@ -22,6 +22,11 @@ from procurepilot_api.errors import (
 )
 from procurepilot_api.modules.auth.jwt import MemberRole
 from procurepilot_api.modules.members.service import authenticated_client
+from procurepilot_api.modules.requests.budget_status import (
+    BudgetRow,
+    SpendRow,
+    compute_budget_status,
+)
 from procurepilot_api.modules.requests.routing import (
     DelegationRow,
     ThresholdRuleRow,
@@ -33,6 +38,7 @@ from procurepilot_api.modules.requests.schemas import (
     ApprovalDelegationCreate,
     ApprovalDelegationList,
     ApprovalStep,
+    BudgetStatus,
     Money,
     PurchaseRequest,
     PurchaseRequestCreate,
@@ -72,6 +78,9 @@ THRESHOLD_RULE_COLUMNS = (
 DELEGATION_COLUMNS = (
     "id,delegator_membership_id,delegate_membership_id,starts_on,ends_on,"
     "created_at"
+)
+BUDGET_COLUMNS = (
+    "id,amount,currency,period,period_start,scope,branch_id,cost_centre_id"
 )
 
 logger = logging.getLogger(__name__)
@@ -142,7 +151,9 @@ class RequestsService:
             action="requests.purchase_request_created",
             target={"purchase_request_id": request_id},
         )
-        return _purchase_request(request_row, line_rows, step_row=None)
+        return self._purchase_request_with_budget_status(
+            client, request_row, line_rows, step_row=None
+        )
 
     def get_request(
         self,
@@ -155,7 +166,9 @@ class RequestsService:
         rid = str(request_id)
         line_rows = self._fetch_lines_for(client, rid)
         step_row = self._fetch_step(client, rid)
-        return _purchase_request(request_row, line_rows, step_row)
+        return self._purchase_request_with_budget_status(
+            client, request_row, line_rows, step_row
+        )
 
     def list_requests(
         self,
@@ -201,7 +214,8 @@ class RequestsService:
         steps_by_request = self._fetch_steps_batch(client, request_ids)
 
         items = [
-            _purchase_request(
+            self._purchase_request_with_budget_status(
+                client,
                 row,
                 lines_by_request.get(str(row["id"]), []),
                 steps_by_request.get(str(row["id"])),
@@ -263,7 +277,8 @@ class RequestsService:
         }
 
         items = [
-            _purchase_request(
+            self._purchase_request_with_budget_status(
+                client,
                 row,
                 lines_by_request.get(str(row["id"]), []),
                 steps_by_request.get(str(row["id"])),
@@ -360,7 +375,9 @@ class RequestsService:
             action="requests.purchase_request_updated",
             target={"purchase_request_id": rid},
         )
-        return _purchase_request(request_row, new_line_rows, step_row)
+        return self._purchase_request_with_budget_status(
+            client, request_row, new_line_rows, step_row
+        )
 
     def submit_request(
         self,
@@ -456,7 +473,9 @@ class RequestsService:
             action="requests.purchase_request_submitted",
             target={"purchase_request_id": rid},
         )
-        return _purchase_request(request_row, frozen_lines, routed_step)
+        return self._purchase_request_with_budget_status(
+            client, request_row, frozen_lines, routed_step
+        )
 
     def withdraw_request(
         self,
@@ -504,7 +523,9 @@ class RequestsService:
             action="requests.purchase_request_withdrawn",
             target={"purchase_request_id": rid},
         )
-        return _purchase_request(request_row, line_rows, step_row)
+        return self._purchase_request_with_budget_status(
+            client, request_row, line_rows, step_row
+        )
 
     def approve_request(
         self,
@@ -1006,6 +1027,40 @@ class RequestsService:
             ) from exc
         return {UUID(str(row["id"])) for row in _rows(response.data)}
 
+    def _fetch_budget_rows(self, client: Client) -> list[BudgetRow]:
+        try:
+            response = client.table("budget").select(BUDGET_COLUMNS).execute()
+        except APIError as exc:
+            raise ServiceUnavailableError(
+                details={"dependency": "database"}
+            ) from exc
+        return [_budget_row(row) for row in _rows(response.data)]
+
+    def _fetch_committed_spend_rows(self, client: Client) -> list[SpendRow]:
+        try:
+            response = (
+                client.table("purchase_request")
+                .select(
+                    "id,branch_id,cost_centre_id,required_by_date,"
+                    "estimated_total_amount,estimated_total_currency,status"
+                )
+                .in_("status", ["submitted", "approved"])
+                .execute()
+            )
+        except APIError as exc:
+            raise ServiceUnavailableError(
+                details={"dependency": "database"}
+            ) from exc
+        spend_rows = []
+        for row in _rows(response.data):
+            if (
+                row.get("estimated_total_amount") is None
+                or row.get("estimated_total_currency") is None
+            ):
+                continue
+            spend_rows.append(_spend_row(row))
+        return spend_rows
+
     def _fetch_delegation(
         self, client: Client, delegation_id: UUID
     ) -> dict[str, object]:
@@ -1200,7 +1255,51 @@ class RequestsService:
                 "decided_by_membership_id": str(member.membership_id),
             },
         )
-        return _purchase_request(decided_request, line_rows, decided_step)
+        return self._purchase_request_with_budget_status(
+            client, decided_request, line_rows, decided_step
+        )
+
+    def _purchase_request_with_budget_status(
+        self,
+        client: Client,
+        request_row: dict[str, object],
+        line_rows: list[dict[str, object]],
+        step_row: dict[str, object] | None,
+    ) -> PurchaseRequest:
+        return _purchase_request(
+            request_row,
+            line_rows,
+            step_row,
+            budget_status=self._budget_status_for(client, request_row),
+        )
+
+    def _budget_status_for(
+        self,
+        client: Client,
+        request_row: dict[str, object],
+    ) -> BudgetStatus | None:
+        return compute_budget_status(
+            request_id=UUID(str(request_row["id"])),
+            request_amount=(
+                Decimal(str(request_row["estimated_total_amount"]))
+                if request_row.get("estimated_total_amount") is not None
+                else None
+            ),
+            request_currency=(
+                str(request_row["estimated_total_currency"])
+                if request_row.get("estimated_total_currency") is not None
+                else None
+            ),
+            branch_id=UUID(str(request_row["branch_id"])),
+            cost_centre_id=(
+                UUID(str(request_row["cost_centre_id"]))
+                if request_row.get("cost_centre_id")
+                else None
+            ),
+            required_by=_parse_date(request_row["required_by_date"]),
+            budgets=self._fetch_budget_rows(client),
+            committed_spend=self._fetch_committed_spend_rows(client),
+        )
 
 
 def get_requests_service() -> RequestsService:
@@ -1238,6 +1337,8 @@ def _purchase_request(
     row: dict[str, object],
     line_rows: list[dict[str, object]],
     step_row: dict[str, object] | None,
+    *,
+    budget_status: BudgetStatus | None = None,
 ) -> PurchaseRequest:
     return PurchaseRequest(
         id=UUID(str(row["id"])),
@@ -1260,7 +1361,7 @@ def _purchase_request(
         has_incomplete_estimate=bool(
             row.get("has_incomplete_estimate", False)
         ),
-        budget_status=None,
+        budget_status=budget_status,
         approval_step=_approval_step(step_row) if step_row else None,
         submitted_at=row.get("submitted_at"),
         withdrawn_at=row.get("withdrawn_at"),
@@ -1348,6 +1449,40 @@ def _approval_delegation(row: dict[str, object]) -> ApprovalDelegation:
         starts_on=_parse_date(row["starts_on"]),
         ends_on=_parse_date(row["ends_on"]),
         created_at=row["created_at"],
+    )
+
+
+def _budget_row(row: dict[str, object]) -> BudgetRow:
+    return BudgetRow(
+        id=UUID(str(row["id"])),
+        amount=Decimal(str(row["amount"])),
+        currency=str(row["currency"]),
+        period=str(row["period"]),
+        period_start=_parse_date(row["period_start"]),
+        scope=str(row["scope"]),
+        branch_id=(
+            UUID(str(row["branch_id"])) if row.get("branch_id") else None
+        ),
+        cost_centre_id=(
+            UUID(str(row["cost_centre_id"]))
+            if row.get("cost_centre_id")
+            else None
+        ),
+    )
+
+
+def _spend_row(row: dict[str, object]) -> SpendRow:
+    return SpendRow(
+        request_id=UUID(str(row["id"])),
+        amount=Decimal(str(row["estimated_total_amount"])),
+        currency=str(row["estimated_total_currency"]),
+        branch_id=UUID(str(row["branch_id"])),
+        cost_centre_id=(
+            UUID(str(row["cost_centre_id"]))
+            if row.get("cost_centre_id")
+            else None
+        ),
+        required_by_date=_parse_date(row["required_by_date"]),
     )
 
 

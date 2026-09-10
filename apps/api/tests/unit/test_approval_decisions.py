@@ -161,6 +161,7 @@ def prepare_decision_service(
     monkeypatch.setattr(service, "_fetch_request", lambda _client, _id: req)
     monkeypatch.setattr(service, "_fetch_step", lambda _client, _id: step)
     monkeypatch.setattr(service, "_fetch_lines_for", lambda _client, _id: [line_row()])
+    monkeypatch.setattr(service, "_budget_status_for", lambda _client, _row: None)
     monkeypatch.setattr(service, "_record", lambda **kwargs: recorded.append(kwargs))
     return service, client, recorded
 
@@ -309,6 +310,7 @@ def test_pending_queue_filters_non_owner_to_their_assigned_steps(
         "_fetch_lines_batch",
         lambda _client, _ids: {str(request_id): [line_row()]},
     )
+    monkeypatch.setattr(service, "_budget_status_for", lambda _client, _row: None)
 
     result = service.list_pending_approvals(
         bearer_token="token", member=current

@@ -84,8 +84,17 @@ def request_row() -> dict[str, object]:
         "id": uuid4(),
         "tenant_id": uuid4(),
         "branch_id": uuid4(),
+        "cost_centre_id": None,
+        "requested_by_membership_id": uuid4(),
+        "required_by_date": date(2026, 9, 15),
+        "status": "submitted",
         "estimated_total_amount": "250.0000",
         "estimated_total_currency": "GBP",
+        "has_incomplete_estimate": False,
+        "submitted_at": datetime(2026, 9, 10, tzinfo=UTC),
+        "withdrawn_at": None,
+        "created_at": datetime(2026, 9, 10, tzinfo=UTC),
+        "updated_at": datetime(2026, 9, 10, tzinfo=UTC),
     }
 
 
@@ -213,6 +222,35 @@ def test_submit_routing_creates_pending_approval_step(
     assert result["assigned_membership_id"] == str(approver_id)
     assert client.queries["approval_step"].payload is not None
     assert client.queries["approval_step"].payload["status"] == "pending"
+
+
+def test_purchase_request_with_budget_status_surfaces_exceeding_warning(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    row = request_row()
+    service = RequestsService()
+    monkeypatch.setattr(
+        service,
+        "_budget_status_for",
+        lambda _client, request_row: requests_module.BudgetStatus(
+            remaining_amount=requests_module.Money(
+                amount="75.0000",
+                currency="GBP",
+            ),
+            exceeds=True,
+        ),
+    )
+
+    result = service._purchase_request_with_budget_status(  # noqa: SLF001
+        FakeClient({}),
+        row,
+        line_rows=[],
+        step_row=None,
+    )
+
+    assert result.budget_status is not None
+    assert result.budget_status.exceeds is True
+    assert result.budget_status.remaining_amount.amount == "75.0000"
 
 
 def test_threshold_router_passes_payload_to_service() -> None:

@@ -141,6 +141,49 @@ describe('ApprovalQueueComponent', () => {
     const budgetWarning = compiled.querySelector('.budget-warning-badge');
     expect(budgetWarning).toBeTruthy();
     expect(budgetWarning?.textContent?.trim()).toContain('Exceeds budget');
+
+    const warningRemaining = compiled.querySelector('.budget-remaining-subtext');
+    expect(warningRemaining).toBeTruthy();
+    expect(warningRemaining?.textContent?.trim()).toBe('Remaining: SAR 100.00');
+  });
+
+  it('should render quiet remaining budget when within budget', () => {
+    const compiled = fixture.nativeElement as HTMLElement;
+    const budgetRemaining = compiled.querySelector('.budget-remaining');
+    expect(budgetRemaining).toBeTruthy();
+    expect(budgetRemaining?.textContent?.trim()).toBe('Remaining: SAR 5000.00');
+  });
+
+  it('should display not available when budget_status is absent or null', () => {
+    const requestWithoutBudget: PurchaseRequest = {
+      ...mockPendingRequests[0],
+      id: 'req-003',
+      budget_status: null,
+    };
+    approvalsApi.listPendingApprovals.and.returnValue(
+      of({ items: [requestWithoutBudget], next_cursor: null }),
+    );
+    component.loadPendingApprovals();
+    fixture.detectChanges();
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    expect(compiled.querySelector('.budget-warning-badge')).toBeNull();
+    expect(compiled.querySelector('.budget-remaining')).toBeNull();
+    const budgetCell = compiled.querySelector('.budget-cell');
+    expect(budgetCell?.textContent?.trim()).toBe('Not available');
+  });
+
+  it('should keep approve and reject buttons enabled when request exceeds budget', () => {
+    const compiled = fixture.nativeElement as HTMLElement;
+    const rows = compiled.querySelectorAll('.request-row');
+    const exceedingRow = rows[1];
+    const approveBtn = exceedingRow.querySelector<HTMLButtonElement>('.approve-btn');
+    const rejectBtn = exceedingRow.querySelector<HTMLButtonElement>('.reject-btn');
+
+    expect(approveBtn).toBeTruthy();
+    expect(approveBtn?.disabled).toBeFalse();
+    expect(rejectBtn).toBeTruthy();
+    expect(rejectBtn?.disabled).toBeFalse();
   });
 
   it('should show empty state when there are no pending requests', () => {

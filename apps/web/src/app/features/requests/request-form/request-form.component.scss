@@ -181,6 +181,64 @@
   }
 }
 
+.budget-warning-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding-inline: 0.875rem;
+  padding-block: 0.75rem;
+  background-color: #fef2f2;
+  border: 1px solid #fee2e2;
+  border-radius: 6px;
+  margin-block-end: 1rem;
+
+  .warning-icon {
+    font-size: 20px;
+    inline-size: 20px;
+    block-size: 20px;
+    color: #dc2626;
+    flex-shrink: 0;
+    margin-block-start: 0.125rem;
+  }
+
+  .budget-warning-content {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .budget-warning-message {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: #991b1b;
+  }
+
+  .budget-remaining-amount {
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: #b91c1c;
+  }
+}
+
+.budget-status-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-block: 0.5rem;
+  margin-block-end: 0.75rem;
+  font-size: 0.875rem;
+
+  .budget-status-label {
+    font-weight: 500;
+    color: #475569;
+  }
+
+  .budget-status-value {
+    font-weight: 600;
+    color: #047857;
+  }
+}
+
 .form-actions {
   display: flex;
   align-items: center;

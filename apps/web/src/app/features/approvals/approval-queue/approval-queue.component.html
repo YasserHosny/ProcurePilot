@@ -88,13 +88,19 @@
             </th>
             <td mat-cell *matCellDef="let req" class="budget-cell">
               @if (req.budget_status?.exceeds) {
-                <span
-                  class="budget-warning-badge"
-                  [matTooltip]="'requests.budgetStatus.exceedsWarning' | translate"
-                >
-                  <mat-icon class="warning-icon" aria-hidden="true">warning</mat-icon>
-                  <span>{{ 'approvals.budgetExceeded' | translate }}</span>
-                </span>
+                <div class="budget-warning-container">
+                  <span
+                    class="budget-warning-badge"
+                    [matTooltip]="'requests.budgetStatus.exceedsWarning' | translate"
+                  >
+                    <mat-icon class="warning-icon" aria-hidden="true">warning</mat-icon>
+                    <span>{{ 'approvals.budgetExceeded' | translate }}</span>
+                  </span>
+                  <span class="budget-remaining-subtext">
+                    {{ 'approvals.budgetRemaining' | translate }}:
+                    {{ req.budget_status.remaining_amount.currency }} {{ req.budget_status.remaining_amount.amount }}
+                  </span>
+                </div>
               } @else if (req.budget_status) {
                 <span class="budget-remaining">
                   {{ 'approvals.budgetRemaining' | translate }}:

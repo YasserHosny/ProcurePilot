@@ -119,6 +119,30 @@
               {{ 'requests.incompleteEstimateBadge' | translate }}
             </div>
           }
+
+          @if (req.budget_status; as budget) {
+            @if (budget.exceeds) {
+              <div class="budget-warning-banner" role="status">
+                <mat-icon class="warning-icon" aria-hidden="true">warning</mat-icon>
+                <div class="budget-warning-content">
+                  <span class="budget-warning-message">
+                    {{ 'requests.budgetStatus.exceedsWarning' | translate }}
+                  </span>
+                  <span class="budget-remaining-amount">
+                    {{ 'requests.budgetStatus.remainingLabel' | translate }}:
+                    {{ budget.remaining_amount.currency }} {{ budget.remaining_amount.amount }}
+                  </span>
+                </div>
+              </div>
+            } @else {
+              <div class="budget-status-row">
+                <span class="budget-status-label">{{ 'requests.budgetStatus.remainingLabel' | translate }}</span>
+                <span class="budget-status-value">
+                  {{ budget.remaining_amount.currency }} {{ budget.remaining_amount.amount }}
+                </span>
+              </div>
+            }
+          }
         }
 
         <div class="form-actions">

@@ -139,6 +139,13 @@
   color: #92400e;
 }
 
+.budget-warning-container {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.25rem;
+}
+
 .budget-warning-badge {
   display: inline-flex;
   align-items: center;
@@ -157,6 +164,12 @@
     block-size: 16px;
     color: #dc2626;
   }
+}
+
+.budget-remaining-subtext {
+  font-size: 0.75rem;
+  color: #64748b;
+  font-weight: 500;
 }
 
 .budget-remaining {
