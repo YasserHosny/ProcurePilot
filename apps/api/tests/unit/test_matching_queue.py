@@ -64,6 +64,8 @@ class FakeClient:
     def table(self, name: str) -> FakeQuery:
         q = FakeQuery(self._tables.get(name, []))
         self.last_query = q
+        if name == "match_task":
+            self.match_task_query = q
         return q
 
 
@@ -109,7 +111,21 @@ def test_list_match_tasks_accepts_query_params_and_enriches_supplier(
         "status": "reviewed",
     }
 
-    client = FakeClient({"match_task": [fake_task_row]})
+    client = FakeClient(
+        {
+            "match_task": [fake_task_row],
+            "quotation_line": [
+                {
+                    "id": line_id,
+                    "original_text": "Organic Whole Milk 2L",
+                    "line_number": 1,
+                    "quotation_id": quotation_id,
+                    "quotation": {"id": quotation_id, "supplier_id": supplier_id},
+                }
+            ],
+            "supplier": [{"id": supplier_id, "name": "Fresh Farms Dairy"}],
+        }
+    )
     monkeypatch.setattr(
         matching_service_module,
         "authenticated_client",
@@ -167,14 +183,14 @@ def test_list_match_tasks_accepts_query_params_and_enriches_supplier(
     )
 
     # Check query filtering and ordering
-    assert client.last_query is not None
-    assert ("eq", "status", "open") in client.last_query.filters
-    assert ("eq", "priority", "high") in client.last_query.filters
-    assert ("eq", "reason", "low_confidence") in client.last_query.filters
-    assert ("gte", "created_at", "2026-08-01") in client.last_query.filters
-    assert ("lte", "created_at", "2026-08-31") in client.last_query.filters
-    assert ("priority", False) in client.last_query.orders  # asc -> desc=False
-    assert ("id", False) in client.last_query.orders
+    assert getattr(client, "match_task_query", None) is not None
+    assert ("eq", "status", "open") in client.match_task_query.filters
+    assert ("eq", "priority", "high") in client.match_task_query.filters
+    assert ("eq", "reason", "low_confidence") in client.match_task_query.filters
+    assert ("gte", "created_at", "2026-08-01") in client.match_task_query.filters
+    assert ("lte", "created_at", "2026-08-31") in client.match_task_query.filters
+    assert ("priority", False) in client.match_task_query.orders  # asc -> desc=False
+    assert ("id", False) in client.match_task_query.orders
 
     # Check item enrichment
     assert len(result.items) == 1
@@ -320,7 +336,54 @@ def test_list_match_tasks_search_filters_by_supplier_or_quotation(
         },
     ]
 
-    client = FakeClient({"match_task": rows})
+    client = FakeClient(
+        {
+            "match_task": rows,
+            "quotation_line": [
+                {
+                    "id": line1_id,
+                    "original_text": "Cheddar Cheese",
+                    "line_number": 1,
+                    "quotation_id": q1_id,
+                    "quotation": {"id": q1_id, "supplier_id": uuid4()},
+                },
+                {
+                    "id": line2_id,
+                    "original_text": "Apples",
+                    "line_number": 2,
+                    "quotation_id": q2_id,
+                    "quotation": {"id": q2_id, "supplier_id": uuid4()},
+                },
+            ],
+        }
+    )
+
+    orig_table = client.table
+
+    def fake_table(name: str) -> object:
+        if name == "supplier":
+
+            class FakeSupplierQuery:
+                def select(self, _cols: str) -> object:
+                    return self
+
+                def in_(self, col: str, vals: list[object]) -> object:
+                    self.vals = vals
+                    return self
+
+                def execute(self) -> object:
+                    class Res:
+                        data = [
+                            {"id": v, "name": "Somerset Dairy"} for v in getattr(self, "vals", [])
+                        ]
+
+                    return Res()
+
+            return FakeSupplierQuery()
+        return orig_table(name)
+
+    client.table = fake_table
+
     monkeypatch.setattr(
         matching_service_module,
         "authenticated_client",
@@ -439,7 +502,34 @@ def test_list_match_tasks_search_finds_matches_beyond_first_page_before_paginati
         },
     )
 
-    client = FakeClient({"match_task": rows})
+    client = FakeClient(
+        {
+            "match_task": rows,
+            "quotation_line": [
+                {
+                    "id": first_line_id,
+                    "original_text": "Other Product",
+                    "line_number": 1,
+                    "quotation_id": first_qid,
+                    "quotation": {"id": first_qid, "supplier_id": None},
+                },
+                {
+                    "id": middle_line_id,
+                    "original_text": "Other Product",
+                    "line_number": 1,
+                    "quotation_id": middle_qid,
+                    "quotation": {"id": middle_qid, "supplier_id": None},
+                },
+                {
+                    "id": second_line_id,
+                    "original_text": "Needle Product",
+                    "line_number": 2,
+                    "quotation_id": second_qid,
+                    "quotation": {"id": second_qid, "supplier_id": None},
+                },
+            ],
+        }
+    )
     monkeypatch.setattr(
         matching_service_module,
         "authenticated_client",
@@ -485,11 +575,25 @@ def test_list_match_tasks_search_finds_matches_beyond_first_page_before_paginati
         },
     )
 
-    result = MatchingService().list_match_tasks(
+    service = MatchingService()
+    task_calls = 0
+    original_task = service._task
+
+    def spied_task(
+        c: object, r: dict[str, object], line_row: dict[str, object] | None = None
+    ) -> object:
+        nonlocal task_calls
+        task_calls += 1
+        return original_task(c, r, line_row=line_row)
+
+    monkeypatch.setattr(service, "_task", spied_task)
+
+    result = service.list_match_tasks(
         bearer_token="dummy",
         limit=1,
         search="needle",
     )
 
     assert [task.id for task in result.items] == [second_task_id]
+    assert task_calls == 1
     assert result.next_cursor is None

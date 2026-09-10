@@ -142,3 +142,7 @@ The match-resolution detail page now uses native radio semantics for candidate s
 - Component coverage proves the radio controls exist and the old custom button role is gone.
 
 The Match Resolution i18n and accessibility cleanup was completed. Feature-ticket identifiers in user-facing language were removed, missing Arabic keys were provided, and accessible names for native candidate selection have been integrated using i18n keys.
+
+## Implementation Follow-Up — 2026-09-10 Search Scalability
+
+The matching queue search now avoids expensive per-task hydration for unpaged search results. When a search is provided, the backend queries minimal line, quotation, and supplier context in batches, evaluates the search against those lightweight rows, slices the requested page, and only performs the heavy `_task()` hydration lookups for the visible items. This preserves the existing search behavior while reducing the most expensive N+1 work. A future SQL/RPC read model would still be the stronger long-term option for very large task volumes.

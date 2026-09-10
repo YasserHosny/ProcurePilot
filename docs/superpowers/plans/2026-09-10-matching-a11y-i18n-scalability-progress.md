@@ -8,8 +8,8 @@ Started: 2026-09-10
 | Task | Status | Commit | Notes |
 |---|---|---|---|
 | Native candidate selection semantics | reviewed+committed | `d017718` | Antigravity refactored candidate cards to native radio-backed labels. Orchestrator added a DOM semantics assertion and updated the quality conclusion. |
-| Match Resolution i18n/accessibility cleanup | reviewed+committed | This commit | Removed feature tags from UI/comments, grouped radios logically with aria-labels via i18n en/ar keys. |
-| Matching queue search scalability | queued | Pending | Backend/API task after UI cleanup lands. |
+| Match Resolution i18n/accessibility cleanup | reviewed+committed | `d1ef675` | Removed feature tags from UI/comments, grouped radios logically with aria-labels via i18n en/ar keys. |
+| Matching queue search scalability | reviewed+committed | This commit | Queue search avoids unpaged task hydration by filtering with lightweight batched context before hydrating the visible page. |
 
 ## Review Notes
 

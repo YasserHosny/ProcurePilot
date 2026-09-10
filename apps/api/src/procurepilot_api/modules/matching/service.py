@@ -140,25 +140,52 @@ class MatchingService:
         except APIError as exc:
             raise ServiceUnavailableError(details={"dependency": "database"}) from exc
         rows = _rows(response.data)
-        tasks = [self._task(client, row) for row in rows]
+
         if clean_search:
-            tasks = [
-                t
-                for t in tasks
-                if (t.quotation_id and clean_search in str(t.quotation_id).lower())
-                or clean_search in t.quotation_line.original_text.lower()
-                or (t.supplier_name and clean_search in t.supplier_name.lower())
-                or clean_search in f"#{t.quotation_line.line_number}"
-                or clean_search in str(t.quotation_line.line_number)
-                or clean_search in t.reason.lower()
-            ]
+            line_ids = list({str(row["quotation_line_id"]) for row in rows})
+            context_by_line = _prefetch_search_context(client, line_ids)
+
+            filtered_rows: list[dict[str, object]] = []
+            for row in rows:
+                if clean_search in str(row.get("reason", "")).lower():
+                    filtered_rows.append(row)
+                    continue
+
+                line_ctx = context_by_line.get(str(row["quotation_line_id"]))
+                if not line_ctx:
+                    continue
+
+                if clean_search in str(line_ctx.get("original_text", "")).lower():
+                    filtered_rows.append(row)
+                    continue
+
+                if clean_search in f"#{line_ctx.get('line_number')}":
+                    filtered_rows.append(row)
+                    continue
+
+                if clean_search in str(line_ctx.get("line_number")):
+                    filtered_rows.append(row)
+                    continue
+
+                if clean_search in str(line_ctx.get("quotation_id", "")).lower():
+                    filtered_rows.append(row)
+                    continue
+
+                if clean_search in str(line_ctx.get("supplier_name", "")).lower():
+                    filtered_rows.append(row)
+                    continue
+
+            rows = filtered_rows
+
         start = offset if clean_search else 0
-        visible = tasks[start : start + capped_limit]
+        visible_rows = rows[start : start + capped_limit]
+        tasks = [self._task(client, row) for row in visible_rows]
+
         return MatchTaskList(
-            items=visible,
+            items=tasks,
             next_cursor=(
                 _encode_cursor(offset + capped_limit)
-                if len(tasks) > start + capped_limit
+                if len(rows) > start + capped_limit
                 else None
             ),
         )
@@ -1130,3 +1157,51 @@ def _decode_cursor(cursor: str | None) -> int:
         return int(base64.urlsafe_b64decode(cursor.encode()).decode())
     except (ValueError, UnicodeDecodeError) as exc:
         raise NotFoundError(details={"cursor": "invalid"}) from exc
+
+def _prefetch_search_context(client: object, line_ids: list[str]) -> dict[str, dict[str, object]]:
+    context: dict[str, dict[str, object]] = {}
+    for i in range(0, len(line_ids), 100):
+        chunk = line_ids[i : i + 100]
+        try:
+            resp = (
+                client.table("quotation_line")
+                .select("id, original_text, line_number, quotation_id, quotation(id, supplier_id)")
+                .in_("id", chunk)
+                .execute()
+            )
+            for r in _rows(resp.data):
+                context[str(r["id"])] = r
+        except APIError as exc:
+            raise ServiceUnavailableError(details={"dependency": "database"}) from exc
+
+    supplier_ids = list(
+        {
+            str(c["quotation"].get("supplier_id"))
+            for c in context.values()
+            if isinstance(c.get("quotation"), dict) and c["quotation"].get("supplier_id")
+        }
+    )
+
+    suppliers_by_id: dict[str, str] = {}
+    for i in range(0, len(supplier_ids), 100):
+        chunk = supplier_ids[i : i + 100]
+        try:
+            resp = (
+                client.table("supplier")
+                .select("id, name")
+                .in_("id", chunk)
+                .execute()
+            )
+            for r in _rows(resp.data):
+                suppliers_by_id[str(r["id"])] = str(r.get("name") or "")
+        except APIError as exc:
+            raise ServiceUnavailableError(details={"dependency": "database"}) from exc
+
+    for c in context.values():
+        if isinstance(c.get("quotation"), dict):
+            sid = c["quotation"].get("supplier_id")
+            c["supplier_name"] = suppliers_by_id.get(str(sid), "") if sid else ""
+        else:
+            c["supplier_name"] = ""
+
+    return context
