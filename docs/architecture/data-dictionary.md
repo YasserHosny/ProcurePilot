@@ -1043,28 +1043,136 @@ holds.
 owner sees every assignment in the tenant; a non-owner sees only their own row(s). Owner-only
 writes.
 
-## Planned later domain entities
+## Implemented requests and approvals entities (chunk R2.1, `008-requests-approvals`)
+
+Purchase requests and the single approval decision each one routes to at submission time.
+Requests reuse R2.0's branch-scoped visibility mechanism verbatim (research.md R1) — an owner
+sees every request; a branch-scoped member sees only their assigned branch(es); the requester
+always sees their own request regardless of branch scope; a same-tenant, different-branch
+reference resolves `not_found`, never forbidden. Write authorization (who may create, edit,
+withdraw, or decide) lives in the service layer, not a write-narrowing RLS policy, matching the
+R2.0 branch/cost-centre/budget pattern. Full contract:
+`specs/008-requests-approvals/contracts/requests-approvals.openapi.yaml`.
 
 ## `PurchaseRequest`
 
 | Field | Type | Notes |
 |---|---|---|
-| `id` | uuid | PK |
-| `tenant_id` | uuid | FK → Tenant |
-| `branch_id` | uuid | FK → Branch |
-| `cost_centre_id` | uuid | FK → CostCentre |
-| `requested_by` | uuid | FK → User |
-| `required_by_date` | date | |
-| `status` | enum | draft, submitted, approved, rejected, ordered |
+| `id` | uuid | PK, default `gen_random_uuid()` |
+| `tenant_id` | uuid | Required FK -> Tenant; RLS key. `unique (tenant_id, id)` for composite FKs |
+| `branch_id` | uuid | Required; composite FK -> Branch `(tenant_id, id)` |
+| `cost_centre_id` | uuid | Optional; composite FK -> CostCentre `(tenant_id, id)` |
+| `requested_by_membership_id` | uuid | Required; composite FK -> Membership `(tenant_id, id)` |
+| `required_by_date` | date | Required |
+| `status` | enum | `draft` \| `submitted` \| `approved` \| `rejected` \| `withdrawn`; default `draft` |
+| `estimated_total_amount` | numeric(18,4) | Sum of line estimates; null when lines span >1 currency or no line has an estimate |
+| `estimated_total_currency` | text | FK -> `supported_currency(code)`; paired with `estimated_total_amount` (both null or both set) |
+| `has_incomplete_estimate` | boolean | Default `false`; `true` when any line's product has no reachable price history |
+| `submitted_at` | timestamptz | Stamped on `draft -> submitted` |
+| `withdrawn_at` | timestamptz | Stamped on `submitted -> withdrawn` |
+| `created_at` | timestamptz | Audit field |
+| `updated_at` | timestamptz | Audit field |
+
+State machine: `draft -> submitted -> (approved | rejected | withdrawn)`. A `draft` may be
+hard-deleted by its own requester; once `submitted`, `withdraw` (FR-004) is the only
+requester-initiated retirement and there is no hard-delete path. No edits after submission
+(FR-004); submit requires at least one line (FR-003, `422 no_lines`). Line estimates are
+recomputed live while the request is `draft` and frozen on submit (`estimated_at` stamped, never
+updated again — research.md R2). `purchase_request_scoped_visibility` is a RESTRICTIVE
+SELECT-only policy adding the requester-always-sees-own clause to R2.0's shape;
+`purchase_request_tenant_isolation` is the permissive `ENABLE`+`FORCE` `for all` policy with
+`USING` and `WITH CHECK`.
+
+## `PurchaseRequestLine`
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | uuid | PK, default `gen_random_uuid()` |
+| `tenant_id` | uuid | Required FK -> Tenant; RLS key |
+| `purchase_request_id` | uuid | Required; composite FK -> PurchaseRequest `(tenant_id, id)`, `on delete cascade` |
+| `workspace_product_id` | uuid | Required; composite FK -> WorkspaceProduct `(tenant_id, id)` |
+| `quantity` | numeric(18,6) | Required, `> 0` |
+| `note` | text | Optional |
+| `estimated_unit_price_amount` | numeric(18,4) | Live while parent is `draft`, frozen on submit; null when the product has no reachable price history |
+| `estimated_unit_price_currency` | text | FK -> `supported_currency(code)` |
+| `estimated_unit_price_source_landed_cost_id` | uuid | Composite FK -> LandedCost `(tenant_id, id)` |
+| `estimated_at` | timestamptz | Stamped when the estimate is frozen at submit |
+
+The three `estimated_unit_price_*` columns are null together or populated together
+(`purchase_request_line_estimate_paired` check — null exactly when the product has no reachable
+`landed_cost` row; the parent request is then flagged `has_incomplete_estimate`). Visibility is
+inherited from the parent request: `purchase_request_line_scoped_visibility` (RESTRICTIVE,
+SELECT-only) re-derives the parent's visibility clause via an `EXISTS` join rather than
+duplicating `branch_id` onto this table. `T002` added `unique (tenant_id, id)` to
+`workspace_product` and `landed_cost` so those composite FKs are possible.
 
 ## `ApprovalStep`
 
 | Field | Type | Notes |
 |---|---|---|
-| `id` | uuid | PK |
-| `request_id` | uuid | FK → PurchaseRequest |
-| `approver_id` | uuid | FK → User |
-| `threshold_rule_id` | uuid | FK → PolicyRule |
-| `status` | enum | pending, approved, rejected, escalated |
-| `comment` | text | |
-| `decided_at` | timestamptz | |
+| `id` | uuid | PK, default `gen_random_uuid()` |
+| `tenant_id` | uuid | Required FK -> Tenant; RLS key |
+| `purchase_request_id` | uuid | Required; composite FK -> PurchaseRequest `(tenant_id, id)`, `on delete cascade`. `unique (tenant_id, purchase_request_id)` — one step per request |
+| `assigned_membership_id` | uuid | Composite FK -> Membership `(tenant_id, id)`; who the request routed to |
+| `source` | enum | `threshold_match` \| `delegate` \| `owner_fallback` — how `assigned_membership_id` was resolved (informational) |
+| `status` | enum | `pending` \| `approved` \| `rejected`; default `pending` |
+| `comment` | text | Optional decision comment |
+| `decided_by_membership_id` | uuid | Composite FK -> Membership `(tenant_id, id)`; null while pending |
+| `decided_at` | timestamptz | Null while pending |
+| `created_at` | timestamptz | Audit field |
+
+One resolved step per request in this release — a single decision, not a multi-stage chain
+(`approval_step_one_per_request`). The `check (status = 'pending') = (decided_by_membership_id
+is null and decided_at is null)` constraint encodes FR-006 ("no request becomes approved without
+a recorded human decision") at the database level. `decided_by_membership_id` may legitimately
+differ from `assigned_membership_id` — FR-007 lets an owner decide as a standing override; the
+"only the assignee or an owner" rule is a service-layer RBAC guard, not a check constraint.
+Produced by `resolve_approver()` at submission time and never silently re-resolved; the one
+exception is member removal, which re-routes a still-`pending` step to the owner
+(`source = 'owner_fallback'`, audited `requests.approval_step_escalated`, FR-009).
+`approval_step_scoped_visibility` (RESTRICTIVE, SELECT-only): owner sees all; the assignee sees
+their own step; the requester sees the step on their own request.
+
+## `ThresholdRule`
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | uuid | PK, default `gen_random_uuid()` |
+| `tenant_id` | uuid | Required FK -> Tenant; RLS key |
+| `branch_id` | uuid | Optional; composite FK -> Branch `(tenant_id, id)`. Null = tenant-wide default rule |
+| `min_amount` | numeric(18,4) | Required; inclusive lower bound (`0` for the lowest tier) |
+| `max_amount` | numeric(18,4) | Optional; exclusive upper bound. Null = top tier (no ceiling) |
+| `currency` | text | Required FK -> `supported_currency(code)`; a rule only matches a request whose estimated total shares this currency |
+| `approver_membership_id` | uuid | Required; composite FK -> Membership `(tenant_id, id)` |
+| `created_by` | uuid | Required; composite FK -> Membership `(tenant_id, id)` |
+| `created_at` | timestamptz | Audit field |
+| `updated_at` | timestamptz | Audit field |
+
+`check (max_amount is null or max_amount > min_amount)`. Tenant-wide configuration: unlike
+branch/cost-centre/budget, `threshold_rule` gets **no** branch-scoped RESTRICTIVE visibility
+policy — every member may read the rules that determine routing (research.md R1), only an owner
+may write them (service-layer RBAC). No uniqueness constraint on overlapping ranges;
+`resolve_approver()` resolves a genuine overlap deterministically — a branch-scoped rule beats a
+tenant-wide one, then the narrowest matching range wins. A rule pointing at a member who has
+been removed from the workspace is skipped, so resolution falls through to owner-fallback.
+
+## `ApprovalDelegation`
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | uuid | PK, default `gen_random_uuid()` |
+| `tenant_id` | uuid | Required FK -> Tenant; RLS key |
+| `delegator_membership_id` | uuid | Required; composite FK -> Membership `(tenant_id, id)` |
+| `delegate_membership_id` | uuid | Required; composite FK -> Membership `(tenant_id, id)` |
+| `starts_on` | date | Required; inclusive |
+| `ends_on` | date | Required; inclusive |
+| `created_at` | timestamptz | Audit field |
+
+`check (delegator_membership_id <> delegate_membership_id)` and `check (ends_on >= starts_on)`.
+Tenant-wide read (a delegation is not per-branch secret data); write restricted to the delegator
+themselves or an owner (service-layer). Applied **after** threshold resolution at submission
+time, not instead of it (research.md R3): once an approver is resolved, an active delegation
+covering the request date redirects the step to the delegate (`source = 'delegate'`),
+single-hop only. No uniqueness constraint on overlapping windows; routing prefers the
+most-recently-created delegation covering the date. A delegation whose delegate has since been
+removed from the workspace is ignored, and resolution falls back to the original assignee.

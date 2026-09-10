@@ -1285,39 +1285,175 @@ No `PATCH`/`DELETE` route exists for budgets in this chunk — list and create o
 
 ---
 
-## Requests & Approvals (Phase 2)
+## Delivered Requests and Approvals API (chunk R2.1, `008-requests-approvals`)
+
+Purchase request creation, threshold-based approval routing with delegation and owner fallback,
+an informational budget check, an approval queue, and a full audit-log entry on every request
+lifecycle event. Requests carry R2.0's branch-scoped visibility: an owner sees every request; a
+branch-scoped member sees only their assigned branch(es); the requester always sees their own
+request; a same-tenant, different-branch reference resolves `404`, never `403`. A request's
+estimated value is the sum of its lines' unit estimates, each drawn from the product's own price
+history — recomputed live while `draft`, frozen on submit; a line whose product has no known
+price contributes zero and sets `has_incomplete_estimate`. All money is `{amount, currency}`
+with decimal-string amounts; every threshold rule and budget carries an explicit currency and is
+compared only against a same-currency request total. Full contract:
+`specs/008-requests-approvals/contracts/requests-approvals.openapi.yaml`.
 
 ### `POST /requests`
+
+- Requires bearer auth; accepts `Idempotency-Key`. Creates the request in `draft`.
+- Request fields: required `branch_id`, optional `cost_centre_id`, required `required_by_date`,
+  required `lines` (at least one; each `workspace_product_id`, `quantity` decimal string,
+  optional `note`).
+- Returns `201` with the `PurchaseRequest` — `lines[]` with a live `estimated_unit_price`
+  (nullable `Money`) each, `estimated_total` (nullable `Money`, null when lines span more than
+  one currency), `has_incomplete_estimate`, `status: "draft"`.
+- Returns `422` when `lines` is empty or a field fails validation.
 
 Request:
 ```json
 {
-  "branch_id": "uuid",
-  "cost_centre_id": "uuid",
+  "branch_id": "00000000-0000-4000-8000-000000000010",
+  "cost_centre_id": "00000000-0000-4000-8000-000000000020",
   "required_by_date": "2026-10-01",
   "lines": [
-    { "workspace_product_id": "uuid", "quantity": "10.000000", "note": "..." }
+    { "workspace_product_id": "00000000-0000-4000-8000-000000000030", "quantity": "10.000000", "note": "Q4 restock" }
   ]
 }
 ```
 
-### `POST /requests/{id}/approve`
+### `GET /requests`
 
-Request:
-```json
-{ "comment": "Approved per budget" }
-```
+- Requires bearer auth. Branch-scoped visibility as above.
+- Query parameters: optional `status`, optional `branch_id`, optional `cursor`, optional `limit`
+  capped at 100 and defaulting to 50.
+- Returns `200` with `items` of `PurchaseRequest` and nullable `next_cursor`.
 
-### `POST /requests/{id}/reject`
+### `GET /requests/{request_id}`
 
-Request:
-```json
-{ "comment": "Need alternative supplier" }
-```
+- Requires bearer auth. Returns `200` with the `PurchaseRequest`, including `approval_step`
+  (once submitted) and `budget_status` (when an applicable budget exists — see below).
+- Returns `404` when the request is outside the caller's workspace or branch-scoped visibility.
+
+### `PATCH /requests/{request_id}`
+
+- Requires bearer auth; the caller must be the requester.
+- Request fields: all optional — `branch_id`, `cost_centre_id`, `required_by_date`, `lines`
+  (if given, at least one). Replacing `lines` re-runs live estimation.
+- Returns `200` with the updated `PurchaseRequest`.
+- Returns `403` (`not_requester`) when the caller did not create the request.
+- Returns `409` (`not_draft`) once the request has left `draft` — no edits after submission
+  (FR-004).
+
+### `POST /requests/{request_id}/submit`
+
+- Requires bearer auth (the requester); accepts `Idempotency-Key`.
+- Freezes every line estimate (`estimated_at` stamped, never updated again), moves the request
+  `draft -> submitted`, and creates the single `approval_step` via `resolve_approver()`:
+  most-specific threshold rule wins (branch-scoped beats tenant-wide, then narrowest range),
+  an active delegation over the resolved approver redirects to the delegate, and the owner is
+  the fallback when nothing resolves. `requests.approval_step_escalated` is audited when the
+  source is `owner_fallback`.
+- Returns `200` with the `PurchaseRequest` (`status: "submitted"`, `approval_step` populated).
+- Returns `409` (`not_draft`) if the request is not in `draft`.
+- Returns `422` (`no_lines`) if the request has no lines (FR-003).
+
+### `POST /requests/{request_id}/withdraw`
+
+- Requires bearer auth (the requester).
+- Moves `submitted -> withdrawn` and stamps `withdrawn_at`.
+- Returns `200` with the `PurchaseRequest`.
+- Returns `409` (`already_decided_or_withdrawn`) if the request is not `submitted`.
 
 ### `GET /approvals/pending`
 
-List pending approvals for the current approver.
+- Requires bearer auth. Lists requests awaiting the caller's decision — the assigned approver
+  sees their own pending steps; an owner sees every pending step (FR-007 standing override).
+- Query parameters: optional `cursor`, optional `limit` capped at 100 and defaulting to 50.
+- Returns `200` with `items` of `PurchaseRequest`, each embedding the full decision context
+  (requester, branch, cost centre, lines, required-by date, `approval_step`, and `budget_status`
+  when applicable) so the approver never has to navigate elsewhere (FR-005). A decided request
+  no longer appears here.
+
+### `POST /requests/{request_id}/approve` · `POST /requests/{request_id}/reject`
+
+- Requires bearer auth. The caller must be the step's `assigned_membership_id` or an owner
+  (FR-007).
+- Request fields: optional `comment`.
+- Records a human decision — sets `status`, `decided_by_membership_id`, and `decided_at`
+  together on the step (FR-006, enforced by the `approval_step` check constraint), moves the
+  request to `approved` / `rejected`, and audits `requests.approval_step_approved` /
+  `requests.approval_step_rejected`. The request row is updated before the step so a concurrent
+  withdrawal cannot strand a decided step on a non-submitted request.
+- Returns `200` with the `PurchaseRequest`.
+- Returns `403` (`not_assigned_approver`) when the caller is neither the assignee nor an owner.
+- Returns `409` (`not_submitted` or `no_pending_approval`) when the request has already left
+  `submitted` or the step is no longer pending.
+
+Request:
+```json
+{ "comment": "Approved — within the branch quarterly budget" }
+```
+
+### `GET /approvals/threshold-rules`
+
+- Requires bearer auth; readable by any member (routing configuration is not a per-branch
+  secret, research.md R1).
+- Query parameters: optional `cursor`, optional `limit` capped at 100 and defaulting to 50.
+- Returns `200` with `items` of `ThresholdRule` and nullable `next_cursor`.
+
+### `POST /approvals/threshold-rules`
+
+- Requires bearer auth and owner role; accepts `Idempotency-Key`.
+- Request fields: optional `branch_id` (null = tenant-wide default), required decimal-string
+  `min_amount`, optional decimal-string `max_amount` (null = top tier), required `currency`,
+  required `approver_membership_id`.
+- Returns `201` with the created `ThresholdRule`.
+- Returns `403` when the caller is not an owner.
+- Returns `422` when validation fails (including the `max_amount > min_amount` constraint).
+
+### `PATCH /approvals/threshold-rules/{rule_id}` · `DELETE /approvals/threshold-rules/{rule_id}`
+
+- Requires bearer auth and owner role.
+- `PATCH` fields: all optional — `branch_id`, `min_amount`, `max_amount`, `currency`,
+  `approver_membership_id`. Returns `200` with the updated `ThresholdRule`.
+- `DELETE` returns `204`.
+- Both return `403` when the caller is not an owner and `404` when the rule is not in the
+  caller's tenant.
+
+### `GET /approvals/delegations`
+
+- Requires bearer auth.
+- Query parameter: optional `membership_id` to filter to one delegator.
+- Returns `200` with `items` of `ApprovalDelegation`.
+
+### `POST /approvals/delegations`
+
+- Requires bearer auth; accepts `Idempotency-Key`. The caller may create a delegation for
+  themselves; an owner may create one for anyone.
+- Request fields: optional `delegator_membership_id` (defaults to the caller), required
+  `delegate_membership_id`, required `starts_on`, required `ends_on`.
+- Returns `201` with the created `ApprovalDelegation`.
+- Returns `403` (`not_delegator_or_owner`) when a non-owner names someone else as delegator.
+- Returns `422` when `delegator == delegate` or `ends_on < starts_on`.
+
+### `DELETE /approvals/delegations/{delegation_id}`
+
+- Requires bearer auth; the delegator or an owner.
+- Returns `204` on success, `403` (`not_delegator_or_owner`) otherwise, `404` when the
+  delegation is not in the caller's tenant.
+
+### Budget status (`budget_status` on `PurchaseRequest`)
+
+- Computed, not stored: `compute_budget_status()` resolves the single most applicable R2.0
+  budget for the request's scope — cost centre beats branch beats organisation, and within a
+  tier the tightest period wins (shortest period, then latest start) — then compares the
+  request's estimated total against that budget's remaining amount for its own period window.
+- Present only when an applicable same-currency budget exists (FR-012); otherwise the field is
+  omitted entirely rather than shown as a misleading zero.
+- Shape: `{ "remaining_amount": { "amount": "...", "currency": "..." }, "exceeds": true }`. It
+  is informational only — an `exceeds: true` request still submits and can still be approved
+  (FR-011); nothing about the budget blocks a decision.
 
 ---
 
