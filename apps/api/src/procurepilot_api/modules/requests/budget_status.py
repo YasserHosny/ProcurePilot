@@ -65,12 +65,13 @@ def compute_budget_status(
         applicable,
         cost_centre_id=cost_centre_id,
     )
-    if not selected:
+    chosen = _current_period_budget(selected)
+    if chosen is None:
         return None
 
-    period_start = min(budget.period_start for budget in selected)
-    period_end = max(_budget_period_end(budget) for budget in selected)
-    budget_amount = sum((budget.amount for budget in selected), Decimal("0"))
+    period_start = chosen.period_start
+    period_end = _budget_period_end(chosen)
+    budget_amount = chosen.amount
     spent_amount = sum(
         (
             spend.amount
@@ -80,7 +81,7 @@ def compute_budget_status(
             and period_start <= spend.required_by_date < period_end
             and _spend_matches_budget_scope(
                 spend,
-                scope=selected[0].scope,
+                scope=chosen.scope,
                 branch_id=branch_id,
                 cost_centre_id=cost_centre_id,
             )
@@ -96,6 +97,38 @@ def compute_budget_status(
             currency=request_currency,
         ),
         exceeds=True,
+    )
+
+
+_PERIOD_RANK: dict[BudgetPeriod, int] = {
+    "monthly": 0,
+    "quarterly": 1,
+    "annual": 2,
+}
+
+
+def _current_period_budget(budgets: list[BudgetRow]) -> BudgetRow | None:
+    """FR-011 compares a request against *one* budget — "whichever R2.0 budget applies to its
+    scope for the current period". ``_most_specific_budgets`` has already narrowed to a single
+    scope tier; when several budgets at that tier still overlap the request's required-by date
+    (the data model deliberately allows it — e.g. a running annual budget plus a supplementary
+    quarterly top-up, see the ``budget`` migration), pick the one that most tightly bounds
+    "now": shortest period, then latest start, then id for a deterministic result.
+
+    This mirrors the narrowest-range-wins tie-break routing already uses (research.md R3). It
+    deliberately does NOT sum amounts or union the periods of overlapping budgets — that would
+    double-count spend that draws down both and invent an envelope no owner defined; a genuine
+    overlap is surfaced as a warning at budget-creation time (R2.0), not reconciled here.
+    """
+    if not budgets:
+        return None
+    return min(
+        budgets,
+        key=lambda budget: (
+            _PERIOD_RANK[budget.period],
+            -budget.period_start.toordinal(),
+            str(budget.id),
+        ),
     )
 
 
