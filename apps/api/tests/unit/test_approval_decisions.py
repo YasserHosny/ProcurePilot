@@ -290,6 +290,35 @@ def test_decided_step_cannot_be_decided_again(
     assert exc.value.details == {"reason": "no_pending_approval"}
 
 
+def test_concurrent_withdrawal_leaves_step_pending(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # A withdrawal that flips the request out of `submitted` between the early guard and the
+    # write must not strand a `decided` step on a non-submitted request. The request is updated
+    # first under a `status = 'submitted'` guard; when that matches zero rows we raise before
+    # touching the step, so the step's payload is never set.
+    request_id = uuid4()
+    approver = member()
+    req = request_row(request_id, uuid4())
+    step = step_row(request_id, approver.membership_id)
+    service, client, recorded = prepare_decision_service(
+        monkeypatch, current_member=approver, req=req, step=step
+    )
+    client.updates["purchase_request"] = UpdateQuery([])
+
+    with pytest.raises(ConflictError) as exc:
+        service.approve_request(
+            bearer_token="token",
+            member=approver,
+            request_id=request_id,
+            payload=ApprovalDecisionInput(comment="Approved"),
+        )
+
+    assert exc.value.details == {"reason": "not_submitted"}
+    assert client.updates["approval_step"].payload is None
+    assert recorded == []
+
+
 def test_pending_queue_filters_non_owner_to_their_assigned_steps(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

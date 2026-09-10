@@ -53,6 +53,18 @@ class ScopedWorkspace:
     budget_a: UUID
     budget_b: UUID
     assignment_id: UUID
+    # T044: a submitted request + its approval step per branch.
+    # request_a: branch A, requested by the unscoped manager (the scoped manager's branch-A
+    #   scope is what would grant visibility).
+    # request_b: branch B, requested by the SCOPED manager (exercises "the requester always
+    #   sees their own request regardless of branch scope").
+    # request_c: branch B, requested by the owner (the scoped manager is neither requester nor
+    #   scoped to branch B — must resolve not-found, never forbidden).
+    request_a: UUID
+    request_b: UUID
+    request_c: UUID
+    step_a: UUID
+    step_b: UUID
 
 
 def _make_member(
@@ -121,6 +133,33 @@ def make_scoped_workspace(cur: psycopg.Cursor, label: str) -> ScopedWorkspace:
         (assignment_id, owner.tenant_id, scoped_manager.membership_id, branch_a),
     )
 
+    def _request(branch_id: UUID, requester: Workspace) -> UUID:
+        request_id = uuid4()
+        cur.execute(
+            "insert into purchase_request "
+            "(id,tenant_id,branch_id,requested_by_membership_id,required_by_date,status,"
+            " submitted_at) "
+            "values (%s,%s,%s,%s, current_date + interval '7 days', 'submitted', now())",
+            (request_id, owner.tenant_id, branch_id, requester.membership_id),
+        )
+        return request_id
+
+    def _step(request_id: UUID) -> UUID:
+        step_id = uuid4()
+        cur.execute(
+            "insert into approval_step "
+            "(id,tenant_id,purchase_request_id,assigned_membership_id,source,status) "
+            "values (%s,%s,%s,%s,'owner_fallback','pending')",
+            (step_id, owner.tenant_id, request_id, owner.membership_id),
+        )
+        return step_id
+
+    request_a = _request(branch_a, unscoped_manager)
+    request_b = _request(branch_b, scoped_manager)
+    request_c = _request(branch_b, owner)
+    step_a = _step(request_a)
+    step_b = _step(request_b)
+
     return ScopedWorkspace(
         owner=owner,
         scoped_manager=scoped_manager,
@@ -132,6 +171,11 @@ def make_scoped_workspace(cur: psycopg.Cursor, label: str) -> ScopedWorkspace:
         budget_a=budget_a,
         budget_b=budget_b,
         assignment_id=assignment_id,
+        request_a=request_a,
+        request_b=request_b,
+        request_c=request_c,
+        step_a=step_a,
+        step_b=step_b,
     )
 
 
@@ -289,3 +333,95 @@ def test_an_unassigned_managers_visibility_of_assignments_is_empty_not_an_error(
         _act_as_scoped(cur, scoped.unscoped_manager)
         cur.execute("select count(*) from branch_role_assignment")
         assert cur.fetchone() == (0,)
+
+
+# ── T044: purchase_request and approval_step under the same visibility axis ──
+
+
+def test_a_scoped_manager_sees_a_request_in_their_own_branch(
+    conn: psycopg.Connection, scoped: ScopedWorkspace
+) -> None:
+    with conn.cursor() as cur:
+        _act_as_scoped(cur, scoped.scoped_manager)
+        cur.execute("select id from purchase_request where branch_id = %s", (scoped.branch_a,))
+        assert [row[0] for row in cur.fetchall()] == [scoped.request_a]
+
+
+def test_a_scoped_manager_does_not_see_another_branchs_request(
+    conn: psycopg.Connection, scoped: ScopedWorkspace
+) -> None:
+    with conn.cursor() as cur:
+        _act_as_scoped(cur, scoped.scoped_manager)
+        # request_c is in branch B, requested by the owner — outside both the manager's branch
+        # scope and the requester-always clause.
+        cur.execute("select count(*) from purchase_request where id = %s", (scoped.request_c,))
+        assert cur.fetchone() == (0,)
+
+
+def test_a_direct_fetch_of_another_branchs_request_resolves_not_found_not_forbidden(
+    conn: psycopg.Connection, scoped: ScopedWorkspace
+) -> None:
+    with conn.cursor() as cur:
+        _act_as_scoped(cur, scoped.scoped_manager)
+        cur.execute("select * from purchase_request where id = %s", (scoped.request_c,))
+        assert cur.fetchone() is None  # empty result, never an error
+
+
+def test_the_requester_sees_their_own_request_even_outside_their_branch_scope(
+    conn: psycopg.Connection, scoped: ScopedWorkspace
+) -> None:
+    # request_b is in branch B; the scoped manager is scoped to branch A only, but requested it.
+    with conn.cursor() as cur:
+        _act_as_scoped(cur, scoped.scoped_manager)
+        cur.execute("select id from purchase_request where id = %s", (scoped.request_b,))
+        assert cur.fetchone() == (scoped.request_b,)
+
+
+def test_an_unscoped_manager_sees_every_branchs_request(
+    conn: psycopg.Connection, scoped: ScopedWorkspace
+) -> None:
+    with conn.cursor() as cur:
+        _act_as_scoped(cur, scoped.unscoped_manager)
+        cur.execute("select count(*) from purchase_request")
+        assert cur.fetchone() == (3,)
+
+
+def test_removing_the_assignment_returns_the_manager_to_seeing_every_request(
+    conn: psycopg.Connection, scoped: ScopedWorkspace
+) -> None:
+    with conn.cursor() as cur:
+        _act_as_scoped(cur, scoped.scoped_manager)
+        cur.execute("select count(*) from purchase_request")
+        assert cur.fetchone() == (2,)  # branch-A request + own branch-B request
+
+        act_as(cur, scoped.owner)
+        cur.execute(
+            "delete from branch_role_assignment where id = %s", (scoped.assignment_id,)
+        )
+
+        _act_as_scoped(cur, scoped.scoped_manager)
+        cur.execute("select count(*) from purchase_request")
+        assert cur.fetchone() == (3,)
+
+
+def test_approval_step_visibility_rides_the_parent_request_not_the_branch(
+    conn: psycopg.Connection, scoped: ScopedWorkspace
+) -> None:
+    # approval_step has no branch clause of its own: the scoped manager sees the step on the
+    # request they submitted (request_b) but not the step on request_a, even though request_a
+    # is in their assigned branch — they are neither its requester nor its assignee.
+    with conn.cursor() as cur:
+        _act_as_scoped(cur, scoped.scoped_manager)
+        cur.execute("select id from approval_step")
+        assert [row[0] for row in cur.fetchall()] == [scoped.step_b]
+
+
+def test_the_owner_sees_every_request_and_every_step(
+    conn: psycopg.Connection, scoped: ScopedWorkspace
+) -> None:
+    with conn.cursor() as cur:
+        act_as(cur, scoped.owner)
+        cur.execute("select count(*) from purchase_request")
+        assert cur.fetchone() == (3,)
+        cur.execute("select count(*) from approval_step")
+        assert cur.fetchone() == (2,)

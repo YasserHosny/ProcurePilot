@@ -152,3 +152,24 @@ def test_removed_threshold_approver_falls_back_to_owner() -> None:
 
     assert result.assigned_membership_id == owner_id
     assert result.source == "owner_fallback"
+
+
+def test_delegation_to_removed_delegate_falls_through_to_original_assignee() -> None:
+    branch_id = uuid4()
+    owner_id = uuid4()
+    approver = uuid4()
+    removed_delegate = uuid4()
+
+    result = resolve_approver(
+        request_value=Decimal("75"),
+        request_currency="GBP",
+        branch_id=branch_id,
+        rules=[rule(approver_id=approver)],
+        delegations=[delegation(delegator_id=approver, delegate_id=removed_delegate)],
+        removed_membership_ids={removed_delegate},
+        owner_membership_id=owner_id,
+        as_of=date(2026, 9, 10),
+    )
+
+    assert result.assigned_membership_id == approver
+    assert result.source == "threshold_match"
