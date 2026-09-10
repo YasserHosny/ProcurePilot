@@ -8,11 +8,18 @@ from fastapi import APIRouter, Body, Depends, Header, Query, status
 from procurepilot_api.deps import CurrentMember, bearer_token, current_member
 from procurepilot_api.modules.requests.schemas import (
     ApprovalDecisionInput,
+    ApprovalDelegation,
+    ApprovalDelegationCreate,
+    ApprovalDelegationList,
     PurchaseRequest,
     PurchaseRequestCreate,
     PurchaseRequestList,
     PurchaseRequestStatus,
     PurchaseRequestUpdate,
+    ThresholdRule,
+    ThresholdRuleCreate,
+    ThresholdRuleList,
+    ThresholdRuleUpdate,
 )
 from procurepilot_api.modules.requests.service import (
     RequestsService,
@@ -174,4 +181,130 @@ def reject_request(
         member=member,
         request_id=request_id,
         payload=payload,
+    )
+
+
+@router.get("/approvals/threshold-rules", response_model=ThresholdRuleList)
+def list_threshold_rules(
+    token: Annotated[str, Depends(bearer_token)],
+    _member: Annotated[CurrentMember, Depends(current_member)],
+    service: Annotated[RequestsService, Depends(get_requests_service)],
+    cursor: Annotated[str | None, Query()] = None,
+    limit: Annotated[int, Query(le=100)] = 50,
+) -> ThresholdRuleList:
+    return service.list_threshold_rules(
+        bearer_token=token,
+        cursor=cursor,
+        limit=limit,
+    )
+
+
+@router.post(
+    "/approvals/threshold-rules",
+    status_code=status.HTTP_201_CREATED,
+    response_model=ThresholdRule,
+)
+def create_threshold_rule(
+    payload: Annotated[ThresholdRuleCreate, Body()],
+    token: Annotated[str, Depends(bearer_token)],
+    member: Annotated[CurrentMember, Depends(current_member)],
+    service: Annotated[RequestsService, Depends(get_requests_service)],
+    _idempotency_key: Annotated[
+        UUID | None, Header(alias="Idempotency-Key")
+    ] = None,
+) -> ThresholdRule:
+    return service.create_threshold_rule(
+        bearer_token=token,
+        member=member,
+        payload=payload,
+    )
+
+
+@router.patch(
+    "/approvals/threshold-rules/{rule_id}",
+    response_model=ThresholdRule,
+)
+def update_threshold_rule(
+    rule_id: UUID,
+    payload: Annotated[ThresholdRuleUpdate, Body()],
+    token: Annotated[str, Depends(bearer_token)],
+    member: Annotated[CurrentMember, Depends(current_member)],
+    service: Annotated[RequestsService, Depends(get_requests_service)],
+) -> ThresholdRule:
+    return service.update_threshold_rule(
+        bearer_token=token,
+        member=member,
+        rule_id=rule_id,
+        patch=payload,
+    )
+
+
+@router.delete(
+    "/approvals/threshold-rules/{rule_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_model=None,
+)
+def delete_threshold_rule(
+    rule_id: UUID,
+    token: Annotated[str, Depends(bearer_token)],
+    member: Annotated[CurrentMember, Depends(current_member)],
+    service: Annotated[RequestsService, Depends(get_requests_service)],
+) -> None:
+    service.delete_threshold_rule(
+        bearer_token=token,
+        member=member,
+        rule_id=rule_id,
+    )
+
+
+@router.get("/approvals/delegations", response_model=ApprovalDelegationList)
+def list_approval_delegations(
+    token: Annotated[str, Depends(bearer_token)],
+    member: Annotated[CurrentMember, Depends(current_member)],
+    service: Annotated[RequestsService, Depends(get_requests_service)],
+    membership_id: Annotated[UUID | None, Query()] = None,
+) -> ApprovalDelegationList:
+    return service.list_approval_delegations(
+        bearer_token=token,
+        member=member,
+        membership_id=membership_id,
+    )
+
+
+@router.post(
+    "/approvals/delegations",
+    status_code=status.HTTP_201_CREATED,
+    response_model=ApprovalDelegation,
+)
+def create_approval_delegation(
+    payload: Annotated[ApprovalDelegationCreate, Body()],
+    token: Annotated[str, Depends(bearer_token)],
+    member: Annotated[CurrentMember, Depends(current_member)],
+    service: Annotated[RequestsService, Depends(get_requests_service)],
+    _idempotency_key: Annotated[
+        UUID | None, Header(alias="Idempotency-Key")
+    ] = None,
+) -> ApprovalDelegation:
+    return service.create_approval_delegation(
+        bearer_token=token,
+        member=member,
+        payload=payload,
+    )
+
+
+@router.delete(
+    "/approvals/delegations/{delegation_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_model=None,
+)
+def cancel_approval_delegation(
+    delegation_id: UUID,
+    token: Annotated[str, Depends(bearer_token)],
+    member: Annotated[CurrentMember, Depends(current_member)],
+    service: Annotated[RequestsService, Depends(get_requests_service)],
+) -> None:
+    service.cancel_approval_delegation(
+        bearer_token=token,
+        member=member,
+        delegation_id=delegation_id,
     )

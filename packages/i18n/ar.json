@@ -1762,6 +1762,8 @@
     "thresholdRules": {
       "sectionTitle": "قواعد عتبات الاعتماد",
       "createButton": "قاعدة عتبة جديدة",
+      "defaultBranch": "كافة الفروع (افتراضي)",
+      "uncapped": "بلا حد أقصى",
       "columns": {
         "branch": "الفرع",
         "minAmount": "من",
@@ -1770,19 +1772,38 @@
         "approver": "المعتمد",
         "actions": "إجراءات"
       },
+      "actions": {
+        "edit": "تعديل قاعدة العتبة",
+        "delete": "حذف قاعدة العتبة"
+      },
       "form": {
         "createTitle": "قاعدة عتبة جديدة",
         "editTitle": "تعديل قاعدة العتبة",
         "branchLabel": "الفرع (اختياري — قاعدة افتراضية للمؤسسة إذا ترك فارغًا)",
         "minAmountLabel": "من مبلغ",
+        "minAmountPlaceholder": "مثال: 0 أو 1000",
+        "minAmountRequired": "مبلغ البداية مطلوب.",
+        "minAmountInvalid": "أدخل مبلغاً موجباً.",
         "maxAmountLabel": "إلى مبلغ (اختياري — بلا حد أقصى إذا ترك فارغًا)",
+        "maxAmountPlaceholder": "مثال: 5000",
+        "maxAmountInvalid": "يجب أن يكون أكبر من أو يساوي مبلغ البداية.",
         "currencyLabel": "العملة",
+        "currencyRequired": "العملة مطلوبة.",
         "approverLabel": "المعتمد",
+        "approverRequired": "المعتمد مطلوب.",
         "cancelButton": "إلغاء",
-        "submitButton": "حفظ القاعدة"
+        "submitButton": "حفظ القاعدة",
+        "submittingButton": "جارٍ الحفظ..."
+      },
+      "deleteDialog": {
+        "title": "حذف قاعدة العتبة",
+        "message": "هل أنت متأكد من رغبتك في حذف قاعدة العتبة هذه؟",
+        "confirmButton": "حذف",
+        "cancelButton": "إلغاء"
       },
       "empty": "لا توجد قواعد عتبات معرفة بعد. ستوجّه الطلبات إلى المالك حتى إضافة القواعد.",
       "createSuccess": "تم إنشاء قاعدة العتبة.",
+      "updateSuccess": "تم تحديث قاعدة العتبة.",
       "deleteSuccess": "تم حذف قاعدة العتبة.",
       "genericError": "تعذر حفظ قاعدة العتبة. يرجى المحاولة مرة أخرى."
     },

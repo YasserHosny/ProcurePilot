@@ -22,8 +22,16 @@ from procurepilot_api.errors import (
 )
 from procurepilot_api.modules.auth.jwt import MemberRole
 from procurepilot_api.modules.members.service import authenticated_client
+from procurepilot_api.modules.requests.routing import (
+    DelegationRow,
+    ThresholdRuleRow,
+    resolve_approver,
+)
 from procurepilot_api.modules.requests.schemas import (
     ApprovalDecisionInput,
+    ApprovalDelegation,
+    ApprovalDelegationCreate,
+    ApprovalDelegationList,
     ApprovalStep,
     Money,
     PurchaseRequest,
@@ -32,6 +40,10 @@ from procurepilot_api.modules.requests.schemas import (
     PurchaseRequestList,
     PurchaseRequestStatus,
     PurchaseRequestUpdate,
+    ThresholdRule,
+    ThresholdRuleCreate,
+    ThresholdRuleList,
+    ThresholdRuleUpdate,
 )
 from procurepilot_api.modules.requests.valuation import (
     LineEstimate,
@@ -52,6 +64,14 @@ LINE_COLUMNS = (
 STEP_COLUMNS = (
     "id,purchase_request_id,assigned_membership_id,source,status,"
     "comment,decided_by_membership_id,decided_at"
+)
+THRESHOLD_RULE_COLUMNS = (
+    "id,branch_id,min_amount,max_amount,currency,approver_membership_id,"
+    "created_by,created_at,updated_at"
+)
+DELEGATION_COLUMNS = (
+    "id,delegator_membership_id,delegate_membership_id,starts_on,ends_on,"
+    "created_at"
 )
 
 logger = logging.getLogger(__name__)
@@ -422,8 +442,13 @@ class RequestsService:
         request_row = _one_row_or_not_found(
             response.data, resource="purchase_request"
         )
+        routed_step = self._create_submission_approval_step(
+            client,
+            bearer_token=bearer_token,
+            member=member,
+            request_row=request_row,
+        )
         frozen_lines = self._fetch_lines_for(client, rid)
-        step_row = self._fetch_step(client, rid)
 
         self._record(
             bearer_token=bearer_token,
@@ -431,7 +456,7 @@ class RequestsService:
             action="requests.purchase_request_submitted",
             target={"purchase_request_id": rid},
         )
-        return _purchase_request(request_row, frozen_lines, step_row)
+        return _purchase_request(request_row, frozen_lines, routed_step)
 
     def withdraw_request(
         self,
@@ -511,6 +536,258 @@ class RequestsService:
             request_id=request_id,
             payload=payload,
             decision="rejected",
+        )
+
+    def list_threshold_rules(
+        self,
+        *,
+        bearer_token: str,
+        cursor: str | None = None,
+        limit: int = 50,
+    ) -> ThresholdRuleList:
+        client = authenticated_client(self._settings, bearer_token)
+        capped = _cap_limit(limit)
+        offset = _decode_cursor(cursor)
+        try:
+            response = (
+                client.table("threshold_rule")
+                .select(THRESHOLD_RULE_COLUMNS)
+                .order("branch_id")
+                .order("min_amount")
+                .order("id")
+                .range(offset, offset + capped)
+                .execute()
+            )
+        except APIError as exc:
+            raise ServiceUnavailableError(
+                details={"dependency": "database"}
+            ) from exc
+        rows = _rows(response.data)
+        return ThresholdRuleList(
+            items=[_threshold_rule(row) for row in rows[:capped]],
+            next_cursor=(
+                _encode_cursor(offset + capped)
+                if len(rows) > capped
+                else None
+            ),
+        )
+
+    def create_threshold_rule(
+        self,
+        *,
+        bearer_token: str,
+        member: CurrentMember,
+        payload: ThresholdRuleCreate,
+    ) -> ThresholdRule:
+        _require_owner(member)
+        client = authenticated_client(self._settings, bearer_token)
+        try:
+            response = (
+                client.table("threshold_rule")
+                .insert(
+                    {
+                        "tenant_id": str(member.tenant_id),
+                        "branch_id": (
+                            str(payload.branch_id)
+                            if payload.branch_id is not None
+                            else None
+                        ),
+                        "min_amount": payload.min_amount,
+                        "max_amount": payload.max_amount,
+                        "currency": payload.currency,
+                        "approver_membership_id": str(
+                            payload.approver_membership_id
+                        ),
+                        "created_by": str(member.membership_id),
+                    }
+                )
+                .execute()
+            )
+        except APIError as exc:
+            raise _write_error(exc) from exc
+        row = _one_row(response.data, reason="threshold_rule_write_failed")
+        self._record(
+            bearer_token=bearer_token,
+            member=member,
+            action="requests.threshold_rule_created",
+            target={"threshold_rule_id": str(row["id"])},
+        )
+        return _threshold_rule(row)
+
+    def update_threshold_rule(
+        self,
+        *,
+        bearer_token: str,
+        member: CurrentMember,
+        rule_id: UUID,
+        patch: ThresholdRuleUpdate,
+    ) -> ThresholdRule:
+        _require_owner(member)
+        updates: dict[str, object] = {}
+        for field in (
+            "branch_id",
+            "min_amount",
+            "max_amount",
+            "currency",
+            "approver_membership_id",
+        ):
+            if field not in patch.model_fields_set:
+                continue
+            value = getattr(patch, field)
+            updates[field] = str(value) if isinstance(value, UUID) else value
+        updates["updated_at"] = _now_iso()
+
+        client = authenticated_client(self._settings, bearer_token)
+        try:
+            response = (
+                client.table("threshold_rule")
+                .update(updates)
+                .eq("id", str(rule_id))
+                .execute()
+            )
+        except APIError as exc:
+            raise _write_error(exc) from exc
+        row = _one_row_or_not_found(
+            response.data, resource="threshold_rule"
+        )
+        self._record(
+            bearer_token=bearer_token,
+            member=member,
+            action="requests.threshold_rule_updated",
+            target={"threshold_rule_id": str(rule_id)},
+        )
+        return _threshold_rule(row)
+
+    def delete_threshold_rule(
+        self,
+        *,
+        bearer_token: str,
+        member: CurrentMember,
+        rule_id: UUID,
+    ) -> None:
+        _require_owner(member)
+        client = authenticated_client(self._settings, bearer_token)
+        try:
+            response = (
+                client.table("threshold_rule")
+                .delete()
+                .eq("id", str(rule_id))
+                .execute()
+            )
+        except APIError as exc:
+            raise _write_error(exc) from exc
+        _one_row_or_not_found(response.data, resource="threshold_rule")
+        self._record(
+            bearer_token=bearer_token,
+            member=member,
+            action="requests.threshold_rule_deleted",
+            target={"threshold_rule_id": str(rule_id)},
+        )
+
+    def list_approval_delegations(
+        self,
+        *,
+        bearer_token: str,
+        member: CurrentMember,
+        membership_id: UUID | None = None,
+    ) -> ApprovalDelegationList:
+        if membership_id is not None and member.role is not MemberRole.owner:
+            if str(membership_id) != str(member.membership_id):
+                raise PermissionDeniedError(
+                    details={"reason": "not_delegator_or_owner"}
+                )
+        client = authenticated_client(self._settings, bearer_token)
+        delegator_id = membership_id or member.membership_id
+        try:
+            response = (
+                client.table("approval_delegation")
+                .select(DELEGATION_COLUMNS)
+                .eq("delegator_membership_id", str(delegator_id))
+                .order("starts_on", desc=True)
+                .order("id")
+                .execute()
+            )
+        except APIError as exc:
+            raise ServiceUnavailableError(
+                details={"dependency": "database"}
+            ) from exc
+        return ApprovalDelegationList(
+            items=[_approval_delegation(row) for row in _rows(response.data)]
+        )
+
+    def create_approval_delegation(
+        self,
+        *,
+        bearer_token: str,
+        member: CurrentMember,
+        payload: ApprovalDelegationCreate,
+    ) -> ApprovalDelegation:
+        delegator_id = payload.delegator_membership_id or member.membership_id
+        if member.role is not MemberRole.owner and str(delegator_id) != str(
+            member.membership_id
+        ):
+            raise PermissionDeniedError(
+                details={"reason": "not_delegator_or_owner"}
+            )
+
+        client = authenticated_client(self._settings, bearer_token)
+        try:
+            response = (
+                client.table("approval_delegation")
+                .insert(
+                    {
+                        "tenant_id": str(member.tenant_id),
+                        "delegator_membership_id": str(delegator_id),
+                        "delegate_membership_id": str(
+                            payload.delegate_membership_id
+                        ),
+                        "starts_on": payload.starts_on.isoformat(),
+                        "ends_on": payload.ends_on.isoformat(),
+                    }
+                )
+                .execute()
+            )
+        except APIError as exc:
+            raise _write_error(exc) from exc
+        row = _one_row(response.data, reason="approval_delegation_write_failed")
+        self._record(
+            bearer_token=bearer_token,
+            member=member,
+            action="requests.approval_delegation_created",
+            target={"approval_delegation_id": str(row["id"])},
+        )
+        return _approval_delegation(row)
+
+    def cancel_approval_delegation(
+        self,
+        *,
+        bearer_token: str,
+        member: CurrentMember,
+        delegation_id: UUID,
+    ) -> None:
+        client = authenticated_client(self._settings, bearer_token)
+        existing = self._fetch_delegation(client, delegation_id)
+        if member.role is not MemberRole.owner and str(
+            existing["delegator_membership_id"]
+        ) != str(member.membership_id):
+            raise PermissionDeniedError(
+                details={"reason": "not_delegator_or_owner"}
+            )
+        try:
+            response = (
+                client.table("approval_delegation")
+                .delete()
+                .eq("id", str(delegation_id))
+                .execute()
+            )
+        except APIError as exc:
+            raise _write_error(exc) from exc
+        _one_row_or_not_found(response.data, resource="approval_delegation")
+        self._record(
+            bearer_token=bearer_token,
+            member=member,
+            action="requests.approval_delegation_cancelled",
+            target={"approval_delegation_id": str(delegation_id)},
         )
 
     # ── internal helpers ──────────────────────────────────────────────
@@ -666,6 +943,88 @@ class RequestsService:
         rows = _rows(response.data)
         return rows[0] if rows else None
 
+    def _fetch_threshold_rules(
+        self, client: Client
+    ) -> list[ThresholdRuleRow]:
+        try:
+            response = (
+                client.table("threshold_rule")
+                .select(THRESHOLD_RULE_COLUMNS)
+                .execute()
+            )
+        except APIError as exc:
+            raise ServiceUnavailableError(
+                details={"dependency": "database"}
+            ) from exc
+        return [_threshold_rule_row(row) for row in _rows(response.data)]
+
+    def _fetch_active_delegations(
+        self, client: Client, *, as_of: date
+    ) -> list[DelegationRow]:
+        try:
+            response = (
+                client.table("approval_delegation")
+                .select(DELEGATION_COLUMNS)
+                .lte("starts_on", as_of.isoformat())
+                .gte("ends_on", as_of.isoformat())
+                .execute()
+            )
+        except APIError as exc:
+            raise ServiceUnavailableError(
+                details={"dependency": "database"}
+            ) from exc
+        return [_delegation_row(row) for row in _rows(response.data)]
+
+    def _fetch_owner_membership_id(self, client: Client) -> UUID:
+        try:
+            response = (
+                client.table("membership")
+                .select("id")
+                .eq("role", "owner")
+                .eq("status", "active")
+                .limit(1)
+                .execute()
+            )
+        except APIError as exc:
+            raise ServiceUnavailableError(
+                details={"dependency": "database"}
+            ) from exc
+        row = _one_row(response.data, reason="owner_membership_not_found")
+        return UUID(str(row["id"]))
+
+    def _fetch_removed_membership_ids(self, client: Client) -> set[UUID]:
+        try:
+            response = (
+                client.table("membership")
+                .select("id")
+                .neq("status", "active")
+                .execute()
+            )
+        except APIError as exc:
+            raise ServiceUnavailableError(
+                details={"dependency": "database"}
+            ) from exc
+        return {UUID(str(row["id"])) for row in _rows(response.data)}
+
+    def _fetch_delegation(
+        self, client: Client, delegation_id: UUID
+    ) -> dict[str, object]:
+        try:
+            response = (
+                client.table("approval_delegation")
+                .select(DELEGATION_COLUMNS)
+                .eq("id", str(delegation_id))
+                .limit(2)
+                .execute()
+            )
+        except APIError as exc:
+            raise ServiceUnavailableError(
+                details={"dependency": "database"}
+            ) from exc
+        return _one_row_or_not_found(
+            response.data, resource="approval_delegation"
+        )
+
     def _fetch_steps_batch(
         self, client: Client, request_ids: list[str]
     ) -> dict[str, dict[str, object] | None]:
@@ -710,6 +1069,67 @@ class RequestsService:
             ),
             bearer_token=bearer_token,
         )
+
+    def _create_submission_approval_step(
+        self,
+        client: Client,
+        *,
+        bearer_token: str,
+        member: CurrentMember,
+        request_row: dict[str, object],
+    ) -> dict[str, object]:
+        as_of = datetime.now(UTC).date()
+        resolved = resolve_approver(
+            request_value=(
+                Decimal(str(request_row["estimated_total_amount"]))
+                if request_row.get("estimated_total_amount") is not None
+                else None
+            ),
+            request_currency=(
+                str(request_row["estimated_total_currency"])
+                if request_row.get("estimated_total_currency") is not None
+                else None
+            ),
+            branch_id=UUID(str(request_row["branch_id"])),
+            rules=self._fetch_threshold_rules(client),
+            delegations=self._fetch_active_delegations(client, as_of=as_of),
+            removed_membership_ids=self._fetch_removed_membership_ids(client),
+            owner_membership_id=self._fetch_owner_membership_id(client),
+            as_of=as_of,
+        )
+        try:
+            response = (
+                client.table("approval_step")
+                .insert(
+                    {
+                        "tenant_id": str(member.tenant_id),
+                        "purchase_request_id": str(request_row["id"]),
+                        "assigned_membership_id": str(
+                            resolved.assigned_membership_id
+                        ),
+                        "source": resolved.source,
+                        "status": "pending",
+                    }
+                )
+                .execute()
+            )
+        except APIError as exc:
+            raise _write_error(exc) from exc
+        row = _one_row(response.data, reason="approval_step_write_failed")
+        if resolved.source == "owner_fallback":
+            self._record(
+                bearer_token=bearer_token,
+                member=member,
+                action="requests.approval_step_escalated",
+                target={
+                    "purchase_request_id": str(request_row["id"]),
+                    "approval_step_id": str(row["id"]),
+                    "assigned_membership_id": str(
+                        resolved.assigned_membership_id
+                    ),
+                },
+            )
+        return row
 
     def _decide_request(
         self,
@@ -809,6 +1229,11 @@ def _require_assigned_approver_or_owner(
     raise PermissionDeniedError(details={"reason": "not_assigned_approver"})
 
 
+def _require_owner(member: CurrentMember) -> None:
+    if member.role is not MemberRole.owner:
+        raise PermissionDeniedError(details={"reason": "owner_required"})
+
+
 def _purchase_request(
     row: dict[str, object],
     line_rows: list[dict[str, object]],
@@ -875,6 +1300,70 @@ def _approval_step(row: dict[str, object]) -> ApprovalStep:
             else None
         ),
         decided_at=row.get("decided_at"),
+    )
+
+
+def _threshold_rule(row: dict[str, object]) -> ThresholdRule:
+    return ThresholdRule(
+        id=UUID(str(row["id"])),
+        branch_id=(
+            UUID(str(row["branch_id"])) if row.get("branch_id") else None
+        ),
+        min_amount=_decimal(row["min_amount"], scale=4),
+        max_amount=(
+            _decimal(row["max_amount"], scale=4)
+            if row.get("max_amount") is not None
+            else None
+        ),
+        currency=str(row["currency"]),
+        approver_membership_id=UUID(str(row["approver_membership_id"])),
+        created_by=UUID(str(row["created_by"])),
+        created_at=row["created_at"],
+        updated_at=row.get("updated_at"),
+    )
+
+
+def _threshold_rule_row(row: dict[str, object]) -> ThresholdRuleRow:
+    return ThresholdRuleRow(
+        id=UUID(str(row["id"])),
+        branch_id=(
+            UUID(str(row["branch_id"])) if row.get("branch_id") else None
+        ),
+        min_amount=Decimal(str(row["min_amount"])),
+        max_amount=(
+            Decimal(str(row["max_amount"]))
+            if row.get("max_amount") is not None
+            else None
+        ),
+        currency=str(row["currency"]),
+        approver_membership_id=UUID(str(row["approver_membership_id"])),
+    )
+
+
+def _approval_delegation(row: dict[str, object]) -> ApprovalDelegation:
+    return ApprovalDelegation(
+        id=UUID(str(row["id"])),
+        delegator_membership_id=UUID(str(row["delegator_membership_id"])),
+        delegate_membership_id=UUID(str(row["delegate_membership_id"])),
+        starts_on=_parse_date(row["starts_on"]),
+        ends_on=_parse_date(row["ends_on"]),
+        created_at=row["created_at"],
+    )
+
+
+def _delegation_row(row: dict[str, object]) -> DelegationRow:
+    created_at = row["created_at"]
+    if isinstance(created_at, str):
+        created_at = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
+    if not isinstance(created_at, datetime):
+        raise ServiceUnavailableError(details={"reason": "invalid_datetime"})
+    return DelegationRow(
+        id=UUID(str(row["id"])),
+        delegator_membership_id=UUID(str(row["delegator_membership_id"])),
+        delegate_membership_id=UUID(str(row["delegate_membership_id"])),
+        starts_on=_parse_date(row["starts_on"]),
+        ends_on=_parse_date(row["ends_on"]),
+        created_at=created_at,
     )
 
 

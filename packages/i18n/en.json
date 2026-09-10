@@ -1762,6 +1762,8 @@
     "thresholdRules": {
       "sectionTitle": "Approval Threshold Rules",
       "createButton": "New Threshold Rule",
+      "defaultBranch": "All branches (default)",
+      "uncapped": "Uncapped",
       "columns": {
         "branch": "Branch",
         "minAmount": "From",
@@ -1770,19 +1772,38 @@
         "approver": "Approver",
         "actions": "Actions"
       },
+      "actions": {
+        "edit": "Edit threshold rule",
+        "delete": "Delete threshold rule"
+      },
       "form": {
         "createTitle": "New Threshold Rule",
         "editTitle": "Edit Threshold Rule",
         "branchLabel": "Branch (optional — tenant-wide default if omitted)",
         "minAmountLabel": "From Amount",
+        "minAmountPlaceholder": "e.g. 0 or 1000",
+        "minAmountRequired": "From amount is required.",
+        "minAmountInvalid": "Enter a positive amount.",
         "maxAmountLabel": "Up To Amount (optional — uncapped if omitted)",
+        "maxAmountPlaceholder": "e.g. 5000",
+        "maxAmountInvalid": "Must be greater than or equal to From amount.",
         "currencyLabel": "Currency",
+        "currencyRequired": "Currency is required.",
         "approverLabel": "Approver",
+        "approverRequired": "Approver is required.",
         "cancelButton": "Cancel",
-        "submitButton": "Save Rule"
+        "submitButton": "Save Rule",
+        "submittingButton": "Saving..."
+      },
+      "deleteDialog": {
+        "title": "Delete Threshold Rule",
+        "message": "Are you sure you want to delete this threshold rule?",
+        "confirmButton": "Delete",
+        "cancelButton": "Cancel"
       },
       "empty": "No threshold rules defined yet. Requests will route to the owner until rules are added.",
       "createSuccess": "Threshold rule created.",
+      "updateSuccess": "Threshold rule updated.",
       "deleteSuccess": "Threshold rule deleted.",
       "genericError": "Unable to save the threshold rule. Please try again."
     },

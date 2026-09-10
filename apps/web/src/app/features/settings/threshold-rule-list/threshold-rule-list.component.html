@@ -1,0 +1,329 @@
+<div class="settings-container">
+  <div class="section-header">
+    <h2 class="section-title">{{ 'approvals.thresholdRules.sectionTitle' | translate }}</h2>
+
+    <button
+      mat-flat-button
+      color="primary"
+      type="button"
+      (click)="openCreateDialog()"
+      class="action-btn"
+      *appRole="['owner']"
+    >
+      <mat-icon aria-hidden="true">add</mat-icon>
+      <span>{{ 'approvals.thresholdRules.createButton' | translate }}</span>
+    </button>
+  </div>
+
+  @if (errorMessage()) {
+    <div class="error-banner" role="alert">
+      <mat-icon class="error-icon" aria-hidden="true">error_outline</mat-icon>
+      <div class="error-text-wrap">
+        <div class="error-title">{{ 'common.traceId' | translate }}</div>
+        <div class="error-message">{{ errorMessage() }}</div>
+        @if (errorTraceId(); as traceId) {
+          <div class="error-trace">{{ traceId }}</div>
+        }
+      </div>
+    </div>
+  }
+
+  <mat-card class="rules-card">
+    @if (isLoading()) {
+      <div class="loading-state" aria-live="polite">
+        <mat-spinner [attr.aria-label]="'common.loading' | translate" diameter="40"></mat-spinner>
+        <span>{{ 'common.loading' | translate }}</span>
+      </div>
+    } @else if (rules().length === 0) {
+      <div class="empty-state">
+        <mat-icon class="empty-icon" aria-hidden="true">tune</mat-icon>
+        <p class="empty-message">
+          {{ 'approvals.thresholdRules.empty' | translate }}
+        </p>
+      </div>
+    } @else {
+      <div class="table-responsive">
+        <table mat-table [dataSource]="rules()" class="rules-table">
+          <!-- Branch Column -->
+          <ng-container matColumnDef="branch">
+            <th mat-header-cell *matHeaderCellDef>
+              {{ 'approvals.thresholdRules.columns.branch' | translate }}
+            </th>
+            <td mat-cell *matCellDef="let rule">
+              <span class="branch-label">{{ branchLabel(rule) }}</span>
+            </td>
+          </ng-container>
+
+          <!-- Min Amount Column -->
+          <ng-container matColumnDef="minAmount">
+            <th mat-header-cell *matHeaderCellDef>
+              {{ 'approvals.thresholdRules.columns.minAmount' | translate }}
+            </th>
+            <td mat-cell *matCellDef="let rule">
+              <span class="amount-val">
+                {{ { amount: rule.min_amount, currency: rule.currency } | formatMoney }}
+              </span>
+            </td>
+          </ng-container>
+
+          <!-- Max Amount Column -->
+          <ng-container matColumnDef="maxAmount">
+            <th mat-header-cell *matHeaderCellDef>
+              {{ 'approvals.thresholdRules.columns.maxAmount' | translate }}
+            </th>
+            <td mat-cell *matCellDef="let rule">
+              @if (rule.max_amount) {
+                <span class="amount-val">
+                  {{ { amount: rule.max_amount, currency: rule.currency } | formatMoney }}
+                </span>
+              } @else {
+                <span class="uncapped-label">
+                  {{ 'approvals.thresholdRules.uncapped' | translate }}
+                </span>
+              }
+            </td>
+          </ng-container>
+
+          <!-- Currency Column -->
+          <ng-container matColumnDef="currency">
+            <th mat-header-cell *matHeaderCellDef>
+              {{ 'approvals.thresholdRules.columns.currency' | translate }}
+            </th>
+            <td mat-cell *matCellDef="let rule">
+              <span class="currency-badge">{{ rule.currency }}</span>
+            </td>
+          </ng-container>
+
+          <!-- Approver Column -->
+          <ng-container matColumnDef="approver">
+            <th mat-header-cell *matHeaderCellDef>
+              {{ 'approvals.thresholdRules.columns.approver' | translate }}
+            </th>
+            <td mat-cell *matCellDef="let rule">
+              <span class="approver-val" [matTooltip]="rule.approver_membership_id">
+                {{ approverLabel(rule) }}
+              </span>
+            </td>
+          </ng-container>
+
+          <!-- Actions Column -->
+          <ng-container matColumnDef="actions">
+            <th mat-header-cell *matHeaderCellDef>
+              {{ 'approvals.thresholdRules.columns.actions' | translate }}
+            </th>
+            <td mat-cell *matCellDef="let rule">
+              <div class="actions-cell" *appRole="['owner']">
+                <button
+                  mat-icon-button
+                  type="button"
+                  (click)="openEditDialog(rule)"
+                  [attr.aria-label]="'approvals.thresholdRules.actions.edit' | translate"
+                  [matTooltip]="'approvals.thresholdRules.actions.edit' | translate"
+                  class="edit-action"
+                >
+                  <mat-icon aria-hidden="true">edit</mat-icon>
+                </button>
+
+                <button
+                  mat-icon-button
+                  type="button"
+                  (click)="openDeleteDialog(rule)"
+                  [attr.aria-label]="'approvals.thresholdRules.actions.delete' | translate"
+                  [matTooltip]="'approvals.thresholdRules.actions.delete' | translate"
+                  class="danger-action"
+                >
+                  <mat-icon aria-hidden="true">delete</mat-icon>
+                </button>
+              </div>
+            </td>
+          </ng-container>
+
+          <tr mat-header-row *matHeaderRowDef="displayedColumns()"></tr>
+          <tr mat-row *matRowDef="let row; columns: displayedColumns()"></tr>
+        </table>
+      </div>
+    }
+  </mat-card>
+</div>
+
+<!-- Rule Create / Edit Dialog Template -->
+<ng-template #ruleDialog>
+  <h2 mat-dialog-title>
+    {{
+      (editingRule()
+        ? 'approvals.thresholdRules.form.editTitle'
+        : 'approvals.thresholdRules.form.createTitle') | translate
+    }}
+  </h2>
+
+  <mat-dialog-content class="dialog-content">
+    @if (dialogErrorMessage()) {
+      <div class="error-banner dialog-error" role="alert">
+        <mat-icon class="error-icon" aria-hidden="true">error_outline</mat-icon>
+        <div class="error-text-wrap">
+          <div class="error-title">{{ 'common.traceId' | translate }}</div>
+          <div class="error-message">{{ dialogErrorMessage() }}</div>
+          @if (dialogErrorTraceId(); as traceId) {
+            <div class="error-trace">{{ traceId }}</div>
+          }
+        </div>
+      </div>
+    }
+
+    <form [formGroup]="form" (ngSubmit)="saveRule()" id="threshold-rule-form" class="rule-form">
+      <!-- Branch -->
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>{{ 'approvals.thresholdRules.form.branchLabel' | translate }}</mat-label>
+        <mat-select formControlName="branch_id">
+          <mat-option [value]="null">
+            {{ 'approvals.thresholdRules.defaultBranch' | translate }}
+          </mat-option>
+          @for (branch of branches(); track branch.id) {
+            <mat-option [value]="branch.id">{{ branch.name }}</mat-option>
+          }
+          @if (form.controls.branch_id.value && !isBranchInList(form.controls.branch_id.value)) {
+            <mat-option [value]="form.controls.branch_id.value">
+              {{ form.controls.branch_id.value }}
+            </mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+
+      <!-- Min Amount -->
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>{{ 'approvals.thresholdRules.form.minAmountLabel' | translate }}</mat-label>
+        <input
+          matInput
+          type="text"
+          inputmode="decimal"
+          formControlName="min_amount"
+          [placeholder]="'approvals.thresholdRules.form.minAmountPlaceholder' | translate"
+          required
+        />
+        @if (form.controls.min_amount.hasError('required')) {
+          <mat-error>{{ 'approvals.thresholdRules.form.minAmountRequired' | translate }}</mat-error>
+        } @else if (form.controls.min_amount.hasError('pattern')) {
+          <mat-error>{{ 'approvals.thresholdRules.form.minAmountInvalid' | translate }}</mat-error>
+        }
+      </mat-form-field>
+
+      <!-- Max Amount -->
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>{{ 'approvals.thresholdRules.form.maxAmountLabel' | translate }}</mat-label>
+        <input
+          matInput
+          type="text"
+          inputmode="decimal"
+          formControlName="max_amount"
+          [placeholder]="'approvals.thresholdRules.form.maxAmountPlaceholder' | translate"
+        />
+        @if (form.controls.max_amount.hasError('pattern')) {
+          <mat-error>{{ 'approvals.thresholdRules.form.minAmountInvalid' | translate }}</mat-error>
+        } @else if (form.hasError('maxLessThanMin')) {
+          <mat-error>{{ 'approvals.thresholdRules.form.maxAmountInvalid' | translate }}</mat-error>
+        }
+      </mat-form-field>
+
+      <!-- Currency -->
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>{{ 'approvals.thresholdRules.form.currencyLabel' | translate }}</mat-label>
+        <mat-select formControlName="currency" required>
+          @for (curr of currencies(); track curr.code) {
+            <mat-option [value]="curr.code">{{ curr.code }}</mat-option>
+          }
+          @if (form.controls.currency.value && !isCurrencyInList(form.controls.currency.value)) {
+            <mat-option [value]="form.controls.currency.value">
+              {{ form.controls.currency.value }}
+            </mat-option>
+          }
+        </mat-select>
+        @if (form.controls.currency.hasError('required')) {
+          <mat-error>{{ 'approvals.thresholdRules.form.currencyRequired' | translate }}</mat-error>
+        }
+      </mat-form-field>
+
+      <!-- Approver -->
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>{{ 'approvals.thresholdRules.form.approverLabel' | translate }}</mat-label>
+        <mat-select formControlName="approver_membership_id" required>
+          @for (member of members(); track member.id) {
+            <mat-option [value]="member.id">{{ member.email }}</mat-option>
+          }
+          @if (form.controls.approver_membership_id.value && !isMemberInList(form.controls.approver_membership_id.value)) {
+            <mat-option [value]="form.controls.approver_membership_id.value">
+              {{ form.controls.approver_membership_id.value }}
+            </mat-option>
+          }
+        </mat-select>
+        @if (form.controls.approver_membership_id.hasError('required')) {
+          <mat-error>{{ 'approvals.thresholdRules.form.approverRequired' | translate }}</mat-error>
+        }
+      </mat-form-field>
+    </form>
+  </mat-dialog-content>
+
+  <mat-dialog-actions align="end">
+    <button mat-button type="button" (click)="closeRuleDialog()" [disabled]="isSubmitting()">
+      {{ 'approvals.thresholdRules.form.cancelButton' | translate }}
+    </button>
+    <button
+      mat-flat-button
+      color="primary"
+      type="submit"
+      form="threshold-rule-form"
+      [disabled]="isSubmitting() || form.invalid"
+    >
+      @if (isSubmitting()) {
+        <mat-spinner diameter="18" class="inline-spinner"></mat-spinner>
+      }
+      <span>
+        {{
+          (isSubmitting()
+            ? 'approvals.thresholdRules.form.submittingButton'
+            : 'approvals.thresholdRules.form.submitButton') | translate
+        }}
+      </span>
+    </button>
+  </mat-dialog-actions>
+</ng-template>
+
+<!-- Delete Confirmation Dialog Template -->
+<ng-template #deleteDialog>
+  <h2 mat-dialog-title>{{ 'approvals.thresholdRules.deleteDialog.title' | translate }}</h2>
+
+  <mat-dialog-content class="dialog-content">
+    @if (deleteErrorMessage()) {
+      <div class="error-banner dialog-error" role="alert">
+        <mat-icon class="error-icon" aria-hidden="true">error_outline</mat-icon>
+        <div class="error-text-wrap">
+          <div class="error-title">{{ 'common.traceId' | translate }}</div>
+          <div class="error-message">{{ deleteErrorMessage() }}</div>
+          @if (deleteErrorTraceId(); as traceId) {
+            <div class="error-trace">{{ traceId }}</div>
+          }
+        </div>
+      </div>
+    }
+
+    <p class="delete-message">{{ 'approvals.thresholdRules.deleteDialog.message' | translate }}</p>
+  </mat-dialog-content>
+
+  <mat-dialog-actions align="end">
+    <button mat-button type="button" (click)="closeDeleteDialog()" [disabled]="isDeleting()">
+      {{ 'approvals.thresholdRules.deleteDialog.cancelButton' | translate }}
+    </button>
+    <button
+      mat-flat-button
+      color="warn"
+      type="button"
+      (click)="confirmDelete()"
+      [disabled]="isDeleting()"
+      class="delete-confirm-btn"
+    >
+      @if (isDeleting()) {
+        <mat-spinner diameter="18" class="inline-spinner"></mat-spinner>
+      }
+      <span>{{ 'approvals.thresholdRules.deleteDialog.confirmButton' | translate }}</span>
+    </button>
+  </mat-dialog-actions>
+</ng-template>
