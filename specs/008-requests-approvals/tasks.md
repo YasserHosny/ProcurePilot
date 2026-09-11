@@ -87,7 +87,7 @@ description: "Task list for Requests + Approvals implementation"
 - [x] T022 [P] [US2] Write contract tests for `GET /approvals/pending` and `POST /requests/{id}/approve`+`/reject` in `apps/api/tests/contract/test_approvals_contract.py`, covering the embedded-context shape (FR-005) and 403/404/409 envelopes
 - [x] T023 [P] [US2] Write approval-decision integration tests in `apps/api/tests/integration/test_approvals.py`, proving approve/reject transitions, the 403 refusal for anyone other than the assigned approver or an owner (FR-007), that `decided_by_membership_id`/`decided_at` are always populated together on any non-pending step (FR-006, the database check constraint from T003), and that a decided request no longer appears in `GET /approvals/pending`
 - [x] T024 [P] [US2] Write frontend unit tests for the approval queue in `apps/web/src/app/features/approvals/approval-queue/approval-queue.component.spec.ts`, covering the embedded context per row and the approve/reject actions with a comment
-- [ ] T025 [P] [US2] Write approval-queue E2E coverage in `apps/web/tests/e2e/approval-queue.spec.ts`, proving an approver sees a routed request with full context, approves it, and that a different, unrelated member cannot decide on it, plus Arabic RTL layout
+- [x] T025 [P] [US2] Write approval-queue E2E coverage in `apps/web/tests/e2e/approval-queue.spec.ts`, proving an approver sees a routed request with full context, approves it, and that a different, unrelated member cannot decide on it, plus Arabic RTL layout
 
 ### Implementation for User Story 2
 
