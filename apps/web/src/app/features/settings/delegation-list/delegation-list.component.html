@@ -1,0 +1,239 @@
+<div class="settings-container">
+  <div class="section-header">
+    <h2 class="section-title">{{ 'approvals.delegations.sectionTitle' | translate }}</h2>
+
+    <button
+      mat-flat-button
+      color="primary"
+      type="button"
+      (click)="openCreateDialog()"
+      class="action-btn"
+    >
+      <mat-icon aria-hidden="true">add</mat-icon>
+      <span>{{ 'approvals.delegations.createButton' | translate }}</span>
+    </button>
+  </div>
+
+  @if (errorMessage()) {
+    <div class="error-banner" role="alert">
+      <mat-icon class="error-icon" aria-hidden="true">error_outline</mat-icon>
+      <div class="error-text-wrap">
+        <div class="error-title">{{ 'common.traceId' | translate }}</div>
+        <div class="error-message">{{ errorMessage() }}</div>
+        @if (errorTraceId(); as traceId) {
+          <div class="error-trace">{{ traceId }}</div>
+        }
+      </div>
+    </div>
+  }
+
+  <mat-card class="delegations-card">
+    @if (isLoading()) {
+      <div class="loading-state" aria-live="polite">
+        <mat-spinner [attr.aria-label]="'common.loading' | translate" diameter="40"></mat-spinner>
+        <span>{{ 'common.loading' | translate }}</span>
+      </div>
+    } @else if (delegations().length === 0) {
+      <div class="empty-state">
+        <mat-icon class="empty-icon" aria-hidden="true">event_busy</mat-icon>
+        <p class="empty-message">
+          {{ 'approvals.delegations.empty' | translate }}
+        </p>
+      </div>
+    } @else {
+      <div class="table-responsive">
+        <table mat-table [dataSource]="delegations()" class="delegations-table">
+          <!-- Delegate Column -->
+          <ng-container matColumnDef="delegate">
+            <th mat-header-cell *matHeaderCellDef>
+              {{ 'approvals.delegations.columns.delegate' | translate }}
+            </th>
+            <td mat-cell *matCellDef="let delegation">
+              <span class="delegate-val" [matTooltip]="delegation.delegate_membership_id">
+                {{ delegateLabel(delegation) }}
+              </span>
+            </td>
+          </ng-container>
+
+          <!-- Starts On Column -->
+          <ng-container matColumnDef="startsOn">
+            <th mat-header-cell *matHeaderCellDef>
+              {{ 'approvals.delegations.columns.startsOn' | translate }}
+            </th>
+            <td mat-cell *matCellDef="let delegation">
+              <span class="date-val">{{ delegation.starts_on }}</span>
+            </td>
+          </ng-container>
+
+          <!-- Ends On Column -->
+          <ng-container matColumnDef="endsOn">
+            <th mat-header-cell *matHeaderCellDef>
+              {{ 'approvals.delegations.columns.endsOn' | translate }}
+            </th>
+            <td mat-cell *matCellDef="let delegation">
+              <span class="date-val">{{ delegation.ends_on }}</span>
+            </td>
+          </ng-container>
+
+          <!-- Actions Column -->
+          <ng-container matColumnDef="actions">
+            <th mat-header-cell *matHeaderCellDef>
+              {{ 'approvals.delegations.columns.actions' | translate }}
+            </th>
+            <td mat-cell *matCellDef="let delegation">
+              <div class="actions-cell">
+                <button
+                  mat-icon-button
+                  type="button"
+                  (click)="openCancelDialog(delegation)"
+                  [attr.aria-label]="'approvals.delegations.actions.cancel' | translate"
+                  [matTooltip]="'approvals.delegations.actions.cancel' | translate"
+                  class="danger-action"
+                >
+                  <mat-icon aria-hidden="true">cancel</mat-icon>
+                </button>
+              </div>
+            </td>
+          </ng-container>
+
+          <tr mat-header-row *matHeaderRowDef="displayedColumns()"></tr>
+          <tr mat-row *matRowDef="let row; columns: displayedColumns()"></tr>
+        </table>
+      </div>
+    }
+  </mat-card>
+</div>
+
+<!-- Delegation Create Dialog Template -->
+<ng-template #delegationDialog>
+  <h2 mat-dialog-title>{{ 'approvals.delegations.form.createTitle' | translate }}</h2>
+
+  <mat-dialog-content class="dialog-content">
+    @if (dialogErrorMessage()) {
+      <div class="error-banner dialog-error" role="alert">
+        <mat-icon class="error-icon" aria-hidden="true">error_outline</mat-icon>
+        <div class="error-text-wrap">
+          <div class="error-title">{{ 'common.traceId' | translate }}</div>
+          <div class="error-message">{{ dialogErrorMessage() }}</div>
+          @if (dialogErrorTraceId(); as traceId) {
+            <div class="error-trace">{{ traceId }}</div>
+          }
+        </div>
+      </div>
+    }
+
+    <form
+      [formGroup]="form"
+      (ngSubmit)="saveDelegation()"
+      id="delegation-form"
+      class="delegation-form"
+    >
+      <!-- Delegate -->
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>{{ 'approvals.delegations.form.delegateLabel' | translate }}</mat-label>
+        <mat-select formControlName="delegate_membership_id" required>
+          @for (member of availableMembers(); track member.id) {
+            <mat-option [value]="member.id">{{ member.email }}</mat-option>
+          }
+          @if (form.controls.delegate_membership_id.value && !isMemberInList(form.controls.delegate_membership_id.value)) {
+            <mat-option [value]="form.controls.delegate_membership_id.value">
+              {{ form.controls.delegate_membership_id.value }}
+            </mat-option>
+          }
+        </mat-select>
+        @if (form.controls.delegate_membership_id.hasError('required')) {
+          <mat-error>{{ 'approvals.delegations.form.delegateRequired' | translate }}</mat-error>
+        }
+      </mat-form-field>
+
+      <!-- Starts On -->
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>{{ 'approvals.delegations.form.startsOnLabel' | translate }}</mat-label>
+        <input
+          matInput
+          type="date"
+          formControlName="starts_on"
+          required
+        />
+        @if (form.controls.starts_on.hasError('required')) {
+          <mat-error>{{ 'approvals.delegations.form.startsOnRequired' | translate }}</mat-error>
+        }
+      </mat-form-field>
+
+      <!-- Ends On -->
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>{{ 'approvals.delegations.form.endsOnLabel' | translate }}</mat-label>
+        <input
+          matInput
+          type="date"
+          formControlName="ends_on"
+          required
+        />
+        @if (form.controls.ends_on.hasError('required')) {
+          <mat-error>{{ 'approvals.delegations.form.endsOnRequired' | translate }}</mat-error>
+        } @else if (form.hasError('endsOnBeforeStartsOn')) {
+          <mat-error>{{ 'approvals.delegations.form.endsOnInvalid' | translate }}</mat-error>
+        }
+      </mat-form-field>
+    </form>
+  </mat-dialog-content>
+
+  <mat-dialog-actions align="end">
+    <button mat-button type="button" (click)="closeDelegationDialog()" [disabled]="isSubmitting()">
+      {{ 'approvals.delegations.form.cancelButton' | translate }}
+    </button>
+    <button
+      mat-flat-button
+      color="primary"
+      type="submit"
+      form="delegation-form"
+      [disabled]="isSubmitting() || form.invalid"
+    >
+      @if (isSubmitting()) {
+        <mat-spinner diameter="18" class="inline-spinner"></mat-spinner>
+      }
+      <span>{{ 'approvals.delegations.form.submitButton' | translate }}</span>
+    </button>
+  </mat-dialog-actions>
+</ng-template>
+
+<!-- Cancel Confirmation Dialog Template -->
+<ng-template #cancelDialog>
+  <h2 mat-dialog-title>{{ 'approvals.delegations.cancelDialog.title' | translate }}</h2>
+
+  <mat-dialog-content class="dialog-content">
+    @if (cancelErrorMessage()) {
+      <div class="error-banner dialog-error" role="alert">
+        <mat-icon class="error-icon" aria-hidden="true">error_outline</mat-icon>
+        <div class="error-text-wrap">
+          <div class="error-title">{{ 'common.traceId' | translate }}</div>
+          <div class="error-message">{{ cancelErrorMessage() }}</div>
+          @if (cancelErrorTraceId(); as traceId) {
+            <div class="error-trace">{{ traceId }}</div>
+          }
+        </div>
+      </div>
+    }
+
+    <p class="cancel-message">{{ 'approvals.delegations.cancelDialog.message' | translate }}</p>
+  </mat-dialog-content>
+
+  <mat-dialog-actions align="end">
+    <button mat-button type="button" (click)="closeCancelDialog()" [disabled]="isCancelling()">
+      {{ 'approvals.delegations.cancelDialog.cancelButton' | translate }}
+    </button>
+    <button
+      mat-flat-button
+      color="warn"
+      type="button"
+      (click)="confirmCancel()"
+      [disabled]="isCancelling()"
+      class="cancel-confirm-btn"
+    >
+      @if (isCancelling()) {
+        <mat-spinner diameter="18" class="inline-spinner"></mat-spinner>
+      }
+      <span>{{ 'approvals.delegations.cancelDialog.confirmButton' | translate }}</span>
+    </button>
+  </mat-dialog-actions>
+</ng-template>

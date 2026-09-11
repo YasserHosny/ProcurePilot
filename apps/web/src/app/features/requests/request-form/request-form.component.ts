@@ -1,5 +1,5 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormArray, FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
@@ -14,10 +14,13 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { ActivatedRoute, Router } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
+import { ApiService } from '../../../core/api/api.service';
+import { FormatDatePipe } from '../../../core/format/date.pipe';
 import type {
   ApiError,
   Branch,
   CostCentre,
+  Member,
   PurchaseRequest,
   PurchaseRequestLine,
 } from '../../../core/api/models';
@@ -48,6 +51,7 @@ interface LineFormGroup {
     MatProgressSpinnerModule,
     MatSnackBarModule,
     TranslatePipe,
+    FormatDatePipe,
   ],
   templateUrl: './request-form.component.html',
   styleUrl: './request-form.component.scss',
@@ -55,6 +59,7 @@ interface LineFormGroup {
 export class RequestFormComponent implements OnInit {
   private readonly requestsApi = inject(RequestsApiService);
   private readonly organisationApi = inject(OrganisationApiService);
+  private readonly api = inject(ApiService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly snackBar = inject(MatSnackBar);
@@ -66,8 +71,17 @@ export class RequestFormComponent implements OnInit {
   readonly errorMessage = signal<string | null>(null);
   readonly branches = signal<Branch[]>([]);
   readonly costCentres = signal<CostCentre[]>([]);
+  readonly members = signal<Member[]>([]);
   readonly existingRequest = signal<PurchaseRequest | null>(null);
   readonly isEditMode = signal<boolean>(false);
+
+  readonly memberEmailById = computed<Map<string, string>>(() => {
+    const byId = new Map<string, string>();
+    for (const member of this.members()) {
+      byId.set(member.id, member.email);
+    }
+    return byId;
+  });
 
   readonly form = new FormGroup({
     branch_id: new FormControl<string>('', { nonNullable: true, validators: [Validators.required] }),
@@ -90,6 +104,7 @@ export class RequestFormComponent implements OnInit {
     const requestId = this.route.snapshot.paramMap.get('id');
     if (requestId) {
       this.isEditMode.set(true);
+      this.loadMembers();
       this.loadRequest(requestId);
     } else {
       this.addLine();
@@ -202,6 +217,12 @@ export class RequestFormComponent implements OnInit {
   private loadCostCentres(): void {
     this.organisationApi.listCostCentres({ is_archived: false }).subscribe({
       next: (res) => this.costCentres.set([...res.items]),
+    });
+  }
+
+  private loadMembers(): void {
+    this.api.members().subscribe({
+      next: (res) => this.members.set([...res.items]),
     });
   }
 

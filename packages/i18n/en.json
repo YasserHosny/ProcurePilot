@@ -1667,6 +1667,7 @@
     "status": {
       "draft": "Draft",
       "submitted": "Submitted",
+      "pending": "Pending",
       "approved": "Approved",
       "rejected": "Rejected",
       "withdrawn": "Withdrawn"
@@ -1720,6 +1721,13 @@
     "budgetStatus": {
       "remainingLabel": "Remaining budget",
       "exceedsWarning": "This request would exceed the remaining budget for its scope."
+    },
+    "approval": {
+      "sectionTitle": "Approval",
+      "assignedTo": "Assigned to",
+      "comment": "Decision comment",
+      "decidedAt": "Decided on",
+      "pending": "Pending approval"
     }
   },
   "approvals": {
@@ -1816,13 +1824,26 @@
         "endsOn": "Ends On",
         "actions": "Actions"
       },
+      "actions": {
+        "cancel": "Cancel delegation"
+      },
       "form": {
         "createTitle": "New Delegation",
         "delegateLabel": "Delegate To",
+        "delegateRequired": "Delegate is required.",
         "startsOnLabel": "Starts On",
+        "startsOnRequired": "Start date is required.",
         "endsOnLabel": "Ends On",
+        "endsOnRequired": "End date is required.",
+        "endsOnInvalid": "End date must be on or after the start date.",
         "cancelButton": "Cancel",
         "submitButton": "Save Delegation"
+      },
+      "cancelDialog": {
+        "title": "Cancel Delegation",
+        "message": "Are you sure you want to cancel this delegation?",
+        "cancelButton": "Cancel",
+        "confirmButton": "Cancel Delegation"
       },
       "empty": "No active delegations.",
       "createSuccess": "Delegation created.",

@@ -7,7 +7,8 @@ import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { of, throwError } from 'rxjs';
 
 import enCatalog from '../../../../../../../packages/i18n/en.json';
-import type { PurchaseRequest } from '../../../core/api/models';
+import { ApiService } from '../../../core/api/api.service';
+import type { Member, PurchaseRequest } from '../../../core/api/models';
 import { OrganisationApiService } from '../../settings/organisation-api';
 import { RequestsApiService } from '../requests-api';
 import { RequestFormComponent } from './request-form.component';
@@ -37,6 +38,7 @@ describe('RequestFormComponent — create mode (T017)', () => {
   let fixture: ComponentFixture<RequestFormComponent>;
   let requestsApi: jasmine.SpyObj<RequestsApiService>;
   let organisationApi: jasmine.SpyObj<OrganisationApiService>;
+  let api: jasmine.SpyObj<ApiService>;
   let snackBarSpy: jasmine.SpyObj<MatSnackBar>;
   let routerSpy: jasmine.SpyObj<Router>;
 
@@ -51,17 +53,20 @@ describe('RequestFormComponent — create mode (T017)', () => {
       'listBranches',
       'listCostCentres',
     ]);
+    api = jasmine.createSpyObj('ApiService', ['members']);
     snackBarSpy = jasmine.createSpyObj('MatSnackBar', ['open']);
     routerSpy = jasmine.createSpyObj('Router', ['navigate']);
 
     organisationApi.listBranches.and.returnValue(of({ items: [], next_cursor: null }));
     organisationApi.listCostCentres.and.returnValue(of({ items: [], next_cursor: null }));
+    api.members.and.returnValue(of({ items: [], next_cursor: null }));
 
     await TestBed.configureTestingModule({
       imports: [RequestFormComponent, TranslateModule.forRoot()],
       providers: [
         { provide: RequestsApiService, useValue: requestsApi },
         { provide: OrganisationApiService, useValue: organisationApi },
+        { provide: ApiService, useValue: api },
         {
           provide: ActivatedRoute,
           useValue: { snapshot: { paramMap: { get: () => null } } },
@@ -163,6 +168,7 @@ describe('RequestFormComponent — edit mode (T017)', () => {
   let fixture: ComponentFixture<RequestFormComponent>;
   let requestsApi: jasmine.SpyObj<RequestsApiService>;
   let organisationApi: jasmine.SpyObj<OrganisationApiService>;
+  let api: jasmine.SpyObj<ApiService>;
   let snackBarSpy: jasmine.SpyObj<MatSnackBar>;
   let routerSpy: jasmine.SpyObj<Router>;
 
@@ -177,11 +183,13 @@ describe('RequestFormComponent — edit mode (T017)', () => {
       'listBranches',
       'listCostCentres',
     ]);
+    api = jasmine.createSpyObj('ApiService', ['members']);
     snackBarSpy = jasmine.createSpyObj('MatSnackBar', ['open']);
     routerSpy = jasmine.createSpyObj('Router', ['navigate']);
 
     organisationApi.listBranches.and.returnValue(of({ items: [], next_cursor: null }));
     organisationApi.listCostCentres.and.returnValue(of({ items: [], next_cursor: null }));
+    api.members.and.returnValue(of({ items: [], next_cursor: null }));
     requestsApi.getRequest.and.returnValue(of(mockRequest));
 
     await TestBed.configureTestingModule({
@@ -189,6 +197,7 @@ describe('RequestFormComponent — edit mode (T017)', () => {
       providers: [
         { provide: RequestsApiService, useValue: requestsApi },
         { provide: OrganisationApiService, useValue: organisationApi },
+        { provide: ApiService, useValue: api },
         {
           provide: ActivatedRoute,
           useValue: { snapshot: { paramMap: { get: () => 'r1' } } },
@@ -333,5 +342,102 @@ describe('RequestFormComponent — edit mode (T017)', () => {
     const submitBtn = compiled.querySelector<HTMLButtonElement>('button[color="accent"]');
     expect(submitBtn).toBeTruthy();
     expect(submitBtn?.disabled).toBeFalse();
+  });
+
+  it('should not render an approval section when the request has no approval_step', () => {
+    const compiled = fixture.nativeElement as HTMLElement;
+    expect(compiled.querySelector('.approval-step')).toBeNull();
+  });
+
+  it('should render a pending approval_step with assigned approver email and no comment/decided-at', () => {
+    const approverMember = { id: 'm-approver', email: 'approver@example.com' } as Member;
+    api.members.and.returnValue(of({ items: [approverMember], next_cursor: null }));
+
+    const pendingRequest: PurchaseRequest = {
+      ...mockRequest,
+      status: 'submitted',
+      approval_step: {
+        id: 'as1',
+        assigned_membership_id: 'm-approver',
+        source: 'threshold_match',
+        status: 'pending',
+      },
+    };
+    requestsApi.getRequest.and.returnValue(of(pendingRequest));
+
+    const hostFixture = TestBed.createComponent(RequestFormComponent);
+    hostFixture.detectChanges();
+
+    const compiled = hostFixture.nativeElement as HTMLElement;
+    const section = compiled.querySelector('.approval-step');
+    expect(section).toBeTruthy();
+    expect(section?.textContent).toContain('Approval');
+    expect(section?.textContent).toContain('Pending approval');
+    expect(section?.textContent).toContain('Assigned to');
+    expect(section?.textContent).toContain('approver@example.com');
+    expect(section?.textContent).not.toContain('Decision comment');
+    expect(section?.textContent).not.toContain('Decided on');
+
+    const chip = section?.querySelector('.status-chip');
+    expect(chip?.getAttribute('data-status')).toBe('pending');
+    expect(chip?.textContent).toContain('Pending');
+  });
+
+  it('should render an approved approval_step with comment and decided-at', () => {
+    const approverMember = { id: 'm-approver', email: 'approver@example.com' } as Member;
+    api.members.and.returnValue(of({ items: [approverMember], next_cursor: null }));
+
+    const approvedRequest: PurchaseRequest = {
+      ...mockRequest,
+      status: 'approved',
+      approval_step: {
+        id: 'as2',
+        assigned_membership_id: 'm-approver',
+        source: 'threshold_match',
+        status: 'approved',
+        comment: 'Budget confirmed.',
+        decided_by_membership_id: 'm-approver',
+        decided_at: '2026-09-10T12:00:00Z',
+      },
+    };
+    requestsApi.getRequest.and.returnValue(of(approvedRequest));
+
+    const hostFixture = TestBed.createComponent(RequestFormComponent);
+    hostFixture.detectChanges();
+
+    const compiled = hostFixture.nativeElement as HTMLElement;
+    const section = compiled.querySelector('.approval-step');
+    expect(section).toBeTruthy();
+    expect(section?.textContent).toContain('Decision comment');
+    expect(section?.textContent).toContain('Budget confirmed.');
+    expect(section?.textContent).toContain('Decided on');
+    expect(section?.textContent).toContain('Sep 10, 2026');
+
+    const chip = section?.querySelector('.status-chip');
+    expect(chip?.getAttribute('data-status')).toBe('approved');
+    expect(chip?.textContent).toContain('Approved');
+  });
+
+  it('should fall back to the raw membership id when the approver is not in the members list', () => {
+    api.members.and.returnValue(of({ items: [], next_cursor: null }));
+
+    const pendingRequest: PurchaseRequest = {
+      ...mockRequest,
+      status: 'submitted',
+      approval_step: {
+        id: 'as3',
+        assigned_membership_id: 'unknown-approver-id',
+        source: 'owner_fallback',
+        status: 'pending',
+      },
+    };
+    requestsApi.getRequest.and.returnValue(of(pendingRequest));
+
+    const hostFixture = TestBed.createComponent(RequestFormComponent);
+    hostFixture.detectChanges();
+
+    const compiled = hostFixture.nativeElement as HTMLElement;
+    const section = compiled.querySelector('.approval-step');
+    expect(section?.textContent).toContain('unknown-approver-id');
   });
 });

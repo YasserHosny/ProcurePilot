@@ -143,6 +143,41 @@
               </div>
             }
           }
+
+          @if (req.approval_step; as step) {
+            <section class="approval-step" aria-labelledby="approval-heading">
+              <h3 id="approval-heading" class="approval-section-title">
+                {{ 'requests.approval.sectionTitle' | translate }}
+              </h3>
+
+              <span class="status-chip" [attr.data-status]="step.status">
+                {{ 'requests.status.' + step.status | translate }}
+              </span>
+
+              <div class="approval-meta">
+                <span>{{ 'requests.approval.assignedTo' | translate }}</span>
+                <span>{{ memberEmailById().get(step.assigned_membership_id) ?? step.assigned_membership_id }}</span>
+              </div>
+
+              @if (step.status !== 'pending') {
+                @if (step.comment) {
+                  <div class="approval-meta">
+                    <span>{{ 'requests.approval.comment' | translate }}</span>
+                    <span>{{ step.comment }}</span>
+                  </div>
+                }
+
+                @if (step.decided_at) {
+                  <div class="approval-meta">
+                    <span>{{ 'requests.approval.decidedAt' | translate }}</span>
+                    <span>{{ step.decided_at | formatDate }}</span>
+                  </div>
+                }
+              } @else {
+                <p class="approval-meta">{{ 'requests.approval.pending' | translate }}</p>
+              }
+            </section>
+          }
         }
 
         <div class="form-actions">

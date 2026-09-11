@@ -1667,6 +1667,7 @@
     "status": {
       "draft": "مسودة",
       "submitted": "مقدمة",
+      "pending": "معلقة",
       "approved": "معتمدة",
       "rejected": "مرفوضة",
       "withdrawn": "مسحوبة"
@@ -1720,6 +1721,13 @@
     "budgetStatus": {
       "remainingLabel": "الميزانية المتبقية",
       "exceedsWarning": "سيتجاوز هذا الطلب الميزانية المتبقية لنطاقه."
+    },
+    "approval": {
+      "sectionTitle": "الاعتماد",
+      "assignedTo": "معيّن إلى",
+      "comment": "تعليق القرار",
+      "decidedAt": "تاريخ القرار",
+      "pending": "بانتظار الاعتماد"
     }
   },
   "approvals": {
@@ -1816,13 +1824,26 @@
         "endsOn": "ينتهي في",
         "actions": "إجراءات"
       },
+      "actions": {
+        "cancel": "إلغاء التفويض"
+      },
       "form": {
         "createTitle": "تفويض جديد",
         "delegateLabel": "التفويض إلى",
+        "delegateRequired": "المفوض إليه مطلوب.",
         "startsOnLabel": "يبدأ في",
+        "startsOnRequired": "تاريخ البدء مطلوب.",
         "endsOnLabel": "ينتهي في",
+        "endsOnRequired": "تاريخ الانتهاء مطلوب.",
+        "endsOnInvalid": "يجب أن يكون تاريخ الانتهاء في أو بعد تاريخ البدء.",
         "cancelButton": "إلغاء",
         "submitButton": "حفظ التفويض"
+      },
+      "cancelDialog": {
+        "title": "إلغاء التفويض",
+        "message": "هل أنت متأكد من رغبتك في إلغاء هذا التفويض؟",
+        "cancelButton": "إلغاء",
+        "confirmButton": "إلغاء التفويض"
       },
       "empty": "لا توجد تفويضات نشطة.",
       "createSuccess": "تم إنشاء التفويض.",
