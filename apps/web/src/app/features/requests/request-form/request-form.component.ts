@@ -13,6 +13,8 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { ActivatedRoute, Router } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
+import { of } from 'rxjs';
+import { catchError } from 'rxjs/operators';
 
 import { ApiService } from '../../../core/api/api.service';
 import { FormatDatePipe } from '../../../core/format/date.pipe';
@@ -221,9 +223,17 @@ export class RequestFormComponent implements OnInit {
   }
 
   private loadMembers(): void {
-    this.api.members().subscribe({
-      next: (res) => this.members.set([...res.items]),
-    });
+    this.api
+      .members()
+      .pipe(
+        catchError(() =>
+          of<{ items: Member[]; next_cursor: string | null }>({
+            items: [],
+            next_cursor: null,
+          }),
+        ),
+      )
+      .subscribe((res) => this.members.set([...res.items]));
   }
 
   private loadRequest(requestId: string): void {

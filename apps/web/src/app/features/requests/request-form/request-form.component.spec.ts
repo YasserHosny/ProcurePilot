@@ -313,7 +313,7 @@ describe('RequestFormComponent — edit mode (T017)', () => {
     expect(warningBanner?.textContent).toContain('Remaining budget');
     expect(warningBanner?.textContent).toContain('GBP 75.0000');
 
-    const submitBtn = compiled.querySelector<HTMLButtonElement>('button[color="accent"]');
+    const submitBtn = compiled.querySelector<HTMLButtonElement>('.submit-request-btn');
     expect(submitBtn).toBeTruthy();
     expect(submitBtn?.disabled).toBeFalse();
   });
@@ -339,7 +339,7 @@ describe('RequestFormComponent — edit mode (T017)', () => {
     expect(budgetRow?.textContent).toContain('Remaining budget');
     expect(budgetRow?.textContent).toContain('GBP 500.0000');
 
-    const submitBtn = compiled.querySelector<HTMLButtonElement>('button[color="accent"]');
+    const submitBtn = compiled.querySelector<HTMLButtonElement>('.submit-request-btn');
     expect(submitBtn).toBeTruthy();
     expect(submitBtn?.disabled).toBeFalse();
   });
