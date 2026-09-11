@@ -58,16 +58,19 @@ curl -sS -X POST "$API_URL/api/v1/requests/$REQUEST_ID/submit" \
 # expect: status=submitted — identical shape and behaviour to a web submission (FR-003)
 ```
 
-## 4. Approver Decides — a Push Notification Fires (research.md R1)
+## 4. Approver Decides — a Durable Push Record Is Written, Then a Notification Fires (research.md R1, revised)
 
 ```bash
 curl -sS -X POST "$API_URL/api/v1/requests/$REQUEST_ID/approve" \
   -H "Authorization: Bearer $APPROVER_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"comment": "Approved"}'
-# expect: status=approved; a push-send job is queued for every current device_registration
-# belonging to $MEMBER_TOKEN's member (FR-007) — delivery itself happens off the request/response
-# cycle, so this call's latency is unaffected by push-provider availability (research.md R1)
+# expect: status=approved; in the same transaction, a push_notification row is written
+# (status=queued) for $MEMBER_TOKEN's member, then a send job is enqueued for every current
+# device_registration belonging to that member (FR-007) — delivery itself happens off the
+# request/response cycle, so this call's latency is unaffected by push-provider availability.
+# The push_notification row (not client-visible; service-role only) is what makes a lost enqueue
+# or a worker outage observable and retryable instead of a silent drop (research.md R1, revised).
 ```
 
 ## 5. Branch Manager Reports Low Stock (does not touch purchase_request)
@@ -86,6 +89,27 @@ curl -sS "$API_URL/api/v1/requests/$REQUEST_ID" \
 # (FR-006 — confirms the low-stock report created nothing on the request side)
 ```
 
+## 5b. Replaying the Same Low-Stock Submission (offline-retry case) Does Not Duplicate It
+
+```bash
+KEY=$(uuidgen)
+curl -sS -X POST "$API_URL/api/v1/low-stock-reports" \
+  -H "Authorization: Bearer $MEMBER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -H "Idempotency-Key: $KEY" \
+  -d '{"branch_id": "'"$BRANCH_ID"'", "workspace_product_id": "'"$PRODUCT_ID"'"}'
+# expect: 201, a new low_stock_report row — note its id as $FIRST_ID
+
+curl -sS -X POST "$API_URL/api/v1/low-stock-reports" \
+  -H "Authorization: Bearer $MEMBER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -H "Idempotency-Key: $KEY" \
+  -d '{"branch_id": "'"$BRANCH_ID"'", "workspace_product_id": "'"$PRODUCT_ID"'"}'
+# expect: 200 (not 201), id == $FIRST_ID — the same Idempotency-Key is recognized server-side
+# (data-model.md's unique (tenant_id, idempotency_key) index, research.md R4 revised), simulating
+# the app replaying a queued offline submission after connectivity returns (FR-011)
+```
+
 ## 6. Confirm a Different Branch's Manager Cannot See This Report
 
 ```bash
@@ -93,6 +117,18 @@ curl -sS "$API_URL/api/v1/low-stock-reports?branch_id=$BRANCH_ID" \
   -H "Authorization: Bearer $OTHER_BRANCH_MANAGER_TOKEN"
 # expect: empty items — branch-scoped visibility (data-model.md RLS Summary), same shape as
 # purchase_request's own branch scoping
+```
+
+## 6b. Member Signs Out — the Device Stops Being Eligible for Push Immediately
+
+```bash
+# The mobile app already holds $DEVICE_ID locally — it's the id returned by step 1's
+# POST /devices response — so sign-out needs no lookup, just the delete:
+curl -sS -X DELETE "$API_URL/api/v1/devices/$DEVICE_ID" \
+  -H "Authorization: Bearer $MEMBER_TOKEN"
+# expect: 204 — this app install is no longer eligible for push (research.md R1, revised). Unlike
+# a reinstall (passive staleness, step 2's superseding-row behaviour), sign-out is explicit and
+# immediate — the row is gone, not merely stale.
 ```
 
 ## 7. Confirm a Revoked Session Forces Re-Authentication on Mobile

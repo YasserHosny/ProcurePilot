@@ -1,17 +1,28 @@
 # Phase 0 Research: Mobile MVP
 
-## R1 — Device push-token registration: a small standalone module, delivery via the existing job queue
+## R1 — Device push-token registration: a small standalone module, durable outbox delivery, explicit sign-out invalidation
 
-**Decision**: `device_registration` is a small, standalone table (one row per signed-in
-member+device install) written through a new `devices` module in `apps/api`. Registration is a
-plain upsert keyed on `(tenant_id, member_id, push_token)` at sign-in and whenever the OS reissues
-a token; no separate "unregister" endpoint is needed for this release — an app reinstall or a
-newer registration simply supersedes the old row (`last_seen_at` bump on every app-open handles
-staleness, per spec.md's edge case on reinstall/new-device). Sending a push itself is **not** a
-synchronous HTTP call made from the request/approval decision path — it is queued onto the
-existing RQ job worker (`services/` background-jobs infrastructure already used for extraction)
-the moment `approval_step.status` transitions away from `pending`, exactly the same way every other
-side-effecting fan-out in this codebase is decoupled from its triggering request/response cycle.
+**Decision** (revised after Codex review — see below): `device_registration` is a small,
+standalone table (one row per signed-in member+device install) written through a new `devices`
+module in `apps/api`. Registration is a plain upsert keyed on `(tenant_id, member_id, push_token)`
+at sign-in and whenever the OS reissues a token; a reinstall or a newer token simply supersedes the
+old row (`last_seen_at` bump on every app-open handles that staleness, per spec.md's edge case on
+reinstall/new-device). **Sign-out is a distinct case and gets an explicit action**: the mobile app
+calls `DELETE /devices/{id}` for its own current registration when a member signs out, removing the
+row so a signed-out device stops being eligible for push — passive staleness alone does not cover
+this, since a signed-out device is still installed and would otherwise keep matching
+`(tenant_id, member_id)` indefinitely.
+
+Sending a push itself is **not** a synchronous HTTP call made from the request/approval decision
+path. The moment `approval_step.status` transitions away from `pending`, the service layer writes a
+durable `push_notification` row (`queued`) in the same transaction as the decision, then enqueues
+the send onto the existing RQ job worker (`services/` background-jobs infrastructure already used
+for extraction). The job updates that row to `sent` or `failed` after attempting delivery to every
+current `device_registration` for the request's original submitter. A `queued` (or `failed`) row
+older than a short threshold is picked up and retried by the same periodic sweep pattern the
+extraction worker already uses for its own stuck-job recovery — so an enqueue that never reached
+Redis, or a worker outage, leaves a durably visible, replayable row instead of a silently vanished
+job.
 
 **Rationale**: Keeping registration in its own module (not inside `requests/`) follows Principle VI
 directly — push delivery is infrastructure a future feature (a low-stock alert to an owner, say)
@@ -20,7 +31,18 @@ send rather than calling FCM/APNs inline keeps a request/approval decision's res
 independent of a third-party push provider's latency or an outage — the approval endpoint's
 existing contract and error envelope stay unchanged; a push failure degrades to "notification not
 delivered," never to "the approval itself failed," matching FR-008's requirement that the app keep
-working fully without push.
+working fully without push. The durable outbox row is the direct fix for a gap Codex's review of
+this plan caught: an in-memory-only RQ enqueue with no persisted row satisfies FR-008 (the app still
+works without push) but not spec.md's SC-004 ("100% of decisions... learns... without opening the
+app") — without a durable record, an enqueue that silently failed to reach Redis, or a worker outage
+long enough to lose the in-flight job, would have no visible trace and no way to be swept up later;
+a persisted row with `status`/`attempts` makes that failure mode observable and recoverable instead
+of an invisible drop. Explicit sign-out invalidation directly closes the privacy gap Codex also
+flagged: spec.md's Key Entities section for `Device Registration` requires "enough to... stop
+notifying a device once it is no longer current (reinstalled, **signed out**, or superseded)" —
+passive `last_seen_at` staleness alone does not satisfy "signed out," since a signed-out but still-
+installed device would otherwise keep matching indefinitely with no future app-open ever refreshing
+or clearing it.
 
 **Alternatives considered**:
 - *Send the push synchronously inside the approve/reject request handler.* Rejected: couples an
@@ -30,6 +52,17 @@ working fully without push.
   Rejected: a member can have more than one device (phone + a second phone, or a reinstall before
   the old row is known-stale), so this is genuinely a one-to-many relationship, not a
   one-to-one extension of `membership`.
+- *No durable outbox — trust the RQ job queue alone.* Rejected on review: Redis-backed RQ is
+  durable enough for normal operation, but "trust the queue" gives no visibility into (and no
+  replay path for) the specific failure modes — enqueue-time connection failure, or a worker down
+  long enough that a job needs re-issuing — that SC-004's 100% figure implicitly promises; a
+  lightweight persisted row costs one small table and closes that gap directly rather than hoping
+  it never happens.
+- *Passive staleness only, no explicit sign-out invalidation.* Rejected on review: this was the
+  original decision, but it conflates two genuinely different cases spec.md separates — "this
+  install is gone, a future one will re-register" (fine to let go stale) versus "this member
+  explicitly signed out of this still-installed device" (a privacy-relevant state change that
+  should take effect immediately, not eventually).
 
 ## R2 — Low-stock report: a standalone table, not folded into `purchase_request`
 
@@ -93,26 +126,45 @@ credential would be a meaningfully weaker auth story, not a stronger one.
   re-enter credentials on every launch"), not as a stronger authentication requirement the backend
   needs to enforce.
 
-## R4 — Offline queue reuses the existing Idempotency-Key mechanism, not a new protocol
+## R4 — Offline queue reuses the `Idempotency-Key` header; this chunk gives it real server-side enforcement, at least for its own new mutation
 
-**Decision**: A request or low-stock report built while offline (FR-010) is persisted to an
-on-device local store (MMKV/SQLite) with a client-generated `Idempotency-Key` (a UUID) stamped onto
-it at creation time, not at send time. When connectivity returns, the app replays the queued
-submission using that same key exactly the way an online submission already uses one. If the first
-attempt actually reached the server but the confirmation was lost (spec.md's User Story 5, scenario
-4), the replayed request with the same `Idempotency-Key` is recognized server-side and returns the
-original result rather than creating a duplicate — no new dedup logic is needed because
-`Idempotency-Key` handling already exists on every mutation per this codebase's API conventions
-(CLAUDE.md: "`Idempotency-Key` on mutations"). The client shows three honest states — local draft,
-queued (has a key, not yet confirmed), confirmed — and FR-012 is satisfied by never marking
-something "submitted" until the confirmed response actually arrives.
+**Decision** (revised after Codex review — see below): A request or low-stock report built while
+offline (FR-010) is persisted to an on-device local store (MMKV/SQLite) with a client-generated
+`Idempotency-Key` (a UUID) stamped onto it at creation time, not at send time. When connectivity
+returns, the app replays the queued submission using that same key exactly the way an online
+submission already uses one. **Correction to the original version of this decision**: the codebase's
+API conventions document the header (CLAUDE.md: "`Idempotency-Key` on mutations") and every existing
+router accepts it, but the PR #2 follow-up findings already on record for this codebase are explicit
+that the header is *systemically accepted and unenforced* — `apps/api/src/procurepilot_api/modules/
+requests/router.py` captures it into an unused `_idempotency_key` parameter, with no dedup logic
+behind it anywhere yet. Reusing the header without checking this was an error in the original
+research; "the mechanism already exists" was true only in the sense of the header being declared,
+not enforced.
 
-**Rationale**: The PR #2 follow-up findings already on record for this codebase call out a
-*systemic unused Idempotency-Key* gap elsewhere in the product — inventing a second, mobile-only
-offline-sync protocol here would both duplicate a mechanism that already exists and risk repeating
-that exact class of bug in a new place. Stamping the key at creation time (not send time) is the
-detail that makes retry-after-partial-failure safe: if key generation happened at send time, a
-retry after a dropped response would generate a *new* key and defeat the whole purpose.
+Given that, this chunk's own scope is: `POST /devices` needs no new dedup logic at all — it is a
+plain upsert on `(tenant_id, member_id, push_token)` (research.md R1), so a replayed registration is
+naturally idempotent regardless of the header. `POST /low-stock-reports` is insert-only with no such
+natural key, and is FR-011's actual offline-retry surface for this release (the request-submission
+half of FR-011 rides on `/requests`, whose own enforcement gap is the pre-existing, separately-
+tracked systemic issue — fixing it everywhere is not this chunk's job). So `low_stock_report` gets
+its own `idempotency_key` column (nullable uuid, `unique (tenant_id, idempotency_key)` where not
+null) and the endpoint does an `insert ... on conflict (tenant_id, idempotency_key) do nothing
+returning *`, falling back to a plain read of the existing row when the insert affects zero rows —
+a real, narrowly-scoped enforcement of the header for the one new mutation this chunk actually needs
+it to hold for, rather than either re-declaring the same unenforced promise a third time or taking
+on fixing the codebase-wide gap as part of this release.
+
+The client shows three honest states — local draft, queued (has a key, not yet confirmed),
+confirmed — and FR-012 is satisfied by never marking something "submitted" until the confirmed
+response actually arrives.
+
+**Rationale**: Stamping the key at creation time (not send time) is the detail that makes
+retry-after-partial-failure safe: if key generation happened at send time, a retry after a dropped
+response would generate a *new* key and defeat the whole purpose. Scoping real enforcement to
+`low_stock_report` only (not attempting to retrofit `/requests` here) keeps this chunk's Complexity
+Tracking honest — R2.2 does not own the pre-existing gap, and silently inheriting an already-known,
+already-tracked bug into a *new* offline-critical path (rather than actually closing it there) would
+have been the real mistake the original research missed.
 
 **Alternatives considered**:
 - *A bespoke sync-queue protocol with server-side sequence numbers per device.* Rejected: strictly
@@ -122,6 +174,12 @@ retry after a dropped response would generate a *new* key and defeat the whole p
 - *Optimistically mark a queued item "submitted" the moment it is queued, reconciling silently
   later.* Rejected directly by FR-012 ("MUST NOT report a submission as successful before it has"
   reached the server) — this is the exact false-positive state the requirement forbids.
+- *Fix the systemic `Idempotency-Key`-unenforced gap across every existing mutation as part of this
+  chunk.* Rejected as out of scope: it is a real, already-tracked issue (PR #2 follow-up findings)
+  spanning modules this chunk does not otherwise touch, and fixing it everywhere is a
+  cross-cutting reliability chunk of its own, not something R2.2's mobile-specific plan should
+  absorb; this chunk's obligation is narrower — don't let its own new offline-critical mutation
+  repeat the same gap, which the `low_stock_report` idempotency-key column does directly.
 
 ## R5 — No presigned-photo-upload endpoint this release; confirmed out of scope
 

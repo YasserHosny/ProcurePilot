@@ -28,7 +28,10 @@ draft/queue persistence (roadmap §12.4), Expo Notifications or an equivalent FC
 supabase-py CRUD, identical shape to every existing module.
 
 **Storage**: Supabase Postgres 17 (unchanged). New tables: `device_registration`,
-`low_stock_report` — both tenant-scoped, both requiring RLS `ENABLE`+`FORCE`. Neither touches
+`low_stock_report`, and `push_notification` (added on review — a durable outbox row for
+decision-triggered push sends, research.md R1 revised) — all three tenant-scoped, all requiring RLS
+`ENABLE`+`FORCE`. `low_stock_report` carries a nullable `idempotency_key` column with a partial
+unique index for genuine server-side offline-retry dedup (research.md R4 revised). None touches
 `purchase_request`, `purchase_request_line`, or `approval_step`; R2.1's schema is reused exactly
 as it stands. On-device: MMKV/SQLite for offline drafts and a submission queue keyed by
 `Idempotency-Key` (research.md R4 — reuses the existing header, not a new sync protocol).
@@ -87,13 +90,18 @@ as every prior chunk).
 
 | Principle | Pre-design | Post-design |
 |---|---|---|
-| **III. Human Authority Over Automation** | ⏳ Must show no approve/reject code path on mobile | ✅ PASS — data-model.md introduces no new state-transition table; the mobile client's only writes are `device_registration` (upsert), `low_stock_report` (insert), and the *unchanged* `/requests` create/submit/withdraw endpoints. Nothing in this plan's contract touches `/requests/{id}/approve`\|`/reject`. |
-| **V. Tenant Isolation by Construction** | ⏳ Must confirm no new isolation axis | ✅ PASS — data-model.md's RLS Summary shows both new tables using `tenant_id = current_tenant_id()` plus a straightforward "own row only" restriction (a member manages their own device registrations and sees their own low-stock reports; an owner sees all) — no branch-scoped RESTRICTIVE layer needed, since neither table is something one branch's staff would need to see another branch's rows for. |
+| **III. Human Authority Over Automation** | ⏳ Must show no approve/reject code path on mobile | ✅ PASS — data-model.md introduces no new state-transition table; the mobile client's only writes are `device_registration` (upsert, plus its own `DELETE` on sign-out — added on review, research.md R1 revised), `low_stock_report` (insert), and the *unchanged* `/requests` create/submit/withdraw endpoints. `push_notification` (added on review) is written server-side only, never by the mobile client. Nothing reachable from the mobile app touches `/requests/{id}/approve`\|`/reject` — tasks.md T019 now proves this against the API client and route table, not only the home screen's widget tree. |
+| **V. Tenant Isolation by Construction** | ⏳ Must confirm no new isolation axis | ✅ PASS — data-model.md's RLS Summary shows `device_registration` using `tenant_id = current_tenant_id()` plus own-row-only restriction (a member manages only their own device registrations; no owner read-all — an owner has no operational need to browse push tokens), `low_stock_report` using `tenant_id = current_tenant_id()` plus R2.0/008's existing branch-scoped RESTRICTIVE mechanism (owner sees all, a branch-scoped member sees their own branch's reports, a member always sees reports they personally raised) — the same shape as `purchase_request`, not a new isolation axis — and `push_notification` (added on review) using the same `tenant_id = current_tenant_id()` isolation with no client-facing read policy at all this release (service-role only). |
 | **VII. Money, Tax, Language from the Schema Up** | ⏳ Must specify how Flutter consumes `packages/i18n` | ✅ PASS — research.md R6: the Flutter app bundles the same `packages/i18n/en.json`/`ar.json` files at build time (via a small generation step turning the flat JSON into Dart constants, or reading the JSON as an asset at runtime) rather than forking a parallel Flutter-only string catalogue that could drift from web's. |
 
 No principle regressed. The one genuinely new *category* of decision this plan makes that R2.1
-didn't have to — offline-tolerant, locally-queued mutations — is fully specified in research.md R4
-as a reuse of the existing Idempotency-Key mechanism, not a new protocol.
+didn't have to — offline-tolerant, locally-queued mutations — is specified in research.md R4:
+`Idempotency-Key` is the existing mechanism to reuse, but research.md R4 (revised) also records that
+the header is currently accepted-but-unenforced everywhere in `apps/api` (a known, separately-tracked
+gap — see `docs/roadmap`'s PR #2 follow-up findings) and that this chunk's own new
+`POST /low-stock-reports` endpoint — the one new insert-only mutation this release actually needs
+offline-safe — gets real server-side dedup rather than repeating that gap for its first genuine
+offline-retry use case.
 
 ## Project Structure
 
@@ -132,13 +140,16 @@ apps/api/
     requests/                      # EXTENDED, not replaced — low-stock report endpoints added
                                     #   here (it is a requests-adjacent concept, not a new domain);
                                     #   /requests and /approvals/* endpoints themselves UNCHANGED
-    devices/                       # NEW, small — device push-token registration only; kept
-                                    #   separate from requests/ because it has nothing to do with
-                                    #   purchase requests and may be reused by future push-worthy
-                                    #   features (alerts, etc.) without requests/ owning them
-  tests/{unit,integration,contract}/  # new test files for the two additions above
+    devices/                       # NEW, small — device push-token registration + sign-out
+                                    #   removal, the push-send/retry-sweep job pair; kept separate
+                                    #   from requests/ because it has nothing to do with purchase
+                                    #   requests and may be reused by future push-worthy features
+                                    #   (alerts, etc.) without requests/ owning them
+  tests/{unit,integration,contract}/  # new test files for the additions above
 
-supabase/migrations/                # NEW — device_registration, low_stock_report, both RLS
+supabase/migrations/                # NEW — device_registration, low_stock_report (with its
+                                     #   idempotency_key column), and push_notification (added on
+                                     #   review, research.md R1 revised), all three RLS
                                      #   ENABLE+FORCE, per the Constitution Check above
 ```
 

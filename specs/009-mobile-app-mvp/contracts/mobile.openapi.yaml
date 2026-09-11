@@ -45,6 +45,26 @@ paths:
         '422':
           $ref: '#/components/responses/Unprocessable'
 
+  /devices/{device_id}:
+    delete:
+      summary: Remove the caller's own device registration (sign-out)
+      description: >
+        Called by the mobile app on sign-out (research.md R1, revised) — a signed-out but
+        still-installed device must stop being eligible for push immediately, not eventually via
+        passive staleness. Only the registration's own member may delete it; any other caller's
+        attempt (including for a different member's registration) resolves not_found, never
+        forbidden, per this codebase's standing convention.
+      parameters:
+        - name: device_id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '204':
+          description: Registration removed
+        '404':
+          $ref: '#/components/responses/NotFound'
+
   /low-stock-reports:
     get:
       summary: List low-stock reports visible to the caller
@@ -76,8 +96,13 @@ paths:
       summary: Record a low-stock report
       description: >
         Insert-only (FR-006). Does not create, modify, or reference any purchase_request —
-        research.md R2. A double-tap is expected to be collapsed client-side; this endpoint does
-        not de-duplicate server-side, since two genuinely separate reports are both legitimate.
+        research.md R2. A rapid double-tap with no connectivity gap is expected to be collapsed
+        client-side before it ever reaches this endpoint. When `Idempotency-Key` IS supplied
+        (the offline-queue replay case, FR-011, research.md R4 revised), it is genuinely enforced
+        server-side via `low_stock_report`'s `unique (tenant_id, idempotency_key)` partial index —
+        a replay of the same key returns the original row (200), not a new one (201). When the
+        header is omitted (the normal online-submission case), every call creates a new row —
+        two omitted-key reports are both legitimate signals, not duplicates to be collapsed.
       parameters:
         - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
@@ -87,7 +112,14 @@ paths:
             schema: { $ref: '#/components/schemas/LowStockReportCreate' }
       responses:
         '201':
-          description: Low-stock report recorded
+          description: Low-stock report recorded (first time this Idempotency-Key was seen, or none was supplied)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LowStockReport' }
+        '200':
+          description: >
+            Idempotent replay — a report already exists for this tenant + Idempotency-Key; the
+            original row is returned unchanged, no new report is created
           content:
             application/json:
               schema: { $ref: '#/components/schemas/LowStockReport' }
