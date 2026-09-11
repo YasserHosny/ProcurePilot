@@ -1,0 +1,186 @@
+openapi: 3.1.0
+info:
+  title: ProcurePilot Mobile MVP API
+  version: 0.9.0
+  description: >
+    Chunk R2.2 (third Phase 2 chunk). Base path /api/v1, Supabase JWT bearer auth, tenant
+    resolved server-side from the token, cursor pagination capped at 100, Idempotency-Key on
+    mutations, and the {code, message, details, trace_id} error envelope — identical conventions
+    to every prior chunk.
+
+    This contract covers ONLY the two new surfaces this chunk adds: device push-token
+    registration and low-stock reporting. Purchase request and approval endpoints
+    (POST/GET/PATCH /requests, POST /requests/{id}/submit|withdraw, GET /approvals/pending) are
+    reused completely unchanged from 008-requests-approvals/contracts/requests-approvals.openapi.yaml
+    — the mobile client calls those exact endpoints and is not a reason to add, remove, or reshape
+    a single field on them (research.md, plan.md Summary).
+
+servers:
+  - url: /api/v1
+
+security:
+  - bearerAuth: []
+
+paths:
+  /devices:
+    post:
+      summary: Register (or refresh) a device for push notifications
+      description: >
+        Upserts on (tenant_id, member_id, push_token) — research.md R1. Calling this again with
+        the same token for the same member simply bumps last_seen_at; it is safe to call on every
+        app-open.
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DeviceRegistrationCreate' }
+      responses:
+        '200':
+          description: Registration created or refreshed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DeviceRegistration' }
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+
+  /low-stock-reports:
+    get:
+      summary: List low-stock reports visible to the caller
+      description: >
+        Owner sees every report in the tenant. A member holding a branch-scoped role sees only
+        reports for their assigned branch(es). A member always sees reports they personally raised
+        regardless of branch scoping — same shape as GET /requests (research.md, data-model.md RLS
+        Summary).
+      parameters:
+        - name: branch_id
+          in: query
+          schema: { type: string, format: uuid }
+        - name: workspace_product_id
+          in: query
+          schema: { type: string, format: uuid }
+        - name: cursor
+          in: query
+          schema: { type: string }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+      responses:
+        '200':
+          description: Low-stock report list
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LowStockReportList' }
+    post:
+      summary: Record a low-stock report
+      description: >
+        Insert-only (FR-006). Does not create, modify, or reference any purchase_request —
+        research.md R2. A double-tap is expected to be collapsed client-side; this endpoint does
+        not de-duplicate server-side, since two genuinely separate reports are both legitimate.
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LowStockReportCreate' }
+      responses:
+        '201':
+          description: Low-stock report recorded
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LowStockReport' }
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: false
+      schema: { type: string, format: uuid }
+
+  responses:
+    NotFound:
+      description: >
+        No such branch/product in this workspace, or it belongs to a branch outside the caller's
+        own branch-scoped visibility — indistinguishable, per this codebase's standing convention.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Unprocessable:
+      description: Validation failed
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+
+  schemas:
+    Error:
+      type: object
+      required: [code, message, trace_id]
+      properties:
+        code: { type: string }
+        message: { type: string }
+        details: { type: object, additionalProperties: true, nullable: true }
+        trace_id: { type: string }
+
+    DevicePlatform:
+      type: string
+      enum: [ios, android]
+
+    DeviceRegistration:
+      type: object
+      required: [id, member_id, platform, push_token, last_seen_at]
+      properties:
+        id: { type: string, format: uuid }
+        member_id: { type: string, format: uuid }
+        platform: { $ref: '#/components/schemas/DevicePlatform' }
+        push_token: { type: string }
+        last_seen_at: { type: string, format: date-time }
+
+    DeviceRegistrationCreate:
+      type: object
+      required: [platform, push_token]
+      additionalProperties: false
+      properties:
+        platform: { $ref: '#/components/schemas/DevicePlatform' }
+        push_token: { type: string, minLength: 1 }
+
+    LowStockReport:
+      type: object
+      required: [id, branch_id, member_id, workspace_product_id, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        branch_id: { type: string, format: uuid }
+        member_id: { type: string, format: uuid }
+        workspace_product_id: { type: string, format: uuid }
+        count_remaining: { type: string, pattern: '^\d+(\.\d{1,6})?$', nullable: true }
+        created_at: { type: string, format: date-time }
+
+    LowStockReportCreate:
+      type: object
+      required: [branch_id, workspace_product_id]
+      additionalProperties: false
+      properties:
+        branch_id: { type: string, format: uuid }
+        workspace_product_id: { type: string, format: uuid }
+        count_remaining: { type: string, pattern: '^\d+(\.\d{1,6})?$', nullable: true }
+
+    LowStockReportList:
+      type: object
+      required: [items, next_cursor]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/LowStockReport' }
+        next_cursor: { type: string, nullable: true }
