@@ -131,7 +131,7 @@ export async function signInOwner(): Promise<string> {
  */
 export async function apiAsUser<T>(
   token: string,
-  method: 'GET' | 'POST' | 'PATCH',
+  method: 'GET' | 'POST' | 'PATCH' | 'DELETE',
   path: string,
   body?: unknown,
 ): Promise<T> {
