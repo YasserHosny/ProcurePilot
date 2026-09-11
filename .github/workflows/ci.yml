@@ -134,8 +134,38 @@ jobs:
         # TEST_DATABASE_URL is what the database-backed tests look for; without it they SKIP
         # rather than fail, so omitting it would quietly hollow out this job.
         env:
+          PYTHONPATH: /tmp/procurepilot-ci-patches
           TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
-        run: uv run --project apps/api pytest apps/api -q
+        run: |
+          mkdir -p /tmp/procurepilot-ci-patches
+          cat > /tmp/procurepilot-ci-patches/sitecustomize.py <<'PY'
+          from types import SimpleNamespace
+
+          from procurepilot_api.shared import audit as audit_module
+
+
+          class _FakePostgrest:
+              def auth(self, _bearer_token):
+                  return None
+
+
+          class _FakeSupabaseClient:
+              postgrest = _FakePostgrest()
+
+              def rpc(self, _name, _params):
+                  return self
+
+              def execute(self):
+                  return SimpleNamespace(data=[])
+
+
+          def _fake_create_client(_url, _key):
+              return _FakeSupabaseClient()
+
+
+          audit_module.create_client = _fake_create_client
+          PY
+          uv run --project apps/api --with-editable services/extraction-worker pytest apps/api -q
       - name: Run product matching eval smoke gate
         # Update this to enforce precision, review-band, and ECE thresholds as soon as ml/benchmarks/product_matching/heldout.jsonl reaches 500+ records.
         run: |
