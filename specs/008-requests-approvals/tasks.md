@@ -84,16 +84,16 @@ description: "Task list for Requests + Approvals implementation"
 
 ### Tests for User Story 2
 
-- [ ] T022 [P] [US2] Write contract tests for `GET /approvals/pending` and `POST /requests/{id}/approve`+`/reject` in `apps/api/tests/contract/test_approvals_contract.py`, covering the embedded-context shape (FR-005) and 403/404/409 envelopes
-- [ ] T023 [P] [US2] Write approval-decision integration tests in `apps/api/tests/integration/test_approvals.py`, proving approve/reject transitions, the 403 refusal for anyone other than the assigned approver or an owner (FR-007), that `decided_by_membership_id`/`decided_at` are always populated together on any non-pending step (FR-006, the database check constraint from T003), and that a decided request no longer appears in `GET /approvals/pending`
-- [ ] T024 [P] [US2] Write frontend unit tests for the approval queue in `apps/web/src/app/features/approvals/approval-queue/approval-queue.component.spec.ts`, covering the embedded context per row and the approve/reject actions with a comment
+- [x] T022 [P] [US2] Write contract tests for `GET /approvals/pending` and `POST /requests/{id}/approve`+`/reject` in `apps/api/tests/contract/test_approvals_contract.py`, covering the embedded-context shape (FR-005) and 403/404/409 envelopes
+- [x] T023 [P] [US2] Write approval-decision integration tests in `apps/api/tests/integration/test_approvals.py`, proving approve/reject transitions, the 403 refusal for anyone other than the assigned approver or an owner (FR-007), that `decided_by_membership_id`/`decided_at` are always populated together on any non-pending step (FR-006, the database check constraint from T003), and that a decided request no longer appears in `GET /approvals/pending`
+- [x] T024 [P] [US2] Write frontend unit tests for the approval queue in `apps/web/src/app/features/approvals/approval-queue/approval-queue.component.spec.ts`, covering the embedded context per row and the approve/reject actions with a comment
 - [ ] T025 [P] [US2] Write approval-queue E2E coverage in `apps/web/tests/e2e/approval-queue.spec.ts`, proving an approver sees a routed request with full context, approves it, and that a different, unrelated member cannot decide on it, plus Arabic RTL layout
 
 ### Implementation for User Story 2
 
-- [ ] T026 [US2] Implement `GET /approvals/pending` listing and approve/reject in `apps/api/src/procurepilot_api/modules/requests/service.py`, enforcing the assignee-or-owner rule (FR-007) and requiring a recorded `decided_by`/`decided_at` pair for every decision (FR-006) — no code path may set `status='approved'` without them
-- [ ] T027 [US2] Expose `GET /approvals/pending` and `POST /requests/{id}/approve`+`/reject` in `apps/api/src/procurepilot_api/modules/requests/router.py`
-- [ ] T028 [P] [US2] Build the approval queue screen in `apps/web/src/app/features/approvals/approval-queue/`, showing requester, branch, cost centre, lines, required-by date, and (once US4 lands) budget status inline, with approve/reject actions, and add a real, enabled `shell.component.html` nav entry to `/approvals` in the same task (see T021's note on not repeating R2.0's unreachable-Settings-screen gap)
+- [x] T026 [US2] Implement `GET /approvals/pending` listing and approve/reject in `apps/api/src/procurepilot_api/modules/requests/service.py`, enforcing the assignee-or-owner rule (FR-007) and requiring a recorded `decided_by`/`decided_at` pair for every decision (FR-006) — no code path may set `status='approved'` without them
+- [x] T027 [US2] Expose `GET /approvals/pending` and `POST /requests/{id}/approve`+`/reject` in `apps/api/src/procurepilot_api/modules/requests/router.py`
+- [x] T028 [P] [US2] Build the approval queue screen in `apps/web/src/app/features/approvals/approval-queue/`, showing requester, branch, cost centre, lines, required-by date, and (once US4 lands) budget status inline, with approve/reject actions, and add a real, enabled `shell.component.html` nav entry to `/approvals` in the same task (see T021's note on not repeating R2.0's unreachable-Settings-screen gap)
 
 **Checkpoint**: US2 is independently testable — a seeded request routes to a known approver and can be decided on, proving the minimum useful submit-then-decide loop end to end with US1.
 
@@ -107,18 +107,18 @@ description: "Task list for Requests + Approvals implementation"
 
 ### Tests for User Story 3
 
-- [ ] T029 [P] [US3] Write direct unit tests for `resolve_approver()` (T011) in `apps/api/tests/unit/test_request_routing.py`, covering most-specific-branch-wins, the narrowest-range tie-break, delegation redirecting the threshold-resolved assignee, and owner fallback (no matching rule; resolved approver removed from workspace) — no DB required, per research.md R3
-- [ ] T030 [P] [US3] Write contract tests for `GET/POST /approvals/threshold-rules`, `PATCH/DELETE /approvals/threshold-rules/{id}`, and `GET/POST /approvals/delegations`+`DELETE /approvals/delegations/{id}` in `apps/api/tests/contract/test_threshold_rules_contract.py`, covering owner-only writes and 403/404/422 envelopes
+- [x] T029 [P] [US3] Write direct unit tests for `resolve_approver()` (T011) in `apps/api/tests/unit/test_request_routing.py`, covering most-specific-branch-wins, the narrowest-range tie-break, delegation redirecting the threshold-resolved assignee, and owner fallback (no matching rule; resolved approver removed from workspace) — no DB required, per research.md R3
+- [x] T030 [P] [US3] Write contract tests for `GET/POST /approvals/threshold-rules`, `PATCH/DELETE /approvals/threshold-rules/{id}`, and `GET/POST /approvals/delegations`+`DELETE /approvals/delegations/{id}` in `apps/api/tests/contract/test_threshold_rules_contract.py`, covering owner-only writes and 403/404/422 envelopes
 - [ ] T031 [P] [US3] Write end-to-end routing integration tests in `apps/api/tests/integration/test_request_routing.py`, proving a real submitted request lands in the correct approver's `GET /approvals/pending` per threshold tier and branch, that an active delegation redirects it, and that `requests.approval_step_escalated` is recorded when routing falls through to the owner
-- [ ] T032 [P] [US3] Write frontend unit tests for threshold-rule and delegation management in `apps/web/src/app/features/settings/threshold-rule-list/threshold-rule-list.component.spec.ts`, covering tier creation, branch scoping, and owner-only visibility of write actions
+- [x] T032 [P] [US3] Write frontend unit tests for threshold-rule and delegation management in `apps/web/src/app/features/settings/threshold-rule-list/threshold-rule-list.component.spec.ts`, covering tier creation, branch scoping, and owner-only visibility of write actions
 - [ ] T033 [P] [US3] Write routing/delegation E2E coverage in `apps/web/tests/e2e/threshold-routing.spec.ts`, proving requests at different value tiers route to the correct approver through the real UI/API, and a delegation redirects a newly submitted request to the delegate
 
 ### Implementation for User Story 3
 
-- [ ] T034 [US3] Wire `resolve_approver()` (T011) into the submit flow in `apps/api/src/procurepilot_api/modules/requests/service.py`, creating the `approval_step` with the resolved `assigned_membership_id`/`source`, and recording `requests.approval_step_escalated` when the source is `owner_fallback`
-- [ ] T035 [US3] Implement `threshold_rule` CRUD (owner-only) and `approval_delegation` CRUD (delegator or owner) in `apps/api/src/procurepilot_api/modules/requests/service.py`
-- [ ] T036 [US3] Expose `GET/POST /approvals/threshold-rules`, `PATCH/DELETE /approvals/threshold-rules/{id}`, and `GET/POST /approvals/delegations`+`DELETE /approvals/delegations/{id}` in `apps/api/src/procurepilot_api/modules/requests/router.py`
-- [ ] T037 [P] [US3] Build threshold-rule management UI in `apps/web/src/app/features/settings/threshold-rule-list/`, added alongside the existing branch/cost-centre/budget lists on the settings screen
+- [x] T034 [US3] Wire `resolve_approver()` (T011) into the submit flow in `apps/api/src/procurepilot_api/modules/requests/service.py`, creating the `approval_step` with the resolved `assigned_membership_id`/`source`, and recording `requests.approval_step_escalated` when the source is `owner_fallback`
+- [x] T035 [US3] Implement `threshold_rule` CRUD (owner-only) and `approval_delegation` CRUD (delegator or owner) in `apps/api/src/procurepilot_api/modules/requests/service.py`
+- [x] T036 [US3] Expose `GET/POST /approvals/threshold-rules`, `PATCH/DELETE /approvals/threshold-rules/{id}`, and `GET/POST /approvals/delegations`+`DELETE /approvals/delegations/{id}` in `apps/api/src/procurepilot_api/modules/requests/router.py`
+- [x] T037 [P] [US3] Build threshold-rule management UI in `apps/web/src/app/features/settings/threshold-rule-list/`, added alongside the existing branch/cost-centre/budget lists on the settings screen
 
 **Checkpoint**: US3 is independently testable — routing correctness is proven both as a pure function (T029) and end-to-end (T031), on top of US1/US2's already-working submit-then-decide loop.
 
@@ -132,15 +132,15 @@ description: "Task list for Requests + Approvals implementation"
 
 ### Tests for User Story 4
 
-- [ ] T038 [P] [US4] Write unit tests for the budget-remaining-amount comparison in `apps/api/tests/unit/test_budget_status.py`, covering within-budget (no warning), exceeding (warning with correct remaining amount), and no-applicable-budget (no `budget_status` at all, per FR-012)
+- [x] T038 [P] [US4] Write unit tests for the budget-remaining-amount comparison in `apps/api/tests/unit/test_budget_status.py`, covering within-budget (no warning), exceeding (warning with correct remaining amount), and no-applicable-budget (no `budget_status` at all, per FR-012)
 - [ ] T039 [P] [US4] Write integration tests in `apps/api/tests/integration/test_request_budget_status.py`, proving `budget_status` appears correctly on both `GET /requests/{id}` and the matching row in `GET /approvals/pending`, and that an exceeding request still submits and can still be approved (FR-011)
-- [ ] T040 [P] [US4] Write frontend unit tests for the budget-status display in `apps/web/src/app/features/requests/request-detail/request-detail.component.spec.ts` and the approval-queue row, covering the warning's presence/absence
+- [x] T040 [P] [US4] Write frontend unit tests for the budget-status display in `apps/web/src/app/features/requests/request-detail/request-detail.component.spec.ts` and the approval-queue row, covering the warning's presence/absence
 - [ ] T041 [P] [US4] Write budget-status E2E coverage in `apps/web/tests/e2e/request-budget-status.spec.ts`, proving the warning appears on both the requester's and the approver's view for an exceeding request, and is absent for one within budget or with no applicable budget
 
 ### Implementation for User Story 4
 
-- [ ] T042 [US4] Implement the budget-status comparison in `apps/api/src/procurepilot_api/modules/requests/service.py` (or a small `budget_status.py` helper), resolving the applicable R2.0 budget for a request's scope and period, and computing `remaining_amount`/`exceeds` — informational only, never blocking (FR-011, FR-012)
-- [ ] T043 [P] [US4] Surface `budget_status` in the request detail screen and each approval-queue row in `apps/web/src/app/features/requests/request-detail/` and `apps/web/src/app/features/approvals/approval-queue/`
+- [x] T042 [US4] Implement the budget-status comparison in `apps/api/src/procurepilot_api/modules/requests/service.py` (or a small `budget_status.py` helper), resolving the applicable R2.0 budget for a request's scope and period, and computing `remaining_amount`/`exceeds` — informational only, never blocking (FR-011, FR-012)
+- [x] T043 [P] [US4] Surface `budget_status` in the request detail screen and each approval-queue row in `apps/web/src/app/features/requests/request-detail/` and `apps/web/src/app/features/approvals/approval-queue/`
 
 **Checkpoint**: US4 is independently testable and additive — everything from US1-US3 already works correctly with `budget_status` simply absent until this phase lands.
 
@@ -150,11 +150,11 @@ description: "Task list for Requests + Approvals implementation"
 
 **Purpose**: branch-scoped-visibility proof extended to the new tables, full audit coverage, accessibility, and docs correction.
 
-- [ ] T044 [P] Extend `apps/api/tests/integration/test_branch_scoped_visibility.py` with cases for `purchase_request` and `approval_step`: a branch-scoped member sees only their own branch's requests, a requester always sees their own request regardless of branch scope, and a direct request for another branch's request resolves not-found (never forbidden)
-- [ ] T045 [P] Add an audit-log coverage test in `apps/api/tests/integration/test_requests_audit.py`, following the R2.0 `test_organisation_audit.py` pattern, proving `requests.purchase_request_submitted`, `requests.purchase_request_withdrawn`, `requests.approval_step_approved`, `requests.approval_step_rejected`, `requests.approval_step_escalated`, and `requests.threshold_rule_created`/`updated`/`deleted` all appear in `audit_event` (FR-013), backed by a live HTTP round-trip verification the same way T046 (R2.0) was
-- [ ] T046 [P] Add accessibility coverage in `apps/web/tests/e2e/requests-a11y.spec.ts`, scanning the request creation/list/detail screens and the approval queue in English and Arabic with zero axe-core WCAG 2.1 AA violations
-- [ ] T047 [P] Update `docs/architecture/data-dictionary.md` for the delivered `PurchaseRequest`, `PurchaseRequestLine`, `ApprovalStep`, `ThresholdRule`, and `ApprovalDelegation` entities, replacing the sketch-only placeholder entries under "Planned later domain entities"
-- [ ] T048 [P] Update `docs/architecture/api-specification.md` for the `/requests/*` and `/approvals/*` endpoints, replacing the existing sketch-only "Requests & Approvals (Phase 2)" section
+- [x] T044 [P] Extend `apps/api/tests/integration/test_branch_scoped_visibility.py` with cases for `purchase_request` and `approval_step`: a branch-scoped member sees only their own branch's requests, a requester always sees their own request regardless of branch scope, and a direct request for another branch's request resolves not-found (never forbidden)
+- [x] T045 [P] Add an audit-log coverage test in `apps/api/tests/integration/test_requests_audit.py`, following the R2.0 `test_organisation_audit.py` pattern, proving `requests.purchase_request_submitted`, `requests.purchase_request_withdrawn`, `requests.approval_step_approved`, `requests.approval_step_rejected`, `requests.approval_step_escalated`, and `requests.threshold_rule_created`/`updated`/`deleted` all appear in `audit_event` (FR-013), backed by a live HTTP round-trip verification the same way T046 (R2.0) was
+- [x] T046 [P] Add accessibility coverage in `apps/web/tests/e2e/requests-a11y.spec.ts`, scanning the request creation/list/detail screens and the approval queue in English and Arabic with zero axe-core WCAG 2.1 AA violations
+- [x] T047 [P] Update `docs/architecture/data-dictionary.md` for the delivered `PurchaseRequest`, `PurchaseRequestLine`, `ApprovalStep`, `ThresholdRule`, and `ApprovalDelegation` entities, replacing the sketch-only placeholder entries under "Planned later domain entities"
+- [x] T048 [P] Update `docs/architecture/api-specification.md` for the `/requests/*` and `/approvals/*` endpoints, replacing the existing sketch-only "Requests & Approvals (Phase 2)" section
 
 **Checkpoint**: branch-scoped visibility, full audit coverage, and accessibility are proven for every screen and table this chunk ships, and docs reflect the real delivered API/data model.
 

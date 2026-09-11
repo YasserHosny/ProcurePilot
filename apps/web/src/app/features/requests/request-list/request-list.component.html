@@ -23,6 +23,7 @@
       (selectionChange)="onStatusFilterChange($event.value)"
       class="status-filter"
       [placeholder]="'requests.columns.status' | translate"
+      [attr.aria-label]="'requests.columns.status' | translate"
     >
       <mat-option value="">{{ 'common.all' | translate }}</mat-option>
       <mat-option value="draft">{{ 'requests.status.draft' | translate }}</mat-option>

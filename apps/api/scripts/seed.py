@@ -55,7 +55,16 @@ def main() -> int:
     expires_at = datetime.now(UTC) + timedelta(days=ttl_days)
     email = os.environ.get("SEED_INVITATION_EMAIL", "pilot@example.test")
 
-    with psycopg.connect(dsn, row_factory=dict_row) as conn, conn.cursor() as cur:
+    # Supabase's transaction-mode pooler can hand back sessions with prepared statement names
+    # already present, so keep this one-shot seed script on simple protocol statements.
+    with (
+        psycopg.connect(
+            dsn,
+            row_factory=dict_row,
+            prepare_threshold=None,
+        ) as conn,
+        conn.cursor() as cur,
+    ):
         cur.executemany(
             """
             insert into supported_region (code, label_en, label_ar)
