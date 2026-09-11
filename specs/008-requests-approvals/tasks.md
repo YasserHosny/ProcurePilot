@@ -133,7 +133,7 @@ description: "Task list for Requests + Approvals implementation"
 ### Tests for User Story 4
 
 - [x] T038 [P] [US4] Write unit tests for the budget-remaining-amount comparison in `apps/api/tests/unit/test_budget_status.py`, covering within-budget (no warning), exceeding (warning with correct remaining amount), and no-applicable-budget (no `budget_status` at all, per FR-012)
-- [ ] T039 [P] [US4] Write integration tests in `apps/api/tests/integration/test_request_budget_status.py`, proving `budget_status` appears correctly on both `GET /requests/{id}` and the matching row in `GET /approvals/pending`, and that an exceeding request still submits and can still be approved (FR-011)
+- [x] T039 [P] [US4] Write integration tests in `apps/api/tests/integration/test_request_budget_status.py`, proving `budget_status` appears correctly on both `GET /requests/{id}` and the matching row in `GET /approvals/pending`, and that an exceeding request still submits and can still be approved (FR-011)
 - [x] T040 [P] [US4] Write frontend unit tests for the budget-status display in `apps/web/src/app/features/requests/request-detail/request-detail.component.spec.ts` and the approval-queue row, covering the warning's presence/absence
 - [ ] T041 [P] [US4] Write budget-status E2E coverage in `apps/web/tests/e2e/request-budget-status.spec.ts`, proving the warning appears on both the requester's and the approver's view for an exceeding request, and is absent for one within budget or with no applicable budget
 
