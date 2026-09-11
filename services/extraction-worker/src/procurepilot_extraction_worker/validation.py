@@ -138,9 +138,4 @@ def _arithmetic_status(
     if has_line_vat or subtotal <= 0 or stated <= subtotal:
         return "mismatch"
 
-    inferred_pct = round(float((stated - subtotal) / subtotal) * 100)
-    if not 0 < inferred_pct <= 30:
-        return "mismatch"
-
-    recomputed = subtotal * (1 + Decimal(str(inferred_pct)) / 100)
-    return "reconciled" if abs(recomputed - stated) <= tolerance else "mismatch"
+    return "mismatch"
