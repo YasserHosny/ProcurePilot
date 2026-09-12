@@ -7,6 +7,7 @@ import '../../core/api/mobile_api_client.dart';
 import '../../core/api/models.dart';
 import '../../core/api/requests_api_client.dart';
 import '../../core/i18n/i18n_loader.dart';
+import '../../core/offline_queue/offline_queue_service.dart';
 import '../service_provider.dart';
 
 /// Low-stock report screen (User Story 3 / T032).
@@ -24,10 +25,12 @@ class LowStockReportScreen extends StatefulWidget {
     super.key,
     this.initialProduct,
     this.initialBranchId,
+    this.offlineQueueService,
   });
 
   final CatalogueProduct? initialProduct;
   final String? initialBranchId;
+  final OfflineQueueService? offlineQueueService;
 
   @override
   State<LowStockReportScreen> createState() => _LowStockReportScreenState();
@@ -39,6 +42,9 @@ class _LowStockReportScreenState extends State<LowStockReportScreen> {
   RequestsApiClient get _requestsApiClient =>
       ServiceProvider.of(context).requestsApiClient;
   I18nLoader get _i18n => ServiceProvider.of(context).i18n;
+  OfflineQueueService? get _offlineQueue =>
+      widget.offlineQueueService ??
+      ServiceProvider.of(context).offlineQueueService;
 
   final _formKey = GlobalKey<FormState>();
   final _searchController = TextEditingController();
@@ -57,6 +63,7 @@ class _LowStockReportScreenState extends State<LowStockReportScreen> {
   bool _submitting = false;
   String? _idempotencyKey;
   LowStockReport? _submittedReport;
+  bool _submittedReportQueued = false;
 
   String? _errorMessage;
   String? _productError;
@@ -221,6 +228,7 @@ class _LowStockReportScreenState extends State<LowStockReportScreen> {
       setState(() {
         _submitting = false;
         _submittedReport = report;
+        _submittedReportQueued = false;
       });
     } on ApiException catch (e) {
       if (!mounted) return;
@@ -229,13 +237,52 @@ class _LowStockReportScreenState extends State<LowStockReportScreen> {
         _submitting = false;
       });
     } on Exception catch (e) {
+      final queued = await _queueLowStockReport(
+        branchId: _branchId!,
+        workspaceProductId: productId!,
+        countRemaining: countRemaining,
+      );
       if (!mounted) return;
+      if (queued) {
+        setState(() {
+          _submitting = false;
+          _submittedReport = LowStockReport(
+            id: key,
+            branchId: _branchId!,
+            memberId: '',
+            workspaceProductId: productId,
+            countRemaining: countRemaining,
+            createdAt: DateTime.now(),
+          );
+          _submittedReportQueued = true;
+        });
+        return;
+      }
       setState(() {
         _errorMessage = _i18n.t('requests.genericError');
         _submitting = false;
       });
       debugPrint('Low-stock report submission failed: $e');
     }
+  }
+
+  Future<bool> _queueLowStockReport({
+    required String branchId,
+    required String workspaceProductId,
+    required String? countRemaining,
+  }) async {
+    final queue = _offlineQueue;
+    if (queue == null) return false;
+    await queue.createAndEnqueue(
+      endpoint: 'low-stock-reports',
+      payload: {
+        'branch_id': branchId,
+        'workspace_product_id': workspaceProductId,
+        'count_remaining': countRemaining,
+      },
+      idempotencyKey: _idempotencyKey,
+    );
+    return true;
   }
 
   @override
@@ -252,9 +299,7 @@ class _LowStockReportScreenState extends State<LowStockReportScreen> {
 
     if (_submittedReport != null) {
       return Scaffold(
-        appBar: AppBar(
-          title: Text(i18n.t('lowStock.title')),
-        ),
+        appBar: AppBar(title: Text(i18n.t('lowStock.title'))),
         body: SafeArea(
           child: Padding(
             padding: const EdgeInsets.all(24),
@@ -271,8 +316,16 @@ class _LowStockReportScreenState extends State<LowStockReportScreen> {
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  i18n.t('lowStock.submittedMessage'),
-                  key: const Key('lowStockSubmittedMessage'),
+                  i18n.t(
+                    _submittedReportQueued
+                        ? 'lowStock.queuedMessage'
+                        : 'lowStock.submittedMessage',
+                  ),
+                  key: Key(
+                    _submittedReportQueued
+                        ? 'lowStockQueuedMessage'
+                        : 'lowStockSubmittedMessage',
+                  ),
                   style: Theme.of(context).textTheme.titleLarge,
                   textAlign: TextAlign.center,
                 ),
@@ -309,9 +362,7 @@ class _LowStockReportScreenState extends State<LowStockReportScreen> {
     }
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(i18n.t('lowStock.title')),
-      ),
+      appBar: AppBar(title: Text(i18n.t('lowStock.title'))),
       body: SafeArea(
         child: Form(
           key: _formKey,
@@ -448,10 +499,9 @@ class _LowStockReportScreenState extends State<LowStockReportScreen> {
                     Expanded(
                       child: ElevatedButton(
                         key: const Key('lowStockSubmitButton'),
-                        onPressed:
-                            (_submitting || _submittedReport != null)
-                                ? null
-                                : _submit,
+                        onPressed: (_submitting || _submittedReport != null)
+                            ? null
+                            : _submit,
                         child: Text(
                           _submitting
                               ? i18n.t('requests.form.submittingButton')

@@ -5,12 +5,7 @@ import 'package:hive/hive.dart';
 import 'package:uuid/uuid.dart';
 
 /// Local status of an offline queue item.
-enum QueueItemStatus {
-  draft,
-  queued,
-  confirmed,
-  failed,
-}
+enum QueueItemStatus { draft, queued, confirmed, failed }
 
 /// A queued mutation that carries its [idempotencyKey] stamped at creation
 /// time, not at send time.
@@ -44,18 +39,15 @@ class QueueItem {
   }
 
   Map<String, dynamic> toJson() => {
-        'idempotency_key': idempotencyKey,
-        'endpoint': endpoint,
-        'payload': payload,
-        'status': status.name,
-        'created_at': createdAt.toIso8601String(),
-        'retries': retries,
-      };
+    'idempotency_key': idempotencyKey,
+    'endpoint': endpoint,
+    'payload': payload,
+    'status': status.name,
+    'created_at': createdAt.toIso8601String(),
+    'retries': retries,
+  };
 
-  QueueItem copyWith({
-    QueueItemStatus? status,
-    int? retries,
-  }) {
+  QueueItem copyWith({QueueItemStatus? status, int? retries}) {
     return QueueItem(
       idempotencyKey: idempotencyKey,
       endpoint: endpoint,
@@ -73,7 +65,7 @@ class QueueItem {
 /// reuse the same key automatically.
 class OfflineQueueService {
   OfflineQueueService({required this.box, Uuid? uuid})
-      : uuid = uuid ?? const Uuid();
+    : uuid = uuid ?? const Uuid();
 
   final Box<String> box;
   final Uuid uuid;
@@ -82,9 +74,10 @@ class OfflineQueueService {
   Future<QueueItem> createDraft({
     required String endpoint,
     required Map<String, dynamic> payload,
+    String? idempotencyKey,
   }) async {
     final item = QueueItem(
-      idempotencyKey: uuid.v4(),
+      idempotencyKey: idempotencyKey ?? uuid.v4(),
       endpoint: endpoint,
       payload: payload,
       status: QueueItemStatus.draft,
@@ -106,15 +99,22 @@ class OfflineQueueService {
   Future<QueueItem> createAndEnqueue({
     required String endpoint,
     required Map<String, dynamic> payload,
+    String? idempotencyKey,
   }) async {
-    final draft = await createDraft(endpoint: endpoint, payload: payload);
+    final draft = await createDraft(
+      endpoint: endpoint,
+      payload: payload,
+      idempotencyKey: idempotencyKey,
+    );
     return enqueue(draft);
   }
 
   /// All items that still need to be sent.
   List<QueueItem> get pending {
     return box.values
-        .map((raw) => QueueItem.fromJson(jsonDecode(raw) as Map<String, dynamic>))
+        .map(
+          (raw) => QueueItem.fromJson(jsonDecode(raw) as Map<String, dynamic>),
+        )
         .where(
           (item) =>
               item.status == QueueItemStatus.queued ||
@@ -137,10 +137,7 @@ class OfflineQueueService {
     if (raw == null) return;
     final item = QueueItem.fromJson(jsonDecode(raw) as Map<String, dynamic>);
     await _save(
-      item.copyWith(
-        status: QueueItemStatus.failed,
-        retries: item.retries + 1,
-      ),
+      item.copyWith(status: QueueItemStatus.failed, retries: item.retries + 1),
     );
   }
 

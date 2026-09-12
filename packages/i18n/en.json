@@ -232,7 +232,8 @@
     "signOut": "Sign out"
   },
   "mobileRequests": {
-    "productSearchHint": "Search products by name..."
+    "productSearchHint": "Search products by name...",
+    "queuedMessage": "Purchase request queued — will submit when back online."
   },
   "team": {
     "title": "Team Management",

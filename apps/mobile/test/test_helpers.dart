@@ -12,6 +12,7 @@ import 'package:procurepilot_mobile/core/api/requests_api_client.dart';
 import 'package:procurepilot_mobile/core/auth/auth_service.dart';
 import 'package:procurepilot_mobile/core/auth/biometric_gate.dart';
 import 'package:procurepilot_mobile/core/i18n/i18n_loader.dart';
+import 'package:procurepilot_mobile/core/offline_queue/offline_queue_service.dart';
 import 'package:procurepilot_mobile/features/auth/biometric_offer_screen.dart';
 import 'package:procurepilot_mobile/features/auth/sign_in_screen.dart';
 import 'package:procurepilot_mobile/features/home/home_screen.dart';
@@ -69,7 +70,8 @@ Future<I18nLoader> loadTestI18n() async {
           'submittingButton': 'Signing in...',
           'genericError': 'Sign in failed',
           'invalidCredentialsError': 'Invalid email or password.',
-          'rateLimitedError': 'Too many sign-in attempts. Please wait and try again.',
+          'rateLimitedError':
+              'Too many sign-in attempts. Please wait and try again.',
           'showPassword': 'Show',
           'hidePassword': 'Hide',
         },
@@ -143,13 +145,16 @@ Future<I18nLoader> loadTestI18n() async {
       },
       'mobileRequests': {
         'productSearchHint': 'Search products by name...',
+        'queuedMessage':
+            'Purchase request queued — will submit when back online.',
       },
       'lowStock': {
         'title': 'Low Stock Report',
         'actionLabel': 'Running low',
         'countRemainingLabel': 'Count remaining',
         'submittedMessage': 'Low stock report submitted.',
-        'queuedMessage': 'Low stock report queued — will send when back online.',
+        'queuedMessage':
+            'Low stock report queued — will send when back online.',
       },
     }),
     '../../packages/i18n/ar.json': jsonEncode({}),
@@ -213,12 +218,16 @@ class FakeRequestsApiClient extends RequestsApiClient {
     : super(apiBaseUrl: 'https://test.api', httpClient: http.Client());
 
   final createCalls = <PurchaseRequestCreate>[];
+  final createIdempotencyKeys = <String?>[];
   final updateCalls = <List<dynamic>>[];
   final submitCalls = <String>[];
+  final submitIdempotencyKeys = <String?>[];
   final getRequestCalls = <String>[];
   PurchaseRequest? createResult;
   PurchaseRequest? updateResult;
   PurchaseRequest? submitResult;
+  Exception? createError;
+  Exception? submitError;
   final getRequestResults = <String, PurchaseRequest>{};
 
   List<PurchaseRequest> listResults = [];
@@ -245,6 +254,8 @@ class FakeRequestsApiClient extends RequestsApiClient {
     String? idempotencyKey,
   }) async {
     createCalls.add(body);
+    createIdempotencyKeys.add(idempotencyKey);
+    if (createError != null) throw createError!;
     if (createResult != null) return createResult!;
     return PurchaseRequest(
       id: '00000000-0000-0000-0000-000000000001',
@@ -293,6 +304,8 @@ class FakeRequestsApiClient extends RequestsApiClient {
     String? idempotencyKey,
   }) async {
     submitCalls.add(requestId);
+    submitIdempotencyKeys.add(idempotencyKey);
+    if (submitError != null) throw submitError!;
     if (submitResult != null) return submitResult!;
     return PurchaseRequest(
       id: requestId,
@@ -312,7 +325,10 @@ class FakeRequestsApiClient extends RequestsApiClient {
   }
 
   @override
-  Future<CostCentreList> listCostCentres({String? cursor, int limit = 100}) async {
+  Future<CostCentreList> listCostCentres({
+    String? cursor,
+    int limit = 100,
+  }) async {
     return CostCentreList(items: costCentres);
   }
 
@@ -494,6 +510,7 @@ class TestServiceProvider extends StatelessWidget {
     required this.approvalsApiClient,
     required this.requestsApiClient,
     required this.i18n,
+    this.offlineQueueService,
     required this.child,
   });
 
@@ -503,6 +520,7 @@ class TestServiceProvider extends StatelessWidget {
   final ApprovalsApiClient approvalsApiClient;
   final RequestsApiClient requestsApiClient;
   final I18nLoader i18n;
+  final OfflineQueueService? offlineQueueService;
   final Widget child;
 
   @override
@@ -517,6 +535,7 @@ class TestServiceProvider extends StatelessWidget {
       approvalsApiClient: approvalsApiClient,
       requestsApiClient: requestsApiClient,
       i18n: i18n,
+      offlineQueueService: offlineQueueService,
       child: MaterialApp(
         locale: const Locale('en'),
         builder: (context, child) => Directionality(
@@ -547,6 +566,7 @@ Future<TestServiceProvider> pumpWithServices(
   MobileApiClient? mobileApiClient,
   ApprovalsApiClient? approvalsApiClient,
   RequestsApiClient? requestsApiClient,
+  OfflineQueueService? offlineQueueService,
   I18nLoader? i18n,
 }) async {
   final i18nValue = i18n ?? await loadTestI18n();
@@ -561,15 +581,14 @@ Future<TestServiceProvider> pumpWithServices(
   final widget = TestServiceProvider(
     authService: authServiceValue,
     biometricAuth: biometricAuth ?? FakeBiometricAuth(),
-    mobileApiClient:
-        mobileApiClient ?? FakeMobileApiClient(),
+    mobileApiClient: mobileApiClient ?? FakeMobileApiClient(),
     approvalsApiClient:
         approvalsApiClient ??
         ApprovalsApiClient(apiBaseUrl: 'https://test.api'),
     requestsApiClient:
-        requestsApiClient ??
-        RequestsApiClient(apiBaseUrl: 'https://test.api'),
+        requestsApiClient ?? RequestsApiClient(apiBaseUrl: 'https://test.api'),
     i18n: i18nValue,
+    offlineQueueService: offlineQueueService,
     child: child,
   );
   await tester.pumpWidget(widget);
