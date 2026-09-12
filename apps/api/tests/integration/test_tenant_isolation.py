@@ -1472,20 +1472,35 @@ def test_another_workspaces_low_stock_reports_are_invisible(
         assert cur.fetchall() == []
 
 
-def test_a_cross_workspace_low_stock_report_delete_removes_nothing(
+def test_authenticated_has_no_delete_or_update_privilege_on_low_stock_report(
     workspaces: tuple[psycopg.Connection, Workspace, Workspace],
 ) -> None:
+    """low_stock_report is insert-only (FR-006) — `authenticated` never had a legitimate DELETE or
+    UPDATE to attempt in the first place (20260912000004_low_stock_report_review_fixes.sql, fixing
+    an original over-broad grant found in PR review). This is a stronger guarantee than "RLS blocks
+    a cross-tenant delete": the privilege itself doesn't exist, for ANY row regardless of tenant,
+    so the statement fails before RLS is even evaluated. This replaces the old
+    test_a_cross_workspace_low_stock_report_delete_removes_nothing, which assumed DELETE was a
+    valid (if RLS-blocked) operation for this role — it no longer is.
+    """
     conn, alpha, beta = workspaces
     with conn.cursor() as cur:
         act_as(cur, alpha)
-        cur.execute("delete from low_stock_report where id = %s", (beta.low_stock_report_id,))
-        assert cur.rowcount == 0
-        cur.execute("reset role")
-        cur.execute(
-            "select count(*) from low_stock_report where id = %s", (beta.low_stock_report_id,)
-        )
-        row = cur.fetchone()
-    assert row is not None and row[0] == 1
+
+        cur.execute("savepoint no_delete_privilege")
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            cur.execute(
+                "delete from low_stock_report where id = %s", (beta.low_stock_report_id,)
+            )
+        cur.execute("rollback to savepoint no_delete_privilege")
+
+        cur.execute("savepoint no_update_privilege")
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            cur.execute(
+                "update low_stock_report set count_remaining = 1 where id = %s",
+                (beta.low_stock_report_id,),
+            )
+        cur.execute("rollback to savepoint no_update_privilege")
 
 
 def test_authenticated_has_no_access_to_push_notification_at_all(

@@ -42,13 +42,20 @@ def create_request(
     token: Annotated[str, Depends(bearer_token)],
     member: Annotated[CurrentMember, Depends(current_member)],
     service: Annotated[RequestsService, Depends(get_requests_service)],
-    _idempotency_key: Annotated[
+    response: Response,
+    idempotency_key: Annotated[
         UUID | None, Header(alias="Idempotency-Key")
     ] = None,
 ) -> PurchaseRequest:
-    return service.create_request(
-        bearer_token=token, member=member, payload=payload
+    request, created = service.create_request(
+        bearer_token=token,
+        member=member,
+        payload=payload,
+        idempotency_key=idempotency_key,
     )
+    if not created:
+        response.status_code = status.HTTP_200_OK
+    return request
 
 
 @router.get("/requests", response_model=PurchaseRequestList)
