@@ -4,6 +4,8 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/foundation.dart';
 
 import '../api/mobile_api_client.dart';
+import '../api/models.dart';
+import '../api/requests_api_client.dart';
 import 'offline_queue_service.dart';
 
 /// Replays pending offline submissions when connectivity returns, reusing the
@@ -12,11 +14,13 @@ class OfflineQueueReplay {
   OfflineQueueReplay({
     required this.queue,
     required this.apiClient,
+    required this.requestsApiClient,
     Connectivity? connectivity,
   }) : connectivity = connectivity ?? Connectivity();
 
-  final OfflineQueueService queue;
+  final OfflineQueue queue;
   final MobileApiClient apiClient;
+  final RequestsApiClient requestsApiClient;
   final Connectivity connectivity;
   StreamSubscription<List<ConnectivityResult>>? _subscription;
 
@@ -63,10 +67,74 @@ class OfflineQueueReplay {
           idempotencyKey: item.idempotencyKey,
         );
       case 'requests':
-        // Wired to the existing /requests endpoints in later user-story work.
-        throw UnimplementedError('Request queue replay not yet wired');
+        await _sendRequest(item);
+      case 'requests/submit':
+        await _sendRequestSubmitOnly(item);
       default:
         throw UnsupportedError('Unknown offline endpoint: ${item.endpoint}');
     }
+  }
+
+  Future<void> _sendRequest(QueueItem item) async {
+    final created = await requestsApiClient.createRequest(
+      _requestCreateFromPayload(item.payload),
+      idempotencyKey: item.idempotencyKey,
+    );
+    await _submitTolerantly(created.id);
+  }
+
+  /// Replays the submit call for a request that was already created online
+  /// (an earlier "Save Draft") before the device went offline — no create
+  /// step needed, just the submit.
+  Future<void> _sendRequestSubmitOnly(QueueItem item) async {
+    final requestId = item.payload['request_id'] as String;
+    await _submitTolerantly(requestId);
+  }
+
+  /// Submits [requestId], treating a `409 not_draft` conflict as success when
+  /// the request has already moved past `draft` — the signal that an earlier
+  /// replay attempt's submit call actually landed even though the client
+  /// never saw the response (`submit_request`'s `Idempotency-Key` header is
+  /// still accepted and unenforced server-side, so this check is what makes
+  /// retrying it safe instead of looping forever on an already-submitted
+  /// request).
+  Future<void> _submitTolerantly(String requestId) async {
+    try {
+      await requestsApiClient.submitRequest(requestId);
+    } on ApiException catch (e) {
+      if (e.statusCode != 409 || e.details?['reason'] != 'not_draft') {
+        rethrow;
+      }
+      final current = await requestsApiClient.getRequest(requestId);
+      if (!_isPastDraft(current.status)) {
+        rethrow;
+      }
+    }
+  }
+
+  bool _isPastDraft(String status) {
+    return status == 'submitted' ||
+        status == 'pending' ||
+        status == 'approved' ||
+        status == 'rejected';
+  }
+
+  PurchaseRequestCreate _requestCreateFromPayload(
+    Map<String, dynamic> payload,
+  ) {
+    final lines = (payload['lines'] as List<dynamic>).map((line) {
+      final json = line as Map<String, dynamic>;
+      return PurchaseRequestLineInput(
+        workspaceProductId: json['workspace_product_id'] as String,
+        quantity: json['quantity'] as String,
+        note: json['note'] as String?,
+      );
+    }).toList();
+    return PurchaseRequestCreate(
+      branchId: payload['branch_id'] as String,
+      costCentreId: payload['cost_centre_id'] as String?,
+      requiredByDate: payload['required_by_date'] as String,
+      lines: lines,
+    );
   }
 }

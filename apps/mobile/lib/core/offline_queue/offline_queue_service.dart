@@ -5,12 +5,7 @@ import 'package:hive/hive.dart';
 import 'package:uuid/uuid.dart';
 
 /// Local status of an offline queue item.
-enum QueueItemStatus {
-  draft,
-  queued,
-  confirmed,
-  failed,
-}
+enum QueueItemStatus { draft, queued, confirmed, failed }
 
 /// A queued mutation that carries its [idempotencyKey] stamped at creation
 /// time, not at send time.
@@ -44,18 +39,15 @@ class QueueItem {
   }
 
   Map<String, dynamic> toJson() => {
-        'idempotency_key': idempotencyKey,
-        'endpoint': endpoint,
-        'payload': payload,
-        'status': status.name,
-        'created_at': createdAt.toIso8601String(),
-        'retries': retries,
-      };
+    'idempotency_key': idempotencyKey,
+    'endpoint': endpoint,
+    'payload': payload,
+    'status': status.name,
+    'created_at': createdAt.toIso8601String(),
+    'retries': retries,
+  };
 
-  QueueItem copyWith({
-    QueueItemStatus? status,
-    int? retries,
-  }) {
+  QueueItem copyWith({QueueItemStatus? status, int? retries}) {
     return QueueItem(
       idempotencyKey: idempotencyKey,
       endpoint: endpoint,
@@ -67,13 +59,30 @@ class QueueItem {
   }
 }
 
+/// Read/write surface both the submitting screens and [OfflineQueueReplay]
+/// need — split out so a test can inject a pure in-memory double instead of
+/// [OfflineQueueService]'s real Hive-backed file I/O.
+abstract class OfflineQueue {
+  Future<QueueItem> createAndEnqueue({
+    required String endpoint,
+    required Map<String, dynamic> payload,
+    String? idempotencyKey,
+  });
+
+  List<QueueItem> get pending;
+
+  Future<void> markConfirmed(String idempotencyKey);
+
+  Future<void> markFailed(String idempotencyKey);
+}
+
 /// Local persistence for the offline submission queue.
 ///
 /// Items are stored as JSON strings keyed by their idempotency key so retries
 /// reuse the same key automatically.
-class OfflineQueueService {
+class OfflineQueueService implements OfflineQueue {
   OfflineQueueService({required this.box, Uuid? uuid})
-      : uuid = uuid ?? const Uuid();
+    : uuid = uuid ?? const Uuid();
 
   final Box<String> box;
   final Uuid uuid;
@@ -82,9 +91,10 @@ class OfflineQueueService {
   Future<QueueItem> createDraft({
     required String endpoint,
     required Map<String, dynamic> payload,
+    String? idempotencyKey,
   }) async {
     final item = QueueItem(
-      idempotencyKey: uuid.v4(),
+      idempotencyKey: idempotencyKey ?? uuid.v4(),
       endpoint: endpoint,
       payload: payload,
       status: QueueItemStatus.draft,
@@ -103,18 +113,27 @@ class OfflineQueueService {
   }
 
   /// Convenience helper that creates and enqueues in one call.
+  @override
   Future<QueueItem> createAndEnqueue({
     required String endpoint,
     required Map<String, dynamic> payload,
+    String? idempotencyKey,
   }) async {
-    final draft = await createDraft(endpoint: endpoint, payload: payload);
+    final draft = await createDraft(
+      endpoint: endpoint,
+      payload: payload,
+      idempotencyKey: idempotencyKey,
+    );
     return enqueue(draft);
   }
 
   /// All items that still need to be sent.
+  @override
   List<QueueItem> get pending {
     return box.values
-        .map((raw) => QueueItem.fromJson(jsonDecode(raw) as Map<String, dynamic>))
+        .map(
+          (raw) => QueueItem.fromJson(jsonDecode(raw) as Map<String, dynamic>),
+        )
         .where(
           (item) =>
               item.status == QueueItemStatus.queued ||
@@ -124,6 +143,7 @@ class OfflineQueueService {
   }
 
   /// Marks an item as successfully confirmed by the server.
+  @override
   Future<void> markConfirmed(String idempotencyKey) async {
     final raw = box.get(idempotencyKey);
     if (raw == null) return;
@@ -132,15 +152,13 @@ class OfflineQueueService {
   }
 
   /// Records a failed send attempt and increments the retry counter.
+  @override
   Future<void> markFailed(String idempotencyKey) async {
     final raw = box.get(idempotencyKey);
     if (raw == null) return;
     final item = QueueItem.fromJson(jsonDecode(raw) as Map<String, dynamic>);
     await _save(
-      item.copyWith(
-        status: QueueItemStatus.failed,
-        retries: item.retries + 1,
-      ),
+      item.copyWith(status: QueueItemStatus.failed, retries: item.retries + 1),
     );
   }
 

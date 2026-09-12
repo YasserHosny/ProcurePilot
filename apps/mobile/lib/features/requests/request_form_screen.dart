@@ -1,10 +1,13 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:uuid/uuid.dart';
 
 import '../../core/api/models.dart';
 import '../../core/api/requests_api_client.dart';
 import '../../core/i18n/i18n_loader.dart';
+import '../../core/offline_queue/offline_queue_service.dart';
+import '../../core/offline_queue/status_widgets.dart';
 import '../service_provider.dart';
 
 /// Purchase-request form screen.
@@ -13,7 +16,9 @@ import '../service_provider.dart';
 /// draft via [PATCH /requests/{id}] for subsequent edits. Submission goes
 /// through [POST /requests/{id}/submit].
 class RequestFormScreen extends StatefulWidget {
-  const RequestFormScreen({super.key});
+  const RequestFormScreen({super.key, this.offlineQueueService});
+
+  final OfflineQueue? offlineQueueService;
 
   @override
   State<RequestFormScreen> createState() => _RequestFormScreenState();
@@ -34,6 +39,9 @@ class _LineInput {
 class _RequestFormScreenState extends State<RequestFormScreen> {
   RequestsApiClient get _apiClient =>
       ServiceProvider.of(context).requestsApiClient;
+  OfflineQueue? get _offlineQueue =>
+      widget.offlineQueueService ??
+      ServiceProvider.of(context).offlineQueueService;
   I18nLoader get _i18n => ServiceProvider.of(context).i18n;
 
   final _formKey = GlobalKey<FormState>();
@@ -46,8 +54,10 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
   bool _loadingMeta = false;
 
   PurchaseRequest? _savedRequest;
+  String? _offlineSubmitIdempotencyKey;
   bool _saving = false;
   bool _submitting = false;
+  bool _submissionQueued = false;
   String? _errorMessage;
   String? _branchError;
 
@@ -134,21 +144,7 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
       _errorMessage = null;
     });
 
-    final body = PurchaseRequestCreate(
-      branchId: _branchId!,
-      costCentreId: _costCentreId,
-      requiredByDate: _requiredByDateController.text,
-      lines:
-          _lines
-              .map(
-                (l) => PurchaseRequestLineInput(
-                  workspaceProductId: l.workspaceProductId,
-                  quantity: l.quantity,
-                  note: l.note,
-                ),
-              )
-              .toList(),
-    );
+    final body = _requestBody();
 
     try {
       final saved = _savedRequest == null
@@ -190,8 +186,16 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
   }
 
   Future<void> _submit() async {
-    final existing = _savedRequest;
-    if (existing == null || _lines.isEmpty) return;
+    setState(() => _branchError = null);
+    if (!_formKey.currentState!.validate()) return;
+    if (_branchId == null || _branchId!.isEmpty) {
+      setState(() => _branchError = _i18n.t('requests.form.branchRequired'));
+      return;
+    }
+    if (_lines.isEmpty) return;
+
+    _formKey.currentState!.save();
+    final body = _requestBody();
 
     setState(() {
       _submitting = true;
@@ -199,6 +203,11 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
     });
 
     try {
+      _offlineSubmitIdempotencyKey ??= const Uuid().v4();
+      final key = _offlineSubmitIdempotencyKey!;
+      final existing =
+          _savedRequest ??
+          await _apiClient.createRequest(body, idempotencyKey: key);
       final submitted = await _apiClient.submitRequest(existing.id);
       if (!mounted) return;
       setState(() => _submitting = false);
@@ -208,10 +217,8 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
           duration: const Duration(seconds: 1),
         ),
       );
-      await Navigator.of(context).pushReplacementNamed(
-        '/requests/detail',
-        arguments: submitted,
-      );
+      await Navigator.of(context)
+          .pushReplacementNamed('/requests/detail', arguments: submitted);
     } on ApiException catch (e) {
       if (!mounted) return;
       setState(() {
@@ -219,13 +226,67 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
         _submitting = false;
       });
     } on Exception catch (e) {
+      final queued = await _queueRequestSubmission(
+        body,
+        idempotencyKey: _offlineSubmitIdempotencyKey,
+      );
       if (!mounted) return;
+      if (queued) {
+        setState(() {
+          _submitting = false;
+          _submissionQueued = true;
+        });
+        return;
+      }
       setState(() {
         _errorMessage = _i18n.t('requests.genericError');
         _submitting = false;
       });
       debugPrint('Submit failed: $e');
     }
+  }
+
+  PurchaseRequestCreate _requestBody() {
+    return PurchaseRequestCreate(
+      branchId: _branchId!,
+      costCentreId: _costCentreId,
+      requiredByDate: _requiredByDateController.text,
+      lines: _lines
+          .map(
+            (l) => PurchaseRequestLineInput(
+              workspaceProductId: l.workspaceProductId,
+              quantity: l.quantity,
+              note: l.note,
+            ),
+          )
+          .toList(),
+    );
+  }
+
+  Future<bool> _queueRequestSubmission(
+    PurchaseRequestCreate body, {
+    required String? idempotencyKey,
+  }) async {
+    final queue = _offlineQueue;
+    if (queue == null) return false;
+    final existingDraft = _savedRequest;
+    if (existingDraft != null) {
+      // The draft already exists server-side (an earlier, online "Save
+      // Draft") — only the submit call itself needs replaying, not a second
+      // create.
+      await queue.createAndEnqueue(
+        endpoint: 'requests/submit',
+        payload: {'request_id': existingDraft.id},
+        idempotencyKey: idempotencyKey,
+      );
+      return true;
+    }
+    await queue.createAndEnqueue(
+      endpoint: 'requests',
+      payload: body.toJson(),
+      idempotencyKey: idempotencyKey,
+    );
+    return true;
   }
 
   static final RegExp _isoDatePattern = RegExp(r'^\d{4}-\d{2}-\d{2}$');
@@ -270,7 +331,22 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
   @override
   Widget build(BuildContext context) {
     final i18n = _i18n;
-    final canSubmit = _savedRequest != null && _lines.isNotEmpty;
+
+    if (_submissionQueued) {
+      return Scaffold(
+        appBar: AppBar(title: Text(i18n.t('requests.form.createTitle'))),
+        body: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: SubmissionQueuedBanner(
+              message: i18n.t('mobileRequests.queuedMessage'),
+            ),
+          ),
+        ),
+      );
+    }
+
+    final canSubmit = _lines.isNotEmpty;
 
     return Scaffold(
       appBar: AppBar(
@@ -309,15 +385,14 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
                       value: _branchId,
                       isDense: true,
                       hint: Text(i18n.t('requests.form.branchLabel')),
-                      items:
-                          _branches
-                              .map(
-                                (b) => DropdownMenuItem(
-                                  value: b.id,
-                                  child: Text(b.name),
-                                ),
-                              )
-                              .toList(),
+                      items: _branches
+                          .map(
+                            (b) => DropdownMenuItem(
+                              value: b.id,
+                              child: Text(b.name),
+                            ),
+                          )
+                          .toList(),
                       onChanged: (value) {
                         setState(() {
                           _branchId = value;
@@ -339,10 +414,7 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
                       isDense: true,
                       hint: Text(i18n.t('requests.form.costCentreLabel')),
                       items: [
-                        const DropdownMenuItem(
-                          value: null,
-                          child: Text('—'),
-                        ),
+                        const DropdownMenuItem(value: null, child: Text('—')),
                         ..._costCentres.map(
                           (c) => DropdownMenuItem(
                             value: c.id,

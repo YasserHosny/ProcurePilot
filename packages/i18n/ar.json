@@ -232,7 +232,8 @@
     "signOut": "تسجيل الخروج"
   },
   "mobileRequests": {
-    "productSearchHint": "البحث عن المنتجات بالاسم..."
+    "productSearchHint": "البحث عن المنتجات بالاسم...",
+    "queuedMessage": "طلب الشراء في قائمة الانتظار — سيتم إرساله عند عودة الاتصال."
   },
   "team": {
     "title": "إدارة الفريق",

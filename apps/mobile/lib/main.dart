@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 import 'package:http/http.dart' as http;
 import 'package:local_auth/local_auth.dart';
 
@@ -11,6 +12,8 @@ import 'core/api/requests_api_client.dart';
 import 'core/auth/auth_service.dart';
 import 'core/auth/biometric_gate.dart';
 import 'core/i18n/i18n_loader.dart';
+import 'core/offline_queue/offline_queue_replay.dart';
+import 'core/offline_queue/offline_queue_service.dart';
 import 'features/auth/biometric_offer_screen.dart';
 import 'features/auth/sign_in_screen.dart';
 import 'features/auth/splash_screen.dart';
@@ -55,6 +58,8 @@ void main() async {
   );
 
   final storage = const FlutterSecureStorageAdapter(FlutterSecureStorage());
+  await Hive.initFlutter();
+  final offlineQueueBox = await Hive.openBox<String>('offline_queue');
   final httpClient = http.Client();
 
   final authService = AuthService(
@@ -76,6 +81,7 @@ void main() async {
     apiBaseUrl: apiBaseUrl,
     httpClient: httpClient,
   );
+  final offlineQueueService = OfflineQueueService(box: offlineQueueBox);
 
   final biometricGate = BiometricGate(
     biometricAuth: LocalAuthAdapter(LocalAuthentication()),
@@ -90,6 +96,7 @@ void main() async {
       mobileApiClient: mobileApiClient,
       approvalsApiClient: approvalsApiClient,
       requestsApiClient: requestsApiClient,
+      offlineQueueService: offlineQueueService,
       notificationPermission: StandInNotificationPermission(),
     ),
   );
@@ -104,6 +111,7 @@ class ProcurePilotApp extends StatefulWidget {
     required this.mobileApiClient,
     required this.approvalsApiClient,
     required this.requestsApiClient,
+    this.offlineQueueService,
     this.notificationPermission,
   });
 
@@ -113,6 +121,7 @@ class ProcurePilotApp extends StatefulWidget {
   final MobileApiClient mobileApiClient;
   final ApprovalsApiClient approvalsApiClient;
   final RequestsApiClient requestsApiClient;
+  final OfflineQueue? offlineQueueService;
   final NotificationPermission? notificationPermission;
 
   @override
@@ -125,11 +134,13 @@ class _ProcurePilotAppState extends State<ProcurePilotApp> {
     onRouteChanged: _registerNotificationsIfSignedIn,
   );
   StreamSubscription<Map<String, String>>? _notificationTapSubscription;
+  OfflineQueueReplay? _offlineQueueReplay;
   bool _notificationRegistrationStarted = false;
 
   @override
   void initState() {
     super.initState();
+    _startOfflineReplay();
     _startNotifications();
   }
 
@@ -144,12 +155,30 @@ class _ProcurePilotAppState extends State<ProcurePilotApp> {
       _notificationRegistrationStarted = false;
       _startNotifications();
     }
+    if (widget.offlineQueueService != oldWidget.offlineQueueService ||
+        widget.mobileApiClient != oldWidget.mobileApiClient ||
+        widget.requestsApiClient != oldWidget.requestsApiClient) {
+      _offlineQueueReplay?.stop();
+      _offlineQueueReplay = null;
+      _startOfflineReplay();
+    }
   }
 
   @override
   void dispose() {
     _notificationTapSubscription?.cancel();
+    _offlineQueueReplay?.stop();
     super.dispose();
+  }
+
+  void _startOfflineReplay() {
+    final queue = widget.offlineQueueService;
+    if (queue == null) return;
+    _offlineQueueReplay = OfflineQueueReplay(
+      queue: queue,
+      apiClient: widget.mobileApiClient,
+      requestsApiClient: widget.requestsApiClient,
+    )..start();
   }
 
   void _startNotifications() {
@@ -160,13 +189,13 @@ class _ProcurePilotAppState extends State<ProcurePilotApp> {
       requestsApiClient: widget.requestsApiClient,
       navigatorKey: _navigatorKey,
     );
-    _notificationTapSubscription = permission.notificationTaps.listen(
-      (payload) {
-        router.route(payload).catchError((Object error) {
-          debugPrint('Failed to route notification tap: $error');
-        });
-      },
-    );
+    _notificationTapSubscription = permission.notificationTaps.listen((
+      payload,
+    ) {
+      router.route(payload).catchError((Object error) {
+        debugPrint('Failed to route notification tap: $error');
+      });
+    });
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _registerNotificationsIfSignedIn();
@@ -204,6 +233,7 @@ class _ProcurePilotAppState extends State<ProcurePilotApp> {
           mobileApiClient: widget.mobileApiClient,
           approvalsApiClient: widget.approvalsApiClient,
           requestsApiClient: widget.requestsApiClient,
+          offlineQueueService: widget.offlineQueueService,
           i18n: widget.i18n,
           child: MaterialApp(
             navigatorKey: _navigatorKey,
