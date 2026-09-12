@@ -309,6 +309,9 @@ class RequestsService:
         codebase yet (research.md R4 revised).
         """
         client = authenticated_client(self._settings, bearer_token)
+        self._authorize_branch_for_write(
+            client, member=member, branch_id=payload.branch_id
+        )
         row_data = {
             "tenant_id": str(member.tenant_id),
             "branch_id": str(payload.branch_id),
@@ -328,7 +331,7 @@ class RequestsService:
                 existing = self._fetch_low_stock_report_by_key(
                     client, idempotency_key=idempotency_key
                 )
-                return LowStockReport.model_validate(existing), False
+                return _low_stock_report(existing), False
             raise _write_error(exc) from exc
 
         row = _one_row(response.data, reason="low_stock_report_write_failed")
@@ -338,7 +341,48 @@ class RequestsService:
             action="requests.low_stock_report_created",
             target={"low_stock_report_id": str(row["id"])},
         )
-        return LowStockReport.model_validate(row), True
+        return _low_stock_report(row), True
+
+    def _authorize_branch_for_write(
+        self, client: Client, *, member: CurrentMember, branch_id: UUID
+    ) -> None:
+        """Refuse a low-stock report for a branch outside the caller's own scope.
+
+        `low_stock_report`'s insert RLS only checks `tenant_id` (its migration's own comment:
+        "Write authorization ... is an application-layer check, matching this project's standing
+        convention rather than a second RLS policy") — without this, any tenant member could POST
+        a report against a same-tenant branch they have no assignment to. Mirrors exactly the
+        three-way branching `low_stock_report_scoped_visibility`'s own SELECT policy already uses:
+        an owner is never scoped; a member with no `branch_role_assignment` row at all is treated
+        as unscoped (sees/may act on every branch); a member who HAS at least one assignment must
+        have one for this specific branch. `branch` itself has no branch-scoped RLS (every member
+        can see every branch in their tenant — it's tenant-wide reference data), so checking
+        `branch_role_assignment` directly, not `branch`, is what actually enforces this.
+        """
+        if member.role is MemberRole.owner:
+            return
+        try:
+            response = (
+                client.table("branch_role_assignment")
+                .select("branch_id")
+                .eq("membership_id", str(member.membership_id))
+                .execute()
+            )
+        except APIError as exc:
+            raise ServiceUnavailableError(
+                details={"dependency": "database"}
+            ) from exc
+        assignments = _rows(response.data)
+        if not assignments:
+            return
+        assigned_branch_ids = {str(row["branch_id"]) for row in assignments}
+        if str(branch_id) not in assigned_branch_ids:
+            # Not a not-found case: branches are tenant-wide visible reference data (branch's own
+            # RLS has no scoping), so there's no existence to hide — this is "you may see it, but
+            # this isn't a branch you may act on," matching _require_requester's own
+            # PermissionDeniedError precedent elsewhere in this file, not the cross-tenant
+            # not-found convention.
+            raise PermissionDeniedError(details={"reason": "branch_not_assigned"})
 
     def _fetch_low_stock_report_by_key(
         self, client: Client, *, idempotency_key: UUID
@@ -395,7 +439,7 @@ class RequestsService:
         next_cursor = (
             _encode_cursor(offset + capped) if len(rows) > capped else None
         )
-        items = [LowStockReport.model_validate(row) for row in visible]
+        items = [_low_stock_report(row) for row in visible]
         return LowStockReportList(items=items, next_cursor=next_cursor)
 
     def update_request(
@@ -1592,6 +1636,26 @@ def _approval_step(row: dict[str, object]) -> ApprovalStep:
             else None
         ),
         decided_at=row.get("decided_at"),
+    )
+
+
+def _low_stock_report(row: dict[str, object]) -> LowStockReport:
+    """PostgREST decodes `numeric(18,6)` as a JSON number, not a string, so `count_remaining`
+    must go through `_decimal()` here — passing the raw row straight into
+    `LowStockReport.model_validate()` fails validation for any row that actually has a count,
+    since the schema's `count_remaining` is a strict, pattern-matched string.
+    """
+    return LowStockReport(
+        id=UUID(str(row["id"])),
+        branch_id=UUID(str(row["branch_id"])),
+        member_id=UUID(str(row["member_id"])),
+        workspace_product_id=UUID(str(row["workspace_product_id"])),
+        count_remaining=(
+            _decimal(row["count_remaining"], scale=6)
+            if row.get("count_remaining") is not None
+            else None
+        ),
+        created_at=row["created_at"],
     )
 
 
