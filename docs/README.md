@@ -36,7 +36,9 @@
 
 ## User-facing
 
-- [`user/user-documentation.md`](user/user-documentation.md) — Help center guides for upload, compare, request, approve, and delivery confirmation.
+- [`user/user-documentation.md`](user/user-documentation.md) — Help center guides for upload, compare, request, approve, and delivery confirmation (web app).
+- [`user/user-flows.md`](user/user-flows.md) — Route-by-route navigation paths and journey diagrams for the web app.
+- [`user/mobile-app-user-documentation.md`](user/mobile-app-user-documentation.md) — Screen-by-screen guide to the mobile app (sign-in, biometric unlock, role-aware home screen).
 
 ---
 

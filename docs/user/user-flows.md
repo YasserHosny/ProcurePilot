@@ -1,7 +1,11 @@
 # ProcurePilot User Flows
 
 > Navigation paths for every user-facing page, with journey visualisations.
-> Last updated: 7 Sep 2026.
+> Last updated: 12 Sep 2026.
+>
+> Covers the web app only. The mobile app uses named routes rather than URLs; see
+> [ProcurePilot Mobile App User Documentation](mobile-app-user-documentation.md) for its screens
+> and navigation.
 
 ---
 
@@ -233,9 +237,11 @@ journey
 
 - `/home` -> **Purchase Requests** -> `/requests` -> **Save Draft** -> `/requests/new` -> save draft -> `/requests/:id`
 - `/requests/:id` -> submit, withdraw, or return to the queue depending on status
-- `/home` -> **Approval Queue** -> `/approvals` -> review routed requests when approval routing is available
+- `/requests/:id` (once routed to an approver) -> view Approval status section -> decision, comment, and timestamp appear once decided
+- `/home` -> **Approval Queue** -> `/approvals` -> expand a row's lines -> **Approve** or **Reject** -> confirm (with optional comment) -> back to queue
+- `/home` -> **Settings** -> `/settings` -> **+ New Delegation** -> pick delegate + date range -> save -> delegated requests route to the delegate's own Approval Queue
 - `/home` -> **Team Management** -> `/team` -> invite member -> pending invitation -> accept invitation flow
-- `/home` -> **Settings** -> `/settings` -> manage branches, cost centres, and budgets
+- `/home` -> **Settings** -> `/settings` -> manage branches, cost centres, budgets, and approval delegations
 - Unknown routes redirect to `/`, then to `/home` for signed-in users.
 
 ```mermaid
@@ -256,8 +262,9 @@ journey
     section Approvals
         Go to Approvals: 3: User
         Open queue: 3: User
-        Review requests: 4: User
-        Approve or reject: 5: User
+        Expand lines: 4: User
+        Approve or reject: 4: User
+        Confirm with comment: 5: User
 ```
 
 ```mermaid
@@ -275,6 +282,7 @@ journey
         Manage branches: 4: User
         Manage cost centres: 4: User
         Manage budgets: 4: User
+        Manage delegations: 4: User
     section Unknown Routes
         Visit unknown URL: 2: User
         Redirect to /: 3: System
