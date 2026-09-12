@@ -27,7 +27,11 @@ cross-tenant isolation only, since the within-tenant branch-scoped visibility th
 enforce (research.md R1) has its own dedicated proof in test_branch_scoped_visibility.py (T036);
 extended again for 008-requests-approvals (T008) to cover purchase_request,
 purchase_request_line, approval_step, threshold_rule and approval_delegation — cross-tenant
-isolation only, same split as R2.0.
+isolation only, same split as R2.0; extended again for 009-mobile-app-mvp (T007) to cover
+device_registration, low_stock_report and push_notification — cross-tenant isolation only, same
+split as every prior chunk; device_registration's own-row-only visibility (no owner read-all) and
+low_stock_report's branch-scoped visibility have their within-tenant proof in
+test_branch_scoped_visibility.py, not here.
 """
 
 from __future__ import annotations
@@ -79,6 +83,9 @@ class Workspace:
         approval_step_id: UUID,
         threshold_rule_id: UUID,
         approval_delegation_id: UUID,
+        device_registration_id: UUID,
+        low_stock_report_id: UUID,
+        push_notification_id: UUID,
     ) -> None:
         self.tenant_id = tenant_id
         self.user_id = user_id
@@ -106,6 +113,9 @@ class Workspace:
         self.approval_step_id = approval_step_id
         self.threshold_rule_id = threshold_rule_id
         self.approval_delegation_id = approval_delegation_id
+        self.device_registration_id = device_registration_id
+        self.low_stock_report_id = low_stock_report_id
+        self.push_notification_id = push_notification_id
 
     def claims(self) -> str:
         return (
@@ -419,6 +429,26 @@ def make_workspace(cur: psycopg.Cursor, label: str) -> Workspace:
         (approval_delegation_id, tenant_id, membership_id, delegate_membership_id),
     )
 
+    # Mobile MVP — chunk R2.2 (009-mobile-app-mvp), T007.
+    device_registration_id, low_stock_report_id, push_notification_id = (
+        uuid4(), uuid4(), uuid4()
+    )
+    cur.execute(
+        "insert into device_registration (id,tenant_id,member_id,platform,push_token) "
+        "values (%s,%s,%s,'ios',%s)",
+        (device_registration_id, tenant_id, membership_id, f"{label}-push-token"),
+    )
+    cur.execute(
+        "insert into low_stock_report (id,tenant_id,branch_id,member_id,workspace_product_id) "
+        "values (%s,%s,%s,%s,%s)",
+        (low_stock_report_id, tenant_id, branch_id, membership_id, workspace_product_id),
+    )
+    cur.execute(
+        "insert into push_notification (id,tenant_id,purchase_request_id,member_id) "
+        "values (%s,%s,%s,%s)",
+        (push_notification_id, tenant_id, purchase_request_id, membership_id),
+    )
+
     return Workspace(
         tenant_id,
         user_id,
@@ -446,6 +476,9 @@ def make_workspace(cur: psycopg.Cursor, label: str) -> Workspace:
         approval_step_id,
         threshold_rule_id,
         approval_delegation_id,
+        device_registration_id,
+        low_stock_report_id,
+        push_notification_id,
     )
 
 
@@ -1393,6 +1426,90 @@ def test_a_cross_workspace_approval_step_delete_removes_nothing(
     assert row is not None and row[0] == 1
 
 
+# --- 009-mobile-app-mvp (T007): device_registration, low_stock_report, push_notification -------
+
+
+def test_another_workspaces_device_registrations_are_invisible(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        cur.execute(
+            "select id from device_registration where id = %s", (beta.device_registration_id,)
+        )
+        assert cur.fetchall() == []
+
+
+def test_a_cross_workspace_device_registration_delete_removes_nothing(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        cur.execute(
+            "delete from device_registration where id = %s", (beta.device_registration_id,)
+        )
+        assert cur.rowcount == 0
+        cur.execute("reset role")
+        cur.execute(
+            "select count(*) from device_registration where id = %s",
+            (beta.device_registration_id,),
+        )
+        row = cur.fetchone()
+    assert row is not None and row[0] == 1
+
+
+def test_another_workspaces_low_stock_reports_are_invisible(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        cur.execute(
+            "select id from low_stock_report where id = %s", (beta.low_stock_report_id,)
+        )
+        assert cur.fetchall() == []
+
+
+def test_a_cross_workspace_low_stock_report_delete_removes_nothing(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        cur.execute("delete from low_stock_report where id = %s", (beta.low_stock_report_id,))
+        assert cur.rowcount == 0
+        cur.execute("reset role")
+        cur.execute(
+            "select count(*) from low_stock_report where id = %s", (beta.low_stock_report_id,)
+        )
+        row = cur.fetchone()
+    assert row is not None and row[0] == 1
+
+
+def test_authenticated_has_no_access_to_push_notification_at_all(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    """push_notification is service-role only (no client-facing read this release — data-model.md).
+
+    `service_role` carries `bypassrls`, by design (it is this project's trusted backend role, the
+    same as every other internal-only write path in this codebase) — testing tenant isolation
+    against it the way the tests above test it for `authenticated` would test something that
+    cannot be true by construction, not a real leak. The actual guarantee for this table is
+    narrower and different: no user-facing role can reach it at all, so tenant filtering for it is
+    the calling Python code's own responsibility, exactly like every other service-role-only write
+    in this codebase (e.g. audit_event).
+    """
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            cur.execute(
+                "select id from push_notification where id = %s", (beta.push_notification_id,)
+            )
+
+
 # --- the guarantee itself ---------------------------------------------------
 
 
@@ -1417,6 +1534,7 @@ def test_rls_is_enabled_and_forced_on_every_tenant_scoped_table(
         "branch", "cost_centre", "budget", "branch_role_assignment",
         "purchase_request", "purchase_request_line", "approval_step", "threshold_rule",
         "approval_delegation",
+        "device_registration", "low_stock_report", "push_notification",
     }
     with conn.cursor() as cur:
         cur.execute(
