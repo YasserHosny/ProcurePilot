@@ -39,11 +39,18 @@ abstract class DeviceRegistrar {
 }
 
 /// Exception surfaced by [AuthService].
+///
+/// [statusCode] is the raw HTTP status from Supabase Auth's own `/auth/v1/token` endpoint (mobile
+/// talks to it directly, unlike web which goes through apps/api's own proxy) — callers use it to
+/// map to a translated `auth.signin.*Error` key rather than showing [message], which is Supabase's
+/// own untranslated `error_description` (PR review finding: a failed sign-in was rendering raw
+/// server copy verbatim, bypassing `packages/i18n` entirely for Arabic sessions).
 @immutable
 class AuthException implements Exception {
-  const AuthException(this.message);
+  const AuthException(this.message, {this.statusCode});
 
   final String message;
+  final int? statusCode;
 
   @override
   String toString() => 'AuthException: $message';
@@ -94,7 +101,7 @@ class AuthService {
           decoded?['error_description'] as String? ??
           decoded?['error'] as String? ??
           'Sign in failed (${response.statusCode})';
-      throw AuthException(message);
+      throw AuthException(message, statusCode: response.statusCode);
     }
 
     final data = jsonDecode(response.body) as Map<String, dynamic>;

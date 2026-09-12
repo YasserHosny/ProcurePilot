@@ -43,7 +43,9 @@ class _SplashScreenState extends State<SplashScreen> {
       return;
     }
 
-    final result = await services.biometricGate.unlock();
+    final result = await services.biometricGate.unlock(
+      localizedReason: services.i18n.t('auth.biometric.unlockPrompt'),
+    );
     if (!mounted) return;
 
     switch (result) {

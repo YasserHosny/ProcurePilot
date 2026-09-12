@@ -26,6 +26,15 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<!-- Required by local_auth for Face ID on a Face ID-capable iPhone — without it, Face ID
+	     authentication fails or terminates the app instead of providing biometric re-entry
+	     (PR review finding, PR #17). Native iOS localization (InfoPlist.strings per locale)
+	     is not set up in this project yet (no en.lproj/ar.lproj, no CFBundleLocalizations) and
+	     isn't added here — this fix cannot be verified against a real Xcode build from this
+	     environment, so it's a single English string rather than a bigger, unverifiable change
+	     to the Xcode project's localization structure. -->
+	<key>NSFaceIDUsageDescription</key>
+	<string>ProcurePilot uses Face ID to unlock the app with your saved sign-in, instead of your password.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

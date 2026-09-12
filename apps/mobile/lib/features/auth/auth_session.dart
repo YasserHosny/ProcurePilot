@@ -12,7 +12,16 @@ class MemberSession {
 
   final String role;
 
-  bool get isApprover => role == 'approver';
+  /// Whether this member should see the Home screen's pending-decisions count.
+  ///
+  /// The backend's own `GET /approvals/pending` routes every pending step to the
+  /// assigned approver, and ADDITIONALLY shows an owner every pending step in the
+  /// tenant regardless of who it's assigned to (`RequestsService.list_pending_approvals`:
+  /// owners are not filtered by `assigned_membership_id`). Restricting this to the literal
+  /// 'approver' role hid the count from owners who can also decide requests — a delegate
+  /// already holds the 'approver' role themselves, so delegation needs no separate check
+  /// here (PR review finding).
+  bool get isApprover => role == 'approver' || role == 'owner';
 
   /// Roles that can raise purchase requests from a branch context.
   bool get canRequestItems =>

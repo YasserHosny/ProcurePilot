@@ -65,7 +65,7 @@ class _SignInScreenState extends State<SignInScreen> {
       }
     } on AuthException catch (e) {
       if (!mounted) return;
-      setState(() => _errorText = e.message);
+      setState(() => _errorText = _translatedAuthError(e));
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -90,6 +90,23 @@ class _SignInScreenState extends State<SignInScreen> {
       return _i18n.t('auth.signin.passwordRequired');
     }
     return null;
+  }
+
+  /// Maps a sign-in failure to a translated `auth.signin.*Error` key rather than showing
+  /// [AuthException.message] verbatim — that's Supabase's own untranslated `error_description`,
+  /// which bypassed `packages/i18n` entirely for Arabic sessions (PR review finding). Supabase
+  /// Auth's `/auth/v1/token` returns 400 for invalid credentials (not 401 — mobile talks to
+  /// Supabase Auth directly, unlike web's apps/api proxy which does use 401 for the same case)
+  /// and 429 for rate limiting.
+  String _translatedAuthError(AuthException e) {
+    switch (e.statusCode) {
+      case 400:
+        return _i18n.t('auth.signin.invalidCredentialsError');
+      case 429:
+        return _i18n.t('auth.signin.rateLimitedError');
+      default:
+        return _i18n.t('auth.signin.genericError');
+    }
   }
 
   @override
