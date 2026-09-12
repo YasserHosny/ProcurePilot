@@ -217,15 +217,19 @@ revert that file before finishing, or flag it in your report so Claude can check
 
 | Track | Implementer | Reviewer |
 |---|---|---|
-| T031 | **Claude** (in-house) | — (self-verified via the same gate re-run discipline applied to every other track) |
+| T031 | **Claude** (in-house) | **Codex** (independent review — user-directed amendment; self-verification alone isn't independent review) |
 | T028, T029 | **Codex** | **Claude** |
 | T030, T032 | **Agy** | **Claude** |
 
-Sequencing: T031 lands on `main` first. Codex is dispatched next (its tests need T031 live).
-**Agy is dispatched after Codex, not in parallel with it** — per Wave 1/2's own finding that
-running two implementer dispatches at once got both externally SIGTERM'd on this machine twice in
-a row; there is no logical dependency between the two tracks here (different files entirely), but
-the resource-contention lesson still applies regardless of whether the tracks are related.
+Sequencing: T031 lands on `main` first (self-verified by Claude via the disposable-Postgres +
+monkeypatched-client checks described in its commit message, since no live PostgREST is available
+in this environment). Codex is dispatched next for T028/T029 (its tests need T031 live) **and,
+once that dispatch completes, reviews T031's own diff** in a separate read-only pass before Agy is
+dispatched. **No two implementer dispatches run at once** — per Wave 1/2's own finding that running
+two at once got both externally SIGTERM'd on this machine twice in a row; there is no logical
+dependency between these tracks (different files entirely), but the resource-contention lesson
+applies regardless of whether the tracks are related, so Codex's test-writing pass, Codex's T031
+review pass, and Agy's mobile pass run one at a time, in that order.
 
 For Agy specifically: this is the first wave using it for `apps/mobile/` Dart code rather than
 `apps/web/` Angular/TypeScript. Read its diff with the same "did it actually do what was asked,
