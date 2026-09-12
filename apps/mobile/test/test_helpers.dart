@@ -5,14 +5,19 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:procurepilot_mobile/core/api/models.dart';
 import 'package:procurepilot_mobile/core/api/approvals_api_client.dart';
 import 'package:procurepilot_mobile/core/api/mobile_api_client.dart';
+import 'package:procurepilot_mobile/core/api/requests_api_client.dart';
 import 'package:procurepilot_mobile/core/auth/auth_service.dart';
 import 'package:procurepilot_mobile/core/auth/biometric_gate.dart';
 import 'package:procurepilot_mobile/core/i18n/i18n_loader.dart';
 import 'package:procurepilot_mobile/features/auth/biometric_offer_screen.dart';
 import 'package:procurepilot_mobile/features/auth/sign_in_screen.dart';
 import 'package:procurepilot_mobile/features/home/home_screen.dart';
+import 'package:procurepilot_mobile/features/requests/request_detail_screen.dart';
+import 'package:procurepilot_mobile/features/requests/request_form_screen.dart';
+import 'package:procurepilot_mobile/features/requests/request_list_screen.dart';
 import 'package:procurepilot_mobile/features/service_provider.dart';
 
 /// A bundle that serves a minimal English catalogue for widget tests.
@@ -83,6 +88,57 @@ Future<I18nLoader> loadTestI18n() async {
         'pendingCountError': 'Count error',
         'signOut': 'Sign out',
       },
+      'requests': {
+        'title': 'Purchase Requests',
+        'subtitle': 'Create and track purchase requests',
+        'status': {
+          'draft': 'Draft',
+          'submitted': 'Submitted',
+          'pending': 'Pending',
+          'approved': 'Approved',
+          'rejected': 'Rejected',
+          'withdrawn': 'Withdrawn',
+        },
+        'columns': {
+          'status': 'Status',
+          'requiredByDate': 'Required By',
+          'estimatedTotal': 'Estimated Total',
+        },
+        'form': {
+          'createTitle': 'New Purchase Request',
+          'editTitle': 'Edit Purchase Request',
+          'branchLabel': 'Branch',
+          'costCentreLabel': 'Cost Centre (optional)',
+          'requiredByDateLabel': 'Required By',
+          'linesTitle': 'Line Items',
+          'addLineButton': 'Add Line',
+          'removeLineButton': 'Remove line',
+          'productLabel': 'Product',
+          'quantityLabel': 'Quantity',
+          'quantityRequired': 'Quantity must be greater than zero',
+          'noteLabel': 'Note (optional)',
+          'cancelButton': 'Cancel',
+          'saveDraftButton': 'Save Draft',
+          'submitButton': 'Submit Request',
+          'submittingButton': 'Submitting...',
+          'atLeastOneLineRequired': 'At least one line item is required',
+        },
+        'empty': 'No purchase requests yet',
+        'createSuccess': 'Purchase request saved as a draft',
+        'submitSuccess': 'Purchase request submitted for approval',
+        'genericError': 'Unable to save the purchase request',
+        'incompleteEstimateBadge': 'Estimate incomplete',
+        'approval': {
+          'sectionTitle': 'Approval',
+          'assignedTo': 'Assigned to',
+          'comment': 'Decision comment',
+          'decidedAt': 'Decided on',
+          'pending': 'Pending approval',
+        },
+      },
+      'mobileRequests': {
+        'productSearchHint': 'Search products by name...',
+      },
     }),
     '../../packages/i18n/ar.json': jsonEncode({}),
   });
@@ -136,6 +192,115 @@ class FakeDeviceRegistrar implements DeviceRegistrar {
   @override
   Future<void> deleteDevice(String deviceId) async {
     deleted.add(deviceId);
+  }
+}
+
+/// Fake requests API client for widget tests.
+class FakeRequestsApiClient extends RequestsApiClient {
+  FakeRequestsApiClient()
+    : super(apiBaseUrl: 'https://test.api', httpClient: http.Client());
+
+  final createCalls = <PurchaseRequestCreate>[];
+  final updateCalls = <List<dynamic>>[];
+  final submitCalls = <String>[];
+  PurchaseRequest? createResult;
+  PurchaseRequest? updateResult;
+  PurchaseRequest? submitResult;
+
+  List<PurchaseRequest> listResults = [];
+  List<Branch> branches = [];
+  List<CostCentre> costCentres = [];
+  List<CatalogueProduct> catalogueSearchResults = [];
+
+  @override
+  Future<PurchaseRequestList> listRequests({
+    String? status,
+    String? branchId,
+    String? cursor,
+    int limit = 50,
+  }) async {
+    final filtered = status == null || status.isEmpty
+        ? listResults
+        : listResults.where((r) => r.status == status).toList();
+    return PurchaseRequestList(items: filtered);
+  }
+
+  @override
+  Future<PurchaseRequest> createRequest(
+    PurchaseRequestCreate body, {
+    String? idempotencyKey,
+  }) async {
+    createCalls.add(body);
+    if (createResult != null) return createResult!;
+    return PurchaseRequest(
+      id: '00000000-0000-0000-0000-000000000001',
+      branchId: body.branchId,
+      costCentreId: body.costCentreId,
+      requestedByMembershipId: '00000000-0000-0000-0000-000000000000',
+      requiredByDate: body.requiredByDate,
+      status: 'draft',
+      lines: [],
+      hasIncompleteEstimate: false,
+      createdAt: DateTime.now(),
+    );
+  }
+
+  @override
+  Future<PurchaseRequest> updateRequest(
+    String requestId,
+    PurchaseRequestUpdate body,
+  ) async {
+    updateCalls.add([requestId, body]);
+    if (updateResult != null) return updateResult!;
+    return PurchaseRequest(
+      id: requestId,
+      branchId: body.branchId ?? '',
+      costCentreId: body.costCentreId,
+      requestedByMembershipId: '00000000-0000-0000-0000-000000000000',
+      requiredByDate: body.requiredByDate ?? '',
+      status: 'draft',
+      lines: [],
+      hasIncompleteEstimate: false,
+      createdAt: DateTime.now(),
+    );
+  }
+
+  @override
+  Future<PurchaseRequest> submitRequest(
+    String requestId, {
+    String? idempotencyKey,
+  }) async {
+    submitCalls.add(requestId);
+    if (submitResult != null) return submitResult!;
+    return PurchaseRequest(
+      id: requestId,
+      branchId: '',
+      requestedByMembershipId: '00000000-0000-0000-0000-000000000000',
+      requiredByDate: '',
+      status: 'submitted',
+      lines: [],
+      hasIncompleteEstimate: false,
+      createdAt: DateTime.now(),
+    );
+  }
+
+  @override
+  Future<BranchList> listBranches({String? cursor, int limit = 100}) async {
+    return BranchList(items: branches);
+  }
+
+  @override
+  Future<CostCentreList> listCostCentres({String? cursor, int limit = 100}) async {
+    return CostCentreList(items: costCentres);
+  }
+
+  @override
+  Future<CatalogueProductList> searchCatalogue({
+    required String query,
+    String? cursor,
+    int limit = 20,
+  }) async {
+    return CatalogueProductList(items: catalogueSearchResults);
   }
 }
 
@@ -234,6 +399,7 @@ class TestServiceProvider extends StatelessWidget {
     required this.biometricAuth,
     required this.mobileApiClient,
     required this.approvalsApiClient,
+    required this.requestsApiClient,
     required this.i18n,
     required this.child,
   });
@@ -242,6 +408,7 @@ class TestServiceProvider extends StatelessWidget {
   final BiometricAuth biometricAuth;
   final MobileApiClient mobileApiClient;
   final ApprovalsApiClient approvalsApiClient;
+  final RequestsApiClient requestsApiClient;
   final I18nLoader i18n;
   final Widget child;
 
@@ -255,6 +422,7 @@ class TestServiceProvider extends StatelessWidget {
       ),
       mobileApiClient: mobileApiClient,
       approvalsApiClient: approvalsApiClient,
+      requestsApiClient: requestsApiClient,
       i18n: i18n,
       child: MaterialApp(
         locale: const Locale('en'),
@@ -266,6 +434,9 @@ class TestServiceProvider extends StatelessWidget {
           '/signIn': (_) => const SignInScreen(),
           '/biometricOffer': (_) => const BiometricOfferScreen(),
           '/home': (_) => const HomeScreen(),
+          '/requests': (_) => const RequestListScreen(),
+          '/requests/new': (_) => const RequestFormScreen(),
+          '/requests/detail': (_) => const RequestDetailScreen(),
         },
         home: child,
       ),
@@ -281,6 +452,7 @@ Future<TestServiceProvider> pumpWithServices(
   BiometricAuth? biometricAuth,
   MobileApiClient? mobileApiClient,
   ApprovalsApiClient? approvalsApiClient,
+  RequestsApiClient? requestsApiClient,
   I18nLoader? i18n,
 }) async {
   final i18nValue = i18n ?? await loadTestI18n();
@@ -300,6 +472,9 @@ Future<TestServiceProvider> pumpWithServices(
     approvalsApiClient:
         approvalsApiClient ??
         ApprovalsApiClient(apiBaseUrl: 'https://test.api'),
+    requestsApiClient:
+        requestsApiClient ??
+        RequestsApiClient(apiBaseUrl: 'https://test.api'),
     i18n: i18nValue,
     child: child,
   );

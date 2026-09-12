@@ -121,10 +121,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   key: const Key('homeRequestItemsButton'),
                   icon: const Icon(Icons.add_shopping_cart),
                   label: Text(i18n.t('mobileHome.requestItems')),
-                  // Phase 4 will wire the actual request-submission flow.
-                  // This wave intentionally ships a disabled placeholder so
-                  // there is no fake request path on mobile.
-                  onPressed: null,
+                  onPressed: () => Navigator.of(context).pushNamed('/requests/new'),
                 ),
               if (isApprover) ...[
                 const SizedBox(height: 24),

@@ -2,6 +2,7 @@ import 'package:flutter/widgets.dart';
 
 import '../../core/api/approvals_api_client.dart';
 import '../../core/api/mobile_api_client.dart';
+import '../../core/api/requests_api_client.dart';
 import '../../core/auth/auth_service.dart';
 import '../../core/auth/biometric_gate.dart';
 import '../../core/i18n/i18n_loader.dart';
@@ -15,6 +16,7 @@ class ServiceProvider extends InheritedWidget {
     required this.biometricGate,
     required this.mobileApiClient,
     required this.approvalsApiClient,
+    required this.requestsApiClient,
     required this.i18n,
     required super.child,
   });
@@ -23,6 +25,7 @@ class ServiceProvider extends InheritedWidget {
   final BiometricGate biometricGate;
   final MobileApiClient mobileApiClient;
   final ApprovalsApiClient approvalsApiClient;
+  final RequestsApiClient requestsApiClient;
   final I18nLoader i18n;
 
   static ServiceProvider of(BuildContext context) {
@@ -38,5 +41,6 @@ class ServiceProvider extends InheritedWidget {
       biometricGate != oldWidget.biometricGate ||
       mobileApiClient != oldWidget.mobileApiClient ||
       approvalsApiClient != oldWidget.approvalsApiClient ||
+      requestsApiClient != oldWidget.requestsApiClient ||
       i18n != oldWidget.i18n;
 }

@@ -14,6 +14,7 @@ void main() {
   const apiFiles = [
     'lib/core/api/mobile_api_client.dart',
     'lib/core/api/approvals_api_client.dart',
+    'lib/core/api/requests_api_client.dart',
   ];
 
   // Require a path-segment boundary so that `/approvals/pending` does not

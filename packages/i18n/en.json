@@ -231,6 +231,9 @@
     "pendingCountError": "Unable to load pending count",
     "signOut": "Sign out"
   },
+  "mobileRequests": {
+    "productSearchHint": "Search products by name..."
+  },
   "team": {
     "title": "Team Management",
     "subtitle": "Manage workspace members, invite colleagues, and configure role-based access.",
@@ -1706,12 +1709,16 @@
       "createTitle": "New Purchase Request",
       "editTitle": "Edit Purchase Request",
       "branchLabel": "Branch",
+      "branchRequired": "Branch is required.",
       "costCentreLabel": "Cost Centre (optional)",
       "requiredByDateLabel": "Required By",
+      "requiredByDateRequired": "Required-by date is required.",
+      "requiredByDateInvalid": "Enter a valid date (YYYY-MM-DD).",
       "linesTitle": "Line Items",
       "addLineButton": "Add Line",
       "removeLineButton": "Remove line",
       "productLabel": "Product",
+      "productRequired": "Select a product.",
       "quantityLabel": "Quantity",
       "quantityRequired": "Quantity must be greater than zero.",
       "noteLabel": "Note (optional)",
