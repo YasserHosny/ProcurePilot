@@ -15,6 +15,7 @@ import 'package:procurepilot_mobile/core/i18n/i18n_loader.dart';
 import 'package:procurepilot_mobile/features/auth/biometric_offer_screen.dart';
 import 'package:procurepilot_mobile/features/auth/sign_in_screen.dart';
 import 'package:procurepilot_mobile/features/home/home_screen.dart';
+import 'package:procurepilot_mobile/features/low_stock/low_stock_report_screen.dart';
 import 'package:procurepilot_mobile/features/requests/request_detail_screen.dart';
 import 'package:procurepilot_mobile/features/requests/request_form_screen.dart';
 import 'package:procurepilot_mobile/features/requests/request_list_screen.dart';
@@ -108,12 +109,14 @@ Future<I18nLoader> loadTestI18n() async {
           'createTitle': 'New Purchase Request',
           'editTitle': 'Edit Purchase Request',
           'branchLabel': 'Branch',
+          'branchRequired': 'Branch is required.',
           'costCentreLabel': 'Cost Centre (optional)',
           'requiredByDateLabel': 'Required By',
           'linesTitle': 'Line Items',
           'addLineButton': 'Add Line',
           'removeLineButton': 'Remove line',
           'productLabel': 'Product',
+          'productRequired': 'Select a product.',
           'quantityLabel': 'Quantity',
           'quantityRequired': 'Quantity must be greater than zero',
           'noteLabel': 'Note (optional)',
@@ -138,6 +141,13 @@ Future<I18nLoader> loadTestI18n() async {
       },
       'mobileRequests': {
         'productSearchHint': 'Search products by name...',
+      },
+      'lowStock': {
+        'title': 'Low Stock Report',
+        'actionLabel': 'Running low',
+        'countRemainingLabel': 'Count remaining',
+        'submittedMessage': 'Low stock report submitted.',
+        'queuedMessage': 'Low stock report queued — will send when back online.',
       },
     }),
     '../../packages/i18n/ar.json': jsonEncode({}),
@@ -304,6 +314,55 @@ class FakeRequestsApiClient extends RequestsApiClient {
   }
 }
 
+/// Fake mobile API client for widget tests.
+class FakeMobileApiClient extends MobileApiClient {
+  FakeMobileApiClient()
+    : super(apiBaseUrl: 'https://test.api', httpClient: http.Client());
+
+  final createLowStockCalls = <Map<String, dynamic>>[];
+  final deleteDeviceCalls = <String>[];
+  final registerDeviceCalls = <Map<String, dynamic>>[];
+
+  LowStockReport? createLowStockResult;
+  Exception? createLowStockError;
+  List<LowStockReport> listLowStockResults = [];
+
+  @override
+  Future<LowStockReportList> listLowStockReports({
+    String? branchId,
+    String? workspaceProductId,
+    String? cursor,
+    int limit = 50,
+  }) async {
+    return LowStockReportList(items: listLowStockResults, nextCursor: null);
+  }
+
+  @override
+  Future<LowStockReport> createLowStockReport({
+    required String branchId,
+    required String workspaceProductId,
+    String? countRemaining,
+    String? idempotencyKey,
+  }) async {
+    createLowStockCalls.add({
+      'branchId': branchId,
+      'workspaceProductId': workspaceProductId,
+      'countRemaining': countRemaining,
+      'idempotencyKey': idempotencyKey,
+    });
+    if (createLowStockError != null) throw createLowStockError!;
+    if (createLowStockResult != null) return createLowStockResult!;
+    return LowStockReport(
+      id: '00000000-0000-0000-0000-000000000001',
+      branchId: branchId,
+      memberId: '00000000-0000-0000-0000-000000000000',
+      workspaceProductId: workspaceProductId,
+      countRemaining: countRemaining,
+      createdAt: DateTime.now(),
+    );
+  }
+}
+
 /// Builds a fake access token containing [member_role]. No signature is
 /// included because the mobile UI only decodes claims; verification is the
 /// API's job.
@@ -437,6 +496,7 @@ class TestServiceProvider extends StatelessWidget {
           '/requests': (_) => const RequestListScreen(),
           '/requests/new': (_) => const RequestFormScreen(),
           '/requests/detail': (_) => const RequestDetailScreen(),
+          '/lowStock': (_) => const LowStockReportScreen(),
         },
         home: child,
       ),
@@ -468,7 +528,7 @@ Future<TestServiceProvider> pumpWithServices(
     authService: authServiceValue,
     biometricAuth: biometricAuth ?? FakeBiometricAuth(),
     mobileApiClient:
-        mobileApiClient ?? MobileApiClient(apiBaseUrl: 'https://test.api'),
+        mobileApiClient ?? FakeMobileApiClient(),
     approvalsApiClient:
         approvalsApiClient ??
         ApprovalsApiClient(apiBaseUrl: 'https://test.api'),
