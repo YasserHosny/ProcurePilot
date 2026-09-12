@@ -99,7 +99,15 @@ class RequestsService:
         bearer_token: str,
         member: CurrentMember,
         payload: PurchaseRequestCreate,
-    ) -> PurchaseRequest:
+        idempotency_key: UUID | None = None,
+    ) -> tuple[PurchaseRequest, bool]:
+        """Returns `(request, created)`. `created` is `False` on an idempotent replay (a supplied
+        `Idempotency-Key` that already exists for this tenant): the caller returns the ORIGINAL
+        request with 200, not a new draft with 201. Enforced via `purchase_request`'s own partial
+        unique index on `(tenant_id, idempotency_key) where idempotency_key is not null` — the
+        same fix `low_stock_report` already had for this exact class of problem, applied here
+        because a lost response otherwise let a client retry create a second draft (FR-011).
+        """
         product_ids = [line.workspace_product_id for line in payload.lines]
         estimates = self._estimate_products(product_ids)
         quantities = [line.quantity for line in payload.lines]
@@ -108,33 +116,46 @@ class RequestsService:
         )
 
         client = authenticated_client(self._settings, bearer_token)
+        row_data: dict[str, object] = {
+            "tenant_id": str(member.tenant_id),
+            "branch_id": str(payload.branch_id),
+            "cost_centre_id": (
+                str(payload.cost_centre_id)
+                if payload.cost_centre_id is not None
+                else None
+            ),
+            "requested_by_membership_id": str(member.membership_id),
+            "required_by_date": payload.required_by_date.isoformat(),
+            "status": "draft",
+            "estimated_total_amount": (
+                _format_decimal(total_amount, scale=4)
+                if total_amount is not None
+                else None
+            ),
+            "estimated_total_currency": total_currency,
+            "has_incomplete_estimate": has_incomplete,
+        }
+        if idempotency_key is not None:
+            row_data["idempotency_key"] = str(idempotency_key)
+
         try:
             response = (
-                client.table("purchase_request")
-                .insert(
-                    {
-                        "tenant_id": str(member.tenant_id),
-                        "branch_id": str(payload.branch_id),
-                        "cost_centre_id": (
-                            str(payload.cost_centre_id)
-                            if payload.cost_centre_id is not None
-                            else None
-                        ),
-                        "requested_by_membership_id": str(member.membership_id),
-                        "required_by_date": payload.required_by_date.isoformat(),
-                        "status": "draft",
-                        "estimated_total_amount": (
-                            _format_decimal(total_amount, scale=4)
-                            if total_amount is not None
-                            else None
-                        ),
-                        "estimated_total_currency": total_currency,
-                        "has_incomplete_estimate": has_incomplete,
-                    }
-                )
-                .execute()
+                client.table("purchase_request").insert(row_data).execute()
             )
         except APIError as exc:
+            if idempotency_key is not None and _api_error_code(exc) == "23505":
+                existing_row = self._fetch_request_by_idempotency_key(
+                    client, idempotency_key=idempotency_key
+                )
+                rid = str(existing_row["id"])
+                existing_lines = self._fetch_lines_for(client, rid)
+                existing_step = self._fetch_step(client, rid)
+                return (
+                    self._purchase_request_with_budget_status(
+                        client, existing_row, existing_lines, existing_step
+                    ),
+                    False,
+                )
             raise _write_error(exc) from exc
 
         request_row = _one_row(response.data, reason="request_write_failed")
@@ -154,8 +175,29 @@ class RequestsService:
             action="requests.purchase_request_created",
             target={"purchase_request_id": request_id},
         )
-        return self._purchase_request_with_budget_status(
-            client, request_row, line_rows, step_row=None
+        return (
+            self._purchase_request_with_budget_status(
+                client, request_row, line_rows, step_row=None
+            ),
+            True,
+        )
+
+    def _fetch_request_by_idempotency_key(
+        self, client: Client, *, idempotency_key: UUID
+    ) -> dict[str, object]:
+        try:
+            response = (
+                client.table("purchase_request")
+                .select(REQUEST_COLUMNS)
+                .eq("idempotency_key", str(idempotency_key))
+                .execute()
+            )
+        except APIError as exc:
+            raise ServiceUnavailableError(
+                details={"dependency": "database"}
+            ) from exc
+        return _one_row(
+            response.data, reason="purchase_request_idempotency_lookup_failed"
         )
 
     def get_request(

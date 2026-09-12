@@ -120,15 +120,23 @@ def _payload(notification: dict[str, object]) -> dict[str, str]:
 def _send_to_device(
     registration: dict[str, object], payload: dict[str, str]
 ) -> bool:
+    """No FCM/APNs credentials exist anywhere in this codebase yet (Phase 6 work) — this only
+    logs what a real send would carry. Returning `True` here would mark the notification `sent`
+    for a push nothing actually delivered, which is exactly the failure mode this table's own
+    outbox design exists to catch (research.md R1). Returning `False` means the notification
+    lands in `failed` and stays visible to the retry sweep instead of being silently lost —
+    honest about "not yet delivered," not a claim of success. Replace this with a real
+    provider call in Phase 6; the outbox/sweep plumbing around it does not need to change.
+    """
     logger.info(
-        "stub push send",
+        "stub push send — no real provider configured, not marking delivered",
         extra={
             "device_registration_id": str(registration["id"]),
             "platform": str(registration["platform"]),
             "payload": payload,
         },
     )
-    return True
+    return False
 
 
 def _mark_attempted(
@@ -176,3 +184,16 @@ def _enqueue_push_job(settings: Settings, notification_id: UUID) -> None:
         str(notification_id),
         job_id=str(notification_id),
     )
+
+
+if __name__ == "__main__":
+    # `sweep_stale_push_notifications()` (T012) was never invoked by anything — no scheduler,
+    # cron, or CI/infra entrypoint referenced it (PR review finding, chunk 009-mobile-app-mvp).
+    # This codebase has no periodic-job mechanism yet at all (no APScheduler, no rq-scheduler, no
+    # cron container) — adding one is an infrastructure/deployment decision, not a bug fix, so
+    # this stays deliberately minimal: `python -m procurepilot_api.modules.devices.push_job` runs
+    # one sweep pass and exits, so ANY external periodic trigger (a Kubernetes CronJob, a systemd
+    # timer, a cron sidecar, an ops runbook) can drive it without this fix picking that mechanism.
+    # Wiring an actual recurring trigger is still an open operational task.
+    count = sweep_stale_push_notifications()
+    logger.info("push notification retry sweep completed", extra={"enqueued": count})

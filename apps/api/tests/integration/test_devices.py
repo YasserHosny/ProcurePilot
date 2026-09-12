@@ -142,7 +142,15 @@ def test_push_job_marks_sent_even_with_zero_device_registrations(conn: object) -
     assert sent_at is not None
 
 
-def test_push_job_sends_to_every_current_registration_for_the_member(conn: object) -> None:
+def test_push_job_marks_failed_with_a_real_registration_and_no_provider_configured(
+    conn: object,
+) -> None:
+    """No FCM/APNs credentials exist anywhere in this codebase (Phase 6 work) — `_send_to_device`
+    is a stub that never actually delivers anything. It must not report `sent` for a push nothing
+    received (PR review finding): a real device registration exists here, so the job attempts a
+    send, gets no real delivery confirmation, and correctly lands the row in `failed` rather than
+    lying that it succeeded. This is the opposite of the zero-registrations case above (FR-008),
+    where there was nothing to attempt in the first place."""
     with conn.cursor() as cur:
         workspace = make_workspace(cur, "push-with-device")
         _, request_id = _seed_request(cur, workspace)
@@ -164,11 +172,13 @@ def test_push_job_sends_to_every_current_registration_for_the_member(conn: objec
 
     with conn.cursor() as cur:
         cur.execute(
-            "select status, sent_at from push_notification where id = %s", (notification_id,)
+            "select status, sent_at, attempts from push_notification where id = %s",
+            (notification_id,),
         )
-        status, sent_at = cur.fetchone()
-    assert status == "sent"
-    assert sent_at is not None
+        status, sent_at, attempts = cur.fetchone()
+    assert status == "failed"
+    assert sent_at is None
+    assert attempts == 1
 
 
 def test_retry_sweep_finds_only_genuinely_stale_queued_or_failed_rows(conn: object) -> None:
