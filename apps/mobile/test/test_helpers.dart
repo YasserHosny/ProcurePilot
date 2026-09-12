@@ -215,9 +215,11 @@ class FakeRequestsApiClient extends RequestsApiClient {
   final createCalls = <PurchaseRequestCreate>[];
   final updateCalls = <List<dynamic>>[];
   final submitCalls = <String>[];
+  final getRequestCalls = <String>[];
   PurchaseRequest? createResult;
   PurchaseRequest? updateResult;
   PurchaseRequest? submitResult;
+  final getRequestResults = <String, PurchaseRequest>{};
 
   List<PurchaseRequest> listResults = [];
   List<Branch> branches = [];
@@ -278,6 +280,14 @@ class FakeRequestsApiClient extends RequestsApiClient {
   }
 
   @override
+  Future<PurchaseRequest> getRequest(String requestId) async {
+    getRequestCalls.add(requestId);
+    final result = getRequestResults[requestId];
+    if (result != null) return result;
+    return listResults.firstWhere((request) => request.id == requestId);
+  }
+
+  @override
   Future<PurchaseRequest> submitRequest(
     String requestId, {
     String? idempotencyKey,
@@ -328,6 +338,26 @@ class FakeMobileApiClient extends MobileApiClient {
   LowStockReport? createLowStockResult;
   Exception? createLowStockError;
   List<LowStockReport> listLowStockResults = [];
+
+  @override
+  Future<DeviceRegistration> registerDevice({
+    required DevicePlatform platform,
+    required String pushToken,
+    String? idempotencyKey,
+  }) async {
+    registerDeviceCalls.add({
+      'platform': platform,
+      'pushToken': pushToken,
+      'idempotencyKey': idempotencyKey,
+    });
+    return DeviceRegistration(
+      id: '00000000-0000-0000-0000-000000000001',
+      memberId: '00000000-0000-0000-0000-000000000000',
+      platform: platform,
+      pushToken: pushToken,
+      lastSeenAt: DateTime.now(),
+    );
+  }
 
   @override
   Future<LowStockReportList> listLowStockReports({
