@@ -142,3 +142,22 @@ class ApprovalDelegationCreate(StrictApiModel):
 
 class ApprovalDelegationList(BaseModel):
     items: list[ApprovalDelegation]
+
+
+class LowStockReport(BaseModel):
+    id: UUID
+    branch_id: UUID
+    member_id: UUID
+    workspace_product_id: UUID
+    count_remaining: StrictStr | None = Field(
+        default=None, pattern=r"^\d+(\.\d{1,6})?$"
+    )
+    created_at: datetime
+
+
+class LowStockReportCreate(StrictApiModel):
+    branch_id: UUID
+    workspace_product_id: UUID
+    count_remaining: StrictStr | None = Field(
+        default=None, pattern=r"^\d+(\.\d{1,6})?$"
+    )

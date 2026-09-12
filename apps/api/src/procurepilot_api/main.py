@@ -9,6 +9,7 @@ from procurepilot_api.modules.alerts.router import router as alerts_router
 from procurepilot_api.modules.auth.router import router as auth_router
 from procurepilot_api.modules.billing.router import router as billing_router
 from procurepilot_api.modules.catalogue.router import router as catalogue_router
+from procurepilot_api.modules.devices.router import router as devices_router
 from procurepilot_api.modules.documents.router import router as documents_router
 from procurepilot_api.modules.exports.router import router as exports_router
 from procurepilot_api.modules.extraction.router import router as extraction_router
@@ -54,6 +55,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(tenants_router, prefix=API_PREFIX)
     app.include_router(members_router, prefix=API_PREFIX)
     app.include_router(catalogue_router, prefix=API_PREFIX)
+    app.include_router(devices_router, prefix=API_PREFIX)
     app.include_router(documents_router, prefix=API_PREFIX)
     app.include_router(quotations_router, prefix=API_PREFIX)
     app.include_router(extraction_router, prefix=API_PREFIX)
