@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
@@ -14,6 +16,9 @@ import 'features/auth/sign_in_screen.dart';
 import 'features/auth/splash_screen.dart';
 import 'features/home/home_screen.dart';
 import 'features/low_stock/low_stock_report_screen.dart';
+import 'features/notifications/notification_permission.dart';
+import 'features/notifications/notification_tap_router.dart';
+import 'features/notifications/push_notification_registration.dart';
 import 'features/requests/request_detail_screen.dart';
 import 'features/requests/request_form_screen.dart';
 import 'features/requests/request_list_screen.dart';
@@ -85,11 +90,12 @@ void main() async {
       mobileApiClient: mobileApiClient,
       approvalsApiClient: approvalsApiClient,
       requestsApiClient: requestsApiClient,
+      notificationPermission: StandInNotificationPermission(),
     ),
   );
 }
 
-class ProcurePilotApp extends StatelessWidget {
+class ProcurePilotApp extends StatefulWidget {
   const ProcurePilotApp({
     super.key,
     required this.i18n,
@@ -98,6 +104,7 @@ class ProcurePilotApp extends StatelessWidget {
     required this.mobileApiClient,
     required this.approvalsApiClient,
     required this.requestsApiClient,
+    this.notificationPermission,
   });
 
   final I18nLoader i18n;
@@ -106,32 +113,131 @@ class ProcurePilotApp extends StatelessWidget {
   final MobileApiClient mobileApiClient;
   final ApprovalsApiClient approvalsApiClient;
   final RequestsApiClient requestsApiClient;
+  final NotificationPermission? notificationPermission;
+
+  @override
+  State<ProcurePilotApp> createState() => _ProcurePilotAppState();
+}
+
+class _ProcurePilotAppState extends State<ProcurePilotApp> {
+  final _navigatorKey = GlobalKey<NavigatorState>();
+  late final _notificationRouteObserver = _NotificationRouteObserver(
+    onRouteChanged: _registerNotificationsIfSignedIn,
+  );
+  StreamSubscription<Map<String, String>>? _notificationTapSubscription;
+  bool _notificationRegistrationStarted = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _startNotifications();
+  }
+
+  @override
+  void didUpdateWidget(ProcurePilotApp oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.notificationPermission != oldWidget.notificationPermission ||
+        widget.mobileApiClient != oldWidget.mobileApiClient ||
+        widget.requestsApiClient != oldWidget.requestsApiClient) {
+      _notificationTapSubscription?.cancel();
+      _notificationTapSubscription = null;
+      _notificationRegistrationStarted = false;
+      _startNotifications();
+    }
+  }
+
+  @override
+  void dispose() {
+    _notificationTapSubscription?.cancel();
+    super.dispose();
+  }
+
+  void _startNotifications() {
+    final permission = widget.notificationPermission;
+    if (permission == null) return;
+
+    final router = NotificationTapRouter(
+      requestsApiClient: widget.requestsApiClient,
+      navigatorKey: _navigatorKey,
+    );
+    _notificationTapSubscription = permission.notificationTaps.listen(
+      (payload) {
+        router.route(payload).catchError((Object error) {
+          debugPrint('Failed to route notification tap: $error');
+        });
+      },
+    );
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _registerNotificationsIfSignedIn();
+    });
+  }
+
+  void _registerNotificationsIfSignedIn() {
+    if (_notificationRegistrationStarted) return;
+    final permission = widget.notificationPermission;
+    if (permission == null) return;
+
+    final token = widget.authService.accessToken;
+    if (token == null || token.isEmpty) return;
+
+    _notificationRegistrationStarted = true;
+    widget.mobileApiClient.accessToken = token;
+    widget.requestsApiClient.accessToken = token;
+
+    PushNotificationRegistration(
+      permission: permission,
+      mobileApiClient: widget.mobileApiClient,
+    ).registerIfGranted().catchError((Object error) {
+      debugPrint('Failed to register notification device: $error');
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: i18n,
+      listenable: widget.i18n,
       builder: (context, _) {
         return ServiceProvider(
-          authService: authService,
-          biometricGate: biometricGate,
-          mobileApiClient: mobileApiClient,
-          approvalsApiClient: approvalsApiClient,
-          requestsApiClient: requestsApiClient,
-          i18n: i18n,
+          authService: widget.authService,
+          biometricGate: widget.biometricGate,
+          mobileApiClient: widget.mobileApiClient,
+          approvalsApiClient: widget.approvalsApiClient,
+          requestsApiClient: widget.requestsApiClient,
+          i18n: widget.i18n,
           child: MaterialApp(
-            title: i18n.t('common.brandName'),
-            locale: Locale(i18n.locale),
+            navigatorKey: _navigatorKey,
+            title: widget.i18n.t('common.brandName'),
+            locale: Locale(widget.i18n.locale),
             builder: (context, child) {
               return Directionality(
-                textDirection: i18n.textDirection,
+                textDirection: widget.i18n.textDirection,
                 child: child ?? const SizedBox.shrink(),
               );
             },
+            navigatorObservers: [_notificationRouteObserver],
             routes: appRoutes,
           ),
         );
       },
     );
+  }
+}
+
+class _NotificationRouteObserver extends NavigatorObserver {
+  _NotificationRouteObserver({required this.onRouteChanged});
+
+  final VoidCallback onRouteChanged;
+
+  @override
+  void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    super.didPush(route, previousRoute);
+    onRouteChanged();
+  }
+
+  @override
+  void didReplace({Route<dynamic>? newRoute, Route<dynamic>? oldRoute}) {
+    super.didReplace(newRoute: newRoute, oldRoute: oldRoute);
+    onRouteChanged();
   }
 }
