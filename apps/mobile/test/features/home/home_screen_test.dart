@@ -108,6 +108,37 @@ void main() {
       expect(rejectionControl(), findsNothing);
     });
 
+    testWidgets('owner also sees pending count and no approval controls', (
+      tester,
+    ) async {
+      // Backend routing (RequestsService.list_pending_approvals) shows an owner every
+      // pending step in the tenant, not just ones assigned to them — the home screen must
+      // not hide this count from owners (PR review finding).
+      final auth =
+          FakeAuthService(
+              storage: FakeStorage(),
+              httpClient: defaultTestHttpClient(),
+              supabaseUrl: 'https://test.supabase.co',
+              supabaseAnonKey: 'test-anon-key',
+            )
+            ..accessToken = makeAccessToken('owner')
+            ..refreshToken = 'refresh-token'
+            ..tokenRole = 'owner';
+
+      await pumpWithServices(
+        tester,
+        child: const HomeScreen(),
+        authService: auth,
+        approvalsApiClient: pendingClient(count: 2),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('2 pending'), findsOneWidget);
+      expect(find.byKey(const Key('pendingApprovalsCount')), findsOneWidget);
+      expect(approvalControl(), findsNothing);
+      expect(rejectionControl(), findsNothing);
+    });
+
     testWidgets('zero pending count is shown for an approver', (tester) async {
       final auth =
           FakeAuthService(

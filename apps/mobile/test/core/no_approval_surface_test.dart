@@ -11,11 +11,17 @@ import 'package:procurepilot_mobile/main.dart' as app;
 /// deliberately stronger than a widget-only test: it catches an approve/reject
 /// call even if it is never wired to a visible button.
 void main() {
-  const apiFiles = [
-    'lib/core/api/mobile_api_client.dart',
-    'lib/core/api/approvals_api_client.dart',
-    'lib/core/api/requests_api_client.dart',
-  ];
+  // Scans every .dart file actually present under lib/core/api/ rather than a hardcoded
+  // filename list — a hardcoded list stays green when a NEW client file is added with an
+  // approve/reject call, which defeats the whole point of this test (PR review finding, PR #19).
+  // This also means the test is unaffected by future client files being added or renamed.
+  final apiDir = Directory('lib/core/api');
+  final apiFiles = apiDir
+      .listSync(recursive: true)
+      .whereType<File>()
+      .where((f) => f.path.endsWith('.dart'))
+      .map((f) => f.path)
+      .toList();
 
   // Require a path-segment boundary so that `/approvals/pending` does not
   // falsely match `/approve`.
@@ -23,6 +29,13 @@ void main() {
     r'/approve(?![a-zA-Z0-9_])|/reject(?![a-zA-Z0-9_])',
     caseSensitive: false,
   );
+
+  test('lib/core/api/ actually has client files to scan', () {
+    // Guards against the discovery mechanism itself silently finding nothing (e.g. a wrong
+    // working directory) and this whole test group passing vacuously.
+    expect(apiFiles, isNotEmpty);
+    expect(apiFiles.any((p) => p.endsWith('mobile_api_client.dart')), isTrue);
+  });
 
   group('No approval/rejection API surface', () {
     for (final path in apiFiles) {

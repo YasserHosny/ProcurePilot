@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:procurepilot_mobile/core/auth/auth_service.dart';
 import 'package:procurepilot_mobile/features/auth/sign_in_screen.dart';
 import 'package:procurepilot_mobile/features/auth/splash_screen.dart';
 import 'package:procurepilot_mobile/features/home/home_screen.dart';
@@ -182,5 +183,82 @@ void main() {
       expect((auth.storage as FakeStorage).values, isEmpty);
       expect(find.byKey(const Key('signInEmailField')), findsOneWidget);
     });
+
+    testWidgets(
+      'a 400 sign-in failure shows the translated invalid-credentials message, not raw server text',
+      (tester) async {
+        final auth = FakeAuthService(
+          storage: FakeStorage(),
+          httpClient: defaultTestHttpClient(),
+          supabaseUrl: 'https://test.supabase.co',
+          supabaseAnonKey: 'test-anon-key',
+        )..signInException = const AuthException(
+          'Invalid login credentials',
+          statusCode: 400,
+        );
+
+        await pumpWithServices(
+          tester,
+          child: const SignInScreen(),
+          authService: auth,
+          biometricAuth: FakeBiometricAuth(available: false),
+        );
+        await tester.pumpAndSettle();
+
+        await tester.enterText(
+          find.byKey(const Key('signInEmailField')),
+          'user@example.com',
+        );
+        await tester.enterText(
+          find.byKey(const Key('signInPasswordField')),
+          'wrong-password',
+        );
+        await tester.tap(find.byKey(const Key('signInSubmitButton')));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Invalid email or password.'), findsOneWidget);
+        expect(find.text('Invalid login credentials'), findsNothing);
+      },
+    );
+
+    testWidgets(
+      'a 429 sign-in failure shows the translated rate-limit message',
+      (tester) async {
+        final auth = FakeAuthService(
+          storage: FakeStorage(),
+          httpClient: defaultTestHttpClient(),
+          supabaseUrl: 'https://test.supabase.co',
+          supabaseAnonKey: 'test-anon-key',
+        )..signInException = const AuthException(
+          'rate limit exceeded',
+          statusCode: 429,
+        );
+
+        await pumpWithServices(
+          tester,
+          child: const SignInScreen(),
+          authService: auth,
+          biometricAuth: FakeBiometricAuth(available: false),
+        );
+        await tester.pumpAndSettle();
+
+        await tester.enterText(
+          find.byKey(const Key('signInEmailField')),
+          'user@example.com',
+        );
+        await tester.enterText(
+          find.byKey(const Key('signInPasswordField')),
+          'password',
+        );
+        await tester.tap(find.byKey(const Key('signInSubmitButton')));
+        await tester.pumpAndSettle();
+
+        expect(
+          find.text('Too many sign-in attempts. Please wait and try again.'),
+          findsOneWidget,
+        );
+        expect(find.text('rate limit exceeded'), findsNothing);
+      },
+    );
   });
 }

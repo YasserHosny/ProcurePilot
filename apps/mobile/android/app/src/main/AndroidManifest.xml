@@ -1,4 +1,11 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Required for every network call the app makes (Supabase sign-in/refresh, the backend
+         API) — debug/profile manifests already declare it for the Flutter tool's own use, but a
+         release build only merges this main manifest, so without it a release build cannot reach
+         the network at all (PR review finding, PR #17). -->
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- Required by local_auth's biometric prompt on Android (PR review finding, PR #19). -->
+    <uses-permission android:name="android.permission.USE_BIOMETRIC"/>
     <application
         android:label="procurepilot_mobile"
         android:name="${applicationName}"

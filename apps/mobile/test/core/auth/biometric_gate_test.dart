@@ -63,7 +63,7 @@ void main() {
         authService: _authService(refreshStatus: 200),
       );
 
-      final result = await gate.unlock();
+      final result = await gate.unlock(localizedReason: 'Authenticate to unlock');
 
       expect(result, BiometricResult.notAvailable);
     });
@@ -74,7 +74,7 @@ void main() {
         authService: _authService(refreshStatus: 200),
       );
 
-      final result = await gate.unlock();
+      final result = await gate.unlock(localizedReason: 'Authenticate to unlock');
 
       expect(result, BiometricResult.cancelled);
     });
@@ -85,7 +85,7 @@ void main() {
         authService: _authService(refreshStatus: 200),
       );
 
-      final result = await gate.unlock();
+      final result = await gate.unlock(localizedReason: 'Authenticate to unlock');
 
       expect(result, BiometricResult.success);
     });
@@ -96,7 +96,7 @@ void main() {
         authService: _authService(refreshStatus: 401),
       );
 
-      final result = await gate.unlock();
+      final result = await gate.unlock(localizedReason: 'Authenticate to unlock');
 
       expect(result, BiometricResult.failed);
     });

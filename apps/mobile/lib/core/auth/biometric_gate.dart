@@ -67,14 +67,18 @@ class BiometricGate {
   ///
   /// Returns [BiometricResult.notAvailable] when the device cannot support
   /// biometrics, allowing the caller to route to password sign-in.
-  Future<BiometricResult> unlock() async {
+  ///
+  /// [localizedReason] is shown by the OS-level biometric dialog itself, so it
+  /// must come from the caller's own `I18nLoader` (`auth.biometric.unlockPrompt`)
+  /// rather than being hardcoded here — this class has no i18n access of its own.
+  Future<BiometricResult> unlock({required String localizedReason}) async {
     final available = await biometricAuth.isAvailable();
     if (!available) {
       return BiometricResult.notAvailable;
     }
 
     final authenticated = await biometricAuth.authenticate(
-      localizedReason: 'Authenticate to unlock ProcurePilot',
+      localizedReason: localizedReason,
     );
     if (!authenticated) {
       return BiometricResult.cancelled;

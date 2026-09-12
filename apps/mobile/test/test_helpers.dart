@@ -68,6 +68,8 @@ Future<I18nLoader> loadTestI18n() async {
           'submitButton': 'Sign In',
           'submittingButton': 'Signing in...',
           'genericError': 'Sign in failed',
+          'invalidCredentialsError': 'Invalid email or password.',
+          'rateLimitedError': 'Too many sign-in attempts. Please wait and try again.',
           'showPassword': 'Show',
           'hidePassword': 'Hide',
         },
@@ -396,6 +398,7 @@ class FakeAuthService extends AuthService {
   bool loadStoredSessionValue = false;
   String tokenRole = 'branch_manager';
   bool refreshShouldFail = false;
+  AuthException? signInException;
 
   Future<void> _writeTokens() async {
     await storage.write('access_token', accessToken ?? '');
@@ -405,6 +408,7 @@ class FakeAuthService extends AuthService {
   @override
   Future<void> signIn(String email, String password) async {
     signInCalls.add([email, password]);
+    if (signInException != null) throw signInException!;
     accessToken = makeAccessToken(tokenRole);
     refreshToken = 'refresh-token';
     await _writeTokens();
