@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Body, Depends, Header, Query, status
+from fastapi import APIRouter, Body, Depends, Header, Query, Response, status
 
 from procurepilot_api.deps import CurrentMember, bearer_token, current_member
 from procurepilot_api.modules.requests.schemas import (
@@ -11,6 +11,9 @@ from procurepilot_api.modules.requests.schemas import (
     ApprovalDelegation,
     ApprovalDelegationCreate,
     ApprovalDelegationList,
+    LowStockReport,
+    LowStockReportCreate,
+    LowStockReportList,
     PurchaseRequest,
     PurchaseRequestCreate,
     PurchaseRequestList,
@@ -80,6 +83,51 @@ def list_pending_approvals(
     return service.list_pending_approvals(
         bearer_token=token,
         member=member,
+        cursor=cursor,
+        limit=limit,
+    )
+
+
+@router.post(
+    "/low-stock-reports",
+    status_code=status.HTTP_201_CREATED,
+    response_model=LowStockReport,
+)
+def create_low_stock_report(
+    payload: Annotated[LowStockReportCreate, Body()],
+    token: Annotated[str, Depends(bearer_token)],
+    member: Annotated[CurrentMember, Depends(current_member)],
+    service: Annotated[RequestsService, Depends(get_requests_service)],
+    response: Response,
+    idempotency_key: Annotated[
+        UUID | None, Header(alias="Idempotency-Key")
+    ] = None,
+) -> LowStockReport:
+    report, created = service.create_low_stock_report(
+        bearer_token=token,
+        member=member,
+        payload=payload,
+        idempotency_key=idempotency_key,
+    )
+    if not created:
+        response.status_code = status.HTTP_200_OK
+    return report
+
+
+@router.get("/low-stock-reports", response_model=LowStockReportList)
+def list_low_stock_reports(
+    token: Annotated[str, Depends(bearer_token)],
+    _member: Annotated[CurrentMember, Depends(current_member)],
+    service: Annotated[RequestsService, Depends(get_requests_service)],
+    branch_id: Annotated[UUID | None, Query()] = None,
+    workspace_product_id: Annotated[UUID | None, Query()] = None,
+    cursor: Annotated[str | None, Query()] = None,
+    limit: Annotated[int, Query(le=100)] = 50,
+) -> LowStockReportList:
+    return service.list_low_stock_reports(
+        bearer_token=token,
+        branch_id=branch_id,
+        workspace_product_id=workspace_product_id,
         cursor=cursor,
         limit=limit,
     )

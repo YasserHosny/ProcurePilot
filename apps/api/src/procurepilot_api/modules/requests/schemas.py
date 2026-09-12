@@ -161,3 +161,8 @@ class LowStockReportCreate(StrictApiModel):
     count_remaining: StrictStr | None = Field(
         default=None, pattern=r"^\d+(\.\d{1,6})?$"
     )
+
+
+class LowStockReportList(BaseModel):
+    items: list[LowStockReport]
+    next_cursor: str | None = None
