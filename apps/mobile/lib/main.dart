@@ -13,6 +13,7 @@ import 'features/auth/biometric_offer_screen.dart';
 import 'features/auth/sign_in_screen.dart';
 import 'features/auth/splash_screen.dart';
 import 'features/home/home_screen.dart';
+import 'features/low_stock/low_stock_report_screen.dart';
 import 'features/requests/request_detail_screen.dart';
 import 'features/requests/request_form_screen.dart';
 import 'features/requests/request_list_screen.dart';
@@ -30,6 +31,7 @@ final Map<String, WidgetBuilder> appRoutes = {
   '/requests': (context) => const RequestListScreen(),
   '/requests/new': (context) => const RequestFormScreen(),
   '/requests/detail': (context) => const RequestDetailScreen(),
+  '/lowStock': (context) => const LowStockReportScreen(),
 };
 
 void main() async {
