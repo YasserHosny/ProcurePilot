@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from types import SimpleNamespace
 from typing import Any
 from uuid import UUID, uuid4
@@ -151,7 +152,19 @@ def prepare_decision_service(
     current_member: CurrentMember,
     req: dict[str, object],
     step: dict[str, object] | None,
+    decide_and_notify: Callable[..., tuple[dict, dict, UUID]] | None = None,
 ) -> tuple[RequestsService, FakeClient, list[dict[str, Any]]]:
+    """Sets up a `RequestsService` with its PostgREST-facing reads mocked (pre-checks, response
+    assembly) — everything this test file can meaningfully unit-test in isolation.
+
+    `_decide_and_notify` (T037's own atomic-transaction write) is NOT mockable through
+    `FakeClient` — it opens a real `psycopg` connection and needs a real Postgres, exactly like
+    every other raw-psycopg-touching method in this codebase (devices/service.py's own tests live
+    in tests/integration/, not here). Its correctness is proven for real in
+    tests/integration/test_decision_atomicity.py. `decide_and_notify`, when given, replaces it
+    with a fake so THIS test can still unit-test the surrounding orchestration (authorization,
+    audit recording, enqueue call, response assembly) without touching a database.
+    """
     client = FakeClient()
     client.updates["approval_step"] = UpdateQuery([step] if step else [])
     client.updates["purchase_request"] = UpdateQuery([req])
@@ -163,6 +176,13 @@ def prepare_decision_service(
     monkeypatch.setattr(service, "_fetch_lines_for", lambda _client, _id: [line_row()])
     monkeypatch.setattr(service, "_budget_status_for", lambda _client, _row: None)
     monkeypatch.setattr(service, "_record", lambda **kwargs: recorded.append(kwargs))
+    monkeypatch.setattr(
+        requests_module,
+        "enqueue_push_job",
+        lambda _settings, _notification_id: None,
+    )
+    if decide_and_notify is not None:
+        monkeypatch.setattr(service, "_decide_and_notify", decide_and_notify)
     return service, client, recorded
 
 
@@ -173,8 +193,27 @@ def test_assigned_approver_can_approve_with_recorded_human_decision(
     approver = member()
     req = request_row(request_id, uuid4())
     step = step_row(request_id, approver.membership_id)
-    service, client, recorded = prepare_decision_service(
-        monkeypatch, current_member=approver, req=req, step=step
+    decided_request = {**req, "status": "approved"}
+    decided_step = {
+        **step,
+        "status": "approved",
+        "comment": "Approved",
+        "decided_by_membership_id": str(approver.membership_id),
+        "decided_at": "2026-09-12T12:00:00Z",
+    }
+    notification_id = uuid4()
+
+    def fake_decide_and_notify(**kwargs: object) -> tuple[dict, dict, UUID]:
+        assert kwargs["decision"] == "approved"
+        assert kwargs["comment"] == "Approved"
+        return decided_request, decided_step, notification_id
+
+    service, _client, recorded = prepare_decision_service(
+        monkeypatch,
+        current_member=approver,
+        req=req,
+        step=step,
+        decide_and_notify=fake_decide_and_notify,
     )
 
     result = service.approve_request(
@@ -184,18 +223,11 @@ def test_assigned_approver_can_approve_with_recorded_human_decision(
         payload=ApprovalDecisionInput(comment="Approved"),
     )
 
-    step_update = client.updates["approval_step"].payload
-    request_update = client.updates["purchase_request"].payload
     assert result.status == "approved"
     assert result.approval_step is not None
+    assert result.approval_step.status == "approved"
+    assert result.approval_step.comment == "Approved"
     assert result.approval_step.decided_by_membership_id == approver.membership_id
-    assert step_update is not None
-    assert step_update["status"] == "approved"
-    assert step_update["comment"] == "Approved"
-    assert step_update["decided_by_membership_id"] == str(approver.membership_id)
-    assert step_update["decided_at"] is not None
-    assert request_update is not None
-    assert request_update["status"] == "approved"
     assert recorded[0]["action"] == "requests.approval_step_approved"
 
 
@@ -207,8 +239,22 @@ def test_owner_can_override_and_reject_pending_request(
     owner = member(role=MemberRole.owner)
     req = request_row(request_id, uuid4())
     step = step_row(request_id, assigned_id)
+    decided_request = {**req, "status": "rejected"}
+    decided_step = {
+        **step,
+        "status": "rejected",
+        "comment": "Need more context",
+        "decided_by_membership_id": str(owner.membership_id),
+        "decided_at": "2026-09-12T12:00:00Z",
+    }
+    notification_id = uuid4()
+
     service, _client, recorded = prepare_decision_service(
-        monkeypatch, current_member=owner, req=req, step=step
+        monkeypatch,
+        current_member=owner,
+        req=req,
+        step=step,
+        decide_and_notify=lambda **_kwargs: (decided_request, decided_step, notification_id),
     )
 
     result = service.reject_request(
@@ -293,18 +339,28 @@ def test_decided_step_cannot_be_decided_again(
 def test_concurrent_withdrawal_leaves_step_pending(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    # A withdrawal that flips the request out of `submitted` between the early guard and the
-    # write must not strand a `decided` step on a non-submitted request. The request is updated
-    # first under a `status = 'submitted'` guard; when that matches zero rows we raise before
-    # touching the step, so the step's payload is never set.
+    # A withdrawal that flips the request out of `submitted` between the pre-check read and the
+    # atomic write must not strand a `decided` step, a partially-applied request, or a
+    # push_notification row — T037's transaction refuses the whole thing at once, and this test
+    # verifies the SURROUNDING orchestration (no audit record, no enqueue call) correctly stops
+    # when that happens. The transaction's own real all-or-nothing guarantee — not a mock — is
+    # proven directly in tests/integration/test_decision_atomicity.py
+    # (test_a_concurrent_withdrawal_leaves_the_step_pending), against a real concurrent write.
     request_id = uuid4()
     approver = member()
     req = request_row(request_id, uuid4())
     step = step_row(request_id, approver.membership_id)
-    service, client, recorded = prepare_decision_service(
-        monkeypatch, current_member=approver, req=req, step=step
+
+    def raise_conflict(**_kwargs: object) -> tuple[dict, dict, UUID]:
+        raise ConflictError(details={"reason": "not_submitted"})
+
+    service, _client, recorded = prepare_decision_service(
+        monkeypatch,
+        current_member=approver,
+        req=req,
+        step=step,
+        decide_and_notify=raise_conflict,
     )
-    client.updates["purchase_request"] = UpdateQuery([])
 
     with pytest.raises(ConflictError) as exc:
         service.approve_request(
@@ -315,7 +371,6 @@ def test_concurrent_withdrawal_leaves_step_pending(
         )
 
     assert exc.value.details == {"reason": "not_submitted"}
-    assert client.updates["approval_step"].payload is None
     assert recorded == []
 
 

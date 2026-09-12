@@ -9,6 +9,7 @@ from uuid import UUID
 
 import psycopg
 from postgrest.exceptions import APIError
+from psycopg.rows import dict_row
 from supabase import Client
 
 from procurepilot_api.config import Settings, get_settings
@@ -21,6 +22,7 @@ from procurepilot_api.errors import (
     UnprocessableEntityError,
 )
 from procurepilot_api.modules.auth.jwt import MemberRole
+from procurepilot_api.modules.devices.push_job import enqueue_push_job
 from procurepilot_api.modules.members.service import authenticated_client
 from procurepilot_api.modules.requests.budget_status import (
     BudgetRow,
@@ -1477,49 +1479,29 @@ class RequestsService:
         _require_assigned_approver_or_owner(step_row, member)
 
         now = _now_iso()
-        # Update the request BEFORE the step. supabase-py has no multi-statement transaction, so
-        # these two writes cannot be truly atomic here — a fully race-safe version needs a DB
-        # function (tracked as follow-up). Given that, the request's `status = 'submitted'` guard
-        # is the authoritative gate: if a concurrent withdrawal already flipped it, this update
-        # matches zero rows and we raise before touching the step, leaving the step `pending`
-        # rather than stranding a `decided` step on a non-submitted request (which would make the
-        # request permanently undecidable).
-        try:
-            request_response = (
-                client.table("purchase_request")
-                .update({"status": decision, "updated_at": now})
-                .eq("id", rid)
-                .eq("status", "submitted")
-                .execute()
-            )
-        except APIError as exc:
-            raise _write_error(exc) from exc
-        decided_request = _one_row_or_conflict(
-            request_response.data, reason="not_submitted"
+        decided_request, decided_step, notification_id = self._decide_and_notify(
+            member=member,
+            request_id=rid,
+            step_id=str(step_row["id"]),
+            decision=decision,
+            comment=payload.comment,
+            now=now,
         )
 
-        try:
-            step_response = (
-                client.table("approval_step")
-                .update(
-                    {
-                        "status": decision,
-                        "comment": payload.comment,
-                        "decided_by_membership_id": str(
-                            member.membership_id
-                        ),
-                        "decided_at": now,
-                    }
+        if notification_id is not None:
+            try:
+                enqueue_push_job(self._settings, notification_id)
+            except Exception:
+                # The push_notification row already committed durably above — a lost enqueue
+                # does not lose the decision or the outbox record, only its (currently manual;
+                # no scheduler exists yet in this codebase to auto-retry it) delivery attempt.
+                logger.exception(
+                    "push notification enqueue failed after a committed decision",
+                    extra={
+                        "purchase_request_id": rid,
+                        "notification_id": str(notification_id),
+                    },
                 )
-                .eq("id", str(step_row["id"]))
-                .eq("status", "pending")
-                .execute()
-            )
-        except APIError as exc:
-            raise _write_error(exc) from exc
-        decided_step = _one_row_or_conflict(
-            step_response.data, reason="no_pending_approval"
-        )
 
         line_rows = self._fetch_lines_for(client, rid)
         self._record(
@@ -1535,6 +1517,104 @@ class RequestsService:
         return self._purchase_request_with_budget_status(
             client, decided_request, line_rows, decided_step
         )
+
+    def _decide_and_notify(
+        self,
+        *,
+        member: CurrentMember,
+        request_id: str,
+        step_id: str,
+        decision: str,
+        comment: str | None,
+        now: str,
+    ) -> tuple[dict[str, object], dict[str, object], UUID | None]:
+        """Atomically applies a decision and queues its notification (T037, research.md R1).
+
+        A single raw-`psycopg` transaction (mirroring `devices/service.py`'s own
+        `_authenticated_db`-style pattern — a deliberate, isolated exception to this file's
+        otherwise-uniform PostgREST/`authenticated_client` style) because `push_notification`
+        grants nothing to `authenticated` at all (its own migration: service-role only), so the
+        notification write needs a role switch mid-transaction that PostgREST/supabase-py cannot
+        express, and because these three writes must succeed or fail together — a prior version of
+        this method did them as separate PostgREST calls with no such guarantee (fixed after
+        review caught it). Returns `(decided_request, decided_step, notification_id)` — the last
+        is `None` only if this were ever called for a request with no requester to notify, which
+        cannot happen in practice (every purchase_request has one), kept `| None` defensively
+        rather than asserted.
+        """
+        claims = {
+            "sub": str(member.user_id),
+            "tenant_id": str(member.tenant_id),
+            "role": "authenticated",
+            "member_role": member.role.value,
+        }
+        with psycopg.connect(self._settings.database_url.get_secret_value()) as conn:
+            with conn.cursor(row_factory=dict_row) as cur:
+                cur.execute("set local role authenticated")
+                cur.execute(
+                    "select set_config('request.jwt.claims', %s, true)",
+                    (json.dumps(claims),),
+                )
+
+                # Same authoritative guard the previous (non-atomic) version used: if a concurrent
+                # withdrawal already flipped the request's status, this matches zero rows and we
+                # raise before touching the step or writing a notification, leaving the step
+                # `pending` rather than stranding a `decided` step on a non-submitted request.
+                cur.execute(
+                    """
+                    update purchase_request
+                    set status = %s, updated_at = %s
+                    where id = %s and status = 'submitted'
+                    returning *
+                    """,
+                    (decision, now, request_id),
+                )
+                decided_request = cur.fetchone()
+                if decided_request is None:
+                    raise ConflictError(details={"reason": "not_submitted"})
+
+                cur.execute(
+                    """
+                    update approval_step
+                    set status = %s, comment = %s, decided_by_membership_id = %s, decided_at = %s
+                    where id = %s and status = 'pending'
+                    returning *
+                    """,
+                    (
+                        decision,
+                        comment,
+                        str(member.membership_id),
+                        now,
+                        step_id,
+                    ),
+                )
+                decided_step = cur.fetchone()
+                if decided_step is None:
+                    raise ConflictError(details={"reason": "no_pending_approval"})
+
+                cur.execute("set local role service_role")
+                cur.execute(
+                    """
+                    insert into push_notification (tenant_id, purchase_request_id, member_id)
+                    values (%s, %s, %s)
+                    returning id
+                    """,
+                    (
+                        str(member.tenant_id),
+                        request_id,
+                        str(decided_request["requested_by_membership_id"]),
+                    ),
+                )
+                notification_row = cur.fetchone()
+                notification_id = (
+                    UUID(str(notification_row["id"]))
+                    if notification_row is not None
+                    else None
+                )
+            # Exiting the `with psycopg.connect(...)` block here commits all three writes above
+            # atomically (or rolls all of them back if any exception was raised) — psycopg's own
+            # connection context manager semantics, the same ones `devices/service.py` relies on.
+        return dict(decided_request), dict(decided_step), notification_id
 
     def _purchase_request_with_budget_status(
         self,
