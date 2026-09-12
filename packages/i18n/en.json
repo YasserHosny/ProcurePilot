@@ -55,6 +55,15 @@
       "successMessage": "If an account exists with that email address, we have sent instructions to reset your password.",
       "rateLimitedError": "Too many password reset requests. Please wait a few moments and try again.",
       "genericError": "Unable to process reset request. Please check your connection and try again."
+    },
+    "biometric": {
+      "enableTitle": "Enable biometric unlock?",
+      "enableMessage": "Use your device's fingerprint or face recognition to unlock ProcurePilot next time instead of typing your password.",
+      "enableButton": "Enable",
+      "declineButton": "Not now",
+      "unlockTitle": "Unlock ProcurePilot",
+      "unlockPrompt": "Use your biometric credentials to unlock the app.",
+      "fallbackButton": "Use password"
     }
   },
   "onboarding": {
@@ -213,6 +222,14 @@
     "step4Title": "Verified Savings Ledger",
     "step4Desc": "Auditable proof of purchasing savings vs baseline policies.",
     "step4Status": "Upcoming (Chunk 4.6)"
+  },
+  "mobileHome": {
+    "title": "Home",
+    "roleLabel": "Your role",
+    "requestItems": "Request items",
+    "pendingApprovalsCount": "{{count}} request(s) awaiting your decision",
+    "pendingCountError": "Unable to load pending count",
+    "signOut": "Sign out"
   },
   "team": {
     "title": "Team Management",
