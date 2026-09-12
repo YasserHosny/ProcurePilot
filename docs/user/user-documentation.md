@@ -1,7 +1,10 @@
 # ProcurePilot User Documentation
 
 > Complete system journey with annotated screenshots for every screen.
-> Last updated: 10 Sep 2026.
+> Last updated: 12 Sep 2026.
+>
+> Covers the web app only. For the mobile app (sign-in, biometric unlock, role-aware home
+> screen), see [ProcurePilot Mobile App User Documentation](mobile-app-user-documentation.md).
 
 ---
 
@@ -544,6 +547,8 @@ Reached from **Record Purchase** on any Smart Compare offer, or **+ Record Purch
 
 **Current display limitation:** existing submitted requests can show the saved product UUID in the line-item field instead of the product name. The underlying relationship is stored correctly, but the detail display still needs the same friendly-name resolution used elsewhere in the app.
 
+**Approval status (once submitted):** once a request has been routed to an approver, the detail view shows an **Approval** section below the budget status: a status chip (Pending / Approved / Rejected), who it's assigned to, and — once a decision has been made — the approver's comment (if any) and the decision timestamp. This is read-only; only the assigned approver can act on it, from the Approval Queue (section 18).
+
 **Business value:** a structured request preserves the context that is usually lost in chat messages: who needs the item, where it is needed, when it is needed, and what budget or price history should influence the decision.
 
 ---
@@ -556,11 +561,19 @@ Reached from **Record Purchase** on any Smart Compare offer, or **+ Record Purch
 
 | # | Element | Description |
 |---|---------|-------------|
-| 1 | **Page title — "Approval Queue"** | Requests awaiting your decision. Only requests routed to you (based on approval thresholds and delegation rules) appear here. |
+| 1 | **Page title — "Approval Queue"** | Requests awaiting your decision. Only requests routed to you — directly, or via an active delegation (section 20) — based on threshold approval rules appear here. |
+| 2 | **Approvals table** | One row per pending request: required-by date, requester, branch, cost centre, estimated total (with an "incomplete estimate" badge when some lines lack pricing), budget status, and line count. |
+| 3 | **Budget Status column** | Shows the remaining budget after this request, or an amber "Budget Exceeded" badge with a tooltip and the remaining-budget figure when the request would exceed the applicable budget. Blank when no budget applies. |
+| 4 | **Lines column + expand toggle** | Shows the line count; the expand icon reveals a nested table underneath the row with each line's product, quantity, unit price, and note — so you can review the full request without leaving the queue. |
+| 5 | **Approve / Reject buttons** | Each row has both actions. Either opens a confirmation dialog with an optional comment field before committing the decision. |
+| 6 | **Empty state** | "No requests awaiting your decision" style message when the queue is empty, instead of a blank table. |
 
-**Note:** This screen is the least mature in the app — as of this writing it renders the title/subtitle with no request cards or empty-state messaging. A submitted purchase request was created in the remote-backed documentation workspace, but no approver-routed card appeared on this page during automation.
+**Approve / Reject dialog:**
+- A comment is optional on both approve and reject — use it to record why, especially on a rejection.
+- Ctrl+Enter (or Cmd+Enter) submits the dialog without reaching for the mouse.
+- Confirming removes the request from the queue immediately and shows a snackbar confirmation; the request's own detail page (section 17) then shows the decision, approver's comment, and timestamp.
 
-**Business value:** approval routing is meant to reduce cycle time without giving up spend control. When complete, approvers should see the commercial context needed to decide quickly: branch, amount, budget impact, supplier recommendation, and expected saving.
+**Business value:** approval routing reduces cycle time without giving up spend control. The queue surfaces the commercial context needed to decide quickly — branch, amount, budget impact, and full line detail — right where the decision is made, and every decision (with its comment) becomes part of the request's own audit trail.
 
 ---
 
@@ -600,6 +613,7 @@ Reached from **Record Purchase** on any Smart Compare offer, or **+ Record Purch
 | 2 | **Branches section** | Define your physical locations or operational divisions. Click **+ New Branch** to add one — only a name is required; address and region are optional. |
 | 3 | **Cost Centres section** | Define cost centres for budget tracking, each with a required **Code** and an optional link to a **Branch**. |
 | 4 | **Budgets section** | Define budgets scoped to the whole organisation, a specific branch, or a specific cost centre, with an amount, currency, period (Monthly/Quarterly/Annual), and period start date. |
+| 5 | **Approval Delegations section** | Lets an approver delegate their pending decisions to a colleague for a date range (e.g. while on leave). Shows a table of the current member's own delegations: delegate, start date, end date, and a cancel action. **+ New Delegation** opens a dialog to pick the delegate (from a dropdown of workspace members), a start date, and an end date. While a delegation is active, requests that would route to the delegating approver are routed to the delegate instead, and appear in the delegate's own Approval Queue (section 18). |
 
 **Create Cost Centre form:**
 
@@ -664,20 +678,21 @@ A: Not yet. It's a heuristic score used to rank and route candidates — the app
 A: Yes. If you belong to multiple workspaces, use the workspace switcher in the top bar to switch. Each workspace has its own data, members, and settings — completely isolated.
 
 **Q: Who can approve purchase requests?**
-A: Users with the Approver or Owner role. Approval routing is based on configurable thresholds — requests above a certain amount may require a higher-level approver. As of this writing this could not be fully verified end-to-end — see §23.
+A: Users with the Approver or Owner role. Approval routing is based on configurable thresholds — requests above a certain amount may require a higher-level approver. If the assigned approver has set up an active delegation (section 20), the request routes to the delegate instead, and the decision is made from the delegate's own Approval Queue.
 
 ---
 
 ## 23. Known Issues
 
-Found during this documentation pass (6 Sep 2026). The app was exercised against the running local web/API containers connected to the configured remote Supabase project, not a local database.
+Originally found during the 6 Sep 2026 documentation pass; re-checked and updated 12 Sep 2026 against current `main`.
 
 | # | Where | Issue |
 |---|-------|-------|
-| 1 | Purchase Requests (§16) | Submitted request rows can display the raw branch UUID in the Branch column instead of the branch name. |
-| 2 | Purchase Request detail (§17) | Existing request line items can display the saved product UUID rather than the product's catalogue name. The linked product still exists and the relationship is stored correctly. |
-| 3 | Approval Queue (§18) | The page renders only its title/subtitle and did not show an empty state or a routed approval card, even after a submitted request existed in the remote-backed documentation workspace. |
-| 4 | Quotation review detail (§9) | The CSV sample upload completed and opened the review screen, but the header fields extracted from the CSV sample left some optional quotation fields blank. The PDF/image sample path depends on external extraction-provider credentials; during this pass Bedrock fell back because AWS SSO was expired, while CSV extraction still completed successfully. |
+| 1 | Purchase Requests (§16) | Submitted request rows can display the raw branch UUID in the Branch column instead of the branch name. Still present as of 12 Sep 2026. |
+| 2 | Purchase Request detail (§17) | Existing request line items can display the saved product UUID rather than the product's catalogue name. The linked product still exists and the relationship is stored correctly. Still present as of 12 Sep 2026. |
+| 3 | Quotation review detail (§9) | The CSV sample upload completed and opened the review screen, but the header fields extracted from the CSV sample left some optional quotation fields blank. The PDF/image sample path depends on external extraction-provider credentials; during the original pass Bedrock fell back because AWS SSO was expired, while CSV extraction still completed successfully. Not re-verified in the 12 Sep pass. |
+
+**Resolved since the original pass:** the Approval Queue (§18) previously rendered only its title/subtitle with no request cards. It is now fully functional — pending requests, budget status, expandable line detail, and an approve/reject dialog with an optional comment — and an approval-delegation management UI (§20) has been added.
 
 If you hit any of these, it's not something wrong with your setup — flag it to the product team.
 
