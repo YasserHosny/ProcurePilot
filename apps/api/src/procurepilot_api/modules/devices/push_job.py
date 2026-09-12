@@ -62,7 +62,7 @@ def sweep_stale_push_notifications() -> int:
         enqueued = 0
         for row in rows:
             try:
-                _enqueue_push_job(settings, UUID(str(row["id"])))
+                enqueue_push_job(settings, UUID(str(row["id"])))
             except Exception:
                 logger.exception(
                     "push notification retry enqueue failed",
@@ -174,7 +174,7 @@ def _stale_notifications(
         return [dict(row) for row in cur.fetchall()]
 
 
-def _enqueue_push_job(settings: Settings, notification_id: UUID) -> None:
+def enqueue_push_job(settings: Settings, notification_id: UUID) -> None:
     from redis import Redis
     from rq import Queue
 

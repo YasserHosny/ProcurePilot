@@ -264,12 +264,34 @@ def test_budget_status_is_attached_to_request_detail_and_pending_queue(
 def test_exceeding_budget_does_not_block_approval(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    service, client, member, request_id = service_with_budget_fixture(monkeypatch)
+    # _decide_and_notify (T037) is a raw-psycopg transaction, not mockable through FakeClient's
+    # PostgREST-style interface (see tests/unit/test_approval_decisions.py's own note on this) —
+    # faked here so this test can still exercise budget-status attachment and audit recording in
+    # isolation. The atomic-write guarantee itself is proven for real against Postgres in
+    # tests/integration/test_decision_atomicity.py.
+    service, _client, member, request_id = service_with_budget_fixture(monkeypatch)
     audit = FakeAuditWriter()
     monkeypatch.setattr(
         "procurepilot_api.modules.requests.service.get_audit_writer",
         lambda: audit,
     )
+    monkeypatch.setattr(
+        "procurepilot_api.modules.requests.service.enqueue_push_job",
+        lambda _settings, _notification_id: None,
+    )
+
+    def fake_decide_and_notify(**kwargs: object) -> tuple[dict, dict, UUID]:
+        decided_request = dict(_client.request_row, status="approved")
+        decided_step = dict(
+            _client.step_row,
+            status="approved",
+            comment=kwargs["comment"],
+            decided_by_membership_id=str(member.membership_id),
+            decided_at=kwargs["now"],
+        )
+        return decided_request, decided_step, uuid4()
+
+    monkeypatch.setattr(service, "_decide_and_notify", fake_decide_and_notify)
 
     decided = service.approve_request(
         bearer_token="token",
@@ -284,6 +306,4 @@ def test_exceeding_budget_does_not_block_approval(
     assert decided.approval_step.decided_by_membership_id == member.membership_id
     assert decided.budget_status is not None
     assert decided.budget_status.exceeds is True
-    assert client.request_row["status"] == "approved"
-    assert client.step_row["status"] == "approved"
     assert audit.actions == ["requests.approval_step_approved"]
