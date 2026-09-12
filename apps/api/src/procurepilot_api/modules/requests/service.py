@@ -39,6 +39,9 @@ from procurepilot_api.modules.requests.schemas import (
     ApprovalDelegationList,
     ApprovalStep,
     BudgetStatus,
+    LowStockReport,
+    LowStockReportCreate,
+    LowStockReportList,
     Money,
     PurchaseRequest,
     PurchaseRequestCreate,
@@ -286,6 +289,114 @@ class RequestsService:
             for row in request_rows
         ]
         return PurchaseRequestList(items=items, next_cursor=next_cursor)
+
+    def create_low_stock_report(
+        self,
+        *,
+        bearer_token: str,
+        member: CurrentMember,
+        payload: LowStockReportCreate,
+        idempotency_key: UUID | None,
+    ) -> tuple[LowStockReport, bool]:
+        """Record a low-stock signal. Insert-only — never touches `purchase_request` (FR-006).
+
+        Returns `(report, created)`. `created` is `False` on an idempotent replay (a supplied
+        `Idempotency-Key` that already exists for this tenant): the caller returns the ORIGINAL
+        row with 200, not a new one with 201. `low_stock_report`'s own partial unique index on
+        `(tenant_id, idempotency_key) where idempotency_key is not null` is what makes this a real
+        guarantee rather than a best-effort check — this table's fix for the still-open, separately
+        tracked gap where `Idempotency-Key` is accepted but not enforced anywhere else in this
+        codebase yet (research.md R4 revised).
+        """
+        client = authenticated_client(self._settings, bearer_token)
+        row_data = {
+            "tenant_id": str(member.tenant_id),
+            "branch_id": str(payload.branch_id),
+            "member_id": str(member.membership_id),
+            "workspace_product_id": str(payload.workspace_product_id),
+            "count_remaining": payload.count_remaining,
+        }
+        if idempotency_key is not None:
+            row_data["idempotency_key"] = str(idempotency_key)
+
+        try:
+            response = (
+                client.table("low_stock_report").insert(row_data).execute()
+            )
+        except APIError as exc:
+            if idempotency_key is not None and _api_error_code(exc) == "23505":
+                existing = self._fetch_low_stock_report_by_key(
+                    client, idempotency_key=idempotency_key
+                )
+                return LowStockReport.model_validate(existing), False
+            raise _write_error(exc) from exc
+
+        row = _one_row(response.data, reason="low_stock_report_write_failed")
+        self._record(
+            bearer_token=bearer_token,
+            member=member,
+            action="requests.low_stock_report_created",
+            target={"low_stock_report_id": str(row["id"])},
+        )
+        return LowStockReport.model_validate(row), True
+
+    def _fetch_low_stock_report_by_key(
+        self, client: Client, *, idempotency_key: UUID
+    ) -> dict[str, object]:
+        try:
+            response = (
+                client.table("low_stock_report")
+                .select("*")
+                .eq("idempotency_key", str(idempotency_key))
+                .execute()
+            )
+        except APIError as exc:
+            raise ServiceUnavailableError(
+                details={"dependency": "database"}
+            ) from exc
+        return _one_row(
+            response.data, reason="low_stock_report_idempotency_lookup_failed"
+        )
+
+    def list_low_stock_reports(
+        self,
+        *,
+        bearer_token: str,
+        branch_id: UUID | None = None,
+        workspace_product_id: UUID | None = None,
+        cursor: str | None = None,
+        limit: int = 50,
+    ) -> LowStockReportList:
+        client = authenticated_client(self._settings, bearer_token)
+        capped = _cap_limit(limit)
+        offset = _decode_cursor(cursor)
+
+        try:
+            query = client.table("low_stock_report").select("*")
+            if branch_id is not None:
+                query = query.eq("branch_id", str(branch_id))
+            if workspace_product_id is not None:
+                query = query.eq(
+                    "workspace_product_id", str(workspace_product_id)
+                )
+            response = (
+                query.order("created_at", desc=True)
+                .order("id")
+                .range(offset, offset + capped)
+                .execute()
+            )
+        except APIError as exc:
+            raise ServiceUnavailableError(
+                details={"dependency": "database"}
+            ) from exc
+
+        rows = _rows(response.data)
+        visible = rows[:capped]
+        next_cursor = (
+            _encode_cursor(offset + capped) if len(rows) > capped else None
+        )
+        items = [LowStockReport.model_validate(row) for row in visible]
+        return LowStockReportList(items=items, next_cursor=next_cursor)
 
     def update_request(
         self,
