@@ -1573,11 +1573,24 @@ class RequestsService:
                 if decided_request is None:
                     raise ConflictError(details={"reason": "not_submitted"})
 
+                # Repeats the assigned-approver-or-owner check the pre-check already made
+                # (`_require_assigned_approver_or_owner`, run before this transaction opened)
+                # directly in the WHERE clause — approval_step's own RLS is read-only on
+                # authorization (its migration: "Write authorization ... is an application-layer
+                # RBAC check"), so without this the pre-check's result could go stale between the
+                # read and this write. Concretely: the step gets reassigned/escalated (e.g. the
+                # approver is removed from the workspace mid-decision, via
+                # escalate_pending_steps_for_removed_member) after the pre-check passed but before
+                # this statement runs — without re-checking here, the now-unassigned former
+                # approver's decision would still apply (review finding).
+                is_owner = member.role is MemberRole.owner
                 cur.execute(
                     """
                     update approval_step
                     set status = %s, comment = %s, decided_by_membership_id = %s, decided_at = %s
-                    where id = %s and status = 'pending'
+                    where id = %s
+                      and status = 'pending'
+                      and (%s or assigned_membership_id = %s)
                     returning *
                     """,
                     (
@@ -1586,6 +1599,8 @@ class RequestsService:
                         str(member.membership_id),
                         now,
                         step_id,
+                        is_owner,
+                        str(member.membership_id),
                     ),
                 )
                 decided_step = cur.fetchone()

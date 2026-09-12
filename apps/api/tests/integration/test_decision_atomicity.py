@@ -222,3 +222,98 @@ def test_a_concurrent_withdrawal_leaves_the_step_pending(conn: psycopg.Connectio
         assert cur.fetchone() == (0,)
         cur.execute("select status from purchase_request where id = %s", (request_id,))
         assert cur.fetchone() == ("withdrawn",), "the concurrent withdrawal itself must stand"
+
+
+def test_a_step_reassigned_after_the_precheck_refuses_the_stale_approver(
+    conn: psycopg.Connection,
+) -> None:
+    """TOCTOU authorization gap (review finding): the pre-check in `_decide_request()` confirms
+    the caller is the assigned approver, but that read happens before this transaction opens. If
+    the step is reassigned in between (e.g. `escalate_pending_steps_for_removed_member` runs
+    because the original approver was just removed from the workspace), the now-stale approver's
+    decision must not still apply. The transactional UPDATE's own WHERE clause — not just the
+    earlier Python-level check — must catch this."""
+    with conn.cursor() as cur:
+        owner = make_workspace(cur, "t037-reassign")
+        requester = _make_member(cur, owner.tenant_id, "t037-reassign-requester", "branch_manager")
+        original_approver = _make_member(
+            cur, owner.tenant_id, "t037-reassign-original", "approver"
+        )
+        new_approver = _make_member(cur, owner.tenant_id, "t037-reassign-new", "approver")
+        branch_id = _make_branch(cur, owner)
+        request_id = _make_submitted_request(cur, owner, branch_id, requester)
+        step_id = _make_pending_step(cur, owner, request_id, original_approver)
+    conn.commit()
+
+    # Simulate the step being reassigned (escalated to a different approver) after the caller's
+    # own pre-check already read the OLD assignment — a separate, already-committed connection.
+    with psycopg.connect(TEST_DATABASE_URL or "") as other_conn:
+        with other_conn.cursor() as other_cur:
+            other_cur.execute(
+                "update approval_step set assigned_membership_id = %s where id = %s",
+                (new_approver.membership_id, step_id),
+            )
+
+    svc = RequestsService()
+    with pytest.raises(ConflictError) as exc:
+        svc._decide_and_notify(
+            member=_current_member(owner, original_approver, MemberRole.approver),
+            request_id=str(request_id),
+            step_id=str(step_id),
+            decision="approved",
+            comment="Approved",
+            now="2026-09-12T14:00:00Z",
+        )
+    assert exc.value.details == {"reason": "no_pending_approval"}
+
+    with conn.cursor() as cur:
+        cur.execute(
+            "select status, assigned_membership_id from approval_step where id = %s",
+            (step_id,),
+        )
+        status, assigned = cur.fetchone()
+        assert status == "pending", "must not have been decided by the now-stale approver"
+        assert str(assigned) == str(new_approver.membership_id), "reassignment must stand"
+        cur.execute("select status from purchase_request where id = %s", (request_id,))
+        assert cur.fetchone() == ("submitted",)
+        cur.execute(
+            "select count(*) from push_notification where purchase_request_id = %s",
+            (request_id,),
+        )
+        assert cur.fetchone() == (0,)
+
+
+def test_the_new_approver_can_decide_after_a_reassignment(conn: psycopg.Connection) -> None:
+    """The flip side of the above: once reassigned, the NEW approver's decision must succeed —
+    this proves the fix adds a real authorization check, not just a blanket refusal."""
+    with conn.cursor() as cur:
+        owner = make_workspace(cur, "t037-reassign-ok")
+        requester = _make_member(
+            cur, owner.tenant_id, "t037-reassign-ok-requester", "branch_manager"
+        )
+        original_approver = _make_member(
+            cur, owner.tenant_id, "t037-reassign-ok-original", "approver"
+        )
+        new_approver = _make_member(cur, owner.tenant_id, "t037-reassign-ok-new", "approver")
+        branch_id = _make_branch(cur, owner)
+        request_id = _make_submitted_request(cur, owner, branch_id, requester)
+        step_id = _make_pending_step(cur, owner, request_id, original_approver)
+        cur.execute(
+            "update approval_step set assigned_membership_id = %s where id = %s",
+            (new_approver.membership_id, step_id),
+        )
+    conn.commit()
+
+    svc = RequestsService()
+    decided_request, decided_step, notification_id = svc._decide_and_notify(
+        member=_current_member(owner, new_approver, MemberRole.approver),
+        request_id=str(request_id),
+        step_id=str(step_id),
+        decision="approved",
+        comment="Approved by the new approver",
+        now="2026-09-12T14:00:00Z",
+    )
+    assert decided_request["status"] == "approved"
+    assert decided_step["status"] == "approved"
+    assert str(decided_step["decided_by_membership_id"]) == str(new_approver.membership_id)
+    assert notification_id is not None
