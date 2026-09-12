@@ -1850,5 +1850,13 @@
       "cancelSuccess": "Delegation cancelled.",
       "genericError": "Unable to save the delegation. Please try again."
     }
+  },
+  "devices": {},
+  "lowStock": {
+    "title": "Low Stock Report",
+    "actionLabel": "Running low",
+    "countRemainingLabel": "Count remaining",
+    "submittedMessage": "Low stock report submitted.",
+    "queuedMessage": "Low stock report queued — will send when back online."
   }
 }

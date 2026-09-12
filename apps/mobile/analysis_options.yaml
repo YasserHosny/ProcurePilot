@@ -1,0 +1,14 @@
+include: package:flutter_lints/flutter.yaml
+
+analyzer:
+  exclude:
+    - build/**
+    - android/**
+    - ios/**
+    - web/**
+
+linter:
+  rules:
+    # The codebase does not yet use the null-aware element syntax introduced
+    # in Dart 3.7; keep the familiar imperative null checks for now.
+    use_null_aware_elements: false
