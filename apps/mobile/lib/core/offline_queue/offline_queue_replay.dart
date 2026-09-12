@@ -18,7 +18,7 @@ class OfflineQueueReplay {
     Connectivity? connectivity,
   }) : connectivity = connectivity ?? Connectivity();
 
-  final OfflineQueueService queue;
+  final OfflineQueue queue;
   final MobileApiClient apiClient;
   final RequestsApiClient requestsApiClient;
   final Connectivity connectivity;
@@ -68,6 +68,8 @@ class OfflineQueueReplay {
         );
       case 'requests':
         await _sendRequest(item);
+      case 'requests/submit':
+        await _sendRequestSubmitOnly(item);
       default:
         throw UnsupportedError('Unknown offline endpoint: ${item.endpoint}');
     }
@@ -78,13 +80,32 @@ class OfflineQueueReplay {
       _requestCreateFromPayload(item.payload),
       idempotencyKey: item.idempotencyKey,
     );
+    await _submitTolerantly(created.id);
+  }
+
+  /// Replays the submit call for a request that was already created online
+  /// (an earlier "Save Draft") before the device went offline — no create
+  /// step needed, just the submit.
+  Future<void> _sendRequestSubmitOnly(QueueItem item) async {
+    final requestId = item.payload['request_id'] as String;
+    await _submitTolerantly(requestId);
+  }
+
+  /// Submits [requestId], treating a `409 not_draft` conflict as success when
+  /// the request has already moved past `draft` — the signal that an earlier
+  /// replay attempt's submit call actually landed even though the client
+  /// never saw the response (`submit_request`'s `Idempotency-Key` header is
+  /// still accepted and unenforced server-side, so this check is what makes
+  /// retrying it safe instead of looping forever on an already-submitted
+  /// request).
+  Future<void> _submitTolerantly(String requestId) async {
     try {
-      await requestsApiClient.submitRequest(created.id);
+      await requestsApiClient.submitRequest(requestId);
     } on ApiException catch (e) {
       if (e.statusCode != 409 || e.details?['reason'] != 'not_draft') {
         rethrow;
       }
-      final current = await requestsApiClient.getRequest(created.id);
+      final current = await requestsApiClient.getRequest(requestId);
       if (!_isPastDraft(current.status)) {
         rethrow;
       }

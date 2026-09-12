@@ -7,6 +7,7 @@ import '../../core/api/models.dart';
 import '../../core/api/requests_api_client.dart';
 import '../../core/i18n/i18n_loader.dart';
 import '../../core/offline_queue/offline_queue_service.dart';
+import '../../core/offline_queue/status_widgets.dart';
 import '../service_provider.dart';
 
 /// Purchase-request form screen.
@@ -17,7 +18,7 @@ import '../service_provider.dart';
 class RequestFormScreen extends StatefulWidget {
   const RequestFormScreen({super.key, this.offlineQueueService});
 
-  final OfflineQueueService? offlineQueueService;
+  final OfflineQueue? offlineQueueService;
 
   @override
   State<RequestFormScreen> createState() => _RequestFormScreenState();
@@ -38,7 +39,7 @@ class _LineInput {
 class _RequestFormScreenState extends State<RequestFormScreen> {
   RequestsApiClient get _apiClient =>
       ServiceProvider.of(context).requestsApiClient;
-  OfflineQueueService? get _offlineQueue =>
+  OfflineQueue? get _offlineQueue =>
       widget.offlineQueueService ??
       ServiceProvider.of(context).offlineQueueService;
   I18nLoader get _i18n => ServiceProvider.of(context).i18n;
@@ -56,6 +57,7 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
   String? _offlineSubmitIdempotencyKey;
   bool _saving = false;
   bool _submitting = false;
+  bool _submissionQueued = false;
   String? _errorMessage;
   String? _branchError;
 
@@ -230,13 +232,10 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
       );
       if (!mounted) return;
       if (queued) {
-        setState(() => _submitting = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(_i18n.t('mobileRequests.queuedMessage')),
-            duration: const Duration(seconds: 2),
-          ),
-        );
+        setState(() {
+          _submitting = false;
+          _submissionQueued = true;
+        });
         return;
       }
       setState(() {
@@ -269,7 +268,19 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
     required String? idempotencyKey,
   }) async {
     final queue = _offlineQueue;
-    if (queue == null || _savedRequest != null) return false;
+    if (queue == null) return false;
+    final existingDraft = _savedRequest;
+    if (existingDraft != null) {
+      // The draft already exists server-side (an earlier, online "Save
+      // Draft") — only the submit call itself needs replaying, not a second
+      // create.
+      await queue.createAndEnqueue(
+        endpoint: 'requests/submit',
+        payload: {'request_id': existingDraft.id},
+        idempotencyKey: idempotencyKey,
+      );
+      return true;
+    }
     await queue.createAndEnqueue(
       endpoint: 'requests',
       payload: body.toJson(),
@@ -320,6 +331,21 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
   @override
   Widget build(BuildContext context) {
     final i18n = _i18n;
+
+    if (_submissionQueued) {
+      return Scaffold(
+        appBar: AppBar(title: Text(i18n.t('requests.form.createTitle'))),
+        body: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: SubmissionQueuedBanner(
+              message: i18n.t('mobileRequests.queuedMessage'),
+            ),
+          ),
+        ),
+      );
+    }
+
     final canSubmit = _lines.isNotEmpty;
 
     return Scaffold(

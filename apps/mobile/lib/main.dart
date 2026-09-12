@@ -121,7 +121,7 @@ class ProcurePilotApp extends StatefulWidget {
   final MobileApiClient mobileApiClient;
   final ApprovalsApiClient approvalsApiClient;
   final RequestsApiClient requestsApiClient;
-  final OfflineQueueService? offlineQueueService;
+  final OfflineQueue? offlineQueueService;
   final NotificationPermission? notificationPermission;
 
   @override

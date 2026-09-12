@@ -520,7 +520,7 @@ class TestServiceProvider extends StatelessWidget {
   final ApprovalsApiClient approvalsApiClient;
   final RequestsApiClient requestsApiClient;
   final I18nLoader i18n;
-  final OfflineQueueService? offlineQueueService;
+  final OfflineQueue? offlineQueueService;
   final Widget child;
 
   @override
@@ -566,7 +566,7 @@ Future<TestServiceProvider> pumpWithServices(
   MobileApiClient? mobileApiClient,
   ApprovalsApiClient? approvalsApiClient,
   RequestsApiClient? requestsApiClient,
-  OfflineQueueService? offlineQueueService,
+  OfflineQueue? offlineQueueService,
   I18nLoader? i18n,
 }) async {
   final i18nValue = i18n ?? await loadTestI18n();

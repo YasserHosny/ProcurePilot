@@ -156,5 +156,80 @@ void main() {
         expect(requestsClient.submitCalls, isEmpty);
       },
     );
+
+    test(
+      'replays a submit-only queue item for a draft already created online',
+      () async {
+        await queue.createAndEnqueue(
+          endpoint: 'requests/submit',
+          payload: {'request_id': 'req-existing-draft'},
+          idempotencyKey: 'submit-key-1',
+        );
+
+        await replay.processQueue();
+
+        expect(requestsClient.createCalls, isEmpty);
+        expect(requestsClient.submitCalls, ['req-existing-draft']);
+        expect(queue.pending, isEmpty);
+      },
+    );
+
+    test(
+      'treats a submit-only replay not_draft conflict as success when moved on',
+      () async {
+        await queue.createAndEnqueue(
+          endpoint: 'requests/submit',
+          payload: {'request_id': 'req-existing-draft-2'},
+          idempotencyKey: 'submit-key-2',
+        );
+        requestsClient.submitError = const ApiException(
+          statusCode: 409,
+          code: 'conflict',
+          message: 'Request is not draft',
+          details: {'reason': 'not_draft'},
+          traceId: 'trace-2',
+        );
+        requestsClient.getRequestResults['req-existing-draft-2'] =
+            PurchaseRequest(
+              id: 'req-existing-draft-2',
+              branchId: 'branch-1',
+              requestedByMembershipId: 'member-1',
+              requiredByDate: '2026-10-01',
+              status: 'submitted',
+              lines: const [],
+              hasIncompleteEstimate: false,
+              createdAt: DateTime.now(),
+            );
+
+        await replay.processQueue();
+
+        expect(requestsClient.getRequestCalls, ['req-existing-draft-2']);
+        expect(queue.pending, isEmpty);
+      },
+    );
+
+    test(
+      'marks a submit-only replay failed on a genuine, non-conflict error',
+      () async {
+        final item = await queue.createAndEnqueue(
+          endpoint: 'requests/submit',
+          payload: {'request_id': 'req-existing-draft-3'},
+          idempotencyKey: 'submit-key-3',
+        );
+        requestsClient.submitError = const ApiException(
+          statusCode: 422,
+          code: 'no_lines',
+          message: 'Request has no lines',
+          details: null,
+          traceId: 'trace-3',
+        );
+
+        await replay.processQueue();
+
+        final pending = queue.pending.single;
+        expect(pending.idempotencyKey, item.idempotencyKey);
+        expect(pending.status, QueueItemStatus.failed);
+      },
+    );
   });
 }

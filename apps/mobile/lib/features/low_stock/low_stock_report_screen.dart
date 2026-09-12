@@ -8,6 +8,7 @@ import '../../core/api/models.dart';
 import '../../core/api/requests_api_client.dart';
 import '../../core/i18n/i18n_loader.dart';
 import '../../core/offline_queue/offline_queue_service.dart';
+import '../../core/offline_queue/status_widgets.dart';
 import '../service_provider.dart';
 
 /// Low-stock report screen (User Story 3 / T032).
@@ -30,7 +31,7 @@ class LowStockReportScreen extends StatefulWidget {
 
   final CatalogueProduct? initialProduct;
   final String? initialBranchId;
-  final OfflineQueueService? offlineQueueService;
+  final OfflineQueue? offlineQueueService;
 
   @override
   State<LowStockReportScreen> createState() => _LowStockReportScreenState();
@@ -42,7 +43,7 @@ class _LowStockReportScreenState extends State<LowStockReportScreen> {
   RequestsApiClient get _requestsApiClient =>
       ServiceProvider.of(context).requestsApiClient;
   I18nLoader get _i18n => ServiceProvider.of(context).i18n;
-  OfflineQueueService? get _offlineQueue =>
+  OfflineQueue? get _offlineQueue =>
       widget.offlineQueueService ??
       ServiceProvider.of(context).offlineQueueService;
 
@@ -308,27 +309,29 @@ class _LowStockReportScreenState extends State<LowStockReportScreen> {
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const Icon(
-                  Icons.check_circle_outline,
-                  key: Key('lowStockSuccessIcon'),
-                  color: Colors.green,
-                  size: 64,
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  i18n.t(
-                    _submittedReportQueued
-                        ? 'lowStock.queuedMessage'
-                        : 'lowStock.submittedMessage',
+                if (_submittedReportQueued)
+                  SubmissionQueuedBanner(
+                    message: i18n.t('lowStock.queuedMessage'),
+                  )
+                else
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      const Icon(
+                        Icons.check_circle_outline,
+                        key: Key('lowStockSuccessIcon'),
+                        color: Colors.green,
+                        size: 64,
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        i18n.t('lowStock.submittedMessage'),
+                        key: const Key('lowStockSubmittedMessage'),
+                        style: Theme.of(context).textTheme.titleLarge,
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
                   ),
-                  key: Key(
-                    _submittedReportQueued
-                        ? 'lowStockQueuedMessage'
-                        : 'lowStockSubmittedMessage',
-                  ),
-                  style: Theme.of(context).textTheme.titleLarge,
-                  textAlign: TextAlign.center,
-                ),
                 if (_submittedReport!.countRemaining != null) ...[
                   const SizedBox(height: 8),
                   Text(

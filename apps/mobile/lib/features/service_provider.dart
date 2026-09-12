@@ -29,7 +29,7 @@ class ServiceProvider extends InheritedWidget {
   final ApprovalsApiClient approvalsApiClient;
   final RequestsApiClient requestsApiClient;
   final I18nLoader i18n;
-  final OfflineQueueService? offlineQueueService;
+  final OfflineQueue? offlineQueueService;
 
   static ServiceProvider of(BuildContext context) {
     final provider = context

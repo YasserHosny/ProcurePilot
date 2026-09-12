@@ -59,11 +59,28 @@ class QueueItem {
   }
 }
 
+/// Read/write surface both the submitting screens and [OfflineQueueReplay]
+/// need — split out so a test can inject a pure in-memory double instead of
+/// [OfflineQueueService]'s real Hive-backed file I/O.
+abstract class OfflineQueue {
+  Future<QueueItem> createAndEnqueue({
+    required String endpoint,
+    required Map<String, dynamic> payload,
+    String? idempotencyKey,
+  });
+
+  List<QueueItem> get pending;
+
+  Future<void> markConfirmed(String idempotencyKey);
+
+  Future<void> markFailed(String idempotencyKey);
+}
+
 /// Local persistence for the offline submission queue.
 ///
 /// Items are stored as JSON strings keyed by their idempotency key so retries
 /// reuse the same key automatically.
-class OfflineQueueService {
+class OfflineQueueService implements OfflineQueue {
   OfflineQueueService({required this.box, Uuid? uuid})
     : uuid = uuid ?? const Uuid();
 
@@ -96,6 +113,7 @@ class OfflineQueueService {
   }
 
   /// Convenience helper that creates and enqueues in one call.
+  @override
   Future<QueueItem> createAndEnqueue({
     required String endpoint,
     required Map<String, dynamic> payload,
@@ -110,6 +128,7 @@ class OfflineQueueService {
   }
 
   /// All items that still need to be sent.
+  @override
   List<QueueItem> get pending {
     return box.values
         .map(
@@ -124,6 +143,7 @@ class OfflineQueueService {
   }
 
   /// Marks an item as successfully confirmed by the server.
+  @override
   Future<void> markConfirmed(String idempotencyKey) async {
     final raw = box.get(idempotencyKey);
     if (raw == null) return;
@@ -132,6 +152,7 @@ class OfflineQueueService {
   }
 
   /// Records a failed send attempt and increments the retry counter.
+  @override
   Future<void> markFailed(String idempotencyKey) async {
     final raw = box.get(idempotencyKey);
     if (raw == null) return;
