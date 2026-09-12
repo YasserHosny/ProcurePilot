@@ -231,6 +231,9 @@
     "pendingCountError": "تعذر تحميل عدد الطلبات المعلقة",
     "signOut": "تسجيل الخروج"
   },
+  "mobileRequests": {
+    "productSearchHint": "البحث عن المنتجات بالاسم..."
+  },
   "team": {
     "title": "إدارة الفريق",
     "subtitle": "إدارة أعضاء مساحة العمل ودعوة الزملاء وضبط التحكم في الوصول القائم على الأدوار.",
@@ -1706,12 +1709,16 @@
       "createTitle": "طلب شراء جديد",
       "editTitle": "تعديل طلب الشراء",
       "branchLabel": "الفرع",
+      "branchRequired": "الفرع مطلوب.",
       "costCentreLabel": "مركز التكلفة (اختياري)",
       "requiredByDateLabel": "مطلوب بحلول",
+      "requiredByDateRequired": "تاريخ الاستحقاق مطلوب.",
+      "requiredByDateInvalid": "أدخل تاريخًا صالحًا (YYYY-MM-DD).",
       "linesTitle": "البنود",
       "addLineButton": "إضافة بند",
       "removeLineButton": "إزالة البند",
       "productLabel": "المنتج",
+      "productRequired": "اختر منتجًا.",
       "quantityLabel": "الكمية",
       "quantityRequired": "يجب أن تكون الكمية أكبر من صفر.",
       "noteLabel": "ملاحظة (اختيارية)",

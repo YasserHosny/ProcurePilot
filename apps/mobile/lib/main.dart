@@ -5,6 +5,7 @@ import 'package:local_auth/local_auth.dart';
 
 import 'core/api/approvals_api_client.dart';
 import 'core/api/mobile_api_client.dart';
+import 'core/api/requests_api_client.dart';
 import 'core/auth/auth_service.dart';
 import 'core/auth/biometric_gate.dart';
 import 'core/i18n/i18n_loader.dart';
@@ -12,6 +13,9 @@ import 'features/auth/biometric_offer_screen.dart';
 import 'features/auth/sign_in_screen.dart';
 import 'features/auth/splash_screen.dart';
 import 'features/home/home_screen.dart';
+import 'features/requests/request_detail_screen.dart';
+import 'features/requests/request_form_screen.dart';
+import 'features/requests/request_list_screen.dart';
 import 'features/service_provider.dart';
 
 /// Route table for the mobile app.
@@ -23,6 +27,9 @@ final Map<String, WidgetBuilder> appRoutes = {
   '/signIn': (context) => const SignInScreen(),
   '/biometricOffer': (context) => const BiometricOfferScreen(),
   '/home': (context) => const HomeScreen(),
+  '/requests': (context) => const RequestListScreen(),
+  '/requests/new': (context) => const RequestFormScreen(),
+  '/requests/detail': (context) => const RequestDetailScreen(),
 };
 
 void main() async {
@@ -58,6 +65,10 @@ void main() async {
     apiBaseUrl: apiBaseUrl,
     httpClient: httpClient,
   );
+  final requestsApiClient = RequestsApiClient(
+    apiBaseUrl: apiBaseUrl,
+    httpClient: httpClient,
+  );
 
   final biometricGate = BiometricGate(
     biometricAuth: LocalAuthAdapter(LocalAuthentication()),
@@ -71,6 +82,7 @@ void main() async {
       biometricGate: biometricGate,
       mobileApiClient: mobileApiClient,
       approvalsApiClient: approvalsApiClient,
+      requestsApiClient: requestsApiClient,
     ),
   );
 }
@@ -83,6 +95,7 @@ class ProcurePilotApp extends StatelessWidget {
     required this.biometricGate,
     required this.mobileApiClient,
     required this.approvalsApiClient,
+    required this.requestsApiClient,
   });
 
   final I18nLoader i18n;
@@ -90,6 +103,7 @@ class ProcurePilotApp extends StatelessWidget {
   final BiometricGate biometricGate;
   final MobileApiClient mobileApiClient;
   final ApprovalsApiClient approvalsApiClient;
+  final RequestsApiClient requestsApiClient;
 
   @override
   Widget build(BuildContext context) {
@@ -101,6 +115,7 @@ class ProcurePilotApp extends StatelessWidget {
           biometricGate: biometricGate,
           mobileApiClient: mobileApiClient,
           approvalsApiClient: approvalsApiClient,
+          requestsApiClient: requestsApiClient,
           i18n: i18n,
           child: MaterialApp(
             title: i18n.t('common.brandName'),
