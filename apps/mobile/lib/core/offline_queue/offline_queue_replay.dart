@@ -70,8 +70,26 @@ class OfflineQueueReplay {
         await _sendRequest(item);
       case 'requests/submit':
         await _sendRequestSubmitOnly(item);
+      case 'quality-issues':
+        await _sendQualityIssue(item);
       default:
         throw UnsupportedError('Unknown offline endpoint: ${item.endpoint}');
+    }
+  }
+
+  Future<void> _sendQualityIssue(QueueItem item) async {
+    final requestId = item.payload['request_id'] as String;
+    final description = item.payload['description'] as String;
+    final created = await requestsApiClient.reportQualityIssue(
+      requestId,
+      description,
+    );
+    final photoLocalPath = item.payload['photo_local_path'] as String?;
+    if (photoLocalPath != null && photoLocalPath.isNotEmpty) {
+      await requestsApiClient.uploadQualityIssuePhoto(
+        created.id,
+        photoLocalPath,
+      );
     }
   }
 

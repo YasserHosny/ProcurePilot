@@ -231,5 +231,101 @@ void main() {
         expect(pending.status, QueueItemStatus.failed);
       },
     );
+
+    test(
+      'replays queued quality issue with photo by creating issue then uploading photo',
+      () async {
+        await queue.createAndEnqueue(
+          endpoint: 'quality-issues',
+          payload: {
+            'request_id': 'req-delivered-1',
+            'description': 'Damaged packaging and broken bottle',
+            'photo_local_path': '/documents/stable_photo.jpg',
+          },
+          idempotencyKey: 'qi-key-1',
+        );
+        requestsClient.reportQualityIssueResult = QualityIssue(
+          id: 'issue-created-1',
+          purchaseRequestId: 'req-delivered-1',
+          reportedByMembershipId: 'member-1',
+          description: 'Damaged packaging and broken bottle',
+          photos: const [],
+          createdAt: DateTime.now(),
+        );
+
+        await replay.processQueue();
+
+        expect(requestsClient.reportQualityIssueCalls, [
+          {
+            'requestId': 'req-delivered-1',
+            'description': 'Damaged packaging and broken bottle',
+          },
+        ]);
+        expect(requestsClient.uploadQualityIssuePhotoCalls, [
+          {
+            'issueId': 'issue-created-1',
+            'filePath': '/documents/stable_photo.jpg',
+          },
+        ]);
+        expect(queue.pending, isEmpty);
+      },
+    );
+
+    test(
+      'replays queued quality issue without photo (only creates issue, no photo upload)',
+      () async {
+        await queue.createAndEnqueue(
+          endpoint: 'quality-issues',
+          payload: {
+            'request_id': 'req-delivered-2',
+            'description': 'Wrong batch received',
+          },
+          idempotencyKey: 'qi-key-2',
+        );
+        requestsClient.reportQualityIssueResult = QualityIssue(
+          id: 'issue-created-2',
+          purchaseRequestId: 'req-delivered-2',
+          reportedByMembershipId: 'member-1',
+          description: 'Wrong batch received',
+          photos: const [],
+          createdAt: DateTime.now(),
+        );
+
+        await replay.processQueue();
+
+        expect(requestsClient.reportQualityIssueCalls, [
+          {
+            'requestId': 'req-delivered-2',
+            'description': 'Wrong batch received',
+          },
+        ]);
+        expect(requestsClient.uploadQualityIssuePhotoCalls, isEmpty);
+        expect(queue.pending, isEmpty);
+      },
+    );
+
+    test(
+      'marks quality issue replay failed when create still cannot reach API',
+      () async {
+        final item = await queue.createAndEnqueue(
+          endpoint: 'quality-issues',
+          payload: {
+            'request_id': 'req-delivered-3',
+            'description': 'Spoiled goods',
+            'photo_local_path': '/documents/photo.jpg',
+          },
+          idempotencyKey: 'qi-key-3',
+        );
+        requestsClient.reportQualityIssueError = _OfflineError();
+
+        await replay.processQueue();
+
+        final pending = queue.pending.single;
+        expect(pending.idempotencyKey, item.idempotencyKey);
+        expect(pending.status, QueueItemStatus.failed);
+        expect(pending.retries, 1);
+        expect(requestsClient.uploadQualityIssuePhotoCalls, isEmpty);
+      },
+    );
   });
 }

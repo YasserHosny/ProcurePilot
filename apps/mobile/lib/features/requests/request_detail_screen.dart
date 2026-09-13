@@ -53,6 +53,17 @@ class RequestDetailScreen extends StatelessWidget {
                 child: Text(i18n.t('delivery.entryPointButton')),
               ),
             ],
+            if (req.status == 'delivered') ...[
+              const SizedBox(height: 16),
+              FilledButton(
+                key: const Key('requestQualityIssueButton'),
+                onPressed: () {
+                  Navigator.of(context)
+                      .pushNamed('/delivery/qualityIssue', arguments: req);
+                },
+                child: Text(i18n.t('qualityIssue.entryPointButton')),
+              ),
+            ],
             RequestApprovalStepSection(request: req),
           ],
         ),

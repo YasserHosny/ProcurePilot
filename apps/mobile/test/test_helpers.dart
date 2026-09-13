@@ -19,6 +19,7 @@ import 'package:procurepilot_mobile/features/approvals/approval_queue_screen.dar
 import 'package:procurepilot_mobile/features/auth/biometric_offer_screen.dart';
 import 'package:procurepilot_mobile/features/auth/sign_in_screen.dart';
 import 'package:procurepilot_mobile/features/delivery/delivery_confirmation_screen.dart';
+import 'package:procurepilot_mobile/features/delivery/quality_issue_screen.dart';
 import 'package:procurepilot_mobile/features/home/home_screen.dart';
 import 'package:procurepilot_mobile/features/low_stock/low_stock_report_screen.dart';
 import 'package:procurepilot_mobile/features/requests/request_detail_screen.dart';
@@ -200,6 +201,29 @@ Future<I18nLoader> loadTestI18n() async {
             'Unable to confirm delivery because the request lines changed.',
         'notAvailable': 'Delivery confirmation is not available.',
       },
+      'qualityIssue': {
+        'title': 'Report Quality Issue',
+        'entryPointButton': 'Report Quality Issue',
+        'descriptionLabel': 'Description',
+        'descriptionPlaceholder':
+            'Describe the quality issue (damage, defect, wrong item)...',
+        'descriptionRequired': 'Description is required.',
+        'photoEvidenceTitle': 'Photo Evidence (Optional)',
+        'capturePhotoButton': 'Take Photo',
+        'cameraUnavailable': 'Camera is not available on this device.',
+        'removePhotoButton': 'Remove Photo',
+        'submitButton': 'Submit Report',
+        'submittingButton': 'Submitting...',
+        'cancelButton': 'Cancel',
+        'successMessage': 'Quality issue report submitted.',
+        'queuedMessage':
+            'Quality issue report queued — will send when back online.',
+        'genericError':
+            'Unable to submit quality issue report. Please try again.',
+        'notDeliveredError':
+            'This request is not ready for quality issue reporting.',
+        'notAvailable': 'Quality issue reporting is not available.',
+      },
       'mobileRequests': {
         'productSearchHint': 'Search products by name...',
         'queuedMessage':
@@ -279,6 +303,55 @@ class FakeCameraCapture implements CameraCapture {
   }
 }
 
+/// In-memory test double for [OfflineQueue].
+class FakeOfflineQueue implements OfflineQueue {
+  final Map<String, QueueItem> items = {};
+
+  @override
+  Future<QueueItem> createAndEnqueue({
+    required String endpoint,
+    required Map<String, dynamic> payload,
+    String? idempotencyKey,
+  }) async {
+    final item = QueueItem(
+      idempotencyKey: idempotencyKey ?? 'fake-${items.length}',
+      endpoint: endpoint,
+      payload: payload,
+      status: QueueItemStatus.queued,
+      createdAt: DateTime.now().toUtc(),
+      retries: 0,
+    );
+    items[item.idempotencyKey] = item;
+    return item;
+  }
+
+  @override
+  List<QueueItem> get pending => items.values
+      .where(
+        (item) =>
+            item.status == QueueItemStatus.queued ||
+            item.status == QueueItemStatus.failed,
+      )
+      .toList();
+
+  @override
+  Future<void> markConfirmed(String idempotencyKey) async {
+    final item = items[idempotencyKey];
+    if (item == null) return;
+    items[idempotencyKey] = item.copyWith(status: QueueItemStatus.confirmed);
+  }
+
+  @override
+  Future<void> markFailed(String idempotencyKey) async {
+    final item = items[idempotencyKey];
+    if (item == null) return;
+    items[idempotencyKey] = item.copyWith(
+      status: QueueItemStatus.failed,
+      retries: item.retries + 1,
+    );
+  }
+}
+
 /// Fake device registrar for tests.
 class FakeDeviceRegistrar implements DeviceRegistrar {
   final deleted = <String>[];
@@ -305,6 +378,8 @@ class FakeRequestsApiClient extends RequestsApiClient {
   final rejectComments = <String?>[];
   final confirmDeliveryCalls = <String>[];
   final confirmDeliveryLines = <List<DeliveryLineInput>>[];
+  final reportQualityIssueCalls = <Map<String, dynamic>>[];
+  final uploadQualityIssuePhotoCalls = <Map<String, dynamic>>[];
   final getRequestCalls = <String>[];
   PurchaseRequest? createResult;
   PurchaseRequest? updateResult;
@@ -312,11 +387,15 @@ class FakeRequestsApiClient extends RequestsApiClient {
   PurchaseRequest? approveResult;
   PurchaseRequest? rejectResult;
   PurchaseRequest? confirmDeliveryResult;
+  QualityIssue? reportQualityIssueResult;
+  QualityIssuePhoto? uploadQualityIssuePhotoResult;
   Exception? createError;
   Exception? submitError;
   Exception? approveError;
   Exception? rejectError;
   Exception? confirmDeliveryError;
+  Exception? reportQualityIssueError;
+  Exception? uploadQualityIssuePhotoError;
   final getRequestResults = <String, PurchaseRequest>{};
 
   List<PurchaseRequest> listResults = [];
@@ -470,6 +549,46 @@ class FakeRequestsApiClient extends RequestsApiClient {
       createdAt: DateTime.now(),
       deliveredAt: DateTime.now(),
       hasDeliveryDiscrepancy: false,
+    );
+  }
+
+  @override
+  Future<QualityIssue> reportQualityIssue(
+    String requestId,
+    String description,
+  ) async {
+    reportQualityIssueCalls.add({
+      'requestId': requestId,
+      'description': description,
+    });
+    if (reportQualityIssueError != null) throw reportQualityIssueError!;
+    if (reportQualityIssueResult != null) return reportQualityIssueResult!;
+    return QualityIssue(
+      id: 'issue-1',
+      purchaseRequestId: requestId,
+      reportedByMembershipId: '00000000-0000-0000-0000-000000000000',
+      description: description,
+      photos: const [],
+      createdAt: DateTime.now(),
+    );
+  }
+
+  @override
+  Future<QualityIssuePhoto> uploadQualityIssuePhoto(
+    String issueId,
+    String filePath,
+  ) async {
+    uploadQualityIssuePhotoCalls.add({
+      'issueId': issueId,
+      'filePath': filePath,
+    });
+    if (uploadQualityIssuePhotoError != null) throw uploadQualityIssuePhotoError!;
+    if (uploadQualityIssuePhotoResult != null) return uploadQualityIssuePhotoResult!;
+    return QualityIssuePhoto(
+      id: 'photo-1',
+      deliveryQualityIssueId: issueId,
+      url: 'https://storage.example.com/signed/photo-1.jpg',
+      createdAt: DateTime.now(),
     );
   }
 
@@ -681,6 +800,7 @@ class TestServiceProvider extends StatelessWidget {
     required this.mobileApiClient,
     required this.approvalsApiClient,
     required this.requestsApiClient,
+    required this.cameraCapture,
     required this.i18n,
     this.offlineQueueService,
     required this.child,
@@ -691,6 +811,7 @@ class TestServiceProvider extends StatelessWidget {
   final MobileApiClient mobileApiClient;
   final ApprovalsApiClient approvalsApiClient;
   final RequestsApiClient requestsApiClient;
+  final CameraCapture cameraCapture;
   final I18nLoader i18n;
   final OfflineQueue? offlineQueueService;
   final Widget child;
@@ -706,6 +827,7 @@ class TestServiceProvider extends StatelessWidget {
       mobileApiClient: mobileApiClient,
       approvalsApiClient: approvalsApiClient,
       requestsApiClient: requestsApiClient,
+      cameraCapture: cameraCapture,
       i18n: i18n,
       offlineQueueService: offlineQueueService,
       child: MaterialApp(
@@ -721,6 +843,7 @@ class TestServiceProvider extends StatelessWidget {
           '/approvals': (_) => const ApprovalQueueScreen(),
           '/approvals/detail': (_) => const ApprovalDecisionScreen(),
           '/delivery/confirm': (_) => const DeliveryConfirmationScreen(),
+          '/delivery/qualityIssue': (_) => const QualityIssueScreen(),
           '/requests': (_) => const RequestListScreen(),
           '/requests/new': (_) => const RequestFormScreen(),
           '/requests/detail': (_) => const RequestDetailScreen(),
@@ -741,6 +864,7 @@ Future<TestServiceProvider> pumpWithServices(
   MobileApiClient? mobileApiClient,
   ApprovalsApiClient? approvalsApiClient,
   RequestsApiClient? requestsApiClient,
+  CameraCapture? cameraCapture,
   OfflineQueue? offlineQueueService,
   I18nLoader? i18n,
 }) async {
@@ -760,6 +884,7 @@ Future<TestServiceProvider> pumpWithServices(
     approvalsApiClient: approvalsApiClient ?? FakeApprovalsApiClient(),
     requestsApiClient:
         requestsApiClient ?? RequestsApiClient(apiBaseUrl: 'https://test.api'),
+    cameraCapture: cameraCapture ?? FakeCameraCapture(),
     i18n: i18nValue,
     offlineQueueService: offlineQueueService,
     child: child,

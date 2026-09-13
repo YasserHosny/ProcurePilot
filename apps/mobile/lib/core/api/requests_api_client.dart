@@ -139,6 +139,52 @@ class RequestsApiClient {
     );
   }
 
+  /// Reports a delivery quality issue against a delivered purchase request.
+  Future<QualityIssue> reportQualityIssue(
+    String requestId,
+    String description,
+  ) async {
+    final uri = Uri.parse('$apiBaseUrl/requests/$requestId/quality-issues');
+    final response = await _httpClient.post(
+      uri,
+      headers: _headers(),
+      body: jsonEncode({'description': description}),
+    );
+    _checkResponse(response);
+    return QualityIssue.fromJson(
+      jsonDecode(response.body) as Map<String, dynamic>,
+    );
+  }
+
+  /// Uploads and attaches photo evidence to an existing quality issue.
+  Future<QualityIssuePhoto> uploadQualityIssuePhoto(
+    String issueId,
+    String filePath,
+  ) async {
+    final uri = Uri.parse('$apiBaseUrl/quality-issues/$issueId/photos');
+    final request = http.MultipartRequest('POST', uri);
+    if (accessToken != null && accessToken!.isNotEmpty) {
+      request.headers['Authorization'] = 'Bearer $accessToken';
+    }
+    request.files.add(await http.MultipartFile.fromPath('file', filePath));
+    final streamedResponse = await _httpClient.send(request);
+    final response = await http.Response.fromStream(streamedResponse);
+    _checkResponse(response);
+    return QualityIssuePhoto.fromJson(
+      jsonDecode(response.body) as Map<String, dynamic>,
+    );
+  }
+
+  /// Lists quality issues reported against a purchase request.
+  Future<QualityIssueList> listQualityIssues(String requestId) async {
+    final uri = Uri.parse('$apiBaseUrl/requests/$requestId/quality-issues');
+    final response = await _httpClient.get(uri, headers: _headers());
+    _checkResponse(response);
+    return QualityIssueList.fromJson(
+      jsonDecode(response.body) as Map<String, dynamic>,
+    );
+  }
+
   Future<PurchaseRequest> _decideRequest(
     String requestId, {
     required String action,
