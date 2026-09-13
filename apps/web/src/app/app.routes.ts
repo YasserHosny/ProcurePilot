@@ -105,6 +105,14 @@ export const routes: Routes = [
           ),
       },
       {
+        // R2.4 Supplier IQ — supplier scorecard (must precede the generic :id route)
+        path: 'suppliers/:id/scorecard',
+        loadComponent: () =>
+          import('./features/catalogue/supplier-scorecard/supplier-scorecard.component').then(
+            (m) => m.SupplierScorecardComponent,
+          ),
+      },
+      {
         path: 'suppliers/:id',
         loadComponent: () =>
           import('./features/catalogue/supplier-form/supplier-form.component').then(

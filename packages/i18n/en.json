@@ -1922,5 +1922,174 @@
     "countRemainingLabel": "Count remaining",
     "submittedMessage": "Low stock report submitted.",
     "queuedMessage": "Low stock report queued — will send when back online."
+  },
+  "advancedBasket": {
+    "title": "Advanced Basket Optimisation",
+    "subtitle": "Optimise purchasing across multiple suppliers with commercial constraints and risk controls.",
+    "constraintsSectionTitle": "Commercial Constraints",
+    "weights": {
+      "sectionTitle": "Optimisation Weights",
+      "price": "Price",
+      "preferred_supplier": "Preferred Supplier",
+      "risk": "Risk",
+      "lead_time": "Lead Time",
+      "quality": "Quality"
+    },
+    "riskTolerance": {
+      "label": "Risk Tolerance",
+      "low": "Low — favour proven, reliable suppliers",
+      "medium": "Medium — balance cost and reliability",
+      "high": "High — allow more uncertainty for better cost"
+    },
+    "urgency": {
+      "label": "Urgency",
+      "normal": "Normal",
+      "urgent": "Urgent — prioritise lead time"
+    },
+    "supplierExclusions": {
+      "label": "Exclude Suppliers",
+      "placeholder": "Select suppliers to exclude...",
+      "hint": "Excluded suppliers will not be considered for any basket item."
+    },
+    "solverStatus": {
+      "queued": "Queued — awaiting optimisation...",
+      "running": "Optimising basket with constraints...",
+      "completed": "Optimisation Complete",
+      "failed": "Optimisation Failed",
+      "failedMessage": "The solver encountered an error. Please review constraints and try again."
+    },
+    "result": {
+      "feasibleTitle": "Recommended Constrained Allocation",
+      "feasibleSubtitle": "Minimum landed cost allocation satisfying all configured constraints.",
+      "infeasibleTitle": "Commercial Infeasibility Report",
+      "infeasibleSubtitle": "The solver completed successfully, but no feasible allocation exists satisfying all constraints.",
+      "appliedConstraints": "Applied Constraints",
+      "violatedConstraints": "Violated Constraints",
+      "riskNotes": "Risk Notes",
+      "solverConfidence": "Solver Confidence",
+      "validity": "Result Validity",
+      "totalLandedCost": "Total Optimised Landed Cost",
+      "singleSupplierBaselines": "Single-Supplier Baselines",
+      "singleSupplierBaselineSubtitle": "Evaluates whether splitting saves money versus allocating entirely to one supplier.",
+      "solverVersion": "Solver Version: {{version}}",
+      "computedAt": "Computed at {{time}}"
+    },
+    "actions": {
+      "rerun": "Rerun Optimisation",
+      "newSplit": "Start New Split",
+      "viewCompare": "Compare Product Offers"
+    }
+  },
+  "supplierIq": {
+    "header": "Supplier Scorecard",
+    "backToSupplier": "Back to Supplier",
+    "metrics": {
+      "sectionTitle": "Performance Metrics",
+      "fulfilmentRate": "Fulfilment Rate",
+      "onTimeDelivery": "On-Time Delivery",
+      "qualityScore": "Quality Score",
+      "priceCompetitiveness": "Price Competitiveness",
+      "spendExposure": "Spend Exposure",
+      "disputeRate": "Dispute Rate"
+    },
+    "sampleCounts": {
+      "label": "Sample Size",
+      "quotations": "{{count}} quotation(s)",
+      "deliveries": "{{count}} delivery record(s)",
+      "qualityIssues": "{{count}} quality issue(s)"
+    },
+    "riskScore": {
+      "label": "Risk Score",
+      "breakdown": "Risk Score Breakdown",
+      "low": "Low Risk",
+      "medium": "Medium Risk",
+      "high": "High Risk"
+    },
+    "sourceEvidence": {
+      "sectionTitle": "Evidence Sources",
+      "quotationCount": "Quotations analysed",
+      "deliveryCount": "Delivery records",
+      "qualityIssueCount": "Quality issues logged"
+    },
+    "insufficientEvidence": {
+      "badge": "Insufficient Evidence",
+      "notice": "Not enough historical data to compute a reliable scorecard for this supplier. Scores will improve as more quotations and delivery records are linked."
+    },
+    "confidence": {
+      "label": "Scorecard Confidence",
+      "high": "High",
+      "medium": "Medium",
+      "low": "Low"
+    }
+  },
+  "supplierTerms": {
+    "header": "Commercial Terms",
+    "addTerms": "Add Terms",
+    "editTerms": "Edit Terms",
+    "currentTermBadge": "Current",
+    "effectiveFrom": "Effective From",
+    "effectiveTo": "Effective To",
+    "mov": {
+      "label": "Minimum Order Value (MOV)",
+      "hint": "The minimum monetary amount required to place an order with this supplier."
+    },
+    "deliveryFee": {
+      "label": "Delivery Fee",
+      "hint": "Fixed fee charged per delivery by this supplier."
+    },
+    "freeDeliveryThreshold": {
+      "label": "Free Delivery Threshold",
+      "hint": "Order value above which delivery is provided free of charge."
+    },
+    "quantityTiers": {
+      "sectionTitle": "Quantity Price Tiers",
+      "minQuantity": "Min Quantity",
+      "tierPrice": "Tier Price",
+      "product": "Product",
+      "addTier": "Add Tier",
+      "removeTier": "Remove Tier"
+    },
+    "empty": "No commercial terms have been configured for this supplier.",
+    "saveSuccess": "Commercial terms saved successfully.",
+    "genericError": "Unable to save commercial terms. Please try again."
+  },
+  "anomalies": {
+    "title": "Anomaly Detection",
+    "subtitle": "Automated detection of commercial data irregularities requiring review.",
+    "kinds": {
+      "price_spike": "Price Spike",
+      "likely_duplicate_quotation_line": "Likely Duplicate Quotation Line",
+      "decimal_or_quantity_anomaly": "Decimal or Quantity Anomaly",
+      "delivery_cost_anomaly": "Delivery Cost Anomaly",
+      "supplier_quality_trend_change": "Supplier Quality Trend Change"
+    },
+    "severities": {
+      "critical": "Critical",
+      "warning": "Warning",
+      "info": "Informational"
+    },
+    "confidence": {
+      "label": "Detection Confidence",
+      "high": "High",
+      "medium": "Medium",
+      "low": "Low"
+    },
+    "sourceEvidence": {
+      "quotation": "Quotation: {{id}}",
+      "supplier": "Supplier: {{name}}",
+      "product": "Product: {{name}}",
+      "detectedAt": "Detected at {{time}}"
+    },
+    "actions": {
+      "inspectScorecard": "Inspect Scorecard",
+      "compareProduct": "Compare Product",
+      "reviewQuotation": "Review Quotation",
+      "viewDeliveryIssues": "View Delivery Issues",
+      "dismiss": "Dismiss"
+    },
+    "empty": {
+      "title": "No anomalies detected",
+      "message": "No commercial data irregularities were detected in your current workspace data."
+    }
   }
 }
