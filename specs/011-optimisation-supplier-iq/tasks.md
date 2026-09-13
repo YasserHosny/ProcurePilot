@@ -37,10 +37,10 @@ release conditions.
 ## Phase 3: User Story 1 - Advanced basket optimisation (P1)
 
 - [x] T011 [P] Write optimiser solver tests in `services/optimiser/tests/test_advanced_solver.py` for MOV, free-delivery threshold, delivery fee, quantity tiers, risk tolerance, supplier exclusion, infeasible constraints, and deterministic tie-breaks.
-- [ ] T012 [P] Write API integration tests in `apps/api/tests/integration/test_advanced_basket_optimisation.py` proving 2-10 suppliers, max 50 lines, mixed-currency refusal, constraint snapshots, idempotency, and advisory-only side effects.
+- [x] T012 [P] Write API integration tests in `apps/api/tests/integration/test_advanced_basket_optimisation.py` proving 2-10 suppliers, max 50 lines, mixed-currency refusal, constraint snapshots, idempotency, and advisory-only side effects.
 - [x] T013 Implement supplier term persistence and validation in `apps/api/src/procurepilot_api/modules/offers/supplier_terms.py`.
 - [x] T014 Expose `GET` and `POST /suppliers/{supplier_id}/commercial-terms` in `apps/api/src/procurepilot_api/modules/offers/router.py`.
-- [ ] T015 Extend `apps/api/src/procurepilot_api/modules/offers/basket_service.py` to accept advanced constraint snapshots and enqueue the existing optimiser worker payload with `rule_version`.
+- [x] T015 Extend `apps/api/src/procurepilot_api/modules/offers/basket_service.py` to accept advanced constraint snapshots and enqueue the existing optimiser worker payload with `rule_version`.
 - [x] T016 Extend `services/optimiser/src/procurepilot_optimiser_worker/models.py` with advanced request/result, terms, constraints, risk, and confidence models.
 - [ ] T017 Extend `services/optimiser/src/procurepilot_optimiser_worker/repository.py` to read supplier terms, scorecard/risk inputs, and current eligible offers without recomputing landed cost.
 - [ ] T018 Extend `services/optimiser/src/procurepilot_optimiser_worker/solver.py` with hard constraints, weighted objective, tier prices, baselines, violated constraints, and deterministic tie-breaks.
