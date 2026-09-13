@@ -11,6 +11,7 @@ import 'core/api/mobile_api_client.dart';
 import 'core/api/requests_api_client.dart';
 import 'core/auth/auth_service.dart';
 import 'core/auth/biometric_gate.dart';
+import 'core/camera/camera_capture.dart';
 import 'core/i18n/i18n_loader.dart';
 import 'core/offline_queue/offline_queue_replay.dart';
 import 'core/offline_queue/offline_queue_service.dart';
@@ -20,6 +21,7 @@ import 'features/auth/biometric_offer_screen.dart';
 import 'features/auth/sign_in_screen.dart';
 import 'features/auth/splash_screen.dart';
 import 'features/delivery/delivery_confirmation_screen.dart';
+import 'features/delivery/quality_issue_screen.dart';
 import 'features/home/home_screen.dart';
 import 'features/low_stock/low_stock_report_screen.dart';
 import 'features/notifications/notification_permission.dart';
@@ -42,6 +44,7 @@ final Map<String, WidgetBuilder> appRoutes = {
   '/approvals': (context) => const ApprovalQueueScreen(),
   '/approvals/detail': (context) => const ApprovalDecisionScreen(),
   '/delivery/confirm': (context) => const DeliveryConfirmationScreen(),
+  '/delivery/qualityIssue': (context) => const QualityIssueScreen(),
   '/requests': (context) => const RequestListScreen(),
   '/requests/new': (context) => const RequestFormScreen(),
   '/requests/detail': (context) => const RequestDetailScreen(),
@@ -102,6 +105,7 @@ void main() async {
       mobileApiClient: mobileApiClient,
       approvalsApiClient: approvalsApiClient,
       requestsApiClient: requestsApiClient,
+      cameraCapture: const StandInCameraCapture(),
       offlineQueueService: offlineQueueService,
       notificationPermission: StandInNotificationPermission(),
     ),
@@ -117,6 +121,7 @@ class ProcurePilotApp extends StatefulWidget {
     required this.mobileApiClient,
     required this.approvalsApiClient,
     required this.requestsApiClient,
+    this.cameraCapture = const StandInCameraCapture(),
     this.offlineQueueService,
     this.notificationPermission,
   });
@@ -127,6 +132,7 @@ class ProcurePilotApp extends StatefulWidget {
   final MobileApiClient mobileApiClient;
   final ApprovalsApiClient approvalsApiClient;
   final RequestsApiClient requestsApiClient;
+  final CameraCapture cameraCapture;
   final OfflineQueue? offlineQueueService;
   final NotificationPermission? notificationPermission;
 
@@ -240,6 +246,7 @@ class _ProcurePilotAppState extends State<ProcurePilotApp> {
           mobileApiClient: widget.mobileApiClient,
           approvalsApiClient: widget.approvalsApiClient,
           requestsApiClient: widget.requestsApiClient,
+          cameraCapture: widget.cameraCapture,
           offlineQueueService: widget.offlineQueueService,
           i18n: widget.i18n,
           child: MaterialApp(

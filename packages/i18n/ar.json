@@ -1772,6 +1772,25 @@
     "invalidLinesError": "تعذر تأكيد الاستلام لأن بنود الطلب تغيرت.",
     "notAvailable": "تأكيد الاستلام غير متاح."
   },
+  "qualityIssue": {
+    "title": "الإبلاغ عن مشكلة جودة",
+    "entryPointButton": "الإبلاغ عن مشكلة جودة",
+    "descriptionLabel": "الوصف",
+    "descriptionPlaceholder": "صف مشكلة الجودة (تلف، عيب، صنف غير مطابق)...",
+    "descriptionRequired": "الوصف مطلوب.",
+    "photoEvidenceTitle": "دليل الصور (اختياري)",
+    "capturePhotoButton": "التقاط صورة",
+    "cameraUnavailable": "الكاميرا غير متاحة على هذا الجهاز.",
+    "removePhotoButton": "إزالة الصورة",
+    "submitButton": "إرسال البلاغ",
+    "submittingButton": "جارٍ الإرسال...",
+    "cancelButton": "إلغاء",
+    "successMessage": "تم إرسال بلاغ مشكلة الجودة.",
+    "queuedMessage": "تم وضع بلاغ مشكلة الجودة في قائمة الانتظار — سيتم إرساله عند الاتصال بالإنترنت.",
+    "genericError": "تعذر إرسال بلاغ مشكلة الجودة. يرجى المحاولة مرة أخرى.",
+    "notDeliveredError": "هذا الطلب غير جاهز للإبلاغ عن مشكلة جودة.",
+    "notAvailable": "الإبلاغ عن مشكلة الجودة غير متاح."
+  },
   "approvals": {
     "title": "قائمة الاعتماد",
     "subtitle": "الطلبات التي تنتظر قرارك.",

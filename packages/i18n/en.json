@@ -1772,6 +1772,25 @@
     "invalidLinesError": "Unable to confirm delivery because the request lines changed.",
     "notAvailable": "Delivery confirmation is not available."
   },
+  "qualityIssue": {
+    "title": "Report Quality Issue",
+    "entryPointButton": "Report Quality Issue",
+    "descriptionLabel": "Description",
+    "descriptionPlaceholder": "Describe the quality issue (damage, defect, wrong item)...",
+    "descriptionRequired": "Description is required.",
+    "photoEvidenceTitle": "Photo Evidence (Optional)",
+    "capturePhotoButton": "Take Photo",
+    "cameraUnavailable": "Camera is not available on this device.",
+    "removePhotoButton": "Remove Photo",
+    "submitButton": "Submit Report",
+    "submittingButton": "Submitting...",
+    "cancelButton": "Cancel",
+    "successMessage": "Quality issue report submitted.",
+    "queuedMessage": "Quality issue report queued — will send when back online.",
+    "genericError": "Unable to submit quality issue report. Please try again.",
+    "notDeliveredError": "This request is not ready for quality issue reporting.",
+    "notAvailable": "Quality issue reporting is not available."
+  },
   "approvals": {
     "title": "Approval Queue",
     "subtitle": "Requests awaiting your decision.",

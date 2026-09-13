@@ -711,6 +711,102 @@ class CatalogueProductList {
       };
 }
 
+/// A photo attached to a delivery quality issue.
+@immutable
+class QualityIssuePhoto {
+  const QualityIssuePhoto({
+    required this.id,
+    required this.deliveryQualityIssueId,
+    required this.url,
+    required this.createdAt,
+  });
+
+  final String id;
+  final String deliveryQualityIssueId;
+  final String url;
+  final DateTime createdAt;
+
+  factory QualityIssuePhoto.fromJson(Map<String, dynamic> json) {
+    return QualityIssuePhoto(
+      id: json['id'] as String,
+      deliveryQualityIssueId: json['delivery_quality_issue_id'] as String,
+      url: json['url'] as String,
+      createdAt: DateTime.parse(json['created_at'] as String),
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'delivery_quality_issue_id': deliveryQualityIssueId,
+        'url': url,
+        'created_at': createdAt.toIso8601String(),
+      };
+}
+
+/// A delivery quality issue reported against a delivered purchase request.
+@immutable
+class QualityIssue {
+  const QualityIssue({
+    required this.id,
+    required this.purchaseRequestId,
+    required this.reportedByMembershipId,
+    required this.description,
+    this.photos = const [],
+    required this.createdAt,
+  });
+
+  final String id;
+  final String purchaseRequestId;
+  final String reportedByMembershipId;
+  final String description;
+  final List<QualityIssuePhoto> photos;
+  final DateTime createdAt;
+
+  factory QualityIssue.fromJson(Map<String, dynamic> json) {
+    final rawPhotos = json['photos'] as List<dynamic>?;
+    return QualityIssue(
+      id: json['id'] as String,
+      purchaseRequestId: json['purchase_request_id'] as String,
+      reportedByMembershipId: json['reported_by_membership_id'] as String,
+      description: json['description'] as String,
+      photos: rawPhotos != null
+          ? rawPhotos
+              .map((p) => QualityIssuePhoto.fromJson(p as Map<String, dynamic>))
+              .toList()
+          : const [],
+      createdAt: DateTime.parse(json['created_at'] as String),
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'purchase_request_id': purchaseRequestId,
+        'reported_by_membership_id': reportedByMembershipId,
+        'description': description,
+        'photos': photos.map((p) => p.toJson()).toList(),
+        'created_at': createdAt.toIso8601String(),
+      };
+}
+
+/// List of quality issues reported against a request.
+@immutable
+class QualityIssueList {
+  const QualityIssueList({required this.items});
+
+  final List<QualityIssue> items;
+
+  factory QualityIssueList.fromJson(Map<String, dynamic> json) {
+    final items = (json['items'] as List<dynamic>)
+        .map((e) => QualityIssue.fromJson(e as Map<String, dynamic>))
+        .toList();
+    return QualityIssueList(items: items);
+  }
+
+  Map<String, dynamic> toJson() => {
+        'items': items.map((e) => e.toJson()).toList(),
+      };
+}
+
 /// Generic API exception carrying the contract's error envelope shape.
 class ApiException implements Exception {
   const ApiException({
