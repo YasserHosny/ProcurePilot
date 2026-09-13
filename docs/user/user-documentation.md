@@ -39,6 +39,10 @@
 For breadcrumb-style navigation paths across the app, see [ProcurePilot User Flows](user-flows.md).
 For the business/revenue value behind each major function, see [Function Business Value](../product/function-business-value.md).
 
+Authenticated page screenshots are cropped to the working content area for print clarity. The shared
+top bar and sidebar are documented once in the Dashboard section, then omitted from later screenshots
+so tables, forms, and review panels remain legible.
+
 ---
 
 ## 1. Sign In
@@ -95,12 +99,32 @@ Invited members arrive here from their email link. The token identifies the pend
 | # | Element | Description |
 |---|---------|-------------|
 | 1 | **Top bar** | Shows the ProcurePilot brand, your active workspace name, and the account menu (workspace switcher, language toggle, sign out). |
-| 2 | **Side navigation** | Lists all available modules: Overview, Products, Suppliers, Import Catalogue, Quotation Inbox, Match Resolution, Smart Compare, Basket Split, Alerts Inbox, Savings Ledger, Purchase Requests, Approval Queue, Team Management, Settings. The active page is highlighted. |
+| 2 | **Side navigation** | Provides module switching for authenticated users. It is shown separately below so page screenshots can focus on the work area. |
 | 3 | **Welcome banner** | Displays your workspace name and confirms your workspace is provisioned with database-level tenant isolation and role-based access control. |
 | 4 | **Tenant & Security card** | Shows your Tenant ID, workspace slug, and the isolation level (PostgreSQL Row-Level Security, FORCED). This is read-only and confirms your data is fully isolated. |
 | 5 | **Regional & Financial Settings card** | Displays your region (e.g. GB), primary currency (e.g. GBP), tax model (e.g. uk_vat_standard), and default locale. These are set at sign-up and are immutable. |
 | 6 | **Current User Authority card** | Shows your email, assigned role (Owner, Buyer, etc.), and MFA status. |
 | 7 | **Procurement Intelligence Modules** | A roadmap card describing each module. **Note:** the "Active"/"Upcoming" labels on this card describe the original chunk plan and have not been refreshed since — Quotation Inbox, Smart Compare, and Savings Ledger are fully built and in active use even though the card may still read "Upcoming." Use the side navigation, not this card, to judge what's actually available. |
+
+### Authenticated app sidebar
+
+![Authenticated Sidebar](screenshots/02b-sidebar-navigation.jpg)
+
+| # | Element | Description |
+|---|---------|-------------|
+| 1 | **Main navigation section** | Groups the workspace modules available after sign-in. |
+| 2 | **Overview** | Opens the Dashboard and workspace security summary. |
+| 3 | **Products** | Opens the Product Catalogue. |
+| 4 | **Suppliers** | Opens supplier records and supplier profile management. |
+| 5 | **Import Catalogue** | Opens the CSV import workflow for bulk product updates. |
+| 6 | **Quotation Inbox** | Opens quotation upload, review, authorization, and audit-trail workflows. |
+| 7 | **Match Resolution** | Opens quotation-line product matching tasks. |
+| 8 | **Smart Compare** | Opens supplier offer comparison and price intelligence tools. |
+| 9 | **Basket Split** | Opens the two-supplier basket optimisation workflow. |
+| 10 | **Alerts Inbox** | Opens detected pricing and procurement alerts. |
+| 11 | **Savings Ledger** | Opens savings records, evidence, outcome capture, and export workflows. |
+| 12 | **Purchase Requests / Approval Queue** | Opens request intake and approval tracking screens for enabled roles. |
+| 13 | **Team Management / Settings** | Opens member administration and organisation configuration screens. |
 
 ---
 
@@ -318,7 +342,7 @@ After AI extraction finishes, each quotation lands in the review queue. Open a r
 | 4 | **Priority filter** | Filter by priority. |
 | 5 | **Routing Reason filter** | Filter by why the line was routed here: Low Confidence, No Candidate, Close Candidates, etc. |
 | 6 | **From date / To date** | Filters tasks by when they entered the matching queue. |
-| 7 | **Quotation groups** | Tasks are grouped by their uploaded quotation. Each group shows supplier, source filename, quotation reviewer, review time, issue date, and authoritative open/total line progress. Empty queues show "No match tasks found" rather than a blank surface. |
+| 7 | **Quotation groups** | Tasks are grouped by their uploaded quotation. Each group shows supplier, source filename, quotation reviewer, review time, issue date, and authoritative open/total line progress. Groups can be collapsed when you want to scan quotations without reading every line, then expanded again to resolve individual tasks. Empty queues show "No match tasks found" rather than a blank surface. |
 | 8 | **Line evidence** | Each line shows its displayed line number, complete supplier wording, quoted exposure with currency, matching routing reason, top candidate and score, queue age, and matching status. `Below Match Threshold` refers to product matching, not OCR or quotation-review confidence. A line may be fully extracted and arithmetically verified in quotation review while still needing a product-matching decision here. |
 | 9 | **Resolve Match / View Details action** | Opens the resolution screen for that quotation line while preserving quotation context. The line itself is not clickable, so keyboard and screen-reader users get one predictable action target. Resolved lines switch to a detail-oriented action for auditing the saved decision. |
 

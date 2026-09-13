@@ -293,10 +293,20 @@
   }
 }
 
+.group-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex: 0 0 auto;
+}
+
+.group-toggle {
+  flex: 0 0 auto;
+}
+
 .group-progress {
   display: grid;
   justify-items: end;
-  flex: 0 0 auto;
 
   strong {
     font-size: 1.3rem;
@@ -424,5 +434,9 @@
 
   .line-action {
     justify-content: space-between;
+  }
+
+  .group-actions {
+    gap: 0.35rem;
   }
 }

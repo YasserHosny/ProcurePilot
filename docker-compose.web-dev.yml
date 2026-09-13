@@ -1,0 +1,17 @@
+# Dev-only override: serve the locally built Angular output instead of building it inside Docker.
+#
+# Why: a `--build` of the web image reinstalls pnpm deps and recompiles the SPA in-container
+# (10+ minutes on this machine) for every UI change. With this override nginx bind-mounts
+# apps/web/dist/web/browser, so the loop is just:
+#
+#   pnpm --filter web build        (or: cd apps/web && pnpm exec ng build)
+#   docker-compose -f docker-compose.yml -f docker-compose.remote.yml -f docker-compose.web-dev.yml up -d web
+#
+# The first `up -d` recreates the container; after that every local rebuild is served
+# immediately (bind mount is live, index.html is already served no-cache).
+# The image build stays available for the production path (deploy), just don't use this file there.
+
+services:
+  web:
+    volumes:
+      - ./apps/web/dist/web/browser:/usr/share/nginx/html:ro

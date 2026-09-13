@@ -943,6 +943,8 @@
         "view": "View Details"
       },
       "groupsLabel": "Quotation match tasks",
+      "collapseGroup": "Collapse quotation group",
+      "expandGroup": "Expand quotation group",
       "unknownSupplier": "Supplier not confirmed",
       "sourceUnavailable": "Source document unavailable",
       "openOfTotal": "open of {{total}} lines",

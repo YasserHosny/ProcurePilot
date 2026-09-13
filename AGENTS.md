@@ -125,6 +125,10 @@ corresponding stage gate is passed. Sketching is allowed; building is not.
   `DATABASE_URL` must not point at `localhost:54321` or `localhost:54322`.
 - Use `docker-compose -f docker-compose.yml -f docker-compose.remote.yml up -d --build redis api web`
   for the remote-DB app path. Do not start a local Supabase stack for this workflow.
+- For UI-only changes, skip the Docker rebuild entirely: build locally (`cd apps/web && pnpm exec ng
+  build`) and add `-f docker-compose.web-dev.yml` to the compose command — nginx then bind-mounts
+  `apps/web/dist/web/browser`, so local rebuilds are served immediately (container recreate only
+  needed once, when the override is first applied).
 - If legacy `docker-compose` fails with `KeyError: 'ContainerConfig'` while recreating stale
   containers, remove only ProcurePilot containers first:
   `docker ps -aq --filter 'name=procurepilot-' | xargs -r docker rm -f`, then rerun the remote

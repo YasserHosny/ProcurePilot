@@ -10,6 +10,18 @@ body {
   margin: 0;
   font-family: Roboto, "Helvetica Neue", sans-serif;
   text-align: start;
+  // The UA shows an I-beam over any selectable text (`cursor: auto`), which reads as
+  // "editable" on labels, values, badges — everywhere. Default to the arrow for the whole
+  // app. Text-entry controls restore the I-beam below, and interactive elements set their
+  // own cursor (pointer) elsewhere. Text stays selectable — the press-drag I-beam is
+  // native selection behavior and the price of copyable text.
+  cursor: default;
+}
+
+input,
+textarea,
+[contenteditable="true"] {
+  cursor: text;
 }
 
 mat-icon {
