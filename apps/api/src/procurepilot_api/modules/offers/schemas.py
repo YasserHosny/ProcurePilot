@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Literal
 from uuid import UUID
 
@@ -12,6 +12,25 @@ RiskNote = Literal[
 ]
 StockSignal = Literal["in_stock", "low_stock", "out_of_stock", "unknown"]
 BasketStatus = Literal["queued", "running", "completed", "failed"]
+RiskTolerance = Literal["low", "medium", "high"]
+BasketUrgency = Literal["normal", "urgent"]
+EvidenceConfidence = Literal["high", "medium", "low"]
+ConstraintKind = Literal[
+    "minimum_order_value",
+    "free_delivery_threshold",
+    "delivery_fee",
+    "quantity_tier",
+    "supplier_exclusion",
+    "urgency",
+    "currency_consistency",
+]
+AnomalyAlertKind = Literal[
+    "price_spike",
+    "likely_duplicate_quotation_line",
+    "decimal_or_quantity_anomaly",
+    "delivery_cost_anomaly",
+    "supplier_quality_trend_change",
+]
 
 
 class StrictApiModel(BaseModel):
@@ -130,6 +149,38 @@ class BasketOptimiseRequest(StrictApiModel):
         return self
 
 
+class OptimisationWeights(StrictApiModel):
+    price: float = Field(ge=0, le=1)
+    preferred_supplier: float = Field(ge=0, le=1)
+    risk: float = Field(ge=0, le=1)
+    lead_time: float = Field(ge=0, le=1)
+    quality: float = Field(ge=0, le=1)
+
+
+class AdvancedBasketOptimiseRequest(StrictApiModel):
+    supplier_ids: list[UUID] = Field(min_length=2, max_length=10)
+    items: list[BasketItemRequest] = Field(min_length=1, max_length=50)
+    risk_tolerance: RiskTolerance
+    urgency: BasketUrgency
+    weights: OptimisationWeights
+    excluded_supplier_ids: list[UUID] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _validate_supplier_sets(self) -> AdvancedBasketOptimiseRequest:
+        supplier_ids = set(self.supplier_ids)
+        if len(supplier_ids) != len(self.supplier_ids):
+            raise ValueError("supplier_ids must contain unique suppliers")
+        excluded_ids = set(self.excluded_supplier_ids)
+        if len(excluded_ids) != len(self.excluded_supplier_ids):
+            raise ValueError("excluded_supplier_ids must contain unique suppliers")
+        unknown_exclusions = excluded_ids - supplier_ids
+        if unknown_exclusions:
+            raise ValueError("excluded_supplier_ids must be selected suppliers")
+        if len(supplier_ids - excluded_ids) < 1:
+            raise ValueError("at least one selected supplier must remain eligible")
+        return self
+
+
 class AllocatedBasketLine(BaseModel):
     workspace_product_id: UUID
     quantity: str
@@ -166,6 +217,56 @@ class BasketSplitResult(BaseModel):
     solver_version: str | None = None
 
 
+class OptimisationConstraint(StrictApiModel):
+    kind: ConstraintKind
+    supplier_id: UUID | None = None
+    workspace_product_id: UUID | None = None
+    description: str
+    money: Money | None = None
+    source_ids: list[UUID] = Field(default_factory=list)
+
+
+class ViolatedOptimisationConstraint(OptimisationConstraint):
+    reason: str
+
+
+class AdvancedBasketAllocationLine(StrictApiModel):
+    workspace_product_id: UUID
+    supplier_id: UUID
+    quantity: StrictStr = Field(pattern=r"^\d+(\.\d{1,6})?$")
+    offer_id: UUID
+    landed_cost: Money
+    applied_tier_id: str | None = None
+
+
+class AdvancedSupplierAllocation(StrictApiModel):
+    supplier_id: UUID
+    lines: list[AdvancedBasketAllocationLine]
+    total_landed_cost: Money
+
+
+class AdvancedSingleSupplierBaseline(StrictApiModel):
+    supplier_id: UUID
+    feasible: bool
+    total_landed_cost: Money | None = None
+    violated_constraints: list[ViolatedOptimisationConstraint] = Field(default_factory=list)
+
+
+class AdvancedBasketResult(StrictApiModel):
+    feasible: bool
+    allocation: list[AdvancedSupplierAllocation]
+    total_landed_cost: Money | None = None
+    single_supplier_baselines: list[AdvancedSingleSupplierBaseline] = Field(default_factory=list)
+    applied_constraints: list[OptimisationConstraint]
+    violated_constraints: list[ViolatedOptimisationConstraint]
+    risk_notes: list[str]
+    confidence: EvidenceConfidence
+    source_landed_cost_ids: list[UUID]
+    solver_version: str
+    computed_at: datetime
+    valid_until: datetime | None = None
+
+
 class BasketSplitJob(BaseModel):
     id: UUID
     supplier_ids: list[UUID]
@@ -177,3 +278,91 @@ class BasketSplitJob(BaseModel):
     error: dict[str, object] | None = None
     started_at: datetime | None = None
     completed_at: datetime | None = None
+
+
+class SupplierQuantityTier(StrictApiModel):
+    workspace_product_id: UUID | None = None
+    min_quantity: StrictStr = Field(pattern=r"^\d+(\.\d{1,6})?$")
+    unit_price: Money
+
+
+class SupplierCommercialTermCreate(StrictApiModel):
+    effective_from: datetime
+    effective_to: datetime | None = None
+    minimum_order_value: Money | None = None
+    delivery_fee: Money | None = None
+    free_delivery_threshold: Money | None = None
+    quantity_tiers: list[SupplierQuantityTier] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _validate_effective_window(self) -> SupplierCommercialTermCreate:
+        if self.effective_to is not None and self.effective_to <= self.effective_from:
+            raise ValueError("effective_to must be after effective_from")
+        return self
+
+
+class SupplierCommercialTerm(SupplierCommercialTermCreate):
+    id: UUID
+    supplier_id: UUID
+    rule_version: str
+    created_at: datetime
+
+
+class SupplierCommercialTermList(StrictApiModel):
+    items: list[SupplierCommercialTerm]
+
+
+class SupplierScoreMetric(StrictApiModel):
+    value: str | None = None
+    sample_count: int = Field(ge=0)
+    source_ids: list[UUID] = Field(default_factory=list)
+    confidence: EvidenceConfidence
+    insufficient_evidence: bool
+    window_start: date
+    window_end: date
+
+
+class SupplierRiskSubScore(StrictApiModel):
+    name: str
+    score: str
+    weight: str
+    evidence: dict[str, object]
+
+
+class SupplierRiskScore(StrictApiModel):
+    total: str
+    confidence: EvidenceConfidence
+    sub_scores: list[SupplierRiskSubScore]
+    rule_version: str
+
+
+class SupplierScorecard(StrictApiModel):
+    supplier_id: UUID
+    window_start: date
+    window_end: date
+    metrics: dict[str, SupplierScoreMetric]
+    risk_score: SupplierRiskScore
+    source_counts: dict[str, int]
+    confidence: EvidenceConfidence
+    insufficient_evidence: bool
+    computed_at: datetime
+    rule_version: str
+
+
+class AnomalySignal(StrictApiModel):
+    id: str
+    kind: AnomalyAlertKind
+    workspace_product_id: UUID
+    supplier_id: UUID | None = None
+    severity: Literal["info", "warning", "critical"]
+    confidence: EvidenceConfidence
+    evidence: dict[str, object]
+    action: Literal[
+        "compare_product",
+        "inspect_supplier_scorecard",
+        "review_quotation",
+        "review_quality_history",
+    ]
+    created_from_current_data_at: datetime
+    dismissed: bool
+    valid_until: datetime | None = None

@@ -16,8 +16,15 @@ from procurepilot_api.modules.offers.schemas import (
     OfferComparison,
     OfferList,
     PriceHistoryResponse,
+    SupplierCommercialTerm,
+    SupplierCommercialTermCreate,
+    SupplierCommercialTermList,
 )
 from procurepilot_api.modules.offers.service import OfferService, get_offer_service
+from procurepilot_api.modules.offers.supplier_terms import (
+    SupplierTermsService,
+    get_supplier_terms_service,
+)
 
 router = APIRouter(tags=["smart-compare"])
 WRITE_ROLES = (MemberRole.owner, MemberRole.buyer)
@@ -94,3 +101,30 @@ def get_basket(
     service: Annotated[BasketService, Depends(get_basket_service)],
 ) -> BasketSplitJob:
     return service.get_job(member=member, job_id=id)
+
+
+@router.get(
+    "/suppliers/{supplier_id}/commercial-terms",
+    response_model=SupplierCommercialTermList,
+)
+def list_supplier_commercial_terms(
+    supplier_id: UUID,
+    member: Annotated[CurrentMember, Depends(current_member)],
+    service: Annotated[SupplierTermsService, Depends(get_supplier_terms_service)],
+) -> SupplierCommercialTermList:
+    return service.list_terms(member=member, supplier_id=supplier_id)
+
+
+@router.post(
+    "/suppliers/{supplier_id}/commercial-terms",
+    status_code=status.HTTP_201_CREATED,
+    response_model=SupplierCommercialTerm,
+)
+def create_supplier_commercial_term(
+    supplier_id: UUID,
+    payload: Annotated[SupplierCommercialTermCreate, Body()],
+    member: Annotated[CurrentMember, Depends(require_role(*WRITE_ROLES))],
+    service: Annotated[SupplierTermsService, Depends(get_supplier_terms_service)],
+    _idempotency_key: Annotated[UUID | None, Header(alias="Idempotency-Key")] = None,
+) -> SupplierCommercialTerm:
+    return service.create_term(member=member, supplier_id=supplier_id, payload=payload)
