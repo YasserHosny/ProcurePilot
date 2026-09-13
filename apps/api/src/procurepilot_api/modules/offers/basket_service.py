@@ -22,6 +22,8 @@ from procurepilot_api.modules.offers.schemas import (
     Money,
 )
 from procurepilot_api.modules.offers.service import _authenticated_db
+from procurepilot_api.shared.audit import AuditEventCreate, get_audit_writer
+from procurepilot_api.shared.logging import get_trace_id
 
 ADVANCED_BASKET_RULE_VERSION = "advanced-basket-v1"
 BasketRequest = BasketOptimiseRequest | AdvancedBasketOptimiseRequest
@@ -36,6 +38,7 @@ class BasketService:
         *,
         member: CurrentMember,
         payload: BasketRequest,
+        bearer_token: str | None = None,
     ) -> BasketSplitJob:
         with _authenticated_db(self._settings, member) as conn:
             _visible_suppliers(conn, payload.supplier_ids)
@@ -67,7 +70,20 @@ class BasketService:
                 _compensate_failed_enqueue(conn, UUID(str(row["id"])))
                 conn.commit()
                 raise
-            return _job(row)
+            job = _job(row)
+        if isinstance(payload, AdvancedBasketOptimiseRequest):
+            _record_audit(
+                bearer_token=bearer_token,
+                member=member,
+                action="offers.advanced_basket_submitted",
+                target={
+                    "basket_split_job_id": str(job.id),
+                    "supplier_ids": [str(supplier_id) for supplier_id in payload.supplier_ids],
+                    "line_count": len(payload.items),
+                    "rule_version": ADVANCED_BASKET_RULE_VERSION,
+                },
+            )
+        return job
 
     def get_job(self, *, member: CurrentMember, job_id: UUID) -> BasketSplitJob:
         with _authenticated_db(self._settings, member) as conn:
@@ -336,6 +352,27 @@ def _money(row: dict[str, object], prefix: str) -> dict[str, str] | None:
 
 def _weight(value: object) -> str:
     return f"{Decimal(str(value)):.4f}"
+
+
+def _record_audit(
+    *,
+    bearer_token: str | None,
+    member: CurrentMember,
+    action: str,
+    target: dict[str, object],
+) -> None:
+    get_audit_writer().record(
+        AuditEventCreate(
+            tenant_id=member.tenant_id,
+            actor_membership_id=member.membership_id,
+            actor_email=member.email,
+            action=action,
+            target=target,
+            outcome="success",
+            trace_id=get_trace_id(),
+        ),
+        bearer_token=bearer_token,
+    )
 
 
 def _enqueue_redis_job(settings: Settings, row: dict[str, object], member: CurrentMember) -> None:

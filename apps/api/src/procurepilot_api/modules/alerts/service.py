@@ -12,6 +12,8 @@ from procurepilot_api.errors import NotFoundError, ServiceUnavailableError, Unpr
 from procurepilot_api.modules.alerts.conditions import AlertConditionService
 from procurepilot_api.modules.alerts.schemas import AlertDismissal, AlertList
 from procurepilot_api.modules.offers.service import _authenticated_db
+from procurepilot_api.shared.audit import AuditEventCreate, get_audit_writer
+from procurepilot_api.shared.logging import get_trace_id
 
 
 class AlertService:
@@ -40,7 +42,13 @@ class AlertService:
         )
         return AlertList(items=page, next_cursor=next_cursor)
 
-    def dismiss_alert(self, *, member: CurrentMember, alert_id: str) -> AlertDismissal:
+    def dismiss_alert(
+        self,
+        *,
+        member: CurrentMember,
+        alert_id: str,
+        bearer_token: str | None = None,
+    ) -> AlertDismissal:
         current = {alert.id: alert for alert in self._conditions.live_alerts(member=member)}
         alert = current.get(alert_id)
         if alert is None:
@@ -73,11 +81,51 @@ class AlertService:
                     row = cur.fetchone()
         except Exception as exc:
             raise ServiceUnavailableError(details={"dependency": "database"}) from exc
-        return AlertDismissal(alert_id=alert.id, dismissed_at=row["dismissed_at"])
+        dismissal = AlertDismissal(alert_id=alert.id, dismissed_at=row["dismissed_at"])
+        if alert.kind in {
+            "price_spike",
+            "likely_duplicate_quotation_line",
+            "decimal_or_quantity_anomaly",
+            "delivery_cost_anomaly",
+            "supplier_quality_trend_change",
+        }:
+            _record_audit(
+                bearer_token=bearer_token,
+                member=member,
+                action="alerts.anomaly_dismissed",
+                target={
+                    "alert_id": alert.id,
+                    "kind": alert.kind,
+                    "workspace_product_id": str(alert.workspace_product_id),
+                    "supplier_id": str(alert.supplier_id) if alert.supplier_id else None,
+                },
+            )
+        return dismissal
 
 
 def get_alert_service() -> AlertService:
     return AlertService()
+
+
+def _record_audit(
+    *,
+    bearer_token: str | None,
+    member: CurrentMember,
+    action: str,
+    target: dict[str, object],
+) -> None:
+    get_audit_writer().record(
+        AuditEventCreate(
+            tenant_id=member.tenant_id,
+            actor_membership_id=member.membership_id,
+            actor_email=member.email,
+            action=action,
+            target=target,
+            outcome="success",
+            trace_id=get_trace_id(),
+        ),
+        bearer_token=bearer_token,
+    )
 
 
 def _dismissed_fingerprints(settings: Settings, member: CurrentMember) -> set[str]:

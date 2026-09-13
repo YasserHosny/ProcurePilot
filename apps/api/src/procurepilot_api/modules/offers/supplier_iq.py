@@ -20,6 +20,8 @@ from procurepilot_api.modules.offers.schemas import (
 )
 from procurepilot_api.modules.offers.service import _authenticated_db
 from procurepilot_api.modules.offers.supplier_terms import _supplier_visible
+from procurepilot_api.shared.audit import AuditEventCreate, get_audit_writer
+from procurepilot_api.shared.logging import get_trace_id
 
 SUPPLIER_SCORECARD_RULE_VERSION = "supplier-scorecard-v1"
 SUPPLIER_RISK_RULE_VERSION = "supplier-risk-v1"
@@ -48,6 +50,7 @@ class SupplierIqService:
         *,
         member: CurrentMember,
         supplier_id: UUID,
+        bearer_token: str | None = None,
     ) -> SupplierScorecard:
         today = datetime.now(UTC).date()
         window_start = today - timedelta(days=DEFAULT_WINDOW_DAYS)
@@ -67,7 +70,18 @@ class SupplierIqService:
                 source_data=source_data,
             )
             _persist_snapshot(conn, member=member, scorecard=scorecard)
-            return scorecard
+        _record_audit(
+            bearer_token=bearer_token,
+            member=member,
+            action="supplier_iq.scorecard_viewed",
+            target={
+                "supplier_id": str(supplier_id),
+                "window_start": scorecard.window_start.isoformat(),
+                "window_end": scorecard.window_end.isoformat(),
+                "rule_version": scorecard.rule_version,
+            },
+        )
+        return scorecard
 
 
 def get_supplier_iq_service() -> SupplierIqService:
@@ -394,6 +408,27 @@ def _persist_snapshot(
             cur.execute("rollback to savepoint supplier_iq_snapshot")
         finally:
             cur.execute("release savepoint supplier_iq_snapshot")
+
+
+def _record_audit(
+    *,
+    bearer_token: str | None,
+    member: CurrentMember,
+    action: str,
+    target: dict[str, object],
+) -> None:
+    get_audit_writer().record(
+        AuditEventCreate(
+            tenant_id=member.tenant_id,
+            actor_membership_id=member.membership_id,
+            actor_email=member.email,
+            action=action,
+            target=target,
+            outcome="success",
+            trace_id=get_trace_id(),
+        ),
+        bearer_token=bearer_token,
+    )
 
 
 def _delivery_score(result: str) -> Decimal:

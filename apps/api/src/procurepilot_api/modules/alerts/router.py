@@ -5,7 +5,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, Header, Query
 
-from procurepilot_api.deps import CurrentMember, current_member
+from procurepilot_api.deps import CurrentMember, bearer_token, current_member
 from procurepilot_api.modules.alerts.schemas import AlertDismissal, AlertList
 from procurepilot_api.modules.alerts.service import AlertService, get_alert_service
 from procurepilot_api.modules.auth.jwt import MemberRole
@@ -34,8 +34,9 @@ def list_alerts(
 @router.post("/alerts/{id}/dismiss", response_model=AlertDismissal)
 def dismiss_alert(
     id: str,
+    token: Annotated[str, Depends(bearer_token)],
     member: Annotated[CurrentMember, Depends(require_role(*WRITE_ROLES))],
     service: Annotated[AlertService, Depends(get_alert_service)],
     _idempotency_key: Annotated[UUID | None, Header(alias="Idempotency-Key")] = None,
 ) -> AlertDismissal:
-    return service.dismiss_alert(member=member, alert_id=id)
+    return service.dismiss_alert(member=member, alert_id=id, bearer_token=token)

@@ -6,7 +6,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Body, Depends, Header, Query, status
 
-from procurepilot_api.deps import CurrentMember, current_member
+from procurepilot_api.deps import CurrentMember, bearer_token, current_member
 from procurepilot_api.modules.auth.jwt import MemberRole
 from procurepilot_api.modules.auth.rbac import require_role
 from procurepilot_api.modules.offers.basket_service import BasketService, get_basket_service
@@ -93,11 +93,12 @@ def price_history(
 )
 def optimise_basket(
     payload: Annotated[BasketOptimiseRequest | AdvancedBasketOptimiseRequest, Body()],
+    token: Annotated[str, Depends(bearer_token)],
     member: Annotated[CurrentMember, Depends(require_role(*WRITE_ROLES))],
     service: Annotated[BasketService, Depends(get_basket_service)],
     _idempotency_key: Annotated[UUID | None, Header(alias="Idempotency-Key")] = None,
 ) -> BasketSplitJob:
-    return service.create_job(member=member, payload=payload)
+    return service.create_job(member=member, payload=payload, bearer_token=token)
 
 
 @router.get("/baskets/{id}", response_model=BasketSplitJob)
@@ -112,10 +113,15 @@ def get_basket(
 @router.get("/suppliers/{supplier_id}/scorecard", response_model=SupplierScorecard)
 def get_supplier_scorecard(
     supplier_id: UUID,
+    token: Annotated[str, Depends(bearer_token)],
     member: Annotated[CurrentMember, Depends(current_member)],
     service: Annotated[SupplierIqService, Depends(get_supplier_iq_service)],
 ) -> SupplierScorecard:
-    return service.get_scorecard(member=member, supplier_id=supplier_id)
+    return service.get_scorecard(
+        member=member,
+        supplier_id=supplier_id,
+        bearer_token=token,
+    )
 
 
 @router.get(
