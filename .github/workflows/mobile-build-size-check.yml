@@ -1,0 +1,40 @@
+name: Mobile build size check
+
+# Manually-triggered only — NOT part of ci.yml's required-to-merge set. This job builds a real
+# release APK and has not been run against a live GitHub Actions runner during authoring (this
+# environment has no local Android SDK to verify it against first, and ci.yml's own standing rule
+# is that nothing gets wired in as a required check without that verification). Run this manually
+# at least once, confirm it both builds and correctly fails on an oversized APK, before ever
+# promoting it into ci.yml. See docs/operations/mobile-build-release-gate.md for the full gate
+# this is one half of (the other half, cold start, cannot be automated in a headless runner at
+# all and stays a manual checklist item there).
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-size:
+    name: Release APK size budget
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - name: Install dependencies
+        working-directory: apps/mobile
+        run: flutter pub get
+      - name: Build release APK
+        working-directory: apps/mobile
+        run: flutter build apk --release
+      - name: Check APK size budget (30MB, plan.md Performance Goals)
+        working-directory: apps/mobile
+        run: |
+          apk_path="build/app/outputs/flutter-apk/app-release.apk"
+          budget_bytes=$((30 * 1024 * 1024))
+          actual_bytes=$(stat -c%s "$apk_path")
+          echo "APK size: $actual_bytes bytes (budget: $budget_bytes bytes)"
+          if [ "$actual_bytes" -gt "$budget_bytes" ]; then
+            echo "::error::Release APK ($actual_bytes bytes) exceeds the 30MB budget ($budget_bytes bytes)"
+            exit 1
+          fi
