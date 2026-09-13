@@ -33,6 +33,7 @@ from integration.catalogue_helpers import (
     act_as,
     connection,
     make_workspace,
+    make_workspace_product,
 )
 
 pytestmark = pytest.mark.skipif(
@@ -65,6 +66,11 @@ class ScopedWorkspace:
     request_c: UUID
     step_a: UUID
     step_b: UUID
+    # T044 (009-mobile-app-mvp): a low_stock_report per branch, same requester/branch shape as
+    # request_a/b/c above, to prove low_stock_report's own scoped-visibility policy the same way.
+    report_a: UUID
+    report_b: UUID
+    report_c: UUID
 
 
 def _make_member(
@@ -133,6 +139,12 @@ def make_scoped_workspace(cur: psycopg.Cursor, label: str) -> ScopedWorkspace:
         (assignment_id, owner.tenant_id, scoped_manager.membership_id, branch_a),
     )
 
+    product_id = make_workspace_product(cur, owner, name=f"{label}-product")
+    # make_workspace_product acts as `owner` (via act_as) for its own inserts and does not
+    # restore role afterward — reset back to the raw superuser context the rest of this
+    # function's inserts rely on.
+    cur.execute("reset role")
+
     def _request(branch_id: UUID, requester: Workspace) -> UUID:
         request_id = uuid4()
         cur.execute(
@@ -154,11 +166,28 @@ def make_scoped_workspace(cur: psycopg.Cursor, label: str) -> ScopedWorkspace:
         )
         return step_id
 
+    def _report(branch_id: UUID, member: Workspace) -> UUID:
+        report_id = uuid4()
+        cur.execute(
+            "insert into low_stock_report "
+            "(id,tenant_id,branch_id,member_id,workspace_product_id) "
+            "values (%s,%s,%s,%s,%s)",
+            (report_id, owner.tenant_id, branch_id, member.membership_id, product_id),
+        )
+        return report_id
+
     request_a = _request(branch_a, unscoped_manager)
     request_b = _request(branch_b, scoped_manager)
     request_c = _request(branch_b, owner)
     step_a = _step(request_a)
     step_b = _step(request_b)
+
+    # Same shape as request_a/b/c: report_a exercises "sees their own branch", report_b exercises
+    # "requester always sees their own report outside branch scope", report_c exercises "a direct
+    # fetch of another branch's report resolves not-found, never forbidden".
+    report_a = _report(branch_a, unscoped_manager)
+    report_b = _report(branch_b, scoped_manager)
+    report_c = _report(branch_b, owner)
 
     return ScopedWorkspace(
         owner=owner,
@@ -176,6 +205,9 @@ def make_scoped_workspace(cur: psycopg.Cursor, label: str) -> ScopedWorkspace:
         request_c=request_c,
         step_a=step_a,
         step_b=step_b,
+        report_a=report_a,
+        report_b=report_b,
+        report_c=report_c,
     )
 
 
@@ -425,3 +457,49 @@ def test_the_owner_sees_every_request_and_every_step(
         assert cur.fetchone() == (3,)
         cur.execute("select count(*) from approval_step")
         assert cur.fetchone() == (2,)
+
+
+# ── T044 (009-mobile-app-mvp): low_stock_report under the same visibility axis ──
+
+
+def test_a_scoped_manager_sees_a_low_stock_report_in_their_own_branch(
+    conn: psycopg.Connection, scoped: ScopedWorkspace
+) -> None:
+    with conn.cursor() as cur:
+        _act_as_scoped(cur, scoped.scoped_manager)
+        cur.execute(
+            "select id from low_stock_report where branch_id = %s", (scoped.branch_a,)
+        )
+        assert [row[0] for row in cur.fetchall()] == [scoped.report_a]
+
+
+def test_a_scoped_manager_does_not_see_another_branchs_low_stock_report(
+    conn: psycopg.Connection, scoped: ScopedWorkspace
+) -> None:
+    with conn.cursor() as cur:
+        _act_as_scoped(cur, scoped.scoped_manager)
+        # report_c is in branch B, raised by the owner — outside both the manager's branch scope
+        # and the "raised it themselves" clause.
+        cur.execute(
+            "select count(*) from low_stock_report where id = %s", (scoped.report_c,)
+        )
+        assert cur.fetchone() == (0,)
+
+
+def test_a_direct_fetch_of_another_branchs_low_stock_report_resolves_not_found_not_forbidden(
+    conn: psycopg.Connection, scoped: ScopedWorkspace
+) -> None:
+    with conn.cursor() as cur:
+        _act_as_scoped(cur, scoped.scoped_manager)
+        cur.execute("select * from low_stock_report where id = %s", (scoped.report_c,))
+        assert cur.fetchone() is None  # empty result, never an error
+
+
+def test_the_requester_sees_their_own_low_stock_report_even_outside_their_branch_scope(
+    conn: psycopg.Connection, scoped: ScopedWorkspace
+) -> None:
+    # report_b is in branch B; the scoped manager is scoped to branch A only, but raised it.
+    with conn.cursor() as cur:
+        _act_as_scoped(cur, scoped.scoped_manager)
+        cur.execute("select id from low_stock_report where id = %s", (scoped.report_b,))
+        assert cur.fetchone() == (scoped.report_b,)
