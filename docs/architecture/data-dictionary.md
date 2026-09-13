@@ -1176,3 +1176,82 @@ covering the request date redirects the step to the delegate (`source = 'delegat
 single-hop only. No uniqueness constraint on overlapping windows; routing prefers the
 most-recently-created delegation covering the date. A delegation whose delegate has since been
 removed from the workspace is ignored, and resolution falls back to the original assignee.
+
+## Implemented mobile MVP entities (chunk R2.2, `009-mobile-app-mvp`)
+
+The Flutter app's own three tables: a member's registered device (for push delivery), a
+fast unlinked "shelf is running low" signal, and a durable record of one decision-triggered push
+send attempt. Full contract: `specs/009-mobile-app-mvp/contracts/mobile.openapi.yaml`.
+
+## `DeviceRegistration`
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | uuid | PK, default `gen_random_uuid()` |
+| `tenant_id` | uuid | Required FK -> Tenant; RLS key. `unique (tenant_id, id)` for composite FKs |
+| `member_id` | uuid | Required; composite FK -> Membership `(tenant_id, id)` |
+| `platform` | enum | `ios` \| `android` |
+| `push_token` | text | Required |
+| `last_seen_at` | timestamptz | Default `now()`; passive staleness marker for a reinstall or token rotation |
+| `created_at` | timestamptz | Audit field |
+
+`unique (tenant_id, member_id, push_token)` makes registration a plain upsert at sign-in and
+whenever the OS reissues a token, so a reinstall never accumulates duplicate rows. Sign-out is
+**not** passive: the mobile app calls `DELETE /devices/{id}` for its own current registration,
+which deletes the row outright, so a signed-out but still-installed device stops being eligible
+for push immediately rather than waiting on `last_seen_at` staleness. Unlike every
+branch-scoped table in this project, there is no owner-read-all clause here —
+`device_registration_own_rows_only` is a RESTRICTIVE `for all` (not SELECT-only) policy narrowing
+every operation to `member_id = current_membership_id()`, since an owner has no operational need
+to browse another member's push tokens.
+
+## `LowStockReport`
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | uuid | PK, default `gen_random_uuid()` |
+| `tenant_id` | uuid | Required FK -> Tenant; RLS key. `unique (tenant_id, id)` for composite FKs |
+| `branch_id` | uuid | Required; composite FK -> Branch `(tenant_id, id)` |
+| `member_id` | uuid | Required; composite FK -> Membership `(tenant_id, id)` |
+| `workspace_product_id` | uuid | Required; composite FK -> WorkspaceProduct `(tenant_id, id)` |
+| `count_remaining` | numeric(18,6) | Optional; `check (count_remaining is null or count_remaining >= 0)` |
+| `idempotency_key` | uuid | Optional; `unique (tenant_id, idempotency_key) where idempotency_key is not null` |
+| `created_at` | timestamptz | Audit field |
+
+Insert-only (FR-006) — `authenticated` is granted `SELECT`/`INSERT` only, no `UPDATE`/`DELETE`
+(narrowed by a review-fix migration after the original grant mistakenly included both). The
+partial unique index on `idempotency_key` is a real, database-enforced idempotent-replay
+guarantee: `POST /low-stock-reports` does `insert ... on conflict (tenant_id, idempotency_key) do
+nothing returning *`, falling back to a plain read of the existing row on a zero-row insert, so a
+client retry after a dropped response never creates a second report. `low_stock_report_
+scoped_visibility` is the same shape as `PurchaseRequest`'s own RESTRICTIVE SELECT-only policy —
+an owner sees everything; a member always sees a report they raised themselves regardless of
+branch scope; an unassigned (not branch-scoped) member sees everything; a branch-scoped member
+sees only their own branch's reports.
+
+## `PushNotification`
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | uuid | PK, default `gen_random_uuid()` |
+| `tenant_id` | uuid | Required FK -> Tenant; RLS key. `unique (tenant_id, id)` for composite FKs |
+| `purchase_request_id` | uuid | Required; composite FK -> PurchaseRequest `(tenant_id, id)` |
+| `member_id` | uuid | Required; composite FK -> Membership `(tenant_id, id)` — the **requester**, not the decider |
+| `status` | enum | `queued` \| `sent` \| `failed`; default `queued` |
+| `attempts` | integer | Default `0` |
+| `created_at` | timestamptz | Audit field |
+| `sent_at` | timestamptz | Null unless `status = 'sent'` (`push_notification_sent_at_pairing` check) |
+
+Not client-facing this release — no endpoint reads or writes it directly, and `authenticated`
+gets no grant at all (rather than a deny-all RESTRICTIVE policy, the simpler of the two ways to
+express "nothing here for a member or owner to see"); only `service_role` may touch it. Written
+in the **same transaction** as the triggering approve/reject decision (a single raw-`psycopg`
+block in `RequestsService._decide_and_notify()`, not a second independent PostgREST write) so an
+insert failure here cleanly fails the whole decision rather than leaving an ambiguous
+half-applied state. `process_push_notification()` marks a row `sent` only if it had zero device
+registrations to attempt (FR-008) or `failed` for one or more real registrations — there is no
+real FCM/APNs provider configured in this codebase, so a real registration's send is an honest,
+deliberate stub that always reports failure rather than a fabricated success. A retry-sweep task
+re-enqueues rows still `queued`/`failed` past a threshold, but no periodic scheduler invokes it
+yet in this codebase — a still-open operational gap, not something this table's own design leaves
+unresolved.

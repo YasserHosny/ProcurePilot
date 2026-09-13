@@ -1457,6 +1457,90 @@ Request:
 
 ---
 
+## Delivered Mobile MVP API (chunk R2.2, `009-mobile-app-mvp`)
+
+Device push-token registration and a fast, unlinked low-stock signal, both consumed by the
+Flutter mobile app. `low_stock_report` reuses `purchase_request`'s own branch-scoped visibility
+shape (see the R2.1 section above): an owner sees everything; a member always sees a report they
+raised themselves regardless of branch scope; a branch-scoped member sees only their own
+branch's reports; a same-tenant, different-branch reference resolves `404`, never `403`. Full
+contract: `specs/009-mobile-app-mvp/contracts/mobile.openapi.yaml`.
+
+### `POST /devices`
+
+- Requires bearer auth; accepts (but does not need) `Idempotency-Key` — the operation is already
+  a plain upsert on `(tenant_id, member_id, push_token)`, so a replayed registration is naturally
+  idempotent regardless of the header.
+- Request fields: required `platform` (`ios` \| `android`), required `push_token`.
+- Returns `200` with the `DeviceRegistration` (`id`, `member_id`, `platform`, `push_token`,
+  `last_seen_at`).
+
+Request:
+```json
+{ "platform": "android", "push_token": "fcm-token-abc123" }
+```
+
+### `DELETE /devices/{device_id}`
+
+- Requires bearer auth; a member may only delete their own device registration
+  (`device_registration_own_rows_only` is RESTRICTIVE for every operation, not just `SELECT` —
+  there is no owner-delete-any-member's-device path).
+- Called on sign-out, not on a passive timer — this is what makes sign-out stop push delivery to
+  that device immediately rather than waiting on `last_seen_at` staleness.
+- Returns `204` on success.
+
+### `POST /low-stock-reports`
+
+- Requires bearer auth; accepts and **enforces** `Idempotency-Key` — a real, database-level
+  guarantee (`insert ... on conflict (tenant_id, idempotency_key) do nothing returning *`,
+  falling back to a plain read on a zero-row insert), not merely an accepted-but-ignored header.
+  A client retry after a dropped response returns the original report, `200` instead of `201`,
+  and creates no second row.
+- Request fields: required `branch_id`, required `workspace_product_id`, optional
+  `count_remaining` (unsigned decimal string).
+- Returns `201` (or `200` on an idempotent replay) with the `LowStockReport`.
+- Insert-only (FR-006) — there is no `PATCH`/`DELETE` surface for a low-stock report this
+  release.
+
+Request:
+```json
+{
+  "branch_id": "00000000-0000-4000-8000-000000000010",
+  "workspace_product_id": "00000000-0000-4000-8000-000000000030",
+  "count_remaining": "2.000000"
+}
+```
+
+### `GET /low-stock-reports`
+
+- Requires bearer auth. Branch-scoped visibility as above.
+- Query parameters: optional `branch_id`, optional `workspace_product_id`, optional `cursor`,
+  optional `limit` capped at 100 and defaulting to 50.
+- Returns `200` with `items` of `LowStockReport` and nullable `next_cursor`.
+
+### Durable push notifications on decision (no dedicated endpoint)
+
+- Not a client-facing surface — `push_notification` has no `authenticated` grant at all and no
+  router of its own. Documented here because it is the direct behavioural consequence of
+  `POST /requests/{request_id}/approve` and `POST /requests/{request_id}/reject` (R2.1 section
+  above): each decision writes a `push_notification` row **in the same transaction** as the
+  decision itself, then enqueues a send job. A decision's own HTTP response is unaffected by
+  whether that job ever actually sends — there is no real FCM/APNs provider configured in this
+  codebase, so a real device registration's send attempt is an honest, deliberate stub that
+  currently always reports failure rather than a fabricated success (FR-008 is still satisfied:
+  zero registrations correctly reports `sent`, since there was nothing to attempt).
+
+**Note on `Idempotency-Key` enforcement across this API**: as of this chunk, real
+database-level enforcement exists for `POST /requests`; `POST /requests/{request_id}/submit`
+is documented above as accepting the header but does not yet enforce it server-side (a client
+retrying a submit whose response was lost gets `409 not_draft`, not the original success — the
+mobile offline-queue client handles this narrow case itself by treating that specific conflict as
+success once the request has actually moved past `draft`, rather than looping forever); and
+`POST /low-stock-reports` enforces it per the endpoint above. Do not assume every endpoint that
+accepts the header actually enforces it — check the specific endpoint's own section.
+
+---
+
 ## Health
 
 ### `GET /health`
