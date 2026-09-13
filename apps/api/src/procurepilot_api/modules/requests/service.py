@@ -122,6 +122,9 @@ class RequestsService:
         )
 
         client = authenticated_client(self._settings, bearer_token)
+        self._authorize_branch_for_write(
+            client, member=member, branch_id=payload.branch_id
+        )
         row_data: dict[str, object] = {
             "tenant_id": str(member.tenant_id),
             "branch_id": str(payload.branch_id),
@@ -521,6 +524,11 @@ class RequestsService:
         if str(existing["status"]) != "draft":
             raise ConflictError(details={"reason": "not_draft"})
         _require_requester(existing, member)
+
+        if "branch_id" in patch.model_fields_set and patch.branch_id is not None:
+            self._authorize_branch_for_write(
+                client, member=member, branch_id=patch.branch_id
+            )
 
         updates: dict[str, object] = {}
         for field in ("branch_id", "cost_centre_id", "required_by_date"):
