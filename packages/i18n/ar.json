@@ -1922,5 +1922,174 @@
     "countRemainingLabel": "الكمية المتبقية",
     "submittedMessage": "تم إرسال بلاغ انخفاض المخزون.",
     "queuedMessage": "بلاغ انخفاض المخزون في قائمة الانتظار — سيتم الإرسال عند عودة الاتصال."
+  },
+  "advancedBasket": {
+    "title": "تحسين السلة المتقدم",
+    "subtitle": "تحسين المشتريات عبر موردين متعددين مع قيود تجارية وضوابط المخاطر.",
+    "constraintsSectionTitle": "القيود التجارية",
+    "weights": {
+      "sectionTitle": "أوزان التحسين",
+      "price": "السعر",
+      "preferred_supplier": "المورد المفضل",
+      "risk": "المخاطر",
+      "lead_time": "وقت التسليم",
+      "quality": "الجودة"
+    },
+    "riskTolerance": {
+      "label": "تحمّل المخاطر",
+      "low": "منخفض — يفضّل الموردين الموثوقين والمجرّبين",
+      "medium": "متوسط — يوازن بين التكلفة والموثوقية",
+      "high": "عالٍ — يقبل قدراً أكبر من عدم اليقين مقابل تكلفة أفضل"
+    },
+    "urgency": {
+      "label": "الاستعجالية",
+      "normal": "عادي",
+      "urgent": "عاجل — يُقدّم وقت التسليم"
+    },
+    "supplierExclusions": {
+      "label": "استثناء الموردين",
+      "placeholder": "اختر الموردين المُستثنَين...",
+      "hint": "لن يُؤخذ الموردون المستثنَون بعين الاعتبار لأي بند في السلة."
+    },
+    "solverStatus": {
+      "queued": "في قائمة الانتظار — بانتظار التحسين...",
+      "running": "جاري تحسين السلة مع تطبيق القيود...",
+      "completed": "اكتمل التحسين",
+      "failed": "فشل التحسين",
+      "failedMessage": "واجه المحلّل خطأً. يُرجى مراجعة القيود والمحاولة مجدداً."
+    },
+    "result": {
+      "feasibleTitle": "التخصيص المُقيَّد الموصى به",
+      "feasibleSubtitle": "أقل تكلفة مُعتمَدة تستوفي جميع القيود المُهيَّأة.",
+      "infeasibleTitle": "تقرير عدم الجدوى التجارية",
+      "infeasibleSubtitle": "اكتمل المحلّل بنجاح، لكن لا يوجد تخصيص ممكن يستوفي جميع القيود.",
+      "appliedConstraints": "القيود المطبّقة",
+      "violatedConstraints": "القيود المنتهكة",
+      "riskNotes": "ملاحظات المخاطر",
+      "solverConfidence": "ثقة المحلّل",
+      "validity": "صلاحية النتيجة",
+      "totalLandedCost": "إجمالي تكلفة الاستلام المحسَّنة",
+      "singleSupplierBaselines": "خطوط الأساس لمورد واحد",
+      "singleSupplierBaselineSubtitle": "يُقيّم ما إذا كان التقسيم يوفّر تكاليف مقارنةً بالتخصيص لمورد واحد.",
+      "solverVersion": "إصدار المحلّل: {{version}}",
+      "computedAt": "حُسب في {{time}}"
+    },
+    "actions": {
+      "rerun": "إعادة تشغيل التحسين",
+      "newSplit": "بدء تقسيم جديد",
+      "viewCompare": "مقارنة عروض المنتجات"
+    }
+  },
+  "supplierIq": {
+    "header": "بطاقة أداء المورد",
+    "backToSupplier": "العودة إلى المورد",
+    "metrics": {
+      "sectionTitle": "مقاييس الأداء",
+      "fulfilmentRate": "معدل الوفاء",
+      "onTimeDelivery": "التسليم في الموعد",
+      "qualityScore": "درجة الجودة",
+      "priceCompetitiveness": "تنافسية السعر",
+      "spendExposure": "حجم الإنفاق",
+      "disputeRate": "معدل النزاعات"
+    },
+    "sampleCounts": {
+      "label": "حجم العيّنة",
+      "quotations": "{{count}} عرض أسعار",
+      "deliveries": "{{count}} سجل تسليم",
+      "qualityIssues": "{{count}} مشكلة جودة"
+    },
+    "riskScore": {
+      "label": "درجة المخاطر",
+      "breakdown": "تفاصيل درجة المخاطر",
+      "low": "مخاطر منخفضة",
+      "medium": "مخاطر متوسطة",
+      "high": "مخاطر عالية"
+    },
+    "sourceEvidence": {
+      "sectionTitle": "مصادر الأدلة",
+      "quotationCount": "عروض الأسعار المُحلَّلة",
+      "deliveryCount": "سجلات التسليم",
+      "qualityIssueCount": "مشكلات الجودة المُسجَّلة"
+    },
+    "insufficientEvidence": {
+      "badge": "أدلة غير كافية",
+      "notice": "لا تتوفر بيانات تاريخية كافية لاحتساب بطاقة أداء موثوقة لهذا المورد. ستتحسن الدرجات مع إضافة المزيد من عروض الأسعار وسجلات التسليم."
+    },
+    "confidence": {
+      "label": "ثقة بطاقة الأداء",
+      "high": "عالية",
+      "medium": "متوسطة",
+      "low": "منخفضة"
+    }
+  },
+  "supplierTerms": {
+    "header": "الشروط التجارية",
+    "addTerms": "إضافة شروط",
+    "editTerms": "تعديل الشروط",
+    "currentTermBadge": "ساري",
+    "effectiveFrom": "ساري من",
+    "effectiveTo": "ساري حتى",
+    "mov": {
+      "label": "الحد الأدنى لقيمة الطلب",
+      "hint": "الحد الأدنى للمبلغ اللازم لتقديم طلب لدى هذا المورد."
+    },
+    "deliveryFee": {
+      "label": "رسوم التوصيل",
+      "hint": "رسوم ثابتة يفرضها هذا المورد لكل عملية توصيل."
+    },
+    "freeDeliveryThreshold": {
+      "label": "حد التوصيل المجاني",
+      "hint": "قيمة الطلب التي يُوفَّر عندها التوصيل مجاناً."
+    },
+    "quantityTiers": {
+      "sectionTitle": "شرائح أسعار الكميات",
+      "minQuantity": "الحد الأدنى للكمية",
+      "tierPrice": "سعر الشريحة",
+      "product": "المنتج",
+      "addTier": "إضافة شريحة",
+      "removeTier": "إزالة الشريحة"
+    },
+    "empty": "لم يتم تهيئة أي شروط تجارية لهذا المورد.",
+    "saveSuccess": "تم حفظ الشروط التجارية بنجاح.",
+    "genericError": "تعذر حفظ الشروط التجارية. يُرجى المحاولة مرة أخرى."
+  },
+  "anomalies": {
+    "title": "الكشف عن الشذوذات",
+    "subtitle": "الكشف التلقائي عن مخالفات البيانات التجارية التي تستوجب المراجعة.",
+    "kinds": {
+      "price_spike": "ارتفاع مفاجئ في السعر",
+      "likely_duplicate_quotation_line": "بند عرض سعر مكرّر على الأرجح",
+      "decimal_or_quantity_anomaly": "شذوذ في الأرقام العشرية أو الكميات",
+      "delivery_cost_anomaly": "شذوذ في تكلفة التوصيل",
+      "supplier_quality_trend_change": "تغيّر في اتجاه جودة المورد"
+    },
+    "severities": {
+      "critical": "حرج",
+      "warning": "تحذير",
+      "info": "معلوماتي"
+    },
+    "confidence": {
+      "label": "ثقة الكشف",
+      "high": "عالية",
+      "medium": "متوسطة",
+      "low": "منخفضة"
+    },
+    "sourceEvidence": {
+      "quotation": "عرض السعر: {{id}}",
+      "supplier": "المورد: {{name}}",
+      "product": "المنتج: {{name}}",
+      "detectedAt": "تم الكشف في {{time}}"
+    },
+    "actions": {
+      "inspectScorecard": "فحص بطاقة الأداء",
+      "compareProduct": "مقارنة المنتج",
+      "reviewQuotation": "مراجعة عرض السعر",
+      "viewDeliveryIssues": "عرض مشكلات التسليم",
+      "dismiss": "إغلاق"
+    },
+    "empty": {
+      "title": "لا توجد شذوذات",
+      "message": "لم يتم الكشف عن أي مخالفات في البيانات التجارية في مساحة العمل الحالية."
+    }
   }
 }
