@@ -80,9 +80,7 @@ void main() {
 
         // 3. Verify the same request is visible in the approval queue.
         final pending = await approvalsClient.listPendingApprovals();
-        final matched = pending.items.any(
-          (item) => item['id'] == submitted.id,
-        );
+        final matched = pending.items.any((item) => item.id == submitted.id);
         expect(
           matched,
           isTrue,
@@ -129,16 +127,13 @@ _TestConfig _config() {
     defaultValue: 'milk',
   );
 
-  if (apiBaseUrl.isEmpty ||
-      requesterToken.isEmpty ||
-      approverToken.isEmpty) {
+  if (apiBaseUrl.isEmpty || requesterToken.isEmpty || approverToken.isEmpty) {
     return const _TestConfig(
       apiBaseUrl: '',
       requesterAccessToken: '',
       approverAccessToken: '',
       productSearchKeyword: '',
-      skipReason:
-          'E2E_REQUESTER_TOKEN and E2E_APPROVER_TOKEN must be set to run the real HTTP integration test',
+      skipReason: 'E2E_REQUESTER_TOKEN and E2E_APPROVER_TOKEN must be set to run the real HTTP integration test',
     );
   }
 
@@ -170,4 +165,3 @@ String _uuid() {
       '${hex.substring(16, 20)}-'
       '${hex.substring(20, 32)}';
 }
-

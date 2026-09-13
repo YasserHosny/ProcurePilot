@@ -76,6 +76,7 @@ class _SignInScreenState extends State<SignInScreen> {
     final token = services.authService.accessToken;
     services.mobileApiClient.accessToken = token;
     services.approvalsApiClient.accessToken = token;
+    services.requestsApiClient.accessToken = token;
   }
 
   String? _emailValidator(String? value) {

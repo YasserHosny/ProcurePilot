@@ -1783,6 +1783,7 @@
     "approveSuccess": "Request approved.",
     "rejectSuccess": "Request rejected.",
     "genericError": "Unable to record the decision. Please try again.",
+    "alreadyDecided": "This request has already been decided by someone else.",
     "empty": "No requests are currently awaiting your decision.",
     "notAvailable": "Not available",
     "line": "line",

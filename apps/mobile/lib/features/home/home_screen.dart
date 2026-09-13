@@ -13,8 +13,8 @@ import '../service_provider.dart';
 /// - Request-capable roles (owner, buyer, branch_manager) see a primary
 ///   "Request items" action. The actual request-submission flow is Phase 4;
 ///   the button is currently disabled/placeholder.
-/// - Approvers additionally see a read-only count of pending decisions from
-///   [GET /approvals/pending]. No approve/reject control is rendered.
+/// - Approvers additionally see an entry point to pending decisions from
+///   [GET /approvals/pending].
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -121,7 +121,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   key: const Key('homeRequestItemsButton'),
                   icon: const Icon(Icons.add_shopping_cart),
                   label: Text(i18n.t('mobileHome.requestItems')),
-                  onPressed: () => Navigator.of(context).pushNamed('/requests/new'),
+                  onPressed: () =>
+                      Navigator.of(context).pushNamed('/requests/new'),
                 ),
               if (isApprover) ...[
                 const SizedBox(height: 24),
@@ -130,6 +131,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   loading: _pendingCountLoading,
                   error: _pendingCountError,
                   i18n: i18n,
+                  onTap: () => Navigator.of(context).pushNamed('/approvals'),
                 ),
               ],
             ],
@@ -146,12 +148,14 @@ class _PendingCountWidget extends StatelessWidget {
     required this.loading,
     required this.error,
     required this.i18n,
+    required this.onTap,
   });
 
   final int? count;
   final bool loading;
   final String? error;
   final I18nLoader i18n;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -168,15 +172,18 @@ class _PendingCountWidget extends StatelessWidget {
 
     final displayCount = count ?? 0;
     return Card(
-      key: const Key('pendingApprovalsCount'),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Text(
-          i18n.t(
-            'mobileHome.pendingApprovalsCount',
-            params: {'count': displayCount.toString()},
+      child: InkWell(
+        key: const Key('pendingApprovalsCount'),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Text(
+            i18n.t(
+              'mobileHome.pendingApprovalsCount',
+              params: {'count': displayCount.toString()},
+            ),
+            style: Theme.of(context).textTheme.bodyLarge,
           ),
-          style: Theme.of(context).textTheme.bodyLarge,
         ),
       ),
     );

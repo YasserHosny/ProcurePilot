@@ -35,103 +35,153 @@ class RequestDetailScreen extends StatelessWidget {
     }
 
     final i18n = _i18n(context);
-    final step = req.approvalStep;
-
     return Scaffold(
       appBar: AppBar(title: Text(i18n.t('requests.title'))),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            _InfoRow(
-              label: i18n.t('requests.columns.requiredByDate'),
-              value: req.requiredByDate,
-            ),
-            _InfoRow(
-              label: i18n.t('requests.columns.status'),
-              value: i18n.t('requests.status.${req.status}'),
-            ),
-            if (req.estimatedTotal != null)
-              _InfoRow(
-                label: i18n.t('requests.columns.estimatedTotal'),
-                value:
-                    '${req.estimatedTotal!.currency} ${req.estimatedTotal!.amount}',
-              ),
-            if (req.hasIncompleteEstimate)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                child: Chip(
-                  label: Text(i18n.t('requests.incompleteEstimateBadge')),
-                ),
-              ),
-            const Divider(),
-            Text(
-              i18n.t('requests.form.linesTitle'),
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            const SizedBox(height: 8),
-            ...req.lines.asMap().entries.map((entry) {
-              final line = entry.value;
-              return Card(
-                child: ListTile(
-                  key: Key('requestDetailLine_${entry.key}'),
-                  title: Text(line.workspaceProductId),
-                  subtitle: Text(
-                    '${i18n.t('requests.form.quantityLabel')}: ${line.quantity}',
-                  ),
-                  trailing:
-                      line.estimatedUnitPrice != null
-                          ? Text(
-                            '${line.estimatedUnitPrice!.currency} ${line.estimatedUnitPrice!.amount}',
-                          )
-                          : null,
-                ),
-              );
-            }),
-            if (step != null) ...[
-              const Divider(),
-              Text(
-                i18n.t('requests.approval.sectionTitle'),
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
-              const SizedBox(height: 8),
-              Chip(
-                key: Key('approvalStepStatus_${step.status}'),
-                label: Text(i18n.t('requests.status.${step.status}')),
-              ),
-              _InfoRow(
-                label: i18n.t('requests.approval.assignedTo'),
-                value: step.assignedMembershipId,
-              ),
-              if (step.status != 'pending') ...[
-                if (step.comment != null)
-                  _InfoRow(
-                    label: i18n.t('requests.approval.comment'),
-                    value: step.comment!,
-                  ),
-                if (step.decidedAt != null)
-                  _InfoRow(
-                    label: i18n.t('requests.approval.decidedAt'),
-                    value: step.decidedAt!.toIso8601String(),
-                  ),
-              ] else
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  child: Text(i18n.t('requests.approval.pending')),
-                ),
-            ],
+            RequestContextSection(request: req),
+            RequestApprovalStepSection(request: req),
           ],
         ),
       ),
     );
   }
 
-  I18nLoader _i18n(BuildContext context) =>
-      ServiceProvider.of(context).i18n;
+  I18nLoader _i18n(BuildContext context) => ServiceProvider.of(context).i18n;
 }
 
-class _InfoRow extends StatelessWidget {
-  const _InfoRow({required this.label, required this.value});
+class RequestContextSection extends StatelessWidget {
+  const RequestContextSection({super.key, required this.request});
+
+  final PurchaseRequest request;
+
+  @override
+  Widget build(BuildContext context) {
+    final i18n = ServiceProvider.of(context).i18n;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        RequestInfoRow(
+          label: i18n.t('requests.columns.requiredByDate'),
+          value: request.requiredByDate,
+        ),
+        RequestInfoRow(
+          label: i18n.t('requests.columns.status'),
+          value: i18n.t('requests.status.${request.status}'),
+        ),
+        RequestInfoRow(
+          label: i18n.t('approvals.columns.requester'),
+          value: request.requestedByMembershipId,
+        ),
+        if (request.estimatedTotal != null)
+          RequestInfoRow(
+            label: i18n.t('requests.columns.estimatedTotal'),
+            value:
+                '${request.estimatedTotal!.currency} ${request.estimatedTotal!.amount}',
+          ),
+        if (request.budgetStatus != null) ...[
+          RequestInfoRow(
+            label: i18n.t('requests.budgetStatus.remainingLabel'),
+            value:
+                '${request.budgetStatus!.remainingAmount.currency} ${request.budgetStatus!.remainingAmount.amount}',
+          ),
+          if (request.budgetStatus!.exceeds)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Chip(
+                key: const Key('requestBudgetExceeded'),
+                label: Text(i18n.t('requests.budgetStatus.exceedsWarning')),
+              ),
+            ),
+        ],
+        if (request.hasIncompleteEstimate)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Chip(
+              label: Text(i18n.t('requests.incompleteEstimateBadge')),
+            ),
+          ),
+        const Divider(),
+        Text(
+          i18n.t('requests.form.linesTitle'),
+          style: Theme.of(context).textTheme.titleMedium,
+        ),
+        const SizedBox(height: 8),
+        ...request.lines.asMap().entries.map((entry) {
+          final line = entry.value;
+          return Card(
+            child: ListTile(
+              key: Key('requestDetailLine_${entry.key}'),
+              title: Text(line.workspaceProductId),
+              subtitle: Text(
+                '${i18n.t('requests.form.quantityLabel')}: ${line.quantity}',
+              ),
+              trailing: line.estimatedUnitPrice != null
+                  ? Text(
+                      '${line.estimatedUnitPrice!.currency} ${line.estimatedUnitPrice!.amount}',
+                    )
+                  : null,
+            ),
+          );
+        }),
+      ],
+    );
+  }
+}
+
+class RequestApprovalStepSection extends StatelessWidget {
+  const RequestApprovalStepSection({super.key, required this.request});
+
+  final PurchaseRequest request;
+
+  @override
+  Widget build(BuildContext context) {
+    final step = request.approvalStep;
+    if (step == null) return const SizedBox.shrink();
+
+    final i18n = ServiceProvider.of(context).i18n;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const Divider(),
+        Text(
+          i18n.t('requests.approval.sectionTitle'),
+          style: Theme.of(context).textTheme.titleMedium,
+        ),
+        const SizedBox(height: 8),
+        Chip(
+          key: Key('approvalStepStatus_${step.status}'),
+          label: Text(i18n.t('requests.status.${step.status}')),
+        ),
+        RequestInfoRow(
+          label: i18n.t('requests.approval.assignedTo'),
+          value: step.assignedMembershipId,
+        ),
+        if (step.status != 'pending') ...[
+          if (step.comment != null)
+            RequestInfoRow(
+              label: i18n.t('requests.approval.comment'),
+              value: step.comment!,
+            ),
+          if (step.decidedAt != null)
+            RequestInfoRow(
+              label: i18n.t('requests.approval.decidedAt'),
+              value: step.decidedAt!.toIso8601String(),
+            ),
+        ] else
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Text(i18n.t('requests.approval.pending')),
+          ),
+      ],
+    );
+  }
+}
+
+class RequestInfoRow extends StatelessWidget {
+  const RequestInfoRow({super.key, required this.label, required this.value});
 
   final String label;
   final String value;

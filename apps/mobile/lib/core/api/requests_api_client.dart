@@ -12,10 +12,10 @@ import 'models.dart';
 /// `GET /approvals/pending` surface.
 ///
 /// This client is the mobile app's caller for the requester-side
-/// `/requests` CRUD surface, plus the supporting organisation/catalogue
+/// `/requests` CRUD surface, its existing human decision endpoints, plus the supporting organisation/catalogue
 /// lookups (`GET /organisation/branches`, `GET /organisation/cost-centres`,
 /// `GET /products`) needed by the request form. It must never reference
-/// the request decision endpoints (FR-009).
+/// a mobile-specific decision path.
 class RequestsApiClient {
   RequestsApiClient({required this.apiBaseUrl, http.Client? httpClient})
     : _httpClient = httpClient ?? http.Client();
@@ -112,6 +112,37 @@ class RequestsApiClient {
     );
   }
 
+  /// Approves a pending purchase request using the existing 008 endpoint.
+  Future<PurchaseRequest> approveRequest(String requestId, {String? comment}) {
+    return _decideRequest(requestId, action: 'approve', comment: comment);
+  }
+
+  /// Rejects a pending purchase request using the existing 008 endpoint.
+  Future<PurchaseRequest> rejectRequest(String requestId, {String? comment}) {
+    return _decideRequest(requestId, action: 'reject', comment: comment);
+  }
+
+  Future<PurchaseRequest> _decideRequest(
+    String requestId, {
+    required String action,
+    String? comment,
+  }) async {
+    final uri = Uri.parse('$apiBaseUrl/requests/$requestId/$action');
+    final trimmedComment = comment?.trim();
+    final response = await _httpClient.post(
+      uri,
+      headers: _headers(),
+      body: jsonEncode({
+        if (trimmedComment != null && trimmedComment.isNotEmpty)
+          'comment': trimmedComment,
+      }),
+    );
+    _checkResponse(response);
+    return PurchaseRequest.fromJson(
+      jsonDecode(response.body) as Map<String, dynamic>,
+    );
+  }
+
   /// Lists active branches for the branch selector.
   Future<BranchList> listBranches({String? cursor, int limit = 100}) async {
     final query = <String, String>{
@@ -128,7 +159,10 @@ class RequestsApiClient {
   }
 
   /// Lists cost centres for the optional cost-centre selector.
-  Future<CostCentreList> listCostCentres({String? cursor, int limit = 100}) async {
+  Future<CostCentreList> listCostCentres({
+    String? cursor,
+    int limit = 100,
+  }) async {
     final query = <String, String>{
       if (cursor != null) 'cursor': cursor,
       'limit': limit.clamp(1, 100).toString(),
