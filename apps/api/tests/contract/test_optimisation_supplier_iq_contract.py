@@ -223,6 +223,7 @@ def test_anomaly_alert_contract_supports_all_r2_4_kinds() -> None:
 def test_supplier_terms_routes_are_registered_on_api_prefix() -> None:
     app_paths = {route.path for route in create_app().routes}
     assert "/api/v1/suppliers/{supplier_id}/commercial-terms" in app_paths
+    assert "/api/v1/suppliers/{supplier_id}/scorecard" in app_paths
 
 
 def test_advanced_basket_result_requires_structured_violations_not_worker_failure() -> None:
