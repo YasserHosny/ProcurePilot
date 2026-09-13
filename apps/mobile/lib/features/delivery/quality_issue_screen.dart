@@ -16,10 +16,7 @@ import '../service_provider.dart';
 ///
 /// Photo evidence is optional per FR-007; zero photos must submit successfully.
 class QualityIssueScreen extends StatefulWidget {
-  const QualityIssueScreen({
-    super.key,
-    this.documentsDirectoryProvider,
-  });
+  const QualityIssueScreen({super.key, this.documentsDirectoryProvider});
 
   /// Injected directory provider for stable photo caching when offline.
   /// Defaults to [getApplicationDocumentsDirectory].
@@ -43,8 +40,7 @@ class _QualityIssueScreenState extends State<QualityIssueScreen> {
 
   RequestsApiClient get _apiClient =>
       ServiceProvider.of(context).requestsApiClient;
-  CameraCapture get _cameraCapture =>
-      ServiceProvider.of(context).cameraCapture;
+  CameraCapture get _cameraCapture => ServiceProvider.of(context).cameraCapture;
   I18nLoader get _i18n => ServiceProvider.of(context).i18n;
 
   @override
@@ -86,7 +82,9 @@ class _QualityIssueScreenState extends State<QualityIssueScreen> {
   Future<void> _submit(PurchaseRequest request) async {
     final description = _descriptionController.text.trim();
     if (description.isEmpty) {
-      setState(() => _descriptionError = _i18n.t('qualityIssue.descriptionRequired'));
+      setState(
+        () => _descriptionError = _i18n.t('qualityIssue.descriptionRequired'),
+      );
       return;
     }
 
@@ -101,7 +99,10 @@ class _QualityIssueScreenState extends State<QualityIssueScreen> {
     final key = _idempotencyKey!;
 
     try {
-      final issue = await _apiClient.reportQualityIssue(request.id, description);
+      final issue = await _apiClient.reportQualityIssue(
+        request.id,
+        description,
+      );
       if (_capturedPhoto != null) {
         await _apiClient.uploadQualityIssuePhoto(
           issue.id,
@@ -207,7 +208,8 @@ class _QualityIssueScreenState extends State<QualityIssueScreen> {
   }
 
   String _qualityIssueErrorMessage(ApiException error) {
-    if (error.statusCode == 409 && error.details?['reason'] == 'not_delivered') {
+    if (error.statusCode == 409 &&
+        error.details?['reason'] == 'not_delivered') {
       return _i18n.t('qualityIssue.notDeliveredError');
     }
     return _i18n.t('qualityIssue.genericError');
@@ -314,7 +316,7 @@ class _QualityIssueScreenState extends State<QualityIssueScreen> {
         child: Text(
           _i18n.t('qualityIssue.cameraUnavailable'),
           key: const Key('qualityIssueCameraUnavailable'),
-          style: TextStyle(color: Theme.of(context).disabledColor),
+          style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
         ),
       );
     }

@@ -201,7 +201,14 @@ def _client_for(
         return _AuditReplayClient(conn)
 
     service = RequestsService.__new__(RequestsService)
-    service._settings = object()
+    # A bare object() was enough for create_request/submit_request (only ever passed through to
+    # authenticated_client, itself monkeypatched above) but approve_request's own
+    # _decide_and_notify opens a SEPARATE raw psycopg connection via
+    # self._settings.database_url.get_secret_value() for its atomic multi-write transaction
+    # (Wave 9's own approved->ordered change) -- it needs a real Settings with a real
+    # database_url, matching test_decision_atomicity.py's own precedent for exercising that exact
+    # method against real Postgres.
+    service._settings = _test_settings()
     service._estimate_products = lambda product_ids: [
         LineEstimate(None, None, None) for _product_id in product_ids
     ]
@@ -336,3 +343,216 @@ def test_post_low_stock_reports_records_low_stock_report_created(
         outcome, target = row
         assert outcome == "success"
         assert target == {"low_stock_report_id": report_id}
+
+
+# ── T034 (010-mobile-approvals-receipt): mobile approvals/receipt audit coverage ──
+#
+# Same gap this file was written to close, for three more actions this chunk adds: a real
+# TestClient(app) round trip through the actual endpoints, not just a check that the service's
+# own source code emits the right action string. `workspace` is the OWNER in every case here
+# (make_workspace's own row), so `_require_assigned_approver_or_owner`'s and
+# `_authorize_delivery_confirmation`'s owner-bypass branches let one caller drive
+# create -> submit -> approve -> confirm-delivery -> quality-issue without any extra
+# branch-assignment plumbing.
+
+
+def test_post_requests_approve_records_approval_step_approved(
+    conn: psycopg.Connection,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    with conn.cursor() as cur:
+        workspace = make_workspace(cur, "mobile-audit-approve")
+        branch_id = _make_branch(cur, workspace)
+        product_id = make_workspace_product(cur, workspace, name="Audit Approve Widget")
+    # approve_request's own _decide_and_notify opens a SEPARATE raw psycopg connection (its own
+    # atomic multi-write transaction, Wave 9's approved->ordered change) -- that connection can
+    # only see this fixture's rows once they're actually committed, not merely written on `conn`'s
+    # own still-open transaction (matches test_decision_atomicity.py's own precedent for this
+    # exact situation).
+    conn.commit()
+    with conn.cursor() as cur:
+        act_as(cur, workspace)
+
+        client = _client_for(conn, workspace, monkeypatch)
+        headers = {"Authorization": "Bearer test-token"}
+        created = client.post(
+            "/api/v1/requests",
+            json={
+                "branch_id": str(branch_id),
+                "required_by_date": (date.today() + timedelta(days=7)).isoformat(),
+                "lines": [
+                    {"workspace_product_id": str(product_id), "quantity": "3.000000"}
+                ],
+            },
+            headers=headers,
+        )
+        assert created.status_code == 201, created.text
+        request_id = created.json()["id"]
+
+        submitted = client.post(
+            f"/api/v1/requests/{request_id}/submit", headers=headers
+        )
+        assert submitted.status_code == 200, submitted.text
+        approval_step_id = submitted.json()["approval_step"]["id"]
+
+    # Same reasoning as the earlier commit: the request/step just created+submitted via `conn`
+    # are only visible to _decide_and_notify's own separate connection once committed here.
+    conn.commit()
+    with conn.cursor() as cur:
+        act_as(cur, workspace)
+        approved = client.post(
+            f"/api/v1/requests/{request_id}/approve",
+            json={"comment": "Approved for audit coverage"},
+            headers=headers,
+        )
+        assert approved.status_code == 200, approved.text
+        assert approved.json()["status"] == "ordered"
+
+        row = _audit_row(
+            cur, tenant_id=workspace.tenant_id, action="requests.approval_step_approved"
+        )
+        assert row is not None
+        outcome, target = row
+        assert outcome == "success"
+        assert target == {
+            "purchase_request_id": request_id,
+            "approval_step_id": approval_step_id,
+            "decided_by_membership_id": str(workspace.membership_id),
+        }
+
+
+def test_post_confirm_delivery_records_delivery_confirmed(
+    conn: psycopg.Connection,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    with conn.cursor() as cur:
+        workspace = make_workspace(cur, "mobile-audit-delivery")
+        branch_id = _make_branch(cur, workspace)
+        product_id = make_workspace_product(cur, workspace, name="Audit Delivery Widget")
+    conn.commit()
+    with conn.cursor() as cur:
+        act_as(cur, workspace)
+
+        client = _client_for(conn, workspace, monkeypatch)
+        headers = {"Authorization": "Bearer test-token"}
+        created = client.post(
+            "/api/v1/requests",
+            json={
+                "branch_id": str(branch_id),
+                "required_by_date": (date.today() + timedelta(days=7)).isoformat(),
+                "lines": [
+                    {"workspace_product_id": str(product_id), "quantity": "3.000000"}
+                ],
+            },
+            headers=headers,
+        )
+        assert created.status_code == 201, created.text
+        request_id = created.json()["id"]
+        line_id = created.json()["lines"][0]["id"]
+
+        submitted = client.post(
+            f"/api/v1/requests/{request_id}/submit", headers=headers
+        )
+        assert submitted.status_code == 200, submitted.text
+
+    # approve_request's own _decide_and_notify opens a separate connection that needs the
+    # just-submitted request/step actually committed to see them (see the earlier test's own
+    # comment for the full explanation).
+    conn.commit()
+    with conn.cursor() as cur:
+        act_as(cur, workspace)
+        approved = client.post(
+            f"/api/v1/requests/{request_id}/approve", json={}, headers=headers
+        )
+        assert approved.status_code == 200, approved.text
+        assert approved.json()["status"] == "ordered"
+
+        confirmed = client.post(
+            f"/api/v1/requests/{request_id}/confirm-delivery",
+            json={
+                "lines": [
+                    {"purchase_request_line_id": line_id, "quantity_received": "3.000000"}
+                ]
+            },
+            headers=headers,
+        )
+        assert confirmed.status_code == 200, confirmed.text
+        assert confirmed.json()["status"] == "delivered"
+
+        row = _audit_row(
+            cur, tenant_id=workspace.tenant_id, action="requests.delivery_confirmed"
+        )
+        assert row is not None
+        outcome, target = row
+        assert outcome == "success"
+        assert target == {"purchase_request_id": request_id}
+
+
+def test_post_quality_issues_records_quality_issue_reported(
+    conn: psycopg.Connection,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    with conn.cursor() as cur:
+        workspace = make_workspace(cur, "mobile-audit-quality")
+        branch_id = _make_branch(cur, workspace)
+        product_id = make_workspace_product(cur, workspace, name="Audit Quality Widget")
+    conn.commit()
+    with conn.cursor() as cur:
+        act_as(cur, workspace)
+
+        client = _client_for(conn, workspace, monkeypatch)
+        headers = {"Authorization": "Bearer test-token"}
+        created = client.post(
+            "/api/v1/requests",
+            json={
+                "branch_id": str(branch_id),
+                "required_by_date": (date.today() + timedelta(days=7)).isoformat(),
+                "lines": [
+                    {"workspace_product_id": str(product_id), "quantity": "3.000000"}
+                ],
+            },
+            headers=headers,
+        )
+        assert created.status_code == 201, created.text
+        request_id = created.json()["id"]
+        line_id = created.json()["lines"][0]["id"]
+
+        submitted = client.post(
+            f"/api/v1/requests/{request_id}/submit", headers=headers
+        )
+        assert submitted.status_code == 200, submitted.text
+
+    conn.commit()
+    with conn.cursor() as cur:
+        act_as(cur, workspace)
+        approved = client.post(
+            f"/api/v1/requests/{request_id}/approve", json={}, headers=headers
+        )
+        assert approved.status_code == 200, approved.text
+
+        confirmed = client.post(
+            f"/api/v1/requests/{request_id}/confirm-delivery",
+            json={
+                "lines": [
+                    {"purchase_request_line_id": line_id, "quantity_received": "3.000000"}
+                ]
+            },
+            headers=headers,
+        )
+        assert confirmed.status_code == 200, confirmed.text
+
+        reported = client.post(
+            f"/api/v1/requests/{request_id}/quality-issues",
+            json={"description": "Box arrived crushed"},
+            headers=headers,
+        )
+        assert reported.status_code == 201, reported.text
+        issue_id = reported.json()["id"]
+
+        row = _audit_row(
+            cur, tenant_id=workspace.tenant_id, action="requests.quality_issue_reported"
+        )
+        assert row is not None
+        outcome, target = row
+        assert outcome == "success"
+        assert target == {"delivery_quality_issue_id": issue_id}

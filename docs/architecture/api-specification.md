@@ -1381,10 +1381,13 @@ Request:
   (FR-007).
 - Request fields: optional `comment`.
 - Records a human decision — sets `status`, `decided_by_membership_id`, and `decided_at`
-  together on the step (FR-006, enforced by the `approval_step` check constraint), moves the
-  request to `approved` / `rejected`, and audits `requests.approval_step_approved` /
-  `requests.approval_step_rejected`. The request row is updated before the step so a concurrent
-  withdrawal cannot strand a decided step on a non-submitted request.
+  together on the step (FR-006, enforced by the `approval_step` check constraint), and audits
+  `requests.approval_step_approved` / `requests.approval_step_rejected` recording that human
+  decision unchanged. The request row itself moves to **`ordered`** on approval (not `approved` —
+  as of chunk R2.3, `010-mobile-approvals-receipt`, there is no separate "place the order" human
+  action this release, so the same decision that approves a request is also what marks it
+  ordered) or to `rejected` on rejection. The request row is updated before the step so a
+  concurrent withdrawal cannot strand a decided step on a non-submitted request.
 - Returns `200` with the `PurchaseRequest`.
 - Returns `403` (`not_assigned_approver`) when the caller is neither the assignee nor an owner.
 - Returns `409` (`not_submitted` or `no_pending_approval`) when the request has already left
@@ -1538,6 +1541,79 @@ mobile offline-queue client handles this narrow case itself by treating that spe
 success once the request has actually moved past `draft`, rather than looping forever); and
 `POST /low-stock-reports` enforces it per the endpoint above. Do not assume every endpoint that
 accepts the header actually enforces it — check the specific endpoint's own section.
+
+---
+
+## Delivered Mobile Approvals and Delivery Receipt API (chunk R2.3, `010-mobile-approvals-receipt`)
+
+Delivery confirmation and delivery-quality reporting, extending `PurchaseRequest`'s own lifecycle
+rather than the pre-existing, unrelated `PurchaseRecord` entity (research.md R1). The approval
+decision endpoints themselves (`POST /requests/{request_id}/approve` · `/reject`, R2.1 section
+above) are reused completely unchanged by the mobile client — this chunk adds no new decision
+surface, only what happens after a decision (research.md R2). Full contract:
+`specs/010-mobile-approvals-receipt/contracts/mobile-approvals-receipt.openapi.yaml`.
+
+### `POST /requests/{request_id}/confirm-delivery`
+
+- Requires bearer auth. The caller must be the request's own requester or hold branch-scoped
+  write access for the request's branch (the same authorization shape `low_stock_report` already
+  uses for its own requester-initiated action) — an owner or an unscoped member always qualifies.
+- Requires the request's `status` to be `ordered`.
+- Request fields: required `lines`, an array of `{purchase_request_line_id, quantity_received}`
+  (decimal string, `>= 0`) — at least one line required.
+- Records each line's `quantity_received`, derives `has_delivery_discrepancy` (`true` if any
+  line's received quantity was short of ordered — over-delivery is not a discrepancy this
+  release), stamps `delivered_at`/`delivery_confirmed_by_membership_id`, moves the request to
+  `delivered`, and audits `requests.delivery_confirmed`.
+- Returns `200` with the `PurchaseRequest` (now including `delivered_at`,
+  `delivery_confirmed_by_membership_id`, `has_delivery_discrepancy`, and each line's
+  `quantity_received`).
+- Returns `403` when the caller is neither the requester nor authorized for the branch.
+- Returns `409` (`not_ordered`) when the request is not currently `ordered`.
+
+Request:
+```json
+{
+  "lines": [
+    { "purchase_request_line_id": "00000000-0000-4000-8000-000000000040", "quantity_received": "3.000000" }
+  ]
+}
+```
+
+### `POST /requests/{request_id}/quality-issues` · `GET /requests/{request_id}/quality-issues`
+
+- Requires bearer auth. Visibility/write access follows the parent request's own scoped-
+  visibility policy — no separate branch-authorization check on top of it (unlike
+  `confirm-delivery` above), since reporting a quality issue does not mutate the request itself.
+- `POST` requires the request's `status` to be `delivered`. Request fields: required
+  non-empty `description`. Photos are attached afterward via the endpoint below, not in this call
+  — FR-007 requires a report with zero photos to succeed.
+- `POST` returns `201` with the created `QualityIssue` (`photos: []`); audits
+  `requests.quality_issue_reported`.
+- `POST` returns `409` (`not_delivered`) when the request is not currently `delivered`.
+- `GET` returns `200` with `items` of `QualityIssue`, each embedding its own `photos` (each with a
+  freshly-generated signed `url`, never a raw storage path).
+
+Request:
+```json
+{ "description": "Outer carton crushed, two bottles broken on arrival" }
+```
+
+### `POST /quality-issues/{issue_id}/photos`
+
+- Requires bearer auth. `multipart/form-data` with a single `file` field — the server receives
+  the bytes directly (a simpler, single-request shape than `POST /documents/presign`'s two-step
+  presigned-upload dance elsewhere in this API, appropriate for a small single photo capped at
+  10MB by the `quality-issue-photos` bucket's own `file_size_limit`).
+- Allocates the Storage path server-side under
+  `tenants/{tenant_id}/quality-issues/{issue_id}/{filename}` (the client never supplies a path;
+  the filename itself is sanitized against path traversal) and uploads via the tenant-scoped
+  client — `quality-issue-photos`' own RLS already permits this, no service-role bypass needed.
+  Multiple calls attach multiple photos (`delivery_quality_issue_photo` is a one-to-many child,
+  not a single column).
+- Returns `201` with the `QualityIssuePhoto` (`id`, `delivery_quality_issue_id`, a signed
+  time-limited `url`, `created_at`) — audits `requests.quality_issue_photo_attached`.
+- Returns `404` when the referenced quality issue is not in the caller's tenant.
 
 ---
 

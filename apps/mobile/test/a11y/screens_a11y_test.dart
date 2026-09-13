@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:procurepilot_mobile/core/api/models.dart';
+import 'package:procurepilot_mobile/features/approvals/approval_decision_screen.dart';
+import 'package:procurepilot_mobile/features/approvals/approval_queue_screen.dart';
 import 'package:procurepilot_mobile/features/auth/sign_in_screen.dart';
+import 'package:procurepilot_mobile/features/delivery/delivery_confirmation_screen.dart';
+import 'package:procurepilot_mobile/features/delivery/quality_issue_screen.dart';
 import 'package:procurepilot_mobile/features/home/home_screen.dart';
 import 'package:procurepilot_mobile/features/low_stock/low_stock_report_screen.dart';
 import 'package:procurepilot_mobile/features/requests/request_form_screen.dart';
@@ -81,7 +85,11 @@ void main() {
             ..refreshToken = 'refresh-token'
             ..tokenRole = 'branch_manager';
 
-      await pumpWithServices(tester, child: const HomeScreen(), authService: auth);
+      await pumpWithServices(
+        tester,
+        child: const HomeScreen(),
+        authService: auth,
+      );
       await tester.pumpAndSettle();
 
       await _checkGuidelines(tester);
@@ -157,4 +165,142 @@ void main() {
       expect(find.byKey(const Key('lowStockSubmitButton')), findsOneWidget);
     });
   });
+
+  // T035 (010-mobile-approvals-receipt): the four screens this chunk adds. Approval decision,
+  // delivery confirmation, and quality-issue report all read a PurchaseRequest from their
+  // route arguments rather than a constructor parameter, so each is reached via a real
+  // Navigator push (mirroring how this codebase's own widget tests for these screens already
+  // do it) rather than pumped as `child` directly.
+  group('Approval queue screen accessibility', () {
+    testWidgets('meets tap-target, contrast, and label guidelines', (
+      tester,
+    ) async {
+      final fakeApprovals = FakeApprovalsApiClient()
+        ..pendingResults = [_sampleRequest(status: 'submitted')];
+
+      await pumpWithServices(
+        tester,
+        child: const ApprovalQueueScreen(),
+        approvalsApiClient: fakeApprovals,
+      );
+      await tester.pumpAndSettle();
+
+      await _checkGuidelines(tester);
+
+      expect(find.byKey(const Key('approvalQueueList')), findsOneWidget);
+    });
+  });
+
+  group('Approval decision screen accessibility', () {
+    testWidgets('meets tap-target, contrast, and label guidelines', (
+      tester,
+    ) async {
+      await _pumpArgScreen(
+        tester,
+        request: _sampleRequest(status: 'submitted'),
+        builder: (_) => const ApprovalDecisionScreen(),
+      );
+
+      await _checkGuidelines(tester);
+
+      expect(
+        find.byKey(const Key('approvalDecisionApproveButton')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('approvalDecisionRejectButton')),
+        findsOneWidget,
+      );
+    });
+  });
+
+  group('Delivery confirmation screen accessibility', () {
+    testWidgets('meets tap-target, contrast, and label guidelines', (
+      tester,
+    ) async {
+      await _pumpArgScreen(
+        tester,
+        request: _sampleRequest(status: 'ordered'),
+        builder: (_) => const DeliveryConfirmationScreen(),
+      );
+
+      await _checkGuidelines(tester);
+
+      expect(find.byKey(const Key('deliverySubmitButton')), findsOneWidget);
+    });
+  });
+
+  group('Quality issue report screen accessibility', () {
+    testWidgets('meets tap-target, contrast, and label guidelines', (
+      tester,
+    ) async {
+      await _pumpArgScreen(
+        tester,
+        request: _sampleRequest(status: 'delivered'),
+        builder: (_) => const QualityIssueScreen(),
+      );
+
+      await _checkGuidelines(tester);
+
+      expect(find.byKey(const Key('qualityIssueSubmitButton')), findsOneWidget);
+    });
+  });
+}
+
+/// Pushes [builder]'s screen with [request] as its route argument, the same
+/// Navigator-push pattern this codebase's own widget tests for these
+/// argument-driven screens already use (they read `PurchaseRequest` from
+/// `ModalRoute.of(context)?.settings.arguments`, not a constructor field).
+Future<void> _pumpArgScreen(
+  WidgetTester tester, {
+  required PurchaseRequest request,
+  required WidgetBuilder builder,
+}) async {
+  await pumpWithServices(
+    tester,
+    child: Builder(
+      builder: (context) => ElevatedButton(
+        onPressed: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              settings: RouteSettings(arguments: request),
+              builder: builder,
+            ),
+          );
+        },
+        child: const Text('Open'),
+      ),
+    ),
+    requestsApiClient: FakeRequestsApiClient(),
+    cameraCapture: FakeCameraCapture(available: false),
+  );
+  await tester.tap(find.text('Open'));
+  await tester.pumpAndSettle();
+}
+
+PurchaseRequest _sampleRequest({required String status}) {
+  return PurchaseRequest(
+    id: 'req-a11y-1',
+    branchId: 'branch-1',
+    requestedByMembershipId: 'requester-1',
+    requiredByDate: '2026-10-01',
+    status: status,
+    lines: const [
+      PurchaseRequestLine(
+        id: 'line-1',
+        workspaceProductId: 'product-1',
+        quantity: '5',
+        estimatedUnitPrice: Money(amount: '25.00', currency: 'USD'),
+      ),
+    ],
+    estimatedTotal: const Money(amount: '125.00', currency: 'USD'),
+    hasIncompleteEstimate: false,
+    approvalStep: const ApprovalStep(
+      id: 'step-1',
+      assignedMembershipId: 'approver-1',
+      source: 'threshold_match',
+      status: 'pending',
+    ),
+    createdAt: DateTime.utc(2026, 9, 13),
+  );
 }

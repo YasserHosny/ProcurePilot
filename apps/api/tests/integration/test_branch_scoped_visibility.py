@@ -71,6 +71,14 @@ class ScopedWorkspace:
     report_a: UUID
     report_b: UUID
     report_c: UUID
+    # T033 (010-mobile-approvals-receipt): a delivery_quality_issue per request_a/b/c. Unlike
+    # low_stock_report, delivery_quality_issue's own RLS derives visibility from the PARENT
+    # request's requester/branch (an EXISTS join), not from who filed the issue itself — so these
+    # three rows are attached directly to request_a/b/c rather than needing a fourth, separate
+    # requester/branch shape of their own.
+    issue_a: UUID
+    issue_b: UUID
+    issue_c: UUID
 
 
 def _make_member(
@@ -176,6 +184,16 @@ def make_scoped_workspace(cur: psycopg.Cursor, label: str) -> ScopedWorkspace:
         )
         return report_id
 
+    def _quality_issue(request_id: UUID, reporter: Workspace) -> UUID:
+        issue_id = uuid4()
+        cur.execute(
+            "insert into delivery_quality_issue "
+            "(id,tenant_id,purchase_request_id,reported_by_membership_id,description) "
+            "values (%s,%s,%s,%s,'Damaged in transit')",
+            (issue_id, owner.tenant_id, request_id, reporter.membership_id),
+        )
+        return issue_id
+
     request_a = _request(branch_a, unscoped_manager)
     request_b = _request(branch_b, scoped_manager)
     request_c = _request(branch_b, owner)
@@ -188,6 +206,15 @@ def make_scoped_workspace(cur: psycopg.Cursor, label: str) -> ScopedWorkspace:
     report_a = _report(branch_a, unscoped_manager)
     report_b = _report(branch_b, scoped_manager)
     report_c = _report(branch_b, owner)
+
+    # delivery_quality_issue's own visibility rides request_a/b/c's requester/branch (see the
+    # ScopedWorkspace field comment), not who filed the issue itself. issue_a/c are reported by
+    # the owner to keep that distinction explicit; issue_b is reported by the scoped manager
+    # (who is ALSO request_b's own requester) so it doubles as the literal "sees an issue they
+    # personally reported" case without contradicting the real RLS mechanism.
+    issue_a = _quality_issue(request_a, owner)
+    issue_b = _quality_issue(request_b, scoped_manager)
+    issue_c = _quality_issue(request_c, owner)
 
     return ScopedWorkspace(
         owner=owner,
@@ -208,6 +235,9 @@ def make_scoped_workspace(cur: psycopg.Cursor, label: str) -> ScopedWorkspace:
         report_a=report_a,
         report_b=report_b,
         report_c=report_c,
+        issue_a=issue_a,
+        issue_b=issue_b,
+        issue_c=issue_c,
     )
 
 
@@ -503,3 +533,59 @@ def test_the_requester_sees_their_own_low_stock_report_even_outside_their_branch
         _act_as_scoped(cur, scoped.scoped_manager)
         cur.execute("select id from low_stock_report where id = %s", (scoped.report_b,))
         assert cur.fetchone() == (scoped.report_b,)
+
+
+# ── T033 (010-mobile-approvals-receipt): delivery_quality_issue under the same visibility axis ──
+#
+# Unlike low_stock_report, delivery_quality_issue's own RLS derives visibility from the PARENT
+# purchase_request's requester/branch (an EXISTS join to purchase_request), not from the issue's
+# own reported_by_membership_id — see delivery_quality_issue_scoped_visibility,
+# 20260913000003_delivery_quality_issue.sql. issue_a/b/c are attached to request_a/b/c
+# respectively, so they inherit the exact same three-case shape already proven for
+# purchase_request itself above.
+
+
+def test_a_scoped_manager_sees_a_quality_issue_on_their_own_branchs_request(
+    conn: psycopg.Connection, scoped: ScopedWorkspace
+) -> None:
+    with conn.cursor() as cur:
+        _act_as_scoped(cur, scoped.scoped_manager)
+        cur.execute(
+            "select id from delivery_quality_issue where purchase_request_id = %s",
+            (scoped.request_a,),
+        )
+        assert [row[0] for row in cur.fetchall()] == [scoped.issue_a]
+
+
+def test_a_scoped_manager_does_not_see_another_branchs_quality_issue(
+    conn: psycopg.Connection, scoped: ScopedWorkspace
+) -> None:
+    with conn.cursor() as cur:
+        _act_as_scoped(cur, scoped.scoped_manager)
+        # issue_c is on request_c (branch B, requested by the owner) — outside both the
+        # manager's branch scope and the parent request's own requester clause.
+        cur.execute(
+            "select count(*) from delivery_quality_issue where id = %s", (scoped.issue_c,)
+        )
+        assert cur.fetchone() == (0,)
+
+
+def test_a_direct_fetch_of_another_branchs_quality_issue_resolves_not_found_not_forbidden(
+    conn: psycopg.Connection, scoped: ScopedWorkspace
+) -> None:
+    with conn.cursor() as cur:
+        _act_as_scoped(cur, scoped.scoped_manager)
+        cur.execute("select * from delivery_quality_issue where id = %s", (scoped.issue_c,))
+        assert cur.fetchone() is None  # empty result, never an error
+
+
+def test_the_requester_sees_a_quality_issue_on_their_own_request_even_outside_branch_scope(
+    conn: psycopg.Connection, scoped: ScopedWorkspace
+) -> None:
+    # issue_b is on request_b (branch B, requested by the scoped manager); the scoped manager
+    # is scoped to branch A only, but visibility rides request_b's own requester, not the
+    # manager's branch scope.
+    with conn.cursor() as cur:
+        _act_as_scoped(cur, scoped.scoped_manager)
+        cur.execute("select id from delivery_quality_issue where id = %s", (scoped.issue_b,))
+        assert cur.fetchone() == (scoped.issue_b,)

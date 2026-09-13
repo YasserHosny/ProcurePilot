@@ -1064,22 +1064,31 @@ R2.0 branch/cost-centre/budget pattern. Full contract:
 | `cost_centre_id` | uuid | Optional; composite FK -> CostCentre `(tenant_id, id)` |
 | `requested_by_membership_id` | uuid | Required; composite FK -> Membership `(tenant_id, id)` |
 | `required_by_date` | date | Required |
-| `status` | enum | `draft` \| `submitted` \| `approved` \| `rejected` \| `withdrawn`; default `draft` |
+| `status` | enum | `draft` \| `submitted` \| `approved` \| `rejected` \| `withdrawn` \| `ordered` \| `delivered`; default `draft` |
 | `estimated_total_amount` | numeric(18,4) | Sum of line estimates; null when lines span >1 currency or no line has an estimate |
 | `estimated_total_currency` | text | FK -> `supported_currency(code)`; paired with `estimated_total_amount` (both null or both set) |
 | `has_incomplete_estimate` | boolean | Default `false`; `true` when any line's product has no reachable price history |
 | `submitted_at` | timestamptz | Stamped on `draft -> submitted` |
 | `withdrawn_at` | timestamptz | Stamped on `submitted -> withdrawn` |
+| `delivered_at` | timestamptz | Stamped on `ordered -> delivered` (chunk R2.3); null before then. `purchase_request_delivered_at_pairing` check: set exactly when `status = 'delivered'` |
+| `delivery_confirmed_by_membership_id` | uuid | Composite FK -> Membership `(tenant_id, id)`; who confirmed delivery (chunk R2.3) — the requester or a branch-scoped-write member, not necessarily the decider |
+| `has_delivery_discrepancy` | boolean | Default `false` (chunk R2.3); `true` when any line's `quantity_received` came in short of `quantity` — a derived summary flag, not the source of truth (each line's own shortfall is computed at read time) |
 | `created_at` | timestamptz | Audit field |
 | `updated_at` | timestamptz | Audit field |
 
-State machine: `draft -> submitted -> (approved | rejected | withdrawn)`. A `draft` may be
-hard-deleted by its own requester; once `submitted`, `withdraw` (FR-004) is the only
-requester-initiated retirement and there is no hard-delete path. No edits after submission
-(FR-004); submit requires at least one line (FR-003, `422 no_lines`). Line estimates are
-recomputed live while the request is `draft` and frozen on submit (`estimated_at` stamped, never
-updated again — research.md R2). `purchase_request_scoped_visibility` is a RESTRICTIVE
-SELECT-only policy adding the requester-always-sees-own clause to R2.0's shape;
+State machine: `draft -> submitted -> (approved | rejected | withdrawn)`. As of chunk R2.3
+(`010-mobile-approvals-receipt`), an `approved` decision lands the request directly on `ordered`
+— there is no separate "place the order" human action this release, so `approved` itself is now a
+transient value the row never actually stops at (`RequestsService._decide_and_notify` maps
+`decision == "approved"` to `status = "ordered"` before writing; `approval_step.status` still
+records the human's real decision as `"approved"`, unchanged). From `ordered`, a delivery
+confirmation (`POST /requests/{id}/confirm-delivery`) moves it to `delivered`, the current
+terminal state. A `draft` may be hard-deleted by its own requester; once `submitted`, `withdraw`
+(FR-004) is the only requester-initiated retirement and there is no hard-delete path. No edits
+after submission (FR-004); submit requires at least one line (FR-003, `422 no_lines`). Line
+estimates are recomputed live while the request is `draft` and frozen on submit (`estimated_at`
+stamped, never updated again — research.md R2). `purchase_request_scoped_visibility` is a
+RESTRICTIVE SELECT-only policy adding the requester-always-sees-own clause to R2.0's shape;
 `purchase_request_tenant_isolation` is the permissive `ENABLE`+`FORCE` `for all` policy with
 `USING` and `WITH CHECK`.
 
@@ -1097,8 +1106,12 @@ SELECT-only policy adding the requester-always-sees-own clause to R2.0's shape;
 | `estimated_unit_price_currency` | text | FK -> `supported_currency(code)` |
 | `estimated_unit_price_source_landed_cost_id` | uuid | Composite FK -> LandedCost `(tenant_id, id)` |
 | `estimated_at` | timestamptz | Stamped when the estimate is frozen at submit |
+| `quantity_received` | numeric(18,6) | Chunk R2.3; null until the parent request is `delivered`. `check (quantity_received is null or quantity_received >= 0)` |
 
-The three `estimated_unit_price_*` columns are null together or populated together
+A line's own delivery shortfall is `quantity_received < quantity` once both are set — computed at
+read time (mirroring how `has_incomplete_estimate` is a computed-and-cached flag at the parent
+level while the per-line comparison itself is not separately stored), not a second stored boolean
+per line. The three `estimated_unit_price_*` columns are null together or populated together
 (`purchase_request_line_estimate_paired` check — null exactly when the product has no reachable
 `landed_cost` row; the parent request is then flagged `has_incomplete_estimate`). Visibility is
 inherited from the parent request: `purchase_request_line_scoped_visibility` (RESTRICTIVE,
@@ -1255,3 +1268,56 @@ deliberate stub that always reports failure rather than a fabricated success. A 
 re-enqueues rows still `queued`/`failed` past a threshold, but no periodic scheduler invokes it
 yet in this codebase — a still-open operational gap, not something this table's own design leaves
 unresolved.
+
+## Implemented mobile approvals and receipt entities (chunk R2.3, `010-mobile-approvals-receipt`)
+
+Extends `PurchaseRequest`'s own lifecycle (see the R2.1 section above) with delivery confirmation
+and delivery-quality reporting, rather than reusing the pre-existing, unrelated `PurchaseRecord`
+entity (value-proof evidence, a different actor and trigger with no existing FK to
+`purchase_request` — research.md R1). Full contract:
+`specs/010-mobile-approvals-receipt/contracts/mobile-approvals-receipt.openapi.yaml`.
+
+## `DeliveryQualityIssue`
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | uuid | PK, default `gen_random_uuid()` |
+| `tenant_id` | uuid | Required FK -> Tenant; RLS key. `unique (tenant_id, id)` for composite FKs |
+| `purchase_request_id` | uuid | Required; composite FK -> PurchaseRequest `(tenant_id, id)`, `on delete cascade` |
+| `reported_by_membership_id` | uuid | Required; composite FK -> Membership `(tenant_id, id)` |
+| `description` | text | Required, `check (char_length(description) > 0)` |
+| `created_at` | timestamptz | Audit field |
+
+Insert-only (no `PATCH`/`DELETE` surface this release) — `authenticated` is granted
+`SELECT`/`INSERT` only, the same posture `LowStockReport` established. The parent
+`purchase_request` must be `delivered` at insert time; enforced at the service layer
+(`409 not_delivered`), not a check constraint, mirroring `approval_step`'s own precedent for a
+condition that depends on a sibling row's current state. `delivery_quality_issue_scoped_visibility`
+(RESTRICTIVE, SELECT-only) re-derives visibility via an `EXISTS` join to the **parent request's**
+own requester/branch, the same pattern `PurchaseRequestLine`'s own policy already established —
+notably, this rides who requested the underlying order, not `reported_by_membership_id` on this
+table; a member who can see the parent request can see every quality issue filed against it,
+regardless of who filed it.
+
+## `DeliveryQualityIssuePhoto`
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | uuid | PK, default `gen_random_uuid()` |
+| `tenant_id` | uuid | Required FK -> Tenant; RLS key |
+| `delivery_quality_issue_id` | uuid | Required; composite FK -> DeliveryQualityIssue `(tenant_id, id)`, `on delete cascade` |
+| `storage_path` | text | Required, `check (char_length(storage_path) > 0)`; server-allocated, never client-supplied |
+| `created_at` | timestamptz | Audit field |
+
+One-to-many child of `DeliveryQualityIssue` (a report may carry zero or more photos, FR-007) —
+not a single photo column on the issue itself. Insert-only, same grant shape as its parent.
+`storage_path` is allocated under `tenants/{tenant_id}/quality-issues/{issue_id}/{filename}` and
+mirrors `quotation-documents`' own tenant-isolation-by-object-path Storage pattern exactly
+(research.md R3) — a **separate** Storage bucket (`quality-issue-photos`, 10MB file-size limit),
+not a shared one, since these are an unrelated document type with an unrelated lifecycle to
+quotation documents. `delivery_quality_issue_photo_scoped_visibility` re-derives visibility one
+join level deeper than its parent's own policy (issue -> parent request), the same idiom repeated
+again rather than a new one. A signed URL for a photo is generated fresh at read time via the
+tenant-scoped client (the same client that wrote it — no service-role bypass needed, since the
+bucket's own RLS policy already permits a tenant member to read/write their own tenant's objects)
+— never cached or stored, since a signed URL is inherently time-limited.
