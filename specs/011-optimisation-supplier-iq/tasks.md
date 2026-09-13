@@ -31,7 +31,7 @@ release conditions.
 
 - [x] T007 [P] Write contract tests in `apps/api/tests/contract/test_optimisation_supplier_iq_contract.py` for advanced basket, supplier terms, supplier scorecard, and anomaly alert response shapes.
 - [x] T008 [P] Extend tenant isolation tests in `apps/api/tests/integration/test_tenant_isolation.py` for `supplier_commercial_term` and `supplier_scorecard_snapshot`.
-- [ ] T009 [P] Write RBAC tests in `apps/api/tests/integration/test_supplier_iq_rbac.py` proving owner/buyer may mutate terms and submit advanced baskets, while read-only roles can view scorecards/alerts only.
+- [x] T009 [P] Write RBAC tests in `apps/api/tests/integration/test_supplier_iq_rbac.py` proving owner/buyer may mutate terms and submit advanced baskets, while read-only roles can view scorecards/alerts only.
 - [ ] T010 [P] Write audit tests in `apps/api/tests/integration/test_supplier_iq_audit.py` for advanced basket submission, scorecard view, and anomaly dismissal audit events.
 
 ## Phase 3: User Story 1 - Advanced basket optimisation (P1)
