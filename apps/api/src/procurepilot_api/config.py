@@ -54,6 +54,9 @@ class Settings(BaseSettings):
     quotation_documents_bucket: str = Field(
         default="quotation-documents", validation_alias="QUOTATION_DOCUMENTS_BUCKET"
     )
+    quality_issue_photos_bucket: str = Field(
+        default="quality-issue-photos", validation_alias="QUALITY_ISSUE_PHOTOS_BUCKET"
+    )
     supabase_exports_bucket: str = Field(
         default="exports", validation_alias="SUPABASE_EXPORTS_BUCKET"
     )

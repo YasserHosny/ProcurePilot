@@ -5,6 +5,7 @@ import json
 import logging
 from datetime import UTC, date, datetime
 from decimal import Decimal
+from pathlib import PurePosixPath
 from uuid import UUID
 
 import psycopg
@@ -52,6 +53,10 @@ from procurepilot_api.modules.requests.schemas import (
     PurchaseRequestList,
     PurchaseRequestStatus,
     PurchaseRequestUpdate,
+    QualityIssue,
+    QualityIssueCreate,
+    QualityIssueList,
+    QualityIssuePhoto,
     ThresholdRule,
     ThresholdRuleCreate,
     ThresholdRuleList,
@@ -90,6 +95,12 @@ DELEGATION_COLUMNS = (
 )
 BUDGET_COLUMNS = (
     "id,amount,currency,period,period_start,scope,branch_id,cost_centre_id"
+)
+QUALITY_ISSUE_COLUMNS = (
+    "id,tenant_id,purchase_request_id,reported_by_membership_id,description,created_at"
+)
+QUALITY_ISSUE_PHOTO_COLUMNS = (
+    "id,tenant_id,delivery_quality_issue_id,storage_path,created_at"
 )
 
 logger = logging.getLogger(__name__)
@@ -848,6 +859,149 @@ class RequestsService:
             client, request_row, confirmed_lines, step_row
         )
 
+    def create_quality_issue(
+        self,
+        *,
+        bearer_token: str,
+        member: CurrentMember,
+        request_id: UUID,
+        payload: QualityIssueCreate,
+    ) -> QualityIssue:
+        client = authenticated_client(self._settings, bearer_token)
+        request_row = self._fetch_request(client, request_id)
+
+        if str(request_row["status"]) != "delivered":
+            raise ConflictError(details={"reason": "not_delivered"})
+
+        try:
+            response = (
+                client.table("delivery_quality_issue")
+                .insert(
+                    {
+                        "tenant_id": str(member.tenant_id),
+                        "purchase_request_id": str(request_id),
+                        "reported_by_membership_id": str(member.membership_id),
+                        "description": payload.description,
+                    }
+                )
+                .execute()
+            )
+        except APIError as exc:
+            raise _write_error(exc) from exc
+
+        row = _one_row(response.data, reason="quality_issue_write_failed")
+        self._record(
+            bearer_token=bearer_token,
+            member=member,
+            action="requests.quality_issue_reported",
+            target={"delivery_quality_issue_id": str(row["id"])},
+        )
+        return _quality_issue(row, photos=[])
+
+    def list_quality_issues(
+        self,
+        *,
+        bearer_token: str,
+        request_id: UUID,
+    ) -> QualityIssueList:
+        client = authenticated_client(self._settings, bearer_token)
+        self._fetch_request(client, request_id)
+        try:
+            response = (
+                client.table("delivery_quality_issue")
+                .select(QUALITY_ISSUE_COLUMNS)
+                .eq("purchase_request_id", str(request_id))
+                .order("created_at", desc=True)
+                .order("id")
+                .execute()
+            )
+        except APIError as exc:
+            raise ServiceUnavailableError(
+                details={"dependency": "database"}
+            ) from exc
+
+        rows = _rows(response.data)
+        photos_by_issue = self._fetch_quality_issue_photos_batch(
+            client, [str(row["id"]) for row in rows]
+        )
+        items = [
+            _quality_issue(row, photos=photos_by_issue.get(str(row["id"]), []))
+            for row in rows
+        ]
+        return QualityIssueList(items=items)
+
+    def attach_quality_issue_photo(
+        self,
+        *,
+        bearer_token: str,
+        member: CurrentMember,
+        issue_id: UUID,
+        filename: str,
+        content_type: str | None,
+        content: bytes,
+    ) -> QualityIssuePhoto:
+        client = authenticated_client(self._settings, bearer_token)
+        issue_row = self._fetch_quality_issue(client, issue_id)
+        tenant_id = UUID(str(issue_row["tenant_id"]))
+        storage_path = _quality_issue_storage_path(
+            tenant_id=tenant_id,
+            issue_id=issue_id,
+            filename=filename,
+        )
+        bucket = self._settings.quality_issue_photos_bucket
+
+        try:
+            file_options: dict[str, str] = {"upsert": "false"}
+            if content_type:
+                file_options["content-type"] = content_type
+            client.storage.from_(bucket).upload(
+                storage_path,
+                content,
+                file_options=file_options,
+            )
+        except TypeError:
+            try:
+                client.storage.from_(bucket).upload(
+                    storage_path,
+                    content,
+                    {"content-type": content_type} if content_type else None,
+                )
+            except Exception as exc:
+                raise ServiceUnavailableError(
+                    details={"dependency": "supabase_storage"}
+                ) from exc
+        except Exception as exc:
+            raise ServiceUnavailableError(
+                details={"dependency": "supabase_storage"}
+            ) from exc
+
+        try:
+            response = (
+                client.table("delivery_quality_issue_photo")
+                .insert(
+                    {
+                        "tenant_id": str(tenant_id),
+                        "delivery_quality_issue_id": str(issue_id),
+                        "storage_path": storage_path,
+                    }
+                )
+                .execute()
+            )
+        except APIError as exc:
+            raise _write_error(exc) from exc
+        row = _one_row(
+            response.data, reason="quality_issue_photo_write_failed"
+        )
+
+        url = self._create_quality_issue_photo_url(client, storage_path)
+        self._record(
+            bearer_token=bearer_token,
+            member=member,
+            action="requests.quality_issue_photo_attached",
+            target={"delivery_quality_issue_photo_id": str(row["id"])},
+        )
+        return _quality_issue_photo(row, url=url)
+
     def approve_request(
         self,
         *,
@@ -1198,6 +1352,61 @@ class RequestsService:
         return _one_row_or_not_found(
             response.data, resource="purchase_request"
         )
+
+    def _fetch_quality_issue(
+        self, client: Client, issue_id: UUID
+    ) -> dict[str, object]:
+        try:
+            response = (
+                client.table("delivery_quality_issue")
+                .select(QUALITY_ISSUE_COLUMNS)
+                .eq("id", str(issue_id))
+                .limit(2)
+                .execute()
+            )
+        except APIError as exc:
+            raise ServiceUnavailableError(
+                details={"dependency": "database"}
+            ) from exc
+        return _one_row_or_not_found(
+            response.data, resource="delivery_quality_issue"
+        )
+
+    def _fetch_quality_issue_photos_batch(
+        self, client: Client, issue_ids: list[str]
+    ) -> dict[str, list[QualityIssuePhoto]]:
+        if not issue_ids:
+            return {}
+        try:
+            response = (
+                client.table("delivery_quality_issue_photo")
+                .select(QUALITY_ISSUE_PHOTO_COLUMNS)
+                .in_("delivery_quality_issue_id", issue_ids)
+                .order("created_at")
+                .order("id")
+                .execute()
+            )
+        except APIError as exc:
+            raise ServiceUnavailableError(
+                details={"dependency": "database"}
+            ) from exc
+
+        result: dict[str, list[QualityIssuePhoto]] = {
+            issue_id: [] for issue_id in issue_ids
+        }
+        for row in _rows(response.data):
+            issue_id = str(row["delivery_quality_issue_id"])
+            if issue_id not in result:
+                continue
+            result[issue_id].append(
+                _quality_issue_photo(
+                    row,
+                    url=self._create_quality_issue_photo_url(
+                        client, str(row["storage_path"])
+                    ),
+                )
+            )
+        return result
 
     def _fetch_requests_batch(
         self, client: Client, request_ids: list[str]
@@ -1803,6 +2012,19 @@ class RequestsService:
             committed_spend=self._fetch_committed_spend_rows(client),
         )
 
+    def _create_quality_issue_photo_url(
+        self, client: Client, storage_path: str
+    ) -> str:
+        try:
+            result = client.storage.from_(
+                self._settings.quality_issue_photos_bucket
+            ).create_signed_url(storage_path, expires_in=300)
+        except Exception as exc:
+            raise ServiceUnavailableError(
+                details={"dependency": "supabase_storage"}
+            ) from exc
+        return _signed_url(result)
+
 
 def get_requests_service() -> RequestsService:
     return RequestsService()
@@ -1940,6 +2162,34 @@ def _low_stock_report(row: dict[str, object]) -> LowStockReport:
     )
 
 
+def _quality_issue(
+    row: dict[str, object], *, photos: list[QualityIssuePhoto]
+) -> QualityIssue:
+    return QualityIssue(
+        id=UUID(str(row["id"])),
+        purchase_request_id=UUID(str(row["purchase_request_id"])),
+        reported_by_membership_id=UUID(
+            str(row["reported_by_membership_id"])
+        ),
+        description=str(row["description"]),
+        photos=photos,
+        created_at=row["created_at"],
+    )
+
+
+def _quality_issue_photo(
+    row: dict[str, object], *, url: str
+) -> QualityIssuePhoto:
+    return QualityIssuePhoto(
+        id=UUID(str(row["id"])),
+        delivery_quality_issue_id=UUID(
+            str(row["delivery_quality_issue_id"])
+        ),
+        url=url,
+        created_at=row["created_at"],
+    )
+
+
 def _threshold_rule(row: dict[str, object]) -> ThresholdRule:
     return ThresholdRule(
         id=UUID(str(row["id"])),
@@ -2069,6 +2319,26 @@ def _compute_totals(
 
 def _now_iso() -> str:
     return datetime.now(UTC).isoformat()
+
+
+def _quality_issue_storage_path(
+    *, tenant_id: UUID, issue_id: UUID, filename: str
+) -> str:
+    name = PurePosixPath(filename).name.replace("/", "_")
+    if not name:
+        name = "photo"
+    return f"tenants/{tenant_id}/quality-issues/{issue_id}/{name}"
+
+
+def _signed_url(result: object) -> str:
+    if isinstance(result, str):
+        return result
+    if isinstance(result, dict):
+        for key in ("signedURL", "signed_url", "url"):
+            value = result.get(key)
+            if value:
+                return str(value)
+    raise ServiceUnavailableError(details={"dependency": "supabase_storage"})
 
 
 def _decimal(value: object, *, scale: int) -> str:

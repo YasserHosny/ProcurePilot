@@ -108,6 +108,30 @@ class DeliveryConfirmationCreate(StrictApiModel):
     lines: list[DeliveryConfirmationLineInput] = Field(min_length=1)
 
 
+class QualityIssueCreate(StrictApiModel):
+    description: str = Field(min_length=1)
+
+
+class QualityIssuePhoto(BaseModel):
+    id: UUID
+    delivery_quality_issue_id: UUID
+    url: str
+    created_at: datetime
+
+
+class QualityIssue(BaseModel):
+    id: UUID
+    purchase_request_id: UUID
+    reported_by_membership_id: UUID
+    description: str
+    photos: list[QualityIssuePhoto]
+    created_at: datetime
+
+
+class QualityIssueList(BaseModel):
+    items: list[QualityIssue]
+
+
 class ThresholdRule(BaseModel):
     id: UUID
     branch_id: UUID | None = None

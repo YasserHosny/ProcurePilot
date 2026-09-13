@@ -3,9 +3,11 @@ from __future__ import annotations
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Body, Depends, Header, Query, Response, status
+from fastapi import APIRouter, Body, Depends, Header, Query, Request, Response, status
+from starlette.datastructures import UploadFile as StarletteUploadFile
 
 from procurepilot_api.deps import CurrentMember, bearer_token, current_member
+from procurepilot_api.errors import UnprocessableEntityError
 from procurepilot_api.modules.requests.schemas import (
     ApprovalDecisionInput,
     ApprovalDelegation,
@@ -20,6 +22,10 @@ from procurepilot_api.modules.requests.schemas import (
     PurchaseRequestList,
     PurchaseRequestStatus,
     PurchaseRequestUpdate,
+    QualityIssue,
+    QualityIssueCreate,
+    QualityIssueList,
+    QualityIssuePhoto,
     ThresholdRule,
     ThresholdRuleCreate,
     ThresholdRuleList,
@@ -221,6 +227,73 @@ def confirm_delivery(
         member=member,
         request_id=request_id,
         payload=payload,
+    )
+
+
+@router.post(
+    "/requests/{request_id}/quality-issues",
+    status_code=status.HTTP_201_CREATED,
+    response_model=QualityIssue,
+)
+def create_quality_issue(
+    request_id: UUID,
+    payload: Annotated[QualityIssueCreate, Body()],
+    token: Annotated[str, Depends(bearer_token)],
+    member: Annotated[CurrentMember, Depends(current_member)],
+    service: Annotated[RequestsService, Depends(get_requests_service)],
+) -> QualityIssue:
+    return service.create_quality_issue(
+        bearer_token=token,
+        member=member,
+        request_id=request_id,
+        payload=payload,
+    )
+
+
+@router.get(
+    "/requests/{request_id}/quality-issues",
+    response_model=QualityIssueList,
+)
+def list_quality_issues(
+    request_id: UUID,
+    token: Annotated[str, Depends(bearer_token)],
+    _member: Annotated[CurrentMember, Depends(current_member)],
+    service: Annotated[RequestsService, Depends(get_requests_service)],
+) -> QualityIssueList:
+    return service.list_quality_issues(
+        bearer_token=token,
+        request_id=request_id,
+    )
+
+
+@router.post(
+    "/quality-issues/{issue_id}/photos",
+    status_code=status.HTTP_201_CREATED,
+    response_model=QualityIssuePhoto,
+)
+async def attach_quality_issue_photo(
+    issue_id: UUID,
+    request: Request,
+    token: Annotated[str, Depends(bearer_token)],
+    member: Annotated[CurrentMember, Depends(current_member)],
+    service: Annotated[RequestsService, Depends(get_requests_service)],
+) -> QualityIssuePhoto:
+    form = await request.form()
+    file = form.get("file")
+    if not isinstance(file, StarletteUploadFile):
+        raise UnprocessableEntityError(details={"file": "required"})
+    content = await file.read()
+    if not isinstance(content, bytes):
+        raise UnprocessableEntityError(details={"file": "invalid"})
+    filename = str(file.filename or "")
+    content_type = file.content_type
+    return service.attach_quality_issue_photo(
+        bearer_token=token,
+        member=member,
+        issue_id=issue_id,
+        filename=filename,
+        content_type=str(content_type) if content_type else None,
+        content=content,
     )
 
 
