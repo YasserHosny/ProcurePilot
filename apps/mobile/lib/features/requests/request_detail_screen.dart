@@ -42,6 +42,17 @@ class RequestDetailScreen extends StatelessWidget {
           padding: const EdgeInsets.all(16),
           children: [
             RequestContextSection(request: req),
+            if (req.status == 'ordered') ...[
+              const SizedBox(height: 16),
+              FilledButton(
+                key: const Key('requestConfirmDeliveryButton'),
+                onPressed: () {
+                  Navigator.of(context)
+                      .pushNamed('/delivery/confirm', arguments: req);
+                },
+                child: Text(i18n.t('delivery.entryPointButton')),
+              ),
+            ],
             RequestApprovalStepSection(request: req),
           ],
         ),
@@ -111,13 +122,16 @@ class RequestContextSection extends StatelessWidget {
         const SizedBox(height: 8),
         ...request.lines.asMap().entries.map((entry) {
           final line = entry.value;
+          final subtitleLines = [
+            '${i18n.t('requests.form.quantityLabel')}: ${line.quantity}',
+            if (line.quantityReceived != null)
+              '${i18n.t('delivery.quantityReceivedLabel')}: ${line.quantityReceived}',
+          ];
           return Card(
             child: ListTile(
               key: Key('requestDetailLine_${entry.key}'),
               title: Text(line.workspaceProductId),
-              subtitle: Text(
-                '${i18n.t('requests.form.quantityLabel')}: ${line.quantity}',
-              ),
+              subtitle: Text(subtitleLines.join('\n')),
               trailing: line.estimatedUnitPrice != null
                   ? Text(
                       '${line.estimatedUnitPrice!.currency} ${line.estimatedUnitPrice!.amount}',

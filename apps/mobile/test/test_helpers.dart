@@ -18,6 +18,7 @@ import 'package:procurepilot_mobile/features/approvals/approval_decision_screen.
 import 'package:procurepilot_mobile/features/approvals/approval_queue_screen.dart';
 import 'package:procurepilot_mobile/features/auth/biometric_offer_screen.dart';
 import 'package:procurepilot_mobile/features/auth/sign_in_screen.dart';
+import 'package:procurepilot_mobile/features/delivery/delivery_confirmation_screen.dart';
 import 'package:procurepilot_mobile/features/home/home_screen.dart';
 import 'package:procurepilot_mobile/features/low_stock/low_stock_report_screen.dart';
 import 'package:procurepilot_mobile/features/requests/request_detail_screen.dart';
@@ -134,6 +135,8 @@ Future<I18nLoader> loadTestI18n() async {
           'submitted': 'Submitted',
           'pending': 'Pending',
           'approved': 'Approved',
+          'ordered': 'Ordered',
+          'delivered': 'Delivered',
           'rejected': 'Rejected',
           'withdrawn': 'Withdrawn',
         },
@@ -180,6 +183,22 @@ Future<I18nLoader> loadTestI18n() async {
           'decidedAt': 'Decided on',
           'pending': 'Pending approval',
         },
+      },
+      'delivery': {
+        'title': 'Confirm Delivery',
+        'entryPointButton': 'Confirm Delivery',
+        'linesTitle': 'Received Quantities',
+        'quantityReceivedLabel': 'Quantity received',
+        'orderedQuantityHelper': 'Ordered quantity: {{quantity}}',
+        'submitButton': 'Confirm Delivery',
+        'submittingButton': 'Confirming...',
+        'cancelButton': 'Cancel',
+        'successMessage': 'Delivery confirmed.',
+        'genericError': 'Unable to confirm delivery. Please try again.',
+        'notOrderedError': 'This request is not ready for delivery receipt.',
+        'invalidLinesError':
+            'Unable to confirm delivery because the request lines changed.',
+        'notAvailable': 'Delivery confirmation is not available.',
       },
       'mobileRequests': {
         'productSearchHint': 'Search products by name...',
@@ -284,16 +303,20 @@ class FakeRequestsApiClient extends RequestsApiClient {
   final approveComments = <String?>[];
   final rejectCalls = <String>[];
   final rejectComments = <String?>[];
+  final confirmDeliveryCalls = <String>[];
+  final confirmDeliveryLines = <List<DeliveryLineInput>>[];
   final getRequestCalls = <String>[];
   PurchaseRequest? createResult;
   PurchaseRequest? updateResult;
   PurchaseRequest? submitResult;
   PurchaseRequest? approveResult;
   PurchaseRequest? rejectResult;
+  PurchaseRequest? confirmDeliveryResult;
   Exception? createError;
   Exception? submitError;
   Exception? approveError;
   Exception? rejectError;
+  Exception? confirmDeliveryError;
   final getRequestResults = <String, PurchaseRequest>{};
 
   List<PurchaseRequest> listResults = [];
@@ -424,6 +447,29 @@ class FakeRequestsApiClient extends RequestsApiClient {
       lines: [],
       hasIncompleteEstimate: false,
       createdAt: DateTime.now(),
+    );
+  }
+
+  @override
+  Future<PurchaseRequest> confirmDelivery(
+    String requestId,
+    List<DeliveryLineInput> lines,
+  ) async {
+    confirmDeliveryCalls.add(requestId);
+    confirmDeliveryLines.add(lines);
+    if (confirmDeliveryError != null) throw confirmDeliveryError!;
+    if (confirmDeliveryResult != null) return confirmDeliveryResult!;
+    return PurchaseRequest(
+      id: requestId,
+      branchId: '',
+      requestedByMembershipId: '00000000-0000-0000-0000-000000000000',
+      requiredByDate: '',
+      status: 'delivered',
+      lines: [],
+      hasIncompleteEstimate: false,
+      createdAt: DateTime.now(),
+      deliveredAt: DateTime.now(),
+      hasDeliveryDiscrepancy: false,
     );
   }
 
@@ -674,6 +720,7 @@ class TestServiceProvider extends StatelessWidget {
           '/home': (_) => const HomeScreen(),
           '/approvals': (_) => const ApprovalQueueScreen(),
           '/approvals/detail': (_) => const ApprovalDecisionScreen(),
+          '/delivery/confirm': (_) => const DeliveryConfirmationScreen(),
           '/requests': (_) => const RequestListScreen(),
           '/requests/new': (_) => const RequestFormScreen(),
           '/requests/detail': (_) => const RequestDetailScreen(),
