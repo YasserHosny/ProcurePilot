@@ -244,7 +244,38 @@ def test_advanced_models_carry_terms_risk_confidence_and_evidence() -> None:
         )
 
 
-@pytest.mark.xfail(reason="T018 will implement advanced MOV constraints", strict=False)
+def test_repository_parses_supplier_terms_from_request_snapshot() -> None:
+    from procurepilot_optimiser_worker.repository import _supplier_terms_from_snapshot
+
+    term_id = uuid4()
+    supplier_id = uuid4()
+    product_id = uuid4()
+
+    terms = _supplier_terms_from_snapshot(
+        {
+            "supplier_terms": [
+                {
+                    "id": str(term_id),
+                    "supplier_id": str(supplier_id),
+                    "rule_version": "supplier-commercial-terms-v1",
+                    "minimum_order_value": {"amount": "250.0000", "currency": "GBP"},
+                    "quantity_tiers": [
+                        {
+                            "workspace_product_id": str(product_id),
+                            "min_quantity": "10.000000",
+                            "unit_price": {"amount": "5.0000", "currency": "GBP"},
+                        }
+                    ],
+                }
+            ]
+        }
+    )
+
+    assert terms[0].supplier_id == supplier_id
+    assert terms[0].minimum_order_value == _money("250.0000")
+    assert terms[0].quantity_tiers[0].source_term_id == term_id
+
+
 def test_solver_enforces_minimum_order_value_before_using_supplier() -> None:
     supplier_a, supplier_b = uuid4(), uuid4()
     product_id = uuid4()
@@ -276,7 +307,6 @@ def test_solver_enforces_minimum_order_value_before_using_supplier() -> None:
     )
 
 
-@pytest.mark.xfail(reason="T018 will implement delivery fee threshold economics", strict=False)
 def test_solver_applies_delivery_fee_until_free_delivery_threshold() -> None:
     supplier_a, supplier_b = uuid4(), uuid4()
     product_id = uuid4()
@@ -305,7 +335,6 @@ def test_solver_applies_delivery_fee_until_free_delivery_threshold() -> None:
     assert any(constraint.kind == "delivery_fee" for constraint in result.applied_constraints)
 
 
-@pytest.mark.xfail(reason="T018 will implement quantity tier pricing", strict=False)
 def test_solver_uses_quantity_tiers_when_requested_quantity_crosses_break() -> None:
     supplier_a, supplier_b = uuid4(), uuid4()
     product_id = uuid4()
@@ -341,7 +370,6 @@ def test_solver_uses_quantity_tiers_when_requested_quantity_crosses_break() -> N
     assert any(source_term_id in constraint.source_ids for constraint in result.applied_constraints)
 
 
-@pytest.mark.xfail(reason="T018 will implement risk tolerance filtering", strict=False)
 def test_solver_respects_risk_tolerance_even_when_cheapest_supplier_is_risky() -> None:
     supplier_a, supplier_b = uuid4(), uuid4()
     product_id = uuid4()
@@ -365,7 +393,6 @@ def test_solver_respects_risk_tolerance_even_when_cheapest_supplier_is_risky() -
     assert any(note.supplier_id == supplier_a for note in result.risk_notes)
 
 
-@pytest.mark.xfail(reason="T018 will implement supplier exclusion filtering", strict=False)
 def test_solver_respects_explicit_supplier_exclusion() -> None:
     supplier_a, supplier_b = uuid4(), uuid4()
     product_id = uuid4()
@@ -391,7 +418,6 @@ def test_solver_respects_explicit_supplier_exclusion() -> None:
     )
 
 
-@pytest.mark.xfail(reason="T018 will return infeasible advanced constraint results", strict=False)
 def test_solver_reports_infeasible_constraints_as_completed_result() -> None:
     supplier_a, supplier_b = uuid4(), uuid4()
     product_id = uuid4()
@@ -415,7 +441,6 @@ def test_solver_reports_infeasible_constraints_as_completed_result() -> None:
     assert {violation.kind for violation in result.violated_constraints} == {"risk_tolerance"}
 
 
-@pytest.mark.xfail(reason="T018 will disclose deterministic tie-break order", strict=False)
 def test_solver_uses_deterministic_tie_break_for_equal_cost_allocations() -> None:
     supplier_a = UUID("00000000-0000-0000-0000-00000000000a")
     supplier_b = UUID("00000000-0000-0000-0000-00000000000b")
