@@ -80,20 +80,18 @@ class ApprovalsApiClient {
 
 /// Cursor-paginated list of pending approvals.
 ///
-/// Only the count of items is surfaced by the home screen. Per-item fields
-/// (requester, branch, lines, budget status, assigned approver, decision
-/// fields, etc.) are intentionally not modelled here so they cannot be
-/// rendered as actionable controls.
+/// Pending approval rows now carry the full [PurchaseRequest] context because
+/// the mobile approval flow is authorized to render and decide on them.
 class PendingApprovalsList {
   const PendingApprovalsList({required this.items, this.nextCursor});
 
-  final List<Map<String, dynamic>> items;
+  final List<PurchaseRequest> items;
   final String? nextCursor;
 
   factory PendingApprovalsList.fromJson(Map<String, dynamic> json) {
     final rawItems = json['items'] as List<dynamic>? ?? const [];
     final items = rawItems
-        .map((e) => e as Map<String, dynamic>)
+        .map((e) => PurchaseRequest.fromJson(e as Map<String, dynamic>))
         .toList(growable: false);
     return PendingApprovalsList(
       items: items,

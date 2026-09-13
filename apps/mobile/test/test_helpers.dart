@@ -14,6 +14,8 @@ import 'package:procurepilot_mobile/core/auth/biometric_gate.dart';
 import 'package:procurepilot_mobile/core/camera/camera_capture.dart';
 import 'package:procurepilot_mobile/core/i18n/i18n_loader.dart';
 import 'package:procurepilot_mobile/core/offline_queue/offline_queue_service.dart';
+import 'package:procurepilot_mobile/features/approvals/approval_decision_screen.dart';
+import 'package:procurepilot_mobile/features/approvals/approval_queue_screen.dart';
 import 'package:procurepilot_mobile/features/auth/biometric_offer_screen.dart';
 import 'package:procurepilot_mobile/features/auth/sign_in_screen.dart';
 import 'package:procurepilot_mobile/features/home/home_screen.dart';
@@ -94,6 +96,36 @@ Future<I18nLoader> loadTestI18n() async {
         'pendingCountError': 'Count error',
         'signOut': 'Sign out',
       },
+      'approvals': {
+        'title': 'Approval Queue',
+        'subtitle': 'Requests awaiting your decision.',
+        'columns': {
+          'requester': 'Requester',
+          'branch': 'Branch',
+          'costCentre': 'Cost Centre',
+          'requiredByDate': 'Required By',
+          'estimatedTotal': 'Estimated Total',
+          'budgetStatus': 'Budget Status',
+          'lines': 'Lines',
+          'actions': 'Actions',
+        },
+        'actions': {'approve': 'Approve', 'reject': 'Reject'},
+        'decisionDialog': {
+          'approveTitle': 'Approve Purchase Request',
+          'rejectTitle': 'Reject Purchase Request',
+          'commentLabel': 'Comment (optional)',
+          'commentPlaceholder': 'Add a comment for the requester...',
+          'confirmButton': 'Confirm',
+          'cancelButton': 'Cancel',
+        },
+        'approveSuccess': 'Request approved.',
+        'rejectSuccess': 'Request rejected.',
+        'genericError': 'Unable to record the decision. Please try again.',
+        'alreadyDecided':
+            'This request has already been decided by someone else.',
+        'empty': 'No requests are currently awaiting your decision.',
+        'notAvailable': 'Not available',
+      },
       'requests': {
         'title': 'Purchase Requests',
         'subtitle': 'Create and track purchase requests',
@@ -136,6 +168,11 @@ Future<I18nLoader> loadTestI18n() async {
         'submitSuccess': 'Purchase request submitted for approval',
         'genericError': 'Unable to save the purchase request',
         'incompleteEstimateBadge': 'Estimate incomplete',
+        'budgetStatus': {
+          'remainingLabel': 'Remaining budget',
+          'exceedsWarning':
+              'This request would exceed the remaining budget for its scope.',
+        },
         'approval': {
           'sectionTitle': 'Approval',
           'assignedTo': 'Assigned to',
@@ -243,12 +280,20 @@ class FakeRequestsApiClient extends RequestsApiClient {
   final updateCalls = <List<dynamic>>[];
   final submitCalls = <String>[];
   final submitIdempotencyKeys = <String?>[];
+  final approveCalls = <String>[];
+  final approveComments = <String?>[];
+  final rejectCalls = <String>[];
+  final rejectComments = <String?>[];
   final getRequestCalls = <String>[];
   PurchaseRequest? createResult;
   PurchaseRequest? updateResult;
   PurchaseRequest? submitResult;
+  PurchaseRequest? approveResult;
+  PurchaseRequest? rejectResult;
   Exception? createError;
   Exception? submitError;
+  Exception? approveError;
+  Exception? rejectError;
   final getRequestResults = <String, PurchaseRequest>{};
 
   List<PurchaseRequest> listResults = [];
@@ -341,6 +386,48 @@ class FakeRequestsApiClient extends RequestsApiClient {
   }
 
   @override
+  Future<PurchaseRequest> approveRequest(
+    String requestId, {
+    String? comment,
+  }) async {
+    approveCalls.add(requestId);
+    approveComments.add(comment);
+    if (approveError != null) throw approveError!;
+    if (approveResult != null) return approveResult!;
+    return PurchaseRequest(
+      id: requestId,
+      branchId: '',
+      requestedByMembershipId: '00000000-0000-0000-0000-000000000000',
+      requiredByDate: '',
+      status: 'approved',
+      lines: [],
+      hasIncompleteEstimate: false,
+      createdAt: DateTime.now(),
+    );
+  }
+
+  @override
+  Future<PurchaseRequest> rejectRequest(
+    String requestId, {
+    String? comment,
+  }) async {
+    rejectCalls.add(requestId);
+    rejectComments.add(comment);
+    if (rejectError != null) throw rejectError!;
+    if (rejectResult != null) return rejectResult!;
+    return PurchaseRequest(
+      id: requestId,
+      branchId: '',
+      requestedByMembershipId: '00000000-0000-0000-0000-000000000000',
+      requiredByDate: '',
+      status: 'rejected',
+      lines: [],
+      hasIncompleteEstimate: false,
+      createdAt: DateTime.now(),
+    );
+  }
+
+  @override
   Future<BranchList> listBranches({String? cursor, int limit = 100}) async {
     return BranchList(items: branches);
   }
@@ -360,6 +447,24 @@ class FakeRequestsApiClient extends RequestsApiClient {
     int limit = 20,
   }) async {
     return CatalogueProductList(items: catalogueSearchResults);
+  }
+}
+
+/// Fake approvals API client for widget tests.
+class FakeApprovalsApiClient extends ApprovalsApiClient {
+  FakeApprovalsApiClient()
+    : super(apiBaseUrl: 'https://test.api', httpClient: http.Client());
+
+  List<PurchaseRequest> pendingResults = [];
+  Exception? pendingError;
+
+  @override
+  Future<PendingApprovalsList> listPendingApprovals({
+    String? cursor,
+    int limit = 100,
+  }) async {
+    if (pendingError != null) throw pendingError!;
+    return PendingApprovalsList(items: pendingResults);
   }
 }
 
@@ -567,6 +672,8 @@ class TestServiceProvider extends StatelessWidget {
           '/signIn': (_) => const SignInScreen(),
           '/biometricOffer': (_) => const BiometricOfferScreen(),
           '/home': (_) => const HomeScreen(),
+          '/approvals': (_) => const ApprovalQueueScreen(),
+          '/approvals/detail': (_) => const ApprovalDecisionScreen(),
           '/requests': (_) => const RequestListScreen(),
           '/requests/new': (_) => const RequestFormScreen(),
           '/requests/detail': (_) => const RequestDetailScreen(),
@@ -603,9 +710,7 @@ Future<TestServiceProvider> pumpWithServices(
     authService: authServiceValue,
     biometricAuth: biometricAuth ?? FakeBiometricAuth(),
     mobileApiClient: mobileApiClient ?? FakeMobileApiClient(),
-    approvalsApiClient:
-        approvalsApiClient ??
-        ApprovalsApiClient(apiBaseUrl: 'https://test.api'),
+    approvalsApiClient: approvalsApiClient ?? FakeApprovalsApiClient(),
     requestsApiClient:
         requestsApiClient ?? RequestsApiClient(apiBaseUrl: 'https://test.api'),
     i18n: i18nValue,

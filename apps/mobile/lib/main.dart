@@ -14,6 +14,8 @@ import 'core/auth/biometric_gate.dart';
 import 'core/i18n/i18n_loader.dart';
 import 'core/offline_queue/offline_queue_replay.dart';
 import 'core/offline_queue/offline_queue_service.dart';
+import 'features/approvals/approval_decision_screen.dart';
+import 'features/approvals/approval_queue_screen.dart';
 import 'features/auth/biometric_offer_screen.dart';
 import 'features/auth/sign_in_screen.dart';
 import 'features/auth/splash_screen.dart';
@@ -36,6 +38,8 @@ final Map<String, WidgetBuilder> appRoutes = {
   '/signIn': (context) => const SignInScreen(),
   '/biometricOffer': (context) => const BiometricOfferScreen(),
   '/home': (context) => const HomeScreen(),
+  '/approvals': (context) => const ApprovalQueueScreen(),
+  '/approvals/detail': (context) => const ApprovalDecisionScreen(),
   '/requests': (context) => const RequestListScreen(),
   '/requests/new': (context) => const RequestFormScreen(),
   '/requests/detail': (context) => const RequestDetailScreen(),
@@ -212,6 +216,7 @@ class _ProcurePilotAppState extends State<ProcurePilotApp> {
 
     _notificationRegistrationStarted = true;
     widget.mobileApiClient.accessToken = token;
+    widget.approvalsApiClient.accessToken = token;
     widget.requestsApiClient.accessToken = token;
 
     PushNotificationRegistration(

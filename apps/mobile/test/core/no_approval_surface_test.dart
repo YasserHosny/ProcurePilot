@@ -3,13 +3,11 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:procurepilot_mobile/main.dart' as app;
 
-/// FR-009 proof at the code-path level.
+/// R2.3 approval-surface proof at the code-path level.
 ///
 /// This test does not render any widget. It inspects the mobile API clients
-/// and the registered route table to prove that no mobile-reachable code path
-/// calls or names `POST /requests/{id}/approve` or `/reject`. This is
-/// deliberately stronger than a widget-only test: it catches an approve/reject
-/// call even if it is never wired to a visible button.
+/// and the registered route table to prove that the now-authorized mobile
+/// decision surface still calls only the shared request decision endpoints.
 void main() {
   // Scans every .dart file actually present under lib/core/api/ rather than a hardcoded
   // filename list — a hardcoded list stays green when a NEW client file is added with an
@@ -37,22 +35,31 @@ void main() {
     expect(apiFiles.any((p) => p.endsWith('mobile_api_client.dart')), isTrue);
   });
 
-  group('No approval/rejection API surface', () {
+  group('No divergent approval/rejection API surface', () {
     for (final path in apiFiles) {
-      test('$path contains no /approve or /reject endpoint paths', () {
-        final file = File(path);
-        final content = file.readAsStringSync();
-        expect(
-          endpointPattern.hasMatch(content),
-          isFalse,
-          reason: 'Found an approve/reject endpoint path reference in $path',
-        );
-      });
+      test(
+        '$path keeps approve/reject endpoint paths in RequestsApiClient only',
+        () {
+          final file = File(path);
+          final content = file.readAsStringSync();
+          if (path.endsWith('requests_api_client.dart')) {
+            expect(content, contains("action: 'approve'"));
+            expect(content, contains("action: 'reject'"));
+          } else {
+            expect(
+              endpointPattern.hasMatch(content),
+              isFalse,
+              reason:
+                  'Found an approve/reject endpoint path reference in $path',
+            );
+          }
+        },
+      );
     }
   });
 
-  group('No approval/rejection route surface', () {
-    test('app route table contains no approve/reject route names', () {
+  group('No direct approve/reject route surface', () {
+    test('app route table contains no direct approve/reject route names', () {
       final routeNamePattern = RegExp(r'approve|reject', caseSensitive: false);
       for (final name in app.appRoutes.keys) {
         expect(

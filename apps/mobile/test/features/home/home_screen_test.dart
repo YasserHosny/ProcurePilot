@@ -1,30 +1,27 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:http/http.dart' as http;
-import 'package:http/testing.dart';
-import 'package:procurepilot_mobile/core/api/approvals_api_client.dart';
+import 'package:procurepilot_mobile/core/api/models.dart';
 import 'package:procurepilot_mobile/features/home/home_screen.dart';
 
 import '../../test_helpers.dart';
 
 void main() {
   group('HomeScreen', () {
-    ApprovalsApiClient pendingClient({required int count}) {
-      return ApprovalsApiClient(
-        apiBaseUrl: 'https://test.api',
-        httpClient: MockClient((request) async {
-          final items = List<Map<String, dynamic>>.generate(
-            count,
-            (_) => <String, dynamic>{},
-          );
-          return http.Response(
-            jsonEncode({'items': items, 'next_cursor': null}),
-            200,
-          );
-        }),
-      );
+    FakeApprovalsApiClient pendingClient({required int count}) {
+      return FakeApprovalsApiClient()
+        ..pendingResults = List<PurchaseRequest>.generate(
+          count,
+          (index) => PurchaseRequest(
+            id: 'req-$index',
+            branchId: 'branch-1',
+            requestedByMembershipId: 'member-$index',
+            requiredByDate: '2026-10-01',
+            status: 'submitted',
+            lines: const [],
+            hasIncompleteEstimate: false,
+            createdAt: DateTime.utc(2026, 9, 13),
+          ),
+        );
     }
 
     /// FR-009: no approve/reject *control* may exist on the home screen. The
@@ -79,34 +76,41 @@ void main() {
       expect(rejectionControl(), findsNothing);
     });
 
-    testWidgets('approver sees pending count and no approval controls', (
-      tester,
-    ) async {
-      final auth =
-          FakeAuthService(
-              storage: FakeStorage(),
-              httpClient: defaultTestHttpClient(),
-              supabaseUrl: 'https://test.supabase.co',
-              supabaseAnonKey: 'test-anon-key',
-            )
-            ..accessToken = makeAccessToken('approver')
-            ..refreshToken = 'refresh-token'
-            ..tokenRole = 'approver';
+    testWidgets(
+      'approver sees tappable pending count and no home approval controls',
+      (tester) async {
+        final auth =
+            FakeAuthService(
+                storage: FakeStorage(),
+                httpClient: defaultTestHttpClient(),
+                supabaseUrl: 'https://test.supabase.co',
+                supabaseAnonKey: 'test-anon-key',
+              )
+              ..accessToken = makeAccessToken('approver')
+              ..refreshToken = 'refresh-token'
+              ..tokenRole = 'approver';
 
-      await pumpWithServices(
-        tester,
-        child: const HomeScreen(),
-        authService: auth,
-        approvalsApiClient: pendingClient(count: 3),
-      );
-      await tester.pumpAndSettle();
+        await pumpWithServices(
+          tester,
+          child: const HomeScreen(),
+          authService: auth,
+          approvalsApiClient: pendingClient(count: 3),
+        );
+        await tester.pumpAndSettle();
 
-      expect(find.byKey(const Key('homeRequestItemsButton')), findsNothing);
-      expect(find.text('3 pending'), findsOneWidget);
-      expect(find.byKey(const Key('pendingApprovalsCount')), findsOneWidget);
-      expect(approvalControl(), findsNothing);
-      expect(rejectionControl(), findsNothing);
-    });
+        expect(find.byKey(const Key('homeRequestItemsButton')), findsNothing);
+        expect(find.text('3 pending'), findsOneWidget);
+        expect(find.byKey(const Key('pendingApprovalsCount')), findsOneWidget);
+        expect(approvalControl(), findsNothing);
+        expect(rejectionControl(), findsNothing);
+
+        await tester.tap(find.byKey(const Key('pendingApprovalsCount')));
+        await tester.pumpAndSettle();
+
+        expect(find.byType(HomeScreen), findsNothing);
+        expect(find.text('Approval Queue'), findsOneWidget);
+      },
+    );
 
     testWidgets('owner also sees pending count and no approval controls', (
       tester,
