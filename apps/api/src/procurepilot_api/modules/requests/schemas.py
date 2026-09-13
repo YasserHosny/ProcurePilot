@@ -31,6 +31,9 @@ class PurchaseRequestLine(BaseModel):
     id: UUID
     workspace_product_id: UUID
     quantity: StrictStr = Field(pattern=r"^\d+(\.\d{1,6})?$")
+    quantity_received: StrictStr | None = Field(
+        default=None, pattern=r"^\d+(\.\d{1,6})?$"
+    )
     note: str | None = None
     estimated_unit_price: Money | None = None
     estimated_unit_price_source_landed_cost_id: UUID | None = None
@@ -66,6 +69,9 @@ class PurchaseRequest(BaseModel):
     approval_step: ApprovalStep | None = None
     submitted_at: datetime | None = None
     withdrawn_at: datetime | None = None
+    delivered_at: datetime | None = None
+    delivery_confirmed_by_membership_id: UUID | None = None
+    has_delivery_discrepancy: bool = False
     created_at: datetime
     updated_at: datetime | None = None
 
@@ -91,6 +97,15 @@ class PurchaseRequestList(BaseModel):
 
 class ApprovalDecisionInput(StrictApiModel):
     comment: str | None = None
+
+
+class DeliveryConfirmationLineInput(StrictApiModel):
+    purchase_request_line_id: UUID
+    quantity_received: StrictStr = Field(pattern=r"^\d+(\.\d{1,6})?$")
+
+
+class DeliveryConfirmationCreate(StrictApiModel):
+    lines: list[DeliveryConfirmationLineInput] = Field(min_length=1)
 
 
 class ThresholdRule(BaseModel):
