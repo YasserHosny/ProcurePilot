@@ -31,7 +31,8 @@ isolation only, same split as R2.0; extended again for 009-mobile-app-mvp (T007)
 device_registration, low_stock_report and push_notification — cross-tenant isolation only, same
 split as every prior chunk; device_registration's own-row-only visibility (no owner read-all) and
 low_stock_report's branch-scoped visibility have their within-tenant proof in
-test_branch_scoped_visibility.py, not here.
+test_branch_scoped_visibility.py, not here; extended again for 011-optimisation-supplier-iq to
+cover supplier_commercial_term and supplier_scorecard_snapshot.
 """
 
 from __future__ import annotations
@@ -86,6 +87,8 @@ class Workspace:
         device_registration_id: UUID,
         low_stock_report_id: UUID,
         push_notification_id: UUID,
+        supplier_commercial_term_id: UUID,
+        supplier_scorecard_snapshot_id: UUID,
     ) -> None:
         self.tenant_id = tenant_id
         self.user_id = user_id
@@ -116,6 +119,8 @@ class Workspace:
         self.device_registration_id = device_registration_id
         self.low_stock_report_id = low_stock_report_id
         self.push_notification_id = push_notification_id
+        self.supplier_commercial_term_id = supplier_commercial_term_id
+        self.supplier_scorecard_snapshot_id = supplier_scorecard_snapshot_id
 
     def claims(self) -> str:
         return (
@@ -449,6 +454,39 @@ def make_workspace(cur: psycopg.Cursor, label: str) -> Workspace:
         (push_notification_id, tenant_id, purchase_request_id, membership_id),
     )
 
+    # Optimisation + Supplier IQ - chunk R2.4 (011-optimisation-supplier-iq).
+    supplier_commercial_term_id, supplier_scorecard_snapshot_id = uuid4(), uuid4()
+    cur.execute(
+        "insert into supplier_commercial_term "
+        "(id,tenant_id,supplier_id,minimum_order_value_amount,minimum_order_value_currency,"
+        "delivery_fee_amount,delivery_fee_currency,free_delivery_threshold_amount,"
+        "free_delivery_threshold_currency,quantity_tiers,created_by_membership_id) "
+        "values (%s,%s,%s,100,'GBP',10,'GBP',250,'GBP',%s,%s)",
+        (
+            supplier_commercial_term_id,
+            tenant_id,
+            supplier_id,
+            Jsonb([]),
+            membership_id,
+        ),
+    )
+    cur.execute(
+        "insert into supplier_scorecard_snapshot "
+        "(id,tenant_id,supplier_id,window_start,window_end,rule_version,metrics,risk_score,"
+        "source_counts,computed_by_membership_id) "
+        "values (%s,%s,%s,current_date - interval '30 days',current_date,"
+        "'supplier-iq-v1',%s,%s,%s,%s)",
+        (
+            supplier_scorecard_snapshot_id,
+            tenant_id,
+            supplier_id,
+            Jsonb({"quality": {"sample_count": 1, "score": "0.900"}}),
+            Jsonb({"overall": "0.120", "confidence": "medium"}),
+            Jsonb({"delivery_quality_issue": 1}),
+            membership_id,
+        ),
+    )
+
     return Workspace(
         tenant_id,
         user_id,
@@ -479,6 +517,8 @@ def make_workspace(cur: psycopg.Cursor, label: str) -> Workspace:
         device_registration_id,
         low_stock_report_id,
         push_notification_id,
+        supplier_commercial_term_id,
+        supplier_scorecard_snapshot_id,
     )
 
 
@@ -1525,6 +1565,116 @@ def test_authenticated_has_no_access_to_push_notification_at_all(
             )
 
 
+# --- 011-optimisation-supplier-iq: supplier terms and scorecard snapshots ---
+
+
+def test_another_workspaces_supplier_commercial_terms_are_invisible(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        cur.execute(
+            "select id from supplier_commercial_term where id = %s",
+            (beta.supplier_commercial_term_id,),
+        )
+        assert cur.fetchone() is None
+
+
+def test_a_member_cannot_write_supplier_commercial_term_into_another_workspace(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            cur.execute(
+                "insert into supplier_commercial_term "
+                "(tenant_id,supplier_id,minimum_order_value_amount,"
+                "minimum_order_value_currency,created_by_membership_id) "
+                "values (%s,%s,50,'GBP',%s)",
+                (beta.tenant_id, beta.supplier_id, alpha.membership_id),
+            )
+
+
+def test_authenticated_has_no_delete_or_update_privilege_on_supplier_commercial_term(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, alpha, _beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+
+        cur.execute("savepoint no_delete_privilege")
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            cur.execute(
+                "delete from supplier_commercial_term where id = %s",
+                (alpha.supplier_commercial_term_id,),
+            )
+        cur.execute("rollback to savepoint no_delete_privilege")
+
+        cur.execute("savepoint no_update_privilege")
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            cur.execute(
+                "update supplier_commercial_term set rule_version = 'tampered' where id = %s",
+                (alpha.supplier_commercial_term_id,),
+            )
+        cur.execute("rollback to savepoint no_update_privilege")
+
+
+def test_another_workspaces_supplier_scorecard_snapshots_are_invisible(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        cur.execute(
+            "select id from supplier_scorecard_snapshot where id = %s",
+            (beta.supplier_scorecard_snapshot_id,),
+        )
+        assert cur.fetchone() is None
+
+
+def test_a_member_cannot_write_supplier_scorecard_snapshot_into_another_workspace(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            cur.execute(
+                "insert into supplier_scorecard_snapshot "
+                "(tenant_id,supplier_id,window_start,window_end,rule_version,metrics,"
+                "risk_score,source_counts,computed_by_membership_id) "
+                "values (%s,%s,current_date - interval '30 days',current_date,"
+                "'supplier-iq-v1','{}'::jsonb,'{}'::jsonb,'{}'::jsonb,%s)",
+                (beta.tenant_id, beta.supplier_id, alpha.membership_id),
+            )
+
+
+def test_authenticated_has_no_delete_or_update_privilege_on_supplier_scorecard_snapshot(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, alpha, _beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+
+        cur.execute("savepoint no_delete_privilege")
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            cur.execute(
+                "delete from supplier_scorecard_snapshot where id = %s",
+                (alpha.supplier_scorecard_snapshot_id,),
+            )
+        cur.execute("rollback to savepoint no_delete_privilege")
+
+        cur.execute("savepoint no_update_privilege")
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            cur.execute(
+                "update supplier_scorecard_snapshot set rule_version = 'tampered' where id = %s",
+                (alpha.supplier_scorecard_snapshot_id,),
+            )
+        cur.execute("rollback to savepoint no_update_privilege")
+
+
 # --- the guarantee itself ---------------------------------------------------
 
 
@@ -1550,6 +1700,7 @@ def test_rls_is_enabled_and_forced_on_every_tenant_scoped_table(
         "purchase_request", "purchase_request_line", "approval_step", "threshold_rule",
         "approval_delegation",
         "device_registration", "low_stock_report", "push_notification",
+        "supplier_commercial_term", "supplier_scorecard_snapshot",
     }
     with conn.cursor() as cur:
         cur.execute(
