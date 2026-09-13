@@ -17,6 +17,11 @@ AlertKindParam = Literal[
     "recommended_price_expiring",
     "preferred_supplier_offer_disappeared",
     "price_swing",
+    "price_spike",
+    "likely_duplicate_quotation_line",
+    "decimal_or_quantity_anomaly",
+    "delivery_cost_anomaly",
+    "supplier_quality_trend_change",
 ]
 
 

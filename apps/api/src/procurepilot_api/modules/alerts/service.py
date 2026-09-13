@@ -36,9 +36,7 @@ class AlertService:
         visible = [alert for alert in live if alert.id not in dismissed]
         page = visible[offset : offset + capped_limit]
         next_cursor = (
-            _encode_cursor(offset + capped_limit)
-            if len(visible) > offset + capped_limit
-            else None
+            _encode_cursor(offset + capped_limit) if len(visible) > offset + capped_limit else None
         )
         return AlertList(items=page, next_cursor=next_cursor)
 

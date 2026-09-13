@@ -57,6 +57,73 @@ describe('AlertsInboxComponent (US4, T061)', () => {
       created_from_current_data_at: '2026-08-21T09:00:00Z',
       dismissed: false,
     },
+    {
+      id: 'fp-spike-4',
+      kind: 'price_spike',
+      workspace_product_id: 'prod-1',
+      supplier_id: 'supp-1',
+      severity: 'critical',
+      confidence: 'high',
+      evidence: {
+        current_normalised_unit_price: { amount: '18.0000', currency: 'GBP' },
+        rolling_average: { amount: '12.0000', currency: 'GBP' },
+        spike_percentage: '50.00',
+      },
+      action: 'view_price_history',
+      created_from_current_data_at: '2026-08-21T09:00:00Z',
+      dismissed: false,
+    },
+    {
+      id: 'fp-dup-5',
+      kind: 'likely_duplicate_quotation_line',
+      workspace_product_id: 'prod-1',
+      supplier_id: 'supp-1',
+      severity: 'warning',
+      confidence: 'high',
+      evidence: {
+        quotation_id_1: 'quot-101',
+        quotation_line_id_1: 'line-1',
+        quotation_line_id_2: 'line-2',
+        unit_price: { amount: '5.5000', currency: 'GBP' },
+        requested_quantity_1: '10.000000',
+      },
+      action: 'review_quotation',
+      created_from_current_data_at: '2026-08-21T09:00:00Z',
+      dismissed: false,
+    },
+    {
+      id: 'fp-quality-6',
+      kind: 'supplier_quality_trend_change',
+      workspace_product_id: 'prod-1',
+      supplier_id: 'supp-1',
+      severity: 'critical',
+      confidence: 'high',
+      evidence: {
+        dispute_rate: '0.1200',
+        quality_score: '0.6500',
+        incident_count: 2,
+      },
+      action: 'inspect_scorecard',
+      created_from_current_data_at: '2026-08-21T09:00:00Z',
+      dismissed: false,
+    },
+    {
+      id: 'fp-delivery-7',
+      kind: 'delivery_cost_anomaly',
+      workspace_product_id: 'prod-2',
+      supplier_id: 'supp-2',
+      severity: 'warning',
+      confidence: 'high',
+      evidence: {
+        delivery_fee: '45.00',
+        minimum_order_value: '100.00',
+        fee_ratio: '0.4500',
+        currency: 'GBP',
+      },
+      action: 'view_delivery_issues',
+      created_from_current_data_at: '2026-08-21T09:00:00Z',
+      dismissed: false,
+    },
   ];
 
   beforeEach(async () => {
@@ -138,7 +205,7 @@ describe('AlertsInboxComponent (US4, T061)', () => {
   it('should initialize and load live alerts', () => {
     expect(component).toBeTruthy();
     expect(apiService.getAlerts).toHaveBeenCalled();
-    expect(component.alerts().length).toBe(3);
+    expect(component.alerts().length).toBe(7);
   });
 
   it('should filter alerts by kind', () => {
@@ -148,12 +215,19 @@ describe('AlertsInboxComponent (US4, T061)', () => {
     });
   });
 
+  it('should filter alerts by anomaly kind', () => {
+    component.onKindFilterChange('price_spike');
+    expect(apiService.getAlerts).toHaveBeenCalledWith({
+      kind: 'price_spike',
+    });
+  });
+
   it('should dismiss an alert and remove it from view', () => {
     const alertToDismiss = mockAlerts[0];
     component.dismissAlert(alertToDismiss);
     expect(apiService.dismissAlert).toHaveBeenCalledWith('fp-expiring-1');
     expect(component.alerts().find((a) => a.id === 'fp-expiring-1')).toBeUndefined();
-    expect(component.alerts().length).toBe(2);
+    expect(component.alerts().length).toBe(6);
   });
 
   it('should route compare_product action to compare screen', () => {
@@ -173,6 +247,24 @@ describe('AlertsInboxComponent (US4, T061)', () => {
     expect(router.navigate).toHaveBeenCalledWith(['/offers/product-intelligence', 'prod-1'], {
       queryParams: { product_id: 'prod-1', supplier_id: 'supp-1' },
     });
+  });
+
+  it('should route inspect_scorecard action to supplier scorecard screen', () => {
+    const qualityAlert = mockAlerts.find((a) => a.action === 'inspect_scorecard')!;
+    component.onActionClick(qualityAlert);
+    expect(router.navigate).toHaveBeenCalledWith(['/suppliers', 'supp-1', 'scorecard']);
+  });
+
+  it('should route review_quotation action to quotation review screen', () => {
+    const dupAlert = mockAlerts.find((a) => a.action === 'review_quotation')!;
+    component.onActionClick(dupAlert);
+    expect(router.navigate).toHaveBeenCalledWith(['/quotations', 'quot-101', 'review']);
+  });
+
+  it('should route view_delivery_issues action to supplier scorecard screen', () => {
+    const deliveryAlert = mockAlerts.find((a) => a.action === 'view_delivery_issues')!;
+    component.onActionClick(deliveryAlert);
+    expect(router.navigate).toHaveBeenCalledWith(['/suppliers', 'supp-2', 'scorecard']);
   });
 
   it('should render empty all-clear state when no alerts exist', () => {

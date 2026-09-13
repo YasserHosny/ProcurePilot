@@ -60,13 +60,13 @@ release conditions.
 
 ## Phase 5: User Story 3 - Anomaly detection v1 (P2)
 
-- [ ] T029 [P] Write anomaly rule tests in `apps/api/tests/unit/test_anomaly_conditions.py` for all five anomaly kinds and severity/confidence rules.
-- [ ] T030 [P] Write alert integration tests in `apps/api/tests/integration/test_anomaly_alerts.py` proving live recomputation, deterministic fingerprints, dismissal suppression, and recurrence on changed evidence.
-- [ ] T031 Extend `apps/api/src/procurepilot_api/modules/alerts/fingerprints.py` for anomaly recurrence keys.
-- [ ] T032 Extend `apps/api/src/procurepilot_api/modules/alerts/conditions.py` with `price_spike`, `likely_duplicate_quotation_line`, `decimal_or_quantity_anomaly`, `delivery_cost_anomaly`, and `supplier_quality_trend_change`.
-- [ ] T033 Extend `apps/api/src/procurepilot_api/modules/alerts/schemas.py` and `apps/api/src/procurepilot_api/modules/alerts/router.py` for new kinds, confidence, validity, and supplier-scorecard action links.
-- [ ] T034 [P] Extend `apps/web/src/app/features/alerts/alert-actions.ts` and `alerts-inbox` tests for anomaly action routing and recurrence copy.
-- [ ] T035 Build anomaly UI states in `apps/web/src/app/features/alerts/alerts-inbox/` with source evidence, confidence, severity, and i18n-only labels.
+- [x] T029 [P] Write anomaly rule tests in `apps/api/tests/unit/test_anomaly_conditions.py` for all five anomaly kinds and severity/confidence rules.
+- [x] T030 [P] Write alert integration tests in `apps/api/tests/integration/test_anomaly_alerts.py` proving live recomputation, deterministic fingerprints, dismissal suppression, and recurrence on changed evidence.
+- [x] T031 Extend `apps/api/src/procurepilot_api/modules/alerts/fingerprints.py` for anomaly recurrence keys.
+- [x] T032 Extend `apps/api/src/procurepilot_api/modules/alerts/conditions.py` with `price_spike`, `likely_duplicate_quotation_line`, `decimal_or_quantity_anomaly`, `delivery_cost_anomaly`, and `supplier_quality_trend_change`.
+- [x] T033 Extend `apps/api/src/procurepilot_api/modules/alerts/schemas.py` and `apps/api/src/procurepilot_api/modules/alerts/router.py` for new kinds, confidence, validity, and supplier-scorecard action links.
+- [x] T034 [P] Extend `apps/web/src/app/features/alerts/alert-actions.ts` and `alerts-inbox` tests for anomaly action routing and recurrence copy.
+- [x] T035 Build anomaly UI states in `apps/web/src/app/features/alerts/alerts-inbox/` with source evidence, confidence, severity, and i18n-only labels.
 
 ## Phase 6: User Story 4 - Web integration (P2)
 

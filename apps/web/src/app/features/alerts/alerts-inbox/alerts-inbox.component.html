@@ -33,6 +33,21 @@
           <mat-option value="price_swing">
             {{ 'alerts.kinds.price_swing' | translate }}
           </mat-option>
+          <mat-option value="price_spike">
+            {{ 'alerts.kinds.price_spike' | translate }}
+          </mat-option>
+          <mat-option value="likely_duplicate_quotation_line">
+            {{ 'alerts.kinds.likely_duplicate_quotation_line' | translate }}
+          </mat-option>
+          <mat-option value="decimal_or_quantity_anomaly">
+            {{ 'alerts.kinds.decimal_or_quantity_anomaly' | translate }}
+          </mat-option>
+          <mat-option value="delivery_cost_anomaly">
+            {{ 'alerts.kinds.delivery_cost_anomaly' | translate }}
+          </mat-option>
+          <mat-option value="supplier_quality_trend_change">
+            {{ 'alerts.kinds.supplier_quality_trend_change' | translate }}
+          </mat-option>
         </mat-select>
       </mat-form-field>
     </div>
@@ -61,6 +76,12 @@
                 <span class="kind-badge">
                   {{ 'alerts.kinds.' + alert.kind | translate }}
                 </span>
+                @if (alert.confidence) {
+                  <span class="confidence-badge" [ngClass]="alert.confidence">
+                    <mat-icon aria-hidden="true">verified_user</mat-icon>
+                    {{ 'anomalies.confidence.label' | translate }}: {{ 'anomalies.confidence.' + alert.confidence | translate }}
+                  </span>
+                }
               </div>
 
               <div class="alert-actions-group">
@@ -128,6 +149,45 @@
                       currentPrice: ($any(alert.evidence['current_price']) | formatMoney),
                       swingPercent: alert.evidence['swing_percent'],
                       avgPrice: ($any(alert.evidence['average_price']) | formatMoney)
+                    } }}
+                  </p>
+                } @else if (alert.kind === 'price_spike') {
+                  <p>
+                    {{ 'alerts.card.evidence.priceSpike' | translate: {
+                      currentPrice: ($any(alert.evidence['current_normalised_unit_price'] || alert.evidence['current_price']) | formatMoney),
+                      spikePercent: alert.evidence['spike_percentage'],
+                      avgPrice: ($any(alert.evidence['rolling_average'] || alert.evidence['baseline_price']) | formatMoney)
+                    } }}
+                  </p>
+                } @else if (alert.kind === 'likely_duplicate_quotation_line') {
+                  <p>
+                    {{ 'alerts.card.evidence.duplicateLine' | translate: {
+                      supplier: getSupplierName(alert.supplier_id),
+                      unitPrice: ($any(alert.evidence['unit_price']) | formatMoney),
+                      quantity: alert.evidence['requested_quantity_1']
+                    } }}
+                  </p>
+                } @else if (alert.kind === 'decimal_or_quantity_anomaly') {
+                  <p>
+                    {{ 'alerts.card.evidence.decimalAnomaly' | translate: {
+                      currentPrice: ($any(alert.evidence['current_price']) | formatMoney),
+                      ratio: alert.evidence['ratio'],
+                      avgPrice: ($any(alert.evidence['baseline_price']) | formatMoney)
+                    } }}
+                  </p>
+                } @else if (alert.kind === 'delivery_cost_anomaly') {
+                  <p>
+                    {{ 'alerts.card.evidence.deliveryCostAnomaly' | translate: {
+                      deliveryFee: alert.evidence['delivery_fee'] + ' ' + (alert.evidence['currency'] || ''),
+                      feeRatio: alert.evidence['fee_ratio'],
+                      mov: alert.evidence['minimum_order_value'] + ' ' + (alert.evidence['currency'] || '')
+                    } }}
+                  </p>
+                } @else if (alert.kind === 'supplier_quality_trend_change') {
+                  <p>
+                    {{ 'alerts.card.evidence.supplierQualityAnomaly' | translate: {
+                      disputeRate: alert.evidence['dispute_rate'],
+                      qualityScore: alert.evidence['quality_score']
                     } }}
                   </p>
                 }

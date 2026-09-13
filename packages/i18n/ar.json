@@ -1314,7 +1314,12 @@
     "kinds": {
       "recommended_price_expiring": "سعر موصى به يقترب من الانتهاء",
       "preferred_supplier_offer_disappeared": "اختفاء عرض المورد المفضل",
-      "price_swing": "تم رصد تقلب في السعر"
+      "price_swing": "تم رصد تقلب في السعر",
+      "price_spike": "ارتفاع حاد في السعر",
+      "likely_duplicate_quotation_line": "بند عرض أسعار مكرر على الأرجح",
+      "decimal_or_quantity_anomaly": "شذوذ في الأرقام العشرية أو الكميات",
+      "delivery_cost_anomaly": "شذوذ في تكلفة التوصيل",
+      "supplier_quality_trend_change": "تغير في اتجاه جودة المورد"
     },
     "severities": {
       "critical": "حرج",
@@ -1331,13 +1336,21 @@
       "evidence": {
         "expiringSoon": "العرض الموصى به من {{supplier}} ينتهي في {{validTo}}.",
         "disappeared": "المورد المفضل {{supplier}} لم يعد لديه عرض نشط لهذا المنتج.",
-        "priceSwing": "سعر الوحدة الموصى به ({{currentPrice}}) تغير بنسبة {{swingPercent}}% مقارنة بالمتوسط التاريخي لـ 6 أشهر ({{avgPrice}})."
+        "priceSwing": "سعر الوحدة الموصى به ({{currentPrice}}) تغير بنسبة {{swingPercent}}% مقارنة بالمتوسط التاريخي لـ 6 أشهر ({{avgPrice}}).",
+        "priceSpike": "سعر الوحدة الموصى به ({{currentPrice}}) ارتفع بنسبة {{spikePercent}}% عن خط الأساس لمتوسط الأسعار ({{avgPrice}}).",
+        "duplicateLine": "تم رصد بنود عروض أسعار مكررة للمورد {{supplier}} بنفس السعر {{unitPrice}} (الكمية: {{quantity}}).",
+        "decimalAnomaly": "سعر الوحدة ({{currentPrice}}) يُظهر تحولاً غير متوقع في الرتبة العشرية (النسبة {{ratio}}x) مقارنة بخط الأساس ({{avgPrice}}).",
+        "deliveryCostAnomaly": "رسوم توصيل المورد البالغة {{deliveryFee}} تمثل {{feeRatio}}% من الحد الأدنى للطلب ({{mov}}).",
+        "supplierQualityAnomaly": "تم رصد تغير في أداء المورد: نسبة النزاعات {{disputeRate}}% ودرجة الجودة {{qualityScore}}."
       }
     },
     "actions": {
       "compare_product": "مقارنة العروض",
       "review_supplier": "مراجعة المورد",
-      "view_price_history": "عرض سجل الأسعار"
+      "view_price_history": "عرض سجل الأسعار",
+      "inspect_scorecard": "فحص بطاقة تقييم المورد",
+      "review_quotation": "مراجعة عرض الأسعار",
+      "view_delivery_issues": "عرض مشكلات التسليم"
     },
     "empty": {
       "title": "كل شيء على ما يرام — لا توجد تنبيهات نشطة",

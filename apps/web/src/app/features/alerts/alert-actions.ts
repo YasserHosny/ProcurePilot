@@ -31,6 +31,37 @@ export function navigateAlertAction(router: Router, alert: Alert): void {
       });
       break;
 
+    case 'inspect_scorecard':
+      if (alert.supplier_id) {
+        router.navigate(['/suppliers', alert.supplier_id, 'scorecard']);
+      } else {
+        router.navigate(['/suppliers']);
+      }
+      break;
+
+    case 'review_quotation': {
+      const quotationId =
+        alert.evidence && typeof alert.evidence === 'object'
+          ? ((alert.evidence['quotation_id_1'] as string) ||
+            (alert.evidence['quotation_id'] as string) ||
+            null)
+          : null;
+      if (quotationId) {
+        router.navigate(['/quotations', quotationId, 'review']);
+      } else {
+        router.navigate(['/quotations']);
+      }
+      break;
+    }
+
+    case 'view_delivery_issues':
+      if (alert.supplier_id) {
+        router.navigate(['/suppliers', alert.supplier_id, 'scorecard']);
+      } else {
+        router.navigate(['/suppliers']);
+      }
+      break;
+
     default:
       break;
   }

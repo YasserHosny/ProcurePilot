@@ -1,2 +1,1 @@
 """Live actionable alert APIs."""
-

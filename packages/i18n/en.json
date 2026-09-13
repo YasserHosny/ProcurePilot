@@ -1314,7 +1314,12 @@
     "kinds": {
       "recommended_price_expiring": "Expiring Recommended Price",
       "preferred_supplier_offer_disappeared": "Preferred Supplier Offer Disappeared",
-      "price_swing": "Price Swing Detected"
+      "price_swing": "Price Swing Detected",
+      "price_spike": "Price Spike",
+      "likely_duplicate_quotation_line": "Likely Duplicate Quotation Line",
+      "decimal_or_quantity_anomaly": "Decimal or Quantity Anomaly",
+      "delivery_cost_anomaly": "Delivery Cost Anomaly",
+      "supplier_quality_trend_change": "Supplier Quality Trend Change"
     },
     "severities": {
       "critical": "Critical",
@@ -1331,13 +1336,21 @@
       "evidence": {
         "expiringSoon": "Recommended offer from {{supplier}} expires on {{validTo}}.",
         "disappeared": "Preferred supplier {{supplier}} no longer has an active offer for this product.",
-        "priceSwing": "Recommended unit price ({{currentPrice}}) has shifted by {{swingPercent}}% compared to the 6-month historical average ({{avgPrice}})."
+        "priceSwing": "Recommended unit price ({{currentPrice}}) has shifted by {{swingPercent}}% compared to the 6-month historical average ({{avgPrice}}).",
+        "priceSpike": "Recommended unit price ({{currentPrice}}) has spiked by {{spikePercent}}% above the rolling average baseline ({{avgPrice}}).",
+        "duplicateLine": "Duplicate quotation lines detected for {{supplier}} with identical price {{unitPrice}} (quantity: {{quantity}}).",
+        "decimalAnomaly": "Unit price ({{currentPrice}}) exhibits an unexpected order-of-magnitude shift (ratio {{ratio}}x) against baseline ({{avgPrice}}).",
+        "deliveryCostAnomaly": "Supplier delivery fee of {{deliveryFee}} represents {{feeRatio}}% of minimum order value ({{mov}}).",
+        "supplierQualityAnomaly": "Supplier performance trend change detected: dispute rate is {{disputeRate}}% and quality score is {{qualityScore}}."
       }
     },
     "actions": {
       "compare_product": "Compare Offers",
       "review_supplier": "Review Supplier",
-      "view_price_history": "View Price History"
+      "view_price_history": "View Price History",
+      "inspect_scorecard": "Inspect Scorecard",
+      "review_quotation": "Review Quotation",
+      "view_delivery_issues": "View Delivery Issues"
     },
     "empty": {
       "title": "All clear — No active alerts",

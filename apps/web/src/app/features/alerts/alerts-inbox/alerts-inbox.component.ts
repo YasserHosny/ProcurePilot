@@ -179,6 +179,12 @@ export class AlertsInboxComponent implements OnInit {
         return 'storefront';
       case 'view_price_history':
         return 'timeline';
+      case 'inspect_scorecard':
+        return 'fact_check';
+      case 'review_quotation':
+        return 'description';
+      case 'view_delivery_issues':
+        return 'local_shipping';
       default:
         return 'arrow_forward';
     }
