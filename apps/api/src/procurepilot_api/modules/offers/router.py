@@ -11,6 +11,7 @@ from procurepilot_api.modules.auth.jwt import MemberRole
 from procurepilot_api.modules.auth.rbac import require_role
 from procurepilot_api.modules.offers.basket_service import BasketService, get_basket_service
 from procurepilot_api.modules.offers.schemas import (
+    AdvancedBasketOptimiseRequest,
     BasketOptimiseRequest,
     BasketSplitJob,
     OfferComparison,
@@ -86,7 +87,7 @@ def price_history(
     response_model=BasketSplitJob,
 )
 def optimise_basket(
-    payload: Annotated[BasketOptimiseRequest, Body()],
+    payload: Annotated[BasketOptimiseRequest | AdvancedBasketOptimiseRequest, Body()],
     member: Annotated[CurrentMember, Depends(require_role(*WRITE_ROLES))],
     service: Annotated[BasketService, Depends(get_basket_service)],
     _idempotency_key: Annotated[UUID | None, Header(alias="Idempotency-Key")] = None,
