@@ -1690,6 +1690,8 @@
       "submitted": "Submitted",
       "pending": "Pending",
       "approved": "Approved",
+      "ordered": "Ordered",
+      "delivered": "Delivered",
       "rejected": "Rejected",
       "withdrawn": "Withdrawn"
     },
@@ -1754,6 +1756,21 @@
       "decidedAt": "Decided on",
       "pending": "Pending approval"
     }
+  },
+  "delivery": {
+    "title": "Confirm Delivery",
+    "entryPointButton": "Confirm Delivery",
+    "linesTitle": "Received Quantities",
+    "quantityReceivedLabel": "Quantity received",
+    "orderedQuantityHelper": "Ordered quantity: {{quantity}}",
+    "submitButton": "Confirm Delivery",
+    "submittingButton": "Confirming...",
+    "cancelButton": "Cancel",
+    "successMessage": "Delivery confirmed.",
+    "genericError": "Unable to confirm delivery. Please try again.",
+    "notOrderedError": "This request is not ready for delivery receipt.",
+    "invalidLinesError": "Unable to confirm delivery because the request lines changed.",
+    "notAvailable": "Delivery confirmation is not available."
   },
   "approvals": {
     "title": "Approval Queue",

@@ -122,6 +122,23 @@ class RequestsApiClient {
     return _decideRequest(requestId, action: 'reject', comment: comment);
   }
 
+  /// Confirms delivery of an ordered purchase request.
+  Future<PurchaseRequest> confirmDelivery(
+    String requestId,
+    List<DeliveryLineInput> lines,
+  ) async {
+    final uri = Uri.parse('$apiBaseUrl/requests/$requestId/confirm-delivery');
+    final response = await _httpClient.post(
+      uri,
+      headers: _headers(),
+      body: jsonEncode({'lines': lines.map((line) => line.toJson()).toList()}),
+    );
+    _checkResponse(response);
+    return PurchaseRequest.fromJson(
+      jsonDecode(response.body) as Map<String, dynamic>,
+    );
+  }
+
   Future<PurchaseRequest> _decideRequest(
     String requestId, {
     required String action,
@@ -230,4 +247,20 @@ class RequestsApiClient {
       traceId: body['trace_id'] as String? ?? '',
     );
   }
+}
+
+/// Input line for delivery confirmation.
+class DeliveryLineInput {
+  const DeliveryLineInput({
+    required this.purchaseRequestLineId,
+    required this.quantityReceived,
+  });
+
+  final String purchaseRequestLineId;
+  final String quantityReceived;
+
+  Map<String, dynamic> toJson() => {
+    'purchase_request_line_id': purchaseRequestLineId,
+    'quantity_received': quantityReceived,
+  };
 }

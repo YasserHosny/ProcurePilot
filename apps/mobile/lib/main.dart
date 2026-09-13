@@ -19,6 +19,7 @@ import 'features/approvals/approval_queue_screen.dart';
 import 'features/auth/biometric_offer_screen.dart';
 import 'features/auth/sign_in_screen.dart';
 import 'features/auth/splash_screen.dart';
+import 'features/delivery/delivery_confirmation_screen.dart';
 import 'features/home/home_screen.dart';
 import 'features/low_stock/low_stock_report_screen.dart';
 import 'features/notifications/notification_permission.dart';
@@ -40,6 +41,7 @@ final Map<String, WidgetBuilder> appRoutes = {
   '/home': (context) => const HomeScreen(),
   '/approvals': (context) => const ApprovalQueueScreen(),
   '/approvals/detail': (context) => const ApprovalDecisionScreen(),
+  '/delivery/confirm': (context) => const DeliveryConfirmationScreen(),
   '/requests': (context) => const RequestListScreen(),
   '/requests/new': (context) => const RequestFormScreen(),
   '/requests/detail': (context) => const RequestDetailScreen(),

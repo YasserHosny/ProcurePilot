@@ -1690,6 +1690,8 @@
       "submitted": "مقدمة",
       "pending": "معلقة",
       "approved": "معتمدة",
+      "ordered": "مطلوبة",
+      "delivered": "مستلمة",
       "rejected": "مرفوضة",
       "withdrawn": "مسحوبة"
     },
@@ -1754,6 +1756,21 @@
       "decidedAt": "تاريخ القرار",
       "pending": "بانتظار الاعتماد"
     }
+  },
+  "delivery": {
+    "title": "تأكيد الاستلام",
+    "entryPointButton": "تأكيد الاستلام",
+    "linesTitle": "الكميات المستلمة",
+    "quantityReceivedLabel": "الكمية المستلمة",
+    "orderedQuantityHelper": "الكمية المطلوبة: {{quantity}}",
+    "submitButton": "تأكيد الاستلام",
+    "submittingButton": "جارٍ التأكيد...",
+    "cancelButton": "إلغاء",
+    "successMessage": "تم تأكيد الاستلام.",
+    "genericError": "تعذر تأكيد الاستلام. يرجى المحاولة مرة أخرى.",
+    "notOrderedError": "هذا الطلب غير جاهز لتسجيل الاستلام.",
+    "invalidLinesError": "تعذر تأكيد الاستلام لأن بنود الطلب تغيرت.",
+    "notAvailable": "تأكيد الاستلام غير متاح."
   },
   "approvals": {
     "title": "قائمة الاعتماد",
