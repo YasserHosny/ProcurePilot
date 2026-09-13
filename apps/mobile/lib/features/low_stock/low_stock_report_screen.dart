@@ -452,7 +452,6 @@ class _LowStockReportScreenState extends State<LowStockReportScreen> {
                   child: DropdownButtonHideUnderline(
                     child: DropdownButton<String>(
                       value: _branchId,
-                      isDense: true,
                       hint: Text(i18n.t('requests.form.branchLabel')),
                       items: _branches
                           .map(
