@@ -20,28 +20,28 @@ release conditions.
 
 ## Phase 1: Setup and schema
 
-- [ ] T001 Write `supabase/migrations/20260914000001_supplier_commercial_term.sql` creating `supplier_commercial_term` with money pairing checks, effective-date checks, composite supplier/membership FKs, `ENABLE` and `FORCE` RLS.
-- [ ] T002 Write `supabase/migrations/20260914000002_supplier_scorecard_snapshot.sql` creating `supplier_scorecard_snapshot` with unique `(tenant_id,supplier_id,window_start,window_end,rule_version)`, source JSON fields, `ENABLE` and `FORCE` RLS.
-- [ ] T003 Write `supabase/migrations/20260914000003_supplier_iq_rls.sql` with `USING` and `WITH CHECK` policies for both new tables, owner/buyer insert permissions, tenant member select permissions, and no update/delete grants.
+- [x] T001 Write `supabase/migrations/20260914000001_supplier_commercial_term.sql` creating `supplier_commercial_term` with money pairing checks, effective-date checks, composite supplier/membership FKs, `ENABLE` and `FORCE` RLS.
+- [x] T002 Write `supabase/migrations/20260914000002_supplier_scorecard_snapshot.sql` creating `supplier_scorecard_snapshot` with unique `(tenant_id,supplier_id,window_start,window_end,rule_version)`, source JSON fields, `ENABLE` and `FORCE` RLS.
+- [x] T003 Write `supabase/migrations/20260914000003_supplier_iq_rls.sql` with `USING` and `WITH CHECK` policies for both new tables, owner/buyer insert permissions, tenant member select permissions, and no update/delete grants.
 - [ ] T004 [P] Add R2.4 i18n namespaces to `packages/i18n/en.json` and `packages/i18n/ar.json`: `advancedBasket`, `supplierIq`, `supplierTerms`, and `anomalies`.
 - [ ] T005 [P] Extend web routing in `apps/web/src/app/app.routes.ts` for supplier scorecard navigation under suppliers without adding a marketing/dashboard page.
-- [ ] T006 [P] Add API schema classes in `apps/api/src/procurepilot_api/modules/offers/schemas.py` for supplier terms, Supplier IQ scorecards, advanced basket request/result fields, and anomaly alert kinds.
+- [x] T006 [P] Add API schema classes in `apps/api/src/procurepilot_api/modules/offers/schemas.py` for supplier terms, Supplier IQ scorecards, advanced basket request/result fields, and anomaly alert kinds.
 
 ## Phase 2: Foundational tests and contracts
 
-- [ ] T007 [P] Write contract tests in `apps/api/tests/contract/test_optimisation_supplier_iq_contract.py` for advanced basket, supplier terms, supplier scorecard, and anomaly alert response shapes.
-- [ ] T008 [P] Extend tenant isolation tests in `apps/api/tests/integration/test_tenant_isolation.py` for `supplier_commercial_term` and `supplier_scorecard_snapshot`.
+- [x] T007 [P] Write contract tests in `apps/api/tests/contract/test_optimisation_supplier_iq_contract.py` for advanced basket, supplier terms, supplier scorecard, and anomaly alert response shapes.
+- [x] T008 [P] Extend tenant isolation tests in `apps/api/tests/integration/test_tenant_isolation.py` for `supplier_commercial_term` and `supplier_scorecard_snapshot`.
 - [ ] T009 [P] Write RBAC tests in `apps/api/tests/integration/test_supplier_iq_rbac.py` proving owner/buyer may mutate terms and submit advanced baskets, while read-only roles can view scorecards/alerts only.
 - [ ] T010 [P] Write audit tests in `apps/api/tests/integration/test_supplier_iq_audit.py` for advanced basket submission, scorecard view, and anomaly dismissal audit events.
 
 ## Phase 3: User Story 1 - Advanced basket optimisation (P1)
 
-- [ ] T011 [P] Write optimiser solver tests in `services/optimiser/tests/test_advanced_solver.py` for MOV, free-delivery threshold, delivery fee, quantity tiers, risk tolerance, supplier exclusion, infeasible constraints, and deterministic tie-breaks.
+- [x] T011 [P] Write optimiser solver tests in `services/optimiser/tests/test_advanced_solver.py` for MOV, free-delivery threshold, delivery fee, quantity tiers, risk tolerance, supplier exclusion, infeasible constraints, and deterministic tie-breaks.
 - [ ] T012 [P] Write API integration tests in `apps/api/tests/integration/test_advanced_basket_optimisation.py` proving 2-10 suppliers, max 50 lines, mixed-currency refusal, constraint snapshots, idempotency, and advisory-only side effects.
-- [ ] T013 Implement supplier term persistence and validation in `apps/api/src/procurepilot_api/modules/offers/supplier_terms.py`.
-- [ ] T014 Expose `GET` and `POST /suppliers/{supplier_id}/commercial-terms` in `apps/api/src/procurepilot_api/modules/offers/router.py`.
+- [x] T013 Implement supplier term persistence and validation in `apps/api/src/procurepilot_api/modules/offers/supplier_terms.py`.
+- [x] T014 Expose `GET` and `POST /suppliers/{supplier_id}/commercial-terms` in `apps/api/src/procurepilot_api/modules/offers/router.py`.
 - [ ] T015 Extend `apps/api/src/procurepilot_api/modules/offers/basket_service.py` to accept advanced constraint snapshots and enqueue the existing optimiser worker payload with `rule_version`.
-- [ ] T016 Extend `services/optimiser/src/procurepilot_optimiser_worker/models.py` with advanced request/result, terms, constraints, risk, and confidence models.
+- [x] T016 Extend `services/optimiser/src/procurepilot_optimiser_worker/models.py` with advanced request/result, terms, constraints, risk, and confidence models.
 - [ ] T017 Extend `services/optimiser/src/procurepilot_optimiser_worker/repository.py` to read supplier terms, scorecard/risk inputs, and current eligible offers without recomputing landed cost.
 - [ ] T018 Extend `services/optimiser/src/procurepilot_optimiser_worker/solver.py` with hard constraints, weighted objective, tier prices, baselines, violated constraints, and deterministic tie-breaks.
 - [ ] T019 Extend `services/optimiser/src/procurepilot_optimiser_worker/worker.py` to persist R2.4 result payloads and reserve `failed` for infrastructure/unexpected errors.
