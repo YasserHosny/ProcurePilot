@@ -6,7 +6,9 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, StrictStr
 
-type PurchaseRequestStatus = Literal["draft", "submitted", "approved", "rejected", "withdrawn"]
+type PurchaseRequestStatus = Literal[
+    "draft", "submitted", "approved", "rejected", "withdrawn", "ordered", "delivered"
+]
 type ApprovalStepStatus = Literal["pending", "approved", "rejected"]
 type ApprovalStepSource = Literal["threshold_match", "delegate", "owner_fallback"]
 

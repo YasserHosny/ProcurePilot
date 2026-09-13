@@ -11,6 +11,7 @@ import 'package:procurepilot_mobile/core/api/mobile_api_client.dart';
 import 'package:procurepilot_mobile/core/api/requests_api_client.dart';
 import 'package:procurepilot_mobile/core/auth/auth_service.dart';
 import 'package:procurepilot_mobile/core/auth/biometric_gate.dart';
+import 'package:procurepilot_mobile/core/camera/camera_capture.dart';
 import 'package:procurepilot_mobile/core/i18n/i18n_loader.dart';
 import 'package:procurepilot_mobile/core/offline_queue/offline_queue_service.dart';
 import 'package:procurepilot_mobile/features/auth/biometric_offer_screen.dart';
@@ -199,6 +200,26 @@ class FakeBiometricAuth implements BiometricAuth {
   Future<bool> authenticate({required String localizedReason}) async {
     lastReason = localizedReason;
     return authenticateResult;
+  }
+}
+
+/// Test double for [CameraCapture] — configurable to simulate an available
+/// camera returning a specific photo, or an unavailable/declined camera
+/// returning null, without ever touching a real device camera.
+class FakeCameraCapture implements CameraCapture {
+  FakeCameraCapture({this.available = true, this.captureResult});
+
+  bool available;
+  CapturedPhoto? captureResult;
+  int captureCalls = 0;
+
+  @override
+  Future<bool> isAvailable() async => available;
+
+  @override
+  Future<CapturedPhoto?> capturePhoto() async {
+    captureCalls += 1;
+    return captureResult;
   }
 }
 

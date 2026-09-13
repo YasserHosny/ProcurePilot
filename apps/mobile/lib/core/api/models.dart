@@ -193,6 +193,7 @@ class PurchaseRequestLine {
     required this.quantity,
     this.note,
     this.estimatedUnitPrice,
+    this.quantityReceived,
   });
 
   final String id;
@@ -200,6 +201,10 @@ class PurchaseRequestLine {
   final String quantity;
   final String? note;
   final Money? estimatedUnitPrice;
+
+  /// Set once the parent request is `delivered` (chunk R2.3) — null until then. A decimal
+  /// string, same convention as [quantity].
+  final String? quantityReceived;
 
   factory PurchaseRequestLine.fromJson(Map<String, dynamic> json) {
     return PurchaseRequestLine(
@@ -210,6 +215,7 @@ class PurchaseRequestLine {
       estimatedUnitPrice: json['estimated_unit_price'] == null
           ? null
           : Money.fromJson(json['estimated_unit_price'] as Map<String, dynamic>),
+      quantityReceived: json['quantity_received'] as String?,
     );
   }
 
@@ -332,6 +338,9 @@ class PurchaseRequest {
     this.withdrawnAt,
     required this.createdAt,
     this.updatedAt,
+    this.deliveredAt,
+    this.deliveryConfirmedByMembershipId,
+    this.hasDeliveryDiscrepancy = false,
   });
 
   final String id;
@@ -349,6 +358,13 @@ class PurchaseRequest {
   final DateTime? withdrawnAt;
   final DateTime createdAt;
   final DateTime? updatedAt;
+
+  /// Delivery-lifecycle fields (chunk R2.3) — null/false until the request reaches
+  /// `ordered`/`delivered`. `status` itself already carries those two new values; these three
+  /// fields are the facts recorded alongside the `delivered` transition specifically.
+  final DateTime? deliveredAt;
+  final String? deliveryConfirmedByMembershipId;
+  final bool hasDeliveryDiscrepancy;
 
   factory PurchaseRequest.fromJson(Map<String, dynamic> json) {
     final lines = (json['lines'] as List<dynamic>)
@@ -382,6 +398,13 @@ class PurchaseRequest {
       updatedAt: json['updated_at'] == null
           ? null
           : DateTime.parse(json['updated_at'] as String),
+      deliveredAt: json['delivered_at'] == null
+          ? null
+          : DateTime.parse(json['delivered_at'] as String),
+      deliveryConfirmedByMembershipId:
+          json['delivery_confirmed_by_membership_id'] as String?,
+      hasDeliveryDiscrepancy:
+          json['has_delivery_discrepancy'] as bool? ?? false,
     );
   }
 
@@ -401,6 +424,10 @@ class PurchaseRequest {
         if (withdrawnAt != null) 'withdrawn_at': withdrawnAt!.toIso8601String(),
         'created_at': createdAt.toIso8601String(),
         if (updatedAt != null) 'updated_at': updatedAt!.toIso8601String(),
+        if (deliveredAt != null) 'delivered_at': deliveredAt!.toIso8601String(),
+        if (deliveryConfirmedByMembershipId != null)
+          'delivery_confirmed_by_membership_id': deliveryConfirmedByMembershipId,
+        'has_delivery_discrepancy': hasDeliveryDiscrepancy,
       };
 }
 
