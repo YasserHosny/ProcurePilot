@@ -33,6 +33,7 @@
 - [`quality/quotation-upload-review-findings.md`](quality/quotation-upload-review-findings.md) — Manual QA walkthrough of the quotation upload + review flow (staging, 2026-09-04): bugs, missing functions, UX improvements, suggested additions.
 - [`operations/release-plan.md`](operations/release-plan.md) — CI/CD, environments, Bunny Magic Containers (production + workers apps), rollback, secrets, IaC.
 - [`operations/runbook.md`](operations/runbook.md) — Operations manual, production topology, extraction provider operations, logging & diagnostics, incident response, scaling, backup/restore.
+- [`operations/mobile-build-release-gate.md`](operations/mobile-build-release-gate.md) — App-size and cold-start checklist to run before any mobile store submission.
 
 ## User-facing
 
