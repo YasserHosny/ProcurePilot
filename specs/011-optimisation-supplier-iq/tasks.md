@@ -91,6 +91,11 @@ release conditions.
 | Optimiser worker | CP-SAT models/repository/solver/worker tests | Codex delegate | T011, T016-T019 |
 | Frontend | Angular UI/i18n/E2E/a11y | Agy delegate | T004-T005, T020-T021, T026-T028, T034-T039 |
 
+For Agy frontend lanes, if permission prompts block headless execution, use
+`agy --dangerously-skip-permissions` only after explicit user approval. Treat that as full-access
+delegate execution: keep the scoped file list in the brief tight, do not combine it with read-only
+mode, and review Agy's diff and gates before landing.
+
 ## Wave 14 recommendation
 
 Start with Phase 1 and Phase 2 plus the first thin slice of US1/US2:

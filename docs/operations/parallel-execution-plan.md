@@ -240,6 +240,11 @@ divides, which doesn't exist yet.
 - **`.angular` cache bloat**: before dispatching anything to Agy, check `du -sh apps/web/.angular` —
   it has repeatedly grown large enough to time out Agy's workspace scan in this project. Clear it
   first if it's multiple GB.
+- **Agy permission prompts**: if a headless Agy run stalls or returns permission-denied/no-output
+  behavior, the next plan should explicitly decide whether to use
+  `agy --dangerously-skip-permissions`. Use that flag only after the user has approved it, never
+  with read-only mode, and treat the delegate as having full workspace access; keep the brief's
+  file scope narrow and independently review the diff and gates before landing it.
 - **Idempotency-Key**: a known, previously-deferred finding in this codebase is that
   `Idempotency-Key` is accepted on several mutation endpoints but not actually enforced end-to-end.
   If any task in this plan touches a mutation endpoint, don't widen that gap further, but also

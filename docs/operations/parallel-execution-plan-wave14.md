@@ -71,6 +71,12 @@ Reason: pure worker model/test setup with no API or web conflicts.
 Reason: user preference is to use Agy especially for frontend. This lane starts with i18n/routes
 and tests only; UI implementation waits for stable API/result models.
 
+Dispatch note: if Agy headless runs are blocked by permission prompts, include
+`agy --dangerously-skip-permissions` in the delegate command only after explicit user approval.
+This flag auto-approves Agy tool permission requests and must be treated as full-access execution:
+do not combine it with read-only mode, keep the file scope tight in the brief, and review the diff
+plus gates before landing any Agy-authored change.
+
 ## 3. Branches
 
 - Planning branch: `011-optimisation-supplier-iq`
@@ -104,4 +110,6 @@ coverage passed.
 - Do not add hardcoded UI strings.
 - Do not introduce FX conversion.
 - Do not persist live anomaly alert rows; persist dismissals only.
-- Do not use Agy write mode with permission bypass unless the user explicitly approves it.
+- Do not use Agy write mode with permission bypass unless the user explicitly approves it. Once
+  approved for a blocked Agy lane, document `agy --dangerously-skip-permissions` in the dispatch
+  brief and treat the run as full-access.
