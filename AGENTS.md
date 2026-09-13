@@ -133,4 +133,15 @@ corresponding stage gate is passed. Sketching is allowed; building is not.
   containers, remove only ProcurePilot containers first:
   `docker ps -aq --filter 'name=procurepilot-' | xargs -r docker rm -f`, then rerun the remote
   compose command.
+
+## Delegation Planning Notes
+
+- Future delegation plans, regardless of whether they are written by Codex, Claude, Agy, or
+  another agent, must preserve the frontend delegation preference: implementation changes under
+  `apps/web/src/**` should be dispatched to Agy when practical and then reviewed independently by
+  the orchestrator before landing.
+- If headless Agy delegation is blocked by permission prompts or no-output permission denial,
+  include `agy --dangerously-skip-permissions` in the Agy dispatch command after explicit user
+  approval. Treat this flag as full-access execution: do not combine it with read-only mode, keep
+  the task/file scope narrow in the plan, and rerun the relevant gates before merging.
 <!-- MANUAL ADDITIONS END -->
