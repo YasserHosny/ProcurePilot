@@ -1560,6 +1560,14 @@ class RequestsService:
                 # withdrawal already flipped the request's status, this matches zero rows and we
                 # raise before touching the step or writing a notification, leaving the step
                 # `pending` rather than stranding a `decided` step on a non-submitted request.
+                #
+                # An approved request lands directly on `ordered`, not `approved` (chunk R2.3,
+                # specs/010-mobile-approvals-receipt/research.md R1) — there is no separate
+                # "place the order" human action this release, so the same decision that approves
+                # a request is also what marks it ordered. `approval_step.status` and the audit
+                # action below still record the human's actual decision ("approved"), unchanged;
+                # only `purchase_request.status` itself takes the new terminal value.
+                request_status = "ordered" if decision == "approved" else decision
                 cur.execute(
                     """
                     update purchase_request
@@ -1567,7 +1575,7 @@ class RequestsService:
                     where id = %s and status = 'submitted'
                     returning *
                     """,
-                    (decision, now, request_id),
+                    (request_status, now, request_id),
                 )
                 decided_request = cur.fetchone()
                 if decided_request is None:
