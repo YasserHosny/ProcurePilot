@@ -383,7 +383,6 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
                   child: DropdownButtonHideUnderline(
                     child: DropdownButton<String>(
                       value: _branchId,
-                      isDense: true,
                       hint: Text(i18n.t('requests.form.branchLabel')),
                       items: _branches
                           .map(
@@ -411,7 +410,6 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
                   child: DropdownButtonHideUnderline(
                     child: DropdownButton<String?>(
                       value: _costCentreId,
-                      isDense: true,
                       hint: Text(i18n.t('requests.form.costCentreLabel')),
                       items: [
                         const DropdownMenuItem(value: null, child: Text('—')),
