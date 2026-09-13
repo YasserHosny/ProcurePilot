@@ -20,8 +20,13 @@ from procurepilot_api.modules.offers.schemas import (
     SupplierCommercialTerm,
     SupplierCommercialTermCreate,
     SupplierCommercialTermList,
+    SupplierScorecard,
 )
 from procurepilot_api.modules.offers.service import OfferService, get_offer_service
+from procurepilot_api.modules.offers.supplier_iq import (
+    SupplierIqService,
+    get_supplier_iq_service,
+)
 from procurepilot_api.modules.offers.supplier_terms import (
     SupplierTermsService,
     get_supplier_terms_service,
@@ -102,6 +107,15 @@ def get_basket(
     service: Annotated[BasketService, Depends(get_basket_service)],
 ) -> BasketSplitJob:
     return service.get_job(member=member, job_id=id)
+
+
+@router.get("/suppliers/{supplier_id}/scorecard", response_model=SupplierScorecard)
+def get_supplier_scorecard(
+    supplier_id: UUID,
+    member: Annotated[CurrentMember, Depends(current_member)],
+    service: Annotated[SupplierIqService, Depends(get_supplier_iq_service)],
+) -> SupplierScorecard:
+    return service.get_scorecard(member=member, supplier_id=supplier_id)
 
 
 @router.get(

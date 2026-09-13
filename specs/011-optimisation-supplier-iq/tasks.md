@@ -50,10 +50,10 @@ release conditions.
 
 ## Phase 4: User Story 2 - Supplier scorecards and risk scoring (P1)
 
-- [ ] T022 [P] Write unit tests in `apps/api/tests/unit/test_supplier_iq_metrics.py` for fulfilment, quality, price competitiveness, spend exposure, freshness, savings contribution, sparse evidence, and rule-versioned risk score.
-- [ ] T023 [P] Write integration tests in `apps/api/tests/integration/test_supplier_iq.py` proving scorecard metrics trace to seeded source records and cross-tenant supplier ids return not found.
-- [ ] T024 Implement deterministic Supplier IQ calculations in `apps/api/src/procurepilot_api/modules/offers/supplier_iq.py`.
-- [ ] T025 Expose `GET /suppliers/{supplier_id}/scorecard` in `apps/api/src/procurepilot_api/modules/offers/router.py`.
+- [x] T022 [P] Write unit tests in `apps/api/tests/unit/test_supplier_iq_metrics.py` for fulfilment, quality, price competitiveness, spend exposure, freshness, savings contribution, sparse evidence, and rule-versioned risk score.
+- [x] T023 [P] Write integration tests in `apps/api/tests/integration/test_supplier_iq.py` proving scorecard metrics trace to seeded source records and cross-tenant supplier ids return not found.
+- [x] T024 Implement deterministic Supplier IQ calculations in `apps/api/src/procurepilot_api/modules/offers/supplier_iq.py`.
+- [x] T025 Expose `GET /suppliers/{supplier_id}/scorecard` in `apps/api/src/procurepilot_api/modules/offers/router.py`.
 - [ ] T026 [P] Add web API client methods/types in `apps/web/src/app/features/catalogue/catalogue-api.ts` or the existing supplier API module.
 - [ ] T027 [P] Write supplier scorecard component tests in `apps/web/src/app/features/catalogue/supplier-scorecard/supplier-scorecard.component.spec.ts`.
 - [ ] T028 Build `apps/web/src/app/features/catalogue/supplier-scorecard/` component, template, and styles with dense operational layout, source counts, insufficient evidence, and risk breakdown.
