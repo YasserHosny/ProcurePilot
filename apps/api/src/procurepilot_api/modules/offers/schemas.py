@@ -274,7 +274,7 @@ class BasketSplitJob(BaseModel):
     status: BasketStatus
     created_at: datetime
     result_url: str
-    result: BasketSplitResult | None = None
+    result: BasketSplitResult | AdvancedBasketResult | None = None
     error: dict[str, object] | None = None
     started_at: datetime | None = None
     completed_at: datetime | None = None
