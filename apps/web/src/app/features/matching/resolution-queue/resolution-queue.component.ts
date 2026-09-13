@@ -79,6 +79,7 @@ export class ResolutionQueueComponent implements OnInit {
   readonly errorMessage = signal<string | null>(null);
   readonly errorTraceId = signal<string | null>(null);
   readonly quotationId = signal<string | null>(null);
+  readonly collapsedGroupIds = signal<ReadonlySet<string>>(new Set<string>());
   private searchDebounce: ReturnType<typeof setTimeout> | null = null;
   private latestLoadRequestId = 0;
 
@@ -243,6 +244,22 @@ export class ResolutionQueueComponent implements OnInit {
 
   truncateId(id: string): string {
     return id.slice(0, 8);
+  }
+
+  isGroupCollapsed(quotationId: string): boolean {
+    return this.collapsedGroupIds().has(quotationId);
+  }
+
+  toggleGroup(quotationId: string): void {
+    this.collapsedGroupIds.update((collapsedGroupIds) => {
+      const next = new Set(collapsedGroupIds);
+      if (next.has(quotationId)) {
+        next.delete(quotationId);
+      } else {
+        next.add(quotationId);
+      }
+      return next;
+    });
   }
 
   ageLabel(createdAt: string): string {

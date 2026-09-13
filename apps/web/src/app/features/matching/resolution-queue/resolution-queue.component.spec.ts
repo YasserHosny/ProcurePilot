@@ -322,6 +322,29 @@ describe('ResolutionQueueComponent', () => {
     expect(compiled.querySelectorAll('tr.clickable-row').length).toBe(0);
   });
 
+  it('should collapse and expand a quotation group from its header toggle', () => {
+    fixture.detectChanges();
+    const compiled = fixture.nativeElement as HTMLElement;
+    const group = compiled.querySelector('.quotation-group') as HTMLElement;
+    const toggle = group.querySelector('.group-toggle') as HTMLButtonElement;
+
+    expect(toggle).toBeTruthy();
+    expect(toggle.getAttribute('aria-expanded')).toBe('true');
+    expect(group.querySelectorAll('article.match-line').length).toBe(1);
+
+    toggle.click();
+    fixture.detectChanges();
+
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+    expect(group.querySelectorAll('article.match-line').length).toBe(0);
+
+    toggle.click();
+    fixture.detectChanges();
+
+    expect(toggle.getAttribute('aria-expanded')).toBe('true');
+    expect(group.querySelectorAll('article.match-line').length).toBe(1);
+  });
+
   it('should show filtered empty state with clear filters button', () => {
     component.tasks.set([]);
     component.statusFilter.set('resolved');

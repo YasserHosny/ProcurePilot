@@ -943,6 +943,8 @@
         "view": "عرض التفاصيل"
       },
       "groupsLabel": "مهام مطابقة عروض الأسعار",
+      "collapseGroup": "طي مجموعة عرض السعر",
+      "expandGroup": "توسيع مجموعة عرض السعر",
       "unknownSupplier": "لم يتم تأكيد المورد",
       "sourceUnavailable": "مستند المصدر غير متاح",
       "openOfTotal": "مفتوحة من إجمالي {{total}} بند",

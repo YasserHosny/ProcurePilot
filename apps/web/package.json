@@ -10,7 +10,8 @@
     "lint": "ng lint",
     "test:unit": "ng test --watch=false --browsers=ChromeHeadless",
     "test:e2e": "playwright test",
-    "test:e2e:headed": "playwright test --headed"
+    "test:e2e:headed": "playwright test --headed",
+    "docs:screenshots": "CAPTURE_USER_DOC_SCREENSHOTS=1 playwright test --config=playwright.docs.config.ts --project=chrome"
   },
   "private": true,
   "dependencies": {

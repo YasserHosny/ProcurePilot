@@ -109,72 +109,88 @@
                 {{ group.quotation.source_filename || ('matching.queue.sourceUnavailable' | translate) }}
               </p>
             </div>
-            <div class="group-progress" role="status">
-              <strong>{{ group.quotation.open_match_task_count }}</strong>
-              <span>{{ 'matching.queue.openOfTotal' | translate: { total: group.quotation.line_count } }}</span>
+            <div class="group-actions">
+              <div class="group-progress" role="status">
+                <strong>{{ group.quotation.open_match_task_count }}</strong>
+                <span>{{ 'matching.queue.openOfTotal' | translate: { total: group.quotation.line_count } }}</span>
+              </div>
+              <button
+                mat-icon-button
+                type="button"
+                class="group-toggle"
+                [attr.aria-controls]="'match-group-content-' + group.quotation.id"
+                [attr.aria-expanded]="!isGroupCollapsed(group.quotation.id)"
+                [attr.aria-label]="(isGroupCollapsed(group.quotation.id) ? 'matching.queue.expandGroup' : 'matching.queue.collapseGroup') | translate"
+                [matTooltip]="(isGroupCollapsed(group.quotation.id) ? 'matching.queue.expandGroup' : 'matching.queue.collapseGroup') | translate"
+                (click)="toggleGroup(group.quotation.id)"
+              >
+                <mat-icon aria-hidden="true">{{ isGroupCollapsed(group.quotation.id) ? 'expand_more' : 'expand_less' }}</mat-icon>
+              </button>
             </div>
           </mat-card-header>
 
-          <mat-card-content>
-            <dl class="quotation-evidence">
-              <div>
-                <dt>{{ 'matching.queue.reviewedBy' | translate }}</dt>
-                <dd>{{ group.quotation.reviewed_by_email || group.quotation.reviewed_by || ('matching.queue.notAvailable' | translate) }}</dd>
-              </div>
-              <div>
-                <dt>{{ 'matching.queue.reviewedAt' | translate }}</dt>
-                <dd>{{ group.quotation.reviewed_at ? (group.quotation.reviewed_at | formatDate) : ('matching.queue.notAvailable' | translate) }}</dd>
-              </div>
-              <div>
-                <dt>{{ 'matching.queue.issueDate' | translate }}</dt>
-                <dd>{{ group.quotation.issue_date ? (group.quotation.issue_date | formatDate) : ('matching.queue.notAvailable' | translate) }}</dd>
-              </div>
-            </dl>
+          @if (!isGroupCollapsed(group.quotation.id)) {
+            <mat-card-content [id]="'match-group-content-' + group.quotation.id">
+              <dl class="quotation-evidence">
+                <div>
+                  <dt>{{ 'matching.queue.reviewedBy' | translate }}</dt>
+                  <dd>{{ group.quotation.reviewed_by_email || group.quotation.reviewed_by || ('matching.queue.notAvailable' | translate) }}</dd>
+                </div>
+                <div>
+                  <dt>{{ 'matching.queue.reviewedAt' | translate }}</dt>
+                  <dd>{{ group.quotation.reviewed_at ? (group.quotation.reviewed_at | formatDate) : ('matching.queue.notAvailable' | translate) }}</dd>
+                </div>
+                <div>
+                  <dt>{{ 'matching.queue.issueDate' | translate }}</dt>
+                  <dd>{{ group.quotation.issue_date ? (group.quotation.issue_date | formatDate) : ('matching.queue.notAvailable' | translate) }}</dd>
+                </div>
+              </dl>
 
-            <div class="line-list">
-              @for (task of group.tasks; track task.id) {
-                <article class="match-line">
-                  <div class="line-identity">
-                    <span class="line-number-badge">#{{ task.quotation_line.line_number }}</span>
-                    <div>
-                      <h3>{{ task.quotation_line.original_text }}</h3>
-                      <span class="timestamp" [matTooltip]="task.created_at">{{ ageLabel(task.created_at) }}</span>
+              <div class="line-list">
+                @for (task of group.tasks; track task.id) {
+                  <article class="match-line">
+                    <div class="line-identity">
+                      <span class="line-number-badge">#{{ task.quotation_line.line_number }}</span>
+                      <div>
+                        <h3>{{ task.quotation_line.original_text }}</h3>
+                        <span class="timestamp" [matTooltip]="task.created_at">{{ ageLabel(task.created_at) }}</span>
+                      </div>
                     </div>
-                  </div>
-                  <div class="line-fact">
-                    <span>{{ 'matching.queue.quotedExposure' | translate }}</span>
-                    @if (task.quotation_line.quoted_line_total) {
-                      <strong>{{ task.quotation_line.quoted_line_total | formatMoney }}</strong>
-                    } @else if (task.quotation_line.quoted_line_total_issue === 'currency_mismatch') {
-                      <strong class="fact-warning">{{ 'matching.queue.currencyMismatch' | translate }}</strong>
-                    } @else {
-                      <strong>{{ 'matching.queue.notAvailable' | translate }}</strong>
-                    }
-                  </div>
-                  <div class="line-fact">
-                    <span>{{ 'matching.queue.columns.reason' | translate }}</span>
-                    <strong class="reason-chip reason-{{ task.reason }}">{{ 'matching.queue.reason.' + task.reason | translate }}</strong>
-                  </div>
-                  <div class="candidate-preview">
-                    <span>{{ 'matching.queue.topCandidate' | translate }}</span>
-                    @if (task.candidates[0]; as candidate) {
-                      <strong>{{ candidate.candidate_product.tenant_name }}</strong>
-                      <small>{{ 'matching.queue.matchScore' | translate: { score: candidate.confidence } }}</small>
-                    } @else {
-                      <strong>{{ 'matching.queue.noCandidateEvidence' | translate }}</strong>
-                    }
-                  </div>
-                  <div class="line-action">
-                    <span class="status-badge status-{{ task.status }}">{{ 'matching.queue.status.' + task.status | translate }}</span>
-                    <a mat-stroked-button [routerLink]="['/matching', task.quotation_line.id]" [queryParams]="{ quotation_id: group.quotation.id }" class="action-btn">
-                      <mat-icon aria-hidden="true">{{ isWriter() && task.status !== 'resolved' ? 'compare_arrows' : 'visibility' }}</mat-icon>
-                      <span>{{ (isWriter() && task.status !== 'resolved' ? 'matching.queue.actions.resolve' : 'matching.queue.actions.view') | translate }}</span>
-                    </a>
-                  </div>
-                </article>
-              }
-            </div>
-          </mat-card-content>
+                    <div class="line-fact">
+                      <span>{{ 'matching.queue.quotedExposure' | translate }}</span>
+                      @if (task.quotation_line.quoted_line_total) {
+                        <strong>{{ task.quotation_line.quoted_line_total | formatMoney }}</strong>
+                      } @else if (task.quotation_line.quoted_line_total_issue === 'currency_mismatch') {
+                        <strong class="fact-warning">{{ 'matching.queue.currencyMismatch' | translate }}</strong>
+                      } @else {
+                        <strong>{{ 'matching.queue.notAvailable' | translate }}</strong>
+                      }
+                    </div>
+                    <div class="line-fact">
+                      <span>{{ 'matching.queue.columns.reason' | translate }}</span>
+                      <strong class="reason-chip reason-{{ task.reason }}">{{ 'matching.queue.reason.' + task.reason | translate }}</strong>
+                    </div>
+                    <div class="candidate-preview">
+                      <span>{{ 'matching.queue.topCandidate' | translate }}</span>
+                      @if (task.candidates[0]; as candidate) {
+                        <strong>{{ candidate.candidate_product.tenant_name }}</strong>
+                        <small>{{ 'matching.queue.matchScore' | translate: { score: candidate.confidence } }}</small>
+                      } @else {
+                        <strong>{{ 'matching.queue.noCandidateEvidence' | translate }}</strong>
+                      }
+                    </div>
+                    <div class="line-action">
+                      <span class="status-badge status-{{ task.status }}">{{ 'matching.queue.status.' + task.status | translate }}</span>
+                      <a mat-stroked-button [routerLink]="['/matching', task.quotation_line.id]" [queryParams]="{ quotation_id: group.quotation.id }" class="action-btn">
+                        <mat-icon aria-hidden="true">{{ isWriter() && task.status !== 'resolved' ? 'compare_arrows' : 'visibility' }}</mat-icon>
+                        <span>{{ (isWriter() && task.status !== 'resolved' ? 'matching.queue.actions.resolve' : 'matching.queue.actions.view') | translate }}</span>
+                      </a>
+                    </div>
+                  </article>
+                }
+              </div>
+            </mat-card-content>
+          }
         </mat-card>
       }
     </section>
