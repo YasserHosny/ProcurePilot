@@ -11,6 +11,7 @@ from procurepilot_api.modules.requests.schemas import (
     ApprovalDelegation,
     ApprovalDelegationCreate,
     ApprovalDelegationList,
+    DeliveryConfirmationCreate,
     LowStockReport,
     LowStockReportCreate,
     LowStockReportList,
@@ -198,6 +199,28 @@ def withdraw_request(
 ) -> PurchaseRequest:
     return service.withdraw_request(
         bearer_token=token, member=member, request_id=request_id
+    )
+
+
+@router.post(
+    "/requests/{request_id}/confirm-delivery",
+    response_model=PurchaseRequest,
+)
+def confirm_delivery(
+    request_id: UUID,
+    payload: Annotated[DeliveryConfirmationCreate, Body()],
+    token: Annotated[str, Depends(bearer_token)],
+    member: Annotated[CurrentMember, Depends(current_member)],
+    service: Annotated[RequestsService, Depends(get_requests_service)],
+    _idempotency_key: Annotated[
+        UUID | None, Header(alias="Idempotency-Key")
+    ] = None,
+) -> PurchaseRequest:
+    return service.confirm_delivery(
+        bearer_token=token,
+        member=member,
+        request_id=request_id,
+        payload=payload,
     )
 
 

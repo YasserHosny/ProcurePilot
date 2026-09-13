@@ -41,6 +41,7 @@ from procurepilot_api.modules.requests.schemas import (
     ApprovalDelegationList,
     ApprovalStep,
     BudgetStatus,
+    DeliveryConfirmationCreate,
     LowStockReport,
     LowStockReportCreate,
     LowStockReportList,
@@ -65,10 +66,13 @@ from procurepilot_api.shared.audit import AuditEventCreate, get_audit_writer
 REQUEST_COLUMNS = (
     "id,tenant_id,branch_id,cost_centre_id,requested_by_membership_id,"
     "required_by_date,status,estimated_total_amount,estimated_total_currency,"
-    "has_incomplete_estimate,submitted_at,withdrawn_at,created_at,updated_at"
+    "has_incomplete_estimate,submitted_at,withdrawn_at,delivered_at,"
+    "delivery_confirmed_by_membership_id,has_delivery_discrepancy,"
+    "created_at,updated_at"
 )
 LINE_COLUMNS = (
     "id,purchase_request_id,workspace_product_id,quantity,note,"
+    "quantity_received,"
     "estimated_unit_price_amount,estimated_unit_price_currency,"
     "estimated_unit_price_source_landed_cost_id,estimated_at"
 )
@@ -428,6 +432,23 @@ class RequestsService:
             # not-found convention.
             raise PermissionDeniedError(details={"reason": "branch_not_assigned"})
 
+    def _authorize_delivery_confirmation(
+        self,
+        client: Client,
+        *,
+        member: CurrentMember,
+        request_row: dict[str, object],
+    ) -> None:
+        try:
+            _require_requester(request_row, member)
+            return
+        except PermissionDeniedError:
+            self._authorize_branch_for_write(
+                client,
+                member=member,
+                branch_id=UUID(str(request_row["branch_id"])),
+            )
+
     def _fetch_low_stock_report_by_key(
         self, client: Client, *, idempotency_key: UUID
     ) -> dict[str, object]:
@@ -724,6 +745,99 @@ class RequestsService:
         )
         return self._purchase_request_with_budget_status(
             client, request_row, line_rows, step_row
+        )
+
+    def confirm_delivery(
+        self,
+        *,
+        bearer_token: str,
+        member: CurrentMember,
+        request_id: UUID,
+        payload: DeliveryConfirmationCreate,
+    ) -> PurchaseRequest:
+        client = authenticated_client(self._settings, bearer_token)
+        existing = self._fetch_request(client, request_id)
+
+        if str(existing["status"]) != "ordered":
+            raise ConflictError(details={"reason": "not_ordered"})
+        self._authorize_delivery_confirmation(
+            client, member=member, request_row=existing
+        )
+
+        rid = str(request_id)
+        line_rows = self._fetch_lines_for(client, rid)
+        line_rows_by_id = {str(row["id"]): row for row in line_rows}
+        received_by_line_id: dict[str, Decimal] = {}
+        for line in payload.lines:
+            line_id = str(line.purchase_request_line_id)
+            if line_id in received_by_line_id:
+                raise UnprocessableEntityError(
+                    details={"reason": "duplicate_line"}
+                )
+            if line_id not in line_rows_by_id:
+                # Reject instead of ignoring: the payload must describe this request's lines only.
+                raise UnprocessableEntityError(
+                    details={"reason": "line_not_in_request"}
+                )
+            received_by_line_id[line_id] = Decimal(line.quantity_received)
+
+        has_discrepancy = False
+        for row in line_rows:
+            received = received_by_line_id.get(str(row["id"]))
+            if received is None:
+                # An omitted line has no confirmed received quantity, so treat it as short.
+                has_discrepancy = True
+                continue
+            if received < Decimal(str(row["quantity"])):
+                has_discrepancy = True
+
+        for line_id, received in received_by_line_id.items():
+            try:
+                client.table("purchase_request_line").update(
+                    {
+                        "quantity_received": _format_decimal(
+                            received, scale=6
+                        )
+                    }
+                ).eq("id", line_id).execute()
+            except APIError as exc:
+                raise _write_error(exc) from exc
+
+        now = _now_iso()
+        try:
+            response = (
+                client.table("purchase_request")
+                .update(
+                    {
+                        "status": "delivered",
+                        "delivered_at": now,
+                        "delivery_confirmed_by_membership_id": str(
+                            member.membership_id
+                        ),
+                        "has_delivery_discrepancy": has_discrepancy,
+                        "updated_at": now,
+                    }
+                )
+                .eq("id", rid)
+                .execute()
+            )
+        except APIError as exc:
+            raise _write_error(exc) from exc
+
+        request_row = _one_row_or_not_found(
+            response.data, resource="purchase_request"
+        )
+        confirmed_lines = self._fetch_lines_for(client, rid)
+        step_row = self._fetch_step(client, rid)
+
+        self._record(
+            bearer_token=bearer_token,
+            member=member,
+            action="requests.delivery_confirmed",
+            target={"purchase_request_id": rid},
+        )
+        return self._purchase_request_with_budget_status(
+            client, request_row, confirmed_lines, step_row
         )
 
     def approve_request(
@@ -1745,6 +1859,15 @@ def _purchase_request(
         approval_step=_approval_step(step_row) if step_row else None,
         submitted_at=row.get("submitted_at"),
         withdrawn_at=row.get("withdrawn_at"),
+        delivered_at=row.get("delivered_at"),
+        delivery_confirmed_by_membership_id=(
+            UUID(str(row["delivery_confirmed_by_membership_id"]))
+            if row.get("delivery_confirmed_by_membership_id")
+            else None
+        ),
+        has_delivery_discrepancy=bool(
+            row.get("has_delivery_discrepancy", False)
+        ),
         created_at=row["created_at"],
         updated_at=row.get("updated_at"),
     )
@@ -1755,6 +1878,11 @@ def _purchase_request_line(row: dict[str, object]) -> PurchaseRequestLine:
         id=UUID(str(row["id"])),
         workspace_product_id=UUID(str(row["workspace_product_id"])),
         quantity=_decimal(row["quantity"], scale=6),
+        quantity_received=(
+            _decimal(row["quantity_received"], scale=6)
+            if row.get("quantity_received") is not None
+            else None
+        ),
         note=row.get("note"),
         estimated_unit_price=_money(
             row.get("estimated_unit_price_amount"),
