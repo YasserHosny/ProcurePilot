@@ -572,4 +572,107 @@ describe('BasketSplitComponent (US3, T045)', () => {
       expect(componentSource).not.toContain('"Recommended Basket"');
     });
   });
+
+  // ─── T021: Advanced Basket UI & Constraints ──────────────────────────────────
+
+  describe('T021 — Advanced basket constraints, multi-supplier and rich results', () => {
+    it('should initialize default values for advanced constraints', () => {
+      expect(component.riskTolerance()).toBe('medium');
+      expect(component.urgency()).toBe('normal');
+      expect(component.weights().price).toBe(0.4);
+      expect(component.weights().preferred_supplier).toBe(0.2);
+      expect(component.weights().risk).toBe(0.2);
+      expect(component.weights().lead_time).toBe(0.1);
+      expect(component.weights().quality).toBe(0.1);
+      expect(component.excludedSupplierIds()).toEqual([]);
+      expect(component.showAdvancedConstraints()).toBeFalse();
+    });
+
+    it('should update risk tolerance and urgency signals', () => {
+      component.riskTolerance.set('high');
+      expect(component.riskTolerance()).toBe('high');
+
+      component.urgency.set('urgent');
+      expect(component.urgency()).toBe('urgent');
+    });
+
+    it('should allow adding, updating, and removing additional suppliers up to 10', () => {
+      expect(component.allSelectedSupplierIds().length).toBe(2);
+
+      component.addAdditionalSupplier();
+      expect(component.additionalSupplierIds().length).toBe(1);
+
+      component.updateAdditionalSupplier(0, 'supp-extra-1');
+      expect(component.allSelectedSupplierIds()).toContain('supp-extra-1');
+
+      component.removeAdditionalSupplier(0);
+      expect(component.additionalSupplierIds().length).toBe(0);
+    });
+
+    it('should pass advanced constraint fields in submitBasket request body', () => {
+      apiService.optimiseBasket.and.returnValue(of(mockFeasibleJob));
+
+      component.riskTolerance.set('low');
+      component.urgency.set('urgent');
+      component.excludedSupplierIds.set(['supp-excluded']);
+      component.updateWeight('price', 0.6);
+
+      try {
+        component.submitBasket();
+      } catch {
+        // Router navigation in test harness
+      }
+
+      expect(apiService.optimiseBasket).toHaveBeenCalledWith(
+        jasmine.objectContaining({
+          supplier_ids: ['supp-1', 'supp-2'],
+          risk_tolerance: 'low',
+          urgency: 'urgent',
+          excluded_supplier_ids: ['supp-excluded'],
+          weights: jasmine.objectContaining({ price: 0.6 }),
+        }),
+      );
+    });
+
+    it('should re-trigger optimisation via rerunOptimisation', () => {
+      apiService.optimiseBasket.and.returnValue(of(mockFeasibleJob));
+      component.currentJob.set(mockFeasibleJob);
+
+      try {
+        component.rerunOptimisation();
+      } catch {
+        // Router navigation
+      }
+
+      expect(apiService.optimiseBasket).toHaveBeenCalled();
+    });
+
+    it('should render rich results details when applied constraints and risk notes exist', () => {
+      const richJob: BasketSplitJob = {
+        ...mockFeasibleJob,
+        result: {
+          ...mockFeasibleJob.result!,
+          applied_constraints: [
+            { type: 'minimum_order_value', supplier_id: 'supp-1' },
+          ],
+          violated_constraints: [],
+          risk_notes: ['Supplier Alpha has moderate lead time risk.'],
+          confidence: 'high',
+          valid_until: '2026-09-20T10:00:00Z',
+        },
+      };
+
+      component.currentJob.set(richJob);
+      fixture.detectChanges();
+
+      expect(component.appliedConstraints().length).toBe(1);
+      expect(component.riskNotes().length).toBe(1);
+      expect(component.solverConfidence()).toBe('high');
+      expect(component.validUntil()).toBe('2026-09-20T10:00:00Z');
+
+      const el: HTMLElement = fixture.nativeElement;
+      expect(el.textContent).toContain('minimum_order_value');
+      expect(el.textContent).toContain('Supplier Alpha has moderate lead time risk.');
+    });
+  });
 });

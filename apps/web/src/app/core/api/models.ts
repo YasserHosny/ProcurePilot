@@ -669,9 +669,24 @@ export interface BasketItemRequest {
   readonly quantity: string;
 }
 
+export interface OptimisationWeights {
+  readonly price: number;
+  readonly preferred_supplier: number;
+  readonly risk: number;
+  readonly lead_time: number;
+  readonly quality: number;
+}
+
+export type RiskTolerance = 'low' | 'medium' | 'high';
+export type UrgencyLevel = 'normal' | 'urgent';
+
 export interface BasketOptimiseRequest {
   readonly supplier_ids: readonly [string, string] | readonly string[];
   readonly items: readonly BasketItemRequest[];
+  readonly risk_tolerance?: RiskTolerance;
+  readonly urgency?: UrgencyLevel;
+  readonly excluded_supplier_ids?: readonly string[];
+  readonly weights?: OptimisationWeights;
 }
 
 export interface AllocatedBasketLine {
@@ -691,6 +706,7 @@ export interface SingleSupplierBaseline {
   readonly supplier_id: string;
   readonly feasible: boolean;
   readonly total_landed_cost: Money | null;
+  readonly violated_constraints?: readonly ViolatedOptimisationConstraint[];
 }
 
 export interface InfeasibleBasketItem {
@@ -700,14 +716,34 @@ export interface InfeasibleBasketItem {
   readonly missing_supplier_ids: readonly string[];
 }
 
+export interface OptimisationConstraint {
+  readonly type: string;
+  readonly supplier_id?: string | null;
+  readonly parameters?: Record<string, unknown>;
+}
+
+export interface ViolatedOptimisationConstraint {
+  readonly type: string;
+  readonly supplier_id?: string | null;
+  readonly workspace_product_id?: string | null;
+  readonly reason: string;
+  readonly details?: Record<string, unknown>;
+}
+
 export interface BasketSplitResult {
   readonly feasible: boolean;
   readonly allocation: readonly SupplierAllocation[];
   readonly total_landed_cost: Money | null;
   readonly single_supplier_baselines?: readonly SingleSupplierBaseline[];
   readonly infeasible_items: readonly InfeasibleBasketItem[];
+  readonly applied_constraints?: readonly OptimisationConstraint[];
+  readonly violated_constraints?: readonly ViolatedOptimisationConstraint[];
+  readonly risk_notes?: readonly string[];
+  readonly confidence?: 'high' | 'medium' | 'low';
+  readonly source_landed_cost_ids?: readonly string[];
   readonly solver_version?: string | null;
   readonly computed_at: string;
+  readonly valid_until?: string | null;
 }
 
 export type BasketSplitJobStatus = 'queued' | 'running' | 'completed' | 'failed';
@@ -725,14 +761,92 @@ export interface BasketSplitJob {
   readonly completed_at?: string | null;
 }
 
+// --- R2.4 Supplier IQ & Scorecards ---------------------------------------
+
+export type ScorecardConfidence = 'high' | 'medium' | 'low';
+
+export interface SupplierScoreMetric {
+  readonly value: string | null;
+  readonly sample_count: number;
+  readonly source_ids?: readonly string[];
+  readonly confidence: ScorecardConfidence;
+  readonly insufficient_evidence: boolean;
+  readonly window_start?: string;
+  readonly window_end?: string;
+}
+
+export interface SupplierRiskSubScore {
+  readonly name: string;
+  readonly score: string;
+  readonly weight: string;
+  readonly evidence?: Record<string, unknown>;
+}
+
+export interface SupplierRiskScore {
+  readonly total: string;
+  readonly confidence: ScorecardConfidence;
+  readonly sub_scores: readonly SupplierRiskSubScore[];
+  readonly rule_version: string;
+}
+
+export interface SupplierScorecard {
+  readonly supplier_id: string;
+  readonly window_start: string;
+  readonly window_end: string;
+  readonly metrics: Record<string, SupplierScoreMetric>;
+  readonly risk_score: SupplierRiskScore;
+  readonly source_counts: Record<string, number>;
+  readonly confidence: ScorecardConfidence;
+  readonly insufficient_evidence: boolean;
+  readonly computed_at: string;
+  readonly rule_version: string;
+}
+
+// --- R2.4 Commercial Terms ------------------------------------------------
+
+export interface SupplierQuantityTier {
+  readonly workspace_product_id?: string | null;
+  readonly min_quantity: string;
+  readonly unit_price: Money;
+}
+
+export interface SupplierCommercialTermCreate {
+  readonly effective_from: string;
+  readonly effective_to?: string | null;
+  readonly minimum_order_value?: Money | null;
+  readonly delivery_fee?: Money | null;
+  readonly free_delivery_threshold?: Money | null;
+  readonly quantity_tiers?: readonly SupplierQuantityTier[];
+}
+
+export interface SupplierCommercialTerm extends SupplierCommercialTermCreate {
+  readonly id: string;
+  readonly supplier_id: string;
+  readonly rule_version: string;
+  readonly created_at: string;
+}
+
+// --- Alerts & Anomalies --------------------------------------------------
+
 export type AlertKind =
   | 'recommended_price_expiring'
   | 'preferred_supplier_offer_disappeared'
-  | 'price_swing';
+  | 'price_swing'
+  | 'price_spike'
+  | 'likely_duplicate_quotation_line'
+  | 'decimal_or_quantity_anomaly'
+  | 'delivery_cost_anomaly'
+  | 'supplier_quality_trend_change';
 
 export type AlertSeverity = 'info' | 'warning' | 'critical';
 
-export type AlertAction = 'compare_product' | 'review_supplier' | 'view_price_history';
+export type AlertAction =
+  | 'compare_product'
+  | 'review_supplier'
+  | 'view_price_history'
+  | 'inspect_scorecard'
+  | 'review_quotation'
+  | 'view_delivery_issues';
 
 export interface Alert {
   readonly id: string;
@@ -740,6 +854,7 @@ export interface Alert {
   readonly workspace_product_id: string;
   readonly supplier_id?: string | null;
   readonly severity: AlertSeverity;
+  readonly confidence?: ScorecardConfidence;
   readonly evidence: Record<string, unknown>;
   readonly action: AlertAction;
   readonly created_from_current_data_at: string;

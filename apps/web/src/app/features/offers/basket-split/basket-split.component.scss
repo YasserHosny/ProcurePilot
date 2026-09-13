@@ -1,17 +1,10 @@
-@use '../../../../styles/breakpoints' as bp;
-
 .basket-container {
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
-  padding: 1.5rem;
+  gap: clamp(1rem, 2vw, 1.5rem);
+  padding: clamp(0.75rem, 2vw, 1.5rem);
   max-width: 1200px;
   margin: 0 auto;
-
-  @include bp.mobile {
-    padding: 0.75rem;
-    gap: 1rem;
-  }
 }
 
 .page-header {
@@ -23,14 +16,10 @@
 
   .header-content {
     .page-title {
-      font-size: 1.75rem;
+      font-size: clamp(1.25rem, 4vw, 1.75rem);
       font-weight: 700;
-      margin: 0 0 0.25rem 0;
+      margin: 0 0 0.25rem;
       color: var(--mat-sys-on-surface, #1e293b);
-
-      @include bp.mobile {
-        font-size: 1.25rem;
-      }
     }
 
     .page-subtitle {
@@ -106,12 +95,8 @@
 
     .suppliers-grid {
       display: grid;
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
       gap: 1.5rem;
-
-      @media (max-width: 600px) {
-        grid-template-columns: 1fr;
-      }
 
       .supplier-field {
         width: 100%;
@@ -325,12 +310,8 @@
 
   .allocations-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
     gap: 1.5rem;
-
-    @media (max-width: 800px) {
-      grid-template-columns: 1fr;
-    }
 
     .allocation-card {
       padding: 1.25rem;
@@ -527,3 +508,120 @@
     }
   }
 }
+
+.additional-suppliers-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1rem;
+  margin-block: 1rem;
+}
+
+.additional-supplier-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  .supplier-field { flex: 1; }
+}
+
+.add-supplier-action { margin-block: 0.5rem; }
+
+.advanced-constraints-section .toggle-constraints-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.constraints-controls-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+  margin-block: 1rem;
+}
+
+.weights-section {
+  margin-block-start: 1rem;
+  padding: 0.75rem 1rem;
+  background: var(--mat-sys-surface-variant, #f8fafc);
+  border-radius: 6px;
+
+  .weights-title {
+    font-size: 0.95rem;
+    font-weight: 600;
+    margin: 0 0 0.75rem;
+  }
+
+  .weights-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 1rem;
+
+    .weight-item {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+
+      .weight-label {
+        font-size: 0.8rem;
+        font-weight: 500;
+        color: #334155;
+      }
+
+      input[type='range'] {
+        width: 100%;
+        accent-color: var(--mat-sys-primary, #0284c7);
+      }
+    }
+  }
+}
+
+.status-pill.confidence {
+  background: #f1f5f9;
+  color: #475569;
+  font-weight: 600;
+
+  &.high { background: #dcfce7; color: #166534; }
+  &.medium { background: #fef9c3; color: #854d0e; }
+  &.low { background: #fee2e2; color: #991b1b; }
+}
+
+.validity-text {
+  font-size: 0.8rem;
+  color: #64748b;
+  margin-top: 0.25rem;
+}
+
+.rich-result-details {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.75rem;
+  margin-block-start: 1rem;
+  padding-block-start: 1rem;
+  border-block-start: 1px solid #e2e8f0;
+
+  .details-block {
+    padding: 0.5rem 0.75rem;
+    border-radius: 4px;
+    background: #f8fafc;
+
+    h4 { font-size: 0.85rem; font-weight: 600; margin: 0 0 0.35rem; }
+    ul { margin: 0; padding-inline-start: 1.25rem; font-size: 0.8rem; color: #334155; }
+
+    &.applied-constraints { border-inline-start: 3px solid #0284c7; }
+    &.violated-constraints { border-inline-start: 3px solid #dc2626; background: #fef2f2; }
+    &.risk-notes { border-inline-start: 3px solid #d97706; background: #fffbeb; }
+  }
+}
+
+.infeasible-violated-section {
+  margin-block-start: 1rem;
+  padding: 0.75rem;
+  background: #fef2f2;
+  border-radius: 4px;
+  border-inline-start: 3px solid #dc2626;
+
+  h3 { font-size: 0.9rem; font-weight: 600; color: #991b1b; margin: 0 0 0.35rem; }
+  ul { margin: 0; padding-inline-start: 1.25rem; font-size: 0.85rem; color: #7f1d1d; }
+}
+
+.rerun-btn { margin-inline-end: 0.5rem; }
+

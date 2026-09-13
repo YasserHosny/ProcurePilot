@@ -28,7 +28,13 @@ import { FormatDatePipe } from '../../../core/format/date.pipe';
 import { FormatMoneyPipe } from '../../../core/format/money.pipe';
 import type {
   BasketItemRequest,
+  BasketOptimiseRequest,
   BasketSplitJob,
+  OptimisationConstraint,
+  OptimisationWeights,
+  RiskTolerance,
+  UrgencyLevel,
+  ViolatedOptimisationConstraint,
 } from '../offers-api';
 import {
   type BasketSplitFormItem,
@@ -83,9 +89,33 @@ export class BasketSplitComponent implements OnInit {
 
   readonly supplierId1 = signal<string>('');
   readonly supplierId2 = signal<string>('');
+  readonly additionalSupplierIds = signal<string[]>([]);
   readonly items = signal<BasketSplitFormItem[]>([
     { workspace_product_id: '', quantity: '10' },
   ]);
+
+  readonly showAdvancedConstraints = signal<boolean>(false);
+  readonly riskTolerance = signal<RiskTolerance>('medium');
+  readonly urgency = signal<UrgencyLevel>('normal');
+  readonly excludedSupplierIds = signal<string[]>([]);
+  readonly weights = signal<OptimisationWeights>({
+    price: 0.4,
+    preferred_supplier: 0.2,
+    risk: 0.2,
+    lead_time: 0.1,
+    quality: 0.1,
+  });
+
+  readonly allSelectedSupplierIds = computed<string[]>(() => {
+    const s1 = this.supplierId1();
+    const s2 = this.supplierId2();
+    const extra = this.additionalSupplierIds().filter(Boolean);
+    const set = new Set<string>();
+    if (s1) set.add(s1);
+    if (s2) set.add(s2);
+    extra.forEach((id) => set.add(id));
+    return Array.from(set);
+  });
 
   readonly currentJob = signal<BasketSplitJob | null>(null);
   readonly errorMessage = signal<string | null>(null);
@@ -95,6 +125,26 @@ export class BasketSplitComponent implements OnInit {
   readonly uiState = computed<BasketSplitUIState>(() => {
     return determineBasketSplitUIState(this.currentJob(), this.isSubmitting());
   });
+
+  readonly appliedConstraints = computed<readonly OptimisationConstraint[]>(
+    () => this.currentJob()?.result?.applied_constraints ?? [],
+  );
+
+  readonly violatedConstraints = computed<readonly ViolatedOptimisationConstraint[]>(
+    () => this.currentJob()?.result?.violated_constraints ?? [],
+  );
+
+  readonly riskNotes = computed<readonly string[]>(
+    () => this.currentJob()?.result?.risk_notes ?? [],
+  );
+
+  readonly solverConfidence = computed<'high' | 'medium' | 'low' | undefined>(
+    () => this.currentJob()?.result?.confidence,
+  );
+
+  readonly validUntil = computed<string | null | undefined>(
+    () => this.currentJob()?.result?.valid_until,
+  );
 
   private pollSubscription: Subscription | null = null;
 
@@ -171,8 +221,11 @@ export class BasketSplitComponent implements OnInit {
     const s2 = this.supplierId2();
     if (!s1 || !s2 || s1 === s2) return false;
 
+    const all = this.allSelectedSupplierIds();
+    if (all.length < 2 || all.length > 10) return false;
+
     const currentItems = this.items();
-    if (currentItems.length === 0) return false;
+    if (currentItems.length === 0 || currentItems.length > 50) return false;
 
     return currentItems.every((item) => {
       const q = parseFloat(item.quantity);
@@ -188,16 +241,24 @@ export class BasketSplitComponent implements OnInit {
 
     const s1 = this.supplierId1();
     const s2 = this.supplierId2();
+    const supplierIds = this.allSelectedSupplierIds();
     const reqItems: BasketItemRequest[] = this.items().map((it) => ({
       workspace_product_id: it.workspace_product_id,
       quantity: it.quantity,
     }));
 
+    const reqBody: BasketOptimiseRequest = {
+      supplier_ids: supplierIds.length >= 2 ? supplierIds : [s1, s2],
+      items: reqItems,
+      risk_tolerance: this.riskTolerance(),
+      urgency: this.urgency(),
+      excluded_supplier_ids:
+        this.excludedSupplierIds().length > 0 ? this.excludedSupplierIds() : undefined,
+      weights: this.weights(),
+    };
+
     this.api
-      .optimiseBasket({
-        supplier_ids: [s1, s2],
-        items: reqItems,
-      })
+      .optimiseBasket(reqBody)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (job) => {
@@ -211,6 +272,35 @@ export class BasketSplitComponent implements OnInit {
           this.handleError(err);
         },
       });
+  }
+
+  addAdditionalSupplier(): void {
+    if (this.allSelectedSupplierIds().length < 10) {
+      this.additionalSupplierIds.update((s) => [...s, '']);
+    }
+  }
+
+  removeAdditionalSupplier(index: number): void {
+    this.additionalSupplierIds.update((s) => s.filter((_, i) => i !== index));
+  }
+
+  updateAdditionalSupplier(index: number, id: string): void {
+    this.additionalSupplierIds.update((s) => {
+      const next = [...s];
+      next[index] = id;
+      return next;
+    });
+  }
+
+  updateWeight(key: keyof OptimisationWeights, val: string | number): void {
+    const num = typeof val === 'number' ? val : parseFloat(val);
+    if (!isNaN(num) && num >= 0 && num <= 1) {
+      this.weights.update((w) => ({ ...w, [key]: num }));
+    }
+  }
+
+  rerunOptimisation(): void {
+    this.submitBasket();
   }
 
   fetchJob(jobId: string): void {

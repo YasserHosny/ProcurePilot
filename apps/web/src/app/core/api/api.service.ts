@@ -80,7 +80,10 @@ import type {
   SavingStatus,
   Session,
   Supplier,
+  SupplierCommercialTerm,
+  SupplierCommercialTermCreate,
   SupplierCreate,
+  SupplierScorecard,
   SupplierUpdate,
   Tenant,
   ThresholdRule,
@@ -283,6 +286,41 @@ export class ApiService {
 
   archiveSupplier(supplierId: string): Observable<void> {
     return this.http.delete<void>(`${this.base}/suppliers/${supplierId}`);
+  }
+
+  getSupplierScorecard(
+    supplierId: string,
+    params?: { window_months?: number },
+  ): Observable<SupplierScorecard> {
+    const query = new URLSearchParams();
+    if (params?.window_months !== undefined) {
+      query.set('window_months', String(params.window_months));
+    }
+    const qs = query.toString() ? `?${query.toString()}` : '';
+    return this.http.get<SupplierScorecard>(
+      `${this.base}/suppliers/${encodeURIComponent(supplierId)}/scorecard${qs}`,
+    );
+  }
+
+  getSupplierCommercialTerms(
+    supplierId: string,
+  ): Observable<{ items: SupplierCommercialTerm[] }> {
+    return this.http.get<{ items: SupplierCommercialTerm[] }>(
+      `${this.base}/suppliers/${encodeURIComponent(supplierId)}/commercial-terms`,
+    );
+  }
+
+  createSupplierCommercialTerm(
+    supplierId: string,
+    body: SupplierCommercialTermCreate,
+    idempotencyKey?: string,
+  ): Observable<SupplierCommercialTerm> {
+    const headers = idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined;
+    return this.http.post<SupplierCommercialTerm>(
+      `${this.base}/suppliers/${encodeURIComponent(supplierId)}/commercial-terms`,
+      body,
+      { headers },
+    );
   }
 
   // --- aliases ------------------------------------------------------------

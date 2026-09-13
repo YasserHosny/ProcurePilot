@@ -7,6 +7,10 @@
 
     @if (currentJob()) {
       <div class="header-actions">
+        <button mat-stroked-button (click)="rerunOptimisation()" class="action-btn rerun-btn" [disabled]="!isWriter() || isSubmitting()">
+          <mat-icon aria-hidden="true">refresh</mat-icon>
+          <span>{{ 'advancedBasket.actions.rerun' | translate }}</span>
+        </button>
         <button mat-stroked-button (click)="resetForm()" class="action-btn">
           <mat-icon aria-hidden="true">add</mat-icon>
           <span>{{ 'basketSplit.actions.newSplit' | translate }}</span>
@@ -69,8 +73,180 @@
               </mat-select>
             </mat-form-field>
           </div>
-          @if (supplierId1() && supplierId2() && supplierId1() === supplierId2()) {
-            <p class="error-text">{{ 'basketSplit.form.sameSupplierError' | translate }}</p>
+          @if (additionalSupplierIds().length > 0) {
+            <div class="additional-suppliers-grid">
+              @for (extraId of additionalSupplierIds(); track $index; let i = $index) {
+                <div class="additional-supplier-row">
+                  <mat-form-field appearance="outline" class="supplier-field">
+                    <mat-label>{{ 'basketSplit.form.selectSupplier' | translate }} #{{ i + 3 }}</mat-label>
+                    <mat-select
+                      [value]="extraId"
+                      (selectionChange)="updateAdditionalSupplier(i, $event.value)"
+                    >
+                      @for (supp of suppliers(); track supp.id) {
+                        <mat-option [value]="supp.id">
+                          {{ supp.name }}
+                        </mat-option>
+                      }
+                    </mat-select>
+                  </mat-form-field>
+                  <button
+                    mat-icon-button
+                    type="button"
+                    color="warn"
+                    (click)="removeAdditionalSupplier(i)"
+                    [attr.aria-label]="'basketSplit.form.removeItem' | translate"
+                  >
+                    <mat-icon aria-hidden="true">delete</mat-icon>
+                  </button>
+                </div>
+              }
+            </div>
+          }
+
+          @if (allSelectedSupplierIds().length < 10) {
+            <div class="add-supplier-action">
+              <button
+                mat-stroked-button
+                type="button"
+                (click)="addAdditionalSupplier()"
+                [disabled]="!isWriter()"
+                class="add-supplier-btn"
+              >
+                <mat-icon aria-hidden="true">add</mat-icon>
+                <span>{{ 'basketSplit.form.selectSupplier' | translate }} (2-10)</span>
+              </button>
+            </div>
+          }
+        </div>
+
+        <mat-divider></mat-divider>
+
+        <!-- Advanced Constraints Section -->
+        <div class="form-section advanced-constraints-section">
+          <div class="section-header-row">
+            <h2 class="section-title">{{ 'advancedBasket.constraintsSectionTitle' | translate }}</h2>
+            <button
+              mat-stroked-button
+              type="button"
+              (click)="showAdvancedConstraints.set(!showAdvancedConstraints())"
+              [attr.aria-label]="'advancedBasket.constraintsSectionTitle' | translate"
+              class="toggle-constraints-btn"
+            >
+              <mat-icon aria-hidden="true">{{ showAdvancedConstraints() ? 'expand_less' : 'tune' }}</mat-icon>
+              <span>{{ 'advancedBasket.constraintsSectionTitle' | translate }}</span>
+            </button>
+          </div>
+
+          @if (showAdvancedConstraints()) {
+            <div class="constraints-controls-grid">
+              <!-- Risk Tolerance -->
+              <mat-form-field appearance="outline">
+                <mat-label>{{ 'advancedBasket.riskTolerance.label' | translate }}</mat-label>
+                <mat-select
+                  [value]="riskTolerance()"
+                  (selectionChange)="riskTolerance.set($event.value)"
+                >
+                  <mat-option value="low">{{ 'advancedBasket.riskTolerance.low' | translate }}</mat-option>
+                  <mat-option value="medium">{{ 'advancedBasket.riskTolerance.medium' | translate }}</mat-option>
+                  <mat-option value="high">{{ 'advancedBasket.riskTolerance.high' | translate }}</mat-option>
+                </mat-select>
+              </mat-form-field>
+
+              <!-- Urgency -->
+              <mat-form-field appearance="outline">
+                <mat-label>{{ 'advancedBasket.urgency.label' | translate }}</mat-label>
+                <mat-select
+                  [value]="urgency()"
+                  (selectionChange)="urgency.set($event.value)"
+                >
+                  <mat-option value="normal">{{ 'advancedBasket.urgency.normal' | translate }}</mat-option>
+                  <mat-option value="urgent">{{ 'advancedBasket.urgency.urgent' | translate }}</mat-option>
+                </mat-select>
+              </mat-form-field>
+
+              <!-- Excluded Suppliers -->
+              <mat-form-field appearance="outline">
+                <mat-label>{{ 'advancedBasket.supplierExclusions.label' | translate }}</mat-label>
+                <mat-select
+                  multiple
+                  [value]="excludedSupplierIds()"
+                  (selectionChange)="excludedSupplierIds.set($event.value)"
+                >
+                  @for (supp of suppliers(); track supp.id) {
+                    <mat-option [value]="supp.id">{{ supp.name }}</mat-option>
+                  }
+                </mat-select>
+                <mat-hint>{{ 'advancedBasket.supplierExclusions.hint' | translate }}</mat-hint>
+              </mat-form-field>
+            </div>
+
+            <!-- Optimization Weights -->
+            <div class="weights-section">
+              <h3 class="weights-title">{{ 'advancedBasket.weights.sectionTitle' | translate }}</h3>
+              <div class="weights-grid">
+                <div class="weight-item">
+                  <span class="weight-label">{{ 'advancedBasket.weights.price' | translate }}: {{ weights().price }}</span>
+                  <input
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.1"
+                    [value]="weights().price"
+                    (input)="updateWeight('price', $any($event.target).value)"
+                    [attr.aria-label]="'advancedBasket.weights.price' | translate"
+                  />
+                </div>
+                <div class="weight-item">
+                  <span class="weight-label">{{ 'advancedBasket.weights.preferred_supplier' | translate }}: {{ weights().preferred_supplier }}</span>
+                  <input
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.1"
+                    [value]="weights().preferred_supplier"
+                    (input)="updateWeight('preferred_supplier', $any($event.target).value)"
+                    [attr.aria-label]="'advancedBasket.weights.preferred_supplier' | translate"
+                  />
+                </div>
+                <div class="weight-item">
+                  <span class="weight-label">{{ 'advancedBasket.weights.risk' | translate }}: {{ weights().risk }}</span>
+                  <input
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.1"
+                    [value]="weights().risk"
+                    (input)="updateWeight('risk', $any($event.target).value)"
+                    [attr.aria-label]="'advancedBasket.weights.risk' | translate"
+                  />
+                </div>
+                <div class="weight-item">
+                  <span class="weight-label">{{ 'advancedBasket.weights.lead_time' | translate }}: {{ weights().lead_time }}</span>
+                  <input
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.1"
+                    [value]="weights().lead_time"
+                    (input)="updateWeight('lead_time', $any($event.target).value)"
+                    [attr.aria-label]="'advancedBasket.weights.lead_time' | translate"
+                  />
+                </div>
+                <div class="weight-item">
+                  <span class="weight-label">{{ 'advancedBasket.weights.quality' | translate }}: {{ weights().quality }}</span>
+                  <input
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.1"
+                    [value]="weights().quality"
+                    (input)="updateWeight('quality', $any($event.target).value)"
+                    [attr.aria-label]="'advancedBasket.weights.quality' | translate"
+                  />
+                </div>
+              </div>
+            </div>
           }
         </div>
 
@@ -205,8 +381,16 @@
                 <mat-icon aria-hidden="true">check_circle</mat-icon>
                 {{ 'basketSplit.status.completed' | translate }}
               </span>
+              @if (solverConfidence(); as conf) {
+                <span class="status-pill confidence" [ngClass]="conf">
+                  {{ 'advancedBasket.result.solverConfidence' | translate }}: {{ conf }}
+                </span>
+              }
               <h2 class="result-title">{{ 'basketSplit.result.feasibleTitle' | translate }}</h2>
               <p class="result-subtitle">{{ 'basketSplit.result.feasibleSubtitle' | translate }}</p>
+              @if (validUntil(); as vu) {
+                <p class="validity-text">{{ 'advancedBasket.result.validity' | translate }}: {{ vu | formatDate }}</p>
+              }
             </div>
 
             @if (res.total_landed_cost) {
@@ -247,6 +431,42 @@
                   <span>{{ 'basketSplit.result.neitherSingleFeasible' | translate }}</span>
                 }
               </div>
+            </div>
+          }
+
+          <!-- Applied Constraints, Violated Constraints & Risk Notes -->
+          @if (appliedConstraints().length > 0 || violatedConstraints().length > 0 || riskNotes().length > 0) {
+            <div class="rich-result-details">
+              @if (appliedConstraints().length > 0) {
+                <div class="details-block applied-constraints">
+                  <h4>{{ 'advancedBasket.result.appliedConstraints' | translate }}</h4>
+                  <ul>
+                    @for (ac of appliedConstraints(); track $index) {
+                      <li>{{ ac.type }}</li>
+                    }
+                  </ul>
+                </div>
+              }
+              @if (violatedConstraints().length > 0) {
+                <div class="details-block violated-constraints">
+                  <h4>{{ 'advancedBasket.result.violatedConstraints' | translate }}</h4>
+                  <ul>
+                    @for (vc of violatedConstraints(); track $index) {
+                      <li>{{ vc.reason || vc.type }}</li>
+                    }
+                  </ul>
+                </div>
+              }
+              @if (riskNotes().length > 0) {
+                <div class="details-block risk-notes">
+                  <h4>{{ 'advancedBasket.result.riskNotes' | translate }}</h4>
+                  <ul>
+                    @for (note of riskNotes(); track $index) {
+                      <li>{{ note }}</li>
+                    }
+                  </ul>
+                </div>
+              }
             </div>
           }
         </mat-card>
@@ -323,12 +543,27 @@
               </div>
             }
           </div>
+
+          @if (violatedConstraints().length > 0) {
+            <div class="infeasible-violated-section">
+              <h3>{{ 'advancedBasket.result.violatedConstraints' | translate }}</h3>
+              <ul>
+                @for (vc of violatedConstraints(); track $index) {
+                  <li>{{ vc.reason || vc.type }}</li>
+                }
+              </ul>
+            </div>
+          }
         </div>
 
         <mat-divider></mat-divider>
         <div class="infeasible-actions">
-          <button mat-flat-button color="primary" (click)="resetForm()">
+          <button mat-stroked-button (click)="rerunOptimisation()" class="rerun-btn" [disabled]="!isWriter() || isSubmitting()">
             <mat-icon aria-hidden="true">refresh</mat-icon>
+            <span>{{ 'advancedBasket.actions.rerun' | translate }}</span>
+          </button>
+          <button mat-flat-button color="primary" (click)="resetForm()">
+            <mat-icon aria-hidden="true">add</mat-icon>
             <span>{{ 'basketSplit.actions.newSplit' | translate }}</span>
           </button>
         </div>

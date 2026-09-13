@@ -2020,6 +2020,10 @@
       "high": "High",
       "medium": "Medium",
       "low": "Low"
+    },
+    "error": {
+      "notFound": "Supplier scorecard not found.",
+      "generic": "Failed to load supplier scorecard. Please try again."
     }
   },
   "supplierTerms": {

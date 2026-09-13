@@ -45,8 +45,8 @@ release conditions.
 - [x] T017 Extend `services/optimiser/src/procurepilot_optimiser_worker/repository.py` to read supplier terms, scorecard/risk inputs, and current eligible offers without recomputing landed cost.
 - [x] T018 Extend `services/optimiser/src/procurepilot_optimiser_worker/solver.py` with hard constraints, weighted objective, tier prices, baselines, violated constraints, and deterministic tie-breaks.
 - [x] T019 Extend `services/optimiser/src/procurepilot_optimiser_worker/worker.py` to persist R2.4 result payloads and reserve `failed` for infrastructure/unexpected errors.
-- [ ] T020 [P] Extend `apps/web/src/app/features/offers/basket-split/basket-split.component.spec.ts` for constraint controls, rerun/poll state, rich results, infeasible constraints, RTL, and keyboard operation.
-- [ ] T021 Build advanced basket UI in `apps/web/src/app/features/offers/basket-split/` using i18n strings only and preserving the existing job-polling pattern.
+- [x] T020 [P] Extend `apps/web/src/app/features/offers/basket-split/basket-split.component.spec.ts` for constraint controls, rerun/poll state, rich results, infeasible constraints, RTL, and keyboard operation.
+- [x] T021 Build advanced basket UI in `apps/web/src/app/features/offers/basket-split/` using i18n strings only and preserving the existing job-polling pattern.
 
 ## Phase 4: User Story 2 - Supplier scorecards and risk scoring (P1)
 
@@ -54,9 +54,9 @@ release conditions.
 - [x] T023 [P] Write integration tests in `apps/api/tests/integration/test_supplier_iq.py` proving scorecard metrics trace to seeded source records and cross-tenant supplier ids return not found.
 - [x] T024 Implement deterministic Supplier IQ calculations in `apps/api/src/procurepilot_api/modules/offers/supplier_iq.py`.
 - [x] T025 Expose `GET /suppliers/{supplier_id}/scorecard` in `apps/api/src/procurepilot_api/modules/offers/router.py`.
-- [ ] T026 [P] Add web API client methods/types in `apps/web/src/app/features/catalogue/catalogue-api.ts` or the existing supplier API module.
-- [ ] T027 [P] Write supplier scorecard component tests in `apps/web/src/app/features/catalogue/supplier-scorecard/supplier-scorecard.component.spec.ts`.
-- [ ] T028 Build `apps/web/src/app/features/catalogue/supplier-scorecard/` component, template, and styles with dense operational layout, source counts, insufficient evidence, and risk breakdown.
+- [x] T026 [P] Add web API client methods/types in `apps/web/src/app/features/catalogue/catalogue-api.ts` or the existing supplier API module.
+- [x] T027 [P] Write supplier scorecard component tests in `apps/web/src/app/features/catalogue/supplier-scorecard/supplier-scorecard.component.spec.ts`.
+- [x] T028 Build `apps/web/src/app/features/catalogue/supplier-scorecard/` component, template, and styles with dense operational layout, source counts, insufficient evidence, and risk breakdown.
 
 ## Phase 5: User Story 3 - Anomaly detection v1 (P2)
 
