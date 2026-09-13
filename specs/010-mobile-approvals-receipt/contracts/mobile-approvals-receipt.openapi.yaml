@@ -1,0 +1,212 @@
+openapi: 3.1.0
+info:
+  title: ProcurePilot Mobile Approvals and Delivery Receipt API
+  version: 0.10.0
+  description: >
+    Chunk R2.3 (fourth Phase 2 chunk). Base path /api/v1, Supabase JWT bearer auth, tenant
+    resolved server-side from the token, {code, message, details, trace_id} error envelope —
+    identical conventions to every prior chunk.
+
+    This contract covers ONLY the two new surfaces this chunk adds: delivery confirmation and
+    delivery quality-issue reporting. Approval decision endpoints (POST /requests/{id}/approve,
+    POST /requests/{id}/reject, GET /approvals/pending) are reused completely unchanged from
+    008-requests-approvals/contracts/requests-approvals.openapi.yaml — the mobile client calls
+    those exact endpoints and is not a reason to add, remove, or reshape a single field on them
+    (research.md R2, plan.md Summary).
+
+servers:
+  - url: /api/v1
+
+security:
+  - bearerAuth: []
+
+paths:
+  /requests/{request_id}/confirm-delivery:
+    post:
+      summary: Confirm delivery of an ordered request
+      description: >
+        Requires the request's status to be `ordered` (data-model.md). Records the quantity
+        actually received per line and derives has_delivery_discrepancy. Requires the caller to
+        be the requester or hold branch-scoped write access for the request's branch, the same
+        authorization shape 008-requests-approvals already uses for other requester-initiated
+        actions (spec.md FR-010).
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DeliveryConfirmationCreate' }
+      responses:
+        '200':
+          description: Request confirmed delivered
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PurchaseRequest' }
+        '409':
+          description: Request is not in `ordered` status (reason `not_ordered`)
+          $ref: '#/components/responses/Conflict'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /requests/{request_id}/quality-issues:
+    post:
+      summary: Report a delivery quality issue against a delivered request
+      description: >
+        Requires the request's status to be `delivered` (reason `not_delivered` otherwise).
+        A description is required; photos are optional (spec.md FR-007). Photo upload itself is
+        two steps — see /quality-issues/{issue_id}/photos below — so this call can return quickly
+        and the client attaches photos afterward, including after a connectivity gap.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/QualityIssueCreate' }
+      responses:
+        '201':
+          description: Quality issue recorded
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/QualityIssue' }
+        '409':
+          description: Request is not in `delivered` status (reason `not_delivered`)
+          $ref: '#/components/responses/Conflict'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    get:
+      summary: List quality issues reported against a request
+      responses:
+        '200':
+          description: Quality issues for this request
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/QualityIssue' }
+
+  /quality-issues/{issue_id}/photos:
+    post:
+      summary: Attach a photo to an already-created quality issue
+      description: >
+        Server allocates the Storage object path under
+        tenants/{tenant_id}/quality-issues/{issue_id}/{filename} (research.md R3) — the client
+        never supplies a path. Multiple calls attach multiple photos (data-model.md
+        delivery_quality_issue_photo is a one-to-many child, not a single column).
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '201':
+          description: Photo attached
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/QualityIssuePhoto' }
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: false
+      schema: { type: string, format: uuid }
+
+  schemas:
+    DeliveryConfirmationCreate:
+      type: object
+      required: [lines]
+      properties:
+        lines:
+          type: array
+          items:
+            type: object
+            required: [purchase_request_line_id, quantity_received]
+            properties:
+              purchase_request_line_id: { type: string, format: uuid }
+              quantity_received: { type: string, description: "Decimal string, >= 0" }
+
+    PurchaseRequest:
+      description: >
+        Unchanged shape from 008-requests-approvals, extended with delivered_at,
+        delivery_confirmed_by_membership_id, has_delivery_discrepancy, and each line's
+        quantity_received (data-model.md).
+      type: object
+
+    QualityIssueCreate:
+      type: object
+      required: [description]
+      properties:
+        description: { type: string, minLength: 1 }
+
+    QualityIssue:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        purchase_request_id: { type: string, format: uuid }
+        reported_by_membership_id: { type: string, format: uuid }
+        description: { type: string }
+        photos:
+          type: array
+          items: { $ref: '#/components/schemas/QualityIssuePhoto' }
+        created_at: { type: string, format: date-time }
+
+    QualityIssuePhoto:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        delivery_quality_issue_id: { type: string, format: uuid }
+        url:
+          type: string
+          description: A signed, time-limited URL to the photo — never a public path.
+        created_at: { type: string, format: date-time }
+
+  responses:
+    NotFound:
+      description: Not found (same-tenant-different-scope references resolve here, never 403)
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              code: { type: string }
+              message: { type: string }
+              trace_id: { type: string }
+    Conflict:
+      description: Conflict — request not in the required status for this action
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              code: { type: string }
+              message: { type: string }
+              details: { type: object }
+              trace_id: { type: string }
+    Unprocessable:
+      description: Validation error
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              code: { type: string }
+              message: { type: string }
+              details: { type: object }
+              trace_id: { type: string }

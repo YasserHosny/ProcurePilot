@@ -1,6 +1,6 @@
 # ProcurePilot — Development Guidelines
 
-Last updated: 2026-08-23 · Active feature: `008-requests-approvals`
+Last updated: 2026-09-13 · Active feature: `008-requests-approvals`
 
 ProcurePilot turns fragmented supplier information into trusted, comparable purchasing
 decisions and proves the money saved. Read `.specify/memory/constitution.md` before writing
@@ -135,6 +135,8 @@ check, audit log, approval queue) — is now in planning on branch `008-requests
 - Supabase Postgres 17 (unchanged). New tables: `branch`, `cost_centre`, `budget`, (007-organisation-model)
 - unchanged — Python 3.12 (`apps/api`), TypeScript 5.6 / Angular 19 (web), SQL + unchanged. No new library. `dateutil.relativedelta` (already a (008-requests-approvals)
 - Supabase Postgres 17 (unchanged). New tables: `purchase_request`, (008-requests-approvals)
+- Unchanged — `apps/api`: Python 3.12; `apps/mobile`: Dart/Flutter (stable + `apps/api` gains no new dependency — the new endpoints are ordinary (010-mobile-approvals-receipt)
+- Supabase Postgres 17 (unchanged). New columns on `purchase_request` for the delivery (010-mobile-approvals-receipt)
 
 ## Recent Changes
 - 002-catalogue-suppliers: Added unchanged — Python 3.12 (backend), TypeScript 5.6 / Angular 19 (web), SQL + unchanged from chunk 4.1. One addition under consideration for CSV
