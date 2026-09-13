@@ -42,9 +42,9 @@ release conditions.
 - [x] T014 Expose `GET` and `POST /suppliers/{supplier_id}/commercial-terms` in `apps/api/src/procurepilot_api/modules/offers/router.py`.
 - [x] T015 Extend `apps/api/src/procurepilot_api/modules/offers/basket_service.py` to accept advanced constraint snapshots and enqueue the existing optimiser worker payload with `rule_version`.
 - [x] T016 Extend `services/optimiser/src/procurepilot_optimiser_worker/models.py` with advanced request/result, terms, constraints, risk, and confidence models.
-- [ ] T017 Extend `services/optimiser/src/procurepilot_optimiser_worker/repository.py` to read supplier terms, scorecard/risk inputs, and current eligible offers without recomputing landed cost.
-- [ ] T018 Extend `services/optimiser/src/procurepilot_optimiser_worker/solver.py` with hard constraints, weighted objective, tier prices, baselines, violated constraints, and deterministic tie-breaks.
-- [ ] T019 Extend `services/optimiser/src/procurepilot_optimiser_worker/worker.py` to persist R2.4 result payloads and reserve `failed` for infrastructure/unexpected errors.
+- [x] T017 Extend `services/optimiser/src/procurepilot_optimiser_worker/repository.py` to read supplier terms, scorecard/risk inputs, and current eligible offers without recomputing landed cost.
+- [x] T018 Extend `services/optimiser/src/procurepilot_optimiser_worker/solver.py` with hard constraints, weighted objective, tier prices, baselines, violated constraints, and deterministic tie-breaks.
+- [x] T019 Extend `services/optimiser/src/procurepilot_optimiser_worker/worker.py` to persist R2.4 result payloads and reserve `failed` for infrastructure/unexpected errors.
 - [ ] T020 [P] Extend `apps/web/src/app/features/offers/basket-split/basket-split.component.spec.ts` for constraint controls, rerun/poll state, rich results, infeasible constraints, RTL, and keyboard operation.
 - [ ] T021 Build advanced basket UI in `apps/web/src/app/features/offers/basket-split/` using i18n strings only and preserving the existing job-polling pattern.
 
