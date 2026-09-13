@@ -1,0 +1,320 @@
+openapi: 3.1.0
+info:
+  title: ProcurePilot Optimisation and Supplier IQ API
+  version: 0.1.0
+servers:
+  - url: /api/v1
+security:
+  - bearerAuth: []
+paths:
+  /baskets/optimise:
+    post:
+      summary: Submit an advanced advisory basket optimisation job
+      operationId: optimiseBasketAdvanced
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdvancedBasketOptimiseRequest'
+      responses:
+        '202':
+          description: Job accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasketSplitJob'
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
+  /baskets/{id}:
+    get:
+      summary: Poll an advanced basket optimisation job
+      operationId: getAdvancedBasketJob
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Job status and result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasketSplitJob'
+        '404': { $ref: '#/components/responses/Error' }
+  /suppliers/{supplier_id}/commercial-terms:
+    get:
+      summary: List supplier commercial term versions
+      operationId: listSupplierCommercialTerms
+      parameters:
+        - name: supplier_id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Terms
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/SupplierCommercialTerm' }
+        '404': { $ref: '#/components/responses/Error' }
+    post:
+      summary: Create a new supplier commercial term version
+      operationId: createSupplierCommercialTerm
+      parameters:
+        - name: supplier_id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SupplierCommercialTermCreate' }
+      responses:
+        '201':
+          description: Created term
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SupplierCommercialTerm' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
+  /suppliers/{supplier_id}/scorecard:
+    get:
+      summary: Get a supplier scorecard
+      operationId: getSupplierScorecard
+      parameters:
+        - name: supplier_id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: window_months
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 24, default: 6 }
+      responses:
+        '200':
+          description: Scorecard
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SupplierScorecard' }
+        '404': { $ref: '#/components/responses/Error' }
+  /alerts:
+    get:
+      summary: List live alerts including anomaly v1 signals
+      operationId: listAlertsWithAnomalies
+      parameters:
+        - name: kind
+          in: query
+          required: false
+          schema: { $ref: '#/components/schemas/AlertKind' }
+      responses:
+        '200':
+          description: Alert list
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/Alert' }
+                  next_cursor:
+                    type: string
+                    nullable: true
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema: { type: string, format: uuid }
+  responses:
+    Error:
+      description: Error envelope
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [code, message, trace_id]
+            properties:
+              code: { type: string }
+              message: { type: string }
+              details: { type: object }
+              trace_id: { type: string }
+  schemas:
+    Money:
+      type: object
+      required: [amount, currency]
+      properties:
+        amount: { type: string, pattern: '^-?\d+(\.\d{1,6})?$' }
+        currency: { type: string, minLength: 3, maxLength: 3 }
+    BasketItem:
+      type: object
+      required: [workspace_product_id, quantity]
+      properties:
+        workspace_product_id: { type: string, format: uuid }
+        quantity: { type: string, pattern: '^\d+(\.\d{1,6})?$' }
+    OptimisationWeights:
+      type: object
+      required: [price, preferred_supplier, risk, lead_time, quality]
+      properties:
+        price: { type: number, minimum: 0, maximum: 1 }
+        preferred_supplier: { type: number, minimum: 0, maximum: 1 }
+        risk: { type: number, minimum: 0, maximum: 1 }
+        lead_time: { type: number, minimum: 0, maximum: 1 }
+        quality: { type: number, minimum: 0, maximum: 1 }
+    AdvancedBasketOptimiseRequest:
+      type: object
+      required: [supplier_ids, items, risk_tolerance, urgency, weights]
+      properties:
+        supplier_ids:
+          type: array
+          minItems: 2
+          maxItems: 10
+          uniqueItems: true
+          items: { type: string, format: uuid }
+        items:
+          type: array
+          minItems: 1
+          maxItems: 50
+          items: { $ref: '#/components/schemas/BasketItem' }
+        risk_tolerance:
+          type: string
+          enum: [low, medium, high]
+        urgency:
+          type: string
+          enum: [normal, urgent]
+        excluded_supplier_ids:
+          type: array
+          items: { type: string, format: uuid }
+        weights: { $ref: '#/components/schemas/OptimisationWeights' }
+    BasketSplitJob:
+      type: object
+      required: [id, supplier_ids, items, status, result_url, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        supplier_ids:
+          type: array
+          items: { type: string, format: uuid }
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/BasketItem' }
+        status:
+          type: string
+          enum: [queued, running, completed, failed]
+        result: { $ref: '#/components/schemas/AdvancedBasketResult' }
+        error: { type: object, nullable: true }
+        result_url: { type: string }
+        created_at: { type: string, format: date-time }
+        started_at: { type: string, format: date-time, nullable: true }
+        completed_at: { type: string, format: date-time, nullable: true }
+    AdvancedBasketResult:
+      type: object
+      required: [feasible, allocation, applied_constraints, violated_constraints, risk_notes, confidence, source_landed_cost_ids, solver_version, computed_at]
+      properties:
+        feasible: { type: boolean }
+        allocation: { type: array, items: { type: object } }
+        total_landed_cost:
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+        applied_constraints: { type: array, items: { type: object } }
+        violated_constraints: { type: array, items: { type: object } }
+        risk_notes: { type: array, items: { type: string } }
+        confidence: { type: string, enum: [high, medium, low] }
+        valid_until: { type: string, format: date-time, nullable: true }
+        source_landed_cost_ids:
+          type: array
+          items: { type: string, format: uuid }
+        solver_version: { type: string }
+        computed_at: { type: string, format: date-time }
+    SupplierCommercialTermCreate:
+      type: object
+      properties:
+        effective_from: { type: string, format: date-time }
+        effective_to: { type: string, format: date-time, nullable: true }
+        minimum_order_value:
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+        delivery_fee:
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+        free_delivery_threshold:
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+        quantity_tiers:
+          type: array
+          items: { type: object }
+    SupplierCommercialTerm:
+      allOf:
+        - $ref: '#/components/schemas/SupplierCommercialTermCreate'
+        - type: object
+          required: [id, supplier_id, rule_version, created_at]
+          properties:
+            id: { type: string, format: uuid }
+            supplier_id: { type: string, format: uuid }
+            rule_version: { type: string }
+            created_at: { type: string, format: date-time }
+    SupplierScorecard:
+      type: object
+      required: [supplier_id, window_start, window_end, metrics, risk_score, source_counts, confidence, insufficient_evidence, computed_at, rule_version]
+      properties:
+        supplier_id: { type: string, format: uuid }
+        window_start: { type: string, format: date }
+        window_end: { type: string, format: date }
+        metrics: { type: object }
+        risk_score: { type: object }
+        source_counts: { type: object }
+        confidence: { type: string, enum: [high, medium, low] }
+        insufficient_evidence: { type: boolean }
+        computed_at: { type: string, format: date-time }
+        rule_version: { type: string }
+    AlertKind:
+      type: string
+      enum:
+        - recommended_price_expiring
+        - preferred_supplier_offer_disappeared
+        - price_swing
+        - price_spike
+        - likely_duplicate_quotation_line
+        - decimal_or_quantity_anomaly
+        - delivery_cost_anomaly
+        - supplier_quality_trend_change
+    Alert:
+      type: object
+      required: [id, kind, workspace_product_id, severity, evidence, action, created_from_current_data_at, dismissed]
+      properties:
+        id: { type: string }
+        kind: { $ref: '#/components/schemas/AlertKind' }
+        workspace_product_id: { type: string, format: uuid }
+        supplier_id: { type: string, format: uuid, nullable: true }
+        severity: { type: string, enum: [info, warning, critical] }
+        confidence: { type: string, enum: [high, medium, low] }
+        evidence: { type: object }
+        action: { type: string }
+        valid_until: { type: string, format: date-time, nullable: true }
+        created_from_current_data_at: { type: string, format: date-time }
+        dismissed: { type: boolean }
