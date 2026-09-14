@@ -1,4 +1,3 @@
-import { NgClass } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
@@ -14,17 +13,16 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatTableModule } from '@angular/material/table';
-import { MatTooltipModule } from '@angular/material/tooltip';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
 import { ApiService } from '../../../core/api/api.service';
 import type { ApiError, Product } from '../../../core/api/models';
-import { FormatDatePipe } from '../../../core/format/date.pipe';
-import { FormatMoneyPipe } from '../../../core/format/money.pipe';
 import { formatConfidenceClass, formatScorePercent } from '../offer-formatting';
 import type { OfferComparison, Recommendation, RecommendationConfidence } from '../offers-api';
 import { type ProjectedOffer, projectComparison } from './compare-projection';
+import { CompareRecommendationComponent } from './compare-recommendation.component';
+import { CompareTableComponent } from './compare-table.component';
 
 @Component({
   selector: 'app-compare',
@@ -32,7 +30,6 @@ import { type ProjectedOffer, projectComparison } from './compare-projection';
   imports: [
     FormsModule,
     ReactiveFormsModule,
-    NgClass,
     RouterLink,
     MatCardModule,
     MatButtonModule,
@@ -46,10 +43,9 @@ import { type ProjectedOffer, projectComparison } from './compare-projection';
     MatTableModule,
     MatProgressSpinnerModule,
     MatSnackBarModule,
-    MatTooltipModule,
     TranslatePipe,
-    FormatDatePipe,
-    FormatMoneyPipe,
+    CompareRecommendationComponent,
+    CompareTableComponent,
   ],
   templateUrl: './compare.component.html',
   styleUrl: './compare.component.scss',

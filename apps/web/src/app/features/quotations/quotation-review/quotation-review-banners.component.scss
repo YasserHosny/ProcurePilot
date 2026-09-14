@@ -1,0 +1,137 @@
+.version-banner,
+.arithmetic-mismatch-banner,
+.keyboard-nav-bar,
+.confidence-legend-bar,
+.error-banner {
+  display: flex;
+  gap: 0.75rem;
+  padding: 1rem;
+  border-radius: 8px;
+  margin-block-end: 1.25rem;
+}
+
+.error-banner {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #991b1b;
+  word-break: break-all;
+  .error-icon { color: #dc2626; }
+  .error-content { display: flex; flex-direction: column; }
+  .error-text { font-weight: 500; }
+  .error-trace { font-size: 0.75rem; font-family: monospace; }
+}
+
+.version-banner {
+  align-items: center;
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  color: #334155;
+
+  .version-content {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    gap: 0.5rem;
+  }
+}
+
+.arithmetic-mismatch-banner {
+  flex-direction: column;
+  background: #fff1f2;
+  border: 1px solid #fecdd3;
+  color: #9f1239;
+
+  .mismatch-header { display: flex; gap: 0.75rem; }
+  .mismatch-icon { color: #e11d48; font-size: 28px; width: 28px; height: 28px; }
+  .mismatch-title { font-size: 1.1rem; font-weight: 700; margin: 0 0 0.25rem; }
+  .mismatch-desc { font-size: 0.9rem; margin: 0; }
+
+  .mismatch-breakdown {
+    display: flex;
+    gap: 1.5rem;
+    padding: 0.75rem 1rem;
+    background: #fff;
+    border-radius: 6px;
+    border: 1px solid #ffe4e6;
+    flex-wrap: wrap;
+  }
+
+  .acknowledge-checkbox {
+    margin-block-start: 0.75rem;
+    font-size: 0.9rem;
+  }
+}
+
+.breakdown-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  .breakdown-label { font-size: 0.8rem; color: #64748b; font-weight: 600; }
+  .breakdown-val { font-size: 1.1rem; font-weight: 700; color: #1e293b; }
+}
+
+.diff-item .diff-val { color: #e11d48; }
+
+.arithmetic-reconciled-banner {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem;
+  border-radius: 8px;
+  margin-block-end: 1.25rem;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  color: #166534;
+
+  .reconciled-header { display: flex; gap: 0.75rem; }
+  .reconciled-icon { color: #16a34a; font-size: 28px; width: 28px; height: 28px; }
+  .reconciled-title { font-size: 1.1rem; font-weight: 700; margin: 0 0 0.25rem; }
+  .reconciled-desc { font-size: 0.9rem; margin: 0; }
+
+  .reconciled-breakdown {
+    display: flex;
+    gap: 1.5rem;
+    padding: 0.75rem 1rem;
+    background: #fff;
+    border-radius: 6px;
+    border: 1px solid #dcfce7;
+    flex-wrap: wrap;
+  }
+}
+
+.keyboard-nav-bar {
+  align-items: center;
+  justify-content: space-between;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  flex-wrap: wrap;
+
+  .nav-info { display: flex; align-items: center; gap: 0.75rem; }
+  .nav-title { font-weight: 600; font-size: 0.9rem; color: #1e293b; }
+  .nav-hint { font-size: 0.8rem; color: #64748b; }
+  .nav-buttons { display: flex; gap: 0.5rem; }
+}
+
+.confidence-legend-bar {
+  align-items: center;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  color: #475569;
+  flex-wrap: wrap;
+  padding-block: 0.75rem;
+
+  .confidence-legend-icon { color: #3b82f6; font-size: 20px; width: 20px; height: 20px; }
+  .confidence-legend-text { font-size: 0.85rem; font-weight: 600; }
+  .confidence-legend-badges { display: inline-flex; align-items: center; gap: 0.4rem; }
+  .confidence-legend-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.15rem 0.45rem;
+    border-radius: 9999px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    &.high-conf { background: #dcfce7; color: #166534; }
+    &.low-conf { background: #fef3c7; color: #b45309; }
+  }
+}

@@ -1,0 +1,138 @@
+.table-card {
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.offers-table {
+  width: 100%;
+
+  .supplier-cell {
+    .supplier-title-group {
+      display: flex;
+      align-items: center;
+      gap: 0.25rem;
+    }
+
+    .supplier-name {
+      font-weight: 600;
+      color: #0f172a;
+    }
+
+    .supplier-scorecard-icon-btn {
+      width: 28px;
+      height: 28px;
+      line-height: 28px;
+      color: #4f46e5;
+    }
+
+    .mini-rec-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: #047857;
+      background-color: #ecfdf5;
+      border: 1px solid #a7f3d0;
+      border-radius: 4px;
+      padding: 0.1rem 0.4rem;
+      margin-top: 0.25rem;
+
+      mat-icon {
+        font-size: 0.9rem;
+        width: 0.9rem;
+        height: 0.9rem;
+      }
+    }
+  }
+
+  .confidence-pill {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.2rem 0.5rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+
+    &.confidence-high { background-color: #d1fae5; color: #065f46; }
+    &.confidence-medium { background-color: #fef3c7; color: #92400e; }
+    &.confidence-low { background-color: #fee2e2; color: #991b1b; }
+  }
+
+  .lead-time-cell {
+    font-size: 0.85rem;
+    color: #475569;
+  }
+
+  .supplier-risk-cell {
+    .risk-score-group {
+      display: flex;
+      align-items: center;
+      gap: 0.25rem;
+    }
+
+    .risk-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+      padding: 0.2rem 0.5rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+
+      &.risk-band-low { background-color: #d1fae5; color: #065f46; }
+      &.risk-band-medium { background-color: #fef3c7; color: #92400e; }
+      &.risk-band-high { background-color: #fee2e2; color: #991b1b; }
+      &.risk-band-unknown { background-color: #f1f5f9; color: #64748b; }
+
+      .risk-badge-icon {
+        font-size: 0.85rem;
+        width: 0.85rem;
+        height: 0.85rem;
+      }
+    }
+
+    .supplier-scorecard-icon-btn {
+      width: 24px;
+      height: 24px;
+      line-height: 24px;
+      color: #64748b;
+    }
+  }
+
+  .rec-row {
+    background-color: #f0fdf4;
+  }
+
+  .expired-row {
+    opacity: 0.6;
+    background-color: #f8fafc;
+  }
+
+  .expired-tag {
+    display: inline-block;
+    padding: 0.1rem 0.4rem;
+    border-radius: 4px;
+    background-color: #fee2e2;
+    color: #b91c1c;
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+
+  .actions-cell {
+    text-align: end;
+  }
+
+  .action-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.8rem;
+  }
+
+  .text-muted {
+    color: #94a3b8;
+    font-style: italic;
+  }
+}

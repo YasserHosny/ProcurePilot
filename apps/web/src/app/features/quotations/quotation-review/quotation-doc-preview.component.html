@@ -1,0 +1,118 @@
+<section class="document-panel" [attr.aria-label]="'quotations.review.panels.document' | translate">
+  <mat-card class="panel-card doc-card">
+    <mat-card-header>
+      <mat-card-title class="panel-title">
+        <mat-icon aria-hidden="true">description</mat-icon>
+        <span>{{ 'quotations.review.panels.document' | translate }}</span>
+      </mat-card-title>
+      @if (isWriter && quotation.status !== 'reviewed') {
+        <input
+          #replaceDocInput
+          type="file"
+          accept=".pdf,.png,.jpg,.jpeg,.tiff,.csv,.xls,.xlsx"
+          hidden
+          (change)="replaceDocumentSelected.emit($event)"
+        />
+        <button
+          mat-icon-button
+          type="button"
+          class="replace-doc-btn"
+          (click)="replaceDocInput.click()"
+          [disabled]="isReplacingDocument"
+          [matTooltip]="'quotations.review.replaceDocument.tooltip' | translate"
+          [attr.aria-label]="'quotations.review.replaceDocument.tooltip' | translate"
+        >
+          <mat-icon aria-hidden="true">swap_horiz</mat-icon>
+        </button>
+      }
+      <button
+        mat-icon-button
+        type="button"
+        class="download-original-btn"
+        (click)="download.emit()"
+        [matTooltip]="'quotations.review.downloadOriginal' | translate"
+        [attr.aria-label]="'quotations.review.downloadOriginal' | translate"
+      >
+        <mat-icon aria-hidden="true">download</mat-icon>
+      </button>
+    </mat-card-header>
+
+    <mat-card-content>
+      <!-- Document Meta -->
+      <div class="doc-meta-strip">
+        <span class="doc-badge">
+          <mat-icon aria-hidden="true">insert_drive_file</mat-icon>
+          {{ documentFileName }}
+        </span>
+        <span class="doc-badge">
+          <mat-icon aria-hidden="true">attachment</mat-icon>
+          {{ quotation.document.mime_type }}
+        </span>
+      </div>
+
+      <!-- PDF Preview or Fallback -->
+      <div class="doc-preview-viewport">
+        @if (safePreviewUrl) {
+          <iframe
+            class="pdf-preview-frame"
+            [src]="safePreviewUrl"
+            title="Source document preview"
+          ></iframe>
+        } @else {
+          <div class="doc-preview-loading">
+            <mat-spinner diameter="32"></mat-spinner>
+            <span>{{ 'common.loading' | translate }}</span>
+          </div>
+        }
+      </div>
+
+      <!-- Active Extraction Info -->
+      @if (activeExtraction; as fe) {
+        <div class="extraction-info-bar">
+          <mat-icon aria-hidden="true" class="extraction-info-icon">find_in_page</mat-icon>
+          <div class="extraction-info-text">
+            <span class="extraction-field-label">{{ fieldLabel(fe.field_name) }}</span>
+            <span class="extraction-confidence" [class.low-conf]="formatConfidence(fe.confidence) < 85">
+              {{ formatConfidence(fe.confidence) }}%
+            </span>
+          </div>
+        </div>
+      }
+
+      <!-- Provenance Details Box -->
+      @if (activeExtraction; as fe) {
+        <div class="provenance-card">
+          <h3 class="prov-title">{{ 'quotations.review.provenance.title' | translate }}</h3>
+          <div class="prov-grid">
+            <div class="prov-item">
+              <span class="prov-label">{{ 'quotations.review.provenance.method' | translate }}</span>
+              <span class="prov-val">{{ fe.extraction_method }}</span>
+            </div>
+            <div class="prov-item">
+              <span class="prov-label">{{ 'quotations.review.provenance.model' | translate }}</span>
+              <span class="prov-val">{{ fe.model_version }}</span>
+            </div>
+            <div class="prov-item">
+              <span class="prov-label">{{ 'quotations.review.provenance.page' | translate }}</span>
+              <span class="prov-val">{{ fe.source_page || 1 }}</span>
+            </div>
+            <div class="prov-item">
+              <span class="prov-label">{{ 'quotations.review.provenance.originalValue' | translate }}</span>
+              <span class="prov-val mono">{{ fe.extracted_value | json }}</span>
+            </div>
+            @if (fe.corrected_value !== null && fe.corrected_value !== undefined) {
+              <div class="prov-item corrected">
+                <span class="prov-label">{{ 'quotations.review.provenance.correctedValue' | translate }}</span>
+                <span class="prov-val mono">{{ fe.corrected_value | json }}</span>
+              </div>
+              <div class="prov-item">
+                <span class="prov-label">{{ 'quotations.review.provenance.correctedAt' | translate }}</span>
+                <span class="prov-val">{{ fe.corrected_at | formatDate }}</span>
+              </div>
+            }
+          </div>
+        </div>
+      }
+    </mat-card-content>
+  </mat-card>
+</section>

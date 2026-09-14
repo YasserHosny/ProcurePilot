@@ -63,9 +63,12 @@
           >
             @if (isVerifying()) {
               <mat-spinner [attr.aria-label]="'common.loading' | translate" diameter="18"></mat-spinner>
-              <span>{{ 'savings.evidence.verifyingButton' | translate }}</span>
             } @else {
               <mat-icon aria-hidden="true">verified</mat-icon>
+            }
+            @if (isVerifying()) {
+              <span>{{ 'savings.evidence.verifyingButton' | translate }}</span>
+            } @else {
               <span>{{ 'savings.evidence.verifyButton' | translate }}</span>
             }
           </button>

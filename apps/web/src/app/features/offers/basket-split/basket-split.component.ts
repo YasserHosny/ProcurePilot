@@ -1,4 +1,3 @@
-import { NgClass } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
@@ -23,8 +22,6 @@ import { Subscription, interval, switchMap } from 'rxjs';
 import { ApiService } from '../../../core/api/api.service';
 import type { ApiError, Product, Supplier } from '../../../core/api/models';
 import { SessionService } from '../../../core/auth/session.service';
-import { FormatDatePipe } from '../../../core/format/date.pipe';
-import { FormatMoneyPipe } from '../../../core/format/money.pipe';
 import type {
   BasketItemRequest,
   BasketOptimiseRequest,
@@ -41,12 +38,14 @@ import {
   determineBasketSplitUIState,
 } from './basket-split-state';
 
+import { BasketSplitInfeasibleComponent } from './basket-split-infeasible.component';
+import { BasketSplitResultsComponent } from './basket-split-results.component';
+
 @Component({
   selector: 'app-basket-split',
   standalone: true,
   imports: [
     FormsModule,
-    NgClass,
     MatCardModule,
     MatButtonModule,
     MatIconModule,
@@ -61,8 +60,8 @@ import {
     MatSnackBarModule,
     MatTooltipModule,
     TranslatePipe,
-    FormatDatePipe,
-    FormatMoneyPipe,
+    BasketSplitResultsComponent,
+    BasketSplitInfeasibleComponent,
   ],
   templateUrl: './basket-split.component.html',
   styleUrl: './basket-split.component.scss',

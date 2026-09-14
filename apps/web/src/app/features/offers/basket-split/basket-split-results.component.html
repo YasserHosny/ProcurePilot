@@ -1,0 +1,137 @@
+@if (currentJob?.result; as res) {
+  <div class="result-container">
+    <!-- Result Summary Banner -->
+    <mat-card class="result-summary-card">
+      <div class="summary-header">
+        <div class="title-group">
+          <span class="status-pill feasible">
+            <mat-icon aria-hidden="true">check_circle</mat-icon>
+            {{ 'basketSplit.status.completed' | translate }}
+          </span>
+          @if (solverConfidence; as conf) {
+            <span class="status-pill confidence" [ngClass]="conf">
+              {{ 'advancedBasket.result.solverConfidence' | translate }}: {{ ('advancedBasket.confidence.' + conf) | translate }}
+            </span>
+          }
+          <h2 class="result-title">{{ 'basketSplit.result.feasibleTitle' | translate }}</h2>
+          <p class="result-subtitle">{{ 'basketSplit.result.feasibleSubtitle' | translate }}</p>
+          @if (validUntil; as vu) {
+            <p class="validity-text">{{ 'advancedBasket.result.validity' | translate }}: {{ vu | formatDate }}</p>
+          }
+        </div>
+
+        @if (res.total_landed_cost) {
+          <div class="total-cost-box">
+            <span class="total-label">{{ 'basketSplit.result.totalLandedCost' | translate }}</span>
+            <span class="total-val">{{ res.total_landed_cost | formatMoney }}</span>
+          </div>
+        }
+      </div>
+
+      <!-- Single-Supplier Baseline Comparison (FR-008, US3 Scenario 2) -->
+      @if (singleSupplierSavings; as baselineInfo) {
+        @if (baselineInfo.type !== 'neither_feasible') {
+          <div class="baseline-comparison-box" [ngClass]="baselineInfo.type">
+            <mat-icon aria-hidden="true">
+              {{ baselineInfo.type === 'split_saves' ? 'savings' : 'info' }}
+            </mat-icon>
+            <div class="baseline-text">
+              @if (baselineInfo.type === 'split_saves') {
+                <span>
+                  {{ 'basketSplit.result.splitSavings' | translate: {
+                    amount: (baselineInfo.savingsAmount + ' ' + baselineInfo.currency),
+                    cheaperSupplier: baselineInfo.cheaperSupplierName
+                  } }}
+                </span>
+              } @else if (baselineInfo.type === 'no_savings') {
+                <span>
+                  {{ 'basketSplit.result.noSplitSavings' | translate: {
+                    cheaperSupplier: baselineInfo.cheaperSupplierName
+                  } }}
+                </span>
+              } @else if (baselineInfo.type === 'single_only') {
+                <span>
+                  {{ 'basketSplit.result.singleSupplierOnly' | translate: {
+                    cheaperSupplier: baselineInfo.cheaperSupplierName
+                  } }}
+                </span>
+              }
+            </div>
+          </div>
+        }
+      }
+
+      <!-- Advanced Details: Constraints & Risk Notes -->
+      @if (appliedConstraints.length > 0 || violatedConstraints.length > 0 || riskNotes.length > 0) {
+        <div class="rich-result-details">
+          @if (appliedConstraints.length > 0) {
+            <div class="details-block applied-constraints">
+              <h4>{{ 'advancedBasket.result.appliedConstraints' | translate }}</h4>
+              <ul>
+                @for (ac of appliedConstraints; track $index) {
+                  <li>{{ ac.description || (('advancedBasket.constraints.' + (ac.kind || ac.type)) | translate) }}</li>
+                }
+              </ul>
+            </div>
+          }
+          @if (violatedConstraints.length > 0) {
+            <div class="details-block violated-constraints">
+              <h4>{{ 'advancedBasket.result.violatedConstraints' | translate }}</h4>
+              <ul>
+                @for (vc of violatedConstraints; track $index) {
+                  <li>{{ vc.description || vc.reason || (('advancedBasket.constraints.' + (vc.kind || vc.type)) | translate) }}</li>
+                }
+              </ul>
+            </div>
+          }
+          @if (riskNotes.length > 0) {
+            <div class="details-block risk-notes">
+              <h4>{{ 'advancedBasket.result.riskNotes' | translate }}</h4>
+              <ul>
+                @for (note of riskNotes; track $index) {
+                  <li>{{ translateRiskNote(note) }}</li>
+                }
+              </ul>
+            </div>
+          }
+        </div>
+      }
+    </mat-card>
+
+    <!-- Per-Supplier Allocations Grid -->
+    <div class="allocations-grid">
+      @for (alloc of res.allocation; track alloc.supplier_id) {
+        <mat-card class="allocation-card">
+          <div class="alloc-header">
+            <div class="alloc-supplier-info">
+              <mat-icon class="supplier-icon" aria-hidden="true">storefront</mat-icon>
+              <h3 class="alloc-supplier-name">{{ getSupplierName(alloc.supplier_id) }}</h3>
+            </div>
+            <span class="alloc-total">{{ alloc.total_landed_cost | formatMoney }}</span>
+          </div>
+
+          <table class="alloc-table" [attr.aria-label]="'basketSplit.result.allocatedItemsTable' | translate">
+            <thead>
+              <tr>
+                <th>{{ 'basketSplit.result.productColumn' | translate }}</th>
+                <th>{{ 'basketSplit.result.quantityColumn' | translate }}</th>
+                <th>{{ 'basketSplit.result.costColumn' | translate }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (line of alloc.lines; track line.workspace_product_id) {
+                <tr>
+                  <td class="product-cell">
+                    {{ getProductName(line.workspace_product_id) }}
+                  </td>
+                  <td>{{ line.quantity }}</td>
+                  <td><strong>{{ line.landed_cost | formatMoney }}</strong></td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </mat-card>
+      }
+    </div>
+  </div>
+}

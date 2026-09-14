@@ -75,319 +75,39 @@
       </div>
     </header>
 
-    <!-- Read-Only Banner for non-writers -->
-    @if (!isWriter()) {
-      <div class="read-only-banner" role="status">
-        <mat-icon class="banner-icon" aria-hidden="true">info</mat-icon>
-        <div class="banner-content">
-          <span class="banner-title">{{ 'quotations.queue.readOnlyBadge' | translate }}</span>
-          <span class="banner-text">{{ 'quotations.review.readOnlyNotice' | translate }}</span>
-        </div>
-      </div>
-    }
-
-    <!-- Versioning Link Banner (US4) -->
-    @if (q.previous_quotation_id) {
-      <div class="version-banner" role="region" aria-label="Version history">
-        <mat-icon class="version-icon" aria-hidden="true">history</mat-icon>
-        <div class="version-content">
-          <span class="version-text">
-            {{ 'quotations.review.versioning.isUpdateOf' | translate }}
-            <strong>{{ 'quotations.review.versioning.versionId' | translate:{ id: q.previous_quotation_id } }}</strong>
-          </span>
-          <a
-            mat-stroked-button
-            [routerLink]="['/quotations', q.previous_quotation_id, 'review']"
-            class="version-link-btn"
-          >
-            <mat-icon aria-hidden="true">open_in_new</mat-icon>
-            <span>{{ 'quotations.review.versioning.viewPriorVersion' | translate }}</span>
-          </a>
-        </div>
-      </div>
-    }
-
-    <!-- Arithmetic Mismatch Warning Banner (US3) -->
-    @if (hasArithmeticMismatch()) {
-      <div class="arithmetic-mismatch-banner" role="alert">
-        <div class="mismatch-header">
-          <mat-icon class="mismatch-icon" aria-hidden="true">warning</mat-icon>
-          <div class="mismatch-titles">
-            <h2 class="mismatch-title">{{ 'quotations.review.arithmetic.mismatchTitle' | translate }}</h2>
-            <p class="mismatch-desc">{{ 'quotations.review.arithmetic.mismatchDescription' | translate }}</p>
-          </div>
-        </div>
-
-        <div class="mismatch-breakdown">
-          <div class="breakdown-item">
-            <span class="breakdown-label">{{ 'quotations.review.arithmetic.statedTotal' | translate }}</span>
-            <span class="breakdown-val">
-              @if (q.stated_total) {
-                {{ q.stated_total | formatMoney }}
-              } @else {
-                —
-              }
-            </span>
-          </div>
-          <div class="breakdown-item">
-            <span class="breakdown-label">{{ 'quotations.review.arithmetic.computedTotal' | translate }}</span>
-            <span class="breakdown-val">
-              @if (computedLinesTotal(); as clt) {
-                {{ clt | formatMoney }}
-              } @else {
-                —
-              }
-            </span>
-          </div>
-          <div class="breakdown-item diff-item">
-            <span class="breakdown-label">{{ 'quotations.review.arithmetic.difference' | translate }}</span>
-            <span class="breakdown-val diff-val">{{ arithmeticDifference() }} {{ q.currency || 'USD' }}</span>
-          </div>
-        </div>
-
-        @if (isWriter() && q.status !== 'reviewed') {
-          <mat-checkbox
-            [checked]="mismatchAcknowledged()"
-            (change)="mismatchAcknowledged.set($event.checked)"
-            color="warn"
-            class="acknowledge-checkbox"
-          >
-            {{ 'quotations.review.arithmetic.acknowledgeLabel' | translate }}
-          </mat-checkbox>
-        }
-      </div>
-    }
-
-    <!-- Arithmetic Reconciled Banner -->
-    @if (isArithmeticReconciled()) {
-      <div class="arithmetic-reconciled-banner" role="status">
-        <div class="reconciled-header">
-          <mat-icon class="reconciled-icon" aria-hidden="true">check_circle</mat-icon>
-          <div class="reconciled-titles">
-            <h2 class="reconciled-title">{{ 'quotations.review.arithmetic.reconciledTitle' | translate }}</h2>
-            <p class="reconciled-desc">
-              @if (inferredVatPct(); as vatPct) {
-                {{ 'quotations.review.arithmetic.reconciledVatNote' | translate:{ pct: vatPct } }}
-              } @else {
-                {{ 'quotations.review.arithmetic.reconciledDescription' | translate }}
-              }
-            </p>
-          </div>
-        </div>
-        <div class="reconciled-breakdown">
-          <div class="breakdown-item">
-            <span class="breakdown-label">{{ 'quotations.review.arithmetic.statedTotal' | translate }}</span>
-            <span class="breakdown-val">
-              @if (q.stated_total) {
-                {{ q.stated_total | formatMoney }}
-              } @else {
-                —
-              }
-            </span>
-          </div>
-          <div class="breakdown-item">
-            <span class="breakdown-label">{{ 'quotations.review.arithmetic.computedTotal' | translate }}</span>
-            <span class="breakdown-val">
-              @if (computedLinesTotal(); as clt) {
-                {{ clt | formatMoney }}
-              } @else {
-                —
-              }
-            </span>
-          </div>
-          @if (inferredVatPct(); as vatPct) {
-            <div class="breakdown-item">
-              <span class="breakdown-label">{{ 'quotations.review.arithmetic.inferredVat' | translate }}</span>
-              <span class="breakdown-val">{{ vatPct }}%</span>
-            </div>
-          }
-        </div>
-      </div>
-    }
-
-    <!-- 409 Blocked Reason or Error Banner -->
-    @if (confirmBlockedReason() || errorMessage()) {
-      <div class="error-banner" role="alert">
-        <mat-icon class="error-icon" aria-hidden="true">error</mat-icon>
-        <div class="error-content">
-          <span class="error-text">{{ confirmBlockedReason() || errorMessage() }}</span>
-          @if (errorTraceId()) {
-            <span class="error-trace">{{ 'common.traceId' | translate }}: {{ errorTraceId() }}</span>
-          }
-        </div>
-      </div>
-    }
-
-    <!-- Keyboard Navigation Banner (FR-014) -->
-    @if (flaggedFields().length > 0) {
-      <div class="keyboard-nav-bar" role="toolbar" [attr.aria-label]="'quotations.review.keyboardNav.title' | translate">
-        <div class="nav-info">
-          <mat-icon class="nav-icon" aria-hidden="true">keyboard</mat-icon>
-          <div class="nav-text-block">
-            <span class="nav-title">{{ 'quotations.review.keyboardNav.title' | translate }}</span>
-            <span class="nav-hint">
-              {{ 'quotations.review.keyboardNav.flaggedCount' | translate:{ current: currentFlaggedIndex() + 1, total: flaggedFields().length } }}
-              (Alt+N / Alt+P)
-            </span>
-          </div>
-        </div>
-
-        <div class="nav-buttons">
-          <button
-            mat-stroked-button
-            type="button"
-            (click)="prevFlaggedField()"
-            class="nav-btn"
-            [matTooltip]="'quotations.review.keyboardNav.prevField' | translate"
-          >
-            <mat-icon aria-hidden="true">arrow_back</mat-icon>
-            <span>{{ 'quotations.review.keyboardNav.prevField' | translate }}</span>
-          </button>
-          <button
-            mat-flat-button
-            color="primary"
-            type="button"
-            (click)="nextFlaggedField()"
-            class="nav-btn"
-            [matTooltip]="'quotations.review.keyboardNav.nextField' | translate"
-          >
-            <span>{{ 'quotations.review.keyboardNav.nextField' | translate }}</span>
-            <mat-icon aria-hidden="true">arrow_forward</mat-icon>
-          </button>
-        </div>
-      </div>
-    }
-
-    <div class="confidence-legend-bar" role="note">
-      <mat-icon class="confidence-legend-icon" aria-hidden="true">info</mat-icon>
-      <span class="confidence-legend-text">{{ 'quotations.review.confidence.legendText' | translate }}</span>
-      <span class="confidence-legend-badges" aria-hidden="true">
-        <span class="confidence-legend-badge high-conf">{{ 'quotations.review.confidence.highBadge' | translate }}</span>
-        <span class="confidence-legend-badge low-conf">{{ 'quotations.review.confidence.lowBadge' | translate }}</span>
-      </span>
-    </div>
+    <!-- Review Banners (Versioning, Mismatch, Reconciled, Error, Keyboard Nav, Legend) -->
+    <app-quotation-review-banners
+      [quotation]="q"
+      [hasArithmeticMismatch]="hasArithmeticMismatch()"
+      [isReconciled]="isArithmeticReconciled()"
+      [computedLinesTotal]="computedLinesTotal()"
+      [arithmeticDifference]="arithmeticDifference()"
+      [inferredVatPct]="inferredVatPct()"
+      [mismatchAcknowledged]="mismatchAcknowledged()"
+      (mismatchAcknowledgedChange)="mismatchAcknowledged.set($event)"
+      [isWriter]="isWriter()"
+      [confirmBlockedReason]="confirmBlockedReason()"
+      [errorMessage]="errorMessage()"
+      [errorTraceId]="errorTraceId()"
+      [flaggedFieldsCount]="flaggedFields().length"
+      [currentFlaggedIndex]="currentFlaggedIndex()"
+      (prevFlagged)="prevFlaggedField()"
+      (nextFlagged)="nextFlaggedField()"
+    ></app-quotation-review-banners>
 
     <!-- Side-by-Side Main Panels -->
     <div class="side-by-side-layout">
       <!-- Left Panel: Source Document Evidence -->
-      <section class="document-panel" [attr.aria-label]="'quotations.review.panels.document' | translate">
-        <mat-card class="panel-card doc-card">
-          <mat-card-header>
-            <mat-card-title class="panel-title">
-              <mat-icon aria-hidden="true">description</mat-icon>
-              <span>{{ 'quotations.review.panels.document' | translate }}</span>
-            </mat-card-title>
-            @if (isWriter() && q.status !== 'reviewed') {
-              <input
-                #replaceDocInput
-                type="file"
-                accept=".pdf,.png,.jpg,.jpeg,.tiff,.csv,.xls,.xlsx"
-                hidden
-                (change)="onReplaceDocumentSelected($event)"
-              />
-              <button
-                mat-icon-button
-                type="button"
-                class="replace-doc-btn"
-                (click)="replaceDocInput.click()"
-                [disabled]="isReplacingDocument()"
-                [matTooltip]="'quotations.review.replaceDocument.tooltip' | translate"
-                [attr.aria-label]="'quotations.review.replaceDocument.tooltip' | translate"
-              >
-                <mat-icon aria-hidden="true">swap_horiz</mat-icon>
-              </button>
-            }
-            <button
-              mat-icon-button
-              type="button"
-              class="download-original-btn"
-              (click)="downloadDocument()"
-              [matTooltip]="'quotations.review.downloadOriginal' | translate"
-              [attr.aria-label]="'quotations.review.downloadOriginal' | translate"
-            >
-              <mat-icon aria-hidden="true">download</mat-icon>
-            </button>
-          </mat-card-header>
-
-          <mat-card-content>
-            <!-- Document Meta -->
-            <div class="doc-meta-strip">
-              <span class="doc-badge">
-                <mat-icon aria-hidden="true">insert_drive_file</mat-icon>
-                {{ documentFileName() }}
-              </span>
-              <span class="doc-badge">
-                <mat-icon aria-hidden="true">attachment</mat-icon>
-                {{ q.document.mime_type }}
-              </span>
-            </div>
-
-            <!-- PDF Preview or Fallback -->
-            <div class="doc-preview-viewport">
-              @if (safePreviewUrl(); as pdfUrl) {
-                <iframe
-                  class="pdf-preview-frame"
-                  [src]="pdfUrl"
-                  title="Source document preview"
-                ></iframe>
-              } @else {
-                <div class="doc-preview-loading">
-                  <mat-spinner diameter="32"></mat-spinner>
-                  <span>{{ 'common.loading' | translate }}</span>
-                </div>
-              }
-            </div>
-
-            <!-- Active Extraction Info -->
-            @if (activeExtraction(); as fe) {
-              <div class="extraction-info-bar">
-                <mat-icon aria-hidden="true" class="extraction-info-icon">find_in_page</mat-icon>
-                <div class="extraction-info-text">
-                  <span class="extraction-field-label">{{ fieldLabel(fe.field_name) }}</span>
-                  <span class="extraction-confidence" [class.low-conf]="formatConfidence(fe.confidence) < 85">
-                    {{ formatConfidence(fe.confidence) }}%
-                  </span>
-                </div>
-              </div>
-            }
-
-            <!-- Provenance Details Box -->
-            @if (activeExtraction(); as fe) {
-              <div class="provenance-card">
-                <h3 class="prov-title">{{ 'quotations.review.provenance.title' | translate }}</h3>
-                <div class="prov-grid">
-                  <div class="prov-item">
-                    <span class="prov-label">{{ 'quotations.review.provenance.method' | translate }}</span>
-                    <span class="prov-val">{{ fe.extraction_method }}</span>
-                  </div>
-                  <div class="prov-item">
-                    <span class="prov-label">{{ 'quotations.review.provenance.model' | translate }}</span>
-                    <span class="prov-val">{{ fe.model_version }}</span>
-                  </div>
-                  <div class="prov-item">
-                    <span class="prov-label">{{ 'quotations.review.provenance.page' | translate }}</span>
-                    <span class="prov-val">{{ fe.source_page || 1 }}</span>
-                  </div>
-                  <div class="prov-item">
-                    <span class="prov-label">{{ 'quotations.review.provenance.originalValue' | translate }}</span>
-                    <span class="prov-val mono">{{ fe.extracted_value | json }}</span>
-                  </div>
-                  @if (fe.corrected_value !== null && fe.corrected_value !== undefined) {
-                    <div class="prov-item corrected">
-                      <span class="prov-label">{{ 'quotations.review.provenance.correctedValue' | translate }}</span>
-                      <span class="prov-val mono">{{ fe.corrected_value | json }}</span>
-                    </div>
-                    <div class="prov-item">
-                      <span class="prov-label">{{ 'quotations.review.provenance.correctedAt' | translate }}</span>
-                      <span class="prov-val">{{ fe.corrected_at | formatDate }}</span>
-                    </div>
-                  }
-                </div>
-              </div>
-            }
-          </mat-card-content>
-        </mat-card>
-      </section>
+      <app-quotation-doc-preview
+        [quotation]="q"
+        [safePreviewUrl]="safePreviewUrl()"
+        [documentFileName]="documentFileName()"
+        [activeExtraction]="activeExtraction()"
+        [isWriter]="isWriter()"
+        [isReplacingDocument]="isReplacingDocument()"
+        (replaceDocumentSelected)="onReplaceDocumentSelected($event)"
+        (download)="downloadDocument()"
+      ></app-quotation-doc-preview>
 
       <!-- Right Panel: Extracted Commercial Data -->
       <section class="data-panel" [attr.aria-label]="'quotations.review.panels.extractedData' | translate">
@@ -773,332 +493,30 @@
         </mat-card>
 
         <!-- Line Items Card -->
-        <mat-card class="panel-card lines-card">
-          <mat-card-header>
-            <mat-card-title class="panel-title">
-              <mat-icon aria-hidden="true">format_list_numbered</mat-icon>
-              <span>{{ 'quotations.review.lines.title' | translate }} ({{ q.lines.length }})</span>
-            </mat-card-title>
-          </mat-card-header>
-
-          <mat-card-content>
-            @if (q.lines.length === 0) {
-              <div class="no-lines-notice">
-                <p>{{ 'quotations.review.lines.noLines' | translate }}</p>
-              </div>
-              @if (isWriter() && q.status !== 'reviewed') {
-                @if (isAddingLine()) {
-                  <div class="add-line-form">
-                    <mat-form-field appearance="outline" class="add-line-field">
-                      <mat-label>{{ 'quotations.review.lines.addLineText' | translate }}</mat-label>
-                      <input
-                        matInput
-                        [ngModel]="newLineText()"
-                        (ngModelChange)="newLineText.set($event)"
-                        required
-                      />
-                    </mat-form-field>
-                    <mat-form-field appearance="outline" class="add-line-field-small">
-                      <mat-label>{{ 'quotations.review.lines.addLineQuantity' | translate }}</mat-label>
-                      <input
-                        matInput
-                        type="number"
-                        [ngModel]="newLineQuantity()"
-                        (ngModelChange)="newLineQuantity.set($event)"
-                      />
-                    </mat-form-field>
-                    <mat-form-field appearance="outline" class="add-line-field-small">
-                      <mat-label>{{ 'quotations.review.lines.addLinePrice' | translate }}</mat-label>
-                      <input
-                        matInput
-                        type="number"
-                        [ngModel]="newLinePriceAmount()"
-                        (ngModelChange)="newLinePriceAmount.set($event)"
-                      />
-                    </mat-form-field>
-                    <button mat-flat-button color="primary" type="button" (click)="addNewLine()" [disabled]="!newLineText()">
-                      <mat-icon aria-hidden="true">check</mat-icon>
-                      {{ 'quotations.review.lines.confirmAdd' | translate }}
-                    </button>
-                    <button mat-button type="button" (click)="cancelAddLine()" class="cancel-add-line-btn">
-                      {{ 'common.cancel' | translate }}
-                    </button>
-                  </div>
-                } @else {
-                  <button
-                    mat-stroked-button
-                    type="button"
-                    (click)="showAddLineForm()"
-                    class="add-line-btn"
-                  >
-                    <mat-icon aria-hidden="true">add</mat-icon>
-                    {{ 'quotations.review.lines.addLine' | translate }}
-                  </button>
-                }
-              }
-            } @else {
-              <mat-accordion class="lines-accordion" multi="false">
-                @for (line of q.lines; track line.id; let idx = $index) {
-                  <mat-expansion-panel
-                    [id]="'line-' + line.id"
-                    [expanded]="idx === 0 || activeExtraction()?.entity_id === line.id"
-                    (opened)="selectField('quotation_line', line.id, 'original_text')"
-                    class="line-panel"
-                    [class.active-panel]="activeExtraction()?.entity_id === line.id"
-                  >
-                    <mat-expansion-panel-header class="line-panel-header">
-                      <mat-panel-title class="line-panel-title">
-                        <span class="line-number-badge">#{{ line.line_number }}</span>
-                        <span class="line-original-text">{{ line.original_text }}</span>
-                      </mat-panel-title>
-                      <mat-panel-description class="line-panel-desc">
-                        @if (computeLineTotal(line); as total) {
-                          <span class="line-summary-total">{{ total }} {{ line.unit_price?.currency || q.currency }}</span>
-                        }
-                        @if (isWriter() && q.status !== 'reviewed' && !pendingRemoveLineIds().has(line.id)) {
-                          <button
-                            mat-icon-button
-                            type="button"
-                            (click)="markLineForRemoval(line.id); $event.stopPropagation()"
-                            [matTooltip]="'quotations.review.lines.removeLine' | translate"
-                            [attr.aria-label]="'quotations.review.lines.removeLine' | translate"
-                            class="remove-line-btn"
-                          >
-                            <mat-icon aria-hidden="true">delete_outline</mat-icon>
-                          </button>
-                        }
-                        @if (pendingRemoveLineIds().has(line.id)) {
-                          <span class="removal-badge">{{ 'quotations.review.lines.markedForRemoval' | translate }}</span>
-                          <button
-                            mat-icon-button
-                            type="button"
-                            (click)="unmarkLineForRemoval(line.id); $event.stopPropagation()"
-                            [matTooltip]="'quotations.review.lines.undoRemove' | translate"
-                            [attr.aria-label]="'quotations.review.lines.undoRemove' | translate"
-                            class="undo-remove-btn"
-                          >
-                            <mat-icon aria-hidden="true">undo</mat-icon>
-                          </button>
-                        }
-                        @if (getFieldExtraction('quotation_line', line.id, 'unit_price'); as fe) {
-                          <span
-                            class="confidence-pill"
-                            [class.low-conf]="formatConfidence(fe.confidence) < 85"
-                            [matTooltip]="'quotations.review.confidence.scoreTooltip' | translate:{ score: formatConfidence(fe.confidence), method: fe.extraction_method, model: fe.model_version }"
-                          >
-                            {{ formatConfidence(fe.confidence) }}%
-                          </span>
-                        }
-                      </mat-panel-description>
-                    </mat-expansion-panel-header>
-
-                    <!-- Line Fields Grid (expanded content) -->
-                    <div class="line-fields-grid">
-                      <!-- Quantity Field -->
-                      <div
-                        class="line-field"
-                        [id]="'field-' + (getFieldExtraction('quotation_line', line.id, 'quantity')?.id || line.id)"
-                        tabindex="0"
-                      >
-                        <mat-form-field appearance="outline" class="dense-field">
-                          <mat-label>{{ 'quotations.review.lines.colQuantity' | translate }}</mat-label>
-                          <input
-                            matInput
-                            [value]="getEffectiveValue('quotation_line', line.id, 'quantity', line.quantity || '1')"
-                            (change)="getFieldExtraction('quotation_line', line.id, 'quantity') && updateCorrection(getFieldExtraction('quotation_line', line.id, 'quantity')!.id, $any($event.target).value)"
-                            (blur)="reviewFieldValue('quotation_line', line.id, 'quantity', $any($event.target).value)"
-                            [readonly]="!isWriter() || q.status === 'reviewed'"
-                          />
-                        </mat-form-field>
-                        @if (isFieldCorrected('quotation_line', line.id, 'quantity')) {
-                          <span class="corrected-tag">{{ 'quotations.review.corrections.correctedBadge' | translate }}</span>
-                        }
-                        @if (getFieldConfidence('quotation_line', line.id, 'quantity') < 0.85 && !isFieldCorrected('quotation_line', line.id, 'quantity')) {
-                          <button
-                            mat-icon-button
-                            type="button"
-                            (click)="confirmFieldAsIs('quotation_line', line.id, 'quantity')"
-                            [matTooltip]="'quotations.review.corrections.confirmAsIsTooltip' | translate"
-                            class="confirm-as-is-btn"
-                          >
-                            <mat-icon aria-hidden="true">check_circle</mat-icon>
-                          </button>
-                        }
-                      </div>
-
-                      <!-- Pack Details -->
-                      <div class="line-field">
-                        <mat-form-field appearance="outline" class="dense-field">
-                          <mat-label>{{ 'quotations.review.lines.colPack' | translate }}</mat-label>
-                          <input
-                            matInput
-                            [value]="line.pack ? (line.pack.pack_count + ' × ' + line.pack.unit_size + ' ' + (line.pack.unit || '')) : '—'"
-                            readonly
-                          />
-                        </mat-form-field>
-                      </div>
-
-                      <!-- Unit Price Field -->
-                      <div
-                        class="line-field"
-                        [id]="'field-' + (getFieldExtraction('quotation_line', line.id, 'unit_price')?.id || line.id)"
-                        tabindex="0"
-                      >
-                        <mat-form-field appearance="outline" class="dense-field">
-                          <mat-label>{{ 'quotations.review.lines.colUnitPrice' | translate }}</mat-label>
-                          <input
-                            matInput
-                            [value]="line.unit_price?.amount || '0.00'"
-                            (change)="getFieldExtraction('quotation_line', line.id, 'unit_price') && updateCorrection(getFieldExtraction('quotation_line', line.id, 'unit_price')!.id, { amount: $any($event.target).value, currency: line.unit_price?.currency || q.currency || 'USD' })"
-                            (blur)="reviewFieldValue('quotation_line', line.id, 'unit_price', { amount: $any($event.target).value, currency: line.unit_price?.currency || q.currency || 'USD' })"
-                            [readonly]="!isWriter() || q.status === 'reviewed'"
-                          />
-                          <span matTextSuffix class="currency-suffix">{{ line.unit_price?.currency || q.currency }}</span>
-                        </mat-form-field>
-                        @if (isFieldCorrected('quotation_line', line.id, 'unit_price')) {
-                          <span class="corrected-tag">{{ 'quotations.review.corrections.correctedBadge' | translate }}</span>
-                        }
-                        @if (getFieldConfidence('quotation_line', line.id, 'unit_price') < 0.85 && !isFieldCorrected('quotation_line', line.id, 'unit_price')) {
-                          <button
-                            mat-icon-button
-                            type="button"
-                            (click)="confirmFieldAsIs('quotation_line', line.id, 'unit_price')"
-                            [matTooltip]="'quotations.review.corrections.confirmAsIsTooltip' | translate"
-                            class="confirm-as-is-btn"
-                          >
-                            <mat-icon aria-hidden="true">check_circle</mat-icon>
-                          </button>
-                        }
-                      </div>
-
-                      <!-- Delivery Fee -->
-                      <div class="line-field">
-                        <mat-form-field appearance="outline" class="dense-field">
-                          <mat-label>{{ 'quotations.review.lines.colDeliveryFee' | translate }}</mat-label>
-                          <input
-                            matInput
-                            [value]="line.delivery_fee?.amount || '—'"
-                            readonly
-                          />
-                          @if (line.delivery_fee; as df) {
-                            <span matTextSuffix class="currency-suffix">{{ df.currency }}</span>
-                          }
-                        </mat-form-field>
-                      </div>
-
-                      <!-- Discount -->
-                      <div class="line-field">
-                        <mat-form-field appearance="outline" class="dense-field">
-                          <mat-label>{{ 'quotations.review.lines.colDiscount' | translate }}</mat-label>
-                          <input
-                            matInput
-                            [value]="line.discount?.amount || '—'"
-                            readonly
-                          />
-                          @if (line.discount; as disc) {
-                            <span matTextSuffix class="currency-suffix">{{ disc.currency }}</span>
-                          }
-                        </mat-form-field>
-                      </div>
-
-                      <!-- VAT % -->
-                      <div class="line-field">
-                        <mat-form-field appearance="outline" class="dense-field">
-                          <mat-label>{{ 'quotations.review.lines.colVat' | translate }}</mat-label>
-                          <input
-                            matInput
-                            [value]="line.vat_rate ? ((line.vat_rate | percent) || line.vat_rate) : '—'"
-                            readonly
-                          />
-                        </mat-form-field>
-                      </div>
-
-                      <!-- Line Total -->
-                      <div class="line-field line-total-field">
-                        <mat-form-field appearance="outline" class="dense-field">
-                          <mat-label>{{ 'quotations.review.lines.colLineTotal' | translate }}</mat-label>
-                          <input
-                            matInput
-                            [value]="computeLineTotal(line) || '—'"
-                            readonly
-                          />
-                          @if (line.unit_price; as up) {
-                            <span matTextSuffix class="currency-suffix">{{ up.currency }}</span>
-                          }
-                        </mat-form-field>
-                      </div>
-                    </div>
-                  </mat-expansion-panel>
-                }
-              </mat-accordion>
-
-              @for (newLine of pendingNewLines(); track $index) {
-                <div class="pending-new-line">
-                  <mat-icon aria-hidden="true">add_circle</mat-icon>
-                  <span class="new-line-text">{{ newLine.original_text }}</span>
-                  @if (newLine.quantity) {
-                    <span class="new-line-detail">&times; {{ newLine.quantity }}</span>
-                  }
-                  @if (newLine.unit_price_amount) {
-                    <span class="new-line-detail">&#64; {{ newLine.unit_price_amount }} {{ newLine.unit_price_currency }}</span>
-                  }
-                  <span class="new-line-badge">{{ 'quotations.review.lines.pendingAdd' | translate }}</span>
-                </div>
-              }
-
-              @if (isWriter() && q.status !== 'reviewed') {
-                @if (isAddingLine()) {
-                  <div class="add-line-form">
-                    <mat-form-field appearance="outline" class="add-line-field">
-                      <mat-label>{{ 'quotations.review.lines.addLineText' | translate }}</mat-label>
-                      <input
-                        matInput
-                        [ngModel]="newLineText()"
-                        (ngModelChange)="newLineText.set($event)"
-                        required
-                      />
-                    </mat-form-field>
-                    <mat-form-field appearance="outline" class="add-line-field-small">
-                      <mat-label>{{ 'quotations.review.lines.addLineQuantity' | translate }}</mat-label>
-                      <input
-                        matInput
-                        type="number"
-                        [ngModel]="newLineQuantity()"
-                        (ngModelChange)="newLineQuantity.set($event)"
-                      />
-                    </mat-form-field>
-                    <mat-form-field appearance="outline" class="add-line-field-small">
-                      <mat-label>{{ 'quotations.review.lines.addLinePrice' | translate }}</mat-label>
-                      <input
-                        matInput
-                        type="number"
-                        [ngModel]="newLinePriceAmount()"
-                        (ngModelChange)="newLinePriceAmount.set($event)"
-                      />
-                    </mat-form-field>
-                    <button mat-flat-button color="primary" type="button" (click)="addNewLine()" [disabled]="!newLineText()">
-                      <mat-icon aria-hidden="true">check</mat-icon>
-                      {{ 'quotations.review.lines.confirmAdd' | translate }}
-                    </button>
-                    <button mat-button type="button" (click)="cancelAddLine()" class="cancel-add-line-btn">
-                      {{ 'common.cancel' | translate }}
-                    </button>
-                  </div>
-                } @else {
-                  <button
-                    mat-stroked-button
-                    type="button"
-                    (click)="showAddLineForm()"
-                    class="add-line-btn"
-                  >
-                    <mat-icon aria-hidden="true">add</mat-icon>
-                    {{ 'quotations.review.lines.addLine' | translate }}
-                  </button>
-                }
-              }
-            }
-          </mat-card-content>
-        </mat-card>
+        <app-quotation-lines
+          [quotation]="q"
+          [activeExtraction]="activeExtraction()"
+          [isWriter]="isWriter()"
+          [pendingRemoveLineIds]="pendingRemoveLineIds()"
+          [pendingCorrections]="pendingCorrections()"
+          [pendingNewLines]="pendingNewLines()"
+          [isAddingLine]="isAddingLine()"
+          [newLineText]="newLineText()"
+          (newLineTextChange)="newLineText.set($event)"
+          [newLineQuantity]="newLineQuantity()"
+          (newLineQuantityChange)="newLineQuantity.set($event)"
+          [newLinePriceAmount]="newLinePriceAmount()"
+          (newLinePriceAmountChange)="newLinePriceAmount.set($event)"
+          (fieldSelected)="selectField($event.entityType, $event.entityId, $event.fieldName)"
+          (lineMarkedForRemoval)="markLineForRemoval($event)"
+          (lineUnmarkedForRemoval)="unmarkLineForRemoval($event)"
+          (correctionUpdated)="updateCorrection($event.feId, $event.newValue)"
+          (fieldReviewed)="reviewFieldValue($event.entityType, $event.entityId, $event.fieldName, $event.reviewedValue)"
+          (fieldConfirmedAsIs)="confirmFieldAsIs($event.entityType, $event.entityId, $event.fieldName)"
+          (showAddLine)="showAddLineForm()"
+          (cancelAddLine)="cancelAddLine()"
+          (addNewLine)="addNewLine()"
+        ></app-quotation-lines>
 
         <!-- Reviewer Notes -->
         <mat-card class="panel-card notes-card">
@@ -1142,9 +560,12 @@
             >
               @if (isRefusing()) {
                 <mat-spinner [attr.aria-label]="'common.loading' | translate" diameter="18"></mat-spinner>
-                <span>{{ 'quotations.review.actions.refusing' | translate }}</span>
               } @else {
                 <mat-icon aria-hidden="true">block</mat-icon>
+              }
+              @if (isRefusing()) {
+                <span>{{ 'quotations.review.actions.refusing' | translate }}</span>
+              } @else {
                 <span>{{ 'quotations.review.actions.refuseButton' | translate }}</span>
               }
             </button>
@@ -1160,9 +581,12 @@
             >
               @if (isSaving()) {
                 <mat-spinner [attr.aria-label]="'common.loading' | translate" diameter="18"></mat-spinner>
-                <span>{{ 'quotations.review.actions.saving' | translate }}</span>
               } @else {
                 <mat-icon aria-hidden="true">save</mat-icon>
+              }
+              @if (isSaving()) {
+                <span>{{ 'quotations.review.actions.saving' | translate }}</span>
+              } @else {
                 <span>{{ 'quotations.review.actions.saveChanges' | translate }}</span>
               }
             </button>
@@ -1177,9 +601,12 @@
             >
               @if (isConfirming()) {
                 <mat-spinner [attr.aria-label]="'common.loading' | translate" diameter="18"></mat-spinner>
-                <span>{{ 'quotations.review.actions.confirming' | translate }}</span>
               } @else {
                 <mat-icon aria-hidden="true">verified</mat-icon>
+              }
+              @if (isConfirming()) {
+                <span>{{ 'quotations.review.actions.confirming' | translate }}</span>
+              } @else {
                 <span>{{ 'quotations.review.actions.confirmButton' | translate }}</span>
               }
             </button>
@@ -1242,31 +669,10 @@
       </section>
     </div>
 
-    <mat-expansion-panel class="audit-trail-panel">
-      <mat-expansion-panel-header>
-        <mat-panel-title>
-          <mat-icon aria-hidden="true">history</mat-icon>
-          <span>{{ 'quotations.audit.title' | translate }}</span>
-        </mat-panel-title>
-      </mat-expansion-panel-header>
-      @if (isLoadingAudit()) {
-        <mat-spinner diameter="24"></mat-spinner>
-      } @else if (auditTrail().length === 0) {
-        <p class="audit-empty">{{ 'quotations.audit.empty' | translate }}</p>
-      } @else {
-        <div class="audit-entries">
-          @for (entry of auditTrail(); track entry.id) {
-            <div class="audit-entry">
-              <div class="audit-action">{{ auditActionLabel(entry.action) }}</div>
-              <div class="audit-meta">
-                <span class="audit-actor">{{ entry.actor_email ?? ('quotations.audit.system' | translate) }}</span>
-                <span class="audit-time">{{ entry.occurred_at | formatDate }}</span>
-              </div>
-            </div>
-          }
-        </div>
-      }
-    </mat-expansion-panel>
+    <app-quotation-audit-trail
+      [auditTrail]="auditTrail()"
+      [isLoading]="isLoadingAudit()"
+    ></app-quotation-audit-trail>
   }
 }
 </div>

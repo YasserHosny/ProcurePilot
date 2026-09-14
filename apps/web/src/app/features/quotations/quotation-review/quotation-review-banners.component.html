@@ -1,0 +1,188 @@
+@if (quotation; as q) {
+  <!-- Read-Only Banner for non-writers -->
+  @if (!isWriter) {
+    <div class="read-only-banner" role="status">
+      <mat-icon class="banner-icon" aria-hidden="true">info</mat-icon>
+      <div class="banner-content">
+        <span class="banner-title">{{ 'quotations.queue.readOnlyBadge' | translate }}</span>
+        <span class="banner-text">{{ 'quotations.review.readOnlyNotice' | translate }}</span>
+      </div>
+    </div>
+  }
+
+  <!-- Versioning Link Banner (US4) -->
+  @if (q.previous_quotation_id) {
+    <div class="version-banner" role="region" aria-label="Version history">
+      <mat-icon class="version-icon" aria-hidden="true">history</mat-icon>
+      <div class="version-content">
+        <span class="version-text">
+          {{ 'quotations.review.versioning.isUpdateOf' | translate }}
+          <strong>{{ 'quotations.review.versioning.versionId' | translate:{ id: q.previous_quotation_id } }}</strong>
+        </span>
+        <a
+          mat-stroked-button
+          [routerLink]="['/quotations', q.previous_quotation_id, 'review']"
+          class="version-link-btn"
+        >
+          <mat-icon aria-hidden="true">open_in_new</mat-icon>
+          <span>{{ 'quotations.review.versioning.viewPriorVersion' | translate }}</span>
+        </a>
+      </div>
+    </div>
+  }
+
+  <!-- Arithmetic Mismatch Warning Banner (US3) -->
+  @if (hasArithmeticMismatch) {
+    <div class="arithmetic-mismatch-banner" role="alert">
+      <div class="mismatch-header">
+        <mat-icon class="mismatch-icon" aria-hidden="true">warning</mat-icon>
+        <div class="mismatch-titles">
+          <h2 class="mismatch-title">{{ 'quotations.review.arithmetic.mismatchTitle' | translate }}</h2>
+          <p class="mismatch-desc">{{ 'quotations.review.arithmetic.mismatchDescription' | translate }}</p>
+        </div>
+      </div>
+
+      <div class="mismatch-breakdown">
+        <div class="breakdown-item">
+          <span class="breakdown-label">{{ 'quotations.review.arithmetic.statedTotal' | translate }}</span>
+          <span class="breakdown-val">
+            @if (q.stated_total) {
+              {{ q.stated_total | formatMoney }}
+            } @else {
+              —
+            }
+          </span>
+        </div>
+        <div class="breakdown-item">
+          <span class="breakdown-label">{{ 'quotations.review.arithmetic.computedTotal' | translate }}</span>
+          <span class="breakdown-val">
+            @if (computedLinesTotal; as clt) {
+              {{ clt | formatMoney }}
+            } @else {
+              —
+            }
+          </span>
+        </div>
+        <div class="breakdown-item diff-item">
+          <span class="breakdown-label">{{ 'quotations.review.arithmetic.difference' | translate }}</span>
+          <span class="breakdown-val diff-val">{{ arithmeticDifference }} {{ q.currency || 'USD' }}</span>
+        </div>
+      </div>
+
+      @if (isWriter && q.status !== 'reviewed') {
+        <mat-checkbox
+          [checked]="mismatchAcknowledged"
+          (change)="mismatchAcknowledgedChange.emit($event.checked)"
+          color="warn"
+          class="acknowledge-checkbox"
+        >
+          {{ 'quotations.review.arithmetic.acknowledgeLabel' | translate }}
+        </mat-checkbox>
+      }
+    </div>
+  }
+
+  <!-- Arithmetic Reconciled Notice (US3) -->
+  @if (isReconciled) {
+    <div class="arithmetic-reconciled-banner" role="status">
+      <div class="reconciled-header">
+        <mat-icon class="reconciled-icon" aria-hidden="true">check_circle</mat-icon>
+        <div class="reconciled-titles">
+          <h2 class="reconciled-title">{{ 'quotations.review.arithmetic.reconciledTitle' | translate }}</h2>
+          <p class="reconciled-desc">
+            @if (inferredVatPct) {
+              {{ 'quotations.review.arithmetic.reconciledVatDescription' | translate:{ vatPct: inferredVatPct } }}
+            } @else {
+              {{ 'quotations.review.arithmetic.reconciledDescription' | translate }}
+            }
+          </p>
+        </div>
+      </div>
+
+      <div class="reconciled-breakdown">
+        <div class="breakdown-item">
+          <span class="breakdown-label">{{ 'quotations.review.arithmetic.statedTotal' | translate }}</span>
+          <span class="breakdown-val">{{ q.stated_total | formatMoney }}</span>
+        </div>
+        <div class="breakdown-item">
+          <span class="breakdown-label">{{ 'quotations.review.arithmetic.computedLinesTotal' | translate }}</span>
+          <span class="breakdown-val">
+            @if (computedLinesTotal; as clt) {
+              {{ clt | formatMoney }}
+            } @else {
+              —
+            }
+          </span>
+        </div>
+        @if (inferredVatPct; as vatPct) {
+          <div class="breakdown-item">
+            <span class="breakdown-label">{{ 'quotations.review.arithmetic.inferredVat' | translate }}</span>
+            <span class="breakdown-val">{{ vatPct }}%</span>
+          </div>
+        }
+      </div>
+    </div>
+  }
+
+  <!-- 409 Blocked Reason or Error Banner -->
+  @if (confirmBlockedReason || errorMessage) {
+    <div class="error-banner" role="alert">
+      <mat-icon class="error-icon" aria-hidden="true">error</mat-icon>
+      <div class="error-content">
+        <span class="error-text">{{ confirmBlockedReason || errorMessage }}</span>
+        @if (errorTraceId) {
+          <span class="error-trace">{{ 'common.traceId' | translate }}: {{ errorTraceId }}</span>
+        }
+      </div>
+    </div>
+  }
+
+  <!-- Keyboard Navigation Banner (FR-014) -->
+  @if (flaggedFieldsCount > 0) {
+    <div class="keyboard-nav-bar" role="toolbar" [attr.aria-label]="'quotations.review.keyboardNav.title' | translate">
+      <div class="nav-info">
+        <mat-icon class="nav-icon" aria-hidden="true">keyboard</mat-icon>
+        <div class="nav-text-block">
+          <span class="nav-title">{{ 'quotations.review.keyboardNav.title' | translate }}</span>
+          <span class="nav-hint">
+            {{ 'quotations.review.keyboardNav.flaggedCount' | translate:{ current: currentFlaggedIndex + 1, total: flaggedFieldsCount } }}
+            (Alt+N / Alt+P)
+          </span>
+        </div>
+      </div>
+
+      <div class="nav-buttons">
+        <button
+          mat-stroked-button
+          type="button"
+          (click)="prevFlagged.emit()"
+          class="nav-btn"
+          [matTooltip]="'quotations.review.keyboardNav.prevField' | translate"
+        >
+          <mat-icon aria-hidden="true">arrow_back</mat-icon>
+          <span>{{ 'quotations.review.keyboardNav.prevField' | translate }}</span>
+        </button>
+        <button
+          mat-flat-button
+          color="primary"
+          type="button"
+          (click)="nextFlagged.emit()"
+          class="nav-btn"
+          [matTooltip]="'quotations.review.keyboardNav.nextField' | translate"
+        >
+          <span>{{ 'quotations.review.keyboardNav.nextField' | translate }}</span>
+          <mat-icon aria-hidden="true">arrow_forward</mat-icon>
+        </button>
+      </div>
+    </div>
+  }
+
+  <div class="confidence-legend-bar" role="note">
+    <mat-icon class="confidence-legend-icon" aria-hidden="true">info</mat-icon>
+    <span class="confidence-legend-text">{{ 'quotations.review.confidence.legendText' | translate }}</span>
+    <span class="confidence-legend-badges" aria-hidden="true">
+      <span class="confidence-legend-badge high-conf">{{ 'quotations.review.confidence.highBadge' | translate }}</span>
+      <span class="confidence-legend-badge low-conf">{{ 'quotations.review.confidence.lowBadge' | translate }}</span>
+    </span>
+  </div>
+}

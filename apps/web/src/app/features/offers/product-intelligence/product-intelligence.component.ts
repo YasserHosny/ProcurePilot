@@ -1,4 +1,3 @@
-import { DecimalPipe, NgClass, NgIf } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
@@ -27,8 +26,6 @@ import { PriceHistoryChartComponent } from './price-history-chart.component';
   standalone: true,
   imports: [
     FormsModule,
-    NgIf,
-    NgClass,
     RouterLink,
     MatCardModule,
     MatButtonModule,
@@ -43,7 +40,6 @@ import { PriceHistoryChartComponent } from './price-history-chart.component';
     TranslatePipe,
     FormatDatePipe,
     FormatMoneyPipe,
-    DecimalPipe,
     PriceHistoryChartComponent,
   ],
   templateUrl: './product-intelligence.component.html',

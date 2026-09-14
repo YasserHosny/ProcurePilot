@@ -1,4 +1,4 @@
-import { DecimalPipe, NgClass, NgFor, NgIf } from '@angular/common';
+import { NgClass } from '@angular/common';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -27,8 +27,6 @@ import type { Alert, AlertKind } from '../alerts-api';
   standalone: true,
   imports: [
     FormsModule,
-    NgIf,
-    NgFor,
     NgClass,
     MatCardModule,
     MatButtonModule,
@@ -43,7 +41,6 @@ import type { Alert, AlertKind } from '../alerts-api';
     TranslatePipe,
     FormatDatePipe,
     FormatMoneyPipe,
-    DecimalPipe,
   ],
   templateUrl: './alerts-inbox.component.html',
   styleUrl: './alerts-inbox.component.scss',

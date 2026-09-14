@@ -205,9 +205,12 @@
           >
             @if (isSubmitting()) {
               <mat-spinner [attr.aria-label]="'common.loading' | translate" diameter="18" class="button-spinner"></mat-spinner>
-              <span>{{ 'savings.outcomeCapture.submittingButton' | translate }}</span>
             } @else {
               <mat-icon aria-hidden="true">check_circle</mat-icon>
+            }
+            @if (isSubmitting()) {
+              <span>{{ 'savings.outcomeCapture.submittingButton' | translate }}</span>
+            } @else {
               <span>{{ 'savings.outcomeCapture.submitButton' | translate }}</span>
             }
           </button>

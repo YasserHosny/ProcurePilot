@@ -1,4 +1,3 @@
-import { DecimalPipe, NgClass, NgIf } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
@@ -30,8 +29,6 @@ import {
   standalone: true,
   imports: [
     ReactiveFormsModule,
-    NgIf,
-    NgClass,
     RouterLink,
     MatCardModule,
     MatFormFieldModule,
@@ -45,7 +42,6 @@ import {
     MatProgressSpinnerModule,
     MatSnackBarModule,
     TranslatePipe,
-    DecimalPipe,
   ],
   templateUrl: './outcome-capture.component.html',
   styleUrl: './outcome-capture.component.scss',

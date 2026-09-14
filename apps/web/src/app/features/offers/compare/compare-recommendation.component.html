@@ -1,0 +1,153 @@
+<mat-card class="recommendation-card" [ngClass]="getConfidenceClass(recommendation.confidence)">
+  <div class="rec-header">
+    <div class="badge-group">
+      <span class="recommendation-badge">
+        <mat-icon aria-hidden="true">verified</mat-icon>
+        {{ 'compare.recommendation.title' | translate }}
+      </span>
+      <span class="confidence-badge" [ngClass]="getConfidenceClass(recommendation.confidence)">
+        {{ 'compare.recommendation.confidence.' + recommendation.confidence | translate }}
+      </span>
+      <span class="score-badge">
+        {{ 'compare.recommendation.scoreLabel' | translate }}: {{ formatScore(recommendation.score) }}
+      </span>
+    </div>
+
+    @if (recommendation.evidence.winning_margin) {
+      <span class="margin-badge">
+        {{ 'compare.recommendation.winningMargin' | translate: { margin: formatPercent(recommendation.evidence.winning_margin) } }}
+      </span>
+    }
+  </div>
+
+  @if (bestOffer) {
+    <div class="rec-main-info">
+      <div class="supplier-section">
+        <span class="supplier-title">{{ bestOffer.supplier_name }}</span>
+        <span class="unit-price-sub">
+          {{ 'compare.table.normalisedUnitPrice' | translate }}:
+          <strong>{{ bestOffer.projected_unit_price | formatMoney }}</strong>
+        </span>
+      </div>
+
+      <div class="cost-section">
+        <span class="cost-label">{{ 'compare.table.landedCostTotal' | translate }}</span>
+        <span class="cost-amount">{{ bestOffer.projected_landed_cost | formatMoney }}</span>
+      </div>
+
+      <div class="rec-action-section">
+        <a
+          mat-flat-button
+          color="primary"
+          routerLink="/savings/outcome-capture"
+          [queryParams]="getRecordPurchaseParams(bestOffer)"
+          class="record-purchase-btn"
+        >
+          <mat-icon aria-hidden="true">shopping_cart_checkout</mat-icon>
+          <span>{{ 'compare.actions.recordPurchase' | translate }}</span>
+        </a>
+      </div>
+    </div>
+  }
+
+  <!-- Risk Notes (FR-003) -->
+  @if (recommendation.risk_notes.length > 0) {
+    <div class="risk-notes-box">
+      <div class="risk-title">
+        <mat-icon aria-hidden="true">warning_amber</mat-icon>
+        <span>{{ 'compare.recommendation.riskNotesTitle' | translate }}</span>
+      </div>
+      <ul class="risk-list">
+        @for (note of recommendation.risk_notes; track note) {
+          <li>{{ 'compare.recommendation.riskNotes.' + note | translate }}</li>
+        }
+      </ul>
+    </div>
+  }
+
+  <!-- Validity Window -->
+  <div class="validity-row">
+    <mat-icon aria-hidden="true">event</mat-icon>
+    @if (recommendation.valid_to) {
+      <span>
+        {{ 'compare.recommendation.validityWindow' | translate: {
+          from: (recommendation.valid_from | formatDate),
+          to: (recommendation.valid_to | formatDate)
+        } }}
+      </span>
+    } @else {
+      <span>
+        {{ 'compare.recommendation.validityOpenEnded' | translate: {
+          from: (recommendation.valid_from | formatDate)
+        } }}
+      </span>
+    }
+  </div>
+
+  <!-- Tie-Break Note (FR-005, Research R3) -->
+  @if (recommendation.evidence.tie_break.applied) {
+    <div class="tie-break-banner">
+      <mat-icon aria-hidden="true">info</mat-icon>
+      <span>
+        {{ 'compare.recommendation.tieBreakNote' | translate: {
+          rule: recommendation.evidence.tie_break.rule.join(', ')
+        } }}
+      </span>
+    </div>
+  }
+
+  <!-- Evidence Criteria Weights Breakdown -->
+  <mat-divider></mat-divider>
+  <div class="evidence-section">
+    <span class="evidence-title">{{ 'compare.recommendation.evidenceTitle' | translate }}</span>
+    <div class="evidence-chips">
+      <span class="evidence-chip">
+        {{ 'compare.recommendation.weights.cost' | translate: { weight: '55' } }}:
+        {{ formatScore(recommendation.evidence.components['cost']) }}
+      </span>
+      <span class="evidence-chip">
+        {{ 'compare.recommendation.weights.matchConfidence' | translate: { weight: '20' } }}:
+        {{ formatScore(recommendation.evidence.components['match_confidence']) }}
+      </span>
+      <span class="evidence-chip">
+        {{ 'compare.recommendation.weights.reliability' | translate: { weight: '15' } }}:
+        {{ formatScore(recommendation.evidence.components['reliability']) }}
+      </span>
+      <span class="evidence-chip">
+        {{ 'compare.recommendation.weights.leadTime' | translate: { weight: '10' } }}:
+        {{ formatScore(recommendation.evidence.components['lead_time']) }}
+      </span>
+      @if (hasSupplierRiskEvidence(recommendation)) {
+        <span class="evidence-chip supplier-risk-chip" data-testid="supplier-risk-evidence-chip">
+          <mat-icon aria-hidden="true" class="chip-icon">verified_user</mat-icon>
+          {{ 'compare.recommendation.weights.supplierRisk' | translate: { weight: getSupplierRiskWeight(recommendation) } }}:
+          {{ formatScore(getSupplierRiskScore(recommendation)) }}
+        </span>
+      }
+    </div>
+
+    <!-- Supplier IQ Risk influence panel & Scorecard Link -->
+    @if (bestOffer) {
+      @if (hasSupplierRiskEvidence(recommendation) || hasSupplierRiskNote(recommendation.risk_notes)) {
+        <div class="supplier-risk-evidence-panel" data-testid="supplier-risk-evidence-panel">
+          <div class="supplier-risk-content">
+            <mat-icon aria-hidden="true" class="supplier-risk-icon">analytics</mat-icon>
+            <span class="supplier-risk-text">
+              {{ 'compare.recommendation.supplierIqInfluenced' | translate: { supplier: bestOffer.supplier_name } }}
+            </span>
+          </div>
+          <a
+            mat-stroked-button
+            color="primary"
+            [routerLink]="['/suppliers', bestOffer.supplier_id, 'scorecard']"
+            class="scorecard-link-btn"
+            data-testid="view-supplier-scorecard-btn"
+          >
+            <mat-icon aria-hidden="true">assessment</mat-icon>
+            <span>{{ 'compare.recommendation.viewSupplierScorecard' | translate }}</span>
+          </a>
+        </div>
+      }
+    }
+  </div>
+</mat-card>

@@ -5,7 +5,7 @@ import {
   provideAppInitializer,
   provideZoneChangeDetection,
 } from '@angular/core';
-import { provideAnimations } from '@angular/platform-browser/animations';
+import { provideAnimationsAsync } from '@angular/platform-browser/animations/async';
 import { provideRouter } from '@angular/router';
 import {
   MissingTranslationHandler,
@@ -33,9 +33,7 @@ export const appConfig: ApplicationConfig = {
     }),
     provideRouter(routes),
     provideHttpClient(withInterceptors([authInterceptor])),
-    // Synchronous rather than the async variant: pnpm's strict node_modules isolation stops
-    // esbuild resolving platform-browser's dynamic import of @angular/animations/browser.
-    provideAnimations(),
+    provideAnimationsAsync(),
     ...provideErrorReporting(),
     provideTranslateService({
       defaultLanguage: 'en',

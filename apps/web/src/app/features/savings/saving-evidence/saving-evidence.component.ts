@@ -1,4 +1,4 @@
-import { DecimalPipe, NgClass, NgIf, NgFor } from '@angular/common';
+import { NgClass } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
@@ -14,7 +14,6 @@ import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
 import { ApiService } from '../../../core/api/api.service';
 import type { ApiError, Product, Supplier } from '../../../core/api/models';
-import { RoleDirective } from '../../../core/auth/role.directive';
 import { SessionService } from '../../../core/auth/session.service';
 import { FormatDatePipe } from '../../../core/format/date.pipe';
 import { FormatMoneyPipe } from '../../../core/format/money.pipe';
@@ -35,8 +34,6 @@ import {
   selector: 'app-saving-evidence',
   standalone: true,
   imports: [
-    NgIf,
-    NgFor,
     NgClass,
     RouterLink,
     MatCardModule,
@@ -50,8 +47,6 @@ import {
     TranslatePipe,
     FormatDatePipe,
     FormatMoneyPipe,
-    DecimalPipe,
-    RoleDirective,
   ],
   templateUrl: './saving-evidence.component.html',
   styleUrl: './saving-evidence.component.scss',

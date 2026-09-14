@@ -1,4 +1,3 @@
-import { DecimalPipe, NgClass, NgFor, NgIf } from '@angular/common';
 import { Component, Input, OnChanges, SimpleChanges, signal } from '@angular/core';
 import { MatCardModule } from '@angular/material/card';
 import { MatIconModule } from '@angular/material/icon';
@@ -38,16 +37,12 @@ const PALETTE = [
   selector: 'app-price-history-chart',
   standalone: true,
   imports: [
-    NgIf,
-    NgFor,
-    NgClass,
     MatCardModule,
     MatIconModule,
     MatTooltipModule,
     TranslatePipe,
     FormatDatePipe,
     FormatMoneyPipe,
-    DecimalPipe,
   ],
   templateUrl: './price-history-chart.component.html',
   styleUrl: './price-history-chart.component.scss',

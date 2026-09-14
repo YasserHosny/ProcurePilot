@@ -35,6 +35,8 @@ import { FormatDatePipe } from '../../../core/format/date.pipe';
 import { FormatMoneyPipe } from '../../../core/format/money.pipe';
 import { computeBaseQuantity } from '../../catalogue/normalisation';
 
+import { MatchResolutionCandidatesComponent } from './match-resolution-candidates.component';
+
 @Component({
   selector: 'app-match-resolution',
   standalone: true,
@@ -57,6 +59,7 @@ import { computeBaseQuantity } from '../../catalogue/normalisation';
     TranslatePipe,
     FormatDatePipe,
     FormatMoneyPipe,
+    MatchResolutionCandidatesComponent,
   ],
   templateUrl: './match-resolution.component.html',
   styleUrl: './match-resolution.component.scss',

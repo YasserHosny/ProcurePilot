@@ -1,4 +1,3 @@
-import { JsonPipe, PercentPipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, HostListener, OnInit, computed, inject, signal } from '@angular/core';
 import { DomSanitizer, type SafeResourceUrl } from '@angular/platform-browser';
@@ -37,6 +36,10 @@ import type {
 import { SessionService } from '../../../core/auth/session.service';
 import { FormatDatePipe } from '../../../core/format/date.pipe';
 import { FormatMoneyPipe } from '../../../core/format/money.pipe';
+import { QuotationReviewBannersComponent } from './quotation-review-banners.component';
+import { QuotationDocPreviewComponent } from './quotation-doc-preview.component';
+import { QuotationLinesComponent } from './quotation-lines.component';
+import { QuotationAuditTrailComponent } from './quotation-audit-trail.component';
 
 interface FlaggedField {
   readonly id: string;
@@ -78,8 +81,6 @@ type QuotationTimestampFields = QuotationDetail & {
   selector: 'app-quotation-review',
   standalone: true,
   imports: [
-    JsonPipe,
-    PercentPipe,
     FormsModule,
     ReactiveFormsModule,
     RouterLink,
@@ -103,6 +104,10 @@ type QuotationTimestampFields = QuotationDetail & {
     TranslatePipe,
     FormatDatePipe,
     FormatMoneyPipe,
+    QuotationReviewBannersComponent,
+    QuotationDocPreviewComponent,
+    QuotationLinesComponent,
+    QuotationAuditTrailComponent,
   ],
   templateUrl: './quotation-review.component.html',
   styleUrl: './quotation-review.component.scss',

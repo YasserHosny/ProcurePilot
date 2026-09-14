@@ -1,4 +1,4 @@
-import { NgClass, NgIf } from '@angular/common';
+import { NgClass } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
@@ -22,9 +22,7 @@ import { Subscription, interval, switchMap } from 'rxjs';
 
 import { ApiService } from '../../../core/api/api.service';
 import type { ApiError, Supplier } from '../../../core/api/models';
-import { RoleDirective } from '../../../core/auth/role.directive';
 import { SessionService } from '../../../core/auth/session.service';
-import { FormatDatePipe } from '../../../core/format/date.pipe';
 import {
   type ExportCreate,
   type ExportFormat,
@@ -41,7 +39,6 @@ import {
   standalone: true,
   imports: [
     ReactiveFormsModule,
-    NgIf,
     NgClass,
     RouterLink,
     MatCardModule,
@@ -58,8 +55,6 @@ import {
     MatProgressSpinnerModule,
     MatSnackBarModule,
     TranslatePipe,
-    FormatDatePipe,
-    RoleDirective,
   ],
   templateUrl: './export-savings.component.html',
   styleUrl: './export-savings.component.scss',

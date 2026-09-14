@@ -1,0 +1,25 @@
+<mat-expansion-panel class="audit-trail-panel">
+  <mat-expansion-panel-header>
+    <mat-panel-title>
+      <mat-icon aria-hidden="true">history</mat-icon>
+      <span>{{ 'quotations.audit.title' | translate }}</span>
+    </mat-panel-title>
+  </mat-expansion-panel-header>
+  @if (isLoading) {
+    <mat-spinner diameter="24"></mat-spinner>
+  } @else if (auditTrail.length === 0) {
+    <p class="audit-empty">{{ 'quotations.audit.empty' | translate }}</p>
+  } @else {
+    <div class="audit-entries">
+      @for (entry of auditTrail; track entry.id) {
+        <div class="audit-entry">
+          <div class="audit-action">{{ auditActionLabel(entry.action) }}</div>
+          <div class="audit-meta">
+            <span class="audit-actor">{{ entry.actor_email ?? ('quotations.audit.system' | translate) }}</span>
+            <span class="audit-time">{{ entry.occurred_at | formatDate }}</span>
+          </div>
+        </div>
+      }
+    </div>
+  }
+</mat-expansion-panel>
