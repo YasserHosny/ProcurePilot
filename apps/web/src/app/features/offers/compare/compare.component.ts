@@ -1,4 +1,4 @@
-import { DecimalPipe, NgClass } from '@angular/common';
+import { NgClass } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
@@ -50,7 +50,6 @@ import { type ProjectedOffer, projectComparison } from './compare-projection';
     TranslatePipe,
     FormatDatePipe,
     FormatMoneyPipe,
-    DecimalPipe,
   ],
   templateUrl: './compare.component.html',
   styleUrl: './compare.component.scss',
@@ -250,12 +249,17 @@ export class CompareComponent implements OnInit {
 
   getSupplierRiskWeight(rec: Recommendation | null | undefined): string {
     if (!rec?.evidence?.weights) return '15';
-    return (
+    const rawWeight = (
       rec.evidence.weights['supplier_risk'] ||
       rec.evidence.weights['risk_score'] ||
       rec.evidence.weights['supplier_iq'] ||
       '15'
     );
+    const numericWeight = parseFloat(rawWeight);
+    if (!isNaN(numericWeight) && numericWeight > 0 && numericWeight <= 1) {
+      return `${Math.round(numericWeight * 100)}`;
+    }
+    return rawWeight;
   }
 
   getRecordPurchaseParams(offer: ProjectedOffer): Record<string, string> {
@@ -280,4 +284,3 @@ export class CompareComponent implements OnInit {
     return params;
   }
 }
-

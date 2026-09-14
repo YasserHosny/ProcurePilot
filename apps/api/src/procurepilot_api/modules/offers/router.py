@@ -116,11 +116,13 @@ def get_supplier_scorecard(
     token: Annotated[str, Depends(bearer_token)],
     member: Annotated[CurrentMember, Depends(current_member)],
     service: Annotated[SupplierIqService, Depends(get_supplier_iq_service)],
+    window_months: Annotated[int, Query(ge=1, le=24)] = 6,
 ) -> SupplierScorecard:
     return service.get_scorecard(
         member=member,
         supplier_id=supplier_id,
         bearer_token=token,
+        window_months=window_months,
     )
 
 

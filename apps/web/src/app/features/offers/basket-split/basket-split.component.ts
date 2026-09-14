@@ -1,4 +1,4 @@
-import { DecimalPipe, NgClass, NgFor, NgIf } from '@angular/common';
+import { NgClass } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
@@ -16,13 +16,12 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatTableModule } from '@angular/material/table';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { Subscription, interval, switchMap } from 'rxjs';
 
 import { ApiService } from '../../../core/api/api.service';
 import type { ApiError, Product, Supplier } from '../../../core/api/models';
-import { RoleDirective } from '../../../core/auth/role.directive';
 import { SessionService } from '../../../core/auth/session.service';
 import { FormatDatePipe } from '../../../core/format/date.pipe';
 import { FormatMoneyPipe } from '../../../core/format/money.pipe';
@@ -47,10 +46,7 @@ import {
   standalone: true,
   imports: [
     FormsModule,
-    NgIf,
-    NgFor,
     NgClass,
-    RouterLink,
     MatCardModule,
     MatButtonModule,
     MatIconModule,
@@ -67,8 +63,6 @@ import {
     TranslatePipe,
     FormatDatePipe,
     FormatMoneyPipe,
-    DecimalPipe,
-    RoleDirective,
   ],
   templateUrl: './basket-split.component.html',
   styleUrl: './basket-split.component.scss',
@@ -145,6 +139,12 @@ export class BasketSplitComponent implements OnInit {
   readonly validUntil = computed<string | null | undefined>(
     () => this.currentJob()?.result?.valid_until,
   );
+
+  translateRiskNote(note: string): string {
+    const key = `advancedBasket.riskNotes.${note}`;
+    const translated = this.translate.instant(key);
+    return translated !== key ? translated : note;
+  }
 
   private pollSubscription: Subscription | null = null;
 

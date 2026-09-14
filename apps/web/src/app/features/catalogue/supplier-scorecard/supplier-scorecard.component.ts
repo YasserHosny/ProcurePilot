@@ -1,4 +1,4 @@
-import { DecimalPipe, NgClass, NgFor, NgIf } from '@angular/common';
+import { NgClass, NgFor, NgIf } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
@@ -25,9 +25,9 @@ import { FormatDatePipe } from '../../../core/format/date.pipe';
  * Supplier Scorecard (R2.4 Supplier IQ, T028).
  *
  * Dense operational display showing historical supplier performance:
- * - Fulfilment, on-time delivery, quality score, price competitiveness, spend exposure, dispute rate
+ * - Fulfilment rate, quality score, price competitiveness, spend exposure, freshness score, savings contribution
  * - Deterministic risk scoring and sub-score breakdown
- * - Source transaction counts (quotations, deliveries, quality incidents)
+ * - Source transaction counts (purchase records, quality issues, landed costs, savings)
  * - Insufficient evidence handling when transaction history is sparse
  * - No autonomous purchasing side effects
  */
@@ -49,7 +49,6 @@ import { FormatDatePipe } from '../../../core/format/date.pipe';
     MatProgressSpinnerModule,
     TranslatePipe,
     FormatDatePipe,
-    DecimalPipe,
   ],
   template: `
     <main role="main" aria-labelledby="scorecard-heading" class="scorecard-page">
@@ -175,20 +174,7 @@ import { FormatDatePipe } from '../../../core/format/date.pipe';
               <mat-card-content>
                 <div class="metric-value">{{ formatMetricValue(metrics()['fulfilment_rate']) }}</div>
                 <div class="metric-sample-count" *ngIf="metrics()['fulfilment_rate'] as m">
-                  {{ 'supplierIq.sampleCounts.deliveries' | translate:{ count: m.sample_count } }}
-                </div>
-              </mat-card-content>
-            </mat-card>
-
-            <!-- On-Time Delivery -->
-            <mat-card role="listitem" class="metric-card" tabindex="0">
-              <mat-card-header>
-                <mat-card-title>{{ 'supplierIq.metrics.onTimeDelivery' | translate }}</mat-card-title>
-              </mat-card-header>
-              <mat-card-content>
-                <div class="metric-value">{{ formatMetricValue(metrics()['on_time_delivery']) }}</div>
-                <div class="metric-sample-count" *ngIf="metrics()['on_time_delivery'] as m">
-                  {{ 'supplierIq.sampleCounts.deliveries' | translate:{ count: m.sample_count } }}
+                  {{ 'supplierIq.sampleCounts.samples' | translate:{ count: m.sample_count } }}
                 </div>
               </mat-card-content>
             </mat-card>
@@ -201,7 +187,7 @@ import { FormatDatePipe } from '../../../core/format/date.pipe';
               <mat-card-content>
                 <div class="metric-value">{{ formatMetricValue(metrics()['quality_score']) }}</div>
                 <div class="metric-sample-count" *ngIf="metrics()['quality_score'] as m">
-                  {{ 'supplierIq.sampleCounts.qualityIssues' | translate:{ count: m.sample_count } }}
+                  {{ 'supplierIq.sampleCounts.samples' | translate:{ count: m.sample_count } }}
                 </div>
               </mat-card-content>
             </mat-card>
@@ -214,7 +200,7 @@ import { FormatDatePipe } from '../../../core/format/date.pipe';
               <mat-card-content>
                 <div class="metric-value">{{ formatMetricValue(metrics()['price_competitiveness']) }}</div>
                 <div class="metric-sample-count" *ngIf="metrics()['price_competitiveness'] as m">
-                  {{ 'supplierIq.sampleCounts.quotations' | translate:{ count: m.sample_count } }}
+                  {{ 'supplierIq.sampleCounts.samples' | translate:{ count: m.sample_count } }}
                 </div>
               </mat-card-content>
             </mat-card>
@@ -227,20 +213,33 @@ import { FormatDatePipe } from '../../../core/format/date.pipe';
               <mat-card-content>
                 <div class="metric-value">{{ formatMetricValue(metrics()['spend_exposure']) }}</div>
                 <div class="metric-sample-count" *ngIf="metrics()['spend_exposure'] as m">
-                  {{ 'supplierIq.sampleCounts.deliveries' | translate:{ count: m.sample_count } }}
+                  {{ 'supplierIq.sampleCounts.samples' | translate:{ count: m.sample_count } }}
                 </div>
               </mat-card-content>
             </mat-card>
 
-            <!-- Dispute Rate -->
+            <!-- Freshness Score -->
             <mat-card role="listitem" class="metric-card" tabindex="0">
               <mat-card-header>
-                <mat-card-title>{{ 'supplierIq.metrics.disputeRate' | translate }}</mat-card-title>
+                <mat-card-title>{{ 'supplierIq.metrics.freshnessScore' | translate }}</mat-card-title>
               </mat-card-header>
               <mat-card-content>
-                <div class="metric-value">{{ formatMetricValue(metrics()['dispute_rate']) }}</div>
-                <div class="metric-sample-count" *ngIf="metrics()['dispute_rate'] as m">
-                  {{ 'supplierIq.sampleCounts.qualityIssues' | translate:{ count: m.sample_count } }}
+                <div class="metric-value">{{ formatMetricValue(metrics()['freshness_score']) }}</div>
+                <div class="metric-sample-count" *ngIf="metrics()['freshness_score'] as m">
+                  {{ 'supplierIq.sampleCounts.samples' | translate:{ count: m.sample_count } }}
+                </div>
+              </mat-card-content>
+            </mat-card>
+
+            <!-- Savings Contribution -->
+            <mat-card role="listitem" class="metric-card" tabindex="0">
+              <mat-card-header>
+                <mat-card-title>{{ 'supplierIq.metrics.savingsContribution' | translate }}</mat-card-title>
+              </mat-card-header>
+              <mat-card-content>
+                <div class="metric-value">{{ formatMetricValue(metrics()['savings_contribution']) }}</div>
+                <div class="metric-sample-count" *ngIf="metrics()['savings_contribution'] as m">
+                  {{ 'supplierIq.sampleCounts.samples' | translate:{ count: m.sample_count } }}
                 </div>
               </mat-card-content>
             </mat-card>
@@ -254,11 +253,11 @@ import { FormatDatePipe } from '../../../core/format/date.pipe';
           <div class="sub-scores-grid">
             <mat-card *ngFor="let sub of riskScore()?.sub_scores" class="sub-score-card" tabindex="0">
               <div class="sub-score-header">
-                <span class="sub-score-name">{{ sub.name }}</span>
+                <span class="sub-score-name">{{ ('supplierIq.subScores.' + sub.name) | translate }}</span>
                 <span class="sub-score-val">{{ formatRiskScore(sub.score) }}</span>
               </div>
               <div class="sub-score-weight">
-                <span>Weight: {{ sub.weight }}</span>
+                <span>{{ 'supplierIq.riskScore.weightLabel' | translate:{ weight: sub.weight } }}</span>
               </div>
             </mat-card>
           </div>
@@ -271,16 +270,32 @@ import { FormatDatePipe } from '../../../core/format/date.pipe';
           <mat-card class="evidence-card">
             <dl class="evidence-list">
               <div class="evidence-row">
-                <dt>{{ 'supplierIq.sourceEvidence.quotationCount' | translate }}</dt>
-                <dd><strong>{{ sourceCounts()['quotations'] ?? 0 }}</strong></dd>
+                <dt>{{ 'supplierIq.sourceEvidence.purchaseRecord' | translate }}</dt>
+                <dd><strong>{{ sourceCounts()['purchase_record'] ?? 0 }}</strong></dd>
               </div>
               <div class="evidence-row">
-                <dt>{{ 'supplierIq.sourceEvidence.deliveryCount' | translate }}</dt>
-                <dd><strong>{{ sourceCounts()['deliveries'] ?? 0 }}</strong></dd>
+                <dt>{{ 'supplierIq.sourceEvidence.tenantPurchaseRecord' | translate }}</dt>
+                <dd><strong>{{ sourceCounts()['tenant_purchase_record'] ?? 0 }}</strong></dd>
               </div>
               <div class="evidence-row">
-                <dt>{{ 'supplierIq.sourceEvidence.qualityIssueCount' | translate }}</dt>
-                <dd><strong>{{ sourceCounts()['quality_issues'] ?? 0 }}</strong></dd>
+                <dt>{{ 'supplierIq.sourceEvidence.deliveryQualityIssue' | translate }}</dt>
+                <dd><strong>{{ sourceCounts()['delivery_quality_issue'] ?? 0 }}</strong></dd>
+              </div>
+              <div class="evidence-row">
+                <dt>{{ 'supplierIq.sourceEvidence.landedCost' | translate }}</dt>
+                <dd><strong>{{ sourceCounts()['landed_cost'] ?? 0 }}</strong></dd>
+              </div>
+              <div class="evidence-row">
+                <dt>{{ 'supplierIq.sourceEvidence.marketLandedCost' | translate }}</dt>
+                <dd><strong>{{ sourceCounts()['market_landed_cost'] ?? 0 }}</strong></dd>
+              </div>
+              <div class="evidence-row">
+                <dt>{{ 'supplierIq.sourceEvidence.savingRecord' | translate }}</dt>
+                <dd><strong>{{ sourceCounts()['saving_record'] ?? 0 }}</strong></dd>
+              </div>
+              <div class="evidence-row">
+                <dt>{{ 'supplierIq.sourceEvidence.tenantSavingRecord' | translate }}</dt>
+                <dd><strong>{{ sourceCounts()['tenant_saving_record'] ?? 0 }}</strong></dd>
               </div>
             </dl>
           </mat-card>
@@ -288,9 +303,11 @@ import { FormatDatePipe } from '../../../core/format/date.pipe';
 
         <!-- Scorecard Footer Metadata -->
         <footer class="scorecard-footer">
-          <span *ngIf="scorecard()?.rule_version">Rule version: {{ scorecard()?.rule_version }}</span>
+          <span *ngIf="scorecard()?.rule_version">
+            {{ 'supplierIq.ruleVersion' | translate:{ version: scorecard()?.rule_version } }}
+          </span>
           <span *ngIf="scorecard()?.computed_at">
-            Computed: {{ scorecard()?.computed_at | formatDate }}
+            {{ 'supplierIq.computedAt' | translate:{ date: (scorecard()?.computed_at | formatDate) } }}
           </span>
         </footer>
       </div>
@@ -556,8 +573,8 @@ export class SupplierScorecardComponent implements OnInit {
 
   readonly riskLevel = computed<'low' | 'medium' | 'high'>(() => {
     const score = parseFloat(this.scorecard()?.risk_score?.total ?? '0');
-    if (isNaN(score) || score < 30) return 'low';
-    if (score < 70) return 'medium';
+    if (isNaN(score) || score < 0.30) return 'low';
+    if (score < 0.70) return 'medium';
     return 'high';
   });
 
@@ -565,7 +582,7 @@ export class SupplierScorecardComponent implements OnInit {
     () => this.scorecard()?.metrics ?? {},
   );
 
-  readonly sourceCounts = computed<Record<string, number>>(
+  readonly sourceCounts = computed<Partial<Record<string, number>>>(
     () => this.scorecard()?.source_counts ?? {},
   );
 
@@ -623,15 +640,9 @@ export class SupplierScorecardComponent implements OnInit {
         error: (err: unknown) => {
           this.isLoading.set(false);
           if (err instanceof HttpErrorResponse && err.status === 404) {
-            this.errorMessage.set(
-              this.translate.instant('supplierIq.error.notFound') ||
-                'Supplier scorecard not found.',
-            );
+            this.errorMessage.set(this.translate.instant('supplierIq.error.notFound'));
           } else {
-            this.errorMessage.set(
-              this.translate.instant('supplierIq.error.generic') ||
-                'Failed to load supplier scorecard. Please try again.',
-            );
+            this.errorMessage.set(this.translate.instant('supplierIq.error.generic'));
           }
         },
       });
@@ -656,6 +667,9 @@ export class SupplierScorecardComponent implements OnInit {
     if (!score) return '—';
     const num = parseFloat(score);
     if (isNaN(num)) return score;
-    return num.toFixed(1);
+    if (num >= 0 && num <= 1) {
+      return `${(num * 100).toFixed(1)}%`;
+    }
+    return `${num.toFixed(1)}%`;
   }
 }
