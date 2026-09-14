@@ -21,18 +21,19 @@
 9. [Quotation Review & Authorization](#9-quotation-review--authorization)
 10. [Match Resolution Queue](#10-match-resolution-queue)
 11. [Smart Compare](#11-smart-compare)
-12. [Basket Split Optimiser](#12-basket-split-optimiser)
-13. [Alerts Inbox](#13-alerts-inbox)
-14. [Savings Ledger](#14-savings-ledger)
-15. [Export Savings](#15-export-savings)
-16. [Purchase Requests](#16-purchase-requests)
-17. [New Purchase Request](#17-new-purchase-request)
-18. [Approval Queue](#18-approval-queue)
-19. [Team Management](#19-team-management)
-20. [Organisation Settings](#20-organisation-settings)
-21. [Roles & Permissions](#21-roles--permissions)
-22. [FAQ](#22-faq)
-23. [Known Issues](#23-known-issues)
+12. [Basket Split & Advanced Optimiser](#12-basket-split--advanced-optimiser)
+13. [Supplier Scorecards & Supplier IQ](#13-supplier-scorecards--supplier-iq)
+14. [Alerts Inbox & Anomaly Detection](#14-alerts-inbox--anomaly-detection)
+15. [Savings Ledger](#15-savings-ledger)
+16. [Export Savings](#16-export-savings)
+17. [Purchase Requests](#17-purchase-requests)
+18. [New Purchase Request](#18-new-purchase-request)
+19. [Approval Queue](#19-approval-queue)
+20. [Team Management](#20-team-management)
+21. [Organisation Settings](#21-organisation-settings)
+22. [Roles & Permissions](#22-roles--permissions)
+23. [FAQ](#23-faq)
+24. [Known Issues](#24-known-issues)
 
 ---
 
@@ -381,16 +382,16 @@ After AI extraction finishes, each quotation lands in the review queue. Open a r
 | 2 | **Product selector** | Select a product from your catalogue to see all available supplier offers. |
 | 3 | **Required Quantity field** | Enter the quantity you need. Prices recalculate live — tiers, minimum order values, and delivery thresholds update instantly. |
 | 4 | **Include expired offers toggle** | Check to include expired quotation offers in the comparison. |
-| 5 | **Recommended Offer banner** | Shown when a matched and costed offer exists: a confidence badge (High/Medium/Low), a recommendation score, risk considerations (e.g. "Product match confidence is below 85%. Verify product specifications."), the price's validity window, and a scoring-evidence breakdown showing how much each factor (landed cost, match confidence, supplier reliability, lead time) contributed to the recommendation. |
-| 6 | **Comparison table** | Each row is one supplier offer created from reviewed, matched quotation data: unit price, total landed cost, lead time, reliability, stock availability, match confidence, validity, and status. Offers from lines still awaiting match resolution are intentionally excluded until a decision exists. |
-| 7 | **Record Purchase action** | From the banner or any table row, click "Record Purchase" to open the outcome-capture form (section 14) and have the savings automatically calculated. |
+| 5 | **Recommended Offer banner** | Shown when a matched and costed offer exists: a confidence badge (High/Medium/Low), a recommendation score, risk considerations (e.g. "Product match confidence is below 85%"), validity window, and scoring evidence breakdown. When Supplier IQ risk evaluation influenced the recommendation, a **Supplier IQ / Risk** evidence chip and risk panel appear with a direct **View Supplier Scorecard** link. |
+| 6 | **Comparison table** | Each row is one supplier offer: unit price, total landed cost, lead time, reliability, stock availability, match confidence, validity, and status. Next to each supplier's name, a scorecard icon button allows navigating directly to that supplier's detailed Supplier IQ scorecard (`/suppliers/:id/scorecard`). |
+| 7 | **Record Purchase action** | From the banner or any table row, click "Record Purchase" to open the outcome-capture form (section 15) and have the savings automatically calculated. |
 
 **Business value:** Smart Compare converts cleaned data into a buying decision. It lowers recurring purchasing cost, gives buyers evidence for negotiation, and helps owners see why a recommendation was made before money is spent.
 
 **Data readiness:** Smart Compare depends on the full chain being complete: upload quotation → review and authorize → resolve product matching where needed → compute landed cost. If an expected quote is missing from comparison, check the Quotation Review Queue and Match Resolution Queue first.
 
 **Related screens:**
-- **Basket Split** — see next section.
+- **Basket Split & Advanced Optimiser** — see next section.
 
 ### Product Price Intelligence
 
@@ -410,7 +411,7 @@ After AI extraction finishes, each quotation lands in the review queue. Open a r
 
 ---
 
-## 12. Basket Split Optimiser
+## 12. Basket Split & Advanced Optimiser
 
 **Route:** `/offers/basket-split`
 
@@ -418,25 +419,40 @@ After AI extraction finishes, each quotation lands in the review queue. Open a r
 
 | # | Element | Description |
 |---|---------|-------------|
-| 1 | **Page title — "Two-Supplier Basket Split"** | Optimise purchasing across exactly two suppliers for minimum total landed cost using a constraint-programming solver (OR-Tools CP-SAT). |
-| 2 | **First / Second Supplier selectors** | The two selectors enforce mutual exclusion — you cannot pick the same supplier twice. |
-| 3 | **Basket Items section** | Add the products and quantities you want to purchase. Click **+ Add Item** to add more lines. |
-| 4 | **Optimise Basket Split button** | Submits the basket to the solver. The job runs asynchronously. |
+| 1 | **Page title — "Two-Supplier Basket Split" / Multi-Supplier Optimisation** | Optimise purchasing across 2 to 10 selected suppliers for minimum total landed cost using an exact constraint-programming solver (Google OR-Tools CP-SAT). |
+| 2 | **Supplier selectors** | Choose 2 to 10 suppliers. The selector dynamically enforces mutual exclusion. |
+| 3 | **Commercial Constraints panel** | Toggle to configure supplier commercial terms: Minimum Order Values (MOV), Free Delivery Thresholds, Delivery Fees, and Quantity Tiers. |
+| 4 | **Risk & Urgency controls** | Set Risk Tolerance (`low`, `medium`, `high`), Delivery Urgency (`normal`, `urgent`), and explicit supplier exclusions. |
+| 5 | **Optimisation Weights** | Customise relative weighting sliders for price, preferred suppliers, risk, lead time, and quality. |
+| 6 | **Basket Items section** | Add catalogue products and required quantities. Click **+ Add Item** to add more lines. |
+| 7 | **Optimise Basket button** | Submits the constrained basket to the solver. Execution runs asynchronously with live polling. |
 
-**Processing state:**
-
-![Basket Split Processing](screenshots/11b-basket-split-processing.jpg)
-
-While the solver runs, the screen shows "Basket split queued for optimisation..." with a progress indicator. Results, once ready:
-- **Feasible result:** Per-supplier allocation cards showing which products go to which supplier, quantities, costs, total landed cost, and savings compared to single-supplier baseline.
-- **Infeasible result:** Shows which products are missing from which supplier.
-- **Failed result:** System error details.
-
-**Business value:** Basket Split finds savings that line-by-line comparison can miss. It accounts for supplier minimums, delivery fees, and basket-level tradeoffs so a buyer can reduce total landed cost, not just choose the cheapest-looking line.
+**Results and Analysis:**
+- **Feasible Allocation:** Clear per-supplier breakdown detailing assigned items, quantities, sub-totals, delivery fees, and overall minimum landed cost.
+- **Single-Supplier Baselines:** Evaluates whether splitting across suppliers saves money versus purchasing entirely from a single supplier.
+- **Applied & Violated Constraints:** Inspect which commercial terms (MOV, delivery fee) were applied and which constraints were violated if infeasible.
+- **Advisory-Only Protection:** In strict adherence to system principles, basket optimisation is purely advisory and never autonomously creates orders or commits funds.
 
 ---
 
-## 13. Alerts Inbox
+## 13. Supplier Scorecards & Supplier IQ
+
+**Route:** `/suppliers/:id/scorecard`
+
+| # | Element | Description |
+|---|---------|-------------|
+| 1 | **Scorecard Header** | Supplier name, rule version (`supplier-risk-v1`), and back-link to supplier profile. |
+| 2 | **Time Window Selector** | Toggle analysis window between 3, 6, and 12 months. |
+| 3 | **Overall Risk Score Card** | Weighted composite risk score (0-100%) with risk level indicator (Low/Medium/High) and component breakdown. |
+| 4 | **Performance Metrics Grid** | Dense operational cards displaying Fulfilment Rate, On-Time Delivery, Quality Incident Rate, Price Competitiveness, Spend Exposure, and Dispute Rate. |
+| 5 | **Evidence Sources Panel** | Transparent transaction counts showing total quotations, delivery confirmations, and quality issue records analysed. |
+| 6 | **Insufficient Evidence State** | Automatically flagged when transaction history is sparse, informing buyers that scores reflect limited sample observations. |
+
+**Business value:** Supplier IQ transforms fragmented operational and commercial records into defensible risk indicators, empowering buyers to detect vendor drift and quality issues before awarding orders.
+
+---
+
+## 14. Alerts Inbox & Anomaly Detection
 
 **Route:** `/alerts`
 
@@ -444,21 +460,28 @@ While the solver runs, the screen shows "Basket split queued for optimisation...
 
 | # | Element | Description |
 |---|---------|-------------|
-| 1 | **Page title — "Actionable Alerts Inbox"** | Proactive commercial signals computed live from your current quotations and price history. |
-| 2 | **Filter by Alert Type** | Filter by type: Price Expiring, Supplier Disappeared, Price Swing, or All Alert Types. |
-| 3 | **Alert list** | Each alert shows severity (info/warning/critical), kind, affected product/supplier, and a description. |
-| 4 | **All clear state** | When no active alerts exist, a green checkmark confirms "No commercial conditions requiring immediate attention were detected in your current workspace data." |
+| 1 | **Page title — "Actionable Alerts Inbox"** | Proactive commercial signals and anomaly alerts computed live from current quotations, deliveries, and price history. |
+| 2 | **Filter by Alert Type** | Filter by type: Price Expiring, Supplier Disappeared, Price Swing, Price Spike, Duplicate Quotation Line, Decimal/Quantity Anomaly, Delivery Cost Anomaly, Quality Trend Change, or All. |
+| 3 | **Alert cards** | Each alert displays severity (info/warning/critical), confidence rating (High/Medium/Low), affected supplier/product, recurrence key, and actionable routing. |
+| 4 | **Action routing links** | Direct action buttons: **Inspect Scorecard** (navigates to Supplier Scorecard), **Review Quotation** (navigates to quotation review), **Compare Offers**, or **View Delivery Issues**. |
+| 5 | **Dismiss action** | Dismisses alerts with recurrence suppression; recurring alerts only resurface if underlying commercial evidence changes. |
+| 6 | **All clear state** | Confirms no commercial anomalies or warning conditions require immediate buyer attention. |
 
-**Alert types:**
+**Alert kinds:**
 - **Price Expiring** — a quotation is about to expire and no renewal has been uploaded.
 - **Supplier Disappeared** — a supplier that previously quoted for a product has not submitted a quotation in the current cycle.
-- **Price Swing** — a significant price change (up or down) compared to the previous quotation for the same product/supplier.
+- **Price Swing** — a significant price change compared to previous quotes.
+- **Price Spike Anomaly** — sudden abnormal price surge compared to workspace baselines.
+- **Likely Duplicate Quotation Line** — multiple identical quotation lines detected across current uploads.
+- **Decimal / Quantity Anomaly** — potential decimal shift or unit-of-measure mismatch in supplier quotation.
+- **Delivery Cost Anomaly** — abnormal surge in delivery fee relative to order value.
+- **Supplier Quality Trend Change** — sharp increase in delivery discrepancies or quality complaints.
 
-**Business value:** alerts reduce silent leakage. They prompt action before an expired price, missing supplier quote, or price swing turns into emergency buying, margin loss, or avoidable supplier dependence.
+**Business value:** live anomaly detection intercepts erroneous quotes, supplier performance degradation, and commercial leakage before purchasing decisions are finalized.
 
 ---
 
-## 14. Savings Ledger
+## 15. Savings Ledger
 
 **Route:** `/savings`
 
@@ -510,7 +533,7 @@ Reached from **Record Purchase** on any Smart Compare offer, or **+ Record Purch
 
 ---
 
-## 15. Export Savings
+## 16. Export Savings
 
 **Route:** `/savings/export`
 
@@ -529,7 +552,7 @@ Reached from **Record Purchase** on any Smart Compare offer, or **+ Record Purch
 
 ---
 
-## 16. Purchase Requests
+## 17. Purchase Requests
 
 **Route:** `/requests`
 
@@ -553,7 +576,7 @@ Reached from **Record Purchase** on any Smart Compare offer, or **+ Record Purch
 
 ---
 
-## 17. New Purchase Request
+## 18. New Purchase Request
 
 **Route:** `/requests/new` or `/requests/:id`
 
@@ -562,7 +585,7 @@ Reached from **Record Purchase** on any Smart Compare offer, or **+ Record Purch
 | # | Element | Description |
 |---|---------|-------------|
 | 1 | **Page title** | Reads "New Purchase Request" when creating a draft and "Edit Purchase Request" when opening an existing draft/submitted request. |
-| 2 | **Branch selector** (required) | Select the branch this request is for. Branches are defined in Organisation Settings (section 20) — a request cannot be created until at least one branch exists. Existing requests show the saved branch. |
+| 2 | **Branch selector** (required) | Select the branch this request is for. Branches are defined in Organisation Settings (section 21) — a request cannot be created until at least one branch exists. Existing requests show the saved branch. |
 | 3 | **Cost Centre selector** (optional) | Optionally assign the request to a cost centre for budget tracking. |
 | 4 | **Required By date** (required) | The date by which the goods are needed. |
 | 5 | **Line Items section** | Each line needs a **Product**, a **Quantity**, and an optional **Note**. |
@@ -571,13 +594,13 @@ Reached from **Record Purchase** on any Smart Compare offer, or **+ Record Purch
 
 **Current display limitation:** existing submitted requests can show the saved product UUID in the line-item field instead of the product name. The underlying relationship is stored correctly, but the detail display still needs the same friendly-name resolution used elsewhere in the app.
 
-**Approval status (once submitted):** once a request has been routed to an approver, the detail view shows an **Approval** section below the budget status: a status chip (Pending / Approved / Rejected), who it's assigned to, and — once a decision has been made — the approver's comment (if any) and the decision timestamp. This is read-only; only the assigned approver can act on it, from the Approval Queue (section 18).
+**Approval status (once submitted):** once a request has been routed to an approver, the detail view shows an **Approval** section below the budget status: a status chip (Pending / Approved / Rejected), who it's assigned to, and — once a decision has been made — the approver's comment (if any) and the decision timestamp. This is read-only; only the assigned approver can act on it, from the Approval Queue (section 19).
 
 **Business value:** a structured request preserves the context that is usually lost in chat messages: who needs the item, where it is needed, when it is needed, and what budget or price history should influence the decision.
 
 ---
 
-## 18. Approval Queue
+## 19. Approval Queue
 
 **Route:** `/approvals`
 
@@ -585,7 +608,7 @@ Reached from **Record Purchase** on any Smart Compare offer, or **+ Record Purch
 
 | # | Element | Description |
 |---|---------|-------------|
-| 1 | **Page title — "Approval Queue"** | Requests awaiting your decision. Only requests routed to you — directly, or via an active delegation (section 20) — based on threshold approval rules appear here. |
+| 1 | **Page title — "Approval Queue"** | Requests awaiting your decision. Only requests routed to you — directly, or via an active delegation (section 21) — based on threshold approval rules appear here. |
 | 2 | **Approvals table** | One row per pending request: required-by date, requester, branch, cost centre, estimated total (with an "incomplete estimate" badge when some lines lack pricing), budget status, and line count. |
 | 3 | **Budget Status column** | Shows the remaining budget after this request, or an amber "Budget Exceeded" badge with a tooltip and the remaining-budget figure when the request would exceed the applicable budget. Blank when no budget applies. |
 | 4 | **Lines column + expand toggle** | Shows the line count; the expand icon reveals a nested table underneath the row with each line's product, quantity, unit price, and note — so you can review the full request without leaving the queue. |
@@ -595,13 +618,13 @@ Reached from **Record Purchase** on any Smart Compare offer, or **+ Record Purch
 **Approve / Reject dialog:**
 - A comment is optional on both approve and reject — use it to record why, especially on a rejection.
 - Ctrl+Enter (or Cmd+Enter) submits the dialog without reaching for the mouse.
-- Confirming removes the request from the queue immediately and shows a snackbar confirmation; the request's own detail page (section 17) then shows the decision, approver's comment, and timestamp.
+- Confirming removes the request from the queue immediately and shows a snackbar confirmation; the request's own detail page (section 18) then shows the decision, approver's comment, and timestamp.
 
 **Business value:** approval routing reduces cycle time without giving up spend control. The queue surfaces the commercial context needed to decide quickly — branch, amount, budget impact, and full line detail — right where the decision is made, and every decision (with its comment) becomes part of the request's own audit trail.
 
 ---
 
-## 19. Team Management
+## 20. Team Management
 
 **Route:** `/team` (Owner only)
 
@@ -625,7 +648,7 @@ Reached from **Record Purchase** on any Smart Compare offer, or **+ Record Purch
 
 ---
 
-## 20. Organisation Settings
+## 21. Organisation Settings
 
 **Route:** `/settings`
 
@@ -637,7 +660,7 @@ Reached from **Record Purchase** on any Smart Compare offer, or **+ Record Purch
 | 2 | **Branches section** | Define your physical locations or operational divisions. Click **+ New Branch** to add one — only a name is required; address and region are optional. |
 | 3 | **Cost Centres section** | Define cost centres for budget tracking, each with a required **Code** and an optional link to a **Branch**. |
 | 4 | **Budgets section** | Define budgets scoped to the whole organisation, a specific branch, or a specific cost centre, with an amount, currency, period (Monthly/Quarterly/Annual), and period start date. |
-| 5 | **Approval Delegations section** | Lets an approver delegate their pending decisions to a colleague for a date range (e.g. while on leave). Shows a table of the current member's own delegations: delegate, start date, end date, and a cancel action. **+ New Delegation** opens a dialog to pick the delegate (from a dropdown of workspace members), a start date, and an end date. While a delegation is active, requests that would route to the delegating approver are routed to the delegate instead, and appear in the delegate's own Approval Queue (section 18). |
+| 5 | **Approval Delegations section** | Lets an approver delegate their pending decisions to a colleague for a date range (e.g. while on leave). Shows a table of the current member's own delegations: delegate, start date, end date, and a cancel action. **+ New Delegation** opens a dialog to pick the delegate (from a dropdown of workspace members), a start date, and an end date. While a delegation is active, requests that would route to the delegating approver are routed to the delegate instead, and appear in the delegate's own Approval Queue (section 19). |
 
 **Create Cost Centre form:**
 
@@ -648,17 +671,17 @@ Reached from **Record Purchase** on any Smart Compare offer, or **+ Record Purch
 ![Budget Form](screenshots/19c-budget-form.jpg)
 
 **Why this matters:**
-- Purchase requests require a **branch** — this determines who can see and approve the request. A branch must exist before you can create your first request (section 17).
+- Purchase requests require a **branch** — this determines who can see and approve the request. A branch must exist before you can create your first request (section 18).
 - Cost centres and budgets enable budget-impact visibility on purchase requests.
 - When a request's estimated total would exceed a budget, a warning is shown.
 
 **Business value:** organisation settings connect procurement activity to the way the business is managed. Branches, cost centres, and budgets turn isolated purchases into accountable spend by location, department, and financial period.
 
-**Display note:** the Settings screen now resolves branch names in the Branch and Cost Centre tables. See [§23 Known Issues](#23-known-issues) for remaining raw-ID display issues in the Purchase Requests area.
+**Display note:** the Settings screen now resolves branch names in the Branch and Cost Centre tables. See [§24 Known Issues](#24-known-issues) for remaining raw-ID display issues in the Purchase Requests area.
 
 ---
 
-## 21. Roles & Permissions
+## 22. Roles & Permissions
 
 | Role | Description | Key capabilities |
 |------|-------------|-----------------|
@@ -675,7 +698,7 @@ Reached from **Record Purchase** on any Smart Compare offer, or **+ Record Purch
 
 ---
 
-## 22. FAQ
+## 23. FAQ
 
 **Q: Can I edit a verified saving?**
 A: No. Verified savings are immutable. If a correction is needed, a new adjustment record is created.
@@ -702,21 +725,21 @@ A: Not yet. It's a heuristic score used to rank and route candidates — the app
 A: Yes. If you belong to multiple workspaces, use the workspace switcher in the top bar to switch. Each workspace has its own data, members, and settings — completely isolated.
 
 **Q: Who can approve purchase requests?**
-A: Users with the Approver or Owner role. Approval routing is based on configurable thresholds — requests above a certain amount may require a higher-level approver. If the assigned approver has set up an active delegation (section 20), the request routes to the delegate instead, and the decision is made from the delegate's own Approval Queue.
+A: Users with the Approver or Owner role. Approval routing is based on configurable thresholds — requests above a certain amount may require a higher-level approver. If the assigned approver has set up an active delegation (section 21), the request routes to the delegate instead, and the decision is made from the delegate's own Approval Queue.
 
 ---
 
-## 23. Known Issues
+## 24. Known Issues
 
 Originally found during the 6 Sep 2026 documentation pass; re-checked and updated 12 Sep 2026 against current `main`.
 
 | # | Where | Issue |
 |---|-------|-------|
-| 1 | Purchase Requests (§16) | Submitted request rows can display the raw branch UUID in the Branch column instead of the branch name. Still present as of 12 Sep 2026. |
-| 2 | Purchase Request detail (§17) | Existing request line items can display the saved product UUID rather than the product's catalogue name. The linked product still exists and the relationship is stored correctly. Still present as of 12 Sep 2026. |
+| 1 | Purchase Requests (§17) | Submitted request rows can display the raw branch UUID in the Branch column instead of the branch name. Still present as of 12 Sep 2026. |
+| 2 | Purchase Request detail (§18) | Existing request line items can display the saved product UUID rather than the product's catalogue name. The linked product still exists and the relationship is stored correctly. Still present as of 12 Sep 2026. |
 | 3 | Quotation review detail (§9) | The CSV sample upload completed and opened the review screen, but the header fields extracted from the CSV sample left some optional quotation fields blank. The PDF/image sample path depends on external extraction-provider credentials; during the original pass Bedrock fell back because AWS SSO was expired, while CSV extraction still completed successfully. Not re-verified in the 12 Sep pass. |
 
-**Resolved since the original pass:** the Approval Queue (§18) previously rendered only its title/subtitle with no request cards. It is now fully functional — pending requests, budget status, expandable line detail, and an approve/reject dialog with an optional comment — and an approval-delegation management UI (§20) has been added.
+**Resolved since the original pass:** the Approval Queue (§19) previously rendered only its title/subtitle with no request cards. It is now fully functional — pending requests, budget status, expandable line detail, and an approve/reject dialog with an optional comment — and an approval-delegation management UI (§21) has been added.
 
 If you hit any of these, it's not something wrong with your setup — flag it to the product team.
 

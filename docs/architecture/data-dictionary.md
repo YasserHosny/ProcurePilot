@@ -1321,3 +1321,89 @@ again rather than a new one. A signed URL for a photo is generated fresh at read
 tenant-scoped client (the same client that wrote it — no service-role bypass needed, since the
 bucket's own RLS policy already permits a tenant member to read/write their own tenant's objects)
 — never cached or stored, since a signed URL is inherently time-limited.
+
+## Implemented Optimisation and Supplier IQ entities (chunk R2.4, `011-optimisation-supplier-iq`)
+
+Extends smart compare, multi-supplier basket optimisation, supplier intelligence, and anomaly
+detection without autonomous purchasing side effects (binding constitution rule).
+Full contract: `specs/011-optimisation-supplier-iq/contracts/optimisation-supplier-iq.openapi.yaml`.
+
+## `SupplierCommercialTerm`
+
+Versioned tenant-scoped commercial rules for one supplier, enforcing commercial constraints
+(MOV, free-delivery thresholds, delivery fees, and quantity pricing tiers).
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | uuid | PK, default `gen_random_uuid()` |
+| `tenant_id` | uuid | Required FK -> Tenant; RLS key. `unique (tenant_id, id)` for composite FKs |
+| `supplier_id` | uuid | Required composite FK -> Supplier `(tenant_id, id)` |
+| `effective_from` | timestamptz | Required |
+| `effective_to` | timestamptz | Nullable; null indicates term is active open-endedly until superseded |
+| `minimum_order_value_amount` | numeric(18,4) | Nullable money amount; paired with currency |
+| `minimum_order_value_currency` | text | Required exactly when MOV amount is set |
+| `delivery_fee_amount` | numeric(18,4) | Nullable money amount; paired with currency |
+| `delivery_fee_currency` | text | Required exactly when delivery fee amount is set |
+| `free_delivery_threshold_amount` | numeric(18,4) | Nullable money amount; paired with currency |
+| `free_delivery_threshold_currency` | text | Required exactly when threshold amount is set |
+| `quantity_tiers` | jsonb | Array of `{workspace_product_id?, min_quantity, unit_price_amount, unit_price_currency}` |
+| `rule_version` | text | Required rule version identifier, e.g. `supplier-commercial-terms-v1` |
+| `created_by_membership_id` | uuid | Required composite FK -> Membership `(tenant_id, id)` |
+| `created_at` | timestamptz | Audit field |
+
+Constraints and RLS:
+- Money pairings enforced in database checks (`check_mov_pairing`, `check_delivery_fee_pairing`, `check_free_delivery_threshold_pairing`).
+- Check constraint: `effective_to IS NULL OR effective_to > effective_from`.
+- RLS enabled and forced: `supplier_commercial_term_tenant_isolation_select` allows all active tenant members; `supplier_commercial_term_tenant_isolation_insert` restricted to workspace owners and buyers. Forward-only / append-only: updates and deletes are disallowed for client roles.
+
+## `SupplierScorecardSnapshot`
+
+Cached, deterministic Supplier IQ scorecard calculation for a supplier and metric window.
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | uuid | PK, default `gen_random_uuid()` |
+| `tenant_id` | uuid | Required FK -> Tenant; RLS key. `unique (tenant_id, id)` for composite FKs |
+| `supplier_id` | uuid | Required composite FK -> Supplier `(tenant_id, id)` |
+| `window_start` | date | Required window start date |
+| `window_end` | date | Required window end date |
+| `rule_version` | text | Required, e.g. `supplier-risk-v1` |
+| `metrics` | jsonb | Required map of metric definitions, scores, sample counts, source ids, and confidence |
+| `risk_score` | jsonb | Required weighted risk score total, rule version, and component breakdown |
+| `source_counts` | jsonb | Required counts across quotation lines, delivery confirmations, and quality issues |
+| `computed_at` | timestamptz | Required computation timestamp |
+| `computed_by_membership_id` | uuid | Optional composite FK -> Membership `(tenant_id, id)` for human-triggered recompute |
+
+Constraints and RLS:
+- Unique `(tenant_id, supplier_id, window_start, window_end, rule_version)`.
+- Check constraint: `window_end >= window_start`.
+- Snapshots are deterministic caches computed from seeded tenant records (quotations, deliveries, quality issues, purchase records).
+- RLS enabled and forced: tenant members may select; owner/buyer may insert/recompute via service.
+
+## Extended `BasketSplitJob` Request & Result Snapshots
+
+The existing `basket_split_job` table persists advanced multi-supplier basket optimisation runs:
+- Request snapshot payload additions:
+  - `supplier_ids`: 2 to 10 selected supplier UUIDs.
+  - `hard_constraints`: Minimum order values (MOV), free-delivery thresholds, delivery fees, quantity tiers, supplier exclusions, and delivery urgency level (`normal` | `urgent`).
+  - `soft_weights`: Weights for price, preferred suppliers, risk tolerance, lead time, and quality.
+  - `rule_version`: Versioned optimiser algorithm snapshot.
+- Result payload additions:
+  - `allocation`: Product-to-supplier allocations satisfying constraints.
+  - `total_landed_cost`: Optimised total money amount and currency.
+  - `single_supplier_baselines`: Comparison against single-supplier fulfilment.
+  - `applied_constraints` & `violated_constraints`: Structured list of constraint evaluations.
+  - `risk_notes` & `confidence`: Calibrated confidence levels and risk notices.
+
+## Response-Only Entities
+
+- **`SupplierScorecard`**: Returned by `GET /suppliers/{supplier_id}/scorecard` (`supplier`, `window_start`, `window_end`, `metrics`, `risk_score`, `source_counts`, `confidence`, `insufficient_evidence`, `computed_at`, `rule_version`).
+- **`AnomalySignal`**: Live-computed commercial alert returned by `GET /alerts` with kinds `price_spike`, `likely_duplicate_quotation_line`, `decimal_or_quantity_anomaly`, `delivery_cost_anomaly`, and `supplier_quality_trend_change`. Includes confidence, severity, recurrence fingerprints, and scorecard action routing.
+
+## Audit Events
+
+Append-only audit trail logging for R2.4 operations:
+- `optimisation.basket_split.submitted`: Human-triggered advanced multi-supplier basket optimisation.
+- `supplier_iq.scorecard.viewed`: Inspection of supplier scorecard metrics and risk evidence.
+- `alerts.anomaly.dismissed`: Dismissal of commercial anomaly alerts with deterministic recurrence keys.
+

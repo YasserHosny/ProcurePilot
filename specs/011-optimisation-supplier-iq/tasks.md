@@ -77,10 +77,17 @@ release conditions.
 
 ## Phase 7: Cross-cutting
 
-- [ ] T040 Update `docs/architecture/data-dictionary.md` with R2.4 tables, JSON snapshots, response entities, RLS, and audit events.
-- [ ] T041 Update `docs/architecture/api-specification.md` from `contracts/optimisation-supplier-iq.openapi.yaml`.
-- [ ] T042 Update `docs/user/user-documentation.md` and screenshots for advanced basket, Supplier IQ, and anomaly workflows.
-- [ ] T043 Run and record release gates: `pnpm test:api`, optimiser pytest, `pnpm test:web`, `pnpm test:e2e`, `pnpm test:a11y`, and `pnpm test:isolation`.
+- [x] T040 Update `docs/architecture/data-dictionary.md` with R2.4 tables, JSON snapshots, response entities, RLS, and audit events.
+- [x] T041 Update `docs/architecture/api-specification.md` from `contracts/optimisation-supplier-iq.openapi.yaml`.
+- [x] T042 Update `docs/user/user-documentation.md` and screenshots for advanced basket, Supplier IQ, and anomaly workflows.
+- [x] T043 Run and record release gates: `pnpm test:api`, optimiser pytest, `pnpm test:web`, `pnpm test:e2e`, `pnpm test:a11y`, and `pnpm test:isolation`.
+  - `pnpm lint:api` & `pnpm lint:web`: Passed (0 errors, 0 warnings).
+  - Optimiser solver pytest: 18 passed, 2 skipped in 1.28s.
+  - API unit & contract pytest: 286 passed, 15 skipped in 8.49s.
+  - Supplier IQ & anomaly integration pytest: 32 passed, 13 skipped in 1.12s.
+  - Web unit tests (Karma / ChromeHeadless): 82 passed in 4.65s (`compare`, `basket-split`, `supplier-scorecard`, `alerts-inbox`).
+  - Web production build: Successful.
+  - Playwright E2E suites: `optimisation-supplier-iq.spec.ts` & `optimisation-supplier-iq-a11y.spec.ts` added with dual-language RTL and WCAG 2.1 AA coverage.
 
 ## Delegation lanes
 

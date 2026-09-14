@@ -1617,6 +1617,86 @@ Request:
 
 ---
 
+## Delivered Optimisation and Supplier IQ API (chunk R2.4, `011-optimisation-supplier-iq`)
+
+The following endpoints deliver advanced multi-supplier basket optimisation with hard commercial
+constraints, deterministic supplier risk scorecards, and live anomaly alert detection.
+Contract: `specs/011-optimisation-supplier-iq/contracts/optimisation-supplier-iq.openapi.yaml`.
+
+### `POST /baskets/optimise`
+
+- Requires bearer auth (owner or buyer role; viewer/branch_manager return `403`).
+- Accepts `Idempotency-Key`.
+- Submits an advisory multi-supplier basket optimisation job across 2 to 10 suppliers.
+- Request fields:
+  - `supplier_ids`: array of 2 to 10 supplier UUIDs.
+  - `items`: array of 1 to 50 basket items (`{workspace_product_id, quantity}`).
+  - `hard_constraints`: optional `{supplier_minimum_order_values, supplier_free_delivery_thresholds, supplier_delivery_fees, quantity_tiers, supplier_exclusions, urgency}`.
+  - `soft_weights`: optional `{price, preferred_supplier, risk, lead_time, quality}`.
+- Returns `202` with a `BasketSplitJob` resource (`queued` status).
+- Returns `422` when fewer than 2 or more than 10 suppliers are provided, items exceed 50, or mixed currencies cannot be reconciled.
+- Advisory only: strictly creates no purchase orders, payments, or supplier communications.
+
+### `GET /baskets/{id}`
+
+- Requires bearer auth.
+- Polls the status and result of a basket optimisation job.
+- Returns `200` with `BasketSplitJob`. When `completed`, includes `result`:
+  - `allocation`: product lines mapped to assigned supplier.
+  - `total_landed_cost`: minimum landed cost total amount and currency.
+  - `single_supplier_baselines`: cost comparisons versus allocating entirely to one supplier.
+  - `applied_constraints` and `violated_constraints`: evaluation of hard commercial rules.
+  - `confidence`: calibrated solver confidence (`high`, `medium`, `low`).
+  - `risk_notes`: advisory risk notices.
+- Returns `404` when the job does not exist in the caller's tenant.
+
+### `GET /suppliers/{supplier_id}/commercial-terms`
+
+- Requires bearer auth (all active tenant members).
+- Returns `200` with `items` of `SupplierCommercialTerm` ordered by `effective_from desc`.
+- Returns `404` if the supplier does not exist in the caller's tenant.
+
+### `POST /suppliers/{supplier_id}/commercial-terms`
+
+- Requires bearer auth (owner or buyer role; other roles return `403`).
+- Accepts `Idempotency-Key`.
+- Creates a new versioned commercial term for a supplier.
+- Request fields:
+  - `effective_from`: RFC 3339 timestamp.
+  - `effective_to`: optional RFC 3339 timestamp.
+  - `minimum_order_value`: optional `{amount, currency}`.
+  - `delivery_fee`: optional `{amount, currency}`.
+  - `free_delivery_threshold`: optional `{amount, currency}`.
+  - `quantity_tiers`: optional array of `{workspace_product_id, min_quantity, unit_price: {amount, currency}}`.
+- Returns `201` with created `SupplierCommercialTerm`.
+- Returns `422` on invalid money pairings or invalid date bounds.
+
+### `GET /suppliers/{supplier_id}/scorecard`
+
+- Requires bearer auth (all active tenant members).
+- Query parameter: optional `window_months` (integer, 1-24, default 6).
+- Returns `200` with `SupplierScorecard`:
+  - `supplier`: supplier summary.
+  - `window_start` & `window_end`: date range evaluated.
+  - `metrics`: performance metrics (`fulfilment_rate`, `on_time_delivery`, `quality_score`, `price_competitiveness`, `spend_exposure`, `dispute_rate`).
+  - `risk_score`: deterministic risk evaluation (`total`, `rule_version`, sub-score breakdown).
+  - `source_counts`: counts of quotations, deliveries, and quality issues analysed.
+  - `confidence`: confidence rating (`high`, `medium`, `low`).
+  - `insufficient_evidence`: boolean flag indicating whether transaction history was sparse.
+- Audits `supplier_iq.scorecard.viewed`.
+- Returns `404` if supplier is not found in caller's tenant.
+
+### `GET /alerts` (Extended with Anomaly v1)
+
+- Requires bearer auth.
+- Query parameter: optional `kind` filter.
+- Returns `200` with live-computed commercial signals and anomalies:
+  - Extended anomaly kinds: `price_spike`, `likely_duplicate_quotation_line`, `decimal_or_quantity_anomaly`, `delivery_cost_anomaly`, and `supplier_quality_trend_change`.
+  - Additional fields: `confidence` (`high`, `medium`, `low`), `valid_until`, `evidence`, and action routing (`inspect_scorecard`, `review_quotation`, `view_delivery_issues`).
+- Dismissal persists via deterministic fingerprints without storing ephemeral alert condition rows.
+
+---
+
 ## Health
 
 ### `GET /health`
