@@ -5,13 +5,25 @@ from datetime import UTC, datetime, timedelta
 from decimal import ROUND_HALF_UP, Decimal
 from uuid import UUID
 
-from procurepilot_api.modules.offers.schemas import Offer, Recommendation, RecommendationEvidence
+from procurepilot_api.modules.offers.schemas import (
+    Offer,
+    Recommendation,
+    RecommendationEvidence,
+    RiskNote,
+)
 
 WEIGHTS = {
     "cost": Decimal("0.55"),
     "match_confidence": Decimal("0.20"),
     "reliability": Decimal("0.15"),
     "lead_time": Decimal("0.10"),
+}
+SUPPLIER_IQ_WEIGHTS = {
+    "cost": Decimal("0.45"),
+    "match_confidence": Decimal("0.17"),
+    "reliability": Decimal("0.13"),
+    "lead_time": Decimal("0.10"),
+    "supplier_risk": Decimal("0.15"),
 }
 TIE_BREAK_RULE = [
     "lower_projected_total_amount",
@@ -31,13 +43,19 @@ class ScoredOffer:
     components: dict[str, Decimal]
 
 
-def recommend_offer(offers: list[Offer], *, now: datetime | None = None) -> Recommendation | None:
+def recommend_offer(
+    offers: list[Offer],
+    *,
+    now: datetime | None = None,
+    supplier_risk_scores: dict[UUID, str | Decimal] | None = None,
+) -> Recommendation | None:
     eligible = [offer for offer in offers if not offer.is_expired]
     if not eligible:
         return None
     evaluated_at = now or datetime.now(UTC)
     cheapest = min(_money_amount(offer) for offer in eligible)
-    scored = [_score_offer(offer, cheapest) for offer in eligible]
+    weights = SUPPLIER_IQ_WEIGHTS if supplier_risk_scores else WEIGHTS
+    scored = [_score_offer(offer, cheapest, weights, supplier_risk_scores) for offer in eligible]
     scored.sort(key=_sort_key)
     winner = scored[0]
     second = scored[1] if len(scored) > 1 else None
@@ -50,9 +68,9 @@ def recommend_offer(offers: list[Offer], *, now: datetime | None = None) -> Reco
         confidence=_confidence(winner.score, margin),
         valid_from=winner.offer.valid_from,
         valid_to=winner.offer.valid_to,
-        risk_notes=_risk_notes(winner.offer, evaluated_at),
+        risk_notes=_risk_notes(winner.offer, evaluated_at, supplier_risk_scores),
         evidence=RecommendationEvidence(
-            weights={key: format(value, "f") for key, value in WEIGHTS.items()},
+            weights={key: format(value, "f") for key, value in weights.items()},
             components={key: _score_string(value) for key, value in winner.components.items()},
             winning_margin=None if margin is None else _score_string(margin),
             tie_break={
@@ -64,7 +82,12 @@ def recommend_offer(offers: list[Offer], *, now: datetime | None = None) -> Reco
     )
 
 
-def _score_offer(offer: Offer, cheapest: Decimal) -> ScoredOffer:
+def _score_offer(
+    offer: Offer,
+    cheapest: Decimal,
+    weights: dict[str, Decimal],
+    supplier_risk_scores: dict[UUID, str | Decimal] | None = None,
+) -> ScoredOffer:
     total = _money_amount(offer)
     components = {
         "cost": min(Decimal("1"), cheapest / total) if total > 0 else Decimal("0"),
@@ -74,7 +97,16 @@ def _score_offer(offer: Offer, cheapest: Decimal) -> ScoredOffer:
         ),
         "lead_time": _lead_time_score(offer.lead_time_days),
     }
-    score = sum(WEIGHTS[key] * components[key] for key in WEIGHTS)
+    scoring_components = dict(components)
+    if "supplier_risk" in weights:
+        raw_risk = supplier_risk_scores.get(offer.supplier_id) if supplier_risk_scores else None
+        risk_dec = _clamp_score(
+            Decimal(str(raw_risk)) if raw_risk is not None else Decimal("0.500")
+        )
+        components["supplier_risk"] = risk_dec
+        scoring_components["supplier_risk"] = Decimal("1") - risk_dec
+
+    score = sum(weights[key] * scoring_components[key] for key in weights)
     return ScoredOffer(offer=offer, score=score, components=components)
 
 
@@ -110,14 +142,26 @@ def _confidence(score: Decimal, margin: Decimal | None) -> str:
     return "low"
 
 
-def _risk_notes(offer: Offer, now: datetime) -> list[str]:
-    risks: list[str] = []
+def _risk_notes(
+    offer: Offer,
+    now: datetime,
+    supplier_risk_scores: dict[UUID, str | Decimal] | None = None,
+) -> list[RiskNote]:
+    risks: list[RiskNote] = []
     if offer.valid_to is not None and now <= offer.valid_to <= now + timedelta(days=7):
         risks.append("price_expiring_soon")
     if Decimal(offer.match_confidence) < Decimal("0.850"):
         risks.append("low_match_confidence")
     if offer.reliability_score is not None and Decimal(offer.reliability_score) < Decimal("0.600"):
         risks.append("low_supplier_reliability")
+    if supplier_risk_scores:
+        winner_risk = supplier_risk_scores.get(offer.supplier_id)
+        if winner_risk is not None:
+            w_risk = Decimal(str(winner_risk))
+            if w_risk >= Decimal("0.70"):
+                risks.append("high_supplier_risk")
+            elif w_risk >= Decimal("0.30"):
+                risks.append("elevated_supplier_risk")
     return risks
 
 
@@ -131,6 +175,10 @@ def _score_rounded(score: Decimal) -> Decimal:
 
 def _score_string(score: Decimal) -> str:
     return format(_score_rounded(score), "f")
+
+
+def _clamp_score(score: Decimal) -> Decimal:
+    return min(Decimal("1"), max(Decimal("0"), score))
 
 
 def offer_id_from_recommendation(recommendation: Recommendation | None) -> UUID | None:

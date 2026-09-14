@@ -4,9 +4,10 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { ActivatedRoute, convertToParamMap } from '@angular/router';
-import { TranslateModule } from '@ngx-translate/core';
+import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { BehaviorSubject, of, throwError } from 'rxjs';
 
+import enCatalog from '../../../../../../../packages/i18n/en.json';
 import { ApiService } from '../../../core/api/api.service';
 import type { Supplier, SupplierScorecard } from '../../../core/api/models';
 import { SupplierScorecardComponent } from './supplier-scorecard.component';
@@ -35,12 +36,6 @@ describe('SupplierScorecardComponent (T027)', () => {
         confidence: 'high',
         insufficient_evidence: false,
       },
-      on_time_delivery: {
-        value: '0.9400',
-        sample_count: 50,
-        confidence: 'high',
-        insufficient_evidence: false,
-      },
       quality_score: {
         value: '0.9900',
         sample_count: 50,
@@ -54,20 +49,26 @@ describe('SupplierScorecardComponent (T027)', () => {
         insufficient_evidence: false,
       },
       spend_exposure: {
-        value: '25000.00',
+        value: '0.2500',
         sample_count: 50,
         confidence: 'high',
         insufficient_evidence: false,
       },
-      dispute_rate: {
-        value: '0.0200',
+      freshness_score: {
+        value: '0.9400',
+        sample_count: 50,
+        confidence: 'high',
+        insufficient_evidence: false,
+      },
+      savings_contribution: {
+        value: '0.3000',
         sample_count: 50,
         confidence: 'high',
         insufficient_evidence: false,
       },
     },
     risk_score: {
-      total: '18.5',
+      total: '0.1850',
       confidence: 'high',
       rule_version: 'risk-v1',
       sub_scores: [
@@ -77,9 +78,13 @@ describe('SupplierScorecardComponent (T027)', () => {
       ],
     },
     source_counts: {
-      quotations: 12,
-      deliveries: 50,
-      quality_issues: 1,
+      purchase_record: 50,
+      tenant_purchase_record: 75,
+      delivery_quality_issue: 1,
+      landed_cost: 12,
+      market_landed_cost: 36,
+      saving_record: 3,
+      tenant_saving_record: 10,
     },
     confidence: 'high',
     insufficient_evidence: false,
@@ -100,15 +105,19 @@ describe('SupplierScorecardComponent (T027)', () => {
       },
     },
     risk_score: {
-      total: '45.0',
+      total: '0.4500',
       confidence: 'low',
       rule_version: 'risk-v1',
       sub_scores: [],
     },
     source_counts: {
-      quotations: 1,
-      deliveries: 1,
-      quality_issues: 0,
+      purchase_record: 1,
+      tenant_purchase_record: 1,
+      delivery_quality_issue: 0,
+      landed_cost: 0,
+      market_landed_cost: 0,
+      saving_record: 0,
+      tenant_saving_record: 0,
     },
   };
 
@@ -138,6 +147,10 @@ describe('SupplierScorecardComponent (T027)', () => {
       ],
     }).compileComponents();
 
+    const translate = TestBed.inject(TranslateService);
+    translate.setTranslation('en', enCatalog);
+    translate.use('en');
+
     fixture = TestBed.createComponent(SupplierScorecardComponent);
     component = fixture.componentInstance;
     fixture.detectChanges();
@@ -166,6 +179,9 @@ describe('SupplierScorecardComponent (T027)', () => {
     expect(el.textContent).toContain('94.0%');
     // 0.9900 -> 99.0%
     expect(el.textContent).toContain('99.0%');
+    expect(el.textContent).toContain('30.0%');
+    expect(el.textContent).toContain('Freshness');
+    expect(el.textContent).toContain('Savings');
   });
 
   it('should show insufficient evidence warning when insufficient_evidence is true', () => {
@@ -185,25 +201,25 @@ describe('SupplierScorecardComponent (T027)', () => {
   });
 
   it('should compute risk level correctly based on total score', () => {
-    expect(component.riskLevel()).toBe('low'); // 18.5 < 30
+    expect(component.riskLevel()).toBe('low'); // 0.1850 < 0.30
 
     component.scorecard.set({
       ...mockScorecard,
-      risk_score: { ...mockScorecard.risk_score, total: '55.0' },
+      risk_score: { ...mockScorecard.risk_score, total: '0.5500' },
     });
-    expect(component.riskLevel()).toBe('medium'); // 30 <= 55 < 70
+    expect(component.riskLevel()).toBe('medium'); // 0.30 <= 0.55 < 0.70
 
     component.scorecard.set({
       ...mockScorecard,
-      risk_score: { ...mockScorecard.risk_score, total: '82.0' },
+      risk_score: { ...mockScorecard.risk_score, total: '0.8200' },
     });
-    expect(component.riskLevel()).toBe('high'); // >= 70
+    expect(component.riskLevel()).toBe('high'); // >= 0.70
   });
 
   it('should render source transaction counts', () => {
     const el: HTMLElement = fixture.nativeElement;
-    expect(el.textContent).toContain('12'); // quotations
-    expect(el.textContent).toContain('50'); // deliveries
+    expect(el.textContent).toContain('12'); // landed costs
+    expect(el.textContent).toContain('50'); // purchase records
     expect(el.textContent).toContain('1'); // quality issues
   });
 

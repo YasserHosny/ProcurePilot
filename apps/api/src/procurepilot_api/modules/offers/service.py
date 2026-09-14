@@ -153,12 +153,36 @@ class OfferService:
                 offset=0,
                 limit=101,
             )
-        offers = [_offer(row, quantity=quantity) for row in rows]
+            offers = [_offer(row, quantity=quantity) for row in rows]
+            supplier_risk_scores: dict[UUID, str] = {}
+            supplier_ids = list({offer.supplier_id for offer in offers})
+            if supplier_ids:
+                with conn.cursor(row_factory=dict_row) as cur:
+                    cur.execute(
+                        """
+                        select distinct on (supplier_id) supplier_id, risk_score
+                        from supplier_scorecard_snapshot
+                        where supplier_id = any(%s::uuid[])
+                        order by supplier_id, window_end desc, computed_at desc, id desc
+                        """,
+                        ([str(supplier_id) for supplier_id in supplier_ids],),
+                    )
+                    for snapshot_row in cur.fetchall():
+                        supp_id = snapshot_row["supplier_id"]
+                        risk_score = snapshot_row["risk_score"]
+                        if isinstance(risk_score, str):
+                            try:
+                                risk_score = json.loads(risk_score)
+                            except json.JSONDecodeError:
+                                pass
+                        if isinstance(risk_score, dict) and "total" in risk_score:
+                            supplier_risk_scores[supp_id] = str(risk_score["total"])
+
         return OfferComparison(
             product=ProductRef(id=product_id, tenant_name=str(product["tenant_name"])),
             requested_quantity=_quantity_string(quantity),
             offers=offers,
-            recommendation=recommend_offer(offers),
+            recommendation=recommend_offer(offers, supplier_risk_scores=supplier_risk_scores),
         )
 
     def price_history(

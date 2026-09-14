@@ -723,16 +723,19 @@ export interface InfeasibleBasketItem {
 }
 
 export interface OptimisationConstraint {
-  readonly type: string;
-  readonly supplier_id?: string | null;
-  readonly parameters?: Record<string, unknown>;
-}
-
-export interface ViolatedOptimisationConstraint {
-  readonly type: string;
+  readonly kind: string;
   readonly supplier_id?: string | null;
   readonly workspace_product_id?: string | null;
-  readonly reason: string;
+  readonly description?: string;
+  readonly money?: Money | null;
+  readonly source_ids?: readonly string[];
+  readonly parameters?: Record<string, unknown>;
+  /** @deprecated legacy alias */
+  readonly type?: string;
+}
+
+export interface ViolatedOptimisationConstraint extends OptimisationConstraint {
+  readonly reason?: string;
   readonly details?: Record<string, unknown>;
 }
 

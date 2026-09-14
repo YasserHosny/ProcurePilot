@@ -1272,6 +1272,7 @@
       "quantity": "Quantity",
       "unitLabel": "Unit: {{unit}}",
       "addItem": "Add Item",
+      "addSupplier": "Add Supplier (2–10)",
       "removeItem": "Remove Item",
       "submitButton": "Optimise Basket Split",
       "submitting": "Submitting Basket...",
@@ -1294,6 +1295,8 @@
       "productColumn": "Product",
       "quantityColumn": "Allocated Quantity",
       "costColumn": "Projected Landed Cost",
+      "allocatedItemsTable": "Allocated Items Table",
+      "requestedQuantity": "(Qty: {{quantity}})",
       "baselinesTitle": "Single-Supplier Baseline Comparison",
       "baselineSubtitle": "Evaluates whether splitting saves money compared to buying everything from one supplier.",
       "splitSavings": "Splitting saves {{amount}} versus buying exclusively from {{cheaperSupplier}}.",
@@ -1966,6 +1969,20 @@
       "normal": "Normal",
       "urgent": "Urgent — prioritise lead time"
     },
+    "confidence": {
+      "high": "High",
+      "medium": "Medium",
+      "low": "Low"
+    },
+    "constraints": {
+      "minimum_order_value": "Minimum Order Value",
+      "free_delivery_threshold": "Free Delivery Threshold",
+      "delivery_fee": "Delivery Fee",
+      "quantity_tier": "Quantity Tier",
+      "supplier_exclusion": "Supplier Exclusion",
+      "urgency": "Urgency",
+      "currency_consistency": "Currency Consistency"
+    },
     "supplierExclusions": {
       "label": "Exclude Suppliers",
       "placeholder": "Select suppliers to exclude...",
@@ -2003,33 +2020,47 @@
   "supplierIq": {
     "header": "Supplier Scorecard",
     "backToSupplier": "Back to Supplier",
+    "windowLabel": "{{months}} Months",
+    "ruleVersion": "Rule version: {{version}}",
+    "computedAt": "Computed: {{date}}",
     "metrics": {
       "sectionTitle": "Performance Metrics",
       "fulfilmentRate": "Fulfilment Rate",
-      "onTimeDelivery": "On-Time Delivery",
       "qualityScore": "Quality Score",
       "priceCompetitiveness": "Price Competitiveness",
       "spendExposure": "Spend Exposure",
-      "disputeRate": "Dispute Rate"
+      "freshnessScore": "Freshness Score",
+      "savingsContribution": "Savings Contribution"
     },
     "sampleCounts": {
       "label": "Sample Size",
-      "quotations": "{{count}} quotation(s)",
-      "deliveries": "{{count}} delivery record(s)",
-      "qualityIssues": "{{count}} quality issue(s)"
+      "samples": "{{count}} record(s)"
+    },
+    "subScores": {
+      "fulfilment": "Fulfilment",
+      "quality": "Quality",
+      "price": "Price",
+      "exposure": "Spend Exposure",
+      "freshness": "Freshness",
+      "savings": "Savings"
     },
     "riskScore": {
       "label": "Risk Score",
       "breakdown": "Risk Score Breakdown",
+      "weightLabel": "Weight: {{weight}}",
       "low": "Low Risk",
       "medium": "Medium Risk",
       "high": "High Risk"
     },
     "sourceEvidence": {
       "sectionTitle": "Evidence Sources",
-      "quotationCount": "Quotations analysed",
-      "deliveryCount": "Delivery records",
-      "qualityIssueCount": "Quality issues logged"
+      "purchaseRecord": "Purchase records",
+      "tenantPurchaseRecord": "Tenant purchase records",
+      "deliveryQualityIssue": "Quality issues logged",
+      "landedCost": "Landed cost records",
+      "marketLandedCost": "Market landed cost records",
+      "savingRecord": "Supplier saving records",
+      "tenantSavingRecord": "Tenant saving records"
     },
     "insufficientEvidence": {
       "badge": "Insufficient Evidence",

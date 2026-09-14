@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 from uuid import uuid4
 
 from procurepilot_api.modules.offers.recommendation import TIE_BREAK_RULE, WEIGHTS, recommend_offer
@@ -88,3 +89,38 @@ def test_sc006_honest_gap_has_no_ml_eval_until_outcome_history_exists() -> None:
     """
 
     assert "lexicographic_supplier_id" in TIE_BREAK_RULE
+
+
+def test_recommendation_can_include_supplier_iq_risk_evidence_when_available() -> None:
+    risky_supplier = offer(amount="10.0000", supplier_name="Risky Supplier")
+    safer_supplier = offer(amount="10.5000", supplier_name="Safer Supplier")
+
+    recommendation = recommend_offer(
+        [risky_supplier, safer_supplier],
+        supplier_risk_scores={
+            risky_supplier.supplier_id: "0.9000",
+            safer_supplier.supplier_id: "0.1000",
+        },
+    )
+
+    assert recommendation is not None
+    assert recommendation.recommended_offer_id == safer_supplier.id
+    assert recommendation.evidence.weights["supplier_risk"] == "0.15"
+    total_weight = sum(Decimal(weight) for weight in recommendation.evidence.weights.values())
+    assert total_weight == Decimal("1.00")
+    assert recommendation.evidence.components["supplier_risk"] == "0.1000"
+    assert "high_supplier_risk" not in recommendation.risk_notes
+
+
+def test_recommendation_notes_high_supplier_risk_for_winning_supplier() -> None:
+    risky_supplier = offer(amount="10.0000", supplier_name="Risky Supplier")
+
+    recommendation = recommend_offer(
+        [risky_supplier],
+        supplier_risk_scores={risky_supplier.supplier_id: "0.9000"},
+    )
+
+    assert recommendation is not None
+    assert recommendation.recommended_offer_id == risky_supplier.id
+    assert recommendation.evidence.components["supplier_risk"] == "0.9000"
+    assert "high_supplier_risk" in recommendation.risk_notes

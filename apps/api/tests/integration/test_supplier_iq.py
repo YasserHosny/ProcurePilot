@@ -105,6 +105,20 @@ def test_supplier_scorecard_metrics_trace_to_seeded_source_records(
         assert _snapshot_count(context, context.supplier_ids[0]) == 1
 
 
+def test_supplier_scorecard_honours_requested_window_months(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = settings_for_test_db(monkeypatch)
+    with committed_smart_context("supplier-iq-window") as context:
+        scorecard = SupplierIqService(settings).get_scorecard(
+            member=context.member,
+            supplier_id=context.supplier_ids[0],
+            window_months=3,
+        )
+
+        assert 88 <= (scorecard.window_end - scorecard.window_start).days <= 93
+
+
 def test_cross_tenant_supplier_scorecard_reference_returns_not_found(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

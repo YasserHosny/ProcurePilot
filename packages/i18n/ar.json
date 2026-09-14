@@ -1272,6 +1272,7 @@
       "quantity": "الكمية",
       "unitLabel": "الوحدة: {{unit}}",
       "addItem": "إضافة منتج",
+      "addSupplier": "إضافة مورّد (٢-١٠)",
       "removeItem": "حذف المنتج",
       "submitButton": "تحسين تقسيم السلة",
       "submitting": "جاري إرسال السلة...",
@@ -1294,6 +1295,8 @@
       "productColumn": "المنتج",
       "quantityColumn": "الكمية المخصصة",
       "costColumn": "التكلفة الواصلة المتوقعة",
+      "allocatedItemsTable": "جدول البنود المخصصة",
+      "requestedQuantity": "(الكمية: {{quantity}})",
       "baselinesTitle": "مقارنة الأساس مع مورد فردي",
       "baselineSubtitle": "تقييم ما إذا كان التقسيم يوفر المال مقارنة بالشراء الكامل من مورد واحد.",
       "splitSavings": "التقسيم يوفر {{amount}} مقارنة بالشراء الحصري من {{cheaperSupplier}}.",
@@ -1966,6 +1969,20 @@
       "normal": "عادي",
       "urgent": "عاجل — يُقدّم وقت التسليم"
     },
+    "confidence": {
+      "high": "عالية",
+      "medium": "متوسطة",
+      "low": "منخفضة"
+    },
+    "constraints": {
+      "minimum_order_value": "الحد الأدنى لقيمة الطلب",
+      "free_delivery_threshold": "حد التسليم المجاني",
+      "delivery_fee": "رسوم التسليم",
+      "quantity_tier": "شريحة الكمية",
+      "supplier_exclusion": "استثناء المورد",
+      "urgency": "الاستعجالية",
+      "currency_consistency": "توافق العملة"
+    },
     "supplierExclusions": {
       "label": "استثناء الموردين",
       "placeholder": "اختر الموردين المُستثنَين...",
@@ -2003,33 +2020,47 @@
   "supplierIq": {
     "header": "بطاقة أداء المورد",
     "backToSupplier": "العودة إلى المورد",
+    "windowLabel": "{{months}} أشهر",
+    "ruleVersion": "إصدار القاعدة: {{version}}",
+    "computedAt": "تاريخ الاحتساب: {{date}}",
     "metrics": {
       "sectionTitle": "مقاييس الأداء",
       "fulfilmentRate": "معدل الوفاء",
-      "onTimeDelivery": "التسليم في الموعد",
       "qualityScore": "درجة الجودة",
       "priceCompetitiveness": "تنافسية السعر",
       "spendExposure": "حجم الإنفاق",
-      "disputeRate": "معدل النزاعات"
+      "freshnessScore": "درجة الحداثة",
+      "savingsContribution": "المساهمة في الوفورات"
     },
     "sampleCounts": {
       "label": "حجم العيّنة",
-      "quotations": "{{count}} عرض أسعار",
-      "deliveries": "{{count}} سجل تسليم",
-      "qualityIssues": "{{count}} مشكلة جودة"
+      "samples": "{{count}} سجل"
+    },
+    "subScores": {
+      "fulfilment": "الوفاء",
+      "quality": "الجودة",
+      "price": "السعر",
+      "exposure": "حجم الإنفاق",
+      "freshness": "الحداثة",
+      "savings": "الوفورات"
     },
     "riskScore": {
       "label": "درجة المخاطر",
       "breakdown": "تفاصيل درجة المخاطر",
+      "weightLabel": "الوزن: {{weight}}",
       "low": "مخاطر منخفضة",
       "medium": "مخاطر متوسطة",
       "high": "مخاطر عالية"
     },
     "sourceEvidence": {
       "sectionTitle": "مصادر الأدلة",
-      "quotationCount": "عروض الأسعار المُحلَّلة",
-      "deliveryCount": "سجلات التسليم",
-      "qualityIssueCount": "مشكلات الجودة المُسجَّلة"
+      "purchaseRecord": "سجلات الشراء للمورد",
+      "tenantPurchaseRecord": "إجمالي سجلات الشراء للمستأجر",
+      "deliveryQualityIssue": "مشكلات جودة التسليم",
+      "landedCost": "سجلات التكلفة المستلمة",
+      "marketLandedCost": "سجلات تكلفة السوق",
+      "savingRecord": "سجلات وفورات المورد",
+      "tenantSavingRecord": "إجمالي سجلات الوفورات للمستأجر"
     },
     "insufficientEvidence": {
       "badge": "أدلة غير كافية",

@@ -653,7 +653,12 @@ describe('BasketSplitComponent (US3, T045)', () => {
         result: {
           ...mockFeasibleJob.result!,
           applied_constraints: [
-            { type: 'minimum_order_value', supplier_id: 'supp-1' },
+            {
+              kind: 'minimum_order_value',
+              supplier_id: 'supp-1',
+              description: 'Supplier Alpha requires a GBP 250.00 minimum order value.',
+              source_ids: [],
+            },
           ],
           violated_constraints: [],
           risk_notes: ['Supplier Alpha has moderate lead time risk.'],
@@ -671,7 +676,7 @@ describe('BasketSplitComponent (US3, T045)', () => {
       expect(component.validUntil()).toBe('2026-09-20T10:00:00Z');
 
       const el: HTMLElement = fixture.nativeElement;
-      expect(el.textContent).toContain('minimum_order_value');
+      expect(el.textContent).toContain('Supplier Alpha requires a GBP 250.00 minimum order value.');
       expect(el.textContent).toContain('Supplier Alpha has moderate lead time risk.');
     });
   });

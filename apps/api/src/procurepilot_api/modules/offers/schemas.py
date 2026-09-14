@@ -8,7 +8,11 @@ from pydantic import BaseModel, ConfigDict, Field, StrictStr, model_validator
 
 RecommendationConfidence = Literal["high", "medium", "low"]
 RiskNote = Literal[
-    "price_expiring_soon", "low_match_confidence", "low_supplier_reliability"
+    "price_expiring_soon",
+    "low_match_confidence",
+    "low_supplier_reliability",
+    "high_supplier_risk",
+    "elevated_supplier_risk",
 ]
 StockSignal = Literal["in_stock", "low_stock", "out_of_stock", "unknown"]
 BasketStatus = Literal["queued", "running", "completed", "failed"]

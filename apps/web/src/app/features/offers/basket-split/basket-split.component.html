@@ -114,7 +114,7 @@
                 class="add-supplier-btn"
               >
                 <mat-icon aria-hidden="true">add</mat-icon>
-                <span>{{ 'basketSplit.form.selectSupplier' | translate }} (2-10)</span>
+                <span>{{ 'basketSplit.form.addSupplier' | translate }}</span>
               </button>
             </div>
           }
@@ -340,11 +340,17 @@
           >
             @if (isSubmitting()) {
               <mat-spinner [attr.aria-label]="'common.loading' | translate" diameter="20" class="btn-spinner"></mat-spinner>
-              <span>{{ 'basketSplit.form.submitting' | translate }}</span>
             } @else {
               <mat-icon aria-hidden="true">call_split</mat-icon>
-              <span>{{ 'basketSplit.form.submitButton' | translate }}</span>
             }
+            <span>
+              {{
+                (isSubmitting()
+                  ? 'basketSplit.form.submitting'
+                  : 'basketSplit.form.submitButton'
+                ) | translate
+              }}
+            </span>
           </button>
         </div>
       </form>
@@ -383,7 +389,7 @@
               </span>
               @if (solverConfidence(); as conf) {
                 <span class="status-pill confidence" [ngClass]="conf">
-                  {{ 'advancedBasket.result.solverConfidence' | translate }}: {{ conf }}
+                  {{ 'advancedBasket.result.solverConfidence' | translate }}: {{ ('advancedBasket.confidence.' + conf) | translate }}
                 </span>
               }
               <h2 class="result-title">{{ 'basketSplit.result.feasibleTitle' | translate }}</h2>
@@ -442,7 +448,7 @@
                   <h4>{{ 'advancedBasket.result.appliedConstraints' | translate }}</h4>
                   <ul>
                     @for (ac of appliedConstraints(); track $index) {
-                      <li>{{ ac.type }}</li>
+                      <li>{{ ac.description || (('advancedBasket.constraints.' + (ac.kind || ac.type)) | translate) }}</li>
                     }
                   </ul>
                 </div>
@@ -452,7 +458,7 @@
                   <h4>{{ 'advancedBasket.result.violatedConstraints' | translate }}</h4>
                   <ul>
                     @for (vc of violatedConstraints(); track $index) {
-                      <li>{{ vc.reason || vc.type }}</li>
+                      <li>{{ vc.description || vc.reason || (('advancedBasket.constraints.' + (vc.kind || vc.type)) | translate) }}</li>
                     }
                   </ul>
                 </div>
@@ -462,7 +468,7 @@
                   <h4>{{ 'advancedBasket.result.riskNotes' | translate }}</h4>
                   <ul>
                     @for (note of riskNotes(); track $index) {
-                      <li>{{ note }}</li>
+                      <li>{{ translateRiskNote(note) }}</li>
                     }
                   </ul>
                 </div>
@@ -483,7 +489,7 @@
                 <span class="alloc-total">{{ alloc.total_landed_cost | formatMoney }}</span>
               </div>
 
-              <table class="alloc-table" aria-label="Allocated Items Table">
+              <table class="alloc-table" [attr.aria-label]="'basketSplit.result.allocatedItemsTable' | translate">
                 <thead>
                   <tr>
                     <th>{{ 'basketSplit.result.productColumn' | translate }}</th>
@@ -533,7 +539,7 @@
                 <div class="item-name">
                   <mat-icon aria-hidden="true">warning</mat-icon>
                   <strong>{{ getProductName(item.workspace_product_id) }}</strong>
-                  <span>(Qty: {{ item.requested_quantity }})</span>
+                  <span>{{ 'basketSplit.result.requestedQuantity' | translate:{ quantity: item.requested_quantity } }}</span>
                 </div>
                 <div class="missing-suppliers">
                   {{ 'basketSplit.result.missingSuppliers' | translate: {
@@ -549,7 +555,7 @@
               <h3>{{ 'advancedBasket.result.violatedConstraints' | translate }}</h3>
               <ul>
                 @for (vc of violatedConstraints(); track $index) {
-                  <li>{{ vc.reason || vc.type }}</li>
+                  <li>{{ vc.description || vc.reason || (('advancedBasket.constraints.' + (vc.kind || vc.type)) | translate) }}</li>
                 }
               </ul>
             </div>

@@ -309,6 +309,30 @@ describe('CompareComponent (US1, SC-002, T020)', () => {
     expect(riskChip?.textContent).toContain('92.0%');
   });
 
+  it('T036/T037: should format decimal Supplier IQ weights as percentages', () => {
+    const comparisonWithDecimalRiskWeight: OfferComparison = {
+      ...mockComparison,
+      recommendation: {
+        ...mockComparison.recommendation!,
+        evidence: {
+          ...mockComparison.recommendation!.evidence,
+          weights: {
+            ...mockComparison.recommendation!.evidence.weights,
+            supplier_risk: '0.15',
+          },
+          components: {
+            ...mockComparison.recommendation!.evidence.components,
+            supplier_risk: '0.1000',
+          },
+        },
+      },
+    };
+
+    component.rawComparison.set(comparisonWithDecimalRiskWeight);
+
+    expect(component.getSupplierRiskWeight(component.projected()?.recommendation)).toBe('15');
+  });
+
   it('T036/T037: should render scorecard action button in offers table for each supplier', () => {
     const el = fixture.nativeElement as HTMLElement;
     const scorecardBtns = el.querySelectorAll('[data-testid="table-view-scorecard-btn"]');

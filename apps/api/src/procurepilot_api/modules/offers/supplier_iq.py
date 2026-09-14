@@ -7,6 +7,7 @@ from decimal import ROUND_HALF_UP, Decimal
 from uuid import UUID
 
 import psycopg
+from dateutil.relativedelta import relativedelta
 from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 
@@ -51,9 +52,11 @@ class SupplierIqService:
         member: CurrentMember,
         supplier_id: UUID,
         bearer_token: str | None = None,
+        window_months: int = 6,
     ) -> SupplierScorecard:
         today = datetime.now(UTC).date()
-        window_start = today - timedelta(days=DEFAULT_WINDOW_DAYS)
+        bounded_months = max(1, min(24, int(window_months)))
+        window_start = today - relativedelta(months=bounded_months)
         with _authenticated_db(self._settings, member) as conn:
             _supplier_visible(conn, supplier_id)
             source_data = _load_source_data(
