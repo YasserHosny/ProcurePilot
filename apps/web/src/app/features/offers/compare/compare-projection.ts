@@ -230,6 +230,31 @@ export function projectComparison(
     risk_notes.push('low_supplier_reliability');
   }
 
+  // Preserve any Supplier IQ / risk notes and extra components from raw recommendation
+  const extraComponents: Record<string, string> = {};
+  const extraWeights: Record<string, string> = {};
+  if (originalComparison?.recommendation?.evidence?.components) {
+    for (const [key, val] of Object.entries(originalComparison.recommendation.evidence.components)) {
+      if (!['cost', 'match_confidence', 'reliability', 'lead_time'].includes(key) && val !== null && val !== undefined) {
+        extraComponents[key] = String(val);
+      }
+    }
+  }
+  if (originalComparison?.recommendation?.evidence?.weights) {
+    for (const [key, val] of Object.entries(originalComparison.recommendation.evidence.weights)) {
+      if (!['cost', 'match_confidence', 'reliability', 'lead_time'].includes(key) && val !== null && val !== undefined) {
+        extraWeights[key] = String(val);
+      }
+    }
+  }
+  if (originalComparison?.recommendation?.risk_notes) {
+    for (const note of originalComparison.recommendation.risk_notes) {
+      if (!risk_notes.includes(note)) {
+        risk_notes.push(note);
+      }
+    }
+  }
+
   const recommendation: Recommendation = {
     recommended_offer_id: winner.offer.id,
     score: winner.total_score.toFixed(4),
@@ -243,12 +268,14 @@ export function projectComparison(
         match_confidence: '0.20',
         reliability: '0.15',
         lead_time: '0.10',
+        ...extraWeights,
       },
       components: {
         cost: winner.cost_score.toFixed(4),
         match_confidence: winner.match_confidence_score.toFixed(4),
         reliability: winner.reliability_score.toFixed(4),
         lead_time: winner.lead_time_score.toFixed(4),
+        ...extraComponents,
       },
       winning_margin: winningMargin !== null ? winningMargin.toFixed(4) : null,
       tie_break: {

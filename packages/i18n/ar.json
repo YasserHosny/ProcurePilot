@@ -1163,14 +1163,20 @@
         "cost": "التكلفة الإجمالية ({{weight}}%)",
         "matchConfidence": "دقة المطابقة ({{weight}}%)",
         "reliability": "موثوقية المورد ({{weight}}%)",
-        "leadTime": "مدة التوريد ({{weight}}%)"
+        "leadTime": "مدة التوريد ({{weight}}%)",
+        "supplierRisk": "ذكاء المورّد / المخاطر ({{weight}}%)"
       },
       "riskNotesTitle": "ملاحظات المخاطر",
       "riskNotes": {
         "price_expiring_soon": "السعر سينتهي خلال 7 أيام. يُوصى باتخاذ إجراء سريع.",
         "low_match_confidence": "دقة مطابقة المنتج أقل من 85%. يُرجى التحقق من مواصفات المنتج.",
-        "low_supplier_reliability": "تقييم موثوقية المورد أقل من 60%."
+        "low_supplier_reliability": "تقييم موثوقية المورد أقل من 60%.",
+        "high_supplier_risk": "يشير ذكاء المورّد إلى مخاطر مرتفعة لهذا المورّد. راجع بطاقة الأداء.",
+        "supplier_quality_risk": "تم الإبلاغ عن حوادث جودة حديثة لهذا المورّد.",
+        "elevated_supplier_risk": "قد تؤثر درجة مخاطر المورّد المرتفعة على التسليم أو الأداء."
       },
+      "supplierIqInfluenced": "تم أخذ تقييم مخاطر ذكاء المورّد في الاعتبار لهذه التوصية لـ {{supplier}}.",
+      "viewSupplierScorecard": "عرض بطاقة أداء المورّد",
       "tieBreakTitle": "تم تطبيق معيار كسر التعادل الحتمي",
       "tieBreakNote": "تساوت درجات العروض؛ تم كسر التعادل بالترتيب: {{rule}}"
     },
@@ -1201,6 +1207,7 @@
     "actions": {
       "viewIntelligence": "سجل الأسعار",
       "viewProduct": "عرض المنتج",
+      "viewScorecard": "عرض بطاقة الأداء",
       "backToCatalogue": "العودة إلى الكتالوج",
       "recordPurchase": "تسجيل الشراء"
     }

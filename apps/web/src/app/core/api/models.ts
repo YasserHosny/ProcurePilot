@@ -593,13 +593,19 @@ export type RecommendationConfidence = 'high' | 'medium' | 'low';
 export type RecommendationRiskNote =
   | 'price_expiring_soon'
   | 'low_match_confidence'
-  | 'low_supplier_reliability';
+  | 'low_supplier_reliability'
+  | 'high_supplier_risk'
+  | 'supplier_quality_risk'
+  | 'elevated_supplier_risk'
+  | (string & {});
 
 export interface RecommendationWeights {
   readonly cost: string;
   readonly match_confidence: string;
   readonly reliability: string;
   readonly lead_time: string;
+  readonly supplier_risk?: string;
+  readonly [key: string]: string | undefined;
 }
 
 export interface RecommendationTieBreak {

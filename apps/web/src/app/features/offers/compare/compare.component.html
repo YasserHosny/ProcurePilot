@@ -212,7 +212,38 @@
                 {{ 'compare.recommendation.weights.leadTime' | translate: { weight: '10' } }}:
                 {{ formatScore(rec.evidence.components['lead_time']) }}
               </span>
+              @if (hasSupplierRiskEvidence(rec)) {
+                <span class="evidence-chip supplier-risk-chip" data-testid="supplier-risk-evidence-chip">
+                  <mat-icon aria-hidden="true" class="chip-icon">verified_user</mat-icon>
+                  {{ 'compare.recommendation.weights.supplierRisk' | translate: { weight: getSupplierRiskWeight(rec) } }}:
+                  {{ formatScore(getSupplierRiskScore(rec)) }}
+                </span>
+              }
             </div>
+
+            <!-- Supplier IQ Risk influence panel & Scorecard Link -->
+            @if (recommendedOffer(); as bestOffer) {
+              @if (hasSupplierRiskEvidence(rec) || hasSupplierRiskNote(rec.risk_notes)) {
+                <div class="supplier-risk-evidence-panel" data-testid="supplier-risk-evidence-panel">
+                  <div class="supplier-risk-content">
+                    <mat-icon aria-hidden="true" class="supplier-risk-icon">analytics</mat-icon>
+                    <span class="supplier-risk-text">
+                      {{ 'compare.recommendation.supplierIqInfluenced' | translate: { supplier: bestOffer.supplier_name } }}
+                    </span>
+                  </div>
+                  <a
+                    mat-stroked-button
+                    color="primary"
+                    [routerLink]="['/suppliers', bestOffer.supplier_id, 'scorecard']"
+                    class="scorecard-link-btn"
+                    data-testid="view-supplier-scorecard-btn"
+                  >
+                    <mat-icon aria-hidden="true">assessment</mat-icon>
+                    <span>{{ 'compare.recommendation.viewSupplierScorecard' | translate }}</span>
+                  </a>
+                </div>
+              }
+            }
           </div>
         </mat-card>
       }
@@ -224,7 +255,19 @@
           <ng-container matColumnDef="supplier">
             <th mat-header-cell *matHeaderCellDef>{{ 'compare.table.supplier' | translate }}</th>
             <td mat-cell *matCellDef="let offer" class="supplier-cell">
-              <span class="supplier-name">{{ offer.supplier_name }}</span>
+              <div class="supplier-title-group">
+                <span class="supplier-name">{{ offer.supplier_name }}</span>
+                <a
+                  mat-icon-button
+                  [routerLink]="['/suppliers', offer.supplier_id, 'scorecard']"
+                  class="supplier-scorecard-icon-btn"
+                  [attr.aria-label]="('compare.actions.viewScorecard' | translate) + ' ' + offer.supplier_name"
+                  [matTooltip]="'compare.actions.viewScorecard' | translate"
+                  data-testid="table-view-scorecard-btn"
+                >
+                  <mat-icon aria-hidden="true">assessment</mat-icon>
+                </a>
+              </div>
               @if (offer.id === proj.recommendation?.recommended_offer_id) {
                 <span class="mini-rec-badge">
                   <mat-icon aria-hidden="true">star</mat-icon>

@@ -236,4 +236,84 @@ describe('CompareComponent (US1, SC-002, T020)', () => {
     expect(params['currency']).toBe('GBP');
     expect(params['tenant_id']).toBeUndefined(); // Never pass tenant id
   });
+
+  it('T036/T037: should display Supplier IQ risk evidence chip and scorecard link when risk influenced recommendation', () => {
+    const comparisonWithSupplierRisk: OfferComparison = {
+      ...mockComparison,
+      recommendation: {
+        ...mockComparison.recommendation!,
+        risk_notes: ['high_supplier_risk'],
+        evidence: {
+          ...mockComparison.recommendation!.evidence,
+          weights: {
+            ...mockComparison.recommendation!.evidence.weights,
+            supplier_risk: '15',
+          },
+          components: {
+            ...mockComparison.recommendation!.evidence.components,
+            supplier_risk: '0.8800',
+          },
+        },
+      },
+    };
+
+    component.rawComparison.set(comparisonWithSupplierRisk);
+    fixture.detectChanges();
+
+    expect(component.hasSupplierRiskEvidence(component.projected()?.recommendation)).toBeTrue();
+    expect(component.hasSupplierRiskNote(component.projected()?.recommendation?.risk_notes)).toBeTrue();
+    expect(component.getSupplierRiskScore(component.projected()?.recommendation)).toBe('0.8800');
+
+    const el = fixture.nativeElement as HTMLElement;
+    const riskChip = el.querySelector('[data-testid="supplier-risk-evidence-chip"]');
+    expect(riskChip).toBeTruthy();
+    expect(riskChip?.textContent).toContain('88.0%');
+
+    const riskPanel = el.querySelector('[data-testid="supplier-risk-evidence-panel"]');
+    expect(riskPanel).toBeTruthy();
+
+    const scorecardBtn = el.querySelector('[data-testid="view-supplier-scorecard-btn"]');
+    expect(scorecardBtn).toBeTruthy();
+    expect(scorecardBtn?.getAttribute('href')).toContain('/suppliers/supp-1/scorecard');
+  });
+
+  it('T036/T037: should retain Supplier IQ risk evidence during client-side projection recompute', () => {
+    const comparisonWithRisk: OfferComparison = {
+      ...mockComparison,
+      recommendation: {
+        ...mockComparison.recommendation!,
+        evidence: {
+          ...mockComparison.recommendation!.evidence,
+          components: {
+            ...mockComparison.recommendation!.evidence.components,
+            supplier_risk: '0.9200',
+          },
+        },
+      },
+    };
+
+    component.rawComparison.set(comparisonWithRisk);
+    fixture.detectChanges();
+
+    // User changes quantity
+    component.onQuantityChange('25');
+    fixture.detectChanges();
+
+    const proj = component.projected();
+    expect(proj?.recommendation?.evidence.components['supplier_risk']).toBe('0.9200');
+    expect(component.hasSupplierRiskEvidence(proj?.recommendation)).toBeTrue();
+
+    const el = fixture.nativeElement as HTMLElement;
+    const riskChip = el.querySelector('[data-testid="supplier-risk-evidence-chip"]');
+    expect(riskChip).toBeTruthy();
+    expect(riskChip?.textContent).toContain('92.0%');
+  });
+
+  it('T036/T037: should render scorecard action button in offers table for each supplier', () => {
+    const el = fixture.nativeElement as HTMLElement;
+    const scorecardBtns = el.querySelectorAll('[data-testid="table-view-scorecard-btn"]');
+    expect(scorecardBtns.length).toBe(2);
+    expect(scorecardBtns[0].getAttribute('href')).toContain('/suppliers/supp-1/scorecard');
+    expect(scorecardBtns[1].getAttribute('href')).toContain('/suppliers/supp-2/scorecard');
+  });
 });

@@ -23,8 +23,8 @@ release conditions.
 - [x] T001 Write `supabase/migrations/20260914000001_supplier_commercial_term.sql` creating `supplier_commercial_term` with money pairing checks, effective-date checks, composite supplier/membership FKs, `ENABLE` and `FORCE` RLS.
 - [x] T002 Write `supabase/migrations/20260914000002_supplier_scorecard_snapshot.sql` creating `supplier_scorecard_snapshot` with unique `(tenant_id,supplier_id,window_start,window_end,rule_version)`, source JSON fields, `ENABLE` and `FORCE` RLS.
 - [x] T003 Write `supabase/migrations/20260914000003_supplier_iq_rls.sql` with `USING` and `WITH CHECK` policies for both new tables, owner/buyer insert permissions, tenant member select permissions, and no update/delete grants.
-- [ ] T004 [P] Add R2.4 i18n namespaces to `packages/i18n/en.json` and `packages/i18n/ar.json`: `advancedBasket`, `supplierIq`, `supplierTerms`, and `anomalies`.
-- [ ] T005 [P] Extend web routing in `apps/web/src/app/app.routes.ts` for supplier scorecard navigation under suppliers without adding a marketing/dashboard page.
+- [x] T004 [P] Add R2.4 i18n namespaces to `packages/i18n/en.json` and `packages/i18n/ar.json`: `advancedBasket`, `supplierIq`, `supplierTerms`, and `anomalies`.
+- [x] T005 [P] Extend web routing in `apps/web/src/app/app.routes.ts` for supplier scorecard navigation under suppliers without adding a marketing/dashboard page.
 - [x] T006 [P] Add API schema classes in `apps/api/src/procurepilot_api/modules/offers/schemas.py` for supplier terms, Supplier IQ scorecards, advanced basket request/result fields, and anomaly alert kinds.
 
 ## Phase 2: Foundational tests and contracts
@@ -70,10 +70,10 @@ release conditions.
 
 ## Phase 6: User Story 4 - Web integration (P2)
 
-- [ ] T036 [P] Extend Compare UI tests in `apps/web/src/app/features/offers/compare/compare.component.spec.ts` for Supplier IQ risk evidence in recommendation explanations.
-- [ ] T037 [P] Extend `apps/web/src/app/features/offers/compare/` to display Supplier IQ/risk evidence when it influenced a recommendation.
-- [ ] T038 [P] Add Playwright E2E `apps/web/tests/e2e/optimisation-supplier-iq.spec.ts` covering advanced basket, supplier scorecard, anomaly action links, and advisory-only language.
-- [ ] T039 [P] Add Playwright a11y/RTL coverage `apps/web/tests/e2e/optimisation-supplier-iq-a11y.spec.ts`.
+- [x] T036 [P] Extend Compare UI tests in `apps/web/src/app/features/offers/compare/compare.component.spec.ts` for Supplier IQ risk evidence in recommendation explanations.
+- [x] T037 [P] Extend `apps/web/src/app/features/offers/compare/` to display Supplier IQ/risk evidence when it influenced a recommendation.
+- [x] T038 [P] Add Playwright E2E `apps/web/tests/e2e/optimisation-supplier-iq.spec.ts` covering advanced basket, supplier scorecard, anomaly action links, and advisory-only language.
+- [x] T039 [P] Add Playwright a11y/RTL coverage `apps/web/tests/e2e/optimisation-supplier-iq-a11y.spec.ts`.
 
 ## Phase 7: Cross-cutting
 

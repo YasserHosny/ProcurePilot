@@ -1163,14 +1163,20 @@
         "cost": "Landed Cost ({{weight}}%)",
         "matchConfidence": "Match Confidence ({{weight}}%)",
         "reliability": "Supplier Reliability ({{weight}}%)",
-        "leadTime": "Lead Time ({{weight}}%)"
+        "leadTime": "Lead Time ({{weight}}%)",
+        "supplierRisk": "Supplier IQ / Risk ({{weight}}%)"
       },
       "riskNotesTitle": "Risk Considerations",
       "riskNotes": {
         "price_expiring_soon": "Price is expiring within 7 days. Prompt action recommended.",
         "low_match_confidence": "Product match confidence is below 85%. Verify product specifications.",
-        "low_supplier_reliability": "Supplier reliability score is below 60%."
+        "low_supplier_reliability": "Supplier reliability score is below 60%.",
+        "high_supplier_risk": "Supplier IQ indicates elevated risk for this supplier. Review scorecard.",
+        "supplier_quality_risk": "Recent quality incidents reported for this supplier.",
+        "elevated_supplier_risk": "Elevated supplier risk score may affect delivery or performance."
       },
+      "supplierIqInfluenced": "Supplier IQ risk evaluation factored into this recommendation for {{supplier}}.",
+      "viewSupplierScorecard": "View Supplier Scorecard",
       "tieBreakTitle": "Deterministic Tie-Break Applied",
       "tieBreakNote": "Offers scored equally; tie-break applied in order: {{rule}}"
     },
@@ -1201,6 +1207,7 @@
     "actions": {
       "viewIntelligence": "Price History",
       "viewProduct": "View Product",
+      "viewScorecard": "View Scorecard",
       "backToCatalogue": "Back to Catalogue",
       "recordPurchase": "Record Purchase"
     }

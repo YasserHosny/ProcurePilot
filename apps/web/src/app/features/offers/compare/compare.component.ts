@@ -23,7 +23,7 @@ import type { ApiError, Product } from '../../../core/api/models';
 import { FormatDatePipe } from '../../../core/format/date.pipe';
 import { FormatMoneyPipe } from '../../../core/format/money.pipe';
 import { formatConfidenceClass, formatScorePercent } from '../offer-formatting';
-import type { OfferComparison, RecommendationConfidence } from '../offers-api';
+import type { OfferComparison, Recommendation, RecommendationConfidence } from '../offers-api';
 import { type ProjectedOffer, projectComparison } from './compare-projection';
 
 @Component({
@@ -216,6 +216,46 @@ export class CompareComponent implements OnInit {
     const n = typeof val === 'number' ? val : parseFloat(val);
     if (isNaN(n)) return '—';
     return `${(n * 100).toFixed(0)}%`;
+  }
+
+  hasSupplierRiskEvidence(rec: Recommendation | null | undefined): boolean {
+    if (!rec?.evidence?.components) return false;
+    return !!(
+      rec.evidence.components['supplier_risk'] ||
+      rec.evidence.components['risk_score'] ||
+      rec.evidence.components['supplier_iq']
+    );
+  }
+
+  hasSupplierRiskNote(riskNotes: readonly string[] | undefined): boolean {
+    if (!riskNotes) return false;
+    return riskNotes.some(
+      (note) =>
+        note.includes('supplier_risk') ||
+        note.includes('quality') ||
+        note === 'high_supplier_risk' ||
+        note === 'elevated_supplier_risk',
+    );
+  }
+
+  getSupplierRiskScore(rec: Recommendation | null | undefined): string | null {
+    if (!rec?.evidence?.components) return null;
+    return (
+      rec.evidence.components['supplier_risk'] ||
+      rec.evidence.components['risk_score'] ||
+      rec.evidence.components['supplier_iq'] ||
+      null
+    );
+  }
+
+  getSupplierRiskWeight(rec: Recommendation | null | undefined): string {
+    if (!rec?.evidence?.weights) return '15';
+    return (
+      rec.evidence.weights['supplier_risk'] ||
+      rec.evidence.weights['risk_score'] ||
+      rec.evidence.weights['supplier_iq'] ||
+      '15'
+    );
   }
 
   getRecordPurchaseParams(offer: ProjectedOffer): Record<string, string> {

@@ -333,6 +333,58 @@
         border-radius: 12px;
         font-size: 0.8rem;
         color: #334155;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+
+        &.supplier-risk-chip {
+          background-color: #f0fdf4;
+          border-color: #86efac;
+          color: #166534;
+          font-weight: 600;
+
+          .chip-icon {
+            font-size: 0.95rem;
+            width: 0.95rem;
+            height: 0.95rem;
+            color: #16a34a;
+          }
+        }
+      }
+    }
+
+    .supplier-risk-evidence-panel {
+      margin-top: 0.85rem;
+      padding: 0.75rem 1rem;
+      background-color: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+
+      .supplier-risk-content {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.85rem;
+        color: #334155;
+
+        .supplier-risk-icon {
+          font-size: 1.1rem;
+          width: 1.1rem;
+          height: 1.1rem;
+          color: #2563eb;
+        }
+      }
+
+      .scorecard-link-btn {
+        font-size: 0.8rem;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
       }
     }
   }
@@ -363,10 +415,32 @@
     }
 
     .supplier-cell {
-      .supplier-name {
-        font-weight: 600;
-        color: #0f172a;
-        display: block;
+      .supplier-title-group {
+        display: flex;
+        align-items: center;
+        gap: 0.25rem;
+
+        .supplier-name {
+          font-weight: 600;
+          color: #0f172a;
+        }
+
+        .supplier-scorecard-icon-btn {
+          width: 28px;
+          height: 28px;
+          line-height: 28px;
+          color: #64748b;
+
+          mat-icon {
+            font-size: 1rem;
+            width: 1rem;
+            height: 1rem;
+          }
+
+          &:hover {
+            color: #2563eb;
+          }
+        }
       }
 
       .mini-rec-badge {
