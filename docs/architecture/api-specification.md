@@ -1002,15 +1002,17 @@ Response:
 - Requests an asynchronous savings-ledger export.
 - Request fields: `kind` fixed to `savings_ledger`, `format` (`xlsx` or `pdf`), and `filters`.
 - `filters` fields: required `period_start`, required `period_end`, optional `supplier_id`, and
-  optional `branch_id`. `Branch` now exists as a real entity (chunk R2.0,
-  `007-organisation-model`), but `SavingRecord` itself carries no `branch_id` column yet — a
-  non-null `branch_id` here remains future-compatible input only, not yet meaningful filtering.
-- Only verified savings are included in savings-ledger exports.
+  optional `branch_id`. A non-null `branch_id` is refused with `422`
+  (`unsupported_in_phase_1`): `SavingRecord` carries no branch attribution yet, so an honest
+  branch-filtered savings export cannot be produced. Branch filtering lands with R2.5
+  (`012-reporting-hardening`) once savings rows carry branch linkage.
+- Only verified savings are included in savings-ledger exports. Filter values are applied when
+  the worker renders the ledger: a `supplier_id` with no verified savings in the period yields an
+  empty ledger (`row_count = 0`), not an error.
 - Returns `202` with an `ExportJob`.
 - Returns `403` when the caller's role may not request exports.
-- Returns `404` when a filter reference is not in the caller's workspace.
-- Returns `409` when an equivalent export is already queued or running.
-- Returns `422` when validation fails.
+- Returns `422` when validation fails, including a non-null `branch_id`.
+- Concurrent equivalent requests are not de-duplicated; each returns its own job.
 
 Request:
 
@@ -1058,6 +1060,27 @@ Response:
   "created_at": "2026-08-21T09:00:00Z",
   "started_at": "2026-08-21T09:00:05Z",
   "completed_at": "2026-08-21T09:01:00Z"
+}
+```
+
+### `GET /exports/{id}/download`
+
+- Requires bearer auth.
+- Mints a short-lived signed Supabase Storage URL for a completed export artifact in the active
+  workspace. The URL lifetime is bounded by `EXPORT_DOWNLOAD_URL_TTL_SECONDS` (default 300
+  seconds, clamped to 60–3600).
+- Appends a `reports.artifact_downloaded` audit event with the job id, kind, format, and row
+  count.
+- Returns `200` with `{ "download_url": "<signed storage url>" }`.
+- Returns `404` when the export job does not exist, is not in the caller's workspace, or has no
+  completed artifact yet (`queued`, `running`, or `failed` jobs).
+- The `download_url` field on an `ExportJob` names this endpoint; it is not itself a storage URL.
+
+Response:
+
+```json
+{
+  "download_url": "https://<project>.supabase.co/storage/v1/object/sign/exports/<tenant>/<path>?token=..."
 }
 ```
 

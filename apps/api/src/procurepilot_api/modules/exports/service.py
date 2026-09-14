@@ -11,7 +11,10 @@ from procurepilot_api.config import Settings, get_settings
 from procurepilot_api.deps import CurrentMember
 from procurepilot_api.errors import NotFoundError, ServiceUnavailableError, UnprocessableEntityError
 from procurepilot_api.modules.exports.schemas import ExportCreate, ExportJob
+from procurepilot_api.modules.exports.storage import ExportStorage
 from procurepilot_api.modules.offers.service import _authenticated_db
+from procurepilot_api.shared.audit import AuditEventCreate, get_audit_writer
+from procurepilot_api.shared.logging import get_trace_id
 
 
 class ExportService:
@@ -51,9 +54,63 @@ class ExportService:
             row = _job_row(conn, job_id)
         return _job(row)
 
+    def create_download_url(
+        self,
+        *,
+        member: CurrentMember,
+        job_id: UUID,
+        bearer_token: str,
+    ) -> str:
+        with _authenticated_db(self._settings, member) as conn:
+            row = _job_row(conn, job_id)
+        if (
+            row.get("status") != "completed"
+            or row.get("storage_bucket") is None
+            or row.get("storage_path") is None
+        ):
+            raise NotFoundError(details={"resource": "export_download"})
+        url = ExportStorage(self._settings).create_signed_url(
+            bucket=str(row["storage_bucket"]),
+            path=str(row["storage_path"]),
+            ttl_seconds=self._settings.export_download_url_ttl_seconds,
+        )
+        _record_audit(
+            bearer_token=bearer_token,
+            member=member,
+            action="reports.artifact_downloaded",
+            target={
+                "export_job_id": str(row["id"]),
+                "kind": str(row["kind"]),
+                "format": str(row["format"]),
+                "row_count": row.get("row_count"),
+            },
+        )
+        return url
+
 
 def get_export_service() -> ExportService:
     return ExportService()
+
+
+def _record_audit(
+    *,
+    bearer_token: str | None,
+    member: CurrentMember,
+    action: str,
+    target: dict[str, object],
+) -> None:
+    get_audit_writer().record(
+        AuditEventCreate(
+            tenant_id=member.tenant_id,
+            actor_membership_id=member.membership_id,
+            actor_email=member.email,
+            action=action,
+            target=target,
+            outcome="success",
+            trace_id=get_trace_id(),
+        ),
+        bearer_token=bearer_token,
+    )
 
 
 def verified_savings_for_export(
