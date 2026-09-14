@@ -86,7 +86,9 @@ Contract: `specs/001-platform-foundation/contracts/auth-tenant.openapi.yaml`.
 interfaces, not shared internal state.
 
 **TypeScript** — strict mode, standalone components, signals for local state, RxJS for streams.
-No `any`. Shared validation schemas come from `packages/validation`.
+No `any`. Shared validation schemas come from `packages/validation`. One stylesheet per
+component via `styleUrl` (single); CI rejects `styleUrls` arrays — they evade the per-file
+4 kB component-style budget. Decompose oversized components into child components instead.
 
 **SQL** — one versioned file per migration, forward-only, never edited after merge. Every new
 tenant-scoped table ships with its RLS policy in the same migration.

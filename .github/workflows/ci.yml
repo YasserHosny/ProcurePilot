@@ -272,6 +272,16 @@ jobs:
       - name: Install web dependencies
         working-directory: apps/web
         run: pnpm install --ignore-workspace --frozen-lockfile
+      - name: "Guard: no multi-stylesheet components (SCSS budget evasion)"
+        # A `styleUrls` array splits one component's styles across files so each stays under the
+        # per-file 4 kB check while the component's total CSS is unchanged — the evasion rejected
+        # in the Wave 15 remediation review. Convention: `styleUrl` (single file); decompose
+        # oversized components into child components instead.
+        run: |
+          if grep -rn "styleUrls" apps/web/src --include='*.ts'; then
+            echo "::error::styleUrls evades the per-file component-style budget. Use styleUrl (single file) and decompose oversized components into child components."
+            exit 1
+          fi
       - name: Unit tests
         # Includes the i18n catalogue completeness check (SC-005): a key present in one language
         # and missing from the other fails here rather than reaching a customer as a raw key.
