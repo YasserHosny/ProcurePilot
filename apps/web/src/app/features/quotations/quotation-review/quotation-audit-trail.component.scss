@@ -1,0 +1,51 @@
+:host {
+  display: block;
+}
+
+.audit-trail-panel {
+  margin-block-start: 1.5rem;
+  border-radius: 8px !important;
+
+  mat-panel-title {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+}
+
+.audit-entries {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding-block: 0.5rem;
+}
+
+.audit-entry {
+  padding: 0.75rem 0;
+  border-block-end: 1px solid #e2e8f0;
+
+  &:last-child {
+    border-block-end: 0;
+  }
+}
+
+.audit-action {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.audit-meta {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-block-start: 0.25rem;
+  color: #64748b;
+  font-size: 0.82rem;
+}
+
+.audit-empty {
+  margin: 0;
+  padding-block: 0.5rem;
+  color: #64748b;
+}

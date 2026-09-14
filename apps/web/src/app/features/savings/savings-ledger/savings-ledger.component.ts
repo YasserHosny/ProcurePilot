@@ -1,4 +1,4 @@
-import { DecimalPipe, NgClass, NgIf } from '@angular/common';
+import { NgClass } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
@@ -43,7 +43,6 @@ import {
   standalone: true,
   imports: [
     FormsModule,
-    NgIf,
     NgClass,
     RouterLink,
     MatCardModule,
@@ -63,7 +62,6 @@ import {
     TranslatePipe,
     FormatDatePipe,
     FormatMoneyPipe,
-    DecimalPipe,
     RoleDirective,
   ],
   templateUrl: './savings-ledger.component.html',

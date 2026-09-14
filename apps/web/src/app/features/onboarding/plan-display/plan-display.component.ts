@@ -1,4 +1,3 @@
-import { DecimalPipe, NgClass, NgIf } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
@@ -7,12 +6,10 @@ import { MatChipsModule } from '@angular/material/chips';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { Router, RouterLink } from '@angular/router';
+import { Router } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
 import type { ApiError } from '../../../core/api/models';
-import { FormatDatePipe } from '../../../core/format/date.pipe';
-import { FormatMoneyPipe } from '../../../core/format/money.pipe';
 import {
   type BillingAccount,
   BillingApiService,
@@ -23,9 +20,6 @@ import {
   selector: 'app-plan-display',
   standalone: true,
   imports: [
-    NgIf,
-    NgClass,
-    RouterLink,
     MatCardModule,
     MatButtonModule,
     MatIconModule,
@@ -33,9 +27,6 @@ import {
     MatDividerModule,
     MatProgressSpinnerModule,
     TranslatePipe,
-    FormatDatePipe,
-    FormatMoneyPipe,
-    DecimalPipe,
   ],
   templateUrl: './plan-display.component.html',
   styleUrl: './plan-display.component.scss',

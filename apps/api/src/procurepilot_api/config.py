@@ -60,6 +60,9 @@ class Settings(BaseSettings):
     supabase_exports_bucket: str = Field(
         default="exports", validation_alias="SUPABASE_EXPORTS_BUCKET"
     )
+    export_download_url_ttl_seconds: int = Field(
+        default=300, validation_alias="EXPORT_DOWNLOAD_URL_TTL_SECONDS", ge=60, le=3600
+    )
     matching_auto_accept_threshold: float = Field(
         default=0.9200, validation_alias="MATCHING_AUTO_ACCEPT_THRESHOLD", ge=0, le=1
     )

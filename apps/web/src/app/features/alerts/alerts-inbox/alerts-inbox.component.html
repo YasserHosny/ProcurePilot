@@ -107,9 +107,12 @@
                   >
                     @if (dismissingAlertIds().has(alert.id)) {
                       <mat-spinner [attr.aria-label]="'common.loading' | translate" diameter="16" class="btn-spinner"></mat-spinner>
-                      <span>{{ 'alerts.card.dismissing' | translate }}</span>
                     } @else {
                       <mat-icon aria-hidden="true">check</mat-icon>
+                    }
+                    @if (dismissingAlertIds().has(alert.id)) {
+                      <span>{{ 'alerts.card.dismissing' | translate }}</span>
+                    } @else {
                       <span>{{ 'alerts.card.dismiss' | translate }}</span>
                     }
                   </button>

@@ -5,10 +5,10 @@ from uuid import UUID
 
 from fastapi import APIRouter, Body, Depends, Header, status
 
-from procurepilot_api.deps import CurrentMember, current_member
+from procurepilot_api.deps import CurrentMember, bearer_token, current_member
 from procurepilot_api.modules.auth.jwt import MemberRole
 from procurepilot_api.modules.auth.rbac import require_role
-from procurepilot_api.modules.exports.schemas import ExportCreate, ExportJob
+from procurepilot_api.modules.exports.schemas import ExportCreate, ExportDownloadUrl, ExportJob
 from procurepilot_api.modules.exports.service import ExportService, get_export_service
 
 router = APIRouter(tags=["exports"])
@@ -32,3 +32,15 @@ def get_export(
     service: Annotated[ExportService, Depends(get_export_service)],
 ) -> ExportJob:
     return service.get_job(member=member, job_id=id)
+
+
+@router.get("/exports/{id}/download", response_model=ExportDownloadUrl)
+def download_export(
+    id: UUID,
+    member: Annotated[CurrentMember, Depends(current_member)],
+    token: Annotated[str, Depends(bearer_token)],
+    service: Annotated[ExportService, Depends(get_export_service)],
+) -> ExportDownloadUrl:
+    return ExportDownloadUrl(
+        download_url=service.create_download_url(member=member, job_id=id, bearer_token=token)
+    )

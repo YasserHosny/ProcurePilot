@@ -1,0 +1,79 @@
+<!-- Case B: Infeasible Completed Result (FR-010, Research R5, Distinct from Failed!) -->
+@if (uiState === 'completed_infeasible') {
+  @if (currentJob?.result; as res) {
+    <mat-card class="infeasible-card">
+      <div class="infeasible-header">
+        <div class="infeasible-icon-wrapper">
+          <mat-icon class="infeasible-icon" aria-hidden="true">block</mat-icon>
+        </div>
+        <div class="infeasible-title-group">
+          <h2 class="infeasible-title">{{ 'basketSplit.result.infeasibleTitle' | translate }}</h2>
+          <p class="infeasible-subtitle">{{ 'basketSplit.result.infeasibleSubtitle' | translate }}</p>
+        </div>
+      </div>
+
+      <div class="infeasible-body">
+        <p class="infeasible-lead">{{ 'basketSplit.result.infeasibleReason' | translate }}</p>
+
+        <div class="infeasible-items-list">
+          @for (item of res.infeasible_items; track item.workspace_product_id) {
+            <div class="infeasible-item-row">
+              <div class="item-name">
+                <mat-icon aria-hidden="true">warning</mat-icon>
+                <strong>{{ getProductName(item.workspace_product_id) }}</strong>
+                <span>{{ 'basketSplit.result.requestedQuantity' | translate:{ quantity: item.requested_quantity } }}</span>
+              </div>
+              <div class="missing-suppliers">
+                {{ 'basketSplit.result.missingSuppliers' | translate: {
+                  suppliers: item.missing_supplier_ids.map(getSupplierName.bind(this)).join(', ')
+                } }}
+              </div>
+            </div>
+          }
+        </div>
+
+        @if (violatedConstraints.length > 0) {
+          <div class="infeasible-violated-section">
+            <h3>{{ 'advancedBasket.result.violatedConstraints' | translate }}</h3>
+            <ul>
+              @for (vc of violatedConstraints; track $index) {
+                <li>{{ vc.description || vc.reason || (('advancedBasket.constraints.' + (vc.kind || vc.type)) | translate) }}</li>
+              }
+            </ul>
+          </div>
+        }
+      </div>
+
+      <mat-divider></mat-divider>
+      <div class="infeasible-actions">
+        <button mat-stroked-button (click)="rerun.emit()" class="rerun-btn" [disabled]="!isWriter || isSubmitting">
+          <mat-icon aria-hidden="true">refresh</mat-icon>
+          <span>{{ 'advancedBasket.actions.rerun' | translate }}</span>
+        </button>
+        <button mat-flat-button color="primary" (click)="resetBasket.emit()">
+          <mat-icon aria-hidden="true">add</mat-icon>
+          <span>{{ 'basketSplit.actions.newSplit' | translate }}</span>
+        </button>
+      </div>
+    </mat-card>
+  }
+}
+
+<!-- Case C: Actual System Failure (Distinct from Commercial Infeasibility!) -->
+@if (uiState === 'failed') {
+  <mat-card class="failed-card">
+    <div class="failed-content">
+      <mat-icon class="failed-icon" aria-hidden="true">error</mat-icon>
+      <h2 class="failed-title">{{ 'basketSplit.status.failed' | translate }}</h2>
+      <p class="failed-message">
+        {{ errorMessage || ('basketSplit.status.failedMessage' | translate) }}
+      </p>
+      <div class="failed-actions">
+        <button mat-flat-button color="primary" (click)="resetBasket.emit()">
+          <mat-icon aria-hidden="true">refresh</mat-icon>
+          <span>{{ 'basketSplit.actions.newSplit' | translate }}</span>
+        </button>
+      </div>
+    </div>
+  </mat-card>
+}

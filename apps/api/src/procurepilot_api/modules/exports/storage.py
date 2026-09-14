@@ -41,6 +41,17 @@ class ExportStorage:
             raise ServiceUnavailableError(details={"dependency": "supabase_storage"}) from exc
         return bucket, path, f"/api/v1/exports/{job_id}/download"
 
+    def create_signed_url(self, *, bucket: str, path: str, ttl_seconds: int) -> str:
+        try:
+            client = create_client(
+                self._settings.supabase_url,
+                self._settings.supabase_service_role_key.get_secret_value(),
+            )
+            result = client.storage.from_(bucket).create_signed_url(path, expires_in=ttl_seconds)
+        except Exception as exc:
+            raise ServiceUnavailableError(details={"dependency": "supabase_storage"}) from exc
+        return str(result["signedURL"])
+
 
 def get_export_storage() -> ExportStorage:
     return ExportStorage()

@@ -233,9 +233,12 @@
           >
             @if (isSubmitting()) {
               <mat-spinner [attr.aria-label]="'common.loading' | translate" diameter="18" class="btn-spinner"></mat-spinner>
-              <span>{{ 'exports.submittingButton' | translate }}</span>
             } @else {
               <mat-icon aria-hidden="true">download</mat-icon>
+            }
+            @if (isSubmitting()) {
+              <span>{{ 'exports.submittingButton' | translate }}</span>
+            } @else {
               <span>{{ 'exports.submitButton' | translate }}</span>
             }
           </button>

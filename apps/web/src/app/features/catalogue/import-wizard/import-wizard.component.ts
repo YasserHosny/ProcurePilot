@@ -17,6 +17,7 @@ import { TranslatePipe, TranslateService } from "@ngx-translate/core";
 import { ApiService } from "../../../core/api/api.service";
 import type { ApiError, ImportPreview, ImportResult } from "../../../core/api/models";
 import { SessionService } from "../../../core/auth/session.service";
+import { ImportWizardPreviewComponent } from "./import-wizard-preview.component";
 
 type WizardStep = "upload" | "preview" | "result";
 
@@ -37,6 +38,7 @@ type WizardStep = "upload" | "preview" | "result";
     MatProgressSpinnerModule,
     MatSnackBarModule,
     TranslatePipe,
+    ImportWizardPreviewComponent,
   ],
   templateUrl: "./import-wizard.component.html",
   styleUrl: "./import-wizard.component.scss",

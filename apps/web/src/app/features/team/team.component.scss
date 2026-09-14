@@ -51,8 +51,7 @@
   display: flex;
   align-items: flex-start;
   gap: 0.75rem;
-  padding-inline: 1rem;
-  padding-block: 0.75rem;
+  padding: 0.75rem 1rem;
   background-color: #fef2f2;
   border: 1px solid #fee2e2;
   border-radius: 8px;
@@ -64,28 +63,24 @@
     inline-size: 24px;
     block-size: 24px;
   }
+}
 
-  .error-text-wrap {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-  }
+.error-text-wrap {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
 
-  .error-title {
-    font-weight: 600;
-    font-size: 0.9375rem;
-  }
+.error-title {
+  font-weight: 600;
+  font-size: 0.9375rem;
+}
 
-  .error-message {
-    font-size: 0.875rem;
-  }
-
-  .error-trace {
-    font-size: 0.75rem;
-    color: #b91c1c;
-    font-family: monospace;
-  }
+.error-trace {
+  font-size: 0.75rem;
+  color: #b91c1c;
+  font-family: monospace;
 }
 
 .team-card {
@@ -111,19 +106,16 @@
   color: #475569;
   font-size: 0.75rem;
   font-weight: 600;
-  padding-inline: 0.5rem;
-  padding-block: 0.125rem;
+  padding: 0.125rem 0.5rem;
   border-radius: 9999px;
   margin-inline-start: 0.5rem;
 }
 
 .tab-body {
-  padding-inline: 1.5rem;
-  padding-block: 1.5rem;
+  padding: 1.5rem;
 
   @include bp.mobile {
-    padding-inline: 0.75rem;
-    padding-block: 1rem;
+    padding: 1rem 0.75rem;
   }
 }
 
@@ -162,8 +154,7 @@
   }
 
   td.mat-cell {
-    padding-inline: 1rem;
-    padding-block: 0.875rem;
+    padding: 0.875rem 1rem;
     font-size: 0.875rem;
     color: #1e293b;
   }
@@ -209,8 +200,7 @@
 .role-pill {
   display: inline-flex;
   align-items: center;
-  padding-inline: 0.625rem;
-  padding-block: 0.25rem;
+  padding: 0.25rem 0.625rem;
   border-radius: 9999px;
   font-size: 0.75rem;
   font-weight: 600;

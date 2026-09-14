@@ -30,6 +30,10 @@ class ExportCreate(BaseModel):
     filters: ExportFilters
 
 
+class ExportDownloadUrl(BaseModel):
+    download_url: str
+
+
 class ExportJob(BaseModel):
     id: UUID
     kind: Literal["savings_ledger"]

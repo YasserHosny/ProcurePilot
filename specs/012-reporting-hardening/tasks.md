@@ -106,6 +106,12 @@ reason (no module code yet), ready to drive implementation.
   documents-module pattern with a bounded environment-configured TTL, audit
   `reports.artifact_downloaded`, and not found for cross-tenant, unauthorised-branch, or purged
   artifacts — closing the Wave 15 audit finding (research R6).
+  Wave 15 remediation note: the core endpoint (authenticated lookup, RLS-visible 404s, signed
+  URL with `EXPORT_DOWNLOAD_URL_TTL_SECONDS`, `reports.artifact_downloaded` audit,
+  integration tests in `apps/api/tests/integration/test_export_download.py`) landed early on
+  main with honest `api-specification.md` docs. T013's remainder: branch-visibility
+  verification (FR-005, blocked on T014 readers) and purged-artifact/expiry semantics (blocked
+  on the T006 retention migration).
 - [ ] T014 [US1] Extend on-demand exports in `apps/api/src/procurepilot_api/modules/exports/schemas.py`
   and `service.py`: kinds `spend_by_supplier` and `alerts_summary`, `csv` format, the branch filter
   (replacing the `unsupported_in_phase_1` refusal) with branch-visibility validation, the locale
@@ -199,16 +205,23 @@ source-backed and actionable, with honest delivery state.
 
 ## Phase 5: User Story 3+4 — Performance and accessibility pass (P2)
 
-- [ ] T029 [P] [US4] Convert feature routes to lazy-loaded routes in
+- [x] T029 [P] [US4] Convert feature routes to lazy-loaded routes in
   `apps/web/src/app/app.routes.ts` (and component imports accordingly) so the production build
   reports the initial bundle at or under 500 kB raw with zero budget warnings — measured against
   the Wave 15 baseline (588.35 kB), per research R10.
-- [ ] T030 [P] [US4] Bring every component style inside its 4 kB budget, refactoring or splitting
+  Landed early in the Wave 15 remediation (main): routes were already lazy; the real offenders
+  were the eagerly-imported Sentry SDK (244.92 kB) and synchronous animations provider — both
+  now lazy. Initial bundle 457.79 kB, zero budget warnings.
+- [x] T030 [P] [US4] Bring every component style inside its 4 kB budget, refactoring or splitting
   the styles of the components listed in
   `docs/quality/r2.5-performance-accessibility-baseline.md` (team, review-queue,
   resolution-queue, product-intelligence, alerts-inbox, savings-ledger, saving-evidence,
   match-resolution, export-savings, plan-display, home), so the build emits zero SCSS budget
   warnings.
+  Landed early in the Wave 15 remediation (main): shared primitives deduplicated into global
+  `styles.scss`; oversized components decomposed into real child components (own template +
+  class), not `styleUrls` budget evasion; TS-998113/NG8011 warnings also cleared. Zero build
+  warnings, 56/56 component styles within budget.
 - [ ] T031 [US4] Write `apps/web/tests/e2e/compare-grid-performance.spec.ts` asserting
   compare-grid recalculation completes under 150 ms for a seeded basket (constitution gate;
   FR-025), stable against CI noise via repeated-measurement median.

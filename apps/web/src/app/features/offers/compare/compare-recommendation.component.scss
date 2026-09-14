@@ -1,0 +1,185 @@
+.recommendation-card {
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+  border-inline-start: 6px solid #10b981;
+  background-color: #f0fdf4;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+
+  &.confidence-high { border-inline-start-color: #10b981; background-color: #f0fdf4; }
+  &.confidence-medium { border-inline-start-color: #f59e0b; background-color: #fffbeb; }
+  &.confidence-low { border-inline-start-color: #ef4444; background-color: #fef2f2; }
+}
+
+.rec-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.badge-group {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.recommendation-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #065f46;
+  background-color: #d1fae5;
+  padding: 0.25rem 0.6rem;
+  border-radius: 9999px;
+}
+
+.score-badge, .margin-badge {
+  font-size: 0.8rem;
+  padding: 0.2rem 0.5rem;
+  border-radius: 6px;
+}
+.score-badge {
+  color: #475569;
+  background-color: rgba(255, 255, 255, 0.8);
+  border: 1px solid #cbd5e1;
+}
+.margin-badge {
+  font-weight: 600;
+  color: #065f46;
+  background-color: #ecfdf5;
+  border: 1px solid #a7f3d0;
+}
+
+.rec-main-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.supplier-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  .supplier-title { font-size: 1.4rem; font-weight: 700; color: #0f172a; }
+  .unit-price-sub { font-size: 0.9rem; color: #475569; }
+}
+
+.cost-section {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.25rem;
+  .cost-label { font-size: 0.85rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; }
+  .cost-amount { font-size: 1.6rem; font-weight: 800; color: #047857; }
+}
+
+.rec-action-section .record-purchase-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 600;
+}
+
+.risk-notes-box {
+  background-color: #fff7ed;
+  border: 1px solid #ffedd5;
+  border-radius: 6px;
+  padding: 0.75rem 1rem;
+  margin-bottom: 0.75rem;
+  .risk-title {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-weight: 600;
+    font-size: 0.85rem;
+    color: #c2410c;
+    margin-bottom: 0.25rem;
+    mat-icon { font-size: 1.1rem; width: 1.1rem; height: 1.1rem; }
+  }
+  .risk-list { margin: 0; padding-inline-start: 1.5rem; font-size: 0.85rem; color: #9a3412; }
+}
+
+.validity-row, .tie-break-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  margin-bottom: 0.75rem;
+}
+.validity-row {
+  color: #475569;
+  mat-icon { font-size: 1rem; width: 1rem; height: 1rem; color: #64748b; }
+}
+.tie-break-banner {
+  background-color: #e0f2fe;
+  color: #0369a1;
+  padding: 0.5rem 0.75rem;
+  border-radius: 6px;
+  mat-icon { font-size: 1rem; width: 1rem; height: 1rem; }
+}
+
+.evidence-section {
+  margin-top: 0.75rem;
+  .evidence-title {
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #64748b;
+    display: block;
+    margin-bottom: 0.5rem;
+  }
+  .evidence-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+}
+
+.evidence-chip {
+  background-color: rgba(255, 255, 255, 0.8);
+  border: 1px solid #cbd5e1;
+  padding: 0.25rem 0.6rem;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  color: #334155;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  &.supplier-risk-chip {
+    background-color: #f0fdf4;
+    border-color: #86efac;
+    color: #166534;
+    font-weight: 600;
+    .chip-icon { font-size: 0.95rem; width: 0.95rem; height: 0.95rem; color: #16a34a; }
+  }
+}
+
+.supplier-risk-evidence-panel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-top: 0.75rem;
+  padding: 0.6rem 0.75rem;
+  border-radius: 8px;
+  background-color: rgba(255, 255, 255, 0.7);
+  border: 1px solid #cbd5e1;
+  .supplier-risk-content {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    .supplier-risk-icon { font-size: 1rem; width: 1rem; height: 1rem; color: #16a34a; }
+    .supplier-risk-text { font-size: 0.85rem; font-weight: 600; color: #1e293b; }
+  }
+}
