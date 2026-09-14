@@ -1,6 +1,6 @@
 # ProcurePilot — Development Guidelines
 
-Last updated: 2026-08-20 · Active feature: `001-platform-foundation`
+Last updated: 2026-09-14 · Active feature: `012-reporting-hardening` (R2.5)
 
 ProcurePilot turns fragmented supplier information into trusted, comparable purchasing
 decisions and proves the money saved. Read `.specify/memory/constitution.md` before writing
@@ -110,9 +110,11 @@ directions.
 
 ## Current phase
 
-Phase 1 (Procurement Intelligence MVP, web). Chunk 4.1 of 4.1–4.6. **Do not implement Phase 2+
-features** — requests, approvals, branches, budgets, mobile, integrations — until the
-corresponding stage gate is passed. Sketching is allowed; building is not.
+Phase 1 (Procurement Intelligence MVP, web). R2.5 `012-reporting-hardening` is the active
+feature, executing in waves 16–18 per `docs/operations/parallel-execution-plan-wave16.md`
+(Wave 15 planning + critiques is merged). **Do not implement Phase 2+ features** — requests,
+approvals, branch-scoped workflows, budgets, mobile, integrations — until the corresponding
+stage gate is passed. Sketching is allowed; building is not.
 
 <!-- MANUAL ADDITIONS START -->
 ## Local App Restart Notes
