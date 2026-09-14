@@ -175,6 +175,9 @@ test scope document exists and names every in-scope surface.
   count, and must not create a storage object.
 - If a digest subscriber's membership is removed or suspended, the subscription must stop
   delivering and the next scheduler run must skip it without error.
+- If a report schedule's creating membership is deactivated, the schedule must continue as a
+  workspace asset under tenant authority, editable by any owner or buyer, with the creator
+  preserved for provenance.
 - If email delivery is unconfigured, unreachable, or refuses the message, the in-app digest and
   the explicit failure status must remain available and audited.
 - If an artifact's retention window passes while a member holds an unexpired download link, the
@@ -193,40 +196,69 @@ test scope document exists and names every in-scope surface.
   editable by owners and buyers.
 - **FR-002**: System MUST support report kinds `savings_ledger`, `spend_by_supplier`, and
   `alerts_summary`, each with a declared set of supported formats: CSV and XLSX for all kinds;
-  PDF additionally for `savings_ledger` and `alerts_summary`.
+  PDF additionally for `savings_ledger` and `alerts_summary`. Each kind MUST declare its column
+  schema — human-readable business identifiers (supplier name, product name, branch name,
+  PO or reference number), never bare UUIDs — and spend aggregation MUST group by currency and
+  MUST NOT sum across currencies.
 - **FR-003**: System MUST generate scheduled artifacts in the workspace's reporting timezone
   (IANA name, default UTC, owner-editable), covering the prior complete period window.
 - **FR-004**: System MUST list artifacts and export jobs in one cursor-paginated Reports surface
   carrying kind, format, filters snapshot, period, status, row count, rule version, source
-  schedule id where applicable, and created, started, and completed timestamps.
+  schedule id where applicable, and created, started, and completed timestamps. The listing MUST
+  filter by the caller's authorized branches: branch-scoped roles MUST NOT see artifacts whose
+  filters include branches they cannot see.
 - **FR-005**: System MUST serve artifact downloads through an authenticated endpoint that returns
   an expiring signed URL, records a download audit event, and returns not found for cross-tenant
-  or expired artifacts. The documented-but-unimplemented `GET /api/v1/exports/{id}/download`
-  endpoint on `main` MUST be delivered by this feature.
+  or expired artifacts. The download MUST additionally verify the caller's branch visibility
+  against the artifact's branch filter, resolving as not found when unauthorised. The
+  documented-but-unimplemented `GET /api/v1/exports/{id}/download` endpoint on `main` MUST be
+  delivered by this feature.
 - **FR-006**: System MUST make scheduled generation idempotent per schedule and period: a repeated
   or raced scheduler pass MUST NOT produce a duplicate artifact.
-- **FR-007**: System MUST run scheduled generation and digest delivery in workers without a member
-  JWT, with every database query pinned to the owning tenant by construction, and with each
-  generation and delivery attempt recorded as an audit event.
+- **FR-007**: System MUST run scheduled generation and digest delivery in workers without a
+  member JWT, treating queue payloads as untrusted hints: the worker MUST load the owning row by
+  id, re-derive the tenant scope (and membership or branch scope where relevant) from the
+  database row inside the transaction, and refuse mismatches before any read, render, upload, or
+  audit. Reader functions MUST be authorization-pinned — validating the effective membership and
+  branch visibility — not merely tenant-pinned. Each generation and delivery attempt MUST be
+  recorded as an audit event.
 - **FR-008**: System MUST provide per-member digest subscriptions with kind, optional branch
-  filter, channel, status, next-run time, and last delivery outcome.
-- **FR-009**: System MUST render the weekly digest from: verified savings recorded in the period,
-  new anomalies detected in the period, and offers whose validity ends within seven days, with
-  every item carrying a deep link into the acting surface.
+  filter, channel, status, next-run time, and last delivery outcome. New memberships MUST be
+  provisioned with one active weekly digest subscription (in-app channel, or email when the
+  workspace has email configured), disclosed in the invitation flow with one-click pause.
+- **FR-009**: System MUST render the weekly digest with verified savings in the hero position
+  (explicit currency), followed by actionable backlog sections — purchase outcomes pending
+  verification and purchase requests awaiting the subscriber's approval — then new anomalies
+  detected in the period, then offers whose validity ends within seven days, with every item
+  carrying a deep link into the acting surface. No section may present history without an
+  available action.
 - **FR-010**: System MUST deliver digests by email through an environment-configured SMTP provider
   when configured, and MUST expose the digest in-app regardless, with an explicit
-  "email not configured" status when the provider is absent.
+  "email not configured" status when the provider is absent. Digest email MUST be multipart (HTML
+  and plain text), MUST set direction and language attributes per locale with email-safe fonts,
+  and MUST carry standard List-Unsubscribe headers plus a footer link to digest settings.
 - **FR-011**: System MUST record every digest delivery attempt with outcome, timestamp, and error
-  detail where present, audited append-only.
+  detail where present, audited append-only. Each audit action across this feature MUST carry its
+  mandatory payload fields: actor membership for member actions and an explicit system-actor
+  marker for worker actions, trace or correlation id, source schedule or subscription id, period
+  window, filters digest, row count, storage path reference, and outcome-specific detail
+  (signed-URL TTL, delivery response class, purge reason, schedule state transition).
 - **FR-012**: System MUST support the CSV format for every export kind and MUST support the branch
   filter that today returns `unsupported_in_phase_1`.
 - **FR-013**: System MUST cap export row counts at a configured maximum (default 10,000) and
   refuse over-cap requests with a structured error naming the cap and actual count.
 - **FR-014**: System MUST purge stored artifacts after a configurable retention window (default
-  90 days) and record each purge as an audit event.
+  90 days) and record each purge as an audit event. Artifact rows MUST carry immutable schedule
+  and filter snapshots so replay survives schedule deletion, and purging MUST invalidate
+  previously issued download links.
 - **FR-015**: System MUST render report labels and headings from the shared `packages/i18n`
-  catalogues (English and Arabic) — no hardcoded user-facing strings in renderers — and MUST
-  render Arabic PDFs right-to-left with an Arabic-capable embedded font.
+  catalogues (English and Arabic) — no hardcoded user-facing strings in renderers — with CSV
+  output prefixed by a UTF-8 BOM for Excel compatibility, empty exports rendering full report
+  header metadata (workspace, kind, filters, period, timestamp, rule version) rather than a bare
+  sentence, PDFs using structured table layouts with page headers, and Arabic PDFs passing
+  through an explicit shaping pipeline (Arabic glyph reshaping and bidirectional reordering)
+  before drawing, right-to-left, with an Arabic-capable embedded font. Evidence references in
+  artifacts MUST be human-usable web links, not internal API paths.
 - **FR-016**: System MUST express every monetary value in reports, digests, and exports as amount
   with explicit currency, and MUST carry rule version and filter snapshots in every artifact
   metadata for replay.
@@ -238,7 +270,9 @@ test scope document exists and names every in-scope surface.
 - **FR-019**: System MUST return not found, never forbidden, for cross-tenant schedule, artifact,
   export job, and digest subscription references.
 - **FR-020**: System MUST rate limit export creation, schedule mutations, and digest subscription
-  mutations.
+  mutations, keyed by the verified tenant and membership claims (IP only as fallback), MUST cap
+  active schedules and digest subscriptions per member, and MUST return structured 429 responses
+  without queuing work.
 - **FR-021**: System MUST run dependency vulnerability audits (Python and JavaScript) as a
   blocking CI job on every pull request.
 - **FR-022**: System MUST produce a recorded security review covering RLS on new tables, worker
@@ -257,6 +291,9 @@ test scope document exists and names every in-scope surface.
   settings with logical focus order in both layout directions.
 - **FR-028**: System MUST serve all new web UI strings from `packages/i18n` in English and Arabic
   with layout using CSS logical properties.
+- **FR-029**: System MUST record the rendering locale on every report schedule and export job,
+  defaulting to the requesting member's preferred locale, and MUST expose it in the Reports
+  surface so members can identify an artifact's language before download.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -314,7 +351,9 @@ test scope document exists and names every in-scope surface.
 - Product telemetry for the G2 gate (workflow origination, mobile adoption, retention) is measured
   by the existing telemetry pipeline, not by reporting code; R2.5 does not add a telemetry product.
 - The existing `openpyxl` and `reportlab` dependencies remain the rendering stack; Arabic support
-  is achieved by embedding an Arabic-capable open-license font, not by changing libraries.
+  additionally requires Arabic glyph reshaping and bidirectional-reordering libraries (for
+  example `arabic-reshaper` and `python-bidi`) alongside the embedded open-license font — font
+  embedding alone does not shape Arabic script.
 - The existing `export_job` table remains the single job-and-artifact record; scheduled runs extend
   it rather than creating a parallel table, per its own migration comment.
 - Bundle-size reduction uses route-level lazy loading of existing feature areas; no feature is

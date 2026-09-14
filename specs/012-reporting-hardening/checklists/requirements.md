@@ -53,3 +53,11 @@ typeface. Neither changes what is built, only how one subsystem reaches the same
 
 **Validation iteration 2 (2026-09-14)** — cross-artifact pass against the Wave 15 critique set
 (product, security, performance/a11y, docs) completed; contradiction-free. All items pass.
+
+**Validation iteration 3 (2026-09-14)** — after the four critique documents landed, the
+orchestrator reconciled every accepted finding into this package (the full mapping is recorded in
+research.md R13): branch-visibility scoping and untrusted-queue-payload hardening (security
+blockers), the Arabic shaping/bidi pipeline, `locale` tracking, human-readable export columns,
+and the actionable-digest redesign (product blockers), and the missing test-strategy update task
+(docs audit, now T042). No finding was rejected; one was adjusted in wording only (default digest
+provisioning is disclosed and one-click pausable). All items still pass.

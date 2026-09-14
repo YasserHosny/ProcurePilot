@@ -46,6 +46,11 @@ Per-branch and per-role variants are additive filter work later; R2.5 ships the 
 the roadmap names, and monthly/other cadences are deliberately excluded to keep the scheduler
 honest.
 
+**Default provisioning (product critique finding 10)**: every new membership is provisioned with
+one active weekly subscription at invitation acceptance (in-app channel, or email when SMTP is
+configured), disclosed in the invitation flow with one-click pause. An opt-in-only digest cannot
+move the G2 retention metric it exists to serve.
+
 ## R4 - Scheduling mechanism and idempotency
 
 **Decision**: A single-instance scheduler entrypoint (`procurepilot_api.workers.report_scheduler`)
@@ -68,10 +73,20 @@ uniqueness is the same pattern the codebase already uses for idempotency keys.
 service-role connection, and every query is pinned to the owning tenant by an explicit
 `tenant_id` parameter — the same pattern as `record_audit_event` (migration `0007`) and
 `accept_member_invitation` (migration `0009`), which exist precisely because RLS cannot admit a
-claimless caller. Tenant-pinned reader functions for savings, purchases, alert conditions, and
-validity windows are SECURITY DEFINER functions taking `tenant_id` (plus period/branch/supplier
-filters), owned by the migrations with `SET search_path`. The isolation test gains cases that
-call these functions with tenant A and assert tenant B rows are invisible.
+claimless caller. Authorization-pinned reader functions for savings, purchases, alert conditions,
+and validity windows are SECURITY DEFINER functions taking `tenant_id` (plus period/branch/supplier
+filters, plus the effective `membership_id` wherever member-specific visibility matters — they
+validate active membership and branch visibility internally), owned by the migrations with
+`SET search_path`. The isolation test gains cases that call these functions with tenant A and
+assert tenant B rows are invisible, plus a branch-A/branch-B case for the member-scoped readers.
+
+**Untrusted queue payloads (security critique finding 2)**: workers treat Redis payloads as
+untrusted hints — the worker loads the schedule/subscription/job row by id, re-derives the tenant
+(and membership/branch scope) from the database row inside the transaction, verifies status and
+due period, and refuses mismatches before any read, render, upload, or audit. This closes the
+queue-poisoning/replay angle (an attacker with Redis write access pairing tenant A with job B)
+and is tested with tenant/job mismatch payloads, duplicate RQ replay, stale claims, and
+crash-after-upload recovery cases.
 
 **Rationale**: The alternative — minting member-impersonating JWTs inside workers — couples
 scheduling to session semantics and widens the audit story. Parameter-pinned functions keep the
@@ -117,6 +132,15 @@ CSS logical properties and a print stylesheet that works in both directions.
 applies to rendered documents, not only to the SPA; today's renderer headers are hardcoded
 English. reportlab's base-14 fonts carry no Arabic glyphs, so Arabic PDFs without an embedded
 font produce empty glyphs — a correctness defect for Arabic-first tenants, not a polish item.
+
+**Shaping pipeline (product critique finding 1)**: embedding a font supplies glyphs but performs
+no Arabic shaping or bidirectional reordering — reportlab draws isolated-form characters in
+logical (reversed) order. Arabic rendering therefore passes every string through
+`arabic-reshaper` (contextual glyph forms) and `python-bidi` (display-order reordering) before
+drawing; both join the api dependencies. Mixed Arabic/Latin/numeric strings are the explicit test
+case. CSV output is prefixed with a UTF-8 BOM so desktop Excel decodes Arabic correctly
+(product critique finding 9), and digest email is multipart with `dir`/`lang` attributes and
+List-Unsubscribe headers (product critique finding 8).
 
 ## R9 - Artifact retention and purge
 
@@ -176,8 +200,42 @@ the pentest is a purchase, and R2.5's job is to make it procurable the day G2 cl
 passed on product telemetry, not on these checks — the Wave 15 G2 evidence checklist carries that
 separately.
 
+## R13 - Wave 15 critique reconciliation record
+
+The four Wave 15 critique/baseline documents were reviewed against this package. Accepted
+findings and where they landed:
+
+| Finding | Source | Landed in |
+|---|---|---|
+| Branch/member-scoped visibility on artifact listing and download (blocker) | security 1 + product 5 | FR-004, FR-005, FR-018; T008, T012, T013, T019 |
+| Untrusted queue payloads; workers re-derive scope from rows (blocker) | security 2 | FR-007; T016, T017, T023, T024; tests in T008 |
+| Authorization-pinned reader functions (major) | security 3 | FR-007; data-model readers; T005, T008 |
+| Audit payload contract per action (major) | security 4 | FR-011; data-model audit section; T012-T017, T024 |
+| Settings hygiene: SecretStr, bounded TTLs, redaction, font licence (major) | security 5 | FR-005, FR-010, FR-014, FR-015; T013, T015, T024, T036 |
+| Rate limits keyed by tenant/member; caps; structured 429 (major) | security 6 | FR-020; T035 |
+| Immutable schedule snapshots; audited transitions (major) | security 7 | FR-014; data-model `schedule_snapshot`; T004, T016, T017 |
+| Storage path shape, CSV content type, private bucket regression (minor) | security 8 | T013, T014, T036 |
+| Arabic shaping + bidi pipeline (blocker) | product 1 | FR-015; assumption; R8; T015, T019 |
+| `locale` on schedules and export jobs (blocker) | product 2 | FR-029; data-model; T002, T004, T011, T014, T021 |
+| Human-readable export columns, web evidence links, structured PDF (blocker) | product 3 | FR-002, FR-015, FR-016; data-model column schemas; T015 |
+| Actionable digest: pending verifications + approvals, hero IA (blocker) | product 4 + 11 | FR-009; DigestView; T023, T024, T027 |
+| Column schemas + currency grouping for new kinds (major) | product 6 | FR-002; data-model; T005, T014, T015 |
+| Reports center insight pills + deep links; cross-links (major/minor) | product 7 + 13 | FR-004; T020, T021, T040 |
+| Multipart RTL email + List-Unsubscribe (major) | product 8 | FR-010; R8; T024 |
+| CSV UTF-8 BOM (major) | product 9 | FR-015; R8; T015, T019 |
+| Default digest provisioning (major) | product 10 | FR-008; R3; T023, T027 |
+| Empty-export header metadata (minor) | product 12 | FR-015; T015 |
+| Schedule survives creator deactivation (minor) | product 14 | spec Edge Cases; T011, T016 |
+| Test-strategy update missing from tasks | docs audit | new T042 |
+| Mobile docs web-only boundary note | docs audit | T040 |
+
+No findings were rejected. One was adjusted in wording, not substance: default digest
+provisioning is disclosed in the invitation flow and pausable in one click (recorded in R3), so
+the provisioning never becomes an unannounced email stream.
+
 ## Open questions carried to Wave 16
 
 None blocking. Two items are flagged for the user at the Wave 16 start gate, both recorded as
 spec assumptions: the SMTP provider-agnostic choice (R7), and Noto Naskh Arabic (or equivalent
-OFL font) as the embedded Arabic typeface (R8).
+OFL font) as the embedded Arabic typeface (R8). A third, smaller item rides with them: the
+`arabic-reshaper` + `python-bidi` dependency additions (R8, product critique finding 1).

@@ -49,6 +49,7 @@ A per-member weekly digest definition.
 | `tenant_id` | uuid | Required FK -> Tenant; RLS key |
 | `membership_id` | uuid | Required composite FK -> Membership `(tenant_id, id)`; the subscriber |
 | `kind` | text | Required; `weekly_digest` (single value in R2.5) |
+| `locale` | text | Required; `en` or `ar` — the digest render language, defaulting to the member's preferred locale |
 | `filters` | jsonb | Required; `{branch_id?: uuid}` |
 | `filters_digest` | text | Required; canonical digest of filters |
 | `channel` | digest_channel | Required; `email` or `in_app` |
@@ -62,6 +63,9 @@ A per-member weekly digest definition.
 Constraints:
 
 - Unique `(tenant_id, membership_id, kind, filters_digest)`.
+- Every new membership is provisioned with one active subscription (in-app channel, or email when
+  SMTP is configured) at acceptance, per FR-008; the provisioning is a service behaviour on top
+  of this table.
 - The scheduler skips subscriptions whose membership is no longer active.
 - RLS: a member may select/insert/update/delete only their own subscription rows
   (`membership_id = (auth.jwt() ->> 'membership_id')`); owners may additionally select all rows
@@ -80,7 +84,11 @@ immutable).
 Remains the single job-and-artifact record for on-demand and scheduled generation. Extensions:
 
 - `schedule_id` uuid nullable, composite FK -> `report_schedule (tenant_id, id)`.
+- `locale` text not null default `'en'` — the artifact render language (FR-029).
 - `rule_version` text not null default `''` (set by the renderer at run time).
+- `schedule_snapshot` jsonb nullable — an immutable copy of the schedule definition (kind, format,
+  filters, weekday, locale, rule version at creation) taken when the scheduled run is enqueued, so
+  replay survives schedule edits and deletion.
 - `expires_at` timestamptz nullable (set at completion: completion time + retention window).
 - `kind` widens to `savings_ledger | spend_by_supplier | alerts_summary` (text column; the API and
   a new CHECK constraint enforce the value set).
@@ -101,10 +109,13 @@ Remains the single job-and-artifact record for on-demand and scheduled generatio
 - `saving_record` and `purchase_record` already carry `(tenant_id, recorded_at desc)`-shaped
   indexes from earlier chunks; `spend_by_supplier` reuses them.
 
-## Tenant-pinned reader functions
+## Authorization-pinned reader functions
 
 SECURITY DEFINER functions owned by migrations, `SET search_path` pinned, each taking `tenant_id`
-plus filters and returning only that tenant's rows (research R5):
+plus filters, and — wherever member-specific visibility matters (digest content, branch-scoped
+reports) — the effective `membership_id` and optional `branch_id`, validating active membership
+and branch visibility inside the function before returning rows (research R5; security critique
+finding 3):
 
 - `reporting_savings_for_period(tenant_id, period_start, period_end, supplier_id, branch_id)`
 - `reporting_purchases_for_period(tenant_id, period_start, period_end, supplier_id, branch_id)`
@@ -114,7 +125,20 @@ plus filters and returning only that tenant's rows (research R5):
 - `reporting_validity_expiring(tenant_id, now, horizon_days, branch_id)` — offers whose validity
   window ends inside the horizon (digest section three).
 
-Each function is covered by the isolation test with a tenant-A/tenant-B marker-record case.
+Each function is covered by the isolation test with a tenant-A/tenant-B marker-record case, plus
+a branch-A/branch-B case for the member-scoped readers.
+
+## Declared column schemas per report kind
+
+- `savings_ledger`: short saving reference, recorded date, branch name, supplier name, product
+  name, SKU/unit, quantity, baseline unit price and total (currency-explicit), actual unit price
+  and total paid, verified saving amount, PO/reference, evidence web link.
+- `spend_by_supplier`: grouped by (supplier, currency) — supplier name, tax registration number,
+  currency, total spend, order count, verified savings realised, primary branch. Never sums
+  across currencies.
+- `alerts_summary`: alert id, triggered date, alert type, severity, supplier name, product name,
+  branch name, estimated financial exposure (currency-explicit), status, dismissed by,
+  dismissal reason.
 
 ## Response-only entities
 
@@ -137,13 +161,17 @@ while downloadable), `expires_at`, `error`, `created_at`, `started_at`, `complet
 
 ### `DigestView`
 
-The in-app digest render: `subscription_id`, `period_start`, `period_end`, `sections` (savings,
-anomalies, expiring validity — each item with `label`, `money` where applicable, `evidence_ref`,
-`deep_link`), `rendered_at`, `delivery_status`.
+The in-app digest render: `subscription_id`, `period_start`, `period_end`, `sections` in fixed
+order — verified savings (hero position), pending outcome verifications, pending approvals for
+the subscriber, anomalies, expiring validity (each item with `label`, `money` where applicable,
+`evidence_ref`, `deep_link`), `rendered_at`, `delivery_status`.
 
 ## Audit events
 
-Append-only, no update or delete for any role:
+Append-only, no update or delete for any role. Every event carries the mandatory payload contract
+from FR-011: actor membership (or the explicit system-actor marker for worker-triggered events),
+trace or correlation id, source schedule or subscription id, period window, filters digest, row
+count where applicable, storage path reference where applicable, and outcome-specific detail.
 
 - `reports.schedule_created` / `schedule_updated` / `schedule_paused` / `schedule_resumed` /
   `schedule_deleted`

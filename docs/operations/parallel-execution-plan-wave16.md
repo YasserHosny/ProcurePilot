@@ -14,9 +14,12 @@ below, and only for them.
 
 Wave 15 produced the planning package under `specs/012-reporting-hardening/` (spec, plan,
 research, data-model, quickstart, requirements checklist, tasks) plus four critique/baseline
-documents. All five scope ambiguities are resolved in research.md R1-R5, R11, R12. Two
-assumptions are flagged for the user at the start gate: provider-agnostic SMTP (R7) and the OFL
-Arabic typeface (R8).
+documents. All five scope ambiguities are resolved in research.md R1-R5, R11, R12, and every
+accepted critique finding is reconciled into the spec and tasks (research.md R13) — including
+branch-visibility scoping, untrusted-queue-payload worker hardening, the Arabic shaping pipeline,
+`locale` tracking, human-readable export columns, and the actionable-digest redesign. Three
+assumptions are flagged for the user at the start gate: provider-agnostic SMTP (R7), the OFL
+Arabic typeface (R8), and the `arabic-reshaper` + `python-bidi` dependency additions (R8).
 
 Wave 16 is the first of three implementation waves defined in
 `specs/012-reporting-hardening/tasks.md`:
@@ -175,3 +178,6 @@ Wave 17 (US1 completion + US2: T013, T015–T019, T021–T022, T023–T028) may 
   Wave 17.
 - Bundle/style budget work (T029/T030) must not be pulled into the UI slice "while we're in
   there" — it is Wave 18 with its own measurement-verified gates.
+- The critique amendments are binding: T012's artifact listing and T013's download must carry
+  branch-visibility checks from their first commit (never "tenant RLS first, branch later"), and
+  T011/T014 must persist `locale` from the start — the Wave 17 renderers depend on both.
