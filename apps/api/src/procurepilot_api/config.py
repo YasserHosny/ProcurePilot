@@ -63,6 +63,7 @@ class Settings(BaseSettings):
     export_download_url_ttl_seconds: int = Field(
         default=300, validation_alias="EXPORT_DOWNLOAD_URL_TTL_SECONDS", ge=60, le=3600
     )
+    export_row_cap: int = Field(default=10_000, validation_alias="EXPORT_ROW_CAP", ge=1)
     matching_auto_accept_threshold: float = Field(
         default=0.9200, validation_alias="MATCHING_AUTO_ACCEPT_THRESHOLD", ge=0, le=1
     )

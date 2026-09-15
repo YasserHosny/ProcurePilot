@@ -132,6 +132,12 @@ def test_download_for_job_without_artifact_returns_not_found(
             "_enqueue_export_job",
             lambda *_args, **_kwargs: None,
         )
+
+        class _NoAuditWriter:
+            def record(self, event: object, bearer_token: str | None = None) -> None:
+                return None
+
+        monkeypatch.setattr(export_service_module, "get_audit_writer", lambda: _NoAuditWriter())
         job = ExportService(settings).create_job(
             member=context.member,
             payload=export_request(),

@@ -648,6 +648,14 @@ def test_export_worker_refuses_a_tenant_job_mismatch_payload(
                 "_enqueue_export_job",
                 lambda *_args, **_kwargs: None,
             )
+
+            class FakeAuditWriter:
+                def record(self, event: object, bearer_token: str | None = None) -> None:
+                    return None
+
+            monkeypatch.setattr(
+                export_service_module, "get_audit_writer", lambda: FakeAuditWriter()
+            )
             from integration.value_proof_helpers import export_request
 
             job = ExportService(settings).create_job(member=alpha.member, payload=export_request())
@@ -766,7 +774,7 @@ def test_branch_scoped_member_sees_only_own_branch_artifacts(
     response = branch_client.get("/api/v1/reports/artifacts?limit=100")
     assert response.status_code == 200, (
         f"positive control failed: the artifacts listing must answer (got "
-        f"{response.status_code}; is the reports router wired into main.py?)"
+        f"{response.status_code}; body={response.text})"
     )
     ids = {item["id"] for item in response.json()["items"]}
 

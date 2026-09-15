@@ -3,16 +3,22 @@ from __future__ import annotations
 import json
 from datetime import UTC, datetime
 from uuid import UUID
+from zoneinfo import ZoneInfo
 
 from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 
 from procurepilot_api.config import Settings, get_settings
 from procurepilot_api.deps import CurrentMember
-from procurepilot_api.errors import NotFoundError, ServiceUnavailableError, UnprocessableEntityError
-from procurepilot_api.modules.exports.schemas import ExportCreate, ExportJob
+from procurepilot_api.errors import (
+    ExportRowCapExceededError,
+    NotFoundError,
+    ServiceUnavailableError,
+)
+from procurepilot_api.modules.exports.schemas import ExportCreate, ExportFilters, ExportJob
 from procurepilot_api.modules.exports.storage import ExportStorage
 from procurepilot_api.modules.offers.service import _authenticated_db
+from procurepilot_api.modules.reports.schedules import authorize_filters, workspace_context
 from procurepilot_api.shared.audit import AuditEventCreate, get_audit_writer
 from procurepilot_api.shared.logging import get_trace_id
 
@@ -21,15 +27,38 @@ class ExportService:
     def __init__(self, settings: Settings | None = None) -> None:
         self._settings = settings or get_settings()
 
-    def create_job(self, *, member: CurrentMember, payload: ExportCreate) -> ExportJob:
-        if payload.filters.branch_id is not None:
-            raise UnprocessableEntityError(details={"branch_id": "unsupported_in_phase_1"})
+    def create_job(
+        self,
+        *,
+        member: CurrentMember,
+        payload: ExportCreate,
+        bearer_token: str | None = None,
+    ) -> ExportJob:
         with _authenticated_db(self._settings, member) as conn:
+            workspace = workspace_context(conn, member)
+            filters = _resolved_filters(payload.filters, workspace)
+            authorize_filters(
+                conn,
+                member=member,
+                supplier_id=payload.filters.supplier_id,
+                branch_id=payload.filters.branch_id,
+            )
+            _enforce_row_cap(
+                conn,
+                member=member,
+                kind=payload.kind,
+                filters=filters,
+                cap=self._settings.export_row_cap,
+            )
+            locale = payload.locale or str(
+                workspace["preferred_locale"] or workspace["default_locale"]
+            )
             with conn.cursor(row_factory=dict_row) as cur:
                 cur.execute(
                     """
-                    insert into export_job (tenant_id, requested_by, kind, format, filters, status)
-                    values (%s, %s, %s, %s, %s, 'queued')
+                    insert into export_job
+                      (tenant_id, requested_by, kind, format, filters, status, locale)
+                    values (%s, %s, %s, %s, %s, 'queued', %s)
                     returning *
                     """,
                     (
@@ -37,7 +66,8 @@ class ExportService:
                         member.membership_id,
                         payload.kind,
                         payload.format,
-                        Jsonb(payload.filters.model_dump(mode="json")),
+                        Jsonb(filters.model_dump(mode="json")),
+                        locale,
                     ),
                 )
                 row = dict(cur.fetchone())
@@ -47,7 +77,20 @@ class ExportService:
                 _mark_enqueue_failed(conn, UUID(str(row["id"])))
                 conn.commit()
                 raise
-            return _job(row)
+            conn.commit()
+        _record_audit(
+            bearer_token=bearer_token,
+            member=member,
+            action="reports.export_requested",
+            target={
+                "export_job_id": str(row["id"]),
+                "kind": payload.kind,
+                "format": payload.format,
+                "period_start": filters.period_start.isoformat(),
+                "period_end": str(filters.period_end),
+            },
+        )
+        return _job(row)
 
     def get_job(self, *, member: CurrentMember, job_id: UUID) -> ExportJob:
         with _authenticated_db(self._settings, member) as conn:
@@ -86,6 +129,61 @@ class ExportService:
             },
         )
         return url
+
+
+def _resolved_filters(filters: ExportFilters, workspace: dict[str, object]) -> ExportFilters:
+    """An omitted period_end means "through today" in the workspace's reporting timezone
+    (FR-012) — resolved at submission so the stored snapshot is concrete."""
+    if filters.period_end is not None:
+        return filters
+    today = datetime.now(UTC).astimezone(ZoneInfo(str(workspace["reporting_timezone"]))).date()
+    return ExportFilters(
+        period_start=filters.period_start,
+        period_end=today,
+        supplier_id=filters.supplier_id,
+        branch_id=filters.branch_id,
+    )
+
+
+def _enforce_row_cap(
+    conn: object,
+    *,
+    member: CurrentMember,
+    kind: str,
+    filters: ExportFilters,
+    cap: int,
+) -> None:
+    """FR-013: count the rows the artifact would carry via the landed readers and refuse
+    over-cap requests at submission — nothing is queued."""
+    if kind == "alerts_summary":
+        reader = (
+            "reporting_alert_snapshot("
+            "%(tenant_id)s, %(period_start)s, %(period_end)s, %(branch_id)s)"
+        )
+    elif kind == "spend_by_supplier":
+        reader = (
+            "reporting_purchases_for_period("
+            "%(tenant_id)s, %(period_start)s, %(period_end)s, %(supplier_id)s, %(branch_id)s)"
+        )
+    else:
+        reader = (
+            "reporting_savings_for_period("
+            "%(tenant_id)s, %(period_start)s, %(period_end)s, %(supplier_id)s, %(branch_id)s)"
+        )
+    with conn.cursor() as cur:
+        cur.execute(
+            f"select count(*) from {reader}",
+            {
+                "tenant_id": member.tenant_id,
+                "period_start": filters.period_start,
+                "period_end": filters.period_end,
+                "supplier_id": filters.supplier_id,
+                "branch_id": filters.branch_id,
+            },
+        )
+        actual = int(cur.fetchone()[0])
+    if actual > cap:
+        raise ExportRowCapExceededError(details={"cap": cap, "actual": actual})
 
 
 def get_export_service() -> ExportService:
@@ -202,6 +300,7 @@ def _job(row: dict[str, object]) -> ExportJob:
         format=str(row["format"]),
         filters=filters,
         status=str(row["status"]),
+        locale=str(row["locale"]) if row.get("locale") else None,
         row_count=row.get("row_count"),
         download_url=row.get("download_url"),
         error=row.get("error"),
