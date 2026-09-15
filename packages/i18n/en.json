@@ -2146,5 +2146,100 @@
       "title": "No anomalies detected",
       "message": "No commercial data irregularities were detected in your current workspace data."
     }
+  },
+  "reports": {
+    "nav": "Reports",
+    "title": "Reports Center",
+    "subtitle": "View generated report artifacts and recurring report schedules.",
+    "readOnlyBadge": "Read-only",
+    "artifactsTab": "Generated Reports",
+    "schedulesTab": "Scheduled Reports",
+    "loading": "Loading reports...",
+    "filters": {
+      "all": "All",
+      "kind": "Report Type",
+      "status": "Status",
+      "allKinds": "All Types",
+      "allStatuses": "All Statuses",
+      "clear": "Clear Filters"
+    },
+    "kinds": {
+      "savings_ledger": "Savings Ledger",
+      "spend_by_supplier": "Spend by Supplier",
+      "alerts_summary": "Alerts Summary"
+    },
+    "formats": {
+      "csv": "CSV",
+      "xlsx": "Excel (XLSX)",
+      "pdf": "PDF"
+    },
+    "statuses": {
+      "queued": "Queued",
+      "running": "Running",
+      "completed": "Completed",
+      "failed": "Failed",
+      "expired": "Expired",
+      "active": "Active",
+      "paused": "Paused"
+    },
+    "weekdays": {
+      "0": "Monday",
+      "1": "Tuesday",
+      "2": "Wednesday",
+      "3": "Thursday",
+      "4": "Friday",
+      "5": "Saturday",
+      "6": "Sunday"
+    },
+    "artifacts": {
+      "table": {
+        "kind": "Report Type",
+        "format": "Format",
+        "status": "Status",
+        "period": "Period",
+        "rowCount": "Row Count",
+        "createdAt": "Generated At",
+        "expiresAt": "Expires At",
+        "locale": "Language",
+        "scope": "Scope"
+      },
+      "empty": {
+        "title": "No reports generated yet",
+        "message": "Generated artifacts and completed exports will appear here."
+      },
+      "scopeAll": "All branches & suppliers",
+      "notApplicable": "—",
+      "rows": "{{count}} rows"
+    },
+    "schedules": {
+      "table": {
+        "kind": "Report Type",
+        "format": "Format",
+        "frequency": "Run Day",
+        "status": "Status",
+        "nextRun": "Next Run",
+        "lastRun": "Last Run",
+        "locale": "Language",
+        "scope": "Scope"
+      },
+      "empty": {
+        "title": "No scheduled reports",
+        "message": "Recurring report schedules configured for this workspace will appear here."
+      },
+      "scopeAll": "All branches & suppliers",
+      "notApplicable": "—",
+      "never": "Never"
+    },
+    "pagination": {
+      "loadMore": "Load More",
+      "loadingMore": "Loading more...",
+      "noMore": "All records loaded"
+    },
+    "error": {
+      "title": "Unable to load reports",
+      "generic": "An unexpected error occurred while loading reports data.",
+      "retry": "Retry",
+      "traceId": "Trace ID: {{id}}"
+    }
   }
 }
