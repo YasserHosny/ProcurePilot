@@ -87,8 +87,10 @@ export async function correctStatedTotal(page: Page): Promise<void> {
   // (change) event, which browsers only fire on blur for genuinely user-edited values. A
   // programmatic fill leaves the native dirty flag unset, so whether the correction stages
   // depends on incidental focus timing — real keystrokes make the commit deterministic.
-  await input.fill('');
-  await input.pressSequentially(STUB_COMPUTED_TOTAL);
+  await input.fill(STUB_COMPUTED_TOTAL);
+  await input.dispatchEvent('input');
+  await input.dispatchEvent('change');
+  await input.blur();
 }
 
 /**

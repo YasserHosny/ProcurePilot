@@ -641,10 +641,23 @@ export class QuotationReviewComponent implements OnInit {
   // FR-014: Keyboard Navigation through flagged fields
   @HostListener('window:keydown', ['$event'])
   handleKeyboardEvent(event: KeyboardEvent): void {
-    if (event.altKey && (event.key === 'n' || event.key === 'N')) {
+    const isNext =
+      event.altKey &&
+      (event.key === 'n' ||
+        event.key === 'N' ||
+        event.key === 'KeyN' ||
+        event.code === 'KeyN');
+    const isPrev =
+      event.altKey &&
+      (event.key === 'p' ||
+        event.key === 'P' ||
+        event.key === 'KeyP' ||
+        event.code === 'KeyP');
+
+    if (isNext) {
       event.preventDefault();
       this.nextFlaggedField();
-    } else if (event.altKey && (event.key === 'p' || event.key === 'P')) {
+    } else if (isPrev) {
       event.preventDefault();
       this.prevFlaggedField();
     }

@@ -421,6 +421,7 @@
                   <input
                     matInput
                     [value]="q.stated_total | formatMoney"
+                    (input)="getFieldExtraction('quotation', q.id, 'stated_total') && updateCorrection(getFieldExtraction('quotation', q.id, 'stated_total')!.id, { amount: normalizeMoneyInput($any($event.target).value), currency: q.stated_total?.currency || q.currency || 'USD' })"
                     (change)="getFieldExtraction('quotation', q.id, 'stated_total') && updateCorrection(getFieldExtraction('quotation', q.id, 'stated_total')!.id, { amount: normalizeMoneyInput($any($event.target).value), currency: q.stated_total?.currency || q.currency || 'USD' })"
                     (blur)="reviewFieldValue('quotation', q.id, 'stated_total', { amount: normalizeMoneyInput($any($event.target).value), currency: q.stated_total?.currency || q.currency || 'USD' })"
                     [readonly]="!isWriter() || q.status === 'reviewed'"

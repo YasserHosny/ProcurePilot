@@ -32,8 +32,14 @@ async function ensureEnglish(page: Page) {
 test.describe('Purchase Request Submission (chunk 008 US1)', () => {
   let creds: Credentials;
 
-  test.beforeAll(() => {
+  test.beforeAll(async () => {
     creds = credentials();
+    const token = await signInOwner();
+    await apiAsUser(token, 'POST', '/organisation/branches', {
+      name: `Submission Branch ${Date.now()}`,
+      address: '10 Request Lane',
+      region: 'GB',
+    });
   });
 
   test.beforeEach(async ({ page }) => {

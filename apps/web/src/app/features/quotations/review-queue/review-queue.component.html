@@ -54,6 +54,7 @@
           [ngModel]="searchQuery()"
           (ngModelChange)="onSearchChange($event)"
           [placeholder]="'quotations.queue.searchPlaceholder' | translate"
+          [attr.aria-label]="'quotations.queue.searchPlaceholder' | translate"
         />
         <mat-icon matPrefix aria-hidden="true">search</mat-icon>
       </mat-form-field>
@@ -63,6 +64,7 @@
         <mat-select
           [value]="statusFilter()"
           (selectionChange)="onStatusChange($event.value)"
+          [attr.aria-label]="'quotations.queue.filterStatus' | translate"
         >
           <mat-option value="open">{{ 'quotations.queue.status.open' | translate }}</mat-option>
           <mat-option value="in_progress">{{ 'quotations.queue.status.in_progress' | translate }}</mat-option>
@@ -76,6 +78,7 @@
         <mat-select
           [value]="priorityFilter()"
           (selectionChange)="onPriorityChange($event.value)"
+          [attr.aria-label]="'quotations.queue.filterPriority' | translate"
         >
           <mat-option value="all">{{ 'quotations.queue.priority.all' | translate }}</mat-option>
           <mat-option value="high">{{ 'quotations.queue.priority.high' | translate }}</mat-option>
@@ -91,6 +94,7 @@
           type="date"
           [ngModel]="dateFrom()"
           (ngModelChange)="onDateFromChange($event)"
+          [attr.aria-label]="'quotations.queue.filters.dateFrom' | translate"
         />
       </mat-form-field>
 
@@ -101,6 +105,7 @@
           type="date"
           [ngModel]="dateTo()"
           (ngModelChange)="onDateToChange($event)"
+          [attr.aria-label]="'quotations.queue.filters.dateTo' | translate"
         />
       </mat-form-field>
     </mat-card-content>
@@ -214,6 +219,7 @@
                   [indeterminate]="hasSelection() && !allSelected()"
                   (change)="toggleAll()"
                   [disabled]="isBulkArchiving() || isBulkRefusing() || isBulkReprioritising()"
+                  [aria-label]="'quotations.queue.selectAllLabel' | translate"
                   [attr.aria-label]="'quotations.queue.selectAllLabel' | translate"
                   color="primary"
                 ></mat-checkbox>
@@ -224,6 +230,7 @@
                   (change)="toggleTask(task.id)"
                   (click)="$event.stopPropagation()"
                   [disabled]="isBulkArchiving() || isBulkRefusing() || isBulkReprioritising()"
+                  [aria-label]="'quotations.queue.selectTaskLabel' | translate:{ id: task.quotation_id }"
                   [attr.aria-label]="'quotations.queue.selectTaskLabel' | translate:{ id: task.quotation_id }"
                   color="primary"
                 ></mat-checkbox>

@@ -129,9 +129,9 @@ export class OutcomeCaptureComponent implements OnInit {
     const landedCostId = qp.get('landed_cost_id');
     const quantity = qp.get('quantity');
     const unitPrice = qp.get('unit_price') || qp.get('unit_price_amount');
-    const currency = qp.get('currency');
-    const totalPaid = qp.get('total_paid') || qp.get('total_paid_amount');
-    const baseUnit = qp.get('base_unit');
+    const currency = qp.get('currency') || qp.get('realised_currency');
+    const totalPaid = qp.get('total_paid') || qp.get('total_paid_amount') || qp.get('realised_amount');
+    const baseUnit = qp.get('base_unit') || qp.get('unit');
 
     if (productId) {
       this.form.patchValue({ workspace_product_id: productId });
@@ -157,6 +157,12 @@ export class OutcomeCaptureComponent implements OnInit {
     }
     if (unitPrice) {
       this.form.patchValue({ unit_price_amount: unitPrice });
+    } else if (totalPaid && quantity) {
+      const q = parseFloat(quantity);
+      const t = parseFloat(totalPaid);
+      if (!isNaN(q) && !isNaN(t) && q > 0) {
+        this.form.patchValue({ unit_price_amount: (t / q).toFixed(4) });
+      }
     }
     if (currency) {
       this.form.patchValue({ currency: currency.toUpperCase() });
