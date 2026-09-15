@@ -69,11 +69,12 @@ test.describe('Quotation Review & Confirmation (T053, US2)', () => {
     await expect(page.locator('.document-panel')).toBeVisible();
     await expect(page.locator('.data-panel')).toBeVisible();
 
-    // Test clicking a field highlights its source region in the document canvas
+    // Test clicking a field makes it the active extraction: the doc preview's info bar and
+    // provenance card both render for it (the canvas bbox overlay was replaced by the iframe
+    // preview in the review rework).
     const currencyField = page.locator('.field-box', { hasText: 'Currency' });
     await currencyField.click();
-    // Both the highlighted region and the provenance card render for the active extraction.
-    await expect(page.locator('.bounding-box-highlight')).toBeVisible();
+    await expect(page.locator('.extraction-info-bar')).toBeVisible();
     await expect(page.locator('.provenance-card')).toBeVisible();
 
     // Test Keyboard navigation between flagged fields (FR-014): the stub provider always
@@ -81,7 +82,11 @@ test.describe('Quotation Review & Confirmation (T053, US2)', () => {
     const keyboardNavBar = page.locator('.keyboard-nav-bar');
     await expect(keyboardNavBar).toBeVisible();
     await page.keyboard.press('Alt+KeyN');
-    await expect(page.locator('.bounding-box-highlight')).toBeVisible();
+    // The nav moves the active extraction to the flagged Issue Date field, reflected in the
+    // info bar's field label.
+    await expect(page.locator('.extraction-info-bar .extraction-field-label')).toHaveText(
+      'Issue Date',
+    );
   });
 
   test('corrects header fields, selects supplier, saves corrections, and confirms quotation', async ({ page }) => {

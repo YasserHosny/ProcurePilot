@@ -83,7 +83,12 @@ export async function correctStatedTotal(page: Page): Promise<void> {
   const input = page
     .locator('.field-box', { hasText: 'Stated Total Amount' })
     .locator('input');
-  await input.fill(STUB_COMPUTED_TOTAL);
+  // Type as a real user would, not fill(): the component stages this correction on the input's
+  // (change) event, which browsers only fire on blur for genuinely user-edited values. A
+  // programmatic fill leaves the native dirty flag unset, so whether the correction stages
+  // depends on incidental focus timing — real keystrokes make the commit deterministic.
+  await input.fill('');
+  await input.pressSequentially(STUB_COMPUTED_TOTAL);
 }
 
 /**
@@ -192,7 +197,9 @@ export async function resolveLineAsNewProduct(
   await page.locator('mat-select[formControlName="base_unit"]').click();
   await page.locator('mat-option', { hasText: '(kilogram)' }).click();
 
-  await page.locator('button.confirm-resolution-btn').click();
+  // Two buttons share .confirm-resolution-btn (Confirm Match Decision / Resolve and Next);
+  // target the primary flat one — class-based, so it works regardless of the active locale.
+  await page.locator('.confirm-resolution-btn.mat-mdc-unelevated-button').click();
   await expect(page.locator('.decision-banner')).toBeVisible({ timeout: 15000 });
 
   const ownerToken = await signInOwner();

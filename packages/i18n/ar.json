@@ -659,6 +659,8 @@
       "bulkRefuseConfirm": "رفض {{count}} عرض(ات)؟ سيتم تمييزها كمرفوضة.",
       "bulkReprioritiseButton": "تعيين الأولوية",
       "bulkClear": "إلغاء التحديد",
+      "selectAllLabel": "تحديد كل مهام المراجعة",
+      "selectTaskLabel": "تحديد عرض السعر {{id}}",
       "readOnlyBadge": "صلاحية قراءة فقط",
       "readOnlyNotice": "دورك يتيح صلاحية القراءة فقط. يملك المالكون والمشترون فقط صلاحية تصحيح واعتماد عروض الأسعار.",
       "loadMore": "تحميل المزيد",

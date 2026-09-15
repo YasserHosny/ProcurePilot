@@ -659,6 +659,8 @@
       "bulkRefuseConfirm": "Refuse {{count}} quotation(s)? This action marks them as refused.",
       "bulkReprioritiseButton": "Set Priority",
       "bulkClear": "Clear Selection",
+      "selectAllLabel": "Select all review tasks",
+      "selectTaskLabel": "Select quotation {{id}}",
       "readOnlyBadge": "Read-Only Access",
       "readOnlyNotice": "Your role has read-only access. Only Owners and Buyers can correct and confirm quotations.",
       "loadMore": "Load More",

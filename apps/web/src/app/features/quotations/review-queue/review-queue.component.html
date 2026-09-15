@@ -214,6 +214,7 @@
                   [indeterminate]="hasSelection() && !allSelected()"
                   (change)="toggleAll()"
                   [disabled]="isBulkArchiving() || isBulkRefusing() || isBulkReprioritising()"
+                  [attr.aria-label]="'quotations.queue.selectAllLabel' | translate"
                   color="primary"
                 ></mat-checkbox>
               </th>
@@ -223,6 +224,7 @@
                   (change)="toggleTask(task.id)"
                   (click)="$event.stopPropagation()"
                   [disabled]="isBulkArchiving() || isBulkRefusing() || isBulkReprioritising()"
+                  [attr.aria-label]="'quotations.queue.selectTaskLabel' | translate:{ id: task.quotation_id }"
                   color="primary"
                 ></mat-checkbox>
               </td>
