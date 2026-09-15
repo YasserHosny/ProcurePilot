@@ -1,0 +1,396 @@
+<div class="reports-center-container">
+  <div class="header-section">
+    <div class="title-group">
+      <div class="title-row">
+        <h1 class="page-title">{{ 'reports.title' | translate }}</h1>
+        <span class="read-only-badge">{{ 'reports.readOnlyBadge' | translate }}</span>
+      </div>
+      <p class="page-subtitle">{{ 'reports.subtitle' | translate }}</p>
+    </div>
+  </div>
+
+  <mat-card class="reports-card">
+    <mat-tab-group animationDuration="200ms">
+      <!-- Artifacts Tab -->
+      <mat-tab>
+        <ng-template mat-tab-label>
+          <mat-icon class="tab-icon" aria-hidden="true">description</mat-icon>
+          <span>{{ 'reports.artifactsTab' | translate }}</span>
+        </ng-template>
+
+        <div class="tab-content">
+          <!-- Filter toolbar -->
+          <div class="filter-toolbar">
+            <mat-form-field appearance="outline" class="filter-field">
+              <mat-label>{{ 'reports.filters.kind' | translate }}</mat-label>
+              <mat-select
+                [ngModel]="selectedKind()"
+                (ngModelChange)="selectedKind.set($event); onFilterChange()"
+              >
+                <mat-option value="all">{{ 'reports.filters.allKinds' | translate }}</mat-option>
+                <mat-option value="savings_ledger">{{ 'reports.kinds.savings_ledger' | translate }}</mat-option>
+                <mat-option value="spend_by_supplier">{{ 'reports.kinds.spend_by_supplier' | translate }}</mat-option>
+                <mat-option value="alerts_summary">{{ 'reports.kinds.alerts_summary' | translate }}</mat-option>
+              </mat-select>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" class="filter-field">
+              <mat-label>{{ 'reports.filters.status' | translate }}</mat-label>
+              <mat-select
+                [ngModel]="selectedStatus()"
+                (ngModelChange)="selectedStatus.set($event); onFilterChange()"
+              >
+                <mat-option value="all">{{ 'reports.filters.allStatuses' | translate }}</mat-option>
+                <mat-option value="queued">{{ 'reports.statuses.queued' | translate }}</mat-option>
+                <mat-option value="running">{{ 'reports.statuses.running' | translate }}</mat-option>
+                <mat-option value="completed">{{ 'reports.statuses.completed' | translate }}</mat-option>
+                <mat-option value="failed">{{ 'reports.statuses.failed' | translate }}</mat-option>
+                <mat-option value="expired">{{ 'reports.statuses.expired' | translate }}</mat-option>
+              </mat-select>
+            </mat-form-field>
+
+            @if (selectedKind() !== 'all' || selectedStatus() !== 'all') {
+              <button
+                mat-stroked-button
+                type="button"
+                class="clear-btn"
+                (click)="clearFilters()"
+              >
+                <mat-icon aria-hidden="true">clear</mat-icon>
+                <span>{{ 'reports.filters.clear' | translate }}</span>
+              </button>
+            }
+          </div>
+
+          <!-- Error banner -->
+          @if (artifactsErrorMessage(); as err) {
+            <div class="error-banner" role="alert">
+              <mat-icon class="error-icon" aria-hidden="true">error_outline</mat-icon>
+              <div class="error-text-wrap">
+                <span class="error-title">{{ 'reports.error.title' | translate }}</span>
+                <span class="error-message">{{ err }}</span>
+                @if (artifactsErrorTraceId(); as traceId) {
+                  <span class="error-trace">{{ 'reports.error.traceId' | translate: { id: traceId } }}</span>
+                }
+              </div>
+              <button
+                mat-button
+                type="button"
+                class="retry-btn"
+                (click)="loadArtifacts()"
+              >
+                <mat-icon aria-hidden="true">refresh</mat-icon>
+                <span>{{ 'reports.error.retry' | translate }}</span>
+              </button>
+            </div>
+          }
+
+          <!-- Loading state -->
+          @if (isLoadingArtifacts()) {
+            <div class="loading-state" aria-live="polite">
+              <mat-spinner [attr.aria-label]="'reports.loading' | translate" diameter="36"></mat-spinner>
+              <span>{{ 'reports.loading' | translate }}</span>
+            </div>
+          } @else if (artifacts().length === 0) {
+            <!-- Empty state -->
+            <div class="empty-state">
+              <mat-icon class="empty-icon" aria-hidden="true">folder_open</mat-icon>
+              <h2 class="empty-title">{{ 'reports.artifacts.empty.title' | translate }}</h2>
+              <p class="empty-message">{{ 'reports.artifacts.empty.message' | translate }}</p>
+            </div>
+          } @else {
+            <!-- Artifacts Table -->
+            <div class="table-responsive">
+              <table
+                mat-table
+                [dataSource]="artifacts()"
+                class="reports-table"
+                [attr.aria-label]="'reports.artifactsTab' | translate"
+              >
+                <!-- Kind Column -->
+                <ng-container matColumnDef="kind">
+                  <th mat-header-cell *matHeaderCellDef scope="col">
+                    {{ 'reports.artifacts.table.kind' | translate }}
+                  </th>
+                  <td mat-cell *matCellDef="let artifact" class="kind-cell">
+                    <span class="kind-name">{{ 'reports.kinds.' + artifact.kind | translate }}</span>
+                  </td>
+                </ng-container>
+
+                <!-- Format Column -->
+                <ng-container matColumnDef="format">
+                  <th mat-header-cell *matHeaderCellDef scope="col">
+                    {{ 'reports.artifacts.table.format' | translate }}
+                  </th>
+                  <td mat-cell *matCellDef="let artifact">
+                    <span class="format-badge">{{ 'reports.formats.' + artifact.format | translate }}</span>
+                  </td>
+                </ng-container>
+
+                <!-- Status Column -->
+                <ng-container matColumnDef="status">
+                  <th mat-header-cell *matHeaderCellDef scope="col">
+                    {{ 'reports.artifacts.table.status' | translate }}
+                  </th>
+                  <td mat-cell *matCellDef="let artifact">
+                    <span class="status-pill" [ngClass]="getArtifactStatusClass(artifact.status)">
+                      {{ 'reports.statuses.' + artifact.status | translate }}
+                    </span>
+                  </td>
+                </ng-container>
+
+                <!-- Period Column -->
+                <ng-container matColumnDef="period">
+                  <th mat-header-cell *matHeaderCellDef scope="col">
+                    {{ 'reports.artifacts.table.period' | translate }}
+                  </th>
+                  <td mat-cell *matCellDef="let artifact">
+                    <span>{{ formatPeriod(artifact.filters) }}</span>
+                  </td>
+                </ng-container>
+
+                <!-- Row Count Column -->
+                <ng-container matColumnDef="rowCount">
+                  <th mat-header-cell *matHeaderCellDef scope="col">
+                    {{ 'reports.artifacts.table.rowCount' | translate }}
+                  </th>
+                  <td mat-cell *matCellDef="let artifact">
+                    @if (artifact.row_count !== null && artifact.row_count !== undefined) {
+                      <span>{{ 'reports.artifacts.rows' | translate: { count: artifact.row_count } }}</span>
+                    } @else {
+                      <span>{{ 'reports.artifacts.notApplicable' | translate }}</span>
+                    }
+                  </td>
+                </ng-container>
+
+                <!-- Locale Column -->
+                <ng-container matColumnDef="locale">
+                  <th mat-header-cell *matHeaderCellDef scope="col">
+                    {{ 'reports.artifacts.table.locale' | translate }}
+                  </th>
+                  <td mat-cell *matCellDef="let artifact">
+                    <span>{{ 'common.languages.' + artifact.locale | translate }}</span>
+                  </td>
+                </ng-container>
+
+                <!-- Created At Column -->
+                <ng-container matColumnDef="createdAt">
+                  <th mat-header-cell *matHeaderCellDef scope="col">
+                    {{ 'reports.artifacts.table.createdAt' | translate }}
+                  </th>
+                  <td mat-cell *matCellDef="let artifact">
+                    <span>{{ artifact.created_at | formatDate }}</span>
+                  </td>
+                </ng-container>
+
+                <!-- Expires At Column -->
+                <ng-container matColumnDef="expiresAt">
+                  <th mat-header-cell *matHeaderCellDef scope="col">
+                    {{ 'reports.artifacts.table.expiresAt' | translate }}
+                  </th>
+                  <td mat-cell *matCellDef="let artifact">
+                    @if (artifact.expires_at) {
+                      <span>{{ artifact.expires_at | formatDate }}</span>
+                    } @else {
+                      <span>{{ 'reports.artifacts.notApplicable' | translate }}</span>
+                    }
+                  </td>
+                </ng-container>
+
+                <tr mat-header-row *matHeaderRowDef="artifactDisplayedColumns"></tr>
+                <tr mat-row *matRowDef="let row; columns: artifactDisplayedColumns"></tr>
+              </table>
+            </div>
+
+            <!-- Cursor Pagination -->
+            <div class="pagination-footer">
+              @if (artifactsNextCursor()) {
+                <button
+                  mat-stroked-button
+                  type="button"
+                  class="load-more-btn"
+                  [disabled]="isLoadingMoreArtifacts()"
+                  (click)="loadMoreArtifacts()"
+                >
+                  @if (isLoadingMoreArtifacts()) {
+                    <mat-spinner diameter="18" [attr.aria-label]="'reports.pagination.loadingMore' | translate"></mat-spinner>
+                    <span>{{ 'reports.pagination.loadingMore' | translate }}</span>
+                  } @else {
+                    <span class="btn-content">
+                      <mat-icon aria-hidden="true">expand_more</mat-icon>
+                      <span>{{ 'reports.pagination.loadMore' | translate }}</span>
+                    </span>
+                  }
+                </button>
+              } @else {
+                <span class="no-more-text">{{ 'reports.pagination.noMore' | translate }}</span>
+              }
+            </div>
+          }
+        </div>
+      </mat-tab>
+
+      <!-- Schedules Tab -->
+      <mat-tab>
+        <ng-template mat-tab-label>
+          <mat-icon class="tab-icon" aria-hidden="true">schedule</mat-icon>
+          <span>{{ 'reports.schedulesTab' | translate }}</span>
+        </ng-template>
+
+        <div class="tab-content">
+          <!-- Error banner -->
+          @if (schedulesErrorMessage(); as err) {
+            <div class="error-banner" role="alert">
+              <mat-icon class="error-icon" aria-hidden="true">error_outline</mat-icon>
+              <div class="error-text-wrap">
+                <span class="error-title">{{ 'reports.error.title' | translate }}</span>
+                <span class="error-message">{{ err }}</span>
+                @if (schedulesErrorTraceId(); as traceId) {
+                  <span class="error-trace">{{ 'reports.error.traceId' | translate: { id: traceId } }}</span>
+                }
+              </div>
+              <button
+                mat-button
+                type="button"
+                class="retry-btn"
+                (click)="loadSchedules()"
+              >
+                <mat-icon aria-hidden="true">refresh</mat-icon>
+                <span>{{ 'reports.error.retry' | translate }}</span>
+              </button>
+            </div>
+          }
+
+          <!-- Loading state -->
+          @if (isLoadingSchedules()) {
+            <div class="loading-state" aria-live="polite">
+              <mat-spinner [attr.aria-label]="'reports.loading' | translate" diameter="36"></mat-spinner>
+              <span>{{ 'reports.loading' | translate }}</span>
+            </div>
+          } @else if (schedules().length === 0) {
+            <!-- Empty state -->
+            <div class="empty-state">
+              <mat-icon class="empty-icon" aria-hidden="true">event_busy</mat-icon>
+              <h2 class="empty-title">{{ 'reports.schedules.empty.title' | translate }}</h2>
+              <p class="empty-message">{{ 'reports.schedules.empty.message' | translate }}</p>
+            </div>
+          } @else {
+            <!-- Schedules Table -->
+            <div class="table-responsive">
+              <table
+                mat-table
+                [dataSource]="schedules()"
+                class="reports-table"
+                [attr.aria-label]="'reports.schedulesTab' | translate"
+              >
+                <!-- Kind Column -->
+                <ng-container matColumnDef="kind">
+                  <th mat-header-cell *matHeaderCellDef scope="col">
+                    {{ 'reports.schedules.table.kind' | translate }}
+                  </th>
+                  <td mat-cell *matCellDef="let schedule" class="kind-cell">
+                    <span class="kind-name">{{ 'reports.kinds.' + schedule.kind | translate }}</span>
+                  </td>
+                </ng-container>
+
+                <!-- Format Column -->
+                <ng-container matColumnDef="format">
+                  <th mat-header-cell *matHeaderCellDef scope="col">
+                    {{ 'reports.schedules.table.format' | translate }}
+                  </th>
+                  <td mat-cell *matCellDef="let schedule">
+                    <span class="format-badge">{{ 'reports.formats.' + schedule.format | translate }}</span>
+                  </td>
+                </ng-container>
+
+                <!-- Weekday Column -->
+                <ng-container matColumnDef="weekday">
+                  <th mat-header-cell *matHeaderCellDef scope="col">
+                    {{ 'reports.schedules.table.frequency' | translate }}
+                  </th>
+                  <td mat-cell *matCellDef="let schedule">
+                    <span>{{ getWeekdayKey(schedule.weekday) | translate }}</span>
+                  </td>
+                </ng-container>
+
+                <!-- Status Column -->
+                <ng-container matColumnDef="status">
+                  <th mat-header-cell *matHeaderCellDef scope="col">
+                    {{ 'reports.schedules.table.status' | translate }}
+                  </th>
+                  <td mat-cell *matCellDef="let schedule">
+                    <span class="status-pill" [ngClass]="getScheduleStatusClass(schedule)">
+                      {{ getScheduleStatusKey(schedule) | translate }}
+                    </span>
+                  </td>
+                </ng-container>
+
+                <!-- Locale Column -->
+                <ng-container matColumnDef="locale">
+                  <th mat-header-cell *matHeaderCellDef scope="col">
+                    {{ 'reports.schedules.table.locale' | translate }}
+                  </th>
+                  <td mat-cell *matCellDef="let schedule">
+                    <span>{{ 'common.languages.' + schedule.locale | translate }}</span>
+                  </td>
+                </ng-container>
+
+                <!-- Next Run Column -->
+                <ng-container matColumnDef="nextRunAt">
+                  <th mat-header-cell *matHeaderCellDef scope="col">
+                    {{ 'reports.schedules.table.nextRun' | translate }}
+                  </th>
+                  <td mat-cell *matCellDef="let schedule">
+                    <span>{{ schedule.next_run_at | formatDate }}</span>
+                  </td>
+                </ng-container>
+
+                <!-- Last Run Column -->
+                <ng-container matColumnDef="lastRunAt">
+                  <th mat-header-cell *matHeaderCellDef scope="col">
+                    {{ 'reports.schedules.table.lastRun' | translate }}
+                  </th>
+                  <td mat-cell *matCellDef="let schedule">
+                    @if (schedule.last_run_at) {
+                      <span>{{ schedule.last_run_at | formatDate }}</span>
+                    } @else {
+                      <span>{{ 'reports.schedules.never' | translate }}</span>
+                    }
+                  </td>
+                </ng-container>
+
+                <tr mat-header-row *matHeaderRowDef="scheduleDisplayedColumns"></tr>
+                <tr mat-row *matRowDef="let row; columns: scheduleDisplayedColumns"></tr>
+              </table>
+            </div>
+
+            <!-- Cursor Pagination -->
+            <div class="pagination-footer">
+              @if (schedulesNextCursor()) {
+                <button
+                  mat-stroked-button
+                  type="button"
+                  class="load-more-btn"
+                  [disabled]="isLoadingMoreSchedules()"
+                  (click)="loadMoreSchedules()"
+                >
+                  @if (isLoadingMoreSchedules()) {
+                    <mat-spinner diameter="18" [attr.aria-label]="'reports.pagination.loadingMore' | translate"></mat-spinner>
+                    <span>{{ 'reports.pagination.loadingMore' | translate }}</span>
+                  } @else {
+                    <span class="btn-content">
+                      <mat-icon aria-hidden="true">expand_more</mat-icon>
+                      <span>{{ 'reports.pagination.loadMore' | translate }}</span>
+                    </span>
+                  }
+                </button>
+              } @else {
+                <span class="no-more-text">{{ 'reports.pagination.noMore' | translate }}</span>
+              }
+            </div>
+          }
+        </div>
+      </mat-tab>
+    </mat-tab-group>
+  </mat-card>
+</div>

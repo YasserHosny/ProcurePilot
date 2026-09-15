@@ -247,6 +247,14 @@ export const routes: Routes = [
             (m) => m.SavingsLedgerComponent,
           ),
       },
+      // --- reports center (R2.5) ---
+      {
+        path: 'reports',
+        loadComponent: () =>
+          import('./features/reports/reports-center/reports-center.component').then(
+            (m) => m.ReportsCenterComponent,
+          ),
+      },
       {
         path: 'savings/outcome-capture',
         canActivate: [roleGuard('owner', 'buyer')],

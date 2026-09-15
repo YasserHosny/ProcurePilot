@@ -1,0 +1,224 @@
+@use '../../../../styles/breakpoints' as bp;
+
+.reports-center-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  padding: 1.5rem;
+  max-width: 1200px;
+  margin-inline: auto;
+
+  @include bp.mobile {
+    padding: 0.75rem;
+    gap: 1rem;
+  }
+}
+
+.title-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.title-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.page-title {
+  margin: 0;
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--mat-sys-on-surface, #0f172a);
+}
+
+.read-only-badge {
+  padding: 0.15rem 0.5rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: var(--mat-sys-surface-variant, #f1f5f9);
+  color: var(--mat-sys-on-surface-variant, #475569);
+  border: 1px solid var(--mat-sys-outline-variant, #cbd5e1);
+}
+
+.page-subtitle {
+  margin: 0;
+  font-size: 0.95rem;
+  color: var(--mat-sys-on-surface-variant, #64748b);
+}
+
+.reports-card {
+  padding: 1.25rem;
+  border-radius: 12px;
+}
+
+.tab-icon {
+  margin-inline-end: 0.5rem;
+}
+
+.tab-content {
+  padding-block-start: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.filter-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem;
+}
+
+.filter-field {
+  min-width: 200px;
+  flex: 1;
+}
+
+.clear-btn {
+  gap: 0.25rem;
+  height: 52px;
+}
+
+.error-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem;
+  background: var(--mat-sys-error-container, #fef2f2);
+  border: 1px solid var(--mat-sys-error, #f87171);
+  border-radius: 8px;
+
+  .error-icon {
+    color: var(--mat-sys-error, #dc2626);
+    flex-shrink: 0;
+  }
+}
+
+.error-text-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  flex: 1;
+
+  .error-title {
+    font-weight: 600;
+    font-size: 0.85rem;
+    color: var(--mat-sys-error, #991b1b);
+  }
+
+  .error-message {
+    font-size: 0.9rem;
+    color: var(--mat-sys-on-error-container, #7f1d1d);
+  }
+
+  .error-trace {
+    font-family: monospace;
+    font-size: 0.75rem;
+    color: var(--mat-sys-on-error-container, #991b1b);
+  }
+}
+
+.loading-state,
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 4rem 2rem;
+  text-align: center;
+}
+
+.loading-state {
+  gap: 1rem;
+  color: var(--mat-sys-on-surface-variant, #64748b);
+}
+
+.empty-state {
+  gap: 0.75rem;
+
+  .empty-icon {
+    font-size: 48px;
+    width: 48px;
+    height: 48px;
+    color: var(--mat-sys-outline, #94a3b8);
+  }
+
+  .empty-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin: 0;
+    color: var(--mat-sys-on-surface, #1e293b);
+  }
+
+  .empty-message {
+    max-width: 480px;
+    margin: 0;
+    color: var(--mat-sys-on-surface-variant, #64748b);
+    font-size: 0.95rem;
+  }
+}
+
+.table-responsive {
+  overflow-x: auto;
+}
+
+.reports-table {
+  width: 100%;
+
+  .kind-cell {
+    font-weight: 600;
+  }
+}
+
+.format-badge {
+  display: inline-block;
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  background: var(--mat-sys-surface-variant, #e2e8f0);
+  color: var(--mat-sys-on-surface-variant, #334155);
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.6rem;
+  border-radius: 9999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+
+  &.status-completed,
+  &.status-active { background: #dcfce7; color: #15803d; }
+  &.status-running { background: #e0f2fe; color: #0369a1; }
+  &.status-queued { background: #f1f5f9; color: #475569; }
+  &.status-failed { background: #fee2e2; color: #b91c1c; border: 1px solid #ef4444; font-weight: 700; }
+  &.status-expired { background: #fef3c7; color: #92400e; border: 1px dashed #d97706; font-style: italic; }
+  &.status-paused { background: #fef3c7; color: #b45309; }
+}
+
+.pagination-footer {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding-block: 1rem;
+}
+
+.load-more-btn {
+  gap: 0.5rem;
+
+  .btn-content {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+  }
+}
+
+.no-more-text {
+  font-size: 0.85rem;
+  color: var(--mat-sys-outline, #94a3b8);
+}

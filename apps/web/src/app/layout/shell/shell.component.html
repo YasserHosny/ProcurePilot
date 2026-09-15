@@ -211,6 +211,16 @@
 
       <a
         mat-list-item
+        routerLink="/reports"
+        routerLinkActive="active"
+        class="nav-item"
+      >
+        <mat-icon aria-hidden="true">assessment</mat-icon>
+        <span class="nav-label">{{ 'reports.nav' | translate }}</span>
+      </a>
+
+      <a
+        mat-list-item
         routerLink="/requests"
         routerLinkActive="active"
         class="nav-item"
