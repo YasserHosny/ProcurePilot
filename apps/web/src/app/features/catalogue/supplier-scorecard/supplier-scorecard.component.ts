@@ -342,7 +342,7 @@ import { FormatDatePipe } from '../../../core/format/date.pipe';
       }
 
       .supplier-subtitle {
-        color: var(--mat-hint-color, #757575);
+        color: #5f6368;
         font-size: 1.125rem;
         margin-block-start: 0.25rem;
         margin-block-end: 0;
@@ -428,7 +428,7 @@ import { FormatDatePipe } from '../../../core/format/date.pipe';
       .risk-level-badge.medium,
       .confidence-badge.medium {
         background-color: #fff8e1;
-        color: #f57f17;
+        color: #7c4a03;
       }
 
       .risk-level-badge.high,
@@ -439,7 +439,7 @@ import { FormatDatePipe } from '../../../core/format/date.pipe';
 
       .risk-rule-version,
       .window-dates {
-        color: var(--mat-hint-color, #757575);
+        color: #5f6368;
         font-size: 0.8125rem;
         margin-block-start: 0.5rem;
         margin-block-end: 0;

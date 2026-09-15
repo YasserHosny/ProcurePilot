@@ -179,7 +179,7 @@
 }
 
 .muted-text {
-  color: #94a3b8;
+  color: #475569;
 }
 
 .lines-cell {
@@ -212,6 +212,12 @@
     inline-size: 18px;
     block-size: 18px;
   }
+}
+
+.reject-btn {
+  --mdc-outlined-button-label-text-color: #b3261e;
+  --mdc-outlined-button-outline-color: rgba(179, 38, 30, 0.4);
+  --mat-outlined-button-state-layer-color: #b3261e;
 }
 
 .detail-row {

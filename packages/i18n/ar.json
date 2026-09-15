@@ -2018,7 +2018,7 @@
     }
   },
   "supplierIq": {
-    "header": "بطاقة أداء المورد",
+    "header": "بطاقة أداء المورّد",
     "backToSupplier": "العودة إلى المورد",
     "windowLabel": "{{months}} أشهر",
     "ruleVersion": "إصدار القاعدة: {{version}}",
