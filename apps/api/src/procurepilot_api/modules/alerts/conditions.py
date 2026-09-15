@@ -18,7 +18,55 @@ from procurepilot_api.modules.alerts.fingerprints import (
     supplier_quality_recurrence_key,
 )
 from procurepilot_api.modules.alerts.schemas import Alert
-from procurepilot_api.modules.offers.service import OfferService, _authenticated_db
+from procurepilot_api.modules.offers.price_history import historical_average_excluding
+from procurepilot_api.modules.offers.schemas import Offer
+from procurepilot_api.modules.offers.service import (
+    OfferService,
+    _authenticated_db,
+    _offer,
+    _subtract_calendar_months,
+)
+
+# Duplicate-line detection must see every current landed cost per supplier. The compare view
+# (OFFER_READ_SQL) deliberately keeps one offer per supplier, which is right for comparing
+# suppliers but erases the same-supplier pairs this detector exists to find. Same row filters as
+# the compare view; no per-supplier dedup. distinct on (lc.id) guards against a product with
+# several pack_definitions multiplying rows.
+LANDED_COST_OFFER_SQL = """
+select distinct on (lc.id)
+  lc.id,
+  md.matched_workspace_product_id as workspace_product_id,
+  q.supplier_id,
+  s.name as supplier_name,
+  lc.quotation_line_id,
+  lc.match_decision_id,
+  lc.total_amount,
+  lc.total_currency,
+  lc.raw_inputs,
+  lc.rule_version,
+  lc.valid_from,
+  lc.valid_to,
+  lc.recorded_at,
+  lc.base_unit,
+  md.confidence as match_confidence,
+  s.lead_time_days,
+  s.reliability_score,
+  pd.base_quantity as pack_base_quantity
+from workspace_product wp
+join match_decision md on md.matched_workspace_product_id = wp.id
+join landed_cost lc on lc.match_decision_id = md.id
+join quotation_line ql on ql.id = lc.quotation_line_id
+join quotation q on q.id = ql.quotation_id
+join supplier s on s.id = q.supplier_id
+join pack_definition pd on pd.workspace_product_id = wp.id
+where wp.id = %(product_id)s
+  and wp.status = 'active'
+  and q.status = 'reviewed'
+  and s.status in ('active', 'preferred')
+  and (lc.valid_to is null or lc.valid_to >= %(now)s)
+order by lc.id, pd.base_quantity, pd.id
+limit %(limit)s
+"""
 
 
 class AlertConditionService:
@@ -47,7 +95,14 @@ class AlertConditionService:
             if kind in {None, "price_spike"}:
                 alerts.extend(_price_spike_alerts(self._offers, member, compare, now))
             if kind in {None, "likely_duplicate_quotation_line"}:
-                alerts.extend(_duplicate_line_alerts(member, compare, now))
+                alerts.extend(
+                    _duplicate_line_alerts(
+                        member,
+                        _landed_cost_offers(self._settings, member, product_id),
+                        product_id,
+                        now,
+                    )
+                )
             if kind in {None, "decimal_or_quantity_anomaly"}:
                 alerts.extend(_decimal_anomaly_alerts(self._offers, member, compare, now))
             if kind in {None, "delivery_cost_anomaly"}:
@@ -249,7 +304,11 @@ def _price_spike_alerts(
     if offer is None:
         return []
     history = offers.price_history(member=member, product_id=compare.product.id, window_months=6)
-    window_metric = history.summary.average_paid_rolling_window
+    window_metric = historical_average_excluding(
+        history.points,
+        window_start=_subtract_calendar_months(now, 6),
+        excluding_landed_cost_id=offer.id,
+    )
     if window_metric is None or len(window_metric.source_landed_cost_ids) < 2:
         return []
     average = Decimal(window_metric.value.amount)
@@ -296,14 +355,34 @@ def _price_spike_alerts(
     ]
 
 
+def _landed_cost_offers(
+    settings: Settings,
+    member: CurrentMember,
+    product_id: UUID,
+) -> list[Offer]:
+    with _authenticated_db(settings, member) as conn:
+        with conn.cursor(row_factory=dict_row) as cur:
+            cur.execute(
+                LANDED_COST_OFFER_SQL,
+                {
+                    "product_id": product_id,
+                    "now": datetime.now(UTC),
+                    "limit": 200,
+                },
+            )
+            rows = [dict(row) for row in cur.fetchall()]
+    return [_offer(row, quantity=Decimal("1.000000")) for row in rows]
+
+
 def _duplicate_line_alerts(
     member: CurrentMember,
-    compare: object,
+    offers: list[Offer],
+    product_id: UUID,
     now: datetime,
 ) -> list[Alert]:
     alerts: list[Alert] = []
-    active_offers = [o for o in compare.offers if not getattr(o, "is_expired", False)]
-    by_supplier: dict[UUID, list[object]] = {}
+    active_offers = [o for o in offers if not getattr(o, "is_expired", False)]
+    by_supplier: dict[UUID, list[Offer]] = {}
     for o in active_offers:
         by_supplier.setdefault(o.supplier_id, []).append(o)
     for supplier_id, supplier_offers in by_supplier.items():
@@ -333,12 +412,12 @@ def _duplicate_line_alerts(
                             id=alert_fingerprint(
                                 tenant_id=member.tenant_id,
                                 kind="likely_duplicate_quotation_line",
-                                product_id=compare.product.id,
+                                product_id=product_id,
                                 supplier_id=supplier_id,
                                 recurrence_key=recurrence_key,
                             ),
                             kind="likely_duplicate_quotation_line",
-                            workspace_product_id=compare.product.id,
+                            workspace_product_id=product_id,
                             supplier_id=supplier_id,
                             severity="warning",
                             confidence=confidence,
@@ -367,16 +446,20 @@ def _decimal_anomaly_alerts(
     now: datetime,
 ) -> list[Alert]:
     history = offers.price_history(member=member, product_id=compare.product.id, window_months=6)
-    window_metric = history.summary.average_paid_rolling_window
-    if window_metric is None or len(window_metric.source_landed_cost_ids) < 1:
-        return []
-    baseline = Decimal(window_metric.value.amount)
-    if baseline <= 0:
-        return []
+    window_start = _subtract_calendar_months(now, 6)
     alerts: list[Alert] = []
-    sample_count = len(window_metric.source_landed_cost_ids)
     for offer in compare.offers:
         if getattr(offer, "is_expired", False):
+            continue
+        window_metric = historical_average_excluding(
+            history.points,
+            window_start=window_start,
+            excluding_landed_cost_id=offer.id,
+        )
+        if window_metric is None or len(window_metric.source_landed_cost_ids) < 1:
+            continue
+        baseline = Decimal(window_metric.value.amount)
+        if baseline <= 0:
             continue
         current = Decimal(offer.normalised_unit_price.amount)
         if current <= 0:
@@ -386,6 +469,7 @@ def _decimal_anomaly_alerts(
             ratio_quantized = ratio.quantize(Decimal("0.0001"))
             ratio_str = format(ratio_quantized, "f")
             recurrence_key = decimal_anomaly_recurrence_key(offer.id, ratio_str)
+            sample_count = len(window_metric.source_landed_cost_ids)
             confidence: Literal["high", "medium", "low"] = "high" if sample_count >= 3 else "medium"
             severity: Literal["warning", "critical"] = (
                 "critical" if ratio >= Decimal("8.0") else "warning"
