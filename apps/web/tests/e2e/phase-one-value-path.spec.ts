@@ -103,7 +103,7 @@ test.describe('Phase 1 Complete Canonical Value Path (T075)', () => {
     await expect(page.locator('.page-title')).toContainText('Smart Compare');
     await expect(page.locator('.recommendation-card')).toBeVisible({ timeout: 15000 });
     // Bug #4 guard: Required Quantity is in the product's normalised base unit.
-    await expect(page.locator('.quantity-field mat-hint')).toHaveText('Unit: kg');
+    await expect(page.locator('.quantity-field mat-hint')).toHaveText('Unit: kilogram');
 
     const quantityValue = parseFloat(
       await page.inputValue('.quantity-input'),

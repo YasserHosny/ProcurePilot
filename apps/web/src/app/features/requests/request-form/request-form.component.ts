@@ -148,7 +148,9 @@ export class RequestFormComponent implements OnInit {
       required_by_date: value.required_by_date,
       lines: value.lines.map((l) => ({
         workspace_product_id: l.workspace_product_id,
-        quantity: l.quantity,
+        // The API contract carries quantity as a decimal string (monetary-rule style), while
+        // the number input's value accessor stores a JS number — serialise at the boundary.
+        quantity: String(l.quantity),
         note: l.note || null,
       })),
     };

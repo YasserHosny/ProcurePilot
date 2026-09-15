@@ -135,7 +135,7 @@ test.describe('Purchase Request Submission (chunk 008 US1)', () => {
     const branches = await apiAsUser<{ items: { id: string }[] }>(
       token,
       'GET',
-      '/branches',
+      '/organisation/branches',
     );
     const branchId = branches.items[0]!.id;
 
@@ -166,7 +166,7 @@ test.describe('Purchase Request Submission (chunk 008 US1)', () => {
     const branches = await apiAsUser<{ items: { id: string }[] }>(
       token,
       'GET',
-      '/branches',
+      '/organisation/branches',
     );
     const branchId = branches.items[0]!.id;
 

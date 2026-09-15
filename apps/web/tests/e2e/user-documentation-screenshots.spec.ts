@@ -537,7 +537,7 @@ async function captureAndResolveMatchScreenshots(
   await captureCurrentPage(page, '09c-match-resolution-outcomes.jpg');
   await page.fill('input[formControlName="tenant_name"]', productName);
   await page.locator('mat-select[formControlName="base_unit"]').click();
-  await page.locator('mat-option', { hasText: '(kg)' }).click();
+  await page.locator('mat-option', { hasText: '(kilogram)' }).click();
   await page.locator('button.confirm-resolution-btn').click();
   await expect(page.locator('.decision-banner')).toBeVisible({ timeout: 15_000 });
   return findProductByName(await signInOwner(), productName);

@@ -45,13 +45,19 @@ test.describe('Quotation Review & Confirmation (T053, US2)', () => {
   test('side-by-side review highlights source region and supports keyboard navigation', async ({ page }) => {
     // Navigate to upload first or directly to a quotation review screen if available
     await page.goto('/quotations/upload');
-    const validPdfContent = '%PDF-1.4\n1 0 obj\n<< /Title (Quote) >>\nendobj\ntrailer\n<< /Root 1 0 R >>\n%%EOF';
+    // Unique per attempt: the upload API refuses byte-identical re-uploads (duplicate guard).
+    const validPdfContent = `%PDF-1.4\n1 0 obj\n<< /Title (Quote ${Date.now()}) >>\nendobj\ntrailer\n<< /Root 1 0 R >>\n%%EOF`;
     await page.setInputFiles('input.file-input', {
       name: 'quote_for_review.pdf',
       mimeType: 'application/pdf',
       buffer: Buffer.from(validPdfContent),
     });
-    await page.click('.start-upload-btn');
+    // File selection starts the import automatically; the manual start button only exists in
+    // the pre-selection state, so click it only if it is still rendered.
+    const startUpload = page.locator('.start-upload-btn');
+    if (await startUpload.isVisible()) {
+      await startUpload.click();
+    }
 
     // Wait for extraction to complete. 30s: a genuine RQ round trip, not a client-side state
     // change, but still safely under the 60s per-test default.

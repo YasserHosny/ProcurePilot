@@ -150,8 +150,8 @@ export async function reconcileAndConfirmQuotation(
  * behaving correctly, so if the row does not appear we wait for the pipeline's automatic
  * decision instead of failing; callers get back which path happened plus the matched product id.
  *
- * When the resolution UI does run, the base unit is set explicitly (kg) so the created product's
- * pack_base_quantity is deterministic (1 × 10 kg for the stub's tomato line), which pins every
+ * When the resolution UI does run, the base unit is set explicitly (kilogram) so the created
+ * product's pack_base_quantity is deterministic (1 × 10 kg for the stub's tomato line), which pins every
  * later Smart Compare number too.
  */
 export interface ResolvedLineMatch {
@@ -190,7 +190,7 @@ export async function resolveLineAsNewProduct(
 
   await page.fill('input[formControlName="tenant_name"]', productName);
   await page.locator('mat-select[formControlName="base_unit"]').click();
-  await page.locator('mat-option', { hasText: '(kg)' }).click();
+  await page.locator('mat-option', { hasText: '(kilogram)' }).click();
 
   await page.locator('button.confirm-resolution-btn').click();
   await expect(page.locator('.decision-banner')).toBeVisible({ timeout: 15000 });

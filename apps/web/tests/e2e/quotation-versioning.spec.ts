@@ -30,7 +30,12 @@ test.describe('Quotation Versioning & Re-quotes (T059, US4)', () => {
       mimeType: 'application/pdf',
       buffer: Buffer.from(validPdfContent),
     });
-    await page.click('.start-upload-btn');
+    // File selection starts the import automatically; the manual start button only exists in
+    // the pre-selection state, so click it only if it is still rendered.
+    const startUpload = page.locator('.start-upload-btn');
+    if (await startUpload.isVisible()) {
+      await startUpload.click();
+    }
     // 30s: a genuine RQ round trip, not a client-side state change, but still safely under the
     // 60s per-test default.
     await expect(page.locator('.result-container.success')).toBeVisible({ timeout: 30000 });
