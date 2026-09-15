@@ -26,19 +26,19 @@ regression), FR-022 (recorded security review).
 
 **Purpose**: the tenant, schedule, subscription, and artifact state everything else sits on.
 
-- [ ] T001 Write migration `supabase/migrations/20260915000001_tenant_reporting_timezone.sql`
+- [x] T001 Write migration `supabase/migrations/20260915000001_tenant_reporting_timezone.sql`
   adding `tenant.reporting_timezone text not null default 'UTC'` with the IANA-validation comment
   (API validates the value; the database stores it).
-- [ ] T002 Write migration `supabase/migrations/20260915000002_report_schedule.sql` creating
+- [x] T002 Write migration `supabase/migrations/20260915000002_report_schedule.sql` creating
   `report_schedule` with the `report_schedule_status` enum, the `locale` column (FR-029), unique
   `(tenant_id, created_by_membership_id, kind, format, filters_digest)`, the due-list partial
   index, kind CHECK, and RLS: `ENABLE` + `FORCE`, policies with `USING` and `WITH CHECK`
   (members select; owner/buyer write) per data-model.md.
-- [ ] T003 Write migration `supabase/migrations/20260915000003_digest_subscription.sql` creating
+- [x] T003 Write migration `supabase/migrations/20260915000003_digest_subscription.sql` creating
   `digest_subscription` with the `digest_channel` and `digest_subscription_status` enums, unique
   `(tenant_id, membership_id, kind, filters_digest)`, the due-list partial index, and RLS:
   members manage only their own rows; owners may select all rows in the tenant (visibility only).
-- [ ] T004 Write migration
+- [x] T004 Write migration
   `supabase/migrations/20260915000004_export_job_reporting_extensions.sql` adding
   `schedule_id` (composite FK), `locale`, `rule_version`, `expires_at`, the immutable
   `schedule_snapshot` jsonb (research R13 / security critique finding 7), the `expired` status
@@ -47,14 +47,14 @@ regression), FR-022 (recorded security review).
   boundary), the kind CHECK for the R2.5 value set, the per-period unique partial index
   `(tenant_id, schedule_id, filters->>'period_start') where schedule_id is not null`, and the
   `(tenant_id, created_at desc)` listing index.
-- [ ] T005 Write migration
+- [x] T005 Write migration
   `supabase/migrations/20260915000005_reporting_reader_functions.sql` defining the four
   authorization-pinned SECURITY DEFINER reader functions (`reporting_savings_for_period`,
   `reporting_purchases_for_period`, `reporting_alert_snapshot`, `reporting_validity_expiring`)
   with `SET search_path` pinned, explicit `tenant_id` parameters, and — where member-specific
   visibility matters — effective `membership_id` and optional `branch_id` parameters validated
   inside the function, per research R5.
-- [ ] T006 [P] Update `apps/api/scripts/seed.py` to seed, in the demo tenant: one report schedule
+- [x] T006 [P] Update `apps/api/scripts/seed.py` to seed, in the demo tenant: one report schedule
   and one digest subscription with `next_run_at` in the past, plus the period data they report on.
 
 **Checkpoint**: migrations apply cleanly; `\d+ report_schedule` shows FORCE RLS and both-policy
@@ -64,23 +64,23 @@ shape; the isolation test for the new tables passes.
 
 ## Phase 2: Contract and test-first foundations (orchestrator lane)
 
-- [ ] T007 Write `specs/012-reporting-hardening/contracts/reporting-hardening.openapi.yaml`
+- [x] T007 Write `specs/012-reporting-hardening/contracts/reporting-hardening.openapi.yaml`
   covering: schedules CRUD (`/reports/schedules`), the artifacts cursor list
   (`/reports/artifacts`), the extended `POST /exports` (kinds, csv, branch filter, row-cap
   error), `GET /exports/{id}/download`, digest subscriptions CRUD (`/digests/subscriptions`),
   `GET /digests/latest`, the `reporting_timezone` field on `PATCH /tenant`, and the kind/format
   matrix.
-- [ ] T008 [P] [US1] Write `apps/api/tests/integration/test_reporting_isolation.py` — the FR-019
+- [x] T008 [P] [US1] Write `apps/api/tests/integration/test_reporting_isolation.py` — the FR-019
   test: two tenants with marker schedules, artifacts, export jobs, and subscriptions; cross-reads
   via API assert not found; the four reader functions are called with tenant A's id and assert
   tenant B's marker rows are invisible; a branch-A/branch-B case asserts a branch-scoped member
   cannot see the other branch's artifacts, digest content, or reader rows; worker hardening cases
   assert tenant/job mismatch payloads and duplicate RQ replay are refused, and that purged
   artifacts invalidate previously issued download links.
-- [ ] T009 [P] [US1] Write `apps/api/tests/unit/test_report_windows.py` covering the pure
+- [x] T009 [P] [US1] Write `apps/api/tests/unit/test_report_windows.py` covering the pure
   schedule math: weekly window derivation in the reporting timezone (UTC default, DST boundary
   case), weekday/next-run computation, and per-period idempotency key derivation.
-- [ ] T010 Write `apps/api/tests/contract/test_reporting_contract.py` validating request and
+- [x] T010 Write `apps/api/tests/contract/test_reporting_contract.py` validating request and
   response shapes of every new and extended endpoint against the contract from T007.
 
 **Checkpoint**: the contract exists, and the isolation and window tests are red for the right
@@ -90,12 +90,12 @@ reason (no module code yet), ready to drive implementation.
 
 ## Phase 3: User Story 1 — Scheduled reports and a working Reports center (P1)
 
-- [ ] T011 [US1] Implement schedule CRUD and window math in
+- [x] T011 [US1] Implement schedule CRUD and window math in
   `apps/api/src/procurepilot_api/modules/reports/schedules.py` and `modules/reports/schemas.py`:
   create/update/pause/resume/delete with duplicate refusal, RBAC (owner/buyer write), filter
   validation against enabled branches/suppliers, locale selection (FR-029), next-run computation,
   and the schedule-survives-creator-deactivation rule — passing T009.
-- [ ] T012 [US1] Implement `GET/POST/PATCH/DELETE /api/v1/reports/schedules` and
+- [x] T012 [US1] Implement `GET/POST/PATCH/DELETE /api/v1/reports/schedules` and
   `GET /api/v1/reports/artifacts` (cursor pagination, limit cap 100, branch-visibility filtering
   for branch-scoped roles per FR-004) in
   `apps/api/src/procurepilot_api/modules/reports/router.py`, with audit events
@@ -112,7 +112,7 @@ reason (no module code yet), ready to drive implementation.
   main with honest `api-specification.md` docs. T013's remainder: branch-visibility
   verification (FR-005, blocked on T014 readers) and purged-artifact/expiry semantics (blocked
   on the T006 retention migration).
-- [ ] T014 [US1] Extend on-demand exports in `apps/api/src/procurepilot_api/modules/exports/schemas.py`
+- [x] T014 [US1] Extend on-demand exports in `apps/api/src/procurepilot_api/modules/exports/schemas.py`
   and `service.py`: kinds `spend_by_supplier` and `alerts_summary`, `csv` format, the branch filter
   (replacing the `unsupported_in_phase_1` refusal) with branch-visibility validation, the locale
   field (FR-029), the declared column schemas and currency-grouped aggregation from
@@ -146,7 +146,7 @@ reason (no module code yet), ready to drive implementation.
   (signed URL, expiry, cross-tenant, unauthorised-branch, and purged not found; CSV BOM presence;
   Arabic PDF shaping assertion on connected glyphs and display order), and extend
   `apps/api/tests/contract/test_reporting_contract.py` coverage for the download flow.
-- [ ] T020 [P] [US1] Build the Reports center in `apps/web/src/app/features/reports/reports-center/`:
+- [x] T020 [P] [US1] Build the Reports center in `apps/web/src/app/features/reports/reports-center/`:
   artifacts list (kind, format, locale, period, status, row count, rule version, summary
   highlight, download action, and per-kind operational deep link — alerts to the inbox,
   savings to the ledger, spend to compare), schedules list with pause/resume, cross-links from
