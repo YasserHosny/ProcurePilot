@@ -381,10 +381,17 @@ jobs:
           curl -sf http://localhost:8000/api/v1/health
 
       - name: Start the extraction worker
-        # Consumes the quotation-extraction RQ queue over the redis service above. Every default
-        # (redis_url, queue_name, provider_mode=stub, confidence_threshold) already matches this
-        # job's environment; only the Supabase connection needs to come from this job's own
-        # credentials, already exported to GITHUB_ENV by "Export Supabase credentials".
+        # Consumes the quotation-extraction RQ queue over the redis service above. Defaults for
+        # redis_url, queue_name and confidence_threshold already match this job's environment;
+        # the Supabase connection comes from GITHUB_ENV via "Export Supabase credentials".
+        # EXTRACTION_PROVIDER_MODE=stub selects the deterministic FakeExtractionProvider
+        # explicitly: there are no cloud credentials here, and without it every extraction job
+        # would fail loudly (bedrock -> azure_di) and every quotation-flow spec would die at
+        # upload with "Extraction Failed" — exactly how the functional suite silently broke
+        # between 7004c27 and the first CI run that reached this step. The stub's fixed output
+        # is the contract support/canonical-flow.ts encodes; production keeps bedrock default.
+        env:
+          EXTRACTION_PROVIDER_MODE: stub
         run: |
           uv run --project services/extraction-worker python -m procurepilot_extraction_worker &
           sleep 5

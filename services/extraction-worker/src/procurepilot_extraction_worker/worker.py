@@ -14,6 +14,7 @@ from procurepilot_logging import new_trace_id, set_trace_id
 from procurepilot_extraction_worker.azure_di import AzureDocumentIntelligenceProvider
 from procurepilot_extraction_worker.bedrock import BedrockExtractionProvider
 from procurepilot_extraction_worker.models import ExtractedField, ExtractedLine, ExtractionResult
+from procurepilot_extraction_worker.providers import FakeExtractionProvider
 from procurepilot_extraction_worker.settings import WorkerSettings, get_settings
 from procurepilot_extraction_worker.structured_parse import is_structured_mime_type
 from procurepilot_extraction_worker.validation import low_confidence_fields, validate_arithmetic
@@ -111,6 +112,11 @@ def _extract(
         logger.info("using structured parser", extra={"mime_type": mime_type})
         content = _download_storage_object(settings, bucket=bucket, path=storage_path)
         return parse_structured_content(content, mime_type=mime_type)
+    if settings.provider_mode == "stub":
+        logger.info("using stub provider")
+        return FakeExtractionProvider().extract(
+            document_id=str(document_id), mime_type=mime_type, storage_path=storage_path
+        )
     doc_bytes = _download_storage_object(settings, bucket=bucket, path=storage_path)
     common = dict(
         document_id=str(document_id),

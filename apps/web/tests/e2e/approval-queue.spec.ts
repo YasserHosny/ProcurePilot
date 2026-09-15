@@ -111,6 +111,11 @@ test.describe('Approval Queue (chunk 008 US2)', () => {
     await row.locator('.expand-lines-btn').click();
     await expect(page.locator('.line-item-row').first()).toBeVisible();
 
+    // The click leaves the pointer on the expand toggle, so its "Hide lines" matTooltip opens
+    // and never dismisses in headless (nothing moves the mouse away). Its overlay panel sits
+    // on top of the approve button and intercepts the click, so park the pointer off it first.
+    await page.mouse.move(0, 0);
+
     await row.locator('.approve-btn').click();
     const dialog = page.locator('mat-dialog-container', { hasText: 'Approve Purchase Request' });
     await expect(dialog).toBeVisible();

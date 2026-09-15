@@ -12,7 +12,7 @@ class WorkerSettings:
     supabase_service_role_key: str
     redis_url: str = "redis://localhost:6379/0"
     queue_name: str = "quotation-extraction"
-    provider_mode: Literal["bedrock", "azure_di"] = "bedrock"
+    provider_mode: Literal["stub", "bedrock", "azure_di"] = "bedrock"
     confidence_threshold: float = 0.85
     log_level: str = "info"
     aws_region: str = "us-east-1"
