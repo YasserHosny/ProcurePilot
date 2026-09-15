@@ -20,9 +20,10 @@ def create_export(
     payload: Annotated[ExportCreate, Body()],
     member: Annotated[CurrentMember, Depends(require_role(*WRITE_ROLES))],
     service: Annotated[ExportService, Depends(get_export_service)],
+    token: Annotated[str, Depends(bearer_token)],
     _idempotency_key: Annotated[UUID | None, Header(alias="Idempotency-Key")] = None,
 ) -> ExportJob:
-    return service.create_job(member=member, payload=payload)
+    return service.create_job(member=member, payload=payload, bearer_token=token)
 
 
 @router.get("/exports/{id}", response_model=ExportJob)

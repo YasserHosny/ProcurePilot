@@ -78,11 +78,19 @@ def test_export_enqueue_failure_marks_failed_and_commits_before_reraising(
             "filters": {"period_start": "2026-08-01", "period_end": "2026-08-31"},
             "status": "queued",
             "created_at": datetime.now(UTC),
+            # The same stub row also answers create_job's workspace_context lookup.
+            "reporting_timezone": "UTC",
+            "preferred_locale": None,
+            "default_locale": "en",
         }
     )
     monkeypatch.setattr(
         "procurepilot_api.modules.exports.service._authenticated_db",
         lambda *_args, **_kwargs: conn,
+    )
+    monkeypatch.setattr(
+        "procurepilot_api.modules.exports.service._enforce_row_cap",
+        lambda *_args, **_kwargs: None,
     )
     monkeypatch.setattr(
         "procurepilot_api.modules.exports.service._enqueue_export_job",
@@ -92,7 +100,7 @@ def test_export_enqueue_failure_marks_failed_and_commits_before_reraising(
     )
 
     with pytest.raises(ServiceUnavailableError):
-        ExportService(settings=object()).create_job(
+        ExportService(settings=type("Settings", (), {"export_row_cap": 10_000})()).create_job(
             member=_member(tenant_id),
             payload=ExportCreate(
                 kind="savings_ledger",

@@ -37,7 +37,7 @@ def _insert_completed_job(
             cur.execute(
                 """
                 insert into export_job (tenant_id, requested_by, kind, format, filters, status)
-                values (%s, %s, 'savings_ledger', %s, %s, 'completed')
+                values (%s, %s, 'savings_ledger', %s, %s, 'queued')
                 returning id
                 """,
                 (
@@ -51,7 +51,8 @@ def _insert_completed_job(
             cur.execute(
                 """
                 update export_job
-                set row_count = %s,
+                set status = 'completed',
+                    row_count = %s,
                     storage_bucket = 'exports',
                     storage_path = %s,
                     download_url = %s,
@@ -131,6 +132,12 @@ def test_download_for_job_without_artifact_returns_not_found(
             "_enqueue_export_job",
             lambda *_args, **_kwargs: None,
         )
+
+        class _NoAuditWriter:
+            def record(self, event: object, bearer_token: str | None = None) -> None:
+                return None
+
+        monkeypatch.setattr(export_service_module, "get_audit_writer", lambda: _NoAuditWriter())
         job = ExportService(settings).create_job(
             member=context.member,
             payload=export_request(),

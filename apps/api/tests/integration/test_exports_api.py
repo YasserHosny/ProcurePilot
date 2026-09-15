@@ -27,6 +27,14 @@ pytestmark = pytest.mark.skipif(
 )
 
 
+class _NoAuditWriter:
+    """create_job records `reports.export_requested` (R2.5 contract); these tests exercise
+    the queue/durability behaviour, not the audit trail."""
+
+    def record(self, event: object, bearer_token: str | None = None) -> None:
+        return None
+
+
 def test_export_create_queues_durable_job_without_tenant_input(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -38,6 +46,7 @@ def test_export_create_queues_durable_job_without_tenant_input(
             enqueued.append((UUID(str(row["id"])), member.tenant_id))
 
         monkeypatch.setattr(export_service_module, "_enqueue_export_job", fake_enqueue)
+        monkeypatch.setattr(export_service_module, "get_audit_writer", lambda: _NoAuditWriter())
         job = ExportService(settings).create_job(
             member=context.member,
             payload=export_request(),
@@ -92,6 +101,7 @@ def test_cross_tenant_export_read_returns_not_found(monkeypatch: pytest.MonkeyPa
                 "_enqueue_export_job",
                 lambda *_args, **_kwargs: None,
             )
+            monkeypatch.setattr(export_service_module, "get_audit_writer", lambda: _NoAuditWriter())
             job = ExportService(settings).create_job(member=alpha.member, payload=export_request())
 
             with pytest.raises(NotFoundError):
@@ -135,6 +145,7 @@ def test_worker_failure_persists_failed_status_from_separate_connection(
             "_enqueue_export_job",
             lambda *_args, **_kwargs: None,
         )
+        monkeypatch.setattr(export_service_module, "get_audit_writer", lambda: _NoAuditWriter())
         job = ExportService(settings).create_job(member=context.member, payload=export_request())
         monkeypatch.setattr(
             export_worker,

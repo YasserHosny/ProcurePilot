@@ -75,6 +75,12 @@ class UnprocessableEntityError(AppError):
     safe_message = "Request validation failed."
 
 
+class ExportRowCapExceededError(AppError):
+    status_code = status.HTTP_422_UNPROCESSABLE_ENTITY
+    code = "export_row_cap_exceeded"
+    safe_message = "Request validation failed."
+
+
 class UnsupportedMediaTypeError(AppError):
     status_code = status.HTTP_415_UNSUPPORTED_MEDIA_TYPE
     code = "validation.unsupported_media_type"
@@ -119,9 +125,7 @@ async def http_error_handler(_request: Request, exc: Exception) -> JSONResponse:
     status_code = http_error.status_code
     code = "not_found" if status_code == status.HTTP_404_NOT_FOUND else "http_error"
     message = (
-        "Resource was not found."
-        if status_code == status.HTTP_404_NOT_FOUND
-        else "Request failed."
+        "Resource was not found." if status_code == status.HTTP_404_NOT_FOUND else "Request failed."
     )
     return _error_response(status_code=status_code, code=code, message=message, details=None)
 
