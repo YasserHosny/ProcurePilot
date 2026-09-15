@@ -28,6 +28,7 @@ from procurepilot_api.modules.offers.schemas import (
     Money,
     Offer,
     PriceHistoryMetric,
+    PriceHistoryPoint,
     PriceHistoryResponse,
     PriceHistorySummary,
     ProductRef,
@@ -77,6 +78,32 @@ def _make_offer(
     )
 
 
+def _make_history_points(
+    *,
+    product_id: uuid4,
+    supplier_id: uuid4,
+    amount: str,
+    count: int,
+) -> list[PriceHistoryPoint]:
+    now = datetime.now(UTC)
+    return [
+        PriceHistoryPoint(
+            landed_cost_id=uuid4(),
+            workspace_product_id=product_id,
+            supplier_id=supplier_id,
+            supplier_name="Acme Supplies",
+            recorded_at=now - timedelta(days=5),
+            valid_from=now - timedelta(days=30),
+            valid_to=now + timedelta(days=10),
+            normalised_unit_price=Money(amount=amount, currency="GBP"),
+            landed_cost_total=Money(amount=amount, currency="GBP"),
+            quantity="1.000000",
+            base_unit="piece",
+        )
+        for _ in range(count)
+    ]
+
+
 def test_price_spike_detection_and_severity() -> None:
     now = datetime.now(UTC)
     member = _make_member()
@@ -107,7 +134,9 @@ def test_price_spike_detection_and_severity() -> None:
     history_2 = PriceHistoryResponse(
         product=compare_25.product,
         window_months=6,
-        points=[],
+        points=_make_history_points(
+            product_id=product_id, supplier_id=supplier_id, amount="10.0000", count=2
+        ),
         summary=PriceHistorySummary(
             average_paid_rolling_window=PriceHistoryMetric(
                 value=Money(amount="10.0000", currency="GBP"),
@@ -159,7 +188,9 @@ def test_price_spike_detection_and_severity() -> None:
     history_5 = PriceHistoryResponse(
         product=compare_25.product,
         window_months=6,
-        points=[],
+        points=_make_history_points(
+            product_id=product_id, supplier_id=supplier_id, amount="10.0000", count=5
+        ),
         summary=PriceHistorySummary(
             average_paid_rolling_window=PriceHistoryMetric(
                 value=Money(amount="10.0000", currency="GBP"),
@@ -222,12 +253,8 @@ def test_likely_duplicate_quotation_line_detection() -> None:
         quantity="10.000000",
         line_id=line_2,
     )
-    compare = SimpleNamespace(
-        product=ProductRef(id=product_id, tenant_name="Flour"),
-        offers=[offer_1, offer_2],
-    )
 
-    alerts = _duplicate_line_alerts(member, compare, now)
+    alerts = _duplicate_line_alerts(member, [offer_1, offer_2], product_id, now)
     assert len(alerts) == 1
     alert = alerts[0]
     assert alert.kind == "likely_duplicate_quotation_line"
@@ -252,11 +279,7 @@ def test_likely_duplicate_quotation_line_detection() -> None:
         amount="5.5000",
         quantity="10.000000",
     )
-    compare_diff = SimpleNamespace(
-        product=compare.product,
-        offers=[offer_1, offer_3],
-    )
-    alerts_diff = _duplicate_line_alerts(member, compare_diff, now)
+    alerts_diff = _duplicate_line_alerts(member, [offer_1, offer_3], product_id, now)
     assert len(alerts_diff) == 0
 
 
@@ -275,7 +298,9 @@ def test_decimal_or_quantity_anomaly_detection() -> None:
     history_baseline = PriceHistoryResponse(
         product=compare_spike.product,
         window_months=6,
-        points=[],
+        points=_make_history_points(
+            product_id=product_id, supplier_id=supplier_id, amount="10.0000", count=3
+        ),
         summary=PriceHistorySummary(
             average_paid_rolling_window=PriceHistoryMetric(
                 value=Money(amount="10.0000", currency="GBP"),
