@@ -45,6 +45,9 @@ class _Conn:
     def cursor(self, **_kwargs: object) -> _Cursor:
         return _Cursor(self._rows)
 
+    def commit(self) -> None:
+        return None
+
 
 def _member() -> CurrentMember:
     return CurrentMember(
@@ -116,6 +119,10 @@ def test_large_period_export_creation_stays_async_and_does_not_render(
                 "row_count": None,
                 "download_url": None,
                 "error": None,
+                # The same stub row also answers create_job's workspace_context lookup.
+                "reporting_timezone": "UTC",
+                "preferred_locale": None,
+                "default_locale": "en",
             }
         ]
     )
@@ -125,11 +132,15 @@ def test_large_period_export_creation_stays_async_and_does_not_render(
         lambda *_args, **_kwargs: conn,
     )
     monkeypatch.setattr(
+        "procurepilot_api.modules.exports.service._enforce_row_cap",
+        lambda *_args, **_kwargs: None,
+    )
+    monkeypatch.setattr(
         "procurepilot_api.modules.exports.service._enqueue_export_job",
         lambda *_args, **_kwargs: enqueued.__setitem__("count", enqueued["count"] + 1),
     )
 
-    job = ExportService(settings=object()).create_job(
+    job = ExportService(settings=type("Settings", (), {"export_row_cap": 10_000})()).create_job(
         member=_member().model_copy(update={"tenant_id": tenant_id}),
         payload=ExportCreate(
             kind="savings_ledger",
