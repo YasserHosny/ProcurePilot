@@ -1,0 +1,615 @@
+openapi: 3.1.0
+info:
+  title: ProcurePilot Reporting and Hardening API
+  version: 0.1.0
+  description: >
+    R2.5 reporting surface: scheduled reports, the Reports center artifact list, the extended
+    on-demand exports, artifact downloads, per-member digest subscriptions, and the in-app
+    digest view. Conventions follow docs/architecture/api-specification.md and the foundation
+    contract (specs/001-platform-foundation/contracts/auth-tenant.openapi.yaml): base path
+    /api/v1, Supabase JWT bearer auth, tenant scope resolved server-side from the token (never
+    from path, query, or header), cursor pagination with limit capped at 100, Idempotency-Key
+    on mutations, and the {code, message, details, trace_id} error envelope.
+
+    Cross-tenant schedule, artifact, export job, and digest subscription references resolve as
+    not found, never forbidden (FR-019). Cross-branch references where the caller's role is
+    branch-scoped also resolve as not found (FR-004/FR-005).
+
+    Audit actions across this surface carry the FR-011 payload contract: actor membership (or
+    the explicit system-actor marker for worker actions), trace or correlation id, source
+    schedule or subscription id, period window, filters digest, row count, storage path
+    reference, and outcome-specific detail.
+
+servers:
+  - url: /api/v1
+
+security:
+  - bearerAuth: []
+
+paths:
+  /reports/schedules:
+    get:
+      summary: List report schedules for the active workspace
+      description: >
+        Members read all schedules in the workspace; owners and buyers create and edit them
+        (FR-001). Listed in creation order, newest first, cursor paginated.
+      parameters:
+        - { name: cursor, in: query, schema: { type: string } }
+        - { name: limit, in: query, schema: { type: integer, maximum: 100, default: 50 } }
+      responses:
+        '200':
+          description: Schedules
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/ReportSchedule' }
+                  next_cursor: { type: string, nullable: true }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    post:
+      summary: Create a report schedule
+      description: >
+        Owner or buyer. One schedule per member per kind/format/filters combination — the
+        filters digest makes a duplicate create an honest 409 rather than a silent second
+        schedule. Filters are validated against the workspace's enabled suppliers and branches;
+        a named branch the caller cannot see resolves as not found (FR-019).
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReportScheduleCreate' }
+      responses:
+        '201':
+          description: Schedule created; first run derivable from weekday and next_run_at
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReportSchedule' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: An identical schedule (same kind, format, and filters digest) already exists
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+
+  /reports/schedules/{schedule_id}:
+    parameters:
+      - { name: schedule_id, in: path, required: true, schema: { type: string, format: uuid } }
+    patch:
+      summary: Update a schedule, or pause / resume it
+      description: >
+        Owner or buyer. Filters, weekday, format, and locale are editable; a paused schedule
+        keeps its position but the scheduler skips it, and resuming recomputes next_run_at from
+        the weekday. Status transitions to and from paused are audited as
+        reports.schedule_paused / reports.schedule_resumed. The schedule survives its creator's
+        deactivation (data-model.md): deactivating a member never deletes or pauses schedules.
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReportScheduleUpdate' }
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReportSchedule' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+    delete:
+      summary: Delete (retire) a schedule
+      description: >
+        Owner or buyer. Hard delete of the configuration only — generated artifacts survive via
+        their immutable schedule_snapshot (FR-014). Audited as reports.schedule_deleted.
+      responses:
+        '204': { description: Deleted }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+
+  /reports/artifacts:
+    get:
+      summary: List report artifacts and export jobs in one Reports surface
+      description: >
+        Cursor list over export_job rows for the workspace, newest first (FR-004), carrying the
+        filters snapshot, period, locale, status, row count, rule version, source schedule id
+        where applicable, timestamps, and the download URL while the artifact is downloadable.
+        Branch-scoped roles see only artifacts whose branch filter includes a branch they can
+        see; artifacts with no branch filter are visible to all members. Optional kind and
+        status filters narrow the list.
+      parameters:
+        - { name: cursor, in: query, schema: { type: string } }
+        - { name: limit, in: query, schema: { type: integer, maximum: 100, default: 50 } }
+        - { name: kind, in: query, schema: { $ref: '#/components/schemas/ReportKind' } }
+        - { name: status, in: query, schema: { type: string, enum: [queued, running, completed, failed, expired] } }
+      responses:
+        '200':
+          description: Artifacts
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/ReportArtifact' }
+                  next_cursor: { type: string, nullable: true }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /exports:
+    post:
+      summary: Request an on-demand export
+      description: >
+        Extended for R2.5 (FR-002, FR-012, FR-013, FR-029): kinds spend_by_supplier and
+        alerts_summary alongside savings_ledger; CSV for every kind; the branch filter is
+        supported (it previously returned unsupported_in_phase_1) with branch-visibility
+        validation; locale is recorded on the job. The kind/format matrix is enforced here and
+        in the API — PDF is not offered for spend_by_supplier. Row counts are capped (default
+        10,000, configured per environment); an over-cap request is refused with a structured
+        error naming the cap and the actual count, and nothing is queued.
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ExportRequest' }
+      responses:
+        '201':
+          description: Export job queued
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ExportJob' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422':
+          description: >
+            Validation failed — unknown kind/format combination, a branch or supplier the
+            caller cannot see, an invalid period, or the row cap exceeded. The over-cap refusal
+            carries code export_row_cap_exceeded with details {cap, actual}.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+
+  /exports/{id}/download:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      summary: Issue an expiring signed URL for a completed artifact
+      description: >
+        FR-005. Authenticated job lookup only — a cross-tenant, unauthorised-branch, purged, or
+        otherwise unauthorised id resolves as not found. Branch visibility is verified against
+        the artifact's branch filter before any URL is minted. The signed URL expires after a
+        bounded, environment-configured TTL; purged or expired artifacts invalidate previously
+        issued links. Every issue is audited as reports.artifact_downloaded.
+      responses:
+        '200':
+          description: Signed URL
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [download_url]
+                properties:
+                  download_url: { type: string, description: Expiring signed storage URL }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /digests/subscriptions:
+    get:
+      summary: List the caller's digest subscriptions
+      description: >
+        Per-member (FR-008): members see their own subscriptions; owners additionally see every
+        subscription in the workspace for visibility, never to modify them.
+      parameters:
+        - { name: cursor, in: query, schema: { type: string } }
+        - { name: limit, in: query, schema: { type: integer, maximum: 100, default: 50 } }
+      responses:
+        '200':
+          description: Subscriptions
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/DigestSubscription' }
+                  next_cursor: { type: string, nullable: true }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    post:
+      summary: Create a digest subscription
+      description: >
+        The caller subscribes themselves (one active weekly digest per filters combination). A
+        named branch the caller cannot see resolves as not found. New memberships are
+        provisioned with one active in-app subscription by the service; this endpoint exists
+        for re-subscribing and additional branch filters.
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                filters:
+                  type: object
+                  properties:
+                    branch_id: { type: string, format: uuid, nullable: true }
+                locale: { type: string, enum: [en, ar] }
+                channel: { type: string, enum: [in_app, email] }
+      responses:
+        '201':
+          description: Subscription created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DigestSubscription' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: An identical subscription (same kind and filters digest) already exists
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+
+  /digests/subscriptions/{subscription_id}:
+    parameters:
+      - { name: subscription_id, in: path, required: true, schema: { type: string, format: uuid } }
+    patch:
+      summary: Update, pause, or resume a digest subscription
+      description: The owning member only — an owner cannot modify another member's digest.
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                filters:
+                  type: object
+                  properties:
+                    branch_id: { type: string, format: uuid, nullable: true }
+                locale: { type: string, enum: [en, ar] }
+                channel: { type: string, enum: [in_app, email] }
+                status: { type: string, enum: [active, paused] }
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DigestSubscription' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+    delete:
+      summary: Delete a digest subscription
+      responses:
+        '204': { description: Deleted }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+
+  /digests/latest:
+    get:
+      summary: The caller's latest in-app weekly digest
+      description: >
+        FR-009. Rendered from the caller's active subscription (or the workspace default when
+        none exists), for the last complete week in the workspace's reporting timezone.
+        Sections are in fixed order with verified savings in the hero position; every item
+        carries a deep link into the acting surface. Advisory only (FR-017) — nothing here can
+        act on a purchase, approval, order, payment, or supplier message.
+      responses:
+        '200':
+          description: Digest view
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DigestView' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /tenant:
+    patch:
+      summary: Update workspace settings (reporting_timezone extension)
+      description: >
+        Owner only. Region, currency, and tax model remain immutable (see the foundation
+        contract for the base surface). reporting_timezone is an IANA name (default UTC); the
+        change takes effect for future scheduled runs — windows already derived are not
+        recomputed.
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reporting_timezone:
+                  type: string
+                  pattern: '^[A-Za-z]+(/[A-Za-z0-9_+-]+)*$'
+                  example: Africa/Cairo
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TenantSettings' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Supabase-issued access token carrying tenant_id and role claims.
+
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: false
+      schema: { type: string, format: uuid }
+
+  responses:
+    Unauthorized:
+      description: Missing, invalid, or expired token
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Forbidden:
+      description: The caller's role does not permit this action
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    NotFound:
+      description: >
+        Not found — also the honest answer for cross-tenant references and for branch-scoped
+        roles referencing artifacts outside their branches (FR-019). Existence is never leaked.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Unprocessable:
+      description: Validation failed — unsupported kind/format matrix, invalid period or filters
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    RateLimited:
+      description: Too many attempts — keyed by tenant and membership claims (FR-020)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+
+  schemas:
+    Error:
+      type: object
+      required: [code, message, trace_id]
+      properties:
+        code: { type: string, example: not_found }
+        message: { type: string }
+        details: { type: object, additionalProperties: true }
+        trace_id: { type: string }
+
+    ReportKind:
+      type: string
+      enum: [savings_ledger, spend_by_supplier, alerts_summary]
+
+    ReportFormat:
+      type: string
+      enum: [csv, xlsx, pdf]
+      description: >
+        The kind/format matrix (FR-002): CSV and XLSX for every kind; PDF additionally for
+        savings_ledger and alerts_summary — never spend_by_supplier, whose value is the
+        currency-grouped table, not a printable layout.
+
+    ReportScheduleCreate:
+      type: object
+      required: [kind, format, weekday]
+      properties:
+        kind: { $ref: '#/components/schemas/ReportKind' }
+        format: { $ref: '#/components/schemas/ReportFormat' }
+        filters: { $ref: '#/components/schemas/ReportFilters' }
+        weekday:
+          type: integer
+          minimum: 0
+          maximum: 6
+          description: 0 = Monday, matching the stored 0-6 Monday-based smallint.
+        locale:
+          type: string
+          enum: [en, ar]
+          description: Defaults to the requesting member's preferred locale, then the workspace default (FR-029).
+
+    ReportScheduleUpdate:
+      type: object
+      properties:
+        format: { $ref: '#/components/schemas/ReportFormat' }
+        filters: { $ref: '#/components/schemas/ReportFilters' }
+        weekday: { type: integer, minimum: 0, maximum: 6 }
+        locale: { type: string, enum: [en, ar] }
+        status: { type: string, enum: [active, paused] }
+
+    ReportFilters:
+      type: object
+      description: >
+        The recurring filter set — the period itself is NOT stored here: scheduled windows are
+        derived at run time from the weekday and the workspace's reporting timezone (FR-003).
+      properties:
+        supplier_id: { type: string, format: uuid, nullable: true }
+        branch_id: { type: string, format: uuid, nullable: true }
+
+    ReportSchedule:
+      type: object
+      required: [id, kind, format, filters, weekday, status, next_run_at, created_at, updated_at]
+      properties:
+        id: { type: string, format: uuid }
+        kind: { $ref: '#/components/schemas/ReportKind' }
+        format: { $ref: '#/components/schemas/ReportFormat' }
+        filters: { $ref: '#/components/schemas/ReportFilters' }
+        weekday: { type: integer, minimum: 0, maximum: 6 }
+        status: { type: string, enum: [active, paused] }
+        next_run_at: { type: string, format: date-time }
+        last_run_at: { type: string, format: date-time, nullable: true }
+        rule_version:
+          type: string
+          description: Empty string means "evaluate with the rule version current at run time".
+        locale: { type: string, enum: [en, ar] }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    ReportArtifact:
+      type: object
+      required: [id, kind, format, filters, status, row_count, rule_version, locale, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        kind: { $ref: '#/components/schemas/ReportKind' }
+        format: { $ref: '#/components/schemas/ReportFormat' }
+        filters:
+          type: object
+          description: The immutable filter snapshot the artifact was generated under.
+          properties:
+            period_start: { type: string, format: date, nullable: true }
+            period_end: { type: string, format: date, nullable: true }
+            supplier_id: { type: string, format: uuid, nullable: true }
+            branch_id: { type: string, format: uuid, nullable: true }
+        status: { type: string, enum: [queued, running, completed, failed, expired] }
+        row_count: { type: integer, nullable: true }
+        rule_version: { type: string }
+        schedule_id: { type: string, format: uuid, nullable: true, description: Present for scheduled artifacts, null for on-demand exports }
+        locale: { type: string, enum: [en, ar] }
+        download_url:
+          type: string
+          nullable: true
+          description: Present only while the artifact is downloadable; purged or expired artifacts have none.
+        expires_at: { type: string, format: date-time, nullable: true }
+        error: { type: string, nullable: true }
+        created_at: { type: string, format: date-time }
+        started_at: { type: string, format: date-time, nullable: true }
+        completed_at: { type: string, format: date-time, nullable: true }
+
+    ExportRequest:
+      type: object
+      required: [kind, format, filters]
+      properties:
+        kind: { $ref: '#/components/schemas/ReportKind' }
+        format: { $ref: '#/components/schemas/ReportFormat' }
+        filters:
+          type: object
+          required: [period_start]
+          properties:
+            period_start: { type: string, format: date }
+            period_end: { type: string, format: date, description: Defaults to the current date in the workspace reporting timezone }
+            supplier_id: { type: string, format: uuid, nullable: true }
+            branch_id: { type: string, format: uuid, nullable: true }
+        locale: { type: string, enum: [en, ar] }
+
+    ExportJob:
+      type: object
+      required: [id, kind, format, status, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        kind: { $ref: '#/components/schemas/ReportKind' }
+        format: { $ref: '#/components/schemas/ReportFormat' }
+        status: { type: string, enum: [queued, running, completed, failed, expired] }
+        row_count: { type: integer, nullable: true }
+        locale: { type: string, enum: [en, ar] }
+        created_at: { type: string, format: date-time }
+
+    DigestSubscription:
+      type: object
+      required: [id, kind, channel, status, next_run_at, created_at, updated_at]
+      properties:
+        id: { type: string, format: uuid }
+        kind: { type: string, enum: [weekly_digest] }
+        filters:
+          type: object
+          properties:
+            branch_id: { type: string, format: uuid, nullable: true }
+        channel: { type: string, enum: [in_app, email] }
+        status: { type: string, enum: [active, paused] }
+        locale: { type: string, enum: [en, ar] }
+        next_run_at: { type: string, format: date-time }
+        last_delivery_at: { type: string, format: date-time, nullable: true }
+        last_delivery_status:
+          type: string
+          nullable: true
+          enum: [succeeded, failed, email_unconfigured, null]
+          description: null until the first delivery attempt.
+        email_configured:
+          type: boolean
+          description: Workspace-level, from settings — explains the email_unconfigured status.
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    DigestView:
+      type: object
+      required: [subscription_id, period_start, period_end, sections, rendered_at]
+      properties:
+        subscription_id: { type: string, format: uuid }
+        period_start: { type: string, format: date }
+        period_end: { type: string, format: date }
+        sections:
+          type: array
+          description: Fixed order (FR-009) — verified savings first (hero position).
+          items: { $ref: '#/components/schemas/DigestSection' }
+        rendered_at: { type: string, format: date-time }
+        delivery_status: { type: string, enum: [succeeded, failed, email_unconfigured] }
+
+    DigestSection:
+      type: object
+      required: [kind, items]
+      properties:
+        kind:
+          type: string
+          enum: [verified_savings, pending_verifications, pending_approvals, anomalies, expiring_validity]
+        items:
+          type: array
+          items:
+            type: object
+            required: [label, deep_link]
+            properties:
+              label: { type: string }
+              money:
+                type: object
+                description: Present where the item carries a monetary value — amount and explicit currency, never a bare number.
+                properties:
+                  amount: { type: number }
+                  currency: { type: string, pattern: '^[A-Z]{3}$' }
+              evidence_ref: { type: string, description: Human-usable web link, not an internal API path }
+              deep_link: { type: string }
+
+    TenantSettings:
+      type: object
+      required: [id, name, slug, region, currency, tax_model, default_locale, reporting_timezone]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        slug: { type: string }
+        region: { type: string }
+        currency: { type: string }
+        tax_model: { type: string }
+        default_locale: { type: string, enum: [en, ar] }
+        reporting_timezone: { type: string, example: UTC }

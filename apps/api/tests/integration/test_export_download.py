@@ -37,7 +37,7 @@ def _insert_completed_job(
             cur.execute(
                 """
                 insert into export_job (tenant_id, requested_by, kind, format, filters, status)
-                values (%s, %s, 'savings_ledger', %s, %s, 'completed')
+                values (%s, %s, 'savings_ledger', %s, %s, 'queued')
                 returning id
                 """,
                 (
@@ -51,7 +51,8 @@ def _insert_completed_job(
             cur.execute(
                 """
                 update export_job
-                set row_count = %s,
+                set status = 'completed',
+                    row_count = %s,
                     storage_bucket = 'exports',
                     storage_path = %s,
                     download_url = %s,
