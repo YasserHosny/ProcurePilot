@@ -168,7 +168,10 @@ export class OutcomeCaptureComponent implements OnInit {
       this.form.patchValue({ currency: currency.toUpperCase() });
     }
     if (baseUnit) {
-      this.form.patchValue({ base_unit: baseUnit });
+      const normalizedUnit = this.normalizeBaseUnit(baseUnit);
+      if (normalizedUnit) {
+        this.form.patchValue({ base_unit: normalizedUnit });
+      }
     }
     if (totalPaid) {
       this.form.patchValue({ total_paid_amount: totalPaid });
@@ -179,6 +182,39 @@ export class OutcomeCaptureComponent implements OnInit {
         this.form.patchValue({ total_paid_amount: (q * u).toFixed(4) });
       }
     }
+  }
+
+  private normalizeBaseUnit(rawUnit: string | null | undefined): string | null {
+    if (!rawUnit) return null;
+    const lower = rawUnit.trim().toLowerCase();
+    const map: Record<string, string> = {
+      kg: 'kilogram',
+      kgs: 'kilogram',
+      kilogram: 'kilogram',
+      kilograms: 'kilogram',
+      g: 'gram',
+      gm: 'gram',
+      gms: 'gram',
+      gram: 'gram',
+      grams: 'gram',
+      l: 'litre',
+      lt: 'litre',
+      ltr: 'litre',
+      liter: 'litre',
+      litre: 'litre',
+      litres: 'litre',
+      liters: 'litre',
+      ml: 'millilitre',
+      millilitre: 'millilitre',
+      milliliter: 'millilitre',
+      ea: 'each',
+      pc: 'each',
+      pcs: 'each',
+      unit: 'each',
+      units: 'each',
+      each: 'each',
+    };
+    return map[lower] || lower;
   }
 
   private setupAutoTotalCalculation(): void {

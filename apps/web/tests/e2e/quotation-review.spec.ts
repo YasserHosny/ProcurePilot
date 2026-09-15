@@ -76,6 +76,7 @@ test.describe('Quotation Review & Confirmation (T053, US2)', () => {
     await currencyField.click();
     await expect(page.locator('.extraction-info-bar')).toBeVisible();
     await expect(page.locator('.provenance-card')).toBeVisible();
+    await page.keyboard.press('Escape');
 
     // Test Keyboard navigation between flagged fields (FR-014): the stub provider always
     // extracts a sub-threshold issue date, so the nav bar is present on every review.

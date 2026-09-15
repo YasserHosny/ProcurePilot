@@ -100,6 +100,7 @@ export class BudgetListComponent implements OnInit {
     this.isLoading.set(true);
     this.errorMessage.set(null);
     this.errorTraceId.set(null);
+    this.loadReferenceData();
 
     this.organisationApi.listBudgets().subscribe({
       next: (res) => {

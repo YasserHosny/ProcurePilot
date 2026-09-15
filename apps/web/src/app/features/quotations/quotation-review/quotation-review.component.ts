@@ -1,5 +1,5 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, HostListener, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
 import { DomSanitizer, type SafeResourceUrl } from '@angular/platform-browser';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -112,7 +112,7 @@ type QuotationTimestampFields = QuotationDetail & {
   templateUrl: './quotation-review.component.html',
   styleUrl: './quotation-review.component.scss',
 })
-export class QuotationReviewComponent implements OnInit {
+export class QuotationReviewComponent implements OnInit, OnDestroy {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly api = inject(ApiService);
@@ -352,7 +352,12 @@ export class QuotationReviewComponent implements OnInit {
     );
   });
 
+  private readonly onKeyDownCapture = (event: KeyboardEvent): void => {
+    this.handleKeyboardEvent(event);
+  };
+
   ngOnInit(): void {
+    window.addEventListener('keydown', this.onKeyDownCapture, { capture: true });
     const id = this.route.snapshot.paramMap.get('id');
     if (id) {
       this.quotationId.set(id);
@@ -360,6 +365,10 @@ export class QuotationReviewComponent implements OnInit {
       this.loadSuppliers();
       this.loadPriorQuotations();
     }
+  }
+
+  ngOnDestroy(): void {
+    window.removeEventListener('keydown', this.onKeyDownCapture, { capture: true });
   }
 
   loadQuotation(id: string): void {
@@ -639,7 +648,6 @@ export class QuotationReviewComponent implements OnInit {
   }
 
   // FR-014: Keyboard Navigation through flagged fields
-  @HostListener('window:keydown', ['$event'])
   handleKeyboardEvent(event: KeyboardEvent): void {
     const isNext =
       event.altKey &&
@@ -656,9 +664,13 @@ export class QuotationReviewComponent implements OnInit {
 
     if (isNext) {
       event.preventDefault();
+      event.stopPropagation();
+      (document.activeElement as HTMLElement)?.blur?.();
       this.nextFlaggedField();
     } else if (isPrev) {
       event.preventDefault();
+      event.stopPropagation();
+      (document.activeElement as HTMLElement)?.blur?.();
       this.prevFlaggedField();
     }
   }

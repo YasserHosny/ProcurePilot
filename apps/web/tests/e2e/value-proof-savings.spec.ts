@@ -51,7 +51,7 @@ test.describe('Value Proof & Savings Ledger (T023, US1)', () => {
       quotation_line_id: tomatoLine.line.id,
       match_decision_id: tomatoLine.decision.id,
       landed_cost_id: tomatoLine.landed_cost.id,
-      base_unit: 'kg',
+      base_unit: tomatoLine.landed_cost.base_unit || 'kilogram',
     });
     await page.goto(`/savings/outcome-capture?${params.toString()}`);
 
