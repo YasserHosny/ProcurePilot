@@ -791,6 +791,7 @@
         "mismatchDescription": "The sum of the extracted line totals does not match the stated document total. This quotation cannot be confirmed until this discrepancy is reconciled or corrected.",
         "statedTotal": "Stated Document Total:",
         "computedTotal": "Computed Line Total:",
+        "computedLinesTotal": "Computed Lines Total:",
         "difference": "Discrepancy:",
         "reconciled": "Line items match the stated document total perfectly.",
         "statusMismatch": "Discrepancy Unresolved",

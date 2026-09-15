@@ -9,9 +9,10 @@
  * confirm threshold, which means the low-confidence gate is also always present.
  *
  * Reaching a confirmable state therefore always takes the same route: select a supplier,
- * correct Stated Total to 75.00 (reconciles arithmetic), correct Issue Date to a different
- * value (clears low_confidence_unresolved), save, confirm. These helpers encode that recipe
- * once so every spec that needs a confirmed quotation reuses it instead of re-deriving it.
+ * correct Stated Total to 75.00 (reconciles arithmetic), resolve the low-confidence Issue
+ * Date flag via its "confirm as extracted" control, save, then confirm through the review
+ * dialog. These helpers encode that recipe once so every spec that needs a confirmed
+ * quotation reuses it instead of re-deriving it.
  */
 
 import { expect, type Page } from '@playwright/test';
@@ -21,11 +22,18 @@ import { createTestSupplier, fetchQuotationMatches, findProductByName, signInOwn
 /** The stub provider's fixed line arithmetic: 3×12 + (2×20 − 1) = 75.00, always. */
 export const STUB_COMPUTED_TOTAL = '75.00';
 
-const STUB_PDF =
-  '%PDF-1.4\n1 0 obj\n<< /Title (Quotation) >>\nendobj\ntrailer\n<< /Root 1 0 R >>\n%%EOF';
-
-/** The stub provider always extracts this issue date; a correction must differ to fire change. */
-const ISSUE_DATE_REPLACEMENT = '2026-08-19';
+/**
+ * The stub provider ignores file content, but the upload API does not: it hashes the bytes and
+ * refuses a re-upload of content that already exists in the workspace ("Possible Duplicate
+ * Detected"). Embedding a per-call unique token keeps every upload on the primary path instead
+ * of dead-ending on the duplicate dialog.
+ */
+function stubPdfBytes(fileName: string): Buffer {
+  const token = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}-${fileName}`;
+  return Buffer.from(
+    `%PDF-1.4\n1 0 obj\n<< /Title (Quotation ${token}) >>\nendobj\ntrailer\n<< /Root 1 0 R >>\n%%EOF`,
+  );
+}
 
 export interface CreatedSupplier {
   id: string;
@@ -49,7 +57,7 @@ export async function uploadQuotationAndOpenReview(
   await page.setInputFiles('input.file-input', {
     name: fileName,
     mimeType: 'application/pdf',
-    buffer: Buffer.from(STUB_PDF),
+    buffer: stubPdfBytes(fileName),
   });
   const startUpload = page.locator('.start-upload-btn');
   if (await startUpload.isVisible()) {
@@ -79,12 +87,18 @@ export async function correctStatedTotal(page: Page): Promise<void> {
 }
 
 /**
- * Corrects Issue Date to a value different from the extracted one — Angular's (change) only
- * fires on a real value change, and the extracted value is deterministically 2026-08-21.
+ * Resolves the low-confidence Issue Date flag via the field's "confirm as extracted" control.
+ *
+ * The Issue Date input is a matDatepicker: filling it programmatically never fires the
+ * (dateChange) binding that stages a correction, so the low-confidence gate would survive and
+ * confirm would be rejected with low_confidence_unresolved. The confirm-as-is button stages
+ * the extracted value as a human-confirmed correction through the same mechanism as a manual
+ * edit, which is exactly what this recipe needs.
  */
-export async function correctIssueDate(page: Page): Promise<void> {
-  const input = page.locator('.field-box', { hasText: 'Issue Date' }).locator('input');
-  await input.fill(ISSUE_DATE_REPLACEMENT);
+export async function resolveIssueDateFlag(page: Page): Promise<void> {
+  const fieldBox = page.locator('.field-box', { hasText: 'Issue Date' });
+  await fieldBox.locator('.confirm-as-is-btn').click();
+  await expect(fieldBox.locator('.corrected-tag')).toBeVisible();
 }
 
 /** Saves pending corrections and asserts they were persisted with attribution and took effect. */
@@ -98,6 +112,11 @@ export async function saveCorrections(page: Page): Promise<void> {
 /** Confirms the quotation and asserts it reached the reviewed state. */
 export async function confirmQuotation(page: Page): Promise<void> {
   await page.locator('button.confirm-btn').click();
+  // FR-016: confirmation is a two-step human authorisation — the button opens an in-page
+  // dialog whose Proceed button performs the actual POST /confirm.
+  const dialog = page.locator('.confirm-dialog');
+  await expect(dialog).toBeVisible();
+  await dialog.locator('.confirm-dialog-actions .mat-mdc-unelevated-button').click();
   await expect(page.locator('.status-pill.status-reviewed')).toBeVisible();
   const continueLink = page.getByRole('link', { name: 'Continue to Product Matching' });
   await expect(continueLink).toBeVisible({ timeout: 30000 });
@@ -113,7 +132,7 @@ export async function reconcileAndConfirmQuotation(
   const quotationId = await uploadQuotationAndOpenReview(page, fileName);
   await selectReviewSupplier(page, supplier.name);
   await correctStatedTotal(page);
-  await correctIssueDate(page);
+  await resolveIssueDateFlag(page);
   await saveCorrections(page);
   await confirmQuotation(page);
   return { quotationId, supplier };

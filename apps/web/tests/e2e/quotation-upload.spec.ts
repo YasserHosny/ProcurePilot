@@ -44,8 +44,10 @@ test.describe('Quotation Upload & Extraction (T037, US1)', () => {
     await page.goto('/quotations/upload');
     await expect(page.locator('.page-title')).toContainText('Upload Supplier Quotation');
 
-    // Create a mock PDF buffer
-    const validPdfContent = '%PDF-1.4\n1 0 obj\n<< /Title (Quotation) >>\nendobj\ntrailer\n<< /Root 1 0 R >>\n%%EOF';
+    // A mock PDF buffer. The token makes the bytes unique per attempt: the upload API hashes
+    // content and refuses a re-upload of bytes that already exist in the workspace, so a
+    // fixed buffer would dead-end a retried attempt on the duplicate dialog.
+    const validPdfContent = `%PDF-1.4\n1 0 obj\n<< /Title (Quotation ${Date.now()}) >>\nendobj\ntrailer\n<< /Root 1 0 R >>\n%%EOF`;
 
     await page.setInputFiles('input.file-input', {
       name: 'supplier_quotation.pdf',

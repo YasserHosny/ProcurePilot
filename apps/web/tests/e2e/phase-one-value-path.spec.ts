@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import { createMember, type CreatedMember } from './support/api';
 import {
   confirmQuotation,
-  correctIssueDate,
+  resolveIssueDateFlag,
   correctStatedTotal,
   resolveLineAsNewProduct,
   saveCorrections,
@@ -76,7 +76,7 @@ test.describe('Phase 1 Complete Canonical Value Path (T075)', () => {
     //    issue date, confirm the supplier, save, then authorize the quotation.
     await selectReviewSupplier(page, supplierName);
     await correctStatedTotal(page);
-    await correctIssueDate(page);
+    await resolveIssueDateFlag(page);
     await saveCorrections(page);
     await confirmQuotation(page);
 

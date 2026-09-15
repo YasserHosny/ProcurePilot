@@ -73,7 +73,10 @@ test.describe('Organisation Branch Management (chunk 007 US1)', () => {
     await page.goto('/settings');
     await expect(page.locator('.settings-title')).toContainText('Organisation Settings');
     // Fresh workspace: nothing created yet, so the empty state shows before the first branch.
-    await expect(page.locator('.empty-message')).toBeVisible();
+    // Scoped to the branches card: the settings page renders one .empty-message per section
+    // (branches, cost centres, budgets), and an unscoped locator trips strict mode once the
+    // other sections' async loads land.
+    await expect(page.locator('app-branch-list .empty-message')).toBeVisible();
 
     const branch = { name: uniqueBranchName(), address: '12 Market St', region: 'GB' };
     await createBranchViaDialog(page, branch);

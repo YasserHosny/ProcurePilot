@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 
 import {
   credentials,
@@ -17,6 +17,18 @@ import {
  * - The create form (/requests/new) renders with all required fields.
  * - Arabic RTL layout renders the requests title correctly.
  */
+
+// The shared owner's preferred_locale persists server-side, and other spec files switch it to
+// Arabic without restoring (their RTL tests are declared last within their own file only).
+// Every test here asserts English text, so pin the language right after sign-in.
+async function ensureEnglish(page: Page) {
+  if ((await page.locator('html').getAttribute('dir')) === 'rtl') {
+    await page.click('.account-btn');
+    await page.locator('button[mat-menu-item]', { hasText: 'English' }).click();
+    await expect(page.locator('html')).toHaveAttribute('dir', 'ltr');
+  }
+}
+
 test.describe('Purchase Request Submission (chunk 008 US1)', () => {
   let creds: Credentials;
 
@@ -30,6 +42,7 @@ test.describe('Purchase Request Submission (chunk 008 US1)', () => {
     await page.fill('input[formControlName="password"]', creds.ownerPassword);
     await page.click('button[type="submit"]');
     await page.waitForURL('**/home');
+    await ensureEnglish(page);
   });
 
   test('navigates to /requests via the sidebar and shows the list', async ({ page }) => {

@@ -22,7 +22,9 @@ test.describe('Quotation Versioning & Re-quotes (T059, US4)', () => {
 
   test('re-quote checkbox reveals prior quotation selection', async ({ page }) => {
     await page.goto('/quotations/upload');
-    const validPdfContent = '%PDF-1.4\n1 0 obj\n<< /Title (Quote V2) >>\nendobj\ntrailer\n<< /Root 1 0 R >>\n%%EOF';
+    // Unique per attempt: the upload API refuses byte-identical re-uploads (duplicate guard),
+    // so a fixed buffer would dead-end a retried attempt on the duplicate dialog.
+    const validPdfContent = `%PDF-1.4\n1 0 obj\n<< /Title (Quote V2 ${Date.now()}) >>\nendobj\ntrailer\n<< /Root 1 0 R >>\n%%EOF`;
     await page.setInputFiles('input.file-input', {
       name: 'quote_v2.pdf',
       mimeType: 'application/pdf',

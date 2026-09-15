@@ -18,7 +18,7 @@ import {
 } from './support/api';
 import {
   confirmQuotation,
-  correctIssueDate,
+  resolveIssueDateFlag,
   correctStatedTotal,
   saveCorrections,
   selectReviewSupplier,
@@ -289,7 +289,7 @@ async function buildCommercialFixtures(page: Page): Promise<ScreenshotFixtures> 
     quotationId = await uploadQuotationAndOpenReview(page, `docs_capture_${stamp}.pdf`);
     await selectReviewSupplier(page, workflowSupplier.name);
     await correctStatedTotal(page);
-    await correctIssueDate(page);
+    await resolveIssueDateFlag(page);
     await saveCorrections(page);
     const matchedProduct = await captureAndResolveMatchScreenshots(
       page,

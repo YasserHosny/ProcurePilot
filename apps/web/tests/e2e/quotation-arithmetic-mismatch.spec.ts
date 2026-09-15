@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { createMember, type CreatedMember } from './support/api';
 import {
-  correctIssueDate,
+  resolveIssueDateFlag,
   correctStatedTotal,
   saveCorrections,
   selectReviewSupplier,
@@ -54,7 +54,7 @@ test.describe('Quotation Arithmetic Mismatch (T055, US3)', () => {
     // issue date; only then is the guardrail released.
     await selectReviewSupplier(page, supplier.name);
     await correctStatedTotal(page);
-    await correctIssueDate(page);
+    await resolveIssueDateFlag(page);
     await saveCorrections(page);
 
     // The banner (and its breakdown) only renders while the mismatch persists.

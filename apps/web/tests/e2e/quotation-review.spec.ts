@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import { createMember, type CreatedMember } from './support/api';
 import {
   confirmQuotation,
-  correctIssueDate,
+  resolveIssueDateFlag,
   correctStatedTotal,
   createE2ESupplier,
   saveCorrections,
@@ -86,7 +86,7 @@ test.describe('Quotation Review & Confirmation (T053, US2)', () => {
     // date; both must be corrected by a human before the quotation can be confirmed.
     await selectReviewSupplier(page, supplier.name);
     await correctStatedTotal(page);
-    await correctIssueDate(page);
+    await resolveIssueDateFlag(page);
     await saveCorrections(page);
 
     // FR-016: human authorization via POST /confirm flips the quotation to reviewed.
