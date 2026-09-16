@@ -226,9 +226,9 @@ def test_download_unauthorised_branch_returns_not_found(
                     """
                     insert into export_job
                       (tenant_id, requested_by, kind, format, filters, status,
-                       storage_bucket, storage_path, download_url, completed_at)
+                       storage_bucket, storage_path, download_url, row_count, completed_at)
                     values (%s, %s, 'spend_by_supplier', 'csv', %s, 'completed',
-                            'exports', 'fake/path.csv', '/api/v1/exports/fake/download', now())
+                            'exports', 'fake/path.csv', '/api/v1/exports/fake/download', 1, now())
                     returning id
                     """,
                     (

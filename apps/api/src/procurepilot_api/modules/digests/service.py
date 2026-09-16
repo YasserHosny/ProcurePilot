@@ -482,9 +482,8 @@ class DigestsService:
                 select
                   ast.id as step_id,
                   pr.id as request_id,
-                  pr.request_number,
-                  pr.total_estimated_amount,
-                  pr.total_estimated_currency,
+                  pr.estimated_total_amount,
+                  pr.estimated_total_currency,
                   pr.created_at,
                   pr.branch_id
                 from approval_step ast
@@ -506,9 +505,9 @@ class DigestsService:
 
         approval_items: list[DigestItem] = []
         for a in approval_rows:
-            req_num = a.get("request_number") or str(a.get("request_id") or "")[:8]
-            amt = float(a.get("total_estimated_amount") or 0.0)
-            curr = str(a.get("total_estimated_currency") or "")
+            req_num = str(a.get("request_id") or "")[:8]
+            amt = float(a.get("estimated_total_amount") or 0.0)
+            curr = str(a.get("estimated_total_currency") or "")
             approval_items.append(
                 DigestItem(
                     label=t("digests.itemLabels.approvalRequest", locale, number=req_num),

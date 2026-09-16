@@ -88,29 +88,10 @@ def process_digest_subscription(
 def _claim_due_subscriptions(conn: psycopg.Connection) -> list[dict[str, object]]:
     """Claim active subscriptions that are due for delivery using FOR UPDATE SKIP LOCKED.
 
-    The connection uses service-role credentials; we explicitly set the role and inject
-    the jwt.claims config so that RLS policies fire on the read side (C-1).  The worker
-    still validates tenant_id per subscription in _process_subscription as a second layer.
+    The worker connects using service credentials to sweep across tenants.
+    Per-tenant isolation is enforced inside _process_subscription where tenant_id and
+    membership status are verified before any content is assembled.
     """
-    with conn.cursor() as setup_cur:
-        # Tell Postgres this is an authenticated service-worker session.
-        # Row-level security USING clauses on digest_subscription will evaluate
-        # request.jwt.claims->>'tenant_id'; since we're claiming for ALL tenants in one
-        # pass we use a special service-worker sentinel that bypasses per-tenant filtering
-        # while still enforcing the policy.  The per-subscription _process_subscription
-        # call performs explicit tenant_id verification as the application-layer guard.
-        setup_cur.execute("set local role authenticated")
-        service_claims = json.dumps(
-            {
-                "sub": "00000000-0000-0000-0000-000000000000",
-                "role": "service_worker",
-                "tenant_id": "00000000-0000-0000-0000-000000000000",
-            }
-        )
-        setup_cur.execute(
-            "select set_config('request.jwt.claims', %s, true)",
-            (service_claims,),
-        )
     with conn.cursor(row_factory=dict_row) as cur:
         cur.execute(
             """
