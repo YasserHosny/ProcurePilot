@@ -319,8 +319,12 @@ def _record_delivery_audit(
             actor_membership_id=None,  # Worker is a system actor per FR-011
             actor_email="system@procurepilot.internal",
             action=f"digests.delivery_{status}",
-            target={"subscription_id": str(sub_id), "membership_id": str(membership_id)},
-            outcome="success" if status == "succeeded" else "failure",
+            target={
+                "subscription_id": str(sub_id),
+                "membership_id": str(membership_id),
+                "detail": detail,
+            },
+            outcome="success" if status == "succeeded" else "refused",
             trace_id=get_trace_id(),
         ),
         bearer_token=None,

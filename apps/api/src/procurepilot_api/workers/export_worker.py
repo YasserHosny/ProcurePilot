@@ -13,7 +13,7 @@ from psycopg.types.json import Jsonb
 from procurepilot_api.config import Settings, get_settings
 from procurepilot_api.modules.exports.renderers import render_csv, render_pdf, render_xlsx
 from procurepilot_api.modules.exports.storage import ExportStorage
-from procurepilot_api.shared.audit import AuditEventCreate, get_audit_writer
+from procurepilot_api.shared.audit import AuditEventCreate, AuditOutcome, get_audit_writer
 from procurepilot_api.shared.logging import get_trace_id
 
 logger = logging.getLogger(__name__)
@@ -129,7 +129,7 @@ def process_export_job(payload: dict[str, str]) -> dict[str, Any]:
                     "format": str(initial_row["format"]),
                     "error": exc.__class__.__name__,
                 },
-                outcome="failure",
+                outcome="refused",
             )
         raise
 
@@ -353,7 +353,7 @@ def _record_worker_audit(
     actor_id: UUID,
     action: str,
     target: dict[str, object],
-    outcome: str = "success",
+    outcome: AuditOutcome = "success",
 ) -> None:
     try:
         get_audit_writer().record(
