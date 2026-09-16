@@ -81,6 +81,18 @@ class ExportRowCapExceededError(AppError):
     safe_message = "Request validation failed."
 
 
+class ScheduleCapExceededError(AppError):
+    status_code = status.HTTP_422_UNPROCESSABLE_ENTITY
+    code = "report_schedule_cap_exceeded"
+    safe_message = "Request validation failed."
+
+
+class DigestSubscriptionCapExceededError(AppError):
+    status_code = status.HTTP_422_UNPROCESSABLE_ENTITY
+    code = "digest_subscription_cap_exceeded"
+    safe_message = "Request validation failed."
+
+
 class UnsupportedMediaTypeError(AppError):
     status_code = status.HTTP_415_UNSUPPORTED_MEDIA_TYPE
     code = "validation.unsupported_media_type"

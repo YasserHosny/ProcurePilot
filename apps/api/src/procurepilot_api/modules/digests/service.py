@@ -12,7 +12,12 @@ from psycopg.types.json import Jsonb
 
 from procurepilot_api.config import Settings, get_settings
 from procurepilot_api.deps import CurrentMember
-from procurepilot_api.errors import ConflictError, NotFoundError, UnprocessableEntityError
+from procurepilot_api.errors import (
+    ConflictError,
+    DigestSubscriptionCapExceededError,
+    NotFoundError,
+    UnprocessableEntityError,
+)
 from procurepilot_api.modules.auth.jwt import MemberRole
 from procurepilot_api.modules.digests.schemas import (
     DigestFilters,
@@ -102,6 +107,11 @@ class DigestsService:
         with _authenticated_db(self._settings, member) as conn:
             ctx = _tenant_context(conn, member.tenant_id, member.membership_id)
             _authorize_branch(conn, member=member, branch_id=payload.filters.branch_id)
+            _enforce_subscription_cap(
+                conn,
+                member=member,
+                cap=self._settings.active_digest_subscription_cap_per_member,
+            )
             locale = (
                 payload.locale or ctx.get("preferred_locale") or ctx.get("default_locale") or "en"
             )
@@ -632,6 +642,27 @@ class DigestsService:
             created_at=row["created_at"],
             updated_at=row["updated_at"],
         )
+
+
+def _enforce_subscription_cap(
+    conn: psycopg.Connection, *, member: CurrentMember, cap: int
+) -> None:
+    """T035 (FR-020): each active digest subscription is a standing recurring worker cost, so
+    the count of a member's own active subscriptions is capped independently of how fast they
+    were created."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            select count(*) from digest_subscription
+            where tenant_id = %(tenant_id)s
+              and membership_id = %(membership_id)s
+              and status = 'active'
+            """,
+            {"tenant_id": member.tenant_id, "membership_id": member.membership_id},
+        )
+        actual = int(cur.fetchone()[0])
+    if actual >= cap:
+        raise DigestSubscriptionCapExceededError(details={"cap": cap, "actual": actual})
 
 
 def _tenant_context(

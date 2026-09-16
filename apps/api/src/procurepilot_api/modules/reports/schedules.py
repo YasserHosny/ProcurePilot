@@ -13,7 +13,12 @@ from psycopg.types.json import Jsonb
 
 from procurepilot_api.config import Settings, get_settings
 from procurepilot_api.deps import CurrentMember
-from procurepilot_api.errors import ConflictError, NotFoundError, UnprocessableEntityError
+from procurepilot_api.errors import (
+    ConflictError,
+    NotFoundError,
+    ScheduleCapExceededError,
+    UnprocessableEntityError,
+)
 from procurepilot_api.modules.offers.service import _authenticated_db
 from procurepilot_api.modules.reports.schemas import (
     ReportArtifact,
@@ -90,6 +95,11 @@ class ReportsService:
                 member=member,
                 supplier_id=filters.supplier_id,
                 branch_id=filters.branch_id,
+            )
+            _enforce_schedule_cap(
+                conn,
+                member=member,
+                cap=self._settings.active_schedule_cap_per_member,
             )
             resolved_locale = locale or workspace["preferred_locale"] or workspace["default_locale"]
             next_run = next_run_after(
@@ -310,6 +320,24 @@ class ReportsService:
 
 def get_reports_service() -> ReportsService:
     return ReportsService()
+
+
+def _enforce_schedule_cap(conn: object, *, member: CurrentMember, cap: int) -> None:
+    """T035 (FR-020): each active schedule is a standing recurring worker cost, so the count of
+    a member's own active schedules is capped independently of how fast they were created."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            select count(*) from report_schedule
+            where tenant_id = %(tenant_id)s
+              and created_by_membership_id = %(membership_id)s
+              and status = 'active'
+            """,
+            {"tenant_id": member.tenant_id, "membership_id": member.membership_id},
+        )
+        actual = int(cur.fetchone()[0])
+    if actual >= cap:
+        raise ScheduleCapExceededError(details={"cap": cap, "actual": actual})
 
 
 def workspace_context(conn: object, member: CurrentMember) -> dict[str, object]:

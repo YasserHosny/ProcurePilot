@@ -1,10 +1,9 @@
-from __future__ import annotations
-
 from typing import Annotated, Literal
 from uuid import UUID
 
-from fastapi import APIRouter, Body, Depends, Header, Query, Response, status
+from fastapi import APIRouter, Body, Depends, Header, Query, Request, Response, status
 
+from procurepilot_api.config import get_settings
 from procurepilot_api.deps import CurrentMember, bearer_token, current_member
 from procurepilot_api.modules.auth.jwt import MemberRole
 from procurepilot_api.modules.auth.rbac import require_role
@@ -16,9 +15,14 @@ from procurepilot_api.modules.reports.schemas import (
     ReportScheduleList,
     ReportScheduleUpdate,
 )
+from procurepilot_api.shared.rate_limit import mutation_limiter
 
 router = APIRouter(tags=["reports"])
 WRITE_ROLES = (MemberRole.owner, MemberRole.buyer)
+
+
+def _schedule_mutation_limit() -> str:
+    return get_settings().rate_limit_schedule_mutation
 
 
 @router.get("/reports/schedules", response_model=ReportScheduleList)
@@ -36,7 +40,9 @@ def list_schedules(
     status_code=status.HTTP_201_CREATED,
     response_model=ReportSchedule,
 )
+@mutation_limiter.limit(_schedule_mutation_limit)
 def create_schedule(
+    request: Request,
     payload: Annotated[ReportScheduleCreate, Body()],
     member: Annotated[CurrentMember, Depends(require_role(*WRITE_ROLES))],
     service: Annotated[ReportsService, Depends(get_reports_service)],
@@ -64,7 +70,9 @@ def get_schedule(
 
 
 @router.patch("/reports/schedules/{schedule_id}", response_model=ReportSchedule)
+@mutation_limiter.limit(_schedule_mutation_limit)
 def update_schedule(
+    request: Request,
     schedule_id: UUID,
     payload: Annotated[ReportScheduleUpdate, Body()],
     member: Annotated[CurrentMember, Depends(require_role(*WRITE_ROLES))],
@@ -78,7 +86,9 @@ def update_schedule(
 
 
 @router.delete("/reports/schedules/{schedule_id}", status_code=status.HTTP_204_NO_CONTENT)
+@mutation_limiter.limit(_schedule_mutation_limit)
 def delete_schedule(
+    request: Request,
     schedule_id: UUID,
     member: Annotated[CurrentMember, Depends(require_role(*WRITE_ROLES))],
     service: Annotated[ReportsService, Depends(get_reports_service)],

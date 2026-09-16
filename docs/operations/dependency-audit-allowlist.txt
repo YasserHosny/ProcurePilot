@@ -1,0 +1,49 @@
+# Dependency audit allowlist
+#
+# Findings here are accepted, reviewed exceptions to the CI dependency-audit job
+# (.github/workflows/ci.yml, "Dependency audit" job) — not findings we forgot about.
+# Every entry names an owner and a reason. Re-review this file whenever a listed package's
+# ecosystem publishes a fix, and whenever the security review record
+# (docs/quality/r2.5-security-review-record.md) is refreshed.
+#
+# Enforcement: Python IDs are passed to `pip-audit --ignore-vuln <id>`; JS/npm GHSA IDs are
+# read by pnpm itself from `pnpm.auditConfig.ignoreGhsas` in the root package.json (kept in
+# sync with the GHSA column below — pnpm does not read this file).
+#
+# Last reviewed: 2026-09-16, by Claude (orchestrator, Wave 18 T034/T036).
+
+## Python (pip-audit)
+
+| ID              | Package     | Installed | Fix available? | Owner            | Reason |
+|-----------------|-------------|-----------|-----------------|-------------------|--------|
+| PYSEC-2026-1325 | ecdsa       | 0.19.2    | none            | orchestrator/BE  | Upstream `python-ecdsa` maintainers have stated they will not fix Minerva-class timing side-channel issues in this project; no patched version exists on any branch. Transitive via `python-jose[cryptography]`. Re-check on every python-jose bump. |
+| PYSEC-2024-232  | python-jose | 3.3.0     | 3.4.0           | orchestrator/BE  | Fix version 3.4.0 hard-pins `pyasn1>=0.4.1,<0.5.0`, which reintroduces 4 separate pyasn1 CVEs (PYSEC-2026-2263, -3455, -3456, -3457) that are otherwise clean at pyasn1 0.6.4 — a net-negative trade, not a fix. Blocked pending python-jose relaxing its pyasn1 pin, or a migration off python-jose (tracked as a follow-up, not in Wave 18 scope). |
+| PYSEC-2024-233  | python-jose | 3.3.0     | 3.4.0           | orchestrator/BE  | Same as PYSEC-2024-232 — same upgrade, same net-negative trade-off. |
+| PYSEC-2025-185  | python-jose | 3.3.0     | none            | orchestrator/BE  | No fix version published for this advisory at any python-jose release, including 3.4.0. |
+| PYSEC-2026-1941 | starlette   | 0.41.3    | 0.47.2          | orchestrator/BE  | FastAPI 0.115.6 requires `starlette<0.42.0`; the fix line (0.47.2+, and the 1.x line for the rest of this table) needs a FastAPI major/minor upgrade, which is a separate, larger regression-test effort out of scope for Wave 18. Tracked as a follow-up. |
+| PYSEC-2026-1942 | starlette   | 0.41.3    | 0.49.1          | orchestrator/BE  | Same FastAPI-pin blocker as PYSEC-2026-1941. |
+| PYSEC-2026-161  | starlette   | 0.41.3    | 1.0.1           | orchestrator/BE  | Same FastAPI-pin blocker as PYSEC-2026-1941. |
+| PYSEC-2026-2281 | starlette   | 0.41.3    | 1.1.0           | orchestrator/BE  | Same FastAPI-pin blocker as PYSEC-2026-1941. |
+| PYSEC-2026-2280 | starlette   | 0.41.3    | 1.1.0           | orchestrator/BE  | Same FastAPI-pin blocker as PYSEC-2026-1941. |
+| PYSEC-2026-249  | starlette   | 0.41.3    | 1.3.1           | orchestrator/BE  | Same FastAPI-pin blocker as PYSEC-2026-1941. |
+| PYSEC-2026-248  | starlette   | 0.41.3    | 1.3.0           | orchestrator/BE  | Same FastAPI-pin blocker as PYSEC-2026-1941. |
+
+## JavaScript (pnpm audit) — GHSA IDs, mirrored in `package.json`'s `pnpm.auditConfig.ignoreGhsas`
+
+| GHSA ID                   | Package           | Installed | Fix available? | Owner  | Reason |
+|----------------------------|-------------------|-----------|-----------------|--------|--------|
+| GHSA-48r7-hpm6-gfxm        | @angular/common   | 19.2.25   | none            | FE/Agy | DoS via OOM in `formatDate`. No patched version listed on any Angular 19.x release as of 2026-09-16. |
+| GHSA-39pv-4j6c-2g6v        | @angular/common   | 19.2.25   | none            | FE/Agy | Weak 32-bit cache-key hashing in `HttpTransferCache`. This app does not use `HttpTransferCache` (no SSR); exposure is theoretical, but no fix exists to adopt regardless. |
+| GHSA-58w9-8g37-x9v5        | @angular/compiler | 19.2.25   | none            | FE/Agy | Two-way property binding sanitization bypass (XSS). No patched version on 19.x. |
+| GHSA-rgjc-h3x7-9mwg        | @angular/core     | 19.2.25   | none            | FE/Agy | Client hydration DOM clobbering / response-cache poisoning. This app has no SSR/hydration in production; exposure is theoretical. No fix on 19.x. |
+| GHSA-jhpw-976m-542j        | @angular/common   | 19.2.25   | none            | FE/Agy | Cache-key ambiguity in `HttpTransferCache`. Same non-applicability as GHSA-39pv-4j6c-2g6v (no SSR). No fix on 19.x. |
+| GHSA-jj27-h5hq-8x99        | @angular/core, @angular/compiler | 19.2.25 | none | FE/Agy | i18n XSS via event-handler attributes. This is the one advisory in this batch with real exposure for a non-SSR app (any `$localize`-templated content with event bindings). No patched version on 19.x — flagged in the security review record for compensating review of translated templates until a fix ships. |
+| GHSA-p297-fm68-3q8c        | @angular/common   | 19.2.25   | none            | FE/Agy | Information leak via `HttpTransferCache` bypass with `withRequestsMadeViaParent`. Not used (no SSR). No fix on 19.x. |
+| GHSA-hh8m-fm6v-7cvg        | @angular/core, @angular/compiler | 19.2.25 | none | FE/Agy | Sanitization bypass via directive host bindings on concrete host elements. No patched version on 19.x. |
+
+All ten JS findings and all four Python findings share one root cause category: **no upstream
+fix exists yet** at the pinned major/minor line this project is on (Angular 19, FastAPI 0.115.6 /
+Starlette 0.41.3, python-jose 3.3.0). None were introduced by this repo's own code. A full
+Angular 20 and FastAPI/Starlette major-version upgrade is out of scope for R2.5 — track as a
+follow-up, and re-run `pnpm audit --prod` / `pip-audit` after any such upgrade to confirm these
+entries can be removed rather than carried forward automatically.

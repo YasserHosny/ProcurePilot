@@ -177,6 +177,53 @@ jobs:
           assert 'honest_gap' in result and result['honest_gap'], 'harness must state the gap explicitly'
           "
 
+  dependency-audit:
+    name: Dependency audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: apps/web/pnpm-lock.yaml
+      - name: Install web dependencies
+        working-directory: apps/web
+        run: pnpm install --ignore-workspace --frozen-lockfile
+      - name: pip-audit — apps/api and worker packages
+        # Findings on docs/operations/dependency-audit-allowlist.txt are pinned by
+        # --ignore-vuln; anything new fails the job. `-e .` / `-e ../..` editable local packages
+        # are stripped before scanning — pip-audit's installer chokes on relative editable paths
+        # once it tries to `pip install --dry-run` them outside their source tree.
+        run: |
+          for project in apps/api services/extraction-worker services/optimiser; do
+            echo "::group::pip-audit — $project"
+            uv export --project "$project" --no-hashes --no-dev -o /tmp/audit-req.txt
+            grep -v '^-e ' /tmp/audit-req.txt > /tmp/audit-req-scan.txt
+            uvx pip-audit -r /tmp/audit-req-scan.txt \
+              --ignore-vuln PYSEC-2026-1325 \
+              --ignore-vuln PYSEC-2024-232 \
+              --ignore-vuln PYSEC-2024-233 \
+              --ignore-vuln PYSEC-2025-185 \
+              --ignore-vuln PYSEC-2026-1941 \
+              --ignore-vuln PYSEC-2026-1942 \
+              --ignore-vuln PYSEC-2026-161 \
+              --ignore-vuln PYSEC-2026-2281 \
+              --ignore-vuln PYSEC-2026-2280 \
+              --ignore-vuln PYSEC-2026-249 \
+              --ignore-vuln PYSEC-2026-248
+            echo "::endgroup::"
+          done
+      - name: pnpm audit — workspace production dependencies
+        # Allowlisted GHSA IDs live in package.json's pnpm.auditConfig.ignoreGhsas (pnpm reads
+        # that itself; docs/operations/dependency-audit-allowlist.txt is the human-readable
+        # mirror with owner + reason for each). Anything not listed there fails the job.
+        run: pnpm audit --prod
+
   tenant-isolation:
     name: Tenant isolation
     # Deliberately its own job with its own name (FR-030). Constitution Principle V's failure mode

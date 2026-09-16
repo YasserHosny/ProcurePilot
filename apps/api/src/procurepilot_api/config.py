@@ -67,6 +67,29 @@ class Settings(BaseSettings):
     export_retention_days: int = Field(default=90, validation_alias="EXPORT_RETENTION_DAYS", ge=1)
     export_row_cap: int = Field(default=10_000, validation_alias="EXPORT_ROW_CAP", ge=1)
 
+    # T035 (012-reporting-hardening, FR-020): per-tenant-member request-rate limits on the
+    # mutation endpoints that spend worker/storage resources, keyed by verified tenant+member
+    # claims rather than IP (see shared/rate_limit.py) — an office NAT'd behind one IP must not
+    # share a single bucket across members, and one tenant's traffic must not exhaust another's.
+    rate_limit_export_create: str = Field(
+        default="30/minute", validation_alias="RATE_LIMIT_EXPORT_CREATE"
+    )
+    rate_limit_schedule_mutation: str = Field(
+        default="30/minute", validation_alias="RATE_LIMIT_SCHEDULE_MUTATION"
+    )
+    rate_limit_digest_mutation: str = Field(
+        default="30/minute", validation_alias="RATE_LIMIT_DIGEST_MUTATION"
+    )
+    # Business-rule caps (distinct from the request-rate limits above): each recurring schedule
+    # or subscription is itself a standing worker cost, so the count of *active* rows per member
+    # is capped independently of how fast they were created.
+    active_schedule_cap_per_member: int = Field(
+        default=20, validation_alias="ACTIVE_SCHEDULE_CAP_PER_MEMBER", ge=1
+    )
+    active_digest_subscription_cap_per_member: int = Field(
+        default=10, validation_alias="ACTIVE_DIGEST_SUBSCRIPTION_CAP_PER_MEMBER", ge=1
+    )
+
     smtp_host: str | None = Field(default=None, validation_alias="SMTP_HOST")
     smtp_port: int = Field(default=587, validation_alias="SMTP_PORT")
     smtp_user: str | None = Field(default=None, validation_alias="SMTP_USER")

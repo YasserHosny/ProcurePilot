@@ -19,5 +19,19 @@
   },
   "devDependencies": {
     "turbo": "^2.4.0"
+  },
+  "pnpm": {
+    "auditConfig": {
+      "ignoreGhsas": [
+        "GHSA-48r7-hpm6-gfxm",
+        "GHSA-39pv-4j6c-2g6v",
+        "GHSA-58w9-8g37-x9v5",
+        "GHSA-rgjc-h3x7-9mwg",
+        "GHSA-jhpw-976m-542j",
+        "GHSA-jj27-h5hq-8x99",
+        "GHSA-p297-fm68-3q8c",
+        "GHSA-hh8m-fm6v-7cvg"
+      ]
+    }
   }
 }
