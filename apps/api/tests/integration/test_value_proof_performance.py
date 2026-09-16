@@ -139,6 +139,10 @@ def test_large_period_export_creation_stays_async_and_does_not_render(
         "procurepilot_api.modules.exports.service._enqueue_export_job",
         lambda *_args, **_kwargs: enqueued.__setitem__("count", enqueued["count"] + 1),
     )
+    monkeypatch.setattr(
+        "procurepilot_api.modules.exports.service._record_audit",
+        lambda *_args, **_kwargs: None,
+    )
 
     job = ExportService(settings=type("Settings", (), {"export_row_cap": 10_000})()).create_job(
         member=_member().model_copy(update={"tenant_id": tenant_id}),
