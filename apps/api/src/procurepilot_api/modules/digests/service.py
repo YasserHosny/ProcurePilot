@@ -264,7 +264,7 @@ class DigestsService:
 
             now = datetime.now(UTC)
             period_start, period_end = derive_weekly_window(now, tz_name)
-            sub_locale = str(sub_row.get("locale") or "en")
+            sub_locale = str(sub_row.get("locale") or "en") if sub_row else "en"
             sections = self._assemble_sections(
                 conn,
                 tenant_id=member.tenant_id,

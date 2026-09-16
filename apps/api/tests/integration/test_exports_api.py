@@ -154,7 +154,7 @@ def test_worker_failure_persists_failed_status_from_separate_connection(
         monkeypatch.setattr(
             export_worker,
             "render_xlsx",
-            lambda _rows: (_ for _ in ()).throw(RuntimeError("forced-render-failure")),
+            lambda _rows, **_kwargs: (_ for _ in ()).throw(RuntimeError("forced-render-failure")),
         )
         monkeypatch.setattr(export_worker, "get_settings", lambda: settings)
 

@@ -10,7 +10,7 @@ from integration.smart_compare_helpers import (
     member_from_workspace,
     settings_for_test_db,
 )
-from procurepilot_api.deps import current_member
+from procurepilot_api.deps import bearer_token, current_member
 from procurepilot_api.main import create_app
 from procurepilot_api.modules.auth.jwt import MemberRole
 
@@ -23,6 +23,7 @@ pytestmark = pytest.mark.skipif(
 def _app(monkeypatch: pytest.MonkeyPatch, member: object) -> FastAPI:
     app = create_app(settings_for_test_db(monkeypatch))
     app.dependency_overrides[current_member] = lambda: member
+    app.dependency_overrides[bearer_token] = lambda: "test-token"
     return app
 
 

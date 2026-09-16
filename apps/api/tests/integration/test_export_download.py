@@ -212,8 +212,8 @@ def test_download_unauthorised_branch_returns_not_found(
                 cur.execute(
                     """
                     insert into branch_role_assignment
-                      (id, tenant_id, branch_id, membership_id, role)
-                    values (gen_random_uuid(), %s, %s, %s, 'branch_manager')
+                      (id, tenant_id, branch_id, membership_id)
+                    values (gen_random_uuid(), %s, %s, %s)
                     """,
                     (context.workspace.tenant_id, branch_a, context.member.membership_id),
                 )

@@ -102,7 +102,7 @@ def _claim_due_subscriptions(conn: psycopg.Connection) -> list[dict[str, object]
         setup_cur.execute("set local role authenticated")
         service_claims = json.dumps(
             {
-                "sub": "system",
+                "sub": "00000000-0000-0000-0000-000000000000",
                 "role": "service_worker",
                 "tenant_id": "00000000-0000-0000-0000-000000000000",
             }
