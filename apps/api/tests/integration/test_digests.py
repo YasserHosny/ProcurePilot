@@ -237,5 +237,9 @@ def test_digest_worker_execution_and_skip_inactive(
         finally:
             with psycopg.connect(TEST_DATABASE_URL or "") as conn:
                 with conn.cursor() as cur:
+                    cur.execute(
+                        "update membership set status = 'active' where id = %s",
+                        (member.membership_id,),
+                    )
                     cur.execute("delete from auth.users where id = %s", (second_user_id,))
                 conn.commit()
