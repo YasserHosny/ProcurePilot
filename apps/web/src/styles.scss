@@ -319,3 +319,8 @@ mat-icon {
     color: #991b1b;
   }
 }
+
+// WCAG 2.1 AA contrast fix: ensure mat-warn button labels meet 4.5:1 on light backgrounds
+button.mat-warn:not(:disabled) {
+  color: var(--mat-sys-error, #dc2626) !important;
+}

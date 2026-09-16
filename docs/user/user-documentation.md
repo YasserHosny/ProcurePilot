@@ -31,9 +31,12 @@
 19. [Approval Queue](#19-approval-queue)
 20. [Team Management](#20-team-management)
 21. [Organisation Settings](#21-organisation-settings)
-22. [Roles & Permissions](#22-roles--permissions)
-23. [FAQ](#23-faq)
-24. [Known Issues](#24-known-issues)
+22. [Reports Center](#22-reports-center)
+23. [Report Schedules & Schedule Form](#23-report-schedules--schedule-form)
+24. [Weekly Digest & Digest Settings](#24-weekly-digest--digest-settings)
+25. [Roles & Permissions](#25-roles--permissions)
+26. [FAQ](#26-faq)
+27. [Known Issues](#27-known-issues)
 
 ---
 
@@ -541,14 +544,16 @@ Reached from **Record Purchase** on any Smart Compare offer, or **+ Record Purch
 
 | # | Element | Description |
 |---|---------|-------------|
-| 1 | **Page title — "Export Savings Ledger"** | Generate audit-ready reports of verified savings. |
+| 1 | **Page title — "Export Savings Ledger"** | Generate audit-ready reports of verified savings, spend by supplier, or commercial alerts. |
 | 2 | **Compliance notice** | "Only verified savings are included in the export. Pending rows are excluded per audit compliance rules." |
-| 3 | **Export Format selector** | Choose **Excel Spreadsheet (.xlsx)** or **PDF Summary Report (.pdf)**. |
-| 4 | **Period Start Date / Period End Date** | Filters the export by recorded date; default to year-to-date. |
-| 5 | **Filter by Supplier** | Optionally restrict the export to a specific supplier. |
-| 6 | **Generate Export button** | Submits the export job. A progress indicator shows processing status, and a download link appears when complete. |
+| 3 | **Export Kind selector** | Choose **Savings Ledger**, **Spend by Supplier**, or **Commercial Alerts Summary**. |
+| 4 | **Export Format selector** | Choose **Excel Spreadsheet (.xlsx)**, **CSV Spreadsheet (.csv)**, or **PDF Summary Report (.pdf)**. |
+| 5 | **Period Start Date / Period End Date** | Filters the export by recorded date; default to year-to-date. |
+| 6 | **Filter by Branch / Supplier** | Optionally restrict the export to an enabled branch or specific supplier. |
+| 7 | **Schedule as Weekly Report link** | Pre-populates the Report Schedule form (§23) with the selected kind, format, and filters. |
+| 8 | **Generate Export button** | Submits the export job. A progress indicator shows processing status, and a download link appears when complete. |
 
-**Business value:** exports make procurement value portable. Finance, owners, and external advisors can review verified savings outside the app without losing the evidence discipline that produced the numbers.
+**Business value:** exports make procurement value portable. Finance, owners, and external advisors can review verified savings and spend intelligence outside the app without losing the evidence discipline that produced the numbers. Export generation is capped at 10,000 rows with a strict 60-second execution budget to protect workspace performance.
 
 ---
 
@@ -677,11 +682,65 @@ Reached from **Record Purchase** on any Smart Compare offer, or **+ Record Purch
 
 **Business value:** organisation settings connect procurement activity to the way the business is managed. Branches, cost centres, and budgets turn isolated purchases into accountable spend by location, department, and financial period.
 
-**Display note:** the Settings screen now resolves branch names in the Branch and Cost Centre tables. See [§24 Known Issues](#24-known-issues) for remaining raw-ID display issues in the Purchase Requests area.
+**Display note:** the Settings screen now resolves branch names in the Branch and Cost Centre tables. See [§27 Known Issues](#27-known-issues) for remaining raw-ID display issues in the Purchase Requests area.
 
 ---
 
-## 22. Roles & Permissions
+## 22. Reports Center
+
+**Route:** `/reports`
+
+The unified workspace hub for generated reporting artifacts and recurring report schedules.
+
+| # | Element | Description |
+|---|---------|-------------|
+| 1 | **Page title — "Reports Center"** | Browse, filter, and download all generated exports and manage automated reporting schedules. |
+| 2 | **Tabs — Artifacts & Schedules** | Toggle between generated report artifacts and recurring report schedules. |
+| 3 | **Filter Toolbar** | Filter artifacts by report kind (Savings Ledger, Spend by Supplier, Commercial Alerts Summary) and status (Completed, Queued, Failed, Expired). |
+| 4 | **Artifacts List** | Comprehensive table displaying report kind, format pill, creation date, period, row count, and status badge. |
+| 5 | **Download Action** | Generates a secure, signed URL (short-lived TTL) for downloading completed Excel, CSV, or PDF artifacts directly from storage. Purged/expired artifacts indicate expiry. |
+| 6 | **Operational Deep Links** | Per-kind operational shortcuts allowing instant navigation from artifacts to real actionable contexts: Alerts to the inbox, Savings to the ledger, and Spend to Smart Compare. |
+
+**Print support:** the Reports Center includes a dedicated print stylesheet (`@media print`) that isolates the artifact list and suppresses navigation chrome, filters, and tab headers for clean audit printing.
+
+---
+
+## 23. Report Schedules & Schedule Form
+
+**Route:** `/reports/schedule` (or via **+ New Schedule** in the Reports Center)
+
+Configure automated recurring weekly reports delivered directly to the Reports Center.
+
+| # | Element | Description |
+|---|---------|-------------|
+| 1 | **Report Kind** | Select **Savings Ledger**, **Spend by Supplier**, or **Commercial Alerts Summary**. Note: Spend by Supplier is available for Excel and CSV only. |
+| 2 | **Format** | Choose **Excel Spreadsheet (.xlsx)**, **CSV Spreadsheet (.csv)**, or **PDF Summary Report (.pdf)**. |
+| 3 | **Filter by Branch / Supplier** | Optionally scope the recurring report to a specific branch or supplier. |
+| 4 | **Delivery Day (Weekday)** | Choose which day of the week (Monday through Sunday) the report automatically generates at midnight in your workspace reporting timezone. |
+| 5 | **Locale** | Choose report language (**English** or **Arabic** with full RTL layout and typography). |
+| 6 | **Schedule Management** | Active schedules automatically enqueue export jobs weekly. Schedules can be paused or resumed at any time, and survive creator deactivation to preserve operational continuity. |
+
+**Rate limiting & caps:** schedule creation and mutation are rate-limited and capped per member to prevent resource exhaustion. Duplicate schedules matching an existing member/kind/filters configuration return a structured conflict notification.
+
+---
+
+## 24. Weekly Digest & Digest Settings
+
+**Route:** `/reports/digest-settings`
+
+Personalized weekly intelligence digests assembling key procurement metrics and pending actions into a single actionable overview.
+
+| # | Element | Description |
+|---|---------|-------------|
+| 1 | **Subscription Controls** | Configure your personal weekly digest subscription, choose delivery channel (**In-App** or **Email**), and select locale. |
+| 2 | **Delivery Status & Onboarding** | Displays current delivery state (e.g. "Delivered", or "Email not configured" if workspace SMTP settings are unset). New members receive an active default in-app subscription on invitation acceptance. |
+| 3 | **Latest In-App Digest View** | Browse the latest complete weekly digest organized in the standardized five-section hierarchy: **Verified Savings** (hero), **Pending Verifications**, **Pending Approvals**, **Commercial Anomalies**, and **Expiring Validity**. |
+| 4 | **Actionable Deep Links** | Every digest section and flagged item contains direct deep links to the responsible review, compare, or approval screen. |
+| 5 | **Strictly Advisory** | Digests never execute autonomous purchasing, approvals, or ordering (FR-017). Human authorization is required on the respective surface. |
+
+---
+
+## 25. Roles & Permissions
 
 | Role | Description | Key capabilities |
 |------|-------------|-----------------|
@@ -698,7 +757,7 @@ Reached from **Record Purchase** on any Smart Compare offer, or **+ Record Purch
 
 ---
 
-## 23. FAQ
+## 26. FAQ
 
 **Q: Can I edit a verified saving?**
 A: No. Verified savings are immutable. If a correction is needed, a new adjustment record is created.
@@ -729,7 +788,7 @@ A: Users with the Approver or Owner role. Approval routing is based on configura
 
 ---
 
-## 24. Known Issues
+## 27. Known Issues
 
 Originally found during the 6 Sep 2026 documentation pass; re-checked and updated 12 Sep 2026 against current `main`.
 

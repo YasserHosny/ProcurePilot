@@ -74,6 +74,7 @@ access, identity, and request awareness.
 | Purchase request creation | Preview only | Web sections 16–17 |
 | Approval decisions | Read-only pending count only | Web section 18 |
 | Team management and organisation settings | Web-only | Web sections 19–20 |
+| Reports Center, report schedules, weekly digests | Web-only | Web sections 22–24 (digest deep links open web routes) |
 
 **Data readiness:** the mobile pending-decision count depends on the same backend state as the
 web Approval Queue. If the count does not match what you expect, check that the request was

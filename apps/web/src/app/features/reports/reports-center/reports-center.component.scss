@@ -222,3 +222,38 @@
   font-size: 0.85rem;
   color: var(--mat-sys-outline, #94a3b8);
 }
+
+// T033 (012-reporting-hardening, research R11): print coverage for the Reports center artifact
+// list. Interactive-only chrome (header actions, filter controls, pagination, the tab strip
+// itself) has no meaning on paper; the artifact table is the thing worth printing.
+@media print {
+  .header-actions,
+  .filter-toolbar,
+  .pagination-footer {
+    display: none !important;
+  }
+
+  ::ng-deep .mat-mdc-tab-header {
+    display: none !important;
+  }
+
+  .reports-center-container {
+    max-width: none;
+    padding: 0;
+    gap: 0.75rem;
+  }
+
+  .reports-card {
+    padding: 0;
+    box-shadow: none !important;
+    border: none !important;
+  }
+
+  .table-responsive {
+    overflow: visible;
+  }
+
+  .reports-table {
+    break-inside: avoid;
+  }
+}

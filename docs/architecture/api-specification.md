@@ -998,34 +998,43 @@ Response:
 
 ### `POST /exports`
 
-- Requires bearer auth and owner or buyer role; accepts `Idempotency-Key`.
-- Requests an asynchronous savings-ledger export.
-- Request fields: `kind` fixed to `savings_ledger`, `format` (`xlsx` or `pdf`), and `filters`.
-- `filters` fields: required `period_start`, required `period_end`, optional `supplier_id`, and
-  optional `branch_id`. A non-null `branch_id` is refused with `422`
-  (`unsupported_in_phase_1`): `SavingRecord` carries no branch attribution yet, so an honest
-  branch-filtered savings export cannot be produced. Branch filtering lands with R2.5
-  (`012-reporting-hardening`) once savings rows carry branch linkage.
-- Only verified savings are included in savings-ledger exports. Filter values are applied when
-  the worker renders the ledger: a `supplier_id` with no verified savings in the period yields an
-  empty ledger (`row_count = 0`), not an error.
+- Requires bearer auth and owner or buyer role; accepts `Idempotency-Key`; rate-limited (429,
+  `rate_limit.exceeded`, keyed by tenant + membership — chunk R2.5, FR-020).
+- Requests an asynchronous export. Extended for R2.5 (FR-002, FR-012, FR-013, FR-029): `kind` is
+  `savings_ledger`, `spend_by_supplier`, or `alerts_summary`; `format` is `csv`, `xlsx`, or `pdf`
+  (PDF is not offered for `spend_by_supplier` — its value is the currency-grouped table, not a
+  printable layout — refused `422`).
+- `filters` fields: required `period_start`, optional `period_end` (defaults to today in the
+  workspace reporting timezone), optional `supplier_id`, optional `branch_id`. Branch filtering
+  is now fully supported with branch-visibility validation — the R1/R2.4-era restriction
+  (`unsupported_in_phase_1`, refusing any non-null `branch_id`) is gone as of R2.5.
+- Row counts are capped (`EXPORT_ROW_CAP`, default 10,000). An over-cap request is refused with
+  `422`, `code: export_row_cap_exceeded`, `details: {cap, actual}` — evaluated before the job row
+  is created, so nothing is ever queued for a refused request (SC-004).
+- Only verified rows are included for `savings_ledger`. `alerts_summary` reflects live alert
+  conditions at generation time, not the requested period (consistent with R2.4's dismissal-only
+  alert model — the period/branch filters are accepted but do not narrow this one kind; see
+  `docs/quality/r2.5-security-review-record.md` §3).
 - Returns `202` with an `ExportJob`.
 - Returns `403` when the caller's role may not request exports.
-- Returns `422` when validation fails, including a non-null `branch_id`.
-- Concurrent equivalent requests are not de-duplicated; each returns its own job.
+- Returns `422` when validation fails, including an unknown kind/format combination, a branch or
+  supplier the caller cannot see, an invalid period, or the row cap exceeded.
+- Concurrent equivalent on-demand requests are not de-duplicated; each returns its own job
+  (scheduled runs ARE de-duplicated per period — see `POST /reports/schedules` below).
 
 Request:
 
 ```json
 {
-  "kind": "savings_ledger",
-  "format": "xlsx",
+  "kind": "spend_by_supplier",
+  "format": "csv",
   "filters": {
     "period_start": "2026-08-01",
     "period_end": "2026-08-31",
     "supplier_id": "00000000-0000-4000-8000-000000000020",
-    "branch_id": null
-  }
+    "branch_id": "00000000-0000-4000-8000-000000000030"
+  },
+  "locale": "en"
 }
 ```
 
@@ -1034,9 +1043,11 @@ Request:
 - Requires bearer auth.
 - Polls export job status and result in the active workspace.
 - Returns `200` with `ExportJob`.
-- Job statuses are `queued`, `running`, `completed`, and `failed`.
-- `row_count`, `download_url`, and storage-backed result metadata are null until completion. A
-  completed empty export has `row_count = 0`.
+- Job statuses are `queued`, `running`, `completed`, `failed`, and `expired` (chunk R2.5 —
+  retention-purged artifacts).
+- `row_count`, `download_url`, and storage-backed result metadata are null until completion, and
+  are nulled again once the artifact expires and is purged. A completed empty export has
+  `row_count = 0`.
 - Failed jobs carry structured `error`.
 - Returns `404` when the export job is not in the caller's workspace.
 
@@ -1045,17 +1056,20 @@ Response:
 ```json
 {
   "id": "00000000-0000-4000-8000-000000000100",
-  "kind": "savings_ledger",
-  "format": "xlsx",
+  "kind": "spend_by_supplier",
+  "format": "csv",
   "filters": {
     "period_start": "2026-08-01",
     "period_end": "2026-08-31",
     "supplier_id": "00000000-0000-4000-8000-000000000020",
-    "branch_id": null
+    "branch_id": "00000000-0000-4000-8000-000000000030"
   },
   "status": "completed",
   "row_count": 1,
+  "schedule_id": null,
+  "locale": "en",
   "download_url": "/api/v1/exports/00000000-0000-4000-8000-000000000100/download",
+  "expires_at": "2026-11-21T09:01:00Z",
   "error": null,
   "created_at": "2026-08-21T09:00:00Z",
   "started_at": "2026-08-21T09:00:05Z",
@@ -1063,17 +1077,24 @@ Response:
 }
 ```
 
+`schedule_id` is present (non-null) for artifacts generated by a scheduled run — see
+`POST /reports/schedules` below — and null for on-demand exports created directly through this
+endpoint.
+
 ### `GET /exports/{id}/download`
 
 - Requires bearer auth.
 - Mints a short-lived signed Supabase Storage URL for a completed export artifact in the active
-  workspace. The URL lifetime is bounded by `EXPORT_DOWNLOAD_URL_TTL_SECONDS` (default 300
-  seconds, clamped to 60–3600).
+  workspace, from the private `exports` Storage bucket (chunk R2.5:
+  `docs/quality/r2.5-security-review-record.md` §4). The URL lifetime is bounded by
+  `EXPORT_DOWNLOAD_URL_TTL_SECONDS` (default 300 seconds, clamped to 60–3600).
 - Appends a `reports.artifact_downloaded` audit event with the job id, kind, format, and row
   count.
 - Returns `200` with `{ "download_url": "<signed storage url>" }`.
-- Returns `404` when the export job does not exist, is not in the caller's workspace, or has no
-  completed artifact yet (`queued`, `running`, or `failed` jobs).
+- Returns `404` when the export job does not exist, is not in the caller's workspace, has no
+  completed artifact yet (`queued`, `running`, or `failed` jobs), or has been retention-purged
+  (`expired`) — a link issued before purge stops resolving once the underlying storage object is
+  deleted and the row's storage metadata is nulled.
 - The `download_url` field on an `ExportJob` names this endpoint; it is not itself a storage URL.
 
 Response:
@@ -1717,6 +1738,156 @@ Contract: `specs/011-optimisation-supplier-iq/contracts/optimisation-supplier-iq
   - Extended anomaly kinds: `price_spike`, `likely_duplicate_quotation_line`, `decimal_or_quantity_anomaly`, `delivery_cost_anomaly`, and `supplier_quality_trend_change`.
   - Additional fields: `confidence` (`high`, `medium`, `low`), `valid_until`, `evidence`, and action routing (`inspect_scorecard`, `review_quotation`, `view_delivery_issues`).
 - Dismissal persists via deterministic fingerprints without storing ephemeral alert condition rows.
+
+---
+
+## Delivered Reporting and Hardening API (chunk R2.5, `012-reporting-hardening`)
+
+Contract: `specs/012-reporting-hardening/contracts/reporting-hardening.openapi.yaml`. Adds
+scheduled reports, the Reports center artifact list, per-member weekly digest subscriptions, and
+extends `POST /exports`/`GET /exports/{id}`/`GET /exports/{id}/download` (documented above) and
+`PATCH /tenant` (reporting timezone). Every mutation endpoint in this section is rate-limited
+(429, `rate_limit.exceeded`, keyed by tenant + membership claims — FR-020); schedule and digest
+mutation endpoints additionally enforce an independent per-member cap on *active* rows
+(422, `report_schedule_cap_exceeded` / `digest_subscription_cap_exceeded`, `details: {cap,
+actual}`) so the count of standing recurring jobs cannot grow unbounded regardless of creation
+rate. Cross-tenant and unauthorised-branch references resolve `404`, never `403` (FR-019).
+
+### `GET /reports/schedules` · `POST /reports/schedules`
+
+- Requires bearer auth. List: any tenant member (team visibility by design — see
+  `docs/quality/r2.5-security-review-record.md` §1); cursor-paginated, newest first.
+- Create: owner or buyer role; accepts `Idempotency-Key`. One schedule per member per
+  kind/format/filters combination — a duplicate create is refused `409` with the filters digest
+  named in the response, not silently accepted as a second schedule. A named `branch_id` the
+  caller cannot see resolves `404`.
+- Request fields: `kind`, `format`, `filters` (`{supplier_id?, branch_id?}` — the period is
+  **not** stored; scheduled windows derive at run time from `weekday` and the workspace's
+  `reporting_timezone`), `weekday` (0 = Monday), optional `locale` (defaults to the requester's
+  preferred locale, then the workspace default).
+- Returns `201` with a `ReportSchedule`; `next_run_at` is derivable immediately from `weekday`.
+
+Request:
+
+```json
+{
+  "kind": "savings_ledger",
+  "format": "xlsx",
+  "filters": { "branch_id": null, "supplier_id": null },
+  "weekday": 0,
+  "locale": "en"
+}
+```
+
+Response (`ReportSchedule`):
+
+```json
+{
+  "id": "00000000-0000-4000-8000-000000000200",
+  "kind": "savings_ledger",
+  "format": "xlsx",
+  "filters": { "supplier_id": null, "branch_id": null },
+  "weekday": 0,
+  "status": "active",
+  "next_run_at": "2026-08-24T00:00:00Z",
+  "last_run_at": null,
+  "rule_version": "",
+  "locale": "en",
+  "created_at": "2026-08-21T09:00:00Z",
+  "updated_at": "2026-08-21T09:00:00Z"
+}
+```
+
+### `PATCH /reports/schedules/{schedule_id}` · `DELETE /reports/schedules/{schedule_id}`
+
+- Owner or buyer role — any owner/buyer in the tenant, not only the schedule's own creator (team
+  visibility/control by design). Accepts `Idempotency-Key`.
+- `PATCH`: `format`, `filters`, `weekday`, `locale`, and `status` (`active`/`paused`) are
+  editable. Pausing keeps the schedule's position but the scheduler skips it; resuming
+  recomputes `next_run_at` from `weekday`. The schedule survives its creator's own deactivation —
+  deactivating a member never deletes or pauses their schedules.
+- `DELETE`: hard delete of the configuration only. Generated artifacts survive via their
+  immutable `schedule_snapshot` on `export_job` — deleting a schedule never deletes its history.
+- Returns `200` (`PATCH`, `ReportSchedule`) or `204` (`DELETE`); `404` for a cross-tenant or
+  nonexistent id.
+
+### `GET /reports/artifacts`
+
+- Requires bearer auth. Cursor list over `export_job` rows for the workspace, newest first —
+  this is the Reports center's single "Artifacts" surface, covering both on-demand exports and
+  scheduled runs in one feed. Optional `kind` and `status` (`queued`/`running`/`completed`/
+  `failed`/`expired`) query filters narrow the list.
+- Each item carries the immutable filters snapshot, period, locale, status, row count, rule
+  version, source `schedule_id` where applicable, timestamps, `expires_at`, and `download_url`
+  while the artifact is still downloadable (null once purged).
+- Branch-scoped roles see only artifacts whose branch filter includes a branch they can see;
+  artifacts with no branch filter are visible to every member.
+
+### `GET /digests/subscriptions` · `POST /digests/subscriptions`
+
+- Requires bearer auth. List: per-member — a non-owner sees only their own subscriptions; owners
+  additionally see every subscription in the tenant for visibility only, never to modify them
+  (matches the RLS shape in `docs/quality/r2.5-security-review-record.md` §1).
+- Create: the caller always subscribes themselves — there is no "create on behalf of another
+  member" path. One active weekly digest per filters combination (duplicate create refused
+  `409`). New memberships are auto-provisioned with one active in-app subscription
+  (`digests.subscription_provisioned`) on accept; this endpoint exists for re-subscribing after
+  deletion or for an additional branch-filtered subscription.
+- Request fields: `filters` (`{branch_id?}`), `locale`, `channel` (`in_app` or `email`).
+- Returns `201` with a `DigestSubscription`.
+
+Response (`DigestSubscription`):
+
+```json
+{
+  "id": "00000000-0000-4000-8000-000000000300",
+  "kind": "weekly_digest",
+  "filters": { "branch_id": null },
+  "channel": "in_app",
+  "status": "active",
+  "locale": "en",
+  "next_run_at": "2026-08-24T00:00:00Z",
+  "last_delivery_at": null,
+  "last_delivery_status": null,
+  "email_configured": false,
+  "created_at": "2026-08-21T09:00:00Z",
+  "updated_at": "2026-08-21T09:00:00Z"
+}
+```
+
+`email_configured` is workspace-level (from `SMTP_HOST`/`SMTP_USER`/`SMTP_PASSWORD` settings),
+not per-subscription — it explains why a `channel: email` subscription's delivery status may read
+`email_unconfigured` rather than `succeeded`/`failed`.
+
+### `PATCH /digests/subscriptions/{subscription_id}` · `DELETE /digests/subscriptions/{subscription_id}`
+
+- The owning member only — unlike schedules, an owner cannot modify another member's digest
+  subscription (visibility is shared; control is not). `403` for any other member, including
+  owners, attempting to mutate someone else's subscription.
+- `PATCH` fields: `filters`, `locale`, `channel`, `status`. Returns `200` with the updated
+  `DigestSubscription`.
+- `DELETE` returns `204`.
+
+### `GET /digests/latest`
+
+- Requires bearer auth. The caller's latest in-app weekly digest, rendered from their active
+  subscription (or the workspace default when none exists) for the last complete week in the
+  workspace's reporting timezone.
+- Sections are in a fixed order (FR-009) with verified savings first (hero position):
+  `verified_savings`, `pending_verifications`, `pending_approvals`, `anomalies`,
+  `expiring_validity`. Every item carries a `deep_link` into the acting surface, and a `money`
+  object (amount + explicit currency, never a bare number) where a monetary value applies.
+- Advisory only (FR-017) — nothing returned here can act on a purchase, approval, order, payment,
+  or supplier message; every action still requires the human to follow the deep link and act
+  through the real surface.
+
+### `PATCH /tenant` — `reporting_timezone` extension
+
+- Owner only (existing `PATCH /tenant` surface from the foundation contract; region, currency,
+  and tax model remain immutable). New field: `reporting_timezone`, an IANA timezone name
+  (default `UTC`) — every scheduled-report window, digest window, and next-run computation for
+  the workspace derives from it. The change takes effect for future scheduled runs; windows
+  already derived are not recomputed retroactively.
 
 ---
 

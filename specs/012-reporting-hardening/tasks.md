@@ -100,7 +100,7 @@ reason (no module code yet), ready to drive implementation.
   for branch-scoped roles per FR-004) in
   `apps/api/src/procurepilot_api/modules/reports/router.py`, with audit events
   `reports.schedule_*` and `reports.export_requested` carrying the FR-011 payload contract.
-- [ ] T013 [US1] Implement `GET /api/v1/exports/{id}/download` in
+- [x] T013 [US1] Implement `GET /api/v1/exports/{id}/download` in
   `apps/api/src/procurepilot_api/modules/exports/router.py` and `storage.py`: authenticated
   job lookup (RLS-visible), branch-visibility verification (FR-005), expiring signed URL via the
   documents-module pattern with a bounded environment-configured TTL, audit
@@ -222,13 +222,13 @@ source-backed and actionable, with honest delivery state.
   `styles.scss`; oversized components decomposed into real child components (own template +
   class), not `styleUrls` budget evasion; TS-998113/NG8011 warnings also cleared. Zero build
   warnings, 56/56 component styles within budget.
-- [ ] T031 [US4] Write `apps/web/tests/e2e/compare-grid-performance.spec.ts` asserting
+- [x] T031 [US4] Write `apps/web/tests/e2e/compare-grid-performance.spec.ts` asserting
   compare-grid recalculation completes under 150 ms for a seeded basket (constitution gate;
   FR-025), stable against CI noise via repeated-measurement median.
-- [ ] T032 [US3] Write `apps/api/tests/integration/test_export_generation_budget.py` asserting a
+- [x] T032 [US3] Write `apps/api/tests/integration/test_export_generation_budget.py` asserting a
   10,000-row export completes within 60 seconds and an over-cap request is refused with the
   structured error and no storage object (SC-004).
-- [ ] T033 [US4] Extend the axe-core suite (`pnpm test:a11y`) to the mandatory surface list from
+- [x] T033 [US4] Extend the axe-core suite (`pnpm test:a11y`) to the mandatory surface list from
   research R11 in English and Arabic, including the Reports center and digest settings, and add
   the print-stylesheet check for the Reports center.
 
@@ -239,16 +239,16 @@ CI.
 
 ## Phase 6: User Story 5 — Security review before G2 (P2)
 
-- [ ] T034 [US5] Add the dependency-audit job to `.github/workflows/ci.yml`: `pip-audit` over
+- [x] T034 [US5] Add the dependency-audit job to `.github/workflows/ci.yml`: `pip-audit` over
   `apps/api` and the worker packages, `pnpm audit --prod` over the workspace, blocking on
   high/critical, with the accepted-findings allowlist at
   `docs/operations/dependency-audit-allowlist.txt` (each entry naming owner and reason).
-- [ ] T035 [US5] Extend `apps/api/src/procurepilot_api/shared/rate_limit.py` and apply limits to
+- [x] T035 [US5] Extend `apps/api/src/procurepilot_api/shared/rate_limit.py` and apply limits to
   export creation, schedule mutations, and digest subscription mutations (FR-020): keyed by
   verified tenant and membership claims with IP fallback, caps on active schedules and
   subscriptions per member, and integration tests proving structured 429 responses with no
   queued work.
-- [ ] T036 [US5] Execute and record the security review in
+- [x] T036 [US5] Execute and record the security review in
   `docs/quality/r2.5-security-review-record.md`: RLS policy review for `report_schedule` and
   `digest_subscription` (both-policy shape, FORCE), worker tenant re-derivation and
   authorization-pinned reader review, signed-URL max TTL and private bucket policy review
@@ -256,7 +256,7 @@ CI.
   review, SMTP secret-handling and log-redaction review, audit payload completeness, and a
   re-check that `audit_event` still grants no update or delete — every item passed or carrying an
   owned exception (FR-022).
-- [ ] T037 [US5] Write the penetration-test scope document
+- [x] T037 [US5] Write the penetration-test scope document
   `docs/operations/pentest-scope.md`: in-scope surfaces, data classifications, environment and
   credentials handling, boundaries and exclusions, per roadmap §10.8 (FR-023).
 
@@ -267,20 +267,20 @@ pentest is procurable.
 
 ## Phase 7: Cross-cutting (orchestrator lane)
 
-- [ ] T038 Update `docs/architecture/data-dictionary.md` with `report_schedule`,
+- [x] T038 Update `docs/architecture/data-dictionary.md` with `report_schedule`,
   `digest_subscription`, the `tenant`, `export_job`, and reader-function extensions, and the new
   audit events.
-- [ ] T039 Update `docs/architecture/api-specification.md` from
+- [x] T039 Update `docs/architecture/api-specification.md` from
   `specs/012-reporting-hardening/contracts/reporting-hardening.openapi.yaml`, including the
   previously documented-but-unimplemented download endpoint now matching the implementation.
-- [ ] T040 Update `docs/user/user-documentation.md` and screenshots for the Reports center,
+- [x] T040 Update `docs/user/user-documentation.md` and screenshots for the Reports center,
   schedule form, digest settings, and the export extensions; add the mobile web-only boundary
   note to `docs/user/mobile-app-user-documentation.md` (reporting surfaces are web-only in R2.5;
   digest deep links open web routes).
-- [ ] T041 Run and record the release gates: `pnpm lint`, `pnpm test:api`, `pnpm test:web`,
+- [x] T041 Run and record the release gates: `pnpm lint`, `pnpm test:api`, `pnpm test:web`,
   `pnpm test:e2e`, `pnpm test:a11y`, `pnpm test:isolation`, and a warning-free
   `pnpm --filter web build`; record results in this file.
-- [ ] T042 Update `docs/quality/test-strategy.md` with the R2.5 gates (docs gap audit): the
+- [x] T042 Update `docs/quality/test-strategy.md` with the R2.5 gates (docs gap audit): the
   compare-grid timing regression and CI-noise strategy, initial-bundle and style-budget gates,
   the mandatory axe surface list in EN and AR, the dependency-audit CI job, rate-limit and
   security-review checks, pentest scope, and the isolation extension for schedules, artifacts,

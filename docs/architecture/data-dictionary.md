@@ -21,6 +21,7 @@ Entities for later chunks are marked as planned and are not present in the curre
 | `tax_model` | text | Required FK -> `supported_tax_model.code`; no default |
 | `default_locale` | text | Required workspace fallback locale; `en` or `ar`, default `en` |
 | `platform_invitation_id` | uuid | Required unique FK -> `platform_invitation.id`; invitation that produced the workspace |
+| `reporting_timezone` | text | Chunk R2.5. IANA timezone name (e.g. `Africa/Cairo`, `UTC`); every scheduled-report window, digest window, and next-run instant for the workspace derives from this. Default `UTC`; owner-only write via `PATCH /api/v1/tenant`, validated as a real IANA name by the API |
 | `created_at` | timestamptz | Audit field |
 
 `Tenant` is protected by RLS, but it is not keyed by `tenant_id`; its policy compares `id` to the
@@ -869,25 +870,41 @@ role. Verification is the final allowed mutation and changes only `status`, `ver
 | `id` | uuid | PK, default `gen_random_uuid()` |
 | `tenant_id` | uuid | Required FK -> Tenant; RLS key |
 | `requested_by` | uuid | Required FK -> Membership |
-| `kind` | text | Const-like value `savings_ledger` for chunk 4.6 |
-| `format` | enum | `xlsx` or `pdf` |
+| `kind` | text | `savings_ledger`, `spend_by_supplier`, or `alerts_summary` (widened chunk R2.5) |
+| `format` | enum | `xlsx`, `pdf`, or `csv` (csv added chunk R2.5) |
 | `filters` | jsonb | Required export filters: `period_start`, `period_end`, optional `supplier_id`, optional `branch_id` |
-| `status` | enum | `queued`, `running`, `completed`, or `failed`; default `queued` |
-| `storage_bucket` | text | Optional storage bucket set when completed |
-| `storage_path` | text | Optional storage path set when completed |
-| `download_url` | text | Optional signed URL or API download URL |
-| `row_count` | integer | Optional number of verified savings rendered; zero is valid |
+| `status` | enum | `queued`, `running`, `completed`, `failed`, or `expired` (expired added chunk R2.5); default `queued` |
+| `storage_bucket` | text | Optional storage bucket set when completed; nulled on purge |
+| `storage_path` | text | Optional storage path set when completed; nulled on purge |
+| `download_url` | text | Optional signed URL or API download URL; nulled on purge |
+| `row_count` | integer | Optional number of rows rendered; zero is valid |
 | `error` | jsonb | Optional structured failure details for failed jobs |
+| `schedule_id` | uuid | Chunk R2.5. Composite FK -> ReportSchedule `(tenant_id, id)`. Null for on-demand jobs |
+| `locale` | text | Chunk R2.5. `en` or `ar`; default `en` |
+| `rule_version` | text | Chunk R2.5. Renderer rule version, for replay; default `''` |
+| `schedule_snapshot` | jsonb | Chunk R2.5. Immutable copy of the schedule definition (kind, format, filters, weekday, locale, rule version) taken at enqueue time, so replay survives later schedule edits or deletion |
+| `expires_at` | timestamptz | Chunk R2.5. Set at completion (`completed_at` + retention window); the purge pass flips `status` to `expired` and clears storage after this instant |
 | `created_at` | timestamptz | Job creation time |
 | `started_at` | timestamptz | Optional worker start time |
 | `completed_at` | timestamptz | Required for completed or failed jobs |
 
-`ExportJob` is the durable polling resource for savings-ledger exports. Only verified savings are
-rendered; an empty export is represented by `row_count = 0`, not a failed job. Completed jobs must
-carry storage metadata and `row_count`; failed jobs must carry structured `error` details.
+`ExportJob` is the single durable job-and-artifact record for both on-demand exports and
+scheduled report runs (chunk R2.5 widened it rather than adding a second table — see
+`ReportSchedule` below). An empty export is represented by `row_count = 0`, not a failed job.
+Completed jobs must carry storage metadata and `row_count`; failed jobs must carry structured
+`error` details; expired jobs have had their storage metadata nulled by the purge pass and are
+terminal for downloads.
+
+A partial unique index (`export_job_schedule_period_uidx`) enforces one artifact per
+`(tenant_id, schedule_id, filters->>'period_start')` for scheduled jobs only — on-demand jobs
+(`schedule_id` null) are excluded on purpose; concurrent equivalent on-demand requests are not
+de-duplicated.
 
 `ExportJob` is tenant-scoped with forced RLS. Owner and buyer may request exports through the API;
-active workspace roles may read export status for jobs in their workspace.
+active workspace roles may read export status for jobs in their workspace. Rendered artifacts land
+in the `exports` Supabase Storage bucket (`public = false`), with a `storage.objects` tenant-
+isolation policy mirroring the `quotation-documents`/`quality-issue-photos` pattern — see
+`docs/quality/r2.5-security-review-record.md` §4.
 
 ## `Plan`
 
@@ -1406,4 +1423,121 @@ Append-only audit trail logging for R2.4 operations:
 - `optimisation.basket_split.submitted`: Human-triggered advanced multi-supplier basket optimisation.
 - `supplier_iq.scorecard.viewed`: Inspection of supplier scorecard metrics and risk evidence.
 - `alerts.anomaly.dismissed`: Dismissal of commercial anomaly alerts with deterministic recurrence keys.
+
+## Implemented mobile approvals and receipt entities (chunk R2.3, `010-mobile-approvals-receipt`)
+
+See `specs/010-mobile-approvals-receipt/data-model.md` for `PurchaseRequest`'s delivery-status
+columns and the `DeliveryQualityIssue`/`DeliveryQualityIssuePhoto` entities above (T037 landed
+these; the section marker exists so this file's own section list stays in feature order).
+
+## Implemented reporting and hardening entities (chunk R2.5, `012-reporting-hardening`)
+
+### `ReportSchedule`
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | uuid | PK, default `gen_random_uuid()` |
+| `tenant_id` | uuid | Required FK -> Tenant; RLS key |
+| `created_by_membership_id` | uuid | Required composite FK -> Membership `(tenant_id, id)` |
+| `kind` | text | Required; `savings_ledger`, `spend_by_supplier`, or `alerts_summary` |
+| `format` | enum | Required; `csv`, `xlsx`, or `pdf` (kind/format compatibility validated at the API — `spend_by_supplier` + `pdf` is refused) |
+| `filters` | jsonb | Required; `{supplier_id?, branch_id?}` — the fixed filter part; the period itself is derived at run time from `weekday`/`tenant.reporting_timezone` |
+| `filters_digest` | text | Required; sha256 of the canonical filters JSON, computed by the API |
+| `weekday` | smallint | Required; 0-6 (Monday-based) for the weekly cadence |
+| `status` | enum | `active` or `paused`; default `active` |
+| `next_run_at` | timestamptz | Required; the next due instant in the tenant's reporting timezone |
+| `last_run_at` | timestamptz | Optional |
+| `rule_version` | text | Required; renderer rule version, for replay |
+| `locale` | text | `en` or `ar`; default `en` (added `20260915000006_report_schedule_locale.sql`, forward-only after the table's own creation migration) |
+| `created_at` / `updated_at` | timestamptz | Audit fields |
+
+A member-owned recurring report definition — configuration, not outcome history: deleting a
+schedule never deletes the artifacts it already produced (`export_job.schedule_snapshot` keeps
+them self-describing). Unique on `(tenant_id, created_by_membership_id, kind, format,
+filters_digest)` — one schedule per member per kind/format/filters combination, turning an
+accidental duplicate create into an honest 409 rather than a silent second schedule.
+
+RLS (enabled + forced): any tenant member may `SELECT` any schedule in the tenant (team
+visibility, by design — see `docs/quality/r2.5-security-review-record.md` §1); owner/buyer may
+insert/update/delete any schedule in the tenant, not only their own. A partial index
+(`report_schedule_due_idx`) on `(next_run_at)` where `status = 'active'` backs the scheduler's
+`FOR UPDATE SKIP LOCKED` due-list claim.
+
+### `DigestSubscription`
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | uuid | PK, default `gen_random_uuid()` |
+| `tenant_id` | uuid | Required FK -> Tenant; RLS key |
+| `membership_id` | uuid | Required composite FK -> Membership `(tenant_id, id)` |
+| `kind` | text | Fixed value `weekly_digest` |
+| `locale` | text | `en` or `ar`; drives the digest's render language (FR-029) |
+| `filters` | jsonb | `{branch_id?}` |
+| `filters_digest` | text | sha256 of the canonical filters JSON |
+| `channel` | enum | `in_app` or `email` |
+| `status` | enum | `active` or `paused`; default `active` |
+| `next_run_at` | timestamptz | Required; the next due weekly instant |
+| `last_delivery_at` | timestamptz | Optional |
+| `last_delivery_status` | text | Optional (`succeeded`, `failed`, `skipped`) |
+| `created_at` / `updated_at` | timestamptz | Audit fields |
+
+A per-member weekly digest definition. Unique on `(tenant_id, membership_id, kind,
+filters_digest)`. Content (verified-savings hero, pending outcome verifications, pending
+approvals, anomalies, expiring validity) is assembled fresh at delivery time from existing tables
+via the same tenant-pinned reader functions exports use — no digest content is persisted as a
+second source of truth.
+
+RLS (enabled + forced): a member sees and mutates only their own subscription rows; owners may
+additionally `SELECT` every row in the tenant for visibility (not control — they cannot
+insert/update/delete another member's subscription). A partial index on `(next_run_at)` where
+`status = 'active'` backs the digest worker's own due-list claim, mirroring `ReportSchedule`'s.
+
+### Reporting reader functions
+
+Three `security definer`, `stable` SQL functions (`supabase/migrations/
+20260915000005_reporting_reader_functions.sql`), each taking `p_tenant_id` as an explicit,
+API-supplied (never client-supplied) parameter and pinning every joined table to it — the same
+"authorization inside the function, not just at the API layer" pattern R2.4's supplier-IQ
+functions established:
+
+- `reporting_savings_for_period(tenant_id, period_start, period_end, supplier_id?, branch_id?)` —
+  verified-savings rows for the `savings_ledger` export/digest kind.
+- `reporting_purchases_for_period(tenant_id, period_start, period_end, supplier_id?, branch_id?)`
+  — purchase/spend aggregation source for `spend_by_supplier`.
+- `reporting_alert_snapshot(tenant_id, period_start, period_end, branch_id?)` — live alert
+  conditions for `alerts_summary`. By design (`spec.md`'s own stated assumption, consistent with
+  R2.4's dismissal-only alert model), this one does **not** filter by the period or branch
+  parameters it declares — alerts have no persisted history and no branch attribution in this
+  data model; it always returns the current live snapshot. See
+  `docs/quality/r2.5-security-review-record.md` §3 for the review that confirmed this is
+  intentional rather than a missed filter.
+
+### `ExportJob` extensions
+
+See the updated `ExportJob` entity above (schedule linkage, locale, rule version, immutable
+schedule snapshot, retention expiry, the widened `kind`/`format`/`status` value sets, and the
+per-schedule-period idempotency index).
+
+### Storage: `exports` bucket
+
+A private (`public = false`) Supabase Storage bucket, added in `supabase/migrations/
+20260916000001_exports_storage.sql` — see `docs/quality/r2.5-security-review-record.md` §4 for
+why this migration exists (the bucket had no creation migration or `storage.objects`
+tenant-isolation policy before this review). Object paths are
+`{tenant_id}/savings/{job_id}.{format}` (no `tenants/` prefix, unlike the
+`quotation-documents`/`quality-issue-photos` buckets), so the tenant-isolation policy pins
+`storage.foldername(name)`'s first element rather than its second.
+
+### New audit events (chunk R2.5)
+
+- `reports.export_requested` — an on-demand export was queued.
+- `reports.artifact_downloaded` — a signed download URL was minted for a completed artifact.
+- `reports.artifact_purged` — a retention-expired artifact's storage object was deleted.
+- `reports.schedule_created` / `reports.schedule_updated` / `reports.schedule_deleted`.
+- `reports.run_enqueued` / `reports.run_started` / `reports.run_completed` / `reports.run_failed`
+  — the scheduled-run lifecycle, recorded by the scheduler and the export worker.
+- `digests.subscription_created` / `digests.subscription_updated` /
+  `digests.subscription_active` / `digests.subscription_paused` (the two live values of a status
+  toggle) / `digests.subscription_deleted` / `digests.subscription_provisioned` (default
+  subscription created automatically on member accept).
 

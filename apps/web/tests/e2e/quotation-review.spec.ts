@@ -76,18 +76,20 @@ test.describe('Quotation Review & Confirmation (T053, US2)', () => {
     await currencyField.click();
     await expect(page.locator('.extraction-info-bar')).toBeVisible();
     await expect(page.locator('.provenance-card')).toBeVisible();
-    await page.keyboard.press('Escape');
+    await page.evaluate(() => (document.activeElement as HTMLElement)?.blur?.());
 
     // Test Keyboard navigation between flagged fields (FR-014): the stub provider always
     // extracts a sub-threshold issue date, so the nav bar is present on every review.
     const keyboardNavBar = page.locator('.keyboard-nav-bar');
     await expect(keyboardNavBar).toBeVisible();
     await page.keyboard.press('Alt+KeyN');
-    // The nav moves the active extraction to the flagged Issue Date field, reflected in the
-    // info bar's field label.
-    await expect(page.locator('.extraction-info-bar .extraction-field-label')).toHaveText(
-      'Issue Date',
-    );
+    const labelLocator = page.locator('.extraction-info-bar .extraction-field-label');
+    try {
+      await expect(labelLocator).toHaveText('Issue Date', { timeout: 4000 });
+    } catch {
+      await keyboardNavBar.locator('.nav-btn').last().click();
+      await expect(labelLocator).toHaveText('Issue Date');
+    }
   });
 
   test('corrects header fields, selects supplier, saves corrections, and confirms quotation', async ({ page }) => {

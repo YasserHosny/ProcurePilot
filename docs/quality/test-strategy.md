@@ -115,7 +115,49 @@ This catches issues that local tests cannot: misconfigured container env vars (e
 `EXTRACTION_PROVIDER_MODE` still set to `stub`), cross-app Redis connectivity failures,
 and GHCR image pull issues.
 
-## 10. Open Decisions
+## 10. R2.5 Hardening & Release Gates
+
+Release R2.5 (`012-reporting-hardening`) introduces formal performance, accessibility, security, and tenant-isolation gates before the G2 stage gate:
+
+### 10.1 Compare-Grid Timing Regression & CI-Noise Strategy
+- **Gate:** Compare-grid recalculation under 150 ms (constitution Principle V, FR-025, SC-006).
+- **CI-Noise Mitigation:** To eliminate false positives from runner load spikes, Playwright test `compare-grid-performance.spec.ts` computes the median of 7 consecutive quantity recalculation samples rendered entirely inside the browser DOM via `performance.now()`.
+- **Target:** Median recalculation time < 150 ms for a 25-offer comparison grid.
+
+### 10.2 Initial Bundle & Component Style Budgets
+- **Initial Bundle Budget:** Raw initial bundle must remain ≤ 500 kB (Wave 15 baseline was 588 kB; lazy routes + lazy Sentry SDK achieved 457.79 kB).
+- **Component Style Budget:** Strict ≤ 4 kB SCSS limit per component stylesheet (`styleUrl` single, no evasion via `styleUrls` array). Monitored via Angular CLI build budgets in `angular.json`.
+
+### 10.3 Accessibility (axe-core) Mandatory Surfaces
+- **Automated Gate (`pnpm test:a11y`):** Zero WCAG 2.1 AA violations across both English (LTR) and Arabic (RTL) for all primary user journeys:
+  - Sign-in / Sign-up
+  - Dashboard & Home
+  - Product Catalogue & Supplier management
+  - Quotation Upload & Review
+  - Smart Compare & Basket Split
+  - Alerts Inbox & Savings Ledger
+  - Reports Center (`/reports`) & Digest Settings (`/reports/digest-settings`)
+- **Keyboard Navigation:** Full bidirectional Tab/Shift+Tab navigation traversable through all interactive elements on data tables, banner toolbars, and forms.
+- **Print Coverage:** Reports Center includes `@media print` coverage ensuring artifact tables print without UI chrome.
+
+### 10.4 Dependency Audit CI Gate
+- **Automated Check:** `.github/workflows/ci.yml` runs `pip-audit` across all Python environments (`apps/api`, worker services) and `pnpm audit --prod` across web workspaces.
+- **Enforcement:** Blocks CI on any unallowlisted High or Critical vulnerability.
+- **Allowlist (`docs/operations/dependency-audit-allowlist.txt`):** Every accepted finding must carry an assigned owner and explicit rationale (e.g. upstream framework constraint, non-exploitable transitive dependency).
+
+### 10.5 Rate Limiting & Resource Caps
+- **Endpoint Limits:** Export creation, report schedule mutations, and digest subscription mutations enforce tenant+membership claim rate limits with client IP fallbacks (FR-020).
+- **Standing Caps:** Active schedules and digest subscriptions enforce strict per-member cardinality limits (422 structured error) preventing unbounded daemon job accumulation.
+
+### 10.6 Security Review & Penetration Test Readiness
+- **Internal Security Review (`docs/quality/r2.5-security-review-record.md`):** Evidence-based verification covering RLS policy shapes (`ENABLE` + `FORCE`), worker tenant re-derivation from DB state, reader-function authorization pins, storage bucket policies (`exports`), signed-URL max TTLs, and append-only audit enforcement.
+- **Third-Party Penetration Test Scope (`docs/operations/pentest-scope.md`):** Formal procurement-ready scope document establishing in-scope boundaries, data classification, and test environments for third-party adversarial testing at the G2 gate.
+
+### 10.7 Tenancy & Isolation Extension
+- **Automated Isolation Tests (`pnpm test:isolation`):** Verified RLS policies across `report_schedule`, `digest_subscription`, `export_job`, and Supabase Storage `exports` bucket.
+- **Cross-Tenant Guarantees:** Any cross-tenant or unauthorized-branch access resolves to HTTP 404 (Not Found), never HTTP 403 (Forbidden), avoiding existence leakage.
+
+## 11. Open Decisions
 
 1. Which Flutter testing framework (integration tests vs. Maestro).
 2. Whether to add synthetic data generation for performance testing.
