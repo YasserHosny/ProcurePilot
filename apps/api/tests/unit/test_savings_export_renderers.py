@@ -38,10 +38,10 @@ def test_xlsx_renderer_contains_money_and_evidence_reference(tmp_path: Path) -> 
     values = list(workbook.active.iter_rows(values_only=True))
     # openpyxl pads every row to the sheet's widest row (the 10-column header), so compare only
     # the cells this row actually wrote rather than the full padded tuple.
-    assert values[1][:2] == ("Verified rows", 1)
+    assert "Total records: 1" in values[1][0]
     assert str(row["id"]) in values[4]
     assert "GBP" in values[4]
-    assert f"/api/v1/savings/{row['id']}/evidence" in values[4]
+    assert f"/savings/{row['id']}/evidence" in values[4]
 
 
 def test_xlsx_renderer_makes_intentional_empty_file(tmp_path: Path) -> None:
@@ -50,10 +50,8 @@ def test_xlsx_renderer_makes_intentional_empty_file(tmp_path: Path) -> None:
 
     workbook = openpyxl.load_workbook(path)
     values = list(workbook.active.iter_rows(values_only=True))
-    # openpyxl pads every row to the sheet's widest row (the 10-column header), so compare only
-    # the cells this row actually wrote rather than the full padded tuple.
-    assert values[1][:2] == ("Verified rows", 0)
-    assert values[4][0] == "No verified savings matched the requested period."
+    assert "Total records: 0" in values[1][0]
+    assert values[4][0] == "No records matched the requested period."
 
 
 def test_pdf_renderer_contains_summary_text() -> None:
@@ -65,4 +63,4 @@ def test_pdf_renderer_contains_summary_text() -> None:
 def test_pdf_renderer_makes_intentional_empty_file() -> None:
     content = render_pdf([])
     assert content.startswith(b"%PDF")
-    assert b"No verified savings" in content
+    assert b"No records matched" in content

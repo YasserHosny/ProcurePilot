@@ -2289,5 +2289,38 @@
       "verifiedRows": "Total records: {{count}}",
       "emptyResult": "No records matched the requested period."
     }
+  },
+  "digests": {
+    "title": "Weekly Procurement Digest",
+    "subtitle": "Summary of realised savings, pending verifications, approvals, and anomalies",
+    "subject": "ProcurePilot: Weekly Procurement Digest ({{periodStart}} – {{periodEnd}})",
+    "sections": {
+      "verified_savings": "Verified Savings Realised",
+      "pending_verifications": "Pending Savings Verifications",
+      "pending_approvals": "Pending Approvals",
+      "anomalies": "Pricing & Quality Alerts",
+      "expiring_validity": "Expiring Quotation Offers"
+    },
+    "empty": {
+      "noItems": "No items in this section for this period."
+    },
+    "channels": {
+      "in_app": "In-App Only",
+      "email": "Email & In-App"
+    },
+    "statuses": {
+      "active": "Active",
+      "paused": "Paused"
+    },
+    "deliveryStatuses": {
+      "succeeded": "Delivered",
+      "failed": "Delivery Failed",
+      "email_unconfigured": "Email Not Configured"
+    },
+    "email": {
+      "footer": "You received this email because you are subscribed to weekly procurement digests.",
+      "manageSettings": "Manage digest settings",
+      "unsubscribe": "Unsubscribe"
+    }
   }
 }

@@ -45,6 +45,7 @@ class Settings(BaseSettings):
         default="basket-split", validation_alias="BASKET_SPLIT_QUEUE_NAME"
     )
     export_queue_name: str = Field(default="exports", validation_alias="EXPORT_QUEUE_NAME")
+    digest_queue_name: str = Field(default="digests", validation_alias="DIGEST_QUEUE_NAME")
     extraction_provider_mode: Literal["stub", "bedrock", "azure_di"] = Field(
         default="stub", validation_alias="EXTRACTION_PROVIDER_MODE"
     )
@@ -72,6 +73,11 @@ class Settings(BaseSettings):
     smtp_password: SecretStr | None = Field(default=None, validation_alias="SMTP_PASSWORD")
     smtp_tls: bool = Field(default=True, validation_alias="SMTP_TLS")
     smtp_from: str | None = Field(default=None, validation_alias="SMTP_FROM")
+
+    @property
+    def email_configured(self) -> bool:
+        return bool(self.smtp_host and self.smtp_from)
+
     matching_auto_accept_threshold: float = Field(
         default=0.9200, validation_alias="MATCHING_AUTO_ACCEPT_THRESHOLD", ge=0, le=1
     )

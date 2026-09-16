@@ -9,6 +9,7 @@ from procurepilot_api.errors import InvalidCredentialsError, UnprocessableEntity
 from procurepilot_api.modules.auth.jwt import MemberRole
 from procurepilot_api.modules.auth.rbac import require_role
 from procurepilot_api.modules.auth.service import AuthService, get_auth_service
+from procurepilot_api.modules.digests.service import DigestsService
 from procurepilot_api.modules.members.invitations import (
     MemberInvitationService,
     get_member_invitation_service,
@@ -216,6 +217,16 @@ def accept_invitation(
         accepting_email=invitation.email,
     )
     session = auth.login(email=invitation.email, password=payload.password)
+    try:
+        DigestsService().provision_default_subscription(
+            tenant_id=membership.tenant_id,
+            membership_id=membership.id,
+            email=membership.email,
+            bearer_token=session.access_token,
+        )
+    except Exception:
+        # Advisory provisioning failure must not roll back invitation acceptance
+        pass
     get_audit_writer().record(
         AuditEventCreate(
             tenant_id=membership.tenant_id,
