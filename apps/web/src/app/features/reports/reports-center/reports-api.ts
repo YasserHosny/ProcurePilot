@@ -97,4 +97,34 @@ export class ReportsApiService {
     const qs = query.toString() ? `?${query.toString()}` : '';
     return this.http.get<ReportArtifactList>(`${this.base}/reports/artifacts${qs}`);
   }
+
+  createSchedule(payload: {
+    kind: ReportKind;
+    format: ReportFormat;
+    weekday: number;
+    locale: 'en' | 'ar';
+    filters: ReportScheduleFilters;
+  }): Observable<ReportSchedule> {
+    return this.http.post<ReportSchedule>(`${this.base}/reports/schedules`, payload);
+  }
+
+  updateSchedule(
+    id: string,
+    payload: {
+      status?: ReportScheduleStatus;
+      weekday?: number;
+      locale?: 'en' | 'ar';
+      filters?: ReportScheduleFilters;
+    }
+  ): Observable<ReportSchedule> {
+    return this.http.patch<ReportSchedule>(`${this.base}/reports/schedules/${id}`, payload);
+  }
+
+  deleteSchedule(id: string): Observable<void> {
+    return this.http.delete<void>(`${this.base}/reports/schedules/${id}`);
+  }
+
+  getDownloadUrl(id: string): Observable<{ download_url: string }> {
+    return this.http.get<{ download_url: string }>(`${this.base}/exports/${id}/download`);
+  }
 }

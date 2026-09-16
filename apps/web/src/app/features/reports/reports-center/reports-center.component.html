@@ -7,6 +7,16 @@
       </div>
       <p class="page-subtitle">{{ 'reports.subtitle' | translate }}</p>
     </div>
+    <div class="header-actions">
+      <a mat-stroked-button routerLink="/reports/digest-settings" class="action-btn">
+        <mat-icon aria-hidden="true">mark_email_read</mat-icon>
+        <span>{{ 'digests.title' | translate }}</span>
+      </a>
+      <a mat-flat-button color="primary" routerLink="/reports/schedule-form" class="action-btn">
+        <mat-icon aria-hidden="true">add</mat-icon>
+        <span>{{ 'reports.schedules.newSchedule' | translate }}</span>
+      </a>
+    </div>
   </div>
 
   <mat-card class="reports-card">

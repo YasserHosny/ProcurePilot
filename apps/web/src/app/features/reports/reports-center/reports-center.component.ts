@@ -10,6 +10,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSelectModule } from '@angular/material/select';
 import { MatTableModule } from '@angular/material/table';
 import { MatTabsModule } from '@angular/material/tabs';
+import { RouterLink } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
 import { FormatDatePipe } from '../../../core/format/date.pipe';
@@ -41,6 +42,7 @@ interface ApiErrorShape {
     MatSelectModule,
     MatTableModule,
     MatTabsModule,
+    RouterLink,
     TranslatePipe,
     FormatDatePipe,
   ],

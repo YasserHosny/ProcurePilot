@@ -1,0 +1,97 @@
+.schedule-form-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  padding: 1.5rem;
+  max-width: 720px;
+  margin-inline: auto;
+}
+
+.header-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.back-link {
+  margin-bottom: 0.5rem;
+}
+
+.page-title {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.page-subtitle {
+  margin: 0.25rem 0 0;
+  color: #64748b;
+  font-size: 0.875rem;
+}
+
+.form-card {
+  padding: 1.5rem;
+  border-radius: 8px;
+}
+
+.form-content {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.field-row {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.form-field {
+  flex: 1;
+  min-width: 240px;
+}
+
+.full-width {
+  flex: 1 1 100%;
+}
+
+.error-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  background-color: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 6px;
+  color: #991b1b;
+}
+
+.error-details {
+  display: flex;
+  flex-direction: column;
+}
+
+.error-text {
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.trace-id {
+  font-size: 0.75rem;
+  color: #b91c1c;
+}
+
+.actions-row {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.spinner {
+  display: inline-block;
+  margin-inline-end: 0.5rem;
+}

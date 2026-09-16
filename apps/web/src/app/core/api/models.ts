@@ -971,7 +971,7 @@ export interface SavingEvidence {
   readonly calculation: SavingCalculationEvidence;
 }
 
-export type ExportFormat = 'xlsx' | 'pdf';
+export type ExportFormat = 'xlsx' | 'pdf' | 'csv';
 
 export type ExportStatus = 'queued' | 'running' | 'completed' | 'failed';
 
@@ -983,9 +983,10 @@ export interface ExportFilters {
 }
 
 export interface ExportCreate {
-  readonly kind: 'savings_ledger';
+  readonly kind?: 'savings_ledger' | 'spend_by_supplier' | 'alerts_summary';
   readonly format: ExportFormat;
   readonly filters: ExportFilters;
+  readonly locale?: 'en' | 'ar';
 }
 
 export interface ExportJob {

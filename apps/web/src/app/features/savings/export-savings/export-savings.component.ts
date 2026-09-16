@@ -21,7 +21,7 @@ import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { Subscription, interval, switchMap } from 'rxjs';
 
 import { ApiService } from '../../../core/api/api.service';
-import type { ApiError, Supplier } from '../../../core/api/models';
+import type { ApiError, Branch, Supplier } from '../../../core/api/models';
 import { SessionService } from '../../../core/auth/session.service';
 import {
   type ExportCreate,
@@ -73,6 +73,7 @@ export class ExportSavingsComponent implements OnInit {
   readonly isLoading = signal<boolean>(false);
   readonly isSubmitting = signal<boolean>(false);
   readonly suppliers = signal<Supplier[]>([]);
+  readonly branches = signal<readonly Branch[]>([]);
   readonly currentJob = signal<ExportJob | null>(null);
   readonly errorMessage = signal<string | null>(null);
   readonly errorTraceId = signal<string | null>(null);
@@ -91,10 +92,12 @@ export class ExportSavingsComponent implements OnInit {
     period_start: [new Date(new Date().getFullYear(), 0, 1), [Validators.required]],
     period_end: [new Date(), [Validators.required]],
     supplier_id: [''],
+    branch_id: [''],
   });
 
   ngOnInit(): void {
     this.loadSuppliers();
+    this.loadBranches();
 
     this.route.paramMap.subscribe((params) => {
       const jobId = params.get('id');
@@ -107,6 +110,13 @@ export class ExportSavingsComponent implements OnInit {
   private loadSuppliers(): void {
     this.api.suppliers({ limit: 100, status: 'all' }).subscribe({
       next: (res) => this.suppliers.set(res.items),
+      error: () => undefined,
+    });
+  }
+
+  private loadBranches(): void {
+    this.api.listBranches({ is_active: true }).subscribe({
+      next: (res) => this.branches.set(res.items || []),
       error: () => undefined,
     });
   }
@@ -137,6 +147,7 @@ export class ExportSavingsComponent implements OnInit {
         period_start: startDate.toISOString().split('T')[0],
         period_end: endDate.toISOString().split('T')[0],
         supplier_id: fv.supplier_id ? fv.supplier_id : null,
+        branch_id: fv.branch_id ? fv.branch_id : null,
       },
     };
 

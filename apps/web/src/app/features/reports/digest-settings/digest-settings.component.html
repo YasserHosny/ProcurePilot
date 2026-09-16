@@ -1,0 +1,174 @@
+<div class="digest-settings-container">
+  <div class="header-section">
+    <div class="back-link">
+      <a mat-button routerLink="/reports">
+        <mat-icon aria-hidden="true">arrow_back</mat-icon>
+        <span>{{ 'reports.title' | translate }}</span>
+      </a>
+    </div>
+    <div class="title-group">
+      <h1 class="page-title">{{ 'digests.title' | translate }}</h1>
+      <p class="page-subtitle">{{ 'digests.subtitle' | translate }}</p>
+    </div>
+  </div>
+
+  <!-- FR-008 Onboarding Prompt -->
+  @if (showOnboarding()) {
+    <div class="onboarding-banner" role="region" aria-label="Digest Onboarding">
+      <div class="onboarding-content">
+        <mat-icon class="onboarding-icon" aria-hidden="true">mark_email_read</mat-icon>
+        <div class="onboarding-text">
+          <p class="onboarding-title">{{ 'digests.settings.onboardingTitle' | translate }}</p>
+          <p class="onboarding-desc">{{ 'digests.settings.onboardingDesc' | translate }}</p>
+        </div>
+      </div>
+      <div class="onboarding-actions">
+        <button mat-button type="button" (click)="dismissOnboarding()">
+          {{ 'digests.settings.dismiss' | translate }}
+        </button>
+      </div>
+    </div>
+  }
+
+  <!-- Subscription Settings Section -->
+  <mat-card class="settings-card">
+    <div class="card-header">
+      <h2 class="card-title">{{ 'digests.settings.subscriptionsTitle' | translate }}</h2>
+    </div>
+
+    @if (isLoadingSubs()) {
+      <div class="loading-wrap">
+        <mat-spinner diameter="32" [attr.aria-label]="'common.loading' | translate" />
+      </div>
+    } @else if (subscriptions().length === 0) {
+      <div class="empty-state">
+        <p>{{ 'digests.settings.noSubscriptions' | translate }}</p>
+      </div>
+    } @else {
+      <div class="subscriptions-list">
+        @for (sub of subscriptions(); track sub.id) {
+          <div class="sub-item" [ngClass]="{ paused: sub.status === 'paused' }">
+            <div class="sub-info">
+              <div class="sub-title-row">
+                <span class="sub-kind">{{ 'digests.title' | translate }}</span>
+                <span class="status-badge" [ngClass]="sub.status">
+                  {{ 'digests.statuses.' + sub.status | translate }}
+                </span>
+                <span class="channel-badge" [ngClass]="sub.channel">
+                  {{ 'digests.channels.' + sub.channel | translate }}
+                </span>
+              </div>
+              <div class="sub-meta">
+                <span>{{ 'reports.schedules.table.nextRun' | translate }}: {{ sub.next_run_at | formatDate }}</span>
+                @if (sub.last_delivery_status) {
+                  <span class="delivery-status-tag" [ngClass]="sub.last_delivery_status">
+                    {{ 'digests.deliveryStatuses.' + sub.last_delivery_status | translate }}
+                  </span>
+                }
+              </div>
+              @if (!sub.email_configured && sub.channel === 'email') {
+                <div class="unconfigured-note">
+                  <mat-icon aria-hidden="true">info</mat-icon>
+                  <span>{{ 'digests.deliveryStatuses.email_unconfigured' | translate }}</span>
+                </div>
+              }
+            </div>
+
+            <div class="sub-actions">
+              <button
+                mat-stroked-button
+                type="button"
+                [disabled]="isMutating()"
+                (click)="toggleChannel(sub)"
+              >
+                {{ sub.channel === 'email' ? ('digests.channels.in_app' | translate) : ('digests.channels.email' | translate) }}
+              </button>
+              <button
+                mat-button
+                type="button"
+                [color]="sub.status === 'active' ? 'warn' : 'primary'"
+                [disabled]="isMutating()"
+                (click)="togglePause(sub)"
+              >
+                {{ sub.status === 'active' ? ('reports.statuses.paused' | translate) : ('reports.statuses.active' | translate) }}
+              </button>
+            </div>
+          </div>
+        }
+      </div>
+    }
+  </mat-card>
+
+  <!-- Latest In-App Digest View (FR-009) -->
+  <mat-card class="digest-view-card">
+    <div class="card-header">
+      <div class="digest-header-info">
+        <h2 class="card-title">{{ 'digests.settings.latestDigestTitle' | translate }}</h2>
+        @if (digestView(); as view) {
+          <p class="digest-period">
+            {{ view.period_start | formatDate }} &ndash; {{ view.period_end | formatDate }}
+          </p>
+        }
+      </div>
+
+      @if (digestView(); as view) {
+        <span class="delivery-status-badge" [ngClass]="view.delivery_status">
+          {{ 'digests.deliveryStatuses.' + view.delivery_status | translate }}
+        </span>
+      }
+    </div>
+
+    @if (digestView()?.delivery_status === 'email_unconfigured') {
+      <div class="email-unconfigured-banner" role="status">
+        <mat-icon aria-hidden="true">info</mat-icon>
+        <span>{{ 'digests.settings.unconfiguredNotice' | translate }}</span>
+      </div>
+    }
+
+    @if (isLoadingView()) {
+      <div class="loading-wrap">
+        <mat-spinner diameter="32" [attr.aria-label]="'common.loading' | translate" />
+      </div>
+    } @else {
+      @if (digestView(); as view) {
+        <div class="digest-sections">
+          @for (sec of view.sections; track sec.kind) {
+            <div class="digest-section" [ngClass]="{ 'hero-section': sec.kind === 'verified_savings' }">
+              <h3 class="section-title">
+                @if (sec.kind === 'verified_savings') {
+                  <mat-icon class="hero-icon" aria-hidden="true">savings</mat-icon>
+                }
+                <span>{{ 'digests.sections.' + sec.kind | translate }}</span>
+              </h3>
+
+              @if (sec.items.length === 0) {
+                <p class="section-empty">{{ 'digests.empty.noItems' | translate }}</p>
+              } @else {
+                <div class="items-list">
+                  @for (item of sec.items; track item.label) {
+                    <div class="digest-item">
+                      <div class="item-main">
+                        <span class="item-label">{{ item.label }}</span>
+                        @if (item.money) {
+                          <span class="money-badge" [ngClass]="{ hero: sec.kind === 'verified_savings' }">
+                            {{ item.money.amount | number: '1.2-2' }} {{ item.money.currency }}
+                          </span>
+                        }
+                      </div>
+                      <div class="item-action">
+                        <a [routerLink]="item.deep_link" class="deep-link">
+                          <span>{{ 'digests.settings.viewAction' | translate }}</span>
+                          <mat-icon aria-hidden="true">arrow_forward</mat-icon>
+                        </a>
+                      </div>
+                    </div>
+                  }
+                </div>
+              }
+            </div>
+          }
+        </div>
+      }
+    }
+  </mat-card>
+</div>

@@ -256,6 +256,21 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'reports/schedule-form',
+        canActivate: [roleGuard('owner', 'buyer')],
+        loadComponent: () =>
+          import('./features/reports/schedule-form/schedule-form.component').then(
+            (m) => m.ScheduleFormComponent,
+          ),
+      },
+      {
+        path: 'reports/digest-settings',
+        loadComponent: () =>
+          import('./features/reports/digest-settings/digest-settings.component').then(
+            (m) => m.DigestSettingsComponent,
+          ),
+      },
+      {
         path: 'savings/outcome-capture',
         canActivate: [roleGuard('owner', 'buyer')],
         loadComponent: () =>

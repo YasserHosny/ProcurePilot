@@ -2231,7 +2231,23 @@
       },
       "scopeAll": "All branches & suppliers",
       "notApplicable": "—",
-      "never": "Never"
+      "never": "Never",
+      "newSchedule": "New Schedule"
+    },
+    "scheduleForm": {
+      "title": "New Scheduled Report",
+      "subtitle": "Configure recurring automatic report generation.",
+      "fields": {
+        "weekday": "Run Day (Weekly)",
+        "locale": "Report Language",
+        "branch": "Branch Scope"
+      },
+      "cancel": "Cancel",
+      "submit": "Create Schedule",
+      "scheduleAsWeekly": "Schedule as weekly report",
+      "errors": {
+        "conflict": "A schedule with these exact parameters already exists."
+      }
     },
     "pagination": {
       "loadMore": "Load More",
@@ -2321,6 +2337,18 @@
       "footer": "You received this email because you are subscribed to weekly procurement digests.",
       "manageSettings": "Manage digest settings",
       "unsubscribe": "Unsubscribe"
+    },
+    "settings": {
+      "onboardingTitle": "Weekly Digest Active",
+      "onboardingDesc": "You are subscribed to weekly procurement intelligence digests. You can pause or change channel preferences anytime.",
+      "dismiss": "Dismiss",
+      "subscriptionsTitle": "Digest Subscriptions",
+      "noSubscriptions": "No digest subscriptions found.",
+      "latestDigestTitle": "Latest Weekly Digest",
+      "unconfiguredNotice": "Email delivery is not configured in this environment; your weekly digest remains fully accessible here in-app.",
+      "viewAction": "View",
+      "statusUpdated": "Subscription status updated.",
+      "channelUpdated": "Delivery channel updated."
     }
   }
 }

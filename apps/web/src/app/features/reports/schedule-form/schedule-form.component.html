@@ -1,0 +1,102 @@
+<div class="schedule-form-container">
+  <div class="header-section">
+    <div class="title-group">
+      <div class="back-link">
+        <a mat-button routerLink="/reports">
+          <mat-icon aria-hidden="true">arrow_back</mat-icon>
+          <span>{{ 'reports.title' | translate }}</span>
+        </a>
+      </div>
+      <h1 class="page-title">{{ 'reports.scheduleForm.title' | translate }}</h1>
+      <p class="page-subtitle">{{ 'reports.scheduleForm.subtitle' | translate }}</p>
+    </div>
+  </div>
+
+  <mat-card class="form-card">
+    <form [formGroup]="form" (ngSubmit)="onSubmit()" class="form-content">
+      @if (errorMessage()) {
+        <div class="error-banner" role="alert">
+          <mat-icon aria-hidden="true">error_outline</mat-icon>
+          <div class="error-details">
+            <p class="error-text">{{ errorMessage() }}</p>
+            @if (errorTraceId()) {
+              <span class="trace-id">ID: {{ errorTraceId() }}</span>
+            }
+          </div>
+        </div>
+      }
+
+      <div class="field-row">
+        <mat-form-field appearance="outline" class="form-field">
+          <mat-label>{{ 'reports.filters.kind' | translate }}</mat-label>
+          <mat-select formControlName="kind">
+            <mat-option value="savings_ledger">{{ 'reports.kinds.savings_ledger' | translate }}</mat-option>
+            <mat-option value="spend_by_supplier">{{ 'reports.kinds.spend_by_supplier' | translate }}</mat-option>
+            <mat-option value="alerts_summary">{{ 'reports.kinds.alerts_summary' | translate }}</mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="form-field">
+          <mat-label>{{ 'reports.artifacts.table.format' | translate }}</mat-label>
+          <mat-select formControlName="format">
+            @for (fmt of availableFormats(); track fmt) {
+              <mat-option [value]="fmt">{{ 'reports.formats.' + fmt | translate }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+      </div>
+
+      <div class="field-row">
+        <mat-form-field appearance="outline" class="form-field">
+          <mat-label>{{ 'reports.scheduleForm.fields.weekday' | translate }}</mat-label>
+          <mat-select formControlName="weekday">
+            <mat-option [value]="0">{{ 'reports.weekdays.0' | translate }}</mat-option>
+            <mat-option [value]="1">{{ 'reports.weekdays.1' | translate }}</mat-option>
+            <mat-option [value]="2">{{ 'reports.weekdays.2' | translate }}</mat-option>
+            <mat-option [value]="3">{{ 'reports.weekdays.3' | translate }}</mat-option>
+            <mat-option [value]="4">{{ 'reports.weekdays.4' | translate }}</mat-option>
+            <mat-option [value]="5">{{ 'reports.weekdays.5' | translate }}</mat-option>
+            <mat-option [value]="6">{{ 'reports.weekdays.6' | translate }}</mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="form-field">
+          <mat-label>{{ 'reports.scheduleForm.fields.locale' | translate }}</mat-label>
+          <mat-select formControlName="locale">
+            <mat-option value="en">English (en)</mat-option>
+            <mat-option value="ar">العربية (ar)</mat-option>
+          </mat-select>
+        </mat-form-field>
+      </div>
+
+      <div class="field-row">
+        <mat-form-field appearance="outline" class="form-field full-width">
+          <mat-label>{{ 'reports.scheduleForm.fields.branch' | translate }}</mat-label>
+          <mat-select formControlName="branch_id">
+            <mat-option [value]="null">{{ 'reports.artifacts.scopeAll' | translate }}</mat-option>
+            @for (branch of branches(); track branch.id) {
+              <mat-option [value]="branch.id">{{ branch.name }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+      </div>
+
+      <div class="actions-row">
+        <a mat-button routerLink="/reports" [disabled]="isSubmitting()">
+          {{ 'reports.scheduleForm.cancel' | translate }}
+        </a>
+        <button
+          mat-raised-button
+          color="primary"
+          type="submit"
+          [disabled]="form.invalid || isSubmitting()"
+        >
+          @if (isSubmitting()) {
+            <mat-progress-spinner mode="indeterminate" diameter="20" class="spinner" />
+          }
+          <span>{{ 'reports.scheduleForm.submit' | translate }}</span>
+        </button>
+      </div>
+    </form>
+  </mat-card>
+</div>

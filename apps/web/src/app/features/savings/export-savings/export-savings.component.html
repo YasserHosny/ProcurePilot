@@ -174,6 +174,13 @@
                 </div>
               </mat-radio-button>
 
+              <mat-radio-button value="csv" color="primary">
+                <div class="radio-label-content">
+                  <mat-icon aria-hidden="true" class="format-icon csv-icon">description</mat-icon>
+                  <span>{{ 'reports.formats.csv' | translate }}</span>
+                </div>
+              </mat-radio-button>
+
               <mat-radio-button value="pdf" color="primary">
                 <div class="radio-label-content">
                   <mat-icon aria-hidden="true" class="format-icon pdf-icon">picture_as_pdf</mat-icon>
@@ -205,8 +212,19 @@
             }
           </mat-form-field>
 
+          <!-- Branch Filter -->
+          <mat-form-field appearance="outline" class="col-half">
+            <mat-label>{{ 'reports.scheduleForm.fields.branch' | translate }}</mat-label>
+            <mat-select formControlName="branch_id">
+              <mat-option value="">{{ 'reports.artifacts.scopeAll' | translate }}</mat-option>
+              @for (branch of branches(); track branch.id) {
+                <mat-option [value]="branch.id">{{ branch.name }}</mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+
           <!-- Supplier Filter -->
-          <mat-form-field appearance="outline" class="full-width">
+          <mat-form-field appearance="outline" class="col-half">
             <mat-label>{{ 'exports.supplierLabel' | translate }}</mat-label>
             <mat-select formControlName="supplier_id">
               <mat-option [value]="''">{{ 'exports.allSuppliers' | translate }}</mat-option>
@@ -220,6 +238,20 @@
         <mat-divider></mat-divider>
 
         <div class="form-actions">
+          <a
+            mat-stroked-button
+            [routerLink]="['/reports/schedule-form']"
+            [queryParams]="{
+              kind: 'savings_ledger',
+              format: form.get('format')?.value,
+              branch_id: form.get('branch_id')?.value || null
+            }"
+            class="schedule-crosslink-btn"
+          >
+            <mat-icon aria-hidden="true">schedule</mat-icon>
+            <span>{{ 'reports.scheduleForm.scheduleAsWeekly' | translate }}</span>
+          </a>
+
           <a mat-stroked-button routerLink="/savings">
             {{ 'savings.outcomeCapture.cancelButton' | translate }}
           </a>
