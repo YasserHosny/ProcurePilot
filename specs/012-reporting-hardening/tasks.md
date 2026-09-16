@@ -117,7 +117,7 @@ reason (no module code yet), ready to drive implementation.
   (replacing the `unsupported_in_phase_1` refusal) with branch-visibility validation, the locale
   field (FR-029), the declared column schemas and currency-grouped aggregation from
   data-model.md, and the 10,000-row cap with the structured over-cap refusal (FR-013).
-- [ ] T015 [US1] Implement the catalogue loader `apps/api/src/procurepilot_api/shared/i18n.py`
+- [x] T015 [US1] Implement the catalogue loader `apps/api/src/procurepilot_api/shared/i18n.py`
   reading `packages/i18n/en.json` and `ar.json` at runtime, and extend
   `apps/api/src/procurepilot_api/modules/exports/renderers.py`: CSV renderer for all kinds
   (UTF-8 BOM prefixed), `spend_by_supplier` and `alerts_summary` renderers with the declared
@@ -126,22 +126,22 @@ reason (no module code yet), ready to drive implementation.
   Arabic-capable PDF through the shaping pipeline (`arabic-reshaper` + `python-bidi` added to
   `apps/api/pyproject.toml`, embedded OFL font under
   `apps/api/src/procurepilot_api/assets/fonts/`, right-to-left layout) per research R8.
-- [ ] T016 [US1] Implement the scheduler entrypoint
+- [x] T016 [US1] Implement the scheduler entrypoint
   `apps/api/src/procurepilot_api/workers/report_scheduler.py`: tick loop with `--once` flag,
   due-row claim via `FOR UPDATE SKIP LOCKED`, next-run advance in the claimed transaction, RQ
   enqueue with deterministic per-period job ids, the immutable schedule snapshot written at
   enqueue, crash-after-upload recovery, and the retention purge pass with
   `reports.artifact_purged` audit events that invalidate issued links.
-- [ ] T017 [US1] Extend `apps/api/src/procurepilot_api/workers/export_worker.py` for scheduled
+- [x] T017 [US1] Extend `apps/api/src/procurepilot_api/workers/export_worker.py` for scheduled
   runs: treat queue payloads as untrusted hints (load the row by id, re-derive tenant and scope
   from the database inside the transaction, refuse mismatches — research R5), schedule-linked
   jobs read their window from the immutable snapshot, use the authorization-pinned reader
   functions, set `locale`, `rule_version`, and `expires_at`, and record `reports.run_*` audit
   events with the FR-011 payload; failed runs leave no completed artifact.
-- [ ] T018 [US1] Extend `apps/api/src/procurepilot_api/modules/tenants/router.py` so
+- [x] T018 [US1] Extend `apps/api/src/procurepilot_api/modules/tenants/router.py` so
   `PATCH /api/v1/tenant` accepts `reporting_timezone` (owner-only, IANA-validated; region,
   currency, tax model stay immutable).
-- [ ] T019 [US1] Write `apps/api/tests/integration/test_report_schedules.py` (CRUD, RBAC
+- [x] T019 [US1] Write `apps/api/tests/integration/test_report_schedules.py` (CRUD, RBAC
   refusal, pause/resume, duplicate refusal) and `apps/api/tests/integration/test_export_download.py`
   (signed URL, expiry, cross-tenant, unauthorised-branch, and purged not found; CSV BOM presence;
   Arabic PDF shaping assertion on connected glyphs and display order), and extend
@@ -152,11 +152,11 @@ reason (no module code yet), ready to drive implementation.
   savings to the ledger, spend to compare), schedules list with pause/resume, cross-links from
   the savings/export screens, cursor pagination, i18n keys in `packages/i18n/en.json` and
   `ar.json`, logical properties, keyboard-reachable actions.
-- [ ] T021 [P] [US1] Build the schedule form in `apps/web/src/app/features/reports/schedule-form/`
+- [x] T021 [P] [US1] Build the schedule form in `apps/web/src/app/features/reports/schedule-form/`
   (kind, format per the contract matrix, filters, weekday, locale) and extend
   `apps/web/src/app/features/savings/export-savings/` for csv, kinds, the branch filter, and the
   "schedule as weekly report" cross-link pre-populating the schedule form.
-- [ ] T022 [US1] Write `apps/web/tests/e2e/reporting-hardening.spec.ts`: schedule create →
+- [x] T022 [US1] Write `apps/web/tests/e2e/reporting-hardening.spec.ts`: schedule create →
   scheduler trigger → artifact appears → download → pause stops generation, in English and
   Arabic, plus the keyboard-only Reports center journey in both directions.
 
@@ -167,14 +167,14 @@ evidence-carrying artifact exactly once per period.
 
 ## Phase 4: User Story 2 — Weekly actionable digests (P2)
 
-- [ ] T023 [US2] Implement digest subscription CRUD and content assembly in
+- [x] T023 [US2] Implement digest subscription CRUD and content assembly in
   `apps/api/src/procurepilot_api/modules/digests/service.py` and `schemas.py`: self-service
   subscriptions (a member manages only their own), branch filter, weekly window content from the
   authorization-pinned readers in the FR-009 section order (verified savings hero, pending
   outcome verifications, pending approvals for the subscriber, anomalies, expiring validity),
   each item with deep link and explicit-currency money where applicable, and default provisioning
   of one active subscription on membership acceptance (research R3).
-- [ ] T024 [US2] Implement the digest renderer and delivery in
+- [x] T024 [US2] Implement the digest renderer and delivery in
   `apps/api/src/procurepilot_api/modules/digests/renderer.py`, the SMTP settings in
   `apps/api/src/procurepilot_api/config.py` (host, port, username, password as `SecretStr`,
   from, tls — no hardcoded fallbacks, `.env.example` placeholders), and the worker
@@ -184,18 +184,18 @@ evidence-carrying artifact exactly once per period.
   untrusted hints (research R5), redact credentials from logs and audit detail, record
   `last_delivery_*` and the `digests.delivery_*` audit events with the FR-011 payload, skip
   inactive memberships, and leave an explicit `email_unconfigured` status otherwise (research R7).
-- [ ] T025 [US2] Implement `GET/POST/PATCH/DELETE /api/v1/digests/subscriptions` and
+- [x] T025 [US2] Implement `GET/POST/PATCH/DELETE /api/v1/digests/subscriptions` and
   `GET /api/v1/digests/latest` (the in-app DigestView) in
   `apps/api/src/procurepilot_api/modules/digests/router.py`.
-- [ ] T026 [US2] Write `apps/api/tests/integration/test_digests.py`: content matches seeded
+- [x] T026 [US2] Write `apps/api/tests/integration/test_digests.py`: content matches seeded
   weekly records; delivery success, failure, and unconfigured paths audited; inactive membership
   skipped; cross-tenant subscription ids not found.
-- [ ] T027 [P] [US2] Build digest settings and the in-app digest view in
+- [x] T027 [P] [US2] Build digest settings and the in-app digest view in
   `apps/web/src/app/features/reports/digest-settings/`: subscription CRUD with one-click
   pause/resume, the dismissible onboarding prompt for the default subscription, honest email
   status ("email not configured" state), the rendered digest in the FR-009 information
   architecture with per-item deep links, i18n in both catalogues, keyboard-reachable.
-- [ ] T028 [US2] Extend `apps/web/tests/e2e/reporting-hardening.spec.ts` with the digest flow:
+- [x] T028 [US2] Extend `apps/web/tests/e2e/reporting-hardening.spec.ts` with the digest flow:
   subscribe → trigger → in-app digest renders with links → status reflects delivery outcome.
 
 **Checkpoint**: a subscriber receives (or reads in-app) a digest whose every section is
