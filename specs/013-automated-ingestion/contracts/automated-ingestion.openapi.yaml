@@ -1,0 +1,535 @@
+openapi: 3.1.0
+info:
+  title: ProcurePilot Automated Ingestion API
+  description: >
+    API contract for R3.0 Automated Ingestion — email forwarding, WhatsApp
+    quotation capture, and supplier catalogue import.
+  version: 3.0.0-draft
+
+paths:
+  /api/v1/tenants/email-config:
+    get:
+      operationId: getEmailConfig
+      summary: Get tenant email ingestion configuration
+      tags: [Ingestion]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Tenant email config
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TenantEmailConfig'
+        '404':
+          description: No email config exists for this tenant
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+    put:
+      operationId: updateEmailConfig
+      summary: Update tenant email ingestion configuration
+      description: Owner only. Creates or updates the tenant's email ingestion settings.
+      tags: [Ingestion]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TenantEmailConfigUpdate'
+      responses:
+        '200':
+          description: Updated config
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TenantEmailConfig'
+        '403':
+          description: Caller is not an owner
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+
+  /api/v1/tenants/email-config/enable:
+    post:
+      operationId: enableEmailIngestion
+      summary: Enable email ingestion for the tenant
+      tags: [Ingestion]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Email ingestion enabled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TenantEmailConfig'
+
+  /api/v1/tenants/email-config/disable:
+    post:
+      operationId: disableEmailIngestion
+      summary: Disable email ingestion for the tenant
+      tags: [Ingestion]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Email ingestion disabled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TenantEmailConfig'
+
+  /api/v1/webhooks/inbound-email:
+    post:
+      operationId: receiveInboundEmail
+      summary: Receive inbound email webhook from SES/Mailgun
+      description: >
+        Called by the email service provider when an email is received at a
+        tenant's forwarding address. Validates the webhook signature, stores
+        the raw email, and enqueues an ingestion job.
+      tags: [Webhooks]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: Provider-specific webhook payload (SES SNS notification or Mailgun POST)
+      responses:
+        '200':
+          description: Email accepted and queued
+        '429':
+          description: Tenant daily rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+
+  /api/v1/capture:
+    post:
+      operationId: captureQuotation
+      summary: Upload a quotation photo or PDF via mobile capture
+      description: >
+        Accepts an image or PDF file with optional supplier attribution.
+        Creates a quotation record with source='capture' and queues extraction.
+      tags: [Ingestion]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Image (JPEG, PNG, HEIC) or PDF file. Max 10 MB.
+                supplier_id:
+                  type: string
+                  format: uuid
+                  description: Optional supplier UUID if known.
+                notes:
+                  type: string
+                  maxLength: 1000
+                  description: Optional free-text context.
+      responses:
+        '201':
+          description: Quotation created and extraction queued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CaptureResponse'
+        '400':
+          description: Invalid file type or size
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '413':
+          description: File exceeds 10 MB limit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+
+  /api/v1/suppliers/{supplier_id}/catalogue-import:
+    post:
+      operationId: importSupplierCatalogue
+      summary: Import a supplier price catalogue from CSV or XLSX
+      description: >
+        Parses the uploaded file, maps columns to the product schema, creates
+        or updates offers, and flags unmatched products for review.
+      tags: [Ingestion]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: supplier_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: CSV or XLSX file. Max 25 MB.
+      responses:
+        '200':
+          description: Import completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CatalogueImportResult'
+        '400':
+          description: Invalid file format or unmappable columns
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Supplier not found (or cross-tenant)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+
+  /api/v1/ingestion/emails:
+    get:
+      operationId: listIngestionEmails
+      summary: List processed inbound emails
+      tags: [Ingestion]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: cursor
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [received, processing, completed, failed, duplicate, rejected]
+        - name: from_domain
+          in: query
+          schema:
+            type: string
+        - name: since
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: until
+          in: query
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: Paginated list of ingestion emails
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IngestionEmailList'
+
+  /api/v1/suppliers/{supplier_id}/catalogue-imports:
+    get:
+      operationId: listCatalogueImports
+      summary: List catalogue import history for a supplier
+      tags: [Ingestion]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: supplier_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: cursor
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        '200':
+          description: Paginated list of catalogue imports
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CatalogueImportList'
+
+  /api/v1/ingestion/stats:
+    get:
+      operationId: getIngestionStats
+      summary: Get ingestion dashboard statistics
+      tags: [Ingestion]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Aggregate ingestion statistics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IngestionStats'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    ErrorEnvelope:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        details:
+          type: object
+        trace_id:
+          type: string
+
+    TenantEmailConfig:
+      type: object
+      required: [id, tenant_id, forwarding_address, enabled, daily_limit]
+      properties:
+        id:
+          type: string
+          format: uuid
+        tenant_id:
+          type: string
+          format: uuid
+        forwarding_address:
+          type: string
+          description: "Format: {tenant_slug}@ingest.procurepilot.com"
+        enabled:
+          type: boolean
+        domain_allowlist:
+          type: array
+          items:
+            type: string
+        daily_limit:
+          type: integer
+        daily_count:
+          type: integer
+        spf_dkim_required:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    TenantEmailConfigUpdate:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+        domain_allowlist:
+          type: array
+          items:
+            type: string
+        daily_limit:
+          type: integer
+          minimum: 1
+          maximum: 1000
+        spf_dkim_required:
+          type: boolean
+
+    CaptureResponse:
+      type: object
+      required: [quotation_id, status]
+      properties:
+        quotation_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [pending_extraction]
+        document_id:
+          type: string
+          format: uuid
+
+    CatalogueImportResult:
+      type: object
+      required: [import_id, status, total_rows, imported_rows, skipped_rows, error_rows]
+      properties:
+        import_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [completed, partial]
+        total_rows:
+          type: integer
+        imported_rows:
+          type: integer
+        skipped_rows:
+          type: integer
+        error_rows:
+          type: integer
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              row:
+                type: integer
+              column:
+                type: string
+              error:
+                type: string
+
+    IngestionEmailSummary:
+      type: object
+      required: [id, from_address, from_domain, subject, status, received_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        from_address:
+          type: string
+        from_domain:
+          type: string
+        subject:
+          type: string
+        status:
+          type: string
+          enum: [received, processing, completed, failed, duplicate, rejected]
+        received_at:
+          type: string
+          format: date-time
+        processed_at:
+          type: string
+          format: date-time
+        attachment_count:
+          type: integer
+        supplier_id:
+          type: string
+          format: uuid
+        supplier_name:
+          type: string
+        match_method:
+          type: string
+          enum: [address, domain, thread, manual]
+        quotation_id:
+          type: string
+          format: uuid
+
+    IngestionEmailList:
+      type: object
+      required: [items, next_cursor]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/IngestionEmailSummary'
+        next_cursor:
+          type: string
+          nullable: true
+
+    CatalogueImportSummary:
+      type: object
+      required: [id, supplier_id, file_name, status, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        supplier_id:
+          type: string
+          format: uuid
+        file_name:
+          type: string
+        file_format:
+          type: string
+          enum: [csv, xlsx]
+        status:
+          type: string
+          enum: [pending, processing, completed, failed]
+        total_rows:
+          type: integer
+        imported_rows:
+          type: integer
+        error_rows:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+        completed_at:
+          type: string
+          format: date-time
+
+    CatalogueImportList:
+      type: object
+      required: [items, next_cursor]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CatalogueImportSummary'
+        next_cursor:
+          type: string
+          nullable: true
+
+    IngestionStats:
+      type: object
+      required: [emails_today, emails_this_week, captures_today, imports_this_week, supplier_match_rate]
+      properties:
+        emails_today:
+          type: integer
+        emails_this_week:
+          type: integer
+        emails_this_month:
+          type: integer
+        captures_today:
+          type: integer
+        captures_this_week:
+          type: integer
+        imports_this_week:
+          type: integer
+        imports_this_month:
+          type: integer
+        supplier_match_rate:
+          type: number
+          format: float
+          description: Percentage of emails auto-matched to a supplier (0.0 – 1.0)
+        extraction_success_rate:
+          type: number
+          format: float
+          description: Percentage of ingested documents successfully extracted (0.0 – 1.0)
