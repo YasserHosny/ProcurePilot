@@ -12,13 +12,17 @@ follows the established wave-based execution pattern with orchestrator/delegate 
 
 ## Delegation Lanes
 
-| Lane | Owner | Scope |
-|---|---|---|
-| **Orchestrator** | Antigravity / Claude | Migrations, RLS policies, schemas, isolation tests, security review, documentation |
-| **Backend** | Claude / OpenCode | Services, workers, API endpoints, integration tests |
-| **Frontend** | Agy | Angular components, i18n, API clients under `apps/web/src/` |
+| Lane | Owner | Model / Tool | Scope |
+|---|---|---|---|
+| **Orchestrator** | Antigravity / Claude | Reasoning / High | Architecture, schema, RLS policies, tenant isolation, security review, release gating |
+| **Backend** | Claude | Claude 3.7 Sonnet / Opus | Complex services, worker loops, webhook signature verification, data orchestrators |
+| **Frontend** | Agy | Antigravity CLI (`agy`) | Angular 19 components, reactive forms, i18n, a11y, routing under `apps/web/src/**` |
+| **Trivial / Fast** | OpenCode | Muse Spark 1.2 Free | Boilerplate schemas, test fixtures, mock data, straightforward unit tests |
 
-Per AGENTS.md: frontend changes under `apps/web/src/**` dispatched to Agy when practical.
+### Delegation & Review Rules
+
+- **Frontend work**: Per [AGENTS.md](file:///media/yasserhosny/My%20Passport/Work/Projects/ProcurePilot/AGENTS.md), frontend implementation under `apps/web/src/**` should be dispatched to Agy when practical and reviewed independently by the orchestrator.
+- **OpenCode (Muse Spark 1.2 Free)**: Reserved strictly for trivial tasks (e.g. static fixtures, straightforward schema boilerplates, unit test mocks). **All diffs produced by OpenCode must be reviewed and verified by Claude or Agy** before landing or merging into the main flow.
 
 ## Wave Plan
 
@@ -106,10 +110,10 @@ Error rows are reported. Price updates on re-import work.
 
 | Task | Lane | Description | Depends on |
 |---|---|---|---|
-| T030 | Backend | Unit tests: email parser + supplier matcher | T009, T010 |
-| T031 | Backend | Integration tests: email ingestion e2e | T011, T012, T014 |
-| T032 | Backend | Integration tests: capture endpoint | T015 |
-| T033 | Backend | Integration tests: catalogue import | T017, T018 |
+| T030 | OpenCode (Muse Spark 1.2 Free) | Unit tests & fixtures: email parser + supplier matcher (reviewed by Claude) | T009, T010 |
+| T031 | Backend (Claude) | Integration tests: email ingestion e2e | T011, T012, T014 |
+| T032 | Backend (Claude) | Integration tests: capture endpoint | T015 |
+| T033 | Backend (Claude) | Integration tests: catalogue import | T017, T018 |
 | T034 | Orchestrator | Tenant isolation tests | All new tables |
 | T035 | Frontend (Agy) | E2E tests: ingestion flows | Wave 5 |
 | T036 | Frontend (Agy) | a11y: ingestion surfaces | Wave 5 |
