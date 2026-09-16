@@ -106,12 +106,7 @@ class ExportService:
     ) -> str:
         with _authenticated_db(self._settings, member) as conn:
             row = _job_row(conn, job_id)
-        if (
-            row.get("status") != "completed"
-            or row.get("storage_bucket") is None
-            or row.get("storage_path") is None
-        ):
-            raise NotFoundError(details={"resource": "export_download"})
+            _enforce_download_visibility(conn, member, row)
         url = ExportStorage(self._settings).create_signed_url(
             bucket=str(row["storage_bucket"]),
             path=str(row["storage_path"]),
@@ -129,6 +124,61 @@ class ExportService:
             },
         )
         return url
+
+
+def _enforce_download_visibility(
+    conn: object,
+    member: CurrentMember,
+    row: dict[str, object],
+) -> None:
+    """FR-005: authenticated job lookup verifies caller branch visibility against the
+    artifact's branch filter, returning not found when unauthorised, purged, or expired."""
+    if (
+        row.get("status") != "completed"
+        or row.get("storage_bucket") is None
+        or row.get("storage_path") is None
+    ):
+        raise NotFoundError(details={"resource": "export_download"})
+
+    expires_at = row.get("expires_at")
+    if expires_at is not None:
+        if isinstance(expires_at, str):
+            try:
+                expires_at = datetime.fromisoformat(expires_at)
+            except ValueError:
+                pass
+        if isinstance(expires_at, datetime):
+            if expires_at.tzinfo is None:
+                expires_at = expires_at.replace(tzinfo=UTC)
+            if expires_at <= datetime.now(UTC):
+                raise NotFoundError(details={"resource": "export_download"})
+
+    if member.role.value == "owner":
+        return
+
+    raw_filters = row.get("filters")
+    filters_dict: dict[str, object] = {}
+    if isinstance(raw_filters, str):
+        try:
+            filters_dict = json.loads(raw_filters)
+        except Exception:
+            filters_dict = {}
+    elif isinstance(raw_filters, dict):
+        filters_dict = raw_filters
+
+    branch_id = filters_dict.get("branch_id")
+    if not branch_id:
+        return
+
+    with conn.cursor() as cur:
+        cur.execute(
+            "select branch_id from branch_role_assignment where membership_id = %s",
+            (member.membership_id,),
+        )
+        assigned = {str(r[0]) for r in cur.fetchall()}
+
+    if assigned and str(branch_id) not in assigned:
+        raise NotFoundError(details={"resource": "export_download"})
 
 
 def _resolved_filters(filters: ExportFilters, workspace: dict[str, object]) -> ExportFilters:

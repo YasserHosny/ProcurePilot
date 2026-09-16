@@ -2243,6 +2243,51 @@
       "generic": "An unexpected error occurred while loading reports data.",
       "retry": "Retry",
       "traceId": "Trace ID: {{id}}"
+    },
+    "exportColumns": {
+      "savings_ledger": {
+        "id": "Saving Reference",
+        "recorded_at": "Recorded Date",
+        "branch_name": "Branch",
+        "supplier_name": "Supplier",
+        "product_name": "Product",
+        "unit": "Unit",
+        "quantity": "Quantity",
+        "baseline_total": "Baseline Total",
+        "actual_total": "Actual Total Paid",
+        "delta_amount": "Verified Saving",
+        "currency": "Currency",
+        "evidence_ref": "Evidence Link"
+      },
+      "spend_by_supplier": {
+        "supplier_name": "Supplier",
+        "tax_number": "Tax Registration Number",
+        "currency": "Currency",
+        "total_spend": "Total Spend",
+        "order_count": "Order Count",
+        "realised_savings": "Verified Savings Realised",
+        "primary_branch": "Primary Branch"
+      },
+      "alerts_summary": {
+        "id": "Alert ID",
+        "triggered_at": "Triggered Date",
+        "alert_type": "Alert Type",
+        "severity": "Severity",
+        "supplier_name": "Supplier",
+        "product_name": "Product",
+        "branch_name": "Branch",
+        "exposure_amount": "Estimated Exposure",
+        "currency": "Currency",
+        "status": "Status",
+        "dismissed_by": "Dismissed By",
+        "dismissal_reason": "Dismissal Reason"
+      }
+    },
+    "pdf": {
+      "generatedAt": "Generated At: {{date}}",
+      "period": "Period: {{start}} to {{end}}",
+      "verifiedRows": "Total records: {{count}}",
+      "emptyResult": "No records matched the requested period."
     }
   }
 }

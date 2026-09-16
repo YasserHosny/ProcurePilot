@@ -63,7 +63,15 @@ class Settings(BaseSettings):
     export_download_url_ttl_seconds: int = Field(
         default=300, validation_alias="EXPORT_DOWNLOAD_URL_TTL_SECONDS", ge=60, le=3600
     )
+    export_retention_days: int = Field(default=90, validation_alias="EXPORT_RETENTION_DAYS", ge=1)
     export_row_cap: int = Field(default=10_000, validation_alias="EXPORT_ROW_CAP", ge=1)
+
+    smtp_host: str | None = Field(default=None, validation_alias="SMTP_HOST")
+    smtp_port: int = Field(default=587, validation_alias="SMTP_PORT")
+    smtp_user: str | None = Field(default=None, validation_alias="SMTP_USER")
+    smtp_password: SecretStr | None = Field(default=None, validation_alias="SMTP_PASSWORD")
+    smtp_tls: bool = Field(default=True, validation_alias="SMTP_TLS")
+    smtp_from: str | None = Field(default=None, validation_alias="SMTP_FROM")
     matching_auto_accept_threshold: float = Field(
         default=0.9200, validation_alias="MATCHING_AUTO_ACCEPT_THRESHOLD", ge=0, le=1
     )

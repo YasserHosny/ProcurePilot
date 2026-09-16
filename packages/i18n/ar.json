@@ -2243,6 +2243,51 @@
       "generic": "حدث خطأ غير متوقع أثناء تحميل بيانات التقارير.",
       "retry": "إعادة المحاولة",
       "traceId": "معرف التتبع: {{id}}"
+    },
+    "exportColumns": {
+      "savings_ledger": {
+        "id": "مرجع الوفر",
+        "recorded_at": "تاريخ التسجيل",
+        "branch_name": "الفرع",
+        "supplier_name": "المورد",
+        "product_name": "المنتج",
+        "unit": "الوحدة",
+        "quantity": "الكمية",
+        "baseline_total": "إجمالي خط الأساس",
+        "actual_total": "إجمالي المدفوع الفعلي",
+        "delta_amount": "الوفر المؤكد",
+        "currency": "العملة",
+        "evidence_ref": "رابط الإثبات"
+      },
+      "spend_by_supplier": {
+        "supplier_name": "المورد",
+        "tax_number": "الرقم الضريبي",
+        "currency": "العملة",
+        "total_spend": "إجمالي الإنفاق",
+        "order_count": "عدد الطلبات",
+        "realised_savings": "الوفورات المحققة المؤكدة",
+        "primary_branch": "الفرع الرئيسي"
+      },
+      "alerts_summary": {
+        "id": "معرف التنبيه",
+        "triggered_at": "تاريخ التنبيه",
+        "alert_type": "نوع التنبيه",
+        "severity": "مستوى الخطورة",
+        "supplier_name": "المورد",
+        "product_name": "المنتج",
+        "branch_name": "الفرع",
+        "exposure_amount": "الأثر المالي التقديري",
+        "currency": "العملة",
+        "status": "الحالة",
+        "dismissed_by": "تم الاستبعاد بواسطة",
+        "dismissal_reason": "سبب الاستبعاد"
+      }
+    },
+    "pdf": {
+      "generatedAt": "تاريخ الإنشاء: {{date}}",
+      "period": "الفترة: من {{start}} إلى {{end}}",
+      "verifiedRows": "إجمالي السجلات: {{count}}",
+      "emptyResult": "لم يتم العثور على سجلات مطابقة للفترة المحددة."
     }
   }
 }

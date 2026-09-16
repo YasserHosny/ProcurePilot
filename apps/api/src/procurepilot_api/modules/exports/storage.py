@@ -22,11 +22,12 @@ class ExportStorage:
     ) -> tuple[str, str, str]:
         bucket = self._settings.supabase_exports_bucket
         path = f"{tenant_id}/savings/{job_id}.{format}"
-        content_type = (
-            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            if format == "xlsx"
-            else "application/pdf"
-        )
+        if format == "xlsx":
+            content_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        elif format == "csv":
+            content_type = "text/csv; charset=utf-8"
+        else:
+            content_type = "application/pdf"
         try:
             client = create_client(
                 self._settings.supabase_url,
@@ -40,6 +41,16 @@ class ExportStorage:
         except Exception as exc:
             raise ServiceUnavailableError(details={"dependency": "supabase_storage"}) from exc
         return bucket, path, f"/api/v1/exports/{job_id}/download"
+
+    def delete_object(self, *, bucket: str, path: str) -> None:
+        try:
+            client = create_client(
+                self._settings.supabase_url,
+                self._settings.supabase_service_role_key.get_secret_value(),
+            )
+            client.storage.from_(bucket).remove([path])
+        except Exception:
+            pass
 
     def create_signed_url(self, *, bucket: str, path: str, ttl_seconds: int) -> str:
         try:

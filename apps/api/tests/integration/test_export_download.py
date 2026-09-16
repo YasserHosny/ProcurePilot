@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import psycopg
 import pytest
@@ -15,6 +15,7 @@ from integration.smart_compare_helpers import (
 )
 from integration.value_proof_helpers import export_request
 from procurepilot_api.errors import NotFoundError
+from procurepilot_api.modules.auth.jwt import MemberRole
 from procurepilot_api.modules.exports import service as export_service_module
 from procurepilot_api.modules.exports.service import ExportService
 from procurepilot_api.modules.exports.storage import ExportStorage
@@ -183,5 +184,73 @@ def test_download_for_missing_job_returns_not_found(
             ExportService(settings).create_download_url(
                 member=context.member,
                 job_id=UUID("00000000-0000-0000-0000-000000000000"),
+                bearer_token="caller-token",
+            )
+
+
+def test_download_unauthorised_branch_returns_not_found(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """FR-005: download for artifact with branch filter returns not found if
+    caller is not assigned to that branch.
+    """
+    settings = settings_for_test_db(monkeypatch)
+    with committed_smart_context("export-branch-iso") as context:
+        branch_a = uuid4()
+        branch_b = uuid4()
+        # Seed two branches
+        with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    insert into branch (id, tenant_id, name)
+                    values (%s, %s, 'Branch A'), (%s, %s, 'Branch B')
+                    """,
+                    (branch_a, context.workspace.tenant_id, branch_b, context.workspace.tenant_id),
+                )
+                # Assign member only to branch A
+                cur.execute(
+                    """
+                    insert into branch_role_assignment
+                      (id, tenant_id, branch_id, membership_id, role)
+                    values (gen_random_uuid(), %s, %s, %s, 'branch_manager')
+                    """,
+                    (context.workspace.tenant_id, branch_a, context.member.membership_id),
+                )
+            conn.commit()
+
+        # Create completed export job filtered to branch B
+        with psycopg.connect(TEST_DATABASE_URL or "", row_factory=dict_row) as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    insert into export_job
+                      (tenant_id, requested_by, kind, format, filters, status,
+                       storage_bucket, storage_path, download_url, completed_at)
+                    values (%s, %s, 'spend_by_supplier', 'csv', %s, 'completed',
+                            'exports', 'fake/path.csv', '/api/v1/exports/fake/download', now())
+                    returning id
+                    """,
+                    (
+                        context.workspace.tenant_id,
+                        context.member.membership_id,
+                        Jsonb(
+                            {
+                                "branch_id": str(branch_b),
+                                "period_start": "2026-09-01",
+                                "period_end": "2026-09-07",
+                            }
+                        ),
+                    ),
+                )
+                job_id = UUID(str(dict(cur.fetchone())["id"]))
+            conn.commit()
+
+        # Non-owner branch-scoped member accessing branch B export must raise NotFoundError
+        non_owner_member = context.member.model_copy(update={"role": MemberRole.buyer})
+        with pytest.raises(NotFoundError):
+            ExportService(settings).create_download_url(
+                member=non_owner_member,
+                job_id=job_id,
                 bearer_token="caller-token",
             )

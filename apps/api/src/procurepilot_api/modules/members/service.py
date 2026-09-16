@@ -46,7 +46,7 @@ def load_me_for_token(settings: Settings, bearer_token: str, member: CurrentMemb
     client = authenticated_client(settings, bearer_token)
     tenant_rows = _rows(
         client.table("tenant")
-        .select("id,name,slug,region,currency,tax_model,default_locale,created_at")
+        .select("id,name,slug,region,currency,tax_model,default_locale,reporting_timezone,created_at")
         .eq("id", str(member.tenant_id))
         .limit(2)
         .execute()

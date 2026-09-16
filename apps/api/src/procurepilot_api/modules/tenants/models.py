@@ -3,8 +3,9 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Literal
 from uuid import UUID
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from procurepilot_api.modules.auth.jwt import MemberRole
 
@@ -32,12 +33,25 @@ class Tenant(BaseModel):
     currency: str
     tax_model: str
     default_locale: Locale
+    reporting_timezone: str = "UTC"
     created_at: datetime | None = None
 
 
 class TenantUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=200)
     default_locale: Locale | None = None
+    reporting_timezone: str | None = None
+
+    @field_validator("reporting_timezone")
+    @classmethod
+    def validate_timezone(cls, v: str | None) -> str | None:
+        if v is None:
+            return None
+        try:
+            ZoneInfo(v)
+        except (ZoneInfoNotFoundError, ValueError) as e:
+            raise ValueError(f"Invalid IANA timezone: {v}") from e
+        return v
 
 
 class PlatformInvitation(BaseModel):
@@ -81,4 +95,5 @@ class TenantRow(BaseModel):
     currency: str
     tax_model: str
     default_locale: Locale
+    reporting_timezone: str = "UTC"
     created_at: datetime | None = None
