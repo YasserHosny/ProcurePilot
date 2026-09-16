@@ -199,9 +199,9 @@ def test_digest_worker_execution_and_skip_inactive(
         # 3. Test skip inactive membership
         with psycopg.connect(TEST_DATABASE_URL or "") as conn:
             with conn.cursor() as cur:
-                # Suspend membership
+                # Set membership status to removed
                 cur.execute(
-                    "update membership set status = 'suspended' where id = %s",
+                    "update membership set status = 'removed' where id = %s",
                     (member.membership_id,),
                 )
                 # Reset next_run_at to past
