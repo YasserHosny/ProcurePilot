@@ -6,39 +6,39 @@
 
 ## Phase 1 — Data Model & Infrastructure (Foundation)
 
-- [ ] **T001** — Migration: `ingestion_email_log` table + RLS + indexes
+- [x] **T001** — Migration: `ingestion_email_log` table + RLS + indexes
   - Create table with all columns from data-model.md
   - ENABLE + FORCE RLS with `USING` and `WITH CHECK`
   - Unique constraint on `(tenant_id, message_id)`
   - File: `supabase/migrations/20260917000001_ingestion_email_log.sql`
 
-- [ ] **T002** — Migration: `ingestion_jobs` table + RLS + indexes
+- [x] **T002** — Migration: `ingestion_jobs` table + RLS + indexes
   - Create table with `FOR UPDATE SKIP LOCKED` pattern support
   - ENABLE + FORCE RLS
   - Partial index on `(status, created_at) WHERE status = 'pending'`
   - File: `supabase/migrations/20260917000002_ingestion_jobs.sql`
 
-- [ ] **T003** — Migration: `tenant_email_config` table + RLS + indexes
+- [x] **T003** — Migration: `tenant_email_config` table + RLS + indexes
   - Create table with unique constraints on `tenant_id` and `forwarding_address`
   - ENABLE + FORCE RLS
   - File: `supabase/migrations/20260917000003_tenant_email_config.sql`
 
-- [ ] **T004** — Migration: `catalogue_imports` table + RLS + indexes
+- [x] **T004** — Migration: `catalogue_imports` table + RLS + indexes
   - Create table
   - ENABLE + FORCE RLS
   - File: `supabase/migrations/20260917000004_catalogue_imports.sql`
 
-- [ ] **T005** — Migration: `quotations` add `source` + `ingestion_email_id` columns
+- [x] **T005** — Migration: `quotations` add `source` + `ingestion_email_id` columns
   - Add `source` column with default `'upload'`
   - Backfill existing rows
   - Add `ingestion_email_id` FK
   - File: `supabase/migrations/20260917000005_quotations_source.sql`
 
-- [ ] **T006** — Migration: `suppliers` add `email_domains` column
+- [x] **T006** — Migration: `suppliers` add `email_domains` column
   - Add `email_domains text[]` with GIN index
   - File: `supabase/migrations/20260917000006_suppliers_email_domains.sql`
 
-- [ ] **T007** — Migration: `ingestion-raw` storage bucket + RLS
+- [x] **T007** — Migration: `ingestion-raw` storage bucket + RLS
   - Create bucket for raw email storage
   - Tenant-scoped RLS policy
   - File: `supabase/migrations/20260917000007_ingestion_storage.sql`
