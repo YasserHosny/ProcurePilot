@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
+from uuid import uuid4
 
 import psycopg
 import pytest
@@ -197,8 +198,26 @@ def test_digest_worker_execution_and_skip_inactive(
         assert stats_email["email_unconfigured"] >= 1
 
         # 3. Test skip inactive membership
+        second_user_id = uuid4()
         with psycopg.connect(TEST_DATABASE_URL or "") as conn:
             with conn.cursor() as cur:
+                # Add another owner so removing member does not violate the owner guard trigger
+                cur.execute(
+                    "insert into auth.users (id, email) values (%s, %s)",
+                    (second_user_id, f"{second_user_id}@example.com"),
+                )
+                cur.execute(
+                    """
+                    insert into membership (id, tenant_id, user_id, email, role, status)
+                    values (%s, %s, %s, %s, 'owner', 'active')
+                    """,
+                    (
+                        uuid4(),
+                        context.workspace.tenant_id,
+                        second_user_id,
+                        f"{second_user_id}@example.com",
+                    ),
+                )
                 # Set membership status to removed
                 cur.execute(
                     "update membership set status = 'removed' where id = %s",
@@ -211,6 +230,12 @@ def test_digest_worker_execution_and_skip_inactive(
                 )
             conn.commit()
 
-        stats_inactive = tick(settings)
-        assert stats_inactive["claimed"] >= 1
-        assert stats_inactive["skipped"] >= 1
+        try:
+            stats_inactive = tick(settings)
+            assert stats_inactive["claimed"] >= 1
+            assert stats_inactive["skipped"] >= 1
+        finally:
+            with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+                with conn.cursor() as cur:
+                    cur.execute("delete from auth.users where id = %s", (second_user_id,))
+                conn.commit()
