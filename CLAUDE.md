@@ -110,18 +110,12 @@ directions.
 
 ## Current phase
 
-Phase 1 (chunks 4.1–4.6 / R1.0–R1.5, Procurement Intelligence MVP) shipped to `main` on
-2026-08-22 (PR #2). The roadmap's G1 → Phase 2 gate (≥10 verified savings, ≥8 paying customers,
-accuracy targets against the Phase 0 benchmark) has not been independently evidenced in this repo
-— the user explicitly chose to proceed into Phase 2 build work anyway on 2026-08-22, overriding
-the gate rather than waiting for it. Phase 2 (Team Workflow + Mobile) is now active. Release R2.0
-— Organisation model (branches, cost centres, roles/permissions, budgets, org settings) — is
-complete (T001-T046) and open as PR #8 against `main`, not yet merged. Release R2.1 — Requests +
-Approvals (purchase request creation, threshold-based approval routing with delegation, budget
-check, audit log, approval queue) — is now in planning on branch `008-requests-approvals`
-(spec/plan/research/data-model/contracts/tasks committed; implementation not yet started). See
-`docs/roadmap/procurepilot_roadmap.md` §7 for the full Phase 2 scope and release breakdown
-(R2.0–R2.5).
+Phase 2 (releases R2.0–R2.5, Team Workflow + Mobile + Intelligence Hardening) is complete, merged
+to `main`, and fully verified across all CI gates (CI run #35146371910). The G2 stage gate evaluation
+is recorded in `docs/quality/g2-stage-gate-evaluation.md` and authorized via ADR-016. The project is
+initiating Phase 3 (Connected Procurement, starting with R3.0 Automated Ingestion: email forwarding +
+WhatsApp quotation capture). See `docs/roadmap/procurepilot_roadmap.md` §8 for the Phase 3 scope
+breakdown (R3.0–R3.4).
 
 <!-- MANUAL ADDITIONS START -->
 <!-- MANUAL ADDITIONS END -->

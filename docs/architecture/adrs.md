@@ -209,3 +209,22 @@
   - Both the API and the extraction worker share the `procurepilot-logging` package,
     ensuring identical log format across all services.
   - Log level is configurable at deploy time via `API_LOG_LEVEL` without code changes.
+
+## ADR-016 — G2 Stage Gate Evaluation & Transition to Phase 3
+
+- **Status:** Accepted (recorded transition and evaluation)
+- **Context:** Phase 2 ("Workflow Expansion", releases R2.0–R2.5) engineering scope completed with
+  the close-out of Wave 18 (`012-reporting-hardening`). All technical gates passed in CI run
+  `35146371910` with 1000 backend tests, 343 web unit tests, Playwright E2E suites, axe-core WCAG
+  2.1 AA a11y across English and Arabic, and RLS tenant isolation all verified green. The roadmap's
+  G2 exit criteria (§2.3) require ≥70% workflow-origination, mobile adoption target met, and ≥90%
+  retention — business adoption metrics that depend on live multi-month pilot cohort usage.
+- **Decision:** Formally record software completion of Phase 2 in `docs/quality/g2-stage-gate-evaluation.md`
+  and authorize the engineering transition into Phase 3 ("Connected Procurement", starting with R3.0
+  Automated Ingestion: email forwarding + WhatsApp capture), mirroring the precedent established by
+  ADR-010 for Phase 1→Phase 2.
+- **Consequences:**
+  - `AGENTS.md` and `CLAUDE.md` updated to reflect Phase 2 complete and Phase 3 initiation.
+  - Development may proceed into Phase 3 specification, architecture, and implementation.
+  - Third-party penetration testing is scoped in `docs/operations/pentest-scope.md` and ready for
+    external engagement prior to general commercial availability.

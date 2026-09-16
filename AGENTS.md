@@ -1,6 +1,6 @@
 # ProcurePilot — Development Guidelines
 
-Last updated: 2026-09-14 · Active feature: `012-reporting-hardening` (R2.5)
+Last updated: 2026-09-17 · Phase: Phase 2 Complete (G2 Gate Evaluated) · Target: Phase 3 (Connected Procurement)
 
 ProcurePilot turns fragmented supplier information into trusted, comparable purchasing
 decisions and proves the money saved. Read `.specify/memory/constitution.md` before writing
@@ -112,11 +112,11 @@ directions.
 
 ## Current phase
 
-Phase 1 (Procurement Intelligence MVP, web). R2.5 `012-reporting-hardening` is the active
-feature, executing in waves 16–18 per `docs/operations/parallel-execution-plan-wave16.md`
-(Wave 15 planning + critiques is merged). **Do not implement Phase 2+ features** — requests,
-approvals, branch-scoped workflows, budgets, mobile, integrations — until the corresponding
-stage gate is passed. Sketching is allowed; building is not.
+Phase 2 (Workflow Expansion, releases R2.0–R2.5) is complete and verified across all technical
+gates (CI run #35146371910). The G2 stage gate evaluation is recorded in
+`docs/quality/g2-stage-gate-evaluation.md` and authorized via ADR-016. The project is transitioning
+into Phase 3 (Connected Procurement, starting with R3.0 Automated Ingestion: email forwarding +
+WhatsApp capture). Phase 4+ features remain out of scope until corresponding gates are reached.
 
 <!-- MANUAL ADDITIONS START -->
 ## Local App Restart Notes
