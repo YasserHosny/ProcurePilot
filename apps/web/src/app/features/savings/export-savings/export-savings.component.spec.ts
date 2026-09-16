@@ -56,7 +56,7 @@ describe('ExportSavingsComponent (T040)', () => {
   };
 
   beforeEach(async () => {
-    mockApiService = jasmine.createSpyObj<ApiService>('ApiService', ['suppliers']);
+    mockApiService = jasmine.createSpyObj<ApiService>('ApiService', ['suppliers', 'listBranches']);
     mockExportsApiService = jasmine.createSpyObj<ExportsApiService>('ExportsApiService', [
       'createExport',
       'getExportJob',
@@ -72,6 +72,9 @@ describe('ExportSavingsComponent (T040)', () => {
 
     mockApiService.suppliers.and.returnValue(
       of({ items: [{ id: 'supp-1', name: 'Supplier A', status: 'active' as const, created_at: '' }], next_cursor: null }),
+    );
+    mockApiService.listBranches.and.returnValue(
+      of({ items: [], total: 0, next_cursor: null }),
     );
 
     await TestBed.configureTestingModule({

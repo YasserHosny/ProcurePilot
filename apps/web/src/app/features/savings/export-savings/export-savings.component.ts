@@ -147,7 +147,7 @@ export class ExportSavingsComponent implements OnInit {
         period_start: startDate.toISOString().split('T')[0],
         period_end: endDate.toISOString().split('T')[0],
         supplier_id: fv.supplier_id ? fv.supplier_id : null,
-        branch_id: fv.branch_id ? fv.branch_id : null,
+        ...(fv.branch_id ? { branch_id: fv.branch_id } : {}),
       },
     };
 

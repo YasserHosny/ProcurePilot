@@ -2,6 +2,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
+import { provideRouter } from '@angular/router';
 import { TranslateModule } from '@ngx-translate/core';
 
 import type { ReportArtifact, ReportSchedule } from './reports-api';
@@ -62,21 +63,22 @@ describe('ReportsCenterComponent', () => {
       schedule_id: null,
       kind: 'alerts_summary',
       format: 'pdf',
-      status: 'expired',
+      status: 'queued',
       filters: {
-        period_start: '2026-06-01',
-        period_end: '2026-06-30',
+        period_start: '2026-08-15',
+        period_end: '2026-08-22',
         supplier_id: null,
         branch_id: null,
       },
       locale: 'en',
-      row_count: 50,
-      rule_version: 'v1.1.0',
+      row_count: null,
+      rule_version: 'v1.2.0',
       download_url: null,
-      expires_at: '2026-07-31T23:59:59Z',
+      expires_at: null,
       error: null,
-      created_at: '2026-07-01T00:00:00Z',
-      completed_at: '2026-07-01T00:00:15Z',
+      created_at: '2026-09-03T08:00:00Z',
+      started_at: null,
+      completed_at: null,
     },
   ];
 
@@ -85,7 +87,7 @@ describe('ReportsCenterComponent', () => {
       id: 'sch-001',
       kind: 'savings_ledger',
       format: 'csv',
-      weekday: 0,
+      weekday: 1,
       filters: {
         supplier_id: null,
         branch_id: null,
@@ -93,10 +95,10 @@ describe('ReportsCenterComponent', () => {
       locale: 'en',
       status: 'active',
       is_active: true,
-      next_run_at: '2026-09-21T02:00:00Z',
-      last_run_at: '2026-09-14T02:00:00Z',
-      rule_version: '',
-      created_at: '2026-08-01T12:00:00Z',
+      next_run_at: '2026-09-15T02:00:00Z',
+      last_run_at: '2026-09-08T02:00:00Z',
+      rule_version: 'v1.2.0',
+      created_at: '2026-08-01T10:00:00Z',
       updated_at: '2026-08-01T12:00:00Z',
     },
     {
@@ -126,6 +128,7 @@ describe('ReportsCenterComponent', () => {
         provideHttpClient(),
         provideHttpClientTesting(),
         provideNoopAnimations(),
+        provideRouter([]),
       ],
     }).compileComponents();
 
