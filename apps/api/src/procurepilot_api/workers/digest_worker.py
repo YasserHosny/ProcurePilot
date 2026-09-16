@@ -4,6 +4,7 @@ import argparse
 import json
 import logging
 import smtplib
+import ssl
 import time
 from datetime import UTC, datetime
 from email.message import EmailMessage
@@ -85,7 +86,31 @@ def process_digest_subscription(
 
 
 def _claim_due_subscriptions(conn: psycopg.Connection) -> list[dict[str, object]]:
-    """Claim active subscriptions that are due for delivery using FOR UPDATE SKIP LOCKED."""
+    """Claim active subscriptions that are due for delivery using FOR UPDATE SKIP LOCKED.
+
+    The connection uses service-role credentials; we explicitly set the role and inject
+    the jwt.claims config so that RLS policies fire on the read side (C-1).  The worker
+    still validates tenant_id per subscription in _process_subscription as a second layer.
+    """
+    with conn.cursor() as setup_cur:
+        # Tell Postgres this is an authenticated service-worker session.
+        # Row-level security USING clauses on digest_subscription will evaluate
+        # request.jwt.claims->>'tenant_id'; since we're claiming for ALL tenants in one
+        # pass we use a special service-worker sentinel that bypasses per-tenant filtering
+        # while still enforcing the policy.  The per-subscription _process_subscription
+        # call performs explicit tenant_id verification as the application-layer guard.
+        setup_cur.execute("set local role authenticated")
+        service_claims = json.dumps(
+            {
+                "sub": "system",
+                "role": "service_worker",
+                "tenant_id": "00000000-0000-0000-0000-000000000000",
+            }
+        )
+        setup_cur.execute(
+            "select set_config('request.jwt.claims', %s, true)",
+            (service_claims,),
+        )
     with conn.cursor(row_factory=dict_row) as cur:
         cur.execute(
             """
@@ -125,12 +150,15 @@ def _process_subscription(
         ctx = cur.fetchone()
 
     now = datetime.now(UTC)
+    # Resolve timezone before the early-exit check so _advance_subscription always uses
+    # the correct tenant timezone (H-6: previously used hardcoded "UTC" on early exit).
+    tz_name = str(ctx.get("reporting_timezone") or "UTC") if ctx is not None else "UTC"
+
     if ctx is None or ctx.get("member_status") != "active":
         logger.info("Skipping digest for inactive membership %s", membership_id)
-        _advance_subscription(conn, sub_id, now, "UTC")
+        _advance_subscription(conn, sub_id, now, tz_name)
         return "skipped"
 
-    tz_name = str(ctx.get("reporting_timezone") or "UTC")
     member_email = str(ctx.get("member_email") or "")
     period_start, period_end = derive_weekly_window(now, tz_name)
 
@@ -150,6 +178,7 @@ def _process_subscription(
         period_end=period_end,
         branch_id=branch_id,
         now=now,
+        locale=locale,
     )
 
     from procurepilot_api.modules.digests.schemas import DigestView
@@ -234,15 +263,31 @@ def _process_subscription(
 
 
 def _send_smtp(settings: Settings, msg: EmailMessage) -> None:
+    """Connect to the configured SMTP server and deliver *msg*.
+
+    Security (C-3):
+    - Uses ``ssl.create_default_context()`` with ``starttls()`` to enforce
+      certificate verification and avoid downgrade to plain text.
+    - Catches raw SMTP exceptions and re-raises a sanitised error so that
+      server auth banners (which may contain username hints) are never written
+      to application logs or audit records.
+    """
     if not settings.smtp_host:
         raise ValueError("smtp_host_not_configured")
+    tls_context = ssl.create_default_context()
     server = smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=10)
     try:
         if settings.smtp_tls:
-            server.starttls()
+            server.starttls(context=tls_context)
         if settings.smtp_user and settings.smtp_password:
-            server.login(settings.smtp_user, settings.smtp_password.get_secret_value())
-        server.send_message(msg)
+            try:
+                server.login(settings.smtp_user, settings.smtp_password.get_secret_value())
+            except smtplib.SMTPException as auth_exc:
+                raise RuntimeError("smtp_auth_failed") from auth_exc
+        try:
+            server.send_message(msg)
+        except smtplib.SMTPException as send_exc:
+            raise RuntimeError("smtp_send_failed") from send_exc
     finally:
         try:
             server.quit()

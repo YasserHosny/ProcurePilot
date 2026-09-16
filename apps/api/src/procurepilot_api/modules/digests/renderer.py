@@ -58,8 +58,9 @@ def render_digest(
                     f" [{item.money.amount:,.2f} {item.money.currency}]" if item.money else ""
                 )
                 link = urljoin(web_base_url, item.deep_link)
+                action_label = t("digests.settings.viewAction", locale)
                 text_lines.append(f"  * {item.label}{money_str}")
-                text_lines.append(f"    Action: {link}")
+                text_lines.append(f"    {action_label}: {link}")
         text_lines.append("")
 
     footer_text = t("digests.email.footer", locale)
@@ -110,7 +111,7 @@ def render_digest(
                     "</div>"
                     "<div style='margin-top: 4px; font-size: 12px;'>"
                     f"<a href='{item_url}' style='color: #2563eb; text-decoration: none;'>"
-                    "View &rarr;</a>"
+                    f"{html.escape(t('digests.settings.viewAction', locale))} &rarr;</a>"
                     "</div>"
                     "</div>"
                 )

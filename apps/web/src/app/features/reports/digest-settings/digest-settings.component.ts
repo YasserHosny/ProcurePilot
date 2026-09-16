@@ -68,9 +68,9 @@ export class DigestSettingsComponent implements OnInit {
         this.isLoadingView.set(false);
         this.digestView.set(view);
       },
-      error: (err) => {
+      error: () => {
         this.isLoadingView.set(false);
-        this.viewError.set(err?.message || 'Failed to load weekly digest.');
+        this.viewError.set(this.translate.instant('digests.settings.loadError'));
       },
     });
   }
@@ -83,9 +83,9 @@ export class DigestSettingsComponent implements OnInit {
         this.isLoadingSubs.set(false);
         this.subscriptions.set(res.items || []);
       },
-      error: (err) => {
+      error: () => {
         this.isLoadingSubs.set(false);
-        this.subsError.set(err?.message || 'Failed to load subscriptions.');
+        this.subsError.set(this.translate.instant('digests.settings.loadSubsError'));
       },
     });
   }
@@ -100,14 +100,18 @@ export class DigestSettingsComponent implements OnInit {
           subs.map((s) => (s.id === updated.id ? updated : s))
         );
         this.snackBar.open(
-          this.translate.instant('digests.settings.statusUpdated') || 'Status updated',
+          this.translate.instant('digests.settings.statusUpdated'),
           undefined,
           { duration: 3000 }
         );
       },
-      error: (err) => {
+      error: () => {
         this.isMutating.set(false);
-        this.snackBar.open(err?.message || 'Update failed', undefined, { duration: 4000 });
+        this.snackBar.open(
+          this.translate.instant('digests.settings.updateFailed'),
+          undefined,
+          { duration: 4000 }
+        );
       },
     });
   }
@@ -122,14 +126,18 @@ export class DigestSettingsComponent implements OnInit {
           subs.map((s) => (s.id === updated.id ? updated : s))
         );
         this.snackBar.open(
-          this.translate.instant('digests.settings.channelUpdated') || 'Delivery channel updated',
+          this.translate.instant('digests.settings.channelUpdated'),
           undefined,
           { duration: 3000 }
         );
       },
-      error: (err) => {
+      error: () => {
         this.isMutating.set(false);
-        this.snackBar.open(err?.message || 'Update failed', undefined, { duration: 4000 });
+        this.snackBar.open(
+          this.translate.instant('digests.settings.updateFailed'),
+          undefined,
+          { duration: 4000 }
+        );
       },
     });
   }

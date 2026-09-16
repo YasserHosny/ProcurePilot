@@ -16,7 +16,7 @@ from integration.smart_compare_helpers import (
 from integration.value_proof_helpers import export_request, fetch_export_jobs, record_purchase
 from procurepilot_api.errors import NotFoundError, ServiceUnavailableError
 from procurepilot_api.modules.exports import service as export_service_module
-from procurepilot_api.modules.exports.service import ExportService, verified_savings_for_export
+from procurepilot_api.modules.exports.service import ExportService
 from procurepilot_api.modules.offers.service import _authenticated_db
 from procurepilot_api.modules.savings.service import SavingsService
 from procurepilot_api.workers import export_worker
@@ -69,8 +69,10 @@ def test_verified_savings_export_query_excludes_pending_and_handles_empty_period
         record_purchase(service, context, actual="9.0000")
 
         with _authenticated_db(settings, context.member) as conn:
-            rows = verified_savings_for_export(
+            rows = export_worker._fetch_report_rows(
                 conn,
+                tenant_id=context.workspace.tenant_id,
+                kind="savings_ledger",
                 filters={
                     "period_start": "2026-01-01",
                     "period_end": "2026-12-31",
@@ -78,8 +80,10 @@ def test_verified_savings_export_query_excludes_pending_and_handles_empty_period
                     "branch_id": None,
                 },
             )
-            empty = verified_savings_for_export(
+            empty = export_worker._fetch_report_rows(
                 conn,
+                tenant_id=context.workspace.tenant_id,
+                kind="savings_ledger",
                 filters={
                     "period_start": "2000-01-01",
                     "period_end": "2000-12-31",
@@ -88,7 +92,7 @@ def test_verified_savings_export_query_excludes_pending_and_handles_empty_period
                 },
             )
 
-        assert [row["id"] for row in rows] == [verified.id]
+        assert [row["saving_id"] for row in rows] == [verified.id]
         assert empty == []
 
 

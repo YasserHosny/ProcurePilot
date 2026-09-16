@@ -147,8 +147,7 @@ export class ScheduleFormComponent implements OnInit {
         this.isSubmitting.set(false);
         if (err.status === 409) {
           this.errorMessage.set(
-            this.translate.instant('reports.scheduleForm.errors.conflict') ||
-              'A schedule with these exact parameters already exists.'
+            this.translate.instant('reports.scheduleForm.errors.conflict')
           );
         } else {
           const body = err.error as ApiErrorShape | null;

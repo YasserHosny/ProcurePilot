@@ -33,7 +33,7 @@ test.describe('Reporting Hardening & Actionable Digests (T022, T028)', () => {
     await page.waitForURL('**/reports/schedule-form**');
 
     // Verify form rendered
-    await expect(page.locator('.form-title')).toBeVisible();
+    await expect(page.locator('.page-title')).toBeVisible();
 
     // Select format and submit
     await page.locator('mat-select[formControlName="format"]').click();
@@ -50,12 +50,12 @@ test.describe('Reporting Hardening & Actionable Digests (T022, T028)', () => {
     await page.goto('/savings/export');
     await expect(page.locator('.page-title')).toContainText('Export Savings Ledger');
 
-    const scheduleLink = page.locator('.schedule-link-btn');
+    const scheduleLink = page.locator('.schedule-crosslink-btn');
     await expect(scheduleLink).toBeVisible();
     await scheduleLink.click();
 
     await page.waitForURL('**/reports/schedule-form?kind=savings_ledger**');
-    await expect(page.locator('.form-title')).toBeVisible();
+    await expect(page.locator('.page-title')).toBeVisible();
   });
 
   test('digest settings displays onboarding prompt, allows channel/status toggle, and renders in-app digest', async ({ page }) => {
@@ -75,7 +75,7 @@ test.describe('Reporting Hardening & Actionable Digests (T022, T028)', () => {
     await expect(page.locator('.digest-view-card .card-title')).toBeVisible();
 
     // If subscription card is present, test toggle interaction
-    const subCard = page.locator('.subscription-card').first();
+    const subCard = page.locator('.sub-item').first();
     if (await subCard.isVisible()) {
       const toggleBtn = subCard.locator('button').first();
       await expect(toggleBtn).toBeEnabled();

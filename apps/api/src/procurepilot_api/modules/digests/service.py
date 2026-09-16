@@ -32,6 +32,7 @@ from procurepilot_api.modules.reports.schedules import (
     next_run_after,
 )
 from procurepilot_api.shared.audit import AuditEventCreate, get_audit_writer
+from procurepilot_api.shared.i18n import t
 from procurepilot_api.shared.logging import get_trace_id
 
 
@@ -263,6 +264,7 @@ class DigestsService:
 
             now = datetime.now(UTC)
             period_start, period_end = derive_weekly_window(now, tz_name)
+            sub_locale = str(sub_row.get("locale") or "en")
             sections = self._assemble_sections(
                 conn,
                 tenant_id=member.tenant_id,
@@ -271,6 +273,7 @@ class DigestsService:
                 period_end=period_end,
                 branch_id=branch_id,
                 now=now,
+                locale=sub_locale,
             )
 
         if last_status not in ("succeeded", "failed", "email_unconfigured"):
@@ -292,10 +295,29 @@ class DigestsService:
         membership_id: UUID,
         email: str | None = None,
         bearer_token: str | None = None,
+        member: CurrentMember | None = None,
     ) -> DigestSubscription | None:
         """Provision the default active subscription upon membership acceptance (FR-008)."""
         channel = "email" if self._settings.email_configured else "in_app"
-        with psycopg.connect(self._settings.database_url.get_secret_value()) as conn:
+        db_cm = (
+            _authenticated_db(self._settings, member)
+            if member is not None
+            else psycopg.connect(self._settings.database_url.get_secret_value())
+        )
+        with db_cm as conn:
+            if member is None:
+                with conn.cursor() as setup_cur:
+                    claims = {
+                        "sub": str(membership_id),
+                        "tenant_id": str(tenant_id),
+                        "role": "authenticated",
+                        "member_role": "member",
+                    }
+                    setup_cur.execute("set local role authenticated")
+                    setup_cur.execute(
+                        "select set_config('request.jwt.claims', %s, true)",
+                        (json.dumps(claims),),
+                    )
             ctx = _tenant_context(conn, tenant_id, membership_id)
             locale = ctx.get("preferred_locale") or ctx.get("default_locale") or "en"
             tz_name = str(ctx.get("reporting_timezone") or "UTC")
@@ -354,6 +376,7 @@ class DigestsService:
         period_end: date,
         branch_id: UUID | None,
         now: datetime,
+        locale: str = "en",
     ) -> list[DigestSection]:
         """Assemble the 5 sections in strict FR-009 order."""
         sections: list[DigestSection] = []
@@ -444,7 +467,7 @@ class DigestsService:
             curr = str(p.get("total_paid_currency") or "")
             pending_items.append(
                 DigestItem(
-                    label=f"Pending saving verification: {pname}",
+                    label=t("digests.itemLabels.pendingVerification", locale, product=pname),
                     money=DigestMoney(amount=amt, currency=curr) if curr else None,
                     evidence_ref=f"/savings-ledger/{sid}/evidence" if sid else "/savings-ledger",
                     deep_link=f"/savings-ledger/{sid}/evidence" if sid else "/savings-ledger",
@@ -488,7 +511,7 @@ class DigestsService:
             curr = str(a.get("total_estimated_currency") or "")
             approval_items.append(
                 DigestItem(
-                    label=f"Approval request #{req_num}",
+                    label=t("digests.itemLabels.approvalRequest", locale, number=req_num),
                     money=DigestMoney(amount=amt, currency=curr) if curr else None,
                     evidence_ref=None,
                     deep_link=f"/approvals/{a['step_id']}",
@@ -521,7 +544,12 @@ class DigestsService:
             curr = str(al.get("total_currency") or "")
             anomaly_items.append(
                 DigestItem(
-                    label=f"Price anomaly: {pname} from {sname}",
+                    label=t(
+                        "digests.itemLabels.priceAnomaly",
+                        locale,
+                        product=pname,
+                        supplier=sname,
+                    ),
                     money=DigestMoney(amount=amt, currency=curr) if curr else None,
                     evidence_ref=None,
                     deep_link="/alerts",
@@ -553,7 +581,12 @@ class DigestsService:
             curr = str(ex.get("total_currency") or "")
             expiring_items.append(
                 DigestItem(
-                    label=f"Offer expiring soon: {pname} from {sname}",
+                    label=t(
+                        "digests.itemLabels.expiringOffer",
+                        locale,
+                        product=pname,
+                        supplier=sname,
+                    ),
                     money=DigestMoney(amount=amt, currency=curr) if curr else None,
                     evidence_ref=None,
                     deep_link="/quotations",

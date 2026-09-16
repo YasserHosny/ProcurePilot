@@ -13,8 +13,8 @@
       "viewer": "Viewer"
     },
     "languages": {
-      "en": "English",
-      "ar": "العربية"
+      "en": "English (en)",
+      "ar": "العربية (ar)"
     },
     "all": "All",
     "cancel": "Cancel"
@@ -2348,7 +2348,16 @@
       "unconfiguredNotice": "Email delivery is not configured in this environment; your weekly digest remains fully accessible here in-app.",
       "viewAction": "View",
       "statusUpdated": "Subscription status updated.",
-      "channelUpdated": "Delivery channel updated."
+      "channelUpdated": "Delivery channel updated.",
+      "loadError": "Failed to load weekly digest.",
+      "loadSubsError": "Failed to load subscriptions.",
+      "updateFailed": "Update failed."
+    },
+    "itemLabels": {
+      "pendingVerification": "Pending saving verification: {{product}}",
+      "approvalRequest": "Approval request #{{number}}",
+      "priceAnomaly": "Price anomaly: {{product}} from {{supplier}}",
+      "expiringOffer": "Offer expiring soon: {{product}} from {{supplier}}"
     }
   }
 }

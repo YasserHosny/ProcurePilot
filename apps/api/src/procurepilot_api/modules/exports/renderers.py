@@ -257,6 +257,14 @@ def _format_pdf_row_summary(kind: str, row: dict[str, object], locale: str = "en
     if kind == "spend_by_supplier":
         supp = row.get("supplier_name") or "—"
         curr = row.get("currency") or row.get("total_paid_currency") or ""
+        if not curr:
+            # N-7: never render a bare monetary amount; log and use a visible sentinel
+            import logging as _logging
+
+            _logging.getLogger(__name__).error(
+                "spend_by_supplier row missing currency — row id: %s", row.get("id", "unknown")
+            )
+            curr = "MISSING_CURRENCY"
         spend = row.get("total_spend") or row.get("total_paid_amount") or 0
         orders = row.get("order_count") or 1
         return f"{supp} | {spend} {curr} ({orders} orders)"

@@ -80,9 +80,7 @@ def switch_active_workspace(
     auth: Annotated[AuthService, Depends(get_auth_service)],
 ) -> SessionResponse:
     refresh_token = require_refresh_token(payload.refresh_token)
-    service.switch_active_workspace(
-        bearer_token=token, member=member, tenant_id=payload.tenant_id
-    )
+    service.switch_active_workspace(bearer_token=token, member=member, tenant_id=payload.tenant_id)
     return auth.reissue_session(refresh_token=refresh_token)
 
 
@@ -218,11 +216,19 @@ def accept_invitation(
     )
     session = auth.login(email=invitation.email, password=payload.password)
     try:
+        current_m = CurrentMember(
+            membership_id=membership.id,
+            tenant_id=membership.tenant_id,
+            user_id=user_id,
+            email=membership.email,
+            role=membership.role,
+        )
         DigestsService().provision_default_subscription(
             tenant_id=membership.tenant_id,
             membership_id=membership.id,
             email=membership.email,
             bearer_token=session.access_token,
+            member=current_m,
         )
     except Exception:
         # Advisory provisioning failure must not roll back invitation acceptance

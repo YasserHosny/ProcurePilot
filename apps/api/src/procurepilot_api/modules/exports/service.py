@@ -87,7 +87,7 @@ class ExportService:
                 "kind": payload.kind,
                 "format": payload.format,
                 "period_start": filters.period_start.isoformat(),
-                "period_end": str(filters.period_end),
+                "period_end": filters.period_end.isoformat(),
             },
         )
         return _job(row)
@@ -172,8 +172,9 @@ def _enforce_download_visibility(
 
     with conn.cursor() as cur:
         cur.execute(
-            "select branch_id from branch_role_assignment where membership_id = %s",
-            (member.membership_id,),
+            "select branch_id from branch_role_assignment"
+            " where membership_id = %s and tenant_id = %s",
+            (member.membership_id, member.tenant_id),
         )
         assigned = {str(r[0]) for r in cur.fetchall()}
 
@@ -259,35 +260,6 @@ def _record_audit(
         ),
         bearer_token=bearer_token,
     )
-
-
-def verified_savings_for_export(
-    conn: object,
-    *,
-    filters: dict[str, object],
-) -> list[dict[str, object]]:
-    if filters.get("branch_id") is not None:
-        return []
-    with conn.cursor(row_factory=dict_row) as cur:
-        cur.execute(
-            """
-            select id, purchase_record_id, workspace_product_id, supplier_id, recorded_at,
-                   baseline_value_amount, baseline_value_currency, actual_value_amount,
-                   actual_value_currency, delta_amount, delta_currency
-            from saving_record
-            where status = 'verified'
-              and recorded_at::date >= %(period_start)s::date
-              and recorded_at::date <= %(period_end)s::date
-              and (%(supplier_id)s::uuid is null or supplier_id = %(supplier_id)s::uuid)
-            order by recorded_at desc, id desc
-            """,
-            {
-                "period_start": filters["period_start"],
-                "period_end": filters["period_end"],
-                "supplier_id": filters.get("supplier_id"),
-            },
-        )
-        return [dict(row) for row in cur.fetchall()]
 
 
 def _enqueue_export_job(settings: Settings, row: dict[str, object], member: CurrentMember) -> None:

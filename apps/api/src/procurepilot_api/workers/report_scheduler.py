@@ -236,7 +236,9 @@ def _purge_expired_artifacts(conn: psycopg.Connection, settings: Settings) -> in
             get_audit_writer().record(
                 AuditEventCreate(
                     tenant_id=UUID(str(job["tenant_id"])),
-                    actor_membership_id=UUID(str(job["requested_by"])),
+                    actor_membership_id=(
+                        UUID(str(job["requested_by"])) if job.get("requested_by") else None
+                    ),
                     actor_email="system@procurepilot.local",
                     action="reports.artifact_purged",
                     target={

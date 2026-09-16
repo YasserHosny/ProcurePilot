@@ -13,8 +13,8 @@
       "viewer": "مشاهد"
     },
     "languages": {
-      "en": "English",
-      "ar": "العربية"
+      "en": "English (en)",
+      "ar": "العربية (ar)"
     },
     "all": "الكل",
     "cancel": "إلغاء"
@@ -2348,7 +2348,16 @@
       "unconfiguredNotice": "إرسال البريد الإلكتروني غير مهيأ في هذه البيئة؛ يظل ملخصك الأسبوعي متاحاً بالكامل هنا داخل التطبيق.",
       "viewAction": "عرض",
       "statusUpdated": "تم تحديث حالة الاشتراك.",
-      "channelUpdated": "تم تحديث قناة التسليم."
+      "channelUpdated": "تم تحديث قناة التسليم.",
+      "loadError": "فشل في تحميل الملخص الأسبوعي.",
+      "loadSubsError": "فشل في تحميل الاشتراكات.",
+      "updateFailed": "فشل التحديث."
+    },
+    "itemLabels": {
+      "pendingVerification": "التحقق من التوفير معلق: {{product}}",
+      "approvalRequest": "طلب موافقة رقم #{{number}}",
+      "priceAnomaly": "شذوذ في السعر: {{product}} من {{supplier}}",
+      "expiringOffer": "عرض ينتهي قريباً: {{product}} من {{supplier}}"
     }
   }
 }

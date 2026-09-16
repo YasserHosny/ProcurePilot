@@ -14,7 +14,7 @@
 
   <!-- FR-008 Onboarding Prompt -->
   @if (showOnboarding()) {
-    <div class="onboarding-banner" role="region" aria-label="Digest Onboarding">
+    <div class="onboarding-banner" role="region" [attr.aria-label]="'digests.settings.onboardingTitle' | translate">
       <div class="onboarding-content">
         <mat-icon class="onboarding-icon" aria-hidden="true">mark_email_read</mat-icon>
         <div class="onboarding-text">
