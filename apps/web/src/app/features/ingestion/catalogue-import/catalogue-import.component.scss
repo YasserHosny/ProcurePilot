@@ -101,9 +101,22 @@
   }
 
   &.disabled {
-    opacity: 0.6;
     background-color: var(--mat-sys-surface-container-lowest, #f1f5f9);
+    border-color: var(--mat-sys-outline-variant, #cbd5e1);
     cursor: not-allowed;
+
+    .dropzone-icon {
+      color: var(--mat-sys-outline, #94a3b8);
+      opacity: 0.5;
+    }
+
+    .dropzone-prompt {
+      color: var(--mat-sys-on-surface, #1e293b);
+    }
+
+    .dropzone-hint {
+      color: var(--mat-sys-on-surface-variant, #475569);
+    }
   }
 }
 
@@ -137,6 +150,7 @@
 
 .dropzone-hint {
   font-size: 0.875rem;
+  color: var(--mat-sys-on-surface-variant, #475569);
 }
 
 .dropzone-actions {
