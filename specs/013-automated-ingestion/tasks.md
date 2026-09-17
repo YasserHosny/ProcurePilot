@@ -111,44 +111,71 @@
 
 ## Phase 3 — Backend: Capture & Catalogue Import
 
-- [ ] **T015** — API: capture endpoint
-  - `POST /api/v1/capture` — multipart/form-data
-  - Accept file (image/pdf) + optional supplier_id + optional notes
-  - Validate file type and size (10 MB limit)
-  - Store file → Supabase Storage
-  - Create quotation record (source = 'capture')
-  - Queue extraction job
-  - Create audit event
-  - Return quotation_id + status
-  - Rate limiting
-  - Unit + integration tests
+- [x] **T015** — API: capture endpoint (`modules/ingestion/capture_service.py` + `router.py`)
+  - `POST /capture` — multipart/form-data (`file`, optional `supplier_id`/`notes`). Synchronous
+    in the request (research R5) — unlike email, there is no external step to decouple from,
+    the server already has the file bytes. Mirrors the manual-upload flow's own
+    document+quotation+extraction_job creation (source = `capture`, status = `pending`)
+    rather than routing through `ingestion_jobs`. `enqueue_extraction` factored out of
+    `orchestrator.py` into a new shared `modules/ingestion/extraction.py` so capture and email
+    share one Redis-enqueue implementation.
+  - File type validated via `python-magic` MIME sniffing (`application/pdf`, `image/jpeg`,
+    `image/png`, `image/heic`), not the client-supplied filename/extension. `image/heic` and
+    a new `document.mime_type` CHECK value added for phone-camera uploads
+    (`20260917000009_capture_catalogue_source_and_mime.sql`). No persisted column exists for
+    free-text `notes` on `quotation` yet — carried in the audit trail rather than silently
+    dropped.
+  - Tests: `tests/integration/test_capture_service.py` (5 tests: happy path with queued
+    extraction, no-supplier capture, oversized file, unsupported MIME, cross-tenant/unknown
+    supplier).
 
-- [ ] **T016** — Service: catalogue file parser
-  - Parse CSV (stdlib csv module)
-  - Parse XLSX (openpyxl)
-  - Column mapping via alias dictionary (research R6)
-  - Row validation (required fields, types, currency presence)
-  - Return structured `CatalogueImportData` with valid_rows + error_rows
-  - Unit tests with sample files
+- [x] **T016** — Service: catalogue file parser (`modules/ingestion/catalogue_parser.py`)
+  - CSV (stdlib `csv`) and XLSX (`openpyxl`, `read_only=True`) via one shared row model.
+    Alias dictionary per research R6. `currency` added to the required-column set beyond R6's
+    own explicit list — constitution non-negotiable 6 (every monetary value has an explicit
+    currency) makes a missing currency column a whole-file rejection, not a per-row default.
+  - Per-row errors (bad type, missing value, etc.) are collected without rejecting the whole
+    file; only a missing/unmappable required column rejects the whole file.
+  - Tests: `tests/unit/test_catalogue_parser.py` (8 tests: canonical headers, alias
+    resolution, missing-required-column and missing-currency whole-file rejection, mixed
+    per-row errors, 1-based row numbering, XLSX numeric cells, empty file).
 
-- [ ] **T017** — Service: catalogue import orchestrator
-  - Accept parsed catalogue data + supplier_id + tenant_id
-  - Match products against catalogue (call spec 004 matching pipeline)
-  - Create/update offers with explicit currency
-  - Flag unmatched products as `pending_review`
-  - Create `catalogue_imports` record with results
-  - Create audit events
-  - Integration tests
+- [x] **T017** — Service: catalogue import orchestrator (`modules/ingestion/catalogue_import_service.py`)
+  - Real finding that reshapes this task versus its own summary above: `MatchingService.
+    quotation_matches()` (the actual spec-004 matching entry point) refuses any quotation
+    whose status is not already `reviewed`, and itself creates the `landed_cost` row for every
+    line it auto-matches — there is no lighter "create an offer from a bare product+price"
+    path to call instead. So this synthesizes **one `quotation` per import** (not one per row,
+    and not one `offer`/`landed_cost` per row directly) with status `reviewed` set at
+    creation — the importing owner/buyer is the human vouching for the bulk price list, the
+    same role a reviewer plays for extracted data — and one `quotation_line` per valid row,
+    then calls the existing, tested matching pipeline exactly as a real reviewed quotation
+    would. Runs synchronously inside the request (not via the `ingestion_jobs`/
+    `catalogue_import` worker type Wave 1 already declared but leaves unused) because
+    `quotation_matches()` authenticates with the caller's real bearer token, which a
+    background worker does not have; SC-003 (1,000 rows in 30s) fits an HTTP request budget.
+    Full reasoning: `docs/operations/parallel-execution-plan-ingestion-wave3.md` §2.
+  - A row with an unsupported currency is a per-row error (FK violation on
+    `supported_currency`, caught via a psycopg SAVEPOINT per row), not a whole-import failure;
+    an import with zero importable rows records `status = 'failed'` and skips matching
+    entirely.
+  - Tests mock `MatchingService.quotation_matches` itself (asserting it is called with the
+    right bearer token and quotation id) rather than exercising it end-to-end — it talks to
+    Postgres via the older postgrest-client architecture that the disposable-Postgres-only
+    test environment does not provide, matching this codebase's own precedent
+    (`test_matching_routing.py` tests `MatchingService`'s internals in its own suite).
+  - Tests: `tests/integration/test_catalogue_import.py` (5 tests: one line per row + matching
+    invoked, per-row bad-currency error, all-rows-bad-currency skips matching, unmappable
+    required column records a failed import, cross-tenant supplier resolves not-found).
 
-- [ ] **T018** — API: catalogue import endpoint
-  - `POST /api/v1/suppliers/{supplier_id}/catalogue-import` — multipart/form-data
-  - Accept CSV or XLSX file (25 MB limit)
-  - Validate supplier belongs to tenant
-  - Store file → Supabase Storage
-  - Call catalogue import orchestrator
-  - Return import summary (imported, skipped, errors)
-  - Rate limiting
-  - Unit + integration tests
+- [x] **T018** — API: catalogue import endpoint (`modules/ingestion/router.py`)
+  - `POST /suppliers/{supplier_id}/catalogue-import` — multipart/form-data, CSV or XLSX only
+    (25 MB limit via `CATALOGUE_IMPORT_MAX_BYTES`). Owner/buyer role, matching T017's
+    `catalogue_imports_owner_buyer_insert` RLS policy. Returns the completed import summary
+    directly — there is no async job id to poll, since T017 runs synchronously.
+  - Covered by T017's service-level integration tests (`import_catalogue` is exactly what
+    this endpoint calls); no separate TestClient-level HTTP test was added for the router
+    wiring itself.
 
 ## Phase 4 — Backend: Ingestion Listing & Monitoring
 

@@ -125,6 +125,17 @@ class Settings(BaseSettings):
     ingestion_max_email_bytes: int = Field(
         default=52_428_800, validation_alias="INGESTION_MAX_EMAIL_BYTES", ge=1
     )
+    # Wave 3 (T015/T018, research R8).
+    capture_max_bytes: int = Field(default=10_485_760, validation_alias="CAPTURE_MAX_BYTES", ge=1)
+    catalogue_import_max_bytes: int = Field(
+        default=26_214_400, validation_alias="CATALOGUE_IMPORT_MAX_BYTES", ge=1
+    )
+    rate_limit_capture_upload: str = Field(
+        default="30/minute", validation_alias="RATE_LIMIT_CAPTURE_UPLOAD"
+    )
+    rate_limit_catalogue_import: str = Field(
+        default="10/minute", validation_alias="RATE_LIMIT_CATALOGUE_IMPORT"
+    )
 
     smtp_host: str | None = Field(default=None, validation_alias="SMTP_HOST")
     smtp_port: int = Field(default=587, validation_alias="SMTP_PORT")

@@ -16,6 +16,7 @@ from procurepilot_api.modules.ingestion.email_parser import (
     ParsedAttachment,
     parse_email,
 )
+from procurepilot_api.modules.ingestion.extraction import enqueue_extraction as _enqueue_extraction
 from procurepilot_api.modules.ingestion.matcher import match_supplier
 from procurepilot_api.shared.audit import AuditEventCreate, AuditOutcome, get_audit_writer
 from procurepilot_api.shared.logging import get_trace_id
@@ -370,25 +371,6 @@ def _insert_unmatched_review_task(
             """,
             (tenant_id, quotation_id),
         )
-
-
-def _enqueue_extraction(
-    settings: Settings, *, job_id: UUID, tenant_id: UUID, quotation_id: UUID, document_id: UUID
-) -> None:
-    from redis import Redis
-    from rq import Queue
-
-    queue = Queue(settings.extraction_queue_name, connection=Redis.from_url(settings.redis_url))
-    queue.enqueue(
-        "procurepilot_extraction_worker.worker.process_extraction_job",
-        {
-            "job_id": str(job_id),
-            "tenant_id": str(tenant_id),
-            "quotation_id": str(quotation_id),
-            "document_id": str(document_id),
-        },
-        job_id=str(job_id),
-    )
 
 
 def _record_audit(
