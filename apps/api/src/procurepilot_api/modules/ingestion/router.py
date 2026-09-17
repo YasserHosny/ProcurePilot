@@ -4,7 +4,7 @@ from typing import Annotated
 from uuid import UUID, uuid4
 
 import psycopg
-from fastapi import APIRouter, Body, Depends, Header, Request, Response, status
+from fastapi import APIRouter, Body, Depends, Header, Query, Request, Response, status
 from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 from starlette.datastructures import UploadFile as StarletteUploadFile
@@ -20,7 +20,16 @@ from procurepilot_api.modules.ingestion.capture_service import (
     get_capture_service,
 )
 from procurepilot_api.modules.ingestion.catalogue_import_service import import_catalogue
-from procurepilot_api.modules.ingestion.schemas import TenantEmailConfig, TenantEmailConfigUpdate
+from procurepilot_api.modules.ingestion.email_log_service import (
+    IngestionEmailLogService,
+    get_ingestion_email_log_service,
+)
+from procurepilot_api.modules.ingestion.schemas import (
+    IngestionEmailLogList,
+    IngestionEmailStatus,
+    TenantEmailConfig,
+    TenantEmailConfigUpdate,
+)
 from procurepilot_api.modules.ingestion.service import (
     IngestionConfigService,
     get_ingestion_config_service,
@@ -97,6 +106,31 @@ def disable_email_config(
     token: Annotated[str, Depends(bearer_token)],
 ) -> TenantEmailConfig:
     return service.set_enabled(member=member, enabled=False, bearer_token=token)
+
+
+@router.get("/ingestion/emails", response_model=IngestionEmailLogList)
+def list_ingestion_emails(
+    member: Annotated[CurrentMember, Depends(current_member)],
+    service: Annotated[
+        IngestionEmailLogService, Depends(get_ingestion_email_log_service)
+    ],
+    cursor: Annotated[str | None, Query()] = None,
+    limit: Annotated[int, Query(ge=1, le=100)] = 50,
+    status: Annotated[IngestionEmailStatus | None, Query()] = None,
+    from_domain: Annotated[str | None, Query()] = None,
+    date_from: Annotated[str | None, Query()] = None,
+    date_to: Annotated[str | None, Query()] = None,
+) -> IngestionEmailLogList:
+    """T019: List inbound email logs for the caller's tenant, cursor-paginated and filtered."""
+    return service.list_email_logs(
+        member=member,
+        cursor=cursor,
+        limit=limit,
+        status=status,
+        from_domain=from_domain,
+        date_from=date_from,
+        date_to=date_to,
+    )
 
 
 @router.post("/webhooks/inbound-email", status_code=status.HTTP_202_ACCEPTED)
