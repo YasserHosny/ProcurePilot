@@ -141,7 +141,11 @@ needed yet to verify this story's own value.
   `purchase_bill_match` row (`match_method = 'automatic'`) only when exactly one qualifying
   candidate exists — more than one candidate is left unmatched for manual review (FR-007's own
   tie-breaking rule), not auto-picked. In
-  `apps/api/src/procurepilot_api/modules/accounting/matching_service.py`.
+  `apps/api/src/procurepilot_api/modules/accounting/matching_service.py`. Add a one-line module
+  docstring note disambiguating SC-002's ≥90% bill↔purchase-record auto-match rate from the
+  constitution's unrelated "Matching precision at auto-accept ≥92%" gate (quotation-line↔
+  canonical-product matching, a different system entirely) — the two numbers are easy to conflate
+  later since both are ~90% matching thresholds in the same codebase.
 - [ ] **T020** [P] [US2] — Unit tests for `MatchingService`'s matching/tie-breaking logic
   (no DB — pure function over in-memory candidate lists) in
   `apps/api/tests/unit/test_matching_service.py`: exact match, $0.01-rounding match, just-inside/
@@ -168,7 +172,11 @@ needed yet to verify this story's own value.
   `apps/api/tests/integration/test_accounting_matching.py`: exact match creates a
   `purchase_bill_match`, a synced bill with no matching purchase record stays unmatched and
   visible (not hidden — Acceptance Scenario 2.3), cross-tenant purchase records are never
-  candidates (proven here directly, not just assumed from RLS).
+  candidates (proven here directly, not just assumed from RLS), **and SC-002's own aggregate
+  claim specifically**: seed a batch of purchase records where a known fraction are genuinely
+  matchable (same supplier, amount within $0.01, date within 14 days) and the rest are not, run
+  matching, and assert the computed match rate over that batch is ≥90% — a per-case assertion
+  alone doesn't prove the measurable success criterion the spec actually states.
 - [ ] **T025** [P] [US2] — Integration test for the worker's own claim loop in
   `apps/api/tests/integration/test_accounting_sync_worker.py`, modeled directly on
   `test_email_ingestion_worker.py`'s real-overlapping-transactions concurrency proof — do not
@@ -243,6 +251,12 @@ resolve.
 - [ ] **T036** — E2E: `apps/web/tests/e2e/accounting.spec.ts` — connect (stub-backed test
   environment), trigger a sync, see bills and at least one automatic match, see and resolve a
   discrepancy — one continuous flow given the real pipeline dependency between the three stories.
+  Include SC-001 and SC-003's own timing claims explicitly rather than leaving them
+  unverified: assert the connect flow (from clicking "Connect" through seeing the active
+  connection state) completes well within 2 minutes, and the resolve-a-discrepancy flow (from
+  opening the discrepancy list through the resolved state) well within 60 seconds — a generous
+  assertion margin against the stated budget (e.g. assert under half the stated limit) is fine;
+  the point is catching a real regression, not chasing a tight CI timing budget.
 - [ ] **T037** — a11y: `apps/web/tests/e2e/accounting-a11y.spec.ts` — axe-core WCAG 2.1 AA on all
   three new screens in English and Arabic, keyboard navigation for the resolve-discrepancy action.
 - [ ] **T038** — Docs: add the accounting integration section to

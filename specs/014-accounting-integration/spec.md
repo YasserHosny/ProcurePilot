@@ -203,10 +203,14 @@ screen.
   last-successful-sync timestamps, and current health (active / needs re-authorization /
   disconnected). Exactly one active connection per workspace for this release (a workspace does
   not connect multiple accounting accounts simultaneously).
+- **Synced Vendor**: One supplier/vendor as recorded by the connected accounting system (FR-006).
+  Matched to an existing ProcurePilot supplier by name on first sync; once matched, that link is
+  reused on every later sync rather than re-matched by name each time. An unmatched vendor is
+  shown as such rather than blocking its bills from syncing.
 - **Synced Bill**: One supplier bill/invoice as recorded by the connected accounting system at the
-  time of the most recent sync — supplier, amount, explicit currency, bill date, provider status,
-  and a reference back to the provider's own record so updates can be matched to the right row on
-  the next sync.
+  time of the most recent sync — supplier (via its Synced Vendor), amount, explicit currency,
+  bill date, provider status, and a reference back to the provider's own record so updates can be
+  matched to the right row on the next sync.
 - **Purchase-Bill Match**: A link between a Synced Bill and an existing ProcurePilot purchase
   record, however that purchase record already exists in the product today, produced either
   automatically (by the matching in FR-007) or confirmed manually by a reviewer resolving a
