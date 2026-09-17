@@ -16,6 +16,34 @@
     <div class="loading-wrap" role="status">
       <mat-spinner diameter="32" [attr.aria-label]="'common.loading' | translate" />
     </div>
+  } @else if (isUnconfigured()) {
+    <mat-card class="unconfigured-card" data-testid="unconfigured-card">
+      <div class="unconfigured-content">
+        <mat-icon class="unconfigured-icon" aria-hidden="true">forward_to_inbox</mat-icon>
+        <div class="unconfigured-text">
+          <h2 class="unconfigured-title">{{ 'ingestion.emailConfig.unconfigured.title' | translate }}</h2>
+          <p class="unconfigured-message">{{ 'ingestion.emailConfig.unconfigured.description' | translate }}</p>
+        </div>
+      </div>
+      <div class="unconfigured-actions">
+        <button
+          mat-flat-button
+          color="primary"
+          type="button"
+          class="setup-btn"
+          [disabled]="isMutating()"
+          (click)="setUpEmailIngestion()"
+          data-testid="setup-email-config-btn"
+        >
+          @if (isMutating()) {
+            <mat-spinner diameter="18" [attr.aria-label]="'common.loading' | translate" />
+          } @else {
+            <mat-icon aria-hidden="true">forward_to_inbox</mat-icon>
+          }
+          <span>{{ 'ingestion.emailConfig.unconfigured.setup' | translate }}</span>
+        </button>
+      </div>
+    </mat-card>
   } @else if (error()) {
     <mat-card class="error-card" role="alert">
       <div class="error-content">

@@ -139,6 +139,135 @@ describe('EmailConfigComponent (T022)', () => {
       expect(component.isLoading()).toBeFalse();
       expect(component.config()).toEqual(mockConfig);
     });
+
+    it('should show not configured state on 404 response instead of generic error card', () => {
+      fixture.detectChanges();
+
+      const req = httpTestingController.expectOne('/api/v1/tenants/email-config');
+      req.flush(
+        { message: 'Email config not found' },
+        { status: 404, statusText: 'Not Found' }
+      );
+
+      fixture.detectChanges();
+
+      expect(component.isLoading()).toBeFalse();
+      expect(component.isUnconfigured()).toBeTrue();
+      expect(component.error()).toBeNull();
+      expect(component.config()).toBeNull();
+
+      const unconfiguredCard = fixture.debugElement.query(By.css('.unconfigured-card'));
+      expect(unconfiguredCard).not.toBeNull();
+
+      const errorCard = fixture.debugElement.query(By.css('.error-card'));
+      expect(errorCard).toBeNull();
+
+      const setupBtn = fixture.debugElement.query(By.css('[data-testid="setup-email-config-btn"]'));
+      expect(setupBtn).not.toBeNull();
+    });
+
+    it('should call enableEmailConfig when setup button is clicked and transition to configured view on success', () => {
+      fixture.detectChanges();
+
+      const req = httpTestingController.expectOne('/api/v1/tenants/email-config');
+      req.flush(
+        { message: 'Email config not found' },
+        { status: 404, statusText: 'Not Found' }
+      );
+
+      fixture.detectChanges();
+
+      expect(component.isUnconfigured()).toBeTrue();
+
+      const setupBtn = fixture.debugElement.query(By.css('[data-testid="setup-email-config-btn"]'));
+      expect(setupBtn).not.toBeNull();
+      setupBtn.nativeElement.click();
+      fixture.detectChanges();
+
+      expect(component.isMutating()).toBeTrue();
+
+      const enableReq = httpTestingController.expectOne('/api/v1/tenants/email-config/enable');
+      expect(enableReq.request.method).toBe('POST');
+      enableReq.flush(mockConfig);
+
+      fixture.detectChanges();
+
+      expect(component.isMutating()).toBeFalse();
+      expect(component.isUnconfigured()).toBeFalse();
+      expect(component.config()).toEqual(mockConfig);
+
+      const unconfiguredCard = fixture.debugElement.query(By.css('.unconfigured-card'));
+      expect(unconfiguredCard).toBeNull();
+
+      const errorCard = fixture.debugElement.query(By.css('.error-card'));
+      expect(errorCard).toBeNull();
+
+      const addressEl = fixture.debugElement.query(By.css('[data-testid="forwarding-address"]'));
+      expect(addressEl).not.toBeNull();
+      expect(addressEl.nativeElement.textContent.trim()).toBe('inbound-test@procurepilot.com');
+      expect(snackBarSpy.open).toHaveBeenCalledWith(
+        'ingestion.emailConfig.enabledSuccess',
+        undefined,
+        jasmine.objectContaining({ duration: 3000 })
+      );
+    });
+
+    it('should fall back to generic error card if setup email ingestion fails', () => {
+      fixture.detectChanges();
+
+      const req = httpTestingController.expectOne('/api/v1/tenants/email-config');
+      req.flush(
+        { message: 'Email config not found' },
+        { status: 404, statusText: 'Not Found' }
+      );
+
+      fixture.detectChanges();
+
+      const setupBtn = fixture.debugElement.query(By.css('[data-testid="setup-email-config-btn"]'));
+      setupBtn.nativeElement.click();
+      fixture.detectChanges();
+
+      const enableReq = httpTestingController.expectOne('/api/v1/tenants/email-config/enable');
+      enableReq.flush(
+        { message: 'Server error during setup' },
+        { status: 500, statusText: 'Internal Server Error' }
+      );
+
+      fixture.detectChanges();
+
+      expect(component.isMutating()).toBeFalse();
+      expect(component.isUnconfigured()).toBeFalse();
+      expect(component.error()).toBe('ingestion.emailConfig.loadError');
+
+      const errorCard = fixture.debugElement.query(By.css('.error-card'));
+      expect(errorCard).not.toBeNull();
+
+      const unconfiguredCard = fixture.debugElement.query(By.css('.unconfigured-card'));
+      expect(unconfiguredCard).toBeNull();
+    });
+
+    it('should show generic error card on non-404 error (e.g. 500) unchanged', () => {
+      fixture.detectChanges();
+
+      const req = httpTestingController.expectOne('/api/v1/tenants/email-config');
+      req.flush(
+        { message: 'Internal Server Error' },
+        { status: 500, statusText: 'Internal Server Error' }
+      );
+
+      fixture.detectChanges();
+
+      expect(component.isLoading()).toBeFalse();
+      expect(component.isUnconfigured()).toBeFalse();
+      expect(component.config()).toBeNull();
+      expect(component.error()).toBe('ingestion.emailConfig.loadError');
+
+      const errorCard = fixture.debugElement.query(By.css('.error-card'));
+      expect(errorCard).not.toBeNull();
+
+      const unconfiguredCard = fixture.debugElement.query(By.css('.unconfigured-card'));
+      expect(unconfiguredCard).toBeNull();
+    });
   });
 
   describe('Enable/disable toggle', () => {

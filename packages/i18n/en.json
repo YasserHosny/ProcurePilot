@@ -2487,6 +2487,11 @@
       "enabledSuccess": "Email ingestion enabled successfully.",
       "disabledSuccess": "Email ingestion disabled successfully.",
       "retry": "Retry",
+      "unconfigured": {
+        "title": "Email Ingestion Not Configured",
+        "description": "Email ingestion has not been set up for this workspace yet. Set it up to start receiving and extracting supplier quotations automatically.",
+        "setup": "Set Up Email Ingestion"
+      },
       "error": {
         "title": "Unable to load email configuration",
         "generic": "An unexpected error occurred while loading email configuration.",

@@ -1,4 +1,5 @@
 import { NgClass } from '@angular/common';
+import { HttpErrorResponse } from '@angular/common/http';
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -50,6 +51,7 @@ export class EmailConfigComponent implements OnInit {
 
   readonly isLoading = signal<boolean>(true);
   readonly isMutating = signal<boolean>(false);
+  readonly isUnconfigured = signal<boolean>(false);
   readonly config = signal<TenantEmailConfig | null>(null);
   readonly error = signal<string | null>(null);
 
@@ -62,13 +64,45 @@ export class EmailConfigComponent implements OnInit {
   loadConfig(): void {
     this.isLoading.set(true);
     this.error.set(null);
+    this.isUnconfigured.set(false);
     this.ingestionApi.getEmailConfig().subscribe({
       next: (data) => {
         this.isLoading.set(false);
         this.config.set(data);
       },
-      error: () => {
+      error: (err: unknown) => {
         this.isLoading.set(false);
+        if (err instanceof HttpErrorResponse && err.status === 404) {
+          this.isUnconfigured.set(true);
+          this.config.set(null);
+        } else {
+          this.error.set(this.translate.instant('ingestion.emailConfig.loadError'));
+        }
+      },
+    });
+  }
+
+  setUpEmailIngestion(): void {
+    if (this.isMutating()) {
+      return;
+    }
+    this.isMutating.set(true);
+    this.error.set(null);
+
+    this.ingestionApi.enableEmailConfig().subscribe({
+      next: (config) => {
+        this.isMutating.set(false);
+        this.config.set(config);
+        this.isUnconfigured.set(false);
+        this.snackBar.open(
+          this.translate.instant('ingestion.emailConfig.enabledSuccess'),
+          undefined,
+          { duration: 3000 }
+        );
+      },
+      error: () => {
+        this.isMutating.set(false);
+        this.isUnconfigured.set(false);
         this.error.set(this.translate.instant('ingestion.emailConfig.loadError'));
       },
     });
