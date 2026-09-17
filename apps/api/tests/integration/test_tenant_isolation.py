@@ -32,7 +32,12 @@ device_registration, low_stock_report and push_notification — cross-tenant iso
 split as every prior chunk; device_registration's own-row-only visibility (no owner read-all) and
 low_stock_report's branch-scoped visibility have their within-tenant proof in
 test_branch_scoped_visibility.py, not here; extended again for 011-optimisation-supplier-iq to
-cover supplier_commercial_term and supplier_scorecard_snapshot.
+cover supplier_commercial_term and supplier_scorecard_snapshot; extended again for
+013-automated-ingestion (T034) to cover tenant_email_config, ingestion_email_log,
+ingestion_jobs and catalogue_imports — cross-tenant isolation only, matching the split
+established for prior chunks (each of these already grants ordinary authenticated-role CRUD
+per its own RBAC, proven separately in tests/integration/test_ingestion_*.py; this file's job is
+only "another tenant's row is invisible/unwritable-into", not the full RBAC matrix).
 """
 
 from __future__ import annotations
@@ -89,6 +94,10 @@ class Workspace:
         push_notification_id: UUID,
         supplier_commercial_term_id: UUID,
         supplier_scorecard_snapshot_id: UUID,
+        tenant_email_config_id: UUID,
+        ingestion_email_log_id: UUID,
+        ingestion_jobs_id: UUID,
+        catalogue_import_id: UUID,
     ) -> None:
         self.tenant_id = tenant_id
         self.user_id = user_id
@@ -121,6 +130,10 @@ class Workspace:
         self.push_notification_id = push_notification_id
         self.supplier_commercial_term_id = supplier_commercial_term_id
         self.supplier_scorecard_snapshot_id = supplier_scorecard_snapshot_id
+        self.tenant_email_config_id = tenant_email_config_id
+        self.ingestion_email_log_id = ingestion_email_log_id
+        self.ingestion_jobs_id = ingestion_jobs_id
+        self.catalogue_import_id = catalogue_import_id
 
     def claims(self) -> str:
         return (
@@ -487,6 +500,51 @@ def make_workspace(cur: psycopg.Cursor, label: str) -> Workspace:
         ),
     )
 
+    # Automated ingestion - chunk R3.0 (013-automated-ingestion).
+    tenant_email_config_id, ingestion_email_log_id = uuid4(), uuid4()
+    ingestion_jobs_id, catalogue_import_id = uuid4(), uuid4()
+    cur.execute(
+        "insert into tenant_email_config "
+        "(id,tenant_id,forwarding_address,daily_limit,created_by) "
+        "values (%s,%s,%s,100,%s)",
+        (
+            tenant_email_config_id,
+            tenant_id,
+            f"{label}-{tenant_id.hex[:8]}@ingest.procurepilot.test",
+            membership_id,
+        ),
+    )
+    cur.execute(
+        "insert into ingestion_email_log "
+        "(id,tenant_id,message_id,from_address,from_domain) "
+        "values (%s,%s,%s,%s,%s)",
+        (
+            ingestion_email_log_id,
+            tenant_id,
+            f"<{label}-{ingestion_email_log_id.hex[:8]}@example.test>",
+            f"supplier@{label}.example.test",
+            f"{label}.example.test",
+        ),
+    )
+    cur.execute(
+        "insert into ingestion_jobs (id,tenant_id,job_type,payload) "
+        "values (%s,%s,'email_ingest',%s)",
+        (ingestion_jobs_id, tenant_id, Jsonb({"raw_email_path": f"{label}/raw.eml"})),
+    )
+    cur.execute(
+        "insert into catalogue_imports "
+        "(id,tenant_id,supplier_id,file_name,file_path,file_size_bytes,file_format,created_by) "
+        "values (%s,%s,%s,%s,%s,1024,'csv',%s)",
+        (
+            catalogue_import_id,
+            tenant_id,
+            supplier_id,
+            f"{label}-catalogue.csv",
+            f"{label}/catalogue-imports/{catalogue_import_id}.csv",
+            membership_id,
+        ),
+    )
+
     return Workspace(
         tenant_id,
         user_id,
@@ -519,6 +577,10 @@ def make_workspace(cur: psycopg.Cursor, label: str) -> Workspace:
         push_notification_id,
         supplier_commercial_term_id,
         supplier_scorecard_snapshot_id,
+        tenant_email_config_id,
+        ingestion_email_log_id,
+        ingestion_jobs_id,
+        catalogue_import_id,
     )
 
 
@@ -1675,6 +1737,120 @@ def test_authenticated_has_no_delete_or_update_privilege_on_supplier_scorecard_s
         cur.execute("rollback to savepoint no_update_privilege")
 
 
+# --- 013-automated-ingestion: email config, email log, jobs, catalogue imports ---
+
+
+def test_another_workspaces_tenant_email_config_is_invisible(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        cur.execute(
+            "select id from tenant_email_config where id = %s",
+            (beta.tenant_email_config_id,),
+        )
+        assert cur.fetchone() is None
+
+
+def test_a_member_cannot_write_tenant_email_config_into_another_workspace(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            cur.execute(
+                "insert into tenant_email_config "
+                "(tenant_id,forwarding_address,daily_limit,created_by) "
+                "values (%s,%s,100,%s)",
+                (beta.tenant_id, f"hijack-{uuid4().hex[:8]}@ingest.procurepilot.test",
+                 alpha.membership_id),
+            )
+
+
+def test_another_workspaces_ingestion_email_log_is_invisible(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        cur.execute(
+            "select id from ingestion_email_log where id = %s",
+            (beta.ingestion_email_log_id,),
+        )
+        assert cur.fetchone() is None
+
+
+def test_a_member_cannot_write_ingestion_email_log_into_another_workspace(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            cur.execute(
+                "insert into ingestion_email_log (tenant_id,message_id,from_address,from_domain) "
+                "values (%s,%s,'attacker@evil.test','evil.test')",
+                (beta.tenant_id, f"<hijack-{uuid4().hex[:8]}@evil.test>"),
+            )
+
+
+def test_another_workspaces_ingestion_jobs_are_invisible(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        cur.execute(
+            "select id from ingestion_jobs where id = %s",
+            (beta.ingestion_jobs_id,),
+        )
+        assert cur.fetchone() is None
+
+
+def test_a_member_cannot_write_ingestion_jobs_into_another_workspace(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            cur.execute(
+                "insert into ingestion_jobs (tenant_id,job_type) values (%s,'email_ingest')",
+                (beta.tenant_id,),
+            )
+
+
+def test_another_workspaces_catalogue_imports_are_invisible(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        cur.execute(
+            "select id from catalogue_imports where id = %s",
+            (beta.catalogue_import_id,),
+        )
+        assert cur.fetchone() is None
+
+
+def test_a_member_cannot_write_a_catalogue_import_into_another_workspace(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            cur.execute(
+                "insert into catalogue_imports "
+                "(tenant_id,supplier_id,file_name,file_path,file_size_bytes,file_format,"
+                "created_by) "
+                "values (%s,%s,'hijack.csv','hijack/hijack.csv',1024,'csv',%s)",
+                (beta.tenant_id, beta.supplier_id, alpha.membership_id),
+            )
+
+
 # --- the guarantee itself ---------------------------------------------------
 
 
@@ -1701,6 +1877,7 @@ def test_rls_is_enabled_and_forced_on_every_tenant_scoped_table(
         "approval_delegation",
         "device_registration", "low_stock_report", "push_notification",
         "supplier_commercial_term", "supplier_scorecard_snapshot",
+        "tenant_email_config", "ingestion_email_log", "ingestion_jobs", "catalogue_imports",
     }
     with conn.cursor() as cur:
         cur.execute(
