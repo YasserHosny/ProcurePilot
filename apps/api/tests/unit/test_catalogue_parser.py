@@ -123,3 +123,48 @@ def test_parses_xlsx_with_numeric_cells() -> None:
 def test_empty_file_raises_parse_error() -> None:
     with pytest.raises(CatalogueParseError):
         parse_catalogue_file(b"", file_format="csv")
+
+
+def test_non_utf8_csv_raises_catalogue_parse_error() -> None:
+    # 0xe9 is 'é' in Latin-1, invalid standalone in UTF-8
+    content = b"product_name,unit_price,currency\nCaf\xe9,1.00,USD\n"
+    with pytest.raises(CatalogueParseError) as excinfo:
+        parse_catalogue_file(content, file_format="csv")
+    assert "file could not be decoded as UTF-8 text" in str(excinfo.value)
+
+
+def test_corrupted_xlsx_raises_catalogue_parse_error() -> None:
+    content = b"not a valid zip or xlsx file content"
+    with pytest.raises(CatalogueParseError) as excinfo:
+        parse_catalogue_file(content, file_format="xlsx")
+    assert "file is not a valid XLSX workbook" in str(excinfo.value)
+
+
+def test_header_only_csv_parses_with_zero_data_rows() -> None:
+    content = _csv_bytes(["product_name,unit_price,currency"])
+    result = parse_catalogue_file(content, file_format="csv")
+
+    assert result.total_rows == 0
+    assert result.valid_rows == []
+    assert result.error_rows == []
+    assert result.column_mapping["product_name"] == "product_name"
+    assert result.column_mapping["unit_price"] == "unit_price"
+    assert result.column_mapping["currency"] == "currency"
+
+
+def test_header_only_xlsx_parses_with_zero_data_rows() -> None:
+    workbook = openpyxl.Workbook()
+    sheet = workbook.active
+    sheet.append(["product_name", "unit_price", "currency"])
+    buffer = io.BytesIO()
+    workbook.save(buffer)
+
+    result = parse_catalogue_file(buffer.getvalue(), file_format="xlsx")
+
+    assert result.total_rows == 0
+    assert result.valid_rows == []
+    assert result.error_rows == []
+    assert result.column_mapping["product_name"] == "product_name"
+    assert result.column_mapping["unit_price"] == "unit_price"
+    assert result.column_mapping["currency"] == "currency"
+

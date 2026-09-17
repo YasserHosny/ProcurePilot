@@ -3,11 +3,14 @@ from __future__ import annotations
 import csv
 import io
 import re
+import zipfile
 from dataclasses import dataclass, field
 from decimal import Decimal, InvalidOperation
 from typing import Literal
+from xml.etree.ElementTree import ParseError
 
 import openpyxl
+from openpyxl.utils.exceptions import InvalidFileException
 
 # T016 (research R6): header-name matching against an alias dictionary. product_name and
 # unit_price are the columns R6 names as required. currency is ALSO effectively required here,
@@ -169,17 +172,32 @@ def _parse_row(row_number: int, row: dict[str, str], mapping: dict[str, str]) ->
 
 
 def _read_csv(content: bytes) -> list[list[str]]:
-    text = content.decode("utf-8-sig")
+    try:
+        text = content.decode("utf-8-sig")
+    except UnicodeDecodeError as exc:
+        raise CatalogueParseError("file could not be decoded as UTF-8 text") from exc
     reader = csv.reader(io.StringIO(text))
     return [row for row in reader if any(cell.strip() for cell in row)]
 
 
 def _read_xlsx(content: bytes) -> list[list[str]]:
-    workbook = openpyxl.load_workbook(io.BytesIO(content), read_only=True, data_only=True)
-    sheet = workbook.active
-    rows: list[list[str]] = []
-    for row in sheet.iter_rows(values_only=True):
-        if row is None or all(cell is None for cell in row):
-            continue
-        rows.append(["" if cell is None else str(cell) for cell in row])
-    return rows
+    try:
+        workbook = openpyxl.load_workbook(io.BytesIO(content), read_only=True, data_only=True)
+        sheet = workbook.active
+        if sheet is None:
+            return []
+        rows: list[list[str]] = []
+        for row in sheet.iter_rows(values_only=True):
+            if row is None or all(cell is None for cell in row):
+                continue
+            rows.append(["" if cell is None else str(cell) for cell in row])
+        return rows
+    except (
+        zipfile.BadZipFile,
+        InvalidFileException,
+        KeyError,
+        ValueError,
+        OSError,
+        ParseError,
+    ) as exc:
+        raise CatalogueParseError("file is not a valid XLSX workbook") from exc

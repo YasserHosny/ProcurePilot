@@ -5,6 +5,7 @@ import pytest
 
 from integration.catalogue_helpers import TEST_DATABASE_URL
 from integration.smart_compare_helpers import committed_smart_context, settings_for_test_db
+from procurepilot_api.errors import UnprocessableEntityError
 from procurepilot_api.modules.ingestion import catalogue_import_service
 from procurepilot_api.modules.matching.service import MatchingService
 
@@ -333,3 +334,101 @@ def test_importing_the_same_file_twice_creates_two_independent_quotations(
                         "Whole Milk 2L",
                         "Sourdough Loaf",
                     ]
+
+
+def test_import_header_only_csv_results_in_completed_with_zero_counts(
+    monkeypatch: pytest.MonkeyPatch, _fake_matching: list[dict[str, object]]
+) -> None:
+    settings = settings_for_test_db(monkeypatch)
+    with committed_smart_context("catalogue-import-empty", supplier_count=1) as context:
+        supplier_id = context.supplier_ids[0]
+        token = "test-bearer-token"
+        content = _csv(["product_name,unit_price,currency"])
+
+        row = import_catalogue(
+            settings,
+            member=context.member,
+            supplier_id=supplier_id,
+            file_content=content,
+            filename="empty.csv",
+            file_format="csv",
+            bearer_token=token,
+        )
+
+        assert row["status"] == "completed"
+        assert row["total_rows"] == 0
+        assert row["imported_rows"] == 0
+        assert row["skipped_rows"] == 0
+        assert row["error_rows"] == 0
+        assert row["error_details"] == []
+        assert _fake_matching == []
+
+
+def test_import_non_utf8_csv_raises_and_records_a_failed_import(
+    monkeypatch: pytest.MonkeyPatch, _fake_matching: list[dict[str, object]]
+) -> None:
+    settings = settings_for_test_db(monkeypatch)
+    with committed_smart_context("catalogue-import-nonutf8", supplier_count=1) as context:
+        supplier_id = context.supplier_ids[0]
+        content = b"product_name,unit_price,currency\nCaf\xe9,1.00,USD\n"
+
+        with pytest.raises(UnprocessableEntityError) as excinfo:
+            import_catalogue(
+                settings,
+                member=context.member,
+                supplier_id=supplier_id,
+                file_content=content,
+                filename="bad_encoding.csv",
+                file_format="csv",
+                bearer_token="test-bearer-token",
+            )
+
+        assert excinfo.value.status_code == 422
+        assert excinfo.value.details == {"reason": "file could not be decoded as UTF-8 text"}
+
+        with psycopg.connect(TEST_DATABASE_URL or "", row_factory=psycopg.rows.dict_row) as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "select status, error_details from catalogue_imports where tenant_id = %s",
+                    (context.workspace.tenant_id,),
+                )
+                imports = cur.fetchall()
+                assert len(imports) == 1
+                assert imports[0]["status"] == "failed"
+                assert "file could not be decoded as UTF-8 text" in str(imports[0]["error_details"])
+        assert _fake_matching == []
+
+
+def test_import_corrupted_xlsx_raises_and_records_a_failed_import(
+    monkeypatch: pytest.MonkeyPatch, _fake_matching: list[dict[str, object]]
+) -> None:
+    settings = settings_for_test_db(monkeypatch)
+    with committed_smart_context("catalogue-import-corruptxlsx", supplier_count=1) as context:
+        supplier_id = context.supplier_ids[0]
+        content = b"not a valid zip or xlsx file content"
+
+        with pytest.raises(UnprocessableEntityError) as excinfo:
+            import_catalogue(
+                settings,
+                member=context.member,
+                supplier_id=supplier_id,
+                file_content=content,
+                filename="corrupted.xlsx",
+                file_format="xlsx",
+                bearer_token="test-bearer-token",
+            )
+
+        assert excinfo.value.status_code == 422
+        assert excinfo.value.details == {"reason": "file is not a valid XLSX workbook"}
+
+        with psycopg.connect(TEST_DATABASE_URL or "", row_factory=psycopg.rows.dict_row) as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "select status, error_details from catalogue_imports where tenant_id = %s",
+                    (context.workspace.tenant_id,),
+                )
+                imports = cur.fetchall()
+                assert len(imports) == 1
+                assert imports[0]["status"] == "failed"
+                assert "file is not a valid XLSX workbook" in str(imports[0]["error_details"])
+        assert _fake_matching == []

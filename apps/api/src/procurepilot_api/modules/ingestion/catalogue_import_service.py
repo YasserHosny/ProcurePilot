@@ -106,7 +106,9 @@ def import_catalogue(
             bearer_token=bearer_token, member=member, quotation_id=quotation_id
         )
 
-    status: Literal["completed", "failed"] = "completed" if imported_rows else "failed"
+    status: Literal["completed", "failed"] = (
+        "failed" if parsed.total_rows > 0 and imported_rows == 0 else "completed"
+    )
     with _authenticated_db(settings, member) as conn:
         with conn.cursor(row_factory=dict_row) as cur:
             cur.execute(
