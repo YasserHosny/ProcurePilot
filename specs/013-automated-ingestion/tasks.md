@@ -420,10 +420,24 @@ precisely-scoped gap that was actually closed, not a full suite written from scr
     though the anon/service-role keys work fine. Once both were fixed, all 4 flows passed cleanly,
     independently, twice.
 
-- [ ] **T036** — a11y: ingestion surfaces
-  - axe-core scan on all ingestion components
-  - Keyboard navigation for file upload
-  - RTL layout verification
+- [x] **T036** — a11y: ingestion surfaces (`apps/web/tests/e2e/ingestion-a11y.spec.ts`)
+  - axe-core (WCAG 2.1 AA) on all five surfaces in English and Arabic, keyboard-only operability
+    of both file-upload components (Tab/Enter reaching and activating the file trigger and the
+    remove-file control, with real focus assertions), and an explicit RTL check beyond the axe
+    scan (no horizontal scroll, directional-icon mirroring via `.rtl-flip`).
+  - Delegated to Agy, with an explicit instruction not to weaken assertions or suppress findings.
+    It found 3 real WCAG AA color-contrast violations and correctly left the spec committed with
+    those 3 tests failing rather than hiding them: dashboard `.stat-secondary` text (`#94a3b8` on
+    white, 2.56:1), and catalogue-import's disabled-dropzone prompt/hint text (3.82:1 and 2.17:1,
+    made worse by `opacity: 0.6` on the whole disabled container). Independently re-verified the
+    same 3 failures myself before merging the spec as-is.
+  - Immediately dispatched a follow-up fix (also Agy) for all 3: replaced the washed-out colors
+    with ones that independently compute to >= 4.5:1 (verified both by the dispatch and by me,
+    same luminance formula, same results — 4.76:1 / 13.35:1 / 6.92:1), and removed the disabled
+    dropzone's blanket `opacity: 0.6` (de-emphasis is now full-contrast text plus a de-emphasized
+    icon and `cursor: not-allowed` instead). Rebuilt the live web container with the fix and
+    re-ran the full a11y suite plus T035's E2E suite against it: 15/15 and 4/4 pass, zero
+    regressions, zero remaining violations.
 
 ## Phase 8 — Documentation & Close-Out
 
