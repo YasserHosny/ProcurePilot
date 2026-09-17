@@ -110,6 +110,14 @@ class Settings(BaseSettings):
     mailgun_signing_key: SecretStr | None = Field(
         default=None, validation_alias="MAILGUN_SIGNING_KEY"
     )
+    # R3.0 security review (T042): the HMAC alone proves the payload was signed by Mailgun, not
+    # that it is fresh — a captured valid webhook call could otherwise be replayed indefinitely
+    # to drain a tenant's daily quota and create unbounded raw-email storage objects. Mailgun's
+    # own docs recommend rejecting a timestamp older than a few minutes; 900s (15 min) matches
+    # Mailgun's documented retry/delivery window with headroom for normal clock skew.
+    mailgun_max_timestamp_skew_seconds: int = Field(
+        default=900, validation_alias="MAILGUN_MAX_TIMESTAMP_SKEW_SECONDS", ge=1
+    )
     # The base domain tenant forwarding addresses are minted under. Deployment-specific, so it
     # lives here rather than hardcoded into a DB CHECK constraint (see
     # docs/quality — tenant_email_config's address-format constraint validates shape only).

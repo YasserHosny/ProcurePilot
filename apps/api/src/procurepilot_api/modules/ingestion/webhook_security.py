@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import time
 
 from procurepilot_api.config import Settings
 from procurepilot_api.errors import AuthenticationError
@@ -26,6 +27,21 @@ def verify_mailgun_signature(
     ).hexdigest()
     if not hmac.compare_digest(expected, signature):
         raise AuthenticationError(details={"reason": "invalid_mailgun_signature"})
+
+    # R3.0 security review (T042): the HMAC alone proves Mailgun signed this exact
+    # timestamp+token pair at some point — it says nothing about WHEN. Without this check, a
+    # single captured valid webhook call stays replayable forever (message-id dedup downstream
+    # stops a replay from creating a second quotation, but not from draining the tenant's daily
+    # quota or creating another raw-email storage object each time). Checked only after the
+    # signature itself verifies, so an attacker without the signing key learns nothing by probing
+    # timestamps.
+    try:
+        signed_at = float(timestamp)
+    except ValueError as exc:
+        raise AuthenticationError(details={"reason": "invalid_mailgun_timestamp"}) from exc
+    skew = abs(time.time() - signed_at)
+    if skew > settings.mailgun_max_timestamp_skew_seconds:
+        raise AuthenticationError(details={"reason": "stale_mailgun_timestamp"})
 
 
 def verify_shared_secret(settings: Settings, *, provided_secret: str | None) -> None:
