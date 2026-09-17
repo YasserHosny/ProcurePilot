@@ -179,22 +179,49 @@
 
 ## Phase 4 — Backend: Ingestion Listing & Monitoring
 
-- [ ] **T019** — API: ingestion email log listing
-  - `GET /api/v1/ingestion/emails` — cursor-paginated list of processed emails
-  - Filters: status, from_domain, date range
-  - Response includes supplier match info and quotation link
-  - Unit + integration tests
+- [x] **T019** — API: ingestion email log listing (`modules/ingestion/email_log_service.py` + `router.py`)
+  - `GET /ingestion/emails`, cursor-paginated (`_encode_cursor`/`_decode_cursor` offset pattern
+    from `digests/service.py`), `order by received_at desc, id desc`. Filters: `status`,
+    `from_domain` (exact match), `date_from`/`date_to` (accepts a bare `YYYY-MM-DD` or a full
+    ISO datetime; a bare date is widened to the full local day). Reuses the `IngestionEmailLog`/
+    `IngestionEmailLogList` schemas already scaffolded in T008 — no changes needed. Every query
+    through `_authenticated_db`, no service-role client.
+  - Delegated to Agy (`docs/operations/parallel-execution-plan-ingestion-wave4.md`); reviewed
+    and independently re-tested before merge, no changes needed.
+  - Tests: `tests/integration/test_ingestion_email_log_listing.py` (9 tests: empty list,
+    multi-page pagination, invalid cursor, each filter independently, cross-tenant isolation,
+    populated vs. null `quotation_id`/`supplier_id`, buyer+owner RBAC).
 
-- [ ] **T020** — API: catalogue import history
-  - `GET /api/v1/suppliers/{supplier_id}/catalogue-imports` — paginated import history
-  - Response includes summary stats and error details
-  - Unit + integration tests
+- [x] **T020** — API: catalogue import history (`catalogue_import_service.py` + `router.py`)
+  - `GET /suppliers/{supplier_id}/catalogue-imports`, cursor-paginated, same pattern as T019.
+    Validates the supplier belongs to the caller's tenant first, reusing `import_catalogue`'s
+    own check (same query, same `NotFoundError` shape). New `CatalogueImportSummary`/
+    `CatalogueImportSummaryList` schemas modeled directly on `catalogue_imports`'s real columns.
+  - Delegated to Agy; reviewed and independently re-tested before merge, no changes needed.
+  - Tests: `tests/integration/test_catalogue_import_history.py` (5 tests: empty list,
+    pagination, a real import seeded via T017's `import_catalogue` appears with correct summary
+    counts, cross-tenant supplier resolves 404, supplier scoping within the same tenant).
 
-- [ ] **T021** — API: ingestion dashboard stats
-  - `GET /api/v1/ingestion/stats` — aggregate stats
-  - Emails received today/week/month, capture uploads, catalogue imports
-  - Supplier match rate, extraction success rate
-  - Unit tests
+- [x] **T021** — API: ingestion dashboard stats (`modules/ingestion/stats_service.py` + `router.py`)
+  - `GET /ingestion/stats` — single aggregate, no pagination. `emails_received_today/_week/
+    _month` use tenant-local calendar boundaries (`reporting_timezone` from `tenant`, ISO week
+    starting Monday). `supplier_match_rate` = (`ingestion_email_log` rows with `status =
+    'completed'` and a non-null `supplier_id`) / (rows with `status = 'completed'`).
+    `extraction_success_rate` = (`extraction_job` rows for `quotation.source in ('email',
+    'capture')` with `status = 'succeeded'`) / (same scope, `status not in ('queued',
+    'running')`). Both rates resolve to `0.0` on a zero denominator, never a division error.
+    These two definitions were ambiguous in this task's own one-line spec — pinned precisely in
+    `docs/operations/parallel-execution-plan-ingestion-wave4.md` §2 before implementation so
+    they wouldn't drift.
+  - Delegated to Agy; reviewed before merge. One real finding: the first implementation imported
+    `digests/service.py`'s private (`_`-prefixed) `_tenant_context` helper cross-module — CLAUDE.md:
+    "cross-module access goes through defined interfaces, not shared internal state." Fixed by
+    inlining the one-column `reporting_timezone` lookup this endpoint actually needs, rather than
+    reusing a helper that also fetches locale fields it doesn't.
+  - Tests: `tests/integration/test_ingestion_stats.py` (6 tests: zero-activity tenant returns
+    all-zero stats with `0.0` rates, a seeded mix of matched/unmatched emails and succeeded/failed
+    extraction jobs produces hand-verified exact rates, cross-tenant isolation, tenant-timezone
+    window derivation, the HTTP endpoint itself, calendar-window unit boundaries).
 
 ## Phase 5 — Frontend: Email Config & Ingestion Views
 
