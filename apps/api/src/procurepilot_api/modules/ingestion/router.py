@@ -19,12 +19,16 @@ from procurepilot_api.modules.ingestion.capture_service import (
     CaptureService,
     get_capture_service,
 )
-from procurepilot_api.modules.ingestion.catalogue_import_service import import_catalogue
+from procurepilot_api.modules.ingestion.catalogue_import_service import (
+    import_catalogue,
+    list_imports,
+)
 from procurepilot_api.modules.ingestion.email_log_service import (
     IngestionEmailLogService,
     get_ingestion_email_log_service,
 )
 from procurepilot_api.modules.ingestion.schemas import (
+    CatalogueImportSummaryList,
     IngestionEmailLogList,
     IngestionEmailStatus,
     TenantEmailConfig,
@@ -300,6 +304,25 @@ async def create_catalogue_import(
         "error_rows": row["error_rows"],
         "error_details": row["error_details"],
     }
+
+
+@router.get(
+    "/suppliers/{supplier_id}/catalogue-imports",
+    response_model=CatalogueImportSummaryList,
+)
+def list_catalogue_imports(
+    supplier_id: UUID,
+    member: Annotated[CurrentMember, Depends(current_member)],
+    cursor: Annotated[str | None, Query()] = None,
+    limit: Annotated[int, Query(ge=1, le=100)] = 50,
+) -> CatalogueImportSummaryList:
+    """T020. Cursor-paginated catalogue import history for a single supplier."""
+    return list_imports(
+        member=member,
+        supplier_id=supplier_id,
+        cursor=cursor,
+        limit=limit,
+    )
 
 
 def _lookup_tenant_by_address(conn: object, forwarding_address: str) -> dict[str, object] | None:

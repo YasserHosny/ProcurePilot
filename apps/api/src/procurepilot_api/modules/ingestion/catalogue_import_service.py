@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import base64
+import json
 from typing import Literal
 from uuid import UUID, uuid4
 
@@ -8,13 +10,17 @@ from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 from supabase import create_client
 
-from procurepilot_api.config import Settings
+from procurepilot_api.config import Settings, get_settings
 from procurepilot_api.deps import CurrentMember
 from procurepilot_api.errors import NotFoundError, UnprocessableEntityError
 from procurepilot_api.modules.ingestion.catalogue_parser import (
     CatalogueParseError,
     CatalogueRow,
     parse_catalogue_file,
+)
+from procurepilot_api.modules.ingestion.schemas import (
+    CatalogueImportSummary,
+    CatalogueImportSummaryList,
 )
 from procurepilot_api.modules.matching.service import MatchingService
 from procurepilot_api.modules.offers.service import _authenticated_db
@@ -144,6 +150,79 @@ def import_catalogue(
         outcome="success" if status == "completed" else "refused",
     )
     return row
+
+
+def list_imports(
+    *,
+    member: CurrentMember,
+    supplier_id: UUID,
+    cursor: str | None = None,
+    limit: int = 50,
+    settings: Settings | None = None,
+) -> CatalogueImportSummaryList:
+    offset = _decode_cursor(cursor)
+    fetch_limit = min(max(limit, 1), 100)
+    active_settings = settings or get_settings()
+
+    with _authenticated_db(active_settings, member) as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "select 1 from supplier where id = %s and tenant_id = %s",
+                (supplier_id, member.tenant_id),
+            )
+            if cur.fetchone() is None:
+                raise NotFoundError(details={"resource": "supplier"})
+
+        with conn.cursor(row_factory=dict_row) as cur:
+            cur.execute(
+                """
+                select * from catalogue_imports
+                where tenant_id = %(tenant_id)s and supplier_id = %(supplier_id)s
+                order by created_at desc, id desc
+                offset %(offset)s limit %(limit)s
+                """,
+                {
+                    "tenant_id": member.tenant_id,
+                    "supplier_id": supplier_id,
+                    "offset": offset,
+                    "limit": fetch_limit + 1,
+                },
+            )
+            rows = [dict(r) for r in cur.fetchall()]
+
+    for r in rows:
+        if isinstance(r.get("error_details"), str):
+            r["error_details"] = json.loads(r["error_details"])
+        elif r.get("error_details") is None:
+            r["error_details"] = []
+        if isinstance(r.get("column_mapping"), str):
+            r["column_mapping"] = json.loads(r["column_mapping"])
+        elif r.get("column_mapping") is None:
+            r["column_mapping"] = {}
+
+    has_more = len(rows) > fetch_limit
+    page_rows = rows[:fetch_limit]
+    next_cursor = _encode_cursor(offset + fetch_limit) if has_more else None
+    return CatalogueImportSummaryList(
+        items=[CatalogueImportSummary.model_validate(r) for r in page_rows],
+        next_cursor=next_cursor,
+    )
+
+
+def _encode_cursor(offset: int) -> str:
+    return base64.urlsafe_b64encode(str(offset).encode("ascii")).decode("ascii")
+
+
+def _decode_cursor(cursor: str | None) -> int:
+    if cursor is None:
+        return 0
+    try:
+        val = int(base64.urlsafe_b64decode(cursor.encode("ascii")))
+        if val < 0:
+            raise ValueError("negative cursor offset")
+        return val
+    except (ValueError, UnicodeError) as exc:
+        raise UnprocessableEntityError(details={"cursor": "invalid"}) from exc
 
 
 def _store_catalogue_document(

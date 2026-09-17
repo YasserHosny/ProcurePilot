@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime
-from typing import Literal
+from typing import Any, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -54,3 +54,30 @@ class IngestionEmailLog(BaseModel):
 class IngestionEmailLogList(BaseModel):
     items: list[IngestionEmailLog]
     next_cursor: str | None
+
+
+CatalogueImportStatus = Literal["pending", "processing", "completed", "failed"]
+
+
+class CatalogueImportSummary(BaseModel):
+    id: UUID
+    supplier_id: UUID
+    file_name: str
+    file_path: str
+    file_size_bytes: int
+    file_format: Literal["csv", "xlsx"]
+    status: CatalogueImportStatus
+    total_rows: int | None = None
+    imported_rows: int | None = None
+    skipped_rows: int | None = None
+    error_rows: int | None = None
+    error_details: list[dict[str, Any]] = Field(default_factory=list)
+    column_mapping: dict[str, Any] = Field(default_factory=dict)
+    created_at: datetime
+    completed_at: datetime | None = None
+    created_by: UUID
+
+
+class CatalogueImportSummaryList(BaseModel):
+    items: list[CatalogueImportSummary]
+    next_cursor: str | None = None
