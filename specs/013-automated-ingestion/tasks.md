@@ -461,9 +461,21 @@ precisely-scoped gap that was actually closed, not a full suite written from scr
   - `specs/013-automated-ingestion/contracts/automated-ingestion.openapi.yaml`
   - All new endpoints with request/response schemas
 
-- [ ] **T042** — Security review: ingestion surfaces
-  - Webhook signature verification
-  - File upload validation (type sniffing, size limits)
-  - Rate limiting on all ingestion endpoints
-  - Tenant isolation in worker jobs
-  - Anti-abuse measures
+- [x] **T042** — Security review: ingestion surfaces
+  (`docs/quality/r3.0-security-review-record.md`)
+  - Nine areas reviewed directly against source/migrations, matching the R2.5 review's own
+    method and rigor (see that record for the precedent). Two real gaps found and fixed, not
+    merely recorded: (1) the Mailgun webhook's HMAC verified authenticity but never timestamp
+    freshness, making a captured valid call replayable indefinitely (quota drain / unbounded
+    storage objects, though message-id dedup already blocked a duplicate quotation) — fixed with
+    a 900s skew bound, plus 11 new unit tests for a function that had zero prior coverage of any
+    kind; (2) nginx's `/api/` location had no `client_max_body_size`, so its 1 MB default
+    silently rejected legitimate uploads under the app's own 10 MB/25 MB limits before ever
+    reaching the app — confirmed empirically (a 3 MB request got nginx's raw 413), fixed with
+    `client_max_body_size 30m`, re-verified empirically after rebuilding the live stack. Seven
+    other areas (rate limiting, worker tenant isolation, anti-abuse ordering, SQL injection,
+    secret handling, audit completeness, `audit_event` append-only) reviewed and passed.
+  - Done in-house, not delegated — same precedent as `[[tenancy-work-stays-in-house]]` and the
+    R2.5 security review, both attributed to the orchestrator directly rather than a delegate.
+  - Full backend suite re-run clean after both fixes (1103 passed, only the 2 known pre-existing
+    failures) and both E2E suites (19 tests) re-run clean against the rebuilt live stack.
