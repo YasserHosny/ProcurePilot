@@ -7,7 +7,7 @@ from uuid import UUID, uuid4
 
 import psycopg
 from psycopg.rows import dict_row
-from supabase import create_client
+from supabase import Client, create_client
 
 from procurepilot_api.config import Settings
 from procurepilot_api.modules.ingestion.email_parser import (
@@ -30,13 +30,16 @@ logger = logging.getLogger(__name__)
 # Schema realities this orchestrator works within, found and documented during implementation
 # rather than assumed from the spec docs:
 # - `quotation.document_id` is a single required FK — there is no document<->quotation join
-#   table, so one quotation can only ever have ONE primary document under the current schema.
+#   table, so one quotation can only ever have ONE primary document under the current schema,
+#   and `extraction_job` enforces a unique active job per quotation.
 #   spec.md acceptance scenario 2 ("each attachment produces a separate document record linked
-#   to the same quotation") is only partly deliverable as a result: every attachment is stored
-#   as its own `document` row (for audit/replay), but only the first is wired to a quotation via
-#   `quotation.document_id` and queued for extraction. This is a real product-scope gap, not a
-#   bug in this code — flagged for a follow-up decision (either a join table, or accepting
-#   "first attachment is authoritative, rest are reference material").
+#   to the same quotation") is only partly deliverable as a result: every attachment is uploaded
+#   and stored as its own `document` row (for audit/replay, closing the data-loss gap), but only
+#   the primary (first) attachment is wired to a quotation via `quotation.document_id` and queued
+#   for extraction. This remains a real, deliberately-scoped product limitation — secondary
+#   attachments are preserved in storage and the document table, but are not linked to the
+#   quotation and do not produce extraction results, pending a bigger design decision
+#   (either a join table, or one quotation per attachment).
 # - Storage path reuses the EXISTING `document.storage_path` shape
 #   (`tenants/{tenant_id}/quotations/{document_id}/{filename}`), not the
 #   `{tenant_id}/ingestion/email/...` shape data-model.md proposed — the `document` table's own
@@ -315,7 +318,64 @@ def _store_primary_document(
             """,
             (document_id, tenant_id, bucket, storage_path, mime_type, content_hash, tenant_id),
         )
+
+    _store_secondary_documents(
+        settings,
+        conn,
+        client=client,
+        tenant_id=tenant_id,
+        attachments=email_data.attachments[1:],
+    )
+
     return document_id, mime_type, filename
+
+
+def _store_secondary_documents(
+    settings: Settings,
+    conn: psycopg.Connection,
+    *,
+    client: Client,
+    tenant_id: UUID,
+    attachments: list[ParsedAttachment],
+) -> None:
+    bucket = settings.quotation_documents_bucket
+    for attachment in attachments:
+        try:
+            document_id = uuid4()
+            storage_path = f"tenants/{tenant_id}/quotations/{document_id}/{attachment.filename}"
+            client.storage.from_(bucket).upload(
+                storage_path,
+                attachment.content,
+                {"content-type": attachment.declared_content_type, "upsert": "true"},
+            )
+            content_hash = hashlib.sha256(attachment.content).hexdigest()
+            with conn.transaction():
+                with conn.cursor() as cur:
+                    cur.execute(
+                        """
+                        insert into document
+                          (id, tenant_id, storage_bucket, storage_path, mime_type, content_hash,
+                           source_channel, status, created_by)
+                        values (%s, %s, %s, %s, %s, %s, 'email', 'uploaded',
+                                (select created_by from tenant_email_config where tenant_id = %s))
+                        """,
+                        (
+                            document_id,
+                            tenant_id,
+                            bucket,
+                            storage_path,
+                            attachment.declared_content_type,
+                            content_hash,
+                            tenant_id,
+                        ),
+                    )
+        except Exception:
+            logger.warning(
+                "Failed to store secondary attachment %s for tenant %s; continuing",
+                attachment.filename,
+                tenant_id,
+                exc_info=True,
+            )
 
 
 def _insert_quotation(
