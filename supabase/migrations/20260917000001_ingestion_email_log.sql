@@ -48,8 +48,16 @@ create table if not exists ingestion_email_log (
   -- rather than a bare `references supplier(id)`, matching supplier_commercial_term and
   -- supplier_scorecard_snapshot's own precedent, so a cross-tenant supplier match can never be
   -- inserted even from the service-role worker path that bypasses RLS.
+  --
+  -- Found by PR review: plain `on delete set null` on a MULTI-COLUMN foreign key nulls every
+  -- referencing column, including tenant_id — which is `not null` on this table, so deleting a
+  -- referenced supplier would fail the delete outright with a not-null violation instead of
+  -- just clearing supplier_id. PG17's column-targeted form fixes this: only supplier_id is set
+  -- to null, tenant_id (and the row itself) is left intact. Verified empirically against a real
+  -- PG17 instance both ways before applying this fix.
   constraint ingestion_email_log_supplier_fkey
-    foreign key (tenant_id, supplier_id) references supplier (tenant_id, id) on delete set null
+    foreign key (tenant_id, supplier_id) references supplier (tenant_id, id)
+    on delete set null (supplier_id)
 );
 
 create index if not exists ingestion_email_log_tenant_domain_idx

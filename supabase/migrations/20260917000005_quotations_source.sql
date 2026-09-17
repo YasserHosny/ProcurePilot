@@ -21,10 +21,16 @@ alter table quotation
 -- (which has no such key yet, so every OTHER FK into it stays bare — see
 -- ingestion_email_log_supplier_fkey's comment), ingestion_email_log was created with one in the
 -- same wave, so there is no excuse for a bare reference here.
+--
+-- Found by PR review: plain `on delete set null` on this multi-column FK would null BOTH
+-- referencing columns on delete, including tenant_id — which is `not null` on quotation, so
+-- deleting the referenced ingestion_email_log row would fail outright instead of just clearing
+-- ingestion_email_id. PG17's column-targeted form fixes this (see
+-- ingestion_email_log_supplier_fkey's own comment for the same fix, verified empirically there).
 alter table quotation
   add constraint quotation_ingestion_email_fkey
     foreign key (tenant_id, ingestion_email_id) references ingestion_email_log (tenant_id, id)
-    on delete set null;
+    on delete set null (ingestion_email_id);
 
 create index if not exists quotation_tenant_source_idx
   on quotation (tenant_id, source);
