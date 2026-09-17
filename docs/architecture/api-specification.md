@@ -1891,6 +1891,286 @@ not per-subscription — it explains why a `channel: email` subscription's deliv
 
 ---
 
+## Delivered Automated Ingestion API (chunk R3.0, `013-automated-ingestion`)
+
+Contract: `specs/013-automated-ingestion/contracts/automated-ingestion.openapi.yaml`. Delivers automated
+quotation ingestion via inbound email forwarding, external mail delivery webhook, mobile and desktop
+document capture, and supplier catalogue spreadsheet imports. Mutation endpoints enforce dedicated
+rate limits (`rate_limit_ingestion_config_mutation`, `rate_limit_capture_upload`,
+`rate_limit_catalogue_import`, and `rate_limit_inbound_email_webhook`).
+
+Role-based access control is evaluated individually per endpoint:
+- Tenant email configuration mutations (`PUT /tenants/email-config`, `POST /tenants/email-config/enable`,
+  `POST /tenants/email-config/disable`): strictly **owner-only** (`require_role(owner)`).
+- Document capture (`POST /capture`) and catalogue import (`POST /suppliers/{supplier_id}/catalogue-import`):
+  **owner or buyer** (`require_role(owner, buyer)`).
+- Email log inspection (`GET /ingestion/emails`), catalogue import history (`GET /suppliers/{supplier_id}/catalogue-imports`),
+  tenant email configuration retrieval (`GET /tenants/email-config`), and dashboard statistics
+  (`GET /ingestion/stats`): accessible to **any authenticated tenant member**.
+- Inbound email webhook (`POST /webhooks/inbound-email`): public, **no Bearer auth**; authenticated
+  exclusively via cryptographic provider signature verification.
+
+### `GET /tenants/email-config` · `PUT /tenants/email-config`
+
+- `GET`: requires bearer auth; accessible to any authenticated member in the tenant. Returns the
+  workspace's inbound email forwarding configuration. The configuration is upserted on first write;
+  before any write occurs, `GET` returns `404` (`{"resource": "tenant_email_config"}`).
+- `PUT`: owner only (`403` for non-owners); rate limited (`rate_limit_ingestion_config_mutation`,
+  default 30/minute). Upserts the tenant configuration on first call or updates existing settings.
+- Request fields (`TenantEmailConfigUpdate`):
+  - `enabled` (optional boolean): toggles inbound email ingestion for the workspace.
+  - `domain_allowlist` (optional list of string domain names, e.g. `["supplier.com"]`): restrict
+    inbound email processing to messages originating from explicitly approved sender domains.
+    Inbound messages from unlisted domains are accepted at the webhook and discarded without queuing
+    an ingestion job.
+  - `daily_limit` (optional integer between 1 and 10,000, default 100): maximum count of inbound
+    emails processed per calendar day to protect against runaway volume or abuse.
+  - `spf_dkim_required` (optional boolean, default false): enforce SPF/DKIM verification checks.
+- Server-derived forwarding address: `forwarding_address` is **never client-supplied**; it is
+  deterministically derived server-side from `{tenant.slug}@{INGESTION_EMAIL_DOMAIN}` (e.g.
+  `acme-catering@ingest.procurepilot.local`) and is immutable.
+- `PUT` records an audit event (`ingestion.email_config_updated`).
+- Returns `200` with `TenantEmailConfig`:
+
+```json
+{
+  "id": "00000000-0000-4000-8000-000000000101",
+  "forwarding_address": "acme-catering@ingest.procurepilot.local",
+  "enabled": true,
+  "domain_allowlist": ["acmefood.com", "beverageco.net"],
+  "daily_limit": 100,
+  "daily_count": 12,
+  "daily_count_date": "2026-09-17",
+  "spf_dkim_required": false,
+  "created_at": "2026-09-17T08:00:00Z",
+  "updated_at": "2026-09-17T09:30:00Z"
+}
+```
+
+### `POST /tenants/email-config/enable` · `POST /tenants/email-config/disable`
+
+- Owner only (`403` for non-owners); rate limited (`rate_limit_ingestion_config_mutation`, default 30/minute).
+- Quick state mutation endpoints that toggle the `enabled` boolean flag without supplying a full body payload.
+  If no configuration row exists yet, one is created with default settings.
+- Auditing: records `ingestion.email_config_enabled` or `ingestion.email_config_disabled`.
+- Returns `200` with the updated `TenantEmailConfig`.
+
+### `POST /webhooks/inbound-email`
+
+- Public endpoint called by external email delivery services (Mailgun, SES, or local stub); **no Bearer auth**.
+- Rate limited via provider limiter (`rate_limit_inbound_email_webhook`, default 60/minute).
+- Authentication via cryptographic signature verification:
+  - Mailgun mode (`INGESTION_EMAIL_PROVIDER="mailgun"`): multipart form submission containing `timestamp`,
+    `token`, and `signature` verified using HMAC-SHA256 against `MAILGUN_SIGNING_KEY`. Raw email bytes are
+    read from `body-mime`, recipient address from `recipient`.
+  - Stub and SES modes (`INGESTION_EMAIL_PROVIDER="stub"` or `"ses"`): constant-time verification of the
+    `X-Ingestion-Webhook-Secret` request header against `INGESTION_WEBHOOK_SHARED_SECRET`. Expects a JSON
+    payload containing `recipient` and `raw_email_base64`. (Note: SES mode uses interim shared-secret
+    verification pending a dedicated AWS SNS certificate-chain validation spike).
+  - Unauthenticated requests (invalid or missing signature/secret) return `401` (`AuthenticationError`).
+  - Malformed payloads (missing recipient/body or invalid base64 encoding) return `422` (`UnprocessableEntityError`).
+- Always returns `202 Accepted` for processed deliveries (R10 anti-enumeration guarantee):
+  - In accordance with requirement R10, the webhook always returns `202` for **every** delivery outcome once
+    signature verification passes, specifically including:
+    - Unknown forwarding address (recipient address does not match any tenant).
+    - Disabled tenant ingestion (`enabled: false`).
+    - Sender domain not present in the tenant's `domain_allowlist`.
+    - Tenant daily ingestion quota exceeded (`daily_count >= daily_limit`).
+    - Raw email size exceeds maximum allowable payload (`INGESTION_MAX_EMAIL_BYTES`, default 50 MB).
+    - Success (valid email accepted, raw email uploaded to Supabase `ingestion-raw` bucket, and pending
+      `ingestion_jobs` row inserted with `job_type='email_ingest'`).
+  - Rationale: External HTTP response codes must never leak whether a recipient email address exists on
+    ProcurePilot or whether a tenant's email ingestion is currently enabled or disabled. Returning `404`,
+    `403`, or `429` would allow external attackers to probe and enumerate valid workspace addresses. Furthermore,
+    returning a 4xx error to an external mail provider would trigger repeated delivery retries for permanently
+    refused messages; returning `202` acknowledges delivery termination from the provider's perspective while
+    the system handles rejection internally.
+
+### `POST /capture`
+
+- Owner or buyer role (`require_role(owner, buyer)`). Rate limited (`rate_limit_capture_upload`, default 30/minute).
+- Accepts `multipart/form-data`:
+  - `file`: binary file (required, non-empty).
+  - `supplier_id`: optional UUID string attributing the quotation to a known supplier.
+  - `notes`: optional free-text string (e.g. buyer context or mobile photo notes).
+- Server-side MIME type sniffing via `python-magic`: The server inspects file magic bytes directly rather than
+  trusting the client's declared `Content-Type` header. Permitted MIME types are `application/pdf`,
+  `image/jpeg`, `image/png`, and `image/heic`. Unsupported media types return `415` (`UnsupportedMediaTypeError`,
+  `details: {detected_mime}`).
+- Size limit: Maximum 10 MB (`CAPTURE_MAX_BYTES`, 10,485,760 bytes). Payloads exceeding this limit return `422`
+  (`UnprocessableEntityError`, `reason: file_too_large`).
+- Supplier validation: If `supplier_id` is supplied, validates that the supplier exists within the caller's tenant;
+  returns `404` (`NotFoundError`) if nonexistent or cross-tenant.
+- Synchronous upload pipeline: Unlike inbound email, capture uploads have file bytes immediately available. The
+  service uploads the document to Supabase storage (`quotation-documents` bucket), creates a `document`
+  (`source_channel: 'capture'`, `status: 'uploaded'`), creates a `quotation` (`source: 'capture'`, `status: 'pending'`),
+  creates an `extraction_job` (`status: 'queued'`), and dispatches extraction synchronously within the request.
+  Notes are recorded on the `capture_uploaded` audit event (since `quotation` has no dedicated free-text notes column).
+- Returns `202 Accepted` (`status.HTTP_202_ACCEPTED`):
+
+```json
+{
+  "quotation_id": "00000000-0000-4000-8000-000000000200",
+  "status": "pending"
+}
+```
+
+### `POST /suppliers/{supplier_id}/catalogue-import`
+
+- Owner or buyer role (`require_role(owner, buyer)`), matching the `catalogue_imports_owner_buyer_insert` RLS policy.
+- Path parameter: `supplier_id` (UUID). Validates supplier existence within caller's tenant; returns `404` (`NotFoundError`)
+  for unknown or cross-tenant supplier IDs.
+- Accepts `multipart/form-data`:
+  - `file`: binary spreadsheet file (required). Only `.csv` and `.xlsx` file extensions are supported.
+- Rate limited via mutation limiter (`rate_limit_catalogue_import`, default 10/minute).
+- Validation and limits:
+  - File size capped at 25 MB (`CATALOGUE_IMPORT_MAX_BYTES`, 26,214,400 bytes). Larger files return `422`
+    (`UnprocessableEntityError`, `reason: file_too_large`).
+  - Unsupported file extensions return `422` (`unsupported_file_format`).
+  - Structural errors (unparseable file, missing required columns such as `product_name` or `unit_price_amount`)
+    raise `422` (`UnprocessableEntityError`) and record a failed `catalogue_imports` entry.
+- Synchronous execution (no async polling):
+  - Catalogue import runs completely synchronously within the HTTP request. There is no async job ID to poll;
+    the response body IS the completed import summary.
+  - The service stores the spreadsheet in `quotation-documents` storage, synthesizes one `quotation` record with
+    `status: 'reviewed'` and `source: 'catalogue_import'` (the importing buyer or owner acts as the human reviewer
+    vouching for the bulk price list), inserts a `quotation_line` for every valid row, and immediately invokes the
+    matching pipeline (`MatchingService.quotation_matches()`) using the caller's bearer credentials.
+  - Persists an audit record to `catalogue_imports` with status `completed` (or `failed` if zero rows could be imported).
+- Returns `201 Created` (`status.HTTP_201_CREATED`):
+
+```json
+{
+  "id": "00000000-0000-4000-8000-000000000300",
+  "supplier_id": "00000000-0000-4000-8000-000000000050",
+  "status": "completed",
+  "total_rows": 120,
+  "imported_rows": 118,
+  "skipped_rows": 0,
+  "error_rows": 2,
+  "error_details": [
+    { "row": 42, "column": "currency", "error": "unsupported_currency" }
+  ]
+}
+```
+
+### `GET /ingestion/emails`
+
+- Requires bearer auth. Accessible to any authenticated member of the tenant.
+- Lists inbound email processing logs for the workspace, ordered newest first (`order by received_at desc, id desc`).
+- Query parameters:
+  - `cursor`: optional base64-encoded integer offset string.
+  - `limit`: optional integer, capped at 100 and defaulting to 50.
+  - `status`: optional filter by `IngestionEmailStatus` (`received`, `processing`, `completed`, `failed`, `duplicate`, `rejected`).
+  - `from_domain`: optional string for exact matching against sender domain.
+  - `date_from`: optional ISO 8601 datetime or `YYYY-MM-DD` date string (bare dates widened to `00:00:00` UTC).
+  - `date_to`: optional ISO 8601 datetime or `YYYY-MM-DD` date string (bare dates widened to `23:59:59` UTC).
+- Pagination: Follows the workspace cursor-pagination convention (`_encode_cursor`/`_decode_cursor` pattern,
+  matching `digests` and `reports/schedules`).
+- Returns `200` with `items` containing `IngestionEmailLog` resources and nullable `next_cursor`:
+
+```json
+{
+  "items": [
+    {
+      "id": "00000000-0000-4000-8000-000000000401",
+      "message_id": "<202609170830.abc123@supplier.com>",
+      "from_address": "orders@supplier.com",
+      "from_domain": "supplier.com",
+      "subject": "Quote #9872 - Fresh Produce",
+      "received_at": "2026-09-17T08:30:00Z",
+      "processed_at": "2026-09-17T08:30:05Z",
+      "status": "completed",
+      "error_message": null,
+      "attachment_count": 1,
+      "quotation_id": "00000000-0000-4000-8000-000000000201",
+      "supplier_id": "00000000-0000-4000-8000-000000000050",
+      "match_method": "domain",
+      "created_at": "2026-09-17T08:30:00Z"
+    }
+  ],
+  "next_cursor": null
+}
+```
+
+### `GET /suppliers/{supplier_id}/catalogue-imports`
+
+- Requires bearer auth. Accessible to any authenticated member of the tenant.
+- Path parameter: `supplier_id` (UUID). Validates supplier existence within caller's tenant; returns `404`
+  (`NotFoundError`) if supplier does not belong to the caller's tenant.
+- Query parameters: optional `cursor`, optional `limit` capped at 100 and defaulting to 50.
+- Ordering: Newest first (`order by created_at desc, id desc`).
+- Pagination: Cursor-paginated; returns `200` with `items` containing `CatalogueImportSummary` resources and
+  nullable `next_cursor`:
+
+```json
+{
+  "items": [
+    {
+      "id": "00000000-0000-4000-8000-000000000300",
+      "supplier_id": "00000000-0000-4000-8000-000000000050",
+      "file_name": "q3_price_list.xlsx",
+      "file_path": "tenants/00000000-0000-4000-8000-000000000001/quotations/00000000-0000-4000-8000-000000000202/q3_price_list.xlsx",
+      "file_size_bytes": 1048576,
+      "file_format": "xlsx",
+      "status": "completed",
+      "total_rows": 120,
+      "imported_rows": 118,
+      "skipped_rows": 0,
+      "error_rows": 2,
+      "error_details": [
+        { "row": 42, "column": "currency", "error": "unsupported_currency" }
+      ],
+      "column_mapping": {
+        "product_name": "Item Description",
+        "unit_price_amount": "Price",
+        "unit_price_currency": "Curr"
+      },
+      "created_at": "2026-09-17T09:00:00Z",
+      "completed_at": "2026-09-17T09:00:04Z",
+      "created_by": "00000000-0000-4000-8000-000000000010"
+    }
+  ],
+  "next_cursor": null
+}
+```
+
+### `GET /ingestion/stats`
+
+- Requires bearer auth. Accessible to any authenticated member of the tenant.
+- Single aggregate metrics object; no pagination.
+- Timezone semantics: Calendar windows for `emails_received_today`, `emails_received_week`, and `emails_received_month`
+  are derived dynamically in the workspace's configured `reporting_timezone` (from `tenant.reporting_timezone`,
+  defaulting to `UTC`; week window begins Monday 00:00).
+- Calculated metrics:
+  - `emails_received_today`: count of inbound email log rows received since local midnight today.
+  - `emails_received_week`: count of inbound email log rows received since Monday 00:00 of the current week.
+  - `emails_received_month`: count of inbound email log rows received since the 1st of the current month.
+  - `capture_uploads_total`: all-time count of quotations created via mobile/desktop capture (`source = 'capture'`).
+  - `catalogue_imports_total`: all-time count of catalogue imports recorded for the tenant.
+  - `supplier_match_rate`: float ratio (0.0 to 1.0) of completed email logs with an attributed supplier (`supplier_id is not null`)
+    over all completed email logs (`status = 'completed'`). Unprocessed, failed, or rejected emails are excluded from
+    the denominator; returns 0.0 when no completed emails exist.
+  - `extraction_success_rate`: float ratio (0.0 to 1.0) of succeeded extraction jobs (`status = 'succeeded'`) over all
+    terminal extraction jobs (`status not in ('queued', 'running')`) strictly for automated-ingestion quotations
+    (`source in ('email', 'capture')`). Excludes non-ingestion manual uploads and in-flight jobs; returns 0.0 when no
+    terminal ingestion extraction jobs exist.
+- Returns `200` with `IngestionStats`:
+
+```json
+{
+  "emails_received_today": 12,
+  "emails_received_week": 45,
+  "emails_received_month": 180,
+  "capture_uploads_total": 34,
+  "catalogue_imports_total": 8,
+  "supplier_match_rate": 0.88,
+  "extraction_success_rate": 0.95
+}
+```
+
+---
+
 ## Health
 
 ### `GET /health`
