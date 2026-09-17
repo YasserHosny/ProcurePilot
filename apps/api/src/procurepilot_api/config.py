@@ -80,6 +80,12 @@ class Settings(BaseSettings):
     rate_limit_digest_mutation: str = Field(
         default="30/minute", validation_alias="RATE_LIMIT_DIGEST_MUTATION"
     )
+    rate_limit_ingestion_config_mutation: str = Field(
+        default="30/minute", validation_alias="RATE_LIMIT_INGESTION_CONFIG_MUTATION"
+    )
+    rate_limit_inbound_email_webhook: str = Field(
+        default="60/minute", validation_alias="RATE_LIMIT_INBOUND_EMAIL_WEBHOOK"
+    )
     # Business-rule caps (distinct from the request-rate limits above): each recurring schedule
     # or subscription is itself a standing worker cost, so the count of *active* rows per member
     # is capped independently of how fast they were created.
@@ -88,6 +94,36 @@ class Settings(BaseSettings):
     )
     active_digest_subscription_cap_per_member: int = Field(
         default=10, validation_alias="ACTIVE_DIGEST_SUBSCRIPTION_CAP_PER_MEMBER", ge=1
+    )
+
+    # R3.0 automated ingestion (013-automated-ingestion). R1 research left the SES-vs-Mailgun
+    # infrastructure choice as a "pending implementation spike" — "stub" keeps the webhook
+    # endpoint fully wired and testable (shared-secret verification only) without picking a
+    # provider or pulling in a provider SDK before that decision is made, mirroring
+    # EXTRACTION_PROVIDER_MODE's own stub/real split.
+    ingestion_email_provider: Literal["stub", "mailgun", "ses"] = Field(
+        default="stub", validation_alias="INGESTION_EMAIL_PROVIDER"
+    )
+    ingestion_webhook_shared_secret: SecretStr | None = Field(
+        default=None, validation_alias="INGESTION_WEBHOOK_SHARED_SECRET"
+    )
+    mailgun_signing_key: SecretStr | None = Field(
+        default=None, validation_alias="MAILGUN_SIGNING_KEY"
+    )
+    # The base domain tenant forwarding addresses are minted under. Deployment-specific, so it
+    # lives here rather than hardcoded into a DB CHECK constraint (see
+    # docs/quality — tenant_email_config's address-format constraint validates shape only).
+    ingestion_email_domain: str = Field(
+        default="ingest.procurepilot.local", validation_alias="INGESTION_EMAIL_DOMAIN"
+    )
+    ingestion_raw_bucket: str = Field(
+        default="ingestion-raw", validation_alias="INGESTION_RAW_BUCKET"
+    )
+    ingestion_max_attachment_bytes: int = Field(
+        default=10_485_760, validation_alias="INGESTION_MAX_ATTACHMENT_BYTES", ge=1
+    )
+    ingestion_max_email_bytes: int = Field(
+        default=52_428_800, validation_alias="INGESTION_MAX_EMAIL_BYTES", ge=1
     )
 
     smtp_host: str | None = Field(default=None, validation_alias="SMTP_HOST")

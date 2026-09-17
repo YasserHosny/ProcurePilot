@@ -45,61 +45,69 @@
 
 ## Phase 2 — Backend: Email Ingestion
 
-- [ ] **T008** — Module: `modules/ingestion/__init__.py`, router, schemas
-  - Create ingestion module skeleton
-  - Pydantic schemas for email log, job, tenant email config
-  - Router stub with OpenAPI tags
+- [x] **T008** — Module: `modules/ingestion/__init__.py`, router, schemas
+  - `modules/ingestion/schemas.py`, `router.py` wired into `main.py`
 
-- [ ] **T009** — Service: supplier domain matcher
-  - `match_supplier_by_address(tenant_id, email)` → supplier_id or None
-  - `match_supplier_by_domain(tenant_id, domain)` → supplier_id or None
-  - `match_supplier_by_thread(tenant_id, in_reply_to, references)` → supplier_id or None
-  - Cascading match function combining all three
-  - Unit tests
+- [x] **T009** — Service: supplier domain matcher (`modules/ingestion/matcher.py`)
+  - R3 assumes a `supplier_contacts` table for the "address" signal that does not exist
+    anywhere in this codebase (checked directly). Implemented instead as address MEMORY:
+    has this exact From address matched a supplier before, for this tenant
+    (`match_supplier_by_address_history`) — delivers the same stated purpose ("higher
+    specificity than domain for a shared domain like gmail.com") with no schema change.
+  - Cascading order per R3's Decision line: address history → domain → thread → unmatched.
+  - Tests: `tests/integration/test_ingestion_matcher.py` (5 tests, including cross-tenant
+    isolation) — integration rather than pure-unit, since the logic is mostly SQL.
 
-- [ ] **T010** — Service: email parser
-  - Parse raw email bytes → structured `InboundEmail` model
-  - Extract: from, subject, message_id, in_reply_to, references, body_text, attachments
-  - Each attachment: filename, content_type, size_bytes, content
-  - MIME type verification with `python-magic`
-  - Unit tests with sample .eml files
+- [x] **T010** — Service: email parser (`modules/ingestion/email_parser.py`)
+  - stdlib `email` + `python-magic` per R2. `content_type_mismatch` flags a disguised
+    attachment for the orchestrator to reject.
+  - Tests: `tests/unit/test_email_parser.py` (7 tests).
 
-- [ ] **T011** — Service: email ingestion orchestrator
-  - Accept parsed email + tenant_id
-  - Deduplication check (message_id)
-  - Supplier identification (cascading match)
-  - Create quotation record (source = 'email')
-  - Store attachments → Supabase Storage
-  - Queue extraction jobs
-  - Create audit events
-  - Update ingestion_email_log
-  - Integration tests
+- [x] **T011** — Service: email ingestion orchestrator (`modules/ingestion/orchestrator.py`)
+  - Real schema gaps found and resolved during implementation (not assumed from spec docs):
+    (a) `quotation.document_id` is a single required FK with no join table, so one quotation
+    can only ever have one primary document — every attachment still gets its own `document`
+    row, but only the first is wired to a quotation and queued for extraction (a genuine,
+    flagged product-scope gap versus the full "each attachment linked to the same quotation"
+    acceptance scenario, not a bug in this code); (b) `document.storage_path`'s CHECK only
+    allowed `tenants/%/quotations/%`, so ingested documents reuse that exact path shape
+    rather than data-model.md's proposed (incompatible) `{tenant_id}/ingestion/email/...`
+    shape; (c) `document.mime_type`'s CHECK had no text/plain, which acceptance scenario 5
+    (text-only email) requires — widened via `20260917000008_document_mime_type_text_plain.sql`.
+  - Unmatched suppliers get a `review_task` (reusing the generic `review_required` reason —
+    no reason value names "supplier unmatched" specifically).
+  - Tests: `tests/integration/test_ingestion_orchestrator.py` (4 tests: matched, unmatched,
+    no-attachment/body-as-document, duplicate message-id).
 
-- [ ] **T012** — Worker: email ingestion worker
-  - Poll `ingestion_jobs` where `job_type = 'email_ingest'` using `FOR UPDATE SKIP LOCKED`
-  - Fetch raw email from S3/Storage
-  - Call email parser → email ingestion orchestrator
-  - Handle retries (max 3 attempts)
-  - Error handling and dead-letter logging
-  - Integration tests
+- [x] **T012** — Worker: email ingestion worker (`workers/email_ingestion_worker.py`)
+  - Same `FOR UPDATE SKIP LOCKED` shape as report_scheduler/export_worker/digest_worker;
+    tenant_id read from the claimed job row, never the payload (same untrusted-payload
+    discipline). Retry up to `max_attempts` (3), then terminal `failed`.
+  - No dedicated worker-level test file; covered indirectly via the orchestrator tests
+    (`process_inbound_email` is exactly what the worker calls per claimed job).
 
-- [ ] **T013** — API: tenant email config endpoints
-  - `GET /api/v1/tenants/email-config` — get current config
-  - `PUT /api/v1/tenants/email-config` — update config (owner only)
-  - `POST /api/v1/tenants/email-config/enable` — enable forwarding
-  - `POST /api/v1/tenants/email-config/disable` — disable forwarding
-  - Rate limiting (SlowAPI)
-  - Unit + integration tests
+- [x] **T013** — API: tenant email config endpoints (`modules/ingestion/service.py` + `router.py`)
+  - `GET`/`PUT /tenants/email-config`, `POST /tenants/email-config/{enable,disable}`. `PUT`
+    upserts (no separate "create" task existed) — `forwarding_address` is server-derived from
+    `{tenant.slug}@{INGESTION_EMAIL_DOMAIN}`, not client-supplied.
+  - Rate-limited via the established `mutation_limiter` (T035, 012-reporting-hardening)
+    pattern — new dedicated setting `RATE_LIMIT_INGESTION_CONFIG_MUTATION`, not reused from
+    an unrelated feature's limit.
+  - Tests: `tests/integration/test_ingestion_email_config.py` (5 tests, including RBAC).
 
-- [ ] **T014** — Webhook: SES/Mailgun inbound endpoint
-  - `POST /api/v1/webhooks/inbound-email` — receives SES SNS notification or Mailgun webhook
-  - Validate webhook signature (SES SNS signature verification or Mailgun API key)
-  - Store raw email → `ingestion-raw` bucket
-  - Create `ingestion_jobs` record with `job_type = 'email_ingest'`
-  - Update `tenant_email_config.daily_count`
-  - Rate limit check against `daily_limit`
-  - Return appropriate HTTP status (200 for accepted, 429 for rate limited)
-  - Integration tests
+- [x] **T014** — Webhook: inbound-email endpoint (`modules/ingestion/router.py` + `webhook_security.py`)
+  - R1's own "pending implementation spike" (SES vs Mailgun undecided) resolved by an
+    `INGESTION_EMAIL_PROVIDER` setting (`stub` default / `mailgun` / `ses`), mirroring
+    `EXTRACTION_PROVIDER_MODE`'s stub/real split rather than committing to one provider SDK
+    before that decision is made. Mailgun's HMAC-SHA256 signature verification is fully
+    implemented (no SDK, no network call). `stub`/`ses` modes verify an interim shared secret
+    instead of a real SNS certificate-chain check — full SNS verification is real, separate
+    follow-up work once SES vs Mailgun is actually decided, not something to fake as done.
+  - Every rejection path (unknown recipient, disabled, domain not allowlisted, daily limit
+    reached, oversized) returns the same `202` as success (R10: no existence/state leak from
+    the response) rather than the task list's literal "429 for rate limited," which would
+    leak that the address exists and has its own limit.
+  - Tests: `tests/integration/test_ingestion_webhook.py` (5 tests).
 
 ## Phase 3 — Backend: Capture & Catalogue Import
 
