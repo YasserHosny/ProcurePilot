@@ -16,6 +16,7 @@ pytestmark = pytest.mark.skipif(
 # A minimal real PDF header — enough for libmagic to detect application/pdf, one of
 # CaptureService's accepted mime types.
 _PDF_BYTES = b"%PDF-1.4\n%\xe2\xe3\xcf\xd3\n1 0 obj\n<< /Type /Catalog >>\nendobj\n"
+_JPEG_BYTES = b"\xff\xd8\xff\xe0\x00\x10JFIF\x00\x01\x01\x00\x00\x01\x00\x01\x00\x00\xff\xd9"
 
 
 class _FakeBucket:
@@ -92,6 +93,59 @@ def test_capture_creates_pending_quotation_and_queues_extraction(
                 document = cur.fetchone()
                 assert document is not None
                 assert document["mime_type"] == "application/pdf"
+                assert document["source_channel"] == "capture"
+
+                cur.execute(
+                    "select status from extraction_job where quotation_id = %s",
+                    (quotation_id,),
+                )
+                job = cur.fetchone()
+                assert job is not None
+                assert job["status"] == "queued"
+
+
+def test_capture_creates_pending_quotation_for_an_image_upload(
+    monkeypatch: pytest.MonkeyPatch, _fake_queue: list[dict[str, object]]
+) -> None:
+    settings = settings_for_test_db(monkeypatch)
+    with committed_smart_context("capture-image", supplier_count=1) as context:
+        supplier_id = context.supplier_ids[0]
+        service = CaptureService(settings)
+
+        result = service.create_capture(
+            member=context.member,
+            file_content=_JPEG_BYTES,
+            filename="delivery-photo.jpg",
+            supplier_id=supplier_id,
+            notes="left at reception",
+            bearer_token="test-bearer-token",
+        )
+
+        assert result["status"] == "pending"
+        quotation_id = result["quotation_id"]
+
+        assert len(_fake_queue) == 1
+        assert _fake_queue[0]["quotation_id"] == quotation_id
+
+        with psycopg.connect(TEST_DATABASE_URL or "", row_factory=psycopg.rows.dict_row) as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "select status, source, supplier_id, document_id from quotation where id = %s",
+                    (quotation_id,),
+                )
+                quotation = cur.fetchone()
+                assert quotation is not None
+                assert quotation["status"] == "pending"
+                assert quotation["source"] == "capture"
+                assert quotation["supplier_id"] == supplier_id
+
+                cur.execute(
+                    "select mime_type, source_channel, status from document where id = %s",
+                    (quotation["document_id"],),
+                )
+                document = cur.fetchone()
+                assert document is not None
+                assert document["mime_type"] == "image/jpeg"
                 assert document["source_channel"] == "capture"
 
                 cur.execute(
