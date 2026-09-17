@@ -1,0 +1,210 @@
+<div class="email-config-container">
+  <div class="header-section">
+    <div class="back-link">
+      <a mat-button routerLink="/ingestion">
+        <mat-icon aria-hidden="true">arrow_back</mat-icon>
+        <span>{{ 'ingestion.title' | translate }}</span>
+      </a>
+    </div>
+    <div class="title-group">
+      <h1 class="page-title">{{ 'ingestion.emailConfig.title' | translate }}</h1>
+      <p class="page-subtitle">{{ 'ingestion.emailConfig.subtitle' | translate }}</p>
+    </div>
+  </div>
+
+  @if (isLoading()) {
+    <div class="loading-wrap" role="status">
+      <mat-spinner diameter="32" [attr.aria-label]="'common.loading' | translate" />
+    </div>
+  } @else if (error()) {
+    <mat-card class="error-card" role="alert">
+      <div class="error-content">
+        <mat-icon class="error-icon" aria-hidden="true">error_outline</mat-icon>
+        <div class="error-text">
+          <h2 class="error-title">{{ 'ingestion.emailConfig.error.title' | translate }}</h2>
+          <p class="error-message">{{ error() }}</p>
+        </div>
+      </div>
+      <div class="error-actions">
+        <button mat-flat-button color="primary" type="button" (click)="loadConfig()">
+          {{ 'ingestion.emailConfig.error.retry' | translate }}
+        </button>
+      </div>
+    </mat-card>
+  } @else {
+    @if (config(); as cfg) {
+      <div class="config-sections">
+        <!-- Forwarding Address Card -->
+        <mat-card class="settings-card">
+          <div class="card-header">
+            <h2 class="card-title">{{ 'ingestion.emailConfig.forwardingAddress' | translate }}</h2>
+          </div>
+          <p class="card-hint">{{ 'ingestion.emailConfig.forwardingAddressHint' | translate }}</p>
+          <div class="address-row">
+            <div class="address-display" data-testid="forwarding-address-container">
+              <mat-icon class="address-icon" aria-hidden="true">mail</mat-icon>
+              <code class="address-value" data-testid="forwarding-address">{{ cfg.forwarding_address }}</code>
+            </div>
+            <button
+              mat-stroked-button
+              type="button"
+              class="copy-btn"
+              [disabled]="isMutating()"
+              (click)="copyAddress()"
+            >
+              <mat-icon aria-hidden="true">content_copy</mat-icon>
+              <span>{{ 'ingestion.emailConfig.copyAddress' | translate }}</span>
+            </button>
+          </div>
+        </mat-card>
+
+        <!-- Status & Enable/Disable Toggle Card -->
+        <mat-card class="settings-card">
+          <div class="card-header">
+            <div class="header-left">
+              <h2 class="card-title">{{ 'ingestion.emailConfig.toggleLabel' | translate }}</h2>
+              <span
+                class="status-badge"
+                [ngClass]="cfg.enabled ? 'active' : 'inactive'"
+                data-testid="status-badge"
+              >
+                {{ (cfg.enabled ? 'ingestion.emailConfig.enabled' : 'ingestion.emailConfig.disabled') | translate }}
+              </span>
+            </div>
+
+            <!-- Owner-only toggle -->
+            <mat-slide-toggle
+              *appRole="'owner'"
+              class="status-toggle"
+              [checked]="cfg.enabled"
+              [disabled]="isMutating()"
+              (change)="toggleEnabled()"
+              [attr.aria-label]="'ingestion.emailConfig.toggleLabel' | translate"
+              data-testid="toggle-enabled"
+            >
+              {{ (cfg.enabled ? 'ingestion.emailConfig.disable' : 'ingestion.emailConfig.enable') | translate }}
+            </mat-slide-toggle>
+          </div>
+          <p class="card-hint">{{ 'ingestion.emailConfig.toggleHint' | translate }}</p>
+          <div
+            *appRole="['buyer', 'approver', 'viewer', 'branch_manager']"
+            class="owner-notice"
+            role="note"
+          >
+            <mat-icon aria-hidden="true">info</mat-icon>
+            <span>{{ 'ingestion.emailConfig.ownerOnly' | translate }}</span>
+          </div>
+        </mat-card>
+
+        <!-- Domain Allowlist Card -->
+        <mat-card class="settings-card">
+          <div class="card-header">
+            <h2 class="card-title">{{ 'ingestion.emailConfig.domainAllowlistTitle' | translate }}</h2>
+          </div>
+          <p class="card-hint">{{ 'ingestion.emailConfig.domainAllowlistHint' | translate }}</p>
+
+          <div class="allowlist-editor">
+            <div class="add-domain-form">
+              <mat-form-field appearance="outline" class="domain-input-field">
+                <mat-label>{{ 'ingestion.emailConfig.domainAllowlistLabel' | translate }}</mat-label>
+                <input
+                  matInput
+                  type="text"
+                  [placeholder]="'ingestion.emailConfig.addDomainPlaceholder' | translate"
+                  [ngModel]="newDomain()"
+                  (ngModelChange)="newDomain.set($event)"
+                  (keydown.enter)="addDomain()"
+                  [disabled]="isMutating()"
+                  data-testid="domain-input"
+                />
+              </mat-form-field>
+              <button
+                mat-flat-button
+                color="primary"
+                type="button"
+                class="add-domain-btn"
+                [disabled]="isMutating() || !newDomain().trim()"
+                (click)="addDomain()"
+                data-testid="add-domain-btn"
+              >
+                <mat-icon aria-hidden="true">add</mat-icon>
+                <span>{{ 'ingestion.emailConfig.addDomain' | translate }}</span>
+              </button>
+            </div>
+
+            <div class="chips-container">
+              @if ((cfg.domain_allowlist?.length ?? 0) === 0) {
+                <div class="empty-allowlist-notice" role="status">
+                  <mat-icon aria-hidden="true">public</mat-icon>
+                  <span>{{ 'ingestion.emailConfig.emptyAllowlist' | translate }}</span>
+                </div>
+              } @else {
+                <mat-chip-set class="domain-chip-set" [attr.aria-label]="'ingestion.emailConfig.domainAllowlistLabel' | translate">
+                  @for (domain of cfg.domain_allowlist; track domain) {
+                    <mat-chip class="domain-chip">
+                      <span class="domain-text">{{ domain }}</span>
+                      <button
+                        matChipRemove
+                        type="button"
+                        class="remove-domain-btn"
+                        [disabled]="isMutating()"
+                        [attr.aria-label]="'ingestion.emailConfig.removeDomain' | translate: { domain: domain }"
+                        (click)="removeDomain(domain)"
+                      >
+                        <mat-icon aria-hidden="true">cancel</mat-icon>
+                      </button>
+                    </mat-chip>
+                  }
+                </mat-chip-set>
+              }
+            </div>
+          </div>
+        </mat-card>
+
+        <!-- Daily Limit (Read-Only) Card -->
+        <mat-card class="settings-card">
+          <div class="card-header">
+            <h2 class="card-title">{{ 'ingestion.emailConfig.dailyLimitTitle' | translate }}</h2>
+          </div>
+          <p class="card-hint">{{ 'ingestion.emailConfig.dailyLimitHint' | translate }}</p>
+
+          <div class="daily-limit-stats">
+            <div class="limit-stat-box">
+              <span class="stat-value" data-testid="daily-count">{{ cfg.daily_count }}</span>
+              <span class="stat-label">{{ 'ingestion.emailConfig.dailyCount' | translate }}</span>
+            </div>
+            <div class="limit-stat-divider" aria-hidden="true">/</div>
+            <div class="limit-stat-box">
+              <span class="stat-value" data-testid="daily-limit">{{ cfg.daily_limit }}</span>
+              <span class="stat-label">{{ 'ingestion.emailConfig.dailyLimitLabel' | translate }}</span>
+            </div>
+          </div>
+
+          <p class="limit-summary" data-testid="daily-usage">
+            {{ 'ingestion.emailConfig.dailyUsage' | translate: { count: cfg.daily_count, limit: cfg.daily_limit } }}
+          </p>
+        </mat-card>
+
+        <!-- SPF / DKIM Verification (Read-Only) Card -->
+        <mat-card class="settings-card">
+          <div class="card-header">
+            <h2 class="card-title">{{ 'ingestion.emailConfig.spfDkimRequired' | translate }}</h2>
+            <span
+              class="status-badge"
+              [ngClass]="cfg.spf_dkim_required ? 'active' : 'inactive'"
+            >
+              {{ (cfg.spf_dkim_required ? 'ingestion.emailConfig.enabled' : 'ingestion.emailConfig.disabled') | translate }}
+            </span>
+          </div>
+          <p class="card-hint">{{ 'ingestion.emailConfig.spfDkimRequiredHint' | translate }}</p>
+          @if (cfg.spf_dkim_required) {
+            <div class="spf-active-banner" role="status">
+              <mat-icon aria-hidden="true">verified_user</mat-icon>
+              <span>{{ 'ingestion.emailConfig.spfDkimActive' | translate }}</span>
+            </div>
+          }
+        </mat-card>
+      </div>
+    }
+  }
+</div>
