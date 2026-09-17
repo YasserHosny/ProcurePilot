@@ -81,3 +81,13 @@ class CatalogueImportSummary(BaseModel):
 class CatalogueImportSummaryList(BaseModel):
     items: list[CatalogueImportSummary]
     next_cursor: str | None = None
+
+
+class IngestionStats(BaseModel):
+    emails_received_today: int
+    emails_received_week: int
+    emails_received_month: int
+    capture_uploads_total: int
+    catalogue_imports_total: int
+    supplier_match_rate: float
+    extraction_success_rate: float

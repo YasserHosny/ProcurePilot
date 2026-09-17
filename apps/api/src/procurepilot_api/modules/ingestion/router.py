@@ -10,7 +10,7 @@ from psycopg.types.json import Jsonb
 from starlette.datastructures import UploadFile as StarletteUploadFile
 from supabase import create_client
 
-from procurepilot_api.config import get_settings
+from procurepilot_api.config import Settings, get_settings
 from procurepilot_api.deps import CurrentMember, bearer_token, current_member
 from procurepilot_api.errors import NotFoundError, UnprocessableEntityError
 from procurepilot_api.modules.auth.jwt import MemberRole
@@ -31,6 +31,7 @@ from procurepilot_api.modules.ingestion.schemas import (
     CatalogueImportSummaryList,
     IngestionEmailLogList,
     IngestionEmailStatus,
+    IngestionStats,
     TenantEmailConfig,
     TenantEmailConfigUpdate,
 )
@@ -38,6 +39,7 @@ from procurepilot_api.modules.ingestion.service import (
     IngestionConfigService,
     get_ingestion_config_service,
 )
+from procurepilot_api.modules.ingestion.stats_service import get_ingestion_stats
 from procurepilot_api.modules.ingestion.webhook_security import (
     verify_mailgun_signature,
     verify_shared_secret,
@@ -135,6 +137,15 @@ def list_ingestion_emails(
         date_from=date_from,
         date_to=date_to,
     )
+
+
+@router.get("/ingestion/stats", response_model=IngestionStats)
+def get_ingestion_stats_endpoint(
+    member: Annotated[CurrentMember, Depends(current_member)],
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> IngestionStats:
+    """T021 — Ingestion dashboard stats aggregate object."""
+    return get_ingestion_stats(member=member, settings=settings)
 
 
 @router.post("/webhooks/inbound-email", status_code=status.HTTP_202_ACCEPTED)
