@@ -6,8 +6,14 @@
 alter table supplier
   add column if not exists email_domains text[] not null default '{}';
 
+-- GIN over tenant_id + email_domains together needs the btree_gin extension (uuid has no
+-- default GIN operator class on its own — confirmed by actually applying this migration, which
+-- fails with "data type uuid has no default operator class for access method gin" without it).
+-- supplier_tenant_idx already covers tenant_id; Postgres bitmap-ANDs it with a plain GIN index
+-- on email_domains for a query like `where tenant_id = $1 and email_domains && $2`, so there is
+-- no need to pull the extension in just for this.
 create index if not exists supplier_email_domains_gin_idx
-  on supplier using gin (tenant_id, email_domains);
+  on supplier using gin (email_domains);
 
 comment on column supplier.email_domains is
   'List of email domains (e.g. {almarai.com, almarai.sa}) associated with this supplier for

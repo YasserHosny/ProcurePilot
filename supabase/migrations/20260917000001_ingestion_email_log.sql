@@ -28,8 +28,12 @@ create table if not exists ingestion_email_log (
   attachment_count    integer not null default 0 check (attachment_count >= 0),
   raw_email_ref       text,
 
+  -- quotation_id stays a bare FK, matching every other reference to this table in the codebase
+  -- (extraction_review_jobs, quotation.previous_quotation_id, etc.) — quotation itself has no
+  -- (tenant_id, id) composite key to target yet, so adding one here without fixing that
+  -- foundational gap everywhere else would be new inconsistency, not less of it.
   quotation_id        uuid references quotation(id) on delete set null,
-  supplier_id         uuid references supplier(id) on delete set null,
+  supplier_id         uuid,
   match_method        text check (match_method is null or match_method in ('address', 'domain', 'thread', 'manual')),
 
   created_at          timestamptz not null default now(),
@@ -38,7 +42,14 @@ create table if not exists ingestion_email_log (
   constraint ingestion_email_log_tenant_id_key unique (tenant_id, id),
 
   -- Deduplication: one message_id per tenant (RFC 5322 uniqueness)
-  constraint ingestion_email_log_tenant_message_id_key unique (tenant_id, message_id)
+  constraint ingestion_email_log_tenant_message_id_key unique (tenant_id, message_id),
+
+  -- supplier DOES have a (tenant_id, id) composite key (supplier_tenant_id_key) — pin to it
+  -- rather than a bare `references supplier(id)`, matching supplier_commercial_term and
+  -- supplier_scorecard_snapshot's own precedent, so a cross-tenant supplier match can never be
+  -- inserted even from the service-role worker path that bypasses RLS.
+  constraint ingestion_email_log_supplier_fkey
+    foreign key (tenant_id, supplier_id) references supplier (tenant_id, id) on delete set null
 );
 
 create index if not exists ingestion_email_log_tenant_domain_idx

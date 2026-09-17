@@ -14,7 +14,7 @@ create type catalogue_import_status as enum (
 create table if not exists catalogue_imports (
   id               uuid primary key default gen_random_uuid(),
   tenant_id        uuid not null references tenant(id) on delete cascade,
-  supplier_id      uuid not null references supplier(id) on delete cascade,
+  supplier_id      uuid not null,
 
   file_name        text not null check (char_length(file_name) between 1 and 255),
   file_path        text not null,
@@ -31,11 +31,19 @@ create table if not exists catalogue_imports (
 
   created_at       timestamptz not null default now(),
   completed_at     timestamptz,
-  created_by       uuid not null references membership(id),
+  created_by       uuid not null,
 
   constraint catalogue_imports_tenant_id_key unique (tenant_id, id),
   constraint catalogue_imports_completed_after_created
-    check (completed_at is null or completed_at >= created_at)
+    check (completed_at is null or completed_at >= created_at),
+
+  -- Composite pins into supplier/membership's own (tenant_id, id) keys — see
+  -- ingestion_email_log_supplier_fkey's comment (20260917000001) for why a bare FK into a
+  -- tenant-scoped table is a real gap even though RLS covers normal request paths.
+  constraint catalogue_imports_supplier_fkey
+    foreign key (tenant_id, supplier_id) references supplier (tenant_id, id) on delete cascade,
+  constraint catalogue_imports_created_by_fkey
+    foreign key (tenant_id, created_by) references membership (tenant_id, id)
 );
 
 create index if not exists catalogue_imports_tenant_supplier_idx

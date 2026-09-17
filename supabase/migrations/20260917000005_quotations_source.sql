@@ -12,10 +12,19 @@ alter type document_source_channel add value if not exists 'capture';
 
 alter table quotation
   add column if not exists source text not null default 'upload',
-  add column if not exists ingestion_email_id uuid references ingestion_email_log(id) on delete set null;
+  add column if not exists ingestion_email_id uuid;
 
 alter table quotation
   add constraint quotation_source_valid check (source in ('upload', 'email', 'capture'));
+
+-- Composite pin into ingestion_email_log's own (tenant_id, id) key — unlike quotation itself
+-- (which has no such key yet, so every OTHER FK into it stays bare — see
+-- ingestion_email_log_supplier_fkey's comment), ingestion_email_log was created with one in the
+-- same wave, so there is no excuse for a bare reference here.
+alter table quotation
+  add constraint quotation_ingestion_email_fkey
+    foreign key (tenant_id, ingestion_email_id) references ingestion_email_log (tenant_id, id)
+    on delete set null;
 
 create index if not exists quotation_tenant_source_idx
   on quotation (tenant_id, source);

@@ -21,11 +21,25 @@ create table if not exists tenant_email_config (
 
   created_at          timestamptz not null default now(),
   updated_at          timestamptz not null default now(),
-  created_by          uuid not null references membership(id),
+  created_by          uuid not null,
 
   constraint tenant_email_config_tenant_id_key unique (tenant_id),
   constraint tenant_email_config_address_key unique (forwarding_address),
-  constraint tenant_email_config_address_format check (forwarding_address ~ '^[a-z0-9-]+@ingest\.procurepilot\.com$')
+  -- Shape only, not the domain: the ingestion domain is deployment-specific configuration (an
+  -- env-configured base, e.g. INGESTION_EMAIL_DOMAIN), not something the database should
+  -- hardcode. The original constraint pinned '@ingest.procurepilot.com' literally, which meant
+  -- this row could never be created in local dev, CI, or a disposable test Postgres — the same
+  -- "database constrains shape only, the API constrains meaning" division tenant.reporting_
+  -- timezone already established (20260915000001_tenant_reporting_timezone.sql). The API layer
+  -- both validates and constructs the real address against its own configured domain.
+  constraint tenant_email_config_address_format check (forwarding_address ~ '^[^@\s]+@[^@\s]+\.[^@\s]+$'),
+
+  -- supplier-style composite pin: membership DOES have a (tenant_id, id) composite key
+  -- (membership_tenant_id_key) — see ingestion_email_log_supplier_fkey's own comment for why
+  -- this matters even though nothing but the service-role worker or a bug could exploit a bare
+  -- FK here.
+  constraint tenant_email_config_created_by_fkey
+    foreign key (tenant_id, created_by) references membership (tenant_id, id)
 );
 
 create index if not exists tenant_email_config_address_lookup_idx
@@ -58,6 +72,19 @@ create policy tenant_email_config_owner_update on tenant_email_config
     and current_member_role() = 'owner'
   )
   with check (
+    tenant_id = current_tenant_id()
+    and current_member_role() = 'owner'
+  );
+
+-- No delete policy previously existed: with RLS forced, that silently blocked every delete
+-- attempt regardless of the blanket GRANT below — turning "should only owners delete this" into
+-- "no one can, ever," without saying so anywhere. Added explicitly rather than left implicit,
+-- since disabling ingestion (enabled = false, an UPDATE) is the intended day-to-day path but
+-- removing the row entirely (e.g. before deleting the workspace) is still a legitimate owner
+-- action this table needs to support.
+create policy tenant_email_config_owner_delete on tenant_email_config
+  for delete to authenticated
+  using (
     tenant_id = current_tenant_id()
     and current_member_role() = 'owner'
   );
