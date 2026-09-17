@@ -12,6 +12,16 @@ connector/sync architecture, the reconciliation data model, and the first real a
 connection ProcurePilot has ever had — everything before this release has been procurement-side
 only, with no visibility into what actually gets invoiced or paid."
 
+## Clarifications
+
+### Session 2026-09-17
+
+- Q: What counts as an automatic match between a synced bill and a purchase record? → A: Exact
+  amount (or within rounding, e.g. $0.01) plus within a 14-day date window.
+- Q: How long after a purchase record has no matching bill before it's flagged as a discrepancy?
+  → A: 30 days, aligned with common net-30 supplier payment terms.
+- Q: How often does the recurring sync run? → A: Daily.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Connect an accounting account (Priority: P1)
@@ -78,8 +88,8 @@ and date — independent of whether automatic matching succeeds for any of them.
 ### User Story 3 - Review and resolve reconciliation discrepancies (Priority: P3)
 
 An owner or buyer reviews a list of reconciliation exceptions — bills that don't match any
-purchase record, purchase records with no corresponding bill after a reasonable time, or matched
-pairs whose amounts disagree — and marks each one resolved once they've investigated it, so
+purchase record, purchase records with no corresponding bill after 30 days, or matched pairs
+whose amounts disagree — and marks each one resolved once they've investigated it, so
 discrepancies don't silently accumulate unnoticed.
 
 **Why this priority**: Automatic matching (User Story 2) handles the easy cases; the actual
@@ -96,9 +106,10 @@ screen.
 1. **Given** a bill whose amount differs from its matched purchase record's own recorded cost,
    **When** viewing the discrepancy list, **Then** the mismatch is shown with both figures side by
    side, in their own explicit currencies.
-2. **Given** an unmatched bill or an unmatched purchase record older than a reasonable grace
-   period, **When** viewing the discrepancy list, **Then** it appears there with enough detail
-   (supplier, amount, date) to investigate without cross-referencing another screen.
+2. **Given** an unmatched bill (immediately) or an unmatched purchase record more than 30 days old
+   (giving normal net-30 invoicing time to catch up), **When** viewing the discrepancy list,
+   **Then** it appears there with enough detail (supplier, amount, date) to investigate without
+   cross-referencing another screen.
 3. **Given** a discrepancy the reviewer has investigated and considers resolved (e.g. a legitimate
    price change, or a manual match they've confirmed by eye), **When** they mark it resolved,
    **Then** it no longer appears in the active discrepancy list but its resolution is recorded
@@ -150,18 +161,20 @@ screen.
 - **FR-006**: The system MUST sync the connected account's supplier/vendor list to support
   matching synced bills against ProcurePilot's own supplier records, without requiring a buyer to
   manually re-enter supplier identity information the accounting system already has.
-- **FR-007**: The system MUST automatically attempt to match each synced bill to an existing
-  ProcurePilot purchase record using supplier identity, amount, and date proximity, and MUST
-  clearly distinguish a matched pair from an unmatched bill or purchase record rather than
-  guessing silently.
-- **FR-008**: The system MUST re-sync on a recurring schedule (not solely on manual request) so
-  that reconciliation data does not silently go stale, and MUST also support an on-demand manual
-  sync.
+- **FR-007**: The system MUST automatically match each synced bill to an existing ProcurePilot
+  purchase record when they share the same supplier, the amount is identical (allowing for
+  currency-rounding differences up to $0.01), and the bill date falls within 14 days of the
+  purchase record's own date — and MUST clearly distinguish a matched pair from an unmatched bill
+  or purchase record rather than guessing silently. A bill or purchase record with more than one
+  equally-qualifying candidate is left unmatched for manual review rather than auto-picked.
+- **FR-008**: The system MUST re-sync once daily (not solely on manual request) so that
+  reconciliation data does not silently go stale, and MUST also support an on-demand manual sync.
 - **FR-009**: The system MUST prevent two sync operations from running concurrently for the same
   connection.
 - **FR-010**: The system MUST surface a reconciliation discrepancy list distinct from the general
   matched-bills view, covering: amount mismatches on matched pairs, bills with no matching
-  purchase record, and purchase records with no matching bill after a configurable grace period.
+  purchase record (flagged immediately), and purchase records with no matching bill after 30 days
+  (aligned with common net-30 supplier payment terms).
 - **FR-011**: The system MUST let an owner or buyer mark a discrepancy as resolved, recording who
   resolved it, when, and an optional note, and MUST re-surface a previously resolved discrepancy
   if the underlying records change again afterward.
@@ -209,7 +222,7 @@ screen.
 - **SC-001**: A workspace owner can connect their accounting account and see it reflected as
   active in under 2 minutes, without needing help documentation.
 - **SC-002**: Within one sync cycle of connecting, at least 90% of an account's genuinely matching
-  bills (same supplier, amount, and a purchase record within the expected date proximity) are
+  bills (same supplier, amount within $0.01, and a purchase record within 14 days) are
   automatically linked without manual intervention.
 - **SC-003**: A reviewer can find and resolve a real reconciliation discrepancy end-to-end
   (identify it, see enough context to judge it, mark it resolved) in under 60 seconds per
