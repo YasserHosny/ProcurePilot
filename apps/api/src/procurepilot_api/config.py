@@ -133,6 +133,9 @@ class Settings(BaseSettings):
     ingestion_max_email_bytes: int = Field(
         default=52_428_800, validation_alias="INGESTION_MAX_EMAIL_BYTES", ge=1
     )
+    email_ingestion_stale_lock_seconds: int = Field(
+        default=600, validation_alias="EMAIL_INGESTION_STALE_LOCK_SECONDS", ge=1
+    )
     # Wave 3 (T015/T018, research R8).
     capture_max_bytes: int = Field(default=10_485_760, validation_alias="CAPTURE_MAX_BYTES", ge=1)
     catalogue_import_max_bytes: int = Field(

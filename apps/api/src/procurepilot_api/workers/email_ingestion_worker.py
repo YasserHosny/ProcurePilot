@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 def tick(settings: Settings) -> dict[str, int]:
     stats = {"claimed": 0, "completed": 0, "duplicate": 0, "rejected": 0, "failed": 0}
     with psycopg.connect(settings.database_url.get_secret_value()) as conn:
-        claimed = _claim_pending_jobs(conn)
+        claimed = _claim_pending_jobs(conn, settings=settings)
         stats["claimed"] = len(claimed)
         conn.commit()
 
@@ -36,30 +36,105 @@ def tick(settings: Settings) -> dict[str, int]:
     return stats
 
 
-def _claim_pending_jobs(conn: psycopg.Connection, limit: int = 10) -> list[dict[str, object]]:
+def _claim_pending_jobs(
+    conn: psycopg.Connection,
+    settings: Settings | None = None,
+    limit: int = 10,
+    *,
+    stale_seconds: int | None = None,
+) -> list[dict[str, object]]:
+    if stale_seconds is None:
+        stale_seconds = (
+            settings.email_ingestion_stale_lock_seconds
+            if settings is not None
+            else 600
+        )
+    claimed_jobs: list[dict[str, object]] = []
     with conn.cursor(row_factory=dict_row) as cur:
         cur.execute(
             """
             select * from ingestion_jobs
             where job_type = 'email_ingest'
-              and status = 'pending'
+              and (
+                status = 'pending'
+                or (
+                  status = 'processing'
+                  and locked_at < now() - make_interval(secs => %(stale_seconds)s)
+                )
+              )
             order by created_at
-            limit %s
+            limit %(limit)s
             for update skip locked
             """,
-            (limit,),
+            {"stale_seconds": stale_seconds, "limit": limit},
         )
-        jobs = [dict(r) for r in cur.fetchall()]
-        for job in jobs:
+        candidates = [dict(r) for r in cur.fetchall()]
+        for job in candidates:
+            was_stale = job["status"] == "processing"
             cur.execute(
                 """
                 update ingestion_jobs
-                set status = 'processing', locked_by = %s, locked_at = now(), updated_at = now()
-                where id = %s
+                set status = case
+                      when status = 'processing' and attempts + 1 >= max_attempts
+                        then 'failed'::ingestion_job_status
+                      else 'processing'::ingestion_job_status
+                    end,
+                    attempts = case
+                      when status = 'processing' then attempts + 1
+                      else attempts
+                    end,
+                    last_error = case
+                      when status = 'processing' and attempts + 1 >= max_attempts
+                        then coalesce(last_error, 'stale lock timeout exceeded max_attempts')
+                      else last_error
+                    end,
+                    locked_by = case
+                      when status = 'processing' and attempts + 1 >= max_attempts then null
+                      else %(locked_by)s
+                    end,
+                    locked_at = case
+                      when status = 'processing' and attempts + 1 >= max_attempts then null
+                      else now()
+                    end,
+                    completed_at = case
+                      when status = 'processing' and attempts + 1 >= max_attempts then now()
+                      else null
+                    end,
+                    updated_at = now()
+                where id = %(id)s
+                returning *
                 """,
-                ("email_ingestion_worker", job["id"]),
+                {"locked_by": "email_ingestion_worker", "id": job["id"]},
             )
-    return jobs
+            res = cur.fetchone()
+            if res is None:
+                continue
+            updated_row = dict(res)
+            if updated_row["status"] == "failed":
+                logger.warning(
+                    "Email ingestion job %s reached max attempts (%s) on stale lock reclaim; "
+                    "marked failed directly",
+                    job["id"],
+                    updated_row["attempts"],
+                )
+                continue
+
+            if was_stale:
+                logger.warning(
+                    "Email ingestion job %s (claimed: reclaimed stale lock, attempt %s of %s)",
+                    job["id"],
+                    updated_row["attempts"],
+                    updated_row["max_attempts"],
+                )
+            else:
+                logger.info(
+                    "Email ingestion job %s (claimed: pending)",
+                    job["id"],
+                )
+
+            claimed_jobs.append(updated_row)
+
+    return claimed_jobs
 
 
 def _process_job(settings: Settings, job: dict[str, object]) -> str:

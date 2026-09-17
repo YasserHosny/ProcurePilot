@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+from datetime import UTC, datetime, timedelta
 from email.message import EmailMessage
 from uuid import UUID, uuid4
 
@@ -129,6 +131,8 @@ def _insert_email_job(
     status: str = "pending",
     attempts: int = 0,
     max_attempts: int = 3,
+    locked_by: str | None = None,
+    locked_at: datetime | None = None,
 ) -> UUID:
     job_id = uuid4()
     with psycopg.connect(TEST_DATABASE_URL or "") as conn:
@@ -136,8 +140,9 @@ def _insert_email_job(
             cur.execute(
                 """
                 insert into ingestion_jobs
-                  (id, tenant_id, job_type, status, payload, attempts, max_attempts)
-                values (%s, %s, 'email_ingest', %s, %s, %s, %s)
+                  (id, tenant_id, job_type, status, payload, attempts, max_attempts,
+                   locked_by, locked_at)
+                values (%s, %s, 'email_ingest', %s, %s, %s, %s, %s, %s)
                 """,
                 (
                     job_id,
@@ -146,6 +151,8 @@ def _insert_email_job(
                     Jsonb(payload if payload is not None else {}),
                     attempts,
                     max_attempts,
+                    locked_by,
+                    locked_at,
                 ),
             )
         conn.commit()
@@ -507,3 +514,152 @@ def test_tenant_id_discipline_read_from_job_row_not_untrusted_payload(
         assert fake_quotations == 0
         assert real_docs == 2
         assert fake_docs == 0
+
+
+def test_stale_processing_job_reclaimed_and_processed_on_tick(
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    settings = settings_for_test_db(monkeypatch)
+
+    with committed_smart_context("email-worker-stale-reclaim", supplier_count=1) as context:
+        supplier_id = context.supplier_ids[0]
+        _seed_email_config(context.workspace.tenant_id, context.workspace.membership_id)
+        with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "update supplier set email_domains = %s where id = %s",
+                    (["acme.com"], supplier_id),
+                )
+            conn.commit()
+
+        raw_email = _build_email(
+            from_addr="sales@acme.com", message_id="<worker-stale@acme.com>"
+        )
+        raw_email_path = f"tenants/{context.workspace.tenant_id}/raw/worker-stale.eml"
+        uploads, enqueued = _patch_storage_and_queue(
+            monkeypatch, downloads={raw_email_path: raw_email}
+        )
+
+        stale_time = datetime.now(UTC) - timedelta(
+            seconds=settings.email_ingestion_stale_lock_seconds + 60
+        )
+        job_id = _insert_email_job(
+            context.workspace.tenant_id,
+            payload={"raw_email_path": raw_email_path},
+            status="processing",
+            attempts=0,
+            max_attempts=3,
+            locked_by="dead_worker",
+            locked_at=stale_time,
+        )
+
+        with caplog.at_level(logging.WARNING):
+            stats = tick(settings)
+
+        assert stats["claimed"] == 1
+        assert stats["completed"] == 1
+        assert len(uploads) == 1
+        assert len(enqueued) == 1
+        assert "claimed: reclaimed stale lock" in caplog.text
+
+        with psycopg.connect(TEST_DATABASE_URL or "", row_factory=dict_row) as conn:
+            with conn.cursor() as cur:
+                cur.execute("select * from ingestion_jobs where id = %s", (job_id,))
+                job_row = cur.fetchone()
+
+        assert job_row is not None
+        assert job_row["status"] == "completed"
+        assert job_row["completed_at"] is not None
+        # Attempts was incremented to 1 during the stale reclaim
+        assert job_row["attempts"] == 1
+
+
+def test_recent_processing_job_not_reclaimed_by_concurrent_worker(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = settings_for_test_db(monkeypatch)
+
+    with committed_smart_context("email-worker-recent-lock") as context:
+        raw_email_path = f"tenants/{context.workspace.tenant_id}/raw/worker-recent.eml"
+        recent_time = datetime.now(UTC) - timedelta(seconds=10)
+        job_id = _insert_email_job(
+            context.workspace.tenant_id,
+            payload={"raw_email_path": raw_email_path},
+            status="processing",
+            attempts=0,
+            max_attempts=3,
+            locked_by="in_flight_worker",
+            locked_at=recent_time,
+        )
+
+        with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+            claimed = _claim_pending_jobs(conn, settings=settings, limit=10)
+            conn.commit()
+
+        assert not any(j["id"] == job_id for j in claimed)
+
+        # Also verify tick() does not claim or touch the in-flight job
+        stats = tick(settings)
+        assert stats["claimed"] == 0
+
+        with psycopg.connect(TEST_DATABASE_URL or "", row_factory=dict_row) as conn:
+            with conn.cursor() as cur:
+                cur.execute("select * from ingestion_jobs where id = %s", (job_id,))
+                job_row = cur.fetchone()
+
+        assert job_row is not None
+        assert job_row["status"] == "processing"
+        assert job_row["attempts"] == 0
+        assert job_row["locked_by"] == "in_flight_worker"
+        assert job_row["completed_at"] is None
+
+
+def test_stale_job_exceeding_max_attempts_marked_failed_directly(
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    settings = settings_for_test_db(monkeypatch)
+
+    with committed_smart_context("email-worker-stale-max-attempts") as context:
+        raw_email_path = f"tenants/{context.workspace.tenant_id}/raw/worker-exhausted.eml"
+        stale_time = datetime.now(UTC) - timedelta(
+            seconds=settings.email_ingestion_stale_lock_seconds + 60
+        )
+        # Job already at 2 attempts with max_attempts = 3.
+        # Reclaim increment (2 + 1 = 3) reaches max_attempts.
+        job_id = _insert_email_job(
+            context.workspace.tenant_id,
+            payload={"raw_email_path": raw_email_path},
+            status="processing",
+            attempts=2,
+            max_attempts=3,
+            locked_by="dead_worker",
+            locked_at=stale_time,
+        )
+
+        with caplog.at_level(logging.WARNING):
+            stats = tick(settings)
+
+        # Job is marked failed directly in claim query rather than claimed into processing
+        assert stats["claimed"] == 0
+        assert stats["failed"] == 0
+
+        with psycopg.connect(TEST_DATABASE_URL or "", row_factory=dict_row) as conn:
+            with conn.cursor() as cur:
+                cur.execute("select * from ingestion_jobs where id = %s", (job_id,))
+                job_row = cur.fetchone()
+
+        assert job_row is not None
+        assert job_row["status"] == "failed"
+        assert job_row["attempts"] == 3
+        assert job_row["completed_at"] is not None
+        assert job_row["locked_by"] is None
+        assert job_row["locked_at"] is None
+        assert job_row["last_error"] is not None
+        assert "stale lock" in job_row["last_error"].lower()
+
+        # Subsequent tick() does not touch terminal-failed job
+        stats2 = tick(settings)
+        assert stats2["claimed"] == 0
+
