@@ -195,13 +195,31 @@ Same sequencing note as T035 — after T030–T034, and ideally after Agy's find
 
 ## 3. Delegation mechanics
 
-- **T034**: done in-house, not delegated (standing tenancy carve-out for this feature).
-- **T030, T031, T032, T033**: route to OpenCode (test lane, per the fleet map) as four
-  independent tasks — they touch four different test files with no overlap
-  (`test_email_parser.py`; a new `test_email_ingestion_worker.py`; `test_capture_service.py`;
-  `test_catalogue_import.py`), so genuinely parallel, not sequential. Each session gets: this
-  document's §0 (so it doesn't reinvent existing coverage) and its own §2 subsection — nothing
-  else needs re-explaining.
+Lane map current as of 2026-09-17 (see memory `delegate-heavily-to-codex` for the live version —
+do not reuse this snapshot in a future wave without checking it first): Agy used intensively as
+the default for substantial work; Cursor (`auto`) for mid-complexity; OpenCode
+(`opencode-go/muse-spark-1.2-contributor-free`) for trivial/mechanical only; Codex paused until
+2026-09-19 12:09; Claude-in-house minimized to the tenancy carve-out and genuinely-too-small
+tasks. `opencode-go/kimi-k2.7-code`/`kimi-k3` are gone — never propose them.
+
+Four independent tasks, no file overlap (`test_email_parser.py`; a new
+`test_email_ingestion_worker.py`; `test_capture_service.py`; `test_catalogue_import.py`), so
+genuinely parallel, not sequential, regardless of which lane each lands on:
+
+- **T030** (parser edge cases — charset/encoding judgment calls, e.g. what "correct" RFC 2047
+  and non-UTF-8 decoding looks like) → **Agy**.
+- **T031** (worker concurrent-claim test — the one task in this wave with real correctness
+  stakes: proving `FOR UPDATE SKIP LOCKED` exclusivity under genuine concurrency, not a
+  sleep-based fake) → **Agy**.
+- **T032** (add one `image/jpeg` happy-path test, essentially copy-adapt of the existing PDF
+  happy-path test) → **OpenCode**, trivial lane.
+- **T033** (repeat-import test — needs to actually run it twice and characterize real,
+  unknown-in-advance behavior, not just transcribe a known expectation) → **Cursor**, mid lane.
+  No packaged `cursor-delegate` skill exists yet; dispatch by hand (brief → `cursor-agent` →
+  verify gates myself → commit myself) or run `/delegate-setup` first to formalize the lane.
+
+- **T034**: done in-house, not delegated (standing tenancy carve-out — this is the one thing
+  "minimize self-work" does not reach into).
 - **T035, T036**: held. Do not dispatch until T030–T034 are merged and the backend+frontend
   suites are both green, and ideally not until Agy's live walkthrough (running now, dispatched
   directly by the user, outside this plan) has reported back — its findings may change what
