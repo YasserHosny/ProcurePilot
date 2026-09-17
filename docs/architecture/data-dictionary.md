@@ -1541,3 +1541,171 @@ tenant-isolation policy before this review). Object paths are
   toggle) / `digests.subscription_deleted` / `digests.subscription_provisioned` (default
   subscription created automatically on member accept).
 
+## Implemented automated ingestion entities (chunk R3.0, `013-automated-ingestion`)
+
+Adds multi-channel quotation ingestion (inbound email forwarding, mobile/desktop capture, and
+bulk supplier catalogue imports) with automated supplier matching, deduplication, and
+asynchronous processing queues.
+
+### Schema design note: Composite foreign keys for cross-tenant isolation
+
+Several foreign keys in this chunk (`ingestion_email_log.supplier_id`, `tenant_email_config.created_by`,
+`catalogue_imports.supplier_id`, `catalogue_imports.created_by`, and the `quotation.ingestion_email_id`
+extension) deliberately reference parent tables via their `(tenant_id, id)` composite unique keys
+(`supplier(tenant_id, id)`, `membership(tenant_id, id)`, and `ingestion_email_log(tenant_id, id)`) rather
+than a bare `references table(id)`.
+
+As documented in `ingestion_email_log_supplier_fkey`'s migration comment, this provides critical
+defense-in-depth: a cross-tenant reference can never be inserted even from a background worker,
+asynchronous processor, or service-role execution path that bypasses PostgreSQL Row Level Security.
+Conversely, references to `quotation` (such as `ingestion_email_log.quotation_id`) remain bare foreign keys
+because `quotation` does not yet possess a `(tenant_id, id)` composite unique constraint in the foundational
+schema; introducing one piecemeal here would create inconsistency with existing quotation foreign keys across
+the codebase.
+
+### `TenantEmailConfig`
+
+Per-tenant email ingestion configuration and rate limit counters (table `tenant_email_config`). Stores the
+dedicated workspace forwarding address, ingestion enablement state, optional sender domain allowlist,
+daily quota, and current daily consumption counter.
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | uuid | PK, default `gen_random_uuid()` |
+| `tenant_id` | uuid | Required FK -> Tenant (`tenant.id`, `on delete cascade`); RLS key. Unique `(tenant_id)` enforces one config per workspace |
+| `forwarding_address` | text | Required, unique (`tenant_email_config_address_key`). Format validated by regex `check (forwarding_address ~ '^[^@\s]+@[^@\s]+\.[^@\s]+$')` |
+| `enabled` | boolean | Required, default `true`. Tenant owner toggle to enable or disable inbound email processing |
+| `domain_allowlist` | text[] | Nullable. Optional array of allowed sender domains; if non-empty, emails from unlisted domains are rejected |
+| `daily_limit` | integer | Required, default `100`, `check (daily_limit between 1 and 10000)`. Max inbound emails allowed per calendar day |
+| `daily_count` | integer | Required, default `0`, `check (daily_count >= 0)`. Count of emails accepted on `daily_count_date` |
+| `daily_count_date` | date | Required, default `current_date`. Anchor date for the daily rate limit counter |
+| `spf_dkim_required` | boolean | Required, default `false`. When true, inbound emails lacking passing SPF/DKIM verification are rejected |
+| `created_at` / `updated_at` | timestamptz | Audit fields, default `now()` |
+| `created_by` | uuid | Required composite FK -> Membership `(tenant_id, id)` (`tenant_email_config_created_by_fkey`) |
+
+RLS (enabled + forced): all active tenant members may `SELECT` (`tenant_email_config_tenant_select` using
+`tenant_id = current_tenant_id()`) to view settings and copy the workspace forwarding address. Mutation
+(`INSERT`, `UPDATE`, `DELETE`) is strictly restricted to the `owner` role via `tenant_email_config_owner_insert`,
+`tenant_email_config_owner_update`, and `tenant_email_config_owner_delete` (checking `tenant_id = current_tenant_id() and current_member_role() = 'owner'`).
+A case-insensitive index on `lower(forwarding_address)` backs inbound webhook routing queries. The address format
+check constrains email syntax only rather than hardcoding `@ingest.procurepilot.com` into the database, preserving
+testability across local, CI, and staging environments where the domain is dynamically configured.
+
+### `IngestionEmailLog`
+
+Metadata and audit record for every inbound email processed for a workspace (table `ingestion_email_log`).
+Enforces per-tenant RFC 5322 Message-ID deduplication, attachment counting, and records supplier identification
+provenance.
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | uuid | PK, default `gen_random_uuid()` |
+| `tenant_id` | uuid | Required FK -> Tenant (`tenant.id`, `on delete cascade`); RLS key. Unique `(tenant_id, id)` for composite FKs |
+| `message_id` | text | Required. RFC 5322 Message-ID header value. Unique per tenant `(tenant_id, message_id)` for duplicate prevention |
+| `from_address` | text | Required. Envelope sender email address |
+| `from_domain` | text | Required. Extracted and normalized domain from sender address; indexed for supplier matching |
+| `subject` | text | Nullable. Email subject line |
+| `in_reply_to` | text | Nullable. In-Reply-To header used for threading correlation |
+| `references_list` | text[] | Required, default `'{}'`. Array of Message-IDs from the References header |
+| `received_at` | timestamptz | Required, default `now()`. Ingestion timestamp recorded by inbound webhook |
+| `processed_at` | timestamptz | Nullable. Timestamp when pipeline execution finished |
+| `status` | enum `ingestion_email_status` | Required, default `'received'`. Values: `received`, `processing`, `completed`, `failed`, `duplicate`, `rejected` |
+| `error_message` | text | Nullable. Error description or rejection reason if status is `failed` or `rejected` |
+| `attachment_count` | integer | Required, default `0`, `check (attachment_count >= 0)`. Total attachments found |
+| `raw_email_ref` | text | Nullable. Supabase Storage path in the private `ingestion-raw` bucket (`{tenant_id}/raw-email/{message_id}`) for audit and replay |
+| `quotation_id` | uuid | Nullable bare FK -> Quotation (`quotation.id`, `on delete set null`). Linked quotation created from primary attachment |
+| `supplier_id` | uuid | Nullable composite FK -> Supplier `(tenant_id, id)` (`ingestion_email_log_supplier_fkey`, `on delete set null`) |
+| `match_method` | text | Nullable `check (match_method is null or match_method in ('address', 'domain', 'thread', 'manual'))`. Supplier identification mechanism |
+| `created_at` | timestamptz | Audit field, default `now()` |
+
+RLS (enabled + forced): `ingestion_email_log_tenant_isolation` grants full CRUD (`SELECT`, `INSERT`, `UPDATE`, `DELETE`)
+to `authenticated` users scoped to their current tenant (`tenant_id = current_tenant_id()`). Unique constraint
+`(tenant_id, message_id)` guarantees strict deduplication per RFC 5322: duplicates are caught at insertion time and
+short-circuited without re-extracting documents.
+
+### `IngestionJob`
+
+Asynchronous worker queue for background ingestion tasks (table `ingestion_jobs`), including inbound email processing,
+mobile/desktop camera capture extraction, and bulk supplier catalogue imports.
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | uuid | PK, default `gen_random_uuid()` |
+| `tenant_id` | uuid | Required FK -> Tenant (`tenant.id`, `on delete cascade`); RLS key. Unique `(tenant_id, id)` |
+| `job_type` | enum `ingestion_job_type` | Required. Values: `email_ingest`, `capture_ingest`, `catalogue_import` |
+| `status` | enum `ingestion_job_status` | Required, default `'pending'`. Values: `pending`, `processing`, `completed`, `failed` |
+| `payload` | jsonb | Required, default `'{}'::jsonb`. Serialized job parameters (e.g. storage paths, message metadata) |
+| `attempts` | integer | Required, default `0`, `check (attempts >= 0)`. Execution attempt counter |
+| `max_attempts` | integer | Required, default `3`, `check (max_attempts > 0)`. Retry limit before transition to terminal failed status |
+| `last_error` | text | Nullable. Error message from the most recent failed execution attempt |
+| `locked_by` | text | Nullable. Worker instance identifier holding execution lease |
+| `locked_at` | timestamptz | Nullable. Timestamp when worker acquired lock |
+| `created_at` / `updated_at` | timestamptz | Audit fields, default `now()` |
+| `completed_at` | timestamptz | Nullable. Completion timestamp; `check (completed_at is null or completed_at >= created_at)` |
+
+RLS (enabled + forced): `ingestion_jobs_tenant_isolation` grants full CRUD to `authenticated` users within their
+workspace (`tenant_id = current_tenant_id()`). Polled by background workers using the `FOR UPDATE SKIP LOCKED`
+pattern over partial index `ingestion_jobs_pending_worker_idx` on `(created_at) where status = 'pending'`, mirroring
+the concurrency mechanics of `ReportSchedule` and `DigestSubscription`.
+
+### `CatalogueImport`
+
+Tracks supplier catalogue bulk price refresh operations and telemetry from uploaded spreadsheets (table `catalogue_imports`).
+Persists storage references, parsing/import metrics, structured row validation errors, and resolved header mappings.
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | uuid | PK, default `gen_random_uuid()` |
+| `tenant_id` | uuid | Required FK -> Tenant (`tenant.id`, `on delete cascade`); RLS key. Unique `(tenant_id, id)` |
+| `supplier_id` | uuid | Required composite FK -> Supplier `(tenant_id, id)` (`catalogue_imports_supplier_fkey`, `on delete cascade`) |
+| `file_name` | text | Required, `check (char_length(file_name) between 1 and 255)`. Original uploaded filename |
+| `file_path` | text | Required. Storage path in Supabase Storage |
+| `file_size_bytes` | bigint | Required, `check (file_size_bytes > 0)`. Source file byte count |
+| `file_format` | text | Required, `check (file_format in ('csv', 'xlsx'))`. Supported spreadsheet format |
+| `status` | enum `catalogue_import_status` | Required, default `'pending'`. Values: `pending`, `processing`, `completed`, `failed` |
+| `total_rows` | integer | Nullable, `check (total_rows is null or total_rows >= 0)`. Total data rows in sheet (excluding header) |
+| `imported_rows` | integer | Nullable, `check (imported_rows is null or imported_rows >= 0)`. Valid rows imported into quotation lines |
+| `skipped_rows` | integer | Nullable, `check (skipped_rows is null or skipped_rows >= 0)`. Rows skipped during processing |
+| `error_rows` | integer | Nullable, `check (error_rows is null or error_rows >= 0)`. Count of invalid/unparseable rows |
+| `error_details` | jsonb | Required, default `'[]'::jsonb`. Array of `{row, column, error}` validation failure objects |
+| `column_mapping` | jsonb | Required, default `'{}'::jsonb`. Resolved spreadsheet column to catalogue attribute mapping |
+| `created_at` | timestamptz | Audit field, default `now()` |
+| `completed_at` | timestamptz | Nullable. Completion timestamp; `check (completed_at is null or completed_at >= created_at)` |
+| `created_by` | uuid | Required composite FK -> Membership `(tenant_id, id)` (`catalogue_imports_created_by_fkey`) |
+
+RLS (enabled + forced): all active tenant members may `SELECT` (`catalogue_imports_tenant_select` using
+`tenant_id = current_tenant_id()`) to view import status and error logs. Mutation (`INSERT`, `UPDATE`) is
+restricted to `owner` and `buyer` roles via `catalogue_imports_owner_buyer_insert` and
+`catalogue_imports_owner_buyer_update` (checking `tenant_id = current_tenant_id() and current_member_role() in ('owner', 'buyer')`).
+
+### Storage: `ingestion-raw` bucket
+
+A private (`public = false`, 50MB file size limit) Supabase Storage bucket added in migration
+`20260917000007_ingestion_storage.sql`. Stores unmodified incoming MIME emails under `{tenant_id}/raw-email/{message_id}`
+for compliance, audit trails, and deterministic replay. Protected by `ingestion_raw_tenant_isolation` on `storage.objects`,
+pinning `(storage.foldername(name))[1] = current_tenant_id()::text` to enforce tenant isolation.
+
+### Quotation & Supplier Schema Extensions
+
+- **`quotation.source`**: Text column tracking arrival channel with check constraint `check (source in ('upload', 'email', 'capture', 'catalogue_import'))`; default `'upload'`.
+- **`quotation.ingestion_email_id`**: Composite FK to `ingestion_email_log(tenant_id, id)` on delete set null (`quotation_ingestion_email_fkey`).
+- **`supplier.email_domains`**: `text[] not null default '{}'` column storing authorized sender domains for automated email attribution, indexed with GIN (`supplier_email_domains_gin_idx`).
+- **`document_source_channel`**: Enum extended with `'email'`, `'capture'`, and `'catalogue_import'`.
+- **`document.mime_type`**: Widened check constraint accepting `image/heic` (mobile photo captures) and `text/plain`.
+
+### New audit events (chunk R3.0)
+
+- `ingestion.email_config_updated` — tenant email ingestion settings (domain allowlist, daily limit, SPF/DKIM enforcement) were updated.
+- `ingestion.email_config_enabled` — email ingestion was activated by a workspace owner.
+- `ingestion.email_config_disabled` — email ingestion was deactivated by a workspace owner.
+- `email_received` — inbound email was accepted, raw MIME payload stored in `ingestion-raw`, and primary document/quotation enqueued.
+- `email_duplicate` — duplicate RFC 5322 Message-ID was detected for the tenant and skipped without reprocessing.
+- `email_rejected` — inbound email was rejected during validation (SPF/DKIM failure, unsupported attachment type, or file size limits).
+- `email_supplier_matched` — inbound email sender was successfully resolved to a known tenant supplier via address, domain, or thread correlation.
+- `email_supplier_unmatched` — inbound email sender could not be matched; quotation was created and flagged for manual supplier review.
+- `capture_uploaded` — quotation document or photo was successfully uploaded via mobile/desktop capture endpoint.
+- `capture_rejected` — capture upload was rejected due to file size exceeding limit or unsupported media type.
+- `catalogue_import_started` — supplier price catalogue spreadsheet upload was accepted and import parsing initiated.
+- `catalogue_import_completed` — supplier catalogue spreadsheet was successfully parsed and quotation lines imported.
+- `catalogue_import_failed` — supplier catalogue import failed due to parse error, schema validation errors, or zero valid rows.
+
