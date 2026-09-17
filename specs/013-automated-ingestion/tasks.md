@@ -356,18 +356,19 @@ precisely-scoped gap that was actually closed, not a full suite written from scr
   - Delegated to Agy; reviewed (including the concurrency test's actual mechanics, not just
     that it passed), independently re-tested (5/5), no changes needed.
 
-- [ ] **T032** — Integration test: capture endpoint, `image/jpeg` happy path
+- [x] **T032** — Integration test: capture endpoint, `image/jpeg` happy path
   (`tests/integration/test_capture_service.py`)
-  - **Blocked, not started.** Four of five scenarios already covered by T015's own tests; the
-    one gap is the happy-path test only exercising a PDF, not the image case tasks.md also asks
-    for. Dispatched to OpenCode (`opencode-go/muse-spark-1.2-contributor-free`, the `simple`
-    lane) — both `-free` model variants (`1.2` and `1.3`) fail immediately with a generic
-    `"Unexpected server error"` even for a trivial "say hello" prompt run directly via the raw
-    `opencode` CLI (confirmed twice, not a brief or relay-mechanics problem); the paid
-    `-contributor` variants work but require a data-collection opt-in only the account owner can
-    approve. Looks like an OpenCode free-tier outage, not a task-specific issue. Not resolved by
-    silently switching to a different (metered) model on my own initiative — flagged for the
-    user to pick a fallback (retry OpenCode later, or reassign to Agy/Cursor for this one task).
+  - Four of five scenarios were already covered by T015's own tests; the one gap was the
+    happy-path test only exercising a PDF, not the image case tasks.md also asks for. New test
+    mirrors the existing PDF happy path exactly, asserting `document["mime_type"] ==
+    "image/jpeg"`.
+  - First dispatched to OpenCode (`opencode-go/muse-spark-1.2-contributor-free`, the `simple`
+    lane at the time) — both `-free` model variants (`1.2` and `1.3`) failed immediately with a
+    generic `"Unexpected server error"`, confirmed independent of the brief by running the raw
+    `opencode` CLI directly with a trivial "say hello" prompt. The user's response was to remove
+    OpenCode from the fleet entirely (not just retry or swap models) — see the
+    `delegate-heavily-to-codex` memory. Re-dispatched to Agy (the `simple` lane's new default);
+    reviewed, independently re-tested, no changes needed.
 
 - [x] **T033** — Integration test: catalogue import repeat-call behavior
   (`tests/integration/test_catalogue_import.py`)
