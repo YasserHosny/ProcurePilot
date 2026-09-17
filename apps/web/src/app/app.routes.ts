@@ -270,6 +270,44 @@ export const routes: Routes = [
             (m) => m.DigestSettingsComponent,
           ),
       },
+      // --- automated ingestion (R3.0) ---
+      {
+        path: 'ingestion',
+        loadComponent: () =>
+          import('./features/ingestion/dashboard/dashboard.component').then(
+            (m) => m.DashboardComponent,
+          ),
+      },
+      {
+        path: 'ingestion/email-config',
+        loadComponent: () =>
+          import('./features/ingestion/email-config/email-config.component').then(
+            (m) => m.EmailConfigComponent,
+          ),
+      },
+      {
+        path: 'ingestion/email-log',
+        loadComponent: () =>
+          import('./features/ingestion/email-log/email-log.component').then(
+            (m) => m.EmailLogComponent,
+          ),
+      },
+      {
+        path: 'ingestion/capture',
+        canActivate: [roleGuard('owner', 'buyer')],
+        loadComponent: () =>
+          import('./features/ingestion/capture/capture.component').then(
+            (m) => m.CaptureComponent,
+          ),
+      },
+      {
+        path: 'ingestion/catalogue-import',
+        canActivate: [roleGuard('owner', 'buyer')],
+        loadComponent: () =>
+          import('./features/ingestion/catalogue-import/catalogue-import.component').then(
+            (m) => m.CatalogueImportComponent,
+          ),
+      },
       {
         path: 'savings/outcome-capture',
         canActivate: [roleGuard('owner', 'buyer')],
