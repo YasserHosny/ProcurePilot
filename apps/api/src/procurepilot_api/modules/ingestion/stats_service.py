@@ -7,7 +7,6 @@ from psycopg.rows import dict_row
 
 from procurepilot_api.config import Settings, get_settings
 from procurepilot_api.deps import CurrentMember
-from procurepilot_api.modules.digests.service import _tenant_context
 from procurepilot_api.modules.ingestion.schemas import IngestionStats
 from procurepilot_api.modules.offers.service import _authenticated_db
 
@@ -60,8 +59,12 @@ def get_ingestion_stats(
     resolved_settings = settings or get_settings()
 
     with _authenticated_db(resolved_settings, member) as conn:
-        ctx = _tenant_context(conn, member.tenant_id, member.membership_id)
-        tz_name = str(ctx.get("reporting_timezone") or "UTC")
+        with conn.cursor() as cur:
+            cur.execute(
+                "select reporting_timezone from tenant where id = %s", (member.tenant_id,)
+            )
+            tz_row = cur.fetchone()
+        tz_name = str(tz_row[0]) if tz_row and tz_row[0] else "UTC"
         today_start, week_start, month_start = derive_calendar_windows(tz_name, now=now)
 
         with conn.cursor(row_factory=dict_row) as cur:
