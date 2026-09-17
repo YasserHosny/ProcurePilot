@@ -244,10 +244,25 @@ genuinely parallel, not sequential, regardless of which lane each lands on:
 
 ## 5. What comes after
 
+**Update 2026-09-17, after this wave's dispatches ran**: T030, T031, T033, and T034 are merged
+(see `specs/013-automated-ingestion/tasks.md`'s own entries for exactly what each closed — the
+grounding table in §0 above held up; no task needed more than its scoped gap). T032 hit a real,
+unplanned blocker mid-wave: OpenCode's `muse-spark` (the `simple` lane's model at the time) failed
+every dispatch with a generic server error, confirmed independent of the brief by testing the raw
+CLI directly. The user's response was to remove OpenCode from the fleet entirely, not just swap
+models — see `delegate-heavily-to-codex` memory. T032 was re-dispatched to Agy and is either
+already merged or still running by the time you're reading this; check `tasks.md` for its real
+current status rather than trusting this paragraph.
+
+T035/T036 got their own dedicated plan once both of this wave's hold conditions (T030–T034
+merged; Agy's live walkthrough reported back) were satisfied — see
+`parallel-execution-plan-ingestion-wave7.md`, not this document, for their real scope. Do not
+re-plan them here.
+
 Phase 8 (T037–T042 — API spec, data dictionary, user docs, test-strategy doc, OpenAPI contract,
-security review) is the feature's close-out. T042 (security review) should happen after T035/
-T036 land, not before — a security review of surfaces whose E2E/a11y coverage doesn't exist yet
-is reviewing an incomplete picture.
+security review) is the feature's close-out, after Wave 7. T042 (security review) should happen
+last of all — a security review of surfaces whose E2E/a11y coverage doesn't exist yet is
+reviewing an incomplete picture.
 
 ## 6. Cautions
 
