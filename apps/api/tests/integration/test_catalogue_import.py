@@ -246,3 +246,90 @@ def test_cross_tenant_supplier_id_resolves_not_found(
                     bearer_token="test-bearer-token",
                 )
         assert _fake_matching == []
+
+
+def test_importing_the_same_file_twice_creates_two_independent_quotations(
+    monkeypatch: pytest.MonkeyPatch, _fake_matching: list[dict[str, object]]
+) -> None:
+    settings = settings_for_test_db(monkeypatch)
+    with committed_smart_context("catalogue-import-reimport", supplier_count=1) as context:
+        supplier_id = context.supplier_ids[0]
+        token = "test-bearer-token"
+        content = _csv(
+            [
+                "product_name,unit_price,currency",
+                "Whole Milk 2L,1.75,USD",
+                "Sourdough Loaf,3.25,USD",
+            ]
+        )
+
+        first = import_catalogue(
+            settings,
+            member=context.member,
+            supplier_id=supplier_id,
+            file_content=content,
+            filename="prices.csv",
+            file_format="csv",
+            bearer_token=token,
+        )
+        second = import_catalogue(
+            settings,
+            member=context.member,
+            supplier_id=supplier_id,
+            file_content=content,
+            filename="prices.csv",
+            file_format="csv",
+            bearer_token=token,
+        )
+
+        for row in (first, second):
+            assert row["status"] == "completed"
+            assert row["total_rows"] == 2
+            assert row["imported_rows"] == 2
+            assert row["error_rows"] == 0
+
+        assert first["id"] != second["id"]
+
+        history = catalogue_import_service.list_imports(
+            member=context.member,
+            supplier_id=supplier_id,
+            settings=settings,
+        )
+        assert len(history.items) == 2
+        assert {item.id for item in history.items} == {first["id"], second["id"]}
+
+        assert len(_fake_matching) == 2
+        matching_quotation_ids = {
+            _fake_matching[0]["quotation_id"],
+            _fake_matching[1]["quotation_id"],
+        }
+        assert len(matching_quotation_ids) == 2
+
+        with psycopg.connect(TEST_DATABASE_URL or "", row_factory=psycopg.rows.dict_row) as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "select id, status, source, supplier_id "
+                    "from quotation where tenant_id = %s and source = 'catalogue_import' "
+                    "and supplier_id = %s order by created_at",
+                    (context.workspace.tenant_id, supplier_id),
+                )
+                quotations = cur.fetchall()
+                assert len(quotations) == 2
+                quotation_ids = {q["id"] for q in quotations}
+                assert len(quotation_ids) == 2
+                assert quotation_ids == matching_quotation_ids
+                for quotation in quotations:
+                    assert quotation["status"] == "reviewed"
+                    assert quotation["source"] == "catalogue_import"
+                    assert quotation["supplier_id"] == supplier_id
+
+                    cur.execute(
+                        "select line_number, original_text "
+                        "from quotation_line where quotation_id = %s order by line_number",
+                        (quotation["id"],),
+                    )
+                    lines = cur.fetchall()
+                    assert [line_row["original_text"] for line_row in lines] == [
+                        "Whole Milk 2L",
+                        "Sourdough Loaf",
+                    ]
