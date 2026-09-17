@@ -225,64 +225,106 @@
 
 ## Phase 5 — Frontend: Email Config & Ingestion Views
 
-- [ ] **T022** — Component: email ingestion settings
-  - Tenant email config display (forwarding address, enabled state)
-  - Enable/disable toggle (owner only)
-  - Domain allowlist editor
-  - Daily limit display
-  - Copy-to-clipboard for forwarding address
-  - i18n (en + ar)
-  - File: `apps/web/src/app/features/ingestion/email-config/`
+- [x] **T028** — i18n: add ingestion keys (en + ar) (`packages/i18n/{en,ar}.json`)
+  - One new top-level `ingestion` namespace, nested the same way `digests`/`reports` already
+    are. Covers every label, button, empty-state, and error message for T022–T026 in one pass,
+    landed *before* those five components so five parallel builds never had to touch (and
+    conflict on) the same two JSON files. Real, natural Arabic — not transliterated.
+  - Ran first, alone, in Wave 5's delegation sequence (see
+    `docs/operations/parallel-execution-plan-ingestion-wave5.md` §4).
 
-- [ ] **T023** — Component: ingestion email log viewer
-  - Paginated list of processed emails
-  - Status badges, supplier attribution, quotation links
-  - Date range filter
-  - i18n (en + ar)
-  - File: `apps/web/src/app/features/ingestion/email-log/`
+- [x] **T029** — API service: ingestion API client (`modules/ingestion/ingestion-api.ts` on web)
+  - `IngestionApiService`, modeled on `reports/digest-settings/digests-api.ts`'s shape. One
+    method per backend endpoint (T013, T015, T018–T021), typed request/response interfaces
+    matching the real Pydantic schemas field-for-field. The two upload methods
+    (`submitCapture`, `submitCatalogueImport`) build `FormData` and post it directly — no
+    `Content-Type` header set by hand, no presign step (unlike `quotation-upload.component.ts`'s
+    older flow) — since the backend endpoints are plain multipart POSTs. Reuses the existing
+    `ApiError` type rather than redefining it; does not duplicate `ApiService.suppliers()`.
+  - Ran alongside T028 (no shared files). Tests: `ingestion-api.spec.ts` (15 tests).
 
-- [ ] **T024** — Component: capture upload
-  - File picker for image/PDF
-  - Camera integration (via `<input type="file" accept="image/*" capture="camera">`)
-  - Optional supplier selector
-  - Upload progress indicator
-  - i18n (en + ar)
-  - File: `apps/web/src/app/features/ingestion/capture/`
+- [x] **T022** — Component: email ingestion settings (`features/ingestion/email-config/`)
+  - Tenant email config display, owner-only enable/disable toggle (`*appRole="'owner'"`,
+    matching T013's server-side `require_role(*OWNER)`), domain allowlist editor (chip add/
+    remove, PUTs the full array), copy-to-clipboard forwarding address, read-only daily limit
+    display. Follows `digest-settings.component.ts`'s signal + `TranslateService` pattern.
+  - **Real test-infrastructure bug found in review**: spying on `MatSnackBar` via a plain
+    `TestBed.configureTestingModule({ providers: [{ provide: MatSnackBar, useValue: spy }] })`
+    entry silently does nothing for a standalone component in this Angular setup — `inject(
+    MatSnackBar)` still resolves to the real service (confirmed empirically by logging the
+    injected instance). The proven fix, used throughout this codebase (e.g.
+    `team.component.spec.ts`) but not written down anywhere: `.overrideComponent(YourComponent,
+    { set: { providers: [...] } })` instead. Fixed in this component's spec and called out
+    explicitly in every subsequent Wave 5 component's dispatch brief so it wasn't rediscovered
+    five times.
+  - Delegated to Agy; reviewed, independently re-tested, one fix applied before merge.
 
-- [ ] **T025** — Component: catalogue import
-  - File picker for CSV/XLSX
-  - Supplier selector
-  - Upload + processing progress
-  - Import results display (imported, skipped, errors)
-  - Error details expandable list
-  - i18n (en + ar)
-  - File: `apps/web/src/app/features/ingestion/catalogue-import/`
+- [x] **T023** — Component: ingestion email log viewer (`features/ingestion/email-log/`)
+  - Cursor-paginated list via `IngestionApiService.listEmailLogs`, six distinct status badges
+    (`received`/`processing`/`completed`/`failed`/`duplicate`/`rejected`), supplier/quotation
+    links, status/from-domain/date-range filters with reset. Follows `reports-center.component.
+    ts`'s listing pattern.
+  - Delegated to Agy; reviewed. One minor fix: a pagination test relied only on
+    `HttpTestingController.expectNone(...)` with no Jasmine `expect(...)`, which Karma flags as
+    "has no expectations" even though it passes — added real assertions alongside it.
 
-- [ ] **T026** — Component: ingestion dashboard
-  - Stats cards: emails today, captures, imports
-  - Match rate gauge
-  - Recent activity list
-  - i18n (en + ar)
-  - File: `apps/web/src/app/features/ingestion/dashboard/`
+- [x] **T024** — Component: capture upload (`features/ingestion/capture/`)
+  - File picker (`application/pdf,image/jpeg,image/png,image/heic`) plus a mobile camera-capture
+    input (`accept="image/*" capture="camera"`), optional supplier selector (reuses the existing
+    `ApiService.suppliers()`, no duplicate lookup logic), optional notes field, client-side
+    pre-checks (empty/oversized/unsupported-format) before the round trip. Mirrors
+    `quotation-upload.component.ts`'s drag-drop/validate/error-handling UX, but posts directly
+    via `IngestionApiService.submitCapture` (no presign step — T015's endpoint is a plain
+    multipart POST). Inline error banner, not a snackbar. `*appRole="['owner','buyer']"` display
+    gate matching T015's real server-side role requirement.
+  - Delegated to Agy; reviewed, independently re-tested, no changes needed.
 
-- [ ] **T027** — Routing: ingestion feature module
-  - Add ingestion routes to app routing
-  - Navigation menu entry
-  - Role guards (owner/buyer)
-  - File: `apps/web/src/app/features/ingestion/ingestion.routes.ts`
+- [x] **T025** — Component: catalogue import (`features/ingestion/catalogue-import/`)
+  - Required supplier selector (the endpoint is per-supplier; file picker stays disabled until
+    one is chosen), CSV/XLSX-only picker, client-side pre-checks (empty/oversized/format) before
+    submit, indeterminate progress (never a fake determinate percentage — T017's matching runs
+    synchronously server-side), results summary (total/imported/skipped/error counts) with an
+    expandable per-row error list, "import another" reset. Deliberately has no "cancel" action on
+    an in-flight import (there is nothing to cancel — the server call is synchronous).
+  - Delegated to Agy; reviewed, independently re-tested, no changes needed.
 
-## Phase 6 — i18n & API Service Layer (Frontend)
+- [x] **T026** — Component: ingestion dashboard (`features/ingestion/dashboard/`)
+  - Stat cards (emails today/week/month, capture uploads, catalogue imports), match-rate and
+    extraction-success-rate shown as `<mat-progress-bar mode="determinate">` percentages (no new
+    charting library). Recent-activity section deliberately scoped to the 5 most recent
+    `listEmailLogs` rows only and labeled "Recent Emails," not an unqualified "Recent Activity"
+    — there is no tenant-wide catalogue-import listing endpoint (T020 is per-supplier only), so
+    captures/imports genuinely cannot appear there; a code comment says so. Cards link to the
+    other four sub-pages (this is the hub — see T027).
+  - Delegated to Agy; reviewed, independently re-tested, no changes needed.
 
-- [ ] **T028** — i18n: add ingestion keys (en + ar)
-  - All labels for email config, capture, catalogue import, dashboard
-  - Error messages
-  - Status labels
-  - Files: `packages/i18n/en.json`, `packages/i18n/ar.json`
+- [x] **T027** — Routing + navigation (`app.routes.ts` + `layout/shell/shell.component.html`)
+  - **Real finding versus tasks.md's own file list**: this codebase has no per-feature
+    `*.routes.ts` files anywhere (`find . -iname "*.routes.ts"` returns only `app.routes.ts`
+    itself) — every feature registers lazy `loadComponent` routes directly in one central file.
+    Added five routes there instead of creating `features/ingestion/ingestion.routes.ts` as
+    tasks.md's bullet suggested. `/ingestion/capture` and `/ingestion/catalogue-import` get
+    `canActivate: [roleGuard('owner', 'buyer')]` (matching `/quotations/upload`'s own
+    precedent); the other three ingestion routes have no route-level guard, matching
+    `/reports`/`/reports/digest-settings`.
+  - **Hub-and-spoke navigation**, not one sidenav item per component: a single new entry
+    (`inbox` icon, `ingestion.nav` i18n key, matching `reports.nav`'s own per-feature-key
+    convention) routes to `/ingestion` only — the other four pages are reached via links from
+    the dashboard hub, exactly like `reports-center` → `schedule-form`/`digest-settings` have no
+    sidenav entries of their own.
+  - Ran solo, after all five Phase 5 components were merged, specifically to avoid five parallel
+    sessions all editing these same two shared files.
+  - Delegated to Agy; the first dispatch attempt was killed by the host's OOM watchdog while
+    running backgrounded — retried in the foreground per this session's own established
+    guidance for OOM-prone dispatches, which completed cleanly. Reviewed, independently
+    re-tested (436/436), lint and a full production build both clean.
 
-- [ ] **T029** — API service: ingestion API client
-  - Typed API calls for all ingestion endpoints
-  - Error handling with structured error mapping
-  - File: `apps/web/src/app/features/ingestion/ingestion-api.ts`
+**Known follow-up, not fixed in this wave**: `pnpm --filter web build` warns that all five new
+components' `.scss` files exceed the project's 4 KB per-component style budget (by 195 B–1.95 KB
+each) — a non-blocking build warning, not an error, and not caught by any test. Five components
+built in parallel without visibility into this shared Angular CLI budget. Worth a follow-up pass
+to trim shared styles into a common stylesheet rather than tuning five files individually, but
+deferred rather than spending another delegation round on pure CSS size right now.
 
 ## Phase 7 — Testing & Quality
 
