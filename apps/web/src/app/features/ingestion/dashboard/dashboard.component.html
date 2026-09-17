@@ -1,0 +1,292 @@
+<div class="ingestion-dashboard-container">
+  <!-- Header -->
+  <div class="header-section">
+    <div class="title-group">
+      <h1 class="page-title">{{ 'ingestion.dashboard.title' | translate }}</h1>
+      <p class="page-subtitle">{{ 'ingestion.dashboard.subtitle' | translate }}</p>
+    </div>
+  </div>
+
+  <!-- Error banner -->
+  @if (errorMessage(); as err) {
+    <div class="error-banner" role="alert">
+      <mat-icon class="error-icon" aria-hidden="true">error_outline</mat-icon>
+      <div class="error-text-wrap">
+        <span class="error-title">{{ 'ingestion.dashboard.error.title' | translate }}</span>
+        <span class="error-message">{{ err }}</span>
+      </div>
+      <button
+        mat-button
+        type="button"
+        class="retry-btn"
+        (click)="loadDashboard()"
+      >
+        <mat-icon aria-hidden="true">refresh</mat-icon>
+        <span>{{ 'ingestion.dashboard.error.retry' | translate }}</span>
+      </button>
+    </div>
+  }
+
+  <!-- Loading state -->
+  @if (isLoading()) {
+    <div class="loading-state" aria-live="polite">
+      <mat-spinner [attr.aria-label]="'ingestion.dashboard.loading' | translate" diameter="36"></mat-spinner>
+      <span>{{ 'ingestion.dashboard.loading' | translate }}</span>
+    </div>
+  } @else {
+    <!-- Stat cards: Emails today, Document captures, Catalogue imports -->
+    <section class="stats-section">
+      <div class="stats-grid">
+        <!-- Emails Today -->
+        <mat-card class="stat-card">
+          <mat-card-header>
+            <mat-icon mat-card-avatar class="stat-icon email-icon" aria-hidden="true">mail</mat-icon>
+            <mat-card-title class="stat-title">{{ 'ingestion.dashboard.stats.emailsToday' | translate }}</mat-card-title>
+          </mat-card-header>
+          <mat-card-content>
+            <div class="stat-value">{{ stats()?.emails_received_today ?? 0 }}</div>
+            <div class="stat-secondary">
+              {{ 'ingestion.dashboard.stats.periodSummary' | translate: {
+                today: stats()?.emails_received_today ?? 0,
+                week: stats()?.emails_received_week ?? 0,
+                month: stats()?.emails_received_month ?? 0
+              } }}
+            </div>
+          </mat-card-content>
+        </mat-card>
+
+        <!-- Document Captures -->
+        <mat-card class="stat-card">
+          <mat-card-header>
+            <mat-icon mat-card-avatar class="stat-icon capture-icon" aria-hidden="true">document_scanner</mat-icon>
+            <mat-card-title class="stat-title">{{ 'ingestion.dashboard.stats.captureUploads' | translate }}</mat-card-title>
+          </mat-card-header>
+          <mat-card-content>
+            <div class="stat-value">{{ stats()?.capture_uploads_total ?? 0 }}</div>
+            <div class="stat-secondary">{{ 'ingestion.dashboard.stats.totalCaptures' | translate }}</div>
+          </mat-card-content>
+        </mat-card>
+
+        <!-- Catalogue Imports -->
+        <mat-card class="stat-card">
+          <mat-card-header>
+            <mat-icon mat-card-avatar class="stat-icon catalogue-icon" aria-hidden="true">inventory_2</mat-icon>
+            <mat-card-title class="stat-title">{{ 'ingestion.dashboard.stats.catalogueImports' | translate }}</mat-card-title>
+          </mat-card-header>
+          <mat-card-content>
+            <div class="stat-value">{{ stats()?.catalogue_imports_total ?? 0 }}</div>
+            <div class="stat-secondary">{{ 'ingestion.dashboard.stats.totalImports' | translate }}</div>
+          </mat-card-content>
+        </mat-card>
+      </div>
+    </section>
+
+    <!-- Rates: Supplier match rate & Extraction success rate -->
+    <section class="rates-section">
+      <div class="rates-grid">
+        <!-- Supplier Match Rate -->
+        <mat-card class="rate-card">
+          <mat-card-content>
+            <div class="rate-header">
+              <span class="rate-title">{{ 'ingestion.dashboard.rates.supplierMatchRate' | translate }}</span>
+              <span class="rate-value">{{ formatRate(stats()?.supplier_match_rate) }}</span>
+            </div>
+            <mat-progress-bar
+              mode="determinate"
+              [value]="getRatePercent(stats()?.supplier_match_rate)"
+              class="rate-progress match-rate-bar"
+              [attr.aria-label]="'ingestion.dashboard.rates.supplierMatchRate' | translate"
+            ></mat-progress-bar>
+            <p class="rate-desc">{{ 'ingestion.dashboard.rates.supplierMatchRateDesc' | translate }}</p>
+          </mat-card-content>
+        </mat-card>
+
+        <!-- Extraction Success Rate -->
+        <mat-card class="rate-card">
+          <mat-card-content>
+            <div class="rate-header">
+              <span class="rate-title">{{ 'ingestion.dashboard.rates.extractionSuccessRate' | translate }}</span>
+              <span class="rate-value">{{ formatRate(stats()?.extraction_success_rate) }}</span>
+            </div>
+            <mat-progress-bar
+              mode="determinate"
+              [value]="getRatePercent(stats()?.extraction_success_rate)"
+              class="rate-progress extraction-rate-bar"
+              [attr.aria-label]="'ingestion.dashboard.rates.extractionSuccessRate' | translate"
+            ></mat-progress-bar>
+            <p class="rate-desc">{{ 'ingestion.dashboard.rates.extractionSuccessRateDesc' | translate }}</p>
+          </mat-card-content>
+        </mat-card>
+      </div>
+    </section>
+
+    <!-- Channels & Tools (Links to sub-pages) -->
+    <section class="channels-section">
+      <div class="section-header">
+        <h2 class="section-title">{{ 'ingestion.dashboard.channels.title' | translate }}</h2>
+        <p class="section-subtitle">{{ 'ingestion.dashboard.channels.subtitle' | translate }}</p>
+      </div>
+      <div class="channels-grid">
+        <!-- Email Config -->
+        <mat-card class="channel-card">
+          <mat-card-header>
+            <mat-icon mat-card-avatar class="channel-icon" aria-hidden="true">settings</mat-icon>
+            <mat-card-title class="channel-title">{{ 'ingestion.dashboard.channels.emailConfigTitle' | translate }}</mat-card-title>
+          </mat-card-header>
+          <mat-card-content>
+            <p class="channel-desc">{{ 'ingestion.dashboard.channels.emailConfigDesc' | translate }}</p>
+          </mat-card-content>
+          <mat-card-actions>
+            <a mat-stroked-button routerLink="/ingestion/email-config" class="channel-action-btn">
+              <span>{{ 'ingestion.dashboard.channels.configureAction' | translate }}</span>
+              <mat-icon class="rtl-flip" aria-hidden="true">arrow_forward</mat-icon>
+            </a>
+          </mat-card-actions>
+        </mat-card>
+
+        <!-- Email Log -->
+        <mat-card class="channel-card">
+          <mat-card-header>
+            <mat-icon mat-card-avatar class="channel-icon" aria-hidden="true">mark_email_read</mat-icon>
+            <mat-card-title class="channel-title">{{ 'ingestion.dashboard.channels.emailLogTitle' | translate }}</mat-card-title>
+          </mat-card-header>
+          <mat-card-content>
+            <p class="channel-desc">{{ 'ingestion.dashboard.channels.emailLogDesc' | translate }}</p>
+          </mat-card-content>
+          <mat-card-actions>
+            <a mat-stroked-button routerLink="/ingestion/email-log" class="channel-action-btn">
+              <span>{{ 'ingestion.dashboard.channels.viewLogAction' | translate }}</span>
+              <mat-icon class="rtl-flip" aria-hidden="true">arrow_forward</mat-icon>
+            </a>
+          </mat-card-actions>
+        </mat-card>
+
+        <!-- Capture -->
+        <mat-card class="channel-card">
+          <mat-card-header>
+            <mat-icon mat-card-avatar class="channel-icon" aria-hidden="true">document_scanner</mat-icon>
+            <mat-card-title class="channel-title">{{ 'ingestion.dashboard.channels.captureTitle' | translate }}</mat-card-title>
+          </mat-card-header>
+          <mat-card-content>
+            <p class="channel-desc">{{ 'ingestion.dashboard.channels.captureDesc' | translate }}</p>
+          </mat-card-content>
+          <mat-card-actions>
+            <a mat-stroked-button routerLink="/ingestion/capture" class="channel-action-btn">
+              <span>{{ 'ingestion.dashboard.channels.captureAction' | translate }}</span>
+              <mat-icon class="rtl-flip" aria-hidden="true">arrow_forward</mat-icon>
+            </a>
+          </mat-card-actions>
+        </mat-card>
+
+        <!-- Catalogue Import -->
+        <mat-card class="channel-card">
+          <mat-card-header>
+            <mat-icon mat-card-avatar class="channel-icon" aria-hidden="true">inventory_2</mat-icon>
+            <mat-card-title class="channel-title">{{ 'ingestion.dashboard.channels.catalogueImportTitle' | translate }}</mat-card-title>
+          </mat-card-header>
+          <mat-card-content>
+            <p class="channel-desc">{{ 'ingestion.dashboard.channels.catalogueImportDesc' | translate }}</p>
+          </mat-card-content>
+          <mat-card-actions>
+            <a mat-stroked-button routerLink="/ingestion/catalogue-import" class="channel-action-btn">
+              <span>{{ 'ingestion.dashboard.channels.importAction' | translate }}</span>
+              <mat-icon class="rtl-flip" aria-hidden="true">arrow_forward</mat-icon>
+            </a>
+          </mat-card-actions>
+        </mat-card>
+      </div>
+    </section>
+
+    <!--
+      Recent activity scope: Per plan doc §2, this section displays only the 5 most recent
+      inbound emails from GET /ingestion/emails. Captures and catalogue imports are not included
+      here because there is no tenant-wide activity listing endpoint for them.
+    -->
+    <section class="recent-emails-section">
+      <mat-card class="recent-emails-card">
+        <div class="recent-emails-header">
+          <div class="recent-emails-title-group">
+            <h2 class="section-title">{{ 'ingestion.dashboard.recentEmails.title' | translate }}</h2>
+            <p class="section-subtitle">{{ 'ingestion.dashboard.recentEmails.subtitle' | translate }}</p>
+          </div>
+          <a mat-stroked-button routerLink="/ingestion/email-log" class="view-all-btn">
+            <span>{{ 'ingestion.dashboard.recentEmails.viewAll' | translate }}</span>
+            <mat-icon class="rtl-flip" aria-hidden="true">arrow_forward</mat-icon>
+          </a>
+        </div>
+
+        @if (recentEmails().length === 0) {
+          <div class="empty-state">
+            <mat-icon class="empty-icon" aria-hidden="true">mail_outline</mat-icon>
+            <h3 class="empty-title">{{ 'ingestion.dashboard.recentEmails.emptyTitle' | translate }}</h3>
+            <p class="empty-message">{{ 'ingestion.dashboard.recentEmails.emptyMessage' | translate }}</p>
+          </div>
+        } @else {
+          <div class="table-responsive">
+            <table
+              mat-table
+              [dataSource]="recentEmails()"
+              class="recent-emails-table"
+              [attr.aria-label]="'ingestion.dashboard.recentEmails.title' | translate"
+            >
+              <!-- Sender Column -->
+              <ng-container matColumnDef="from">
+                <th mat-header-cell *matHeaderCellDef scope="col">
+                  {{ 'ingestion.dashboard.recentEmails.from' | translate }}
+                </th>
+                <td mat-cell *matCellDef="let email" class="from-cell">
+                  <span class="from-address">{{ email.from_address }}</span>
+                </td>
+              </ng-container>
+
+              <!-- Subject Column -->
+              <ng-container matColumnDef="subject">
+                <th mat-header-cell *matHeaderCellDef scope="col">
+                  {{ 'ingestion.dashboard.recentEmails.subject' | translate }}
+                </th>
+                <td mat-cell *matCellDef="let email" class="subject-cell">
+                  <span>{{ email.subject || '—' }}</span>
+                </td>
+              </ng-container>
+
+              <!-- Status Column -->
+              <ng-container matColumnDef="status">
+                <th mat-header-cell *matHeaderCellDef scope="col">
+                  {{ 'ingestion.dashboard.recentEmails.status' | translate }}
+                </th>
+                <td mat-cell *matCellDef="let email">
+                  <span class="status-pill" [ngClass]="getEmailStatusClass(email.status)">
+                    {{ 'ingestion.statuses.' + email.status | translate }}
+                  </span>
+                </td>
+              </ng-container>
+
+              <!-- Supplier Column -->
+              <ng-container matColumnDef="supplier">
+                <th mat-header-cell *matHeaderCellDef scope="col">
+                  {{ 'ingestion.dashboard.recentEmails.supplier' | translate }}
+                </th>
+                <td mat-cell *matCellDef="let email">
+                  <span>{{ email.supplier_id || '—' }}</span>
+                </td>
+              </ng-container>
+
+              <!-- Received At Column -->
+              <ng-container matColumnDef="receivedAt">
+                <th mat-header-cell *matHeaderCellDef scope="col">
+                  {{ 'ingestion.dashboard.recentEmails.receivedAt' | translate }}
+                </th>
+                <td mat-cell *matCellDef="let email">
+                  <span>{{ email.received_at | formatDate }}</span>
+                </td>
+              </ng-container>
+
+              <tr mat-header-row *matHeaderRowDef="displayedEmailColumns"></tr>
+              <tr mat-row *matRowDef="let row; columns: displayedEmailColumns"></tr>
+            </table>
+          </div>
+        }
+      </mat-card>
+    </section>
+  }
+</div>
