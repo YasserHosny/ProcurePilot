@@ -328,34 +328,77 @@ deferred rather than spending another delegation round on pure CSS size right no
 
 ## Phase 7 — Testing & Quality
 
-- [ ] **T030** — Unit tests: email parser + supplier matcher
-  - Sample .eml files as fixtures
-  - Domain match, address match, thread match, no-match scenarios
-  - MIME type verification edge cases
+Wave 6 execution plan: `docs/operations/parallel-execution-plan-ingestion-wave6.md`. Its own
+grounding pass found T030–T034 largely already covered by tests written alongside their own
+backend tasks in Waves 1–4 (see that doc's §0) — each entry below records only the real,
+precisely-scoped gap that was actually closed, not a full suite written from scratch.
 
-- [ ] **T031** — Integration tests: email ingestion end-to-end
-  - Webhook → job → worker → quotation + documents + extraction job
-  - Deduplication test
-  - Rate limit test
-  - Unmatched supplier → review queue test
+- [x] **T030** — Unit tests: email parser (`tests/unit/test_email_parser.py`)
+  - The matcher side (domain/address/thread/no-match, cross-tenant) was already fully covered
+    by T009's own tests — untouched. Real parser-level gaps closed: body-only/no-attachment
+    email, `multipart/alternative` (plain-text preferred over html), RFC 2047 non-ASCII subject
+    + non-UTF-8 (`windows-1256`) body charset, malformed/garbage bytes raising `EmailParseError`
+    cleanly. Kept the existing programmatic `EmailMessage`-builder pattern rather than adding
+    on-disk `.eml` fixtures — a deliberate call, not a default.
+  - Delegated to Agy; reviewed, independently re-tested (11/11), no changes needed.
 
-- [ ] **T032** — Integration tests: capture endpoint
-  - Upload image → quotation + extraction job
-  - Upload PDF → same flow
-  - File too large → rejection
-  - Unsupported type → rejection
+- [x] **T031** — Integration test: the email ingestion worker itself
+  (`tests/integration/test_email_ingestion_worker.py`, new file)
+  - Deduplication, the unmatched-supplier review path, and the daily rate limit were already
+    covered by T011/T014's own tests — untouched. The real, single gap: nothing exercised the
+    actual worker's `FOR UPDATE SKIP LOCKED` claim loop end-to-end (every existing test called
+    the orchestrator function or webhook handler directly). Five new tests: claim + status
+    transition, **real concurrent-claim exclusivity** (two genuine overlapping psycopg
+    transactions, no `sleep()`-based race), the success path via `tick()` creating
+    document/quotation/extraction_job, retry-to-terminal-`failed` after `max_attempts`, and
+    `tenant_id` sourced from the claimed job row even when the payload carries a wrong or
+    missing tenant id.
+  - Delegated to Agy; reviewed (including the concurrency test's actual mechanics, not just
+    that it passed), independently re-tested (5/5), no changes needed.
 
-- [ ] **T033** — Integration tests: catalogue import
-  - CSV with known products → offers created
-  - XLSX with unknown products → pending_review
-  - Invalid rows → error report
-  - Second import → price update, no duplicate offers
+- [ ] **T032** — Integration test: capture endpoint, `image/jpeg` happy path
+  (`tests/integration/test_capture_service.py`)
+  - **Blocked, not started.** Four of five scenarios already covered by T015's own tests; the
+    one gap is the happy-path test only exercising a PDF, not the image case tasks.md also asks
+    for. Dispatched to OpenCode (`opencode-go/muse-spark-1.2-contributor-free`, the `simple`
+    lane) — both `-free` model variants (`1.2` and `1.3`) fail immediately with a generic
+    `"Unexpected server error"` even for a trivial "say hello" prompt run directly via the raw
+    `opencode` CLI (confirmed twice, not a brief or relay-mechanics problem); the paid
+    `-contributor` variants work but require a data-collection opt-in only the account owner can
+    approve. Looks like an OpenCode free-tier outage, not a task-specific issue. Not resolved by
+    silently switching to a different (metered) model on my own initiative — flagged for the
+    user to pick a fallback (retry OpenCode later, or reassign to Agy/Cursor for this one task).
 
-- [ ] **T034** — Tenant isolation tests
-  - Cross-tenant email log access → not found
-  - Cross-tenant capture → not found
-  - Cross-tenant catalogue import → not found
-  - Email to disabled tenant → bounce
+- [x] **T033** — Integration test: catalogue import repeat-call behavior
+  (`tests/integration/test_catalogue_import.py`)
+  - T033's original acceptance-scenario wording ("offers created", "pending_review", "no
+    duplicate offers") describes a design T017 explicitly abandoned during implementation (see
+    T017's own entry above) — the four scenarios already tested there are correct for the real
+    design and untouched. The one scenario with a real analog under the new design: importing
+    the identical file twice. New test proves catalogue_import's own repeat-call behavior is
+    sane (two independent, internally consistent reviewed quotations, matching invoked twice
+    with two different quotation ids) — it explicitly does **not** prove the real
+    `MatchingService`/`landed_cost` pipeline is idempotent on a duplicate price list, since that
+    pipeline is faked in this test file by established precedent; that remains a genuine,
+    explicitly-flagged open question, not silently resolved either way.
+  - Delegated to Cursor (`auto`, the new `mid` lane — no packaged `cursor-delegate` skill yet,
+    dispatched by hand via `cursor-agent -p`); reviewed, independently re-tested, no changes
+    needed. First use of the Cursor lane on this feature.
+
+- [x] **T034** — Tenant isolation: close the one real gap, extend the canonical surface
+  (`tests/integration/test_tenant_isolation.py`)
+  - Every ingestion table except `tenant_email_config` already had *some* cross-tenant coverage
+    scattered in its own per-endpoint test file (T019/T020/T021) — but none of the four had an
+    entry in this codebase's actual canonical isolation surface, the master
+    `test_tenant_isolation.py` (its own module docstring tracks every chunk that's extended it;
+    its closing `test_rls_is_enabled_and_forced_on_every_tenant_scoped_table` meta-test is a
+    hardcoded table allowlist that silently does not check any table missing from it). Added
+    `tenant_email_config`, `ingestion_email_log`, `ingestion_jobs`, and `catalogue_imports` to
+    both — new `Workspace` fields + `make_workspace()` seed rows, 8 new visibility/cross-tenant-
+    write tests, and the meta-test's allowlist. All 83 tests in the file pass, including the
+    meta-test now actually verifying RLS enabled+forced on all four (it silently wasn't
+    checking them before this).
+  - Done in-house, not delegated, per the standing tenancy carve-out.
 
 - [ ] **T035** — E2E tests: ingestion flows
   - Email config setup (Playwright)
