@@ -401,11 +401,24 @@ precisely-scoped gap that was actually closed, not a full suite written from scr
     checking them before this).
   - Done in-house, not delegated, per the standing tenancy carve-out.
 
-- [ ] **T035** — E2E tests: ingestion flows
-  - Email config setup (Playwright)
-  - Capture upload flow (Playwright)
-  - Catalogue import flow (Playwright)
-  - Dashboard stats display
+- [x] **T035** — E2E tests: ingestion flows (`apps/web/tests/e2e/ingestion.spec.ts`)
+  - Four flows per `docs/operations/parallel-execution-plan-ingestion-wave7.md` §2: email config
+    setup (including the unconfigured-state fix from Wave 6's bug find), capture upload with a
+    positive+negative route-guard regression pair (viewer blocked, buyer allowed), catalogue
+    import (supplier-gated file picker, real CSV fixture matched exactly by row count), and
+    dashboard stats on a genuinely fresh zero-activity workspace.
+  - Delegated to Agy; reviewed and independently re-run. My own first re-run hit a real
+    infrastructure gap this session hadn't hit before: the running `procurepilot-api`/`-web`
+    containers were wired to the **remote hosted** Supabase project (`docker-compose.remote.yml`,
+    left over from Agy's own live-walkthrough session), while local E2E setup mints its test
+    invitation directly into a **local** `supabase start` Postgres — two different databases, so
+    sign-up 404'd. Rebuilt against the local stack instead and hit a second, genuinely subtle gap:
+    the API's `SUPABASE_JWT_ISSUER` must equal GoTrue's own literal configured issuer string
+    (`http://127.0.0.1:54321/auth/v1`, confirmed by reading `supabase_auth_ProcurePilot`'s real
+    env — note this is `127.0.0.1`, not the docker bridge gateway IP the app otherwise reaches
+    Supabase through) or every real signed-in session 401s with `invalid_token_claims`, even
+    though the anon/service-role keys work fine. Once both were fixed, all 4 flows passed cleanly,
+    independently, twice.
 
 - [ ] **T036** — a11y: ingestion surfaces
   - axe-core scan on all ingestion components
