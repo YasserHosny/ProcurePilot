@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Literal
 from urllib.parse import urlencode
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, status
 from fastapi.responses import RedirectResponse
@@ -14,16 +15,25 @@ from procurepilot_api.errors import NotFoundError
 from procurepilot_api.modules.accounting.schemas import (
     AccountingConnection,
     StartConnectionResponse,
+    SyncedBillList,
+    TriggerSyncResponse,
 )
 from procurepilot_api.modules.accounting.service import (
     ConnectionService,
     get_connection_service,
+)
+from procurepilot_api.modules.accounting.sync_service import (
+    ConnectionNotActiveError,
+    SyncService,
+    TokenRefreshFailedError,
 )
 from procurepilot_api.modules.auth.jwt import MemberRole
 from procurepilot_api.modules.auth.rbac import require_role
 
 router = APIRouter(prefix="/accounting", tags=["accounting"])
 OWNER = (MemberRole.owner,)
+SYNC_ROLES = (MemberRole.owner, MemberRole.buyer)
+
 
 
 def _frontend_redirect_url(
@@ -123,3 +133,87 @@ def disconnect_accounting(
 ) -> AccountingConnection:
     row = service.disconnect(member, bearer_token=token)
     return AccountingConnection.model_validate(row)
+
+
+@router.post(
+    "/sync",
+    status_code=status.HTTP_202_ACCEPTED,
+    response_model=TriggerSyncResponse,
+    operation_id="triggerAccountingSync",
+)
+def trigger_accounting_sync(
+    member: Annotated[CurrentMember, Depends(require_role(*SYNC_ROLES))],
+    service: Annotated[ConnectionService, Depends(get_connection_service)],
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> TriggerSyncResponse:
+    # 1. Look up the tenant's current connection via tenant-scoped service.
+    # Translate missing or non-active connections to NotFoundError (404) per OpenAPI contract.
+    conn_row = service.get_status(member)
+    if conn_row is None or conn_row.get("status") != "active":
+        raise NotFoundError(
+            details={
+                "resource": "accounting_connection",
+                "reason": "no_active_connection",
+            }
+        )
+
+    connection_id = UUID(str(conn_row["id"]))
+
+    # 2. Synchronous execution: There is no background task queue for manual sync triggers
+    # in this codebase. The daily worker handles recurring synchronization. The manual
+    # trigger completes inline within the HTTP request and returns 202 Accepted ("enqueued"
+    # per OpenAPI contract) as an intentional simplification.
+    sync_service = SyncService()
+    try:
+        sync_service.sync(
+            settings,
+            tenant_id=member.tenant_id,
+            connection_id=connection_id,
+        )
+    except ConnectionNotActiveError as exc:
+        # Contract documents 404 for no active connection (including disconnected/needs_reauth).
+        raise NotFoundError(
+            details={
+                "resource": "accounting_connection",
+                "reason": "connection_not_active",
+                "status": exc.status,
+            }
+        ) from exc
+    except TokenRefreshFailedError as exc:
+        # Token refresh failed during sync; SyncService has already transitioned connection status
+        # to 'needs_reauth' and recorded the audit event. Mapping to NotFoundError (404) preserves
+        # the small OpenAPI contract surface (which documents 404 for "no active connection").
+        raise NotFoundError(
+            details={
+                "resource": "accounting_connection",
+                "reason": "token_refresh_failed",
+            }
+        ) from exc
+    # Note: ConflictError (raised by SyncService when Postgres advisory lock cannot be acquired)
+    # is an AppError subclass and is automatically translated to HTTP 409 Conflict by the global
+    # exception handler.
+
+    # Returns {"status": "enqueued"} with 202 Accepted per the OpenAPI contract, interpreting
+    # "enqueued" loosely as accepted and processed.
+    return TriggerSyncResponse(status="enqueued")
+
+
+@router.get(
+    "/bills",
+    response_model=SyncedBillList,
+    operation_id="listSyncedBills",
+)
+def list_synced_bills(
+    member: Annotated[CurrentMember, Depends(current_member)],
+    service: Annotated[ConnectionService, Depends(get_connection_service)],
+    cursor: Annotated[str | None, Query()] = None,
+    limit: Annotated[int, Query(ge=1, le=100)] = 50,
+    match_status: Annotated[Literal["matched", "unmatched"] | None, Query()] = None,
+) -> SyncedBillList:
+    return service.list_bills(
+        member,
+        cursor=cursor,
+        limit=limit,
+        match_status=match_status,
+    )
+

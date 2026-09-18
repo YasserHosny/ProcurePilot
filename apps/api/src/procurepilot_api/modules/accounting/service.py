@@ -22,8 +22,9 @@ from psycopg.rows import dict_row
 
 from procurepilot_api.config import Settings, get_settings
 from procurepilot_api.deps import CurrentMember
-from procurepilot_api.errors import ConflictError, NotFoundError
+from procurepilot_api.errors import ConflictError, NotFoundError, UnprocessableEntityError
 from procurepilot_api.modules.accounting.connector import get_accounting_connector
+from procurepilot_api.modules.accounting.schemas import SyncedBill, SyncedBillList
 from procurepilot_api.modules.auth.jwt import MemberRole
 from procurepilot_api.modules.offers.service import _authenticated_db
 from procurepilot_api.shared.audit import AuditEventCreate, get_audit_writer
@@ -332,6 +333,86 @@ class ConnectionService:
                 row = cur.fetchone()
         return dict(row) if row else None
 
+    def list_bills(
+        self,
+        member: CurrentMember,
+        *,
+        cursor: str | None = None,
+        limit: int = 50,
+        match_status: str | None = None,
+    ) -> SyncedBillList:
+        """Return cursor-paginated list of synced bills for the member's tenant (T022).
+
+        A bill is matched if a corresponding row exists in purchase_bill_match.
+        Joined with synced_vendor to supply vendor_name.
+        """
+        offset = _decode_cursor(cursor)
+        fetch_limit = min(max(limit, 1), 100)
+
+        clauses = ["b.tenant_id = %(tenant_id)s"]
+        params: dict[str, object] = {
+            "tenant_id": member.tenant_id,
+            "offset": offset,
+            "limit": fetch_limit + 1,
+        }
+
+        if match_status == "matched":
+            clauses.append("m.id is not null")
+        elif match_status == "unmatched":
+            clauses.append("m.id is null")
+
+        where_sql = " and ".join(clauses)
+
+        query = f"""
+            select
+                b.id,
+                v.display_name as vendor_name,
+                b.matched_supplier_id,
+                b.amount,
+                b.currency,
+                b.bill_date,
+                b.provider_status,
+                (m.id is not null) as matched,
+                m.purchase_record_id
+            from synced_bill b
+            join synced_vendor v on v.tenant_id = b.tenant_id and v.id = b.vendor_id
+            left join purchase_bill_match m on m.tenant_id = b.tenant_id and m.synced_bill_id = b.id
+            where {where_sql}
+            order by b.bill_date desc, b.id desc
+            offset %(offset)s limit %(limit)s
+        """
+
+        with _authenticated_db(self._settings, member) as conn:
+            with conn.cursor(row_factory=dict_row) as cur:
+                cur.execute(query, params)
+                rows = [dict(r) for r in cur.fetchall()]
+
+        has_more = len(rows) > fetch_limit
+        page_rows = rows[:fetch_limit]
+        next_cursor = _encode_cursor(offset + fetch_limit) if has_more else None
+
+        return SyncedBillList(
+            items=[SyncedBill.model_validate(r) for r in page_rows],
+            next_cursor=next_cursor,
+        )
+
+
+def _encode_cursor(offset: int) -> str:
+    return base64.urlsafe_b64encode(str(offset).encode("ascii")).decode("ascii")
+
+
+def _decode_cursor(cursor: str | None) -> int:
+    if cursor is None:
+        return 0
+    try:
+        offset = int(base64.urlsafe_b64decode(cursor.encode("ascii")))
+        if offset < 0:
+            raise UnprocessableEntityError(details={"cursor": "invalid"})
+        return offset
+    except (ValueError, UnicodeError) as exc:
+        raise UnprocessableEntityError(details={"cursor": "invalid"}) from exc
+
 
 def get_connection_service() -> ConnectionService:
     return ConnectionService()
+
