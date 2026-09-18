@@ -1,7 +1,9 @@
 -- 20260918000004_synced_bill.sql — task T006, chunk R3.1 (014-accounting-integration)
 --
 -- synced_bill — one supplier bill as recorded by the connected accounting system at the time of
--- the most recent sync (spec: "Synced Bill"). Sync-derived, same write split as synced_vendor.
+-- the most recent sync (spec: "Synced Bill"). Sync-derived, same write path as synced_vendor —
+-- see that migration's own header for why this is a tenant-scoped `authenticated` write (RLS as
+-- the real boundary), not a literal service_role connection.
 -- matched_supplier_id is denormalized from vendor_id's own match (query convenience for the
 -- reconciliation views) and kept in sync by the sync worker when the vendor's match changes.
 
@@ -49,8 +51,9 @@ create index if not exists synced_bill_matched_supplier_idx
 
 comment on table synced_bill is
   'A supplier bill as recorded by the connected accounting system at the time of the most recent
-   sync (R3.1). updated_at advances whenever a re-sync changes any field. Sync-derived: written
-   only by the sync worker''s service-role path. See specs/014-accounting-integration/data-model.md.';
+   sync (R3.1). updated_at advances whenever a re-sync changes any field. Written by the sync
+   worker/service (system-triggered, acting as authenticated for the tenant — see file header),
+   read by any member. See specs/014-accounting-integration/data-model.md.';
 
 alter table synced_bill enable row level security;
 alter table synced_bill force  row level security;
@@ -59,5 +62,14 @@ create policy synced_bill_tenant_select on synced_bill
   for select to authenticated
   using (tenant_id = current_tenant_id());
 
-grant select on synced_bill to authenticated;
+create policy synced_bill_tenant_insert on synced_bill
+  for insert to authenticated
+  with check (tenant_id = current_tenant_id());
+
+create policy synced_bill_tenant_update on synced_bill
+  for update to authenticated
+  using (tenant_id = current_tenant_id())
+  with check (tenant_id = current_tenant_id());
+
+grant select, insert, update on synced_bill to authenticated;
 grant select, insert, update on synced_bill to service_role;

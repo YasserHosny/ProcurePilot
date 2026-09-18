@@ -85,8 +85,30 @@ create policy accounting_connection_owner_update on accounting_connection
     and current_member_role() = 'owner'
   );
 
+-- The sync worker also updates this row (last_synced_at on every sync; status -> 'needs_reauth'
+-- on a failed token refresh, FR-002/spec Acceptance Scenario 1.4) — a system-triggered write via
+-- the same tenant-scoped `authenticated` session as synced_vendor/synced_bill (see that
+-- migration's header), which never carries a member_role claim. `current_member_role() is null`
+-- is what distinguishes that worker session from a real member's own session here (every real
+-- member session sets member_role; a worker session deliberately never does), so a non-owner
+-- member's own session can never satisfy this policy — only the worker's can.
+create policy accounting_connection_worker_update on accounting_connection
+  for update to authenticated
+  using (
+    tenant_id = current_tenant_id()
+    and current_member_role() is null
+  )
+  with check (
+    tenant_id = current_tenant_id()
+    and current_member_role() is null
+  );
+
 -- Column-level split (see file header): `authenticated` never gets access_token/refresh_token
--- in SELECT or UPDATE — only INSERT, for the one-time write at connect time.
+-- in SELECT or UPDATE — only INSERT, for the one-time write at connect time. A refreshed token
+-- (research.md R4) is instead written through a literal service_role connection — see
+-- sync_service.py's own _service_role_db helper — the one write this feature makes that
+-- genuinely needs to bypass RLS rather than act as a tenant-scoped authenticated session,
+-- because no authenticated session (member or worker) is ever allowed to see or set a token.
 grant select (
   id, tenant_id, provider, realm_id, display_name, status, connected_by, connected_at,
   last_synced_at, disconnected_at, created_at, updated_at
@@ -98,7 +120,7 @@ grant insert (
 ) on accounting_connection to authenticated;
 
 grant update (
-  status, disconnected_at, updated_at
+  status, disconnected_at, updated_at, last_synced_at
 ) on accounting_connection to authenticated;
 
 grant select, insert, update on accounting_connection to service_role;

@@ -57,9 +57,19 @@ create policy purchase_bill_match_tenant_select on purchase_bill_match
   for select to authenticated
   using (tenant_id = current_tenant_id());
 
--- INSERT (automatic, via the sync worker's service-role path) and INSERT/DELETE (manual, an
--- owner/buyer resolving a discrepancy per FR-011) both need row-level access; no UPDATE policy
--- exists at all (see file header) and none is granted below.
+-- Two permissive INSERT policies (Postgres ORs them): automatic matches come from the sync
+-- worker's tenant-scoped session (see synced_vendor's migration header — same _act_as_tenant-
+-- style write, no member_role/membership_id claim set, so this policy cannot and must not
+-- require either); manual matches come from an owner/buyer resolving a discrepancy (FR-011).
+-- No UPDATE policy exists at all (see file header) and none is granted below.
+create policy purchase_bill_match_automatic_insert on purchase_bill_match
+  for insert to authenticated
+  with check (
+    tenant_id = current_tenant_id()
+    and match_method = 'automatic'
+    and matched_by is null
+  );
+
 create policy purchase_bill_match_owner_buyer_insert on purchase_bill_match
   for insert to authenticated
   with check (
@@ -67,6 +77,16 @@ create policy purchase_bill_match_owner_buyer_insert on purchase_bill_match
     and match_method = 'manual'
     and matched_by = current_membership_id()
     and current_member_role() in ('owner', 'buyer')
+  );
+
+-- Mirrors the insert split above: the worker may only ever delete its own automatic matches
+-- (a resync that finds a stale automatic match no longer qualifies) — it can never touch a
+-- manual match, which only an owner/buyer may remove.
+create policy purchase_bill_match_automatic_delete on purchase_bill_match
+  for delete to authenticated
+  using (
+    tenant_id = current_tenant_id()
+    and match_method = 'automatic'
   );
 
 create policy purchase_bill_match_owner_buyer_delete on purchase_bill_match
