@@ -35,9 +35,9 @@ from procurepilot_api.modules.accounting.connector import (
 from procurepilot_api.modules.accounting.matching_service import MatchingService
 from procurepilot_api.modules.accounting.quickbooks_client import QuickBooksAuthError
 from procurepilot_api.modules.accounting.reconciliation_service import ReconciliationService
-from procurepilot_api.modules.accounting.token_crypto import decrypt_token, encrypt_token
 from procurepilot_api.shared.audit import AuditEventCreate, AuditOutcome, get_audit_writer
 from procurepilot_api.shared.logging import get_trace_id
+from procurepilot_api.shared.token_crypto import decrypt_token, encrypt_token
 
 logger = logging.getLogger(__name__)
 
@@ -265,12 +265,12 @@ class SyncService:
                 token_row = cur.fetchone()
 
         access_token = (
-            decrypt_token(str(token_row["access_token"]), settings)
+            decrypt_token(str(token_row["access_token"]), settings.accounting_token_encryption_key)
             if token_row and token_row.get("access_token")
             else None
         )
         refresh_token = (
-            decrypt_token(str(token_row["refresh_token"]), settings)
+            decrypt_token(str(token_row["refresh_token"]), settings.accounting_token_encryption_key)
             if token_row and token_row.get("refresh_token")
             else None
         )
@@ -305,8 +305,14 @@ class SyncService:
                             {
                                 "id": connection_id,
                                 "tenant_id": tenant_id,
-                                "access_token": encrypt_token(tokens.access_token, settings),
-                                "refresh_token": encrypt_token(tokens.refresh_token, settings),
+                                "access_token": encrypt_token(
+                                    tokens.access_token,
+                                    settings.accounting_token_encryption_key,
+                                ),
+                                "refresh_token": encrypt_token(
+                                    tokens.refresh_token,
+                                    settings.accounting_token_encryption_key,
+                                ),
                             },
                         )
                     sr_conn.commit()
