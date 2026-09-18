@@ -20,14 +20,14 @@ work.
 
 ## Phase 1 — Setup
 
-- [ ] **T001** — Config: add `pos_provider_mode` (`stub`/`square`, default `stub`),
+- [x] **T001** — Config: add `pos_provider_mode` (`stub`/`square`, default `stub`),
   `square_application_id`, `square_application_secret` (SecretStr), `square_redirect_uri`,
   `square_environment` (`sandbox`/`production`), `pos_token_encryption_key` (SecretStr),
   `rate_limit_pos_sync` (default `"10/minute"`), `rate_limit_pos_match` (default `"30/minute"`) to
   `apps/api/src/procurepilot_api/config.py`, matching `accounting_provider_mode`'s existing
   settings shape exactly (research.md R1/R3). Extend the `empty_secret_to_none` validator to cover
   `pos_token_encryption_key`.
-- [ ] **T002** [P] — Module skeleton: `apps/api/src/procurepilot_api/modules/pos/__init__.py`,
+- [x] **T002** [P] — Module skeleton: `apps/api/src/procurepilot_api/modules/pos/__init__.py`,
   `schemas.py` (empty Pydantic models per data-model.md's tables — fill in as each story needs
   them), `router.py` wired into `main.py`'s router registration, matching
   `modules/accounting/__init__.py`'s own precedent. Do **not** add
@@ -35,7 +35,7 @@ work.
   `@mutation_limiter.limit()` decorator on a path-parameter endpoint breaks FastAPI/pydantic's
   forward-ref resolution (the exact bug found and fixed in `modules/accounting/router.py` this
   program; `modules/ingestion/router.py` is the working precedent to match).
-- [ ] **T003** — Extract `encrypt_token()`/`decrypt_token()` from
+- [x] **T003** — Extract `encrypt_token()`/`decrypt_token()` from
   `apps/api/src/procurepilot_api/modules/accounting/token_crypto.py` into
   `apps/api/src/procurepilot_api/shared/token_crypto.py` (research.md R3), generalizing only the
   settings-key lookup (accept the encryption key as a constructor/function argument rather than
@@ -72,7 +72,7 @@ work.
   split between worker (automatic matches only) and owner/buyer (any match). Because
   `synced_product_signal_id` is now stable across reconnects (T005), a match made before a
   disconnect remains valid after a reconnect with no extra handling needed here.
-- [ ] **T007** — Connector abstraction: `PosConnector` protocol (typed methods:
+- [x] **T007** — Connector abstraction: `PosConnector` protocol (typed methods:
   `list_sales_transactions(since: date) -> list[RawSalesTransaction]`,
   `list_inventory_levels() -> list[RawInventoryLevel]`, `get_account_info() -> PosAccountInfo` —
   no write method exists on the protocol at all, enforcing FR-002/FR-004's read-only constraint at
@@ -82,11 +82,11 @@ work.
   ambiguous-match edge case, and an item with fewer than `velocity_window_days` of transaction
   history to exercise FR-013's provisional-figure path) in
   `apps/api/src/procurepilot_api/modules/pos/connector.py`.
-- [ ] **T008** — `SquareClient`: OAuth2 authorization-code + refresh-token flow, and the two
+- [x] **T008** — `SquareClient`: OAuth2 authorization-code + refresh-token flow, and the two
   read-only REST calls (Orders API for sales transactions, Inventory API for stock counts) built
   on `httpx` per research.md R1 — implements the same `PosConnector` protocol as `StubConnector`,
   in `apps/api/src/procurepilot_api/modules/pos/square_client.py`. No SDK dependency.
-- [ ] **T009** [P] — Unit tests for `SquareClient`'s OAuth token exchange/refresh logic and REST
+- [x] **T009** [P] — Unit tests for `SquareClient`'s OAuth token exchange/refresh logic and REST
   response parsing (mocked `httpx` responses, no real network call) in
   `apps/api/tests/unit/test_square_client.py`.
 
