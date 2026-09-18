@@ -141,11 +141,19 @@ export class DiscrepanciesComponent implements OnInit {
   startResolve(discrepancy: ReconciliationDiscrepancy): void {
     this.activeResolvingId.set(discrepancy.id);
     this.resolutionNote.set('');
+    setTimeout(() => {
+      const input = document.querySelector<HTMLInputElement>('[data-testid="resolve-note-input"]');
+      input?.focus();
+    }, 0);
   }
 
   cancelResolve(): void {
     this.activeResolvingId.set(null);
     this.resolutionNote.set('');
+    setTimeout(() => {
+      const resolveBtn = document.querySelector<HTMLButtonElement>('[data-testid="resolve-btn"]');
+      resolveBtn?.focus();
+    }, 0);
   }
 
   confirmResolve(discrepancy: ReconciliationDiscrepancy): void {

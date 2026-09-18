@@ -220,7 +220,12 @@
                 <!-- Open discrepancy action -->
                 @if (disc.status === 'open') {
                   @if (activeResolvingId() === disc.id) {
-                    <div class="inline-resolve-form" data-testid="inline-resolve-form">
+                    <div
+                      class="inline-resolve-form"
+                      role="region"
+                      [attr.aria-label]="'accounting.discrepancies.resolveDialog.title' | translate"
+                      data-testid="inline-resolve-form"
+                    >
                       <mat-form-field appearance="outline" class="resolve-input-field">
                         <mat-label>{{ 'accounting.discrepancies.resolveDialog.noteLabel' | translate }}</mat-label>
                         <input
@@ -269,6 +274,7 @@
                       type="button"
                       class="resolve-action-btn"
                       (click)="startResolve(disc)"
+                      [attr.aria-label]="('accounting.discrepancies.resolveAction' | translate) + ': ' + getTypeLabel(disc.discrepancy_type)"
                       data-testid="resolve-btn"
                     >
                       <mat-icon aria-hidden="true">task_alt</mat-icon>
