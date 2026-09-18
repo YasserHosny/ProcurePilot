@@ -1,6 +1,6 @@
 # ProcurePilot — Development Guidelines
 
-Last updated: 2026-09-18 · Active feature: `008-requests-approvals`
+Last updated: 2026-09-19 · Active feature: `008-requests-approvals`
 
 ProcurePilot turns fragmented supplier information into trusted, comparable purchasing
 decisions and proves the money saved. Read `.specify/memory/constitution.md` before writing
@@ -133,6 +133,8 @@ breakdown (R3.0–R3.4).
 - Supabase Postgres 17 (unchanged). New columns on `purchase_request` for the delivery (010-mobile-approvals-receipt)
 - Python 3.12 (`apps/api`), TypeScript 5.6 / Angular 19 (`apps/web`) — + FastAPI (existing), `httpx` (existing, already used for outbound HTTP — (014-accounting-integration)
 - Supabase Postgres 17 (unchanged). New tables: `accounting_connection`, (014-accounting-integration)
+- Python 3.12 (`apps/api`), TypeScript 5.6 / Angular 19 (`apps/web`) — + FastAPI (existing), `httpx` (existing — sufficient for Square's plain (015-pos-inventory-integration)
+- Supabase Postgres 17 (unchanged). New tables: `pos_connection`, (015-pos-inventory-integration)
 
 ## Recent Changes
 - 002-catalogue-suppliers: Added unchanged — Python 3.12 (backend), TypeScript 5.6 / Angular 19 (web), SQL + unchanged from chunk 4.1. One addition under consideration for CSV

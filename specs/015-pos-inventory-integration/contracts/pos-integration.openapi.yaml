@@ -1,0 +1,333 @@
+openapi: 3.0.3
+info:
+  title: ProcurePilot POS & Inventory Integration API
+  version: "1.0.0"
+  description: >
+    R3.2 (015-pos-inventory-integration). One Square connection per tenant, recurring sales +
+    inventory sync, product matching against workspace_product, and read-only sales-velocity /
+    stock-on-hand signals surfaced alongside existing purchasing screens. Strictly read-only
+    against Square — no endpoint here ever writes to the connected provider, and no synced signal
+    ever changes Smart Compare's own recommendation scoring (FR-003).
+servers:
+  - url: /api/v1
+
+security:
+  - BearerAuth: []
+
+paths:
+  /pos/connect:
+    post:
+      operationId: startPosConnection
+      summary: Start the Square OAuth authorization flow
+      description: >
+        Owner-only. Returns the Square consent-screen URL the client redirects the browser to.
+        Does not itself create a connection — the connection is created only after the provider
+        redirects back to the callback with a successful authorization.
+      tags: [POS]
+      responses:
+        '200':
+          description: Authorization URL minted
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StartConnectionResponse' }
+        '401':
+          description: Missing or invalid bearer token
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+        '403':
+          description: Caller is not an owner
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+        '409':
+          description: An active connection already exists for this tenant
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+
+  /pos/connect/callback:
+    get:
+      operationId: completePosConnection
+      summary: OAuth callback — completes the connection
+      description: >
+        The provider redirects here after the owner authorizes (or declines) access. Public
+        callback; no Bearer auth. On success, exchanges the authorization code for tokens, records
+        the connection as active, and redirects the browser to /pos?pos_connected=success. A
+        declined or failed authorization leaves no connection row and redirects to
+        /pos?pos_connected=failed&error={error_code} (spec Acceptance Scenario 1.3) — never a
+        half-created connection.
+      tags: [POS]
+      security: []
+      parameters:
+        - name: code
+          in: query
+          required: false
+          schema: { type: string }
+        - name: state
+          in: query
+          required: true
+          schema: { type: string }
+        - name: error
+          in: query
+          required: false
+          schema: { type: string }
+      responses:
+        '302':
+          description: Redirect to the frontend /pos screen (pos_connected=success or pos_connected=failed)
+
+  /pos/connection:
+    get:
+      operationId: getPosConnection
+      summary: Current connection status
+      description: Any authenticated member. Returns 404 if never connected.
+      tags: [POS]
+      responses:
+        '200':
+          description: Connection status
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PosConnection' }
+        '401':
+          description: Missing or invalid bearer token
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+        '404':
+          description: No connection has ever been created for this tenant
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+
+  /pos/disconnect:
+    post:
+      operationId: disconnectPos
+      summary: Disconnect the active POS connection
+      description: >
+        Owner-only. Marks the connection disconnected (FR-001) — previously synced signals and
+        matches remain queryable afterward, clearly labelled as no longer updating (Acceptance
+        Scenario 1.2, SC-005). Every purchasing workflow continues unaffected (FR-007, User Story 3).
+      tags: [POS]
+      responses:
+        '200':
+          description: Disconnected
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PosConnection' }
+        '401':
+          description: Missing or invalid bearer token
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+        '403':
+          description: Caller is not an owner
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+        '404':
+          description: No active connection to disconnect
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+
+  /pos/sync:
+    post:
+      operationId: triggerPosSync
+      summary: Trigger an on-demand sync
+      description: >
+        Owner or buyer. FR-002's manual-sync path (the recurring scheduled sync is the primary
+        path). Concurrency guarded via a PostgreSQL advisory lock
+        (pg_try_advisory_lock(hashtext(connection_id))) on the connection; returns 409 Conflict if
+        a sync for this connection is already running, rather than queueing a second one.
+      tags: [POS]
+      responses:
+        '202':
+          description: Sync enqueued
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TriggerSyncResponse' }
+        '401':
+          description: Missing or invalid bearer token
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+        '403':
+          description: Caller is not an owner or buyer
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+        '404':
+          description: No active connection
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+        '409':
+          description: A sync for this connection is already in progress
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+
+  /pos/signals:
+    get:
+      operationId: listSyncedProductSignals
+      summary: List synced product signals, with match status
+      description: >
+        Any authenticated member. Cursor-paginated. Used by the manual-match review screen
+        (FR-006) and by the product/compare screens to look up a signal for a given
+        workspace_product.
+      tags: [POS]
+      parameters:
+        - name: cursor
+          in: query
+          schema: { type: string }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+        - name: match_status
+          in: query
+          description: Filter to matched or unmatched signals only; omit for both.
+          schema: { type: string, enum: [matched, unmatched] }
+        - name: workspace_product_id
+          in: query
+          description: Return the signal matched to this product, if any.
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Signals
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SyncedProductSignalList' }
+        '401':
+          description: Missing or invalid bearer token
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+
+  /pos/signals/{signal_id}/match:
+    post:
+      operationId: manuallyMatchProductSignal
+      summary: Manually link an unmatched signal to a workspace product
+      description: Owner or buyer (FR-006's manual resolution path).
+      tags: [POS]
+      parameters:
+        - name: signal_id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ManualMatchRequest' }
+      responses:
+        '200':
+          description: Matched
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PosProductMatch' }
+        '401':
+          description: Missing or invalid bearer token
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+        '403':
+          description: Caller is not an owner or buyer
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+        '404':
+          description: Unknown or cross-tenant signal or product id
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+        '409':
+          description: Signal or product is already matched
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    ErrorEnvelope:
+      type: object
+      required: [code, message, trace_id]
+      properties:
+        code: { type: string }
+        message: { type: string }
+        details: { type: object, nullable: true }
+        trace_id: { type: string, minLength: 1 }
+
+    StartConnectionResponse:
+      type: object
+      required: [authorization_url]
+      properties:
+        authorization_url:
+          type: string
+          format: uri
+
+    TriggerSyncResponse:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [enqueued]
+
+    ManualMatchRequest:
+      type: object
+      required: [workspace_product_id]
+      properties:
+        workspace_product_id:
+          type: string
+          format: uuid
+
+    PosConnection:
+      type: object
+      required: [id, provider, display_name, status, connected_at]
+      properties:
+        id: { type: string, format: uuid }
+        provider: { type: string, enum: [square] }
+        display_name: { type: string }
+        status: { type: string, enum: [active, needs_reauth, disconnected] }
+        connected_at: { type: string, format: date-time }
+        last_synced_at: { type: string, format: date-time, nullable: true }
+        disconnected_at: { type: string, format: date-time, nullable: true }
+
+    SyncedProductSignal:
+      type: object
+      required: [id, external_item_name, matched, velocity_window_days]
+      properties:
+        id: { type: string, format: uuid }
+        external_item_name: { type: string }
+        matched: { type: boolean }
+        matched_workspace_product_id: { type: string, format: uuid, nullable: true }
+        stock_on_hand: { type: string, nullable: true, description: "Decimal string, never a float" }
+        stock_synced_at: { type: string, format: date-time, nullable: true }
+        sales_velocity_per_day: { type: string, nullable: true, description: "Decimal string, never a float" }
+        velocity_window_days: { type: integer }
+        velocity_computed_at: { type: string, format: date-time, nullable: true }
+
+    SyncedProductSignalList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/SyncedProductSignal' }
+        next_cursor: { type: string, nullable: true }
+
+    PosProductMatch:
+      type: object
+      required: [id, synced_product_signal_id, workspace_product_id, match_method, matched_at]
+      properties:
+        id: { type: string, format: uuid }
+        synced_product_signal_id: { type: string, format: uuid }
+        workspace_product_id: { type: string, format: uuid }
+        match_method: { type: string, enum: [automatic, manual] }
+        matched_at: { type: string, format: date-time }
