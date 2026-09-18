@@ -32,18 +32,20 @@ def _frontend_redirect_url(
     success: bool,
     error: str | None = None,
 ) -> str:
-    """Build redirect URL to the web app's connection-settings screen."""
+    """Build redirect URL to the web app's connection-settings screen.
+
+    Route and query param match the frontend's own contract exactly:
+    ConnectionSettingsComponent is mounted at /accounting (see app.routes.ts) and reads
+    `accounting_connected` = 'success' | 'failed' (see handleOAuthCallbackParams).
+    """
     base = settings.api_cors_origins[0] if settings.api_cors_origins else settings.web_api_base_url
     base = base.rstrip("/")
     if base.endswith("/api/v1"):
         base = base[:-7]
-    params: dict[str, str] = {
-        "status": "success" if success else "error",
-        "success": "true" if success else "false",
-    }
+    params: dict[str, str] = {"accounting_connected": "success" if success else "failed"}
     if error:
         params["error"] = error
-    return f"{base}/accounting/connection-settings?{urlencode(params)}"
+    return f"{base}/accounting?{urlencode(params)}"
 
 
 @router.post(

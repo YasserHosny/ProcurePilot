@@ -111,8 +111,8 @@ def test_owner_can_start_and_complete_connection(
         )
         assert cb_res.status_code == 302, cb_res.text
         location = cb_res.headers["location"]
-        assert "/accounting/connection-settings" in location
-        assert "status=success" in location
+        assert "/accounting" in location
+        assert "accounting_connected=success" in location
 
         conn_res = client.get("/api/v1/accounting/connection")
         assert conn_res.status_code == 200, conn_res.text
@@ -232,7 +232,7 @@ def test_callback_with_error_or_missing_code_leaves_no_connection(
             follow_redirects=False,
         )
         assert err_res.status_code == 302, err_res.text
-        assert "status=error" in err_res.headers["location"]
+        assert "accounting_connected=failed" in err_res.headers["location"]
 
         get_res = client.get("/api/v1/accounting/connection")
         assert get_res.status_code == 404, get_res.text
@@ -243,7 +243,7 @@ def test_callback_with_error_or_missing_code_leaves_no_connection(
             follow_redirects=False,
         )
         assert nocode_res.status_code == 302, nocode_res.text
-        assert "status=error" in nocode_res.headers["location"]
+        assert "accounting_connected=failed" in nocode_res.headers["location"]
 
         # Confirm DB has 0 rows for this tenant
         with psycopg.connect(TEST_DATABASE_URL or "") as conn:
