@@ -317,6 +317,13 @@ export const routes: Routes = [
           ).then((m) => m.ConnectionSettingsComponent),
       },
       {
+        path: 'accounting/bills',
+        loadComponent: () =>
+          import('./features/accounting/bills/bills.component').then(
+            (m) => m.BillsComponent,
+          ),
+      },
+      {
         path: 'savings/outcome-capture',
         canActivate: [roleGuard('owner', 'buyer')],
         loadComponent: () =>

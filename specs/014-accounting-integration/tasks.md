@@ -181,10 +181,10 @@ needed yet to verify this story's own value.
   `apps/api/tests/integration/test_accounting_sync_worker.py`, modeled directly on
   `test_email_ingestion_worker.py`'s real-overlapping-transactions concurrency proof — do not
   reintroduce a sleep-based race.
-- [ ] **T026** [P] [US2] — Frontend: `apps/web/src/app/features/accounting/bills/` component —
+- [x] **T026** [P] [US2] — Frontend: `apps/web/src/app/features/accounting/bills/` component —
   bill list with matched/unmatched filter, showing supplier, amount+currency, date, status, and
   a link to the matched purchase record where one exists. Karma spec alongside it.
-- [ ] **T027** [US2] — Extend `accounting-api.ts` with the sync-trigger and bills-list methods.
+- [x] **T027** [US2] — Extend `accounting-api.ts` with the sync-trigger and bills-list methods.
 
 **Checkpoint**: bills sync and match automatically. US1 + US2 together are demoable as "connect
 and see your real bills reconciled against purchases."

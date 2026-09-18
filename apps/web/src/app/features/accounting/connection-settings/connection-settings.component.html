@@ -136,6 +136,16 @@
 
           @if (conn.status !== 'disconnected') {
             <div class="card-actions">
+              <a
+                mat-stroked-button
+                routerLink="/accounting/bills"
+                class="view-bills-btn"
+                data-testid="view-bills-btn"
+              >
+                <mat-icon aria-hidden="true">receipt_long</mat-icon>
+                <span>{{ 'accounting.connection.viewBills' | translate }}</span>
+              </a>
+
               <button
                 *appRole="'owner'"
                 mat-stroked-button
