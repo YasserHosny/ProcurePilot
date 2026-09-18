@@ -35,8 +35,11 @@
 23. [Report Schedules & Schedule Form](#23-report-schedules--schedule-form)
 24. [Weekly Digest & Digest Settings](#24-weekly-digest--digest-settings)
 25. [Roles & Permissions](#25-roles--permissions)
-26. [FAQ](#26-faq)
-27. [Known Issues](#27-known-issues)
+26. [Email Forwarding Setup](#26-email-forwarding-setup)
+27. [Capture a Quotation (Photo or Upload)](#27-capture-a-quotation-photo-or-upload)
+28. [Catalogue Import (Bulk Price List)](#28-catalogue-import-bulk-price-list)
+29. [FAQ](#29-faq)
+30. [Known Issues](#30-known-issues)
 
 ---
 
@@ -757,7 +760,64 @@ Personalized weekly intelligence digests assembling key procurement metrics and 
 
 ---
 
-## 26. FAQ
+## 26. Email Forwarding Setup
+
+**Route:** `/ingestion/email-config`
+
+Configure automated inbound email forwarding and domain security to receive and extract supplier quotations directly from your inbox.
+
+| # | Element | Description |
+|---|---------|-------------|
+| 1 | **Inbound Forwarding Address** | Your workspace's unique ingestion email address. Forward supplier quote emails or PDF attachments to this address to begin automated quotation extraction. |
+| 2 | **Copy Address button** | Copies the inbound forwarding email address to your clipboard with one click so you can share it with buyers or set up automated email forwarding rules. |
+| 3 | **Email Ingestion Status toggle** | Turn email quotation processing on or off for the workspace. When enabled, incoming emails are processed into quotations; when disabled, incoming emails are rejected. Only workspace owners can turn this on or off (other roles see an informational notice). |
+| 4 | **Domain Allowlist input & chips** | Enter approved supplier domains (e.g. `supplier.com`) and click **Add Domain**. Each allowed domain appears as an interactive chip with a remove button. Leave empty to accept inbound emails from all domains. |
+| 5 | **Daily Processing Limit counter** | Shows your workspace's daily email volume and processing quota (e.g. "Processed 12 of 100 emails today") to monitor inbound activity and prevent accidental email loops. |
+| 6 | **SPF / DKIM Verification badge** | Displays whether strict sender identity verification is active, ensuring inbound messages legitimately originate from the sender's domain. |
+
+**Security and spam controls:** the domain allowlist is a critical abuse-prevention control, not just a technical filter. When empty, emails from any sender domain are accepted; once one or more domains are added, ProcurePilot strictly rejects emails from unapproved domains. This prevents spam, unsolicited marketing messages, or unauthorized external emails from polluting your quotation review queue or consuming your workspace's daily processing allowance.
+
+---
+
+## 27. Capture a Quotation (Photo or Upload)
+
+**Route:** `/ingestion/capture`
+
+Quickly capture paper quotes using your mobile device camera or upload quotation documents from your desktop for automated line-item extraction.
+
+| # | Element | Description |
+|---|---------|-------------|
+| 1 | **Document Dropzone & Browse Files** | Drag and drop a quotation document into the dropzone or click **Browse Files** to select a file from your computer. Supports PDF, JPEG, PNG, and HEIC files up to 10 MB. |
+| 2 | **Take Photo (Capture with Camera)** | On mobile devices or tablets, tap **Take Photo** to open your camera and capture a clear photo of a printed quote, physical invoice, or paper price sheet on the spot. |
+| 3 | **Supplier (Optional) selector** | Optionally link the upload to an existing supplier from the dropdown. If left unselected, ProcurePilot's extraction engine will automatically identify the supplier from the document. |
+| 4 | **Notes (Optional) field** | Add optional notes or context (such as delivery terms, project codes, or special instructions) to accompany the quotation document. |
+| 5 | **Upload & Process button** | Submits the captured file to the ingestion queue. A progress indicator confirms that the document is being uploaded and queued for automated line-item extraction. |
+| 6 | **Success confirmation & deep links** | Displays the generated quotation reference (e.g. "Quotation #42 created successfully") with a **View Quotation** button to open the review screen immediately, and a **Capture Another Document** button to submit more quotes. |
+
+**Review workflow:** capturing quotations is available to workspace Owners and Buyers. Once submitted, the captured document enters the automated line-item extraction queue and becomes a standard quotation for review. Line items, prices, and quantities can then be reviewed, adjusted, and authorized in the Quotation Review Queue (§7) and Quotation Review & Authorization screen (§9) exactly like any manually uploaded quotation.
+
+---
+
+## 28. Catalogue Import (Bulk Price List)
+
+**Route:** `/ingestion/catalogue-import`
+
+Bulk-import supplier price lists and catalogues from CSV or Excel spreadsheets into your product matching and comparison catalogue.
+
+| # | Element | Description |
+|---|---------|-------------|
+| 1 | **Supplier selector (Required)** | Select the supplier whose price list you are importing. Because price lists represent supplier-specific contractual pricing rather than generic products, selecting a supplier is required before choosing or uploading a file. |
+| 2 | **Catalogue Dropzone & Browse Files** | Drag and drop a spreadsheet or click **Browse Files** once a supplier is selected. Supports CSV and Excel (`.xlsx`) files up to 25 MB. |
+| 3 | **Import Catalogue button** | Uploads the spreadsheet, parses product line items, and runs the automated product matching pipeline against your catalogue. |
+| 4 | **Import Results summary** | Displays a stat breakdown upon completion showing Total Rows, Imported Rows, Skipped Rows, and Error Rows, along with an overall summary (e.g. "Successfully imported 142 of 150 rows"). |
+| 5 | **Error Details table** | When unparseable rows occur, an expandable table details the exact spreadsheet Row number, Column name, and plain-language Error Description (such as missing product names, unparseable prices, or invalid currency codes). |
+| 6 | **Import Another Catalogue button** | Resets the import form so you can import price lists for additional suppliers. |
+
+**Spreadsheet format & partial import resilience:** available to workspace Owners and Buyers. Spreadsheets must include three required columns: product name (accepted headers: `product_name`, `name`, `item`, or `description`), unit price (accepted headers: `unit_price`, `price`, or `rate`; must be a positive number), and currency (accepted headers: `currency` or `curr`; a valid 3-letter currency code such as GBP, USD, or SAR). Optional columns include unit of measure (`unit`, `uom`, or `unit_of_measure`) and minimum order quantity (`qty`, `quantity`, or `moq`). If some rows contain errors, they are listed in the Error Details table and skipped without blocking the rows that succeeded — all valid rows are imported immediately.
+
+---
+
+## 29. FAQ
 
 **Q: Can I edit a verified saving?**
 A: No. Verified savings are immutable. If a correction is needed, a new adjustment record is created.
@@ -786,9 +846,15 @@ A: Yes. If you belong to multiple workspaces, use the workspace switcher in the 
 **Q: Who can approve purchase requests?**
 A: Users with the Approver or Owner role. Approval routing is based on configurable thresholds — requests above a certain amount may require a higher-level approver. If the assigned approver has set up an active delegation (section 21), the request routes to the delegate instead, and the decision is made from the delegate's own Approval Queue.
 
+**Q: What happens if an email is forwarded from a domain not on the allowlist?**
+A: If you have configured a domain allowlist, any incoming email sent from an unapproved domain is rejected. It will not be processed into a quotation or added to your review queue, protecting your workspace from spam and unverified submissions.
+
+**Q: What happens if some rows in my catalogue spreadsheet contain errors?**
+A: ProcurePilot uses partial import resilience. All valid rows are imported into the supplier catalogue immediately, while rows with errors (such as missing product names or invalid currency codes) are reported in the expandable Error Details table with their row number and reason so you can fix and re-import them.
+
 ---
 
-## 27. Known Issues
+## 30. Known Issues
 
 Originally found during the 6 Sep 2026 documentation pass; re-checked and updated 12 Sep 2026 against current `main`.
 

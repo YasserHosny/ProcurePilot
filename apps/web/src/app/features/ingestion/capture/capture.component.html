@@ -1,0 +1,242 @@
+<div class="capture-container">
+  <!-- Page Header -->
+  <header class="page-header">
+    <div class="header-titles">
+      <h1 class="page-title">{{ 'ingestion.capture.title' | translate }}</h1>
+      <p class="page-subtitle">{{ 'ingestion.capture.subtitle' | translate }}</p>
+    </div>
+    <div class="header-actions">
+      <a mat-button routerLink="/ingestion" class="back-link">
+        <mat-icon aria-hidden="true">arrow_back</mat-icon>
+        <span>{{ 'ingestion.nav' | translate }}</span>
+      </a>
+    </div>
+  </header>
+
+  <!-- Error Alert -->
+  @if (errorMessage() && uploadState() !== 'failed') {
+    <div class="error-banner" role="alert">
+      <mat-icon class="error-icon" aria-hidden="true">error_outline</mat-icon>
+      <div class="error-content">
+        <span class="error-text">{{ errorMessage() }}</span>
+        @if (errorTraceId()) {
+          <span class="error-trace">{{ 'common.traceId' | translate }}: {{ errorTraceId() }}</span>
+        }
+      </div>
+    </div>
+  }
+
+  <!-- Actionable Capture Card (Gated to Owner & Buyer) -->
+  <mat-card class="capture-card" *appRole="['owner', 'buyer']">
+    <mat-card-content>
+      @switch (uploadState()) {
+        @case ('idle') {
+          @if (!selectedFile()) {
+            <!-- Dropzone -->
+            <div
+              class="dropzone"
+              [class.drag-over]="isDragOver()"
+              (dragover)="onDragOver($event)"
+              (dragleave)="onDragLeave($event)"
+              (drop)="onDropFile($event)"
+            >
+              <mat-icon class="dropzone-icon" aria-hidden="true">cloud_upload</mat-icon>
+              <p class="dropzone-prompt">{{ 'ingestion.capture.dropzonePrompt' | translate }}</p>
+              <p class="dropzone-hint">{{ 'ingestion.capture.dropzoneHint' | translate }}</p>
+
+              <div class="dropzone-actions">
+                <input
+                  #fileInput
+                  type="file"
+                  class="file-input"
+                  (change)="onFileSelected($event)"
+                  accept="application/pdf,image/jpeg,image/png,image/heic"
+                  [attr.aria-label]="'ingestion.capture.fileLabel' | translate"
+                />
+                <button
+                  mat-stroked-button
+                  type="button"
+                  class="browse-btn"
+                  (click)="fileInput.click()"
+                >
+                  <mat-icon aria-hidden="true">folder_open</mat-icon>
+                  <span>{{ 'ingestion.capture.browse' | translate }}</span>
+                </button>
+
+                <input
+                  #cameraInput
+                  type="file"
+                  class="file-input"
+                  (change)="onFileSelected($event)"
+                  accept="image/*"
+                  capture="camera"
+                  [attr.aria-label]="'ingestion.capture.cameraCaptureLabel' | translate"
+                />
+                <button
+                  mat-stroked-button
+                  type="button"
+                  class="camera-btn"
+                  (click)="cameraInput.click()"
+                >
+                  <mat-icon aria-hidden="true">photo_camera</mat-icon>
+                  <span>{{ 'ingestion.capture.cameraButton' | translate }}</span>
+                </button>
+              </div>
+            </div>
+          } @else {
+            <!-- Selected File Details -->
+            @if (selectedFile(); as file) {
+              <div class="selected-file-card">
+                <div class="file-icon-box">
+                  <mat-icon aria-hidden="true">description</mat-icon>
+                </div>
+                <div class="file-meta">
+                  <span class="file-name">{{ file.name }}</span>
+                  <span class="file-size">{{ formatFileSize(file.size) }}</span>
+                </div>
+                <button
+                  mat-icon-button
+                  type="button"
+                  (click)="removeFile()"
+                  [attr.aria-label]="'ingestion.capture.removeFile' | translate"
+                >
+                  <mat-icon aria-hidden="true">close</mat-icon>
+                </button>
+              </div>
+            }
+          }
+
+          <!-- Additional Capture Options (Supplier & Notes) -->
+          <div class="capture-fields">
+            <mat-form-field appearance="outline" class="form-field full-width">
+              <mat-label>{{ 'ingestion.capture.supplierLabel' | translate }}</mat-label>
+              <mat-select
+                [ngModel]="selectedSupplierId()"
+                (ngModelChange)="selectedSupplierId.set($event)"
+                [placeholder]="'ingestion.capture.supplierPlaceholder' | translate"
+              >
+                <mat-option [value]="null">{{ 'ingestion.capture.supplierPlaceholder' | translate }}</mat-option>
+                @for (supplier of suppliers(); track supplier.id) {
+                  <mat-option [value]="supplier.id">{{ supplier.name }}</mat-option>
+                }
+              </mat-select>
+              <mat-hint>{{ 'ingestion.capture.supplierHint' | translate }}</mat-hint>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" class="form-field full-width">
+              <mat-label>{{ 'ingestion.capture.notesLabel' | translate }}</mat-label>
+              <textarea
+                matInput
+                [ngModel]="notes()"
+                (ngModelChange)="notes.set($event)"
+                rows="3"
+                [placeholder]="'ingestion.capture.notesPlaceholder' | translate"
+              ></textarea>
+            </mat-form-field>
+          </div>
+
+          <!-- Submit Actions -->
+          <div class="form-actions">
+            <button
+              mat-flat-button
+              color="primary"
+              type="button"
+              (click)="submit()"
+              [disabled]="!selectedFile()"
+              class="submit-btn"
+            >
+              <mat-icon aria-hidden="true">upload</mat-icon>
+              <span>{{ 'ingestion.capture.submitButton' | translate }}</span>
+            </button>
+          </div>
+        }
+
+        @case ('uploading') {
+          <div class="progress-container">
+            <mat-spinner [attr.aria-label]="'common.loading' | translate" diameter="48"></mat-spinner>
+            <h2 class="progress-title">{{ 'ingestion.capture.uploading' | translate }}</h2>
+            <p class="progress-hint">{{ 'ingestion.capture.progressHint' | translate }}</p>
+            <mat-progress-bar mode="indeterminate" class="progress-bar"></mat-progress-bar>
+            @if (selectedFile(); as file) {
+              <p class="file-caption">{{ file.name }} ({{ formatFileSize(file.size) }})</p>
+            }
+          </div>
+        }
+
+        @case ('success') {
+          <div class="result-container success">
+            <div class="result-icon-circle success-circle">
+              <mat-icon aria-hidden="true">check_circle</mat-icon>
+            </div>
+            <h2 class="result-title">{{ 'ingestion.capture.successTitle' | translate }}</h2>
+            <p class="result-message">{{ 'ingestion.capture.successMessage' | translate }}</p>
+            @if (captureResult(); as result) {
+              <div class="result-details">
+                <span class="detail-badge">
+                  <mat-icon aria-hidden="true">tag</mat-icon>
+                  <span>{{ 'ingestion.capture.quotationCreated' | translate:{ id: result.quotation_id } }}</span>
+                </span>
+              </div>
+
+              <div class="result-actions">
+                <a
+                  mat-flat-button
+                  color="primary"
+                  [routerLink]="['/quotations', result.quotation_id]"
+                  class="action-btn"
+                >
+                  <mat-icon aria-hidden="true">visibility</mat-icon>
+                  <span>{{ 'ingestion.capture.viewQuotation' | translate }}</span>
+                </a>
+                <button
+                  mat-stroked-button
+                  type="button"
+                  (click)="resetForm()"
+                  class="action-btn"
+                >
+                  <mat-icon aria-hidden="true">add</mat-icon>
+                  <span>{{ 'ingestion.capture.captureAnother' | translate }}</span>
+                </button>
+              </div>
+            }
+          </div>
+        }
+
+        @case ('failed') {
+          <div class="result-container failure">
+            <div class="result-icon-circle failure-circle">
+              <mat-icon aria-hidden="true">error_outline</mat-icon>
+            </div>
+            <h2 class="result-title">{{ 'ingestion.capture.uploadFailed' | translate }}</h2>
+            <p class="result-message">{{ errorMessage() || ('ingestion.capture.errors.generic' | translate) }}</p>
+            @if (errorTraceId()) {
+              <span class="error-trace">{{ 'common.traceId' | translate }}: {{ errorTraceId() }}</span>
+            }
+
+            <div class="result-actions">
+              <button
+                mat-flat-button
+                color="primary"
+                type="button"
+                (click)="retry()"
+                class="action-btn"
+              >
+                <mat-icon aria-hidden="true">refresh</mat-icon>
+                <span>{{ 'ingestion.capture.retryButton' | translate }}</span>
+              </button>
+              <button
+                mat-stroked-button
+                type="button"
+                (click)="resetForm()"
+                class="action-btn"
+              >
+                <mat-icon aria-hidden="true">close</mat-icon>
+                <span>{{ 'common.cancel' | translate }}</span>
+              </button>
+            </div>
+          </div>
+        }
+      }
+    </mat-card-content>
+  </mat-card>
+</div>

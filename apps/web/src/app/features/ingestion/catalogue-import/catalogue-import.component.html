@@ -1,0 +1,262 @@
+<div class="catalogue-import-container">
+  <!-- Page Header -->
+  <header class="page-header">
+    <div class="header-titles">
+      <h1 class="page-title">{{ 'ingestion.catalogueImport.title' | translate }}</h1>
+      <p class="page-subtitle">{{ 'ingestion.catalogueImport.subtitle' | translate }}</p>
+    </div>
+    <div class="header-actions">
+      <a mat-button routerLink="/ingestion" class="back-link">
+        <mat-icon aria-hidden="true">arrow_back</mat-icon>
+        <span>{{ 'ingestion.nav' | translate }}</span>
+      </a>
+    </div>
+  </header>
+
+  <!-- Error Banner -->
+  @if (errorMessage() && importState() !== 'failed') {
+    <div class="error-banner" role="alert">
+      <mat-icon class="error-icon" aria-hidden="true">error_outline</mat-icon>
+      <div class="error-content">
+        <span class="error-text">{{ errorMessage() }}</span>
+        @if (errorTraceId()) {
+          <span class="error-trace">{{ 'common.traceId' | translate }}: {{ errorTraceId() }}</span>
+        }
+      </div>
+    </div>
+  }
+
+  <!-- Actionable Import Card (Gated to Owner & Buyer) -->
+  <mat-card class="import-card" *appRole="['owner', 'buyer']">
+    <mat-card-content>
+      @switch (importState()) {
+        @case ('idle') {
+          <!-- Supplier Selection (REQUIRED) -->
+          <div class="supplier-section">
+            <mat-form-field appearance="outline" class="form-field full-width">
+              <mat-label>{{ 'ingestion.catalogueImport.supplierLabel' | translate }}</mat-label>
+              <mat-select
+                [ngModel]="selectedSupplierId()"
+                (ngModelChange)="onSupplierChange($event)"
+                [placeholder]="'ingestion.catalogueImport.supplierPlaceholder' | translate"
+                required
+              >
+                <mat-option [value]="null">{{ 'ingestion.catalogueImport.supplierPlaceholder' | translate }}</mat-option>
+                @for (supplier of suppliers(); track supplier.id) {
+                  <mat-option [value]="supplier.id">{{ supplier.name }}</mat-option>
+                }
+              </mat-select>
+              <mat-hint>{{ 'ingestion.catalogueImport.supplierHint' | translate }}</mat-hint>
+            </mat-form-field>
+          </div>
+
+          <!-- File Picker Section -->
+          @if (!selectedFile()) {
+            <div
+              class="dropzone"
+              [class.drag-over]="isDragOver()"
+              [class.disabled]="!selectedSupplierId()"
+              (dragover)="onDragOver($event)"
+              (dragleave)="onDragLeave($event)"
+              (drop)="onDropFile($event)"
+            >
+              <mat-icon class="dropzone-icon" aria-hidden="true">cloud_upload</mat-icon>
+              <p class="dropzone-prompt">{{ 'ingestion.catalogueImport.dropzonePrompt' | translate }}</p>
+              <p class="dropzone-hint">{{ 'ingestion.catalogueImport.dropzoneHint' | translate }}</p>
+
+              <div class="dropzone-actions">
+                <input
+                  #fileInput
+                  type="file"
+                  class="file-input"
+                  (change)="onFileSelected($event)"
+                  accept=".csv,.xlsx"
+                  [disabled]="!selectedSupplierId()"
+                  [attr.aria-label]="'ingestion.catalogueImport.fileLabel' | translate"
+                />
+                <button
+                  mat-stroked-button
+                  type="button"
+                  class="browse-btn"
+                  (click)="fileInput.click()"
+                  [disabled]="!selectedSupplierId()"
+                >
+                  <mat-icon aria-hidden="true">folder_open</mat-icon>
+                  <span>{{ 'ingestion.catalogueImport.browse' | translate }}</span>
+                </button>
+              </div>
+            </div>
+          } @else {
+            @if (selectedFile(); as file) {
+              <div class="selected-file-card">
+                <div class="file-icon-box">
+                  <mat-icon aria-hidden="true">table_chart</mat-icon>
+                </div>
+                <div class="file-meta">
+                  <span class="file-name">{{ file.name }}</span>
+                  <span class="file-size">{{ formatFileSize(file.size) }}</span>
+                </div>
+                <button
+                  mat-icon-button
+                  type="button"
+                  (click)="removeFile()"
+                  [attr.aria-label]="'ingestion.catalogueImport.removeFile' | translate"
+                >
+                  <mat-icon aria-hidden="true">close</mat-icon>
+                </button>
+              </div>
+            }
+          }
+
+          <!-- Submit Button -->
+          <div class="form-actions">
+            <button
+              mat-flat-button
+              color="primary"
+              type="button"
+              (click)="submit()"
+              [disabled]="!selectedSupplierId() || !selectedFile()"
+              class="submit-btn"
+            >
+              <mat-icon aria-hidden="true">upload</mat-icon>
+              <span>{{ 'ingestion.catalogueImport.submitButton' | translate }}</span>
+            </button>
+          </div>
+        }
+
+        @case ('importing') {
+          <div class="progress-container">
+            <mat-spinner [attr.aria-label]="'common.loading' | translate" diameter="48"></mat-spinner>
+            <h2 class="progress-title">{{ 'ingestion.catalogueImport.processing' | translate }}</h2>
+            <p class="progress-hint">{{ 'ingestion.catalogueImport.processingHint' | translate }}</p>
+            <mat-progress-bar mode="indeterminate" class="progress-bar"></mat-progress-bar>
+            @if (selectedFile(); as file) {
+              <p class="file-caption">{{ file.name }} ({{ formatFileSize(file.size) }})</p>
+            }
+          </div>
+        }
+
+        @case ('success') {
+          <div class="result-container success">
+            <div class="result-icon-circle success-circle">
+              <mat-icon aria-hidden="true">check_circle</mat-icon>
+            </div>
+            <h2 class="result-title">{{ 'ingestion.catalogueImport.resultsTitle' | translate }}</h2>
+            <p class="result-message">{{ 'ingestion.catalogueImport.resultsSubtitle' | translate }}</p>
+
+            @if (importResult(); as result) {
+              <!-- Stat Cards Grid -->
+              <div class="stats-grid">
+                <div class="stat-card stat-total">
+                  <span class="stat-value">{{ result.total_rows }}</span>
+                  <span class="stat-label">{{ 'ingestion.catalogueImport.totalRows' | translate }}</span>
+                </div>
+                <div class="stat-card stat-imported">
+                  <span class="stat-value">{{ result.imported_rows }}</span>
+                  <span class="stat-label">{{ 'ingestion.catalogueImport.importedRows' | translate }}</span>
+                </div>
+                <div class="stat-card stat-skipped">
+                  <span class="stat-value">{{ result.skipped_rows }}</span>
+                  <span class="stat-label">{{ 'ingestion.catalogueImport.skippedRows' | translate }}</span>
+                </div>
+                <div class="stat-card stat-errors" [class.has-errors]="result.error_rows > 0">
+                  <span class="stat-value">{{ result.error_rows }}</span>
+                  <span class="stat-label">{{ 'ingestion.catalogueImport.errorRows' | translate }}</span>
+                </div>
+              </div>
+
+              <!-- Summary Message -->
+              <p class="summary-text">
+                {{ 'ingestion.catalogueImport.successSummary' | translate:{ imported: result.imported_rows, total: result.total_rows } }}
+              </p>
+
+              <!-- Expandable Error Details: ONLY when error_rows > 0 -->
+              @if (result.error_rows > 0 && result.error_details && result.error_details.length > 0) {
+                <mat-accordion class="error-accordion">
+                  <mat-expansion-panel class="error-panel">
+                    <mat-expansion-panel-header>
+                      <mat-panel-title>
+                        <mat-icon class="panel-icon" aria-hidden="true">error_outline</mat-icon>
+                        <span>{{ 'ingestion.catalogueImport.errorDetailsTitle' | translate:{ count: result.error_rows } }}</span>
+                      </mat-panel-title>
+                    </mat-expansion-panel-header>
+
+                    <div class="error-table-wrapper">
+                      <table class="error-table">
+                        <thead>
+                          <tr>
+                            <th scope="col">{{ 'ingestion.catalogueImport.errorTable.row' | translate }}</th>
+                            <th scope="col">{{ 'ingestion.catalogueImport.errorTable.column' | translate }}</th>
+                            <th scope="col">{{ 'ingestion.catalogueImport.errorTable.error' | translate }}</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          @for (detail of result.error_details; track $index) {
+                            <tr>
+                              <td class="row-cell">{{ detail.row ?? ('ingestion.catalogueImport.errorTable.general' | translate) }}</td>
+                              <td class="col-cell">{{ detail.column || '—' }}</td>
+                              <td class="desc-cell">{{ detail.error }}</td>
+                            </tr>
+                          }
+                        </tbody>
+                      </table>
+                    </div>
+                  </mat-expansion-panel>
+                </mat-accordion>
+              }
+
+              <!-- Action: Import Another -->
+              <div class="result-actions">
+                <button
+                  mat-flat-button
+                  color="primary"
+                  type="button"
+                  (click)="resetForm()"
+                  class="action-btn"
+                >
+                  <mat-icon aria-hidden="true">add</mat-icon>
+                  <span>{{ 'ingestion.catalogueImport.importAnother' | translate }}</span>
+                </button>
+              </div>
+            }
+          </div>
+        }
+
+        @case ('failed') {
+          <div class="result-container failure">
+            <div class="result-icon-circle failure-circle">
+              <mat-icon aria-hidden="true">error_outline</mat-icon>
+            </div>
+            <h2 class="result-title">{{ 'ingestion.catalogueImport.importFailed' | translate }}</h2>
+            <p class="result-message">{{ errorMessage() || ('ingestion.catalogueImport.importFailed' | translate) }}</p>
+            @if (errorTraceId()) {
+              <span class="error-trace">{{ 'common.traceId' | translate }}: {{ errorTraceId() }}</span>
+            }
+
+            <div class="result-actions">
+              <button
+                mat-flat-button
+                color="primary"
+                type="button"
+                (click)="retry()"
+                class="action-btn"
+              >
+                <mat-icon aria-hidden="true">refresh</mat-icon>
+                <span>{{ 'ingestion.catalogueImport.retry' | translate }}</span>
+              </button>
+              <button
+                mat-stroked-button
+                type="button"
+                (click)="resetForm()"
+                class="action-btn"
+              >
+                <mat-icon aria-hidden="true">close</mat-icon>
+                <span>{{ 'common.cancel' | translate }}</span>
+              </button>
+            </div>
+          </div>
+        }
+      }
+    </mat-card-content>
+  </mat-card>
+</div>
