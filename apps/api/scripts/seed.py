@@ -38,6 +38,7 @@ CURRENCIES: list[tuple[str, str, str, int]] = [
     ("GBP", "Pound Sterling", "جنيه إسترليني", 2),
     ("EGP", "Egyptian Pound", "جنيه مصري", 2),
     ("AED", "UAE Dirham", "درهم إماراتي", 2),
+    ("USD", "US Dollar", "دولار أمريكي", 2),
 ]
 
 TAX_MODELS: list[tuple[str, str, str, str]] = [
