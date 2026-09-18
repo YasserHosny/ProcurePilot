@@ -58,6 +58,11 @@ def _mock_audit_and_cleanup(monkeypatch: pytest.MonkeyPatch) -> RecordingAuditWr
     if TEST_DATABASE_URL:
         with psycopg.connect(TEST_DATABASE_URL) as conn:
             with conn.cursor() as cur:
+                # reconciliation_discrepancy FKs into synced_bill/purchase_record — must be
+                # cleared first, or synced_bill's own delete below hits a FK violation now that
+                # SyncService.sync() (via ReconciliationService.recompute_discrepancies) creates
+                # rows here on every sync this test suite runs.
+                cur.execute("delete from reconciliation_discrepancy")
                 cur.execute("delete from purchase_bill_match")
                 cur.execute("delete from synced_bill")
                 cur.execute("delete from synced_vendor")
