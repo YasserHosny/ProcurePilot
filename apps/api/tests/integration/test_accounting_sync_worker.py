@@ -39,22 +39,7 @@ class RecordingAuditWriter:
         self.events.append(event)
 
 
-@pytest.fixture(autouse=True)
-def _mock_audit_and_cleanup(monkeypatch: pytest.MonkeyPatch) -> RecordingAuditWriter:
-    writer = RecordingAuditWriter()
-    monkeypatch.setattr(
-        "procurepilot_api.shared.audit.get_audit_writer",
-        lambda: writer,
-    )
-    monkeypatch.setattr(
-        "procurepilot_api.modules.accounting.service.get_audit_writer",
-        lambda: writer,
-    )
-    monkeypatch.setattr(
-        "procurepilot_api.modules.accounting.sync_service.get_audit_writer",
-        lambda: writer,
-    )
-    yield writer
+def _clean_accounting_tables() -> None:
     if TEST_DATABASE_URL:
         with psycopg.connect(TEST_DATABASE_URL) as conn:
             with conn.cursor() as cur:
@@ -70,6 +55,24 @@ def _mock_audit_and_cleanup(monkeypatch: pytest.MonkeyPatch) -> RecordingAuditWr
             conn.commit()
 
 
+@pytest.fixture(autouse=True)
+def _mock_audit_and_cleanup(monkeypatch: pytest.MonkeyPatch) -> RecordingAuditWriter:
+    _clean_accounting_tables()
+    writer = RecordingAuditWriter()
+    monkeypatch.setattr(
+        "procurepilot_api.shared.audit.get_audit_writer",
+        lambda: writer,
+    )
+    monkeypatch.setattr(
+        "procurepilot_api.modules.accounting.service.get_audit_writer",
+        lambda: writer,
+    )
+    monkeypatch.setattr(
+        "procurepilot_api.modules.accounting.sync_service.get_audit_writer",
+        lambda: writer,
+    )
+    yield writer
+    _clean_accounting_tables()
 
 
 def _seed_connection(
