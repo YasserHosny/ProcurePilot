@@ -2689,6 +2689,7 @@
     }
   },
   "accounting": {
+    "nav": "Accounting",
     "connection": {
       "title": "Accounting Integration",
       "subtitle": "Connect your accounting software to sync bills and reconcile spend against purchase records.",
