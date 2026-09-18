@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from procurepilot_api.config import Settings, get_settings
 from procurepilot_api.errors import register_exception_handlers
+from procurepilot_api.modules.accounting.router import router as accounting_router
 from procurepilot_api.modules.alerts.router import router as alerts_router
 from procurepilot_api.modules.auth.router import router as auth_router
 from procurepilot_api.modules.billing.router import router as billing_router
@@ -54,6 +55,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app.include_router(health_router, prefix=API_PREFIX)
     app.include_router(auth_router, prefix=API_PREFIX)
+    app.include_router(accounting_router, prefix=API_PREFIX)
     app.include_router(tenants_router, prefix=API_PREFIX)
     app.include_router(members_router, prefix=API_PREFIX)
     app.include_router(catalogue_router, prefix=API_PREFIX)

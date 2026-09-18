@@ -1,0 +1,189 @@
+"""Accounting connector interface, types, and stub implementation (R3.1).
+
+Defines the read-only AccountingConnector protocol, data transfer objects mirroring
+synced_bill and synced_vendor schema shapes, and an in-memory StubConnector for testing.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from datetime import date, timedelta
+from decimal import Decimal
+from typing import Literal, Protocol, runtime_checkable
+
+from procurepilot_api.config import Settings, get_settings
+
+
+@dataclass(frozen=True)
+class RawBill:
+    """A supplier bill as extracted from an accounting provider (FR-005).
+
+    Matches the database schema of synced_bill (migration 20260918000004).
+    """
+
+    provider_bill_id: str
+    provider_vendor_id: str
+    amount: Decimal
+    currency: str
+    bill_date: date
+    status: Literal["open", "paid", "void"]
+
+    @property
+    def provider_id(self) -> str:
+        """Alias for provider_bill_id."""
+        return self.provider_bill_id
+
+    @property
+    def provider_status(self) -> Literal["open", "paid", "void"]:
+        """Alias for status."""
+        return self.status
+
+
+@dataclass(frozen=True)
+class RawVendor:
+    """A vendor/supplier as extracted from an accounting provider (FR-006).
+
+    Matches the database schema of synced_vendor (migration 20260918000003).
+    """
+
+    provider_vendor_id: str
+    display_name: str
+
+    @property
+    def provider_id(self) -> str:
+        """Alias for provider_vendor_id."""
+        return self.provider_vendor_id
+
+
+@dataclass(frozen=True)
+class CompanyInfo:
+    """Connected accounting tenant/company details (FR-002).
+
+    Matches realm_id and display_name in accounting_connection (migration 20260918000002).
+    """
+
+    realm_id: str
+    company_name: str
+
+    @property
+    def display_name(self) -> str:
+        """Alias for company_name."""
+        return self.company_name
+
+
+@runtime_checkable
+class AccountingConnector(Protocol):
+    """Protocol for reading from an external accounting system (QuickBooks, Stub).
+
+    Deliberately read-only: no create, update, or delete methods exist on this protocol,
+    enforcing FR-013 at the type level. All reconciliation decisions live solely in
+    ProcurePilot; nothing is ever written back to the accounting system.
+    """
+
+    def list_bills(self, since: date) -> list[RawBill]:
+        """Fetch bills recorded on or after the specified date."""
+        ...
+
+    def list_vendors(self) -> list[RawVendor]:
+        """Fetch the full list of vendors/suppliers."""
+        ...
+
+    def company_info(self) -> CompanyInfo:
+        """Fetch metadata for the connected company/realm."""
+        ...
+
+
+class StubConnector:
+    """In-memory stub implementation of AccountingConnector.
+
+    Provides deterministic fixtures so sync, matching, and discrepancy flows can be developed
+    and tested without requiring real QuickBooks credentials (research.md R5).
+    """
+
+    def __init__(
+        self,
+        bills: list[RawBill] | None = None,
+        vendors: list[RawVendor] | None = None,
+        company: CompanyInfo | None = None,
+    ) -> None:
+        self._bills = list(bills) if bills is not None else self._default_bills()
+        self._vendors = list(vendors) if vendors is not None else self._default_vendors()
+        self._company = company or CompanyInfo(
+            realm_id="stub-realm-12345",
+            company_name="ProcurePilot Demo Company",
+        )
+
+    @staticmethod
+    def _default_vendors() -> list[RawVendor]:
+        return [
+            RawVendor(
+                provider_vendor_id="stub-vendor-001",
+                display_name="Global Office Supplies",
+            ),
+            RawVendor(
+                provider_vendor_id="stub-vendor-002",
+                display_name="Industrial Parts Direct",
+            ),
+            RawVendor(
+                provider_vendor_id="stub-vendor-003",
+                display_name="Apex Logistics",
+            ),
+        ]
+
+    @staticmethod
+    def _default_bills() -> list[RawBill]:
+        today = date.today()
+        return [
+            RawBill(
+                provider_bill_id="stub-bill-101",
+                provider_vendor_id="stub-vendor-001",
+                amount=Decimal("1250.00"),
+                currency="USD",
+                bill_date=today - timedelta(days=15),
+                status="open",
+            ),
+            RawBill(
+                provider_bill_id="stub-bill-102",
+                provider_vendor_id="stub-vendor-002",
+                amount=Decimal("3450.50"),
+                currency="USD",
+                bill_date=today - timedelta(days=30),
+                status="paid",
+            ),
+            RawBill(
+                provider_bill_id="stub-bill-103",
+                provider_vendor_id="stub-vendor-003",
+                amount=Decimal("890.25"),
+                currency="USD",
+                bill_date=today - timedelta(days=5),
+                status="open",
+            ),
+        ]
+
+    def list_bills(self, since: date) -> list[RawBill]:
+        return [b for b in self._bills if b.bill_date >= since]
+
+    def list_vendors(self) -> list[RawVendor]:
+        return list(self._vendors)
+
+    def company_info(self) -> CompanyInfo:
+        return self._company
+
+
+def get_accounting_connector(
+    settings: Settings | None = None,
+    *,
+    realm_id: str | None = None,
+    access_token: str | None = None,
+) -> AccountingConnector:
+    """Factory returning the active AccountingConnector based on configuration."""
+    cfg = settings or get_settings()
+    if cfg.accounting_provider_mode == "quickbooks":
+        from procurepilot_api.modules.accounting.quickbooks_client import QuickBooksClient
+
+        return QuickBooksClient(
+            settings=cfg,
+            realm_id=realm_id,
+            access_token=access_token,
+        )
+    return StubConnector()

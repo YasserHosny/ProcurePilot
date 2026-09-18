@@ -123,6 +123,26 @@ class Settings(BaseSettings):
     sentry_dsn: SecretStr | None = Field(default=None, validation_alias="SENTRY_DSN")
     posthog_api_key: SecretStr | None = Field(default=None, validation_alias="POSTHOG_API_KEY")
 
+    # Accounting integration (R3.1, 014-accounting-integration):
+    # Provider mode defaults to "stub" so tests, local development, and CI can run
+    # without a real Intuit/QuickBooks developer account. "quickbooks" uses live
+    # OAuth2 and REST calls against QuickBooks Online.
+    accounting_provider_mode: Literal["stub", "quickbooks"] = Field(
+        default="stub", validation_alias="ACCOUNTING_PROVIDER_MODE"
+    )
+    quickbooks_client_id: str | None = Field(
+        default=None, validation_alias="QUICKBOOKS_CLIENT_ID"
+    )
+    quickbooks_client_secret: SecretStr | None = Field(
+        default=None, validation_alias="QUICKBOOKS_CLIENT_SECRET"
+    )
+    quickbooks_redirect_uri: str | None = Field(
+        default=None, validation_alias="QUICKBOOKS_REDIRECT_URI"
+    )
+    quickbooks_environment: Literal["sandbox", "production"] = Field(
+        default="sandbox", validation_alias="QUICKBOOKS_ENVIRONMENT"
+    )
+
     @field_validator("api_cors_origins", mode="before")
     @classmethod
     def parse_cors_origins(cls, value: object) -> tuple[str, ...] | object:
@@ -133,7 +153,7 @@ class Settings(BaseSettings):
             return origins
         return value
 
-    @field_validator("sentry_dsn", "posthog_api_key", mode="before")
+    @field_validator("sentry_dsn", "posthog_api_key", "quickbooks_client_secret", mode="before")
     @classmethod
     def empty_secret_to_none(cls, value: object) -> object | None:
         if value == "":

@@ -14,55 +14,55 @@ in parallel the way the template usually assumes — build them in order.
 
 ## Phase 1 — Setup
 
-- [ ] **T001** — Config: add `accounting_provider_mode` (`stub`/`quickbooks`, default `stub`),
+- [x] **T001** — Config: add `accounting_provider_mode` (`stub`/`quickbooks`, default `stub`),
   `quickbooks_client_id`, `quickbooks_client_secret` (SecretStr), `quickbooks_redirect_uri`,
   `quickbooks_environment` (`sandbox`/`production`) to `apps/api/src/procurepilot_api/config.py`,
   matching `EXTRACTION_PROVIDER_MODE`'s existing settings shape exactly (research.md R5).
-- [ ] **T002** [P] — Module skeleton: `apps/api/src/procurepilot_api/modules/accounting/
+- [x] **T002** [P] — Module skeleton: `apps/api/src/procurepilot_api/modules/accounting/
   __init__.py`, `schemas.py` (empty Pydantic models per data-model.md's tables — fill in as each
   story needs them), `router.py` wired into `main.py`'s router registration, matching
   `modules/ingestion/__init__.py`'s own T008 precedent.
 
 ## Phase 2 — Foundational (blocking — every user story needs this)
 
-- [ ] **T003** — Migration: `purchase_record` composite key fix
+- [x] **T003** — Migration: `purchase_record` composite key fix
   (`supabase/migrations/202609XX000001_purchase_record_composite_key.sql`) — add
   `alter table purchase_record add constraint purchase_record_tenant_id_key unique (tenant_id,
   id);` exactly as research.md R7 specifies. Pure additive constraint, no backfill needed.
-- [ ] **T004** [P] — Migration: `accounting_connection` table
+- [x] **T004** [P] — Migration: `accounting_connection` table
   (`supabase/migrations/202609XX000002_accounting_connection.sql`) — per data-model.md exactly:
   columns, `accounting_provider`/`accounting_connection_status` enums, the
   `unique (tenant_id) where status <> 'disconnected'` partial constraint, `ENABLE + FORCE` RLS
   with `SELECT` for any member and `INSERT`/`UPDATE` owner-only.
-- [ ] **T005** [P] — Migration: `synced_vendor` table
+- [x] **T005** [P] — Migration: `synced_vendor` table
   (`supabase/migrations/202609XX000003_synced_vendor.sql`) — per data-model.md, FK into
   `accounting_connection(tenant_id, id)` and `supplier(tenant_id, id)`, `ENABLE + FORCE` RLS
   (`SELECT` any member, `INSERT`/`UPDATE` service-role sync path only).
-- [ ] **T006** [P] — Migration: `synced_bill` table
+- [x] **T006** [P] — Migration: `synced_bill` table
   (`supabase/migrations/202609XX000004_synced_bill.sql`) — per data-model.md,
   `synced_bill_status` enum, FK into `accounting_connection`/`synced_vendor`/`supplier`
   (all `(tenant_id, id)`-pinned), `ENABLE + FORCE` RLS matching `synced_vendor`'s pattern.
-- [ ] **T007** [P] — Migration: `purchase_bill_match` table
+- [x] **T007** [P] — Migration: `purchase_bill_match` table
   (`supabase/migrations/202609XX000005_purchase_bill_match.sql`) — per data-model.md,
   `match_method` enum, FK into `synced_bill`/`purchase_record` (both `(tenant_id, id)`-pinned —
   depends on T003), the two 1:1 uniqueness constraints, `ENABLE + FORCE` RLS with no
   `UPDATE`/`DELETE` grant at all (supersede-by-insert, per data-model.md's Principle-I rationale).
-- [ ] **T008** [P] — Migration: `reconciliation_discrepancy` table
+- [x] **T008** [P] — Migration: `reconciliation_discrepancy` table
   (`supabase/migrations/202609XX000006_reconciliation_discrepancy.sql`) — per data-model.md,
   `discrepancy_type`/`discrepancy_status` enums, the mutual-exclusivity `check` constraint,
   `ENABLE + FORCE` RLS with `UPDATE` restricted to `owner`/`buyer` and only the resolution
   columns (mirror `digest_subscription`'s column-scoped update policy).
-- [ ] **T009** — Connector abstraction: `AccountingConnector` protocol (typed methods:
+- [x] **T009** — Connector abstraction: `AccountingConnector` protocol (typed methods:
   `list_bills(since: date) -> list[RawBill]`, `list_vendors() -> list[RawVendor]`,
   `company_info() -> CompanyInfo`  — no write method exists on the protocol at all, enforcing
   FR-013 at the type level, not just by convention) plus `StubConnector` (returns fixture data)
   in `apps/api/src/procurepilot_api/modules/accounting/connector.py`.
-- [ ] **T010** — `QuickBooksClient`: OAuth2 authorization-code + refresh-token flow and the three
+- [x] **T010** — `QuickBooksClient`: OAuth2 authorization-code + refresh-token flow and the three
   read-only REST calls (`Bill`, `Vendor`, `CompanyInfo` via QuickBooks's `/v3/company/{realmId}/
   query` endpoint), built on `httpx` per research.md R1 — implements the same
   `AccountingConnector` protocol as `StubConnector`, in
   `apps/api/src/procurepilot_api/modules/accounting/quickbooks_client.py`. No SDK dependency.
-- [ ] **T011** [P] — Unit tests for `QuickBooksClient`'s OAuth token exchange/refresh logic and
+- [x] **T011** [P] — Unit tests for `QuickBooksClient`'s OAuth token exchange/refresh logic and
   REST response parsing (mocked `httpx` responses, no real network call) in
   `apps/api/tests/unit/test_quickbooks_client.py`.
 
