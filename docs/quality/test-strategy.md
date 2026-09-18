@@ -157,7 +157,35 @@ Release R2.5 (`012-reporting-hardening`) introduces formal performance, accessib
 - **Automated Isolation Tests (`pnpm test:isolation`):** Verified RLS policies across `report_schedule`, `digest_subscription`, `export_job`, and Supabase Storage `exports` bucket.
 - **Cross-Tenant Guarantees:** Any cross-tenant or unauthorized-branch access resolves to HTTP 404 (Not Found), never HTTP 403 (Forbidden), avoiding existence leakage.
 
-## 11. Open Decisions
+## 11. R3.0 Automated Ingestion Hardening & Verification Gates
+
+Release R3.0 (`013-automated-ingestion`) introduces multi-channel ingestion (inbound email forwarding, document capture, and supplier catalogue import) backed by asynchronous workers. Verification gates enforce database-level concurrency safety, strict deduplication, anti-abuse rate limits, and failure recovery:
+
+### 11.1 Worker Reliability & Concurrency Claims
+- **Claim Pattern (`FOR UPDATE SKIP LOCKED`):** The email ingestion background daemon (`apps/api/src/procurepilot_api/workers/email_ingestion_worker.py`) polls `ingestion_jobs` for pending `email_ingest` jobs using `FOR UPDATE SKIP LOCKED`. Claimed rows are locked and transitioned to `status = 'processing'` with `locked_by = 'email_ingestion_worker'`. Following established worker security discipline (export and digest workers), `tenant_id` is re-derived strictly from the claimed database row, never trusted from the job payload.
+- **Exclusivity Proof:** Integration test `test_concurrency_skip_locked_prevents_duplicate_claims` in `apps/api/tests/integration/test_email_ingestion_worker.py` proves claim exclusivity using two real, overlapping `psycopg` transactions (`conn_a` and `conn_b`). While Connection A holds the claim lock uncommitted, Connection B executes the exact same query; Connection B skips the locked row and returns an empty claim list (`claimed_b == []`), verifying that concurrent workers cannot double-claim or race on pending jobs.
+- **Retry & Terminal Failure:** When processing raises an unhandled exception, `_mark_job_failed()` increments `attempts`. If `new_attempts < max_attempts`, the job reverts to `pending` with `locked_by = None` and `last_error` recorded. When `attempts >= max_attempts`, the job transitions to terminal `failed` with `completed_at = now()`.
+- **Failure Proof:** Integration test `test_failure_retry_and_terminal_failed_status` in `apps/api/tests/integration/test_email_ingestion_worker.py` verifies this lifecycle with `max_attempts = 3`. Attempts 1 and 2 return the job to `pending`, attempt 3 transitions the job to terminal `failed`, and a subsequent worker tick ignores the failed job without retrying (`claimed == 0`).
+
+### 11.2 Inbound Email Deduplication
+- **Database Constraint:** `supabase/migrations/20260917000001_ingestion_email_log.sql` defines `constraint ingestion_email_log_tenant_message_id_key unique (tenant_id, message_id)`. This enforces RFC 5322 Message-ID uniqueness scoped per tenant, preventing replayed or redelivered emails from triggering duplicate ingestion pipelines.
+- **Deduplication Proof:** Integration test `test_duplicate_message_id_is_skipped_without_creating_a_second_quotation` in `apps/api/tests/integration/test_ingestion_orchestrator.py` processes an email with an identical `message_id` twice. The first call succeeds (`status: "completed"`), while the second immediately returns `status: "duplicate"` with the message ID. The database confirms that `ingestion_email_log` retains exactly 1 record and no second quotation or extraction job is created.
+
+### 11.3 Rate Limiting & Quota Controls
+- **Tenant Daily Email Limit:** Each tenant's ingestion volume is capped via `tenant_email_config.daily_limit` against rolling usage `daily_count`.
+- **Quota Rejection Proof:** Integration test `test_daily_limit_reached_refuses_without_queueing` in `apps/api/tests/integration/test_ingestion_webhook.py` verifies that when `daily_count >= daily_limit`, inbound webhook calls return HTTP `202 Accepted` (complying with R10 anti-probing and no-existence-leak requirements) but refuse processing without enqueuing any job (`count(*) from ingestion_jobs` is 0).
+- **Endpoint Limits (`apps/api/src/procurepilot_api/config.py`):** Ingestion mutation endpoints enforce verified tenant+membership claim rate limits, with IP fallbacks:
+  - Ingestion configuration mutations: `rate_limit_ingestion_config_mutation` (`RATE_LIMIT_INGESTION_CONFIG_MUTATION`, default `30/minute`).
+  - Inbound email webhook: `rate_limit_inbound_email_webhook` (`RATE_LIMIT_INBOUND_EMAIL_WEBHOOK`, default `60/minute`).
+  - Document capture uploads: `rate_limit_capture_upload` (`RATE_LIMIT_CAPTURE_UPLOAD`, default `30/minute`).
+  - Catalogue imports: `rate_limit_catalogue_import` (`RATE_LIMIT_CATALOGUE_IMPORT`, default `10/minute`).
+
+### 11.4 Known Coverage Gap: Catalogue Re-Import Matching Pipeline Idempotency
+- **Sanity Proof:** Integration test `test_importing_the_same_file_twice_creates_two_independent_quotations` in `apps/api/tests/integration/test_catalogue_import.py` verifies that `catalogue_import`'s own repeat-call behavior is sane. Importing the identical CSV file twice creates two distinct quotations (`first["id"] != second["id"]`), two separate `catalogue_imports` audit records, and triggers matching invocation for each quotation.
+- **Coverage Gap:** In `test_catalogue_import.py`, `MatchingService.quotation_matches()` is stubbed via the `_fake_matching` fixture because the full matching pipeline relies on the legacy PostgREST client architecture rather than the disposable PostgreSQL test harness (as documented in `_fake_matching`'s fixture docstring). Consequently, whether the real `MatchingService` and landed-cost pipeline behaves idempotently when processing duplicate catalogue imports remains untested and is flagged as an open question for a future test wave.
+
+## 12. Open Decisions
 
 1. Which Flutter testing framework (integration tests vs. Maestro).
 2. Whether to add synthetic data generation for performance testing.
+3. Real `MatchingService` idempotency on duplicate catalogue imports: catalogue import repeat-call sanity is proven in `test_catalogue_import.py`, but real matching and landed-cost pipeline behavior on re-import remains untested because `MatchingService` is faked in integration tests (see §11.4).
