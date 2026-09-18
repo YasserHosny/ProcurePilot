@@ -1,0 +1,347 @@
+<div class="discrepancies-container">
+  <!-- Header Section -->
+  <div class="header-section">
+    <div class="back-link">
+      <a mat-button routerLink="/accounting" data-testid="back-to-connection-link">
+        <mat-icon aria-hidden="true">arrow_back</mat-icon>
+        <span>{{ 'accounting.discrepancies.backToConnection' | translate }}</span>
+      </a>
+    </div>
+
+    <div class="header-main">
+      <div class="title-group">
+        <h1 class="page-title">{{ 'accounting.discrepancies.title' | translate }}</h1>
+        <p class="page-subtitle">{{ 'accounting.discrepancies.subtitle' | translate }}</p>
+      </div>
+
+      <div class="header-actions">
+        <button
+          mat-stroked-button
+          type="button"
+          class="refresh-btn"
+          [disabled]="isLoading() || isResolving()"
+          (click)="loadDiscrepancies()"
+          data-testid="refresh-discrepancies-btn"
+        >
+          <mat-icon aria-hidden="true">refresh</mat-icon>
+          <span>{{ 'accounting.discrepancies.refresh' | translate }}</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <mat-card class="discrepancies-card">
+    <div class="card-content">
+      <!-- Filter Toolbar -->
+      <div class="filter-toolbar">
+        <mat-form-field appearance="outline" class="filter-field">
+          <mat-label>{{ 'accounting.discrepancies.filters.status' | translate }}</mat-label>
+          <mat-select
+            [ngModel]="statusFilter()"
+            (ngModelChange)="onStatusFilterChange($event)"
+            data-testid="status-filter"
+          >
+            <mat-option value="open" data-testid="filter-opt-open">
+              {{ 'accounting.discrepancies.filters.open' | translate }}
+            </mat-option>
+            <mat-option value="resolved" data-testid="filter-opt-resolved">
+              {{ 'accounting.discrepancies.filters.resolved' | translate }}
+            </mat-option>
+          </mat-select>
+        </mat-form-field>
+      </div>
+
+      <!-- Error State -->
+      @if (errorMessage(); as err) {
+        <div class="error-banner" role="alert" data-testid="error-banner">
+          <mat-icon class="error-icon" aria-hidden="true">error_outline</mat-icon>
+          <div class="error-text-wrap">
+            <span class="error-title">{{ 'accounting.discrepancies.error.title' | translate }}</span>
+            <span class="error-message">{{ err }}</span>
+          </div>
+          <button mat-button type="button" class="retry-btn" (click)="loadDiscrepancies()" data-testid="retry-btn">
+            <mat-icon aria-hidden="true">refresh</mat-icon>
+            <span>{{ 'accounting.discrepancies.error.retry' | translate }}</span>
+          </button>
+        </div>
+      }
+
+      <!-- Loading State -->
+      @if (isLoading()) {
+        <div class="loading-state" aria-live="polite" role="status" data-testid="loading-state">
+          <mat-spinner diameter="36" [attr.aria-label]="'common.loading' | translate" />
+        </div>
+      } @else if (discrepancies().length === 0) {
+        <!-- Empty State -->
+        <div class="empty-state" data-testid="empty-state">
+          <mat-icon class="empty-icon" aria-hidden="true">rule</mat-icon>
+          <h2 class="empty-title">{{ 'accounting.discrepancies.empty.title' | translate }}</h2>
+          <p class="empty-message">{{ 'accounting.discrepancies.empty.description' | translate }}</p>
+        </div>
+      } @else {
+        <!-- Table -->
+        <div class="table-responsive">
+          <table
+            mat-table
+            [dataSource]="discrepancies()"
+            class="discrepancies-table"
+            [attr.aria-label]="'accounting.discrepancies.title' | translate"
+            data-testid="discrepancies-table"
+          >
+            <!-- Type Column -->
+            <ng-container matColumnDef="type">
+              <th mat-header-cell *matHeaderCellDef scope="col">
+                {{ 'accounting.discrepancies.table.type' | translate }}
+              </th>
+              <td mat-cell *matCellDef="let disc" class="type-cell">
+                <span
+                  class="type-chip"
+                  [ngClass]="getTypeClass(disc.discrepancy_type)"
+                  data-testid="discrepancy-type"
+                >
+                  {{ getTypeLabel(disc.discrepancy_type) }}
+                </span>
+              </td>
+            </ng-container>
+
+            <!-- Details Column -->
+            <ng-container matColumnDef="details">
+              <th mat-header-cell *matHeaderCellDef scope="col">
+                {{ 'accounting.discrepancies.table.details' | translate }}
+              </th>
+              <td mat-cell *matCellDef="let disc" class="details-cell">
+                <!-- Amount Mismatch -->
+                @if (disc.discrepancy_type === 'amount_mismatch') {
+                  <div class="side-by-side-comparison" data-testid="amount-mismatch-detail">
+                    <div class="mismatch-side bill-side">
+                      <span class="mismatch-tag">{{ 'accounting.discrepancies.details.syncedBill' | translate }}</span>
+                      <span class="mismatch-name" data-testid="bill-vendor">
+                        {{ disc.synced_bill_detail?.vendor_name }}
+                      </span>
+                      <span class="mismatch-amount bill-amount" data-testid="bill-amount">
+                        {{ disc.synced_bill_detail | formatMoney }}
+                      </span>
+                      @if (disc.synced_bill_detail?.bill_date) {
+                        <span class="mismatch-date">
+                          {{ disc.synced_bill_detail?.bill_date | formatDate }}
+                        </span>
+                      }
+                    </div>
+
+                    <div class="mismatch-divider">
+                      <mat-icon aria-hidden="true">compare_arrows</mat-icon>
+                    </div>
+
+                    <div class="mismatch-side purchase-side">
+                      <span class="mismatch-tag">{{ 'accounting.discrepancies.details.purchaseRecord' | translate }}</span>
+                      <span class="mismatch-name" data-testid="purchase-supplier">
+                        {{ disc.purchase_record_detail?.supplier_name }}
+                      </span>
+                      <span class="mismatch-amount purchase-amount" data-testid="purchase-amount">
+                        {{ disc.purchase_record_detail | formatMoney }}
+                      </span>
+                      @if (disc.purchase_record_detail?.date) {
+                        <span class="mismatch-date">
+                          {{ disc.purchase_record_detail?.date | formatDate }}
+                        </span>
+                      }
+                    </div>
+                  </div>
+                }
+
+                <!-- Unmatched Bill -->
+                @if (disc.discrepancy_type === 'unmatched_bill') {
+                  <div class="unmatched-detail" data-testid="unmatched-bill-detail">
+                    <div class="unmatched-main">
+                      <span class="unmatched-name" data-testid="unmatched-bill-vendor">
+                        {{ disc.synced_bill_detail?.vendor_name }}
+                      </span>
+                      <span class="unmatched-amount" data-testid="unmatched-bill-amount">
+                        {{ disc.synced_bill_detail | formatMoney }}
+                      </span>
+                    </div>
+                    @if (disc.synced_bill_detail?.bill_date) {
+                      <span class="unmatched-date" data-testid="unmatched-bill-date">
+                        {{ disc.synced_bill_detail?.bill_date | formatDate }}
+                      </span>
+                    }
+                  </div>
+                }
+
+                <!-- Unmatched Purchase Record -->
+                @if (disc.discrepancy_type === 'unmatched_purchase') {
+                  <div class="unmatched-detail" data-testid="unmatched-purchase-detail">
+                    <div class="unmatched-main">
+                      <span class="unmatched-name" data-testid="unmatched-purchase-supplier">
+                        {{ disc.purchase_record_detail?.supplier_name }}
+                      </span>
+                      <span class="unmatched-amount" data-testid="unmatched-purchase-amount">
+                        {{ disc.purchase_record_detail | formatMoney }}
+                      </span>
+                    </div>
+                    @if (disc.purchase_record_detail?.date) {
+                      <span class="unmatched-date" data-testid="unmatched-purchase-date">
+                        {{ disc.purchase_record_detail?.date | formatDate }}
+                      </span>
+                    }
+                  </div>
+                }
+              </td>
+            </ng-container>
+
+            <!-- Detected At Column -->
+            <ng-container matColumnDef="detectedAt">
+              <th mat-header-cell *matHeaderCellDef scope="col">
+                {{ 'accounting.discrepancies.table.detectedAt' | translate }}
+              </th>
+              <td mat-cell *matCellDef="let disc" class="detected-cell" data-testid="discrepancy-detected-at">
+                <span class="detected-date">{{ disc.detected_at | formatDate }}</span>
+              </td>
+            </ng-container>
+
+            <!-- Status Column -->
+            <ng-container matColumnDef="status">
+              <th mat-header-cell *matHeaderCellDef scope="col">
+                {{ 'accounting.discrepancies.table.status' | translate }}
+              </th>
+              <td mat-cell *matCellDef="let disc" class="status-cell" data-testid="discrepancy-status">
+                <span class="status-chip" [ngClass]="disc.status === 'resolved' ? 'status-resolved' : 'status-open'">
+                  {{ getStatusLabel(disc.status) }}
+                </span>
+              </td>
+            </ng-container>
+
+            <!-- Actions / Resolution Info Column -->
+            <ng-container matColumnDef="actions">
+              <th mat-header-cell *matHeaderCellDef scope="col">
+                {{ (statusFilter() === 'resolved' ? 'accounting.discrepancies.resolution.title' : 'accounting.discrepancies.table.actions') | translate }}
+              </th>
+              <td mat-cell *matCellDef="let disc" class="actions-cell">
+                <!-- Open discrepancy action -->
+                @if (disc.status === 'open') {
+                  @if (activeResolvingId() === disc.id) {
+                    <div
+                      class="inline-resolve-form"
+                      role="region"
+                      [attr.aria-label]="'accounting.discrepancies.resolveDialog.title' | translate"
+                      data-testid="inline-resolve-form"
+                    >
+                      <mat-form-field appearance="outline" class="resolve-input-field">
+                        <mat-label>{{ 'accounting.discrepancies.resolveDialog.noteLabel' | translate }}</mat-label>
+                        <input
+                          matInput
+                          [ngModel]="resolutionNote()"
+                          (ngModelChange)="resolutionNote.set($event)"
+                          [placeholder]="'accounting.discrepancies.resolveDialog.notePlaceholder' | translate"
+                          data-testid="resolve-note-input"
+                          (keydown.enter)="confirmResolve(disc)"
+                        />
+                      </mat-form-field>
+                      <div class="resolve-buttons">
+                        <button
+                          mat-button
+                          type="button"
+                          class="cancel-btn"
+                          (click)="cancelResolve()"
+                          [disabled]="isResolving()"
+                          data-testid="cancel-resolve-btn"
+                        >
+                          {{ 'accounting.discrepancies.resolveDialog.cancel' | translate }}
+                        </button>
+                        <button
+                          mat-flat-button
+                          color="primary"
+                          type="button"
+                          class="confirm-resolve-btn"
+                          (click)="confirmResolve(disc)"
+                          [disabled]="isResolving()"
+                          data-testid="confirm-resolve-btn"
+                        >
+                          @if (isResolving()) {
+                            <mat-spinner diameter="16" />
+                          } @else {
+                            <mat-icon aria-hidden="true">check</mat-icon>
+                          }
+                          <span>{{ 'accounting.discrepancies.resolveDialog.confirm' | translate }}</span>
+                        </button>
+                      </div>
+                    </div>
+                  } @else {
+                    <button
+                      *appRole="['owner', 'buyer']"
+                      mat-stroked-button
+                      color="primary"
+                      type="button"
+                      class="resolve-action-btn"
+                      (click)="startResolve(disc)"
+                      [attr.aria-label]="('accounting.discrepancies.resolveAction' | translate) + ': ' + getTypeLabel(disc.discrepancy_type)"
+                      data-testid="resolve-btn"
+                    >
+                      <mat-icon aria-hidden="true">task_alt</mat-icon>
+                      <span>{{ 'accounting.discrepancies.resolveAction' | translate }}</span>
+                    </button>
+                  }
+                } @else {
+                  <!-- Resolved discrepancy details -->
+                  <div class="resolution-info" data-testid="resolution-info">
+                    <div class="resolver-wrap">
+                      @if (disc.resolved_by) {
+                        <span class="resolved-by" data-testid="resolved-by">
+                          {{ 'accounting.discrepancies.resolution.resolvedBy' | translate: { name: disc.resolved_by } }}
+                        </span>
+                      } @else {
+                        <span class="system-resolved-badge" data-testid="system-resolved-indicator">
+                          <mat-icon aria-hidden="true">smart_toy</mat-icon>
+                          <span>{{ 'accounting.discrepancies.resolution.automaticallyResolved' | translate }}</span>
+                        </span>
+                      }
+                    </div>
+                    @if (disc.resolved_at) {
+                      <span class="resolved-at" data-testid="resolved-at">
+                        {{ 'accounting.discrepancies.resolution.resolvedAt' | translate: { date: (disc.resolved_at | formatDate) } }}
+                      </span>
+                    }
+                    @if (disc.resolution_note) {
+                      <span class="resolution-note" data-testid="resolution-note">
+                        {{ 'accounting.discrepancies.resolution.note' | translate: { note: disc.resolution_note } }}
+                      </span>
+                    }
+                  </div>
+                }
+              </td>
+            </ng-container>
+
+            <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+            <tr mat-row *matRowDef="let row; columns: displayedColumns" class="discrepancy-row" data-testid="discrepancy-row"></tr>
+          </table>
+        </div>
+
+        <!-- Pagination Footer -->
+        <div class="pagination-footer">
+          @if (nextCursor()) {
+            <button
+              mat-stroked-button
+              type="button"
+              class="load-more-btn"
+              [disabled]="isLoadingMore()"
+              (click)="loadMore()"
+              data-testid="load-more-btn"
+            >
+              @if (isLoadingMore()) {
+                <mat-spinner diameter="18" [attr.aria-label]="'accounting.discrepancies.pagination.loadingMore' | translate" />
+                <span>{{ 'accounting.discrepancies.pagination.loadingMore' | translate }}</span>
+              } @else {
+                <mat-icon aria-hidden="true">expand_more</mat-icon>
+                <span>{{ 'accounting.discrepancies.pagination.loadMore' | translate }}</span>
+              }
+            </button>
+          } @else {
+            <span class="no-more-text" data-testid="no-more-discrepancies">
+              {{ 'accounting.discrepancies.pagination.noMore' | translate }}
+            </span>
+          }
+        </div>
+      }
+    </div>
+  </mat-card>
+</div>

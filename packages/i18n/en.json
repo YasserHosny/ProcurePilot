@@ -2687,5 +2687,162 @@
         "error": "Error Description"
       }
     }
+  },
+  "accounting": {
+    "nav": "Accounting",
+    "connection": {
+      "title": "Accounting Integration",
+      "subtitle": "Connect your accounting software to sync bills and reconcile spend against purchase records.",
+      "empty": {
+        "title": "Connect your accounting system",
+        "description": "Link your QuickBooks Online account to automatically import bills and match them against purchase records.",
+        "connect": "Connect QuickBooks"
+      },
+      "statusCardTitle": "Connected Account",
+      "providerQuickbooks": "QuickBooks Online",
+      "status": {
+        "active": "Active",
+        "needs_reauth": "Needs Re-authorization",
+        "disconnected": "Disconnected"
+      },
+      "connectedAt": "Connected On",
+      "lastSyncedAt": "Last Synced",
+      "neverSynced": "Never synced yet",
+      "disconnectedAt": "Disconnected On",
+      "connect": "Connect",
+      "reconnect": "Reconnect",
+      "disconnect": "Disconnect",
+      "ownerOnly": "Only workspace owners can connect or disconnect accounting integrations.",
+      "needsReauth": {
+        "title": "Re-authorization Required",
+        "message": "Authorization for your QuickBooks connection has expired or was revoked. Please reconnect to resume bill synchronization.",
+        "action": "Reconnect"
+      },
+      "error": {
+        "title": "Failed to load connection",
+        "retry": "Retry"
+      },
+      "loadError": "Failed to load accounting connection status.",
+      "startFailed": "Failed to start accounting connection. Please try again.",
+      "disconnectSuccess": "Accounting connection disconnected successfully.",
+      "disconnectFailed": "Failed to disconnect accounting connection. Please try again.",
+      "connectedSuccess": "Accounting account connected successfully.",
+      "connectFailed": "Accounting authorization failed or was declined. Please try again.",
+      "viewBills": "View Synced Bills"
+    },
+    "bills": {
+      "title": "Synced Bills & Invoices",
+      "subtitle": "View supplier bills imported from your accounting software and their purchase record matches.",
+      "backToConnection": "Connection Settings",
+      "syncNow": "Sync now",
+      "syncing": "Syncing...",
+      "refresh": "Refresh",
+      "filters": {
+        "matchStatus": "Filter by Match Status",
+        "all": "All",
+        "matched": "Matched",
+        "unmatched": "Unmatched"
+      },
+      "table": {
+        "vendor": "Supplier / Vendor",
+        "amount": "Amount",
+        "date": "Bill Date",
+        "providerStatus": "Status",
+        "matchedStatus": "Reconciliation"
+      },
+      "providerStatus": {
+        "open": "Open",
+        "paid": "Paid",
+        "void": "Void"
+      },
+      "matched": "Matched",
+      "unmatched": "Unmatched",
+      "purchaseRecordId": "Purchase Record: {{id}}",
+      "empty": {
+        "title": "No synced bills found",
+        "description": "No bills match the current filter. Try selecting another filter or trigger a sync."
+      },
+      "error": {
+        "title": "Failed to load bills",
+        "retry": "Retry"
+      },
+      "loadError": "Failed to load synced bills. Please try again.",
+      "syncSuccess": "Sync enqueued. Bills will update shortly.",
+      "syncAlreadyRunning": "A sync is already running. Please wait for it to complete.",
+      "syncNoConnection": "Connect an accounting system first before syncing bills.",
+      "syncFailed": "Failed to trigger sync. Please try again.",
+      "pagination": {
+        "loadMore": "Load more",
+        "loadingMore": "Loading more...",
+        "noMore": "All bills loaded"
+      }
+    },
+    "discrepancies": {
+      "title": "Reconciliation Discrepancies",
+      "subtitle": "Review and resolve reconciliation discrepancies between synced bills and purchase records.",
+      "backToConnection": "Connection Settings",
+      "refresh": "Refresh",
+      "filters": {
+        "status": "Filter by Status",
+        "open": "Open",
+        "resolved": "Resolved"
+      },
+      "types": {
+        "amount_mismatch": "Amount Mismatch",
+        "unmatched_bill": "Unmatched Bill",
+        "unmatched_purchase": "Unmatched Purchase Record"
+      },
+      "table": {
+        "type": "Type",
+        "details": "Details",
+        "detectedAt": "Detected",
+        "status": "Status",
+        "actions": "Actions"
+      },
+      "details": {
+        "syncedBill": "Synced Bill",
+        "purchaseRecord": "Purchase Record",
+        "vendor": "Vendor",
+        "supplier": "Supplier",
+        "amount": "Amount",
+        "date": "Date"
+      },
+      "status": {
+        "open": "Open",
+        "resolved": "Resolved"
+      },
+      "resolution": {
+        "title": "Resolution Info",
+        "resolvedBy": "Resolved by: {{name}}",
+        "automaticallyResolved": "Automatically resolved",
+        "resolvedAt": "Resolved on {{date}}",
+        "note": "Note: {{note}}"
+      },
+      "resolveDialog": {
+        "title": "Resolve Discrepancy",
+        "noteLabel": "Resolution Note (Optional)",
+        "notePlaceholder": "Reason for resolving this discrepancy...",
+        "cancel": "Cancel",
+        "confirm": "Resolve"
+      },
+      "resolveAction": "Resolve",
+      "empty": {
+        "title": "No discrepancies found",
+        "description": "No reconciliation discrepancies match the current filter."
+      },
+      "error": {
+        "title": "Failed to load discrepancies",
+        "retry": "Retry"
+      },
+      "loadError": "Failed to load discrepancies. Please try again.",
+      "resolveSuccess": "Discrepancy resolved successfully.",
+      "resolveAlreadyResolved": "This discrepancy was already resolved by someone else. Please refresh.",
+      "resolveFailed": "Failed to resolve discrepancy. Please try again.",
+      "pagination": {
+        "loadMore": "Load more",
+        "loadingMore": "Loading more...",
+        "noMore": "All discrepancies loaded"
+      }
+    }
   }
 }

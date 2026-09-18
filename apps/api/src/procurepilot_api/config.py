@@ -181,6 +181,54 @@ class Settings(BaseSettings):
     sentry_dsn: SecretStr | None = Field(default=None, validation_alias="SENTRY_DSN")
     posthog_api_key: SecretStr | None = Field(default=None, validation_alias="POSTHOG_API_KEY")
 
+    # Accounting integration (R3.1, 014-accounting-integration):
+    # Provider mode defaults to "stub" so tests, local development, and CI can run
+    # without a real Intuit/QuickBooks developer account. "quickbooks" uses live
+    # OAuth2 and REST calls against QuickBooks Online.
+    accounting_provider_mode: Literal["stub", "quickbooks"] = Field(
+        default="stub", validation_alias="ACCOUNTING_PROVIDER_MODE"
+    )
+    quickbooks_client_id: str | None = Field(
+        default=None, validation_alias="QUICKBOOKS_CLIENT_ID"
+    )
+    quickbooks_client_secret: SecretStr | None = Field(
+        default=None, validation_alias="QUICKBOOKS_CLIENT_SECRET"
+    )
+    quickbooks_redirect_uri: str | None = Field(
+        default=None, validation_alias="QUICKBOOKS_REDIRECT_URI"
+    )
+    quickbooks_environment: Literal["sandbox", "production"] = Field(
+        default="sandbox", validation_alias="QUICKBOOKS_ENVIRONMENT"
+    )
+    # R3.1 security review (T039): access_token/refresh_token were stored as plain `text` with
+    # no encryption at rest — research.md R4 named this as an "encrypted-column-at-the-
+    # database-layer" requirement, but only the RLS/column-grant restriction (accounting_
+    # connection's own migration) was ever built; the encryption half never was. A DB-level
+    # compromise (a leaked pg_dump, a stolen service_role credential, disk access) would expose
+    # live third-party financial credentials in plaintext. Fernet (authenticated symmetric
+    # encryption from `cryptography`, already a transitive dependency via python-jose) is applied
+    # at the application layer — not via Postgres's pgcrypto — specifically so the key itself
+    # never has to travel over the database connection as a query parameter, where it could end
+    # up in query logs or pg_stat_statements. Optional, matching every other QuickBooks setting's
+    # own None-by-default shape (stub mode's fake tokens need no real protection); required in
+    # any deployment actually running accounting_provider_mode="quickbooks" against live tokens.
+    accounting_token_encryption_key: SecretStr | None = Field(
+        default=None, validation_alias="ACCOUNTING_TOKEN_ENCRYPTION_KEY"
+    )
+    # R3.1 security review (T039): router.py had zero rate limiting on either mutation endpoint —
+    # every other module's own mutation endpoints follow this same config-driven-limit
+    # convention (see rate_limit_capture_upload/rate_limit_catalogue_import above). Sync is the
+    # expensive one (a real outbound QuickBooks API call chain, and the advisory lock only stops
+    # concurrent syncs, not rapid sequential ones), so its default is conservative like
+    # catalogue import's own; resolve is a lightweight mutation, matching the email-config
+    # mutations' own default.
+    rate_limit_accounting_sync: str = Field(
+        default="10/minute", validation_alias="RATE_LIMIT_ACCOUNTING_SYNC"
+    )
+    rate_limit_accounting_discrepancy_resolve: str = Field(
+        default="30/minute", validation_alias="RATE_LIMIT_ACCOUNTING_DISCREPANCY_RESOLVE"
+    )
+
     @field_validator("api_cors_origins", mode="before")
     @classmethod
     def parse_cors_origins(cls, value: object) -> tuple[str, ...] | object:
@@ -191,7 +239,13 @@ class Settings(BaseSettings):
             return origins
         return value
 
-    @field_validator("sentry_dsn", "posthog_api_key", mode="before")
+    @field_validator(
+        "sentry_dsn",
+        "posthog_api_key",
+        "quickbooks_client_secret",
+        "accounting_token_encryption_key",
+        mode="before",
+    )
     @classmethod
     def empty_secret_to_none(cls, value: object) -> object | None:
         if value == "":

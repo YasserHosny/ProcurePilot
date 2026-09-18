@@ -42,6 +42,7 @@ only "another tenant's row is invisible/unwritable-into", not the full RBAC matr
 
 from __future__ import annotations
 
+import json
 import os
 from collections.abc import Iterator
 from uuid import UUID, uuid4
@@ -98,6 +99,11 @@ class Workspace:
         ingestion_email_log_id: UUID,
         ingestion_jobs_id: UUID,
         catalogue_import_id: UUID,
+        accounting_connection_id: UUID,
+        synced_vendor_id: UUID,
+        synced_bill_id: UUID,
+        purchase_bill_match_id: UUID,
+        reconciliation_discrepancy_id: UUID,
     ) -> None:
         self.tenant_id = tenant_id
         self.user_id = user_id
@@ -134,6 +140,11 @@ class Workspace:
         self.ingestion_email_log_id = ingestion_email_log_id
         self.ingestion_jobs_id = ingestion_jobs_id
         self.catalogue_import_id = catalogue_import_id
+        self.accounting_connection_id = accounting_connection_id
+        self.synced_vendor_id = synced_vendor_id
+        self.synced_bill_id = synced_bill_id
+        self.purchase_bill_match_id = purchase_bill_match_id
+        self.reconciliation_discrepancy_id = reconciliation_discrepancy_id
 
     def claims(self) -> str:
         return (
@@ -545,6 +556,74 @@ def make_workspace(cur: psycopg.Cursor, label: str) -> Workspace:
         ),
     )
 
+    # Accounting integration & reconciliation - chunk R3.1 (014-accounting-integration).
+    accounting_connection_id = uuid4()
+    cur.execute(
+        "insert into accounting_connection "
+        "(id,tenant_id,provider,realm_id,display_name,access_token,refresh_token,"
+        "status,connected_by) "
+        "values (%s,%s,'quickbooks',%s,%s,'access-token','refresh-token','active',%s)",
+        (
+            accounting_connection_id,
+            tenant_id,
+            f"realm-{label}-{tenant_id.hex[:8]}",
+            f"{label} QuickBooks",
+            membership_id,
+        ),
+    )
+    synced_vendor_id = uuid4()
+    cur.execute(
+        "insert into synced_vendor "
+        "(id,tenant_id,connection_id,provider_vendor_id,display_name,matched_supplier_id) "
+        "values (%s,%s,%s,%s,%s,%s)",
+        (
+            synced_vendor_id,
+            tenant_id,
+            accounting_connection_id,
+            f"vendor-{label}-{synced_vendor_id.hex[:8]}",
+            f"{label} Vendor",
+            supplier_id,
+        ),
+    )
+    synced_bill_id = uuid4()
+    cur.execute(
+        "insert into synced_bill "
+        "(id,tenant_id,connection_id,provider_bill_id,vendor_id,matched_supplier_id,"
+        "amount,currency,bill_date,provider_status) "
+        "values (%s,%s,%s,%s,%s,%s,100,'GBP',current_date,'open')",
+        (
+            synced_bill_id,
+            tenant_id,
+            accounting_connection_id,
+            f"bill-{label}-{synced_bill_id.hex[:8]}",
+            synced_vendor_id,
+            supplier_id,
+        ),
+    )
+    purchase_bill_match_id = uuid4()
+    cur.execute(
+        "insert into purchase_bill_match "
+        "(id,tenant_id,synced_bill_id,purchase_record_id,match_method) "
+        "values (%s,%s,%s,%s,'automatic')",
+        (
+            purchase_bill_match_id,
+            tenant_id,
+            synced_bill_id,
+            purchase_record_id,
+        ),
+    )
+    reconciliation_discrepancy_id = uuid4()
+    cur.execute(
+        "insert into reconciliation_discrepancy "
+        "(id,tenant_id,discrepancy_type,synced_bill_id,status) "
+        "values (%s,%s,'unmatched_bill',%s,'open')",
+        (
+            reconciliation_discrepancy_id,
+            tenant_id,
+            synced_bill_id,
+        ),
+    )
+
     return Workspace(
         tenant_id,
         user_id,
@@ -581,6 +660,11 @@ def make_workspace(cur: psycopg.Cursor, label: str) -> Workspace:
         ingestion_email_log_id,
         ingestion_jobs_id,
         catalogue_import_id,
+        accounting_connection_id,
+        synced_vendor_id,
+        synced_bill_id,
+        purchase_bill_match_id,
+        reconciliation_discrepancy_id,
     )
 
 
@@ -599,6 +683,22 @@ def act_as(cur: psycopg.Cursor, workspace: Workspace) -> None:
     """Become a member of `workspace`, exactly as a real request arrives."""
     cur.execute("set local role authenticated")
     cur.execute("select set_config('request.jwt.claims', %s, true)", (workspace.claims(),))
+
+
+def _act_as_tenant_sync(
+    conn_or_cur: psycopg.Connection | psycopg.Cursor,
+    tenant_id: UUID,
+) -> None:
+    """Simulate a worker session scoped to `tenant_id` without a member role."""
+    if isinstance(conn_or_cur, psycopg.Connection):
+        cur = conn_or_cur.cursor()
+    else:
+        cur = conn_or_cur
+    cur.execute("set local role authenticated")
+    cur.execute(
+        "select set_config('request.jwt.claims', %s, true)",
+        (json.dumps({"tenant_id": str(tenant_id), "role": "authenticated"}),),
+    )
 
 
 # --- reads ------------------------------------------------------------------
@@ -1851,6 +1951,152 @@ def test_a_member_cannot_write_a_catalogue_import_into_another_workspace(
             )
 
 
+# --- 014-accounting-integration: connection, vendor, bill, match, discrepancy ---
+
+
+def test_another_workspaces_accounting_connections_are_invisible(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        cur.execute(
+            "select id from accounting_connection where id = %s",
+            (beta.accounting_connection_id,),
+        )
+        assert cur.fetchone() is None
+
+
+def test_a_member_cannot_write_an_accounting_connection_into_another_workspace(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            cur.execute(
+                "insert into accounting_connection "
+                "(tenant_id,provider,realm_id,display_name,access_token,refresh_token,"
+                "status,connected_by) "
+                "values (%s,'quickbooks','realm-hijack','Hijack Connection','token',"
+                "'refresh','active',%s)",
+                (beta.tenant_id, alpha.membership_id),
+            )
+
+
+def test_another_workspaces_synced_vendors_are_invisible(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        cur.execute(
+            "select id from synced_vendor where id = %s",
+            (beta.synced_vendor_id,),
+        )
+        assert cur.fetchone() is None
+
+
+def test_a_worker_session_cannot_write_synced_vendor_into_another_workspace(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        _act_as_tenant_sync(cur, alpha.tenant_id)
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            cur.execute(
+                "insert into synced_vendor "
+                "(tenant_id,connection_id,provider_vendor_id,display_name) "
+                "values (%s,%s,'vendor-hijack','Hijack Vendor')",
+                (beta.tenant_id, beta.accounting_connection_id),
+            )
+
+
+def test_another_workspaces_synced_bills_are_invisible(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        cur.execute(
+            "select id from synced_bill where id = %s",
+            (beta.synced_bill_id,),
+        )
+        assert cur.fetchone() is None
+
+
+def test_a_worker_session_cannot_write_synced_bill_into_another_workspace(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        _act_as_tenant_sync(cur, alpha.tenant_id)
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            cur.execute(
+                "insert into synced_bill "
+                "(tenant_id,connection_id,provider_bill_id,vendor_id,"
+                "amount,currency,bill_date,provider_status) "
+                "values (%s,%s,'bill-hijack',%s,200,'GBP',current_date,'open')",
+                (beta.tenant_id, beta.accounting_connection_id, beta.synced_vendor_id),
+            )
+
+
+def test_another_workspaces_purchase_bill_matches_are_invisible(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        cur.execute(
+            "select id from purchase_bill_match where id = %s",
+            (beta.purchase_bill_match_id,),
+        )
+        assert cur.fetchone() is None
+
+
+def test_a_worker_session_cannot_write_purchase_bill_match_into_another_workspace(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        _act_as_tenant_sync(cur, alpha.tenant_id)
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            cur.execute(
+                "insert into purchase_bill_match "
+                "(tenant_id,synced_bill_id,purchase_record_id,match_method,matched_by) "
+                "values (%s,%s,%s,'automatic',null)",
+                (beta.tenant_id, beta.synced_bill_id, beta.purchase_record_id),
+            )
+
+
+def test_another_workspaces_reconciliation_discrepancies_are_invisible(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        cur.execute(
+            "select id from reconciliation_discrepancy where id = %s",
+            (beta.reconciliation_discrepancy_id,),
+        )
+        assert cur.fetchone() is None
+
+
+def test_a_worker_session_cannot_write_reconciliation_discrepancy_into_another_workspace(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        _act_as_tenant_sync(cur, alpha.tenant_id)
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            cur.execute(
+                "insert into reconciliation_discrepancy "
+                "(tenant_id,discrepancy_type,synced_bill_id,status) "
+                "values (%s,'unmatched_bill',%s,'open')",
+                (beta.tenant_id, beta.synced_bill_id),
+            )
+
+
 # --- the guarantee itself ---------------------------------------------------
 
 
@@ -1878,6 +2124,8 @@ def test_rls_is_enabled_and_forced_on_every_tenant_scoped_table(
         "device_registration", "low_stock_report", "push_notification",
         "supplier_commercial_term", "supplier_scorecard_snapshot",
         "tenant_email_config", "ingestion_email_log", "ingestion_jobs", "catalogue_imports",
+        "accounting_connection", "synced_vendor", "synced_bill", "purchase_bill_match",
+        "reconciliation_discrepancy",
     }
     with conn.cursor() as cur:
         cur.execute(

@@ -1,0 +1,215 @@
+<div class="bills-container">
+  <!-- Header Section -->
+  <div class="header-section">
+    <div class="back-link">
+      <a mat-button routerLink="/accounting" data-testid="back-to-connection-link">
+        <mat-icon aria-hidden="true">arrow_back</mat-icon>
+        <span>{{ 'accounting.bills.backToConnection' | translate }}</span>
+      </a>
+    </div>
+
+    <div class="header-main">
+      <div class="title-group">
+        <h1 class="page-title">{{ 'accounting.bills.title' | translate }}</h1>
+        <p class="page-subtitle">{{ 'accounting.bills.subtitle' | translate }}</p>
+      </div>
+
+      <div class="header-actions">
+        <button
+          mat-stroked-button
+          type="button"
+          class="refresh-btn"
+          [disabled]="isLoading() || isSyncing()"
+          (click)="loadBills()"
+          data-testid="refresh-bills-btn"
+        >
+          <mat-icon aria-hidden="true">refresh</mat-icon>
+          <span>{{ 'accounting.bills.refresh' | translate }}</span>
+        </button>
+
+        <button
+          *appRole="['owner', 'buyer']"
+          mat-flat-button
+          color="primary"
+          type="button"
+          class="sync-btn"
+          [disabled]="isSyncing()"
+          (click)="triggerSync()"
+          data-testid="sync-now-btn"
+        >
+          @if (isSyncing()) {
+            <mat-spinner diameter="18" [attr.aria-label]="'accounting.bills.syncing' | translate" />
+            <span>{{ 'accounting.bills.syncing' | translate }}</span>
+          } @else {
+            <mat-icon aria-hidden="true">sync</mat-icon>
+            <span>{{ 'accounting.bills.syncNow' | translate }}</span>
+          }
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <mat-card class="bills-card">
+    <div class="card-content">
+      <!-- Filter Toolbar -->
+      <div class="filter-toolbar">
+        <mat-form-field appearance="outline" class="filter-field">
+          <mat-label>{{ 'accounting.bills.filters.matchStatus' | translate }}</mat-label>
+          <mat-select
+            [ngModel]="matchStatusFilter()"
+            (ngModelChange)="onFilterChange($event)"
+            data-testid="match-status-filter"
+          >
+            <mat-option value="all" data-testid="filter-opt-all">
+              {{ 'accounting.bills.filters.all' | translate }}
+            </mat-option>
+            <mat-option value="matched" data-testid="filter-opt-matched">
+              {{ 'accounting.bills.filters.matched' | translate }}
+            </mat-option>
+            <mat-option value="unmatched" data-testid="filter-opt-unmatched">
+              {{ 'accounting.bills.filters.unmatched' | translate }}
+            </mat-option>
+          </mat-select>
+        </mat-form-field>
+      </div>
+
+      <!-- Error State -->
+      @if (errorMessage(); as err) {
+        <div class="error-banner" role="alert" data-testid="error-banner">
+          <mat-icon class="error-icon" aria-hidden="true">error_outline</mat-icon>
+          <div class="error-text-wrap">
+            <span class="error-title">{{ 'accounting.bills.error.title' | translate }}</span>
+            <span class="error-message">{{ err }}</span>
+          </div>
+          <button mat-button type="button" class="retry-btn" (click)="loadBills()" data-testid="retry-btn">
+            <mat-icon aria-hidden="true">refresh</mat-icon>
+            <span>{{ 'accounting.bills.error.retry' | translate }}</span>
+          </button>
+        </div>
+      }
+
+      <!-- Loading State -->
+      @if (isLoading()) {
+        <div class="loading-state" aria-live="polite" role="status" data-testid="loading-state">
+          <mat-spinner diameter="36" [attr.aria-label]="'common.loading' | translate" />
+        </div>
+      } @else if (bills().length === 0) {
+        <!-- Empty State -->
+        <div class="empty-state" data-testid="empty-state">
+          <mat-icon class="empty-icon" aria-hidden="true">receipt_long</mat-icon>
+          <h2 class="empty-title">{{ 'accounting.bills.empty.title' | translate }}</h2>
+          <p class="empty-message">{{ 'accounting.bills.empty.description' | translate }}</p>
+        </div>
+      } @else {
+        <!-- Table -->
+        <div class="table-responsive">
+          <table
+            mat-table
+            [dataSource]="bills()"
+            class="bills-table"
+            [attr.aria-label]="'accounting.bills.title' | translate"
+            data-testid="bills-table"
+          >
+            <!-- Vendor Column -->
+            <ng-container matColumnDef="vendor">
+              <th mat-header-cell *matHeaderCellDef scope="col">
+                {{ 'accounting.bills.table.vendor' | translate }}
+              </th>
+              <td mat-cell *matCellDef="let bill" class="vendor-cell" data-testid="bill-vendor">
+                <span class="vendor-name">{{ bill.vendor_name }}</span>
+              </td>
+            </ng-container>
+
+            <!-- Amount Column -->
+            <ng-container matColumnDef="amount">
+              <th mat-header-cell *matHeaderCellDef scope="col">
+                {{ 'accounting.bills.table.amount' | translate }}
+              </th>
+              <td mat-cell *matCellDef="let bill" class="amount-cell" data-testid="bill-amount">
+                <span class="amount-value">{{ bill | formatMoney }}</span>
+              </td>
+            </ng-container>
+
+            <!-- Bill Date Column -->
+            <ng-container matColumnDef="date">
+              <th mat-header-cell *matHeaderCellDef scope="col">
+                {{ 'accounting.bills.table.date' | translate }}
+              </th>
+              <td mat-cell *matCellDef="let bill" class="date-cell" data-testid="bill-date">
+                <span class="date-value">{{ bill.bill_date | formatDate }}</span>
+              </td>
+            </ng-container>
+
+            <!-- Provider Status Column -->
+            <ng-container matColumnDef="providerStatus">
+              <th mat-header-cell *matHeaderCellDef scope="col">
+                {{ 'accounting.bills.table.providerStatus' | translate }}
+              </th>
+              <td mat-cell *matCellDef="let bill" class="provider-status-cell" data-testid="bill-provider-status">
+                <span class="status-chip" [ngClass]="getProviderStatusClass(bill.provider_status)">
+                  {{ getProviderStatusLabel(bill.provider_status) }}
+                </span>
+              </td>
+            </ng-container>
+
+            <!-- Matched Status Column -->
+            <ng-container matColumnDef="matchedStatus">
+              <th mat-header-cell *matHeaderCellDef scope="col">
+                {{ 'accounting.bills.table.matchedStatus' | translate }}
+              </th>
+              <td mat-cell *matCellDef="let bill" class="matched-status-cell" data-testid="bill-match-status">
+                @if (bill.matched) {
+                  <div class="matched-wrap">
+                    <span class="match-badge matched" data-testid="match-badge-matched">
+                      <mat-icon aria-hidden="true">check_circle</mat-icon>
+                      <span>{{ 'accounting.bills.matched' | translate }}</span>
+                    </span>
+                    @if (bill.purchase_record_id) {
+                      <span class="purchase-record-id" data-testid="purchase-record-id">
+                        {{ 'accounting.bills.purchaseRecordId' | translate: { id: bill.purchase_record_id } }}
+                      </span>
+                    }
+                  </div>
+                } @else {
+                  <span class="match-badge unmatched" data-testid="match-badge-unmatched">
+                    <mat-icon aria-hidden="true">pending</mat-icon>
+                    <span>{{ 'accounting.bills.unmatched' | translate }}</span>
+                  </span>
+                }
+              </td>
+            </ng-container>
+
+            <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+            <tr mat-row *matRowDef="let row; columns: displayedColumns" data-testid="bill-row"></tr>
+          </table>
+        </div>
+
+        <!-- Pagination Footer -->
+        <div class="pagination-footer">
+          @if (nextCursor()) {
+            <button
+              mat-stroked-button
+              type="button"
+              class="load-more-btn"
+              [disabled]="isLoadingMore()"
+              (click)="loadMore()"
+              data-testid="load-more-btn"
+            >
+              @if (isLoadingMore()) {
+                <mat-spinner diameter="18" [attr.aria-label]="'accounting.bills.pagination.loadingMore' | translate" />
+                <span>{{ 'accounting.bills.pagination.loadingMore' | translate }}</span>
+              } @else {
+                <mat-icon aria-hidden="true">expand_more</mat-icon>
+                <span>{{ 'accounting.bills.pagination.loadMore' | translate }}</span>
+              }
+            </button>
+          } @else {
+            <span class="no-more-text" data-testid="no-more-bills">
+              {{ 'accounting.bills.pagination.noMore' | translate }}
+            </span>
+          }
+        </div>
+      }
+    </div>
+  </mat-card>
+</div>

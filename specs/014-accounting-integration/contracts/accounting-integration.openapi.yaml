@@ -1,0 +1,399 @@
+openapi: 3.0.3
+info:
+  title: ProcurePilot Accounting Integration API
+  version: "1.0.0"
+  description: >
+    R3.1 (014-accounting-integration). One QuickBooks Online connection per tenant, daily bill/
+    vendor sync, automatic matching against purchase_record, and a reconciliation discrepancy
+    list. Strictly read-only against QuickBooks — no endpoint here ever writes to the connected
+    provider.
+servers:
+  - url: /api/v1
+
+security:
+  - BearerAuth: []
+
+paths:
+  /accounting/connect:
+    post:
+      operationId: startAccountingConnection
+      summary: Start the QuickBooks OAuth authorization flow
+      description: >
+        Owner-only. Returns the QuickBooks consent-screen URL the client redirects the browser
+        to. Does not itself create a connection — the connection is created only after the
+        provider redirects back to the callback with a successful authorization.
+      tags: [Accounting]
+      responses:
+        '200':
+          description: Authorization URL minted
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StartConnectionResponse' }
+        '401':
+          description: Missing or invalid bearer token
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+        '403':
+          description: Caller is not an owner
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+        '409':
+          description: A connection already exists for this tenant
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+
+  /accounting/connect/callback:
+    get:
+      operationId: completeAccountingConnection
+      summary: OAuth callback — completes the connection
+      description: >
+        The provider redirects here after the owner authorizes (or declines) access. Public
+        callback; no Bearer auth. On success, exchanges the authorization code for tokens,
+        records the connection as active, and redirects the browser to
+        /accounting?accounting_connected=success. A declined or failed authorization leaves
+        no connection row and redirects to /accounting?accounting_connected=failed&error={error_code}
+        (spec Acceptance Scenario 1.3) — never a half-created connection.
+      tags: [Accounting]
+      security: []
+      parameters:
+        - name: code
+          in: query
+          required: false
+          schema: { type: string }
+        - name: realmId
+          in: query
+          required: false
+          schema: { type: string }
+        - name: state
+          in: query
+          required: true
+          schema: { type: string }
+        - name: error
+          in: query
+          required: false
+          schema: { type: string }
+      responses:
+        '302':
+          description: Redirect to the frontend /accounting screen (accounting_connected=success or accounting_connected=failed)
+
+  /accounting/connection:
+    get:
+      operationId: getAccountingConnection
+      summary: Current connection status
+      description: Any authenticated member. Returns null-equivalent (404) if never connected.
+      tags: [Accounting]
+      responses:
+        '200':
+          description: Connection status
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AccountingConnection' }
+        '401':
+          description: Missing or invalid bearer token
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+        '404':
+          description: No connection has ever been created for this tenant
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+
+  /accounting/disconnect:
+    post:
+      operationId: disconnectAccounting
+      summary: Disconnect the active accounting connection
+      description: >
+        Owner-only. Revokes the connection (FR-004) — previously synced bills, matches, and
+        discrepancies remain queryable afterward (spec Acceptance Scenario 1.2, SC-005).
+      tags: [Accounting]
+      responses:
+        '200':
+          description: Disconnected
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AccountingConnection' }
+        '401':
+          description: Missing or invalid bearer token
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+        '403':
+          description: Caller is not an owner
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+        '404':
+          description: No active connection to disconnect
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+
+  /accounting/sync:
+    post:
+      operationId: triggerAccountingSync
+      summary: Trigger an on-demand sync
+      description: >
+        Owner or buyer (require_role(owner, buyer)). FR-008's manual-sync path (the daily automatic
+        sync is the primary path). Runs synchronously inline within the request (no background task
+        queue), returning 202 Accepted ('enqueued') on completion. Concurrency is guarded via a
+        PostgreSQL advisory lock (pg_try_advisory_lock(hashtext(connection_id))) on the connection
+        rather than a status column; returns 409 Conflict if a sync for this connection is already
+        running (FR-009).
+      tags: [Accounting]
+      responses:
+        '202':
+          description: Sync enqueued
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TriggerSyncResponse' }
+        '401':
+          description: Missing or invalid bearer token
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+        '403':
+          description: Caller is not an owner or buyer
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+        '404':
+          description: No active connection
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+        '409':
+          description: A sync for this connection is already in progress
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+
+  /accounting/bills:
+    get:
+      operationId: listSyncedBills
+      summary: List synced bills, with match status
+      description: Any authenticated member. Cursor-paginated, matching this codebase's established list-endpoint convention.
+      tags: [Accounting]
+      parameters:
+        - name: cursor
+          in: query
+          schema: { type: string }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+        - name: match_status
+          in: query
+          description: Filter to matched or unmatched bills only; omit for both.
+          schema: { type: string, enum: [matched, unmatched] }
+      responses:
+        '200':
+          description: Bills
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SyncedBillList' }
+        '401':
+          description: Missing or invalid bearer token
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+
+  /accounting/discrepancies:
+    get:
+      operationId: listReconciliationDiscrepancies
+      summary: List reconciliation discrepancies
+      description: Any authenticated member. Cursor-paginated.
+      tags: [Accounting]
+      parameters:
+        - name: cursor
+          in: query
+          schema: { type: string }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+        - name: status
+          in: query
+          schema: { type: string, enum: [open, resolved], default: open }
+      responses:
+        '200':
+          description: Discrepancies
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReconciliationDiscrepancyList' }
+        '401':
+          description: Missing or invalid bearer token
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+
+  /accounting/discrepancies/{discrepancy_id}/resolve:
+    post:
+      operationId: resolveReconciliationDiscrepancy
+      summary: Mark a discrepancy resolved
+      description: Owner or buyer (FR-011).
+      tags: [Accounting]
+      parameters:
+        - name: discrepancy_id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ResolveDiscrepancyRequest' }
+      responses:
+        '200':
+          description: Resolved
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReconciliationDiscrepancy' }
+        '401':
+          description: Missing or invalid bearer token
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+        '403':
+          description: Caller is not an owner or buyer
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+        '404':
+          description: Unknown or cross-tenant discrepancy id
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+        '409':
+          description: Discrepancy is already resolved
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    ErrorEnvelope:
+      type: object
+      required: [code, message, trace_id]
+      properties:
+        code: { type: string }
+        message: { type: string }
+        details: { type: object, nullable: true }
+        trace_id: { type: string, minLength: 1 }
+
+    StartConnectionResponse:
+      type: object
+      required: [authorization_url]
+      properties:
+        authorization_url:
+          type: string
+          format: uri
+
+    TriggerSyncResponse:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [enqueued]
+
+    ResolveDiscrepancyRequest:
+      type: object
+      properties:
+        note:
+          type: string
+          maxLength: 2000
+          nullable: true
+
+    AccountingConnection:
+      type: object
+      required: [id, provider, display_name, status, connected_at]
+      properties:
+        id: { type: string, format: uuid }
+        provider: { type: string, enum: [quickbooks] }
+        display_name: { type: string }
+        status: { type: string, enum: [active, needs_reauth, disconnected] }
+        connected_at: { type: string, format: date-time }
+        last_synced_at: { type: string, format: date-time, nullable: true }
+        disconnected_at: { type: string, format: date-time, nullable: true }
+
+    SyncedBill:
+      type: object
+      required: [id, vendor_name, amount, currency, bill_date, provider_status, matched]
+      properties:
+        id: { type: string, format: uuid }
+        vendor_name: { type: string }
+        matched_supplier_id: { type: string, format: uuid, nullable: true }
+        amount: { type: string, description: "Decimal string, never a float" }
+        currency: { type: string }
+        bill_date: { type: string, format: date }
+        provider_status: { type: string, enum: [open, paid, void] }
+        matched: { type: boolean }
+        purchase_record_id: { type: string, format: uuid, nullable: true }
+
+    SyncedBillList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/SyncedBill' }
+        next_cursor: { type: string, nullable: true }
+
+    ReconciliationDiscrepancy:
+      type: object
+      required: [id, discrepancy_type, status, detected_at]
+      properties:
+        id: { type: string, format: uuid }
+        discrepancy_type:
+          type: string
+          enum: [amount_mismatch, unmatched_bill, unmatched_purchase]
+        synced_bill_id: { type: string, format: uuid, nullable: true }
+        purchase_record_id: { type: string, format: uuid, nullable: true }
+        status: { type: string, enum: [open, resolved] }
+        detected_at: { type: string, format: date-time }
+        resolved_by: { type: string, format: uuid, nullable: true }
+        resolved_at: { type: string, format: date-time, nullable: true }
+        resolution_note: { type: string, nullable: true }
+        synced_bill_detail:
+          allOf:
+            - $ref: '#/components/schemas/SyncedBillDetail'
+          nullable: true
+        purchase_record_detail:
+          allOf:
+            - $ref: '#/components/schemas/PurchaseRecordDetail'
+          nullable: true
+
+    SyncedBillDetail:
+      type: object
+      required: [vendor_name, amount, currency, bill_date]
+      properties:
+        vendor_name: { type: string }
+        amount: { type: string, description: "Decimal string, never a float" }
+        currency: { type: string }
+        bill_date: { type: string, format: date }
+
+    PurchaseRecordDetail:
+      type: object
+      required: [amount, currency, date]
+      properties:
+        supplier_name: { type: string, nullable: true }
+        amount: { type: string, description: "Decimal string, never a float" }
+        currency: { type: string }
+        date: { type: string, format: date }
+
+    ReconciliationDiscrepancyList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/ReconciliationDiscrepancy' }
+        next_cursor: { type: string, nullable: true }

@@ -1709,3 +1709,214 @@ pinning `(storage.foldername(name))[1] = current_tenant_id()::text` to enforce t
 - `catalogue_import_completed` — supplier catalogue spreadsheet was successfully parsed and quotation lines imported.
 - `catalogue_import_failed` — supplier catalogue import failed due to parse error, schema validation errors, or zero valid rows.
 
+## Implemented accounting integration entities (chunk R3.1, `014-accounting-integration`)
+
+Adds external accounting system integration (QuickBooks Online in R3.1) with OAuth credential management,
+automated vendor and supplier bill synchronization, automated purchase-to-bill matching, and 3-way
+reconciliation discrepancy tracking.
+
+### Schema design note: Composite foreign keys for cross-tenant isolation
+
+All foreign keys introduced in this chunk pin to parent tables via `(tenant_id, id)` composite unique keys
+rather than bare `id` references:
+- `purchase_record_tenant_id_key` unique constraint added on `purchase_record(tenant_id, id)` in migration
+  `20260918000001_purchase_record_composite_key.sql`. `purchase_record` predated the composite-key convention
+  established across chunks 011/012/013 (`supplier_commercial_term`, `supplier_scorecard_snapshot`, `ingestion_email_log`,
+  `report_schedule`). `purchase_bill_match` and `reconciliation_discrepancy` are the first tables to reference
+  `purchase_record` from outside its originating module, closing this legacy gap.
+- `accounting_connection.connected_by` references `membership(tenant_id, id)`.
+- `synced_vendor.connection_id` references `accounting_connection(tenant_id, id)`.
+- `synced_vendor.matched_supplier_id` references `supplier(tenant_id, id)`.
+- `synced_bill.connection_id` references `accounting_connection(tenant_id, id)`.
+- `synced_bill.vendor_id` references `synced_vendor(tenant_id, id)`.
+- `synced_bill.matched_supplier_id` references `supplier(tenant_id, id)`.
+- `purchase_bill_match.synced_bill_id` references `synced_bill(tenant_id, id)`.
+- `purchase_bill_match.purchase_record_id` references `purchase_record(tenant_id, id)`.
+- `purchase_bill_match.matched_by` references `membership(tenant_id, id)`.
+- `reconciliation_discrepancy.synced_bill_id` references `synced_bill(tenant_id, id)`.
+- `reconciliation_discrepancy.purchase_record_id` references `purchase_record(tenant_id, id)`.
+- `reconciliation_discrepancy.resolved_by` references `membership(tenant_id, id)`.
+
+This provides strict defense-in-depth: cross-tenant references cannot be persisted even from background workers,
+system tasks, or service-role execution paths that bypass PostgreSQL Row Level Security.
+
+### Schema design note: Worker session isolation vs. column-level credential privileges
+
+An essential RLS architecture nuance in this chunk is the operational boundary between background worker writes
+and OAuth credential privileges:
+- **Worker/System-triggered session pattern**: Four of the five tables (`synced_vendor`, `synced_bill`,
+  `purchase_bill_match`'s automatic path, and `reconciliation_discrepancy`), as well as background sync updates
+  to `accounting_connection` (`last_synced_at` and `status = 'needs_reauth'`), are written by the background sync
+  worker or on-demand sync pipeline. Instead of running as a global `service_role` connection (which lacks
+  tenant guardrails and would introduce architectural inconsistency), the worker establishes a tenant-scoped session
+  acting as Postgres role `authenticated` via `_act_as_tenant_sync`: executing `SET LOCAL ROLE authenticated` and
+  setting `request.jwt.claims` to `{"tenant_id": "<uuid>", "role": "authenticated"}` with **no** `member_role` claim.
+- **Distinguishing worker from member sessions via `current_member_role() IS NULL`**: Real member sessions always
+  carry an explicit `member_role` claim (`owner`, `buyer`, `approver`, `viewer`). In contrast, worker sessions
+  deliberately omit `member_role`. The database RLS policies exploit this exact difference:
+  - `accounting_connection_worker_update`: allows updates with `tenant_id = current_tenant_id() and current_member_role() is null`.
+    Real non-owner member sessions cannot satisfy this policy because their JWT always provides `member_role`.
+  - `purchase_bill_match_automatic_insert` / `purchase_bill_match_automatic_delete`: allows inserts/deletes where
+    `tenant_id = current_tenant_id() and match_method = 'automatic' and matched_by is null`. Workers can insert and delete
+    stale automatic matches, but can never alter or delete manual matches created by owners or buyers.
+  - `reconciliation_discrepancy_worker_insert` / `reconciliation_discrepancy_worker_update`: allows inserts and reopening
+    updates where `tenant_id = current_tenant_id() and current_member_role() is null`.
+- **OAuth token security (`access_token`/`refresh_token` as the sole `service_role` write path)**:
+  `accounting_connection.access_token` and `refresh_token` store live third-party financial credentials. Because PostgreSQL
+  RLS is row-scoped rather than column-scoped, normal `SELECT` on `accounting_connection` for `authenticated` would expose
+  tokens to every workspace member reading the connection status. Column-level `GRANT`s eliminate this exposure:
+  - `authenticated` is granted `SELECT` on non-secret columns only (`id`, `tenant_id`, `provider`, `realm_id`, `display_name`,
+    `status`, `connected_by`, `connected_at`, `last_synced_at`, `disconnected_at`, `created_at`, `updated_at`).
+  - `authenticated` is granted `INSERT` on all columns including tokens (allowing the owner connect callback to insert
+    credentials directly without needing a service-role bypass).
+  - `authenticated` is granted `UPDATE` only on non-secret fields (`status`, `disconnected_at`, `updated_at`, `last_synced_at`).
+  - Token reading and token refresh updates (`UPDATE access_token, refresh_token`) are the **sole operations** in this feature
+    that use a direct `service_role` connection (`_service_role_db`), explicitly constrained by
+    `WHERE id = %(id)s AND tenant_id = %(tenant_id)s`.
+- On `reconciliation_discrepancy`, column-level `GRANT`s similarly restrict `authenticated`'s `UPDATE` privileges strictly to
+  resolution fields `(status, resolved_by, resolved_at, resolution_note)`. `detected_at` is set once at `INSERT` and is
+  permanently immutable (even when a discrepancy is reopened on subsequent syncs).
+
+### `AccountingConnection`
+
+One workspace's authorized link to an external accounting account (table `accounting_connection`). Exactly one non-disconnected
+connection per tenant is permitted at a time; disconnecting a connection leaves the row intact for audit history while freeing
+the tenant to connect a new account.
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | uuid | PK, default `gen_random_uuid()` |
+| `tenant_id` | uuid | Required FK -> Tenant (`tenant.id`, `on delete cascade`); RLS key. Unique `(tenant_id, id)` |
+| `provider` | enum `accounting_provider` | Required. Provider type, currently `'quickbooks'` |
+| `realm_id` | text | Required. Third-party realm/company identifier |
+| `display_name` | text | Required. Connected company name retrieved from provider |
+| `access_token` | text | Required. Live OAuth access token; `service_role`-only for SELECT/UPDATE; `authenticated` INSERT-only |
+| `refresh_token` | text | Required. Live OAuth refresh token; `service_role`-only for SELECT/UPDATE; `authenticated` INSERT-only |
+| `status` | enum `accounting_connection_status` | Required, default `'active'`. Values: `'active'`, `'needs_reauth'`, `'disconnected'` |
+| `connected_by` | uuid | Required composite FK -> Membership `(tenant_id, id)` (`accounting_connection_membership_fkey`) |
+| `connected_at` | timestamptz | Required, default `now()`. Authorization timestamp |
+| `last_synced_at` | timestamptz | Nullable. Timestamp when last full sync completed |
+| `disconnected_at` | timestamptz | Nullable. Timestamp when disconnected; check `((status = 'disconnected') = (disconnected_at is not null))` |
+| `created_at` / `updated_at` | timestamptz | Audit fields, default `now()` |
+
+RLS (enabled + forced): All tenant members may `SELECT` (`accounting_connection_tenant_select` using `tenant_id = current_tenant_id()`)
+to view connection status and display name; column-level grants withhold `access_token` and `refresh_token`. Mutation (`INSERT`, `UPDATE`)
+is restricted to `owner` members via `accounting_connection_owner_insert` and `accounting_connection_owner_update`. The sync worker
+updates `last_synced_at` and `status` via `accounting_connection_worker_update` (`current_member_role() IS NULL`). A partial unique index
+`accounting_connection_one_active_per_tenant` on `(tenant_id) WHERE status <> 'disconnected'` enforces at most one active connection.
+
+### `SyncedVendor`
+
+Vendor entities synced from the external accounting system (table `synced_vendor`). Persists the vendor-to-supplier name match
+so subsequent sync passes reuse the established linkage without re-evaluating fuzzy name heuristics.
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | uuid | PK, default `gen_random_uuid()` |
+| `tenant_id` | uuid | Required FK -> Tenant (`tenant.id`, `on delete cascade`); RLS key. Unique `(tenant_id, id)` |
+| `connection_id` | uuid | Required composite FK -> AccountingConnection `(tenant_id, id)` (`synced_vendor_connection_fkey`) |
+| `provider_vendor_id` | text | Required. External provider vendor identifier (QuickBooks `Vendor.Id`) |
+| `display_name` | text | Required. Vendor display name in accounting system |
+| `matched_supplier_id` | uuid | Nullable composite FK -> Supplier `(tenant_id, id)` (`synced_vendor_supplier_fkey`, `on delete set null`) |
+| `created_at` / `updated_at` | timestamptz | Audit fields, default `now()` |
+
+RLS (enabled + forced): All tenant members may `SELECT` (`synced_vendor_tenant_select`). Sync worker inserts and updates rows
+under tenant-scoped `authenticated` sessions via `synced_vendor_tenant_insert` and `synced_vendor_tenant_update`. Unique constraint
+`synced_vendor_provider_id_key` on `(tenant_id, connection_id, provider_vendor_id)` prevents duplicate vendor ingestion.
+
+### `SyncedBill`
+
+Supplier bills as recorded in the connected accounting system as of the most recent sync (table `synced_bill`). Stores total amount,
+currency, bill date, and provider status (`open`, `paid`, `void`).
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | uuid | PK, default `gen_random_uuid()` |
+| `tenant_id` | uuid | Required FK -> Tenant (`tenant.id`, `on delete cascade`); RLS key. Unique `(tenant_id, id)` |
+| `connection_id` | uuid | Required composite FK -> AccountingConnection `(tenant_id, id)` (`synced_bill_connection_fkey`) |
+| `provider_bill_id` | text | Required. External provider bill identifier (QuickBooks `Bill.Id`) |
+| `vendor_id` | uuid | Required composite FK -> SyncedVendor `(tenant_id, id)` (`synced_bill_vendor_fkey`) |
+| `matched_supplier_id` | uuid | Nullable composite FK -> Supplier `(tenant_id, id)` (`synced_bill_supplier_fkey`, `on delete set null`). Denormalized from vendor |
+| `amount` | numeric(18, 4) | Required. Total monetary amount; decimal precision |
+| `currency` | text | Required FK -> SupportedCurrency (`supported_currency.code`) |
+| `bill_date` | date | Required. Commercial transaction date (QuickBooks `TxnDate`) |
+| `provider_status` | enum `synced_bill_status` | Required. Values: `'open'`, `'paid'`, `'void'` |
+| `created_at` / `updated_at` | timestamptz | Audit fields, default `now()` |
+
+RLS (enabled + forced): All tenant members may `SELECT` (`synced_bill_tenant_select`). The sync worker inserts and updates bills
+via `synced_bill_tenant_insert` and `synced_bill_tenant_update`. Unique constraint `synced_bill_provider_id_key` on
+`(tenant_id, connection_id, provider_bill_id)` prevents duplicate bill creation. Indexed on `(tenant_id, connection_id, bill_date desc)`
+for efficient paginated list queries.
+
+### `PurchaseBillMatch`
+
+Links a `synced_bill` to a `purchase_record` (table `purchase_bill_match`). Enforces a strict 1:1 relationship in both directions:
+one bill matches at most one purchase record, and one purchase record matches at most one bill.
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | uuid | PK, default `gen_random_uuid()` |
+| `tenant_id` | uuid | Required FK -> Tenant (`tenant.id`, `on delete cascade`); RLS key. Unique `(tenant_id, id)` |
+| `synced_bill_id` | uuid | Required composite FK -> SyncedBill `(tenant_id, id)`. Unique `(tenant_id, synced_bill_id)` enforces 1:1 |
+| `purchase_record_id` | uuid | Required composite FK -> PurchaseRecord `(tenant_id, id)`. Unique `(tenant_id, purchase_record_id)` enforces 1:1 |
+| `match_method` | enum `match_method` | Required. Values: `'automatic'` (matching service algorithm) or `'manual'` (buyer/owner discrepancy resolution) |
+| `matched_by` | uuid | Nullable composite FK -> Membership `(tenant_id, id)`. Check `((match_method = 'manual') = (matched_by is not null))` |
+| `matched_at` | timestamptz | Required, default `now()` |
+
+RLS (enabled + forced): All tenant members may `SELECT` (`purchase_bill_match_tenant_select`). There is **no UPDATE policy or grant**:
+matches are superseded by inserting a new record and deleting the previous one. `INSERT` is split into two policies:
+`purchase_bill_match_automatic_insert` (for the worker's tenant session: `match_method = 'automatic' and matched_by is null`) and
+`purchase_bill_match_owner_buyer_insert` (for manual match resolution: `match_method = 'manual' and current_member_role() in ('owner', 'buyer')`).
+`DELETE` follows the same symmetry: workers can only delete automatic matches (`purchase_bill_match_automatic_delete`), while manual
+matches can only be deleted by an owner or buyer (`purchase_bill_match_owner_buyer_delete`).
+
+### `ReconciliationDiscrepancy`
+
+Flagged reconciliation exceptions requiring human review (table `reconciliation_discrepancy`). Re-evaluated dynamically on each sync:
+resolved discrepancies reopen if underlying records are modified, while open discrepancies auto-resolve if conditions clear.
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | uuid | PK, default `gen_random_uuid()` |
+| `tenant_id` | uuid | Required FK -> Tenant (`tenant.id`, `on delete cascade`); RLS key. Unique `(tenant_id, id)` |
+| `discrepancy_type` | enum `discrepancy_type` | Required. Values: `'amount_mismatch'`, `'unmatched_bill'`, `'unmatched_purchase'` |
+| `synced_bill_id` | uuid | Nullable composite FK -> SyncedBill `(tenant_id, id)` (`reconciliation_discrepancy_bill_fkey`) |
+| `purchase_record_id` | uuid | Nullable composite FK -> PurchaseRecord `(tenant_id, id)` (`reconciliation_discrepancy_purchase_record_fkey`) |
+| `status` | enum `discrepancy_status` | Required, default `'open'`. Values: `'open'`, `'resolved'` |
+| `detected_at` | timestamptz | Required, default `now()`. Initial detection timestamp; immutable |
+| `resolved_by` | uuid | Nullable composite FK -> Membership `(tenant_id, id)` (`reconciliation_discrepancy_resolved_by_fkey`) |
+| `resolved_at` | timestamptz | Nullable. Timestamp of resolution |
+| `resolution_note` | text | Nullable. Reviewer explanation or auto-resolution system note |
+
+Check constraints:
+- `reconciliation_discrepancy_shape`: enforces mutual exclusivity across the three discrepancy types:
+  - `unmatched_bill`: `synced_bill_id is not null and purchase_record_id is null`
+  - `unmatched_purchase`: `purchase_record_id is not null and synced_bill_id is null`
+  - `amount_mismatch`: `synced_bill_id is not null and purchase_record_id is not null`
+- `reconciliation_discrepancy_resolved_fields`: `check ((status = 'resolved') = (resolved_at is not null) and (resolved_by is null or status = 'resolved'))`.
+  Allows `resolved_by` to be `null` when a discrepancy is automatically resolved by the sync worker.
+
+RLS (enabled + forced): All tenant members may `SELECT` (`reconciliation_discrepancy_tenant_select`). Owners and buyers can resolve
+discrepancies via `reconciliation_discrepancy_owner_buyer_update`, with column-level grants restricting `UPDATE` strictly to
+`(status, resolved_by, resolved_at, resolution_note)`. The sync worker inserts new discrepancies via `reconciliation_discrepancy_worker_insert`
+and updates/reopens existing ones via `reconciliation_discrepancy_worker_update` (`current_member_role() IS NULL`).
+
+### Enumerations & Schema Types
+
+- **`accounting_provider`**: `'quickbooks'`
+- **`accounting_connection_status`**: `'active'`, `'needs_reauth'`, `'disconnected'`
+- **`synced_bill_status`**: `'open'`, `'paid'`, `'void'`
+- **`match_method`**: `'automatic'`, `'manual'`
+- **`discrepancy_type`**: `'amount_mismatch'`, `'unmatched_bill'`, `'unmatched_purchase'`
+- **`discrepancy_status`**: `'open'`, `'resolved'`
+
+### New audit events (chunk R3.1)
+
+- `accounting.connection_created` — external accounting connection was established and authorized by a workspace owner.
+- `accounting.connection_disconnected` — external accounting connection was disconnected by a workspace owner (historical records preserved).
+- `accounting.sync_started` — accounting synchronization pass was initiated for the tenant connection.
+- `accounting.sync_completed` — accounting synchronization pass finished successfully, recording synced vendor count, bill count, and match count.
+- `accounting.sync_failed` — accounting synchronization pass failed (e.g. token refresh failure, network exception).
+- `accounting.discrepancy_resolved` — reconciliation discrepancy was reviewed and marked resolved by a workspace owner or buyer.
+
+
