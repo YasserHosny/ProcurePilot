@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -26,7 +27,12 @@ import {
 } from './support/canonical-flow';
 
 const RUN_CAPTURE = process.env['CAPTURE_USER_DOC_SCREENSHOTS'] === '1';
-const SCREENSHOT_DIR = join(__dirname, '..', '..', '..', '..', 'docs', 'user', 'screenshots');
+const REPO_ROOT = join(__dirname, '..', '..', '..', '..');
+const SCREENSHOT_DIR = process.env['DOCS_SCREENSHOT_DIR']
+  ? (process.env['DOCS_SCREENSHOT_DIR'].startsWith('/')
+    ? process.env['DOCS_SCREENSHOT_DIR']
+    : join(REPO_ROOT, process.env['DOCS_SCREENSHOT_DIR']))
+  : join(REPO_ROOT, 'docs', 'user', 'screenshots');
 const VIEWPORT = { width: 1440, height: 900 };
 type ScreenshotTarget = 'auto' | 'dialog' | 'sidebar';
 
@@ -35,6 +41,7 @@ interface ScreenshotFixtures {
   ownerCreds: Credentials;
   product: { id: string; tenant_name: string };
   supplier: { id: string; name: string };
+  workflowSupplier: { id: string; name: string };
   quotationId?: string;
   matchTaskId?: string;
   matchedProductId: string;
@@ -262,6 +269,29 @@ test.describe('User documentation screenshots', () => {
       target: 'dialog',
     });
   });
+
+  test('captures automated ingestion dashboard and email log pages', async ({ page }) => {
+    await page.setViewportSize(VIEWPORT);
+    if (!fixtures) {
+      throw new Error('Commercial fixtures were not created by the previous serial screenshot test.');
+    }
+    await signInAsOwner(page, fixtures.ownerCreds);
+    await seedIngestionData(page, fixtures);
+
+    await page.setViewportSize({ width: 1440, height: 1250 });
+    await captureRoute(page, '/ingestion', '26-ingestion-dashboard.jpg', async () => {
+      await expect(page.locator('.page-title')).toContainText('Ingestion Dashboard');
+      await waitForNoVisibleLoading(page);
+      await expect(page.locator('.recent-emails-table')).toBeVisible();
+    });
+    await page.setViewportSize(VIEWPORT);
+
+    await captureRoute(page, '/ingestion/email-log', '28-email-ingestion-log.jpg', async () => {
+      await expect(page.locator('.page-title')).toContainText('Email Inbound Log');
+      await waitForNoVisibleLoading(page);
+      await expect(page.locator('.email-log-table')).toBeVisible();
+    });
+  });
 });
 
 async function buildCommercialFixtures(page: Page): Promise<ScreenshotFixtures> {
@@ -355,6 +385,7 @@ async function buildCommercialFixtures(page: Page): Promise<ScreenshotFixtures> 
     ownerCreds,
     product,
     supplier,
+    workflowSupplier,
     quotationId,
     matchTaskId,
     matchedProductId,
@@ -363,14 +394,169 @@ async function buildCommercialFixtures(page: Page): Promise<ScreenshotFixtures> 
   };
 }
 
+async function seedIngestionData(page: Page, fixtures: ScreenshotFixtures): Promise<void> {
+  const { ownerToken, supplier, workflowSupplier, quotationId } = fixtures;
+
+  try {
+    await apiAsUser(ownerToken, 'POST', '/tenants/email-config/enable');
+  } catch {
+    // Ignore if enable already active
+  }
+  try {
+    await apiAsUser(ownerToken, 'PUT', '/tenants/email-config', {
+      enabled: true,
+      domain_allowlist: ['acmefoods.co.uk', 'freshdirect.example.com'],
+    });
+  } catch {
+    // Ignore if allowlist already active
+  }
+
+  // Real document capture upload
+  try {
+    await page.goto('/ingestion/capture');
+    await expect(page.locator('.page-title')).toContainText('Quotation Capture');
+    const pdfFixturePath = join(REPO_ROOT, 'apps', 'web', 'tests', 'e2e', 'fixtures', 'test-quotation.pdf');
+    await page.locator('input.file-input').first().setInputFiles(pdfFixturePath);
+    await expect(page.locator('.selected-file-card')).toBeVisible();
+    await page.locator('button.submit-btn').click();
+    await expect(page.locator('.result-container.success')).toBeVisible({ timeout: 25_000 });
+  } catch (e) {
+    console.warn('Document capture upload failed:', e);
+  }
+
+  // Real catalogue import
+  try {
+    await page.goto('/ingestion/catalogue-import');
+    await expect(page.locator('.page-title')).toContainText('Catalogue Import');
+    await page.locator('mat-select').click();
+    await page.locator('mat-option', { hasText: supplier.name }).click();
+    const csvFixturePath = join(REPO_ROOT, 'apps', 'web', 'tests', 'e2e', 'fixtures', 'test-catalogue.csv');
+    await page.locator('input.file-input').setInputFiles(csvFixturePath);
+    await expect(page.locator('.selected-file-card')).toBeVisible();
+    await page.locator('button.submit-btn').click();
+    await expect(page.locator('.result-container.success')).toBeVisible({ timeout: 25_000 });
+  } catch (e) {
+    console.warn('Catalogue import failed:', e);
+  }
+
+  // Direct SQL seed for realistic email log entries
+  const quoteSql = quotationId ? `'${quotationId}'::uuid` : 'null::uuid';
+  const sql = `
+    with owner as (
+      select m.tenant_id
+      from membership m
+      where lower(m.email) = lower('${fixtures.ownerCreds.ownerEmail}') and m.status = 'active'
+      limit 1
+    )
+    insert into ingestion_email_log (
+      tenant_id, message_id, from_address, from_domain, subject,
+      status, error_message, attachment_count, supplier_id, match_method,
+      quotation_id, received_at, processed_at
+    )
+    select
+      owner.tenant_id,
+      v.message_id,
+      v.from_address,
+      v.from_domain,
+      v.subject,
+      v.status::ingestion_email_status,
+      v.error_message,
+      v.attachment_count,
+      v.supplier_id,
+      v.match_method,
+      v.quotation_id,
+      v.received_at,
+      v.processed_at
+    from owner, (values
+      (
+        '<quote-2026-0819@acmefoods.co.uk>',
+        'orders@acmefoods.co.uk',
+        'acmefoods.co.uk',
+        'Quotation Q-2026-0819: Weekly Fresh Produce',
+        'completed',
+        null,
+        2,
+        '${workflowSupplier.id}'::uuid,
+        'domain',
+        ${quoteSql},
+        now() - interval '45 minutes',
+        now() - interval '44 minutes'
+      ),
+      (
+        '<quotes-sep2026@freshdirect.example.com>',
+        'quotes@freshdirect.example.com',
+        'freshdirect.example.com',
+        'Price List Update — Dairy & Ambient Goods Sep 2026',
+        'completed',
+        null,
+        1,
+        '${supplier.id}'::uuid,
+        'domain',
+        null::uuid,
+        now() - interval '2 hours',
+        now() - interval '1 hour 58 minutes'
+      ),
+      (
+        '<promo-autumn@unapproved-vendor.com>',
+        'sales@unapproved-vendor.com',
+        'unapproved-vendor.com',
+        'Special Wholesale Promotion Catalog',
+        'rejected',
+        'Domain "unapproved-vendor.com" is not on the workspace allowlist.',
+        1,
+        null::uuid,
+        null,
+        null::uuid,
+        now() - interval '3 hours',
+        now() - interval '3 hours'
+      ),
+      (
+        '<err-98124@brightwell-electronics.co.uk>',
+        'quotes@brightwell-electronics.co.uk',
+        'brightwell-electronics.co.uk',
+        'Office Equipment Quote Ref #98124',
+        'failed',
+        'Extraction failed: File is corrupted or password protected.',
+        1,
+        null::uuid,
+        null,
+        null::uuid,
+        now() - interval '4 hours',
+        now() - interval '3 hours 58 minutes'
+      ),
+      (
+        '<logistics-2026@highland-transport.test>',
+        'rates@highland-transport.test',
+        'highland-transport.test',
+        'Delivery Surcharges & Freight Schedule',
+        'received',
+        null,
+        0,
+        null::uuid,
+        null,
+        null::uuid,
+        now() - interval '5 hours',
+        null::timestamptz
+      )
+    ) as v(message_id, from_address, from_domain, subject, status, error_message, attachment_count, supplier_id, match_method, quotation_id, received_at, processed_at)
+    on conflict do nothing;
+  `;
+
+  execFileSync(
+    'docker',
+    ['exec', 'supabase_db_ProcurePilot', 'psql', '-U', 'postgres', '-t', '-A', '-c', sql],
+    { encoding: 'utf-8' },
+  );
+}
+
 async function discoverExistingMatchTask(
   ownerToken: string,
 ): Promise<{ id: string; quotationId: string | null } | null> {
   const list = await apiAsUser<{
-    items: Array<{ id: string; quotation_id: string | null }>;
+    items: { id: string; quotation_id: string | null; quotation_line?: { id: string } }[];
   }>(ownerToken, 'GET', '/match-tasks?status=all&limit=1');
   const task = list.items[0];
-  return task ? { id: task.id, quotationId: task.quotation_id } : null;
+  return task ? { id: task.quotation_line?.id ?? task.id, quotationId: task.quotation_id } : null;
 }
 
 async function discoverExistingQuotationId(page: Page): Promise<string | undefined> {
@@ -511,7 +697,7 @@ async function captureExistingMatchScreenshots(page: Page, matchTaskId: string):
   await expect(page.locator('.quotation-group, .empty-state')).toBeVisible();
   await captureCurrentPage(page, '09-match-resolution-queue.jpg');
 
-  await page.goto(`/matching/tasks/${matchTaskId}`);
+  await page.goto(`/matching/${matchTaskId}`);
   await expect(page.locator('.page-title')).toBeVisible();
   await expect(page.locator('.line-detail-card, .task-summary-card, .decision-card')).toBeVisible();
   await captureCurrentPage(page, '09b-match-resolution-detail.jpg');
@@ -530,9 +716,9 @@ async function captureAndResolveMatchScreenshots(
   await captureCurrentPage(page, '09-match-resolution-queue.jpg');
   await page.locator('.quotation-group', { hasText: quotationId.slice(0, 8) }).locator('.action-btn').first().click();
   await page.waitForURL('**/matching/**');
-  await expect(page.locator('.page-title')).toContainText('Resolve Product Match');
+  await expect(page.locator('.page-title')).toContainText('Match Resolution');
   await captureCurrentPage(page, '09b-match-resolution-detail.jpg');
-  await page.locator('mat-radio-button', { hasText: 'No Match' }).click();
+  await page.locator('mat-radio-button', { hasText: 'No Match — Create New Product' }).click();
   await expect(page.locator('.new-product-section')).toBeVisible();
   await captureCurrentPage(page, '09c-match-resolution-outcomes.jpg');
   await page.fill('input[formControlName="tenant_name"]', productName);

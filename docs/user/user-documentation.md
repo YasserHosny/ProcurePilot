@@ -1,7 +1,7 @@
 # ProcurePilot User Documentation
 
 > Complete system journey with annotated screenshots for every screen.
-> Last updated: 12 Sep 2026.
+> Last updated: 18 Sep 2026.
 >
 > Covers the web app only. For the mobile app (sign-in, biometric unlock, role-aware home
 > screen), see [ProcurePilot Mobile App User Documentation](mobile-app-user-documentation.md).
@@ -35,11 +35,13 @@
 23. [Report Schedules & Schedule Form](#23-report-schedules--schedule-form)
 24. [Weekly Digest & Digest Settings](#24-weekly-digest--digest-settings)
 25. [Roles & Permissions](#25-roles--permissions)
-26. [Email Forwarding Setup](#26-email-forwarding-setup)
-27. [Capture a Quotation (Photo or Upload)](#27-capture-a-quotation-photo-or-upload)
-28. [Catalogue Import (Bulk Price List)](#28-catalogue-import-bulk-price-list)
-29. [FAQ](#29-faq)
-30. [Known Issues](#30-known-issues)
+26. [Ingestion Dashboard](#26-ingestion-dashboard)
+27. [Email Forwarding Setup](#27-email-forwarding-setup)
+28. [Email Ingestion Log](#28-email-ingestion-log)
+29. [Capture a Quotation (Photo or Upload)](#29-capture-a-quotation-photo-or-upload)
+30. [Catalogue Import (Bulk Price List)](#30-catalogue-import-bulk-price-list)
+31. [FAQ](#31-faq)
+32. [Known Issues](#32-known-issues)
 
 ---
 
@@ -685,7 +687,7 @@ Reached from **Record Purchase** on any Smart Compare offer, or **+ Record Purch
 
 **Business value:** organisation settings connect procurement activity to the way the business is managed. Branches, cost centres, and budgets turn isolated purchases into accountable spend by location, department, and financial period.
 
-**Display note:** the Settings screen now resolves branch names in the Branch and Cost Centre tables. See [§27 Known Issues](#27-known-issues) for remaining raw-ID display issues in the Purchase Requests area.
+**Display note:** the Settings screen now resolves branch names in the Branch and Cost Centre tables. See [§32 Known Issues](#32-known-issues) for remaining raw-ID display issues in the Purchase Requests area.
 
 ---
 
@@ -710,7 +712,7 @@ The unified workspace hub for generated reporting artifacts and recurring report
 
 ## 23. Report Schedules & Schedule Form
 
-**Route:** `/reports/schedule` (or via **+ New Schedule** in the Reports Center)
+**Route:** `/reports/schedule-form` (or via **+ New Schedule** in the Reports Center)
 
 Configure automated recurring weekly reports delivered directly to the Reports Center.
 
@@ -760,7 +762,27 @@ Personalized weekly intelligence digests assembling key procurement metrics and 
 
 ---
 
-## 26. Email Forwarding Setup
+## 26. Ingestion Dashboard
+
+**Route:** `/ingestion`
+
+![Ingestion Dashboard](screenshots/26-ingestion-dashboard.jpg)
+
+The hub page for automated quotation intake — the landing screen for the three channels documented
+in the sections that follow, plus a rolling view of recent activity.
+
+| # | Element | Description |
+|---|---------|-------------|
+| 1 | **Stat cards** | Three counters: **Emails Today**, **Capture Uploads**, and **Catalogue Imports** — same-day activity across all three inbound channels. |
+| 2 | **Rate indicators** | **Supplier Match Rate** and **Extraction Success Rate** — how often inbound documents are automatically linked to a known supplier and successfully parsed into structured line items. |
+| 3 | **Channel cards** | One card per inbound channel — **Email Forwarding** (§27), **Email Ingestion Log** (§28), **Capture a Quotation** (§29), and **Catalogue Import** (§30) — each with a direct action button into that screen. |
+| 4 | **Recent Emails panel** | A short preview of the most recently received inbound emails, with a **View All** link into the full Email Ingestion Log (§28). Shows an empty state when nothing has arrived yet. |
+
+**Business value:** the dashboard turns "did automated ingestion actually work today" into a single glance, instead of requiring a buyer to open each channel separately to check whether emails are arriving, captures are processing, or catalogue imports are landing cleanly.
+
+---
+
+## 27. Email Forwarding Setup
 
 **Route:** `/ingestion/email-config`
 
@@ -779,7 +801,34 @@ Configure automated inbound email forwarding and domain security to receive and 
 
 ---
 
-## 27. Capture a Quotation (Photo or Upload)
+## 28. Email Ingestion Log
+
+**Route:** `/ingestion/email-log`
+
+![Email Ingestion Log](screenshots/28-email-ingestion-log.jpg)
+
+An audit trail of every email received on your workspace's forwarding address, whether or not it
+was successfully turned into a quotation.
+
+| # | Element | Description |
+|---|---------|-------------|
+| 1 | **Status filter** | Filter by processing status (e.g. received, processed, rejected, failed) or view all. |
+| 2 | **From Domain filter** | Restrict the log to emails from a specific sender domain. |
+| 3 | **Date From / Date To filters** | Restrict the log to a received-date range. |
+| 4 | **Reset filters button** | Clears all active filters at once; disabled when no filter is applied. |
+| 5 | **Log table** | One row per received email: received time, sender address and domain, subject (with an attachment-count chip when attachments were present), status badge, matched supplier (or "unmatched"), a link to the resulting quotation when one was created, and error details when processing failed. |
+| 6 | **Load more** | Cursor-paginated — click to fetch the next page of older emails; shows "no more" once the log is exhausted. |
+| 7 | **Empty state** | Shown when no emails have been received yet. |
+
+**Tips:**
+- An email rejected for an unapproved sender domain (see §27's domain allowlist) still appears here with a rejected status, so you can confirm the block worked as expected rather than wondering if the email was simply lost.
+- The quotation link only appears once an email has been successfully parsed into a quotation — use the error details column to see why a failed email didn't produce one.
+
+**Business value:** the log is what makes an automated, unattended intake channel trustworthy. Without it, a rejected or failed email is invisible; with it, a buyer can confirm every forwarded quote either became a quotation or has a clear, specific reason it didn't.
+
+---
+
+## 29. Capture a Quotation (Photo or Upload)
 
 **Route:** `/ingestion/capture`
 
@@ -798,7 +847,7 @@ Quickly capture paper quotes using your mobile device camera or upload quotation
 
 ---
 
-## 28. Catalogue Import (Bulk Price List)
+## 30. Catalogue Import (Bulk Price List)
 
 **Route:** `/ingestion/catalogue-import`
 
@@ -817,7 +866,7 @@ Bulk-import supplier price lists and catalogues from CSV or Excel spreadsheets i
 
 ---
 
-## 29. FAQ
+## 31. FAQ
 
 **Q: Can I edit a verified saving?**
 A: No. Verified savings are immutable. If a correction is needed, a new adjustment record is created.
@@ -854,7 +903,7 @@ A: ProcurePilot uses partial import resilience. All valid rows are imported into
 
 ---
 
-## 30. Known Issues
+## 32. Known Issues
 
 Originally found during the 6 Sep 2026 documentation pass; re-checked and updated 12 Sep 2026 against current `main`.
 
