@@ -1,0 +1,202 @@
+<div class="accounting-settings-container">
+  <div class="header-section">
+    <div class="title-group">
+      <h1 class="page-title">{{ 'accounting.connection.title' | translate }}</h1>
+      <p class="page-subtitle">{{ 'accounting.connection.subtitle' | translate }}</p>
+    </div>
+  </div>
+
+  @if (isLoading()) {
+    <div class="loading-wrap" role="status">
+      <mat-spinner diameter="32" [attr.aria-label]="'common.loading' | translate" />
+    </div>
+  } @else if (error()) {
+    <mat-card class="error-card" role="alert" data-testid="error-card">
+      <div class="error-content">
+        <mat-icon class="error-icon" aria-hidden="true">error_outline</mat-icon>
+        <div class="error-text">
+          <h2 class="error-title">{{ 'accounting.connection.error.title' | translate }}</h2>
+          <p class="error-message">{{ error() }}</p>
+        </div>
+      </div>
+      <div class="error-actions">
+        <button mat-flat-button color="primary" type="button" (click)="loadConnection()" data-testid="retry-btn">
+          {{ 'accounting.connection.error.retry' | translate }}
+        </button>
+      </div>
+    </mat-card>
+  } @else if (!connection()) {
+    <!-- Empty state: never connected (404) -->
+    <mat-card class="empty-card" data-testid="empty-connection-card">
+      <div class="empty-content">
+        <mat-icon class="empty-icon" aria-hidden="true">account_balance</mat-icon>
+        <div class="empty-text">
+          <h2 class="empty-title">{{ 'accounting.connection.empty.title' | translate }}</h2>
+          <p class="empty-message">{{ 'accounting.connection.empty.description' | translate }}</p>
+        </div>
+      </div>
+      <div class="empty-actions">
+        <button
+          mat-flat-button
+          color="primary"
+          type="button"
+          class="connect-btn"
+          [disabled]="isMutating()"
+          (click)="connect()"
+          data-testid="connect-btn"
+        >
+          @if (isMutating()) {
+            <mat-spinner diameter="18" [attr.aria-label]="'common.loading' | translate" />
+          } @else {
+            <mat-icon aria-hidden="true">link</mat-icon>
+          }
+          <span>{{ 'accounting.connection.empty.connect' | translate }}</span>
+        </button>
+      </div>
+    </mat-card>
+  } @else {
+    @if (connection(); as conn) {
+      <div class="connection-section">
+        <!-- Needs Re-authorization Banner -->
+        @if (conn.status === 'needs_reauth') {
+          <div class="needs-reauth-banner" role="alert" data-testid="needs-reauth-banner">
+            <div class="banner-content">
+              <mat-icon class="banner-icon" aria-hidden="true">warning</mat-icon>
+              <div class="banner-text">
+                <h3 class="banner-title">{{ 'accounting.connection.needsReauth.title' | translate }}</h3>
+                <p class="banner-message">{{ 'accounting.connection.needsReauth.message' | translate }}</p>
+              </div>
+            </div>
+            <button
+              mat-flat-button
+              color="warn"
+              type="button"
+              class="reconnect-btn"
+              [disabled]="isMutating()"
+              (click)="connect()"
+              data-testid="reconnect-btn"
+            >
+              @if (isMutating()) {
+                <mat-spinner diameter="18" [attr.aria-label]="'common.loading' | translate" />
+              } @else {
+                <mat-icon aria-hidden="true">sync</mat-icon>
+              }
+              <span>{{ 'accounting.connection.needsReauth.action' | translate }}</span>
+            </button>
+          </div>
+        }
+
+        <!-- Connection Status Card -->
+        <mat-card class="settings-card" data-testid="connection-status-card">
+          <div class="card-header">
+            <div class="header-left">
+              <mat-icon class="provider-icon" aria-hidden="true">account_balance</mat-icon>
+              <div class="header-titles">
+                <h2 class="card-title" data-testid="connection-display-name">{{ conn.display_name }}</h2>
+                <span class="provider-subtitle">{{ 'accounting.connection.providerQuickbooks' | translate }}</span>
+              </div>
+            </div>
+            <span
+              class="status-badge"
+              [ngClass]="conn.status"
+              data-testid="connection-status-badge"
+            >
+              {{ ('accounting.connection.status.' + conn.status) | translate }}
+            </span>
+          </div>
+
+          <div class="connection-details">
+            <div class="detail-row">
+              <span class="detail-label">{{ 'accounting.connection.connectedAt' | translate }}</span>
+              <span class="detail-value" data-testid="connection-connected-at">
+                {{ conn.connected_at | formatDate }}
+              </span>
+            </div>
+
+            <div class="detail-row">
+              <span class="detail-label">{{ 'accounting.connection.lastSyncedAt' | translate }}</span>
+              <span class="detail-value" data-testid="connection-last-synced-at">
+                @if (conn.last_synced_at) {
+                  {{ conn.last_synced_at | formatDate }}
+                } @else {
+                  {{ 'accounting.connection.neverSynced' | translate }}
+                }
+              </span>
+            </div>
+
+            @if (conn.status === 'disconnected' && conn.disconnected_at) {
+              <div class="detail-row">
+                <span class="detail-label">{{ 'accounting.connection.disconnectedAt' | translate }}</span>
+                <span class="detail-value" data-testid="connection-disconnected-at">
+                  {{ conn.disconnected_at | formatDate }}
+                </span>
+              </div>
+            }
+          </div>
+
+          @if (conn.status !== 'disconnected') {
+            <div class="card-actions">
+              <button
+                *appRole="'owner'"
+                mat-stroked-button
+                color="warn"
+                type="button"
+                class="disconnect-btn"
+                [disabled]="isMutating()"
+                (click)="disconnect()"
+                data-testid="disconnect-btn"
+              >
+                @if (isMutating()) {
+                  <mat-spinner diameter="18" [attr.aria-label]="'common.loading' | translate" />
+                } @else {
+                  <mat-icon aria-hidden="true">link_off</mat-icon>
+                }
+                <span>{{ 'accounting.connection.disconnect' | translate }}</span>
+              </button>
+
+              <div
+                *appRole="['buyer', 'approver', 'viewer', 'branch_manager']"
+                class="owner-notice"
+                role="note"
+                data-testid="owner-notice"
+              >
+                <mat-icon aria-hidden="true">info</mat-icon>
+                <span>{{ 'accounting.connection.ownerOnly' | translate }}</span>
+              </div>
+            </div>
+          } @else {
+            <div class="card-actions">
+              <button
+                *appRole="'owner'"
+                mat-flat-button
+                color="primary"
+                type="button"
+                class="connect-btn"
+                [disabled]="isMutating()"
+                (click)="connect()"
+                data-testid="reconnect-disconnected-btn"
+              >
+                @if (isMutating()) {
+                  <mat-spinner diameter="18" [attr.aria-label]="'common.loading' | translate" />
+                } @else {
+                  <mat-icon aria-hidden="true">link</mat-icon>
+                }
+                <span>{{ 'accounting.connection.reconnect' | translate }}</span>
+              </button>
+
+              <div
+                *appRole="['buyer', 'approver', 'viewer', 'branch_manager']"
+                class="owner-notice"
+                role="note"
+                data-testid="owner-notice"
+              >
+                <mat-icon aria-hidden="true">info</mat-icon>
+                <span>{{ 'accounting.connection.ownerOnly' | translate }}</span>
+              </div>
+            </div>
+          }
+        </mat-card>
+      </div>
+    }
+  }
+</div>

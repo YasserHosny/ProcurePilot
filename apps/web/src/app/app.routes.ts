@@ -308,6 +308,14 @@ export const routes: Routes = [
             (m) => m.CatalogueImportComponent,
           ),
       },
+      // --- accounting integration (R3.1) ---
+      {
+        path: 'accounting',
+        loadComponent: () =>
+          import(
+            './features/accounting/connection-settings/connection-settings.component'
+          ).then((m) => m.ConnectionSettingsComponent),
+      },
       {
         path: 'savings/outcome-capture',
         canActivate: [roleGuard('owner', 'buyer')],

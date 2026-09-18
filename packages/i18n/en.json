@@ -2687,5 +2687,46 @@
         "error": "Error Description"
       }
     }
+  },
+  "accounting": {
+    "connection": {
+      "title": "Accounting Integration",
+      "subtitle": "Connect your accounting software to sync bills and reconcile spend against purchase records.",
+      "empty": {
+        "title": "Connect your accounting system",
+        "description": "Link your QuickBooks Online account to automatically import bills and match them against purchase records.",
+        "connect": "Connect QuickBooks"
+      },
+      "statusCardTitle": "Connected Account",
+      "providerQuickbooks": "QuickBooks Online",
+      "status": {
+        "active": "Active",
+        "needs_reauth": "Needs Re-authorization",
+        "disconnected": "Disconnected"
+      },
+      "connectedAt": "Connected On",
+      "lastSyncedAt": "Last Synced",
+      "neverSynced": "Never synced yet",
+      "disconnectedAt": "Disconnected On",
+      "connect": "Connect",
+      "reconnect": "Reconnect",
+      "disconnect": "Disconnect",
+      "ownerOnly": "Only workspace owners can connect or disconnect accounting integrations.",
+      "needsReauth": {
+        "title": "Re-authorization Required",
+        "message": "Authorization for your QuickBooks connection has expired or was revoked. Please reconnect to resume bill synchronization.",
+        "action": "Reconnect"
+      },
+      "error": {
+        "title": "Failed to load connection",
+        "retry": "Retry"
+      },
+      "loadError": "Failed to load accounting connection status.",
+      "startFailed": "Failed to start accounting connection. Please try again.",
+      "disconnectSuccess": "Accounting connection disconnected successfully.",
+      "disconnectFailed": "Failed to disconnect accounting connection. Please try again.",
+      "connectedSuccess": "Accounting account connected successfully.",
+      "connectFailed": "Accounting authorization failed or was declined. Please try again."
+    }
   }
 }

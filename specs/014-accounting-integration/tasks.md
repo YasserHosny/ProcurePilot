@@ -103,7 +103,7 @@ scenario in spec.md's User Story 1 — no bills, matches, or discrepancies invol
   no connection row at all (spec Acceptance Scenario 1.3), a connection whose refresh fails
   transitions to `needs_reauth` (spec Acceptance Scenario 1.4), cross-tenant connection lookup
   resolves not-found.
-- [ ] **T016** [P] [US1] — Frontend: `apps/web/src/app/features/accounting/connection-settings/`
+- [x] **T016** [P] [US1] — Frontend: `apps/web/src/app/features/accounting/connection-settings/`
   component — connection status card, "Connect" button (redirects to the authorization URL),
   "Disconnect" button (owner-only, `*appRole="'owner'"` display gate matching
   `email-config.component.ts`'s own established pattern), needs-reauth banner. Karma spec
@@ -111,7 +111,7 @@ scenario in spec.md's User Story 1 — no bills, matches, or discrepancies invol
   `MatSnackBar` is used for feedback (see the standing gotcha in `delegate-heavily-to-codex`/prior
   wave docs — a plain `TestBed.configureTestingModule({ providers })` override silently fails
   for a standalone component here).
-- [ ] **T017** [P] [US1] — `apps/web/src/app/features/accounting/accounting-api.ts` — typed API
+- [x] **T017** [P] [US1] — `apps/web/src/app/features/accounting/accounting-api.ts` — typed API
   client for the four US1 endpoints, matching `ingestion-api.ts`'s own shape and error handling.
 
 **Checkpoint**: an owner can connect/disconnect and see status. Fully functional and demoable on
