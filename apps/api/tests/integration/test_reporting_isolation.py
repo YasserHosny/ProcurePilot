@@ -372,8 +372,20 @@ def reporting_tenants() -> Iterator[tuple[ReportingTenant, ReportingTenant]]:
     try:
         yield alpha, beta
     finally:
+        # cleanup_workspace(alpha.workspace) deletes the tenant (cascading away the branch
+        # member's membership row) and that workspace's own auth.users row — but never the
+        # SEPARATE auth.users row make_reporting_tenant() inserts directly for the branch
+        # member (branch_user_id), which has no FK path back to tenant. Left orphaned with a
+        # fixed, non-random email, this leaks across test runs: the real Supabase auth.users
+        # schema enforces a unique index on email (unlike this test suite's own lightweight
+        # stand-in), so the next test to build a reporting tenant fails outright on a duplicate
+        # key. alpha.branch_member is already a full Workspace for exactly this reason — reuse
+        # the same cleanup_workspace call on it; it's a no-op on the (already-deleted) tenant
+        # and just deletes the one auth.users row that would otherwise leak (issue #21).
         cleanup_workspace(alpha.workspace)
+        cleanup_workspace(alpha.branch_member)
         cleanup_workspace(beta.workspace)
+        cleanup_workspace(beta.branch_member)
 
 
 # --- layer 1: RLS on the new tables -----------------------------------------
