@@ -2844,5 +2844,46 @@
         "noMore": "All discrepancies loaded"
       }
     }
+  },
+  "pos": {
+    "connection": {
+      "title": "Point of Sale & Inventory Integration",
+      "subtitle": "Connect your Square account to sync sales velocity and stock-on-hand signals.",
+      "empty": {
+        "title": "Connect your POS & inventory system",
+        "description": "Link your Square account to automatically sync sales data and stock levels for purchasing recommendations.",
+        "connect": "Connect Square"
+      },
+      "statusCardTitle": "Connected Account",
+      "providerSquare": "Square",
+      "status": {
+        "active": "Active",
+        "needs_reauth": "Needs Re-authorization",
+        "disconnected": "Disconnected"
+      },
+      "connectedAt": "Connected On",
+      "lastSyncedAt": "Last Synced",
+      "neverSynced": "Never synced yet",
+      "disconnectedAt": "Disconnected On",
+      "connect": "Connect",
+      "reconnect": "Reconnect",
+      "disconnect": "Disconnect",
+      "ownerOnly": "Only workspace owners can connect or disconnect POS integrations.",
+      "needsReauth": {
+        "title": "Re-authorization Required",
+        "message": "Authorization for your Square connection has expired or was revoked. Please reconnect to resume sales and inventory synchronization.",
+        "action": "Reconnect"
+      },
+      "error": {
+        "title": "Failed to load connection",
+        "retry": "Retry"
+      },
+      "loadError": "Failed to load POS connection status.",
+      "startFailed": "Failed to start POS connection. Please try again.",
+      "disconnectSuccess": "POS connection disconnected successfully.",
+      "disconnectFailed": "Failed to disconnect POS connection. Please try again.",
+      "connectedSuccess": "POS account connected successfully.",
+      "connectFailed": "POS authorization failed or was declined. Please try again."
+    }
   }
 }
