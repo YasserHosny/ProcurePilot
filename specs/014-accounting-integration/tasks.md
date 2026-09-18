@@ -79,24 +79,24 @@ logic yet.
 authorization flow, and verify connection state transitions correctly through every acceptance
 scenario in spec.md's User Story 1 — no bills, matches, or discrepancies involved.
 
-- [ ] **T012** [US1] — `ConnectionService` (connect: mint the provider authorization URL;
+- [x] **T012** [US1] — `ConnectionService` (connect: mint the provider authorization URL;
   complete: exchange the callback code for tokens via the connector, create the
   `accounting_connection` row; disconnect: set `status = 'disconnected'`, `disconnected_at`,
   never delete the row; status: read current state) in
   `apps/api/src/procurepilot_api/modules/accounting/service.py`. Every method takes `member:
   CurrentMember` and runs through `_authenticated_db`, matching every other ingestion/reporting
   service's own established pattern.
-- [ ] **T013** [US1] — Router: `POST /accounting/connect`, `GET /accounting/connect/callback`,
+- [x] **T013** [US1] — Router: `POST /accounting/connect`, `GET /accounting/connect/callback`,
   `GET /accounting/connection`, `POST /accounting/disconnect` in
   `apps/api/src/procurepilot_api/modules/accounting/router.py`, matching the contract exactly
   (`contracts/accounting-integration.openapi.yaml`). `connect`/`disconnect` gated
   `require_role(owner)` (FR-003); `connection` (GET) open to any authenticated member.
   Record `accounting.connection_created`/`accounting.connection_disconnected` audit events.
-- [ ] **T014** [US1] — Pydantic schemas for the four endpoints
+- [x] **T014** [US1] — Pydantic schemas for the four endpoints
   (`AccountingConnection`, `StartConnectionResponse`) in
   `apps/api/src/procurepilot_api/modules/accounting/schemas.py`, matching the contract's
   component schemas field-for-field.
-- [ ] **T015** [US1] — Integration tests in
+- [x] **T015** [US1] — Integration tests in
   `apps/api/tests/integration/test_accounting_connection.py`: owner can connect (stub connector),
   non-owner gets 403, a second connect attempt while one is active returns 409, disconnect
   preserves the row (`status = 'disconnected'`, not deleted), a declined/failed callback leaves

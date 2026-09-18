@@ -71,6 +71,16 @@ class CompanyInfo:
         return self.company_name
 
 
+@dataclass(frozen=True)
+class OAuthTokens:
+    """OAuth 2.0 access and refresh token pair."""
+
+    access_token: str
+    refresh_token: str
+    expires_in: int = 3600
+    token_type: str = "bearer"
+
+
 @runtime_checkable
 class AccountingConnector(Protocol):
     """Protocol for reading from an external accounting system (QuickBooks, Stub).
@@ -79,6 +89,19 @@ class AccountingConnector(Protocol):
     enforcing FR-013 at the type level. All reconciliation decisions live solely in
     ProcurePilot; nothing is ever written back to the accounting system.
     """
+
+    def build_authorization_url(self, state: str) -> str:
+        """Build the OAuth authorization URL for user consent."""
+        ...
+
+    def exchange_code_for_tokens(
+        self,
+        code: str,
+        redirect_uri: str | None = None,
+        realm_id: str | None = None,
+    ) -> OAuthTokens:
+        """Exchange authorization code for access and refresh tokens."""
+        ...
 
     def list_bills(self, since: date) -> list[RawBill]:
         """Fetch bills recorded on or after the specified date."""
@@ -159,6 +182,34 @@ class StubConnector:
                 status="open",
             ),
         ]
+
+    def build_authorization_url(self, state: str) -> str:
+        from urllib.parse import urlencode
+
+        params = {
+            "client_id": "stub-client-id",
+            "response_type": "code",
+            "scope": "com.intuit.quickbooks.accounting",
+            "redirect_uri": "http://localhost:8000/api/v1/accounting/connect/callback",
+            "state": state,
+        }
+        return f"https://appcenter.intuit.com/connect/oauth2?{urlencode(params)}"
+
+    def exchange_code_for_tokens(
+        self,
+        code: str,
+        redirect_uri: str | None = None,
+        realm_id: str | None = None,
+    ) -> OAuthTokens:
+        if realm_id is not None:
+            self._company = CompanyInfo(
+                realm_id=realm_id,
+                company_name=self._company.company_name,
+            )
+        return OAuthTokens(
+            access_token="stub-access-token",
+            refresh_token="stub-refresh-token",
+        )
 
     def list_bills(self, since: date) -> list[RawBill]:
         return [b for b in self._bills if b.bill_date >= since]

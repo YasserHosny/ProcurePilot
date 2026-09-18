@@ -7,7 +7,6 @@ Queries QuickBooks read-only REST endpoints for Bill, Vendor, and CompanyInfo (F
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
 from typing import Any, Literal, Self
@@ -17,17 +16,12 @@ import httpx
 from pydantic import SecretStr
 
 from procurepilot_api.config import Settings, get_settings
-from procurepilot_api.modules.accounting.connector import CompanyInfo, RawBill, RawVendor
-
-
-@dataclass(frozen=True)
-class OAuthTokens:
-    """OAuth 2.0 access and refresh token pair returned by Intuit."""
-
-    access_token: str
-    refresh_token: str
-    expires_in: int = 3600
-    token_type: str = "bearer"
+from procurepilot_api.modules.accounting.connector import (
+    CompanyInfo,
+    OAuthTokens,
+    RawBill,
+    RawVendor,
+)
 
 
 class QuickBooksError(Exception):
