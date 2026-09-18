@@ -229,6 +229,35 @@ class Settings(BaseSettings):
         default="30/minute", validation_alias="RATE_LIMIT_ACCOUNTING_DISCREPANCY_RESOLVE"
     )
 
+    # POS & inventory integration (R3.2, 015-pos-inventory-integration):
+    # Provider mode defaults to "stub" so tests, local development, and CI can run
+    # without a real Square developer account. "square" uses live OAuth2 and REST calls
+    # against Square's Orders and Inventory APIs.
+    pos_provider_mode: Literal["stub", "square"] = Field(
+        default="stub", validation_alias="POS_PROVIDER_MODE"
+    )
+    square_application_id: str | None = Field(
+        default=None, validation_alias="SQUARE_APPLICATION_ID"
+    )
+    square_application_secret: SecretStr | None = Field(
+        default=None, validation_alias="SQUARE_APPLICATION_SECRET"
+    )
+    square_redirect_uri: str | None = Field(
+        default=None, validation_alias="SQUARE_REDIRECT_URI"
+    )
+    square_environment: Literal["sandbox", "production"] = Field(
+        default="sandbox", validation_alias="SQUARE_ENVIRONMENT"
+    )
+    pos_token_encryption_key: SecretStr | None = Field(
+        default=None, validation_alias="POS_TOKEN_ENCRYPTION_KEY"
+    )
+    rate_limit_pos_sync: str = Field(
+        default="10/minute", validation_alias="RATE_LIMIT_POS_SYNC"
+    )
+    rate_limit_pos_match: str = Field(
+        default="30/minute", validation_alias="RATE_LIMIT_POS_MATCH"
+    )
+
     @field_validator("api_cors_origins", mode="before")
     @classmethod
     def parse_cors_origins(cls, value: object) -> tuple[str, ...] | object:
@@ -244,6 +273,8 @@ class Settings(BaseSettings):
         "posthog_api_key",
         "quickbooks_client_secret",
         "accounting_token_encryption_key",
+        "square_application_secret",
+        "pos_token_encryption_key",
         mode="before",
     )
     @classmethod
