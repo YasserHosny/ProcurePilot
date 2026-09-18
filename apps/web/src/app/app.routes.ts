@@ -324,6 +324,13 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'accounting/discrepancies',
+        loadComponent: () =>
+          import(
+            './features/accounting/discrepancies/discrepancies.component'
+          ).then((m) => m.DiscrepanciesComponent),
+      },
+      {
         path: 'savings/outcome-capture',
         canActivate: [roleGuard('owner', 'buyer')],
         loadComponent: () =>

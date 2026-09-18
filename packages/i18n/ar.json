@@ -2775,6 +2775,73 @@
         "loadingMore": "جارٍ التحميل...",
         "noMore": "تم تحميل جميع الفواتير"
       }
+    },
+    "discrepancies": {
+      "title": "فروقات المطابقة",
+      "subtitle": "مراجعة وتسوية فروقات المطابقة بين الفواتير المتزامنة وسجلات الشراء.",
+      "backToConnection": "إعدادات الربط",
+      "refresh": "تحديث",
+      "filters": {
+        "status": "تصفية حسب الحالة",
+        "open": "مفتوحة",
+        "resolved": "تمت تسويتها"
+      },
+      "types": {
+        "amount_mismatch": "عدم تطابق المبلغ",
+        "unmatched_bill": "فاتورة غير مطابقة",
+        "unmatched_purchase": "سجل شراء غير مطابق"
+      },
+      "table": {
+        "type": "النوع",
+        "details": "التفاصيل",
+        "detectedAt": "تاريخ الاكتشاف",
+        "status": "الحالة",
+        "actions": "الإجراءات"
+      },
+      "details": {
+        "syncedBill": "الفاتورة المتزامنة",
+        "purchaseRecord": "سجل الشراء",
+        "vendor": "المورد",
+        "supplier": "المورد",
+        "amount": "المبلغ",
+        "date": "التاريخ"
+      },
+      "status": {
+        "open": "مفتوحة",
+        "resolved": "تمت تسويتها"
+      },
+      "resolution": {
+        "title": "معلومات التسوية",
+        "resolvedBy": "تمت التسوية بواسطة: {{name}}",
+        "automaticallyResolved": "تمت التسوية تلقائياً",
+        "resolvedAt": "تمت التسوية في {{date}}",
+        "note": "الملاحظة: {{note}}"
+      },
+      "resolveDialog": {
+        "title": "تسوية الفرق",
+        "noteLabel": "ملاحظة التسوية (اختياري)",
+        "notePlaceholder": "سبب تسوية هذا الفرق...",
+        "cancel": "إلغاء",
+        "confirm": "تسوية"
+      },
+      "resolveAction": "تسوية",
+      "empty": {
+        "title": "لا توجد فروقات مطابقة",
+        "description": "لا توجد فروقات مطابقة للمرشح المحدد."
+      },
+      "error": {
+        "title": "فشل تحميل فروقات المطابقة",
+        "retry": "إعادة المحاولة"
+      },
+      "loadError": "فشل تحميل فروقات المطابقة. يُرجى المحاولة مرة أخرى.",
+      "resolveSuccess": "تمت تسوية الفرق بنجاح.",
+      "resolveAlreadyResolved": "تمت تسوية هذا الفرق بالفعل بواسطة شخص آخر. يُرجى التحديث.",
+      "resolveFailed": "فشلت تسوية الفرق. يُرجى المحاولة مرة أخرى.",
+      "pagination": {
+        "loadMore": "تحميل المزيد",
+        "loadingMore": "جارٍ التحميل...",
+        "noMore": "تم تحميل جميع الفروقات"
+      }
     }
   }
 }

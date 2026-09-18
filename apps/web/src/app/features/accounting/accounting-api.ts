@@ -60,6 +60,53 @@ export interface TriggerSyncResponse {
   status: 'enqueued';
 }
 
+export type DiscrepancyType = 'amount_mismatch' | 'unmatched_bill' | 'unmatched_purchase';
+
+export type DiscrepancyStatus = 'open' | 'resolved';
+
+export interface SyncedBillDetail {
+  vendor_name: string;
+  amount: string;
+  currency: string;
+  bill_date: string;
+}
+
+export interface PurchaseRecordDetail {
+  supplier_name: string;
+  amount: string;
+  currency: string;
+  date: string;
+}
+
+export interface ReconciliationDiscrepancy {
+  id: string;
+  discrepancy_type: DiscrepancyType;
+  synced_bill_id: string | null;
+  purchase_record_id: string | null;
+  status: DiscrepancyStatus;
+  detected_at: string;
+  resolved_by: string | null;
+  resolved_at: string | null;
+  resolution_note: string | null;
+  synced_bill_detail?: SyncedBillDetail | null;
+  purchase_record_detail?: PurchaseRecordDetail | null;
+}
+
+export interface ReconciliationDiscrepancyList {
+  items: ReconciliationDiscrepancy[];
+  next_cursor: string | null;
+}
+
+export interface ListDiscrepanciesParams {
+  cursor?: string;
+  limit?: number;
+  status?: DiscrepancyStatus;
+}
+
+export interface ResolveDiscrepancyRequest {
+  note?: string;
+}
+
 @Injectable({ providedIn: 'root' })
 export class AccountingApiService {
   private readonly http = inject(HttpClient);
@@ -112,5 +159,35 @@ export class AccountingApiService {
     if (params?.match_status) query.set('match_status', params.match_status);
     const qs = query.toString() ? `?${query.toString()}` : '';
     return this.http.get<SyncedBillList>(`${this.base}/accounting/bills${qs}`);
+  }
+
+  /**
+   * Lists reconciliation discrepancies with cursor pagination and optional status filter.
+   * When status is omitted, server defaults to 'open'.
+   * On failure, emits an error matching {@link ApiError}.
+   */
+  listDiscrepancies(params?: ListDiscrepanciesParams): Observable<ReconciliationDiscrepancyList> {
+    const query = new URLSearchParams();
+    if (params?.cursor) query.set('cursor', params.cursor);
+    if (params?.limit !== undefined) query.set('limit', String(params.limit));
+    if (params?.status) query.set('status', params.status);
+    const qs = query.toString() ? `?${query.toString()}` : '';
+    return this.http.get<ReconciliationDiscrepancyList>(`${this.base}/accounting/discrepancies${qs}`);
+  }
+
+  /**
+   * Resolves a reconciliation discrepancy with an optional resolution note.
+   * Emits HTTP 404 if not found or cross-tenant, or 409 if already resolved.
+   * On failure, emits an error matching {@link ApiError}.
+   */
+  resolveDiscrepancy(
+    discrepancyId: string,
+    note?: string,
+  ): Observable<ReconciliationDiscrepancy> {
+    const body: ResolveDiscrepancyRequest = note !== undefined ? { note } : {};
+    return this.http.post<ReconciliationDiscrepancy>(
+      `${this.base}/accounting/discrepancies/${encodeURIComponent(discrepancyId)}/resolve`,
+      body,
+    );
   }
 }

@@ -220,11 +220,11 @@ produced that state.
   duplicates) when its underlying records change again on a later sync (Acceptance Scenario
   3.4), resolving an already-resolved discrepancy returns 409, cross-tenant discrepancy lookup
   resolves not-found.
-- [ ] **T031** [P] [US3] — Frontend: `apps/web/src/app/features/accounting/discrepancies/`
+- [x] **T031** [P] [US3] — Frontend: `apps/web/src/app/features/accounting/discrepancies/`
   component — discrepancy list (open by default), per-type detail rendering (side-by-side
   amounts for mismatches; supplier/amount/date for unmatched bills/purchases), resolve action
   with an optional note field. Karma spec alongside it.
-- [ ] **T032** [US3] — Extend `accounting-api.ts` with the discrepancy-list and resolve methods.
+- [x] **T032** [US3] — Extend `accounting-api.ts` with the discrepancy-list and resolve methods.
 
 **Checkpoint**: all three user stories work end to end — connect, sync + match, review +
 resolve.

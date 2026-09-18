@@ -4,6 +4,8 @@ import { TestBed } from '@angular/core/testing';
 
 import type {
   AccountingConnection,
+  ReconciliationDiscrepancy,
+  ReconciliationDiscrepancyList,
   StartConnectionResponse,
   SyncedBillList,
   TriggerSyncResponse,
@@ -159,5 +161,124 @@ describe('AccountingApiService (T017)', () => {
     const req = httpMock.expectOne('/api/v1/accounting/bills?match_status=unmatched');
     expect(req.request.method).toBe('GET');
     req.flush(mockBillList);
+  });
+
+  it('should call listDiscrepancies() without params using GET /accounting/discrepancies', () => {
+    const mockList: ReconciliationDiscrepancyList = {
+      items: [
+        {
+          id: 'disc-001',
+          discrepancy_type: 'amount_mismatch',
+          synced_bill_id: 'bill-001',
+          purchase_record_id: 'pr-001',
+          status: 'open',
+          detected_at: '2026-09-18T10:00:00Z',
+          resolved_by: null,
+          resolved_at: null,
+          resolution_note: null,
+          synced_bill_detail: {
+            vendor_name: 'Acme Corp',
+            amount: '120.00',
+            currency: 'USD',
+            bill_date: '2026-09-10',
+          },
+          purchase_record_detail: {
+            supplier_name: 'Acme Corp',
+            amount: '100.00',
+            currency: 'USD',
+            date: '2026-09-10',
+          },
+        },
+      ],
+      next_cursor: 'cur-2',
+    };
+
+    service.listDiscrepancies().subscribe((res) => {
+      expect(res).toEqual(mockList);
+    });
+
+    const req = httpMock.expectOne('/api/v1/accounting/discrepancies');
+    expect(req.request.method).toBe('GET');
+    req.flush(mockList);
+  });
+
+  it('should call listDiscrepancies() with all query params when provided', () => {
+    const mockList: ReconciliationDiscrepancyList = {
+      items: [],
+      next_cursor: null,
+    };
+
+    service
+      .listDiscrepancies({ cursor: 'cur_abc', limit: 20, status: 'resolved' })
+      .subscribe((res) => {
+        expect(res).toEqual(mockList);
+      });
+
+    const req = httpMock.expectOne(
+      '/api/v1/accounting/discrepancies?cursor=cur_abc&limit=20&status=resolved',
+    );
+    expect(req.request.method).toBe('GET');
+    req.flush(mockList);
+  });
+
+  it('should call listDiscrepancies() with only provided query params', () => {
+    const mockList: ReconciliationDiscrepancyList = {
+      items: [],
+      next_cursor: null,
+    };
+
+    service.listDiscrepancies({ status: 'open' }).subscribe((res) => {
+      expect(res).toEqual(mockList);
+    });
+
+    const req = httpMock.expectOne('/api/v1/accounting/discrepancies?status=open');
+    expect(req.request.method).toBe('GET');
+    req.flush(mockList);
+  });
+
+  it('should call resolveDiscrepancy() with POST /accounting/discrepancies/:id/resolve and note', () => {
+    const mockResolved: ReconciliationDiscrepancy = {
+      id: 'disc-001',
+      discrepancy_type: 'amount_mismatch',
+      synced_bill_id: 'bill-001',
+      purchase_record_id: 'pr-001',
+      status: 'resolved',
+      detected_at: '2026-09-18T10:00:00Z',
+      resolved_by: 'user-001',
+      resolved_at: '2026-09-18T11:00:00Z',
+      resolution_note: 'Verified with supplier',
+    };
+
+    service.resolveDiscrepancy('disc-001', 'Verified with supplier').subscribe((res) => {
+      expect(res).toEqual(mockResolved);
+    });
+
+    const req = httpMock.expectOne('/api/v1/accounting/discrepancies/disc-001/resolve');
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toEqual({ note: 'Verified with supplier' });
+    req.flush(mockResolved);
+  });
+
+  it('should call resolveDiscrepancy() without note sending empty body', () => {
+    const mockResolved: ReconciliationDiscrepancy = {
+      id: 'disc-002',
+      discrepancy_type: 'unmatched_bill',
+      synced_bill_id: 'bill-002',
+      purchase_record_id: null,
+      status: 'resolved',
+      detected_at: '2026-09-18T10:00:00Z',
+      resolved_by: 'user-001',
+      resolved_at: '2026-09-18T11:00:00Z',
+      resolution_note: null,
+    };
+
+    service.resolveDiscrepancy('disc-002').subscribe((res) => {
+      expect(res).toEqual(mockResolved);
+    });
+
+    const req = httpMock.expectOne('/api/v1/accounting/discrepancies/disc-002/resolve');
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toEqual({});
+    req.flush(mockResolved);
   });
 });
