@@ -16,6 +16,7 @@ from integration.smart_compare_helpers import (
 from integration.value_proof_helpers import fetch_export_jobs
 from procurepilot_api.deps import bearer_token, current_member
 from procurepilot_api.main import create_app
+from procurepilot_api.modules.auth.jwt import MemberRole
 from procurepilot_api.modules.exports import service as export_service_module
 from procurepilot_api.shared.rate_limit import mutation_limiter
 
@@ -175,4 +176,124 @@ def test_digest_subscription_rate_limit_refuses_without_creating(
         _assert_structured_429(third)
 
         assert _subscription_count(context.workspace.tenant_id) == 2
+    mutation_limiter.reset()
+
+
+def test_accounting_sync_rate_limit_refuses_without_syncing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """T039 security review: router.py had zero rate limiting on POST /accounting/sync — a
+    real outbound QuickBooks API call chain, and the advisory lock only stops concurrent
+    syncs, not rapid sequential ones. Once the per-member limit is hit, the request is
+    refused with the structured 429 envelope before SyncService.sync is even called."""
+    mutation_limiter.reset()
+    monkeypatch.setenv("RATE_LIMIT_ACCOUNTING_SYNC", "2/minute")
+    monkeypatch.setenv("ACCOUNTING_PROVIDER_MODE", "stub")
+    with committed_smart_context("rl-accounting-sync") as context:
+        settings_for_test_db(monkeypatch)
+        member = member_from_workspace(context.workspace, role=MemberRole.owner)
+        with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+            with conn.cursor() as cur:
+                cur.execute("set local role service_role")
+                cur.execute(
+                    """
+                    insert into accounting_connection (
+                        id, tenant_id, provider, realm_id, display_name,
+                        access_token, refresh_token, status, connected_by, connected_at
+                    ) values (
+                        %s, %s, 'quickbooks', 'stub-realm-12345', 'Demo Company',
+                        'test-access-token', 'test-refresh-token', 'active', %s, now()
+                    )
+                    """,
+                    (uuid4(), context.workspace.tenant_id, context.workspace.membership_id),
+                )
+            conn.commit()
+
+        client = TestClient(_app(monkeypatch, member), raise_server_exceptions=False)
+
+        first = client.post("/api/v1/accounting/sync")
+        second = client.post("/api/v1/accounting/sync")
+        assert first.status_code == 202, first.text
+        assert second.status_code == 202, second.text
+
+        third = client.post("/api/v1/accounting/sync")
+        _assert_structured_429(third)
+    mutation_limiter.reset()
+
+
+def test_accounting_discrepancy_resolve_rate_limit_refuses_without_resolving(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """T039 security review: same gap as sync, on POST /accounting/discrepancies/{id}/resolve.
+    Seeds three distinct open discrepancies so the third call is refused by the rate limit
+    itself, not by the already-resolved 409 a repeat call against the same row would hit."""
+    mutation_limiter.reset()
+    monkeypatch.setenv("RATE_LIMIT_ACCOUNTING_DISCREPANCY_RESOLVE", "2/minute")
+    with committed_smart_context("rl-accounting-resolve") as context:
+        settings_for_test_db(monkeypatch)
+        member = member_from_workspace(context.workspace, role=MemberRole.owner)
+        discrepancy_ids = [uuid4(), uuid4(), uuid4()]
+        with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+            with conn.cursor() as cur:
+                cur.execute("set local role service_role")
+                connection_id = uuid4()
+                cur.execute(
+                    """
+                    insert into accounting_connection (
+                        id, tenant_id, provider, realm_id, display_name,
+                        access_token, refresh_token, status, connected_by, connected_at
+                    ) values (
+                        %s, %s, 'quickbooks', 'stub-realm-12345', 'Demo Company',
+                        'test-access-token', 'test-refresh-token', 'active', %s, now()
+                    )
+                    """,
+                    (connection_id, context.workspace.tenant_id, context.workspace.membership_id),
+                )
+                for i, disc_id in enumerate(discrepancy_ids):
+                    bill_id = uuid4()
+                    vendor_id = uuid4()
+                    cur.execute(
+                        """
+                        insert into synced_vendor (
+                            id, tenant_id, connection_id, provider_vendor_id, display_name
+                        ) values (%s, %s, %s, %s, %s)
+                        """,
+                        (vendor_id, context.workspace.tenant_id, connection_id,
+                         f"rl-vendor-{i}", f"Rate Limit Vendor {i}"),
+                    )
+                    cur.execute(
+                        """
+                        insert into synced_bill (
+                            id, tenant_id, connection_id, provider_bill_id, vendor_id,
+                            amount, currency, bill_date, provider_status
+                        ) values (%s, %s, %s, %s, %s, 100.00, 'USD', current_date, 'open')
+                        """,
+                        (bill_id, context.workspace.tenant_id, connection_id,
+                         f"rl-bill-{i}", vendor_id),
+                    )
+                    cur.execute(
+                        """
+                        insert into reconciliation_discrepancy (
+                            id, tenant_id, discrepancy_type, synced_bill_id, status, detected_at
+                        ) values (%s, %s, 'unmatched_bill', %s, 'open', now())
+                        """,
+                        (disc_id, context.workspace.tenant_id, bill_id),
+                    )
+            conn.commit()
+
+        client = TestClient(_app(monkeypatch, member), raise_server_exceptions=False)
+
+        first = client.post(
+            f"/api/v1/accounting/discrepancies/{discrepancy_ids[0]}/resolve", json={}
+        )
+        second = client.post(
+            f"/api/v1/accounting/discrepancies/{discrepancy_ids[1]}/resolve", json={}
+        )
+        assert first.status_code == 200, first.text
+        assert second.status_code == 200, second.text
+
+        third = client.post(
+            f"/api/v1/accounting/discrepancies/{discrepancy_ids[2]}/resolve", json={}
+        )
+        _assert_structured_429(third)
     mutation_limiter.reset()

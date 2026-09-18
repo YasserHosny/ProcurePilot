@@ -35,6 +35,7 @@ from procurepilot_api.modules.accounting.connector import (
 from procurepilot_api.modules.accounting.matching_service import MatchingService
 from procurepilot_api.modules.accounting.quickbooks_client import QuickBooksAuthError
 from procurepilot_api.modules.accounting.reconciliation_service import ReconciliationService
+from procurepilot_api.modules.accounting.token_crypto import decrypt_token, encrypt_token
 from procurepilot_api.shared.audit import AuditEventCreate, AuditOutcome, get_audit_writer
 from procurepilot_api.shared.logging import get_trace_id
 
@@ -264,12 +265,12 @@ class SyncService:
                 token_row = cur.fetchone()
 
         access_token = (
-            str(token_row["access_token"])
+            decrypt_token(str(token_row["access_token"]), settings)
             if token_row and token_row.get("access_token")
             else None
         )
         refresh_token = (
-            str(token_row["refresh_token"])
+            decrypt_token(str(token_row["refresh_token"]), settings)
             if token_row and token_row.get("refresh_token")
             else None
         )
@@ -304,8 +305,8 @@ class SyncService:
                             {
                                 "id": connection_id,
                                 "tenant_id": tenant_id,
-                                "access_token": tokens.access_token,
-                                "refresh_token": tokens.refresh_token,
+                                "access_token": encrypt_token(tokens.access_token, settings),
+                                "refresh_token": encrypt_token(tokens.refresh_token, settings),
                             },
                         )
                     sr_conn.commit()

@@ -15,6 +15,12 @@ dependencies = [
     "pydantic-settings>=2.7,<3",
     "python-multipart==0.0.31",
     "python-jose[cryptography]==3.3.0",
+    # Explicit direct dependency (previously only transitive via python-jose[cryptography]):
+    # Fernet encrypts accounting_connection's OAuth tokens at rest (R3.1 security review, T039,
+    # see config.py's accounting_token_encryption_key). Relying on a transitive dependency for
+    # security-critical code is fragile — if python-jose ever drops or re-pins it, this would
+    # break silently.
+    "cryptography>=44",
     "httpx==0.28.1",
     "slowapi==0.1.9",
     "supabase==2.11.0",

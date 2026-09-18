@@ -38,7 +38,16 @@ def tenant_member_rate_limit_key(request: Request) -> str:
     return get_remote_address(request)
 
 
-mutation_limiter = Limiter(key_func=tenant_member_rate_limit_key)
+# R3.1 security review (T039): slowapi's own default is key_style="url" — the rate-limit bucket
+# is built from the literal request URL, not the route template. Any endpoint with a path
+# parameter (e.g. .../catalogue-import, .../discrepancies/{id}/resolve) therefore gets a fresh,
+# never-shared bucket per distinct id: a caller rotating the id on every call bypasses the limit
+# entirely, since no two calls ever land in the same bucket. Confirmed empirically while adding
+# rate limiting to the accounting discrepancy-resolve endpoint — three resolves against three
+# different discrepancy ids all succeeded under a 2/minute limit. key_style="endpoint" buckets by
+# the route's function identity instead, which is what every rate_limit_* setting in this
+# codebase actually intends (a per-member, per-*kind-of-mutation* budget, not per-URL).
+mutation_limiter = Limiter(key_func=tenant_member_rate_limit_key, key_style="endpoint")
 
 
 def configure_rate_limiting(app: FastAPI, _settings: Settings) -> None:

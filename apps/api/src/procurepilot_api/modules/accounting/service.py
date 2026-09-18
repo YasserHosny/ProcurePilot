@@ -25,6 +25,7 @@ from procurepilot_api.deps import CurrentMember
 from procurepilot_api.errors import ConflictError, NotFoundError, UnprocessableEntityError
 from procurepilot_api.modules.accounting.connector import get_accounting_connector
 from procurepilot_api.modules.accounting.schemas import SyncedBill, SyncedBillList
+from procurepilot_api.modules.accounting.token_crypto import encrypt_token
 from procurepilot_api.modules.auth.jwt import MemberRole
 from procurepilot_api.modules.offers.service import _authenticated_db
 from procurepilot_api.shared.audit import AuditEventCreate, get_audit_writer
@@ -246,8 +247,8 @@ class ConnectionService:
                             "tenant_id": member.tenant_id,
                             "realm_id": realm_id,
                             "display_name": display_name,
-                            "access_token": tokens.access_token,
-                            "refresh_token": tokens.refresh_token,
+                            "access_token": encrypt_token(tokens.access_token, self._settings),
+                            "refresh_token": encrypt_token(tokens.refresh_token, self._settings),
                             "connected_by": member.membership_id,
                         },
                     )

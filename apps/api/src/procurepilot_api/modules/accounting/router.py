@@ -1,12 +1,18 @@
-"""Router for accounting integration endpoints (R3.1)."""
+"""Router for accounting integration endpoints (R3.1).
 
-from __future__ import annotations
+No `from __future__ import annotations` here, deliberately — matching ingestion/router.py's own
+lack of it. A slowapi @mutation_limiter.limit() decorator combined with deferred (stringified)
+annotations breaks FastAPI/pydantic's forward-ref resolution for any plain (non-Depends) Path/
+Query parameter — confirmed empirically while adding rate limiting here (T039 security review):
+`discrepancy_id: UUID` on the resolve endpoint failed with a `TypeAdapter[...] is not fully
+defined` 500 at request time, reproducibly, only on decorated endpoints with a bare param.
+"""
 
 from typing import Annotated, Literal
 from urllib.parse import urlencode
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Query, Request, status
 from fastapi.responses import RedirectResponse
 
 from procurepilot_api.config import Settings, get_settings
@@ -36,10 +42,19 @@ from procurepilot_api.modules.accounting.sync_service import (
 )
 from procurepilot_api.modules.auth.jwt import MemberRole
 from procurepilot_api.modules.auth.rbac import require_role
+from procurepilot_api.shared.rate_limit import mutation_limiter
 
 router = APIRouter(prefix="/accounting", tags=["accounting"])
 OWNER = (MemberRole.owner,)
 SYNC_ROLES = (MemberRole.owner, MemberRole.buyer)
+
+
+def _sync_limit() -> str:
+    return get_settings().rate_limit_accounting_sync
+
+
+def _discrepancy_resolve_limit() -> str:
+    return get_settings().rate_limit_accounting_discrepancy_resolve
 
 
 
@@ -148,7 +163,9 @@ def disconnect_accounting(
     response_model=TriggerSyncResponse,
     operation_id="triggerAccountingSync",
 )
+@mutation_limiter.limit(_sync_limit)
 def trigger_accounting_sync(
+    request: Request,
     member: Annotated[CurrentMember, Depends(require_role(*SYNC_ROLES))],
     service: Annotated[ConnectionService, Depends(get_connection_service)],
     settings: Annotated[Settings, Depends(get_settings)],
@@ -250,7 +267,9 @@ def list_reconciliation_discrepancies(
     response_model=ReconciliationDiscrepancy,
     operation_id="resolveReconciliationDiscrepancy",
 )
+@mutation_limiter.limit(_discrepancy_resolve_limit)
 def resolve_reconciliation_discrepancy(
+    request: Request,
     discrepancy_id: UUID,
     member: Annotated[CurrentMember, Depends(require_role(*SYNC_ROLES))],
     token: Annotated[str, Depends(bearer_token)],

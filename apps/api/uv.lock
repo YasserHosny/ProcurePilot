@@ -436,6 +436,7 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "arabic-reshaper" },
+    { name = "cryptography" },
     { name = "fastapi" },
     { name = "httpx" },
     { name = "openpyxl" },
@@ -466,6 +467,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "arabic-reshaper", specifier = ">=3.0.0" },
+    { name = "cryptography", specifier = ">=44" },
     { name = "fastapi", specifier = "==0.115.6" },
     { name = "httpx", specifier = "==0.28.1" },
     { name = "openpyxl", specifier = ">=3.1,<4" },
