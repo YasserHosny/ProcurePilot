@@ -274,9 +274,9 @@ class ConnectionService:
                             %(connected_by)s,
                             now()
                         )
-                        returning id, tenant_id, provider, external_account_id, external_account_name,
-                                  status, connected_by, connected_at, last_synced_at, disconnected_at,
-                                  created_at, updated_at
+                        returning id, tenant_id, provider, external_account_id,
+                                  external_account_name, status, connected_by, connected_at,
+                                  last_synced_at, disconnected_at, created_at, updated_at
                         """,
                         {
                             "tenant_id": member.tenant_id,
@@ -384,7 +384,9 @@ class ConnectionService:
         row_dict["display_name"] = row_dict["external_account_name"]
         return row_dict
 
-    def get_connection(self, member: CurrentMember, connection_id: UUID) -> dict[str, object] | None:
+    def get_connection(
+        self, member: CurrentMember, connection_id: UUID
+    ) -> dict[str, object] | None:
         """Fetch a specific connection by ID within tenant isolation."""
         with _authenticated_db(self._settings, member) as conn:
             with conn.cursor(row_factory=dict_row) as cur:
@@ -426,7 +428,9 @@ class ConnectionService:
                 token_row = cur.fetchone()
 
         if not token_row:
-            raise NotFoundError(details={"resource": "pos_connection", "connection_id": str(connection_id)})
+            raise NotFoundError(
+                details={"resource": "pos_connection", "connection_id": str(connection_id)}
+            )
 
         access_token = decrypt_token(
             str(token_row["access_token"]), self._settings.pos_token_encryption_key
