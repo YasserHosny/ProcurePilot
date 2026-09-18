@@ -292,6 +292,28 @@ components:
         resolved_by: { type: string, format: uuid, nullable: true }
         resolved_at: { type: string, format: date-time, nullable: true }
         resolution_note: { type: string, nullable: true }
+        synced_bill_detail:
+          $ref: '#/components/schemas/SyncedBillDetail'
+        purchase_record_detail:
+          $ref: '#/components/schemas/PurchaseRecordDetail'
+
+    SyncedBillDetail:
+      type: object
+      required: [vendor_name, amount, currency, bill_date]
+      properties:
+        vendor_name: { type: string }
+        amount: { type: string, description: "Decimal string, never a float" }
+        currency: { type: string }
+        bill_date: { type: string, format: date }
+
+    PurchaseRecordDetail:
+      type: object
+      required: [amount, currency, date]
+      properties:
+        supplier_name: { type: string, nullable: true }
+        amount: { type: string, description: "Decimal string, never a float" }
+        currency: { type: string }
+        date: { type: string, format: date }
 
     ReconciliationDiscrepancyList:
       type: object

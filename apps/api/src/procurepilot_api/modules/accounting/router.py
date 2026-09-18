@@ -12,8 +12,15 @@ from fastapi.responses import RedirectResponse
 from procurepilot_api.config import Settings, get_settings
 from procurepilot_api.deps import CurrentMember, bearer_token, current_member
 from procurepilot_api.errors import NotFoundError
+from procurepilot_api.modules.accounting.reconciliation_service import (
+    ReconciliationService,
+    get_reconciliation_service,
+)
 from procurepilot_api.modules.accounting.schemas import (
     AccountingConnection,
+    ReconciliationDiscrepancy,
+    ReconciliationDiscrepancyList,
+    ResolveDiscrepancyRequest,
     StartConnectionResponse,
     SyncedBillList,
     TriggerSyncResponse,
@@ -216,4 +223,46 @@ def list_synced_bills(
         limit=limit,
         match_status=match_status,
     )
+
+
+@router.get(
+    "/discrepancies",
+    response_model=ReconciliationDiscrepancyList,
+    operation_id="listReconciliationDiscrepancies",
+)
+def list_reconciliation_discrepancies(
+    member: Annotated[CurrentMember, Depends(current_member)],
+    service: Annotated[ReconciliationService, Depends(get_reconciliation_service)],
+    cursor: Annotated[str | None, Query()] = None,
+    limit: Annotated[int, Query(ge=1, le=100)] = 50,
+    status: Annotated[Literal["open", "resolved"], Query()] = "open",
+) -> ReconciliationDiscrepancyList:
+    return service.list_discrepancies(
+        member,
+        cursor=cursor,
+        limit=limit,
+        status=status,
+    )
+
+
+@router.post(
+    "/discrepancies/{discrepancy_id}/resolve",
+    response_model=ReconciliationDiscrepancy,
+    operation_id="resolveReconciliationDiscrepancy",
+)
+def resolve_reconciliation_discrepancy(
+    discrepancy_id: UUID,
+    member: Annotated[CurrentMember, Depends(require_role(*SYNC_ROLES))],
+    token: Annotated[str, Depends(bearer_token)],
+    service: Annotated[ReconciliationService, Depends(get_reconciliation_service)],
+    body: ResolveDiscrepancyRequest | None = None,
+) -> ReconciliationDiscrepancy:
+    note = body.note if body else None
+    result = service.resolve(
+        member,
+        discrepancy_id=discrepancy_id,
+        note=note,
+        bearer_token=token,
+    )
+    return ReconciliationDiscrepancy.model_validate(result)
 

@@ -200,18 +200,18 @@ directly (bypassing a real sync), run discrepancy derivation, and confirm exactl
 set appears with the right type/detail — independent of whether US2's own live sync path is what
 produced that state.
 
-- [ ] **T028** [US3] — `ReconciliationService.recompute_discrepancies(connection)`: derives the
+- [x] **T028** [US3] — `ReconciliationService.recompute_discrepancies(connection)`: derives the
   current discrepancy set per data-model.md's three shapes and re-evaluation rule (a `resolved`
   discrepancy whose underlying `synced_bill`/`purchase_record` `updated_at` is newer than its own
   `resolved_at` is reopened, not duplicated); `resolve(discrepancy_id, member, note)`: sets
   `status = 'resolved'`, `resolved_by`, `resolved_at`, `resolution_note`. Called by
   `SyncService.sync` at the end of every sync (T018), not only on manual request. In
   `apps/api/src/procurepilot_api/modules/accounting/reconciliation_service.py`.
-- [ ] **T029** [US3] — Router: `GET /accounting/discrepancies` (cursor-paginated, `status` filter,
+- [x] **T029** [US3] — Router: `GET /accounting/discrepancies` (cursor-paginated, `status` filter,
   default `open`) and `POST /accounting/discrepancies/{discrepancy_id}/resolve` in `router.py`,
   matching the contract. `resolve` gated `require_role(owner, buyer)` (FR-011). Record
   `accounting.discrepancy_resolved` audit events.
-- [ ] **T030** [US3] — Integration tests in
+- [x] **T030** [US3] — Integration tests in
   `apps/api/tests/integration/test_reconciliation_discrepancies.py`: an amount mismatch on a
   matched pair is detected and shows both figures (Acceptance Scenario 3.1), an unmatched bill
   appears immediately while an unmatched purchase record appears only after 30 days (Acceptance

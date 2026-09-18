@@ -56,7 +56,8 @@ create table if not exists reconciliation_discrepancy (
   ),
 
   constraint reconciliation_discrepancy_resolved_fields check (
-    (status = 'resolved') = (resolved_by is not null and resolved_at is not null)
+    (status = 'resolved') = (resolved_at is not null)
+    and (resolved_by is null or status = 'resolved')
   )
 );
 

@@ -34,6 +34,7 @@ from procurepilot_api.modules.accounting.connector import (
 )
 from procurepilot_api.modules.accounting.matching_service import MatchingService
 from procurepilot_api.modules.accounting.quickbooks_client import QuickBooksAuthError
+from procurepilot_api.modules.accounting.reconciliation_service import ReconciliationService
 from procurepilot_api.shared.audit import AuditEventCreate, AuditOutcome, get_audit_writer
 from procurepilot_api.shared.logging import get_trace_id
 
@@ -403,12 +404,21 @@ class SyncService:
                 )
             tenant_conn.commit()
 
+            # 10. Recompute reconciliation discrepancies (US3, T028)
+            discrepancy_counts = ReconciliationService().recompute_discrepancies(
+                tenant_conn,
+                tenant_id=tenant_id,
+                connection_id=connection_id,
+            )
+            tenant_conn.commit()
+
         summary = {
             "status": "completed",
             "connection_id": str(connection_id),
             "vendors_synced": len(raw_vendors),
             "bills_synced": len(raw_bills),
             "matches_created": matches_created,
+            "discrepancies": discrepancy_counts,
         }
 
         _record_audit(
