@@ -248,7 +248,7 @@ up yet.
   reference. Karma spec alongside it.
 - [x] **T028** [US2] — Extend `pos-api.ts` (T015) with the sync-trigger, signals-list, and
   manual-match methods.
-- [ ] **T029** [US2] — Frontend: extend the existing `offers/compare/compare.component` (Smart
+- [x] **T029** [US2] — Frontend: extend the existing `offers/compare/compare.component` (Smart
   Compare) and the catalogue product detail view to show `sales_velocity_per_day` (with its
   window label) and `stock_on_hand` (with its last-synced label) inline when a matched signal
   exists for that product, and show nothing when it doesn't (FR-005) — when
