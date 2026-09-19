@@ -154,7 +154,7 @@ and verify signals appear with correct stock/velocity fields and matching behave
 tie-breaking rule, independent of whether the inline display on Smart Compare/catalogue is wired
 up yet.
 
-- [ ] **T016** [US2] — `SyncService.sync(connection)`: calls the connector's
+- [x] **T016** [US2] — `SyncService.sync(connection)`: calls the connector's
   `list_sales_transactions(since)` and `list_inventory_levels()`, upserts `synced_product_signal`
   **by `(tenant_id, external_item_id)` only** (T005's dedup key — always sets `pos_connection_id`
   to *this* sync's connection id on every upsert, whether the row is new or pre-existing from a
@@ -170,7 +170,7 @@ up yet.
   started/completed/failed triple), and invokes `ProductMatchingService` (T017) for every signal
   with no existing `pos_product_match`. In
   `apps/api/src/procurepilot_api/modules/pos/sync_service.py`.
-- [ ] **T017** [US2] — `ProductMatchingService.match_signal(signal)`: reuses
+- [x] **T017** [US2] — `ProductMatchingService.match_signal(signal)`: reuses
   `modules/matching/search.py`'s `build_similarity_candidates` and
   `modules/matching/embeddings.py` (research.md R4) scored against `workspace_product.tenant_name`
   joined to `canonical_product.name`/`brand`, creates a `pos_product_match` row
@@ -178,11 +178,11 @@ up yet.
   clears the same auto-accept confidence threshold quotation-line matching already uses — more
   than one qualifying candidate, or none, is left unmatched for manual review (FR-006), not
   auto-picked. In `apps/api/src/procurepilot_api/modules/pos/matching_service.py`.
-- [ ] **T018** [P] [US2] — Unit tests for `ProductMatchingService`'s tie-breaking logic (mocked
+- [x] **T018** [P] [US2] — Unit tests for `ProductMatchingService`'s tie-breaking logic (mocked
   candidate lists, no DB) in `apps/api/tests/unit/test_pos_matching_service.py`: single confident
   match, multiple equally-qualifying candidates left unmatched (the bundle-vs-component edge case
   from spec.md), zero candidates left unmatched.
-- [ ] **T019** [US2] — Worker: `apps/api/src/procurepilot_api/workers/pos_sync_worker.py` — daily
+- [x] **T019** [US2] — Worker: `apps/api/src/procurepilot_api/workers/pos_sync_worker.py` — daily
   `pg_try_advisory_lock(hashtext(connection_id))`-guarded claim loop over connections due for sync
   (mirrors `accounting_sync_worker.py`'s exact shape: acquire the lock, record `pos.sync_started`,
   call `SyncService.sync`, mark `pos.sync_completed`/`pos.sync_failed` — the `sync_started` event
@@ -190,7 +190,7 @@ up yet.
   leaves an audit trace, closing the gap `/speckit.analyze` found). Worker-initiated writes use the
   tenant-scoped `authenticated`-without-member-claims session convention (research.md R6), never a
   literal `service_role` connection.
-- [ ] **T020** [US2] — Router: `POST /pos/sync` (manual trigger; the advisory lock from T019 makes
+- [x] **T020** [US2] — Router: `POST /pos/sync` (manual trigger; the advisory lock from T019 makes
   a concurrent attempt fail fast — return 409 rather than queueing, FR-002) and `GET /pos/signals`
   (cursor-paginated, `match_status` and `workspace_product_id` filters) in `router.py`, matching
   the contract. Decorate `sync` with `@mutation_limiter.limit(_pos_sync_limit)` reading
@@ -198,13 +198,13 @@ up yet.
   `shared/rate_limit.py`, already fixed to key on the route template
   (`key_style="endpoint"`), not the literal URL. `sync` gated `require_role(owner, buyer)`;
   `signals` open to any authenticated member.
-- [ ] **T021** [US2] — Router: `POST /pos/signals/{signal_id}/match` (manual match — FR-006's
+- [x] **T021** [US2] — Router: `POST /pos/signals/{signal_id}/match` (manual match — FR-006's
   resolution path) in `router.py`, matching the contract. Decorate with
   `@mutation_limiter.limit(_pos_match_limit)` reading `rate_limit_pos_match`. Gated
   `require_role(owner, buyer)`. Returns 409 if the signal or the target product already has a
   match (the 1:1 constraints from T006 are the real enforcement; the endpoint just surfaces a
   clean error).
-- [ ] **T022** [US2] — Integration tests in `apps/api/tests/integration/test_pos_sync.py`: a full
+- [x] **T022** [US2] — Integration tests in `apps/api/tests/integration/test_pos_sync.py`: a full
   sync creates the expected `synced_product_signal` rows with correct stock/velocity fields
   (Acceptance Scenario 2.1), an item with no inventory tracking shows null stock rather than zero
   (Acceptance Scenario 2.2), a stale stock figure's `stock_synced_at` reflects real staleness
@@ -215,13 +215,13 @@ up yet.
   `pos.sync_started` audit event is recorded even when `SyncService.sync` is made to raise
   immediately after lock acquisition (proves the started event isn't just implied by a completed
   one).
-- [ ] **T023** [P] [US2] — Integration tests in
+- [x] **T023** [P] [US2] — Integration tests in
   `apps/api/tests/integration/test_pos_matching.py`: a confident single-candidate match creates a
   `pos_product_match`, ambiguous candidates are left unmatched and visible for manual review, a
   manual match via `POST /pos/signals/{id}/match` succeeds and is recorded with `matched_by`,
   cross-tenant workspace products are never candidates (proven directly, not just assumed from
   RLS).
-- [ ] **T024** [P] [US2] — SC-002 aggregate coverage test in
+- [x] **T024** [P] [US2] — SC-002 aggregate coverage test in
   `apps/api/tests/integration/test_pos_sync.py` (or a dedicated
   `test_pos_signal_coverage.py` if that file is getting crowded): seed a batch of Square fixture
   items where a known ≥90% fraction are confidently matchable to existing `workspace_product` rows
@@ -230,7 +230,7 @@ up yet.
   SC-002's own ≥90% claim — a per-case assertion in T022/T023 does not by itself prove the
   spec's stated aggregate outcome. Mirrors 014-accounting-integration's own equivalent test for
   its SC-002.
-- [ ] **T025** [US2] — Reconnect-dedup regression test in
+- [x] **T025** [US2] — Reconnect-dedup regression test in
   `apps/api/tests/integration/test_pos_sync.py`: connect (stub), sync (creates
   `synced_product_signal` rows and at least one automatic `pos_product_match`), disconnect,
   reconnect (creates a **new** `pos_connection` row per T010), sync again, and assert (a) no
@@ -239,14 +239,14 @@ up yet.
   the `pos_product_match` row created before the disconnect is untouched (same `id`, no
   re-matching triggered) — directly proves the fix for the design flaw `/speckit.analyze` found
   (research.md R8), not just the absence of an error.
-- [ ] **T026** [P] [US2] — Integration test for the worker's own claim loop in
+- [x] **T026** [P] [US2] — Integration test for the worker's own claim loop in
   `apps/api/tests/integration/test_pos_sync_worker.py`, modeled directly on
   `test_accounting_sync_worker.py`'s real-overlapping-transactions concurrency proof — do not
   reintroduce a sleep-based race.
-- [ ] **T027** [P] [US2] — Frontend: `apps/web/src/app/features/pos/signals-review/` component —
+- [x] **T027** [P] [US2] — Frontend: `apps/web/src/app/features/pos/signals-review/` component —
   unmatched-signal list with a "match to product" action (product picker), matched-signal list for
   reference. Karma spec alongside it.
-- [ ] **T028** [US2] — Extend `pos-api.ts` (T015) with the sync-trigger, signals-list, and
+- [x] **T028** [US2] — Extend `pos-api.ts` (T015) with the sync-trigger, signals-list, and
   manual-match methods.
 - [ ] **T029** [US2] — Frontend: extend the existing `offers/compare/compare.component` (Smart
   Compare) and the catalogue product detail view to show `sales_velocity_per_day` (with its
