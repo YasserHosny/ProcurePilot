@@ -310,16 +310,16 @@ graceful-without-it confirmed as a first-class, tested guarantee rather than an 
   `apps/web/src/app/layout/shell/shell.component.html` (single entry point; the signals-review
   sub-page is reached from within the connection-settings view, matching `/accounting`'s own
   hub-and-spoke pattern).
-- [ ] **T035** — Tenant isolation: extend the canonical
+- [x] **T035** — Tenant isolation: extend the canonical
   `apps/api/tests/integration/test_tenant_isolation.py` with all three new tables (visibility +
   cross-tenant-write pairs, matching 014's own equivalent task exactly) and add them to
   `test_rls_is_enabled_and_forced_on_every_tenant_scoped_table`'s allowlist.
-- [ ] **T036** — E2E: `apps/web/tests/e2e/pos.spec.ts` — connect (stub-backed test environment),
+- [x] **T036** — E2E: `apps/web/tests/e2e/pos.spec.ts` — connect (stub-backed test environment),
   trigger a sync, see stock/velocity context on Smart Compare and a catalogue product, manually
   match an unmatched signal, disconnect and confirm purchasing screens are unaffected (covers
   User Story 3's Acceptance Scenario 2 end to end, not just at the unit level). Assert SC-001's
   connect-in-under-2-minutes budget with a generous margin, same convention as 014's own T036.
-- [ ] **T037** — a11y: `apps/web/tests/e2e/pos-a11y.spec.ts` — axe-core WCAG 2.1 AA on the
+- [x] **T037** — a11y: `apps/web/tests/e2e/pos-a11y.spec.ts` — axe-core WCAG 2.1 AA on the
   connection-settings and signals-review screens, plus the modified Smart Compare/catalogue
   screens, in English and Arabic.
 - [x] **T038** — Docs: add the POS/inventory integration section to

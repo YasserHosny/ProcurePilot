@@ -1,4 +1,3 @@
-import { NgClass } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
@@ -27,7 +26,6 @@ import {
   standalone: true,
   imports: [
     FormsModule,
-    NgClass,
     MatButtonModule,
     MatCardModule,
     MatChipsModule,

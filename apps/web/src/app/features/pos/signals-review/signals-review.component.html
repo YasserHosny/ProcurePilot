@@ -78,7 +78,7 @@
                   @if (signal.stock_on_hand !== null) {
                     <span class="signal-value">{{ signal.stock_on_hand }}</span>
                     @if (signal.stock_synced_at) {
-                      <span class="time-hint">{{ 'pos.inline.lastSynced' | translate:{ time: (signal.stock_synced_at | formatDate:'relative') } }}</span>
+                      <span class="time-hint">{{ 'pos.inline.lastSynced' | translate:{ time: (signal.stock_synced_at | formatDate) } }}</span>
                     }
                   } @else {
                     <span class="placeholder-value">—</span>
@@ -196,7 +196,7 @@
                   @if (signal.stock_on_hand !== null) {
                     <span class="signal-value">{{ signal.stock_on_hand }}</span>
                     @if (signal.stock_synced_at) {
-                      <span class="time-hint">{{ 'pos.inline.lastSynced' | translate:{ time: (signal.stock_synced_at | formatDate:'relative') } }}</span>
+                      <span class="time-hint">{{ 'pos.inline.lastSynced' | translate:{ time: (signal.stock_synced_at | formatDate) } }}</span>
                     }
                   } @else {
                     <span class="placeholder-value">—</span>
