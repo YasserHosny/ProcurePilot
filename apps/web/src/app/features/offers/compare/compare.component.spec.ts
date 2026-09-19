@@ -1,10 +1,10 @@
-import { provideHttpClient } from '@angular/common/http';
+import { HttpErrorResponse, provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { provideRouter } from '@angular/router';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
-import { of } from 'rxjs';
+import { of, throwError } from 'rxjs';
 
 import enCatalog from '../../../../../../../packages/i18n/en.json';
 import { ApiService } from '../../../core/api/api.service';
@@ -359,6 +359,29 @@ describe('CompareComponent (US1, SC-002, T020, T029)', () => {
       fixture.detectChanges();
 
       const el = fixture.nativeElement as HTMLElement;
+      expect(el.querySelector('[data-testid="pos-inline-context"]')).toBeNull();
+    });
+
+    it('T031: renders the comparison table normally when POS signals return not connected', () => {
+      posApiService.listSignals.and.returnValue(
+        throwError(
+          () =>
+            new HttpErrorResponse({
+              status: 404,
+              statusText: 'Not Found',
+              error: { code: 'not_found', message: 'No POS connection exists' },
+            }),
+        ),
+      );
+
+      component.fetchComparison('00000000-0000-4000-8000-000000000001');
+      fixture.detectChanges();
+
+      const el = fixture.nativeElement as HTMLElement;
+      expect(component.errorMessage()).toBeNull();
+      expect(component.isLoading()).toBeFalse();
+      expect(component.visibleOffers().length).toBe(2);
+      expect(el.querySelector('app-compare-table')).toBeTruthy();
       expect(el.querySelector('[data-testid="pos-inline-context"]')).toBeNull();
     });
 

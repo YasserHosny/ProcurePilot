@@ -47,6 +47,21 @@ Tenant isolation for the three new tables is proven inside the existing canonica
 confirm the new tables are covered by its own
 `test_rls_is_enabled_and_forced_on_every_tenant_scoped_table` meta-test.
 
+### User Story 3 manual verification (T032)
+
+I verified the purchase-request draft path by reading
+`apps/web/src/app/features/requests/request-form/request-form.component.ts`,
+`apps/web/src/app/features/requests/request-form/request-form.component.html`, and
+`apps/web/src/app/features/requests/requests-api.ts`: drafts are held in the request form's local
+reactive `form` `FormGroup`, line `FormArray`, and `existingRequest` signal, then saved only
+through `RequestsApiService.createRequest` / `updateRequest`. I also checked the POS integration
+touchpoints in `apps/web/src/app/features/pos/pos-api.ts`,
+`apps/web/src/app/features/offers/compare/compare.component.ts`, and
+`apps/web/src/app/features/catalogue/product-form/product-form.component.ts`; those paths only read
+POS connection/signal data for POS screens or inline context and never import, mutate, reset, or
+subscribe to the request draft mechanism, so a POS disconnect or 404 while drafting cannot
+interrupt or lose an in-progress purchase request draft.
+
 ## Key files once implemented
 
 - `apps/api/src/procurepilot_api/shared/token_crypto.py` — extracted from

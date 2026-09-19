@@ -1,9 +1,10 @@
+import { HttpErrorResponse } from "@angular/common/http";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { signal } from "@angular/core";
 import { MatSnackBar } from "@angular/material/snack-bar";
 import { ActivatedRoute, provideRouter } from "@angular/router";
 import { TranslateModule, TranslateService } from "@ngx-translate/core";
-import { of } from "rxjs";
+import { of, throwError } from "rxjs";
 
 import enCatalog from "../../../../../../../packages/i18n/en.json";
 import { ApiService } from "../../../core/api/api.service";
@@ -132,6 +133,44 @@ describe("ProductFormComponent (T017, T029)", () => {
 
   describe("T029: Inline POS Signals", () => {
     it("does not render inline POS signals when no signal exists for product", () => {
+      expect(fixture.nativeElement.querySelector('[data-testid="pos-inline-context"]')).toBeNull();
+    });
+
+    it("T031: renders product form fields normally when POS signals return not connected", () => {
+      const mockProd = {
+        id: "p-existing",
+        tenant_name: "Espresso Roast",
+        canonical_name: "Espresso Roast",
+        brand: "CoffeeCo",
+        variant: null,
+        gtin: null,
+        base_unit: "kg",
+        pack: { pack_count: 1, unit_size: "1.000000", base_quantity: "1.000000" },
+        preferred_supplier_id: null,
+        status: "active" as const,
+        created_at: "2026-08-20T10:00:00Z",
+      };
+      apiService.product.and.returnValue(of(mockProd));
+      posApiService.listSignals.and.returnValue(
+        throwError(
+          () =>
+            new HttpErrorResponse({
+              status: 404,
+              statusText: "Not Found",
+              error: { code: "not_found", message: "No POS connection exists" },
+            }),
+        ),
+      );
+
+      component.productId.set("p-existing");
+      (component as any).checkModeAndLoad();
+      fixture.detectChanges();
+
+      expect(component.errorMessage()).toBeNull();
+      expect(component.isLoading()).toBeFalse();
+      expect(component.form.controls["tenant_name"].value).toBe("Espresso Roast");
+      expect(component.form.controls["base_unit"].value).toBe("kg");
+      expect(fixture.nativeElement.querySelector("form.product-form")).toBeTruthy();
       expect(fixture.nativeElement.querySelector('[data-testid="pos-inline-context"]')).toBeNull();
     });
 
