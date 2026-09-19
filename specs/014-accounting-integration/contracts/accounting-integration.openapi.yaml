@@ -317,7 +317,7 @@ components:
       required: [id, provider, display_name, status, connected_at]
       properties:
         id: { type: string, format: uuid }
-        provider: { type: string, enum: [quickbooks] }
+        provider: { type: string, enum: [quickbooks, xero] }
         display_name: { type: string }
         status: { type: string, enum: [active, needs_reauth, disconnected] }
         connected_at: { type: string, format: date-time }

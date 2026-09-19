@@ -35,6 +35,7 @@ from procurepilot_api.modules.accounting.connector import (
 from procurepilot_api.modules.accounting.matching_service import MatchingService
 from procurepilot_api.modules.accounting.quickbooks_client import QuickBooksAuthError
 from procurepilot_api.modules.accounting.reconciliation_service import ReconciliationService
+from procurepilot_api.modules.accounting.xero_client import XeroAuthError
 from procurepilot_api.shared.audit import AuditEventCreate, AuditOutcome, get_audit_writer
 from procurepilot_api.shared.logging import get_trace_id
 from procurepilot_api.shared.token_crypto import decrypt_token, encrypt_token
@@ -57,6 +58,11 @@ class ConnectionNotActiveError(AccountingSyncError):
 
 class TokenRefreshFailedError(AccountingSyncError):
     """Raised when refreshing the accounting OAuth access token fails."""
+
+
+def _configured_persisted_provider(settings: Settings) -> str:
+    """Return the provider value expected in accounting_connection for this mode."""
+    return "xero" if settings.accounting_provider_mode == "xero" else "quickbooks"
 
 
 def _act_as_tenant_sync(conn: psycopg.Connection, tenant_id: UUID) -> None:
@@ -213,6 +219,17 @@ class SyncService:
         if status != "active":
             raise ConnectionNotActiveError(connection_id=connection_id, status=status)
 
+        expected_provider = _configured_persisted_provider(settings)
+        if (
+            connector is None
+            and self._connector is None
+            and conn_row["provider"] != expected_provider
+        ):
+            raise AccountingSyncError(
+                "Accounting connection provider does not match configured provider mode; "
+                "reauthorize the connection before syncing"
+            )
+
         _record_audit(
             tenant_id=tenant_id,
             action="accounting.sync_started",
@@ -241,6 +258,49 @@ class SyncService:
                     outcome="refused",
                 )
             raise
+
+    def _mark_needs_reauth(
+        self,
+        *,
+        settings: Settings,
+        tenant_id: UUID,
+        connection_id: UUID,
+        operation: str,
+        error: QuickBooksAuthError | XeroAuthError,
+    ) -> None:
+        """Transition an authenticated provider failure without echoing Xero payloads."""
+        with psycopg.connect(settings.database_url.get_secret_value()) as worker_conn:
+            _act_as_tenant_sync(worker_conn, tenant_id)
+            with worker_conn.cursor() as cur:
+                cur.execute(
+                    """
+                    update accounting_connection
+                    set status = 'needs_reauth',
+                        updated_at = now()
+                    where id = %(id)s and tenant_id = %(tenant_id)s
+                    """,
+                    {"id": connection_id, "tenant_id": tenant_id},
+                )
+            worker_conn.commit()
+
+        safe_error = (
+            "provider_authentication_failed"
+            if isinstance(error, XeroAuthError)
+            else str(error)
+        )
+        _record_audit(
+            tenant_id=tenant_id,
+            action="accounting.sync_failed",
+            target={
+                "accounting_connection_id": str(connection_id),
+                "error": safe_error,
+                "reason": f"{operation}_failed",
+            },
+            outcome="refused",
+        )
+        raise TokenRefreshFailedError(
+            f"Accounting provider authentication failed during {operation}"
+        ) from error
 
     def _run_sync_pipeline(
         self,
@@ -316,40 +376,26 @@ class SyncService:
                             },
                         )
                     sr_conn.commit()
-            except QuickBooksAuthError as exc:
-                logger.warning(
-                    "Token refresh failed for connection %s; marking needs_reauth: %s",
-                    connection_id,
-                    exc,
-                )
-                with psycopg.connect(settings.database_url.get_secret_value()) as worker_conn:
-                    _act_as_tenant_sync(worker_conn, tenant_id)
-                    with worker_conn.cursor() as cur:
-                        cur.execute(
-                            """
-                            update accounting_connection
-                            set status = 'needs_reauth',
-                                updated_at = now()
-                            where id = %(id)s and tenant_id = %(tenant_id)s
-                            """,
-                            {"id": connection_id, "tenant_id": tenant_id},
-                        )
-                    worker_conn.commit()
-
-                _record_audit(
+            except (QuickBooksAuthError, XeroAuthError) as exc:
+                self._mark_needs_reauth(
+                    settings=settings,
                     tenant_id=tenant_id,
-                    action="accounting.sync_failed",
-                    target={
-                        "accounting_connection_id": str(connection_id),
-                        "error": str(exc),
-                        "reason": "token_refresh_failed",
-                    },
-                    outcome="refused",
+                    connection_id=connection_id,
+                    operation="token_refresh",
+                    error=exc,
                 )
-                raise TokenRefreshFailedError(f"Token refresh failed: {exc}") from exc
 
         # 3. Fetch vendors outside any DB transaction
-        raw_vendors = active_connector.list_vendors()
+        try:
+            raw_vendors = active_connector.list_vendors()
+        except XeroAuthError as exc:
+            self._mark_needs_reauth(
+                settings=settings,
+                tenant_id=tenant_id,
+                connection_id=connection_id,
+                operation="vendor_fetch",
+                error=exc,
+            )
 
         # 4. Upsert vendors via tenant-scoped session
         vendor_map: dict[str, tuple[UUID, UUID | None]] = {}
@@ -375,7 +421,16 @@ class SyncService:
             since = date(1970, 1, 1)
 
         # 6. Fetch bills outside any DB transaction
-        raw_bills = active_connector.list_bills(since=since)
+        try:
+            raw_bills = active_connector.list_bills(since=since)
+        except XeroAuthError as exc:
+            self._mark_needs_reauth(
+                settings=settings,
+                tenant_id=tenant_id,
+                connection_id=connection_id,
+                operation="bill_fetch",
+                error=exc,
+            )
 
         # 7. Upsert bills and perform matching via tenant-scoped session
         with psycopg.connect(settings.database_url.get_secret_value()) as tenant_conn:

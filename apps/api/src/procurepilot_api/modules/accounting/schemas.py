@@ -32,7 +32,7 @@ class AccountingConnection(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
-    provider: Literal["quickbooks"]
+    provider: Literal["quickbooks", "xero"]
     display_name: str
     status: Literal["active", "needs_reauth", "disconnected"]
     connected_at: datetime

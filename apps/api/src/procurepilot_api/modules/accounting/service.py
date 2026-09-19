@@ -40,8 +40,22 @@ def _get_signing_secret(settings: Settings) -> bytes:
     return settings.supabase_service_role_key.get_secret_value().encode("utf-8")
 
 
+def _effective_provider(settings: Settings) -> str:
+    """Return the database provider value for the configured accounting mode.
+
+    Stub mode retains the R3.1 QuickBooks-compatible storage contract.
+    """
+    return "xero" if settings.accounting_provider_mode == "xero" else "quickbooks"
+
+
+def _configured_redirect_uri(settings: Settings) -> str | None:
+    if settings.accounting_provider_mode == "xero":
+        return settings.xero_redirect_uri
+    return settings.quickbooks_redirect_uri
+
+
 def _generate_state(settings: Settings, member: CurrentMember) -> str:
-    """Generate a signed CSRF state token containing the member/tenant context."""
+    """Generate signed state bound to the configured provider and mode."""
     payload = {
         "tenant_id": str(member.tenant_id),
         "membership_id": str(member.membership_id),
@@ -50,6 +64,8 @@ def _generate_state(settings: Settings, member: CurrentMember) -> str:
         "role": member.role.value,
         "iat": int(time.time()),
         "nonce": secrets.token_hex(16),
+        "provider": _effective_provider(settings),
+        "mode": settings.accounting_provider_mode,
     }
     data_bytes = json.dumps(payload, separators=(",", ":"), sort_keys=True).encode("utf-8")
     secret = _get_signing_secret(settings)
@@ -164,12 +180,24 @@ class ConnectionService:
         elif isinstance(state_or_member, str) and "." in state_or_member:
             resolved_state = state_or_member
 
-        if error or not code or not realm_id or not resolved_state:
+        if error or not code or not resolved_state:
             return None
 
         payload = _verify_state(self._settings, resolved_state)
         if not payload:
             logger.warning("Invalid or expired OAuth state token during callback completion")
+            return None
+
+        configured_mode = self._settings.accounting_provider_mode
+        if (
+            payload.get("mode") != configured_mode
+            or payload.get("provider") != _effective_provider(self._settings)
+        ):
+            logger.warning("OAuth state provider or mode does not match current configuration")
+            return None
+
+        is_quickbooks = _effective_provider(self._settings) == "quickbooks"
+        if is_quickbooks and not realm_id:
             return None
 
         member = CurrentMember(
@@ -180,11 +208,11 @@ class ConnectionService:
             role=MemberRole(str(payload.get("role", "owner"))),
         )
 
-        connector = get_accounting_connector(self._settings)
+        connector = get_accounting_connector(self._settings, realm_id=realm_id)
         try:
             tokens = connector.exchange_code_for_tokens(
                 code=code,
-                redirect_uri=self._settings.quickbooks_redirect_uri,
+                redirect_uri=_configured_redirect_uri(self._settings),
                 realm_id=realm_id,
             )
         except Exception as exc:
@@ -193,10 +221,16 @@ class ConnectionService:
 
         try:
             company = connector.company_info()
-            display_name = company.display_name or f"QuickBooks ({realm_id})"
+            verified_realm_id = company.realm_id
+            display_name = company.display_name or (
+                f"{_effective_provider(self._settings).title()} ({verified_realm_id})"
+            )
         except Exception as exc:
             logger.warning("Company info query failed during complete_connection: %s", exc)
-            display_name = f"QuickBooks ({realm_id})"
+            if not is_quickbooks:
+                return None
+            verified_realm_id = realm_id
+            display_name = f"{_effective_provider(self._settings).title()} ({realm_id})"
 
         try:
             with _authenticated_db(self._settings, member) as conn:
@@ -230,7 +264,7 @@ class ConnectionService:
                             connected_at
                         ) values (
                             %(tenant_id)s,
-                            'quickbooks',
+                            %(provider)s,
                             %(realm_id)s,
                             %(display_name)s,
                             %(access_token)s,
@@ -245,7 +279,8 @@ class ConnectionService:
                         """,
                         {
                             "tenant_id": member.tenant_id,
-                            "realm_id": realm_id,
+                            "provider": _effective_provider(self._settings),
+                            "realm_id": verified_realm_id,
                             "display_name": display_name,
                             "access_token": encrypt_token(
                                 tokens.access_token,
@@ -422,4 +457,3 @@ def _decode_cursor(cursor: str | None) -> int:
 
 def get_connection_service() -> ConnectionService:
     return ConnectionService()
-
