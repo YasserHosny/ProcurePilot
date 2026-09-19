@@ -22,6 +22,7 @@ from procurepilot_api.modules.landed_cost.router import router as landed_cost_ro
 from procurepilot_api.modules.matching.router import router as matching_router
 from procurepilot_api.modules.members.router import router as members_router
 from procurepilot_api.modules.offers.router import router as offers_router
+from procurepilot_api.modules.orders.router import router as orders_router
 from procurepilot_api.modules.organisation.router import router as organisation_router
 from procurepilot_api.modules.pos.router import router as pos_router
 from procurepilot_api.modules.quotations.router import router as quotations_router
@@ -70,6 +71,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(landed_cost_router, prefix=API_PREFIX)
     app.include_router(offers_router, prefix=API_PREFIX)
     app.include_router(organisation_router, prefix=API_PREFIX)
+    app.include_router(orders_router, prefix=API_PREFIX)
     app.include_router(requests_router, prefix=API_PREFIX)
     app.include_router(alerts_router, prefix=API_PREFIX)
     app.include_router(savings_router, prefix=API_PREFIX)

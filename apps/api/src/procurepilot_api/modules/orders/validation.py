@@ -63,8 +63,8 @@ def build_lifecycle_summary(
     receipts: Iterable[DeliveryReceipt] = (),
 ) -> LifecycleSummary:
     """Build a deterministic evidence summary; absent evidence stays pending, not zero."""
-    confirmation_list = tuple(confirmations)
-    receipt_list = tuple(receipts)
+    confirmation_list = tuple(sorted(confirmations, key=lambda item: (item.confirmed_at, item.id)))
+    receipt_list = tuple(sorted(receipts, key=lambda item: (item.receipt_date, item.id)))
     receipt_ids = [receipt.id for receipt in receipt_list]
     if len(set(receipt_ids)) != len(receipt_ids):
         raise ValueError("lifecycle receipts must have unique identifiers")
@@ -73,7 +73,9 @@ def build_lifecycle_summary(
     for receipt in receipt_list:
         validate_receipt_against_order(order, receipt)
 
-    latest_confirmation = max(confirmation_list, key=lambda item: item.confirmed_at, default=None)
+    latest_confirmation = max(
+        confirmation_list, key=lambda item: (item.confirmed_at, item.id), default=None
+    )
     confirmed_by_line: dict[UUID, Decimal] = {}
     if latest_confirmation is not None:
         confirmed_by_line = {
@@ -103,10 +105,7 @@ def build_lifecycle_summary(
                 source_ids=tuple(
                     receipt.id
                     for receipt in receipt_list
-                    if any(
-                        line.purchase_order_line_id == order_line.id
-                        for line in receipt.lines
-                    )
+                    if any(line.purchase_order_line_id == order_line.id for line in receipt.lines)
                 ),
             )
             if order_line.id in received_by_line
@@ -135,10 +134,14 @@ def build_lifecycle_summary(
     confirmation_state = "available" if latest_confirmation is not None else "pending"
     receipt_state = "available" if receipt_list else "pending"
     status = order.status
-    if order.status not in {"cancelled", "closed"} and receipt_list and all(
-        summary.received.quantity is not None
-        and summary.received.quantity >= summary.ordered_quantity
-        for summary in summaries
+    if (
+        order.status not in {"cancelled", "closed"}
+        and receipt_list
+        and all(
+            summary.received.quantity is not None
+            and summary.received.quantity >= summary.ordered_quantity
+            for summary in summaries
+        )
     ):
         status = "received"
     elif order.status not in {"cancelled", "closed"} and receipt_list:

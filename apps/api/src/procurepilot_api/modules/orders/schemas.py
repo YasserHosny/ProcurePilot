@@ -39,9 +39,20 @@ def _require_aware(value: datetime) -> datetime:
     return value
 
 
+def _require_scale(value: Decimal, places: int, field: str) -> Decimal:
+    exponent = value.as_tuple().exponent
+    if isinstance(exponent, int) and exponent < -places:
+        raise ValueError(f"{field} supports at most {places} fractional places")
+    return value
+
+
 class Money(StrictModel):
     amount: Decimal = Field(ge=0)
     currency: str = Field(min_length=3, max_length=3, pattern=r"^[A-Z]{3}$")
+
+    _validate_scale = field_validator("amount")(
+        lambda value: _require_scale(value, 4, "money amount")
+    )
 
 
 class PurchaseOrderLine(StrictModel):
@@ -54,6 +65,10 @@ class PurchaseOrderLine(StrictModel):
     unit_price: Money
     tax: Money
     line_total: Money
+
+    _validate_quantity_scale = field_validator("ordered_quantity")(
+        lambda value: _require_scale(value, 6, "ordered quantity")
+    )
 
     @model_validator(mode="after")
     def validate_currency_relationships(self) -> PurchaseOrderLine:
@@ -112,6 +127,10 @@ class SupplierConfirmationLine(StrictModel):
     confirmed_quantity: Decimal = Field(ge=0)
     confirmed_unit_price: Money | None = None
 
+    _validate_quantity_scale = field_validator("confirmed_quantity")(
+        lambda value: _require_scale(value, 6, "confirmed quantity")
+    )
+
 
 class SupplierConfirmation(StrictModel):
     id: UUID
@@ -141,6 +160,10 @@ class DeliveryReceiptLine(StrictModel):
     id: UUID
     purchase_order_line_id: UUID
     received_quantity: Decimal = Field(ge=0)
+
+    _validate_quantity_scale = field_validator("received_quantity")(
+        lambda value: _require_scale(value, 6, "received quantity")
+    )
 
 
 class DeliveryReceipt(StrictModel):
@@ -215,3 +238,94 @@ class OrderEvidenceProjection(StrictModel):
     confirmation: SupplierConfirmation | None = None
     receipts: tuple[DeliveryReceipt, ...] = ()
     lifecycle: LifecycleSummary
+
+
+class PurchaseOrderLineInput(StrictModel):
+    line_number: int = Field(gt=0)
+    workspace_product_id: UUID | None = None
+    description: str = Field(min_length=1, max_length=500)
+    ordered_quantity: Decimal = Field(ge=0)
+    base_unit: str = Field(min_length=1, max_length=100)
+    unit_price: Money
+    tax: Money
+    line_total: Money
+
+    _validate_quantity_scale = field_validator("ordered_quantity")(
+        lambda value: _require_scale(value, 6, "ordered quantity")
+    )
+
+
+class PurchaseOrderCreate(StrictModel):
+    order_number: str = Field(min_length=1, max_length=100)
+    supplier_id: UUID
+    order_date: date
+    expected_delivery_date: date | None = None
+    total: Money
+    tax: Money
+    source_kind: SourceKind = "manual"
+    source_reference: str = Field(min_length=1, max_length=500)
+    source_hash: str | None = None
+    lines: tuple[PurchaseOrderLineInput, ...] = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def validate_totals(self) -> PurchaseOrderCreate:
+        if (
+            self.expected_delivery_date is not None
+            and self.expected_delivery_date < self.order_date
+        ):
+            raise ValueError("expected delivery date cannot precede order date")
+        if self.tax.amount != 0 and self.tax.currency != self.total.currency:
+            raise ValueError("non-zero order tax must use the total currency")
+        if any(line.line_total.currency != self.total.currency for line in self.lines):
+            raise ValueError("all line totals must use the order currency")
+        if sum((line.line_total.amount for line in self.lines), Decimal("0")) != self.total.amount:
+            raise ValueError("order total must equal the sum of line totals")
+        line_numbers = [line.line_number for line in self.lines]
+        if len(set(line_numbers)) != len(line_numbers):
+            raise ValueError("order line numbers must be unique")
+        return self
+
+
+class SupplierConfirmationLineInput(StrictModel):
+    purchase_order_line_id: UUID
+    confirmed_quantity: Decimal = Field(ge=0)
+    confirmed_unit_price: Money | None = None
+
+    _validate_quantity_scale = field_validator("confirmed_quantity")(
+        lambda value: _require_scale(value, 6, "confirmed quantity")
+    )
+
+
+class SupplierConfirmationCreate(StrictModel):
+    supplier_reference: str = Field(min_length=1, max_length=200)
+    confirmed_at: datetime
+    expected_delivery_date: date | None = None
+    source_kind: SourceKind = "manual"
+    source_reference: str = Field(min_length=1, max_length=500)
+    source_hash: str | None = None
+    lines: tuple[SupplierConfirmationLineInput, ...] = Field(min_length=1)
+
+    _validate_datetime = field_validator("confirmed_at")(_require_aware)
+
+
+class DeliveryReceiptLineInput(StrictModel):
+    purchase_order_line_id: UUID
+    received_quantity: Decimal = Field(ge=0)
+
+    _validate_quantity_scale = field_validator("received_quantity")(
+        lambda value: _require_scale(value, 6, "received quantity")
+    )
+
+
+class DeliveryReceiptCreate(StrictModel):
+    receipt_reference: str = Field(min_length=1, max_length=200)
+    receipt_date: date
+    source_kind: SourceKind = "manual"
+    source_reference: str = Field(min_length=1, max_length=500)
+    source_hash: str | None = None
+    lines: tuple[DeliveryReceiptLineInput, ...] = Field(min_length=1)
+
+
+class PurchaseOrderList(StrictModel):
+    items: tuple[PurchaseOrder, ...]
+    next_cursor: str | None = None

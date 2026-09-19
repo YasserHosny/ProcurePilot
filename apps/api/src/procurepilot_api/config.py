@@ -236,6 +236,9 @@ class Settings(BaseSettings):
     rate_limit_accounting_discrepancy_resolve: str = Field(
         default="30/minute", validation_alias="RATE_LIMIT_ACCOUNTING_DISCREPANCY_RESOLVE"
     )
+    rate_limit_order_mutation: str = Field(
+        default="30/minute", validation_alias="RATE_LIMIT_ORDER_MUTATION"
+    )
 
     # POS & inventory integration (R3.2, 015-pos-inventory-integration):
     # Provider mode defaults to "stub" so tests, local development, and CI can run
