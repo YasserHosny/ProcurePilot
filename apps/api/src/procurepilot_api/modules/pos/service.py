@@ -26,11 +26,18 @@ from uuid import UUID
 import psycopg
 from psycopg.rows import dict_row
 
+from typing import Literal
+
 from procurepilot_api.config import Settings, get_settings
 from procurepilot_api.deps import CurrentMember
-from procurepilot_api.errors import ConflictError, NotFoundError
+from procurepilot_api.errors import ConflictError, NotFoundError, UnprocessableEntityError
 from procurepilot_api.modules.auth.jwt import MemberRole
 from procurepilot_api.modules.offers.service import _authenticated_db
+from procurepilot_api.modules.pos.schemas import (
+    PosProductMatch,
+    SyncedProductSignal,
+    SyncedProductSignalList,
+)
 from procurepilot_api.modules.pos.connector import (
     OAuthTokens,
     PosConnector,
@@ -521,6 +528,178 @@ class ConnectionService:
 
         raise RuntimeError("Connector does not support token refresh or refresh token is missing")
 
+    def list_signals(
+        self,
+        member: CurrentMember,
+        *,
+        cursor: str | None = None,
+        limit: int = 50,
+        match_status: Literal["matched", "unmatched"] | None = None,
+        workspace_product_id: UUID | None = None,
+    ) -> SyncedProductSignalList:
+        """Return cursor-paginated list of synced product signals for the member's tenant (T020)."""
+        offset = _decode_cursor(cursor)
+        fetch_limit = min(max(limit, 1), 100)
+
+        clauses = ["s.tenant_id = %(tenant_id)s"]
+        params: dict[str, object] = {
+            "tenant_id": member.tenant_id,
+            "offset": offset,
+            "limit": fetch_limit + 1,
+        }
+
+        if match_status == "matched":
+            clauses.append("m.id is not null")
+        elif match_status == "unmatched":
+            clauses.append("m.id is null")
+
+        if workspace_product_id is not None:
+            clauses.append("m.workspace_product_id = %(workspace_product_id)s")
+            params["workspace_product_id"] = workspace_product_id
+
+        where_sql = " and ".join(clauses)
+
+        query = f"""
+            select
+                s.id,
+                s.external_item_name,
+                (m.id is not null) as matched,
+                m.workspace_product_id as matched_workspace_product_id,
+                s.stock_on_hand,
+                s.stock_synced_at,
+                s.sales_velocity_per_day,
+                s.velocity_window_days,
+                s.velocity_computed_at
+            from synced_product_signal s
+            left join pos_product_match m
+                on m.tenant_id = s.tenant_id and m.synced_product_signal_id = s.id
+            where {where_sql}
+            order by s.created_at desc, s.id desc
+            offset %(offset)s limit %(limit)s
+        """
+
+        with _authenticated_db(self._settings, member) as conn:
+            with conn.cursor(row_factory=dict_row) as cur:
+                cur.execute(query, params)
+                rows = [dict(r) for r in cur.fetchall()]
+
+        has_more = len(rows) > fetch_limit
+        page_rows = rows[:fetch_limit]
+        next_cursor = _encode_cursor(offset + fetch_limit) if has_more else None
+
+        items = [SyncedProductSignal.model_validate(r) for r in page_rows]
+        return SyncedProductSignalList(items=items, next_cursor=next_cursor)
+
+    def manual_match(
+        self,
+        member: CurrentMember,
+        signal_id: UUID,
+        workspace_product_id: UUID,
+        *,
+        bearer_token: str | None = None,
+    ) -> PosProductMatch:
+        """Manually link an unmatched signal to a workspace product (FR-006, T021)."""
+        with _authenticated_db(self._settings, member) as conn:
+            with conn.cursor(row_factory=dict_row) as cur:
+                # 1. Verify signal exists in caller's tenant
+                cur.execute(
+                    """
+                    select id from synced_product_signal
+                    where id = %(signal_id)s and tenant_id = %(tenant_id)s
+                    """,
+                    {"signal_id": signal_id, "tenant_id": member.tenant_id},
+                )
+                if cur.fetchone() is None:
+                    raise NotFoundError(
+                        details={"resource": "synced_product_signal", "id": str(signal_id)}
+                    )
+
+                # 2. Verify workspace product exists in caller's tenant
+                cur.execute(
+                    """
+                    select id from workspace_product
+                    where id = %(wp_id)s and tenant_id = %(tenant_id)s
+                    """,
+                    {"wp_id": workspace_product_id, "tenant_id": member.tenant_id},
+                )
+                if cur.fetchone() is None:
+                    raise NotFoundError(
+                        details={"resource": "workspace_product", "id": str(workspace_product_id)}
+                    )
+
+                # 3. Check if signal or product is already matched
+                cur.execute(
+                    """
+                    select id from pos_product_match
+                    where tenant_id = %(tenant_id)s
+                      and (synced_product_signal_id = %(signal_id)s or workspace_product_id = %(wp_id)s)
+                    limit 1
+                    """,
+                    {
+                        "tenant_id": member.tenant_id,
+                        "signal_id": signal_id,
+                        "wp_id": workspace_product_id,
+                    },
+                )
+                if cur.fetchone() is not None:
+                    raise ConflictError(
+                        details={"resource": "pos_product_match", "reason": "already_matched"}
+                    )
+
+                # 4. Insert manual match
+                try:
+                    cur.execute(
+                        """
+                        insert into pos_product_match (
+                            tenant_id,
+                            synced_product_signal_id,
+                            workspace_product_id,
+                            match_method,
+                            matched_by,
+                            matched_at
+                        ) values (
+                            %(tenant_id)s,
+                            %(signal_id)s,
+                            %(wp_id)s,
+                            'manual',
+                            %(matched_by)s,
+                            now()
+                        )
+                        returning id, synced_product_signal_id, workspace_product_id, match_method, matched_at
+                        """,
+                        {
+                            "tenant_id": member.tenant_id,
+                            "signal_id": signal_id,
+                            "wp_id": workspace_product_id,
+                            "matched_by": member.membership_id,
+                        },
+                    )
+                    row = dict(cur.fetchone())
+                    conn.commit()
+                except psycopg.errors.UniqueViolation as exc:
+                    raise ConflictError(
+                        details={"resource": "pos_product_match", "reason": "already_matched"}
+                    ) from exc
+
+        return PosProductMatch.model_validate(row)
+
+
+def _decode_cursor(cursor: str | None) -> int:
+    if cursor is None:
+        return 0
+    try:
+        offset = int(base64.urlsafe_b64decode(cursor.encode("ascii")))
+        if offset < 0:
+            raise UnprocessableEntityError(details={"cursor": "invalid"})
+        return offset
+    except (ValueError, UnicodeError) as exc:
+        raise UnprocessableEntityError(details={"cursor": "invalid"}) from exc
+
+
+def _encode_cursor(offset: int) -> str:
+    return base64.urlsafe_b64encode(str(offset).encode("ascii")).decode("ascii")
+
 
 def get_connection_service() -> ConnectionService:
     return ConnectionService()
+
