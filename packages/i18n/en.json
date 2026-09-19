@@ -2884,6 +2884,54 @@
       "disconnectFailed": "Failed to disconnect POS connection. Please try again.",
       "connectedSuccess": "POS account connected successfully.",
       "connectFailed": "POS authorization failed or was declined. Please try again."
+    },
+    "signals": {
+      "title": "Synced Product Signals",
+      "subtitle": "Review and link synced Square items to catalogue products, and view current sales velocity and stock levels.",
+      "syncNow": "Sync now",
+      "syncing": "Syncing...",
+      "syncSuccess": "POS synchronization enqueued successfully.",
+      "syncAlreadyRunning": "A POS synchronization is already in progress.",
+      "syncNoConnection": "No active POS connection found.",
+      "syncFailed": "Failed to trigger POS sync. Please try again.",
+      "loadError": "Failed to load synced signals.",
+      "unmatched": {
+        "title": "Unmatched Signals",
+        "description": "Square catalog items that could not be automatically matched to a catalogue product.",
+        "empty": "No unmatched signals to review.",
+        "itemName": "Square Item",
+        "stockOnHand": "Stock on Hand",
+        "salesVelocity": "Sales Velocity",
+        "selectProduct": "Select catalogue product",
+        "matchAction": "Match to Product",
+        "matching": "Matching...",
+        "matchSuccess": "Signal matched to product successfully.",
+        "matchFailed": "Failed to match signal to product.",
+        "alreadyMatched": "Signal or product is already matched."
+      },
+      "matched": {
+        "title": "Matched Signals",
+        "description": "Square items linked to catalogue products for sales velocity and stock tracking.",
+        "empty": "No matched signals yet.",
+        "itemName": "Square Item",
+        "matchedProduct": "Catalogue Product",
+        "stockOnHand": "Stock on Hand",
+        "salesVelocity": "Sales Velocity",
+        "status": "Matched"
+      },
+      "noStock": "No stock data",
+      "noVelocity": "No velocity data"
+    },
+    "inline": {
+      "stockOnHand": "Stock on hand",
+      "salesVelocity": "Sales velocity",
+      "lastSynced": "Last synced {{time}}",
+      "neverSynced": "Never synced",
+      "windowDays": "{{days}}-day avg",
+      "provisionalVelocity": "≈{{velocity}} units/day · based on {{observed}} of {{days}} days",
+      "fullVelocity": "{{velocity}} units/day · {{days}}-day avg",
+      "provisionalBadge": "Provisional",
+      "unitsPerDay": "units/day"
     }
   }
 }

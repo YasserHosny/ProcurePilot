@@ -1,0 +1,246 @@
+<div class="pos-signals-container">
+  <div class="header-section">
+    <div class="title-group">
+      <h1 class="page-title">{{ 'pos.signals.title' | translate }}</h1>
+      <p class="page-subtitle">{{ 'pos.signals.subtitle' | translate }}</p>
+    </div>
+    <div class="header-actions">
+      <button
+        mat-flat-button
+        color="primary"
+        type="button"
+        class="sync-btn"
+        [disabled]="isSyncing()"
+        (click)="triggerSync()"
+        data-testid="sync-btn"
+      >
+        @if (isSyncing()) {
+          <mat-spinner diameter="18" [attr.aria-label]="'pos.signals.syncing' | translate" />
+          <span>{{ 'pos.signals.syncing' | translate }}</span>
+        } @else {
+          <mat-icon aria-hidden="true">sync</mat-icon>
+          <span>{{ 'pos.signals.syncNow' | translate }}</span>
+        }
+      </button>
+    </div>
+  </div>
+
+  @if (isLoading()) {
+    <div class="loading-wrap" role="status">
+      <mat-spinner diameter="32" [attr.aria-label]="'common.loading' | translate" />
+    </div>
+  } @else if (errorMessage()) {
+    <mat-card class="error-card" role="alert" data-testid="error-card">
+      <div class="error-content">
+        <mat-icon class="error-icon" aria-hidden="true">error_outline</mat-icon>
+        <div class="error-text">
+          <p class="error-message">{{ errorMessage() }}</p>
+        </div>
+      </div>
+      <div class="error-actions">
+        <button mat-flat-button color="primary" type="button" (click)="loadData()" data-testid="retry-btn">
+          {{ 'common.retry' | translate }}
+        </button>
+      </div>
+    </mat-card>
+  } @else {
+    <div class="signals-content">
+      <!-- Section 1: Unmatched Signals -->
+      <mat-card class="signals-card" data-testid="unmatched-section">
+        <div class="card-header">
+          <div class="header-titles">
+            <h2 class="card-title">{{ 'pos.signals.unmatched.title' | translate }}</h2>
+            <p class="card-subtitle">{{ 'pos.signals.unmatched.description' | translate }}</p>
+          </div>
+          <span class="count-badge" data-testid="unmatched-count">{{ unmatchedSignals().length }}</span>
+        </div>
+
+        @if (unmatchedSignals().length === 0) {
+          <div class="empty-state" data-testid="unmatched-empty">
+            <mat-icon class="empty-icon" aria-hidden="true">check_circle_outline</mat-icon>
+            <p class="empty-text">{{ 'pos.signals.unmatched.empty' | translate }}</p>
+          </div>
+        } @else {
+          <div class="table-container" data-testid="unmatched-list">
+            <table mat-table [dataSource]="unmatchedSignals()" class="signals-table">
+              <!-- Item Name Column -->
+              <ng-container matColumnDef="externalItemName">
+                <th mat-header-cell *matHeaderCellDef>{{ 'pos.signals.unmatched.itemName' | translate }}</th>
+                <td mat-cell *matCellDef="let signal" class="item-cell" data-testid="unmatched-item-name">
+                  <span class="item-name">{{ signal.external_item_name }}</span>
+                </td>
+              </ng-container>
+
+              <!-- Stock On Hand Column -->
+              <ng-container matColumnDef="stockOnHand">
+                <th mat-header-cell *matHeaderCellDef>{{ 'pos.signals.unmatched.stockOnHand' | translate }}</th>
+                <td mat-cell *matCellDef="let signal" class="stock-cell">
+                  @if (signal.stock_on_hand !== null) {
+                    <span class="signal-value">{{ signal.stock_on_hand }}</span>
+                    @if (signal.stock_synced_at) {
+                      <span class="time-hint">{{ 'pos.inline.lastSynced' | translate:{ time: (signal.stock_synced_at | formatDate:'relative') } }}</span>
+                    }
+                  } @else {
+                    <span class="placeholder-value">—</span>
+                  }
+                </td>
+              </ng-container>
+
+              <!-- Sales Velocity Column -->
+              <ng-container matColumnDef="salesVelocity">
+                <th mat-header-cell *matHeaderCellDef>{{ 'pos.signals.unmatched.salesVelocity' | translate }}</th>
+                <td mat-cell *matCellDef="let signal" class="velocity-cell">
+                  @if (signal.sales_velocity_per_day !== null) {
+                    @if (signal.velocity_window_days_observed !== null && signal.velocity_window_days_observed !== undefined && signal.velocity_window_days_observed < signal.velocity_window_days) {
+                      <span class="provisional-tag">{{ 'pos.inline.provisionalBadge' | translate }}</span>
+                      <span class="signal-value">
+                        {{ 'pos.inline.provisionalVelocity' | translate:{ velocity: signal.sales_velocity_per_day, observed: signal.velocity_window_days_observed, days: signal.velocity_window_days } }}
+                      </span>
+                    } @else {
+                      <span class="signal-value">
+                        {{ 'pos.inline.fullVelocity' | translate:{ velocity: signal.sales_velocity_per_day, days: signal.velocity_window_days } }}
+                      </span>
+                    }
+                  } @else {
+                    <span class="placeholder-value">—</span>
+                  }
+                </td>
+              </ng-container>
+
+              <!-- Actions Column -->
+              <ng-container matColumnDef="actions">
+                <th mat-header-cell *matHeaderCellDef>{{ 'pos.signals.unmatched.matchAction' | translate }}</th>
+                <td mat-cell *matCellDef="let signal" class="actions-cell">
+                  <div class="match-control-group">
+                    <mat-form-field appearance="outline" class="picker-field" subscriptSizing="dynamic">
+                      <mat-select
+                        [placeholder]="'pos.signals.unmatched.selectProduct' | translate"
+                        [value]="selectedProducts()[signal.id] || null"
+                        (selectionChange)="onProductSelect(signal.id, $event.value)"
+                        data-testid="product-picker"
+                      >
+                        @for (prod of products(); track prod.id) {
+                          <mat-option [value]="prod.id">
+                            {{ prod.tenant_name }}@if (prod.variant) { ({{ prod.variant }})}
+                          </mat-option>
+                        }
+                      </mat-select>
+                    </mat-form-field>
+                    <button
+                      mat-flat-button
+                      color="primary"
+                      type="button"
+                      class="match-action-btn"
+                      [disabled]="!selectedProducts()[signal.id] || isMatching()[signal.id]"
+                      (click)="matchSignal(signal.id)"
+                      data-testid="match-btn"
+                    >
+                      @if (isMatching()[signal.id]) {
+                        <mat-spinner diameter="16" [attr.aria-label]="'pos.signals.unmatched.matching' | translate" />
+                      } @else {
+                        <mat-icon aria-hidden="true">link</mat-icon>
+                      }
+                      <span>{{ 'pos.signals.unmatched.matchAction' | translate }}</span>
+                    </button>
+                  </div>
+                </td>
+              </ng-container>
+
+              <tr mat-header-row *matHeaderRowDef="unmatchedColumns"></tr>
+              <tr mat-row *matRowDef="let row; columns: unmatchedColumns" data-testid="unmatched-row"></tr>
+            </table>
+          </div>
+        }
+      </mat-card>
+
+      <!-- Section 2: Matched Signals -->
+      <mat-card class="signals-card" data-testid="matched-section">
+        <div class="card-header">
+          <div class="header-titles">
+            <h2 class="card-title">{{ 'pos.signals.matched.title' | translate }}</h2>
+            <p class="card-subtitle">{{ 'pos.signals.matched.description' | translate }}</p>
+          </div>
+          <span class="count-badge" data-testid="matched-count">{{ matchedSignals().length }}</span>
+        </div>
+
+        @if (matchedSignals().length === 0) {
+          <div class="empty-state" data-testid="matched-empty">
+            <mat-icon class="empty-icon" aria-hidden="true">inbox</mat-icon>
+            <p class="empty-text">{{ 'pos.signals.matched.empty' | translate }}</p>
+          </div>
+        } @else {
+          <div class="table-container" data-testid="matched-list">
+            <table mat-table [dataSource]="matchedSignals()" class="signals-table">
+              <!-- Item Name Column -->
+              <ng-container matColumnDef="externalItemName">
+                <th mat-header-cell *matHeaderCellDef>{{ 'pos.signals.matched.itemName' | translate }}</th>
+                <td mat-cell *matCellDef="let signal" class="item-cell" data-testid="matched-item-name">
+                  <span class="item-name">{{ signal.external_item_name }}</span>
+                </td>
+              </ng-container>
+
+              <!-- Matched Catalogue Product Column -->
+              <ng-container matColumnDef="matchedProduct">
+                <th mat-header-cell *matHeaderCellDef>{{ 'pos.signals.matched.matchedProduct' | translate }}</th>
+                <td mat-cell *matCellDef="let signal" class="product-cell" data-testid="matched-product-name">
+                  <span class="matched-product-name">
+                    {{ getProductName(signal.matched_workspace_product_id) }}
+                  </span>
+                </td>
+              </ng-container>
+
+              <!-- Stock On Hand Column -->
+              <ng-container matColumnDef="stockOnHand">
+                <th mat-header-cell *matHeaderCellDef>{{ 'pos.signals.matched.stockOnHand' | translate }}</th>
+                <td mat-cell *matCellDef="let signal" class="stock-cell">
+                  @if (signal.stock_on_hand !== null) {
+                    <span class="signal-value">{{ signal.stock_on_hand }}</span>
+                    @if (signal.stock_synced_at) {
+                      <span class="time-hint">{{ 'pos.inline.lastSynced' | translate:{ time: (signal.stock_synced_at | formatDate:'relative') } }}</span>
+                    }
+                  } @else {
+                    <span class="placeholder-value">—</span>
+                  }
+                </td>
+              </ng-container>
+
+              <!-- Sales Velocity Column -->
+              <ng-container matColumnDef="salesVelocity">
+                <th mat-header-cell *matHeaderCellDef>{{ 'pos.signals.matched.salesVelocity' | translate }}</th>
+                <td mat-cell *matCellDef="let signal" class="velocity-cell">
+                  @if (signal.sales_velocity_per_day !== null) {
+                    @if (signal.velocity_window_days_observed !== null && signal.velocity_window_days_observed !== undefined && signal.velocity_window_days_observed < signal.velocity_window_days) {
+                      <span class="provisional-tag">{{ 'pos.inline.provisionalBadge' | translate }}</span>
+                      <span class="signal-value">
+                        {{ 'pos.inline.provisionalVelocity' | translate:{ velocity: signal.sales_velocity_per_day, observed: signal.velocity_window_days_observed, days: signal.velocity_window_days } }}
+                      </span>
+                    } @else {
+                      <span class="signal-value">
+                        {{ 'pos.inline.fullVelocity' | translate:{ velocity: signal.sales_velocity_per_day, days: signal.velocity_window_days } }}
+                      </span>
+                    }
+                  } @else {
+                    <span class="placeholder-value">—</span>
+                  }
+                </td>
+              </ng-container>
+
+              <!-- Status Badge Column -->
+              <ng-container matColumnDef="status">
+                <th mat-header-cell *matHeaderCellDef>{{ 'pos.signals.matched.status' | translate }}</th>
+                <td mat-cell *matCellDef="let signal" class="status-cell">
+                  <span class="status-badge status-matched">
+                    {{ 'pos.signals.matched.status' | translate }}
+                  </span>
+                </td>
+              </ng-container>
+
+              <tr mat-header-row *matHeaderRowDef="matchedColumns"></tr>
+              <tr mat-row *matRowDef="let row; columns: matchedColumns" data-testid="matched-row"></tr>
+            </table>
+          </div>
+        }
+      </mat-card>
+    </div>
+  }
+</div>
