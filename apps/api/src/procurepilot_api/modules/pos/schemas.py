@@ -75,6 +75,7 @@ class SyncedProductSignal(BaseModel):
     stock_synced_at: datetime | None = None
     sales_velocity_per_day: str | None = None
     velocity_window_days: int
+    velocity_window_days_observed: int | None = None
     velocity_computed_at: datetime | None = None
 
     @field_validator("stock_on_hand", "sales_velocity_per_day", mode="before")

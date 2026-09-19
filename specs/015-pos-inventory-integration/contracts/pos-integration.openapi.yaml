@@ -327,10 +327,6 @@ components:
 
     SyncedProductSignal:
       type: object
-      description: >
-        Current API response model. Decimal quantities are serialized as strings. The database
-        stores velocity_window_days_observed for provisional-window disclosure, but the current
-        FastAPI response model does not expose that field.
       required: [id, external_item_name, matched, velocity_window_days]
       properties:
         id: { type: string, format: uuid }
@@ -341,6 +337,7 @@ components:
         stock_synced_at: { type: string, format: date-time, nullable: true }
         sales_velocity_per_day: { type: string, nullable: true, description: "Decimal string, never a float" }
         velocity_window_days: { type: integer }
+        velocity_window_days_observed: { type: integer, nullable: true }
         velocity_computed_at: { type: string, format: date-time, nullable: true }
 
     SyncedProductSignalList:

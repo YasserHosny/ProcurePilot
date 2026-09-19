@@ -161,6 +161,8 @@ def test_full_sync_creates_signals_with_correct_fields(
         cold_brew = signals.get("Cold Brew Concentrate 1L Bottle")
         assert cold_brew is not None
         assert cold_brew["sales_velocity_per_day"] is not None
+        assert cold_brew["velocity_window_days_observed"] is not None
+        assert cold_brew["velocity_window_days_observed"] < cold_brew["velocity_window_days"]
 
         # Check DB directly for observed window
         with psycopg.connect(TEST_DATABASE_URL or "", row_factory=dict_row) as db_conn:

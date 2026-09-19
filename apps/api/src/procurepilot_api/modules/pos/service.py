@@ -568,6 +568,7 @@ class ConnectionService:
                 s.stock_synced_at,
                 s.sales_velocity_per_day,
                 s.velocity_window_days,
+                s.velocity_window_days_observed,
                 s.velocity_computed_at
             from synced_product_signal s
             left join pos_product_match m
@@ -703,4 +704,3 @@ def _encode_cursor(offset: int) -> str:
 
 def get_connection_service() -> ConnectionService:
     return ConnectionService()
-
