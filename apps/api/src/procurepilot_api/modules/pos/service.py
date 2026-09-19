@@ -21,27 +21,26 @@ import secrets
 import time
 from collections.abc import Generator
 from contextlib import contextmanager
+from typing import Literal
 from uuid import UUID
 
 import psycopg
 from psycopg.rows import dict_row
-
-from typing import Literal
 
 from procurepilot_api.config import Settings, get_settings
 from procurepilot_api.deps import CurrentMember
 from procurepilot_api.errors import ConflictError, NotFoundError, UnprocessableEntityError
 from procurepilot_api.modules.auth.jwt import MemberRole
 from procurepilot_api.modules.offers.service import _authenticated_db
-from procurepilot_api.modules.pos.schemas import (
-    PosProductMatch,
-    SyncedProductSignal,
-    SyncedProductSignalList,
-)
 from procurepilot_api.modules.pos.connector import (
     OAuthTokens,
     PosConnector,
     get_pos_connector,
+)
+from procurepilot_api.modules.pos.schemas import (
+    PosProductMatch,
+    SyncedProductSignal,
+    SyncedProductSignalList,
 )
 from procurepilot_api.modules.pos.square_client import SquareAuthError
 from procurepilot_api.shared.audit import AuditEventCreate, get_audit_writer
@@ -632,7 +631,8 @@ class ConnectionService:
                     """
                     select id from pos_product_match
                     where tenant_id = %(tenant_id)s
-                      and (synced_product_signal_id = %(signal_id)s or workspace_product_id = %(wp_id)s)
+                      and (synced_product_signal_id = %(signal_id)s
+                           or workspace_product_id = %(wp_id)s)
                     limit 1
                     """,
                     {
@@ -665,7 +665,8 @@ class ConnectionService:
                             %(matched_by)s,
                             now()
                         )
-                        returning id, synced_product_signal_id, workspace_product_id, match_method, matched_at
+                        returning id, synced_product_signal_id, workspace_product_id,
+                                  match_method, matched_at
                         """,
                         {
                             "tenant_id": member.tenant_id,

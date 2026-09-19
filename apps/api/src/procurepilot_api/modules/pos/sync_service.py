@@ -134,7 +134,7 @@ class SyncService:
 
     def sync(
         self,
-        connection_or_settings: Any = None,
+        connection_or_settings: object | None = None,
         *,
         tenant_id: UUID | None = None,
         connection_id: UUID | None = None,
@@ -169,10 +169,10 @@ class SyncService:
                 )
             else:
                 resolved_tenant_id = resolved_tenant_id or UUID(
-                    str(getattr(connection_or_settings, "tenant_id"))
+                    str(connection_or_settings.tenant_id)
                 )
                 resolved_connection_id = resolved_connection_id or UUID(
-                    str(getattr(connection_or_settings, "id"))
+                    str(connection_or_settings.id)
                 )
 
         if resolved_tenant_id is None or resolved_connection_id is None:
@@ -368,7 +368,11 @@ class SyncService:
                 "external_item_id": inv.external_item_id,
                 "external_item_name": inv.item_name or inv.external_item_id,
                 "stock_on_hand": inv.stock_on_hand,
-                "stock_synced_at": now_ts if inv.stock_on_hand is not None or inv.item_name else now_ts,
+                # Stamped whenever the inventory endpoint returned this item at all — even a
+                # definitive "no quantity tracked" (stock_on_hand is None) is a real sync result,
+                # not an absent one. Unused downstream unless stock_on_hand is also non-null
+                # (FR-005: never label a fabricated/missing figure as freshly synced).
+                "stock_synced_at": now_ts,
                 "txns": [],
             }
 
@@ -392,7 +396,7 @@ class SyncService:
         with psycopg.connect(settings.database_url.get_secret_value()) as tenant_conn:
             _act_as_tenant_sync(tenant_conn, tenant_id)
             with tenant_conn.cursor(row_factory=dict_row) as cur:
-                for item_id, item_data in items_map.items():
+                for item_data in items_map.values():
                     txns: list[RawSalesTransaction] = item_data["txns"]
                     if txns:
                         total_qty = sum((t.quantity for t in txns), Decimal("0"))
@@ -475,6 +479,13 @@ class SyncService:
                         upserted_signals.append(dict(sig_row))
 
             tenant_conn.commit()
+            # SET LOCAL role/claims are transaction-scoped and were just dropped by the commit
+            # above — re-assert them before any further RLS-dependent query on this connection.
+            # Without this, matching (and the last_synced_at update below) would silently run as
+            # this connection's own default role, which on a real deployment governed by RLS
+            # would mean matching one tenant's signal against every OTHER tenant's
+            # workspace_product rows too — a real cross-tenant leak, not just a local artifact.
+            _act_as_tenant_sync(tenant_conn, tenant_id)
 
             # 7. Automatic matching for unmatched signals (T016, T017)
             matches_created = 0
@@ -484,6 +495,7 @@ class SyncService:
                     matches_created += 1
 
             tenant_conn.commit()
+            _act_as_tenant_sync(tenant_conn, tenant_id)
 
             # 8. Update last_synced_at on pos_connection
             with tenant_conn.cursor() as cur:

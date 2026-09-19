@@ -4,7 +4,7 @@ Pure unit tests with mocked candidate lists and no database connection:
 - Single confident candidate meeting threshold is selected
 - Multiple equally-qualifying candidates left unmatched (bundle-vs-component edge case)
 - Zero qualifying candidates left unmatched (low confidence or empty list)
-- Exact threshold boundary handling (ge=0.9200 vs lt=0.9200)
+- Exact threshold boundary handling (ge=0.9000 vs lt=0.9000)
 """
 
 from __future__ import annotations
@@ -21,7 +21,7 @@ from procurepilot_api.modules.pos.matching_service import ProductMatchingService
 
 @pytest.fixture
 def matching_service() -> ProductMatchingService:
-    # Uses default threshold 0.9200
+    # Uses default threshold 0.9000
     return ProductMatchingService()
 
 
@@ -80,9 +80,9 @@ def test_empty_candidate_list_left_unmatched(
 def test_exact_threshold_boundary_clears_or_refuses(
     matching_service: ProductMatchingService,
 ) -> None:
-    """A candidate at exactly 0.9200 qualifies; a candidate at 0.9199 does not."""
-    c_exact = _make_candidate("0.9200")
-    c_below = _make_candidate("0.9199")
+    """A candidate at exactly 0.9000 qualifies; a candidate at 0.8999 does not."""
+    c_exact = _make_candidate("0.9000")
+    c_below = _make_candidate("0.8999")
 
     # Single candidate right on threshold
     assert matching_service.select_candidate([c_exact]) is not None
@@ -95,7 +95,7 @@ def test_custom_threshold_setting() -> None:
     """Custom settings threshold is respected."""
     custom_service = ProductMatchingService(
         Settings(
-            MATCHING_AUTO_ACCEPT_THRESHOLD=0.95,
+            POS_MATCHING_AUTO_ACCEPT_THRESHOLD=0.95,
         )
     )
     c1 = _make_candidate("0.9300")  # < 0.95

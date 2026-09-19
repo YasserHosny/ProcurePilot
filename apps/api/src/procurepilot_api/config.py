@@ -257,6 +257,15 @@ class Settings(BaseSettings):
     rate_limit_pos_match: str = Field(
         default="30/minute", validation_alias="RATE_LIMIT_POS_MATCH"
     )
+    # A bare POS item name carries none of the deterministic (GTIN), brand, variant, or pack
+    # signals that quotation-line matching's score_candidate() formula is weighted around — that
+    # formula caps out well below matching_auto_accept_threshold (0.92) even for a perfect name
+    # match, since deterministic_signal alone accounts for 30% of the score and is always 0 here.
+    # POS matching therefore compares the raw lexical/semantic similarity (the only signals a bare
+    # name actually carries) against its own threshold, not the composite quotation score.
+    pos_matching_auto_accept_threshold: float = Field(
+        default=0.90, validation_alias="POS_MATCHING_AUTO_ACCEPT_THRESHOLD"
+    )
 
     @field_validator("api_cors_origins", mode="before")
     @classmethod

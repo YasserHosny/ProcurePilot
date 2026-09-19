@@ -3,7 +3,7 @@
 Matches synced_product_signal rows to workspace_product rows by reusing:
 - modules/matching/search.py: build_similarity_candidates
 - modules/matching/embeddings.py: StubEmbeddingProvider
-- config.py: matching_auto_accept_threshold (default 0.9200)
+- config.py: pos_matching_auto_accept_threshold (default 0.9000)
 
 Enforces FR-006:
 Only creates an automatic match when EXACTLY ONE candidate clears the auto-accept
@@ -14,8 +14,8 @@ for manual review.
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass, field
 from decimal import Decimal
-from typing import Any
 from uuid import UUID
 
 import psycopg
@@ -31,29 +31,39 @@ from procurepilot_api.modules.matching.search import (
 logger = logging.getLogger(__name__)
 
 
+@dataclass(frozen=True)
+class _QueryResponse:
+    """Mimics the small slice of the supabase-py response shape build_similarity_candidates
+    actually reads (`.data`), so it can run unmodified against a raw psycopg connection."""
+
+    data: list[dict[str, object]] = field(default_factory=list)
+
+
 class _RpcQuery:
-    def __init__(self, conn: psycopg.Connection, fn_name: str, params: dict[str, Any]) -> None:
+    def __init__(
+        self, conn: psycopg.Connection, fn_name: str, params: dict[str, object]
+    ) -> None:
         self._conn = conn
         self._fn_name = fn_name
         self._params = params
 
-    def execute(self) -> Any:
+    def execute(self) -> _QueryResponse:
         with self._conn.cursor(row_factory=dict_row) as cur:
             cur.execute(
                 """
                 select workspace_product_id, lexical_similarity, semantic_similarity
                 from match_candidate_search(
-                    %(p_line_text)s,
-                    %(p_line_embedding)s,
-                    %(p_trigram_threshold)s,
-                    %(p_semantic_threshold)s,
-                    %(p_limit)s
+                    %(p_line_text)s::text,
+                    %(p_line_embedding)s::vector,
+                    %(p_trigram_threshold)s::real,
+                    %(p_semantic_threshold)s::real,
+                    %(p_limit)s::integer
                 )
                 """,
                 self._params,
             )
             rows = [dict(r) for r in cur.fetchall()]
-        return type("Response", (), {"data": rows})()
+        return _QueryResponse(data=rows)
 
 
 class _TableQuery:
@@ -73,9 +83,9 @@ class _TableQuery:
         self._in_vals = vals
         return self
 
-    def execute(self) -> Any:
+    def execute(self) -> _QueryResponse:
         if not self._in_vals:
-            return type("Response", (), {"data": []})()
+            return _QueryResponse(data=[])
         with self._conn.cursor(row_factory=dict_row) as cur:
             query = (
                 f"select {self._columns} from {self._table_name} "
@@ -83,7 +93,7 @@ class _TableQuery:
             )
             cur.execute(query, {"vals": self._in_vals})
             rows = [dict(r) for r in cur.fetchall()]
-        return type("Response", (), {"data": rows})()
+        return _QueryResponse(data=rows)
 
 
 class PsycopgSearchClient:
@@ -92,7 +102,7 @@ class PsycopgSearchClient:
     def __init__(self, conn: psycopg.Connection) -> None:
         self._conn = conn
 
-    def rpc(self, fn_name: str, params: dict[str, Any]) -> _RpcQuery:
+    def rpc(self, fn_name: str, params: dict[str, object]) -> _RpcQuery:
         return _RpcQuery(self._conn, fn_name, params)
 
     def table(self, table_name: str) -> _TableQuery:
@@ -108,7 +118,21 @@ class ProductMatchingService:
 
     @property
     def auto_accept_threshold(self) -> Decimal:
-        return Decimal(str(self._settings.matching_auto_accept_threshold))
+        return Decimal(str(self._settings.pos_matching_auto_accept_threshold))
+
+    @staticmethod
+    def name_similarity(candidate: SimilarityCandidate) -> Decimal:
+        """The raw lexical/semantic similarity a bare item name actually carries.
+
+        candidate.confidence is quotation-line matching's composite score, weighted 30% on a
+        deterministic (GTIN) signal that a bare POS item name never has — that composite score
+        cannot clear a meaningful auto-accept bar even for a perfect name match (see
+        config.py's pos_matching_auto_accept_threshold comment). Use the two signals a name
+        search actually produces instead.
+        """
+        lexical = Decimal(str(candidate.reasons.get("lexical_similarity", "0")))
+        semantic = Decimal(str(candidate.reasons.get("semantic_similarity", "0")))
+        return max(lexical, semantic)
 
     def select_candidate(
         self,
@@ -120,14 +144,14 @@ class ProductMatchingService:
         Zero candidates or multiple qualifying candidates return None (left unmatched).
         """
         threshold = self.auto_accept_threshold
-        qualifying = [c for c in candidates if c.confidence >= threshold]
+        qualifying = [c for c in candidates if self.name_similarity(c) >= threshold]
         if len(qualifying) == 1:
             return qualifying[0]
         return None
 
     def match_signal(
         self,
-        signal: dict[str, Any] | Any,
+        signal: dict[str, object] | object,
         *,
         conn: psycopg.Connection,
         client: object | None = None,
@@ -139,13 +163,13 @@ class ProductMatchingService:
         Otherwise leaves unmatched for manual review and returns None.
         """
         tenant_id = (
-            signal["tenant_id"] if isinstance(signal, dict) else getattr(signal, "tenant_id")
+            signal["tenant_id"] if isinstance(signal, dict) else signal.tenant_id
         )
-        signal_id = signal["id"] if isinstance(signal, dict) else getattr(signal, "id")
+        signal_id = signal["id"] if isinstance(signal, dict) else signal.id
         external_item_name = (
             signal["external_item_name"]
             if isinstance(signal, dict)
-            else getattr(signal, "external_item_name")
+            else signal.external_item_name
         )
 
         with conn.cursor(row_factory=dict_row) as cur:
@@ -173,7 +197,7 @@ class ProductMatchingService:
             return None
 
         with conn.cursor(row_factory=dict_row) as cur:
-            # Check if candidate workspace_product is already matched to another signal (1:1 constraint)
+            # Check if candidate workspace_product is already matched elsewhere (1:1 constraint)
             cur.execute(
                 """
                 select id from pos_product_match
@@ -214,7 +238,7 @@ class ProductMatchingService:
                     "tenant_id": tenant_id,
                     "synced_product_signal_id": signal_id,
                     "workspace_product_id": selected.workspace_product_id,
-                    "confidence": selected.confidence,
+                    "confidence": self.name_similarity(selected),
                 },
             )
             match_row = cur.fetchone()
