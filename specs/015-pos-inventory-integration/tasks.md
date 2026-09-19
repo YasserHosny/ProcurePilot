@@ -273,13 +273,13 @@ it's based on.
 confirm no error state, stuck loading indicator, or layout change; then connect, disconnect, and
 confirm the same screens behave identically immediately afterward with no lost in-progress work.
 
-- [ ] **T030** [US3] — Audit `offers/compare/compare.component` and the catalogue product detail
+- [x] **T030** [US3] — Audit `offers/compare/compare.component` and the catalogue product detail
   view (touched in T029) for a defensive-rendering guarantee: absence of a `pos_connection`,
   absence of a matched signal, and a `needs_reauth`/`disconnected` connection all render the
   screen exactly as it rendered before this feature shipped (Acceptance Scenario 1) — no error
   state, no spinner waiting on a request that will never resolve, no layout shift reserving space
   for data that isn't coming. Fix any gap found rather than assuming T029 already handles it.
-- [ ] **T031** [US3] — Integration/component tests proving the guarantee: a backend test in
+- [x] **T031** [US3] — Integration/component tests proving the guarantee: a backend test in
   `apps/api/tests/integration/test_pos_sync.py` (or a new
   `test_pos_purchasing_unaffected.py` if that file is getting crowded) confirming
   purchase-request creation and offer comparison endpoints are entirely unaffected by POS
@@ -287,7 +287,7 @@ confirm the same screens behave identically immediately afterward with no lost i
   to confirm, don't just test the happy path), plus a frontend spec confirming the compare/
   catalogue components render their pre-existing states correctly with `pos-api.ts` mocked to
   return "not connected."
-- [ ] **T032** [US3] — Manual verification note (recorded in quickstart.md or this file's own
+- [x] **T032** [US3] — Manual verification note (recorded in quickstart.md or this file's own
   checkpoint, not a new automated test): disconnecting mid-session (via `POST /pos/disconnect`)
   while a purchase request is being drafted does not interrupt or lose that draft — drafts live
   entirely in the existing `requests` module/local component state, which this feature never
