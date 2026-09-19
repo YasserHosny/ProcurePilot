@@ -299,12 +299,12 @@ graceful-without-it confirmed as a first-class, tested guarantee rather than an 
 
 ## Phase 6 — Polish & Cross-Cutting Concerns
 
-- [ ] **T033** — i18n: add the `pos.*` namespace (connection settings, signals-review, and the
+- [x] **T033** — i18n: add the `pos.*` namespace (connection settings, signals-review, and the
   inline velocity/stock labels — including the provisional-figure label, FR-013 — added to Smart
   Compare/catalogue) to `packages/i18n/en.json` and `packages/i18n/ar.json` — real Arabic, not
   transliterated. Land this before T014/T027/T029 in actual execution order (matching 014's own
   T033 sequencing note) despite being listed here for completeness of the polish phase's own file.
-- [ ] **T034** — Routing + navigation: add the `/pos/*` routes to `apps/web/src/app/app.routes.ts`
+- [x] **T034** — Routing + navigation: add the `/pos/*` routes to `apps/web/src/app/app.routes.ts`
   (matching `/accounting`'s own route-registration shape, `connect`/`sync`/`match` role-gated at
   the router level, not just component display gating) and one hub sidenav entry in
   `apps/web/src/app/layout/shell/shell.component.html` (single entry point; the signals-review
@@ -322,11 +322,11 @@ graceful-without-it confirmed as a first-class, tested guarantee rather than an 
 - [ ] **T037** — a11y: `apps/web/tests/e2e/pos-a11y.spec.ts` — axe-core WCAG 2.1 AA on the
   connection-settings and signals-review screens, plus the modified Smart Compare/catalogue
   screens, in English and Arabic.
-- [ ] **T038** — Docs: add the POS/inventory integration section to
+- [x] **T038** — Docs: add the POS/inventory integration section to
   `docs/architecture/api-specification.md` and `docs/architecture/data-dictionary.md`, and
   reconcile `contracts/pos-integration.openapi.yaml` against the real implementation — expect real
   drift, same as every prior feature's own contract reconciliation step.
-- [ ] **T039** [P] — Rate-limit regression tests extending
+- [x] **T039** [P] — Rate-limit regression tests extending
   `apps/api/tests/integration/test_mutation_rate_limits.py` with
   `test_pos_sync_rate_limit_refuses_without_syncing` and
   `test_pos_match_rate_limit_refuses_without_matching` (seed enough distinct signals to avoid a
