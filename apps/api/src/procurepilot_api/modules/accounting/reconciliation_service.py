@@ -57,6 +57,35 @@ def _format_discrepancy_row(r: dict[str, Any]) -> dict[str, Any]:
             "date": r.get("pr_date"),
         }
 
+    three_way_match = None
+    if r.get("twm_id") is not None:
+        three_way_match = {
+            "result": r["twm_result"],
+            "tolerance_ruleset_version": r["twm_ruleset_version"],
+            "source_hash": r["twm_source_hash"],
+            "evaluated_at": r["twm_evaluated_at"],
+            "ordered_quantity": r.get("twm_ordered_quantity"),
+            "confirmed_quantity": r.get("twm_confirmed_quantity"),
+            "received_quantity": r.get("twm_received_quantity"),
+            "invoiced_quantity": r.get("twm_invoiced_quantity"),
+            "ordered_unit_price_amount": r.get("twm_ordered_unit_price_amount"),
+            "ordered_unit_price_currency": r.get("twm_ordered_unit_price_currency"),
+            "invoiced_unit_price_amount": r.get("twm_invoiced_unit_price_amount"),
+            "invoiced_unit_price_currency": r.get("twm_invoiced_unit_price_currency"),
+            "ordered_total_amount": r.get("twm_ordered_total_amount"),
+            "ordered_total_currency": r.get("twm_ordered_total_currency"),
+            "invoiced_total_amount": r.get("twm_invoiced_total_amount"),
+            "invoiced_total_currency": r.get("twm_invoiced_total_currency"),
+        }
+
+    purchase_order_detail = None
+    if r.get("po_id") is not None:
+        purchase_order_detail = {
+            "order_number": r["po_order_number"],
+            "status": r["po_status"],
+            "order_date": r["po_order_date"],
+        }
+
     return {
         "id": r["id"],
         "discrepancy_type": r["discrepancy_type"],
@@ -69,6 +98,14 @@ def _format_discrepancy_row(r: dict[str, Any]) -> dict[str, Any]:
         "resolution_note": r.get("resolution_note"),
         "synced_bill_detail": synced_bill_detail,
         "purchase_record_detail": purchase_record_detail,
+        "three_way_match_id": r.get("three_way_match_id"),
+        "purchase_order_id": r.get("purchase_order_id"),
+        "evidence": r.get("evidence"),
+        "source_hash": r.get("source_hash"),
+        "source_updated_at": r.get("source_updated_at"),
+        "reopened_at": r.get("reopened_at"),
+        "three_way_match": three_way_match,
+        "purchase_order_detail": purchase_order_detail,
     }
 
 
@@ -376,6 +413,12 @@ class ReconciliationService:
                         d.resolved_by,
                         d.resolved_at,
                         d.resolution_note,
+                        d.three_way_match_id,
+                        d.purchase_order_id,
+                        d.evidence,
+                        d.source_hash,
+                        d.source_updated_at,
+                        d.reopened_at,
                         b.id as bill_id,
                         sv.display_name as bill_vendor_name,
                         b.amount as bill_amount,
@@ -385,7 +428,28 @@ class ReconciliationService:
                         s.name as pr_supplier_name,
                         pr.total_paid_amount as pr_amount,
                         pr.total_paid_currency as pr_currency,
-                        coalesce(pr.ordered_at, pr.recorded_at)::date as pr_date
+                        coalesce(pr.ordered_at, pr.recorded_at)::date as pr_date,
+                        twm.id as twm_id,
+                        twm.result as twm_result,
+                        twm.tolerance_ruleset_version as twm_ruleset_version,
+                        twm.source_hash as twm_source_hash,
+                        twm.evaluated_at as twm_evaluated_at,
+                        twm.ordered_quantity as twm_ordered_quantity,
+                        twm.confirmed_quantity as twm_confirmed_quantity,
+                        twm.received_quantity as twm_received_quantity,
+                        twm.invoiced_quantity as twm_invoiced_quantity,
+                        twm.ordered_unit_price_amount as twm_ordered_unit_price_amount,
+                        twm.ordered_unit_price_currency as twm_ordered_unit_price_currency,
+                        twm.invoiced_unit_price_amount as twm_invoiced_unit_price_amount,
+                        twm.invoiced_unit_price_currency as twm_invoiced_unit_price_currency,
+                        twm.ordered_total_amount as twm_ordered_total_amount,
+                        twm.ordered_total_currency as twm_ordered_total_currency,
+                        twm.invoiced_total_amount as twm_invoiced_total_amount,
+                        twm.invoiced_total_currency as twm_invoiced_total_currency,
+                        po.id as po_id,
+                        po.order_number as po_order_number,
+                        po.status as po_status,
+                        po.order_date as po_order_date
                     from reconciliation_discrepancy d
                     left join synced_bill b
                         on b.tenant_id = d.tenant_id and b.id = d.synced_bill_id
@@ -395,6 +459,10 @@ class ReconciliationService:
                         on pr.tenant_id = d.tenant_id and pr.id = d.purchase_record_id
                     left join supplier s
                         on s.tenant_id = pr.tenant_id and s.id = pr.supplier_id
+                    left join three_way_match twm
+                        on twm.tenant_id = d.tenant_id and twm.id = d.three_way_match_id
+                    left join purchase_order po
+                        on po.tenant_id = d.tenant_id and po.id = d.purchase_order_id
                     where d.id = %(id)s and d.tenant_id = %(tenant_id)s
                     """,
                     {"id": discrepancy_id, "tenant_id": member.tenant_id},
@@ -441,6 +509,12 @@ class ReconciliationService:
                 d.resolved_by,
                 d.resolved_at,
                 d.resolution_note,
+                d.three_way_match_id,
+                d.purchase_order_id,
+                d.evidence,
+                d.source_hash,
+                d.source_updated_at,
+                d.reopened_at,
                 b.id as bill_id,
                 sv.display_name as bill_vendor_name,
                 b.amount as bill_amount,
@@ -450,7 +524,28 @@ class ReconciliationService:
                 s.name as pr_supplier_name,
                 pr.total_paid_amount as pr_amount,
                 pr.total_paid_currency as pr_currency,
-                coalesce(pr.ordered_at, pr.recorded_at)::date as pr_date
+                coalesce(pr.ordered_at, pr.recorded_at)::date as pr_date,
+                twm.id as twm_id,
+                twm.result as twm_result,
+                twm.tolerance_ruleset_version as twm_ruleset_version,
+                twm.source_hash as twm_source_hash,
+                twm.evaluated_at as twm_evaluated_at,
+                twm.ordered_quantity as twm_ordered_quantity,
+                twm.confirmed_quantity as twm_confirmed_quantity,
+                twm.received_quantity as twm_received_quantity,
+                twm.invoiced_quantity as twm_invoiced_quantity,
+                twm.ordered_unit_price_amount as twm_ordered_unit_price_amount,
+                twm.ordered_unit_price_currency as twm_ordered_unit_price_currency,
+                twm.invoiced_unit_price_amount as twm_invoiced_unit_price_amount,
+                twm.invoiced_unit_price_currency as twm_invoiced_unit_price_currency,
+                twm.ordered_total_amount as twm_ordered_total_amount,
+                twm.ordered_total_currency as twm_ordered_total_currency,
+                twm.invoiced_total_amount as twm_invoiced_total_amount,
+                twm.invoiced_total_currency as twm_invoiced_total_currency,
+                po.id as po_id,
+                po.order_number as po_order_number,
+                po.status as po_status,
+                po.order_date as po_order_date
             from reconciliation_discrepancy d
             left join synced_bill b
                 on b.tenant_id = d.tenant_id and b.id = d.synced_bill_id
@@ -460,6 +555,10 @@ class ReconciliationService:
                 on pr.tenant_id = d.tenant_id and pr.id = d.purchase_record_id
             left join supplier s
                 on s.tenant_id = pr.tenant_id and s.id = pr.supplier_id
+            left join three_way_match twm
+                on twm.tenant_id = d.tenant_id and twm.id = d.three_way_match_id
+            left join purchase_order po
+                on po.tenant_id = d.tenant_id and po.id = d.purchase_order_id
             where d.tenant_id = %(tenant_id)s
               and d.status = %(status)s
             order by d.detected_at desc, d.id desc

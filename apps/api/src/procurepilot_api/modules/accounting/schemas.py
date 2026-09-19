@@ -121,6 +121,54 @@ class PurchaseRecordDetail(BaseModel):
         return str(value)
 
 
+class PurchaseOrderDetail(BaseModel):
+    """Compact detail for the purchase order supporting R3.3 evidence."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    order_number: str
+    status: str
+    order_date: date
+
+
+class ThreeWayMatchSummary(BaseModel):
+    """Typed, replayable summary of the current three-way comparison."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    result: Literal["matched", "partial", "needs_review", "unmatched", "unavailable"]
+    tolerance_ruleset_version: str
+    source_hash: str
+    evaluated_at: datetime
+    ordered_quantity: str | None = None
+    confirmed_quantity: str | None = None
+    received_quantity: str | None = None
+    invoiced_quantity: str | None = None
+    ordered_unit_price_amount: str | None = None
+    ordered_unit_price_currency: str | None = None
+    invoiced_unit_price_amount: str | None = None
+    invoiced_unit_price_currency: str | None = None
+    ordered_total_amount: str | None = None
+    ordered_total_currency: str | None = None
+    invoiced_total_amount: str | None = None
+    invoiced_total_currency: str | None = None
+
+    @field_validator(
+        "ordered_quantity",
+        "confirmed_quantity",
+        "received_quantity",
+        "invoiced_quantity",
+        "ordered_unit_price_amount",
+        "invoiced_unit_price_amount",
+        "ordered_total_amount",
+        "invoiced_total_amount",
+        mode="before",
+    )
+    @classmethod
+    def _coerce_decimal_to_str(cls, value: object) -> str | None:
+        return None if value is None else str(value)
+
+
 class ReconciliationDiscrepancy(BaseModel):
     """A flagged reconciliation exception (T029, US3).
 
@@ -132,7 +180,20 @@ class ReconciliationDiscrepancy(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
-    discrepancy_type: Literal["amount_mismatch", "unmatched_bill", "unmatched_purchase"]
+    discrepancy_type: Literal[
+        "amount_mismatch",
+        "unmatched_bill",
+        "unmatched_purchase",
+        "missing_confirmation",
+        "missing_receipt",
+        "quantity_variance",
+        "price_variance",
+        "currency_mismatch",
+        "invoice_without_order",
+        "ambiguous_order",
+        "over_billed_quantity",
+        "over_billed_price",
+    ]
     synced_bill_id: UUID | None = None
     purchase_record_id: UUID | None = None
     status: Literal["open", "resolved"]
@@ -143,6 +204,14 @@ class ReconciliationDiscrepancy(BaseModel):
 
     synced_bill_detail: SyncedBillDetail | None = None
     purchase_record_detail: PurchaseRecordDetail | None = None
+    three_way_match_id: UUID | None = None
+    purchase_order_id: UUID | None = None
+    evidence: dict[str, object] | None = None
+    source_hash: str | None = None
+    source_updated_at: datetime | None = None
+    reopened_at: datetime | None = None
+    three_way_match: ThreeWayMatchSummary | None = None
+    purchase_order_detail: PurchaseOrderDetail | None = None
 
 
 class ReconciliationDiscrepancyList(BaseModel):
@@ -165,6 +234,7 @@ class ResolveDiscrepancyRequest(BaseModel):
 __all__ = [
     "AccountingConnection",
     "PurchaseRecordDetail",
+    "PurchaseOrderDetail",
     "ReconciliationDiscrepancy",
     "ReconciliationDiscrepancyList",
     "ResolveDiscrepancyRequest",
@@ -173,4 +243,5 @@ __all__ = [
     "SyncedBillDetail",
     "SyncedBillList",
     "TriggerSyncResponse",
+    "ThreeWayMatchSummary",
 ]

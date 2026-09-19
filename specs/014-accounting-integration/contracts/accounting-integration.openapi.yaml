@@ -354,7 +354,9 @@ components:
         id: { type: string, format: uuid }
         discrepancy_type:
           type: string
-          enum: [amount_mismatch, unmatched_bill, unmatched_purchase]
+          enum: [amount_mismatch, unmatched_bill, unmatched_purchase, missing_confirmation,
+            missing_receipt, quantity_variance, price_variance, currency_mismatch,
+            invoice_without_order, ambiguous_order, over_billed_quantity, over_billed_price]
         synced_bill_id: { type: string, format: uuid, nullable: true }
         purchase_record_id: { type: string, format: uuid, nullable: true }
         status: { type: string, enum: [open, resolved] }
@@ -370,6 +372,49 @@ components:
           allOf:
             - $ref: '#/components/schemas/PurchaseRecordDetail'
           nullable: true
+        three_way_match_id: { type: string, format: uuid, nullable: true }
+        purchase_order_id: { type: string, format: uuid, nullable: true }
+        evidence: { type: object, nullable: true, additionalProperties: true }
+        source_hash: { type: string, nullable: true }
+        source_updated_at: { type: string, format: date-time, nullable: true }
+        reopened_at: { type: string, format: date-time, nullable: true }
+        three_way_match:
+          allOf:
+            - $ref: '#/components/schemas/ThreeWayMatchSummary'
+          nullable: true
+        purchase_order_detail:
+          allOf:
+            - $ref: '#/components/schemas/PurchaseOrderDetail'
+          nullable: true
+
+    ThreeWayMatchSummary:
+      type: object
+      required: [result, tolerance_ruleset_version, source_hash, evaluated_at]
+      properties:
+        result: { type: string, enum: [matched, partial, needs_review, unmatched, unavailable] }
+        tolerance_ruleset_version: { type: string }
+        source_hash: { type: string }
+        evaluated_at: { type: string, format: date-time }
+        ordered_quantity: { type: string, nullable: true, description: "Decimal string, never a float" }
+        confirmed_quantity: { type: string, nullable: true, description: "Decimal string, never a float" }
+        received_quantity: { type: string, nullable: true, description: "Decimal string, never a float" }
+        invoiced_quantity: { type: string, nullable: true, description: "Decimal string, never a float" }
+        ordered_unit_price_amount: { type: string, nullable: true, description: "Decimal string, never a float" }
+        ordered_unit_price_currency: { type: string, nullable: true }
+        invoiced_unit_price_amount: { type: string, nullable: true, description: "Decimal string, never a float" }
+        invoiced_unit_price_currency: { type: string, nullable: true }
+        ordered_total_amount: { type: string, nullable: true, description: "Decimal string, never a float" }
+        ordered_total_currency: { type: string, nullable: true }
+        invoiced_total_amount: { type: string, nullable: true, description: "Decimal string, never a float" }
+        invoiced_total_currency: { type: string, nullable: true }
+
+    PurchaseOrderDetail:
+      type: object
+      required: [order_number, status, order_date]
+      properties:
+        order_number: { type: string }
+        status: { type: string }
+        order_date: { type: string, format: date }
 
     SyncedBillDetail:
       type: object
