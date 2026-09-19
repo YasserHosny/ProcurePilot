@@ -331,7 +331,7 @@ graceful-without-it confirmed as a first-class, tested guarantee rather than an 
   `test_pos_sync_rate_limit_refuses_without_syncing` and
   `test_pos_match_rate_limit_refuses_without_matching` (seed enough distinct signals to avoid a
   409-vs-429 ambiguity, mirroring the accounting rate-limit tests' own seeding fix).
-- [ ] **T040** — Security review: OAuth token storage/encryption via the extracted
+- [x] **T040** — Security review: OAuth token storage/encryption via the extracted
   `shared/token_crypto.py` (verify both accounting and pos actually use the shared module post-T003,
   not a stale duplicate), the callback endpoint's `state` parameter (CSRF protection — verify it's
   checked, not just passed through), read-only enforcement (grep the whole `modules/pos/` tree for
