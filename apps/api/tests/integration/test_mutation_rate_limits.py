@@ -1,13 +1,14 @@
 from __future__ import annotations
 
-from uuid import uuid4
+from urllib.parse import parse_qs, urlparse
+from uuid import UUID, uuid4
 
 import psycopg
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from integration.catalogue_helpers import TEST_DATABASE_URL
+from integration.catalogue_helpers import TEST_DATABASE_URL, make_workspace_product
 from integration.smart_compare_helpers import (
     committed_smart_context,
     member_from_workspace,
@@ -296,4 +297,164 @@ def test_accounting_discrepancy_resolve_rate_limit_refuses_without_resolving(
             f"/api/v1/accounting/discrepancies/{discrepancy_ids[2]}/resolve", json={}
         )
         _assert_structured_429(third)
+    mutation_limiter.reset()
+
+
+class _RecordingAuditWriter:
+    def __init__(self) -> None:
+        self.events: list[object] = []
+
+    def record(self, event: object, bearer_token: str | None = None) -> None:
+        self.events.append(event)
+
+
+def _connect_pos_owner(client: TestClient) -> dict[str, object]:
+    start_res = client.post("/api/v1/pos/connect")
+    assert start_res.status_code == 200, start_res.text
+    auth_url = start_res.json()["authorization_url"]
+    state = parse_qs(urlparse(auth_url).query)["state"][0]
+
+    cb_res = client.get(
+        f"/api/v1/pos/connect/callback?code=stub-auth-code&state={state}",
+        follow_redirects=False,
+    )
+    assert cb_res.status_code == 302, cb_res.text
+
+    conn_res = client.get("/api/v1/pos/connection")
+    assert conn_res.status_code == 200, conn_res.text
+    return conn_res.json()
+
+
+def test_pos_sync_rate_limit_refuses_without_syncing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """T039: POST /pos/sync rate limiting. Hit more times than rate_limit_pos_sync allows
+    (2/minute under test override) and assert calls beyond the limit return structured 429,
+    not 202, 404, or 409. An active pos_connection is seeded first via stub provider."""
+    mutation_limiter.reset()
+    monkeypatch.setenv("RATE_LIMIT_POS_SYNC", "2/minute")
+    monkeypatch.setenv("POS_PROVIDER_MODE", "stub")
+    audit_writer = _RecordingAuditWriter()
+    monkeypatch.setattr(
+        "procurepilot_api.modules.pos.service.get_audit_writer",
+        lambda: audit_writer,
+    )
+    monkeypatch.setattr(
+        "procurepilot_api.modules.pos.sync_service.get_audit_writer",
+        lambda: audit_writer,
+    )
+    with committed_smart_context("rl-pos-sync") as context:
+        settings_for_test_db(monkeypatch)
+        member = member_from_workspace(context.workspace, role=MemberRole.owner)
+        client = TestClient(_app(monkeypatch, member), raise_server_exceptions=False)
+
+        _connect_pos_owner(client)
+        mutation_limiter.reset()
+
+        first = client.post("/api/v1/pos/sync")
+        second = client.post("/api/v1/pos/sync")
+        assert first.status_code == 202, first.text
+        assert second.status_code == 202, second.text
+
+        third = client.post("/api/v1/pos/sync")
+        _assert_structured_429(third)
+
+        sync_started_count = sum(
+            1 for e in audit_writer.events if getattr(e, "action", None) == "pos.sync_started"
+        )
+        assert sync_started_count == 2
+    mutation_limiter.reset()
+
+
+def test_pos_match_rate_limit_refuses_without_matching(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """T039: POST /pos/signals/{signal_id}/match rate limiting. Seeds three distinct
+    unmatched signal and workspace product pairs so each call would otherwise succeed (200)
+    rather than hitting a 409 already-matched conflict, proving the third call is refused by
+    the rate limit itself with 429 and does not create a pos_product_match row."""
+    mutation_limiter.reset()
+    monkeypatch.setenv("RATE_LIMIT_POS_MATCH", "2/minute")
+    monkeypatch.setenv("POS_PROVIDER_MODE", "stub")
+    audit_writer = _RecordingAuditWriter()
+    monkeypatch.setattr(
+        "procurepilot_api.modules.pos.service.get_audit_writer",
+        lambda: audit_writer,
+    )
+    monkeypatch.setattr(
+        "procurepilot_api.modules.pos.sync_service.get_audit_writer",
+        lambda: audit_writer,
+    )
+    with committed_smart_context("rl-pos-match") as context:
+        settings_for_test_db(monkeypatch)
+        member = member_from_workspace(context.workspace, role=MemberRole.owner)
+        client = TestClient(_app(monkeypatch, member), raise_server_exceptions=False)
+
+        conn_data = _connect_pos_owner(client)
+        connection_id = UUID(str(conn_data["id"]))
+
+        pairs: list[tuple[UUID, UUID]] = []
+        with psycopg.connect(TEST_DATABASE_URL or "") as db_conn:
+            with db_conn.cursor() as cur:
+                for i in range(3):
+                    wp_id = make_workspace_product(
+                        cur,
+                        context.workspace,
+                        name=f"RL Match Product {i}",
+                    )
+                    sig_id = uuid4()
+                    cur.execute("set local role service_role")
+                    cur.execute(
+                        """
+                        insert into synced_product_signal (
+                            id, tenant_id, pos_connection_id,
+                            external_item_id, external_item_name
+                        ) values (%s, %s, %s, %s, %s)
+                        """,
+                        (
+                            sig_id,
+                            context.workspace.tenant_id,
+                            connection_id,
+                            f"rl-stub-item-{i}",
+                            f"RL Signal Item {i}",
+                        ),
+                    )
+                    pairs.append((sig_id, wp_id))
+            db_conn.commit()
+
+        mutation_limiter.reset()
+
+        first = client.post(
+            f"/api/v1/pos/signals/{pairs[0][0]}/match",
+            json={"workspace_product_id": str(pairs[0][1])},
+        )
+        second = client.post(
+            f"/api/v1/pos/signals/{pairs[1][0]}/match",
+            json={"workspace_product_id": str(pairs[1][1])},
+        )
+        assert first.status_code == 200, first.text
+        assert second.status_code == 200, second.text
+
+        third = client.post(
+            f"/api/v1/pos/signals/{pairs[2][0]}/match",
+            json={"workspace_product_id": str(pairs[2][1])},
+        )
+        _assert_structured_429(third)
+
+        with psycopg.connect(TEST_DATABASE_URL or "") as db_conn:
+            with db_conn.cursor() as cur:
+                cur.execute("set local role service_role")
+                cur.execute(
+                    "select count(*) from pos_product_match where tenant_id = %s",
+                    (context.workspace.tenant_id,),
+                )
+                assert cur.fetchone()[0] == 2
+                cur.execute(
+                    """
+                    select id from pos_product_match
+                    where tenant_id = %s and synced_product_signal_id = %s
+                    """,
+                    (context.workspace.tenant_id, pairs[2][0]),
+                )
+                assert cur.fetchone() is None
     mutation_limiter.reset()
