@@ -136,6 +136,16 @@
 
           @if (conn.status !== 'disconnected') {
             <div class="card-actions">
+              <a
+                mat-stroked-button
+                routerLink="/pos/signals"
+                class="view-signals-btn"
+                data-testid="view-signals-btn"
+              >
+                <mat-icon aria-hidden="true">sync_alt</mat-icon>
+                <span>{{ 'pos.connection.viewSignals' | translate }}</span>
+              </a>
+
               <button
                 *appRole="'owner'"
                 mat-stroked-button

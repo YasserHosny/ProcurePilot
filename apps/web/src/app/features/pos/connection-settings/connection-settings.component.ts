@@ -6,7 +6,7 @@ import { MatCardModule } from '@angular/material/card';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
 import { RoleDirective } from '../../../core/auth/role.directive';
@@ -21,6 +21,7 @@ import {
   standalone: true,
   imports: [
     NgClass,
+    RouterLink,
     MatButtonModule,
     MatCardModule,
     MatIconModule,

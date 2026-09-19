@@ -241,6 +241,16 @@
 
       <a
         mat-list-item
+        routerLink="/pos"
+        routerLinkActive="active"
+        class="nav-item"
+      >
+        <mat-icon aria-hidden="true">point_of_sale</mat-icon>
+        <span class="nav-label">{{ 'pos.nav' | translate }}</span>
+      </a>
+
+      <a
+        mat-list-item
         routerLink="/requests"
         routerLinkActive="active"
         class="nav-item"

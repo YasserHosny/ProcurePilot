@@ -101,6 +101,7 @@ describe('ConnectionSettingsComponent (T014)', () => {
       pos: {
         connection: {
           neverSynced: 'Never synced yet',
+          viewSignals: 'View Synced Signals',
           status: {
             active: 'Active',
             needs_reauth: 'Needs Re-authorization',
@@ -183,6 +184,10 @@ describe('ConnectionSettingsComponent (T014)', () => {
       const lastSyncedEl = fixture.debugElement.query(By.css('[data-testid="connection-last-synced-at"]'));
       expect(lastSyncedEl.nativeElement.textContent.trim()).toBe('Never synced yet');
 
+      const viewSignalsBtn = fixture.debugElement.query(By.css('[data-testid="view-signals-btn"]'));
+      expect(viewSignalsBtn).not.toBeNull();
+      expect(viewSignalsBtn.attributes['routerLink']).toBe('/pos/signals');
+
       const emptyCard = fixture.debugElement.query(By.css('[data-testid="empty-connection-card"]'));
       expect(emptyCard).toBeNull();
     });
@@ -214,6 +219,9 @@ describe('ConnectionSettingsComponent (T014)', () => {
 
       const disconnectedAtEl = fixture.debugElement.query(By.css('[data-testid="connection-disconnected-at"]'));
       expect(disconnectedAtEl).not.toBeNull();
+
+      const viewSignalsBtn = fixture.debugElement.query(By.css('[data-testid="view-signals-btn"]'));
+      expect(viewSignalsBtn).toBeNull();
     });
 
     it('should handle generic load error (500) and allow retry', () => {

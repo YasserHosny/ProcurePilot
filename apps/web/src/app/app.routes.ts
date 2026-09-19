@@ -330,6 +330,21 @@ export const routes: Routes = [
             './features/accounting/discrepancies/discrepancies.component'
           ).then((m) => m.DiscrepanciesComponent),
       },
+      // --- pos / inventory integration (R3.2) ---
+      {
+        path: 'pos',
+        loadComponent: () =>
+          import(
+            './features/pos/connection-settings/connection-settings.component'
+          ).then((m) => m.ConnectionSettingsComponent),
+      },
+      {
+        path: 'pos/signals',
+        loadComponent: () =>
+          import(
+            './features/pos/signals-review/signals-review.component'
+          ).then((m) => m.SignalsReviewComponent),
+      },
       {
         path: 'savings/outcome-capture',
         canActivate: [roleGuard('owner', 'buyer')],

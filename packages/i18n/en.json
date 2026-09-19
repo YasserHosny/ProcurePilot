@@ -2846,6 +2846,7 @@
     }
   },
   "pos": {
+    "nav": "Point of Sale",
     "connection": {
       "title": "Point of Sale & Inventory Integration",
       "subtitle": "Connect your Square account to sync sales velocity and stock-on-hand signals.",
@@ -2883,7 +2884,8 @@
       "disconnectSuccess": "POS connection disconnected successfully.",
       "disconnectFailed": "Failed to disconnect POS connection. Please try again.",
       "connectedSuccess": "POS account connected successfully.",
-      "connectFailed": "POS authorization failed or was declined. Please try again."
+      "connectFailed": "POS authorization failed or was declined. Please try again.",
+      "viewSignals": "View Synced Signals"
     },
     "signals": {
       "title": "Synced Product Signals",
