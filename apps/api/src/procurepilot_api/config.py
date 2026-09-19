@@ -183,9 +183,9 @@ class Settings(BaseSettings):
 
     # Accounting integration (R3.1, 014-accounting-integration):
     # Provider mode defaults to "stub" so tests, local development, and CI can run
-    # without a real Intuit/QuickBooks developer account. "quickbooks" uses live
-    # OAuth2 and REST calls against QuickBooks Online.
-    accounting_provider_mode: Literal["stub", "quickbooks"] = Field(
+    # without a real accounting developer account. "quickbooks" and "xero" use
+    # provider OAuth2 and read-only REST calls.
+    accounting_provider_mode: Literal["stub", "quickbooks", "xero"] = Field(
         default="stub", validation_alias="ACCOUNTING_PROVIDER_MODE"
     )
     quickbooks_client_id: str | None = Field(
@@ -199,6 +199,14 @@ class Settings(BaseSettings):
     )
     quickbooks_environment: Literal["sandbox", "production"] = Field(
         default="sandbox", validation_alias="QUICKBOOKS_ENVIRONMENT"
+    )
+    xero_client_id: str | None = Field(default=None, validation_alias="XERO_CLIENT_ID")
+    xero_client_secret: SecretStr | None = Field(
+        default=None, validation_alias="XERO_CLIENT_SECRET"
+    )
+    xero_redirect_uri: str | None = Field(default=None, validation_alias="XERO_REDIRECT_URI")
+    xero_environment: Literal["sandbox", "production"] = Field(
+        default="sandbox", validation_alias="XERO_ENVIRONMENT"
     )
     # R3.1 security review (T039): access_token/refresh_token were stored as plain `text` with
     # no encryption at rest — research.md R4 named this as an "encrypted-column-at-the-
@@ -281,6 +289,7 @@ class Settings(BaseSettings):
         "sentry_dsn",
         "posthog_api_key",
         "quickbooks_client_secret",
+        "xero_client_secret",
         "accounting_token_encryption_key",
         "square_application_secret",
         "pos_token_encryption_key",

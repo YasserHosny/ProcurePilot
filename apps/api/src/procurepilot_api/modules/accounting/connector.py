@@ -237,4 +237,12 @@ def get_accounting_connector(
             realm_id=realm_id,
             access_token=access_token,
         )
+    if cfg.accounting_provider_mode == "xero":
+        from procurepilot_api.modules.accounting.xero_client import XeroClient
+
+        return XeroClient(
+            settings=cfg,
+            realm_id=realm_id,
+            access_token=access_token,
+        )
     return StubConnector()
