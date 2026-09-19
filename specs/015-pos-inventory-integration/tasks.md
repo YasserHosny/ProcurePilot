@@ -103,7 +103,7 @@ data yet.
 authorization flow, and verify connection state transitions correctly through every acceptance
 scenario in spec.md's User Story 1 — no signals or matches involved.
 
-- [ ] **T010** [US1] — `ConnectionService` (connect: mint the provider authorization URL;
+- [x] **T010** [US1] — `ConnectionService` (connect: mint the provider authorization URL;
   complete: exchange the callback code for tokens via the connector — encrypt via
   `shared/token_crypto.py` (T003) before writing, create a **new** `pos_connection` row (a
   reconnect after a prior disconnect always inserts a new row — the old, disconnected row is never
@@ -113,16 +113,16 @@ scenario in spec.md's User Story 1 — no signals or matches involved.
   `member: CurrentMember` and runs through the existing `_authenticated_db` pattern; token
   read/write goes through a literal `service_role` session exactly as `accounting_connection`'s
   own tokens do (data-model.md).
-- [ ] **T011** [US1] — Router: `POST /pos/connect`, `GET /pos/connect/callback`,
+- [x] **T011** [US1] — Router: `POST /pos/connect`, `GET /pos/connect/callback`,
   `GET /pos/connection`, `POST /pos/disconnect` in
   `apps/api/src/procurepilot_api/modules/pos/router.py`, matching the contract exactly
   (`contracts/pos-integration.openapi.yaml`). `connect`/`disconnect` gated `require_role(owner)`
   (FR-001); `connection` (GET) open to any authenticated member. Record
   `pos.connection_created`/`pos.connection_disconnected` audit events.
-- [ ] **T012** [US1] — Pydantic schemas for the four endpoints (`PosConnection`,
+- [x] **T012** [US1] — Pydantic schemas for the four endpoints (`PosConnection`,
   `StartConnectionResponse`) in `apps/api/src/procurepilot_api/modules/pos/schemas.py`, matching
   the contract's component schemas field-for-field.
-- [ ] **T013** [US1] — Integration tests in `apps/api/tests/integration/test_pos_connection.py`:
+- [x] **T013** [US1] — Integration tests in `apps/api/tests/integration/test_pos_connection.py`:
   owner can connect (stub connector), non-owner gets 403, a second connect attempt while one is
   active returns 409, disconnect preserves the row (`disconnected_at` set, not deleted, previously
   synced data stays queryable — Acceptance Scenario 1.2), a declined/failed callback leaves no
@@ -131,11 +131,11 @@ scenario in spec.md's User Story 1 — no signals or matches involved.
   connection lookup resolves not-found, reconnecting after a disconnect creates a distinct new
   `pos_connection` row (both old and new rows queryable, confirming connection history is
   preserved per T010's note).
-- [ ] **T014** [P] [US1] — Frontend: `apps/web/src/app/features/pos/connection-settings/`
+- [x] **T014** [P] [US1] — Frontend: `apps/web/src/app/features/pos/connection-settings/`
   component — connection status card, "Connect" button (redirects to the authorization URL),
   "Disconnect" button (owner-only display gate matching `email-config.component.ts`'s established
   pattern), needs-reauth banner. Karma spec alongside it.
-- [ ] **T015** [P] [US1] — `apps/web/src/app/features/pos/pos-api.ts` — typed API client for the
+- [x] **T015** [P] [US1] — `apps/web/src/app/features/pos/pos-api.ts` — typed API client for the
   four US1 endpoints, matching `accounting-api.ts`'s own shape and error handling.
 
 **Checkpoint**: an owner can connect/disconnect and see status. Fully functional and demoable on
