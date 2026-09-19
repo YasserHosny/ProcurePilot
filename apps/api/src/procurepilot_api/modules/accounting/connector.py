@@ -6,12 +6,54 @@ synced_bill and synced_vendor schema shapes, and an in-memory StubConnector for 
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from datetime import date, timedelta
 from decimal import Decimal
 from typing import Literal, Protocol, runtime_checkable
 
 from procurepilot_api.config import Settings, get_settings
+
+
+def _validate_decimal(value: Decimal, field_name: str) -> None:
+    if not isinstance(value, Decimal) or not value.is_finite() or value < 0:
+        raise ValueError(f"{field_name} must be a finite non-negative Decimal")
+
+
+def _validate_currency(value: str, field_name: str) -> str:
+    if not isinstance(value, str) or not re.fullmatch(r"[A-Z]{3}", value.upper()):
+        raise ValueError(f"{field_name} must be an uppercase 3-letter currency")
+    return value.upper()
+
+
+@dataclass(frozen=True)
+class RawBillLine:
+    """Normalized, read-only evidence for one provider bill line."""
+
+    line_number: int
+    quantity: Decimal
+    unit_price_amount: Decimal
+    unit_price_currency: str
+    description: str
+    provider_line_reference: str | None = None
+    provider_product_reference: str | None = None
+
+    def __post_init__(self) -> None:
+        if isinstance(self.line_number, bool) or self.line_number <= 0:
+            raise ValueError("line_number must be positive")
+        _validate_decimal(self.quantity, "quantity")
+        _validate_decimal(self.unit_price_amount, "unit_price_amount")
+        object.__setattr__(
+            self,
+            "unit_price_currency",
+            _validate_currency(self.unit_price_currency, "unit_price_currency"),
+        )
+
+
+def _validate_references(value: tuple[str, ...], field_name: str) -> tuple[str, ...]:
+    if not isinstance(value, tuple) or any(not isinstance(item, str) or not item for item in value):
+        raise ValueError(f"{field_name} must be a tuple of non-empty strings")
+    return value
 
 
 @dataclass(frozen=True)
@@ -27,6 +69,22 @@ class RawBill:
     currency: str
     bill_date: date
     status: Literal["open", "paid", "void"]
+    provider_order_reference: str | None = None
+    document_references: tuple[str, ...] = ()
+    lines: tuple[RawBillLine, ...] = ()
+
+    def __post_init__(self) -> None:
+        _validate_decimal(self.amount, "amount")
+        object.__setattr__(self, "currency", _validate_currency(self.currency, "currency"))
+        object.__setattr__(
+            self,
+            "document_references",
+            _validate_references(self.document_references, "document_references"),
+        )
+        if not isinstance(self.lines, tuple) or any(
+            not isinstance(line, RawBillLine) for line in self.lines
+        ):
+            raise ValueError("lines must be a tuple of RawBillLine")
 
     @property
     def provider_id(self) -> str:

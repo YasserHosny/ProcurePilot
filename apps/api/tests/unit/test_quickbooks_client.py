@@ -365,6 +365,19 @@ def test_list_bills_query_and_parsing() -> None:
                             "TxnDate": "2026-07-01",
                             "DueDate": "2026-07-31",
                             "Balance": 1845.50,
+                            "DocNumber": "B-901",
+                            "LinkedTxn": [{"TxnType": "PurchaseOrder", "TxnId": "PO-77"}],
+                            "Line": [
+                                {
+                                    "Id": "line-1",
+                                    "Description": "Paper",
+                                    "ItemBasedExpenseLineDetail": {
+                                        "Qty": 4,
+                                        "UnitPrice": 12.5,
+                                        "ItemRef": {"value": "item-1"},
+                                    },
+                                }
+                            ],
                         },
                         {
                             "Id": "902",
@@ -417,6 +430,10 @@ def test_list_bills_query_and_parsing() -> None:
     assert bills[0].status == "open"
     assert bills[0].provider_status == "open"
     assert bills[0].provider_id == "901"
+    assert bills[0].provider_order_reference == "PO-77"
+    assert bills[0].document_references == ("B-901",)
+    assert bills[0].lines[0].quantity == Decimal("4")
+    assert bills[0].lines[0].provider_product_reference == "item-1"
 
     # Bill 2: Paid (Balance == 0)
     assert bills[1].provider_bill_id == "902"
@@ -433,6 +450,25 @@ def test_list_bills_query_and_parsing() -> None:
     assert bills[2].currency == "USD"
     assert bills[2].bill_date == date(2026, 8, 1)
     assert bills[2].status == "void"
+
+
+def test_quickbooks_bill_without_line_detail_has_no_invented_lines() -> None:
+    def handle_request(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            json={"QueryResponse": {"Bill": [{
+                "Id": "904",
+                "VendorRef": {"value": "65"},
+                "TotalAmt": 1,
+                "CurrencyRef": {"value": "USD"},
+                "TxnDate": "2026-08-01",
+                "Balance": 1,
+            }]}},
+        )
+
+    bill = _make_client(httpx.MockTransport(handle_request)).list_bills(date(2026, 1, 1))[0]
+    assert bill.lines == ()
+    assert bill.provider_order_reference is None
 
 
 # --- REST Error Handling ----------------------------------------------------

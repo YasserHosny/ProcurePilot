@@ -321,6 +321,16 @@ def test_vendor_and_bill_parsing() -> None:
                         "CurrencyCode": "USD",
                         "DateString": "2026-09-01T00:00:00",
                         "Status": "PAID",
+                        "PurchaseOrderNumber": "PO-9",
+                        "InvoiceNumber": "INV-1",
+                        "Reference": "ref-1",
+                        "LineItems": [{
+                            "LineItemID": "line-1",
+                            "Description": "Paper",
+                            "Quantity": 2,
+                            "UnitAmount": 5.5,
+                            "ItemCode": "item-1",
+                        }],
                     },
                     {
                         "InvoiceID": "bill-2",
@@ -345,7 +355,27 @@ def test_vendor_and_bill_parsing() -> None:
     assert bills[0].currency == "USD"
     assert bills[0].bill_date == date(2026, 9, 1)
     assert bills[0].status == "paid"
+    assert bills[0].provider_order_reference == "PO-9"
+    assert bills[0].document_references == ("INV-1", "ref-1")
+    assert bills[0].lines[0].unit_price_amount == Decimal("5.5")
+    assert bills[0].lines[0].provider_line_reference == "line-1"
     assert bills[1].status == "void"
+
+
+def test_raw_bill_lines_are_empty_when_xero_omits_line_items() -> None:
+    def handle(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"Invoices": [{
+            "InvoiceID": "bill-no-lines",
+            "Contact": {"ContactID": "vendor-1"},
+            "Total": 0,
+            "CurrencyCode": "USD",
+            "Date": "2026-09-02",
+            "Status": "AUTHORISED",
+        }]})
+
+    bill = _client(httpx.MockTransport(handle)).list_bills(date(2026, 1, 1))[0]
+    assert bill.lines == ()
+    assert bill.provider_order_reference is None
 
 
 def test_pagination_continues_after_full_page() -> None:

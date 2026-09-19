@@ -2,13 +2,15 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from contextlib import contextmanager
-from datetime import datetime
+from datetime import date, datetime
+from decimal import Decimal
 from types import SimpleNamespace
 from uuid import UUID
 
 import pytest
 from pydantic import SecretStr
 
+from procurepilot_api.modules.accounting.connector import RawBill, RawBillLine
 from procurepilot_api.modules.accounting.sync_service import (
     SyncService,
     TokenRefreshFailedError,
@@ -127,3 +129,34 @@ def test_xero_vendor_auth_failure_marks_connection_and_records_safe_audit(
             "outcome": "refused",
         }
     ]
+
+
+def test_upsert_bill_replaces_lines_with_tenant_scoped_statements() -> None:
+    cursor = _Cursor({"id": str(UUID("00000000-0000-0000-0000-000000000099"))})
+    connection = _Connection(cursor)
+    bill = RawBill(
+        provider_bill_id="bill-1",
+        provider_vendor_id="vendor-1",
+        amount=Decimal("12.00"),
+        currency="USD",
+        bill_date=date(2026, 9, 20),
+        status="open",
+        provider_order_reference="PO-1",
+        document_references=("INV-1",),
+        lines=(RawBillLine(1, Decimal("2"), Decimal("6"), "USD", "Paper"),),
+    )
+
+    synced_id = SyncService()._upsert_bill(
+        connection,
+        tenant_id=TENANT_ID,
+        connection_id=CONNECTION_ID,
+        raw_bill=bill,
+        vendor_map={"vendor-1": (UUID("00000000-0000-0000-0000-000000000098"), None)},
+    )
+
+    assert synced_id == UUID("00000000-0000-0000-0000-000000000099")
+    assert "provider_order_reference" in cursor.queries[0][0]
+    assert "delete from synced_bill_line" in cursor.queries[1][0].lower()
+    assert cursor.queries[1][1]["tenant_id"] == TENANT_ID
+    assert "insert into synced_bill_line" in cursor.queries[2][0].lower()
+    assert cursor.queries[2][1]["unit_price_currency"] == "USD"

@@ -20,6 +20,7 @@ from procurepilot_api.modules.accounting.connector import (
     CompanyInfo,
     OAuthTokens,
     RawBill,
+    RawBillLine,
     RawVendor,
 )
 
@@ -407,6 +408,9 @@ class QuickBooksClient:
                 bill_date = since
 
             status = _parse_bill_status(item)
+            lines = _parse_bill_lines(item)
+            order_reference = _parse_order_reference(item)
+            document_references = _parse_document_references(item)
             bills.append(
                 RawBill(
                     provider_bill_id=bill_id,
@@ -415,9 +419,13 @@ class QuickBooksClient:
                     currency=currency,
                     bill_date=bill_date,
                     status=status,
+                    provider_order_reference=order_reference,
+                    document_references=document_references,
+                    lines=lines,
                 )
             )
         return bills
+
 
     @staticmethod
     def _parse_error_payload(response: httpx.Response) -> tuple[str, str]:
@@ -457,3 +465,65 @@ class QuickBooksClient:
             expires_in=int(data.get("expires_in", 3600)),
             token_type=str(data.get("token_type", "bearer")),
         )
+
+
+def _parse_bill_lines(item: dict[str, Any]) -> tuple[RawBillLine, ...]:
+    raw_lines = item.get("Line")
+    if not isinstance(raw_lines, list):
+        return ()
+    lines: list[RawBillLine] = []
+    for line_number, line in enumerate(raw_lines, start=1):
+        if not isinstance(line, dict):
+            continue
+        detail = line.get("ItemBasedExpenseLineDetail")
+        if (
+            not isinstance(detail, dict)
+            or detail.get("Qty") is None
+            or detail.get("UnitPrice") is None
+        ):
+            continue
+        try:
+            quantity = Decimal(str(detail["Qty"]))
+            unit_price = Decimal(str(detail["UnitPrice"]))
+        except Exception:
+            continue
+        currency_ref = item.get("CurrencyRef")
+        currency = currency_ref.get("value") if isinstance(currency_ref, dict) else currency_ref
+        currency = str(currency or item.get("currency") or "USD").upper()
+        item_ref = detail.get("ItemRef")
+        lines.append(RawBillLine(
+            line_number=line_number,
+            quantity=quantity,
+            unit_price_amount=unit_price,
+            unit_price_currency=currency,
+            description=str(line.get("Description") or ""),
+            provider_line_reference=(
+                str(line["Id"]) if line.get("Id") is not None else None
+            ),
+            provider_product_reference=(
+                str(item_ref["value"])
+                if isinstance(item_ref, dict) and item_ref.get("value") is not None
+                else None
+            ),
+        ))
+    return tuple(lines)
+
+
+def _parse_order_reference(item: dict[str, Any]) -> str | None:
+    linked = item.get("LinkedTxn")
+    if not isinstance(linked, list):
+        return None
+    for reference in linked:
+        if isinstance(reference, dict) and reference.get("TxnType") == "PurchaseOrder":
+            value = reference.get("TxnId")
+            if value is not None and str(value).strip():
+                return str(value).strip()
+    return None
+
+
+def _parse_document_references(item: dict[str, Any]) -> tuple[str, ...]:
+    return tuple(
+        str(item[key]).strip()
+        for key in ("DocNumber", "TxnId")
+        if item.get(key) is not None and str(item[key]).strip()
+    )

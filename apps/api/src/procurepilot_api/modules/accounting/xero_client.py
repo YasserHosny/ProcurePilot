@@ -20,6 +20,7 @@ from procurepilot_api.modules.accounting.connector import (
     CompanyInfo,
     OAuthTokens,
     RawBill,
+    RawBillLine,
     RawVendor,
 )
 
@@ -397,11 +398,24 @@ class XeroClient:
                         currency=currency,
                         bill_date=bill_date,
                         status=_parse_bill_status(item.get("Status")),
+                        provider_order_reference=_optional_text(
+                            item.get("PurchaseOrderNumber")
+                        ),
+                        document_references=tuple(
+                            reference
+                            for reference in (
+                                _optional_text(item.get("InvoiceNumber")),
+                                _optional_text(item.get("Reference")),
+                            )
+                            if reference is not None
+                        ),
+                        lines=_parse_bill_lines(item, currency=currency),
                     )
                 )
             if len(entries) < self.PAGE_SIZE:
                 return bills
             page += 1
+
 
     @staticmethod
     def _parse_error_payload(response: httpx.Response) -> tuple[str, str]:
@@ -431,3 +445,38 @@ def _valid_connection(item: dict[str, Any]) -> bool:
         and (short_name is None or isinstance(short_name, str))
         and (_non_empty_text(tenant_name) or _non_empty_text(short_name))
     )
+
+
+def _optional_text(value: object) -> str | None:
+    if isinstance(value, str) and value.strip():
+        return value.strip()
+    return None
+
+
+def _parse_bill_lines(item: dict[str, Any], *, currency: str) -> tuple[RawBillLine, ...]:
+    raw_lines = item.get("LineItems")
+    if not isinstance(raw_lines, list):
+        return ()
+    lines: list[RawBillLine] = []
+    for line_number, line in enumerate(raw_lines, start=1):
+        if (
+            not isinstance(line, dict)
+            or line.get("Quantity") is None
+            or line.get("UnitAmount") is None
+        ):
+            continue
+        try:
+            quantity = Decimal(str(line["Quantity"]))
+            unit_price = Decimal(str(line["UnitAmount"]))
+        except (InvalidOperation, TypeError, ValueError):
+            continue
+        lines.append(RawBillLine(
+            line_number=line_number,
+            quantity=quantity,
+            unit_price_amount=unit_price,
+            unit_price_currency=currency,
+            description=str(line.get("Description") or ""),
+            provider_line_reference=_optional_text(line.get("LineItemID")),
+            provider_product_reference=_optional_text(line.get("ItemCode")),
+        ))
+    return tuple(lines)

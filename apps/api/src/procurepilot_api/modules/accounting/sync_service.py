@@ -672,6 +672,8 @@ class SyncService:
                     currency,
                     bill_date,
                     provider_status,
+                    provider_order_reference,
+                    document_references,
                     created_at,
                     updated_at
                 ) values (
@@ -684,6 +686,8 @@ class SyncService:
                     %(currency)s,
                     %(bill_date)s,
                     %(provider_status)s,
+                    %(provider_order_reference)s,
+                    %(document_references)s::jsonb,
                     now(),
                     now()
                 )
@@ -694,6 +698,8 @@ class SyncService:
                     currency = excluded.currency,
                     bill_date = excluded.bill_date,
                     provider_status = excluded.provider_status,
+                    provider_order_reference = excluded.provider_order_reference,
+                    document_references = excluded.document_references,
                     updated_at = now()
                 returning id
                 """,
@@ -707,10 +713,70 @@ class SyncService:
                     "currency": raw_bill.currency,
                     "bill_date": raw_bill.bill_date,
                     "provider_status": raw_bill.status,
+                    "provider_order_reference": raw_bill.provider_order_reference,
+                    "document_references": json.dumps(raw_bill.document_references),
                 },
             )
             row = cur.fetchone()
-            return UUID(str(row["id"]))
+            synced_bill_id = UUID(str(row["id"]))
+            cur.execute(
+                """
+                delete from synced_bill_line
+                where tenant_id = %(tenant_id)s
+                  and synced_bill_id = %(synced_bill_id)s
+                """,
+                {"tenant_id": tenant_id, "synced_bill_id": synced_bill_id},
+            )
+            for line in raw_bill.lines:
+                cur.execute(
+                    """
+                    insert into synced_bill_line (
+                        tenant_id,
+                        synced_bill_id,
+                        line_number,
+                        provider_line_reference,
+                        provider_product_reference,
+                        description,
+                        quantity,
+                        unit_price_amount,
+                        unit_price_currency,
+                        created_at,
+                        updated_at
+                    ) values (
+                        %(tenant_id)s,
+                        %(synced_bill_id)s,
+                        %(line_number)s,
+                        %(provider_line_reference)s,
+                        %(provider_product_reference)s,
+                        %(description)s,
+                        %(quantity)s,
+                        %(unit_price_amount)s,
+                        %(unit_price_currency)s,
+                        now(),
+                        now()
+                    )
+                    on conflict (tenant_id, synced_bill_id, line_number) do update
+                    set provider_line_reference = excluded.provider_line_reference,
+                        provider_product_reference = excluded.provider_product_reference,
+                        description = excluded.description,
+                        quantity = excluded.quantity,
+                        unit_price_amount = excluded.unit_price_amount,
+                        unit_price_currency = excluded.unit_price_currency,
+                        updated_at = now()
+                    """,
+                    {
+                        "tenant_id": tenant_id,
+                        "synced_bill_id": synced_bill_id,
+                        "line_number": line.line_number,
+                        "provider_line_reference": line.provider_line_reference,
+                        "provider_product_reference": line.provider_product_reference,
+                        "description": line.description,
+                        "quantity": line.quantity,
+                        "unit_price_amount": line.unit_price_amount,
+                        "unit_price_currency": line.unit_price_currency,
+                    },
+                )
+            return synced_bill_id
 
     def _run_matching(
         self,
