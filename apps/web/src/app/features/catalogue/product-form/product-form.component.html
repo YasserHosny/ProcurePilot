@@ -57,6 +57,47 @@
   } @else {
     <form [formGroup]="form" (ngSubmit)="onSubmit()" class="product-form">
       <mat-card class="form-card">
+        @if (productSignal(); as signal) {
+          @if (signal.sales_velocity_per_day !== null || signal.stock_on_hand !== null) {
+            <div class="pos-inline-context" data-testid="pos-inline-context">
+              @if (signal.stock_on_hand !== null) {
+                <div class="pos-signal-item" data-testid="pos-stock-on-hand">
+                  <mat-icon class="signal-icon" aria-hidden="true">inventory_2</mat-icon>
+                  <span class="signal-label">{{ 'pos.inline.stockOnHand' | translate }}:</span>
+                  <strong class="signal-value">{{ signal.stock_on_hand }}</strong>
+                  @if (form.get('base_unit')?.value; as unit) {
+                    <span class="signal-unit">{{ unit }}</span>
+                  }
+                  <span class="signal-meta">
+                    @if (signal.stock_synced_at) {
+                      ({{ 'pos.inline.lastSynced' | translate:{ time: (signal.stock_synced_at | formatDate) } }})
+                    } @else {
+                      ({{ 'pos.inline.neverSynced' | translate }})
+                    }
+                  </span>
+                </div>
+              }
+              @if (signal.sales_velocity_per_day !== null) {
+                <div class="pos-signal-item" data-testid="pos-sales-velocity">
+                  <mat-icon class="signal-icon" aria-hidden="true">trending_up</mat-icon>
+                  <span class="signal-label">{{ 'pos.inline.salesVelocity' | translate }}:</span>
+                  @if (signal.velocity_window_days_observed !== null && signal.velocity_window_days_observed !== undefined && signal.velocity_window_days_observed < signal.velocity_window_days) {
+                    <span class="provisional-badge" data-testid="pos-velocity-provisional">{{ 'pos.inline.provisionalBadge' | translate }}</span>
+                    <strong class="signal-value provisional-value">
+                      {{ 'pos.inline.provisionalVelocity' | translate:{ velocity: signal.sales_velocity_per_day, observed: signal.velocity_window_days_observed, days: signal.velocity_window_days } }}
+                    </strong>
+                  } @else {
+                    <strong class="signal-value">
+                      {{ 'pos.inline.fullVelocity' | translate:{ velocity: signal.sales_velocity_per_day, days: signal.velocity_window_days } }}
+                    </strong>
+                  }
+                </div>
+              }
+            </div>
+            <mat-divider></mat-divider>
+          }
+        }
+
         <!-- Basic Specifications -->
         <div class="form-section">
           <div class="form-row">

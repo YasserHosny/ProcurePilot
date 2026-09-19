@@ -18,6 +18,8 @@ import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
 import { ApiService } from '../../../core/api/api.service';
 import type { ApiError, Product } from '../../../core/api/models';
+import { FormatDatePipe } from '../../../core/format/date.pipe';
+import { PosApiService, type SyncedProductSignal } from '../../pos/pos-api';
 import { formatConfidenceClass, formatScorePercent } from '../offer-formatting';
 import type { OfferComparison, Recommendation, RecommendationConfidence } from '../offers-api';
 import { type ProjectedOffer, projectComparison } from './compare-projection';
@@ -44,6 +46,7 @@ import { CompareTableComponent } from './compare-table.component';
     MatProgressSpinnerModule,
     MatSnackBarModule,
     TranslatePipe,
+    FormatDatePipe,
     CompareRecommendationComponent,
     CompareTableComponent,
   ],
@@ -54,12 +57,14 @@ export class CompareComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly api = inject(ApiService);
+  private readonly posApi = inject(PosApiService);
   private readonly snackBar = inject(MatSnackBar);
   private readonly translate = inject(TranslateService);
 
   readonly isLoading = signal<boolean>(false);
   readonly products = signal<Product[]>([]);
   readonly selectedProductId = signal<string>('');
+  readonly productSignal = signal<SyncedProductSignal | null>(null);
   readonly quantityInput = signal<string>('10');
   readonly includeExpired = signal<boolean>(false);
   readonly rawComparison = signal<OfferComparison | null>(null);
@@ -158,11 +163,16 @@ export class CompareComponent implements OnInit {
   }
 
   fetchComparison(productId: string): void {
-    if (!productId) return;
+    if (!productId) {
+      this.productSignal.set(null);
+      return;
+    }
     this.isLoading.set(true);
     this.errorMessage.set(null);
     this.errorTraceId.set(null);
     this.networkCallCount++;
+
+    this.fetchProductSignal(productId);
 
     const qty = this.quantityInput() || '10';
     this.api.compareOffers({ product_id: productId, quantity: qty }).subscribe({
@@ -184,6 +194,24 @@ export class CompareComponent implements OnInit {
         } else {
           this.errorMessage.set(this.translate.instant('compare.empty.message'));
         }
+      },
+    });
+  }
+
+  fetchProductSignal(productId: string): void {
+    if (!productId) {
+      this.productSignal.set(null);
+      return;
+    }
+    this.productSignal.set(null);
+    this.posApi.listSignals({ workspaceProductId: productId, matchStatus: 'matched' }).subscribe({
+      next: (res) => {
+        const match = res.items.find((item) => item.matched_workspace_product_id === productId) ?? res.items[0] ?? null;
+        this.productSignal.set(match);
+      },
+      error: () => {
+        // Defensive: Absence of POS connection or error renders zero visible difference (FR-007, US3)
+        this.productSignal.set(null);
       },
     });
   }

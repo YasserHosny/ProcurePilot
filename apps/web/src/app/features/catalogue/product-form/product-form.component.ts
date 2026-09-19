@@ -16,7 +16,9 @@ import { TranslatePipe, TranslateService } from "@ngx-translate/core";
 import { ApiService } from "../../../core/api/api.service";
 import type { ApiError, BaseUnit, LimitCheck, Product, ProductCreate, ProductUpdate, Supplier } from "../../../core/api/models";
 import { SessionService } from "../../../core/auth/session.service";
+import { FormatDatePipe } from "../../../core/format/date.pipe";
 import { I18nService } from "../../../core/i18n/i18n.service";
+import { PosApiService, type SyncedProductSignal } from "../../pos/pos-api";
 import { computeBaseQuantity } from "../normalisation";
 
 @Component({
@@ -35,6 +37,7 @@ import { computeBaseQuantity } from "../normalisation";
     MatProgressSpinnerModule,
     MatSnackBarModule,
     TranslatePipe,
+    FormatDatePipe,
   ],
   templateUrl: "./product-form.component.html",
   styleUrl: "./product-form.component.scss",
@@ -42,6 +45,7 @@ import { computeBaseQuantity } from "../normalisation";
 export class ProductFormComponent implements OnInit {
   private readonly fb = inject(FormBuilder);
   private readonly api = inject(ApiService);
+  private readonly posApi = inject(PosApiService);
   private readonly session = inject(SessionService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
@@ -51,6 +55,7 @@ export class ProductFormComponent implements OnInit {
 
   readonly isEditMode = signal<boolean>(false);
   readonly productId = signal<string | null>(null);
+  readonly productSignal = signal<SyncedProductSignal | null>(null);
   readonly isLoading = signal<boolean>(true);
   readonly isSaving = signal<boolean>(false);
   readonly errorMessage = signal<string | null>(null);
@@ -149,6 +154,7 @@ export class ProductFormComponent implements OnInit {
   private checkModeAndLoad(): void {
     const id = this.productId();
     if (id) {
+      this.fetchProductSignal(id);
       this.api.product(id).subscribe({
         next: (prod) => {
           this.populateForm(prod);
@@ -163,11 +169,26 @@ export class ProductFormComponent implements OnInit {
         },
       });
     } else {
+      this.productSignal.set(null);
       this.isLoading.set(false);
       if (!this.isWriter()) {
         this.form.disable();
       }
     }
+  }
+
+  private fetchProductSignal(productId: string): void {
+    this.productSignal.set(null);
+    this.posApi.listSignals({ workspaceProductId: productId, matchStatus: 'matched' }).subscribe({
+      next: (res) => {
+        const match = res.items.find((item) => item.matched_workspace_product_id === productId) ?? res.items[0] ?? null;
+        this.productSignal.set(match);
+      },
+      error: () => {
+        // Defensive: Absence of connection or error leaves signal null with zero screen impact (US3)
+        this.productSignal.set(null);
+      },
+    });
   }
 
   private populateForm(prod: Product): void {

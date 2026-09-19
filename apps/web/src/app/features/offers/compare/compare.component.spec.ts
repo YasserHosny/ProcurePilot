@@ -3,17 +3,20 @@ import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { provideRouter } from '@angular/router';
-import { TranslateModule } from '@ngx-translate/core';
+import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { of } from 'rxjs';
 
+import enCatalog from '../../../../../../../packages/i18n/en.json';
 import { ApiService } from '../../../core/api/api.service';
+import { PosApiService } from '../../pos/pos-api';
 import type { OfferComparison } from '../offers-api';
 import { CompareComponent } from './compare.component';
 
-describe('CompareComponent (US1, SC-002, T020)', () => {
+describe('CompareComponent (US1, SC-002, T020, T029)', () => {
   let component: CompareComponent;
   let fixture: ComponentFixture<CompareComponent>;
   let apiService: jasmine.SpyObj<ApiService>;
+  let posApiService: jasmine.SpyObj<PosApiService>;
 
   const mockComparison: OfferComparison = {
     product: {
@@ -135,6 +138,9 @@ describe('CompareComponent (US1, SC-002, T020)', () => {
     );
     apiService.compareOffers.and.returnValue(of(mockComparison));
 
+    posApiService = jasmine.createSpyObj<PosApiService>('PosApiService', ['listSignals']);
+    posApiService.listSignals.and.returnValue(of({ items: [], next_cursor: null }));
+
     await TestBed.configureTestingModule({
       imports: [CompareComponent, TranslateModule.forRoot()],
       providers: [
@@ -143,8 +149,13 @@ describe('CompareComponent (US1, SC-002, T020)', () => {
         provideHttpClientTesting(),
         provideRouter([]),
         { provide: ApiService, useValue: apiService },
+        { provide: PosApiService, useValue: posApiService },
       ],
     }).compileComponents();
+
+    const translate = TestBed.inject(TranslateService);
+    translate.setTranslation('en', enCatalog);
+    translate.use('en');
 
     fixture = TestBed.createComponent(CompareComponent);
     component = fixture.componentInstance;
@@ -339,5 +350,87 @@ describe('CompareComponent (US1, SC-002, T020)', () => {
     expect(scorecardBtns.length).toBe(2);
     expect(scorecardBtns[0].getAttribute('href')).toContain('/suppliers/supp-1/scorecard');
     expect(scorecardBtns[1].getAttribute('href')).toContain('/suppliers/supp-2/scorecard');
+  });
+
+  describe('T029: Inline POS Signals', () => {
+    it('does not render inline POS signals when no matched signal exists for product', () => {
+      posApiService.listSignals.and.returnValue(of({ items: [], next_cursor: null }));
+      component.fetchComparison('00000000-0000-4000-8000-000000000001');
+      fixture.detectChanges();
+
+      const el = fixture.nativeElement as HTMLElement;
+      expect(el.querySelector('[data-testid="pos-inline-context"]')).toBeNull();
+    });
+
+    it('renders stock on hand and full-window sales velocity inline when matched signal exists', () => {
+      posApiService.listSignals.and.returnValue(
+        of({
+          items: [
+            {
+              id: 'sig-001',
+              external_item_name: 'Semi-Skimmed Milk 2L',
+              matched: true,
+              matched_workspace_product_id: '00000000-0000-4000-8000-000000000001',
+              stock_on_hand: '24.000',
+              stock_synced_at: '2026-09-19T10:00:00Z',
+              sales_velocity_per_day: '3.500',
+              velocity_window_days: 30,
+              velocity_window_days_observed: 30,
+              velocity_computed_at: '2026-09-19T10:00:00Z',
+            },
+          ],
+          next_cursor: null,
+        }),
+      );
+
+      component.fetchComparison('00000000-0000-4000-8000-000000000001');
+      fixture.detectChanges();
+
+      const el = fixture.nativeElement as HTMLElement;
+      const context = el.querySelector('[data-testid="pos-inline-context"]');
+      expect(context).toBeTruthy();
+
+      const stock = el.querySelector('[data-testid="pos-stock-on-hand"]');
+      expect(stock).toBeTruthy();
+      expect(stock?.textContent).toContain('24.000');
+
+      const velocity = el.querySelector('[data-testid="pos-sales-velocity"]');
+      expect(velocity).toBeTruthy();
+      expect(velocity?.textContent).toContain('3.500 units/day · 30-day avg');
+      expect(el.querySelector('[data-testid="pos-velocity-provisional"]')).toBeNull();
+    });
+
+    it('renders sales velocity visibly as provisional when observed window days is less than target window', () => {
+      posApiService.listSignals.and.returnValue(
+        of({
+          items: [
+            {
+              id: 'sig-002',
+              external_item_name: 'Semi-Skimmed Milk 2L',
+              matched: true,
+              matched_workspace_product_id: '00000000-0000-4000-8000-000000000001',
+              stock_on_hand: null,
+              stock_synced_at: null,
+              sales_velocity_per_day: '4.200',
+              velocity_window_days: 30,
+              velocity_window_days_observed: 6,
+              velocity_computed_at: '2026-09-19T10:00:00Z',
+            },
+          ],
+          next_cursor: null,
+        }),
+      );
+
+      component.fetchComparison('00000000-0000-4000-8000-000000000001');
+      fixture.detectChanges();
+
+      const el = fixture.nativeElement as HTMLElement;
+      const provisionalBadge = el.querySelector('[data-testid="pos-velocity-provisional"]');
+      expect(provisionalBadge).toBeTruthy();
+
+      const velocity = el.querySelector('[data-testid="pos-sales-velocity"]');
+      expect(velocity?.textContent).toContain('≈4.200 units/day · based on 6 of 30 days');
+      expect(el.querySelector('[data-testid="pos-stock-on-hand"]')).toBeNull();
+    });
   });
 });

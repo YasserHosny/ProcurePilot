@@ -282,3 +282,65 @@
   display: inline-block;
   margin-inline-end: 0.5rem;
 }
+
+.pos-inline-context {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1.5rem;
+  padding: 0.75rem 1rem;
+  background-color: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  margin-bottom: 1.5rem;
+
+  .pos-signal-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    font-size: 0.875rem;
+    color: #334155;
+
+    .signal-icon {
+      font-size: 1.125rem;
+      width: 1.125rem;
+      height: 1.125rem;
+      color: #64748b;
+    }
+
+    .signal-label {
+      color: #64748b;
+    }
+
+    .signal-value {
+      color: #0f172a;
+      font-weight: 600;
+    }
+
+    .signal-unit {
+      color: #64748b;
+    }
+
+    .signal-meta {
+      color: #64748b;
+      font-size: 0.8125rem;
+      margin-inline-start: 0.25rem;
+    }
+
+    .provisional-badge {
+      display: inline-block;
+      padding: 0.125rem 0.375rem;
+      border-radius: 4px;
+      font-size: 0.6875rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.025em;
+      background-color: #fef3c7;
+      color: #92400e;
+    }
+
+    .provisional-value {
+      color: #b45309;
+    }
+  }
+}
