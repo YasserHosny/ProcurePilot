@@ -37,7 +37,11 @@ cover supplier_commercial_term and supplier_scorecard_snapshot; extended again f
 ingestion_jobs and catalogue_imports — cross-tenant isolation only, matching the split
 established for prior chunks (each of these already grants ordinary authenticated-role CRUD
 per its own RBAC, proven separately in tests/integration/test_ingestion_*.py; this file's job is
-only "another tenant's row is invisible/unwritable-into", not the full RBAC matrix).
+only "another tenant's row is invisible/unwritable-into", not the full RBAC matrix); extended
+again for 014-accounting-integration to cover accounting_connection, synced_vendor, synced_bill,
+purchase_bill_match and reconciliation_discrepancy; extended again for
+015-pos-inventory-integration (T035) to cover pos_connection, synced_product_signal and
+pos_product_match — cross-tenant isolation only, same split as every prior chunk.
 """
 
 from __future__ import annotations
@@ -104,6 +108,9 @@ class Workspace:
         synced_bill_id: UUID,
         purchase_bill_match_id: UUID,
         reconciliation_discrepancy_id: UUID,
+        pos_connection_id: UUID,
+        synced_product_signal_id: UUID,
+        pos_product_match_id: UUID,
     ) -> None:
         self.tenant_id = tenant_id
         self.user_id = user_id
@@ -145,6 +152,9 @@ class Workspace:
         self.synced_bill_id = synced_bill_id
         self.purchase_bill_match_id = purchase_bill_match_id
         self.reconciliation_discrepancy_id = reconciliation_discrepancy_id
+        self.pos_connection_id = pos_connection_id
+        self.synced_product_signal_id = synced_product_signal_id
+        self.pos_product_match_id = pos_product_match_id
 
     def claims(self) -> str:
         return (
@@ -624,6 +634,47 @@ def make_workspace(cur: psycopg.Cursor, label: str) -> Workspace:
         ),
     )
 
+    # POS & inventory integration - chunk R3.2 (015-pos-inventory-integration).
+    pos_connection_id = uuid4()
+    cur.execute(
+        "insert into pos_connection "
+        "(id,tenant_id,provider,external_account_id,external_account_name,"
+        "access_token,refresh_token,status,connected_by) "
+        "values (%s,%s,'square',%s,%s,'access-token','refresh-token','active',%s)",
+        (
+            pos_connection_id,
+            tenant_id,
+            f"merchant-{label}-{pos_connection_id.hex[:8]}",
+            f"{label} Square",
+            membership_id,
+        ),
+    )
+    synced_product_signal_id = uuid4()
+    cur.execute(
+        "insert into synced_product_signal "
+        "(id,tenant_id,pos_connection_id,external_item_id,external_item_name) "
+        "values (%s,%s,%s,%s,%s)",
+        (
+            synced_product_signal_id,
+            tenant_id,
+            pos_connection_id,
+            f"item-{label}-{synced_product_signal_id.hex[:8]}",
+            f"{label} Signal Item",
+        ),
+    )
+    pos_product_match_id = uuid4()
+    cur.execute(
+        "insert into pos_product_match "
+        "(id,tenant_id,synced_product_signal_id,workspace_product_id,match_method) "
+        "values (%s,%s,%s,%s,'automatic')",
+        (
+            pos_product_match_id,
+            tenant_id,
+            synced_product_signal_id,
+            workspace_product_id,
+        ),
+    )
+
     return Workspace(
         tenant_id,
         user_id,
@@ -665,6 +716,9 @@ def make_workspace(cur: psycopg.Cursor, label: str) -> Workspace:
         synced_bill_id,
         purchase_bill_match_id,
         reconciliation_discrepancy_id,
+        pos_connection_id,
+        synced_product_signal_id,
+        pos_product_match_id,
     )
 
 
@@ -2097,6 +2151,92 @@ def test_a_worker_session_cannot_write_reconciliation_discrepancy_into_another_w
             )
 
 
+def test_another_workspaces_pos_connections_are_invisible(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        cur.execute(
+            "select id from pos_connection where id = %s",
+            (beta.pos_connection_id,),
+        )
+        assert cur.fetchone() is None
+
+
+def test_a_member_cannot_write_a_pos_connection_into_another_workspace(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            cur.execute(
+                "insert into pos_connection "
+                "(tenant_id,provider,external_account_id,external_account_name,"
+                "access_token,refresh_token,status,connected_by) "
+                "values (%s,'square','merchant-hijack','Hijack Connection',"
+                "'token','refresh','active',%s)",
+                (beta.tenant_id, alpha.membership_id),
+            )
+
+
+def test_another_workspaces_synced_product_signals_are_invisible(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        cur.execute(
+            "select id from synced_product_signal where id = %s",
+            (beta.synced_product_signal_id,),
+        )
+        assert cur.fetchone() is None
+
+
+def test_a_worker_session_cannot_write_synced_product_signal_into_another_workspace(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        _act_as_tenant_sync(cur, alpha.tenant_id)
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            cur.execute(
+                "insert into synced_product_signal "
+                "(tenant_id,pos_connection_id,external_item_id,external_item_name) "
+                "values (%s,%s,'item-hijack','Hijack Item')",
+                (beta.tenant_id, beta.pos_connection_id),
+            )
+
+
+def test_another_workspaces_pos_product_matches_are_invisible(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        cur.execute(
+            "select id from pos_product_match where id = %s",
+            (beta.pos_product_match_id,),
+        )
+        assert cur.fetchone() is None
+
+
+def test_a_worker_session_cannot_write_pos_product_match_into_another_workspace(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        _act_as_tenant_sync(cur, alpha.tenant_id)
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            cur.execute(
+                "insert into pos_product_match "
+                "(tenant_id,synced_product_signal_id,workspace_product_id,match_method) "
+                "values (%s,%s,%s,'automatic')",
+                (beta.tenant_id, beta.synced_product_signal_id, beta.workspace_product_id),
+            )
+
+
 # --- the guarantee itself ---------------------------------------------------
 
 
@@ -2126,6 +2266,7 @@ def test_rls_is_enabled_and_forced_on_every_tenant_scoped_table(
         "tenant_email_config", "ingestion_email_log", "ingestion_jobs", "catalogue_imports",
         "accounting_connection", "synced_vendor", "synced_bill", "purchase_bill_match",
         "reconciliation_discrepancy",
+        "pos_connection", "synced_product_signal", "pos_product_match",
     }
     with conn.cursor() as cur:
         cur.execute(
