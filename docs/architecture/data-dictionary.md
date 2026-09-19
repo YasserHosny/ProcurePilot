@@ -1919,4 +1919,119 @@ and updates/reopens existing ones via `reconciliation_discrepancy_worker_update`
 - `accounting.sync_failed` — accounting synchronization pass failed (e.g. token refresh failure, network exception).
 - `accounting.discrepancy_resolved` — reconciliation discrepancy was reviewed and marked resolved by a workspace owner or buyer.
 
+## POS & Inventory Integration (chunk R3.2, `015-pos-inventory-integration`)
+
+This chunk adds a read-only Square POS/inventory connection and persists stock-on-hand plus sales-velocity signals for
+matching to `workspace_product`. The connector boundary enforces read-only behavior in code: `PosConnector` exposes
+OAuth, account metadata, `list_sales_transactions(since)`, and `list_inventory_levels()`; it has no provider write
+method. The sync path consumes those reads, writes ProcurePilot tables, and never changes Smart Compare scoring.
+
+### Schema design note: POS token security, worker writes, and reconnect identity
+
+- **Credential columns**: `pos_connection.access_token` and `refresh_token` are stored encrypted. `authenticated` may
+  insert them during owner-led connection creation, but column-level grants withhold token `SELECT` and token `UPDATE`.
+  Token reads and refresh writes use a direct `service_role` path constrained by explicit `id` and `tenant_id` filters.
+- **Worker/system write sessions**: POS sync writes to `synced_product_signal`, automatic `pos_product_match`, and
+  `pos_connection.last_synced_at` through tenant-scoped database sessions. `pos_connection_worker_update` is explicitly
+  gated by `current_member_role() is null`; `synced_product_signal` insert/update is tenant-scoped authenticated without
+  that additional worker-only role check, matching the migration as shipped. No member-facing endpoint writes
+  `synced_product_signal`.
+- **Reconnect de-duplication**: `synced_product_signal` is unique on `(tenant_id, external_item_id)` alone. Its
+  `pos_connection_id` is the "most recently synced via" pointer and is updated in place on every sync. Because reconnect
+  always creates a new `pos_connection` row, including `pos_connection_id` in the signal uniqueness key would duplicate
+  every known external item after reconnect and strand old `pos_product_match` records. The shipped design keeps signal
+  identity stable across disconnect/reconnect cycles.
+- **Provisional velocity disclosure**: `velocity_window_days_observed` records how many days of transaction history the
+  current velocity figure reflects. `SyncService` sets it below `velocity_window_days` for partial windows so the UI can
+  distinguish a provisional figure from a full-window 30-day average. As of the current FastAPI schema,
+  `SyncedProductSignal` does not expose this field even though the database and frontend type/templates support it.
+
+### `PosConnection`
+
+One workspace's authorized link to an external POS/inventory account (table `pos_connection`). Exactly one
+non-disconnected connection per tenant is allowed at a time; disconnecting marks the row and preserves history, while
+reconnecting inserts a new row.
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | uuid | PK, default `gen_random_uuid()` |
+| `tenant_id` | uuid | Required FK -> Tenant (`tenant.id`, `on delete cascade`); RLS key. Unique `(tenant_id, id)` |
+| `provider` | enum `pos_provider` | Required. Provider type, currently `'square'` |
+| `external_account_id` | text | Required. Provider merchant/account identifier |
+| `external_account_name` | text | Required. Connected account display name; API exposes this as `display_name` |
+| `access_token` | text | Required encrypted OAuth access token; not selectable/updatable by `authenticated` |
+| `refresh_token` | text | Required encrypted OAuth refresh token; not selectable/updatable by `authenticated` |
+| `status` | enum `pos_connection_status` | Required, default `'active'`. Values: `'active'`, `'needs_reauth'`, `'disconnected'` |
+| `connected_by` | uuid | Required composite FK -> Membership `(tenant_id, id)` (`pos_connection_membership_fkey`) |
+| `connected_at` | timestamptz | Required, default `now()` |
+| `last_synced_at` | timestamptz | Nullable. Updated after a successful sync |
+| `disconnected_at` | timestamptz | Nullable. Check `((status = 'disconnected') = (disconnected_at is not null))` |
+| `created_at` / `updated_at` | timestamptz | Audit fields, default `now()` |
+
+RLS (enabled + forced): All tenant members may `SELECT` non-secret connection fields
+(`pos_connection_tenant_select`). Owners may insert and update through `pos_connection_owner_insert` and
+`pos_connection_owner_update`. The sync worker may update status/last-sync fields through `pos_connection_worker_update`
+when `current_member_role() is null`. A partial unique index `pos_connection_one_active_per_tenant` on `(tenant_id)
+where disconnected_at is null` enforces one non-disconnected connection per tenant.
+
+### `SyncedProductSignal`
+
+The latest stock-on-hand and/or sales-velocity signal for one external POS catalog item (table
+`synced_product_signal`). Absence of a provider signal is stored as `null`, not zero.
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | uuid | PK, default `gen_random_uuid()` |
+| `tenant_id` | uuid | Required FK -> Tenant (`tenant.id`, `on delete cascade`); RLS key. Unique `(tenant_id, id)` |
+| `pos_connection_id` | uuid | Required composite FK -> PosConnection `(tenant_id, id)`; most recently synced via this connection |
+| `external_item_id` | text | Required provider item identifier |
+| `external_item_name` | text | Required provider item name, or the item id when no name is provided |
+| `stock_on_hand` | numeric(18, 4) | Nullable. Current inventory quantity when tracked by provider |
+| `stock_synced_at` | timestamptz | Nullable. Stamped when inventory data for the item is returned |
+| `sales_velocity_per_day` | numeric(18, 4) | Nullable. Computed from transactions in the trailing 30-day sync window |
+| `velocity_window_days` | integer | Required, default `30` |
+| `velocity_window_days_observed` | integer | Nullable. Actual observed history window; check allows null or values >= 0 |
+| `velocity_computed_at` | timestamptz | Nullable. Timestamp for the velocity computation |
+| `created_at` / `updated_at` | timestamptz | Audit fields, default `now()` |
+
+RLS (enabled + forced): All tenant members may `SELECT` (`synced_product_signal_tenant_select`). Insert and update are
+allowed for `authenticated` sessions scoped to the tenant (`synced_product_signal_tenant_insert` and
+`synced_product_signal_tenant_update`). Unique constraint `synced_product_signal_external_item_key` on
+`(tenant_id, external_item_id)` is the reconnect-dedup key; `pos_connection_id` is deliberately not part of it.
+
+### `PosProductMatch`
+
+Links a synced POS signal to a `workspace_product` (table `pos_product_match`). Enforces a strict 1:1 relationship in
+both directions: one signal matches at most one product, and one product matches at most one signal.
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | uuid | PK, default `gen_random_uuid()` |
+| `tenant_id` | uuid | Required FK -> Tenant (`tenant.id`, `on delete cascade`); RLS key. Unique `(tenant_id, id)` |
+| `synced_product_signal_id` | uuid | Required composite FK -> SyncedProductSignal `(tenant_id, id)`. Unique `(tenant_id, synced_product_signal_id)` enforces 1:1 |
+| `workspace_product_id` | uuid | Required composite FK -> WorkspaceProduct `(tenant_id, id)`. Unique `(tenant_id, workspace_product_id)` enforces 1:1 |
+| `match_method` | enum `match_method` | Required. Values: `'automatic'` or `'manual'` |
+| `matched_by` | uuid | Nullable composite FK -> Membership `(tenant_id, id)`. Check `((match_method = 'manual') = (matched_by is not null))` |
+| `matched_at` | timestamptz | Required, default `now()` |
+| `confidence` | numeric(5, 4) | Nullable; automatic matcher confidence, constrained between 0 and 1 when present |
+
+RLS (enabled + forced): All tenant members may `SELECT` (`pos_product_match_tenant_select`). There is no `UPDATE` policy
+or grant. `INSERT` is split between automatic matches (`match_method = 'automatic' and matched_by is null`) and manual
+owner/buyer matches (`match_method = 'manual'`, `matched_by = current_membership_id()`, and role in `owner`/`buyer`).
+`DELETE` is also split: automatic matches can be deleted when `tenant_id` matches and `match_method = 'automatic'`;
+owners and buyers can delete tenant matches through `pos_product_match_owner_buyer_delete`.
+
+### Enumerations & Schema Types
+
+- **`pos_provider`**: `'square'`
+- **`pos_connection_status`**: `'active'`, `'needs_reauth'`, `'disconnected'`
+- **`match_method`**: reused from chunk R3.1: `'automatic'`, `'manual'`
+
+### New audit events (chunk R3.2)
+
+- `pos.connection_created` — external POS connection was established and authorized by a workspace owner.
+- `pos.connection_disconnected` — external POS connection was disconnected by a workspace owner (historical signals preserved).
+- `pos.sync_started` — POS synchronization pass acquired its advisory lock and began.
+- `pos.sync_completed` — POS synchronization pass finished successfully, recording synced signal count and match count.
+- `pos.sync_failed` — POS synchronization pass failed after the advisory lock was acquired.
 

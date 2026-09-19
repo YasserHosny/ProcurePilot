@@ -75,6 +75,11 @@ paths:
       responses:
         '302':
           description: Redirect to the frontend /pos screen (pos_connected=success or pos_connected=failed)
+        '422':
+          description: Missing or invalid callback query parameter, such as required state
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
 
   /pos/connection:
     get:
@@ -138,7 +143,9 @@ paths:
         Owner or buyer. FR-002's manual-sync path (the recurring scheduled sync is the primary
         path). Concurrency guarded via a PostgreSQL advisory lock
         (pg_try_advisory_lock(hashtext(connection_id))) on the connection; returns 409 Conflict if
-        a sync for this connection is already running, rather than queueing a second one.
+        a sync for this connection is already running, rather than queueing a second one. The
+        current implementation returns 202 Accepted with status "enqueued", but runs the sync
+        synchronously inside the request before returning.
       tags: [POS]
       responses:
         '202':
@@ -163,6 +170,11 @@ paths:
               schema: { $ref: '#/components/schemas/ErrorEnvelope' }
         '409':
           description: A sync for this connection is already in progress
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+        '429':
+          description: POS sync mutation rate limit exceeded
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ErrorEnvelope' }
@@ -199,6 +211,11 @@ paths:
               schema: { $ref: '#/components/schemas/SyncedProductSignalList' }
         '401':
           description: Missing or invalid bearer token
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+        '422':
+          description: Invalid cursor, limit, match_status, or workspace_product_id query parameter
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ErrorEnvelope' }
@@ -245,6 +262,16 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+        '422':
+          description: Invalid signal_id path parameter or request body
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+        '429':
+          description: POS manual-match mutation rate limit exceeded
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
 
 components:
   securitySchemes:
@@ -269,7 +296,6 @@ components:
       properties:
         authorization_url:
           type: string
-          format: uri
 
     TriggerSyncResponse:
       type: object
@@ -301,6 +327,10 @@ components:
 
     SyncedProductSignal:
       type: object
+      description: >
+        Current API response model. Decimal quantities are serialized as strings. The database
+        stores velocity_window_days_observed for provisional-window disclosure, but the current
+        FastAPI response model does not expose that field.
       required: [id, external_item_name, matched, velocity_window_days]
       properties:
         id: { type: string, format: uuid }
