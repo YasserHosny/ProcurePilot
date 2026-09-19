@@ -35,6 +35,7 @@ from procurepilot_api.modules.accounting.connector import (
 from procurepilot_api.modules.accounting.matching_service import MatchingService
 from procurepilot_api.modules.accounting.quickbooks_client import QuickBooksAuthError
 from procurepilot_api.modules.accounting.reconciliation_service import ReconciliationService
+from procurepilot_api.modules.accounting.three_way_sync_service import run_three_way_sync
 from procurepilot_api.modules.accounting.xero_client import XeroAuthError
 from procurepilot_api.shared.audit import AuditEventCreate, AuditOutcome, get_audit_writer
 from procurepilot_api.shared.logging import get_trace_id
@@ -453,7 +454,16 @@ class SyncService:
             )
             tenant_conn.commit()
 
-            # 9. Update last_synced_at on accounting_connection
+            # 9. Evaluate normalized bills against internal order evidence.  The service
+            # deliberately shares this transaction and does not commit or roll it back.
+            three_way_summary = run_three_way_sync(
+                tenant_conn,
+                tenant_id=tenant_id,
+                connection_id=connection_id,
+            )
+            tenant_conn.commit()
+
+            # 10. Update last_synced_at on accounting_connection
             with tenant_conn.cursor() as cur:
                 cur.execute(
                     """
@@ -466,7 +476,7 @@ class SyncService:
                 )
             tenant_conn.commit()
 
-            # 10. Recompute reconciliation discrepancies (US3, T028)
+            # 11. Recompute reconciliation discrepancies (US3, T028)
             discrepancy_counts = ReconciliationService().recompute_discrepancies(
                 tenant_conn,
                 tenant_id=tenant_id,
@@ -481,6 +491,7 @@ class SyncService:
             "bills_synced": len(raw_bills),
             "matches_created": matches_created,
             "discrepancies": discrepancy_counts,
+            "three_way": three_way_summary.as_dict(),
         }
 
         _record_audit(
@@ -491,6 +502,7 @@ class SyncService:
                 "vendors_synced": len(raw_vendors),
                 "bills_synced": len(raw_bills),
                 "matches_created": matches_created,
+                "three_way": three_way_summary.as_dict(),
             },
             outcome="success",
         )
