@@ -254,6 +254,14 @@ export const routes: Routes = [
             (m) => m.AlertsInboxComponent,
           ),
       },
+      {
+        path: 'forecasting',
+        canActivate: [roleGuard('owner', 'buyer')],
+        loadComponent: () =>
+          import('./features/forecasting/reorder-queue/reorder-queue.component').then(
+            (m) => m.ReorderQueueComponent,
+          ),
+      },
       // --- value proof & savings (Chunk 4.6) ---
       {
         path: 'savings',

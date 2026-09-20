@@ -1,0 +1,157 @@
+<main class="forecasting-page">
+  <header class="page-header">
+    <div>
+      <h1>{{ 'forecasting.title' | translate }}</h1>
+      <p>{{ 'forecasting.subtitle' | translate }}</p>
+    </div>
+    @if (isWriter()) {
+      <button
+        mat-flat-button
+        color="primary"
+        type="button"
+        [disabled]="isRecomputing()"
+        (click)="recompute()"
+      >
+        @if (isRecomputing()) {
+          <mat-spinner diameter="18" [attr.aria-label]="'common.loading' | translate" />
+        } @else {
+          <mat-icon aria-hidden="true">refresh</mat-icon>
+        }
+        <span>{{ 'forecasting.actions.refresh' | translate }}</span>
+      </button>
+    }
+  </header>
+
+  <section class="gate-banner" role="note">
+    <mat-icon aria-hidden="true">science</mat-icon>
+    <div>
+      <strong>{{ 'forecasting.g3.title' | translate }}</strong>
+      <p>{{ 'forecasting.g3.message' | translate }}</p>
+    </div>
+  </section>
+
+  @if (isWriter()) {
+    <section class="request-controls" aria-labelledby="request-controls-title">
+      <div>
+        <h2 id="request-controls-title">{{ 'forecasting.controls.title' | translate }}</h2>
+        <p>{{ 'forecasting.controls.description' | translate }}</p>
+      </div>
+      <div class="controls-grid">
+        <mat-form-field appearance="outline">
+          <mat-label>{{ 'forecasting.controls.branch' | translate }}</mat-label>
+          <mat-select [ngModel]="selectedBranchId()" (ngModelChange)="selectedBranchId.set($event)">
+            @for (branch of branches(); track branch.id) {
+              <mat-option [value]="branch.id">{{ branch.name }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>{{ 'forecasting.controls.requiredBy' | translate }}</mat-label>
+          <input
+            matInput
+            type="date"
+            [ngModel]="requiredByDate()"
+            (ngModelChange)="requiredByDate.set($event)"
+          />
+        </mat-form-field>
+      </div>
+    </section>
+  }
+
+  @if (isLoading()) {
+    <div class="loading-state" role="status">
+      <mat-spinner diameter="32" [attr.aria-label]="'common.loading' | translate" />
+    </div>
+  } @else if (errorMessage()) {
+    <section class="state-panel error-panel" role="alert">
+      <mat-icon aria-hidden="true">error_outline</mat-icon>
+      <p>{{ errorMessage() }}</p>
+      <button mat-stroked-button type="button" (click)="loadProposals()">
+        {{ 'common.retry' | translate }}
+      </button>
+    </section>
+  } @else if (proposals().length === 0) {
+    <section class="state-panel" aria-live="polite">
+      <mat-icon aria-hidden="true">insights</mat-icon>
+      <h2>{{ 'forecasting.empty.title' | translate }}</h2>
+      <p>{{ 'forecasting.empty.message' | translate }}</p>
+    </section>
+  } @else {
+    <section class="proposal-list" [attr.aria-label]="'forecasting.listLabel' | translate">
+      @for (proposal of proposals(); track trackById($index, proposal)) {
+        <article class="proposal-card">
+          <header class="proposal-header">
+            <div>
+              <p class="eyebrow">{{ 'forecasting.card.product' | translate }}</p>
+              <h2>{{ proposal.product_name }}</h2>
+            </div>
+            <span class="status-badge" [class.prepared]="proposal.status === 'prepared'">
+              {{ ('forecasting.status.' + proposal.status) | translate }}
+            </span>
+          </header>
+
+          <div class="metric-grid">
+            <div class="metric">
+              <span>{{ 'forecasting.card.stock' | translate }}</span>
+              <strong>{{ proposal.stock_on_hand ?? ('common.notAvailable' | translate) }}</strong>
+            </div>
+            <div class="metric">
+              <span>{{ 'forecasting.card.expectedDemand' | translate }}</span>
+              <strong>{{ proposal.expected_demand ?? ('common.notAvailable' | translate) }}</strong>
+            </div>
+            <div class="metric">
+              <span>{{ 'forecasting.card.uncertainty' | translate }}</span>
+              <strong>
+                @if (proposal.uncertainty_lower && proposal.uncertainty_upper) {
+                  {{ proposal.uncertainty_lower }} - {{ proposal.uncertainty_upper }}
+                } @else {
+                  {{ 'common.notAvailable' | translate }}
+                }
+              </strong>
+            </div>
+            <div class="metric">
+              <span>{{ 'forecasting.card.suggestedQuantity' | translate }}</span>
+              <strong>{{ proposal.suggested_quantity ?? ('common.notAvailable' | translate) }}</strong>
+            </div>
+          </div>
+
+          <div class="evidence-row">
+            <span>{{ 'forecasting.card.history' | translate:{ days: proposal.observed_history_days ?? 0 } }}</span>
+            <span>{{ ('forecasting.state.' + proposal.state) | translate }}</span>
+            <span>{{ 'forecasting.card.validUntil' | translate:{ date: (proposal.valid_until | formatDate) } }}</span>
+          </div>
+
+          @if (proposal.state === 'insufficient_data') {
+            <p class="notice notice-warning">{{ 'forecasting.card.insufficientData' | translate }}</p>
+          } @else if (proposal.state === 'provisional') {
+            <p class="notice notice-warning">{{ 'forecasting.card.provisional' | translate }}</p>
+          }
+
+          <footer class="proposal-actions">
+            @if (proposal.status === 'prepared') {
+              <span class="prepared-note">
+                <mat-icon aria-hidden="true">task_alt</mat-icon>
+                {{ 'forecasting.card.prepared' | translate }}
+              </span>
+            } @else if (isWriter() && proposal.suggested_quantity && proposal.state !== 'insufficient_data') {
+              <button
+                mat-flat-button
+                color="primary"
+                type="button"
+                [disabled]="!selectedBranchId() || isPreparing(proposal.id)"
+                (click)="prepareRequest(proposal)"
+              >
+                @if (isPreparing(proposal.id)) {
+                  <mat-spinner diameter="18" [attr.aria-label]="'common.loading' | translate" />
+                } @else {
+                  <mat-icon aria-hidden="true">playlist_add</mat-icon>
+                }
+                <span>{{ 'forecasting.actions.prepareRequest' | translate }}</span>
+              </button>
+            }
+          </footer>
+        </article>
+      }
+    </section>
+  }
+</main>

@@ -2035,3 +2035,42 @@ owners and buyers can delete tenant matches through `pos_product_match_owner_buy
 - `pos.sync_completed` — POS synchronization pass finished successfully, recording synced signal count and match count.
 - `pos.sync_failed` — POS synchronization pass failed after the advisory lock was acquired.
 
+## R4.0 Forecasting and Reorder Proposals
+
+### `DemandForecast`
+
+Immutable tenant-scoped evidence snapshot in `demand_forecast`. It is keyed by a deterministic
+source fingerprint so recomputing the same POS signal does not create duplicate snapshots.
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | uuid | Primary key; unique with `tenant_id` |
+| `tenant_id` | uuid | Required tenant FK; RLS key |
+| `workspace_product_id` | uuid | Composite FK to the matched workspace product |
+| `synced_product_signal_id` | uuid | Composite FK to the POS signal used as evidence |
+| `source_fingerprint` | text | Unique per tenant and input/model version |
+| `model_version` | text | Pinned calculation version, currently `forecast-v1` |
+| `horizon_days` | integer | Forecast horizon, currently 14 |
+| `source_window_start/end` | date | Evidence interval used by the calculation |
+| `observed_history_days` | integer | Actual history disclosed to the reviewer |
+| `expected_daily_demand` | numeric(18,4) | Derived quantity in the product base unit |
+| `expected_demand` | numeric(18,4) | Expected quantity over the horizon |
+| `uncertainty_lower/upper` | numeric(18,4) | Quantity interval, never omitted for a numeric forecast |
+| `stock_on_hand` | numeric(18,4) | Stock evidence at forecast time |
+| `suggested_quantity` | numeric(18,4) | Non-negative draft quantity; null for insufficient evidence |
+| `confidence` | text | `high`, `medium`, or `low` |
+| `state` | text | `ready`, `provisional`, or `insufficient_data` |
+| `release_posture` | text | Currently constrained to `g3_unmet` |
+| `valid_from/valid_until` | timestamptz | Explicit forecast validity period |
+
+RLS is enabled and forced. Authenticated owners/buyers may insert; no update or delete policy
+exists, preserving replayable evidence.
+
+### `ReorderProposal`
+
+Tenant-scoped human workflow row in `reorder_proposal` linking one forecast to a draft request.
+Statuses are `open`, `prepared`, `dismissed`, and `expired`. Preparation stores the selected
+branch and `purchase_request_id`; it does not create a purchase order or bypass approvals.
+
+RLS is enabled and forced. All tenant members may read. Owners and buyers may insert or update,
+and every preparation is appended to `audit_event`.

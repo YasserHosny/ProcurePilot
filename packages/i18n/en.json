@@ -182,7 +182,65 @@
     "selectLanguage": "Select language",
     "navBasketSplit": "Basket Split",
     "navAlerts": "Alerts Inbox",
-    "navIntelligence": "Price Intelligence"
+    "navIntelligence": "Price Intelligence",
+    "navForecasting": "Reorder Forecasts"
+  },
+  "forecasting": {
+    "title": "Reorder Forecasts",
+    "subtitle": "Review demand evidence and prepare replenishment requests with uncertainty visible.",
+    "listLabel": "Reorder forecast proposals",
+    "g3": {
+      "title": "G3 evidence is still unmet",
+      "message": "These forecasts are an R4 preview. Connected commercial history has not yet validated the model, so provisional results must be reviewed by a human."
+    },
+    "actions": {
+      "refresh": "Refresh forecasts",
+      "prepareRequest": "Prepare draft request"
+    },
+    "controls": {
+      "title": "Draft request details",
+      "description": "Choose where a reviewed replenishment request should start. It will remain a draft until the normal approval process is completed.",
+      "branch": "Branch",
+      "requiredBy": "Required by date"
+    },
+    "recompute": {
+      "success": "Forecasts refreshed."
+    },
+    "prepare": {
+      "success": "Draft purchase request prepared."
+    },
+    "errors": {
+      "load": "Forecasts could not be loaded.",
+      "recompute": "Forecasts could not be refreshed.",
+      "prepare": "The draft request could not be prepared."
+    },
+    "empty": {
+      "title": "No reorder proposals yet",
+      "message": "Refresh forecasts after a matched POS signal has been synchronized."
+    },
+    "status": {
+      "open": "Needs review",
+      "prepared": "Draft prepared",
+      "dismissed": "Dismissed",
+      "expired": "Expired"
+    },
+    "state": {
+      "ready": "Full history",
+      "provisional": "Provisional history",
+      "insufficient_data": "Insufficient evidence"
+    },
+    "card": {
+      "product": "Product",
+      "stock": "Stock on hand",
+      "expectedDemand": "Expected demand",
+      "uncertainty": "Uncertainty range",
+      "suggestedQuantity": "Suggested quantity",
+      "history": "Observed history: {{days}} days",
+      "validUntil": "Valid until {{date}}",
+      "insufficientData": "The system cannot suggest a quantity until both demand and stock evidence are available.",
+      "provisional": "This forecast has less than 180 days of history and must be reviewed before use.",
+      "prepared": "Draft request is ready in Purchase Requests."
+    }
   },
   "home": {
     "welcomePrefix": "Welcome to",

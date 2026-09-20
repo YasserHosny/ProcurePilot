@@ -211,6 +211,17 @@
 
       <a
         mat-list-item
+        routerLink="/forecasting"
+        routerLinkActive="active"
+        class="nav-item"
+        *appRole="['owner', 'buyer']"
+      >
+        <mat-icon aria-hidden="true">trending_up</mat-icon>
+        <span class="nav-label">{{ 'shell.navForecasting' | translate }}</span>
+      </a>
+
+      <a
+        mat-list-item
         routerLink="/savings"
         routerLinkActive="active"
         class="nav-item"

@@ -2609,3 +2609,33 @@ Response:
 ```json
 { "status": "ok" }
 ```
+
+---
+
+## R4.0 Forecasting and Reorder Proposals
+
+These endpoints implement the controlled R4.0 release while the G3 commercial gate remains
+unmet. Every returned proposal exposes `release_posture = "g3_unmet"` and its evidence window.
+
+### `POST /forecasting/recompute`
+
+- Owner or buyer only.
+- Recomputes deterministic forecasts from tenant-scoped, matched `synced_product_signal` rows.
+- Returns `generated_forecasts`, `open_proposals`, and `release_posture`.
+- Writes immutable `demand_forecast` snapshots and open `reorder_proposal` rows.
+
+### `GET /forecasting/reorder-proposals`
+
+- Requires bearer auth and returns cursor-paginated proposals for the current tenant.
+- Includes stock, expected demand, uncertainty lower/upper bounds, observed history days,
+  confidence, state, validity, and the linked product name.
+- A proposal with `state = "insufficient_data"` has no suggested quantity and cannot be prepared.
+
+### `POST /forecasting/reorder-proposals/{proposal_id}/prepare-request`
+
+- Owner or buyer only.
+- Request requires `branch_id` and `required_by_date`, with an optional `cost_centre_id`.
+- Creates or replays a `draft` purchase request using a deterministic idempotency key.
+- Marks the proposal prepared and returns the linked request ID.
+- Never creates, submits, approves, or sends a purchase order.
+- Cross-tenant or unknown proposal IDs return the standard `404 not_found` envelope.
