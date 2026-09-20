@@ -129,6 +129,47 @@ describe('DiscrepanciesComponent (T031)', () => {
     },
   ];
 
+  const mockThreeWayDiscrepancy: ReconciliationDiscrepancy = {
+    id: 'disc-006',
+    discrepancy_type: 'quantity_variance',
+    synced_bill_id: 'bill-006',
+    purchase_record_id: 'pr-006',
+    status: 'open',
+    detected_at: '2026-09-18T12:00:00Z',
+    resolved_by: null,
+    resolved_at: null,
+    resolution_note: null,
+    purchase_order_id: 'po-006',
+    reopened_at: '2026-09-18T12:05:00Z',
+    evidence: {
+      confirmation: { state: 'pending' },
+      receipt: { state: 'available' },
+    },
+    three_way_match: {
+      result: 'needs_review',
+      tolerance_ruleset_version: 'r3.3',
+      source_hash: 'hash-006',
+      evaluated_at: '2026-09-18T12:00:00Z',
+      ordered_quantity: '10',
+      confirmed_quantity: null,
+      received_quantity: '8',
+      invoiced_quantity: '10',
+      ordered_unit_price_amount: '12.00',
+      ordered_unit_price_currency: 'GBP',
+      invoiced_unit_price_amount: '13.50',
+      invoiced_unit_price_currency: 'GBP',
+      ordered_total_amount: '120.00',
+      ordered_total_currency: 'GBP',
+      invoiced_total_amount: '135.00',
+      invoiced_total_currency: 'GBP',
+    },
+    purchase_order_detail: {
+      order_number: 'PO-006',
+      status: 'partially_received',
+      order_date: '2026-09-10',
+    },
+  };
+
   const mockInitialOpenResponse: ReconciliationDiscrepancyList = {
     items: mockOpenDiscrepancies,
     next_cursor: 'cur-page-2',
@@ -209,6 +250,24 @@ describe('DiscrepanciesComponent (T031)', () => {
             amount_mismatch: 'Amount Mismatch',
             unmatched_bill: 'Unmatched Bill',
             unmatched_purchase: 'Unmatched Purchase Record',
+            quantity_variance: 'Quantity Variance',
+          },
+          threeWay: {
+            title: 'Three-way comparison',
+            order: 'Purchase Order',
+            orderStatus: 'Order {{number}} · {{status}}',
+            ordered: 'Ordered',
+            confirmed: 'Confirmed',
+            received: 'Received',
+            invoiced: 'Invoiced',
+            unitPrice: 'Unit price',
+            ruleset: 'Ruleset {{version}}',
+            evaluatedAt: 'Evaluated {{date}}',
+            reopenedAt: 'Reopened {{date}}',
+            notProvided: 'Not provided',
+            pending: 'Pending',
+            unavailable: 'Unavailable',
+            available: 'Available',
           },
           table: {
             type: 'Type',
@@ -383,6 +442,24 @@ describe('DiscrepanciesComponent (T031)', () => {
     expect(supplier.nativeElement.textContent).toContain('Gamma Hardware');
     expect(amount.nativeElement.textContent).toContain('980.00');
     expect(date).toBeTruthy();
+  });
+
+  it('should render three-way evidence and missing evidence states', () => {
+    fixture.detectChanges();
+    const req = httpTestingController.expectOne(
+      '/api/v1/accounting/discrepancies?limit=50&status=open',
+    );
+    req.flush({ items: [mockThreeWayDiscrepancy], next_cursor: null });
+    fixture.detectChanges();
+
+    const detail = fixture.debugElement.query(By.css('[data-testid="three-way-detail"]'));
+    expect(detail).toBeTruthy();
+    expect(detail.nativeElement.textContent).toContain('PO-006');
+    expect(detail.nativeElement.textContent).toContain('10');
+    expect(detail.nativeElement.textContent).toContain('Not provided');
+    expect(detail.nativeElement.textContent).toContain('Pending');
+    expect(detail.nativeElement.textContent).toContain('12.00 GBP');
+    expect(detail.nativeElement.textContent).toContain('13.50 GBP');
   });
 
   it('should remove row and show success snackbar on successful resolve', () => {

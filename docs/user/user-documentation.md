@@ -1,7 +1,7 @@
 # ProcurePilot User Documentation
 
 > Complete system journey with annotated screenshots for every screen.
-> Last updated: 18 Sep 2026.
+> Last updated: 20 Sep 2026.
 >
 > Covers the web app only. For the mobile app (sign-in, biometric unlock, role-aware home
 > screen), see [ProcurePilot Mobile App User Documentation](mobile-app-user-documentation.md).
@@ -73,6 +73,8 @@ so tables, forms, and review panels remain legible.
 - ProcurePilot supports English and Arabic. Language can be changed after sign-in from the account menu.
 - If you receive an "Invalid email or password" error, check your email address for typos or use **Forgot password?** to reset.
 
+**Business value:** secure sign-in and invitation-gated workspace creation protect supplier pricing, savings evidence, and operational settings from unauthorized access. The flow also ensures each user enters the correct isolated workspace before procurement data is shown.
+
 ### Password reset
 
 **Route:** `/auth/password-reset`
@@ -134,6 +136,8 @@ Invited members arrive here from their email link. The token identifies the pend
 | 11 | **Savings Ledger** | Opens savings records, evidence, outcome capture, and export workflows. |
 | 12 | **Purchase Requests / Approval Queue** | Opens request intake and approval tracking screens for enabled roles. |
 | 13 | **Team Management / Settings** | Opens member administration and organisation configuration screens. |
+
+**Business value:** the dashboard gives users a quick confidence check that they are in the right workspace, under the right role, with the right tenant isolation and financial settings. That reduces setup uncertainty before they begin uploading quotes, comparing offers, or approving spend.
 
 ---
 
@@ -347,13 +351,13 @@ After AI extraction finishes, each quotation lands in the review queue. Open a r
 |---|---------|-------------|
 | 1 | **Page title — "Match Resolution Queue"** | Lists quotation lines from **confirmed** quotations that need a human decision: which catalogue product each extracted line refers to. Matching only runs once a quotation has been authorized (section 9). |
 | 2 | **Search by supplier or ID** | Filters tasks by supplier wording, supplier name, quotation ID, or line identifier. |
-| 3 | **Status filter** | Open (awaiting resolution), Resolved, or All. |
-| 4 | **Priority filter** | Filter by priority. |
-| 5 | **Routing Reason filter** | Filter by why the line was routed here: Low Confidence, No Candidate, Close Candidates, etc. |
-| 6 | **From date / To date** | Filters tasks by when they entered the matching queue. |
-| 7 | **Quotation groups** | Tasks are grouped by their uploaded quotation. Each group shows supplier, source filename, quotation reviewer, review time, issue date, and authoritative open/total line progress. Groups can be collapsed when you want to scan quotations without reading every line, then expanded again to resolve individual tasks. Empty queues show "No match tasks found" rather than a blank surface. |
-| 8 | **Line evidence** | Each line shows its displayed line number, complete supplier wording, quoted exposure with currency, matching routing reason, top candidate and score, queue age, and matching status. `Below Match Threshold` refers to product matching, not OCR or quotation-review confidence. A line may be fully extracted and arithmetically verified in quotation review while still needing a product-matching decision here. |
-| 9 | **Resolve Match / View Details action** | Opens the resolution screen for that quotation line while preserving quotation context. The line itself is not clickable, so keyboard and screen-reader users get one predictable action target. Resolved lines switch to a detail-oriented action for auditing the saved decision. |
+| 3 | **Status filter** | `Awaiting Match Decision` (open), `Being Reviewed` (in_progress), `Resolved`, `Auto-accepted` (view-only audit, `apps/web/src/app/features/matching/resolution-queue/resolution-queue.component.html:44`), or `All`. Select `Auto-accepted` to audit lines automatically matched above the threshold (deterministic GTIN/supplier-code/alias hit with high confidence) — they show a green `Auto-accepted` badge instead of a routing reason and are always `View Details` only (`component.html:172,188`). Default remains `Open` so the worklist stays focused on the ~8% needing human review. |
+| 4 | **Priority filter** | Filter by priority. Auto-accepted audit items are `Normal` priority; hidden if you filter to `High`/`Low`. |
+| 5 | **Routing Reason filter** | Filter by why the line was routed here: Low Confidence, No Candidate, Close Candidates, etc. Auto-accepted items use `Auto-accepted` reason and are hidden unless filter is `All`. |
+| 6 | **From date / To date** | Filters tasks by when they entered the matching queue (`Auto-accepted` uses `decided_at`). |
+| 7 | **Quotation groups** | Tasks are grouped by their uploaded quotation. Each group shows supplier, source filename, quotation reviewer, review time, issue date, and authoritative open/total line progress. Groups can be collapsed when you want to scan quotations without reading every line, then expanded again to resolve individual tasks. Empty queues show "No match tasks found" rather than a blank surface; filtering to `Auto-accepted` with no matches shows the same empty state for that subset. |
+| 8 | **Line evidence** | Each line shows its displayed line number, complete supplier wording with **queue age directly beneath it** (relative time like `just now`, `2h ago`, `3d ago` — full `created_at` on hover via `schedule` icon, `apps/web/src/app/features/matching/resolution-queue/resolution-queue.component.html:157`, `ageLabel()` `component.ts:265`), quoted exposure with currency, routing reason **or** `Auto-accepted` badge, top candidate and score, and matching status (`Awaiting Match Decision` / `Resolved` / `Auto-accepted`). `Below Match Threshold` refers to product matching, not OCR or quotation-review confidence. A line may be fully extracted and arithmetically verified in quotation review while still needing a product-matching decision here. |
+| 9 | **Resolve Match / View Details action** | Opens the resolution screen for that quotation line while preserving quotation context. The line itself is not clickable, so keyboard and screen-reader users get one predictable action target. Human-resolved lines and **all auto-accepted lines** use the view-only `View Details` action for auditing (`component.html:193`); only open `Awaiting Match Decision` lines show `Resolve Match` (for Owner/Buyer). |
 
 ### Match Resolution detail
 
@@ -372,9 +376,9 @@ After AI extraction finishes, each quotation lands in the review queue. Open a r
 | 4 | **Select Resolution Outcome** | Choose how the line resolves: **Same Product** (exact match), **Different Pack Size** (same product, different packaging), **Different Variant** (same family, different specification), **Compatible Alternative** (functional substitute), or **No Match — Create New Product** (adds a new catalogue product and maps this line to it). Close-candidate tasks require an explicit candidate choice; the screen does not preselect the top ranked option for you. |
 | 5 | **Confirm Match Decision** | Saves the outcome. Confirming "Same Product" (or any outcome that selects a candidate) also learns the exact supplier wording as an alias, so an identical wording on a future quotation resolves automatically without going through this queue again. If the same save request is retried because of a network interruption, ProcurePilot reuses the original saved decision instead of creating a duplicate. |
 
-**Business value:** matching is where supplier wording becomes business intelligence. It prevents fake comparisons, teaches the system each supplier's vocabulary, and reduces future operating work because repeated descriptions can resolve automatically once a human has confirmed them.
+**Business value:** matching is where supplier wording becomes business intelligence. It prevents fake comparisons, teaches the system each supplier's vocabulary, and reduces future operating work because repeated descriptions can resolve automatically once a human has confirmed them. Filtering `Status = Auto-accepted` makes the auto-accept precision claim auditable without polluting the default `Open` worklist.
 
-**Audit note:** match-routing, automatic acceptance, and human resolution events are written to the quotation audit trail. Matching and landed-cost history is append-only; corrections to a confirmed match require a future correction/supersession workflow rather than editing the saved decision in place.
+**Audit note:** match-routing, automatic acceptance (`matching.auto_accepted`), and human resolution (`matching.resolved`) events are written to the quotation audit trail and are also surfaced read-only via `Status = Auto-accepted` or the quotation's match overview (`GET /quotations/{id}/matches`). Matching and landed-cost history is append-only; corrections to a confirmed match require a future correction/supersession workflow rather than editing the saved decision in place. Use `View Details` on an auto-accepted line to inspect its candidate, score, and landed cost — no `Resolve` is offered.
 
 ---
 
@@ -440,6 +444,8 @@ After AI extraction finishes, each quotation lands in the review queue. Open a r
 - **Single-Supplier Baselines:** Evaluates whether splitting across suppliers saves money versus purchasing entirely from a single supplier.
 - **Applied & Violated Constraints:** Inspect which commercial terms (MOV, delivery fee) were applied and which constraints were violated if infeasible.
 - **Advisory-Only Protection:** In strict adherence to system principles, basket optimisation is purely advisory and never autonomously creates orders or commits funds.
+
+**Business value:** basket optimisation finds the lowest total landed cost across a real order, not just the cheapest line item. It accounts for supplier minimums, delivery fees, price tiers, urgency, risk, and quality so buyers can avoid overpaying because of supplier constraints while still keeping the final purchasing decision human-authorized.
 
 ---
 
@@ -708,6 +714,8 @@ The unified workspace hub for generated reporting artifacts and recurring report
 
 **Print support:** the Reports Center includes a dedicated print stylesheet (`@media print`) that isolates the artifact list and suppresses navigation chrome, filters, and tab headers for clean audit printing.
 
+**Business value:** the Reports Center gives owners and finance one governed place to retrieve procurement evidence after exports are generated. It reduces time spent hunting for spreadsheets, preserves report status and expiry context, and links reports back to the operational screens where follow-up action happens.
+
 ---
 
 ## 23. Report Schedules & Schedule Form
@@ -727,6 +735,8 @@ Configure automated recurring weekly reports delivered directly to the Reports C
 
 **Rate limiting & caps:** schedule creation and mutation are rate-limited and capped per member to prevent resource exhaustion. Duplicate schedules matching an existing member/kind/filters configuration return a structured conflict notification.
 
+**Business value:** scheduled reports turn procurement governance into a routine instead of an ad hoc manual task. Weekly exports keep savings, spend, and alert evidence visible to the right people without relying on a buyer to remember to regenerate the same report every week.
+
 ---
 
 ## 24. Weekly Digest & Digest Settings
@@ -742,6 +752,8 @@ Personalized weekly intelligence digests assembling key procurement metrics and 
 | 3 | **Latest In-App Digest View** | Browse the latest complete weekly digest organized in the standardized five-section hierarchy: **Verified Savings** (hero), **Pending Verifications**, **Pending Approvals**, **Commercial Anomalies**, and **Expiring Validity**. |
 | 4 | **Actionable Deep Links** | Every digest section and flagged item contains direct deep links to the responsible review, compare, or approval screen. |
 | 5 | **Strictly Advisory** | Digests never execute autonomous purchasing, approvals, or ordering (FR-017). Human authorization is required on the respective surface. |
+
+**Business value:** weekly digests keep commercial attention focused on the highest-value next actions: verified savings, pending approvals, unresolved anomalies, and expiring opportunities. They reduce management blind spots without turning the system into autonomous purchasing.
 
 ---
 
@@ -759,6 +771,8 @@ Personalized weekly intelligence digests assembling key procurement metrics and 
 - Roles are assigned at invitation time and can be changed by the Owner from Team Management.
 - Role-based visibility is enforced for selected navigation items and route guards.
 - Current client-side route guards restrict product/supplier creation, catalogue import, quotation upload, savings outcome/export, and Team Management. Other authenticated pages still rely on backend authorization for unsafe operations.
+
+**Business value:** roles and permissions protect the purchasing process from accidental or unauthorized action. They let the business separate request, buying, approval, administration, and read-only oversight while preserving a clear audit trail of who was allowed to do what.
 
 ---
 
@@ -798,6 +812,8 @@ Configure automated inbound email forwarding and domain security to receive and 
 | 6 | **SPF / DKIM Verification badge** | Displays whether strict sender identity verification is active, ensuring inbound messages legitimately originate from the sender's domain. |
 
 **Security and spam controls:** the domain allowlist is a critical abuse-prevention control, not just a technical filter. When empty, emails from any sender domain are accepted; once one or more domains are added, ProcurePilot strictly rejects emails from unapproved domains. This prevents spam, unsolicited marketing messages, or unauthorized external emails from polluting your quotation review queue or consuming your workspace's daily processing allowance.
+
+**Business value:** email forwarding captures supplier quotes where they already arrive, instead of forcing buyers to download and re-upload every attachment manually. The controls reduce missed quotes, speed up comparison readiness, and keep the intake channel clean enough to trust.
 
 ---
 
@@ -845,6 +861,8 @@ Quickly capture paper quotes using your mobile device camera or upload quotation
 
 **Review workflow:** capturing quotations is available to workspace Owners and Buyers. Once submitted, the captured document enters the automated line-item extraction queue and becomes a standard quotation for review. Line items, prices, and quantities can then be reviewed, adjusted, and authorized in the Quotation Review Queue (§7) and Quotation Review & Authorization screen (§9) exactly like any manually uploaded quotation.
 
+**Business value:** capture lets buyers preserve price evidence at the moment they receive it, even when the source is a paper quote, phone photo, or ad hoc document. That widens the pool of supplier prices available for comparison and reduces the chance that useful market data stays outside the system.
+
 ---
 
 ## 30. Catalogue Import (Bulk Price List)
@@ -863,6 +881,8 @@ Bulk-import supplier price lists and catalogues from CSV or Excel spreadsheets i
 | 6 | **Import Another Catalogue button** | Resets the import form so you can import price lists for additional suppliers. |
 
 **Spreadsheet format & partial import resilience:** available to workspace Owners and Buyers. Spreadsheets must include three required columns: product name (accepted headers: `product_name`, `name`, `item`, or `description`), unit price (accepted headers: `unit_price`, `price`, or `rate`; must be a positive number), and currency (accepted headers: `currency` or `curr`; a valid 3-letter currency code such as GBP, USD, or SAR). Optional columns include unit of measure (`unit`, `uom`, or `unit_of_measure`) and minimum order quantity (`qty`, `quantity`, or `moq`). If some rows contain errors, they are listed in the Error Details table and skipped without blocking the rows that succeeded — all valid rows are imported immediately.
+
+**Business value:** catalogue import turns supplier price lists into comparable offer data quickly, instead of waiting for each item to appear on a quotation. Partial import handling keeps good rows moving while making bad rows easy to fix, which improves price coverage without sacrificing data quality.
 
 ---
 

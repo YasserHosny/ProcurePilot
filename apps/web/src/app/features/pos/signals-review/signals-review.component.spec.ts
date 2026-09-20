@@ -1,5 +1,3 @@
-import { provideHttpClient } from '@angular/common/http';
-import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { By } from '@angular/platform-browser';
@@ -10,7 +8,7 @@ import { of } from 'rxjs';
 import enCatalog from '../../../../../../../packages/i18n/en.json';
 import { ApiService } from '../../../core/api/api.service';
 import type { Product } from '../../../core/api/models';
-import { PosApiService, type PosProductMatch, type SyncedProductSignal, type SyncedProductSignalList, type TriggerSyncResponse } from '../pos-api';
+import { PosApiService, type PosProductMatch, type SyncedProductSignal, type TriggerSyncResponse } from '../pos-api';
 import { SignalsReviewComponent } from './signals-review.component';
 
 describe('SignalsReviewComponent (T027)', () => {

@@ -60,7 +60,19 @@ export interface TriggerSyncResponse {
   status: 'enqueued';
 }
 
-export type DiscrepancyType = 'amount_mismatch' | 'unmatched_bill' | 'unmatched_purchase';
+export type DiscrepancyType =
+  | 'amount_mismatch'
+  | 'unmatched_bill'
+  | 'unmatched_purchase'
+  | 'missing_confirmation'
+  | 'missing_receipt'
+  | 'quantity_variance'
+  | 'price_variance'
+  | 'currency_mismatch'
+  | 'invoice_without_order'
+  | 'ambiguous_order'
+  | 'over_billed_quantity'
+  | 'over_billed_price';
 
 export type DiscrepancyStatus = 'open' | 'resolved';
 
@@ -78,6 +90,38 @@ export interface PurchaseRecordDetail {
   date: string;
 }
 
+export interface PurchaseOrderDetail {
+  order_number: string;
+  status: string;
+  order_date: string;
+}
+
+export type ThreeWayMatchResult =
+  | 'matched'
+  | 'partial'
+  | 'needs_review'
+  | 'unmatched'
+  | 'unavailable';
+
+export interface ThreeWayMatchSummary {
+  result: ThreeWayMatchResult;
+  tolerance_ruleset_version: string;
+  source_hash: string;
+  evaluated_at: string;
+  ordered_quantity: string | null;
+  confirmed_quantity: string | null;
+  received_quantity: string | null;
+  invoiced_quantity: string | null;
+  ordered_unit_price_amount: string | null;
+  ordered_unit_price_currency: string | null;
+  invoiced_unit_price_amount: string | null;
+  invoiced_unit_price_currency: string | null;
+  ordered_total_amount: string | null;
+  ordered_total_currency: string | null;
+  invoiced_total_amount: string | null;
+  invoiced_total_currency: string | null;
+}
+
 export interface ReconciliationDiscrepancy {
   id: string;
   discrepancy_type: DiscrepancyType;
@@ -90,6 +134,14 @@ export interface ReconciliationDiscrepancy {
   resolution_note: string | null;
   synced_bill_detail?: SyncedBillDetail | null;
   purchase_record_detail?: PurchaseRecordDetail | null;
+  three_way_match_id?: string | null;
+  purchase_order_id?: string | null;
+  evidence?: Record<string, unknown> | null;
+  source_hash?: string | null;
+  source_updated_at?: string | null;
+  reopened_at?: string | null;
+  three_way_match?: ThreeWayMatchSummary | null;
+  purchase_order_detail?: PurchaseOrderDetail | null;
 }
 
 export interface ReconciliationDiscrepancyList {

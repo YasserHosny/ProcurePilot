@@ -163,6 +163,7 @@
     "navImport": "Import Catalogue",
     "navQuotations": "Quotation Inbox",
     "navMatching": "Match Resolution",
+    "navOrders": "Order Tracking",
     "navCompare": "Smart Compare",
     "navSavings": "Savings Ledger",
     "navRequests": "Purchase Requests",
@@ -884,6 +885,18 @@
         "matchingAutoAccepted": "Product match accepted automatically",
         "matchingResolved": "Product match resolved by reviewer",
         "unknown": "Action performed"
+      },
+      "details": {
+        "lineWithText": "Line {{number}}: {{text}}",
+        "lineNumber": "Line {{number}}",
+        "lineText": "{{text}}",
+        "matchedProduct": "Matched product: {{name}}",
+        "outcome": "Outcome: {{outcome}}",
+        "score": "Match score: {{score}}",
+        "reason": "Reason: {{reason}}",
+        "corrections": "{{count}} field correction(s)",
+        "addedLines": "{{count}} line(s) added",
+        "removedLines": "{{count}} line(s) removed"
       }
     }
   },
@@ -905,6 +918,7 @@
         "open": "Awaiting Match Decision",
         "in_progress": "Being Reviewed",
         "resolved": "Resolved",
+        "auto_accepted": "Auto-matched",
         "all": "All Statuses"
       },
       "priority": {
@@ -964,7 +978,23 @@
       "clearFilters": "Clear Filters",
       "loadMore": "Load More",
       "emptyTitle": "No match tasks found",
-      "emptyMessage": "There are no quotation lines currently awaiting match resolution."
+      "emptyMessage": "There are no quotation lines currently awaiting match resolution.",
+      "badgeAutoAccepted": "Auto-matched",
+      "badgeResolved": "Resolved",
+      "autoAcceptedBanner": "Auto-matched above threshold without human review. View details only.",
+      "emptyAutoAccepted": "No auto-accepted lines to show for the current filters."
+      ,"refreshReviews": {
+        "title": "Catalogue refreshes awaiting review",
+        "subtitle": "Review normalized supplier prices before they enter the matching pipeline.",
+        "pending": "Pending review",
+        "rows": "rows",
+        "errors": "errors",
+        "preview": "Catalogue refresh preview",
+        "approve": "Approve refresh",
+        "reject": "Reject refresh",
+        "readOnly": "View-only access",
+        "empty": "No catalogue refreshes are awaiting review."
+      }
     },
     "resolution": {
       "title": "Match Resolution",
@@ -2398,6 +2428,19 @@
         "extractionSuccessRate": "Extraction Success Rate",
         "extractionSuccessRateDesc": "Quotation extractions completed without errors"
       },
+      "coverage": {
+        "title": "Connected data coverage",
+        "subtitle": "Track the evidence needed before forecasting is enabled.",
+        "integrationShare": "Integration-sourced quotations",
+        "quotations": "quotations",
+        "history": "Purchase history",
+        "days": "days",
+        "ready": "180-day history threshold reached",
+        "collecting": "Continue collecting connected history",
+        "refreshSchedules": "Refresh schedules with sources",
+        "refreshReady": "Pilot refresh is ready",
+        "refreshNeeded": "Assign a completed catalogue source"
+      },
       "supplierMatchRate": "Supplier Match Rate",
       "supplierMatchRateDesc": "Completed emails successfully matched to a known supplier",
       "extractionSuccessRate": "Extraction Success Rate",
@@ -2429,6 +2472,8 @@
         "captureDesc": "Upload PDF quotations, scanned receipts, or take photos with camera.",
         "catalogueImportTitle": "Catalogue Import",
         "catalogueImportDesc": "Import supplier price lists and catalogues from CSV or Excel files.",
+        "refreshSchedulesTitle": "Catalogue Refresh Schedules",
+        "refreshSchedulesDesc": "Keep supplier offers current by assigning a refresh cadence and source catalogue.",
         "configureAction": "Configure",
         "viewLogAction": "View Log",
         "captureAction": "Capture",
@@ -2439,6 +2484,33 @@
         "title": "Unable to load ingestion dashboard",
         "generic": "An unexpected error occurred while loading ingestion dashboard statistics.",
         "retry": "Retry"
+      }
+    },
+    "refreshSchedules": {
+      "title": "Catalogue Refresh Schedules",
+      "subtitle": "Configure how often supplier catalogues should be refreshed and which completed import to use.",
+      "newTitle": "Add refresh schedule",
+      "product": "Catalogue product",
+      "supplier": "Supplier",
+      "cadence": "Cadence (days)",
+      "days": "days",
+      "source": "Source catalogue",
+      "noSource": "No source assigned",
+      "noSourceOption": "Assign later",
+      "nextRefresh": "Next refresh",
+      "statusLabel": "Status",
+      "create": "Add schedule",
+      "pause": "Pause",
+      "resume": "Resume",
+      "refresh": "Refresh schedules",
+      "empty": "No refresh schedules configured yet.",
+      "created": "Refresh schedule created successfully.",
+      "sourceAssigned": "Catalogue source assigned successfully.",
+      "loadError": "Unable to load refresh schedules.",
+      "status": {
+        "active": "Active",
+        "paused": "Paused",
+        "due": "Due"
       }
     },
     "emailConfig": {
@@ -2688,6 +2760,70 @@
       }
     }
   },
+  "orders": {
+    "title": "Order Tracking",
+    "subtitle": "Follow purchase orders from submission through confirmation, delivery, and invoice evidence.",
+    "refresh": "Refresh",
+    "retry": "Retry",
+    "loadMore": "Load more",
+    "loadError": "Unable to load purchase orders. Please try again.",
+    "saveError": "Unable to save order evidence. Please try again.",
+    "backToOrders": "Back to orders",
+    "open": "Open order",
+    "orderDate": "Ordered {{date}}",
+    "lineCount": "{{count}} line(s)",
+    "notProvided": "Not provided",
+    "status": {
+      "draft": "Draft",
+      "submitted": "Submitted",
+      "confirmed": "Confirmed",
+      "partially_received": "Partially received",
+      "received": "Received",
+      "cancelled": "Cancelled",
+      "closed": "Closed"
+    },
+    "evidence": {
+      "pending": "Pending",
+      "available": "Available",
+      "unavailable": "Unavailable"
+    },
+    "empty": {
+      "title": "No purchase orders yet",
+      "description": "Purchase orders will appear here when they are created in your workspace."
+    },
+    "detail": {
+      "eyebrow": "Purchase order",
+      "createdAt": "Created {{date}}",
+      "orderDate": "Order date",
+      "expectedDelivery": "Expected delivery",
+      "total": "Order total",
+      "confirmation": "Supplier confirmation",
+      "receipt": "Delivery receipt",
+      "linesTitle": "Evidence by line",
+      "linesSubtitle": "Compare what was ordered, confirmed, and received without losing source evidence.",
+      "ordered": "Ordered",
+      "confirmed": "Confirmed",
+      "received": "Received",
+      "remaining": "Remaining",
+      "actionsTitle": "Update evidence",
+      "actionsSubtitle": "Record internal evidence. ProcurePilot never writes back to suppliers or accounting providers.",
+      "submit": "Submit order",
+      "recordConfirmation": "Record confirmation",
+      "recordReceipt": "Record delivery",
+      "confirmationFormTitle": "Supplier confirmation",
+      "receiptFormTitle": "Delivery receipt",
+      "reference": "Reference",
+      "confirmedDate": "Confirmed date",
+      "receivedDate": "Received date",
+      "confirmedQuantity": "Confirmed quantity",
+      "receivedQuantity": "Received quantity",
+      "save": "Save evidence",
+      "timelineTitle": "Evidence timeline",
+      "orderCreated": "Purchase order created",
+      "confirmationRecorded": "Supplier confirmation recorded",
+      "receiptRecorded": "Delivery receipt {{reference}} recorded"
+    }
+  },
   "accounting": {
     "nav": "Accounting",
     "connection": {
@@ -2790,7 +2926,33 @@
       "types": {
         "amount_mismatch": "Amount Mismatch",
         "unmatched_bill": "Unmatched Bill",
-        "unmatched_purchase": "Unmatched Purchase Record"
+        "unmatched_purchase": "Unmatched Purchase Record",
+        "missing_confirmation": "Missing Supplier Confirmation",
+        "missing_receipt": "Missing Delivery Receipt",
+        "quantity_variance": "Quantity Variance",
+        "price_variance": "Price Variance",
+        "currency_mismatch": "Currency Mismatch",
+        "invoice_without_order": "Invoice Without Order",
+        "ambiguous_order": "Ambiguous Order",
+        "over_billed_quantity": "Over-billed Quantity",
+        "over_billed_price": "Over-billed Price"
+      },
+      "threeWay": {
+        "title": "Three-way comparison",
+        "order": "Purchase Order",
+        "orderStatus": "Order {{number}} · {{status}}",
+        "ordered": "Ordered",
+        "confirmed": "Confirmed",
+        "received": "Received",
+        "invoiced": "Invoiced",
+        "unitPrice": "Unit price",
+        "ruleset": "Ruleset {{version}}",
+        "evaluatedAt": "Evaluated {{date}}",
+        "reopenedAt": "Reopened {{date}}",
+        "notProvided": "Not provided",
+        "pending": "Pending",
+        "unavailable": "Unavailable",
+        "available": "Available"
       },
       "table": {
         "type": "Type",

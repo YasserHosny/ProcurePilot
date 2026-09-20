@@ -41,6 +41,7 @@
           <mat-option value="open">{{ 'matching.queue.status.open' | translate }}</mat-option>
           <mat-option value="in_progress">{{ 'matching.queue.status.in_progress' | translate }}</mat-option>
           <mat-option value="resolved">{{ 'matching.queue.status.resolved' | translate }}</mat-option>
+          <mat-option value="auto_accepted">{{ 'matching.queue.status.auto_accepted' | translate }}</mat-option>
           <mat-option value="all">{{ 'matching.queue.status.all' | translate }}</mat-option>
         </mat-select>
       </mat-form-field>
@@ -73,6 +74,61 @@
       </mat-form-field>
     </mat-card-content>
   </mat-card>
+
+  @if (isLoadingRefreshReviews()) {
+    <section class="refresh-review-section" data-testid="refresh-review-section" [attr.aria-label]="'matching.queue.refreshReviews.title' | translate">
+      <mat-spinner [attr.aria-label]="'common.loading' | translate" diameter="24"></mat-spinner>
+    </section>
+  } @else if (refreshReviews().length > 0) {
+    <section class="refresh-review-section" data-testid="refresh-review-section" [attr.aria-labelledby]="'refresh-review-title'">
+      <div class="refresh-review-heading">
+        <div>
+          <h2 id="refresh-review-title">{{ 'matching.queue.refreshReviews.title' | translate }}</h2>
+          <p>{{ 'matching.queue.refreshReviews.subtitle' | translate }}</p>
+        </div>
+        <span class="status-badge status-pending_review">{{ 'matching.queue.refreshReviews.pending' | translate }}</span>
+      </div>
+      @for (review of refreshReviews(); track review.id) {
+        <article class="refresh-review-item" data-testid="refresh-review-item">
+          <div class="refresh-review-meta">
+            <strong>{{ review.source_file_name }}</strong>
+            <span>{{ review.row_count }} {{ 'matching.queue.refreshReviews.rows' | translate }}</span>
+            <span>{{ review.error_count }} {{ 'matching.queue.refreshReviews.errors' | translate }}</span>
+            <span [matTooltip]="review.created_at">{{ ageLabel(review.created_at) }}</span>
+          </div>
+          <div class="refresh-preview" role="table" [attr.aria-label]="'matching.queue.refreshReviews.preview' | translate">
+            @for (row of review.normalized_rows.slice(0, 5); track row.provider_record_id || row.product_name) {
+              <div class="refresh-preview-row" role="row">
+                <span role="cell">{{ row.product_name }}</span>
+                <span role="cell">{{ row.unit_price_amount }} {{ row.unit_price_currency }}</span>
+                <span role="cell">{{ row.base_unit }}</span>
+              </div>
+            }
+          </div>
+          <div class="refresh-review-actions">
+            @if (isWriter()) {
+              <button mat-stroked-button type="button" (click)="decideRefreshReview(review, 'reject')" [disabled]="refreshReviewDecisionId() !== null">
+                <mat-icon aria-hidden="true">close</mat-icon>
+                <span>{{ 'matching.queue.refreshReviews.reject' | translate }}</span>
+              </button>
+              <button mat-flat-button color="primary" type="button" (click)="decideRefreshReview(review, 'approve')" [disabled]="refreshReviewDecisionId() !== null">
+                @if (refreshReviewDecisionId() === review.id) { <mat-spinner diameter="18"></mat-spinner> }
+                @else { <mat-icon aria-hidden="true">check</mat-icon> }
+                <span>{{ 'matching.queue.refreshReviews.approve' | translate }}</span>
+              </button>
+            } @else {
+              <span class="read-only-review">{{ 'matching.queue.refreshReviews.readOnly' | translate }}</span>
+            }
+          </div>
+        </article>
+      }
+    </section>
+  } @else {
+    <section class="refresh-review-section refresh-review-empty" data-testid="refresh-review-section" [attr.aria-label]="'matching.queue.refreshReviews.title' | translate">
+      <mat-icon aria-hidden="true">task_alt</mat-icon>
+      <span>{{ 'matching.queue.refreshReviews.empty' | translate }}</span>
+    </section>
+  }
 
   @if (isLoading()) {
     <div class="loading-state">
@@ -153,7 +209,7 @@
                       <span class="line-number-badge">#{{ task.quotation_line.line_number }}</span>
                       <div>
                         <h3>{{ task.quotation_line.original_text }}</h3>
-                        <span class="timestamp" [matTooltip]="task.created_at">{{ ageLabel(task.created_at) }}</span>
+                        <span class="timestamp" [matTooltip]="task.created_at"><mat-icon class="age-icon" aria-hidden="true">schedule</mat-icon> {{ ageLabel(task.created_at) }}</span>
                       </div>
                     </div>
                     <div class="line-fact">
@@ -168,22 +224,30 @@
                     </div>
                     <div class="line-fact">
                       <span>{{ 'matching.queue.columns.reason' | translate }}</span>
-                      <strong class="reason-chip reason-{{ task.reason }}">{{ 'matching.queue.reason.' + task.reason | translate }}</strong>
+                      @if (task.status === 'auto_accepted') {
+                        <strong class="reason-chip reason-auto_accepted" [matTooltip]="'matching.queue.autoAcceptedBanner' | translate">{{ 'matching.queue.badgeAutoAccepted' | translate }}</strong>
+                      } @else {
+                        <strong class="reason-chip reason-{{ task.reason }}">{{ 'matching.queue.reason.' + task.reason | translate }}</strong>
+                      }
                     </div>
                     <div class="candidate-preview">
                       <span>{{ 'matching.queue.topCandidate' | translate }}</span>
-                      @if (task.candidates[0]; as candidate) {
-                        <strong>{{ candidate.candidate_product.tenant_name }}</strong>
-                        <small>{{ 'matching.queue.matchScore' | translate: { score: candidate.confidence } }}</small>
+                      @if (task.top_candidate; as candidate) {
+                        <strong>{{ candidate.product_name }}</strong>
+                        <small>{{ 'matching.queue.matchScore' | translate: { score: formatScore(candidate.confidence) + '%' } }}</small>
                       } @else {
                         <strong>{{ 'matching.queue.noCandidateEvidence' | translate }}</strong>
                       }
                     </div>
                     <div class="line-action">
-                      <span class="status-badge status-{{ task.status }}">{{ 'matching.queue.status.' + task.status | translate }}</span>
-                      <a mat-stroked-button [routerLink]="['/matching', task.quotation_line.id]" [queryParams]="{ quotation_id: group.quotation.id }" class="action-btn">
-                        <mat-icon aria-hidden="true">{{ isWriter() && task.status !== 'resolved' ? 'compare_arrows' : 'visibility' }}</mat-icon>
-                        <span>{{ (isWriter() && task.status !== 'resolved' ? 'matching.queue.actions.resolve' : 'matching.queue.actions.view') | translate }}</span>
+                      @if (task.status === 'auto_accepted') {
+                        <span class="status-badge status-auto_accepted" [matTooltip]="'matching.queue.autoAcceptedBanner' | translate">{{ 'matching.queue.badgeAutoAccepted' | translate }}</span>
+                      } @else {
+                        <span class="status-badge status-{{ task.status }}">{{ 'matching.queue.status.' + task.status | translate }}</span>
+                      }
+                      <a mat-stroked-button [routerLink]="['/matching', task.quotation_line.id]" [queryParams]="detailQueryParams(group.quotation.id)" class="action-btn">
+                        <mat-icon aria-hidden="true">{{ task.status !== 'auto_accepted' && isWriter() && task.status !== 'resolved' ? 'compare_arrows' : 'visibility' }}</mat-icon>
+                        <span>{{ (task.status !== 'auto_accepted' && isWriter() && task.status !== 'resolved' ? 'matching.queue.actions.resolve' : 'matching.queue.actions.view') | translate }}</span>
                       </a>
                     </div>
                   </article>

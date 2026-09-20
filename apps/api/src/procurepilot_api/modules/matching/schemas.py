@@ -9,10 +9,12 @@ from pydantic import BaseModel, ConfigDict, Field, StrictStr, model_validator
 from procurepilot_api.modules.catalogue.models import ProductCreate
 from procurepilot_api.modules.quotations.schemas import Money, Pack
 
-MatchTaskStatus = Literal["open", "in_progress", "resolved"]
-MatchTaskStatusFilter = Literal["open", "in_progress", "resolved", "all"]
+MatchTaskStatus = Literal["open", "in_progress", "resolved", "auto_accepted"]
+MatchTaskStatusFilter = Literal["open", "in_progress", "resolved", "auto_accepted", "all"]
 MatchTaskPriority = Literal["low", "normal", "high"]
-MatchTaskReason = Literal["low_confidence", "close_candidates", "no_candidate", "alias_conflict"]
+MatchTaskReason = Literal[
+    "low_confidence", "close_candidates", "no_candidate", "alias_conflict", "auto_accepted"
+]
 QuotedExposureIssue = Literal["currency_mismatch"]
 MatchOutcome = Literal[
     "same_product",
@@ -157,6 +159,30 @@ class MatchResolutionRequest(StrictApiModel):
 
 class MatchTaskList(BaseModel):
     items: list[MatchTask]
+    next_cursor: str | None = None
+
+
+class MatchQueueCandidateSummary(BaseModel):
+    product_name: str
+    confidence: str
+
+
+class MatchQueueItem(BaseModel):
+    id: UUID
+    quotation_id: UUID
+    quotation: QuotationMatchSummary
+    quotation_line: QuotationLineSummary
+    status: MatchTaskStatus
+    priority: MatchTaskPriority
+    reason: MatchTaskReason
+    top_candidate: MatchQueueCandidateSummary | None = None
+    created_at: datetime
+    resolved_at: datetime | None = None
+    supplier_name: str | None = None
+
+
+class MatchQueueList(BaseModel):
+    items: list[MatchQueueItem]
     next_cursor: str | None = None
 
 

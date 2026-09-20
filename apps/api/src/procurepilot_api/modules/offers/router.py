@@ -1,15 +1,19 @@
-from __future__ import annotations
-
 from decimal import Decimal
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Body, Depends, Header, Query, status
+from fastapi import APIRouter, Body, Depends, Header, Query, Request, status
 
+from procurepilot_api.config import get_settings
 from procurepilot_api.deps import CurrentMember, bearer_token, current_member
 from procurepilot_api.modules.auth.jwt import MemberRole
 from procurepilot_api.modules.auth.rbac import require_role
 from procurepilot_api.modules.offers.basket_service import BasketService, get_basket_service
+from procurepilot_api.modules.offers.refresh_schedule_service import (
+    create_schedule,
+    list_schedules,
+    update_schedule,
+)
 from procurepilot_api.modules.offers.schemas import (
     AdvancedBasketOptimiseRequest,
     BasketOptimiseRequest,
@@ -17,6 +21,10 @@ from procurepilot_api.modules.offers.schemas import (
     OfferComparison,
     OfferList,
     PriceHistoryResponse,
+    RefreshSchedule,
+    RefreshScheduleCreate,
+    RefreshScheduleList,
+    RefreshScheduleUpdate,
     SupplierCommercialTerm,
     SupplierCommercialTermCreate,
     SupplierCommercialTermList,
@@ -31,9 +39,54 @@ from procurepilot_api.modules.offers.supplier_terms import (
     SupplierTermsService,
     get_supplier_terms_service,
 )
+from procurepilot_api.shared.rate_limit import mutation_limiter
 
 router = APIRouter(tags=["smart-compare"])
 WRITE_ROLES = (MemberRole.owner, MemberRole.buyer)
+
+
+def _schedule_mutation_limit() -> str:
+    return get_settings().rate_limit_schedule_mutation
+
+
+@router.get("/refresh-schedules", response_model=RefreshScheduleList)
+def list_refresh_schedules(
+    member: Annotated[CurrentMember, Depends(current_member)],
+    cursor: Annotated[str | None, Query()] = None,
+    limit: Annotated[int, Query(ge=1, le=100)] = 50,
+) -> RefreshScheduleList:
+    return list_schedules(member=member, cursor=cursor, limit=limit)
+
+
+@router.post(
+    "/refresh-schedules",
+    status_code=status.HTTP_201_CREATED,
+    response_model=RefreshSchedule,
+)
+@mutation_limiter.limit(_schedule_mutation_limit)
+def create_refresh_schedule(
+    request: Request,
+    payload: Annotated[RefreshScheduleCreate, Body()],
+    token: Annotated[str, Depends(bearer_token)],
+    member: Annotated[CurrentMember, Depends(require_role(*WRITE_ROLES))],
+    _idempotency_key: Annotated[UUID | None, Header(alias="Idempotency-Key")] = None,
+) -> RefreshSchedule:
+    return create_schedule(member=member, payload=payload, bearer_token=token)
+
+
+@router.patch("/refresh-schedules/{schedule_id}", response_model=RefreshSchedule)
+@mutation_limiter.limit(_schedule_mutation_limit)
+def update_refresh_schedule(
+    request: Request,
+    schedule_id: UUID,
+    payload: Annotated[RefreshScheduleUpdate, Body()],
+    token: Annotated[str, Depends(bearer_token)],
+    member: Annotated[CurrentMember, Depends(require_role(*WRITE_ROLES))],
+    _idempotency_key: Annotated[UUID | None, Header(alias="Idempotency-Key")] = None,
+) -> RefreshSchedule:
+    return update_schedule(
+        member=member, schedule_id=schedule_id, payload=payload, bearer_token=token
+    )
 
 
 @router.get("/offers", response_model=OfferList)

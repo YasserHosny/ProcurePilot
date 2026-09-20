@@ -201,7 +201,21 @@ class QuotationService:
             )
         except APIError as exc:
             raise ServiceUnavailableError(details={"dependency": "database"}) from exc
-        items = [AuditTrailEntry.model_validate(row) for row in _rows(response.data)]
+        rows = _rows(response.data)
+        lines_by_id, products_by_id = _audit_display_lookups(client, rows)
+        items = [
+            AuditTrailEntry.model_validate(
+                {
+                    **row,
+                    "target": _enrich_audit_target(
+                        row.get("target"),
+                        lines_by_id=lines_by_id,
+                        products_by_id=products_by_id,
+                    ),
+                }
+            )
+            for row in rows
+        ]
         return AuditTrailResponse(items=items)
 
     def update_review_task_priority(
@@ -823,6 +837,108 @@ def _money(row: dict[str, object], prefix: str) -> Money | None:
     if amount is None or currency is None:
         return None
     return Money(amount=decimal_string(amount, scale=4) or "0.0000", currency=str(currency))
+
+
+def _audit_display_lookups(
+    client: object,
+    rows: list[dict[str, object]],
+) -> tuple[dict[str, dict[str, object]], dict[str, str]]:
+    line_ids: list[str] = []
+    product_ids: list[str] = []
+    for row in rows:
+        target = row.get("target")
+        if not isinstance(target, dict):
+            continue
+        line_id = target.get("quotation_line_id")
+        if isinstance(line_id, str) and line_id:
+            line_ids.append(line_id)
+        product_id = target.get("matched_product_id")
+        if isinstance(product_id, str) and product_id:
+            product_ids.append(product_id)
+
+    lines_by_id: dict[str, dict[str, object]] = {}
+    if line_ids:
+        try:
+            line_rows = _rows(
+                client.table("quotation_line")
+                .select("id,line_number,original_text")
+                .in_("id", list(dict.fromkeys(line_ids)))
+                .execute()
+                .data
+            )
+        except APIError as exc:
+            raise ServiceUnavailableError(details={"dependency": "database"}) from exc
+        lines_by_id = {str(line["id"]): line for line in line_rows}
+
+    products_by_id: dict[str, str] = {}
+    unique_product_ids = list(dict.fromkeys(product_ids))
+    if unique_product_ids:
+        try:
+            product_rows = _rows(
+                client.table("workspace_product")
+                .select("id,tenant_name,canonical_product_id")
+                .in_("id", unique_product_ids)
+                .execute()
+                .data
+            )
+        except APIError as exc:
+            raise ServiceUnavailableError(details={"dependency": "database"}) from exc
+        canonical_ids = [
+            str(row["canonical_product_id"])
+            for row in product_rows
+            if row.get("canonical_product_id") is not None
+        ]
+        canonical_by_id: dict[str, dict[str, object]] = {}
+        if canonical_ids:
+            try:
+                canonical_rows = _rows(
+                    client.table("canonical_product")
+                    .select("id,brand,name,variant")
+                    .in_("id", list(dict.fromkeys(canonical_ids)))
+                    .execute()
+                    .data
+                )
+            except APIError as exc:
+                raise ServiceUnavailableError(details={"dependency": "database"}) from exc
+            canonical_by_id = {str(row["id"]): row for row in canonical_rows}
+        for product in product_rows:
+            product_id = str(product["id"])
+            canonical = canonical_by_id.get(str(product.get("canonical_product_id") or ""))
+            label_parts: list[str] = []
+            if canonical is not None:
+                for key in ("brand", "name", "variant"):
+                    value = canonical.get(key)
+                    if value:
+                        label_parts.append(str(value))
+            if not label_parts and product.get("tenant_name"):
+                label_parts.append(str(product["tenant_name"]))
+            if label_parts:
+                products_by_id[product_id] = " / ".join(label_parts)
+
+    return lines_by_id, products_by_id
+
+
+def _enrich_audit_target(
+    target: object,
+    *,
+    lines_by_id: dict[str, dict[str, object]],
+    products_by_id: dict[str, str],
+) -> dict[str, object] | None:
+    if not isinstance(target, dict):
+        return None
+    enriched = dict(target)
+    line_id = enriched.get("quotation_line_id")
+    if isinstance(line_id, str):
+        line = lines_by_id.get(line_id)
+        if line is not None:
+            if line.get("line_number") is not None:
+                enriched["line_number"] = int(str(line["line_number"]))
+            if line.get("original_text") is not None:
+                enriched["line_text"] = str(line["original_text"])
+    product_id = enriched.get("matched_product_id")
+    if isinstance(product_id, str) and product_id in products_by_id:
+        enriched["matched_product_name"] = products_by_id[product_id]
+    return enriched
 
 
 def _rows(data: object) -> list[dict[str, object]]:

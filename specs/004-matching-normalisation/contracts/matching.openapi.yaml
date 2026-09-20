@@ -44,6 +44,14 @@ paths:
   /match-tasks:
     get:
       summary: List outstanding match-resolution work
+      description: >
+        Default returns only human-review tasks (open/in_progress/resolved).
+        When `include_auto_accepted=true`, also returns auto-accepted decisions
+        as view-only audit items (synthesized as `resolved` tasks with
+        `decision.is_automatic=true`, `reason=low_confidence`, `priority=normal`).
+        They appear alongside the worklist (even when `status=open`) so buyers can
+        spot-audit auto precision without polluting the default queue. Filtered by
+        quotation/date/search; priority/reason filters hide them if mismatched.
       parameters:
         - { name: cursor, in: query, schema: { type: string } }
         - { name: limit, in: query, schema: { type: integer, maximum: 100, default: 50 } }
@@ -76,6 +84,10 @@ paths:
         - name: sort_order
           in: query
           schema: { type: string, enum: [asc, desc], default: desc }
+        - name: include_auto_accepted
+          in: query
+          schema: { type: boolean, default: false }
+          description: Include auto-accepted lines as view-only audit items alongside tasks.
       responses:
         '200':
           description: Match tasks
@@ -85,7 +97,7 @@ paths:
                 type: object
                 required: [items, next_cursor]
                 properties:
-                  items: { type: array, items: { $ref: '#/components/schemas/MatchTask' } }
+                  items: { type: array, items: { $ref: '#/components/schemas/MatchQueueItem' } }
                   next_cursor: { type: string, nullable: true }
 
   /quotation-lines/{line_id}/match-task:
@@ -314,6 +326,11 @@ components:
 
     MatchTask:
       type: object
+      description: >
+        Human-review task. When `include_auto_accepted=true`, auto-accepted lines are
+        returned as synthesized tasks with `status=resolved`, `reason=low_confidence`,
+        `priority=normal` and `decision.is_automatic=true`; distinguish them via the
+        decision flag and the `Auto-accepted` badge in the UI.
       required: [id, quotation, quotation_line, status, priority, reason, candidates, created_at]
       properties:
         id: { type: string, format: uuid }
@@ -328,6 +345,35 @@ components:
           items: { $ref: '#/components/schemas/MatchCandidate' }
         decision:
           allOf: [{ $ref: '#/components/schemas/MatchDecision' }]
+          nullable: true
+        created_at: { type: string, format: date-time }
+        resolved_at: { type: string, format: date-time, nullable: true }
+        supplier_name: { type: string, nullable: true }
+
+    MatchQueueCandidateSummary:
+      type: object
+      required: [product_name, confidence]
+      properties:
+        product_name: { type: string }
+        confidence: { type: string }
+
+    MatchQueueItem:
+      type: object
+      description: >
+        Lightweight item returned by the queue list. It preserves the fields rendered by the queue;
+        full candidates, decision detail, extraction fields, and product metadata are loaded from
+        the line detail endpoint.
+      required: [id, quotation_id, quotation, quotation_line, status, priority, reason, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        quotation_id: { type: string, format: uuid }
+        quotation: { $ref: '#/components/schemas/QuotationMatchSummary' }
+        quotation_line: { $ref: '#/components/schemas/QuotationLineSummary' }
+        status: { type: string, enum: [open, in_progress, resolved, auto_accepted] }
+        priority: { type: string, enum: [low, normal, high] }
+        reason: { type: string, enum: [low_confidence, close_candidates, no_candidate, alias_conflict, auto_accepted] }
+        top_candidate:
+          allOf: [{ $ref: '#/components/schemas/MatchQueueCandidateSummary' }]
           nullable: true
         created_at: { type: string, format: date-time }
         resolved_at: { type: string, format: date-time, nullable: true }

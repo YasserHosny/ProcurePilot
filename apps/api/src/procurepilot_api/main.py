@@ -24,12 +24,14 @@ from procurepilot_api.modules.members.router import router as members_router
 from procurepilot_api.modules.offers.router import router as offers_router
 from procurepilot_api.modules.orders.router import router as orders_router
 from procurepilot_api.modules.organisation.router import router as organisation_router
+from procurepilot_api.modules.partner.router import router as partner_router
 from procurepilot_api.modules.pos.router import router as pos_router
 from procurepilot_api.modules.quotations.router import router as quotations_router
 from procurepilot_api.modules.reports.router import router as reports_router
 from procurepilot_api.modules.requests.router import router as requests_router
 from procurepilot_api.modules.savings.router import router as savings_router
 from procurepilot_api.modules.tenants.router import router as tenants_router
+from procurepilot_api.modules.webhooks.router import router as webhooks_router
 from procurepilot_api.shared.logging import TraceIdMiddleware, configure_logging
 from procurepilot_api.shared.observability import init_error_reporting
 from procurepilot_api.shared.rate_limit import configure_rate_limiting
@@ -81,6 +83,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(billing_router, prefix=API_PREFIX)
     app.include_router(ingestion_router, prefix=API_PREFIX)
     app.include_router(pos_router, prefix=API_PREFIX)
+    app.include_router(partner_router, prefix=API_PREFIX)
+    app.include_router(webhooks_router, prefix=API_PREFIX)
     return app
 
 

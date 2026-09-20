@@ -476,7 +476,7 @@ components:
       properties:
         id: { type: string, format: uuid }
         quotation_id: { type: string, format: uuid }
-        status: { type: string, enum: [open, in_progress, resolved] }
+        status: { type: string, enum: [open, in_progress, resolved, auto_accepted] }
         priority: { type: string, enum: [low, normal, high] }
         reason: { type: string, enum: [low_confidence, arithmetic_mismatch, read_failure, review_required] }
         created_at: { type: string, format: date-time }

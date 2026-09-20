@@ -141,11 +141,17 @@ class Settings(BaseSettings):
     catalogue_import_max_bytes: int = Field(
         default=26_214_400, validation_alias="CATALOGUE_IMPORT_MAX_BYTES", ge=1
     )
+    catalogue_provider_mode: Literal["stub"] = Field(
+        default="stub", validation_alias="CATALOGUE_PROVIDER_MODE"
+    )
     rate_limit_capture_upload: str = Field(
         default="30/minute", validation_alias="RATE_LIMIT_CAPTURE_UPLOAD"
     )
     rate_limit_catalogue_import: str = Field(
         default="10/minute", validation_alias="RATE_LIMIT_CATALOGUE_IMPORT"
+    )
+    rate_limit_catalogue_review_decision: str = Field(
+        default="10/minute", validation_alias="RATE_LIMIT_CATALOGUE_REVIEW_DECISION"
     )
 
     smtp_host: str | None = Field(default=None, validation_alias="SMTP_HOST")
@@ -173,6 +179,9 @@ class Settings(BaseSettings):
     )
     matching_embedding_model: str = Field(
         default="stub-hash-v1", validation_alias="MATCHING_EMBEDDING_MODEL"
+    )
+    offer_freshness_target_days: int = Field(
+        default=14, validation_alias="OFFER_FRESHNESS_TARGET_DAYS", ge=1, le=365
     )
 
     web_api_base_url: str = Field(validation_alias="WEB_API_BASE_URL")
@@ -262,6 +271,13 @@ class Settings(BaseSettings):
     pos_token_encryption_key: SecretStr | None = Field(
         default=None, validation_alias="POS_TOKEN_ENCRYPTION_KEY"
     )
+    webhook_token_encryption_key: SecretStr | None = Field(
+        default=None, validation_alias="WEBHOOK_TOKEN_ENCRYPTION_KEY"
+    )
+    webhook_max_attempts: int = Field(default=8, validation_alias="WEBHOOK_MAX_ATTEMPTS", ge=1)
+    webhook_request_timeout_seconds: float = Field(
+        default=10.0, validation_alias="WEBHOOK_REQUEST_TIMEOUT_SECONDS", gt=0
+    )
     rate_limit_pos_sync: str = Field(
         default="10/minute", validation_alias="RATE_LIMIT_POS_SYNC"
     )
@@ -296,6 +312,7 @@ class Settings(BaseSettings):
         "accounting_token_encryption_key",
         "square_application_secret",
         "pos_token_encryption_key",
+        "webhook_token_encryption_key",
         mode="before",
     )
     @classmethod

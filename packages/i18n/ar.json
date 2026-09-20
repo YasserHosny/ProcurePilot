@@ -163,6 +163,7 @@
     "navImport": "استيراد الدليل",
     "navQuotations": "صندوق عروض الأسعار",
     "navMatching": "مطابقة البنود",
+    "navOrders": "تتبع الطلبات",
     "navCompare": "المقارنة الذكية",
     "navSavings": "سجل الوفورات",
     "navRequests": "طلبات الشراء",
@@ -884,6 +885,18 @@
         "matchingAutoAccepted": "تم قبول مطابقة المنتج تلقائياً",
         "matchingResolved": "تمت تسوية مطابقة المنتج بواسطة المراجع",
         "unknown": "تم تنفيذ إجراء"
+      },
+      "details": {
+        "lineWithText": "البند {{number}}: {{text}}",
+        "lineNumber": "البند {{number}}",
+        "lineText": "{{text}}",
+        "matchedProduct": "المنتج المطابق: {{name}}",
+        "outcome": "النتيجة: {{outcome}}",
+        "score": "درجة المطابقة: {{score}}",
+        "reason": "السبب: {{reason}}",
+        "corrections": "{{count}} تصحيح/تصحيحات للحقول",
+        "addedLines": "تمت إضافة {{count}} بند/بنود",
+        "removedLines": "تمت إزالة {{count}} بند/بنود"
       }
     }
   },
@@ -905,6 +918,7 @@
         "open": "بانتظار قرار المطابقة",
         "in_progress": "قيد المراجعة",
         "resolved": "تمت التسوية",
+        "auto_accepted": "تمت المطابقة تلقائياً",
         "all": "جميع الحالات"
       },
       "priority": {
@@ -964,7 +978,23 @@
       "clearFilters": "إعادة تعيين التصفية",
       "loadMore": "تحميل المزيد",
       "emptyTitle": "لا توجد مهام مطابقة",
-      "emptyMessage": "لا توجد بنود عروض أسعار بانتظار تسوية المطابقة حالياً."
+      "emptyMessage": "لا توجد بنود عروض أسعار بانتظار تسوية المطابقة حالياً.",
+      "badgeAutoAccepted": "مطابق تلقائياً",
+      "badgeResolved": "تمت التسوية",
+      "autoAcceptedBanner": "تمت المطابقة تلقائياً فوق الحد دون مراجعة بشرية. للعرض فقط.",
+      "emptyAutoAccepted": "لا توجد بنود مقبولة تلقائياً للعرض حسب عوامل التصفية الحالية."
+      ,"refreshReviews": {
+        "title": "تحديثات دليل المنتجات بانتظار المراجعة",
+        "subtitle": "راجع أسعار الموردين الموحدة قبل إدخالها إلى مسار المطابقة.",
+        "pending": "بانتظار المراجعة",
+        "rows": "صفوف",
+        "errors": "أخطاء",
+        "preview": "معاينة تحديث دليل المنتجات",
+        "approve": "اعتماد التحديث",
+        "reject": "رفض التحديث",
+        "readOnly": "صلاحية للعرض فقط",
+        "empty": "لا توجد تحديثات لدليل المنتجات بانتظار المراجعة."
+      }
     },
     "resolution": {
       "title": "تسوية المطابقة",
@@ -2398,6 +2428,19 @@
         "extractionSuccessRate": "معدل نجاح الاستخراج",
         "extractionSuccessRateDesc": "نسبة عمليات استخراج عروض الأسعار المكتملة بنجاح دون أخطاء"
       },
+      "coverage": {
+        "title": "تغطية البيانات المتصلة",
+        "subtitle": "تتبّع الأدلة المطلوبة قبل تفعيل التنبؤات.",
+        "integrationShare": "عروض الأسعار من التكاملات",
+        "quotations": "عروض أسعار",
+        "history": "سجل المشتريات",
+        "days": "يوماً",
+        "ready": "تم بلوغ حد سجل 180 يوماً",
+        "collecting": "استمر في جمع سجل البيانات المتصلة",
+        "refreshSchedules": "جداول التحديث ذات المصادر",
+        "refreshReady": "التحديث التجريبي جاهز",
+        "refreshNeeded": "عيّن مصدر كتالوج مكتمل"
+      },
       "supplierMatchRate": "معدل مطابقة الموردين",
       "supplierMatchRateDesc": "نسبة رسائل البريد المكتملة المطابقة لموردين مسجلين",
       "extractionSuccessRate": "معدل نجاح الاستخراج",
@@ -2429,6 +2472,8 @@
         "captureDesc": "رفع عروض الأسعار بصيغة PDF أو مسح الفواتير أو التقاط صور بالكاميرا.",
         "catalogueImportTitle": "استيراد الكتالوج",
         "catalogueImportDesc": "استيراد قوائم أسعار وكتالوجات الموردين من ملفات CSV أو Excel.",
+        "refreshSchedulesTitle": "جداول تحديث الكتالوج",
+        "refreshSchedulesDesc": "حافظ على حداثة عروض الموردين بتحديد دورية التحديث وكتالوج المصدر.",
         "configureAction": "تهيئة",
         "viewLogAction": "عرض السجل",
         "captureAction": "التقاط",
@@ -2439,6 +2484,33 @@
         "title": "تعذر تحميل لوحة معلومات الاستيراد",
         "generic": "حدث خطأ غير متوقع أثناء تحميل إحصائيات لوحة معلومات الاستيراد.",
         "retry": "إعادة المحاولة"
+      }
+    },
+    "refreshSchedules": {
+      "title": "جداول تحديث الكتالوج",
+      "subtitle": "حدد دورية تحديث كتالوجات الموردين وكتالوج المصدر المكتمل المستخدم.",
+      "newTitle": "إضافة جدول تحديث",
+      "product": "منتج الكتالوج",
+      "supplier": "المورد",
+      "cadence": "الدورية (بالأيام)",
+      "days": "أيام",
+      "source": "كتالوج المصدر",
+      "noSource": "لم يتم تعيين مصدر",
+      "noSourceOption": "التعيين لاحقاً",
+      "nextRefresh": "التحديث التالي",
+      "statusLabel": "الحالة",
+      "create": "إضافة جدول",
+      "pause": "إيقاف مؤقت",
+      "resume": "استئناف",
+      "refresh": "تحديث الجداول",
+      "empty": "لا توجد جداول تحديث مهيأة بعد.",
+      "created": "تم إنشاء جدول التحديث بنجاح.",
+      "sourceAssigned": "تم تعيين مصدر الكتالوج بنجاح.",
+      "loadError": "تعذر تحميل جداول التحديث.",
+      "status": {
+        "active": "نشط",
+        "paused": "متوقف مؤقتاً",
+        "due": "مستحق"
       }
     },
     "emailConfig": {
@@ -2688,6 +2760,70 @@
       }
     }
   },
+  "orders": {
+    "title": "تتبع الطلبات",
+    "subtitle": "تابع أوامر الشراء من الإرسال إلى التأكيد والتسليم وأدلة الفاتورة.",
+    "refresh": "تحديث",
+    "retry": "إعادة المحاولة",
+    "loadMore": "تحميل المزيد",
+    "loadError": "تعذر تحميل أوامر الشراء. يرجى المحاولة مرة أخرى.",
+    "saveError": "تعذر حفظ دليل الطلب. يرجى المحاولة مرة أخرى.",
+    "backToOrders": "العودة إلى الطلبات",
+    "open": "فتح الطلب",
+    "orderDate": "تم الطلب في {{date}}",
+    "lineCount": "{{count}} بند",
+    "notProvided": "غير متوفر",
+    "status": {
+      "draft": "مسودة",
+      "submitted": "مرسل",
+      "confirmed": "مؤكد",
+      "partially_received": "مستلم جزئياً",
+      "received": "مستلم",
+      "cancelled": "ملغى",
+      "closed": "مغلق"
+    },
+    "evidence": {
+      "pending": "قيد الانتظار",
+      "available": "متوفر",
+      "unavailable": "غير متوفر"
+    },
+    "empty": {
+      "title": "لا توجد أوامر شراء بعد",
+      "description": "ستظهر أوامر الشراء هنا عند إنشائها في مساحة العمل."
+    },
+    "detail": {
+      "eyebrow": "أمر شراء",
+      "createdAt": "تم الإنشاء {{date}}",
+      "orderDate": "تاريخ الطلب",
+      "expectedDelivery": "التسليم المتوقع",
+      "total": "إجمالي الطلب",
+      "confirmation": "تأكيد المورد",
+      "receipt": "إيصال التسليم",
+      "linesTitle": "الدليل حسب البند",
+      "linesSubtitle": "قارن المطلوب والمؤكد والمستلم مع الحفاظ على دليل المصدر.",
+      "ordered": "المطلوب",
+      "confirmed": "المؤكد",
+      "received": "المستلم",
+      "remaining": "المتبقي",
+      "actionsTitle": "تحديث الدليل",
+      "actionsSubtitle": "سجل الدليل الداخلي. لا يكتب ProcurePilot أبداً إلى الموردين أو مزودي المحاسبة.",
+      "submit": "إرسال الطلب",
+      "recordConfirmation": "تسجيل التأكيد",
+      "recordReceipt": "تسجيل التسليم",
+      "confirmationFormTitle": "تأكيد المورد",
+      "receiptFormTitle": "إيصال التسليم",
+      "reference": "المرجع",
+      "confirmedDate": "تاريخ التأكيد",
+      "receivedDate": "تاريخ الاستلام",
+      "confirmedQuantity": "الكمية المؤكدة",
+      "receivedQuantity": "الكمية المستلمة",
+      "save": "حفظ الدليل",
+      "timelineTitle": "الخط الزمني للدليل",
+      "orderCreated": "تم إنشاء أمر الشراء",
+      "confirmationRecorded": "تم تسجيل تأكيد المورد",
+      "receiptRecorded": "تم تسجيل إيصال التسليم {{reference}}"
+    }
+  },
   "accounting": {
     "nav": "المحاسبة",
     "connection": {
@@ -2790,7 +2926,33 @@
       "types": {
         "amount_mismatch": "عدم تطابق المبلغ",
         "unmatched_bill": "فاتورة غير مطابقة",
-        "unmatched_purchase": "سجل شراء غير مطابق"
+        "unmatched_purchase": "سجل شراء غير مطابق",
+        "missing_confirmation": "تأكيد المورد مفقود",
+        "missing_receipt": "إيصال التسليم مفقود",
+        "quantity_variance": "فرق الكمية",
+        "price_variance": "فرق السعر",
+        "currency_mismatch": "اختلاف العملة",
+        "invoice_without_order": "فاتورة بلا أمر شراء",
+        "ambiguous_order": "أمر شراء غير محدد",
+        "over_billed_quantity": "كمية مفوترة زائدة",
+        "over_billed_price": "سعر مفوتر زائد"
+      },
+      "threeWay": {
+        "title": "مقارنة ثلاثية",
+        "order": "أمر الشراء",
+        "orderStatus": "الأمر {{number}} · {{status}}",
+        "ordered": "المطلوبة",
+        "confirmed": "المؤكدة",
+        "received": "المستلمة",
+        "invoiced": "المفوترة",
+        "unitPrice": "سعر الوحدة",
+        "ruleset": "قواعد {{version}}",
+        "evaluatedAt": "تم التقييم {{date}}",
+        "reopenedAt": "أعيد فتحها {{date}}",
+        "notProvided": "غير متوفر",
+        "pending": "قيد الانتظار",
+        "unavailable": "غير متوفر",
+        "available": "متوفر"
       },
       "table": {
         "type": "النوع",

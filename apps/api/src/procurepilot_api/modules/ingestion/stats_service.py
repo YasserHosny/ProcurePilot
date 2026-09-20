@@ -137,6 +137,45 @@ def get_ingestion_stats(
             )
             extraction_row = cur.fetchone() or {}
 
+            cur.execute(
+                """
+                select
+                    count(*) as active_quotation_count,
+                    count(*) filter (where d.source_channel <> 'upload')
+                        as integration_sourced_quotation_count
+                from quotation q
+                join document d on d.id = q.document_id and d.tenant_id = q.tenant_id
+                where q.tenant_id = %(tenant_id)s and q.deleted_at is null
+                """,
+                {"tenant_id": member.tenant_id},
+            )
+            coverage_row = cur.fetchone() or {}
+
+            cur.execute(
+                """
+                select coalesce(max(order_date) - min(order_date), 0) as purchase_history_days
+                from purchase_order
+                where tenant_id = %(tenant_id)s
+                """,
+                {"tenant_id": member.tenant_id},
+            )
+            history_row = cur.fetchone() or {}
+
+            cur.execute(
+                """
+                select
+                    count(*) filter (where status = 'active') as active_refresh_schedule_count,
+                    count(*) filter (
+                        where status = 'active'
+                          and source_import_id is not null
+                    ) as linked_refresh_schedule_count
+                from offer_refresh_schedule
+                where tenant_id = %(tenant_id)s
+                """,
+                {"tenant_id": member.tenant_id},
+            )
+            refresh_row = cur.fetchone() or {}
+
     emails_received_today = int(email_row.get("emails_received_today") or 0)
     emails_received_week = int(email_row.get("emails_received_week") or 0)
     emails_received_month = int(email_row.get("emails_received_month") or 0)
@@ -170,6 +209,23 @@ def get_ingestion_stats(
         float(total_succeeded) / float(total_terminal) if total_terminal > 0 else 0.0
     )
 
+    active_quotation_count = int(coverage_row.get("active_quotation_count") or 0)
+    integration_sourced_quotation_count = int(
+        coverage_row.get("integration_sourced_quotation_count") or 0
+    )
+    integration_sourced_share = (
+        integration_sourced_quotation_count / active_quotation_count
+        if active_quotation_count > 0
+        else 0.0
+    )
+    purchase_history_days = int(history_row.get("purchase_history_days") or 0)
+    active_refresh_schedule_count = int(
+        refresh_row.get("active_refresh_schedule_count") or 0
+    )
+    linked_refresh_schedule_count = int(
+        refresh_row.get("linked_refresh_schedule_count") or 0
+    )
+
     return IngestionStats(
         emails_received_today=emails_received_today,
         emails_received_week=emails_received_week,
@@ -178,4 +234,12 @@ def get_ingestion_stats(
         catalogue_imports_total=catalogue_imports_total,
         supplier_match_rate=supplier_match_rate,
         extraction_success_rate=extraction_success_rate,
+        active_quotation_count=active_quotation_count,
+        integration_sourced_quotation_count=integration_sourced_quotation_count,
+        integration_sourced_share=integration_sourced_share,
+        purchase_history_days=purchase_history_days,
+        g3_history_ready=purchase_history_days >= 180,
+        active_refresh_schedule_count=active_refresh_schedule_count,
+        linked_refresh_schedule_count=linked_refresh_schedule_count,
+        refresh_pilot_ready=linked_refresh_schedule_count > 0,
     )

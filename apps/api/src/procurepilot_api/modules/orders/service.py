@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from collections.abc import Iterator
 from contextlib import contextmanager
 from datetime import UTC, datetime
@@ -43,6 +44,8 @@ from procurepilot_api.modules.orders.validation import (
     validate_receipt_against_order,
 )
 from procurepilot_api.shared.audit import AuditEventCreate, get_audit_writer
+
+LOGGER = logging.getLogger(__name__)
 
 ORDER_COLUMNS = "*"
 ORDER_HEADER_COLUMNS = (
@@ -415,7 +418,10 @@ class OrdersService:
         )
         try:
             with psycopg.connect(
-                self._settings.database_url.get_secret_value(), row_factory=dict_row
+                self._settings.database_url.get_secret_value(),
+                row_factory=dict_row,
+                # Supabase's transaction pooler does not preserve prepared statements.
+                prepare_threshold=None,
             ) as conn:
                 with conn.transaction():
                     conn.execute("set local role authenticated")
@@ -752,6 +758,7 @@ def _database_error(
     exc: psycopg.Error,
 ) -> ConflictError | UnprocessableEntityError | ServiceUnavailableError:
     sqlstate = getattr(exc, "sqlstate", None) or getattr(exc, "pgcode", None)
+    LOGGER.exception("Order tracking database operation failed", extra={"sqlstate": sqlstate})
     if sqlstate in {"23505", "23P01"}:
         return ConflictError(details={"reason": "database_conflict"})
     if (isinstance(sqlstate, str) and sqlstate.startswith("22")) or sqlstate in {

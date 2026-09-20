@@ -69,12 +69,16 @@ access, identity, and request awareness.
 | Sign in | Shipped | Mobile or web |
 | Password reset / workspace creation / invitation acceptance | Web-only | Web sections 1 and 19 |
 | Product catalogue and suppliers | Web-only | Web sections 3–5 |
-| Import, quotation upload, quotation review, and matching | Web-only | Web sections 6–10 |
+| Import, quotation upload, quotation review, and matching | Web-only; quotation capture is responsive and camera-friendly in the web app | Web sections 6–10 and 29 |
 | Smart Compare, Basket Split, Alerts, and Savings | Web-only | Web sections 11–15 |
 | Purchase request creation | Preview only | Web sections 16–17 |
 | Approval decisions | Read-only pending count only | Web section 18 |
 | Team management and organisation settings | Web-only | Web sections 19–20 |
 | Reports Center, report schedules, weekly digests | Web-only | Web sections 22–24 (digest deep links open web routes) |
+
+The R3.0 capture flow is a mobile-friendly web workflow, not a native Flutter screen. On a phone,
+open the web app's **Capture a Quotation** route to take a photo or upload a PDF; the native app
+does not yet expose quotation ingestion, catalogue import, or matching.
 
 **Data readiness:** the mobile pending-decision count depends on the same backend state as the
 web Approval Queue. If the count does not match what you expect, check that the request was

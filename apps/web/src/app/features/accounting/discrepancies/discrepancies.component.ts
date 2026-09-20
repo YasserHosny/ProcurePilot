@@ -222,6 +222,19 @@ export class DiscrepanciesComponent implements OnInit {
         return 'type-unmatched-bill';
       case 'unmatched_purchase':
         return 'type-unmatched-purchase';
+      case 'missing_confirmation':
+      case 'missing_receipt':
+        return 'type-missing-evidence';
+      case 'currency_mismatch':
+        return 'type-currency-mismatch';
+      case 'over_billed_quantity':
+      case 'over_billed_price':
+        return 'type-over-billed';
+      case 'quantity_variance':
+      case 'price_variance':
+      case 'invoice_without_order':
+      case 'ambiguous_order':
+        return 'type-review';
       default:
         return '';
     }
@@ -229,5 +242,36 @@ export class DiscrepanciesComponent implements OnInit {
 
   getStatusLabel(status: DiscrepancyStatus): string {
     return this.translate.instant(`accounting.discrepancies.status.${status}`);
+  }
+
+  formatEvidenceValue(value: string | null | undefined): string {
+    return value ?? this.translate.instant('accounting.discrepancies.threeWay.notProvided');
+  }
+
+  formatPrice(amount: string | null | undefined, currency: string | null | undefined): string {
+    if (amount === null || amount === undefined) {
+      return this.formatEvidenceValue(null);
+    }
+    return currency ? `${amount} ${currency}` : amount;
+  }
+
+  getEvidenceState(
+    evidence: Record<string, unknown> | null | undefined,
+    key: string,
+  ): 'pending' | 'unavailable' | 'available' | null {
+    const section = evidence?.[key];
+    if (!section || typeof section !== 'object') {
+      return null;
+    }
+    const state = (section as Record<string, unknown>)['state'];
+    return state === 'pending' || state === 'unavailable' || state === 'available'
+      ? state
+      : null;
+  }
+
+  getEvidenceStateLabel(state: 'pending' | 'unavailable' | 'available' | null): string {
+    return state
+      ? this.translate.instant(`accounting.discrepancies.threeWay.${state}`)
+      : '';
   }
 }

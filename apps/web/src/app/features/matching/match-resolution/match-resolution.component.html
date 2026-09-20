@@ -6,7 +6,7 @@
       <p class="page-subtitle">{{ 'matching.resolution.subtitle' | translate }}</p>
     </div>
 
-    <a mat-stroked-button routerLink="/matching" class="back-btn">
+    <a mat-stroked-button routerLink="/matching" [queryParams]="backQueryParams()" class="back-btn">
       <mat-icon aria-hidden="true">arrow_back</mat-icon>
       <span>{{ 'matching.resolution.backToQueue' | translate }}</span>
     </a>
@@ -409,7 +409,7 @@
 
       <!-- Actions Bar -->
       <div class="actions-bar">
-        <a mat-button routerLink="/matching" [queryParams]="{ quotation_id: quotationId() }" class="cancel-btn">
+        <a mat-button routerLink="/matching" [queryParams]="backQueryParams()" class="cancel-btn">
           {{ 'matching.resolution.backToQueue' | translate }}
         </a>
 

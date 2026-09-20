@@ -7,7 +7,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 
 import enCatalog from '../../../../../../../packages/i18n/en.json';
 import { ApiService } from '../../../core/api/api.service';
-import type { MatchTask, Role } from '../../../core/api/models';
+import type { CatalogueRefreshReview, MatchTask, Role } from '../../../core/api/models';
 import { SessionService } from '../../../core/auth/session.service';
 import { ResolutionQueueComponent } from './resolution-queue.component';
 
@@ -103,9 +103,37 @@ describe('ResolutionQueueComponent', () => {
     },
   ];
 
+  const mockRefreshReview: CatalogueRefreshReview = {
+    id: 'refresh-1',
+    refresh_schedule_id: 'schedule-1',
+    source_import_id: 'import-1',
+    supplier_id: 'supplier-1',
+    status: 'pending_review',
+    normalized_rows: [
+      {
+        product_name: 'A4 paper',
+        unit_price_amount: '12.5000',
+        unit_price_currency: 'GBP',
+        base_unit: 'box',
+      },
+    ],
+    errors: [],
+    row_count: 1,
+    error_count: 0,
+    created_at: '2026-08-21T01:00:00Z',
+    source_file_name: 'prices.csv',
+    source_file_format: 'csv',
+  };
+
   beforeEach(async () => {
-    apiService = jasmine.createSpyObj('ApiService', ['getMatchTasks']);
+    apiService = jasmine.createSpyObj('ApiService', [
+      'getMatchTasks',
+      'listCatalogueRefreshReviews',
+      'approveCatalogueRefreshReview',
+      'rejectCatalogueRefreshReview',
+    ]);
     apiService.getMatchTasks.and.returnValue(of({ items: mockTasks, next_cursor: 'cursor-123' }));
+    apiService.listCatalogueRefreshReviews.and.returnValue(of({ items: [], next_cursor: null }));
 
     const mockSession = {
       hasRole: jasmine.createSpy('hasRole').and.returnValue(true),
@@ -150,6 +178,26 @@ describe('ResolutionQueueComponent', () => {
     expect(component.nextCursor()).toBe('cursor-123');
     expect(component.isLoading()).toBeFalse();
     expect(component.groups().length).toBe(2);
+  });
+
+  it('should remove an approved catalogue refresh review from the pending section', () => {
+    apiService.approveCatalogueRefreshReview.and.returnValue(
+      of({ review_id: mockRefreshReview.id, status: 'approved', imported_rows: 1, error_rows: 0 }),
+    );
+    component.refreshReviews.set([mockRefreshReview]);
+
+    component.decideRefreshReview(mockRefreshReview, 'approve');
+
+    expect(apiService.approveCatalogueRefreshReview).toHaveBeenCalledWith(mockRefreshReview.id);
+    expect(component.refreshReviews()).toEqual([]);
+  });
+
+  it('should send all status explicitly so auto-matched rows stay in quotation groups', () => {
+    component.onStatusChange('all');
+
+    expect(apiService.getMatchTasks).toHaveBeenCalledWith(
+      jasmine.objectContaining({ status: 'all' }),
+    );
   });
 
   it('should reload tasks when search query changes with debounce', fakeAsync(() => {

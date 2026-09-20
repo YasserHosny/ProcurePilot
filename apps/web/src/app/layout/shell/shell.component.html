@@ -171,6 +171,16 @@
 
       <a
         mat-list-item
+        routerLink="/orders"
+        routerLinkActive="active"
+        class="nav-item"
+      >
+        <mat-icon aria-hidden="true">assignment</mat-icon>
+        <span class="nav-label">{{ 'shell.navOrders' | translate }}</span>
+      </a>
+
+      <a
+        mat-list-item
         routerLink="/offers/compare"
         routerLinkActive="active"
         class="nav-item"

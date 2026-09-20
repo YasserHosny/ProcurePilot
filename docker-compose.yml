@@ -104,6 +104,61 @@ services:
       redis:
         condition: service_started
     command: python -m procurepilot_api.workers.export_worker
+    healthcheck:
+      disable: true
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # Outbound Webhook Worker (R3.4)
+  # ---------------------------------------------------------------------------
+  webhook-worker:
+    build:
+      context: .
+      dockerfile: infra/docker/api.Dockerfile
+    container_name: procurepilot-webhook-worker
+    env_file:
+      - .env
+    environment:
+      WEBHOOK_MAX_ATTEMPTS: ${WEBHOOK_MAX_ATTEMPTS:-8}
+      WEBHOOK_REQUEST_TIMEOUT_SECONDS: ${WEBHOOK_REQUEST_TIMEOUT_SECONDS:-10}
+    depends_on:
+      redis:
+        condition: service_started
+    command: python -m procurepilot_api.workers.webhook_worker
+    healthcheck:
+      disable: true
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # Offer Freshness Scheduler (R3.4)
+  # ---------------------------------------------------------------------------
+  offer-refresh-scheduler:
+    build:
+      context: .
+      dockerfile: infra/docker/api.Dockerfile
+    container_name: procurepilot-offer-refresh-scheduler
+    env_file:
+      - .env
+    environment:
+      OFFER_FRESHNESS_TARGET_DAYS: ${OFFER_FRESHNESS_TARGET_DAYS:-14}
+    command: python -m procurepilot_api.workers.offer_refresh_scheduler
+    healthcheck:
+      disable: true
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # Catalogue Refresh Review Worker (R3.4)
+  # ---------------------------------------------------------------------------
+  catalogue-refresh-worker:
+    build:
+      context: .
+      dockerfile: infra/docker/api.Dockerfile
+    container_name: procurepilot-catalogue-refresh-worker
+    env_file:
+      - .env
+    command: python -m procurepilot_api.workers.catalogue_refresh_worker
+    healthcheck:
+      disable: true
     restart: unless-stopped
 
   # ---------------------------------------------------------------------------

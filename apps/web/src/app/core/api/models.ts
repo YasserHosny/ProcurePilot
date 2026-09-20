@@ -165,6 +165,35 @@ export interface SupplierUpdate {
   readonly status?: 'active' | 'preferred' | 'blocked' | 'archived';
 }
 
+export type RefreshScheduleStatus = 'active' | 'paused' | 'due';
+
+export interface RefreshSchedule {
+  readonly id: string;
+  readonly workspace_product_id: string;
+  readonly supplier_id: string;
+  readonly cadence_days: number;
+  readonly status: RefreshScheduleStatus;
+  readonly next_refresh_at: string;
+  readonly last_observed_at?: string | null;
+  readonly last_requested_at?: string | null;
+  readonly last_error?: string | null;
+  readonly source_import_id?: string | null;
+  readonly created_at: string;
+  readonly updated_at: string;
+}
+
+export interface RefreshScheduleCreate {
+  readonly workspace_product_id: string;
+  readonly supplier_id: string;
+  readonly cadence_days: number;
+}
+
+export interface RefreshScheduleUpdate {
+  readonly cadence_days?: number;
+  readonly status?: RefreshScheduleStatus;
+  readonly source_import_id?: string;
+}
+
 export interface Alias {
   readonly id: string;
   readonly workspace_product_id: string;
@@ -413,13 +442,14 @@ export type MatchOutcome =
   | 'compatible_alternative'
   | 'no_match_new_product';
 
-export type MatchTaskStatus = 'open' | 'in_progress' | 'resolved';
+export type MatchTaskStatus = 'open' | 'in_progress' | 'resolved' | 'auto_accepted';
 export type MatchTaskPriority = 'low' | 'normal' | 'high';
 export type MatchTaskReason =
   | 'low_confidence'
   | 'close_candidates'
   | 'no_candidate'
-  | 'alias_conflict';
+  | 'alias_conflict'
+  | 'auto_accepted';
 
 export interface ProductSummary {
   readonly id: string;
@@ -516,6 +546,69 @@ export interface MatchTask {
   readonly created_at: string;
   readonly resolved_at?: string | null;
   readonly supplier_name?: string | null;
+}
+
+export interface MatchQueueCandidateSummary {
+  readonly product_name: string;
+  readonly confidence: string;
+}
+
+export interface MatchQueueItem {
+  readonly id: string;
+  readonly quotation_id: string;
+  readonly quotation: QuotationMatchSummary;
+  readonly quotation_line: QuotationLineSummary;
+  readonly status: MatchTaskStatus;
+  readonly priority: MatchTaskPriority;
+  readonly reason: MatchTaskReason;
+  readonly top_candidate?: MatchQueueCandidateSummary | null;
+  readonly created_at: string;
+  readonly resolved_at?: string | null;
+  readonly supplier_name?: string | null;
+}
+
+export type CatalogueRefreshReviewStatus =
+  | 'pending_review'
+  | 'processing'
+  | 'approved'
+  | 'rejected';
+
+export interface CatalogueRefreshReviewRow {
+  readonly provider_record_id?: string | null;
+  readonly product_name: string;
+  readonly unit_price_amount: string;
+  readonly unit_price_currency: string;
+  readonly base_unit: string;
+  readonly observed_at?: string | null;
+  readonly valid_from?: string | null;
+  readonly valid_to?: string | null;
+  readonly supplier_sku?: string | null;
+}
+
+export interface CatalogueRefreshReview {
+  readonly id: string;
+  readonly refresh_schedule_id: string;
+  readonly source_import_id: string;
+  readonly supplier_id: string;
+  readonly status: CatalogueRefreshReviewStatus;
+  readonly normalized_rows: readonly CatalogueRefreshReviewRow[];
+  readonly errors: readonly (Record<string, unknown> | string)[];
+  readonly row_count: number;
+  readonly error_count: number;
+  readonly created_at: string;
+  readonly reviewed_at?: string | null;
+  readonly reviewed_by?: string | null;
+  readonly source_file_name: string;
+  readonly source_file_format: 'csv' | 'xlsx';
+}
+
+export interface CatalogueRefreshReviewDecision {
+  readonly review_id: string;
+  readonly status: 'approved' | 'rejected';
+  readonly catalogue_import_id?: string | null;
+  readonly supplier_id?: string | null;
+  readonly imported_rows?: number | null;
+  readonly error_rows?: number | null;
 }
 
 export interface MatchResolutionRequest {

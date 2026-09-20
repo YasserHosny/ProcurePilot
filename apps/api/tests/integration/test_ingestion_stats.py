@@ -460,6 +460,9 @@ def test_get_stats_http_endpoint_returns_200(monkeypatch: pytest.MonkeyPatch) ->
     assert "catalogue_imports_total" in data
     assert "supplier_match_rate" in data
     assert "extraction_success_rate" in data
+    assert "active_refresh_schedule_count" in data
+    assert "linked_refresh_schedule_count" in data
+    assert "refresh_pilot_ready" in data
     assert data["supplier_match_rate"] == 0.0
     assert data["extraction_success_rate"] == 0.0
 

@@ -115,6 +115,14 @@ export interface IngestionStats {
   catalogue_imports_total: number;
   supplier_match_rate: number;
   extraction_success_rate: number;
+  active_quotation_count: number;
+  integration_sourced_quotation_count: number;
+  integration_sourced_share: number;
+  purchase_history_days: number;
+  g3_history_ready: boolean;
+  active_refresh_schedule_count: number;
+  linked_refresh_schedule_count: number;
+  refresh_pilot_ready: boolean;
 }
 
 export interface CaptureResult {

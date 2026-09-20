@@ -183,6 +183,21 @@ export const routes: Routes = [
             (m) => m.MatchResolutionComponent,
           ),
       },
+      {
+        path: 'orders',
+        loadComponent: () =>
+          import('./features/orders/order-list/order-list.component').then(
+            (m) => m.OrderListComponent,
+          ),
+      },
+      {
+        path: 'orders/:id',
+        canActivate: [roleGuard('owner', 'buyer')],
+        loadComponent: () =>
+          import('./features/orders/order-detail/order-detail.component').then(
+            (m) => m.OrderDetailComponent,
+          ),
+      },
       // --- smart compare and intelligence (Chunk 4.5) ---
       {
         path: 'offers/compare',
@@ -306,6 +321,14 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./features/ingestion/catalogue-import/catalogue-import.component').then(
             (m) => m.CatalogueImportComponent,
+          ),
+      },
+      {
+        path: 'ingestion/refresh-schedules',
+        canActivate: [roleGuard('owner', 'buyer')],
+        loadComponent: () =>
+          import('./features/ingestion/refresh-schedules/refresh-schedules.component').then(
+            (m) => m.RefreshSchedulesComponent,
           ),
       },
       // --- accounting integration (R3.1) ---

@@ -134,10 +134,15 @@ export async function apiAsUser<T>(
   method: 'GET' | 'POST' | 'PATCH' | 'DELETE',
   path: string,
   body?: unknown,
+  extraHeaders?: Record<string, string>,
 ): Promise<T> {
   const response = await fetch(`${API}${path}`, {
     method,
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+      ...extraHeaders,
+    },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   if (!response.ok) {
@@ -297,6 +302,35 @@ export async function createTestSupplier(
   });
 }
 
+export async function createTestOrder(
+  token: string,
+  data: { supplier_id: string; product_id: string; order_number?: string },
+): Promise<{ id: string; order_number: string }> {
+  const orderNumber = data.order_number ?? `PO-${Date.now()}`;
+  return apiAsUser<{ id: string; order_number: string }>(token, 'POST', '/orders', {
+    order_number: orderNumber,
+    supplier_id: data.supplier_id,
+    order_date: new Date().toISOString().slice(0, 10),
+    expected_delivery_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+      .toISOString()
+      .slice(0, 10),
+    total: { amount: '120.00', currency: 'GBP' },
+    tax: { amount: '0.00', currency: 'GBP' },
+    source_kind: 'manual',
+    source_reference: orderNumber,
+    lines: [{
+      line_number: 1,
+      workspace_product_id: data.product_id,
+      description: 'E2E delivery paper',
+      ordered_quantity: '10',
+      base_unit: 'each',
+      unit_price: { amount: '12.00', currency: 'GBP' },
+      tax: { amount: '0.00', currency: 'GBP' },
+      line_total: { amount: '120.00', currency: 'GBP' },
+    }],
+  }, { 'Idempotency-Key': crypto.randomUUID() });
+}
+
 export async function recordPurchaseOutcome(
   token: string,
   data: {
@@ -439,4 +473,3 @@ export async function findProductByName(
   }
   return found;
 }
-

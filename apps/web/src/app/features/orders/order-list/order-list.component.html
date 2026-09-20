@@ -1,0 +1,58 @@
+<div class="orders-container">
+  <div class="page-header">
+    <div>
+      <h1>{{ 'orders.title' | translate }}</h1>
+      <p>{{ 'orders.subtitle' | translate }}</p>
+    </div>
+    <button mat-stroked-button type="button" (click)="loadOrders()" [disabled]="isLoading()" data-testid="orders-refresh">
+      <mat-icon aria-hidden="true">refresh</mat-icon>
+      {{ 'orders.refresh' | translate }}
+    </button>
+  </div>
+
+  @if (errorMessage(); as error) {
+    <mat-card class="state error" role="alert">
+      <mat-icon aria-hidden="true">error_outline</mat-icon>
+      <span>{{ error }}</span>
+      <button mat-button type="button" (click)="loadOrders()">{{ 'orders.retry' | translate }}</button>
+    </mat-card>
+  } @else if (isLoading()) {
+    <div class="state" role="status"><mat-spinner diameter="36" /></div>
+  } @else if (orders().length === 0) {
+    <mat-card class="state">
+      <mat-icon aria-hidden="true">assignment</mat-icon>
+      <h2>{{ 'orders.empty.title' | translate }}</h2>
+      <p>{{ 'orders.empty.description' | translate }}</p>
+    </mat-card>
+  } @else {
+    <div class="order-list" data-testid="orders-list">
+      @for (order of orders(); track order.id) {
+        <mat-card class="order-row">
+          <div class="order-main">
+            <div class="order-heading">
+              <a [routerLink]="['/orders', order.id]">{{ order.order_number }}</a>
+              <span class="status-chip" [attr.data-status]="order.status">{{ getStatusLabel(order.status) }}</span>
+            </div>
+            <span class="order-date">{{ 'orders.orderDate' | translate: { date: (order.order_date | formatDate) } }}</span>
+          </div>
+          <div class="order-summary">
+            <span>{{ 'orders.lineCount' | translate: { count: order.lines.length } }}</span>
+            <strong>{{ order.total | formatMoney }}</strong>
+          </div>
+          <a mat-stroked-button [routerLink]="['/orders', order.id]" [attr.aria-label]="('orders.open' | translate) + ' ' + order.order_number">
+            <mat-icon aria-hidden="true">open_in_new</mat-icon>
+            {{ 'orders.open' | translate }}
+          </a>
+        </mat-card>
+      }
+    </div>
+    @if (nextCursor()) {
+      <div class="pagination">
+        <button mat-stroked-button type="button" (click)="loadMore()" [disabled]="isLoadingMore()">
+          @if (isLoadingMore()) { <mat-spinner diameter="18" /> } @else { <mat-icon aria-hidden="true">expand_more</mat-icon> }
+          {{ 'orders.loadMore' | translate }}
+        </button>
+      </div>
+    }
+  }
+</div>

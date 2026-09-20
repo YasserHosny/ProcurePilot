@@ -100,6 +100,14 @@ describe('IngestionApiService', () => {
     catalogue_imports_total: 10,
     supplier_match_rate: 0.88,
     extraction_success_rate: 0.94,
+    active_quotation_count: 50,
+    integration_sourced_quotation_count: 20,
+    integration_sourced_share: 0.4,
+    purchase_history_days: 90,
+    g3_history_ready: false,
+    active_refresh_schedule_count: 3,
+    linked_refresh_schedule_count: 0,
+    refresh_pilot_ready: false,
   };
 
   beforeEach(() => {

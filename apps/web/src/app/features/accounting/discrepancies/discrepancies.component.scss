@@ -224,10 +224,135 @@
     color: #7e22ce;
     border: 1px solid #e9d5ff;
   }
+
+  &.type-missing-evidence {
+    background: #fff7ed;
+    color: #c2410c;
+    border: 1px solid #fed7aa;
+  }
+
+  &.type-currency-mismatch {
+    background: #ecfeff;
+    color: #0e7490;
+    border: 1px solid #a5f3fc;
+  }
+
+  &.type-over-billed {
+    background: #fef2f2;
+    color: #b91c1c;
+    border: 1px solid #fecaca;
+  }
+
+  &.type-review {
+    background: #f0fdf4;
+    color: #166534;
+    border: 1px solid #bbf7d0;
+  }
 }
 
 .details-cell {
   min-width: 280px;
+}
+
+.three-way-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-width: 360px;
+  padding: 0.625rem 0.75rem;
+  background: #f8fafc;
+  border: 1px solid #dbe4ee;
+  border-radius: 8px;
+}
+
+.three-way-order,
+.three-way-price-row,
+.three-way-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.three-way-order {
+  color: #1e293b;
+  font-size: 0.85rem;
+}
+
+.three-way-order-status,
+.three-way-meta {
+  color: #64748b;
+  font-size: 0.75rem;
+}
+
+.three-way-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.three-way-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+  padding: 0.4rem 0.5rem;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+}
+
+.three-way-label {
+  color: #64748b;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.three-way-cell strong {
+  color: #0f172a;
+  font-size: 0.9rem;
+}
+
+.three-way-price-row {
+  color: #334155;
+  font-size: 0.8rem;
+
+  mat-icon {
+    width: 16px;
+    height: 16px;
+    font-size: 16px;
+  }
+}
+
+.evidence-state {
+  width: fit-content;
+  padding: 0.1rem 0.3rem;
+  border-radius: 4px;
+  font-size: 0.65rem;
+  font-weight: 600;
+
+  &.evidence-pending {
+    color: #92400e;
+    background: #fef3c7;
+  }
+
+  &.evidence-unavailable {
+    color: #991b1b;
+    background: #fee2e2;
+  }
+
+  &.evidence-available {
+    color: #166534;
+    background: #dcfce7;
+  }
+}
+
+@media (max-width: 800px) {
+  .three-way-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 .side-by-side-comparison {

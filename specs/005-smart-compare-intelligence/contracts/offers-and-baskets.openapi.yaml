@@ -281,6 +281,9 @@ components:
         - is_expired
         - rule_version
         - recorded_at
+        - freshness_score
+        - freshness_age_days
+        - freshness_status
       properties:
         id: { type: string, format: uuid, description: Current landed_cost row id }
         workspace_product_id: { type: string, format: uuid }
@@ -305,6 +308,10 @@ components:
         is_expired: { type: boolean }
         rule_version: { type: string }
         recorded_at: { type: string, format: date-time }
+        freshness_score: { type: string, pattern: '^0(\.\d{1,4})?|1(\.0{1,4})?$' }
+        freshness_age_days: { type: integer, minimum: 0 }
+        freshness_status: { type: string, enum: [fresh, stale] }
+        freshness_due_at: { type: string, format: date-time, nullable: true }
 
     OfferComparison:
       type: object

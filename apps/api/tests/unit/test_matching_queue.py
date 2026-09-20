@@ -7,7 +7,7 @@ from uuid import UUID, uuid4
 import pytest
 
 from procurepilot_api.modules.matching import service as matching_service_module
-from procurepilot_api.modules.matching.service import MatchingService
+from procurepilot_api.modules.matching.service import MatchingService, _queue_item
 
 
 class FakeQuery:
@@ -67,6 +67,218 @@ class FakeClient:
         if name == "match_task":
             self.match_task_query = q
         return q
+
+
+def test_sync_open_match_tasks_resolves_tasks_for_deleted_quotations(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    task_id = uuid4()
+    line_id = uuid4()
+    quotation_id = uuid4()
+    updated: list[dict[str, object]] = []
+
+    class UpdateQuery:
+        def eq(self, _column: str, _value: object) -> UpdateQuery:
+            return self
+
+        def execute(self) -> object:
+            updated.append({"status": "resolved"})
+            return object()
+
+    class MatchTaskQuery:
+        def select(self, _columns: str) -> MatchTaskQuery:
+            return self
+
+        def in_(self, _column: str, _values: list[str]) -> MatchTaskQuery:
+            return self
+
+        def execute(self) -> object:
+            class Result:
+                data = [{"id": task_id, "quotation_line_id": line_id}]
+
+            return Result()
+
+        def update(self, _payload: dict[str, object]) -> UpdateQuery:
+            return UpdateQuery()
+
+    class Client:
+        def table(self, name: str) -> MatchTaskQuery:
+            assert name == "match_task"
+            return MatchTaskQuery()
+
+    monkeypatch.setattr(
+        matching_service_module,
+        "_line_row",
+        lambda _client, _line_id: {"id": line_id, "quotation_id": quotation_id},
+    )
+    monkeypatch.setattr(
+        matching_service_module,
+        "_quotation_row",
+        lambda _client, _quotation_id: {
+            "id": quotation_id,
+            "status": "reviewed",
+            "deleted_at": "2026-09-19T00:00:00Z",
+        },
+    )
+    monkeypatch.setattr(matching_service_module, "_decision_for_line", lambda *_args: None)
+
+    matching_service_module._sync_open_match_tasks(Client())
+
+    assert updated == [{"status": "resolved"}]
+
+
+def test_queue_item_preserves_visible_queue_fields() -> None:
+    quotation_id = uuid4()
+    line_id = uuid4()
+    created_at = datetime.now(UTC)
+
+    item = _queue_item(
+        {
+            "id": uuid4(),
+            "quotation_id": quotation_id,
+            "quotation_status": "reviewed",
+            "document_id": uuid4(),
+            "storage_path": "tenants/example/quotations/quote.pdf",
+            "issue_date": "2026-08-28",
+            "reviewed_at": created_at,
+            "reviewed_by": uuid4(),
+            "reviewed_by_email": "reviewer@example.test",
+            "supplier_id": uuid4(),
+            "supplier_name": "Acme Supplies",
+            "quotation_line_id": line_id,
+            "line_number": 6,
+            "original_text": "Sticky Notes 76x76mm (12-pack)",
+            "quantity": "10",
+            "pack_count": 12,
+            "unit_size": "76",
+            "pack_unit": "millimetre",
+            "unit_price_amount": "35.0000",
+            "unit_price_currency": "GBP",
+            "vat_rate": "0.2000",
+            "delivery_fee_amount": None,
+            "delivery_fee_currency": None,
+            "discount_amount": None,
+            "discount_currency": None,
+            "status": "open",
+            "priority": "normal",
+            "reason": "no_candidate",
+            "created_at": created_at,
+            "resolved_at": None,
+            "top_candidate_name": None,
+            "top_candidate_confidence": None,
+            "quotation_total_line_count": 6,
+            "quotation_open_task_count": 5,
+        }
+    )
+
+    assert item.quotation.supplier_name == "Acme Supplies"
+    assert item.quotation.line_count == 6
+    assert item.quotation.open_match_task_count == 5
+    assert item.quotation_line.line_number == 6
+    assert item.quotation_line.original_text == "Sticky Notes 76x76mm (12-pack)"
+    assert item.quotation_line.quoted_line_total is not None
+    assert item.quotation_line.quoted_line_total.currency == "GBP"
+    assert item.reason == "no_candidate"
+    assert item.top_candidate is None
+
+
+def test_auto_accepted_tasks_use_auto_accepted_status(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    decision_id = uuid4()
+    line_id = uuid4()
+    captured: dict[str, object] = {}
+    client = FakeClient(
+        {
+            "match_decision": [
+                {
+                    "id": decision_id,
+                    "quotation_line_id": line_id,
+                    "is_automatic": True,
+                    "decided_at": "2026-09-19T10:00:00Z",
+                }
+            ]
+        }
+    )
+    monkeypatch.setattr(
+        matching_service_module,
+        "_line_row",
+        lambda _client, _line_id: {"id": line_id, "quotation_id": uuid4()},
+    )
+
+    def capture_task(
+        _service: MatchingService,
+        _client: object,
+        row: dict[str, object],
+        *,
+        line_row: dict[str, object],
+    ) -> str:
+        captured.update(row)
+        return "task"
+
+    monkeypatch.setattr(MatchingService, "_task", capture_task)
+
+    result = MatchingService()._auto_accepted_tasks(  # noqa: SLF001
+        client,
+        quotation_id=None,
+        date_from=None,
+        date_to=None,
+        clean_search=None,
+        priority=None,
+        reason=None,
+    )
+
+    assert result == ["task"]
+    assert captured["status"] == "auto_accepted"
+
+
+def test_all_statuses_includes_auto_accepted_tasks(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client = FakeClient({"match_task": []})
+    auto_task = matching_service_module.MatchTask.model_construct(
+        status="auto_accepted", created_at=datetime.now(UTC)
+    )
+    monkeypatch.setattr(
+        matching_service_module,
+        "authenticated_client",
+        lambda _settings, _token: client,
+    )
+    monkeypatch.setattr(matching_service_module, "_sync_open_match_tasks", lambda _client: None)
+    monkeypatch.setattr(
+        MatchingService,
+        "_auto_accepted_tasks",
+        lambda *_args, **_kwargs: [auto_task],
+    )
+
+    result = MatchingService().list_match_tasks(bearer_token="dummy", status="all")
+
+    assert result.items == [auto_task]
+
+
+def test_auto_accepted_status_skips_physical_match_task_query(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client = FakeClient({"match_task": []})
+    auto_task = matching_service_module.MatchTask.model_construct(
+        status="auto_accepted", created_at=datetime.now(UTC)
+    )
+    monkeypatch.setattr(
+        matching_service_module,
+        "authenticated_client",
+        lambda _settings, _token: client,
+    )
+    monkeypatch.setattr(matching_service_module, "_sync_open_match_tasks", lambda _client: None)
+    monkeypatch.setattr(
+        MatchingService,
+        "_auto_accepted_tasks",
+        lambda *_args, **_kwargs: [auto_task],
+    )
+
+    result = MatchingService().list_match_tasks(bearer_token="dummy", status="auto_accepted")
+
+    assert result.items == [auto_task]
+    assert not hasattr(client, "match_task_query")
 
 
 def test_list_match_tasks_accepts_query_params_and_enriches_supplier(

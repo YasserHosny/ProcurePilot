@@ -1,0 +1,26 @@
+.orders-container { display: flex; flex-direction: column; gap: 1.25rem; max-width: 1200px; margin-inline: auto; padding: 1.5rem; }
+.page-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+.page-header h1 { margin: 0; color: #0f172a; font-size: 1.75rem; }
+.page-header p { margin: 0.35rem 0 0; color: #64748b; }
+.page-header button, .order-row > a { display: inline-flex; align-items: center; gap: 0.35rem; }
+.order-list { display: flex; flex-direction: column; gap: 0.75rem; }
+.order-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 1rem; padding: 1rem 1.25rem; }
+.order-main, .order-heading { display: flex; flex-direction: column; gap: 0.35rem; }
+.order-heading { flex-direction: row; align-items: center; flex-wrap: wrap; }
+.order-heading a { color: #0f4c81; font-size: 1.05rem; font-weight: 700; text-decoration: none; }
+.order-date, .order-summary { color: #64748b; font-size: 0.85rem; }
+.order-summary { display: flex; flex-direction: column; align-items: flex-end; gap: 0.2rem; }
+.order-summary strong { color: #0f172a; font-size: 1rem; }
+.status-chip { border: 1px solid #cbd5e1; border-radius: 999px; padding: 0.2rem 0.55rem; color: #334155; font-size: 0.72rem; font-weight: 600; }
+.status-chip[data-status='received'], .status-chip[data-status='confirmed'] { border-color: #86efac; color: #166534; background: #f0fdf4; }
+.status-chip[data-status='partially_received'] { border-color: #fde68a; color: #92400e; background: #fffbeb; }
+.status-chip[data-status='cancelled'], .status-chip[data-status='closed'] { border-color: #fecaca; color: #991b1b; background: #fef2f2; }
+.state { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.65rem; min-height: 220px; padding: 2rem; text-align: center; color: #64748b; }
+.state mat-icon { color: #94a3b8; font-size: 42px; width: 42px; height: 42px; }
+.state h2, .state p { margin: 0; }
+.state h2 { color: #1e293b; font-size: 1.15rem; }
+.error { flex-direction: row; justify-content: flex-start; color: #991b1b; }
+.error mat-icon { color: #dc2626; font-size: 24px; width: 24px; height: 24px; }
+.pagination { display: flex; justify-content: center; }
+.pagination button { display: inline-flex; align-items: center; gap: 0.35rem; }
+@media (max-width: 720px) { .orders-container { padding: 0.75rem; } .order-row { grid-template-columns: 1fr; } .order-summary { align-items: flex-start; } .order-row > a { justify-content: center; } }

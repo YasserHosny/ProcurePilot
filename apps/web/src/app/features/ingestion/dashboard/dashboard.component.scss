@@ -185,6 +185,18 @@
   }
 }
 
+.coverage-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.25rem;
+}
+
+.coverage-card { border-radius: 8px; }
+.coverage-card mat-card-content { display: grid; gap: 0.35rem; padding: 1.1rem; }
+.coverage-label { color: var(--mat-sys-on-surface-variant, #475569); font-size: 0.85rem; font-weight: 600; }
+.coverage-value { color: var(--mat-sys-on-surface, #0f172a); font-size: 1.5rem; }
+.coverage-detail { color: var(--mat-sys-on-surface-variant, #64748b); font-size: 0.8rem; }
+
 .rate-card {
   padding: 1.25rem;
   border-radius: 12px;

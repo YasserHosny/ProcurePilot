@@ -28,6 +28,8 @@ import type {
   BudgetList,
   BudgetScope,
   ConfigOptions,
+  CatalogueRefreshReview,
+  CatalogueRefreshReviewDecision,
   CostCentre,
   CostCentreCreate,
   CostCentreList,
@@ -44,6 +46,7 @@ import type {
   LimitCheck,
   MatchDecision,
   MatchResolutionRequest,
+  MatchQueueItem,
   MatchTask,
   MatchTaskPriority,
   MatchTaskReason,
@@ -58,6 +61,9 @@ import type {
   Product,
   ProductCreate,
   ProductUpdate,
+  RefreshSchedule,
+  RefreshScheduleCreate,
+  RefreshScheduleUpdate,
   PurchaseOutcomeCreate,
   PurchaseOutcomeCreated,
   PurchaseRequest,
@@ -269,6 +275,28 @@ export class ApiService {
     return this.http.get<{ items: Supplier[]; next_cursor: string | null }>(
       `${this.base}/suppliers${qs}`,
     );
+  }
+
+  refreshSchedules(params?: { cursor?: string; limit?: number }): Observable<{
+    items: RefreshSchedule[];
+    next_cursor: string | null;
+  }> {
+    const query = new URLSearchParams();
+    if (params?.cursor) query.set('cursor', params.cursor);
+    if (params?.limit) query.set('limit', String(params.limit));
+    const qs = query.toString() ? `?${query.toString()}` : '';
+    return this.http.get<{ items: RefreshSchedule[]; next_cursor: string | null }>(
+      `${this.base}/refresh-schedules${qs}`,
+    );
+  }
+
+  createRefreshSchedule(body: RefreshScheduleCreate, idempotencyKey?: string): Observable<RefreshSchedule> {
+    const headers = idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined;
+    return this.http.post<RefreshSchedule>(`${this.base}/refresh-schedules`, body, { headers });
+  }
+
+  updateRefreshSchedule(scheduleId: string, body: RefreshScheduleUpdate): Observable<RefreshSchedule> {
+    return this.http.patch<RefreshSchedule>(`${this.base}/refresh-schedules/${scheduleId}`, body);
   }
 
   supplier(supplierId: string): Observable<Supplier> {
@@ -550,7 +578,7 @@ export class ApiService {
     date_to?: string;
     sort_by?: 'created_at' | 'priority' | 'status';
     sort_order?: 'asc' | 'desc';
-  }): Observable<{ items: MatchTask[]; next_cursor: string | null }> {
+  }): Observable<{ items: MatchQueueItem[]; next_cursor: string | null }> {
     const query = new URLSearchParams();
     if (params?.cursor) query.set('cursor', params.cursor);
     if (params?.limit) query.set('limit', String(params.limit));
@@ -564,8 +592,37 @@ export class ApiService {
     if (params?.sort_by) query.set('sort_by', params.sort_by);
     if (params?.sort_order) query.set('sort_order', params.sort_order);
     const qs = query.toString() ? `?${query.toString()}` : '';
-    return this.http.get<{ items: MatchTask[]; next_cursor: string | null }>(
+    return this.http.get<{ items: MatchQueueItem[]; next_cursor: string | null }>(
       `${this.base}/match-tasks${qs}`,
+    );
+  }
+
+  listCatalogueRefreshReviews(params?: {
+    status?: 'pending_review' | 'processing' | 'approved' | 'rejected' | 'all';
+    cursor?: string;
+    limit?: number;
+  }): Observable<{ items: CatalogueRefreshReview[]; next_cursor: string | null }> {
+    const query = new URLSearchParams();
+    if (params?.status) query.set('status', params.status);
+    if (params?.cursor) query.set('cursor', params.cursor);
+    if (params?.limit) query.set('limit', String(params.limit));
+    const qs = query.toString() ? `?${query.toString()}` : '';
+    return this.http.get<{ items: CatalogueRefreshReview[]; next_cursor: string | null }>(
+      `${this.base}/catalogue-refresh-reviews${qs}`,
+    );
+  }
+
+  approveCatalogueRefreshReview(reviewId: string): Observable<CatalogueRefreshReviewDecision> {
+    return this.http.post<CatalogueRefreshReviewDecision>(
+      `${this.base}/catalogue-refresh-reviews/${reviewId}/approve`,
+      {},
+    );
+  }
+
+  rejectCatalogueRefreshReview(reviewId: string): Observable<CatalogueRefreshReviewDecision> {
+    return this.http.post<CatalogueRefreshReviewDecision>(
+      `${this.base}/catalogue-refresh-reviews/${reviewId}/reject`,
+      {},
     );
   }
 

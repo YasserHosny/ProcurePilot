@@ -163,7 +163,7 @@ describe("ProductFormComponent (T017, T029)", () => {
       );
 
       component.productId.set("p-existing");
-      (component as any).checkModeAndLoad();
+      component['checkModeAndLoad']();
       fixture.detectChanges();
 
       expect(component.errorMessage()).toBeNull();
@@ -210,7 +210,7 @@ describe("ProductFormComponent (T017, T029)", () => {
       );
 
       component.productId.set("p-existing");
-      (component as any).checkModeAndLoad();
+      component['checkModeAndLoad']();
       fixture.detectChanges();
 
       const context = fixture.nativeElement.querySelector('[data-testid="pos-inline-context"]');
@@ -260,7 +260,7 @@ describe("ProductFormComponent (T017, T029)", () => {
       );
 
       component.productId.set("p-existing");
-      (component as any).checkModeAndLoad();
+      component['checkModeAndLoad']();
       fixture.detectChanges();
 
       const provisional = fixture.nativeElement.querySelector('[data-testid="pos-velocity-provisional"]');

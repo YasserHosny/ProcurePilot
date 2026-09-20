@@ -110,6 +110,60 @@
                 {{ 'accounting.discrepancies.table.details' | translate }}
               </th>
               <td mat-cell *matCellDef="let disc" class="details-cell">
+                @if (disc.three_way_match; as match) {
+                  <div class="three-way-detail" data-testid="three-way-detail">
+                    @if (disc.purchase_order_detail; as order) {
+                      <div class="three-way-order">
+                        <span class="three-way-label">{{ 'accounting.discrepancies.threeWay.order' | translate }}</span>
+                        <strong>{{ order.order_number }}</strong>
+                        <span class="three-way-order-status">
+                          {{ 'accounting.discrepancies.threeWay.orderStatus' | translate: { number: order.order_number, status: order.status } }}
+                        </span>
+                      </div>
+                    }
+
+                    <div class="three-way-grid" [attr.aria-label]="'accounting.discrepancies.threeWay.title' | translate">
+                      <div class="three-way-cell">
+                        <span class="three-way-label">{{ 'accounting.discrepancies.threeWay.ordered' | translate }}</span>
+                        <strong>{{ formatEvidenceValue(match.ordered_quantity) }}</strong>
+                      </div>
+                      <div class="three-way-cell">
+                        <span class="three-way-label">{{ 'accounting.discrepancies.threeWay.confirmed' | translate }}</span>
+                        <strong>{{ formatEvidenceValue(match.confirmed_quantity) }}</strong>
+                        @if (getEvidenceState(disc.evidence, 'confirmation'); as state) {
+                          <span class="evidence-state" [ngClass]="'evidence-' + state">{{ getEvidenceStateLabel(state) }}</span>
+                        }
+                      </div>
+                      <div class="three-way-cell">
+                        <span class="three-way-label">{{ 'accounting.discrepancies.threeWay.received' | translate }}</span>
+                        <strong>{{ formatEvidenceValue(match.received_quantity) }}</strong>
+                        @if (getEvidenceState(disc.evidence, 'receipt'); as state) {
+                          <span class="evidence-state" [ngClass]="'evidence-' + state">{{ getEvidenceStateLabel(state) }}</span>
+                        }
+                      </div>
+                      <div class="three-way-cell">
+                        <span class="three-way-label">{{ 'accounting.discrepancies.threeWay.invoiced' | translate }}</span>
+                        <strong>{{ formatEvidenceValue(match.invoiced_quantity) }}</strong>
+                      </div>
+                    </div>
+
+                    <div class="three-way-price-row">
+                      <span class="three-way-label">{{ 'accounting.discrepancies.threeWay.unitPrice' | translate }}</span>
+                      <span>{{ formatPrice(match.ordered_unit_price_amount, match.ordered_unit_price_currency) }}</span>
+                      <mat-icon aria-hidden="true">arrow_forward</mat-icon>
+                      <span>{{ formatPrice(match.invoiced_unit_price_amount, match.invoiced_unit_price_currency) }}</span>
+                    </div>
+
+                    <div class="three-way-meta">
+                      <span>{{ 'accounting.discrepancies.threeWay.ruleset' | translate: { version: match.tolerance_ruleset_version } }}</span>
+                      <span>{{ 'accounting.discrepancies.threeWay.evaluatedAt' | translate: { date: (match.evaluated_at | formatDate) } }}</span>
+                      @if (disc.reopened_at) {
+                        <span>{{ 'accounting.discrepancies.threeWay.reopenedAt' | translate: { date: (disc.reopened_at | formatDate) } }}</span>
+                      }
+                    </div>
+                  </div>
+                }
+
                 <!-- Amount Mismatch -->
                 @if (disc.discrepancy_type === 'amount_mismatch') {
                   <div class="side-by-side-comparison" data-testid="amount-mismatch-detail">

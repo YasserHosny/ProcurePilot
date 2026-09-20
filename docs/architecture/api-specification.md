@@ -476,11 +476,13 @@ Every monetary value is a `Money` object with `amount` as a decimal string and e
   optional `status` (`open`, `in_progress`, `resolved`, or `all`) defaulting to `open`, optional
   `priority` (`low`, `normal`, or `high`), optional `reason` (`low_confidence`,
   `close_candidates`, `no_candidate`, or `alias_conflict`), and optional `quotation_id`.
-- Returns `200` with `items` containing `MatchTask` resources and nullable `next_cursor`.
-- Match task fields include `id`, optional `quotation_id`, `quotation_line`, `status`, `priority`,
-  `reason`, ranked `candidates`, optional `decision`, `created_at`, and optional `resolved_at`.
-- `MatchTask.quotation_line` uses the same `QuotationLineSummary` shape returned by quotation match
-  state.
+- Returns `200` with lightweight `MatchQueueItem` resources and nullable `next_cursor`.
+- Queue items preserve the fields rendered by the queue: quotation header, line number and text,
+  quoted exposure, reason, status, priority, top candidate name and score, timestamps, and grouping
+  counts. The list response does not include the full candidate list, extraction overlay, product
+  metadata, or decision/audit detail.
+- The full `MatchTask` shape remains available from `GET /quotation-lines/{line_id}/match-task` and
+  is loaded by the Resolve Match/View Details flow.
 
 ### `POST /quotation-lines/{line_id}/match`
 
@@ -564,7 +566,9 @@ data. They are not new persisted sources of price or match truth.
   decimal-string `requested_quantity`, `base_unit`, optional `lead_time_days`, optional
   decimal-string `reliability_score`, nullable `stock_signal`, decimal-string
   `match_confidence`, `valid_from`, optional `valid_to`, `is_expired`, `rule_version`, and
-  `recorded_at`.
+  `recorded_at`, plus additive `freshness_score`, `freshness_age_days`, `freshness_status`, and
+  nullable `freshness_due_at` fields. Freshness is measured against the configured 14-day target
+  by default; it is advisory metadata and does not remove or rewrite an offer.
 - `landed_cost` and `normalised_unit_price` are `Money { amount, currency }`; `amount` is a
   decimal string.
 - `stock_signal` is nullable and always null in chunk 4.5 because no stock, availability, or
@@ -596,7 +600,11 @@ Example:
       "valid_to": "2026-08-28T00:00:00Z",
       "is_expired": false,
       "rule_version": "landed-cost-v1",
-      "recorded_at": "2026-08-21T09:00:00Z"
+      "recorded_at": "2026-08-21T09:00:00Z",
+      "freshness_score": "1.0000",
+      "freshness_age_days": 0,
+      "freshness_status": "fresh",
+      "freshness_due_at": "2026-09-04T09:00:00Z"
     }
   ],
   "next_cursor": null
@@ -2525,6 +2533,71 @@ Role-based access control is evaluated individually per endpoint:
   `matched_at = now()`. Records no separate audit event in the current implementation.
 - Returns `200 OK` with `PosProductMatch`: `id`, `synced_product_signal_id`, `workspace_product_id`, `match_method`,
   and `matched_at`.
+
+---
+
+## Partner API Beta (R3.4)
+
+The first R3.4 increment exposes a provider-neutral, read-only surface for external systems. It
+uses the same verified Supabase JWT as the core API; tenant scope is never supplied by the caller.
+API-key exchange, outbound webhooks, connector writes, and freshness scheduling are separate R3.4
+increments.
+
+### `GET /partner/orders`
+
+- Requires bearer auth and an active tenant membership.
+- Returns the caller's tenant's cursor-paginated `PurchaseOrderList`.
+- Query parameters: optional `cursor`; `limit` between 1 and 100, default 50.
+- Uses the same order projection as `GET /orders`, including explicit money currencies.
+
+### `GET /partner/orders/{order_id}`
+
+- Requires bearer auth and an active tenant membership.
+- Returns `OrderEvidenceProjection`, including order lines, supplier confirmation, delivery
+  receipts, lifecycle status, quantities, and provenance identifiers.
+- A cross-tenant order ID returns the standard `404 not_found` envelope.
+
+### `GET /partner/catalogue/products`
+
+- Requires bearer auth and an active tenant membership.
+- Returns the tenant's cursor-paginated `ProductList`.
+- Query parameters: optional `cursor`, `q`, and `status` (`active`, `archived`, or `all`);
+  `limit` is between 1 and 100, default 50.
+- No partner mutation route is exposed in the beta.
+
+## Outbound Webhooks (R3.4)
+
+Webhook subscriptions are owner-managed and tenant-scoped. Each subscription receives a signing
+secret once at creation; the secret is encrypted at rest and is never returned by list or pause
+operations. Audit events create durable delivery rows through a database trigger, and the webhook
+worker retries failed deliveries with bounded exponential backoff.
+
+### `GET /webhooks/subscriptions`
+
+- Requires bearer auth; returns subscriptions for the current tenant.
+- Response omits signing secrets.
+
+### `POST /webhooks/subscriptions`
+
+- Owner only.
+- Request: `endpoint_url` (`https://` or `http://`) and optional `events` list; `*` subscribes to
+  all tenant audit events.
+- Returns `201` with the subscription and a one-time `secret` value.
+
+### `POST /webhooks/subscriptions/{subscription_id}/pause`
+
+- Owner only.
+- Pauses future delivery while preserving existing delivery history.
+- Cross-tenant or unknown IDs return the standard `404 not_found` envelope.
+
+### `GET /webhooks/deliveries`
+
+- Requires bearer auth and returns the latest 100 delivery records for the current tenant.
+- Includes event type, status, attempt count, next retry time, delivered time, and the last
+  error; signing secrets are never included.
+
+Delivery requests contain `X-ProcurePilot-Event-Id`, `X-ProcurePilot-Event-Type`, and
+`X-ProcurePilot-Signature: sha256=<hmac>` headers. The signature covers canonical JSON bytes.
 
 ---
 

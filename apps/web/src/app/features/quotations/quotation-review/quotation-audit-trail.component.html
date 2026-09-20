@@ -14,6 +14,15 @@
       @for (entry of auditTrail; track entry.id) {
         <div class="audit-entry">
           <div class="audit-action">{{ auditActionLabel(entry.action) }}</div>
+          @if (auditDetailLines(entry); as details) {
+            @if (details.length > 0) {
+              <ul class="audit-details">
+                @for (detail of details; track detail) {
+                  <li>{{ detail }}</li>
+                }
+              </ul>
+            }
+          }
           <div class="audit-meta">
             <span class="audit-actor">{{ entry.actor_email ?? ('quotations.audit.system' | translate) }}</span>
             <span class="audit-time">{{ entry.occurred_at | formatDate }}</span>

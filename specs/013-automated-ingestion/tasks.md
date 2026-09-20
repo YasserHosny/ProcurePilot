@@ -441,23 +441,23 @@ precisely-scoped gap that was actually closed, not a full suite written from scr
 
 ## Phase 8 — Documentation & Close-Out
 
-- [ ] **T037** — API specification: add ingestion endpoints
+- [x] **T037** — API specification: add ingestion endpoints
   - `docs/architecture/api-specification.md` — R3.0 section
   - All new endpoints documented
 
-- [ ] **T038** — Data dictionary: add ingestion entities
+- [x] **T038** — Data dictionary: add ingestion entities
   - `docs/architecture/data-dictionary.md` — new tables, columns, events
   - All new audit events documented
 
-- [ ] **T039** — User documentation: ingestion features
+- [x] **T039** — User documentation: ingestion features
   - `docs/user/user-documentation.md` — email forwarding, capture, catalogue import
   - Mobile documentation update
 
-- [ ] **T040** — Test strategy: R3.0 section
+- [x] **T040** — Test strategy: R3.0 section
   - `docs/quality/test-strategy.md` — ingestion test coverage
   - Worker reliability, deduplication, rate limiting
 
-- [ ] **T041** — OpenAPI contract update
+- [x] **T041** — OpenAPI contract update
   - `specs/013-automated-ingestion/contracts/automated-ingestion.openapi.yaml`
   - All new endpoints with request/response schemas
 

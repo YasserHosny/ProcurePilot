@@ -23,6 +23,14 @@ describe('DashboardComponent (T026)', () => {
     catalogue_imports_total: 8,
     supplier_match_rate: 0.85,
     extraction_success_rate: 0.92,
+    active_quotation_count: 40,
+    integration_sourced_quotation_count: 12,
+    integration_sourced_share: 0.3,
+    purchase_history_days: 120,
+    g3_history_ready: false,
+    active_refresh_schedule_count: 3,
+    linked_refresh_schedule_count: 0,
+    refresh_pilot_ready: false,
   };
 
   const mockZeroStats: IngestionStats = {
@@ -33,6 +41,14 @@ describe('DashboardComponent (T026)', () => {
     catalogue_imports_total: 0,
     supplier_match_rate: 0.0,
     extraction_success_rate: 0.0,
+    active_quotation_count: 0,
+    integration_sourced_quotation_count: 0,
+    integration_sourced_share: 0.0,
+    purchase_history_days: 0,
+    g3_history_ready: false,
+    active_refresh_schedule_count: 0,
+    linked_refresh_schedule_count: 0,
+    refresh_pilot_ready: false,
   };
 
   const mockRecentEmails: IngestionEmailLog[] = [

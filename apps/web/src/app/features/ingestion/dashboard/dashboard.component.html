@@ -120,6 +120,36 @@
       </div>
     </section>
 
+    <section class="coverage-section" aria-labelledby="integration-coverage-title">
+      <div class="section-header">
+        <h2 id="integration-coverage-title" class="section-title">{{ 'ingestion.dashboard.coverage.title' | translate }}</h2>
+        <p class="section-subtitle">{{ 'ingestion.dashboard.coverage.subtitle' | translate }}</p>
+      </div>
+      <div class="coverage-grid">
+        <mat-card class="coverage-card">
+          <mat-card-content>
+            <span class="coverage-label">{{ 'ingestion.dashboard.coverage.integrationShare' | translate }}</span>
+            <strong class="coverage-value">{{ formatRate(stats()?.integration_sourced_share) }}</strong>
+            <span class="coverage-detail">{{ stats()?.integration_sourced_quotation_count ?? 0 }} / {{ stats()?.active_quotation_count ?? 0 }} {{ 'ingestion.dashboard.coverage.quotations' | translate }}</span>
+          </mat-card-content>
+        </mat-card>
+        <mat-card class="coverage-card">
+          <mat-card-content>
+            <span class="coverage-label">{{ 'ingestion.dashboard.coverage.history' | translate }}</span>
+            <strong class="coverage-value">{{ stats()?.purchase_history_days ?? 0 }} {{ 'ingestion.dashboard.coverage.days' | translate }}</strong>
+            <span class="coverage-detail">{{ (stats()?.g3_history_ready ? 'ingestion.dashboard.coverage.ready' : 'ingestion.dashboard.coverage.collecting') | translate }}</span>
+          </mat-card-content>
+        </mat-card>
+        <mat-card class="coverage-card">
+          <mat-card-content>
+            <span class="coverage-label">{{ 'ingestion.dashboard.coverage.refreshSchedules' | translate }}</span>
+            <strong class="coverage-value">{{ stats()?.linked_refresh_schedule_count ?? 0 }} / {{ stats()?.active_refresh_schedule_count ?? 0 }}</strong>
+            <span class="coverage-detail">{{ (stats()?.refresh_pilot_ready ? 'ingestion.dashboard.coverage.refreshReady' : 'ingestion.dashboard.coverage.refreshNeeded') | translate }}</span>
+          </mat-card-content>
+        </mat-card>
+      </div>
+    </section>
+
     <!-- Channels & Tools (Links to sub-pages) -->
     <section class="channels-section">
       <div class="section-header">
@@ -190,6 +220,23 @@
           <mat-card-actions>
             <a mat-stroked-button routerLink="/ingestion/catalogue-import" class="channel-action-btn">
               <span>{{ 'ingestion.dashboard.channels.importAction' | translate }}</span>
+              <mat-icon class="rtl-flip" aria-hidden="true">arrow_forward</mat-icon>
+            </a>
+          </mat-card-actions>
+        </mat-card>
+
+        <!-- Refresh Schedules -->
+        <mat-card class="channel-card">
+          <mat-card-header>
+            <mat-icon mat-card-avatar class="channel-icon" aria-hidden="true">schedule</mat-icon>
+            <mat-card-title class="channel-title">{{ 'ingestion.dashboard.channels.refreshSchedulesTitle' | translate }}</mat-card-title>
+          </mat-card-header>
+          <mat-card-content>
+            <p class="channel-desc">{{ 'ingestion.dashboard.channels.refreshSchedulesDesc' | translate }}</p>
+          </mat-card-content>
+          <mat-card-actions>
+            <a mat-stroked-button routerLink="/ingestion/refresh-schedules" class="channel-action-btn">
+              <span>{{ 'ingestion.dashboard.channels.manageAction' | translate }}</span>
               <mat-icon class="rtl-flip" aria-hidden="true">arrow_forward</mat-icon>
             </a>
           </mat-card-actions>

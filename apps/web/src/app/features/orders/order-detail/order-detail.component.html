@@ -1,0 +1,72 @@
+<div class="order-detail-container">
+  <a mat-button routerLink="/orders" class="back-link"><mat-icon aria-hidden="true">arrow_back</mat-icon>{{ 'orders.backToOrders' | translate }}</a>
+
+  @if (errorMessage(); as error) {
+    <mat-card class="state error" role="alert"><mat-icon aria-hidden="true">error_outline</mat-icon><span>{{ error }}</span><button mat-button type="button" (click)="loadOrder()">{{ 'orders.retry' | translate }}</button></mat-card>
+  } @else if (isLoading()) {
+    <div class="state" role="status"><mat-spinner diameter="36" /></div>
+  } @else {
+    @if (evidence(); as data) {
+    <div class="page-header">
+      <div>
+        <span class="eyebrow">{{ 'orders.detail.eyebrow' | translate }}</span>
+        <h1>{{ data.order.order_number }}</h1>
+        <p>{{ 'orders.detail.createdAt' | translate: { date: (data.order.created_at | formatDate) } }}</p>
+      </div>
+      <span class="status-chip" [attr.data-status]="data.lifecycle.status">{{ getStatusLabel(data.lifecycle.status) }}</span>
+    </div>
+
+    <div class="summary-grid">
+      <mat-card><span>{{ 'orders.detail.orderDate' | translate }}</span><strong>{{ data.order.order_date | formatDate }}</strong></mat-card>
+      <mat-card><span>{{ 'orders.detail.expectedDelivery' | translate }}</span><strong>{{ data.order.expected_delivery_date ? (data.order.expected_delivery_date | formatDate) : ('orders.notProvided' | translate) }}</strong></mat-card>
+      <mat-card><span>{{ 'orders.detail.total' | translate }}</span><strong>{{ data.order.total | formatMoney }}</strong></mat-card>
+      <mat-card><span>{{ 'orders.detail.confirmation' | translate }}</span><strong>{{ getEvidenceLabel(data.lifecycle.confirmation) }}</strong></mat-card>
+      <mat-card><span>{{ 'orders.detail.receipt' | translate }}</span><strong>{{ getEvidenceLabel(data.lifecycle.receipt) }}</strong></mat-card>
+    </div>
+
+    <mat-card class="evidence-card">
+      <div class="section-heading"><div><h2>{{ 'orders.detail.linesTitle' | translate }}</h2><p>{{ 'orders.detail.linesSubtitle' | translate }}</p></div></div>
+      <div class="line-list" data-testid="order-lines">
+        @for (line of data.order.lines; track line.id) {
+          @if (lineSummary(line.id); as summary) {
+            <div class="line-row">
+              <div class="line-description"><span class="line-number">#{{ line.line_number }}</span><strong>{{ line.description }}</strong><span>{{ line.unit_price | formatMoney }} / {{ line.base_unit }}</span></div>
+              <div class="line-evidence"><span>{{ 'orders.detail.ordered' | translate }} <strong>{{ summary.ordered_quantity }}</strong></span><span class="evidence-value" [attr.data-state]="summary.confirmed.state">{{ 'orders.detail.confirmed' | translate }} <strong>{{ summary.confirmed.quantity ?? ('orders.notProvided' | translate) }}</strong></span><span class="evidence-value" [attr.data-state]="summary.received.state">{{ 'orders.detail.received' | translate }} <strong>{{ summary.received.quantity ?? ('orders.notProvided' | translate) }}</strong></span><span>{{ 'orders.detail.remaining' | translate }} <strong>{{ summary.remaining_quantity ?? ('orders.notProvided' | translate) }}</strong></span></div>
+            </div>
+          }
+        }
+      </div>
+    </mat-card>
+
+    <mat-card class="actions-card">
+      <div class="section-heading"><div><h2>{{ 'orders.detail.actionsTitle' | translate }}</h2><p>{{ 'orders.detail.actionsSubtitle' | translate }}</p></div></div>
+      <div class="actions">
+        @if (data.order.status === 'draft') { <button mat-flat-button color="primary" type="button" (click)="submitOrder()" [disabled]="isSaving()" data-testid="submit-order"><mat-icon aria-hidden="true">send</mat-icon>{{ 'orders.detail.submit' | translate }}</button> }
+        @if (data.order.status !== 'cancelled' && data.order.status !== 'closed') {
+          <button mat-stroked-button type="button" (click)="confirmationOpen.set(!confirmationOpen())" [disabled]="isSaving()" data-testid="open-confirmation-form"><mat-icon aria-hidden="true">handshake</mat-icon>{{ 'orders.detail.recordConfirmation' | translate }}</button>
+          <button mat-stroked-button type="button" (click)="receiptOpen.set(!receiptOpen())" [disabled]="isSaving()" data-testid="open-receipt-form"><mat-icon aria-hidden="true">inventory_2</mat-icon>{{ 'orders.detail.recordReceipt' | translate }}</button>
+        }
+      </div>
+
+      @if (confirmationOpen()) {
+        <form class="evidence-form" (ngSubmit)="recordConfirmation()">
+          <h3>{{ 'orders.detail.confirmationFormTitle' | translate }}</h3>
+          <div class="form-grid"><mat-form-field appearance="outline"><mat-label>{{ 'orders.detail.reference' | translate }}</mat-label><input matInput required [ngModel]="confirmationReference()" (ngModelChange)="confirmationReference.set($event)" name="confirmationReference" /></mat-form-field><mat-form-field appearance="outline"><mat-label>{{ 'orders.detail.confirmedDate' | translate }}</mat-label><input matInput required type="date" [ngModel]="confirmationDate()" (ngModelChange)="confirmationDate.set($event)" name="confirmationDate" /></mat-form-field></div>
+          @for (line of data.order.lines; track line.id) { <mat-form-field appearance="outline"><mat-label>{{ line.description }} · {{ 'orders.detail.confirmedQuantity' | translate }}</mat-label><input matInput required type="number" min="0" step="0.000001" [ngModel]="quantityValue(confirmationQuantities(), line)" (ngModelChange)="setQuantity('confirmation', line.id, $event)" [name]="'confirmation-' + line.id" /></mat-form-field> }
+          <button mat-flat-button color="primary" type="submit" [disabled]="isSaving()" data-testid="save-confirmation">{{ 'orders.detail.save' | translate }}</button>
+        </form>
+      }
+      @if (receiptOpen()) {
+        <form class="evidence-form" (ngSubmit)="recordReceipt()">
+          <h3>{{ 'orders.detail.receiptFormTitle' | translate }}</h3>
+          <div class="form-grid"><mat-form-field appearance="outline"><mat-label>{{ 'orders.detail.reference' | translate }}</mat-label><input matInput required [ngModel]="receiptReference()" (ngModelChange)="receiptReference.set($event)" name="receiptReference" /></mat-form-field><mat-form-field appearance="outline"><mat-label>{{ 'orders.detail.receivedDate' | translate }}</mat-label><input matInput required type="date" [ngModel]="receiptDate()" (ngModelChange)="receiptDate.set($event)" name="receiptDate" /></mat-form-field></div>
+          @for (line of data.order.lines; track line.id) { <mat-form-field appearance="outline"><mat-label>{{ line.description }} · {{ 'orders.detail.receivedQuantity' | translate }}</mat-label><input matInput required type="number" min="0" step="0.000001" [ngModel]="quantityValue(receiptQuantities(), line)" (ngModelChange)="setQuantity('receipt', line.id, $event)" [name]="'receipt-' + line.id" /></mat-form-field> }
+          <button mat-flat-button color="primary" type="submit" [disabled]="isSaving()" data-testid="save-receipt">{{ 'orders.detail.save' | translate }}</button>
+        </form>
+      }
+    </mat-card>
+
+    <mat-card class="timeline-card"><h2>{{ 'orders.detail.timelineTitle' | translate }}</h2><div class="timeline"><div><mat-icon aria-hidden="true">shopping_cart</mat-icon><span>{{ 'orders.detail.orderCreated' | translate }}</span><small>{{ data.order.created_at | formatDate }}</small></div>@if (data.confirmation) { <div><mat-icon aria-hidden="true">handshake</mat-icon><span>{{ 'orders.detail.confirmationRecorded' | translate }}</span><small>{{ data.confirmation.confirmed_at | formatDate }}</small></div> } @for (receipt of data.receipts; track receipt.id) { <div><mat-icon aria-hidden="true">inventory_2</mat-icon><span>{{ 'orders.detail.receiptRecorded' | translate: { reference: receipt.receipt_reference } }}</span><small>{{ receipt.receipt_date | formatDate }}</small></div> }</div></mat-card>
+    }
+  }
+</div>

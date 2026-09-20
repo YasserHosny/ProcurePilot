@@ -163,8 +163,9 @@ kbd {
 .form-row { display: flex; gap: 1rem; &.two-col { flex-wrap: wrap; .form-field { flex: 1; min-width: 220px; } } }
 .form-field.full-width { width: 100%; }
 .form-divider { margin-block: 0.75rem; }
-.pack-title { font-size: 1rem; font-weight: 700; margin: 0; }
-.pack-desc { font-size: 0.8rem; color: #64748b; margin: 0; }
+.pack-definition-section { display: flex; flex-direction: column; gap: 0.5rem; }
+.pack-title { font-size: 1rem; font-weight: 700; margin: 0 0 0.15rem 0; }
+.pack-desc { font-size: 0.8rem; color: #64748b; margin: 0 0 0.5rem 0; line-height: 1.4; }
 
 .normalisation-preview {
   display: flex;

@@ -14,6 +14,7 @@ from psycopg.rows import dict_row
 from procurepilot_api.config import Settings, get_settings
 from procurepilot_api.deps import CurrentMember
 from procurepilot_api.errors import NotFoundError, ServiceUnavailableError, UnprocessableEntityError
+from procurepilot_api.modules.offers.freshness import freshness_projection
 from procurepilot_api.modules.offers.price_history import (
     normalised_unit_price,
     price_history_summary,
@@ -131,7 +132,14 @@ class OfferService:
                 offset=offset,
                 limit=capped_limit + 1,
             )
-        offers = [_offer(row, quantity=quantity) for row in rows[:capped_limit]]
+        offers = [
+            _offer(
+                row,
+                quantity=quantity,
+                freshness_target_days=self._settings.offer_freshness_target_days,
+            )
+            for row in rows[:capped_limit]
+        ]
         next_cursor = _encode_cursor(offset + capped_limit) if len(rows) > capped_limit else None
         del product
         return OfferList(items=offers, next_cursor=next_cursor)
@@ -153,7 +161,14 @@ class OfferService:
                 offset=0,
                 limit=101,
             )
-            offers = [_offer(row, quantity=quantity) for row in rows]
+            offers = [
+                _offer(
+                    row,
+                    quantity=quantity,
+                    freshness_target_days=self._settings.offer_freshness_target_days,
+                )
+                for row in rows
+            ]
             supplier_risk_scores: dict[UUID, str] = {}
             supplier_ids = list({offer.supplier_id for offer in offers})
             if supplier_ids:
@@ -283,7 +298,13 @@ def _offer_rows(
         return [dict(row) for row in cur.fetchall()]
 
 
-def _offer(row: dict[str, object], *, quantity: Decimal) -> Offer:
+def _offer(
+    row: dict[str, object],
+    *,
+    quantity: Decimal,
+    freshness_target_days: int = 14,
+    now: datetime | None = None,
+) -> Offer:
     projected = project_landed_cost(
         raw_inputs=_json_object(row["raw_inputs"]),
         rule_version=str(row["rule_version"]),
@@ -293,6 +314,9 @@ def _offer(row: dict[str, object], *, quantity: Decimal) -> Offer:
     valid_to = row.get("valid_to")
     is_expired = valid_to is not None and valid_to < datetime.now(UTC)
     reliability = row.get("reliability_score")
+    freshness_score, freshness_age_days, freshness_status, freshness_due_at = freshness_projection(
+        row["recorded_at"], now=now, target_days=freshness_target_days
+    )
     return Offer(
         id=UUID(str(row["id"])),
         workspace_product_id=UUID(str(row["workspace_product_id"])),
@@ -313,6 +337,10 @@ def _offer(row: dict[str, object], *, quantity: Decimal) -> Offer:
         is_expired=is_expired,
         rule_version=str(row["rule_version"]),
         recorded_at=row["recorded_at"],
+        freshness_score=freshness_score,
+        freshness_age_days=freshness_age_days,
+        freshness_status=freshness_status,
+        freshness_due_at=freshness_due_at,
     )
 
 

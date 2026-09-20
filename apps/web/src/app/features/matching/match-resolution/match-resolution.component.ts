@@ -96,6 +96,19 @@ export class MatchResolutionComponent implements OnInit {
 
   readonly isWriter = computed<boolean>(() => this.session.hasRole('owner', 'buyer'));
 
+  backQueryParams = computed<Record<string, string>>(() => {
+    const qp = this.route.snapshot.queryParamMap;
+    const out: Record<string, string> = {};
+    const keys = ['quotation_id', 'status', 'priority', 'reason', 'search', 'date_from', 'date_to', 'sort_by', 'sort_order'];
+    for (const k of keys) {
+      const v = qp.get(k);
+      if (v) out[k] = v;
+    }
+    // Ensure quotation_id falls back to loaded task's quotation id
+    if (!out['quotation_id'] && this.quotationId()) out['quotation_id'] = this.quotationId()!;
+    return out;
+  });
+
   // Product form for inline product creation
   readonly productForm: FormGroup = this.fb.group({
     tenant_name: ['', [Validators.required, Validators.maxLength(200)]],

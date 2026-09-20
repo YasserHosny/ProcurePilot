@@ -14,9 +14,9 @@ from procurepilot_api.modules.matching.resolution_service import (
 )
 from procurepilot_api.modules.matching.schemas import (
     MatchDecision,
+    MatchQueueList,
     MatchResolutionRequest,
     MatchTask,
-    MatchTaskList,
     MatchTaskPriority,
     MatchTaskReason,
     MatchTaskStatusFilter,
@@ -48,10 +48,10 @@ def quotation_matches(
     return service.quotation_matches(bearer_token=token, member=member, quotation_id=quotation_id)
 
 
-@router.get("/match-tasks", response_model=MatchTaskList)
+@router.get("/match-tasks", response_model=MatchQueueList)
 def list_match_tasks(
     token: Annotated[str, Depends(bearer_token)],
-    _member: Annotated[CurrentMember, Depends(current_member)],
+    member: Annotated[CurrentMember, Depends(current_member)],
     service: Annotated[MatchingService, Depends(get_matching_service)],
     cursor: Annotated[str | None, Query()] = None,
     limit: Annotated[int, Query(le=100)] = 50,
@@ -66,9 +66,10 @@ def list_match_tasks(
         Literal["created_at", "priority", "status"], Query()
     ] = "created_at",
     sort_order: Annotated[Literal["asc", "desc"], Query()] = "desc",
-) -> MatchTaskList:
+) -> MatchQueueList:
     return service.list_match_tasks(
         bearer_token=token,
+        member=member,
         cursor=cursor,
         limit=limit,
         status=status,

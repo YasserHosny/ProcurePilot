@@ -7,6 +7,7 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field, StrictStr, model_validator
 
 RecommendationConfidence = Literal["high", "medium", "low"]
+FreshnessStatus = Literal["fresh", "stale"]
 RiskNote = Literal[
     "price_expiring_soon",
     "low_match_confidence",
@@ -71,6 +72,10 @@ class Offer(BaseModel):
     is_expired: bool
     rule_version: str
     recorded_at: datetime
+    freshness_score: str = "1.0000"
+    freshness_age_days: int = 0
+    freshness_status: FreshnessStatus = "fresh"
+    freshness_due_at: datetime | None = None
 
 
 class RecommendationEvidence(StrictApiModel):
@@ -314,6 +319,41 @@ class SupplierCommercialTerm(SupplierCommercialTermCreate):
 
 class SupplierCommercialTermList(StrictApiModel):
     items: list[SupplierCommercialTerm]
+
+
+RefreshScheduleStatus = Literal["active", "paused", "due"]
+
+
+class RefreshScheduleCreate(StrictApiModel):
+    workspace_product_id: UUID
+    supplier_id: UUID
+    cadence_days: int = Field(default=14, ge=1, le=365)
+
+
+class RefreshScheduleUpdate(StrictApiModel):
+    cadence_days: int | None = Field(default=None, ge=1, le=365)
+    status: RefreshScheduleStatus | None = None
+    source_import_id: UUID | None = None
+
+
+class RefreshSchedule(StrictApiModel):
+    id: UUID
+    workspace_product_id: UUID
+    supplier_id: UUID
+    cadence_days: int
+    status: RefreshScheduleStatus
+    next_refresh_at: datetime
+    last_observed_at: datetime | None = None
+    last_requested_at: datetime | None = None
+    last_error: str | None = None
+    source_import_id: UUID | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class RefreshScheduleList(StrictApiModel):
+    items: list[RefreshSchedule]
+    next_cursor: str | None = None
 
 
 class SupplierScoreMetric(StrictApiModel):

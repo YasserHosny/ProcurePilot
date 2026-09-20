@@ -23,12 +23,21 @@ from procurepilot_api.modules.ingestion.catalogue_import_service import (
     import_catalogue,
     list_imports,
 )
+from procurepilot_api.modules.ingestion.catalogue_refresh_review_service import (
+    approve_review,
+    get_review,
+    list_reviews,
+    reject_review,
+)
 from procurepilot_api.modules.ingestion.email_log_service import (
     IngestionEmailLogService,
     get_ingestion_email_log_service,
 )
 from procurepilot_api.modules.ingestion.schemas import (
     CatalogueImportSummaryList,
+    CatalogueRefreshReview,
+    CatalogueRefreshReviewDecision,
+    CatalogueRefreshReviewList,
     IngestionEmailLogList,
     IngestionEmailStatus,
     IngestionStats,
@@ -67,6 +76,10 @@ def _capture_upload_limit() -> str:
 
 def _catalogue_import_limit() -> str:
     return get_settings().rate_limit_catalogue_import
+
+
+def _catalogue_review_decision_limit() -> str:
+    return get_settings().rate_limit_catalogue_review_decision
 
 
 @router.get("/tenants/email-config", response_model=TenantEmailConfig)
@@ -333,6 +346,57 @@ def list_catalogue_imports(
         supplier_id=supplier_id,
         cursor=cursor,
         limit=limit,
+    )
+
+
+@router.get("/catalogue-refresh-reviews/{review_id}", response_model=CatalogueRefreshReview)
+def get_catalogue_refresh_review(
+    review_id: UUID,
+    member: Annotated[CurrentMember, Depends(current_member)],
+) -> CatalogueRefreshReview:
+    return CatalogueRefreshReview.model_validate(get_review(member=member, review_id=review_id))
+
+
+@router.get("/catalogue-refresh-reviews", response_model=CatalogueRefreshReviewList)
+def list_catalogue_refresh_reviews(
+    member: Annotated[CurrentMember, Depends(current_member)],
+    status_filter: Annotated[str, Query(alias="status")] = "pending_review",
+    cursor: Annotated[str | None, Query()] = None,
+    limit: Annotated[int, Query(ge=1, le=100)] = 50,
+) -> CatalogueRefreshReviewList:
+    return list_reviews(member=member, status=status_filter, cursor=cursor, limit=limit)
+
+
+@router.post(
+    "/catalogue-refresh-reviews/{review_id}/approve",
+    response_model=CatalogueRefreshReviewDecision,
+    status_code=status.HTTP_201_CREATED,
+)
+@mutation_limiter.limit(_catalogue_review_decision_limit)
+def approve_catalogue_refresh_review(
+    request: Request,
+    review_id: UUID,
+    member: Annotated[CurrentMember, Depends(require_role(*WRITE_ROLES))],
+    token: Annotated[str, Depends(bearer_token)],
+) -> CatalogueRefreshReviewDecision:
+    return CatalogueRefreshReviewDecision.model_validate(
+        approve_review(get_settings(), member=member, review_id=review_id, bearer_token=token)
+    )
+
+
+@router.post(
+    "/catalogue-refresh-reviews/{review_id}/reject",
+    response_model=CatalogueRefreshReviewDecision,
+)
+@mutation_limiter.limit(_catalogue_review_decision_limit)
+def reject_catalogue_refresh_review(
+    request: Request,
+    review_id: UUID,
+    member: Annotated[CurrentMember, Depends(require_role(*WRITE_ROLES))],
+    token: Annotated[str, Depends(bearer_token)],
+) -> CatalogueRefreshReviewDecision:
+    return CatalogueRefreshReviewDecision.model_validate(
+        reject_review(get_settings(), member=member, review_id=review_id, bearer_token=token)
     )
 
 
