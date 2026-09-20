@@ -2263,6 +2263,8 @@ def test_rls_is_enabled_and_forced_on_every_tenant_scoped_table(
         "approval_delegation",
         "device_registration", "low_stock_report", "push_notification",
         "supplier_commercial_term", "supplier_scorecard_snapshot",
+        "supplier_scorecard_metric", "supplier_scorecard_evidence", "negotiation_brief",
+        "negotiation_brief_item", "negotiation_brief_item_evidence", "negotiation_brief_action",
         "tenant_email_config", "ingestion_email_log", "ingestion_jobs", "catalogue_imports",
         "accounting_connection", "synced_vendor", "synced_bill", "purchase_bill_match",
         "reconciliation_discrepancy",

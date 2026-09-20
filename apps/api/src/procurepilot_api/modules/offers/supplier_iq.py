@@ -386,8 +386,7 @@ def _persist_snapshot(
                   computed_by_membership_id
                 )
                 values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                on conflict (tenant_id, supplier_id, window_start, window_end, rule_version)
-                do nothing
+                on conflict do nothing
                 """,
                 (
                     member.tenant_id,
