@@ -1,129 +1,232 @@
-# R4.1 Supplier Risk and Negotiation Briefs
+# R4.1 Supplier IQ v2 and Negotiation Briefs
 
-**Status:** Approved design, implementation pending
+**Status:** Revised after architecture review; pending final approval
 **Date:** 2026-09-20
 **Gate posture:** R4.1 proceeds under the recorded G3 exception. G3 remains unmet.
 
 ## Goal
 
-Give procurement users a deterministic, evidence-backed view of supplier risk and a
-human-reviewable negotiation brief that turns the risk evidence into a concrete next step.
-The release must improve purchasing decisions without sending supplier communications or
-authorising purchases automatically.
+Extend the existing Supplier IQ scorecard into a versioned supplier-risk model and turn its
+evidence into a human-reviewable negotiation brief. R4.1 must reuse the current scorecard API,
+snapshot history, and UI instead of introducing a second supplier-risk source of truth.
 
-## Scope
+The release remains advisory. It does not contact suppliers, dispatch an RFQ, authorise a
+purchase, or claim savings that cannot be traced to source records.
 
-R4.1 will calculate four supplier-level risk dimensions over an explicit evidence window:
+## Existing foundation
 
-- **Concentration:** the supplier's share of tenant purchase exposure where comparable
-  currency evidence exists.
-- **Price drift:** change in comparable landed-cost observations between the current and
-  baseline windows, grouped by product and currency.
-- **Delivery reliability:** on-time delivery performance from purchase orders and delivery
-  receipts, including the sample size used.
-- **Reconciliation quality:** discrepancy rate from three-way match and reconciliation
-  outcomes, including the sample size used.
+R2.4 already delivers `SupplierIqService`, `supplier_scorecard_snapshot`,
+`GET /api/v1/suppliers/{supplier_id}/scorecard`, and the supplier scorecard route. R4.1 evolves
+that implementation to rule version `supplier-scorecard-v2` and risk version
+`supplier-risk-v2` while preserving the v1 snapshot history and response compatibility needed
+by existing consumers.
 
-Each dimension will disclose its value, denominator, evidence window, currency where relevant,
-confidence, and data sufficiency. A supplier snapshot will expose an overall risk level only
-when the component evidence is sufficient; otherwise it will be labelled `insufficient_data`.
-Short history will be labelled `provisional`, never silently treated as mature evidence.
+The existing JSON snapshot columns remain a backward-compatible cache. New normalized metric
+and evidence rows become the auditable source for v2 calculations and negotiation briefs.
 
-Negotiation briefs will be generated from the latest risk snapshot. A brief will contain a
-small set of ranked, source-linked talking points, the relevant calculation, suggested human
-questions, and any monetary leverage expressed as an amount plus currency. It will not claim
-savings that cannot be traced to source records.
+## Risk model
 
-## Release constraints
+### Evidence window
 
-- Every snapshot and brief carries `release_posture = g3_unmet`.
-- No risk score or brief may use cross-tenant rows; database RLS is mandatory and application
-  filters are not sufficient.
-- Risk snapshots are append-only evidence. Recomputing the same source window and model
-  version is idempotent.
-- A brief is a workflow artifact, not an outbound communication. Users may inspect, prepare,
-  dismiss, or route it for human follow-up; the system will not email, message, negotiate, or
-  create a purchase order.
-- User-facing copy is added to the shared English and Arabic i18n catalogues and the UI must
-  support RTL.
+- The default window is 180 days ending on the calculation date.
+- The current period is the final 90 days; the baseline period is the preceding 90 days.
+- A caller may request 1-24 months for scorecard inspection, but v2 trend metrics require two
+  equal half-windows and disclose their exact dates.
+- `ready` requires all four risk components, high confidence, and at least 180 observed days.
+- `provisional` requires at least three components but has less than 180 observed days or any
+  component below high confidence.
+- `insufficient_data` applies when fewer than three components are calculable. It has no overall
+  score or risk level.
 
-## Proposed architecture
+### Confidence
 
-### Backend
+For count-based metrics, fewer than 3 qualifying observations is insufficient, 3-9 is medium
+confidence, and 10 or more is high confidence. A ratio that depends on product coverage also
+requires at least 3 distinct products. Overall confidence is the lowest confidence among the
+components included in the score.
 
-Add a focused `supplier_risk` module with:
+### Components
 
-- Pure, versioned calculation functions for component metrics and risk classification.
-- Pydantic schemas for snapshots, component metrics, briefs, and workflow actions.
-- A service that reads existing tenant-scoped order, delivery, invoice, reconciliation,
-  quotation, and landed-cost evidence through the authenticated Supabase client.
-- Routes to recompute snapshots, list supplier risks, retrieve a risk detail, list briefs, and
-  prepare or dismiss a brief.
-- Audit events for recomputation, brief preparation, and dismissal.
+All component risks are decimal values from 0 to 1. Values are rounded only when serialized;
+calculations use `Decimal` throughout.
 
-### Database
+1. **Concentration risk (30%)**
+   - For each currency, divide the supplier's submitted, confirmed, partially received, received,
+     or closed purchase-order spend by total tenant purchase-order spend in the same currency and
+     evidence window.
+   - Never add amounts across currencies. The displayed metric contains every currency bucket.
+   - The risk component is the highest qualifying currency share. Each bucket must have at least
+     3 tenant orders and at least 1 supplier order.
 
-Add a forward-only migration containing:
+2. **Price-drift risk (25%)**
+   - For each product, base unit, and currency with observations in both half-windows, calculate
+     `(current median normalized unit price / baseline median) - 1`.
+   - Observations are assigned by landed-cost record time. A product with a zero baseline median
+     is excluded and reported rather than divided by zero.
+   - The supplier drift is the median of the comparable product drifts.
+   - Risk is `clamp(max(drift, 0) / 0.20, 0, 1)`. A 20% or greater median increase is maximum
+     drift risk; decreases do not create negative risk.
 
-- `supplier_risk_snapshot`: immutable tenant-scoped snapshot with model version, evidence
-  window, overall state, confidence, release posture, and validity period.
-- `supplier_risk_metric`: immutable tenant-scoped child rows for concentration, price drift,
-  delivery reliability, and reconciliation quality, with explicit denominators and source
-  windows. The schema will use first-class columns for metric values and currencies, not an
-  opaque evidence blob.
-- `negotiation_brief`: tenant-scoped human workflow row linked to a snapshot, with status,
-  prepared/dismissed actor and timestamps, and deterministic source fingerprinting.
+3. **Reliability risk and decay (25%)**
+   - Include non-cancelled orders with an expected delivery date and enough receipt evidence to
+     determine completion.
+   - Completion date is the earliest receipt date at which cumulative received quantity reaches
+     ordered quantity for every order line. Partial receipts remain incomplete until that point.
+   - On-time rate is completed-on-or-before-expected orders divided by qualifying orders.
+   - Orders are assigned to baseline or current periods by expected delivery date.
+   - Decay is `baseline on-time rate - current on-time rate`.
+   - Risk is the greater of `1 - current on-time rate` and
+     `clamp(max(decay, 0) / 0.25, 0, 1)`.
+   - Draft and cancelled orders, orders without expected dates, and still-open orders not yet due
+     are excluded and reported in evidence counts.
 
-All tables will have tenant columns, composite tenant foreign keys, forced RLS, `USING` and
-`WITH CHECK` policies, appropriate indexes, and grants matching existing module conventions.
+4. **Single-source exposure (20%)**
+   - Start with distinct products purchased from the supplier in the evidence window.
+   - A product has an alternative when another active supplier has a valid, currency-compatible
+     landed-cost observation for the same normalized product and base unit in the window.
+   - Risk is `products_without_alternatives / qualifying_products`.
 
-### Web
+The overall score is the weighted sum of available components. Weights are renormalized only
+when exactly three components are available; fewer than three produces `insufficient_data`.
+Risk levels are `low` below 0.35, `medium` from 0.35 up to but excluding 0.65, and `high` at
+0.65 or above.
 
-Add a Supplier Risk route and navigation entry. The primary view will support scanning supplier
-risk level, confidence, evidence age, and the highest-ranked risk drivers. A detail view will
-show the underlying calculations and source links, followed by the negotiation brief action.
-The only primary action is human preparation or dismissal of a brief; insufficient and
-provisional evidence states remain prominent.
+## Negotiation brief
 
-## API shape
+A buyer or owner creates a brief from the latest non-expired v2 scorecard snapshot. Creation is
+idempotent for `(tenant, supplier, snapshot, brief_version)`.
 
-- `POST /api/v1/supplier-risk/recompute`
-- `GET /api/v1/supplier-risk/suppliers`
-- `GET /api/v1/supplier-risk/suppliers/{supplier_id}`
-- `GET /api/v1/supplier-risk/briefs`
-- `POST /api/v1/supplier-risk/briefs/{brief_id}/prepare`
-- `POST /api/v1/supplier-risk/briefs/{brief_id}/dismiss`
+The brief ranks deterministic talking points derived from:
 
-All list responses are tenant-scoped and cursor-paginated where applicable. Unknown or
-cross-tenant identifiers return the standard not-found envelope. Mutating actions are
-idempotent where replay can occur.
+- historical spend and order volume per currency;
+- price trajectory and comparable alternatives;
+- current delivery reliability and reliability decay;
+- reconciliation discrepancy rate and delivery-quality incidents;
+- purchase frequency, expressed as order count and median days between orders;
+- payment context: configured supplier payment terms, paid/open bill counts, overdue open bill
+  count, and amount per currency.
 
-## Error and data sufficiency policy
+The brief contains at most one available point in each category: price trajectory, alternatives,
+service performance, concentration and volume, payment context, and purchase pattern. Risk-bearing
+points use their normalized component or incident rate. Service performance uses the highest of
+reliability, non-matched three-way result rate, and quality-incident rate. Payment risk is overdue
+open bills divided by due open bills. Spend, quantities per base unit, and purchase frequency are
+context values within their category, not invented risk. Categories sort by descending risk and
+then by the fixed order shown above. Purchase frequency requires at least four order dates so its
+median is based on at least three intervals.
 
-- No supplier records: return an empty result, not a fabricated zero-risk score.
-- Mixed currencies: calculate concentration and price drift per currency bucket and disclose
-  that no cross-currency aggregate was produced.
-- Missing delivery or reconciliation evidence: retain the metric as `insufficient_data` with
-  the observed sample count.
-- Database or dependency failure: return the standard service-unavailable envelope and never
-  persist a partial snapshot.
-- Stale snapshots: expose validity and evidence dates so the UI can prompt recomputation.
+`synced_bill.due_date` and remaining balance are added to the normalized accounting record and
+populated by supported connectors. No paid-lateness assertion is made without a provider-paid
+date. Missing payment evidence is labelled unavailable rather than inferred from `updated_at`.
+
+Each talking point stores its kind, rank, calculation version, numeric values, currency where
+applicable, confidence, risk, validity period, and links to normalized evidence rows. Display
+copy and suggested questions are selected from English and Arabic i18n keys; generated prose is
+not stored and no ungrounded text model is used.
+
+The user action is **Prepare negotiation brief**, which creates the immutable brief. A prepared
+brief can be acknowledged or dismissed through append-only action events. It is never sent to a
+supplier and it does not alter a purchase request or purchase order.
+
+## Data model
+
+### Existing table retained
+
+`supplier_scorecard_snapshot` remains the snapshot header and compatibility cache. A forward-only
+migration adds `state`, `confidence`, `release_posture`, `valid_from`, `valid_until`, and
+`source_fingerprint`, plus `observed_history_days`. Existing v1 rows remain valid historical
+records.
+
+`synced_bill` gains nullable provider-derived `due_date`, `remaining_balance_amount`, and
+`remaining_balance_currency` fields. Amount and currency are constrained as a pair. Connectors
+populate only values supplied by the provider; historical rows remain null and cannot support an
+overdue-payment assertion.
+
+### New normalized tables
+
+- `supplier_scorecard_metric`: immutable child rows keyed by snapshot and metric kind. It stores
+  value, numerator, denominator, sample count, confidence, sufficiency, window dates, amount and
+  currency where applicable, and calculation version.
+- `supplier_scorecard_evidence`: immutable links from a metric to exactly one tenant-pinned
+  source record. Nullable composite foreign keys cover purchase orders, delivery receipts,
+  landed costs, three-way matches, synced bills, workspace products, quality issues, and supplier
+  commercial terms; a check constraint requires exactly one source target per row.
+- `negotiation_brief`: immutable header linked to supplier and scorecard snapshot, with version,
+  release posture, validity period, creator, and deterministic fingerprint.
+- `negotiation_brief_item`: immutable ranked talking points with typed calculation fields and an
+  optional link to the supporting scorecard metric.
+- `negotiation_brief_item_evidence`: immutable many-to-many links from each brief item to the
+  normalized scorecard evidence rows that justify it.
+- `negotiation_brief_action`: append-only `acknowledged` or `dismissed` events. Current status is
+  derived from the latest event; recommendation outcome history is never overwritten.
+
+Every table carries `tenant_id`, composite tenant foreign keys, indexes, forced RLS, and policies
+with both `USING` and `WITH CHECK`. Snapshot, metric, evidence, brief, item, and action rows expose
+no update or delete path to authenticated or service roles.
+
+## API
+
+### Existing endpoint evolved
+
+- `GET /api/v1/suppliers/{supplier_id}/scorecard`
+  - Returns Supplier IQ v2 by default while preserving existing top-level fields.
+  - Adds state, risk level, release posture, validity, currency buckets, and source-link metadata.
+  - Unknown and cross-tenant supplier IDs return the standard not-found envelope.
+
+### New endpoints
+
+- `POST /api/v1/supplier-iq/recompute` - owner or buyer; recomputes all visible active suppliers.
+- `GET /api/v1/supplier-iq/risks` - any tenant member; cursor-paginated latest snapshots.
+- `POST /api/v1/suppliers/{supplier_id}/negotiation-briefs` - owner or buyer; creates or replays a
+  brief from the latest valid v2 snapshot.
+- `GET /api/v1/negotiation-briefs` - any tenant member; cursor-paginated briefs.
+- `GET /api/v1/negotiation-briefs/{brief_id}` - any tenant member; brief, items, and evidence.
+- `POST /api/v1/negotiation-briefs/{brief_id}/acknowledge` - owner or buyer; idempotent action.
+- `POST /api/v1/negotiation-briefs/{brief_id}/dismiss` - owner or buyer; reason required and
+  idempotent by `Idempotency-Key`.
+
+All mutation routes require `Idempotency-Key`, append an audit event, and execute snapshot header,
+metric, evidence, brief, item, item-evidence, and action writes within one database transaction.
+Partial snapshots, briefs, and actions are rolled back.
+
+## Web experience
+
+The existing supplier scorecard becomes the detail experience for v2 metrics. A new Supplier
+Risk queue provides tenant-wide scanning by risk level, confidence, state, evidence age, and
+highest-ranked driver. It links to the existing scorecard rather than duplicating it.
+
+The scorecard exposes Prepare negotiation brief only when a valid v2 snapshot has sufficient or
+provisional evidence. The brief detail shows calculations and source links before suggested
+questions. Insufficient, mixed-currency, missing-payment, stale, and G3-unmet states remain
+visible. All copy comes from shared English and Arabic catalogues and layouts use logical CSS.
+
+## Error policy
+
+- No supplier evidence returns `insufficient_data`, never zero risk.
+- Fewer than three calculable risk components suppresses the overall score and brief action.
+- Mixed currencies remain separate buckets and are never converted or summed.
+- Missing due dates suppress overdue-payment claims.
+- An expired snapshot requires recomputation before brief creation.
+- Database failures use the standard service-unavailable envelope and roll back the transaction.
+- Arithmetic or validation failures create no snapshot and emit a failed audit event.
 
 ## Verification
 
-- Unit tests first for deterministic metric calculations, thresholds, currency bucketing,
-  insufficient-data states, and replay fingerprints.
-- API tests for authentication, tenant isolation, cursor behavior, idempotent recomputation,
-  workflow transitions, and standard not-found responses.
-- Hosted Supabase migration verification with forced-RLS checks.
-- Angular unit and accessibility tests for English and Arabic/RTL states.
-- Production web build and focused live API consumption after deployment.
+- Unit tests cover every formula, boundary, exclusion, confidence state, currency bucket, weight
+  renormalization, fingerprint, and talking-point rank.
+- Integration tests prove transaction rollback, append-only grants, forced RLS, composite tenant
+  foreign keys, and cross-tenant invisibility for every new table and route.
+- Contract tests cover RBAC, idempotent replay, pagination, not-found behavior, and response
+  compatibility for the existing scorecard endpoint.
+- Angular tests cover risk scanning, evidence links, prepared/dismissed states, English,
+  Arabic/RTL, keyboard navigation, and zero automated accessibility violations.
+- Hosted migration verification, full API and web suites, production build, and physical API
+  consumption are required before release.
 
 ## Explicit non-goals
 
-- No predictive machine-learning model in R4.1.
+- No machine-learning or generative-text risk model.
 - No cross-tenant benchmarking.
+- No currency conversion.
+- No supplier messaging, RFQ dispatch, or autonomous negotiation.
 - No autonomous approval or purchasing.
-- No supplier messaging, RFQ dispatch, or external integration work; those belong to later
-  roadmap releases.
-
