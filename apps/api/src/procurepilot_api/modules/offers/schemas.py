@@ -414,6 +414,7 @@ class SupplierScorecard(StrictApiModel):
 class SupplierRiskSnapshot(StrictApiModel):
     id: UUID
     supplier_id: UUID
+    supplier_name: StrictStr
     window_start: date
     window_end: date
     state: Literal["ready", "provisional", "insufficient_data"]
@@ -424,6 +425,7 @@ class SupplierRiskSnapshot(StrictApiModel):
     source_fingerprint: StrictStr
     observed_history_days: int = Field(ge=0)
     risk_score: dict[str, object]
+    risk_level: Literal["low", "medium", "high"] | None
     computed_at: datetime
 
 

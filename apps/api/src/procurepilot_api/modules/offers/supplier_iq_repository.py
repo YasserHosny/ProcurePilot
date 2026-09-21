@@ -343,7 +343,8 @@ def list_latest(
         cur.execute(
             f"""
             with ranked as (
-              select snapshot.id, snapshot.supplier_id, snapshot.window_start,
+              select snapshot.id, snapshot.supplier_id, supplier.name as supplier_name,
+                     snapshot.window_start,
                      snapshot.window_end, snapshot.state, snapshot.confidence,
                      snapshot.release_posture, snapshot.valid_from, snapshot.valid_until,
                      snapshot.source_fingerprint, snapshot.observed_history_days,
@@ -360,9 +361,16 @@ def list_latest(
               where snapshot.rule_version = 'supplier-scorecard-v2'
                 and supplier.status in ('active', 'preferred')
             )
-            select id, supplier_id, window_start, window_end, state, confidence,
+            select id, supplier_id, supplier_name, window_start, window_end, state, confidence,
                    release_posture, valid_from, valid_until, source_fingerprint,
-                   observed_history_days, risk_score, computed_at
+                   observed_history_days, risk_score,
+                   case
+                     when risk_score->>'total' is null then null
+                     when (risk_score->>'total')::numeric < 0.35 then 'low'
+                     when (risk_score->>'total')::numeric < 0.65 then 'medium'
+                     else 'high'
+                   end as risk_level,
+                   computed_at
             from ranked
             where row_number = 1
               {after_clause}

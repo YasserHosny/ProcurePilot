@@ -45,6 +45,7 @@ describe('SupplierRiskApiService', () => {
       {
         id: 'snapshot-001',
         supplier_id: 'supplier-001',
+        supplier_name: 'Alfaisal Trade',
         window_start: '2026-03-24',
         window_end: '2026-09-20',
         state: 'provisional',
@@ -59,6 +60,7 @@ describe('SupplierRiskApiService', () => {
           components: { concentration: '0.4000' },
           weights: { concentration: '0.3000' },
         },
+        risk_level: 'medium',
         computed_at: '2026-09-20T12:00:00Z',
       },
     ],
@@ -77,12 +79,27 @@ describe('SupplierRiskApiService', () => {
 
   it('lists risks with cursor pagination', () => {
     let result: SupplierRiskList | undefined;
-    service.listRisks({ cursor: 'next page', limit: 25 }).subscribe((value) => (result = value));
+    service.listRisks('next page', 25).subscribe((value) => (result = value));
 
-    const request = httpMock.expectOne('/api/v1/supplier-iq/risks?cursor=next+page&limit=25');
+    const request = httpMock.expectOne('/api/v1/supplier-iq/risks?limit=25&cursor=next+page');
     expect(request.request.method).toBe('GET');
     request.flush(riskList);
     expect(result).toEqual(riskList);
+  });
+
+  it('uses the default page size and caps oversized limits', () => {
+    service.listRisks().subscribe();
+    const riskRequest = httpMock.expectOne('/api/v1/supplier-iq/risks?limit=50');
+    expect(riskRequest.request.method).toBe('GET');
+    riskRequest.flush(riskList);
+
+    service.listBriefs(undefined, 500).subscribe();
+    const briefRequest = httpMock.expectOne('/api/v1/negotiation-briefs?limit=100');
+    expect(briefRequest.request.method).toBe('GET');
+    briefRequest.flush({
+      items: [],
+      next_cursor: null,
+    });
   });
 
   it('recomputes risks with one idempotency key', () => {
@@ -108,7 +125,7 @@ describe('SupplierRiskApiService', () => {
   });
 
   it('lists and gets briefs', () => {
-    service.listBriefs({ limit: 10 }).subscribe();
+    service.listBriefs(undefined, 10).subscribe();
     const listRequest = httpMock.expectOne('/api/v1/negotiation-briefs?limit=10');
     expect(listRequest.request.method).toBe('GET');
     listRequest.flush({ items: [brief], next_cursor: 'brief-cursor' });

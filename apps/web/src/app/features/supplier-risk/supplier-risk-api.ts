@@ -31,6 +31,7 @@ export interface SupplierRiskScore {
 export interface SupplierRiskSnapshot {
   id: string;
   supplier_id: string;
+  supplier_name: string;
   window_start: string;
   window_end: string;
   state: SupplierRiskState;
@@ -41,6 +42,7 @@ export interface SupplierRiskSnapshot {
   source_fingerprint: string;
   observed_history_days: number;
   risk_score: SupplierRiskScore;
+  risk_level: SupplierRiskLevel | null;
   computed_at: string;
 }
 
@@ -87,23 +89,13 @@ export interface NegotiationBriefList {
   next_cursor: string | null;
 }
 
-export interface ListSupplierRiskParams {
-  cursor?: string;
-  limit?: number;
-}
-
-export interface ListNegotiationBriefParams {
-  cursor?: string;
-  limit?: number;
-}
-
 @Injectable({ providedIn: 'root' })
 export class SupplierRiskApiService {
   private readonly http = inject(HttpClient);
   private readonly base = environment.apiBaseUrl;
 
-  listRisks(params?: ListSupplierRiskParams): Observable<SupplierRiskList> {
-    const query = this.paginationQuery(params);
+  listRisks(cursor?: string, limit = 50): Observable<SupplierRiskList> {
+    const query = this.paginationQuery(cursor, limit);
     return this.http.get<SupplierRiskList>(`${this.base}/supplier-iq/risks${query}`);
   }
 
@@ -123,8 +115,8 @@ export class SupplierRiskApiService {
     );
   }
 
-  listBriefs(params?: ListNegotiationBriefParams): Observable<NegotiationBriefList> {
-    const query = this.paginationQuery(params);
+  listBriefs(cursor?: string, limit = 50): Observable<NegotiationBriefList> {
+    const query = this.paginationQuery(cursor, limit);
     return this.http.get<NegotiationBriefList>(`${this.base}/negotiation-briefs${query}`);
   }
 
@@ -150,12 +142,10 @@ export class SupplierRiskApiService {
     );
   }
 
-  private paginationQuery(params?: { cursor?: string; limit?: number }): string {
-    const query = new URLSearchParams();
-    if (params?.cursor) query.set('cursor', params.cursor);
-    if (params?.limit !== undefined) query.set('limit', String(params.limit));
-    const encoded = query.toString();
-    return encoded ? `?${encoded}` : '';
+  private paginationQuery(cursor: string | undefined, limit: number): string {
+    const query = new URLSearchParams({ limit: String(Math.min(100, Math.max(1, limit))) });
+    if (cursor) query.set('cursor', cursor);
+    return `?${query.toString()}`;
   }
 
   private idempotencyHeaders(): HttpHeaders {

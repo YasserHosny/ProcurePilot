@@ -38,3 +38,13 @@ def test_supplier_iq_v2_mutations_require_idempotency_keys() -> None:
         assert idempotency["in"] == "header"
         assert idempotency["required"] is False
         assert idempotency["schema"]["anyOf"]
+
+
+def test_supplier_risk_queue_contract_includes_scan_fields() -> None:
+    schemas = create_app().openapi()["components"]["schemas"]
+    snapshot = schemas["SupplierRiskSnapshot"]
+
+    assert {"supplier_name", "risk_level"} <= set(snapshot["required"])
+    assert snapshot["properties"]["supplier_name"]["type"] == "string"
+    risk_level = snapshot["properties"]["risk_level"]["anyOf"]
+    assert ["low", "medium", "high"] in [item.get("enum") for item in risk_level]
