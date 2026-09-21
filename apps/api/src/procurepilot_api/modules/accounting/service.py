@@ -413,6 +413,9 @@ class ConnectionService:
                 b.amount,
                 b.currency,
                 b.bill_date,
+                b.due_date,
+                b.remaining_balance_amount,
+                b.remaining_balance_currency,
                 b.provider_status,
                 (m.id is not null) as matched,
                 m.purchase_record_id
@@ -432,6 +435,13 @@ class ConnectionService:
         has_more = len(rows) > fetch_limit
         page_rows = rows[:fetch_limit]
         next_cursor = _encode_cursor(offset + fetch_limit) if has_more else None
+
+        for row in page_rows:
+            balance = row.pop("remaining_balance_amount", None)
+            currency = row.pop("remaining_balance_currency", None)
+            row["remaining_balance"] = (
+                {"amount": balance, "currency": currency} if balance is not None else None
+            )
 
         return SyncedBillList(
             items=[SyncedBill.model_validate(r) for r in page_rows],

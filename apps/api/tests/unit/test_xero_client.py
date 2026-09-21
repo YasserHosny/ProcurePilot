@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import inspect
-from datetime import date
+from datetime import UTC, date, datetime
 from decimal import Decimal
 from urllib.parse import parse_qs, urlparse
 
@@ -453,3 +453,50 @@ def test_read_only_protocol_has_no_write_methods() -> None:
         name.startswith(("create", "update", "delete", "post", "write", "put", "patch"))
         for name in public_methods
     )
+
+
+@pytest.mark.parametrize("balance", [None, "0", "12.34", "-1", "NaN", "Infinity", "bad"])
+@pytest.mark.parametrize("due_field", ['DueDateString', 'DueDate', None])
+def test_payment_evidence(balance: str | None, due_field: str | None) -> None:
+    item = {
+        "InvoiceID": "1",
+        "Contact": {"ContactID": "v1"},
+        "Total": 20,
+        "CurrencyCode": "EUR",
+        "DateString": "2026-07-01",
+        "Status": "AUTHORISED",
+    }
+    if balance is not None:
+        item["AmountDue"] = balance
+    if due_field is not None:
+        item[due_field] = "2026-07-31"
+    client = _client(httpx.MockTransport(
+        lambda _: httpx.Response(200, json={"Invoices": [item]})
+    ))
+    if balance in {"-1", "NaN", "Infinity", "bad"}:
+        with pytest.raises(XeroApiError):
+            client.list_bills(date(2026, 1, 1))
+    else:
+        bill = client.list_bills(date(2026, 1, 1))[0]
+        assert bill.due_date == (date(2026, 7, 31) if due_field else None)
+        assert bill.remaining_balance == (Decimal(balance) if balance is not None else None)
+
+
+def test_serialized_xero_due_date_fallback() -> None:
+    timestamp = int(datetime(2026, 7, 31, 23, 30, tzinfo=UTC).timestamp() * 1000)
+    item = {
+        "InvoiceID": "1",
+        "Contact": {"ContactID": "v1"},
+        "Total": 20,
+        "CurrencyCode": "EUR",
+        "DateString": "2026-07-01",
+        "DueDateString": "not-a-date",
+        "DueDate": f"/Date({timestamp}+0530)/",
+        "AmountDue": "18.45",
+        "Status": "AUTHORISED",
+    }
+    client = _client(
+        httpx.MockTransport(lambda _: httpx.Response(200, json={"Invoices": [item]}))
+    )
+    bill = client.list_bills(date(2026, 1, 1))[0]
+    assert bill.due_date == date(2026, 7, 31)

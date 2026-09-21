@@ -8,7 +8,7 @@ Queries QuickBooks read-only REST endpoints for Bill, Vendor, and CompanyInfo (F
 from __future__ import annotations
 
 from datetime import date
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from typing import Any, Literal, Self
 from urllib.parse import urlencode
 
@@ -407,10 +407,25 @@ class QuickBooksClient:
             else:
                 bill_date = since
 
+            balance_value = item.get("Balance")
+            remaining_balance = None
+            if balance_value is not None:
+                try:
+                    remaining_balance = Decimal(str(balance_value))
+                except (InvalidOperation, TypeError, ValueError) as exc:
+                    raise QuickBooksApiError("Invalid remaining balance") from exc
+                if not remaining_balance.is_finite() or remaining_balance < 0:
+                    raise QuickBooksApiError("Invalid remaining balance")
             status = _parse_bill_status(item)
             lines = _parse_bill_lines(item)
             order_reference = _parse_order_reference(item)
             document_references = _parse_document_references(item)
+            due_date = None
+            if item.get("DueDate") is not None:
+                try:
+                    due_date = date.fromisoformat(str(item["DueDate"]))
+                except ValueError as exc:
+                    raise QuickBooksApiError("Invalid due date") from exc
             bills.append(
                 RawBill(
                     provider_bill_id=bill_id,
@@ -418,6 +433,8 @@ class QuickBooksClient:
                     amount=amount,
                     currency=currency,
                     bill_date=bill_date,
+                    due_date=due_date,
+                    remaining_balance=remaining_balance,
                     status=status,
                     provider_order_reference=order_reference,
                     document_references=document_references,

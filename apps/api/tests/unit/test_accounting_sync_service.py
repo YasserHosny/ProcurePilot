@@ -160,3 +160,99 @@ def test_upsert_bill_replaces_lines_with_tenant_scoped_statements() -> None:
     assert cursor.queries[1][1]["tenant_id"] == TENANT_ID
     assert "insert into synced_bill_line" in cursor.queries[2][0].lower()
     assert cursor.queries[2][1]["unit_price_currency"] == "USD"
+
+
+@pytest.mark.parametrize("balance", [None, Decimal("0"), Decimal("12.34")])
+def test_upsert_payment_evidence(balance: Decimal | None) -> None:
+    cursor = _Cursor({"id": str(CONNECTION_ID)})
+    bill = RawBill(
+        provider_bill_id="bill-1", provider_vendor_id="vendor-1",
+        amount=Decimal("20"), currency="EUR", bill_date=date(2026, 7, 1),
+        status="open", due_date=date(2026, 7, 31), remaining_balance=balance,
+    )
+    SyncService()._upsert_bill(
+        _Connection(cursor), tenant_id=TENANT_ID, connection_id=CONNECTION_ID,
+        raw_bill=bill, vendor_map={"vendor-1": (CONNECTION_ID, None)},
+    )
+    query, params = cursor.queries[0]
+    expected = {
+        "due_date": date(2026, 7, 31), "remaining_balance_amount": balance,
+        "remaining_balance_currency": "EUR" if balance is not None else None,
+    }
+    for column, value in expected.items():
+        assert params[column] == value
+        assert f"%({column})s" in query
+        assert f"{column} = excluded.{column}" in query
+        assert column in query.split(") values (")[0]
+
+
+@pytest.mark.parametrize("balance", [Decimal("-1"), Decimal("NaN"), Decimal("Infinity"), "1"])
+def test_raw_bill_rejects_invalid_balance(balance: object) -> None:
+    with pytest.raises(ValueError, match="remaining_balance"):
+        RawBill(
+            provider_bill_id="1", provider_vendor_id="1", amount=Decimal("20"),
+            currency="USD", bill_date=date(2026, 7, 1), status="open",
+            remaining_balance=balance,
+        )
+
+
+@pytest.mark.parametrize("balance", [None, Decimal("0"), Decimal("12.3400")])
+def test_synced_bill_projection(monkeypatch: pytest.MonkeyPatch, balance: Decimal | None) -> None:
+    from procurepilot_api.modules.accounting.service import ConnectionService
+
+    row = {
+        "id": CONNECTION_ID, "vendor_name": "Supplier", "amount": Decimal("20.00"),
+        "currency": "EUR", "bill_date": date(2026, 7, 1), "provider_status": "open",
+        "matched": False, "due_date": date(2026, 7, 31),
+        "remaining_balance_amount": balance,
+        "remaining_balance_currency": "EUR" if balance is not None else None,
+    }
+    cursor = _Cursor(row)
+    monkeypatch.setattr(cursor, "fetchall", lambda: [row], raising=False)
+
+    @contextmanager
+    def authenticated_db(_settings: object, member: object) -> Iterator[_Connection]:
+        assert member.tenant_id == TENANT_ID
+        yield _Connection(cursor)
+
+    monkeypatch.setattr(
+        "procurepilot_api.modules.accounting.service._authenticated_db", authenticated_db,
+    )
+    result = ConnectionService(settings=SimpleNamespace()).list_bills(
+        SimpleNamespace(tenant_id=TENANT_ID)
+    ).model_dump(mode="json")
+    bill = result["items"][0]
+    assert bill["amount"] == "20.00"
+    assert bill["currency"] == "EUR"
+    assert bill["due_date"] == "2026-07-31"
+    assert bill["remaining_balance"] == (
+        {"amount": str(balance), "currency": "EUR"} if balance is not None else None
+    )
+    for field in ("due_date", "remaining_balance_amount", "remaining_balance_currency"):
+        assert f"b.{field}" in cursor.queries[0][0]
+
+
+def test_synced_bill_old_payload_defaults() -> None:
+    from procurepilot_api.modules.accounting.schemas import SyncedBill
+
+    bill = SyncedBill(
+        id=CONNECTION_ID, vendor_name="Supplier", amount="20", currency="EUR",
+        bill_date=date(2026, 7, 1), provider_status="open", matched=False,
+    )
+    assert bill.due_date is None
+    assert bill.remaining_balance is None
+
+
+def test_stub_payment_evidence() -> None:
+    from datetime import timedelta
+
+    from procurepilot_api.modules.accounting.connector import StubConnector
+
+    reference_date = date(2026, 9, 20)
+    bills = StubConnector(reference_date=reference_date).list_bills(date.min)
+    repeat_bills = StubConnector(reference_date=reference_date).list_bills(date.min)
+    for bill in bills:
+        assert bill.due_date == bill.bill_date + timedelta(days=30)
+        assert bill.remaining_balance == (Decimal("0") if bill.status == "paid" else bill.amount)
+    assert bills == repeat_bills
+    assert StubConnector().list_bills(date.min) == StubConnector().list_bills(date.min)

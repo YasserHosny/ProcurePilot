@@ -48,6 +48,15 @@ class TriggerSyncResponse(BaseModel):
     status: Literal["enqueued"] = "enqueued"
 
 
+class Money(BaseModel):
+    """Explicit currency and decimal-string amount for accounting evidence."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    amount: Decimal = Field(ge=0, allow_inf_nan=False)
+    currency: str = Field(pattern=r"^[A-Z]{3}$")
+
+
 class SyncedBill(BaseModel):
     """A supplier bill synced from the external accounting provider (T014-continuation, US2).
 
@@ -67,6 +76,8 @@ class SyncedBill(BaseModel):
     provider_status: Literal["open", "paid", "void"]
     matched: bool
     purchase_record_id: UUID | None = None
+    due_date: date | None = None
+    remaining_balance: Money | None = None
 
     @field_validator("amount", mode="before")
     @classmethod
