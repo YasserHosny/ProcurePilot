@@ -45,6 +45,15 @@ AnomalyAlertKind = Literal[
     "delivery_cost_anomaly",
     "supplier_quality_trend_change",
 ]
+BriefItemKind = Literal[
+    "price_trajectory",
+    "alternatives",
+    "service_performance",
+    "concentration_volume",
+    "payment_context",
+    "purchase_pattern",
+]
+BriefStatus = Literal["prepared", "acknowledged", "dismissed"]
 
 
 class StrictApiModel(BaseModel):
@@ -536,3 +545,31 @@ class SupplierRiskResult(StrictApiModel):
     @classmethod
     def _freeze_dicts(cls, value: dict[str, object]) -> dict[str, object]:
         return _ImmutableDict(value)
+
+
+class NegotiationBriefItem(StrictApiModel):
+    kind: BriefItemKind
+    rank: int = Field(ge=1)
+    value: str | None = None
+    amount: Money | None = None
+    confidence: EvidenceConfidence
+    risk: str | None = None
+    valid_from: date
+    valid_until: date
+    question_i18n_key: StrictStr
+    calculation_version: StrictStr
+    metric_id: UUID | None = None
+    evidence_ids: tuple[UUID, ...] = ()
+
+
+class NegotiationBrief(StrictApiModel):
+    id: UUID
+    supplier_id: UUID
+    snapshot_id: UUID
+    brief_version: StrictStr
+    source_fingerprint: StrictStr
+    release_posture: Literal["g3_unmet"]
+    valid_from: datetime
+    valid_until: datetime
+    status: BriefStatus
+    items: tuple[NegotiationBriefItem, ...]
