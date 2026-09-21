@@ -22,6 +22,7 @@ from procurepilot_api.modules.offers.schemas import (
     RiskCurrencyBucket,
     RiskPriceComparison,
     SupplierRiskComponentV2,
+    SupplierRiskEvidenceRef,
     SupplierRiskResult,
 )
 
@@ -205,6 +206,7 @@ def _component(
     ids: list[UUID],
     excluded: Counter[str],
     products: int = 0,
+    source_refs: list[SupplierRiskEvidenceRef] | None = None,
 ) -> SupplierRiskComponentV2:
     assert p.window_start is not None and p.split_date is not None
     return SupplierRiskComponentV2(
@@ -216,6 +218,12 @@ def _component(
         insufficient_evidence=count < 3 or risk is None,
         excluded_counts=dict(sorted(excluded.items())),
         source_ids=sorted(set(ids)),
+        source_refs=tuple(
+            sorted(
+                set(source_refs or ()),
+                key=lambda ref: (ref.source_kind, str(ref.source_id)),
+            )
+        ),
         window_start=p.window_start,
         split_date=p.split_date,
         window_end=p.window_end,
@@ -262,6 +270,11 @@ def _concentration(p: SupplierRiskInput) -> SupplierRiskComponentV2:
         risk=risk,
         ids=[i for b in buckets for i in b.source_ids],
         excluded=excluded,
+        source_refs=[
+            SupplierRiskEvidenceRef(source_id=source_id, source_kind="purchase_order")
+            for bucket in buckets
+            for source_id in bucket.source_ids
+        ],
     )
     return result.model_copy(update={"currency_buckets": tuple(buckets)})
 
@@ -314,6 +327,11 @@ def _prices(p: SupplierRiskInput) -> SupplierRiskComponentV2:
         risk=risk,
         ids=[i for c in comparisons for i in c.source_ids],
         excluded=excluded,
+        source_refs=[
+            SupplierRiskEvidenceRef(source_id=source_id, source_kind="landed_cost")
+            for comparison in comparisons
+            for source_id in comparison.source_ids
+        ],
     )
     return result.model_copy(update={"price_comparisons": tuple(comparisons)})
 
@@ -322,6 +340,7 @@ def _reliability(p: SupplierRiskInput) -> SupplierRiskComponentV2:
     excluded: Counter[str] = Counter()
     outcomes: tuple[list[bool], list[bool]] = ([], [])
     ids: list[UUID] = []
+    source_refs: list[SupplierRiskEvidenceRef] = []
     receipts: dict[UUID, list[ReceiptLine]] = defaultdict(list)
     for receipt in p.receipts:
         receipts[receipt.purchase_order_id].append(receipt)
@@ -355,6 +374,12 @@ def _reliability(p: SupplierRiskInput) -> SupplierRiskComponentV2:
                 excluded["future_receipt"] += 1
             else:
                 ids.append(receipt.id)
+                source_refs.append(
+                    SupplierRiskEvidenceRef(
+                        source_id=receipt.id,
+                        source_kind="delivery_receipt_line",
+                    )
+                )
                 if _utc(receipt.received_at).date() <= due:
                     quantities[receipt.purchase_order_line_id] += receipt.quantity
                 else:
@@ -363,6 +388,9 @@ def _reliability(p: SupplierRiskInput) -> SupplierRiskComponentV2:
             all(quantities[line.id] >= line.quantity for line in order.lines)
         )
         ids.append(order.id)
+        source_refs.append(
+            SupplierRiskEvidenceRef(source_id=order.id, source_kind="purchase_order")
+        )
     baseline, current = outcomes
     before = Decimal(sum(baseline)) / Decimal(len(baseline)) if len(baseline) >= 3 else None
     after = Decimal(sum(current)) / Decimal(len(current)) if len(current) >= 3 else None
@@ -371,7 +399,15 @@ def _reliability(p: SupplierRiskInput) -> SupplierRiskComponentV2:
         decay = _clamp((before - after) / Decimal(".25")) if before is not None else ZERO
         risk = max(ONE - after, decay)
     count = min(len(baseline), len(current)) if before is not None else len(current)
-    result = _component(p, count=count, value=after, risk=risk, ids=ids, excluded=excluded)
+    result = _component(
+        p,
+        count=count,
+        value=after,
+        risk=risk,
+        ids=ids,
+        excluded=excluded,
+        source_refs=source_refs,
+    )
     return result.model_copy(
         update={
             "baseline_count": len(baseline),
@@ -385,6 +421,7 @@ def _reliability(p: SupplierRiskInput) -> SupplierRiskComponentV2:
 def _single_source(p: SupplierRiskInput) -> SupplierRiskComponentV2:
     purchased: dict[UUID, set[tuple[str, str]]] = defaultdict(set)
     ids: list[UUID] = []
+    source_refs: list[SupplierRiskEvidenceRef] = []
     excluded: Counter[str] = Counter()
     for order in p.purchase_orders:
         if order.supplier_id != p.supplier_id:
@@ -401,6 +438,15 @@ def _single_source(p: SupplierRiskInput) -> SupplierRiskComponentV2:
                 continue
             purchased[line.product_id].add((line.base_unit, order.currency))
             ids.extend([order.id, line.product_id])
+            source_refs.extend(
+                (
+                    SupplierRiskEvidenceRef(source_id=order.id, source_kind="purchase_order"),
+                    SupplierRiskEvidenceRef(
+                        source_id=line.product_id,
+                        source_kind="workspace_product",
+                    ),
+                )
+            )
     available: set[tuple[UUID, str, str]] = set()
     for row in p.alternatives:
         if row.supplier_id == p.supplier_id or not row.active:
@@ -419,12 +465,20 @@ def _single_source(p: SupplierRiskInput) -> SupplierRiskComponentV2:
         else:
             available.add((row.product_id, row.base_unit, row.currency))
             ids.append(row.id)
+            source_refs.append(SupplierRiskEvidenceRef(source_id=row.id, source_kind="landed_cost"))
     products_with_alternatives = {product for product, _unit, _currency in available}
     exposed = sum(product not in products_with_alternatives for product in purchased)
     count = len(purchased)
     value = Decimal(exposed) / Decimal(count) if count else None
     result = _component(
-        p, count=count, products=count, value=value, risk=value, ids=ids, excluded=excluded
+        p,
+        count=count,
+        products=count,
+        value=value,
+        risk=value,
+        ids=ids,
+        excluded=excluded,
+        source_refs=source_refs,
     )
     return result.model_copy(update={"numerator": Decimal(exposed), "denominator": Decimal(count)})
 

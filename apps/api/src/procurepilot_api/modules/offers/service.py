@@ -190,7 +190,9 @@ class OfferService:
                                 risk_score = json.loads(risk_score)
                             except json.JSONDecodeError:
                                 pass
-                        if isinstance(risk_score, dict) and "total" in risk_score:
+                        if isinstance(risk_score, dict) and isinstance(
+                            risk_score.get("total"), (str, int, float)
+                        ):
                             supplier_risk_scores[supp_id] = str(risk_score["total"])
 
         return OfferComparison(
@@ -244,7 +246,9 @@ def get_offer_service() -> OfferService:
 @contextmanager
 def _authenticated_db(settings: Settings, member: CurrentMember) -> Iterator[psycopg.Connection]:
     try:
-        with psycopg.connect(settings.database_url.get_secret_value()) as conn:
+        with psycopg.connect(
+            settings.database_url.get_secret_value(), prepare_threshold=None
+        ) as conn:
             with conn.cursor() as cur:
                 claims = {
                     "sub": str(member.user_id),

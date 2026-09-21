@@ -80,7 +80,7 @@ def committed_smart_context(
 ) -> Iterator[SmartCompareContext]:
     if not TEST_DATABASE_URL:
         raise RuntimeError("TEST_DATABASE_URL is required")
-    with psycopg.connect(TEST_DATABASE_URL) as conn:
+    with psycopg.connect(TEST_DATABASE_URL, prepare_threshold=None) as conn:
         with conn.cursor() as cur:
             ensure_quotation_reference_data(cur)
             workspace = make_workspace(cur, label)
@@ -132,7 +132,7 @@ def add_costed_offer(
     now = datetime.now(UTC)
     valid_from = valid_from or now - timedelta(days=30)
     recorded_at = recorded_at or now
-    with psycopg.connect(TEST_DATABASE_URL) as conn:
+    with psycopg.connect(TEST_DATABASE_URL, prepare_threshold=None) as conn:
         with conn.cursor() as cur:
             document_id = make_document(cur, context.workspace)
             quotation_id = make_quotation(
@@ -216,7 +216,7 @@ def add_costed_offer(
 def cleanup_workspace(workspace: Workspace) -> None:
     if not TEST_DATABASE_URL:
         return
-    with psycopg.connect(TEST_DATABASE_URL) as conn:
+    with psycopg.connect(TEST_DATABASE_URL, prepare_threshold=None) as conn:
         with conn.cursor() as cur:
             reset_role(cur)
             # The owner-guard trigger refuses to delete the last active owner's membership row,
@@ -251,7 +251,7 @@ def cleanup_workspace(workspace: Workspace) -> None:
 def fetch_basket_jobs(tenant_id: UUID) -> list[dict[str, object]]:
     if not TEST_DATABASE_URL:
         raise RuntimeError("TEST_DATABASE_URL is required")
-    with psycopg.connect(TEST_DATABASE_URL) as conn:
+    with psycopg.connect(TEST_DATABASE_URL, prepare_threshold=None) as conn:
         with conn.cursor(row_factory=psycopg.rows.dict_row) as cur:
             cur.execute(
                 """

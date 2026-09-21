@@ -470,6 +470,18 @@ class RiskPriceComparison(StrictApiModel):
     source_ids: tuple[UUID, ...]
 
 
+class SupplierRiskEvidenceRef(StrictApiModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    source_id: UUID
+    source_kind: Literal[
+        "purchase_order",
+        "delivery_receipt_line",
+        "landed_cost",
+        "workspace_product",
+    ]
+
+
 class SupplierRiskComponentV2(StrictApiModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -481,6 +493,7 @@ class SupplierRiskComponentV2(StrictApiModel):
     insufficient_evidence: bool
     excluded_counts: dict[str, int]
     source_ids: tuple[UUID, ...]
+    source_refs: tuple[SupplierRiskEvidenceRef, ...] = Field(default_factory=tuple)
     window_start: date
     split_date: date
     window_end: date

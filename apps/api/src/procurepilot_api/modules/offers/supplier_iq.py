@@ -1,6 +1,9 @@
 from __future__ import annotations
 
-from collections.abc import Iterable
+import hashlib
+import json
+from collections.abc import Iterable, Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from decimal import ROUND_HALF_UP, Decimal
@@ -13,6 +16,13 @@ from psycopg.types.json import Jsonb
 
 from procurepilot_api.config import Settings, get_settings
 from procurepilot_api.deps import CurrentMember
+from procurepilot_api.errors import (
+    ConflictError,
+    PermissionDeniedError,
+    ServiceUnavailableError,
+    UnprocessableEntityError,
+)
+from procurepilot_api.modules.auth.jwt import MemberRole
 from procurepilot_api.modules.offers.schemas import (
     SupplierRiskScore,
     SupplierRiskSubScore,
@@ -20,6 +30,13 @@ from procurepilot_api.modules.offers.schemas import (
     SupplierScoreMetric,
 )
 from procurepilot_api.modules.offers.service import _authenticated_db
+from procurepilot_api.modules.offers.supplier_iq_repository import (
+    SnapshotPage,
+    list_latest,
+    load_risk_input,
+    persist_snapshot,
+)
+from procurepilot_api.modules.offers.supplier_iq_v2 import calculate_supplier_risk
 from procurepilot_api.modules.offers.supplier_terms import _supplier_visible
 from procurepilot_api.shared.audit import AuditEventCreate, get_audit_writer
 from procurepilot_api.shared.logging import get_trace_id
@@ -40,6 +57,12 @@ class SupplierIqSourceData:
     market_landed_costs: list[dict[str, object]]
     saving_records: list[dict[str, object]]
     tenant_saving_records: list[dict[str, object]]
+
+
+@dataclass(frozen=True)
+class SupplierRiskRecomputeSummary:
+    generated_snapshots: int
+    release_posture: str = "g3_unmet"
 
 
 class SupplierIqService:
@@ -85,6 +108,171 @@ class SupplierIqService:
             },
         )
         return scorecard
+
+    def recompute_all(
+        self,
+        *,
+        member: CurrentMember,
+        idempotency_key: UUID | None,
+        bearer_token: str | None = None,
+    ) -> SupplierRiskRecomputeSummary:
+        if idempotency_key is None:
+            raise UnprocessableEntityError(details={"header": "Idempotency-Key is required"})
+        if member.role not in {MemberRole.owner, MemberRole.buyer}:
+            raise PermissionDeniedError()
+        window_end = datetime.now(UTC).date()
+        window_start = window_end - timedelta(days=DEFAULT_WINDOW_DAYS)
+        generated = 0
+        with _authenticated_db_with_failure_audit(
+            self._settings, member, idempotency_key=idempotency_key
+        ) as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "select pg_advisory_xact_lock(hashtextextended(%s, 0))",
+                    (f"{member.tenant_id}:{idempotency_key}",),
+                )
+            with conn.cursor() as cur:
+                cur.execute(
+                    "select id from supplier where status in ('active', 'preferred') order by id"
+                )
+                supplier_ids = [UUID(str(row[0])) for row in cur.fetchall()]
+            results = []
+            for supplier_id in supplier_ids:
+                payload = load_risk_input(
+                    conn,
+                    supplier_id=supplier_id,
+                    window_start=window_start,
+                    window_end=window_end,
+                )
+                result = calculate_supplier_risk(payload)
+                results.append(result)
+            request_fingerprint = hashlib.sha256(
+                json.dumps(
+                    sorted(result.source_fingerprint for result in results),
+                    separators=(",", ":"),
+                ).encode()
+            ).hexdigest()
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    select request_fingerprint, generated_snapshots, release_posture
+                    from supplier_iq_recompute_idempotency
+                    where tenant_id = %s and idempotency_key = %s
+                    """,
+                    (member.tenant_id, idempotency_key),
+                )
+                existing = cur.fetchone()
+            if existing is not None:
+                if existing[0] != request_fingerprint:
+                    raise ConflictError(details={"reason": "idempotency_key_reused"})
+                _record_audit_db(
+                    conn,
+                    member=member,
+                    action="supplier_iq.recompute_replayed",
+                    outcome="success",
+                    target={
+                        "idempotency_key": str(idempotency_key),
+                        "generated_snapshots": int(existing[1]),
+                        "release_posture": str(existing[2]),
+                    },
+                )
+                return SupplierRiskRecomputeSummary(
+                    generated_snapshots=int(existing[1]),
+                    release_posture=str(existing[2]),
+                )
+            for result in results:
+                write = persist_snapshot(conn, member=member, result=result)
+                generated += int(write.created)
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    insert into supplier_iq_recompute_idempotency (
+                      tenant_id, idempotency_key, request_fingerprint,
+                      generated_snapshots, release_posture
+                    ) values (%s, %s, %s, %s, %s)
+                    """,
+                    (
+                        member.tenant_id,
+                        idempotency_key,
+                        request_fingerprint,
+                        generated,
+                        "g3_unmet",
+                    ),
+                )
+                _record_audit_db(
+                    conn,
+                    member=member,
+                    action="supplier_iq.recomputed",
+                    outcome="success",
+                    target={
+                        "idempotency_key": str(idempotency_key),
+                        "generated_snapshots": generated,
+                        "release_posture": "g3_unmet",
+                    },
+                )
+        return SupplierRiskRecomputeSummary(generated_snapshots=generated)
+
+    def list_risks(
+        self,
+        *,
+        member: CurrentMember,
+        cursor: str | None = None,
+        limit: int = 50,
+    ) -> SnapshotPage:
+        with _authenticated_db(self._settings, member) as conn:
+            return list_latest(conn, cursor=cursor, limit=limit)
+
+    def latest_v2(
+        self,
+        *,
+        member: CurrentMember,
+        supplier_id: UUID,
+    ) -> dict[str, object] | None:
+        with _authenticated_db(self._settings, member) as conn:
+            _supplier_visible(conn, supplier_id)
+            with conn.cursor(row_factory=dict_row) as cur:
+                cur.execute(
+                    """
+                    select id, supplier_id, window_start, window_end, state, confidence,
+                           release_posture, valid_from, valid_until, source_fingerprint,
+                           observed_history_days, risk_score, computed_at
+                    from supplier_scorecard_snapshot
+                    where supplier_id = %s and rule_version = 'supplier-scorecard-v2'
+                    order by window_end desc, computed_at desc, id desc
+                    limit 1
+                    """,
+                    (supplier_id,),
+                )
+                row = cur.fetchone()
+            return dict(row) if row is not None else None
+
+
+@contextmanager
+def _authenticated_db_with_failure_audit(
+    settings: Settings,
+    member: CurrentMember,
+    *,
+    idempotency_key: UUID,
+) -> Iterator[psycopg.Connection]:
+    with _authenticated_db(settings, member) as conn:
+        try:
+            yield conn
+        except Exception:
+            conn.rollback()
+            try:
+                with _authenticated_db(settings, member) as audit_conn:
+                    _record_audit_db(
+                        audit_conn,
+                        member=member,
+                        action="supplier_iq.recompute_failed",
+                        outcome="refused",
+                        target={"idempotency_key": str(idempotency_key)},
+                    )
+            except Exception as audit_error:
+                raise ServiceUnavailableError(
+                    details={"dependency": "audit_event"}
+                ) from audit_error
+            raise
 
 
 def get_supplier_iq_service() -> SupplierIqService:
@@ -433,6 +621,31 @@ def _record_audit(
     )
 
 
+def _record_audit_db(
+    conn: psycopg.Connection,
+    *,
+    member: CurrentMember,
+    action: str,
+    outcome: str,
+    target: dict[str, object],
+) -> None:
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            select record_audit_event(%s, %s::audit_outcome, %s, %s, %s, %s::jsonb, %s)
+            """,
+            (
+                action,
+                outcome,
+                member.tenant_id,
+                member.membership_id,
+                member.email,
+                Jsonb(target),
+                get_trace_id(),
+            ),
+        )
+
+
 def _delivery_score(result: str) -> Decimal:
     return {
         "delivered": Decimal("1"),
@@ -460,11 +673,7 @@ def _money_sum(rows: Iterable[dict[str, object]], field: str) -> Decimal:
 
 def _positive_money_sum(rows: Iterable[dict[str, object]], field: str) -> Decimal:
     return sum(
-        (
-            max(Decimal("0"), Decimal(str(row[field])))
-            for row in rows
-            if row.get(field) is not None
-        ),
+        (max(Decimal("0"), Decimal(str(row[field]))) for row in rows if row.get(field) is not None),
         Decimal("0"),
     )
 
