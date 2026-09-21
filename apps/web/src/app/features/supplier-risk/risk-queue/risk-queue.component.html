@@ -72,7 +72,12 @@
       </div>
     } @else {
       <div class="table-scroll">
-        <table mat-table [dataSource]="risks()" class="risk-table">
+        <table
+          mat-table
+          [dataSource]="risks()"
+          class="risk-table"
+          [attr.aria-label]="'supplierRisk.tableLabel' | translate"
+        >
           <ng-container matColumnDef="supplier">
             <th mat-header-cell *matHeaderCellDef>{{ 'supplierRisk.columns.supplier' | translate }}</th>
             <td mat-cell *matCellDef="let risk">

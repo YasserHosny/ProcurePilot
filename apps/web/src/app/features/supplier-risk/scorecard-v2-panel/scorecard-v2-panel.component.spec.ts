@@ -4,7 +4,7 @@ import { signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { Router, provideRouter } from '@angular/router';
-import { TranslateModule } from '@ngx-translate/core';
+import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { Subject, of } from 'rxjs';
 
 import type { SupplierScorecard } from '../../../core/api/models';
@@ -145,6 +145,14 @@ describe('ScorecardV2PanelComponent', () => {
       ],
     }).compileComponents();
 
+    const translate = TestBed.inject(TranslateService);
+    translate.setTranslation('en', {
+      supplierRisk: {
+        scorecard: { sourceLink: 'View {{source}} {{id}}' },
+      },
+    });
+    translate.use('en');
+
     fixture = TestBed.createComponent(ScorecardV2PanelComponent);
     fixture.componentRef.setInput('scorecard', scorecard());
     fixture.componentRef.setInput('supplierId', 'supplier-001');
@@ -165,6 +173,15 @@ describe('ScorecardV2PanelComponent', () => {
     expect(text).toContain('cancelled');
     expect(fixture.nativeElement.querySelector('a[href="/orders/order-001"]')).not.toBeNull();
     expect(fixture.nativeElement.querySelector('a[href="/products/product-001"]')).not.toBeNull();
+  });
+
+  it('gives evidence links contextual accessible names', () => {
+    fixture.detectChanges();
+
+    const orderLink = fixture.nativeElement.querySelector(
+      'a[href="/orders/order-001"]',
+    ) as HTMLAnchorElement;
+    expect(orderLink.getAttribute('aria-label')).toContain('order-001');
   });
 
   it('keeps provisional, G3, and stale states visible', () => {

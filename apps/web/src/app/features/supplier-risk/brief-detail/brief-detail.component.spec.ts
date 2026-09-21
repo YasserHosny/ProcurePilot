@@ -2,7 +2,7 @@ import { signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
-import { TranslateModule } from '@ngx-translate/core';
+import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { BehaviorSubject, Subject, of, throwError } from 'rxjs';
 
 import { SessionService } from '../../../core/auth/session.service';
@@ -104,6 +104,12 @@ describe('BriefDetailComponent', () => {
       ],
     }).compileComponents();
 
+    const translate = TestBed.inject(TranslateService);
+    translate.setTranslation('en', {
+      negotiationBrief: { sourceLink: 'View {{source}} {{id}}' },
+    });
+    translate.use('en');
+
     fixture = TestBed.createComponent(BriefDetailComponent);
     component = fixture.componentInstance;
   });
@@ -119,6 +125,15 @@ describe('BriefDetailComponent', () => {
     }
     expect(text).toContain('GBP');
     expect(fixture.nativeElement.querySelector('a[href="/orders/order-1"]')).not.toBeNull();
+  });
+
+  it('gives brief evidence links contextual accessible names', () => {
+    fixture.detectChanges();
+
+    const orderLink = fixture.nativeElement.querySelector(
+      'a[href="/orders/order-1"]',
+    ) as HTMLAnchorElement;
+    expect(orderLink.getAttribute('aria-label')).toContain('order-1');
   });
 
   it('keeps G3 posture and stale validity visible', () => {

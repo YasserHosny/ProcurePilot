@@ -128,6 +128,13 @@ describe('RiskQueueComponent', () => {
     expect(link.getAttribute('href')).toBe('/suppliers/supplier-001/scorecard');
   });
 
+  it('gives the risk data table an accessible name', () => {
+    fixture.detectChanges();
+
+    const table = fixture.nativeElement.querySelector('.risk-table') as HTMLTableElement;
+    expect(table.getAttribute('aria-label')).toBe('supplierRisk.tableLabel');
+  });
+
   it('makes insufficient and stale states explicit', async () => {
     api.listRisks.and.returnValue(
       of(

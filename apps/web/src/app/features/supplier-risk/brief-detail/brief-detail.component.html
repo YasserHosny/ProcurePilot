@@ -1,7 +1,7 @@
 <main class="brief-page">
   <nav [attr.aria-label]="'negotiationBrief.back' | translate">
     <a mat-button routerLink="/supplier-risk">
-      <mat-icon aria-hidden="true">arrow_back</mat-icon>
+      <mat-icon class="rtl-flip" aria-hidden="true">arrow_back</mat-icon>
       <span>{{ 'negotiationBrief.back' | translate }}</span>
     </a>
   </nav>
@@ -91,7 +91,15 @@
               @for (ref of item.evidence; track ref.evidence_id) {
                 <li>
                   @if (sourceRoute(ref); as route) {
-                    <a [routerLink]="route">{{ 'negotiationBrief.sources.' + ref.source_kind | translate }}</a>
+                    <a
+                      [routerLink]="route"
+                      [attr.aria-label]="'negotiationBrief.sourceLink' | translate: {
+                        source: ('negotiationBrief.sources.' + ref.source_kind | translate),
+                        id: ref.source_id
+                      }"
+                    >
+                      {{ 'negotiationBrief.sources.' + ref.source_kind | translate }}
+                    </a>
                   } @else {
                     <span>{{ 'negotiationBrief.sources.' + ref.source_kind | translate }}</span>
                   }

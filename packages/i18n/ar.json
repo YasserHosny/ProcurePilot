@@ -2253,6 +2253,9 @@
       "readOnly": "يمكنك مراجعة هذه الأدلة. يمكن للمالكين والمشترين فقط إعداد موجز.",
       "samples": "{{count}} عينة",
       "currencyBuckets": "الإنفاق حسب العملة",
+      "componentsTableLabel": "أدلة مكونات مخاطر المورد",
+      "currencyTableLabel": "أدلة إنفاق المورد حسب العملة",
+      "sourceLink": "عرض {{source}} {{id}}",
       "columns": {
         "component": "المكوّن",
         "risk": "المخاطر",
@@ -2310,6 +2313,7 @@
     "validUntil": "ساري حتى",
     "stale": "منتهي الصلاحية",
     "evidence": "الأدلة المصدرية",
+    "sourceLink": "عرض {{source}} {{id}}",
     "questionLabel": "سؤال مقترح",
     "posture": {
       "g3_unmet": "البوابة G3 ما زالت غير مستوفاة. هذا الموجز استشاري ولا يمكنه اعتماد عملية شراء أو إرسالها."

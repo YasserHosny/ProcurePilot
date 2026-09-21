@@ -2253,6 +2253,9 @@
       "readOnly": "You can review this evidence. Only owners and buyers can prepare a brief.",
       "samples": "{{count}} sample(s)",
       "currencyBuckets": "Spend by currency",
+      "componentsTableLabel": "Supplier risk component evidence",
+      "currencyTableLabel": "Supplier spend evidence by currency",
+      "sourceLink": "View {{source}} {{id}}",
       "columns": {
         "component": "Component",
         "risk": "Risk",
@@ -2310,6 +2313,7 @@
     "validUntil": "Valid until",
     "stale": "Expired",
     "evidence": "Source evidence",
+    "sourceLink": "View {{source}} {{id}}",
     "questionLabel": "Suggested question",
     "posture": {
       "g3_unmet": "G3 remains unmet. This brief is advisory and cannot authorise or send a purchase."

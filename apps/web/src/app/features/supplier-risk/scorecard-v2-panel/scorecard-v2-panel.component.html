@@ -55,7 +55,10 @@
     }
 
     <div class="table-scroll">
-      <table class="component-table">
+      <table
+        class="component-table"
+        [attr.aria-label]="'supplierRisk.scorecard.componentsTableLabel' | translate"
+      >
         <thead>
           <tr>
             <th>{{ 'supplierRisk.scorecard.columns.component' | translate }}</th>
@@ -94,7 +97,14 @@
               <td>
                 @for (ref of row.value?.source_refs ?? []; track ref.source_id) {
                   @if (sourceRoute(ref); as route) {
-                    <a class="evidence-line" [routerLink]="route">
+                    <a
+                      class="evidence-line"
+                      [routerLink]="route"
+                      [attr.aria-label]="'supplierRisk.scorecard.sourceLink' | translate: {
+                        source: ('supplierRisk.sources.' + ref.source_kind | translate),
+                        id: ref.source_id
+                      }"
+                    >
                       {{ 'supplierRisk.sources.' + ref.source_kind | translate }}
                     </a>
                   } @else {
@@ -114,7 +124,10 @@
       <section class="currency-section" aria-labelledby="currency-heading">
         <h3 id="currency-heading">{{ 'supplierRisk.scorecard.currencyBuckets' | translate }}</h3>
         <div class="table-scroll">
-          <table class="currency-table">
+          <table
+            class="currency-table"
+            [attr.aria-label]="'supplierRisk.scorecard.currencyTableLabel' | translate"
+          >
             <thead>
               <tr>
                 <th>{{ 'supplierRisk.scorecard.columns.currency' | translate }}</th>
