@@ -20,8 +20,14 @@ WRITE_ROLES = (MemberRole.owner, MemberRole.buyer)
 SUPPLIER_IQ_GUARDS: dict[str, tuple[MemberRole, ...]] = {
     "read-supplier-terms": ALL_ROLES,
     "read-supplier-scorecard": ALL_ROLES,
+    "read-supplier-risks": ALL_ROLES,
+    "read-negotiation-briefs": ALL_ROLES,
     "read-anomaly-alerts": ALL_ROLES,
     "create-supplier-terms": WRITE_ROLES,
+    "recompute-supplier-risks": WRITE_ROLES,
+    "prepare-negotiation-brief": WRITE_ROLES,
+    "acknowledge-negotiation-brief": WRITE_ROLES,
+    "dismiss-negotiation-brief": WRITE_ROLES,
     "submit-advanced-basket": WRITE_ROLES,
     "dismiss-anomaly-alert": WRITE_ROLES,
 }
