@@ -1,10 +1,19 @@
 from __future__ import annotations
 
 from datetime import date, datetime
-from typing import Literal
+from decimal import ROUND_HALF_UP, Decimal, localcontext
+from typing import Annotated, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, StrictStr, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    PlainSerializer,
+    StrictStr,
+    field_validator,
+    model_validator,
+)
 
 RecommendationConfidence = Literal["high", "medium", "low"]
 FreshnessStatus = Literal["fresh", "stale"]
@@ -410,3 +419,107 @@ class AnomalySignal(StrictApiModel):
     created_from_current_data_at: datetime
     dismissed: bool
     valid_until: datetime | None = None
+
+
+# V2 keeps Decimal values internally; only the JSON API representation is rounded.
+RiskDecimal = Annotated[
+    Decimal,
+    PlainSerializer(
+        lambda value: _serialize_risk_decimal(value), return_type=str, when_used="json"
+    ),
+]
+
+
+def _serialize_risk_decimal(value: Decimal) -> str:
+    with localcontext() as context:
+        context.prec = max(28, value.adjusted() + 8 if value else 28)
+        return format(value.quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP), "f")
+
+
+class _ImmutableDict(dict):
+    def _immutable(self, *args: object, **kwargs: object) -> None:
+        raise TypeError("immutable result container")
+
+    __delitem__ = __setitem__ = _immutable
+    clear = pop = popitem = setdefault = update = _immutable
+
+    def __ior__(self, value: object) -> _ImmutableDict:
+        self._immutable(value)
+
+
+class RiskCurrencyBucket(StrictApiModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    currency: str
+    supplier_spend: RiskDecimal
+    tenant_spend: RiskDecimal
+    sample_count: int
+    share: RiskDecimal | None
+    source_ids: tuple[UUID, ...]
+
+
+class RiskPriceComparison(StrictApiModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    product_id: UUID
+    base_unit: str
+    currency: str
+    baseline_median: RiskDecimal
+    current_median: RiskDecimal
+    drift: RiskDecimal
+    source_ids: tuple[UUID, ...]
+
+
+class SupplierRiskComponentV2(StrictApiModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    value: RiskDecimal | None
+    risk: RiskDecimal | None
+    sample_count: int
+    product_count: int = 0
+    confidence: EvidenceConfidence
+    insufficient_evidence: bool
+    excluded_counts: dict[str, int]
+    source_ids: tuple[UUID, ...]
+    window_start: date
+    split_date: date
+    window_end: date
+    calculation_version: str
+    currency_buckets: tuple[RiskCurrencyBucket, ...] = Field(default_factory=tuple)
+    price_comparisons: tuple[RiskPriceComparison, ...] = Field(default_factory=tuple)
+    baseline_count: int = 0
+    current_count: int = 0
+    baseline_reliability: RiskDecimal | None = None
+    current_reliability: RiskDecimal | None = None
+    numerator: RiskDecimal | None = None
+    denominator: RiskDecimal | None = None
+
+    @field_validator("excluded_counts", mode="after")
+    @classmethod
+    def _freeze_excluded_counts(cls, value: dict[str, int]) -> dict[str, int]:
+        return _ImmutableDict(value)
+
+
+class SupplierRiskResult(StrictApiModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    supplier_id: UUID
+    components: dict[str, SupplierRiskComponentV2]
+    weights: dict[str, RiskDecimal]
+    score: RiskDecimal | None
+    risk_level: Literal["low", "medium", "high"] | None
+    confidence: EvidenceConfidence
+    state: Literal["ready", "provisional", "insufficient_data"]
+    release_posture: Literal["g3_unmet"] = "g3_unmet"
+    window_start: date
+    split_date: date
+    window_end: date
+    observed_history_days: int
+    scorecard_version: str
+    risk_version: str
+    source_fingerprint: str
+
+    @field_validator("components", "weights", mode="after")
+    @classmethod
+    def _freeze_dicts(cls, value: dict[str, object]) -> dict[str, object]:
+        return _ImmutableDict(value)
