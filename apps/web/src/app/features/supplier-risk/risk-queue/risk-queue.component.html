@@ -1,0 +1,180 @@
+<main class="risk-queue">
+  <header class="page-header">
+    <div>
+      <h1>{{ 'supplierRisk.title' | translate }}</h1>
+      <p>{{ 'supplierRisk.subtitle' | translate }}</p>
+    </div>
+
+    @if (isWriter()) {
+      <button
+        mat-flat-button
+        type="button"
+        data-testid="recompute-risks"
+        [disabled]="isRecomputing()"
+        (click)="recompute()"
+      >
+        @if (isRecomputing()) {
+          <mat-spinner diameter="18" [attr.aria-label]="'supplierRisk.recompute.running' | translate" />
+        } @else {
+          <mat-icon aria-hidden="true">refresh</mat-icon>
+        }
+        <span>{{ (isRecomputing() ? 'supplierRisk.recompute.running' : 'supplierRisk.recompute.action') | translate }}</span>
+      </button>
+    }
+  </header>
+
+  <aside class="gate-banner" aria-live="polite">
+    <mat-icon aria-hidden="true">policy</mat-icon>
+    <div>
+      <strong>{{ 'supplierRisk.g3.title' | translate }}</strong>
+      <span>{{ 'supplierRisk.g3.message' | translate }}</span>
+    </div>
+  </aside>
+
+  @if (!isWriter()) {
+    <aside class="readonly-banner" data-testid="risk-readonly">
+      <mat-icon aria-hidden="true">visibility</mat-icon>
+      <span>{{ 'supplierRisk.readOnly' | translate }}</span>
+    </aside>
+  }
+
+  @if (error(); as errorKind) {
+    <div class="error-banner" role="alert">
+      <mat-icon aria-hidden="true">error_outline</mat-icon>
+      <span>{{ 'supplierRisk.error.' + errorKind | translate }}</span>
+      @if (errorKind === 'load') {
+        <button mat-button type="button" (click)="loadRisks(true)">
+          <mat-icon aria-hidden="true">refresh</mat-icon>
+          <span>{{ 'supplierRisk.error.retry' | translate }}</span>
+        </button>
+      }
+    </div>
+  }
+
+  @if (recomputedCount() !== null) {
+    <div class="success-banner" role="status">
+      <mat-icon aria-hidden="true">check_circle</mat-icon>
+      <span>{{ 'supplierRisk.recompute.success' | translate: { count: recomputedCount() } }}</span>
+    </div>
+  }
+
+  <section class="queue-surface" [attr.aria-label]="'supplierRisk.tableLabel' | translate">
+    @if (isLoading() && risks().length === 0) {
+      <div class="state-panel" data-testid="risk-loading" aria-live="polite">
+        <mat-spinner diameter="40" [attr.aria-label]="'common.loading' | translate" />
+        <span>{{ 'common.loading' | translate }}</span>
+      </div>
+    } @else if (risks().length === 0 && !error()) {
+      <div class="state-panel" data-testid="risk-empty">
+        <mat-icon class="state-icon" aria-hidden="true">shield</mat-icon>
+        <strong>{{ 'supplierRisk.empty.title' | translate }}</strong>
+        <span>{{ 'supplierRisk.empty.message' | translate }}</span>
+      </div>
+    } @else {
+      <div class="table-scroll">
+        <table mat-table [dataSource]="risks()" class="risk-table">
+          <ng-container matColumnDef="supplier">
+            <th mat-header-cell *matHeaderCellDef>{{ 'supplierRisk.columns.supplier' | translate }}</th>
+            <td mat-cell *matCellDef="let risk">
+              <a class="supplier-name" [routerLink]="['/suppliers', risk.supplier_id, 'scorecard']">{{ risk.supplier_name }}</a>
+              <span class="cell-detail">{{ 'supplierRisk.evidenceAge' | translate: { count: evidenceAgeDays(risk.computed_at) } }}</span>
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="risk">
+            <th mat-header-cell *matHeaderCellDef>{{ 'supplierRisk.columns.risk' | translate }}</th>
+            <td mat-cell *matCellDef="let risk">
+              @if (risk.risk_level; as level) {
+                <mat-chip-set [attr.aria-label]="'supplierRisk.columns.risk' | translate">
+                  <mat-chip [class]="'status-badge risk-level ' + level">
+                    {{ 'supplierRisk.level.' + level | translate }}
+                  </mat-chip>
+                </mat-chip-set>
+                <span class="cell-detail">{{ riskPercent(risk) }}%</span>
+              } @else {
+                <mat-chip-set [attr.aria-label]="'supplierRisk.columns.risk' | translate">
+                  <mat-chip class="status-badge insufficient">
+                    {{ 'supplierRisk.level.insufficient' | translate }}
+                  </mat-chip>
+                </mat-chip-set>
+              }
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="confidence">
+            <th mat-header-cell *matHeaderCellDef>{{ 'supplierRisk.columns.confidence' | translate }}</th>
+            <td mat-cell *matCellDef="let risk">
+              <span class="status-badge neutral">{{ 'supplierRisk.confidence.' + risk.confidence | translate }}</span>
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="state">
+            <th mat-header-cell *matHeaderCellDef>{{ 'supplierRisk.columns.state' | translate }}</th>
+            <td mat-cell *matCellDef="let risk">{{ 'supplierRisk.state.' + risk.state | translate }}</td>
+          </ng-container>
+
+          <ng-container matColumnDef="driver">
+            <th mat-header-cell *matHeaderCellDef>{{ 'supplierRisk.columns.driver' | translate }}</th>
+            <td mat-cell *matCellDef="let risk">
+              @if (topDriver(risk); as driver) {
+                {{ 'supplierRisk.drivers.' + driver | translate }}
+              } @else {
+                {{ 'supplierRisk.notAvailable' | translate }}
+              }
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="posture">
+            <th mat-header-cell *matHeaderCellDef>{{ 'supplierRisk.columns.posture' | translate }}</th>
+            <td mat-cell *matCellDef="let risk">
+              <span class="status-badge gate">{{ 'supplierRisk.posture.' + risk.release_posture | translate }}</span>
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="validity">
+            <th mat-header-cell *matHeaderCellDef>{{ 'supplierRisk.columns.validity' | translate }}</th>
+            <td mat-cell *matCellDef="let risk">
+              @if (isStale(risk.valid_until)) {
+                <span class="status-badge stale" data-testid="validity-stale">{{ 'supplierRisk.validity.stale' | translate }}</span>
+              } @else {
+                <span class="status-badge current">{{ 'supplierRisk.validity.current' | translate }}</span>
+              }
+              <span class="cell-detail">{{ risk.valid_until | formatDate }}</span>
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="actions">
+            <th mat-header-cell *matHeaderCellDef>{{ 'supplierRisk.columns.actions' | translate }}</th>
+            <td mat-cell *matCellDef="let risk">
+              <a
+                mat-stroked-button
+                class="scorecard-link"
+                [routerLink]="['/suppliers', risk.supplier_id, 'scorecard']"
+                [matTooltip]="'supplierRisk.actions.scorecard' | translate"
+              >
+                <mat-icon aria-hidden="true">fact_check</mat-icon>
+                <span>{{ 'supplierRisk.actions.scorecard' | translate }}</span>
+              </a>
+            </td>
+          </ng-container>
+
+          <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+          <tr mat-row *matRowDef="let row; columns: displayedColumns"></tr>
+        </table>
+      </div>
+
+      @if (nextCursor()) {
+        <div class="pagination-row">
+          <button mat-stroked-button type="button" [disabled]="isLoadingMore()" (click)="loadMore()">
+            @if (isLoadingMore()) {
+              <mat-spinner diameter="18" [attr.aria-label]="'supplierRisk.pagination.loading' | translate" />
+            } @else {
+              <mat-icon aria-hidden="true">expand_more</mat-icon>
+            }
+            <span>{{ (isLoadingMore() ? 'supplierRisk.pagination.loading' : 'supplierRisk.pagination.more') | translate }}</span>
+          </button>
+        </div>
+      }
+    }
+  </section>
+</main>

@@ -160,6 +160,7 @@
     "navHome": "Overview",
     "navProducts": "Products",
     "navSuppliers": "Suppliers",
+    "navSupplierRisk": "Supplier Risk",
     "navImport": "Import Catalogue",
     "navQuotations": "Quotation Inbox",
     "navMatching": "Match Resolution",
@@ -2166,6 +2167,78 @@
     "error": {
       "notFound": "Supplier scorecard not found.",
       "generic": "Failed to load supplier scorecard. Please try again."
+    }
+  },
+  "supplierRisk": {
+    "title": "Supplier Risk",
+    "subtitle": "Scan the latest evidence-based risk position for every active supplier.",
+    "tableLabel": "Latest supplier risk snapshots",
+    "readOnly": "You can review supplier risk. Only owners and buyers can recompute it.",
+    "notAvailable": "Not available",
+    "evidenceAge": "Evidence refreshed {{count}} day(s) ago",
+    "columns": {
+      "supplier": "Supplier",
+      "risk": "Risk",
+      "confidence": "Confidence",
+      "state": "Evidence state",
+      "driver": "Top driver",
+      "posture": "Release posture",
+      "validity": "Validity",
+      "actions": "Actions"
+    },
+    "level": {
+      "low": "Low",
+      "medium": "Medium",
+      "high": "High",
+      "insufficient": "Insufficient data"
+    },
+    "confidence": {
+      "low": "Low",
+      "medium": "Medium",
+      "high": "High"
+    },
+    "state": {
+      "ready": "Ready",
+      "provisional": "Provisional",
+      "insufficient_data": "Insufficient data"
+    },
+    "drivers": {
+      "concentration": "Spend concentration",
+      "price_drift": "Price drift",
+      "reliability": "Delivery reliability",
+      "single_source": "Single-source exposure"
+    },
+    "posture": {
+      "g3_unmet": "G3 unmet"
+    },
+    "validity": {
+      "current": "Current",
+      "stale": "Stale"
+    },
+    "g3": {
+      "title": "G3 remains unmet",
+      "message": "These risk signals are advisory and require human review. They cannot authorise a purchase."
+    },
+    "actions": {
+      "scorecard": "View scorecard"
+    },
+    "recompute": {
+      "action": "Recompute risk",
+      "running": "Recomputing",
+      "success": "Recomputed {{count}} supplier snapshot(s)."
+    },
+    "pagination": {
+      "more": "Load more",
+      "loading": "Loading more"
+    },
+    "empty": {
+      "title": "No supplier risk snapshots yet",
+      "message": "An owner or buyer can compute the first evidence-based snapshots."
+    },
+    "error": {
+      "load": "Supplier risk could not be loaded.",
+      "recompute": "Supplier risk could not be recomputed. Existing results are unchanged.",
+      "retry": "Try again"
     }
   },
   "supplierTerms": {
