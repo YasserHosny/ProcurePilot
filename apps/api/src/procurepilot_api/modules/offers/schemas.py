@@ -411,6 +411,32 @@ class SupplierScorecard(StrictApiModel):
     rule_version: str
 
 
+class SupplierRiskSnapshot(StrictApiModel):
+    id: UUID
+    supplier_id: UUID
+    window_start: date
+    window_end: date
+    state: Literal["ready", "provisional", "insufficient_data"]
+    confidence: EvidenceConfidence
+    release_posture: Literal["g3_unmet"]
+    valid_from: datetime
+    valid_until: datetime
+    source_fingerprint: StrictStr
+    observed_history_days: int = Field(ge=0)
+    risk_score: dict[str, object]
+    computed_at: datetime
+
+
+class SupplierRiskList(StrictApiModel):
+    items: tuple[SupplierRiskSnapshot, ...]
+    next_cursor: str | None = None
+
+
+class SupplierRiskRecomputeResponse(StrictApiModel):
+    generated_snapshots: int = Field(ge=0)
+    release_posture: Literal["g3_unmet"] = "g3_unmet"
+
+
 class AnomalySignal(StrictApiModel):
     id: str
     kind: AnomalyAlertKind
@@ -573,3 +599,12 @@ class NegotiationBrief(StrictApiModel):
     valid_until: datetime
     status: BriefStatus
     items: tuple[NegotiationBriefItem, ...]
+
+
+class NegotiationBriefList(StrictApiModel):
+    items: tuple[NegotiationBrief, ...]
+    next_cursor: str | None = None
+
+
+class NegotiationBriefDismissRequest(StrictApiModel):
+    reason: StrictStr = Field(min_length=1, max_length=1000)
