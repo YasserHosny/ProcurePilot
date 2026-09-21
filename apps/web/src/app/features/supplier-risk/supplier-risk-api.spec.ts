@@ -36,6 +36,13 @@ describe('SupplierRiskApiService', () => {
         calculation_version: 'supplier-risk-v2',
         metric_id: 'metric-001',
         evidence_ids: ['evidence-001'],
+        evidence: [
+          {
+            evidence_id: 'evidence-001',
+            source_kind: 'purchase_order',
+            source_id: 'order-001',
+          },
+        ],
       },
     ],
   };

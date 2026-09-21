@@ -69,6 +69,21 @@ export interface NegotiationBriefItem {
   calculation_version: string;
   metric_id: string | null;
   evidence_ids: string[];
+  evidence: NegotiationBriefEvidenceRef[];
+}
+
+export interface NegotiationBriefEvidenceRef {
+  evidence_id: string;
+  source_kind:
+    | 'purchase_order'
+    | 'delivery_receipt'
+    | 'landed_cost'
+    | 'three_way_match'
+    | 'synced_bill'
+    | 'workspace_product'
+    | 'delivery_quality_issue'
+    | 'supplier_commercial_term';
+  source_id: string;
 }
 
 export interface NegotiationBrief {

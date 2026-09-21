@@ -2208,6 +2208,66 @@
       "reliability": "Delivery reliability",
       "single_source": "Single-source exposure"
     },
+    "components": {
+      "concentration": "Spend concentration",
+      "price_drift": "Price drift",
+      "reliability": "Delivery reliability",
+      "single_source": "Single-source exposure"
+    },
+    "sources": {
+      "purchase_order": "Purchase order",
+      "delivery_receipt_line": "Delivery receipt",
+      "landed_cost": "Landed-cost observation",
+      "workspace_product": "Catalogue product"
+    },
+    "exclusions": {
+      "cancelled": "Cancelled",
+      "future_receipt": "Future receipt",
+      "inactive_or_same_supplier": "Inactive or same supplier",
+      "incompatible_product_unit_currency": "Incompatible product, unit, or currency",
+      "insufficient_currency_bucket": "Insufficient currency evidence",
+      "invalid_observation": "Invalid observation",
+      "invalid_order_lines": "Invalid order lines",
+      "late_receipt": "Late receipt",
+      "negative_amount": "Negative amount",
+      "negative_price": "Negative price",
+      "negative_receipt": "Negative receipt",
+      "no_expected_date": "No expected date",
+      "nonpositive_quantity": "Non-positive quantity",
+      "nonqualifying_order": "Non-qualifying order",
+      "not_yet_due": "Not yet due",
+      "other_supplier": "Other supplier",
+      "outside_window": "Outside evidence window",
+      "status": "Excluded status",
+      "unknown_receipt_line": "Unknown receipt line",
+      "unpaired_group": "Unpaired comparison group",
+      "zero_baseline": "Zero baseline"
+    },
+    "scorecard": {
+      "title": "Supplier Risk Evidence",
+      "subtitle": "Review component calculations and source records before acting on a risk signal.",
+      "prepare": "Prepare negotiation brief",
+      "preparing": "Preparing brief",
+      "prepareFailed": "The negotiation brief could not be prepared.",
+      "unavailable": "No v2 risk snapshot is available for this supplier yet.",
+      "readOnly": "You can review this evidence. Only owners and buyers can prepare a brief.",
+      "samples": "{{count}} sample(s)",
+      "currencyBuckets": "Spend by currency",
+      "columns": {
+        "component": "Component",
+        "risk": "Risk",
+        "weight": "Weight",
+        "confidence": "Confidence",
+        "calculation": "Calculation",
+        "exclusions": "Excluded evidence",
+        "evidence": "Sources",
+        "currency": "Currency",
+        "supplierSpend": "Supplier spend",
+        "tenantSpend": "Workspace spend",
+        "share": "Share",
+        "samples": "Samples"
+      }
+    },
     "posture": {
       "g3_unmet": "G3 unmet"
     },
@@ -2239,6 +2299,79 @@
       "load": "Supplier risk could not be loaded.",
       "recompute": "Supplier risk could not be recomputed. Existing results are unchanged.",
       "retry": "Try again"
+    }
+  },
+  "negotiationBrief": {
+    "title": "Negotiation Brief",
+    "subtitle": "Review evidence-backed talking points before contacting the supplier.",
+    "back": "Back to supplier risk",
+    "readOnly": "You can review this brief. Only owners and buyers can acknowledge or dismiss it.",
+    "validFrom": "Valid from",
+    "validUntil": "Valid until",
+    "stale": "Expired",
+    "evidence": "Source evidence",
+    "questionLabel": "Suggested question",
+    "posture": {
+      "g3_unmet": "G3 remains unmet. This brief is advisory and cannot authorise or send a purchase."
+    },
+    "status": {
+      "prepared": "Prepared",
+      "acknowledged": "Acknowledged",
+      "dismissed": "Dismissed"
+    },
+    "kinds": {
+      "price_trajectory": "Price trajectory",
+      "alternatives": "Comparable alternatives",
+      "service_performance": "Service performance",
+      "concentration_volume": "Concentration and volume",
+      "payment_context": "Payment context",
+      "purchase_pattern": "Purchase pattern"
+    },
+    "calculation": {
+      "value": "Value",
+      "risk": "Risk",
+      "amount": "Amount",
+      "version": "Calculation version"
+    },
+    "sources": {
+      "purchase_order": "Purchase order",
+      "delivery_receipt": "Delivery receipt",
+      "landed_cost": "Landed-cost observation",
+      "three_way_match": "Three-way match",
+      "synced_bill": "Synced bill",
+      "workspace_product": "Catalogue product",
+      "delivery_quality_issue": "Delivery quality issue",
+      "supplier_commercial_term": "Supplier commercial term"
+    },
+    "actions": {
+      "title": "Record your review",
+      "message": "Acknowledging or dismissing records an append-only decision. It does not contact the supplier or change a purchase.",
+      "reason": "Dismissal reason",
+      "reasonRequired": "Enter a reason before dismissing this brief.",
+      "acknowledge": "Acknowledge brief",
+      "dismiss": "Dismiss brief"
+    },
+    "priceTrajectory": {
+      "question": "Which recent price changes can you explain or improve?"
+    },
+    "alternatives": {
+      "question": "Can you improve this offer against the available alternatives?"
+    },
+    "servicePerformance": {
+      "question": "What actions will improve delivery and service reliability?"
+    },
+    "concentrationVolume": {
+      "question": "What commercial terms can you offer for our current volume?"
+    },
+    "paymentContext": {
+      "question": "Can we agree clearer payment terms for future orders?"
+    },
+    "purchasePattern": {
+      "question": "Can our purchase cadence support better pricing or service?"
+    },
+    "error": {
+      "load": "The negotiation brief could not be loaded.",
+      "action": "Your review decision could not be recorded."
     }
   },
   "supplierTerms": {

@@ -2208,6 +2208,66 @@
       "reliability": "موثوقية التسليم",
       "single_source": "الاعتماد على مصدر واحد"
     },
+    "components": {
+      "concentration": "تركيز الإنفاق",
+      "price_drift": "انحراف السعر",
+      "reliability": "موثوقية التسليم",
+      "single_source": "الاعتماد على مصدر واحد"
+    },
+    "sources": {
+      "purchase_order": "أمر شراء",
+      "delivery_receipt_line": "إيصال تسليم",
+      "landed_cost": "ملاحظة تكلفة مستلمة",
+      "workspace_product": "منتج الدليل"
+    },
+    "exclusions": {
+      "cancelled": "ملغى",
+      "future_receipt": "إيصال مستقبلي",
+      "inactive_or_same_supplier": "مورد غير نشط أو المورد نفسه",
+      "incompatible_product_unit_currency": "منتج أو وحدة أو عملة غير متوافقة",
+      "insufficient_currency_bucket": "أدلة العملة غير كافية",
+      "invalid_observation": "ملاحظة غير صالحة",
+      "invalid_order_lines": "بنود طلب غير صالحة",
+      "late_receipt": "إيصال متأخر",
+      "negative_amount": "مبلغ سالب",
+      "negative_price": "سعر سالب",
+      "negative_receipt": "إيصال سالب",
+      "no_expected_date": "لا يوجد تاريخ متوقع",
+      "nonpositive_quantity": "كمية غير موجبة",
+      "nonqualifying_order": "طلب غير مؤهل",
+      "not_yet_due": "لم يحن موعده بعد",
+      "other_supplier": "مورد آخر",
+      "outside_window": "خارج نافذة الأدلة",
+      "status": "حالة مستبعدة",
+      "unknown_receipt_line": "بند إيصال غير معروف",
+      "unpaired_group": "مجموعة مقارنة غير مقترنة",
+      "zero_baseline": "خط أساس صفري"
+    },
+    "scorecard": {
+      "title": "أدلة مخاطر المورد",
+      "subtitle": "راجع حسابات المكونات والسجلات المصدرية قبل اتخاذ إجراء بشأن إشارة المخاطر.",
+      "prepare": "إعداد موجز تفاوض",
+      "preparing": "جارٍ إعداد الموجز",
+      "prepareFailed": "تعذر إعداد موجز التفاوض.",
+      "unavailable": "لا تتوفر بعد لقطة مخاطر بالإصدار الثاني لهذا المورد.",
+      "readOnly": "يمكنك مراجعة هذه الأدلة. يمكن للمالكين والمشترين فقط إعداد موجز.",
+      "samples": "{{count}} عينة",
+      "currencyBuckets": "الإنفاق حسب العملة",
+      "columns": {
+        "component": "المكوّن",
+        "risk": "المخاطر",
+        "weight": "الوزن",
+        "confidence": "الثقة",
+        "calculation": "الحساب",
+        "exclusions": "الأدلة المستبعدة",
+        "evidence": "المصادر",
+        "currency": "العملة",
+        "supplierSpend": "الإنفاق لدى المورد",
+        "tenantSpend": "إنفاق مساحة العمل",
+        "share": "الحصة",
+        "samples": "العينات"
+      }
+    },
     "posture": {
       "g3_unmet": "البوابة G3 غير مستوفاة"
     },
@@ -2239,6 +2299,79 @@
       "load": "تعذر تحميل مخاطر الموردين.",
       "recompute": "تعذرت إعادة احتساب مخاطر الموردين. لم تتغير النتائج الحالية.",
       "retry": "المحاولة مجدداً"
+    }
+  },
+  "negotiationBrief": {
+    "title": "موجز التفاوض",
+    "subtitle": "راجع نقاط الحديث المدعومة بالأدلة قبل التواصل مع المورد.",
+    "back": "العودة إلى مخاطر الموردين",
+    "readOnly": "يمكنك مراجعة هذا الموجز. يمكن للمالكين والمشترين فقط تأكيده أو رفضه.",
+    "validFrom": "ساري من",
+    "validUntil": "ساري حتى",
+    "stale": "منتهي الصلاحية",
+    "evidence": "الأدلة المصدرية",
+    "questionLabel": "سؤال مقترح",
+    "posture": {
+      "g3_unmet": "البوابة G3 ما زالت غير مستوفاة. هذا الموجز استشاري ولا يمكنه اعتماد عملية شراء أو إرسالها."
+    },
+    "status": {
+      "prepared": "مُعد",
+      "acknowledged": "تم التأكيد",
+      "dismissed": "تم الرفض"
+    },
+    "kinds": {
+      "price_trajectory": "مسار السعر",
+      "alternatives": "البدائل القابلة للمقارنة",
+      "service_performance": "أداء الخدمة",
+      "concentration_volume": "التركيز والحجم",
+      "payment_context": "سياق الدفع",
+      "purchase_pattern": "نمط الشراء"
+    },
+    "calculation": {
+      "value": "القيمة",
+      "risk": "المخاطر",
+      "amount": "المبلغ",
+      "version": "إصدار الحساب"
+    },
+    "sources": {
+      "purchase_order": "أمر شراء",
+      "delivery_receipt": "إيصال تسليم",
+      "landed_cost": "ملاحظة تكلفة مستلمة",
+      "three_way_match": "مطابقة ثلاثية",
+      "synced_bill": "فاتورة متزامنة",
+      "workspace_product": "منتج الدليل",
+      "delivery_quality_issue": "مشكلة جودة تسليم",
+      "supplier_commercial_term": "شرط تجاري للمورد"
+    },
+    "actions": {
+      "title": "تسجيل مراجعتك",
+      "message": "يسجل التأكيد أو الرفض قراراً غير قابل للتعديل. ولا يتواصل مع المورد أو يغيّر أي عملية شراء.",
+      "reason": "سبب الرفض",
+      "reasonRequired": "أدخل سبباً قبل رفض هذا الموجز.",
+      "acknowledge": "تأكيد الموجز",
+      "dismiss": "رفض الموجز"
+    },
+    "priceTrajectory": {
+      "question": "ما تغييرات الأسعار الأخيرة التي يمكنك تفسيرها أو تحسينها؟"
+    },
+    "alternatives": {
+      "question": "هل يمكنك تحسين هذا العرض مقارنة بالبدائل المتاحة؟"
+    },
+    "servicePerformance": {
+      "question": "ما الإجراءات التي ستحسن موثوقية التسليم والخدمة؟"
+    },
+    "concentrationVolume": {
+      "question": "ما الشروط التجارية التي يمكنك تقديمها لحجم تعاملاتنا الحالي؟"
+    },
+    "paymentContext": {
+      "question": "هل يمكننا الاتفاق على شروط دفع أوضح للطلبات المستقبلية؟"
+    },
+    "purchasePattern": {
+      "question": "هل يمكن أن يدعم نمط مشترياتنا سعراً أو خدمة أفضل؟"
+    },
+    "error": {
+      "load": "تعذر تحميل موجز التفاوض.",
+      "action": "تعذر تسجيل قرار المراجعة."
     }
   },
   "supplierTerms": {

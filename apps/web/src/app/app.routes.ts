@@ -127,6 +127,13 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'negotiation-briefs/:id',
+        loadComponent: () =>
+          import('./features/supplier-risk/brief-detail/brief-detail.component').then(
+            (m) => m.BriefDetailComponent,
+          ),
+      },
+      {
         path: 'import',
         canActivate: [roleGuard('owner', 'buyer')],
         loadComponent: () =>
