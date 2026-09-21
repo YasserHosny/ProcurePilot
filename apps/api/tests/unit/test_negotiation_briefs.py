@@ -6,6 +6,7 @@ from procurepilot_api.modules.offers.negotiation_briefs import (
     BriefBill,
     BriefContext,
     NegotiationBriefService,
+    _brief_evidence_refs,
 )
 from procurepilot_api.modules.offers.supplier_iq_v2 import (
     Alternative,
@@ -131,3 +132,35 @@ def test_prepare_builds_ranked_source_linked_categories() -> None:
 def test_payment_and_purchase_pattern_require_sufficient_evidence() -> None:
     context = BriefContext(supplier_id=S, as_of=END, orders=(), bills=())
     assert context.bills == ()
+
+
+def test_brief_evidence_refs_preserve_typed_source_targets() -> None:
+    evidence_id = UUID(int=8000)
+    order_id = UUID(int=8001)
+
+    class FakeCursor:
+        def execute(self, query: str, params: tuple[UUID]) -> None:
+            assert "supplier_scorecard_evidence" in query
+            assert params == (UUID(int=8002),)
+
+        def fetchall(self) -> list[dict[str, UUID | None]]:
+            return [
+                {
+                    "id": evidence_id,
+                    "purchase_order_id": order_id,
+                    "delivery_receipt_id": None,
+                    "landed_cost_id": None,
+                    "three_way_match_id": None,
+                    "synced_bill_id": None,
+                    "workspace_product_id": None,
+                    "delivery_quality_issue_id": None,
+                    "supplier_commercial_term_id": None,
+                }
+            ]
+
+    refs = _brief_evidence_refs(FakeCursor(), UUID(int=8002))  # type: ignore[arg-type]
+
+    assert len(refs) == 1
+    assert refs[0].evidence_id == evidence_id
+    assert refs[0].source_kind == "purchase_order"
+    assert refs[0].source_id == order_id

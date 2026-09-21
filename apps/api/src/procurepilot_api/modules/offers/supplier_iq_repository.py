@@ -28,6 +28,7 @@ from procurepilot_api.modules.offers.supplier_iq_v2 import (
 
 __all__ = [
     "SupplierIqRepository",
+    "load_latest_scorecard_v2",
     "load_risk_input",
     "persist_snapshot",
     "list_latest",
@@ -387,10 +388,48 @@ def list_latest(
     )
 
 
+def load_latest_scorecard_v2(
+    conn: psycopg.Connection,
+    *,
+    supplier_id: UUID,
+) -> SnapshotRow | None:
+    with conn.cursor(row_factory=dict_row) as cur:
+        cur.execute(
+            """
+            select snapshot.id as snapshot_id, snapshot.state,
+                   case
+                     when snapshot.risk_score->>'total' is null then null
+                     when (snapshot.risk_score->>'total')::numeric < 0.35 then 'low'
+                     when (snapshot.risk_score->>'total')::numeric < 0.65 then 'medium'
+                     else 'high'
+                   end as risk_level,
+                   snapshot.release_posture, snapshot.valid_from, snapshot.valid_until,
+                   snapshot.observed_history_days,
+                   snapshot.risk_score->>'total' as v2_risk_score,
+                   snapshot.metrics as v2_components,
+                   snapshot.risk_score->'weights' as v2_weights,
+                   snapshot.source_fingerprint
+            from supplier_scorecard_snapshot snapshot
+            join supplier
+              on supplier.tenant_id = snapshot.tenant_id
+             and supplier.id = snapshot.supplier_id
+            where snapshot.supplier_id = %s
+              and snapshot.rule_version = 'supplier-scorecard-v2'
+              and supplier.status in ('active', 'preferred')
+            order by snapshot.window_end desc, snapshot.computed_at desc, snapshot.id desc
+            limit 1
+            """,
+            (supplier_id,),
+        )
+        row = cur.fetchone()
+    return dict(row) if row is not None else None
+
+
 class SupplierIqRepository:
     load_risk_input = staticmethod(load_risk_input)
     persist_snapshot = staticmethod(persist_snapshot)
     list_latest = staticmethod(list_latest)
+    load_latest_scorecard_v2 = staticmethod(load_latest_scorecard_v2)
 
 
 def _encode_cursor(row: SnapshotRow) -> str:

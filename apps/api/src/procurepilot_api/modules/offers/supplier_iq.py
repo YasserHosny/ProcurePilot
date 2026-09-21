@@ -33,6 +33,7 @@ from procurepilot_api.modules.offers.service import _authenticated_db
 from procurepilot_api.modules.offers.supplier_iq_repository import (
     SnapshotPage,
     list_latest,
+    load_latest_scorecard_v2,
     load_risk_input,
     persist_snapshot,
 )
@@ -96,6 +97,10 @@ class SupplierIqService:
                 source_data=source_data,
             )
             _persist_snapshot(conn, member=member, scorecard=scorecard)
+            scorecard = _attach_latest_v2(
+                scorecard,
+                load_latest_scorecard_v2(conn, supplier_id=supplier_id),
+            )
         _record_audit(
             bearer_token=bearer_token,
             member=member,
@@ -277,6 +282,20 @@ def _authenticated_db_with_failure_audit(
 
 def get_supplier_iq_service() -> SupplierIqService:
     return SupplierIqService()
+
+
+def _attach_latest_v2(
+    scorecard: SupplierScorecard,
+    latest: dict[str, object] | None,
+) -> SupplierScorecard:
+    if latest is None:
+        return scorecard
+    return SupplierScorecard.model_validate(
+        {
+            **scorecard.model_dump(),
+            **latest,
+        }
+    )
 
 
 def calculate_scorecard(

@@ -28,6 +28,7 @@ from procurepilot_api.modules.offers.schemas import (
     BriefItemKind,
     Money,
     NegotiationBrief,
+    NegotiationBriefEvidenceRef,
     NegotiationBriefItem,
     NegotiationBriefList,
     SupplierRiskComponentV2,
@@ -695,7 +696,8 @@ def _brief_response(conn: psycopg.Connection, brief_id: UUID) -> NegotiationBrie
                 """,
                 (row["id"],),
             )
-            evidence_ids = tuple(UUID(str(link[0])) for link in cur.fetchall())
+            evidence_ids = tuple(UUID(str(link["evidence_id"])) for link in cur.fetchall())
+            evidence = _brief_evidence_refs(cur, row["id"])
             items.append(
                 NegotiationBriefItem(
                     kind=row["item_kind"],
@@ -714,6 +716,7 @@ def _brief_response(conn: psycopg.Connection, brief_id: UUID) -> NegotiationBrie
                     calculation_version=row["calculation_version"],
                     metric_id=row["metric_id"],
                     evidence_ids=evidence_ids,
+                    evidence=evidence,
                 )
             )
     return NegotiationBrief(
@@ -728,6 +731,50 @@ def _brief_response(conn: psycopg.Connection, brief_id: UUID) -> NegotiationBrie
         status=status,
         items=tuple(items),
     )
+
+
+def _brief_evidence_refs(
+    cur: psycopg.Cursor,
+    item_id: UUID,
+) -> tuple[NegotiationBriefEvidenceRef, ...]:
+    source_columns = (
+        ("purchase_order", "purchase_order_id"),
+        ("delivery_receipt", "delivery_receipt_id"),
+        ("landed_cost", "landed_cost_id"),
+        ("three_way_match", "three_way_match_id"),
+        ("synced_bill", "synced_bill_id"),
+        ("workspace_product", "workspace_product_id"),
+        ("delivery_quality_issue", "delivery_quality_issue_id"),
+        ("supplier_commercial_term", "supplier_commercial_term_id"),
+    )
+    cur.execute(
+        """
+        select evidence.id, evidence.purchase_order_id, evidence.delivery_receipt_id,
+               evidence.landed_cost_id, evidence.three_way_match_id,
+               evidence.synced_bill_id, evidence.workspace_product_id,
+               evidence.delivery_quality_issue_id,
+               evidence.supplier_commercial_term_id
+        from negotiation_brief_item_evidence link
+        join supplier_scorecard_evidence evidence
+          on evidence.tenant_id = link.tenant_id and evidence.id = link.evidence_id
+        where link.item_id = %s
+        order by evidence.id
+        """,
+        (item_id,),
+    )
+    refs: list[NegotiationBriefEvidenceRef] = []
+    for row in cur.fetchall():
+        for source_kind, column in source_columns:
+            if row[column] is not None:
+                refs.append(
+                    NegotiationBriefEvidenceRef(
+                        evidence_id=UUID(str(row["id"])),
+                        source_kind=source_kind,
+                        source_id=UUID(str(row[column])),
+                    )
+                )
+                break
+    return tuple(refs)
 
 
 def _encode_brief_cursor(created_at: datetime, brief_id: object) -> str:

@@ -398,19 +398,6 @@ class SupplierRiskScore(StrictApiModel):
     rule_version: str
 
 
-class SupplierScorecard(StrictApiModel):
-    supplier_id: UUID
-    window_start: date
-    window_end: date
-    metrics: dict[str, SupplierScoreMetric]
-    risk_score: SupplierRiskScore
-    source_counts: dict[str, int]
-    confidence: EvidenceConfidence
-    insufficient_evidence: bool
-    computed_at: datetime
-    rule_version: str
-
-
 class SupplierRiskSnapshot(StrictApiModel):
     id: UUID
     supplier_id: UUID
@@ -519,6 +506,21 @@ class SupplierRiskEvidenceRef(StrictApiModel):
     ]
 
 
+class NegotiationBriefEvidenceRef(StrictApiModel):
+    evidence_id: UUID
+    source_kind: Literal[
+        "purchase_order",
+        "delivery_receipt",
+        "landed_cost",
+        "three_way_match",
+        "synced_bill",
+        "workspace_product",
+        "delivery_quality_issue",
+        "supplier_commercial_term",
+    ]
+    source_id: UUID
+
+
 class SupplierRiskComponentV2(StrictApiModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -575,6 +577,30 @@ class SupplierRiskResult(StrictApiModel):
         return _ImmutableDict(value)
 
 
+class SupplierScorecard(StrictApiModel):
+    supplier_id: UUID
+    window_start: date
+    window_end: date
+    metrics: dict[str, SupplierScoreMetric]
+    risk_score: SupplierRiskScore
+    source_counts: dict[str, int]
+    confidence: EvidenceConfidence
+    insufficient_evidence: bool
+    computed_at: datetime
+    rule_version: str
+    snapshot_id: UUID | None = None
+    state: Literal["ready", "provisional", "insufficient_data"] | None = None
+    risk_level: Literal["low", "medium", "high"] | None = None
+    release_posture: Literal["g3_unmet"] | None = None
+    valid_from: datetime | None = None
+    valid_until: datetime | None = None
+    observed_history_days: int | None = Field(default=None, ge=0)
+    v2_risk_score: RiskDecimal | None = None
+    v2_components: dict[str, SupplierRiskComponentV2] = Field(default_factory=dict)
+    v2_weights: dict[str, RiskDecimal] = Field(default_factory=dict)
+    source_fingerprint: str | None = None
+
+
 class NegotiationBriefItem(StrictApiModel):
     kind: BriefItemKind
     rank: int = Field(ge=1)
@@ -588,6 +614,7 @@ class NegotiationBriefItem(StrictApiModel):
     calculation_version: StrictStr
     metric_id: UUID | None = None
     evidence_ids: tuple[UUID, ...] = ()
+    evidence: tuple[NegotiationBriefEvidenceRef, ...] = ()
 
 
 class NegotiationBrief(StrictApiModel):
