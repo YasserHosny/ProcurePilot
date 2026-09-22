@@ -7,7 +7,8 @@ Covers:
 - disconnect preserves the row (disconnected_at set, row still exists, not deleted)
   and previously-synced data stays queryable (Acceptance Scenario 1.2)
 - a callback with error present, or missing code, leaves no connection row at all (Scenario 1.3)
-- a connection whose token refresh fails transitions to needs_reauth on the next sync attempt (Scenario 1.4)
+- a connection whose token refresh fails transitions to needs_reauth on the next sync attempt
+  (Scenario 1.4)
 - GET /pos/connection returns 404 when no connection has ever existed for the tenant
 - cross-tenant: a connection for tenant A resolves not-found (404, never 403) for tenant B
 - reconnecting after a disconnect creates a genuinely distinct new pos_connection row
@@ -20,10 +21,10 @@ from urllib.parse import parse_qs, urlparse
 from uuid import UUID
 
 import psycopg
-from psycopg.rows import dict_row
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from psycopg.rows import dict_row
 
 from integration.catalogue_helpers import TEST_DATABASE_URL
 from integration.smart_compare_helpers import (
@@ -35,7 +36,7 @@ from procurepilot_api.deps import bearer_token, current_member
 from procurepilot_api.main import create_app
 from procurepilot_api.modules.auth.jwt import MemberRole
 from procurepilot_api.modules.pos.connector import OAuthTokens, StubConnector
-from procurepilot_api.modules.pos.service import ConnectionService, get_connection_service
+from procurepilot_api.modules.pos.service import ConnectionService
 from procurepilot_api.modules.pos.square_client import SquareAuthError
 from procurepilot_api.shared.audit import AuditEventCreate
 
@@ -462,7 +463,8 @@ def test_disconnected_connection_preserves_synced_product_signals(
                 cur.execute("set local role service_role")
                 cur.execute(
                     """
-                    select external_item_id, external_item_name, stock_on_hand, sales_velocity_per_day
+                    select external_item_id, external_item_name,
+                           stock_on_hand, sales_velocity_per_day
                     from synced_product_signal
                     where tenant_id = %s and pos_connection_id = %s
                     """,
