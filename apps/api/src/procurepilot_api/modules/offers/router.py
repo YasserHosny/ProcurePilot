@@ -9,6 +9,10 @@ from procurepilot_api.deps import CurrentMember, bearer_token, current_member
 from procurepilot_api.modules.auth.jwt import MemberRole
 from procurepilot_api.modules.auth.rbac import require_role
 from procurepilot_api.modules.offers.basket_service import BasketService, get_basket_service
+from procurepilot_api.modules.offers.negotiation_briefs import (
+    NegotiationBriefService,
+    get_negotiation_brief_service,
+)
 from procurepilot_api.modules.offers.refresh_schedule_service import (
     create_schedule,
     list_schedules,
@@ -18,6 +22,9 @@ from procurepilot_api.modules.offers.schemas import (
     AdvancedBasketOptimiseRequest,
     BasketOptimiseRequest,
     BasketSplitJob,
+    NegotiationBrief,
+    NegotiationBriefDismissRequest,
+    NegotiationBriefList,
     OfferComparison,
     OfferList,
     PriceHistoryResponse,
@@ -28,6 +35,9 @@ from procurepilot_api.modules.offers.schemas import (
     SupplierCommercialTerm,
     SupplierCommercialTermCreate,
     SupplierCommercialTermList,
+    SupplierRiskList,
+    SupplierRiskRecomputeResponse,
+    SupplierRiskSnapshot,
     SupplierScorecard,
 )
 from procurepilot_api.modules.offers.service import OfferService, get_offer_service
@@ -176,6 +186,138 @@ def get_supplier_scorecard(
         supplier_id=supplier_id,
         bearer_token=token,
         window_months=window_months,
+    )
+
+
+@router.post(
+    "/supplier-iq/recompute",
+    response_model=SupplierRiskRecomputeResponse,
+    operation_id="recomputeSupplierRisk",
+)
+@mutation_limiter.limit(_schedule_mutation_limit)
+def recompute_supplier_risk(
+    request: Request,
+    token: Annotated[str, Depends(bearer_token)],
+    member: Annotated[CurrentMember, Depends(require_role(*WRITE_ROLES))],
+    service: Annotated[SupplierIqService, Depends(get_supplier_iq_service)],
+    idempotency_key: Annotated[UUID | None, Header(alias="Idempotency-Key")] = None,
+) -> SupplierRiskRecomputeResponse:
+    result = service.recompute_all(
+        member=member,
+        idempotency_key=idempotency_key,
+        bearer_token=token,
+    )
+    return SupplierRiskRecomputeResponse(
+        generated_snapshots=result.generated_snapshots,
+        release_posture=result.release_posture,
+    )
+
+
+@router.get(
+    "/supplier-iq/risks",
+    response_model=SupplierRiskList,
+    operation_id="listSupplierRisks",
+)
+def list_supplier_risks(
+    _member: Annotated[CurrentMember, Depends(current_member)],
+    service: Annotated[SupplierIqService, Depends(get_supplier_iq_service)],
+    cursor: Annotated[str | None, Query()] = None,
+    limit: Annotated[int, Query(ge=1, le=100)] = 50,
+) -> SupplierRiskList:
+    page = service.list_risks(member=_member, cursor=cursor, limit=limit)
+    return SupplierRiskList(
+        items=tuple(SupplierRiskSnapshot.model_validate(item) for item in page.items),
+        next_cursor=page.next_cursor,
+    )
+
+
+@router.post(
+    "/suppliers/{supplier_id}/negotiation-briefs",
+    status_code=status.HTTP_201_CREATED,
+    response_model=NegotiationBrief,
+    operation_id="prepareNegotiationBrief",
+)
+@mutation_limiter.limit(_schedule_mutation_limit)
+def prepare_negotiation_brief(
+    request: Request,
+    supplier_id: UUID,
+    member: Annotated[CurrentMember, Depends(require_role(*WRITE_ROLES))],
+    service: Annotated[NegotiationBriefService, Depends(get_negotiation_brief_service)],
+    idempotency_key: Annotated[UUID | None, Header(alias="Idempotency-Key")] = None,
+) -> NegotiationBrief:
+    return service.prepare_for_supplier(
+        member=member,
+        supplier_id=supplier_id,
+        idempotency_key=idempotency_key,
+    )
+
+
+@router.get(
+    "/negotiation-briefs",
+    response_model=NegotiationBriefList,
+    operation_id="listNegotiationBriefs",
+)
+def list_negotiation_briefs(
+    member: Annotated[CurrentMember, Depends(current_member)],
+    service: Annotated[NegotiationBriefService, Depends(get_negotiation_brief_service)],
+    cursor: Annotated[str | None, Query()] = None,
+    limit: Annotated[int, Query(ge=1, le=100)] = 50,
+) -> NegotiationBriefList:
+    return service.list(member=member, cursor=cursor, limit=limit)
+
+
+@router.get(
+    "/negotiation-briefs/{brief_id}",
+    response_model=NegotiationBrief,
+    operation_id="getNegotiationBrief",
+)
+def get_negotiation_brief(
+    brief_id: UUID,
+    member: Annotated[CurrentMember, Depends(current_member)],
+    service: Annotated[NegotiationBriefService, Depends(get_negotiation_brief_service)],
+) -> NegotiationBrief:
+    return service.get(member=member, brief_id=brief_id)
+
+
+@router.post(
+    "/negotiation-briefs/{brief_id}/acknowledge",
+    response_model=NegotiationBrief,
+    operation_id="acknowledgeNegotiationBrief",
+)
+@mutation_limiter.limit(_schedule_mutation_limit)
+def acknowledge_negotiation_brief(
+    request: Request,
+    brief_id: UUID,
+    member: Annotated[CurrentMember, Depends(require_role(*WRITE_ROLES))],
+    service: Annotated[NegotiationBriefService, Depends(get_negotiation_brief_service)],
+    idempotency_key: Annotated[UUID | None, Header(alias="Idempotency-Key")] = None,
+) -> NegotiationBrief:
+    return service.acknowledge(
+        member=member,
+        brief_id=brief_id,
+        idempotency_key=idempotency_key,
+    )
+
+
+@router.post(
+    "/negotiation-briefs/{brief_id}/dismiss",
+    response_model=NegotiationBrief,
+    operation_id="dismissNegotiationBrief",
+)
+@mutation_limiter.limit(_schedule_mutation_limit)
+def dismiss_negotiation_brief(
+    request: Request,
+    brief_id: UUID,
+    payload: Annotated[NegotiationBriefDismissRequest, Body()],
+    member: Annotated[CurrentMember, Depends(require_role(*WRITE_ROLES))],
+    service: Annotated[NegotiationBriefService, Depends(get_negotiation_brief_service)],
+    idempotency_key: Annotated[UUID | None, Header(alias="Idempotency-Key")] = None,
+) -> NegotiationBrief:
+    return service.dismiss(
+        member=member,
+        brief_id=brief_id,
+        idempotency_key=idempotency_key,
+        reason=payload.reason,
     )
 
 

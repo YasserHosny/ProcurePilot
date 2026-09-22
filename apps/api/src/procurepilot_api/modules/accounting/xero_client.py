@@ -7,7 +7,7 @@ shapes stay in this module; callers receive the accounting connector's normalize
 from __future__ import annotations
 
 import re
-from datetime import date
+from datetime import UTC, date, datetime
 from decimal import Decimal, InvalidOperation
 from typing import Any, Literal, Self
 from urllib.parse import urlencode
@@ -83,6 +83,12 @@ def _parse_xero_date(value: object) -> date | None:
             return date.fromisoformat(candidate)
         except ValueError:
             pass
+        match = re.fullmatch(r"/Date\((-?\d+)(?:[+-]\d{4})?\)/", value)
+        if match:
+            try:
+                return datetime.fromtimestamp(int(match.group(1)) / 1000, tz=UTC).date()
+            except (OverflowError, OSError, ValueError):
+                pass
     return None
 
 
@@ -390,6 +396,18 @@ class XeroClient:
                 bill_date = _parse_xero_date(item.get("DateString") or item.get("Date"))
                 if bill_date is None:
                     raise XeroApiError(f"Xero invoice {invoice_id} has an invalid provider date")
+                balance_value = item.get("AmountDue")
+                remaining_balance = None
+                if balance_value is not None:
+                    try:
+                        remaining_balance = Decimal(str(balance_value))
+                    except (InvalidOperation, TypeError, ValueError) as exc:
+                        raise XeroApiError("Invalid remaining balance") from exc
+                    if not remaining_balance.is_finite() or remaining_balance < 0:
+                        raise XeroApiError("Invalid remaining balance")
+                due_date = _parse_xero_date(item.get("DueDateString"))
+                if due_date is None:
+                    due_date = _parse_xero_date(item.get("DueDate"))
                 bills.append(
                     RawBill(
                         provider_bill_id=invoice_id,
@@ -397,6 +415,8 @@ class XeroClient:
                         amount=amount,
                         currency=currency,
                         bill_date=bill_date,
+                        due_date=due_date,
+                        remaining_balance=remaining_balance,
                         status=_parse_bill_status(item.get("Status")),
                         provider_order_reference=_optional_text(
                             item.get("PurchaseOrderNumber")

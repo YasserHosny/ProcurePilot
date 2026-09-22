@@ -118,7 +118,7 @@ test.describe('POS Accessibility & RTL (015-pos-inventory-integration, T037) @a1
   test('connection settings in English has no WCAG 2.1 AA violations @a11y', async ({ page }) => {
     await applySession(page);
     await page.goto('/pos');
-    await expect(page.locator('.page-title')).toContainText('POS & Inventory Integration');
+    await expect(page.locator('.page-title')).toContainText('Point of Sale & Inventory Integration');
     await expect(page.locator('[data-testid="connection-status-card"]')).toBeVisible();
     const results = await scan(page);
     expect(results.violations, describeViolations(results)).toEqual([]);
@@ -127,7 +127,7 @@ test.describe('POS Accessibility & RTL (015-pos-inventory-integration, T037) @a1
   test('signals review in English has no WCAG 2.1 AA violations @a11y', async ({ page }) => {
     await applySession(page);
     await page.goto('/pos/signals');
-    await expect(page.locator('.page-title')).toContainText('POS Usage Signals');
+    await expect(page.locator('.page-title')).toContainText('Synced Product Signals');
     await expect(page.locator('[data-testid="matched-row"]').first()).toBeVisible();
     const results = await scan(page);
     expect(results.violations, describeViolations(results)).toEqual([]);
@@ -159,7 +159,7 @@ test.describe('POS Accessibility & RTL (015-pos-inventory-integration, T037) @a1
     await applySession(page);
     await page.goto('/pos');
     await switchToArabic(page);
-    await expect(page.locator('.page-title')).toContainText('تكامل نقاط البيع والمخزون');
+    await expect(page.locator('.page-title')).toContainText('ربط نقاط البيع والمخزون');
     const results = await scan(page);
     expect(results.violations, describeViolations(results)).toEqual([]);
   });
@@ -168,7 +168,7 @@ test.describe('POS Accessibility & RTL (015-pos-inventory-integration, T037) @a1
     await applySession(page);
     await page.goto('/pos/signals');
     await switchToArabic(page);
-    await expect(page.locator('.page-title')).toContainText('إشارات استخدام نقاط البيع');
+    await expect(page.locator('.page-title')).toContainText('مؤشرات المنتجات المتزامنة');
     await expect(page.locator('[data-testid="matched-row"]').first()).toBeVisible();
     const results = await scan(page);
     expect(results.violations, describeViolations(results)).toEqual([]);
@@ -192,7 +192,7 @@ test.describe('POS Accessibility & RTL (015-pos-inventory-integration, T037) @a1
     await applySession(page);
     await page.goto(`/products/${matchedProductId}`);
     await switchToArabic(page);
-    await expect(page.locator('.page-title')).toContainText('تحرير المنتج');
+    await expect(page.locator('.page-title')).toContainText('تعديل المنتج');
     await expect(page.locator('[data-testid="pos-inline-context"]')).toBeVisible();
     const results = await scan(page);
     expect(results.violations, describeViolations(results)).toEqual([]);

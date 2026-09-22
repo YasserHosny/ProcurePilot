@@ -1424,6 +1424,76 @@ Append-only audit trail logging for R2.4 operations:
 - `supplier_iq.scorecard.viewed`: Inspection of supplier scorecard metrics and risk evidence.
 - `alerts.anomaly.dismissed`: Dismissal of commercial anomaly alerts with deterministic recurrence keys.
 
+## R4.1 Supplier IQ v2 and Negotiation Brief Entities
+
+Migration: `supabase/migrations/20260920000009_supplier_iq_v2.sql`. Every new table below carries
+`tenant_id`, composite tenant foreign keys, `ENABLE` and `FORCE` row-level security, tenant-scoped
+`USING` and `WITH CHECK` policies, and no authenticated or service-role update/delete/truncate
+grant. Existing v1 scorecard rows remain readable.
+
+### Extended `SupplierScorecardSnapshot`
+
+The existing snapshot header remains the compatibility source for v1 consumers. V2 adds nullable
+`state`, `confidence`, `release_posture`, `valid_from`, `valid_until`, `source_fingerprint`, and
+`observed_history_days`. V2 rows require a fingerprint and use a partial unique index on
+`(tenant_id, source_fingerprint)`; legacy rows retain window uniqueness. All snapshot history is
+append-only.
+
+### `SupplierScorecardMetric`
+
+Immutable normalized component or currency-bucket calculation linked to one snapshot.
+
+| Field | Type | Notes |
+|---|---|---|
+| `id`, `tenant_id`, `snapshot_id` | uuid | Tenant-pinned identity and snapshot FK |
+| `metric_kind`, `bucket_key` | text | Unique per snapshot/kind/bucket |
+| `value`, `numerator`, `denominator` | numeric(18,8) | Decimal calculation inputs/results |
+| `amount`, `currency` | numeric(18,4), text | Nullable paired money fields |
+| `sample_count`, `confidence`, `is_sufficient` | integer, text, boolean | Evidence sufficiency |
+| `window_start`, `window_end` | date | Exact calculation window |
+| `calculation_version`, `created_at` | text, timestamptz | Replay/provenance metadata |
+
+### `SupplierScorecardEvidence`
+
+Immutable typed link from one metric to exactly one source. The database check requires exactly
+one of `purchase_order_id`, `delivery_receipt_id`, `landed_cost_id`, `three_way_match_id`,
+`synced_bill_id`, `workspace_product_id`, `delivery_quality_issue_id`, or
+`supplier_commercial_term_id`; every target uses a composite tenant FK.
+
+### `NegotiationBrief`
+
+Immutable header linked to a supplier and scorecard snapshot. Stores `brief_version`,
+`source_fingerprint`, fixed `g3_unmet` posture, validity, creator, and creation time. Unique on
+`(tenant_id, supplier_id, snapshot_id, brief_version)` for deterministic replay.
+
+### `NegotiationBriefItem`
+
+Immutable ranked talking point. Stores item kind, rank, optional metric, decimal value, optional
+paired money amount/currency, confidence, optional normalized risk, validity, shared i18n question
+key, and calculation version. A deferred constraint trigger requires at least one linked evidence
+row before transaction commit.
+
+### `NegotiationBriefItemEvidence`
+
+Immutable many-to-many link between a brief item and `SupplierScorecardEvidence`, keyed by
+`(tenant_id, item_id, evidence_id)`.
+
+### `NegotiationBriefAction`
+
+Append-only human review event. `action` is `acknowledged` or `dismissed`; dismissal requires a
+non-blank reason. `idempotency_key` is unique per tenant. Current brief status is derived from the
+latest event rather than stored by updating the brief.
+
+### Extended `SyncedBill`
+
+Adds provider-derived `due_date`, `remaining_balance_amount`, and
+`remaining_balance_currency`. Remaining balance is non-negative and amount/currency are required
+as a pair. Null historical values never support an inferred overdue-payment claim.
+
+R4.1 audit events are append-only: `supplier_iq.recomputed`, `negotiation_brief.prepared`,
+`negotiation_brief.acknowledged`, and `negotiation_brief.dismissed`. The feature writes no supplier
+message, purchase request, or purchase order.
+
 ## Implemented mobile approvals and receipt entities (chunk R2.3, `010-mobile-approvals-receipt`)
 
 See `specs/010-mobile-approvals-receipt/data-model.md` for `PurchaseRequest`'s delivery-status

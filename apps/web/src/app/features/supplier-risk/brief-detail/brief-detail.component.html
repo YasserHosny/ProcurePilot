@@ -1,0 +1,158 @@
+<main class="brief-page">
+  <nav [attr.aria-label]="'negotiationBrief.back' | translate">
+    <a mat-button routerLink="/supplier-risk">
+      <mat-icon class="rtl-flip" aria-hidden="true">arrow_back</mat-icon>
+      <span>{{ 'negotiationBrief.back' | translate }}</span>
+    </a>
+  </nav>
+
+  <header class="page-header">
+    <div>
+      <h1>{{ 'negotiationBrief.title' | translate }}</h1>
+      <p>{{ 'negotiationBrief.subtitle' | translate }}</p>
+    </div>
+    @if (brief(); as current) {
+      <span class="status-tag">{{ 'negotiationBrief.status.' + current.status | translate }}</span>
+    }
+  </header>
+
+  @if (isLoading()) {
+    <div class="state-panel" aria-live="polite">
+      <mat-spinner diameter="40" [attr.aria-label]="'common.loading' | translate" />
+      <span>{{ 'common.loading' | translate }}</span>
+    </div>
+  }
+
+  @if (error(); as errorKind) {
+    <div class="notice error" role="alert">
+      <mat-icon aria-hidden="true">error_outline</mat-icon>
+      <span>{{ 'negotiationBrief.error.' + errorKind | translate }}</span>
+    </div>
+  }
+
+  @if (brief(); as current) {
+    <aside class="notice gate">
+      <mat-icon aria-hidden="true">policy</mat-icon>
+      <span>{{ 'negotiationBrief.posture.' + current.release_posture | translate }}</span>
+    </aside>
+
+    <div class="metadata-row">
+      <span>{{ 'negotiationBrief.validFrom' | translate }}: {{ current.valid_from | formatDate }}</span>
+      <span>{{ 'negotiationBrief.validUntil' | translate }}: {{ current.valid_until | formatDate }}</span>
+      @if (isStale()) {
+        <span class="status-tag stale" data-testid="brief-stale">{{ 'negotiationBrief.stale' | translate }}</span>
+      }
+    </div>
+
+    @if (!isWriter()) {
+      <div class="notice neutral" data-testid="brief-readonly">
+        <mat-icon aria-hidden="true">visibility</mat-icon>
+        <span>{{ 'negotiationBrief.readOnly' | translate }}</span>
+      </div>
+    }
+
+    <ol class="brief-items">
+      @for (item of current.items; track item.rank) {
+        <li class="brief-item" data-testid="brief-item">
+          <header class="item-header">
+            <span class="rank">{{ item.rank }}</span>
+            <h2>{{ 'negotiationBrief.kinds.' + item.kind | translate }}</h2>
+            <span class="confidence">{{ 'supplierRisk.confidence.' + item.confidence | translate }}</span>
+          </header>
+
+          <dl class="calculation-grid">
+            <div>
+              <dt>{{ 'negotiationBrief.calculation.value' | translate }}</dt>
+              <dd>{{ item.value ?? ('supplierRisk.notAvailable' | translate) }}</dd>
+            </div>
+            <div>
+              <dt>{{ 'negotiationBrief.calculation.risk' | translate }}</dt>
+              <dd>{{ percent(item.risk) }}</dd>
+            </div>
+            <div>
+              <dt>{{ 'negotiationBrief.calculation.amount' | translate }}</dt>
+              <dd>
+                @if (item.amount; as amount) {
+                  {{ amount.amount }} {{ amount.currency }}
+                } @else {
+                  {{ 'supplierRisk.notAvailable' | translate }}
+                }
+              </dd>
+            </div>
+            <div>
+              <dt>{{ 'negotiationBrief.calculation.version' | translate }}</dt>
+              <dd>{{ item.calculation_version }}</dd>
+            </div>
+          </dl>
+
+          <div class="evidence-section">
+            <h3>{{ 'negotiationBrief.evidence' | translate }}</h3>
+            <ul>
+              @for (ref of item.evidence; track ref.evidence_id) {
+                <li>
+                  @if (sourceRoute(ref); as route) {
+                    <a
+                      [routerLink]="route"
+                      [attr.aria-label]="'negotiationBrief.sourceLink' | translate: {
+                        source: ('negotiationBrief.sources.' + ref.source_kind | translate),
+                        id: ref.source_id
+                      }"
+                    >
+                      {{ 'negotiationBrief.sources.' + ref.source_kind | translate }}
+                    </a>
+                  } @else {
+                    <span>{{ 'negotiationBrief.sources.' + ref.source_kind | translate }}</span>
+                  }
+                  <code>{{ ref.source_id }}</code>
+                </li>
+              }
+            </ul>
+          </div>
+
+          <div class="question-block">
+            <span>{{ 'negotiationBrief.questionLabel' | translate }}</span>
+            <p>{{ item.question_i18n_key | translate }}</p>
+          </div>
+        </li>
+      }
+    </ol>
+
+    @if (canAct()) {
+      <section class="actions" data-testid="brief-actions" aria-labelledby="brief-actions-heading">
+        <h2 id="brief-actions-heading">{{ 'negotiationBrief.actions.title' | translate }}</h2>
+        <p>{{ 'negotiationBrief.actions.message' | translate }}</p>
+
+        <mat-form-field appearance="outline">
+          <mat-label>{{ 'negotiationBrief.actions.reason' | translate }}</mat-label>
+          <textarea
+            matInput
+            rows="3"
+            [value]="dismissReason()"
+            (input)="updateDismissReason($event)"
+            [attr.aria-invalid]="dismissReasonError()"
+          ></textarea>
+        </mat-form-field>
+        @if (dismissReasonError()) {
+          <p class="reason-error" role="alert">{{ 'negotiationBrief.actions.reasonRequired' | translate }}</p>
+        }
+
+        <div class="action-buttons">
+          <button
+            mat-flat-button
+            type="button"
+            data-testid="acknowledge-brief"
+            [disabled]="isActing()"
+            (click)="acknowledge()"
+          >
+            <mat-icon aria-hidden="true">check</mat-icon>
+            <span>{{ 'negotiationBrief.actions.acknowledge' | translate }}</span>
+          </button>
+          <button mat-stroked-button type="button" [disabled]="isActing()" (click)="dismiss()">
+            <mat-icon aria-hidden="true">close</mat-icon>
+            <span>{{ 'negotiationBrief.actions.dismiss' | translate }}</span>
+          </button>
+        </div>
+      </section>
+    }
+  }
+</main>

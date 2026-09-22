@@ -1,0 +1,156 @@
+<section class="v2-panel" aria-labelledby="v2-risk-heading">
+  <header class="panel-header">
+    <div>
+      <h2 id="v2-risk-heading">{{ 'supplierRisk.scorecard.title' | translate }}</h2>
+      <p>{{ 'supplierRisk.scorecard.subtitle' | translate }}</p>
+    </div>
+
+    @if (canPrepare()) {
+      <button
+        mat-flat-button
+        type="button"
+        data-testid="prepare-brief"
+        [disabled]="isPreparing()"
+        (click)="prepareBrief()"
+      >
+        @if (isPreparing()) {
+          <mat-spinner diameter="18" [attr.aria-label]="'supplierRisk.scorecard.preparing' | translate" />
+        } @else {
+          <mat-icon aria-hidden="true">description</mat-icon>
+        }
+        <span>{{ (isPreparing() ? 'supplierRisk.scorecard.preparing' : 'supplierRisk.scorecard.prepare') | translate }}</span>
+      </button>
+    }
+  </header>
+
+  @if (!hasV2()) {
+    <div class="notice neutral" role="status">
+      <mat-icon aria-hidden="true">info</mat-icon>
+      <span>{{ 'supplierRisk.scorecard.unavailable' | translate }}</span>
+    </div>
+  } @else {
+    <div class="status-row">
+      <span class="status-tag">{{ 'supplierRisk.state.' + scorecard().state | translate }}</span>
+      <span class="status-tag gate">{{ 'supplierRisk.posture.' + scorecard().release_posture | translate }}</span>
+      @if (isStale()) {
+        <span class="status-tag stale">{{ 'supplierRisk.validity.stale' | translate }}</span>
+      } @else {
+        <span class="status-tag current">{{ 'supplierRisk.validity.current' | translate }}</span>
+      }
+      <span class="validity-date">{{ scorecard().valid_until | formatDate }}</span>
+    </div>
+
+    @if (!isWriter()) {
+      <div class="notice neutral" data-testid="scorecard-v2-readonly">
+        <mat-icon aria-hidden="true">visibility</mat-icon>
+        <span>{{ 'supplierRisk.scorecard.readOnly' | translate }}</span>
+      </div>
+    }
+
+    @if (prepareFailed()) {
+      <div class="notice error" role="alert">
+        <mat-icon aria-hidden="true">error_outline</mat-icon>
+        <span>{{ 'supplierRisk.scorecard.prepareFailed' | translate }}</span>
+      </div>
+    }
+
+    <div class="table-scroll">
+      <table
+        class="component-table"
+        [attr.aria-label]="'supplierRisk.scorecard.componentsTableLabel' | translate"
+      >
+        <thead>
+          <tr>
+            <th>{{ 'supplierRisk.scorecard.columns.component' | translate }}</th>
+            <th>{{ 'supplierRisk.scorecard.columns.risk' | translate }}</th>
+            <th>{{ 'supplierRisk.scorecard.columns.weight' | translate }}</th>
+            <th>{{ 'supplierRisk.scorecard.columns.confidence' | translate }}</th>
+            <th>{{ 'supplierRisk.scorecard.columns.calculation' | translate }}</th>
+            <th>{{ 'supplierRisk.scorecard.columns.exclusions' | translate }}</th>
+            <th>{{ 'supplierRisk.scorecard.columns.evidence' | translate }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (row of componentRows(); track row.key) {
+            <tr data-testid="risk-component-row">
+              <th scope="row">{{ 'supplierRisk.components.' + row.key | translate }}</th>
+              <td>{{ percent(row.value?.risk) }}</td>
+              <td>{{ percent(weight(row.key)) }}</td>
+              <td>{{ 'supplierRisk.confidence.' + (row.value?.confidence ?? 'low') | translate }}</td>
+              <td>
+                @if (row.value) {
+                  <span>{{ 'supplierRisk.scorecard.samples' | translate: { count: row.value.sample_count } }}</span>
+                  @if (row.value.numerator !== null && row.value.denominator !== null) {
+                    <span class="cell-detail">{{ row.value.numerator }} / {{ row.value.denominator }}</span>
+                  }
+                } @else {
+                  {{ 'supplierRisk.notAvailable' | translate }}
+                }
+              </td>
+              <td>
+                @for (entry of excluded(row.value); track entry[0]) {
+                  <span class="evidence-line">{{ 'supplierRisk.exclusions.' + entry[0] | translate }}: {{ entry[1] }}</span>
+                } @empty {
+                  {{ 'supplierRisk.notAvailable' | translate }}
+                }
+              </td>
+              <td>
+                @for (ref of row.value?.source_refs ?? []; track ref.source_id) {
+                  @if (sourceRoute(ref); as route) {
+                    <a
+                      class="evidence-line"
+                      [routerLink]="route"
+                      [attr.aria-label]="'supplierRisk.scorecard.sourceLink' | translate: {
+                        source: ('supplierRisk.sources.' + ref.source_kind | translate),
+                        id: ref.source_id
+                      }"
+                    >
+                      {{ 'supplierRisk.sources.' + ref.source_kind | translate }}
+                    </a>
+                  } @else {
+                    <span class="evidence-line">{{ 'supplierRisk.sources.' + ref.source_kind | translate }}</span>
+                  }
+                } @empty {
+                  {{ 'supplierRisk.notAvailable' | translate }}
+                }
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+
+    @if (scorecard().v2_components?.['concentration']?.currency_buckets?.length) {
+      <section class="currency-section" aria-labelledby="currency-heading">
+        <h3 id="currency-heading">{{ 'supplierRisk.scorecard.currencyBuckets' | translate }}</h3>
+        <div class="table-scroll">
+          <table
+            class="currency-table"
+            [attr.aria-label]="'supplierRisk.scorecard.currencyTableLabel' | translate"
+          >
+            <thead>
+              <tr>
+                <th>{{ 'supplierRisk.scorecard.columns.currency' | translate }}</th>
+                <th>{{ 'supplierRisk.scorecard.columns.supplierSpend' | translate }}</th>
+                <th>{{ 'supplierRisk.scorecard.columns.tenantSpend' | translate }}</th>
+                <th>{{ 'supplierRisk.scorecard.columns.share' | translate }}</th>
+                <th>{{ 'supplierRisk.scorecard.columns.samples' | translate }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (bucket of scorecard().v2_components?.['concentration']?.currency_buckets ?? []; track bucket.currency) {
+                <tr>
+                  <th scope="row">{{ bucket.currency }}</th>
+                  <td>{{ bucket.supplier_spend }} {{ bucket.currency }}</td>
+                  <td>{{ bucket.tenant_spend }} {{ bucket.currency }}</td>
+                  <td>{{ percent(bucket.share) }}</td>
+                  <td>{{ bucket.sample_count }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </section>
+    }
+  }
+</section>

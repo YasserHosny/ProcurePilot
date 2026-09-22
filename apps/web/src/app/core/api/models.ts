@@ -891,6 +891,58 @@ export interface SupplierRiskScore {
   readonly rule_version: string;
 }
 
+export interface SupplierRiskEvidenceRefV2 {
+  readonly source_id: string;
+  readonly source_kind:
+    | 'purchase_order'
+    | 'delivery_receipt_line'
+    | 'landed_cost'
+    | 'workspace_product';
+}
+
+export interface RiskCurrencyBucketV2 {
+  readonly currency: string;
+  readonly supplier_spend: string;
+  readonly tenant_spend: string;
+  readonly sample_count: number;
+  readonly share: string | null;
+  readonly source_ids: readonly string[];
+}
+
+export interface RiskPriceComparisonV2 {
+  readonly product_id: string;
+  readonly base_unit: string;
+  readonly currency: string;
+  readonly baseline_median: string;
+  readonly current_median: string;
+  readonly drift: string;
+  readonly source_ids: readonly string[];
+}
+
+export interface SupplierRiskComponentV2 {
+  readonly value: string | null;
+  readonly risk: string | null;
+  readonly sample_count: number;
+  readonly product_count: number;
+  readonly confidence: ScorecardConfidence;
+  readonly insufficient_evidence: boolean;
+  readonly excluded_counts: Readonly<Record<string, number>>;
+  readonly source_ids: readonly string[];
+  readonly source_refs: readonly SupplierRiskEvidenceRefV2[];
+  readonly window_start: string;
+  readonly split_date: string;
+  readonly window_end: string;
+  readonly calculation_version: string;
+  readonly currency_buckets: readonly RiskCurrencyBucketV2[];
+  readonly price_comparisons: readonly RiskPriceComparisonV2[];
+  readonly baseline_count: number;
+  readonly current_count: number;
+  readonly baseline_reliability: string | null;
+  readonly current_reliability: string | null;
+  readonly numerator: string | null;
+  readonly denominator: string | null;
+}
+
 export interface SupplierScorecard {
   readonly supplier_id: string;
   readonly window_start: string;
@@ -902,6 +954,17 @@ export interface SupplierScorecard {
   readonly insufficient_evidence: boolean;
   readonly computed_at: string;
   readonly rule_version: string;
+  readonly snapshot_id?: string | null;
+  readonly state?: 'ready' | 'provisional' | 'insufficient_data' | null;
+  readonly risk_level?: 'low' | 'medium' | 'high' | null;
+  readonly release_posture?: 'g3_unmet' | null;
+  readonly valid_from?: string | null;
+  readonly valid_until?: string | null;
+  readonly observed_history_days?: number | null;
+  readonly v2_risk_score?: string | null;
+  readonly v2_components?: Readonly<Record<string, SupplierRiskComponentV2>>;
+  readonly v2_weights?: Readonly<Record<string, string>>;
+  readonly source_fingerprint?: string | null;
 }
 
 // --- R2.4 Commercial Terms ------------------------------------------------

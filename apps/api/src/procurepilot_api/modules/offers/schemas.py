@@ -1,10 +1,19 @@
 from __future__ import annotations
 
 from datetime import date, datetime
-from typing import Literal
+from decimal import ROUND_HALF_UP, Decimal, localcontext
+from typing import Annotated, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, StrictStr, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    PlainSerializer,
+    StrictStr,
+    field_validator,
+    model_validator,
+)
 
 RecommendationConfidence = Literal["high", "medium", "low"]
 FreshnessStatus = Literal["fresh", "stale"]
@@ -36,6 +45,15 @@ AnomalyAlertKind = Literal[
     "delivery_cost_anomaly",
     "supplier_quality_trend_change",
 ]
+BriefItemKind = Literal[
+    "price_trajectory",
+    "alternatives",
+    "service_performance",
+    "concentration_volume",
+    "payment_context",
+    "purchase_pattern",
+]
+BriefStatus = Literal["prepared", "acknowledged", "dismissed"]
 
 
 class StrictApiModel(BaseModel):
@@ -380,17 +398,32 @@ class SupplierRiskScore(StrictApiModel):
     rule_version: str
 
 
-class SupplierScorecard(StrictApiModel):
+class SupplierRiskSnapshot(StrictApiModel):
+    id: UUID
     supplier_id: UUID
+    supplier_name: StrictStr
     window_start: date
     window_end: date
-    metrics: dict[str, SupplierScoreMetric]
-    risk_score: SupplierRiskScore
-    source_counts: dict[str, int]
+    state: Literal["ready", "provisional", "insufficient_data"]
     confidence: EvidenceConfidence
-    insufficient_evidence: bool
+    release_posture: Literal["g3_unmet"]
+    valid_from: datetime
+    valid_until: datetime
+    source_fingerprint: StrictStr
+    observed_history_days: int = Field(ge=0)
+    risk_score: dict[str, object]
+    risk_level: Literal["low", "medium", "high"] | None
     computed_at: datetime
-    rule_version: str
+
+
+class SupplierRiskList(StrictApiModel):
+    items: tuple[SupplierRiskSnapshot, ...]
+    next_cursor: str | None = None
+
+
+class SupplierRiskRecomputeResponse(StrictApiModel):
+    generated_snapshots: int = Field(ge=0)
+    release_posture: Literal["g3_unmet"] = "g3_unmet"
 
 
 class AnomalySignal(StrictApiModel):
@@ -410,3 +443,197 @@ class AnomalySignal(StrictApiModel):
     created_from_current_data_at: datetime
     dismissed: bool
     valid_until: datetime | None = None
+
+
+# V2 keeps Decimal values internally; only the JSON API representation is rounded.
+RiskDecimal = Annotated[
+    Decimal,
+    PlainSerializer(
+        lambda value: _serialize_risk_decimal(value), return_type=str, when_used="json"
+    ),
+]
+
+
+def _serialize_risk_decimal(value: Decimal) -> str:
+    with localcontext() as context:
+        context.prec = max(28, value.adjusted() + 8 if value else 28)
+        return format(value.quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP), "f")
+
+
+class _ImmutableDict(dict):
+    def _immutable(self, *args: object, **kwargs: object) -> None:
+        raise TypeError("immutable result container")
+
+    __delitem__ = __setitem__ = _immutable
+    clear = pop = popitem = setdefault = update = _immutable
+
+    def __ior__(self, value: object) -> _ImmutableDict:
+        self._immutable(value)
+
+
+class RiskCurrencyBucket(StrictApiModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    currency: str
+    supplier_spend: RiskDecimal
+    tenant_spend: RiskDecimal
+    sample_count: int
+    share: RiskDecimal | None
+    source_ids: tuple[UUID, ...]
+
+
+class RiskPriceComparison(StrictApiModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    product_id: UUID
+    base_unit: str
+    currency: str
+    baseline_median: RiskDecimal
+    current_median: RiskDecimal
+    drift: RiskDecimal
+    source_ids: tuple[UUID, ...]
+
+
+class SupplierRiskEvidenceRef(StrictApiModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    source_id: UUID
+    source_kind: Literal[
+        "purchase_order",
+        "delivery_receipt_line",
+        "landed_cost",
+        "workspace_product",
+    ]
+
+
+class NegotiationBriefEvidenceRef(StrictApiModel):
+    evidence_id: UUID
+    source_kind: Literal[
+        "purchase_order",
+        "delivery_receipt",
+        "landed_cost",
+        "three_way_match",
+        "synced_bill",
+        "workspace_product",
+        "delivery_quality_issue",
+        "supplier_commercial_term",
+    ]
+    source_id: UUID
+
+
+class SupplierRiskComponentV2(StrictApiModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    value: RiskDecimal | None
+    risk: RiskDecimal | None
+    sample_count: int
+    product_count: int = 0
+    confidence: EvidenceConfidence
+    insufficient_evidence: bool
+    excluded_counts: dict[str, int]
+    source_ids: tuple[UUID, ...]
+    source_refs: tuple[SupplierRiskEvidenceRef, ...] = Field(default_factory=tuple)
+    window_start: date
+    split_date: date
+    window_end: date
+    calculation_version: str
+    currency_buckets: tuple[RiskCurrencyBucket, ...] = Field(default_factory=tuple)
+    price_comparisons: tuple[RiskPriceComparison, ...] = Field(default_factory=tuple)
+    baseline_count: int = 0
+    current_count: int = 0
+    baseline_reliability: RiskDecimal | None = None
+    current_reliability: RiskDecimal | None = None
+    numerator: RiskDecimal | None = None
+    denominator: RiskDecimal | None = None
+
+    @field_validator("excluded_counts", mode="after")
+    @classmethod
+    def _freeze_excluded_counts(cls, value: dict[str, int]) -> dict[str, int]:
+        return _ImmutableDict(value)
+
+
+class SupplierRiskResult(StrictApiModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    supplier_id: UUID
+    components: dict[str, SupplierRiskComponentV2]
+    weights: dict[str, RiskDecimal]
+    score: RiskDecimal | None
+    risk_level: Literal["low", "medium", "high"] | None
+    confidence: EvidenceConfidence
+    state: Literal["ready", "provisional", "insufficient_data"]
+    release_posture: Literal["g3_unmet"] = "g3_unmet"
+    window_start: date
+    split_date: date
+    window_end: date
+    observed_history_days: int
+    scorecard_version: str
+    risk_version: str
+    source_fingerprint: str
+
+    @field_validator("components", "weights", mode="after")
+    @classmethod
+    def _freeze_dicts(cls, value: dict[str, object]) -> dict[str, object]:
+        return _ImmutableDict(value)
+
+
+class SupplierScorecard(StrictApiModel):
+    supplier_id: UUID
+    window_start: date
+    window_end: date
+    metrics: dict[str, SupplierScoreMetric]
+    risk_score: SupplierRiskScore
+    source_counts: dict[str, int]
+    confidence: EvidenceConfidence
+    insufficient_evidence: bool
+    computed_at: datetime
+    rule_version: str
+    snapshot_id: UUID | None = None
+    state: Literal["ready", "provisional", "insufficient_data"] | None = None
+    risk_level: Literal["low", "medium", "high"] | None = None
+    release_posture: Literal["g3_unmet"] | None = None
+    valid_from: datetime | None = None
+    valid_until: datetime | None = None
+    observed_history_days: int | None = Field(default=None, ge=0)
+    v2_risk_score: RiskDecimal | None = None
+    v2_components: dict[str, SupplierRiskComponentV2] = Field(default_factory=dict)
+    v2_weights: dict[str, RiskDecimal] = Field(default_factory=dict)
+    source_fingerprint: str | None = None
+
+
+class NegotiationBriefItem(StrictApiModel):
+    kind: BriefItemKind
+    rank: int = Field(ge=1)
+    value: str | None = None
+    amount: Money | None = None
+    confidence: EvidenceConfidence
+    risk: str | None = None
+    valid_from: date
+    valid_until: date
+    question_i18n_key: StrictStr
+    calculation_version: StrictStr
+    metric_id: UUID | None = None
+    evidence_ids: tuple[UUID, ...] = ()
+    evidence: tuple[NegotiationBriefEvidenceRef, ...] = ()
+
+
+class NegotiationBrief(StrictApiModel):
+    id: UUID
+    supplier_id: UUID
+    snapshot_id: UUID
+    brief_version: StrictStr
+    source_fingerprint: StrictStr
+    release_posture: Literal["g3_unmet"]
+    valid_from: datetime
+    valid_until: datetime
+    status: BriefStatus
+    items: tuple[NegotiationBriefItem, ...]
+
+
+class NegotiationBriefList(StrictApiModel):
+    items: tuple[NegotiationBrief, ...]
+    next_cursor: str | None = None
+
+
+class NegotiationBriefDismissRequest(StrictApiModel):
+    reason: StrictStr = Field(min_length=1, max_length=1000)

@@ -13,7 +13,7 @@
     "test:web": "pnpm --filter web test",
     "test:e2e": "pnpm --filter web test:e2e",
     "test:isolation": "uv run --project apps/api pytest apps/api/tests/integration/test_tenant_isolation.py",
-    "test:a11y": "pnpm --filter web test:e2e -- --grep @a11y",
+    "test:a11y": "pnpm --filter web exec playwright test --grep @a11y --project=chrome",
     "lint:api": "uv run --project apps/api ruff check apps/api",
     "lint:web": "pnpm --filter web lint"
   },

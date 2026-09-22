@@ -216,6 +216,29 @@ describe('SupplierScorecardComponent (T027)', () => {
     expect(component.riskLevel()).toBe('high'); // >= 0.70
   });
 
+  it('should prefer the persisted v2 score and risk level when available', () => {
+    component.scorecard.set({
+      ...mockScorecard,
+      snapshot_id: 'snapshot-v2',
+      state: 'provisional',
+      risk_level: 'medium',
+      release_posture: 'g3_unmet',
+      valid_from: '2026-09-14T00:00:00Z',
+      valid_until: '2099-09-15T00:00:00Z',
+      observed_history_days: 180,
+      v2_risk_score: '0.4200',
+      v2_components: {},
+      v2_weights: {},
+      source_fingerprint: 'fingerprint-v2',
+    });
+    fixture.detectChanges();
+
+    expect(component.displayRiskTotal()).toBe('0.4200');
+    expect(component.displayRiskVersion()).toBe('supplier-risk-v2');
+    expect(component.riskLevel()).toBe('medium');
+    expect(fixture.nativeElement.querySelector('app-scorecard-v2-panel')).not.toBeNull();
+  });
+
   it('should render source transaction counts', () => {
     const el: HTMLElement = fixture.nativeElement;
     expect(el.textContent).toContain('12'); // landed costs

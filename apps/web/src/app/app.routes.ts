@@ -120,6 +120,20 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'supplier-risk',
+        loadComponent: () =>
+          import('./features/supplier-risk/risk-queue/risk-queue.component').then(
+            (m) => m.RiskQueueComponent,
+          ),
+      },
+      {
+        path: 'negotiation-briefs/:id',
+        loadComponent: () =>
+          import('./features/supplier-risk/brief-detail/brief-detail.component').then(
+            (m) => m.BriefDetailComponent,
+          ),
+      },
+      {
         path: 'import',
         canActivate: [roleGuard('owner', 'buyer')],
         loadComponent: () =>

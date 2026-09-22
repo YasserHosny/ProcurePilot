@@ -14,6 +14,8 @@ from typing import Literal, Protocol, runtime_checkable
 
 from procurepilot_api.config import Settings, get_settings
 
+STUB_REFERENCE_DATE = date(2026, 9, 20)
+
 
 def _validate_decimal(value: Decimal, field_name: str) -> None:
     if not isinstance(value, Decimal) or not value.is_finite() or value < 0:
@@ -73,7 +75,12 @@ class RawBill:
     document_references: tuple[str, ...] = ()
     lines: tuple[RawBillLine, ...] = ()
 
+    due_date: date | None = None
+    remaining_balance: Decimal | None = None
+
     def __post_init__(self) -> None:
+        if self.remaining_balance is not None:
+            _validate_decimal(self.remaining_balance, "remaining_balance")
         _validate_decimal(self.amount, "amount")
         object.__setattr__(self, "currency", _validate_currency(self.currency, "currency"))
         object.__setattr__(
@@ -186,8 +193,12 @@ class StubConnector:
         bills: list[RawBill] | None = None,
         vendors: list[RawVendor] | None = None,
         company: CompanyInfo | None = None,
+        reference_date: date | None = None,
     ) -> None:
-        self._bills = list(bills) if bills is not None else self._default_bills()
+        self._reference_date = reference_date or STUB_REFERENCE_DATE
+        self._bills = (
+            list(bills) if bills is not None else self._default_bills(self._reference_date)
+        )
         self._vendors = list(vendors) if vendors is not None else self._default_vendors()
         self._company = company or CompanyInfo(
             realm_id="stub-realm-12345",
@@ -212,15 +223,16 @@ class StubConnector:
         ]
 
     @staticmethod
-    def _default_bills() -> list[RawBill]:
-        today = date.today()
+    def _default_bills(reference_date: date = STUB_REFERENCE_DATE) -> list[RawBill]:
         return [
             RawBill(
                 provider_bill_id="stub-bill-101",
                 provider_vendor_id="stub-vendor-001",
                 amount=Decimal("1250.00"),
                 currency="USD",
-                bill_date=today - timedelta(days=15),
+                bill_date=reference_date - timedelta(days=15),
+                due_date=reference_date + timedelta(days=15),
+                remaining_balance=Decimal("1250.00"),
                 status="open",
             ),
             RawBill(
@@ -228,7 +240,9 @@ class StubConnector:
                 provider_vendor_id="stub-vendor-002",
                 amount=Decimal("3450.50"),
                 currency="USD",
-                bill_date=today - timedelta(days=30),
+                bill_date=reference_date - timedelta(days=30),
+                due_date=reference_date,
+                remaining_balance=Decimal("0"),
                 status="paid",
             ),
             RawBill(
@@ -236,7 +250,9 @@ class StubConnector:
                 provider_vendor_id="stub-vendor-003",
                 amount=Decimal("890.25"),
                 currency="USD",
-                bill_date=today - timedelta(days=5),
+                bill_date=reference_date - timedelta(days=5),
+                due_date=reference_date + timedelta(days=25),
+                remaining_balance=Decimal("890.25"),
                 status="open",
             ),
         ]
@@ -303,4 +319,4 @@ def get_accounting_connector(
             realm_id=realm_id,
             access_token=access_token,
         )
-    return StubConnector()
+    return StubConnector(reference_date=date.today())

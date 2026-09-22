@@ -427,6 +427,8 @@ def test_list_bills_query_and_parsing() -> None:
     assert bills[0].amount == Decimal("1845.50")
     assert bills[0].currency == "USD"
     assert bills[0].bill_date == date(2026, 7, 1)
+    assert bills[0].due_date == date(2026, 7, 31)
+    assert bills[0].remaining_balance == Decimal("1845.50")
     assert bills[0].status == "open"
     assert bills[0].provider_status == "open"
     assert bills[0].provider_id == "901"
@@ -441,6 +443,7 @@ def test_list_bills_query_and_parsing() -> None:
     assert bills[1].amount == Decimal("6200.00")
     assert bills[1].currency == "USD"
     assert bills[1].bill_date == date(2026, 7, 15)
+    assert bills[1].remaining_balance == Decimal("0")
     assert bills[1].status == "paid"
 
     # Bill 3: Voided
@@ -553,3 +556,34 @@ def test_stub_connector_satisfies_protocol_and_filters_bills() -> None:
 
     future_bills = stub.list_bills(since=date(2099, 1, 1))
     assert len(future_bills) == 0
+
+
+@pytest.mark.parametrize("balance", [None, "0", "12.34", "-1", "NaN", "Infinity", "bad"])
+@pytest.mark.parametrize("due_field", ['DueDate', None])
+def test_payment_evidence(balance: str | None, due_field: str | None) -> None:
+    item = {"Id": "1", "TotalAmt": 20, "TxnDate": "2026-07-01"}
+    if balance is not None:
+        item["Balance"] = balance
+    if due_field is not None:
+        item[due_field] = "2026-07-31"
+    client = _make_client(httpx.MockTransport(
+        lambda _: httpx.Response(200, json={"QueryResponse": {"Bill": [item]}})
+    ))
+    if balance in {"-1", "NaN", "Infinity", "bad"}:
+        with pytest.raises(QuickBooksApiError):
+            client.list_bills(date(2026, 1, 1))
+    else:
+        bill = client.list_bills(date(2026, 1, 1))[0]
+        assert bill.due_date == (date(2026, 7, 31) if due_field else None)
+        assert bill.remaining_balance == (Decimal(balance) if balance is not None else None)
+
+
+def test_invalid_quickbooks_due_date_is_reported_as_api_error() -> None:
+    item = {"Id": "1", "TotalAmt": 20, "TxnDate": "2026-07-01", "DueDate": "bad"}
+    client = _make_client(
+        httpx.MockTransport(
+            lambda _: httpx.Response(200, json={"QueryResponse": {"Bill": [item]}})
+        )
+    )
+    with pytest.raises(QuickBooksApiError, match="Invalid due date"):
+        client.list_bills(date(2026, 1, 1))

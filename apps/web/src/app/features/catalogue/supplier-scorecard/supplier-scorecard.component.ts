@@ -20,6 +20,7 @@ import type {
   SupplierScorecard,
 } from '../../../core/api/models';
 import { FormatDatePipe } from '../../../core/format/date.pipe';
+import { ScorecardV2PanelComponent } from '../../supplier-risk/scorecard-v2-panel/scorecard-v2-panel.component';
 
 /**
  * Supplier Scorecard (R2.4 Supplier IQ, T028).
@@ -49,6 +50,7 @@ import { FormatDatePipe } from '../../../core/format/date.pipe';
     MatProgressSpinnerModule,
     TranslatePipe,
     FormatDatePipe,
+    ScorecardV2PanelComponent,
   ],
   template: `
     <main role="main" aria-labelledby="scorecard-heading" class="scorecard-page">
@@ -132,13 +134,13 @@ import { FormatDatePipe } from '../../../core/format/date.pipe';
             </mat-card-header>
             <mat-card-content>
               <div class="risk-metric-display">
-                <span class="risk-score-value">{{ formatRiskScore(riskScore()?.total) }}</span>
+                <span class="risk-score-value">{{ formatRiskScore(displayRiskTotal()) }}</span>
                 <span class="risk-level-badge" [ngClass]="riskLevel()">
                   {{ ('supplierIq.riskScore.' + riskLevel()) | translate }}
                 </span>
               </div>
-              <p class="risk-rule-version" *ngIf="riskScore()?.rule_version">
-                {{ riskScore()?.rule_version }}
+              <p class="risk-rule-version" *ngIf="displayRiskVersion()">
+                {{ displayRiskVersion() }}
               </p>
             </mat-card-content>
           </mat-card>
@@ -300,6 +302,11 @@ import { FormatDatePipe } from '../../../core/format/date.pipe';
             </dl>
           </mat-card>
         </section>
+
+        <app-scorecard-v2-panel
+          [scorecard]="scorecard()!"
+          [supplierId]="supplierId()"
+        />
 
         <!-- Scorecard Footer Metadata -->
         <footer class="scorecard-footer">
@@ -571,7 +578,19 @@ export class SupplierScorecardComponent implements OnInit {
 
   readonly riskScore = computed(() => this.scorecard()?.risk_score);
 
+  readonly displayRiskTotal = computed(
+    () => this.scorecard()?.v2_risk_score ?? this.scorecard()?.risk_score?.total,
+  );
+
+  readonly displayRiskVersion = computed(() =>
+    this.scorecard()?.snapshot_id
+      ? 'supplier-risk-v2'
+      : (this.scorecard()?.risk_score?.rule_version ?? null),
+  );
+
   readonly riskLevel = computed<'low' | 'medium' | 'high'>(() => {
+    const v2Level = this.scorecard()?.risk_level;
+    if (v2Level) return v2Level;
     const score = parseFloat(this.scorecard()?.risk_score?.total ?? '0');
     if (isNaN(score) || score < 0.30) return 'low';
     if (score < 0.70) return 'medium';

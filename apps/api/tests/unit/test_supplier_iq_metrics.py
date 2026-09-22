@@ -8,6 +8,7 @@ from procurepilot_api.modules.offers.supplier_iq import (
     SUPPLIER_RISK_RULE_VERSION,
     SUPPLIER_SCORECARD_RULE_VERSION,
     SupplierIqSourceData,
+    _attach_latest_v2,
     calculate_scorecard,
 )
 
@@ -70,6 +71,71 @@ def test_supplier_iq_sparse_evidence_is_explicit() -> None:
     assert scorecard.metrics["fulfilment_rate"].insufficient_evidence
     assert scorecard.metrics["quality_score"].value is None
     assert scorecard.metrics["savings_contribution"].insufficient_evidence
+
+
+def test_v1_scorecard_attaches_latest_v2_detail_without_losing_compatibility() -> None:
+    now = datetime(2026, 9, 20, 12, tzinfo=UTC)
+    supplier_id = uuid4()
+    scorecard = calculate_scorecard(
+        supplier_id=supplier_id,
+        window_start=date(2026, 3, 24),
+        window_end=date(2026, 9, 20),
+        computed_at=now,
+        source_data=_source_data(now),
+    )
+    snapshot_id = uuid4()
+    source_id = uuid4()
+    enriched = _attach_latest_v2(
+        scorecard,
+        {
+            "snapshot_id": snapshot_id,
+            "state": "provisional",
+            "risk_level": "medium",
+            "release_posture": "g3_unmet",
+            "valid_from": now,
+            "valid_until": now + timedelta(days=1),
+            "observed_history_days": 180,
+            "v2_risk_score": "0.4200",
+            "v2_components": {
+                "concentration": {
+                    "value": "0.4200",
+                    "risk": "0.4200",
+                    "sample_count": 3,
+                    "product_count": 0,
+                    "confidence": "medium",
+                    "insufficient_evidence": False,
+                    "excluded_counts": {"cancelled": 1},
+                    "source_ids": [source_id],
+                    "source_refs": [
+                        {"source_id": source_id, "source_kind": "purchase_order"}
+                    ],
+                    "window_start": date(2026, 3, 24),
+                    "split_date": date(2026, 6, 22),
+                    "window_end": date(2026, 9, 20),
+                    "calculation_version": "supplier-risk-v2",
+                    "currency_buckets": [
+                        {
+                            "currency": "GBP",
+                            "supplier_spend": "420.0000",
+                            "tenant_spend": "1000.0000",
+                            "sample_count": 3,
+                            "share": "0.4200",
+                            "source_ids": [source_id],
+                        }
+                    ],
+                }
+            },
+            "v2_weights": {"concentration": "1.0000"},
+            "source_fingerprint": "v2-fingerprint",
+        },
+    )
+
+    assert enriched.metrics == scorecard.metrics
+    assert enriched.risk_score == scorecard.risk_score
+    assert enriched.snapshot_id == snapshot_id
+    assert enriched.v2_risk_score == Decimal("0.4200")
+    assert enriched.v2_components["concentration"].excluded_counts == {"cancelled": 1}
+    assert enriched.v2_components["concentration"].currency_buckets[0].currency == "GBP"
 
 
 def test_supplier_iq_risk_score_is_rule_versioned_and_replayable() -> None:
