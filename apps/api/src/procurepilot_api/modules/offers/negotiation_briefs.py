@@ -477,7 +477,7 @@ def _brief_bills(conn: psycopg.Connection, supplier_id: UUID) -> tuple[BriefBill
     with conn.cursor(row_factory=dict_row) as cur:
         cur.execute(
             """
-            select id, status::text, due_date, remaining_balance_amount,
+            select id, provider_status::text as status, due_date, remaining_balance_amount,
                    remaining_balance_currency
             from synced_bill
             where matched_supplier_id = %s
@@ -618,7 +618,7 @@ def _evidence_ids(
     cur.execute(
         """
         select id from supplier_scorecard_evidence
-        where (%s is null or metric_id = %s) and (
+        where (%s::uuid is null or metric_id = %s) and (
           purchase_order_id = any(%s::uuid[]) or delivery_receipt_id = any(%s::uuid[])
           or landed_cost_id = any(%s::uuid[]) or workspace_product_id = any(%s::uuid[])
           or synced_bill_id = any(%s::uuid[])

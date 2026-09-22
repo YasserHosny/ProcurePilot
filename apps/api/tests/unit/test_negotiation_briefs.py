@@ -6,7 +6,9 @@ from procurepilot_api.modules.offers.negotiation_briefs import (
     BriefBill,
     BriefContext,
     NegotiationBriefService,
+    _brief_bills,
     _brief_evidence_refs,
+    _evidence_ids,
 )
 from procurepilot_api.modules.offers.supplier_iq_v2 import (
     Alternative,
@@ -164,3 +166,59 @@ def test_brief_evidence_refs_preserve_typed_source_targets() -> None:
     assert refs[0].evidence_id == evidence_id
     assert refs[0].source_kind == "purchase_order"
     assert refs[0].source_id == order_id
+
+
+def test_brief_bills_reads_the_accounting_provider_status_column() -> None:
+    bill_id = UUID(int=9000)
+
+    class FakeCursor:
+        def __enter__(self) -> "FakeCursor":
+            return self
+
+        def __exit__(self, *_args: object) -> None:
+            return None
+
+        def execute(self, query: str, params: tuple[UUID]) -> None:
+            assert "provider_status::text as status" in query
+            assert params == (S,)
+
+        def fetchall(self) -> list[dict[str, object]]:
+            return [
+                {
+                    "id": bill_id,
+                    "status": "open",
+                    "due_date": END,
+                    "remaining_balance_amount": Decimal("25.00"),
+                    "remaining_balance_currency": "GBP",
+                }
+            ]
+
+    class FakeConnection:
+        def cursor(self, **_kwargs: object) -> FakeCursor:
+            return FakeCursor()
+
+    bills = _brief_bills(FakeConnection(), S)  # type: ignore[arg-type]
+
+    assert bills == (BriefBill(bill_id, "open", END, Decimal("25.00"), "GBP"),)
+
+
+def test_evidence_lookup_types_a_missing_metric_id_as_uuid() -> None:
+    source_id = UUID(int=9100)
+
+    class FakeCursor:
+        def execute(self, query: str, params: tuple[object, ...]) -> None:
+            assert "%s::uuid is null" in query
+            assert params == (
+                None,
+                None,
+                [source_id],
+                [source_id],
+                [source_id],
+                [source_id],
+                [source_id],
+            )
+
+        def fetchall(self) -> list[tuple[UUID]]:
+            return []
+
+    assert _evidence_ids(FakeCursor(), None, (source_id,)) == ()  # type: ignore[arg-type]

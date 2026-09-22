@@ -2639,3 +2639,75 @@ unmet. Every returned proposal exposes `release_posture = "g3_unmet"` and its ev
 - Marks the proposal prepared and returns the linked request ID.
 - Never creates, submits, approves, or sends a purchase order.
 - Cross-tenant or unknown proposal IDs return the standard `404 not_found` envelope.
+
+---
+
+## R4.1 Supplier Risk and Negotiation Briefs
+
+R4.1 evolves the existing Supplier IQ scorecard into a normalized, evidence-linked v2 risk
+model. It proceeds under the recorded G3 exception: every v2 snapshot and brief returns
+`release_posture = "g3_unmet"`, remains advisory, and cannot contact a supplier or mutate a
+purchase request or purchase order.
+
+All reads are available to active tenant members. Mutations require an owner or buyer and a UUID
+`Idempotency-Key`; a missing key returns the standard validation envelope. Tenant identity comes
+only from the verified JWT. Unknown and cross-tenant identifiers both return `404 not_found`.
+
+### `GET /suppliers/{supplier_id}/scorecard` (R4.1 extension)
+
+- Preserves all v1 fields and historical v1 rows.
+- When a persisted v2 snapshot exists, also returns `snapshot_id`, `state`, `risk_level`,
+  `release_posture`, validity, observed history, v2 score, effective weights, four component
+  calculations, exclusion counts, currency buckets, source references, and source fingerprint.
+- The read never recomputes or persists risk.
+
+### `POST /supplier-iq/recompute`
+
+- Owner or buyer only; requires `Idempotency-Key`.
+- Recomputes every active visible supplier using the fixed 180-day evidence window and persists
+  the snapshot header, normalized metrics, and typed evidence links atomically.
+- Returns `generated_snapshots` and `release_posture`. Replaying a key returns the original
+  result; an unchanged source fingerprint creates no duplicate snapshot.
+
+### `GET /supplier-iq/risks`
+
+- Returns the latest v2 snapshot per supplier, ordered newest first.
+- Cursor pagination defaults to 50 and is capped at 100.
+- Each item includes supplier name, score and risk level, state, confidence, component values and
+  weights, validity, observed history, fingerprint, and G3 posture.
+
+### `POST /suppliers/{supplier_id}/negotiation-briefs`
+
+- Owner or buyer only; requires `Idempotency-Key`.
+- Creates or replays one immutable `negotiation-brief-v1` per supplier, latest valid v2 snapshot,
+  and brief version. Expired or insufficient snapshots cannot create a brief.
+- Returns ranked deterministic items, calculations, explicit money currencies, validity,
+  confidence, risk, localized question key, and typed evidence references.
+
+### `GET /negotiation-briefs`
+
+- Returns cursor-paginated briefs for the JWT tenant, newest first; default 50, maximum 100.
+- Brief status is derived from the latest append-only action and is `prepared`, `acknowledged`, or
+  `dismissed`.
+
+### `GET /negotiation-briefs/{brief_id}`
+
+- Returns the immutable brief header, ranked items, and typed evidence source targets.
+- Unknown and cross-tenant IDs return `404 not_found`.
+
+### `POST /negotiation-briefs/{brief_id}/acknowledge`
+
+- Owner or buyer only; requires `Idempotency-Key`.
+- Appends an `acknowledged` decision and audit event. Replay is idempotent and never changes the
+  brief or a purchasing record.
+
+### `POST /negotiation-briefs/{brief_id}/dismiss`
+
+- Owner or buyer only; requires `Idempotency-Key` and `{ "reason": "..." }` (1-1000 characters).
+- Appends a `dismissed` decision and audit event. The brief remains immutable.
+
+Risk uses decimal arithmetic and versioned formulas: concentration 30%, price drift 25%,
+reliability 25%, and single-source exposure 20%. Exactly three available components are
+renormalized; fewer than three suppress the total. Risk bands are low below 0.35, medium from
+0.35 to below 0.65, and high from 0.65. Currency amounts are bucketed and never summed or
+converted across currencies.
