@@ -21,8 +21,8 @@ implementation and testing of each story.
 
 **Purpose**: Project skeleton, no behavior yet.
 
-- [ ] T001 Create the `analyst` module skeleton: `apps/api/src/procurepilot_api/modules/analyst/__init__.py`
-- [ ] T002 [P] Create the Angular analyst feature directory skeleton at `apps/web/src/app/features/analyst/`
+- [x] T001 Create the `analyst` module skeleton: `apps/api/src/procurepilot_api/modules/analyst/__init__.py`
+- [x] T002 [P] Create the Angular analyst feature directory skeleton at `apps/web/src/app/features/analyst/`
 
 ---
 
@@ -32,20 +32,20 @@ implementation and testing of each story.
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete.
 
-- [ ] T003 Write failing isolation fixtures for two tenants, one conversation, one turn, one
+- [x] T003 Write failing isolation fixtures for two tenants, one conversation, one turn, one
       citation each in `apps/api/tests/integration/test_analyst_isolation.py`
-- [ ] T004 Add migration `supabase/migrations/20260924000001_analyst_conversations.sql`:
+- [x] T004 Add migration `supabase/migrations/20260924000001_analyst_conversations.sql`:
       `analyst_conversation`, `analyst_turn` (append-only — no `UPDATE` grant), and
       `analyst_turn_citation` (exactly one typed tenant-pinned source reference per row,
       mirroring `supplier_scorecard_evidence`), each with composite tenant foreign keys, forced
       RLS, and `USING`/`WITH CHECK` policies scoped to the creating member plus owner/buyer
       read-all (FR-009)
-- [ ] T005 Run the isolation test (T003) against the new migration and verify cross-tenant reads
+- [x] T005 Run the isolation test (T003) against the new migration and verify cross-tenant reads
       and a non-owner member's attempt to list another member's conversations both return no rows
-- [ ] T006 [P] Define `AnalystConversation`/`AnalystTurn`/`AnalystCitation` Pydantic schemas in
+- [x] T006 [P] Define `AnalystConversation`/`AnalystTurn`/`AnalystCitation` Pydantic schemas in
       `apps/api/src/procurepilot_api/modules/analyst/schemas.py`, including the
       `release_posture = g3_unmet` field on every turn response
-- [ ] T007 [P] Write failing unit tests for each FR-002 retrieval category (spend/savings,
+- [x] T007 [P] Write failing unit tests for each FR-002 retrieval category (spend/savings,
       supplier performance/risk, orders/quotations, reorder forecasts) in
       `apps/api/tests/unit/test_analyst_retrieval.py` — cover a normal cited answer, zero
       grounding data (must say so explicitly), conflicting records (must surface both),
@@ -53,7 +53,7 @@ implementation and testing of each story.
       supplier/product ID that belongs to a *different* tenant (FR-007 — must resolve to "no
       grounding data," never a leak), and a replay-determinism case (Constitution Principle
       II — identical inputs at the same calculation version produce a bit-identical result)
-- [ ] T008 Implement one pure retrieval-and-calculation function per category in
+- [x] T008 Implement one pure retrieval-and-calculation function per category in
       `apps/api/src/procurepilot_api/modules/analyst/retrieval.py`, pinning
       `calculation_version = "analyst-retrieval-v1"` on every answer, and scoping every internal
       lookup by both the resolved entities *and* the caller's tenant so a cross-tenant reference
