@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { credentials } from './support/api';
+import { credentials, setOwnerLocale } from './support/api';
 
 async function signInUi(page: Page): Promise<void> {
   const creds = credentials();
@@ -14,6 +14,9 @@ async function signInUi(page: Page): Promise<void> {
 
 test.describe('Catalogue refresh review (R3.4)', () => {
   test('loads the tenant-scoped review queue and preserves preview fields', async ({ page }) => {
+    // The shared owner account's locale is persisted server-side, so an Arabic-switching spec
+    // that runs earlier in the suite leaks into this English-only assertion unless reset here.
+    await setOwnerLocale('en');
     await signInUi(page);
     await page.goto('/matching?status=all');
     await expect(page.locator('.page-title')).toContainText('Match Resolution Queue');

@@ -60,7 +60,7 @@ test.describe('POS & Inventory Integration (015-pos-inventory-integration, T036)
 
     await signInUi(page, creds.ownerEmail, creds.ownerPassword);
     await page.goto('/pos');
-    await expect(page.locator('.page-title')).toContainText('POS & Inventory Integration');
+    await expect(page.locator('.page-title')).toContainText('Point of Sale & Inventory Integration');
     await expect(page.locator('[data-testid="empty-connection-card"]')).toBeVisible();
 
     await page.route('**/oauth2/authorize**', async (route) => {
