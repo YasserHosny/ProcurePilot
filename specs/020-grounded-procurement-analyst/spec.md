@@ -35,6 +35,10 @@ records and calculation behind it, so I can trust the number enough to act on it
    tenant's existence or data.
 4. Given a question outside the supported categories (see FR-002), when it is submitted, then the
    response says so explicitly and does not attempt a partial or approximate answer.
+5. Given an answer about a supplier with elevated risk, a low-stock forecast, or spend the member
+   might want to review further, when the answer is shown, then it includes a link to the existing
+   screen where that follow-up action already lives (negotiation brief, reorder queue, report) —
+   never a new action invented for the analyst itself.
 
 ### US2 - Inspect the evidence behind an answer (P1)
 
@@ -104,6 +108,14 @@ revisit a number I looked up earlier without re-asking it.
 - **FR-003**: Every answer MUST cite at least one typed, tenant-pinned source record (purchase
   order, quotation line, landed cost, saving record, supplier scorecard/risk snapshot, delivery
   receipt, or reorder proposal) that a member can open and independently verify.
+- **FR-003A**: When an answer concerns an entity that already has an executable next step
+  elsewhere in the product, the answer MUST surface that as a deep link — a risky supplier links
+  to negotiation-brief preparation, a forecast or low-stock question links to the reorder queue,
+  a savings/spend question links to the relevant report. This links to *existing* actionable
+  surfaces only; it never creates a new action capability, and it never bypasses the human
+  authorisation those surfaces already require. Constitution Principle IV requires every insight
+  surface to carry an executable next step — this is how R4.2 satisfies that without violating
+  Principle III's no-autonomous-purchasing rule.
 - **FR-004**: Every answer involving a number (a sum, an average, a rate, a trend, a comparison)
   MUST show the calculation: the exact records included, the formula applied, and the result —
   using the same `Decimal` arithmetic and explicit currency handling as R4.0/R4.1. No currency
@@ -147,7 +159,7 @@ revisit a number I looked up earlier without re-asking it.
   creation timestamp and belongs to exactly one member.
 - **AnalystTurn**: One question and its answer within a conversation. Immutable once created.
   Holds the member's question text, the resolved category and entities, the generated answer
-  text, and its citations.
+  text, its citations, and an optional deep link to an existing actionable surface (FR-003A).
 - **AnalystCitation**: A typed, tenant-pinned link from a turn to exactly one source record
   (purchase order, quotation line, landed cost, saving record, scorecard/risk snapshot, delivery
   receipt, or reorder proposal), mirroring the existing evidence-reference pattern from R4.1.
@@ -168,6 +180,9 @@ revisit a number I looked up earlier without re-asking it.
   member repeating the full original question, in automated conversation-flow tests.
 - **SC-006**: Full API tests, Angular tests, production build, migration verification, and
   physical API consumption pass while G3 remains recorded as unmet.
+- **SC-007**: Every answer about an entity with an existing actionable surface (a risky supplier,
+  a low-stock forecast, a spend/savings question with a matching report) includes a deep link to
+  that surface, verified by an automated test per category.
 
 ## Out of scope
 

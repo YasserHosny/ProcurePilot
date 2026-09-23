@@ -43,3 +43,12 @@
   question answering, consistent with every prior R4.x release shipping a tightly scoped slice
   first. This is the single most consequential scope decision in this spec and should be the
   first thing reviewed before approving planning.
+- **2026-09-24 — `/speckit.analyze` remediation applied.** The initial draft was pure read-only
+  Q&A with no tie to Constitution Principle IV ("every insight surface MUST carry an executable
+  next step"). Added FR-003A: an answer about an entity with an existing actionable surface (a
+  risky supplier, a low-stock forecast, a spend/savings question) must include a deep link to that
+  *existing* surface — never a new action capability, never bypassing human authorisation. Also
+  closed a coverage gap on FR-007 (cross-tenant/unknown-identifier grounding had no task or test)
+  and added smaller fixes: an explicit `pnpm test:a11y` gate, an adversarial test for FR-005, an
+  audit-event assertion for FR-012, a resolved release-evidence filename, and a replay-determinism
+  assertion. See `plan.md` and `tasks.md` for where each landed.
