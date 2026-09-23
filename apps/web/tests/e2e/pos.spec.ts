@@ -85,7 +85,7 @@ test.describe('POS & Inventory Integration (015-pos-inventory-integration, T036)
 
     await page.locator('[data-testid="view-signals-btn"]').click();
     await page.waitForURL('**/pos/signals');
-    await expect(page.locator('.page-title')).toContainText('POS Usage Signals');
+    await expect(page.locator('.page-title')).toContainText('Synced Product Signals');
 
     const syncResponse = page.waitForResponse(
       (res) => res.url().includes('/pos/sync') && res.request().method() === 'POST',
