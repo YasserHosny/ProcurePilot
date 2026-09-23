@@ -3,10 +3,9 @@
 from __future__ import annotations
 
 from datetime import UTC, date, datetime, timedelta
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 from uuid import uuid4
 
-import pytest
 from fastapi.testclient import TestClient
 
 from procurepilot_api.deps import CurrentMember, bearer_token, current_member

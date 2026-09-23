@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import UTC, date, datetime, timedelta
-from decimal import Decimal
+from datetime import date, timedelta
 from uuid import UUID, uuid4
 
 import psycopg
@@ -79,7 +78,8 @@ def _insert_proposal(
     proposal_id = uuid4()
     cur.execute(
         """
-        insert into reorder_proposal (id, tenant_id, demand_forecast_id, workspace_product_id, status)
+        insert into reorder_proposal
+          (id, tenant_id, demand_forecast_id, workspace_product_id, status)
         values (%s, %s, %s, %s, 'open')
         """,
         (proposal_id, workspace.tenant_id, forecast_id, product_id),
