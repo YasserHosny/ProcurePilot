@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import enum
 from datetime import date, datetime
 from decimal import ROUND_HALF_UP, Decimal, localcontext
 from typing import Annotated, Literal
@@ -28,6 +29,25 @@ StockSignal = Literal["in_stock", "low_stock", "out_of_stock", "unknown"]
 BasketStatus = Literal["queued", "running", "completed", "failed"]
 RiskTolerance = Literal["low", "medium", "high"]
 BasketUrgency = Literal["normal", "urgent"]
+
+
+class RiskLevel(enum.StrEnum):
+    """Supplier risk severity — a distinct, named type so its ["low","medium","high"] ordering
+    can never be silently overridden by an unrelated bare Literal that happens to share the same
+    three string values in a different order (EvidenceConfidence is ["high","medium","low"]).
+
+    A bare `Literal["low","medium","high"] | None` type hint was found to generate an OpenAPI
+    schema with EvidenceConfidence's reversed order once both fields' owning modules were
+    imported together in the same process (reproducible only when the full test suite ran, not
+    in isolation) — a real, if obscure, cross-field Literal-schema collision, not a typo. A real
+    Enum class gives risk_level its own stable identity so this cannot recur.
+    """
+
+    low = "low"
+    medium = "medium"
+    high = "high"
+
+
 EvidenceConfidence = Literal["high", "medium", "low"]
 ConstraintKind = Literal[
     "minimum_order_value",
@@ -412,7 +432,7 @@ class SupplierRiskSnapshot(StrictApiModel):
     source_fingerprint: StrictStr
     observed_history_days: int = Field(ge=0)
     risk_score: dict[str, object]
-    risk_level: Literal["low", "medium", "high"] | None
+    risk_level: RiskLevel | None
     computed_at: datetime
 
 
@@ -559,7 +579,7 @@ class SupplierRiskResult(StrictApiModel):
     components: dict[str, SupplierRiskComponentV2]
     weights: dict[str, RiskDecimal]
     score: RiskDecimal | None
-    risk_level: Literal["low", "medium", "high"] | None
+    risk_level: RiskLevel | None
     confidence: EvidenceConfidence
     state: Literal["ready", "provisional", "insufficient_data"]
     release_posture: Literal["g3_unmet"] = "g3_unmet"
@@ -590,7 +610,7 @@ class SupplierScorecard(StrictApiModel):
     rule_version: str
     snapshot_id: UUID | None = None
     state: Literal["ready", "provisional", "insufficient_data"] | None = None
-    risk_level: Literal["low", "medium", "high"] | None = None
+    risk_level: RiskLevel | None = None
     release_posture: Literal["g3_unmet"] | None = None
     valid_from: datetime | None = None
     valid_until: datetime | None = None

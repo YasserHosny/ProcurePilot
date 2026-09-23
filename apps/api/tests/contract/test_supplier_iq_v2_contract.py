@@ -47,7 +47,14 @@ def test_supplier_risk_queue_contract_includes_scan_fields() -> None:
     assert {"supplier_name", "risk_level"} <= set(snapshot["required"])
     assert snapshot["properties"]["supplier_name"]["type"] == "string"
     risk_level = snapshot["properties"]["risk_level"]["anyOf"]
-    assert ["low", "medium", "high"] in [item.get("enum") for item in risk_level]
+    # risk_level is a real Enum (RiskLevel), not a bare Literal, specifically so its ordering
+    # can't be silently collapsed with an unrelated same-valued Literal (EvidenceConfidence is
+    # the reverse order) — see schemas.py's own RiskLevel docstring. That means its schema entry
+    # is a named $ref, not an inline enum list; resolve it before checking the documented order.
+    refs = [item["$ref"] for item in risk_level if "$ref" in item]
+    assert refs, f"expected risk_level to reference a named component schema, got {risk_level!r}"
+    risk_level_schema = schemas[refs[0].rsplit("/", 1)[-1]]
+    assert risk_level_schema["enum"] == ["low", "medium", "high"]
 
 
 def test_supplier_scorecard_contract_preserves_v1_and_adds_v2_detail() -> None:

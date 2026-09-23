@@ -63,7 +63,15 @@ def make_workspace(cur: psycopg.Cursor, label: str, *, role: str = "owner") -> W
     cur.execute(
         "insert into tenant (id,name,slug,region,currency,tax_model,platform_invitation_id) "
         "values (%s,%s,%s,'GB','GBP','uk_vat',%s)",
-        (tenant_id, f"{label} Ltd", f"{label}-{tenant_id.hex[:8]}", invitation_id),
+        (
+            tenant_id,
+            f"{label} Ltd",
+            # tenant.slug's own check constraint requires lowercase — the display name above
+            # keeps the caller's original casing, but the slug must not, regardless of what
+            # casing a caller passes (e.g. test_forecasting_isolation.py's "IsoForecastA").
+            f"{label.lower()}-{tenant_id.hex[:8]}",
+            invitation_id,
+        ),
     )
     cur.execute(
         "insert into membership (id,tenant_id,user_id,email,role,is_active_workspace) "
