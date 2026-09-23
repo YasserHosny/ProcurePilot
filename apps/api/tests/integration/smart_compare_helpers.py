@@ -126,6 +126,7 @@ def add_costed_offer(
     recorded_at: datetime | None = None,
     confidence: Decimal = Decimal("0.9500"),
     quantity: Decimal = Decimal("1.000000"),
+    product_id: UUID | None = None,
 ) -> CostedOffer:
     if not TEST_DATABASE_URL:
         raise RuntimeError("TEST_DATABASE_URL is required")
@@ -157,7 +158,7 @@ def add_costed_offer(
                     decision_id,
                     context.workspace.tenant_id,
                     line_id,
-                    context.product_id,
+                    product_id or context.product_id,
                     confidence,
                 ),
             )

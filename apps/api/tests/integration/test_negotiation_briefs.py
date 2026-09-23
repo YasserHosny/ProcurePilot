@@ -9,7 +9,7 @@ from uuid import uuid4
 import psycopg
 import pytest
 
-from integration.catalogue_helpers import TEST_DATABASE_URL, act_as
+from integration.catalogue_helpers import TEST_DATABASE_URL, act_as, make_workspace_product
 from integration.smart_compare_helpers import (
     add_costed_offer,
     committed_smart_context,
@@ -29,15 +29,30 @@ def test_prepare_is_idempotent_and_actions_are_append_only(
 ) -> None:
     settings = settings_for_test_db(monkeypatch)
     with committed_smart_context("negotiation-brief", supplier_count=2) as context:
+        product_ids = [context.product_id, *_seed_extra_products(context, count=2)]
         for supplier_id in context.supplier_ids:
-            for amount in ("10.0000", "11.0000", "12.0000"):
+            for index, product_id in enumerate(product_ids):
+                # price_drift and single_source (supplier_iq_v2.py) both require signal
+                # across >= 3 distinct products before they'll report a risk value — a
+                # single repriced product isn't enough evidence, by design (see
+                # _component()'s and _prices()'s own >= 3 sample/product gates). A
+                # baseline price (before the window's split date) paired with a current
+                # price (after it), for each of >= 3 products, is what clears that gate.
                 add_costed_offer(
                     context,
                     supplier_id=supplier_id,
-                    amount=Decimal(amount),
+                    product_id=product_id,
+                    amount=Decimal("10.0000") + index,
+                    recorded_at=datetime.now(UTC) - timedelta(days=120),
+                )
+                add_costed_offer(
+                    context,
+                    supplier_id=supplier_id,
+                    product_id=product_id,
+                    amount=Decimal("11.0000") + index,
                     recorded_at=datetime.now(UTC) - timedelta(days=1),
                 )
-        _seed_orders(context)
+        _seed_orders(context, product_ids)
         SupplierIqService(settings).recompute_all(member=context.member, idempotency_key=uuid4())
 
         service = NegotiationBriefService(settings)
@@ -110,7 +125,20 @@ def test_prepare_is_idempotent_and_actions_are_append_only(
         assert action_count == 2
 
 
-def _seed_orders(context: object) -> None:
+def _seed_extra_products(context: object, *, count: int) -> list:
+    with psycopg.connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
+        with conn.cursor() as cur:
+            product_ids = [
+                make_workspace_product(
+                    cur, context.workspace, name=f"{context.workspace.label} Product {index}"
+                )
+                for index in range(1, count + 1)
+            ]
+        conn.commit()
+    return product_ids
+
+
+def _seed_orders(context: object, product_ids: list) -> None:
     from datetime import date
 
     with psycopg.connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
@@ -156,7 +184,7 @@ def _seed_orders(context: object) -> None:
                             line_id,
                             context.workspace.tenant_id,
                             order_id,
-                            context.product_id,
+                            product_ids[order_index % len(product_ids)],
                         ),
                     )
         conn.commit()
