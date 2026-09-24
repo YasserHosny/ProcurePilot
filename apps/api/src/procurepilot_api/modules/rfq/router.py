@@ -9,9 +9,16 @@ from fastapi import APIRouter, Body, Depends, Header, Request, status
 from pydantic import BaseModel
 
 from procurepilot_api.config import get_settings
-from procurepilot_api.deps import CurrentMember, current_member
+from procurepilot_api.deps import CurrentMember, bearer_token, current_member
 from procurepilot_api.errors import UnprocessableEntityError
-from procurepilot_api.modules.rfq.schemas import Rfq, RfqLine, RfqRecipient
+from procurepilot_api.modules.rfq.schemas import (
+    PrepareRequestInput,
+    PrepareRequestResponse,
+    Rfq,
+    RfqLine,
+    RfqRecipient,
+    RfqResponseComparisonList,
+)
 from procurepilot_api.modules.rfq.service import RfqService, get_rfq_service
 from procurepilot_api.shared.rate_limit import mutation_limiter
 
@@ -107,3 +114,51 @@ def send_rfq(
         idempotency_key=idempotency_key,
     )
     return RfqSendResponse(rfq=rfq, recipients=recipients)
+
+
+@router.get(
+    "/{rfq_id}/responses",
+    status_code=status.HTTP_200_OK,
+    response_model=RfqResponseComparisonList,
+    operation_id="listRfqResponses",
+)
+def list_responses(
+    rfq_id: uuid.UUID,
+    member: Annotated[CurrentMember, Depends(current_member)],
+    service: Annotated[RfqService, Depends(get_rfq_service)],
+) -> RfqResponseComparisonList:
+    return service.list_responses(
+        member=member,
+        rfq_id=rfq_id,
+    )
+
+
+@router.post(
+    "/{rfq_id}/prepare-request",
+    status_code=status.HTTP_201_CREATED,
+    response_model=PrepareRequestResponse,
+    operation_id="prepareRequestFromRfq",
+)
+@mutation_limiter.limit(_rfq_create_limit)
+def prepare_request(
+    request: Request,
+    rfq_id: uuid.UUID,
+    payload: Annotated[PrepareRequestInput, Body()],
+    token: Annotated[str, Depends(bearer_token)],
+    member: Annotated[CurrentMember, Depends(current_member)],
+    service: Annotated[RfqService, Depends(get_rfq_service)],
+    idempotency_key: Annotated[uuid.UUID | None, Header(alias="Idempotency-Key")] = None,
+) -> PrepareRequestResponse:
+    if idempotency_key is None:
+        raise UnprocessableEntityError(details={"header": "Idempotency-Key is required"})
+
+    return service.prepare_request(
+        bearer_token=token,
+        member=member,
+        rfq_id=rfq_id,
+        rfq_response_id=payload.rfq_response_id,
+        branch_id=payload.branch_id,
+        cost_centre_id=payload.cost_centre_id,
+        required_by_date=payload.required_by_date,
+        idempotency_key=idempotency_key,
+    )

@@ -80,3 +80,38 @@ class AutoPreparationEvent(BaseModel):
     rfq_response_id: UUID
     purchase_request_id: UUID | None = None
     created_at: datetime
+
+
+class RfqResponseLineComparison(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    workspace_product_id: UUID | None
+    quoted_quantity: Decimal
+    quoted_unit_price_amount: Decimal
+    quoted_unit_price_currency: str
+    pending_match: bool
+
+
+class RfqResponseComparison(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    rfq_id: UUID
+    supplier_id: UUID
+    submitted_at: datetime
+    lines: list[RfqResponseLineComparison]
+
+
+class RfqResponseComparisonList(BaseModel):
+    items: list[RfqResponseComparison]
+
+
+class PrepareRequestInput(BaseModel):
+    rfq_response_id: UUID
+    branch_id: UUID
+    cost_centre_id: UUID | None = None
+    required_by_date: date
+
+
+class PrepareRequestResponse(BaseModel):
+    purchase_request_id: UUID

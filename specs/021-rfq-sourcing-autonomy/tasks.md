@@ -166,7 +166,7 @@ approval queue exactly like any other purchase request.
 
 ### Tests for User Story 3
 
-- [ ] T025 [P] [US3] Real-Postgres integration tests in
+- [x] T025 [P] [US3] Real-Postgres integration tests in
       `apps/api/tests/integration/test_rfq_service_e2e.py` (mirror
       `test_analyst_service_e2e.py`'s pattern — mocked tests miss real schema/RLS bugs, proven
       repeatedly this program): both responses to one RFQ appear in `list_responses()`; preparing
@@ -177,14 +177,14 @@ approval queue exactly like any other purchase request.
 
 ### Implementation for User Story 3
 
-- [ ] T026 [US3] Implement `RfqService.list_responses()` in
+- [x] T026 [US3] Implement `RfqService.list_responses()` in
       `apps/api/src/procurepilot_api/modules/rfq/service.py`
-- [ ] T027 [US3] Implement `RfqService.prepare_request()` — calls
+- [x] T027 [US3] Implement `RfqService.prepare_request()` — calls
       `RequestsService.create_request()` exactly as `forecasting/service.py`'s
       `prepare_request()` already does for reorder proposals (read that function first); the new
       `purchase_request_line`'s `estimated_unit_price_amount/currency` comes from the winning
       response's quoted price, not landed cost — do not silently fall back
-- [ ] T028 [US3] Add router endpoints `GET /rfq/{id}/responses` and
+- [x] T028 [US3] Add router endpoints `GET /rfq/{id}/responses` and
       `POST /rfq/{id}/prepare-request`
 - [ ] T029 [P] [US3] Write a failing component test for the comparison view in
       `apps/web/src/app/features/rfq/compare/compare.component.spec.ts` — reuses the existing

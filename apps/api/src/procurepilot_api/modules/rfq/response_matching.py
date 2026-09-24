@@ -10,6 +10,7 @@ class OpenRfqRecipientRow(TypedDict):
     rfq_id: UUID
     supplier_id: UUID
 
+
 def match_rfq_response(
     *,
     in_reply_to: str | None,
@@ -23,12 +24,12 @@ def match_rfq_response(
     thread_ids = {m for m in [in_reply_to, *references] if m}
     if not thread_ids:
         return None
-        
+
     for recipient in open_recipients:
         outbound_msg_id = recipient["outbound_message_id"]
         if outbound_msg_id:
             cleaned_outbound = outbound_msg_id.strip("<>")
             if cleaned_outbound in thread_ids:
                 return recipient["id"]
-            
+
     return None
