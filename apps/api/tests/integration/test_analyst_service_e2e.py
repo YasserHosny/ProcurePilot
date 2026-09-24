@@ -24,6 +24,7 @@ import pytest
 
 from procurepilot_api.config import get_settings
 from procurepilot_api.deps import CurrentMember
+from procurepilot_api.errors import NotFoundError
 from procurepilot_api.modules.analyst.intent import FakeIntentProvider
 from procurepilot_api.modules.analyst.service import AnalystService
 from procurepilot_api.modules.auth.jwt import MemberRole
@@ -461,3 +462,167 @@ def test_next_step_link_is_absent_for_orders_quotations_answers() -> None:
     assert turn.next_step_url is None, (
         "FR-003A names no existing surface for orders_quotations — never invent one"
     )
+
+
+# ---------------------------------------------------------------------------
+# Phase 5 (T027, FR-008, US3): follow-up questions in context
+# ---------------------------------------------------------------------------
+
+
+def test_follow_up_turn_inherits_prior_context_and_appends_to_same_conversation() -> None:
+    with psycopg.connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
+        with conn.cursor() as cur:
+            tenant_id, user_id, membership_id = _seed_workspace_with_spend(cur)
+        conn.commit()
+
+    member = _member(tenant_id, user_id, membership_id)
+    service = AnalystService(settings=get_settings(), intent_provider=FakeIntentProvider())
+
+    first = service.ask(
+        member=member,
+        question_text="How much have we spent this month?",
+        idempotency_key=uuid4(),
+        bearer_token="unused-in-this-path",
+    )
+    assert len(first.turns) == 1
+    assert first.turns[0].category.value == "spend_savings"
+
+    follow_up = service.ask(
+        member=member,
+        question_text="and last quarter?",
+        idempotency_key=uuid4(),
+        bearer_token="unused-in-this-path",
+        conversation_id=first.id,
+    )
+    assert follow_up.id == first.id, "a follow-up must append to the same conversation"
+    assert len(follow_up.turns) == 2
+    assert follow_up.turns[1].category.value == "spend_savings", (
+        "a follow-up with no keyword of its own must inherit the prior turn's category"
+    )
+
+
+def test_follow_up_with_new_subject_does_not_inherit_prior_category() -> None:
+    with psycopg.connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
+        with conn.cursor() as cur:
+            tenant_id, user_id, membership_id = _seed_workspace_with_spend(cur)
+            _seed_supplier_with_snapshot(
+                cur,
+                tenant_id,
+                membership_id,
+                supplier_name="Follow-up Subject Change Supplier",
+                with_negotiation_brief=False,
+            )
+        conn.commit()
+
+    member = _member(tenant_id, user_id, membership_id)
+    service = AnalystService(settings=get_settings(), intent_provider=FakeIntentProvider())
+
+    first = service.ask(
+        member=member,
+        question_text="How much have we spent this month?",
+        idempotency_key=uuid4(),
+        bearer_token="unused-in-this-path",
+    )
+
+    follow_up = service.ask(
+        member=member,
+        question_text="What's our supplier risk?",
+        idempotency_key=uuid4(),
+        bearer_token="unused-in-this-path",
+        conversation_id=first.id,
+    )
+    assert follow_up.id == first.id
+    assert follow_up.turns[1].category.value == "supplier_performance_risk", (
+        "a follow-up naming its own subject must be treated as a fresh question, "
+        "not inherit the prior turn's category"
+    )
+
+
+def test_continuation_of_another_tenants_conversation_raises_not_found() -> None:
+    with psycopg.connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
+        with conn.cursor() as cur:
+            tenant_a_id, tenant_a_user, tenant_a_membership = _seed_workspace_with_spend(cur)
+            tenant_b_id, tenant_b_user, tenant_b_membership = _seed_tenant(
+                cur, email_suffix="other-tenant"
+            )
+        conn.commit()
+
+    member_a = _member(tenant_a_id, tenant_a_user, tenant_a_membership)
+    member_b = _member(tenant_b_id, tenant_b_user, tenant_b_membership)
+    service = AnalystService(settings=get_settings(), intent_provider=FakeIntentProvider())
+
+    tenant_a_conversation = service.ask(
+        member=member_a,
+        question_text="How much have we spent this month?",
+        idempotency_key=uuid4(),
+        bearer_token="unused-in-this-path",
+    )
+
+    with pytest.raises(NotFoundError):
+        service.ask(
+            member=member_b,
+            question_text="and last quarter?",
+            idempotency_key=uuid4(),
+            bearer_token="unused-in-this-path",
+            conversation_id=tenant_a_conversation.id,
+        )
+
+
+def test_continuation_by_a_non_creator_member_raises_not_found() -> None:
+    """FR-009 scopes read to creator (+ owner/buyer oversight), but continuing a
+    conversation is a WRITE — only the original creator may append to their own
+    conversation, even another owner in the same tenant may not."""
+    with psycopg.connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
+        with conn.cursor() as cur:
+            tenant_id, creator_user, creator_membership = _seed_workspace_with_spend(cur)
+            other_user_id, other_membership_id = uuid4(), uuid4()
+            other_email = "analyst-e2e-other-member@example.test"
+            cur.execute(
+                "insert into auth.users (id,email) values (%s,%s)",
+                (other_user_id, other_email),
+            )
+            cur.execute(
+                "insert into membership (id,tenant_id,user_id,email,role,is_active_workspace) "
+                "values (%s,%s,%s,%s,'owner',true)",
+                (other_membership_id, tenant_id, other_user_id, other_email),
+            )
+        conn.commit()
+
+    creator = _member(tenant_id, creator_user, creator_membership)
+    other_member = _member(tenant_id, other_user_id, other_membership_id)
+    service = AnalystService(settings=get_settings(), intent_provider=FakeIntentProvider())
+
+    conversation = service.ask(
+        member=creator,
+        question_text="How much have we spent this month?",
+        idempotency_key=uuid4(),
+        bearer_token="unused-in-this-path",
+    )
+
+    with pytest.raises(NotFoundError):
+        service.ask(
+            member=other_member,
+            question_text="and last quarter?",
+            idempotency_key=uuid4(),
+            bearer_token="unused-in-this-path",
+            conversation_id=conversation.id,
+        )
+
+
+def test_continuation_of_a_nonexistent_conversation_raises_not_found() -> None:
+    with psycopg.connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
+        with conn.cursor() as cur:
+            tenant_id, user_id, membership_id = _seed_workspace_with_spend(cur)
+        conn.commit()
+
+    member = _member(tenant_id, user_id, membership_id)
+    service = AnalystService(settings=get_settings(), intent_provider=FakeIntentProvider())
+
+    with pytest.raises(NotFoundError):
+        service.ask(
+            member=member,
+            question_text="and last quarter?",
+            idempotency_key=uuid4(),
+            bearer_token="unused-in-this-path",
+            conversation_id=uuid4(),
+        )

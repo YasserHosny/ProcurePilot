@@ -164,16 +164,16 @@ confirm it's treated as a fresh question.
 
 ### Tests for User Story 3
 
-- [ ] T026 [P] [US3] Unit test: a follow-up resolves omitted entities from the immediately
+- [x] T026 [P] [US3] Unit test: a follow-up resolves omitted entities from the immediately
       preceding turn only, not the full conversation, in `apps/api/tests/unit/test_analyst_intent.py`
-- [ ] T027 [P] [US3] Integration test: a two-turn conversation where turn 2 depends on turn 1, and
+- [x] T027 [P] [US3] Integration test: a two-turn conversation where turn 2 depends on turn 1, and
       a second case where turn 2 changes subject entirely, in `test_analyst_api.py`
 
 ### Implementation for User Story 3
 
-- [ ] T028 [US3] Extend `intent.py`/`service.py` to pass the preceding turn's resolved category
+- [x] T028 [US3] Extend `intent.py`/`service.py` to pass the preceding turn's resolved category
       and entities into classification for a follow-up (FR-008)
-- [ ] T029 [US3] Update the conversation UI to keep the thread visible and send the prior turn's
+- [x] T029 [US3] Update the conversation UI to keep the thread visible and send the prior turn's
       context alongside a follow-up submission
 
 **Checkpoint**: Multi-turn conversations work without repeating the full question each time.

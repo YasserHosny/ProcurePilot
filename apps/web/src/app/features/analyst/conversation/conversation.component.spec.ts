@@ -118,7 +118,10 @@ describe('AnalystConversationComponent (R4.2)', () => {
     component.ask();
     fixture.detectChanges();
 
-    expect(analystApi.askQuestion).toHaveBeenCalledWith('How much have we spent this month?');
+    expect(analystApi.askQuestion).toHaveBeenCalledWith(
+      'How much have we spent this month?',
+      undefined,
+    );
     const el = fixture.nativeElement as HTMLElement;
     expect(el.querySelector('[data-testid="analyst-answer-text"]')?.textContent).toContain(
       'Total spend',
@@ -221,5 +224,31 @@ describe('AnalystConversationComponent (R4.2)', () => {
     expect(component.nextStepLabelKey({ ...citedTurn, category: 'orders_quotations' })).toBe(
       'analyst.nextStep.label',
     );
+  });
+
+  it('sends the conversation id on a follow-up ask and shows the full thread without duplicates', () => {
+    const followUpTurn: AnalystTurn = {
+      ...citedTurn,
+      id: 'turn-2',
+      question_text: 'and last quarter?',
+      answer_text: 'Total spend: GBP 300.00 across 1 record(s).',
+    };
+    analystApi.askQuestion.and.returnValue(of(conversationWith(citedTurn)));
+    fixture.detectChanges();
+    component.questionText.set('How much have we spent this month?');
+    component.ask();
+    fixture.detectChanges();
+
+    // The server returns the whole thread on every ask.
+    analystApi.askQuestion.and.returnValue(
+      of({ ...conversationWith(citedTurn), turns: [citedTurn, followUpTurn] }),
+    );
+    component.questionText.set('and last quarter?');
+    component.ask();
+    fixture.detectChanges();
+
+    expect(analystApi.askQuestion).toHaveBeenCalledWith('and last quarter?', 'conversation-1');
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.querySelectorAll('[data-testid="analyst-turn"]').length).toBe(2);
   });
 });

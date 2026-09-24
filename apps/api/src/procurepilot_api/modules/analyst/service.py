@@ -44,8 +44,9 @@ from psycopg.types.json import Jsonb
 
 from procurepilot_api.config import Settings, get_settings
 from procurepilot_api.deps import CurrentMember
-from procurepilot_api.errors import ServiceUnavailableError
+from procurepilot_api.errors import NotFoundError, ServiceUnavailableError
 from procurepilot_api.modules.analyst.intent import (
+    IntentEntities,
     IntentProvider,
     IntentResult,
     PriorTurnContext,
@@ -125,6 +126,23 @@ class AnalystService:
             if existing is not None:
                 return _build_conversation_response(conn, existing)
 
+            # A follow-up turn (FR-008): the caller must be the conversation's own creator —
+            # a cross-tenant or cross-member conversation_id resolves to NotFoundError, never
+            # a permission-denied error or a raw DB constraint failure (Non-negotiable #3:
+            # a cross-tenant read returns "not found", never "forbidden" — do not leak
+            # existence). Only load prior-turn context automatically when the caller did not
+            # already supply one explicitly.
+            if conversation_id is not None:
+                conversation_row = _find_conversation(conn, member.tenant_id, conversation_id)
+                if conversation_row is None:
+                    raise NotFoundError(details={"resource": "analyst_conversation"})
+                if UUID(str(conversation_row["creating_member_id"])) != member.membership_id:
+                    raise NotFoundError(details={"resource": "analyst_conversation"})
+                if prior_turn_context is None:
+                    prior_turn_context = _load_prior_turn_context(
+                        conn, member.tenant_id, conversation_id
+                    )
+
             # 1. Classify
             intent: IntentResult = self._intent_provider.classify(
                 question=question_text,
@@ -181,6 +199,7 @@ class AnalystService:
                 idempotency_key=idempotency_key,
                 is_unsupported=is_unsupported,
                 next_step_url=next_step_url,
+                entities=None if is_unsupported else intent.entities,
             )
             for citation in citations:
                 _insert_citation(conn, member.tenant_id, turn_id, citation)
@@ -531,6 +550,56 @@ def _find_by_idempotency_key(
     return UUID(str(row[0])) if row else None
 
 
+def _find_conversation(
+    conn: psycopg.Connection,
+    tenant_id: UUID,
+    conversation_id: UUID,
+) -> dict[str, object] | None:
+    """Return the conversation row (scoped to tenant) or None — used for the FR-008
+    follow-up ownership check. Relies on the tenant filter, not RLS alone, so the
+    caller gets a clean None (-> NotFoundError) rather than an RLS-driven empty read
+    that could be confused with a real absence at a different layer."""
+    with conn.cursor(row_factory=dict_row) as cur:
+        cur.execute(
+            "select id, creating_member_id from analyst_conversation "
+            "where tenant_id = %s and id = %s",
+            (tenant_id, conversation_id),
+        )
+        return cur.fetchone()
+
+
+def _load_prior_turn_context(
+    conn: psycopg.Connection,
+    tenant_id: UUID,
+    conversation_id: UUID,
+) -> PriorTurnContext | None:
+    """Load the immediately preceding turn's category + entities for FR-008 follow-up
+    resolution — only the latest turn, never the full conversation history."""
+    with conn.cursor(row_factory=dict_row) as cur:
+        cur.execute(
+            """
+            select category, entities, is_unsupported
+            from analyst_turn
+            where tenant_id = %s and conversation_id = %s
+            order by created_at desc, id desc
+            limit 1
+            """,
+            (tenant_id, conversation_id),
+        )
+        row = cur.fetchone()
+    if row is None or row["is_unsupported"]:
+        # An unsupported-refusal turn stores a meaningless sentinel category — there is
+        # nothing real to inherit from it, so treat this exactly like no prior turn at all.
+        return None
+    entities_raw = row["entities"]
+    if isinstance(entities_raw, str):
+        entities_raw = json.loads(entities_raw)
+    return PriorTurnContext(
+        category=AnalystCategory(str(row["category"])),
+        entities=IntentEntities.model_validate(entities_raw) if entities_raw else IntentEntities(),
+    )
+
+
 def _insert_conversation(
     conn: psycopg.Connection,
     member: CurrentMember,
@@ -561,16 +630,19 @@ def _insert_turn(
     idempotency_key: UUID,
     is_unsupported: bool,
     next_step_url: str | None = None,
+    entities: IntentEntities | None = None,
 ) -> UUID:
     calculation_json = calculation.model_dump(mode="json") if calculation else None
+    entities_json = entities.model_dump(mode="json") if entities is not None else None
     with conn.cursor() as cur:
         cur.execute(
             """
             insert into analyst_turn (
                 tenant_id, conversation_id, creating_member_id,
                 question_text, category, answer_text, calculation_version,
-                release_posture, next_step_url, calculation, idempotency_key, is_unsupported
-            ) values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb, %s, %s)
+                release_posture, next_step_url, calculation, idempotency_key,
+                is_unsupported, entities
+            ) values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb, %s, %s, %s::jsonb)
             returning id
             """,
             (
@@ -586,6 +658,7 @@ def _insert_turn(
                 Jsonb(calculation_json) if calculation_json is not None else None,
                 str(idempotency_key),
                 is_unsupported,
+                Jsonb(entities_json) if entities_json is not None else None,
             ),
         )
         row = cur.fetchone()

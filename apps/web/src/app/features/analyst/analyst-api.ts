@@ -66,12 +66,16 @@ export class AnalystApiService {
   private readonly http = inject(HttpClient);
   private readonly base = environment.apiBaseUrl;
 
-  askQuestion(questionText: string): Observable<AnalystConversation> {
+  askQuestion(questionText: string, conversationId?: string): Observable<AnalystConversation> {
     const headers = new HttpHeaders({ 'Idempotency-Key': crypto.randomUUID() });
-    return this.http.post<AnalystConversation>(
-      `${this.base}/analyst/conversations`,
-      { question_text: questionText },
-      { headers },
-    );
+    const body: { question_text: string; conversation_id?: string } = {
+      question_text: questionText,
+    };
+    if (conversationId) {
+      body.conversation_id = conversationId;
+    }
+    return this.http.post<AnalystConversation>(`${this.base}/analyst/conversations`, body, {
+      headers,
+    });
   }
 }

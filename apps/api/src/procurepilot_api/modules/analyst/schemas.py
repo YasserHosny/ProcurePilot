@@ -140,9 +140,16 @@ class AnalystConversationResponse(StrictApiModel):
 
 
 class AnalystConversationCreate(StrictApiModel):
-    """Request body for starting a new conversation (first question included)."""
+    """Request body for starting a new conversation, or continuing one with a follow-up.
+
+    ``conversation_id`` is omitted (or null) to start a new conversation. When set, the
+    question is appended as a follow-up turn on that conversation (FR-008) — the caller
+    must be the conversation's original creator, or the request resolves to a plain
+    "not found" (Non-negotiable #3: cross-tenant/cross-member reads never leak existence).
+    """
 
     question_text: StrictStr = Field(min_length=1, max_length=4000)
+    conversation_id: UUID | None = None
 
 
 class AnalystConversationList(StrictApiModel):

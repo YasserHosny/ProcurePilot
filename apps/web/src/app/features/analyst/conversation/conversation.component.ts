@@ -48,6 +48,11 @@ export class AnalystConversationComponent {
   readonly isAsking = signal(false);
   readonly errorMessage = signal<string | null>(null);
 
+  /** Set after the first successful ask (FR-008): later asks in this session pass
+   * it through so the server treats them as follow-ups on the same conversation,
+   * with context resolved from the immediately preceding turn, not client-side. */
+  private readonly conversationId = signal<string | null>(null);
+
   ask(): void {
     const question = this.questionText().trim();
     if (!question || this.isAsking()) {
@@ -56,11 +61,14 @@ export class AnalystConversationComponent {
     this.isAsking.set(true);
     this.errorMessage.set(null);
     this.analystApi
-      .askQuestion(question)
+      .askQuestion(question, this.conversationId() ?? undefined)
       .pipe(finalize(() => this.isAsking.set(false)))
       .subscribe({
         next: (conversation) => {
-          this.turns.update((existing) => [...existing, ...conversation.turns]);
+          this.conversationId.set(conversation.id);
+          // The server returns the full thread for this conversation on every ask,
+          // so replace rather than append — appending would duplicate earlier turns.
+          this.turns.set(conversation.turns);
           this.questionText.set('');
         },
         error: () => {

@@ -165,31 +165,55 @@ def test_fake_provider_is_deterministic() -> None:
 
 
 # ---------------------------------------------------------------------------
-# PriorTurnContext interface (FR-008): accepted by classify(), not yet used in stub
+# T026 (FR-008, US3): follow-up resolution from the immediately preceding turn only
 # ---------------------------------------------------------------------------
 
 
-def test_fake_provider_accepts_prior_turn_context_without_error() -> None:
-    """FR-008: classify() accepts prior_turn_context for follow-up wiring.
-    The stub ignores it (full resolution is US3/T028) but must not raise.
-    """
+def test_follow_up_with_no_keyword_of_its_own_inherits_prior_category_and_entities() -> None:
+    """FR-008: a follow-up that omits the subject ("and last quarter?") resolves using
+    the immediately preceding turn's category and entities."""
+    provider = FakeIntentProvider()
+    ctx = PriorTurnContext(
+        category=AnalystCategory.spend_savings,
+        entities=IntentEntities(supplier_id="00000000-0000-0000-0000-000000000099"),
+    )
+    result = provider.classify(question="and last quarter?", prior_turn_context=ctx)
+    assert result.category == AnalystCategory.spend_savings
+    assert result.entities.supplier_id == "00000000-0000-0000-0000-000000000099"
+
+
+def test_follow_up_with_its_own_keyword_does_not_inherit_prior_context() -> None:
+    """A follow-up that names its own subject is a fresh question — it must NOT
+    inherit the prior turn's category or entities even when prior_turn_context is
+    supplied."""
     provider = FakeIntentProvider()
     ctx = PriorTurnContext(
         category=AnalystCategory.spend_savings,
         entities=IntentEntities(supplier_id="00000000-0000-0000-0000-000000000099"),
     )
     result = provider.classify(
-        question="And last quarter?",
+        question="What's our supplier risk?",
         prior_turn_context=ctx,
     )
-    valid_categories = {
-        "unsupported",
-        AnalystCategory.spend_savings,
-        AnalystCategory.supplier_performance_risk,
-        AnalystCategory.orders_quotations,
-        AnalystCategory.reorder_forecasts,
-    }
-    assert result.category in valid_categories
+    assert result.category == AnalystCategory.supplier_performance_risk
+    assert result.entities.supplier_id is None
+
+
+def test_follow_up_with_no_keyword_and_no_prior_context_is_unsupported() -> None:
+    """No keyword of its own and nothing to inherit from — never guess."""
+    provider = FakeIntentProvider()
+    result = provider.classify(question="and last quarter?", prior_turn_context=None)
+    assert result.category == "unsupported"
+
+
+def test_follow_up_does_not_inherit_from_an_unsupported_prior_turn() -> None:
+    """An unsupported-refusal prior turn has no real category to inherit — a
+    follow-up with no keyword of its own must fall through to unsupported too,
+    not inherit the meaningless sentinel category."""
+    provider = FakeIntentProvider()
+    ctx = PriorTurnContext(category="unsupported", entities=IntentEntities())
+    result = provider.classify(question="and last quarter?", prior_turn_context=ctx)
+    assert result.category == "unsupported"
 
 
 # ---------------------------------------------------------------------------

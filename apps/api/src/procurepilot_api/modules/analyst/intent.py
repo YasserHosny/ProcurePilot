@@ -264,7 +264,9 @@ class FakeIntentProvider:
     ) -> IntentResult:
         lower = question.lower()
 
-        # Explicit unsupported check first
+        # Explicit unsupported check first — a keyword of its own always wins, even
+        # inside a follow-up: a follow-up with its own subject is a fresh question,
+        # not a continuation (FR-008).
         if any(kw in lower for kw in _UNSUPPORTED_KEYWORDS):
             return IntentResult(category="unsupported", entities=IntentEntities())
 
@@ -272,7 +274,16 @@ class FakeIntentProvider:
             if any(kw in lower for kw in keywords):
                 return IntentResult(category=category, entities=IntentEntities())
 
-        # Fall back to unsupported — never guess
+        # No keyword of its own. If this is a follow-up with usable prior-turn
+        # context, resolve the omitted subject from the immediately preceding turn
+        # only (FR-008) — never the full conversation history.
+        if prior_turn_context is not None and prior_turn_context.category != "unsupported":
+            return IntentResult(
+                category=prior_turn_context.category,
+                entities=prior_turn_context.entities,
+            )
+
+        # No keyword and no usable prior context — fall back to unsupported, never guess.
         return IntentResult(category="unsupported", entities=IntentEntities())
 
 

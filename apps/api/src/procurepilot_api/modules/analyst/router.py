@@ -62,6 +62,5 @@ def ask_question(
         question_text=payload.question_text,
         idempotency_key=idempotency_key,
         bearer_token=token,
-        conversation_id=None,
-        prior_turn_context=None,
+        conversation_id=payload.conversation_id,
     )
