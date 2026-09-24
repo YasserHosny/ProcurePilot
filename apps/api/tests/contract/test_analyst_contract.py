@@ -146,3 +146,22 @@ def test_ask_question_does_not_restrict_to_write_roles() -> None:
     assert post_op.get("operationId") == "askAnalystQuestion", (
         f"Unexpected operationId: {post_op.get('operationId')}"
     )
+
+def test_analyst_exposes_the_get_conversations_paths_and_methods() -> None:
+    paths = create_app().openapi()["paths"]
+    assert "/api/v1/analyst/conversations" in paths
+    assert "get" in paths["/api/v1/analyst/conversations"], (
+        "Missing GET method on /api/v1/analyst/conversations"
+    )
+    
+    assert "/api/v1/analyst/conversations/{conversation_id}" in paths
+    assert "get" in paths["/api/v1/analyst/conversations/{conversation_id}"], (
+        "Missing GET method on /api/v1/analyst/conversations/{conversation_id}"
+    )
+
+def test_analyst_conversation_list_includes_required_fields() -> None:
+    schemas = create_app().openapi()["components"]["schemas"]
+    assert "AnalystConversationList" in schemas, "AnalystConversationList schema missing"
+    list_schema = schemas["AnalystConversationList"]
+    required = set(list_schema.get("required", []))
+    assert "items" in required, "AnalystConversationList missing items field"

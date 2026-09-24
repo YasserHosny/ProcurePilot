@@ -226,7 +226,17 @@
       "report": "View report"
     },
     "errors": {
-      "ask": "The question could not be answered."
+      "ask": "The question could not be answered.",
+      "load": "This conversation could not be loaded."
+    },
+    "navHistory": "Analyst History",
+    "history": {
+      "title": "Question History",
+      "newConversation": "New Conversation",
+      "empty": "No past conversations found.",
+      "turns": "{{count}} turn(s)",
+      "noTurns": "Empty conversation",
+      "loadMore": "Load More"
     }
   },
   "forecasting": {
@@ -1084,8 +1094,8 @@
       "badgeAutoAccepted": "Auto-matched",
       "badgeResolved": "Resolved",
       "autoAcceptedBanner": "Auto-matched above threshold without human review. View details only.",
-      "emptyAutoAccepted": "No auto-accepted lines to show for the current filters."
-      ,"refreshReviews": {
+      "emptyAutoAccepted": "No auto-accepted lines to show for the current filters.",
+      "refreshReviews": {
         "title": "Catalogue refreshes awaiting review",
         "subtitle": "Review normalized supplier prices before they enter the matching pipeline.",
         "pending": "Pending review",

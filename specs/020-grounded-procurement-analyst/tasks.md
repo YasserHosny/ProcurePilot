@@ -191,17 +191,17 @@ conversations, and an owner sees both.
 
 ### Tests for User Story 4
 
-- [ ] T030 [P] [US4] Contract test for `GET /api/v1/analyst/conversations` and
+- [x] T030 [P] [US4] Contract test for `GET /api/v1/analyst/conversations` and
       `GET /api/v1/analyst/conversations/{id}` in `test_analyst_contract.py`
-- [ ] T031 [P] [US4] Integration test: a member lists only their own conversations; an owner/buyer
+- [x] T031 [P] [US4] Integration test: a member lists only their own conversations; an owner/buyer
       lists all; a reopened conversation replays its original stored answers rather than
       recomputing them (FR-010), in `test_analyst_api.py`
 
 ### Implementation for User Story 4
 
-- [ ] T032 [US4] Implement conversation list/detail endpoints in `router.py`/`service.py` with
+- [x] T032 [US4] Implement conversation list/detail endpoints in `router.py`/`service.py` with
       cursor pagination and the creator-scoped-plus-owner/buyer-oversight read rule (FR-009)
-- [ ] T033 [US4] Implement the history UI: list past conversations, reopen one, and render its
+- [x] T033 [US4] Implement the history UI: list past conversations, reopen one, and render its
       stored turns exactly as originally given
 
 **Checkpoint**: All four user stories are independently functional.

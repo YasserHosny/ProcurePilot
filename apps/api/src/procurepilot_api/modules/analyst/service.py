@@ -30,10 +30,11 @@ tenant's supplier/product/order IDs silently returns empty results → NoGroundi
 
 from __future__ import annotations
 
+import base64
 import json
 from collections.abc import Iterator
 from contextlib import contextmanager
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Literal
 from uuid import UUID
@@ -44,7 +45,11 @@ from psycopg.types.json import Jsonb
 
 from procurepilot_api.config import Settings, get_settings
 from procurepilot_api.deps import CurrentMember
-from procurepilot_api.errors import NotFoundError, ServiceUnavailableError
+from procurepilot_api.errors import (
+    NotFoundError,
+    ServiceUnavailableError,
+    UnprocessableEntityError,
+)
 from procurepilot_api.modules.analyst.intent import (
     IntentEntities,
     IntentProvider,
@@ -75,6 +80,7 @@ from procurepilot_api.modules.analyst.schemas import (
     AnalystCategory,
     AnalystCitationCreate,
     AnalystCitationResponse,
+    AnalystConversationList,
     AnalystConversationResponse,
     AnalystTurnResponse,
     CalculationDetail,
@@ -124,7 +130,9 @@ class AnalystService:
             # Idempotency: return existing result if this key was already processed
             existing = _find_by_idempotency_key(conn, member.tenant_id, idempotency_key)
             if existing is not None:
-                return _build_conversation_response(conn, existing)
+                resp = _build_conversation_response(conn, existing)
+                assert resp is not None
+                return resp
 
             # A follow-up turn (FR-008): the caller must be the conversation's own creator —
             # a cross-tenant or cross-member conversation_id resolves to NotFoundError, never
@@ -207,7 +215,55 @@ class AnalystService:
             # 5. Audit event (FR-012) — committed in the same transaction
             _record_turn_audit(conn, member, conversation_id, turn_id)
 
+            resp = _build_conversation_response(conn, conversation_id)
+            assert resp is not None
+            return resp
+
+    def get_conversation(
+        self, *, member: CurrentMember, conversation_id: UUID
+    ) -> AnalystConversationResponse | None:
+        with _authenticated_db(self._settings, member) as conn:
             return _build_conversation_response(conn, conversation_id)
+
+    def list_conversations(
+        self, *, member: CurrentMember, cursor: str | None = None, limit: int = 50
+    ) -> AnalystConversationList:
+        after = _decode_conversation_cursor(cursor)
+        fetch_limit = min(100, max(1, limit))
+        with _authenticated_db(self._settings, member) as conn:
+            with conn.cursor(row_factory=dict_row) as cur:
+                after_clause = ""
+                query_params: list[object] = []
+                if after is not None:
+                    after_clause = "where (created_at, id) < (%s, %s)"
+                    query_params.extend(after)
+                cur.execute(
+                    f"""
+                    select id, created_at
+                    from analyst_conversation
+                    {after_clause}
+                    order by created_at desc, id desc
+                    limit %s
+                    """,
+                    (*query_params, fetch_limit + 1),
+                )
+                rows = cur.fetchall()
+            has_more = len(rows) > fetch_limit
+            visible_rows = rows[:fetch_limit]
+            
+            # Use _build_conversation_response for each row
+            items = []
+            for row in visible_rows:
+                resp = _build_conversation_response(conn, UUID(str(row["id"])))
+                if resp is not None:
+                    items.append(resp)
+                    
+            next_cursor = (
+                _encode_conversation_cursor(visible_rows[-1]["created_at"], visible_rows[-1]["id"])
+                if has_more
+                else None
+            )
+            return AnalystConversationList(items=items, next_cursor=next_cursor)
 
 
 def get_analyst_service() -> AnalystService:
@@ -728,7 +784,7 @@ def _record_turn_audit(
 def _build_conversation_response(
     conn: psycopg.Connection,
     conversation_id: UUID,
-) -> AnalystConversationResponse:
+) -> AnalystConversationResponse | None:
     with conn.cursor(row_factory=dict_row) as cur:
         cur.execute(
             """
@@ -739,7 +795,8 @@ def _build_conversation_response(
             (conversation_id,),
         )
         conv = cur.fetchone()
-        assert conv is not None
+        if conv is None:
+            return None
 
         cur.execute(
             """
@@ -839,3 +896,25 @@ def _risk_level_from_score(risk_score_raw: object) -> str | None:
     if score < Decimal("0.65"):
         return "medium"
     return "high"
+
+def _encode_conversation_cursor(created_at: datetime, conversation_id: object) -> str:
+    raw = json.dumps(
+        {"created_at": created_at.isoformat(), "id": str(conversation_id)},
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return base64.urlsafe_b64encode(raw).decode("ascii")
+
+
+def _decode_conversation_cursor(cursor: str | None) -> tuple[datetime, UUID] | None:
+    if cursor is None:
+        return None
+    try:
+        raw = base64.urlsafe_b64decode(cursor.encode("ascii"))
+        payload = json.loads(raw.decode("utf-8"))
+        created_at = datetime.fromisoformat(payload["created_at"])
+        conversation_id = UUID(payload["id"])
+    except (KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
+        raise UnprocessableEntityError(details={"cursor": "invalid"}) from exc
+    if created_at.tzinfo is None:
+        raise UnprocessableEntityError(details={"cursor": "invalid"})
+    return created_at, conversation_id

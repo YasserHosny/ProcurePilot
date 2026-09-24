@@ -1,7 +1,7 @@
 import { JsonPipe } from '@angular/common';
-import { Component, inject, signal } from '@angular/core';
+import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
+import { ActivatedRoute, RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatExpansionModule } from '@angular/material/expansion';
@@ -39,7 +39,7 @@ const NEXT_STEP_LABEL_KEY_BY_CATEGORY: Partial<Record<AnalystCategory, string>> 
   templateUrl: './conversation.component.html',
   styleUrl: './conversation.component.scss',
 })
-export class AnalystConversationComponent {
+export class AnalystConversationComponent implements OnInit {
   private readonly analystApi = inject(AnalystApiService);
   private readonly translate = inject(TranslateService);
 
@@ -52,6 +52,31 @@ export class AnalystConversationComponent {
    * it through so the server treats them as follow-ups on the same conversation,
    * with context resolved from the immediately preceding turn, not client-side. */
   private readonly conversationId = signal<string | null>(null);
+  private readonly route = inject(ActivatedRoute);
+
+  ngOnInit(): void {
+    const id = this.route.snapshot.paramMap.get('conversationId');
+    if (id) {
+      this.loadConversation(id);
+    }
+  }
+
+  private loadConversation(id: string): void {
+    this.isAsking.set(true);
+    this.errorMessage.set(null);
+    this.analystApi
+      .getConversation(id)
+      .pipe(finalize(() => this.isAsking.set(false)))
+      .subscribe({
+        next: (conversation) => {
+          this.conversationId.set(conversation.id);
+          this.turns.set(conversation.turns);
+        },
+        error: () => {
+          this.errorMessage.set(this.translate.instant('analyst.errors.load'));
+        },
+      });
+  }
 
   ask(): void {
     const question = this.questionText().trim();

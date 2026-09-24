@@ -61,6 +61,11 @@ export interface AnalystConversation {
   turns: AnalystTurn[];
 }
 
+export interface AnalystConversationList {
+  items: AnalystConversation[];
+  next_cursor: string | null;
+}
+
 @Injectable({ providedIn: 'root' })
 export class AnalystApiService {
   private readonly http = inject(HttpClient);
@@ -77,5 +82,16 @@ export class AnalystApiService {
     return this.http.post<AnalystConversation>(`${this.base}/analyst/conversations`, body, {
       headers,
     });
+  }
+  listConversations(limit = 50, cursor?: string): Observable<AnalystConversationList> {
+    const params: Record<string, string | number> = { limit };
+    if (cursor) {
+      params['cursor'] = cursor;
+    }
+    return this.http.get<AnalystConversationList>(`${this.base}/analyst/conversations`, { params });
+  }
+
+  getConversation(conversationId: string): Observable<AnalystConversation> {
+    return this.http.get<AnalystConversation>(`${this.base}/analyst/conversations/${conversationId}`);
   }
 }

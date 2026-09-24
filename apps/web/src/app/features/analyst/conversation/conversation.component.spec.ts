@@ -1,6 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
-import { provideRouter } from '@angular/router';
+import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { of, throwError } from 'rxjs';
 
@@ -59,7 +59,10 @@ describe('AnalystConversationComponent (R4.2)', () => {
   }
 
   beforeEach(async () => {
-    analystApi = jasmine.createSpyObj<AnalystApiService>('AnalystApiService', ['askQuestion']);
+    analystApi = jasmine.createSpyObj<AnalystApiService>('AnalystApiService', [
+      'askQuestion',
+      'getConversation',
+    ]);
 
     await TestBed.configureTestingModule({
       imports: [AnalystConversationComponent, TranslateModule.forRoot()],
@@ -250,5 +253,84 @@ describe('AnalystConversationComponent (R4.2)', () => {
     expect(analystApi.askQuestion).toHaveBeenCalledWith('and last quarter?', 'conversation-1');
     const el = fixture.nativeElement as HTMLElement;
     expect(el.querySelectorAll('[data-testid="analyst-turn"]').length).toBe(2);
+  });
+});
+
+describe('AnalystConversationComponent — reopening via route param (R4.2 T033)', () => {
+  it('loads and renders a past conversation when :conversationId is present', async () => {
+    const api = jasmine.createSpyObj<AnalystApiService>('AnalystApiService', [
+      'askQuestion',
+      'getConversation',
+    ]);
+    const storedTurn: AnalystTurn = {
+      id: 'turn-9',
+      conversation_id: 'conversation-9',
+      creating_member_id: 'member-1',
+      question_text: 'How much have we spent this month?',
+      category: 'spend_savings',
+      answer_text: 'Total spend: GBP 500.00 across 1 record(s).',
+      calculation_version: 'analyst-retrieval-v1',
+      release_posture: 'g3_unmet',
+      calculation: null,
+      citations: [],
+      next_step_url: null,
+      created_at: '2026-09-24T00:00:00Z',
+    };
+    api.getConversation.and.returnValue(
+      of({
+        id: 'conversation-9',
+        tenant_id: 'tenant-1',
+        creating_member_id: 'member-1',
+        created_at: '2026-09-24T00:00:00Z',
+        turns: [storedTurn],
+      }),
+    );
+
+    await TestBed.configureTestingModule({
+      imports: [AnalystConversationComponent, TranslateModule.forRoot()],
+      providers: [
+        provideNoopAnimations(),
+        provideRouter([]),
+        { provide: AnalystApiService, useValue: api },
+        {
+          provide: ActivatedRoute,
+          useValue: {
+            snapshot: { paramMap: convertToParamMap({ conversationId: 'conversation-9' }) },
+          },
+        },
+      ],
+    }).compileComponents();
+
+    const translate = TestBed.inject(TranslateService);
+    translate.setTranslation('en', {
+      common: { loading: 'Loading' },
+      analyst: {
+        title: 'Procurement Analyst',
+        subtitle: 'Ask a question about your own data.',
+        g3: { title: 'G3 evidence is still unmet', message: 'Advisory only.' },
+        form: { label: 'Ask a question', submit: 'Ask' },
+        empty: { title: 'No questions yet', message: 'Ask your first question.' },
+        threadLabel: 'Conversation',
+        calculation: { title: 'Show calculation' },
+        citations: { label: 'Sources:', kind: { purchase_order: 'Purchase order' } },
+        nextStep: {
+          label: 'View details',
+          negotiationBrief: 'View negotiation brief',
+          reorderQueue: 'View reorder queue',
+          report: 'View report',
+        },
+        errors: { ask: 'The question could not be answered.', load: 'Could not load.' },
+      },
+    });
+    translate.use('en');
+
+    const fixture = TestBed.createComponent(AnalystConversationComponent);
+    fixture.detectChanges();
+
+    expect(api.getConversation).toHaveBeenCalledWith('conversation-9');
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.querySelector('[data-testid="analyst-answer-text"]')?.textContent).toContain(
+      'Total spend',
+    );
   });
 });

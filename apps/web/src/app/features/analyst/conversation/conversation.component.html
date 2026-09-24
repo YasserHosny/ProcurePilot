@@ -1,7 +1,13 @@
 <main class="analyst-page">
   <header class="page-header">
-    <h1 class="page-title">{{ 'analyst.title' | translate }}</h1>
-    <p>{{ 'analyst.subtitle' | translate }}</p>
+    <div class="header-text">
+      <h1 class="page-title">{{ 'analyst.title' | translate }}</h1>
+      <p>{{ 'analyst.subtitle' | translate }}</p>
+    </div>
+    <button mat-stroked-button routerLink="/analyst/history" color="primary">
+      <mat-icon>history</mat-icon>
+      {{ 'analyst.history.title' | translate }}
+    </button>
   </header>
 
   <section class="gate-banner" role="note">

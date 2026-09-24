@@ -14,13 +14,14 @@ the codebase — see negotiation_briefs, exports, etc.).
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Body, Depends, Header, Request, status
+from fastapi import APIRouter, Body, Depends, Header, Query, Request, status
 
 from procurepilot_api.config import get_settings
 from procurepilot_api.deps import CurrentMember, bearer_token, current_member
-from procurepilot_api.errors import UnprocessableEntityError
+from procurepilot_api.errors import NotFoundError, UnprocessableEntityError
 from procurepilot_api.modules.analyst.schemas import (
     AnalystConversationCreate,
+    AnalystConversationList,
     AnalystConversationResponse,
 )
 from procurepilot_api.modules.analyst.service import AnalystService, get_analyst_service
@@ -64,3 +65,35 @@ def ask_question(
         bearer_token=token,
         conversation_id=payload.conversation_id,
     )
+
+
+@router.get(
+    "/conversations",
+    status_code=status.HTTP_200_OK,
+    response_model=AnalystConversationList,
+    operation_id="listAnalystConversations",
+)
+def list_conversations(
+    member: Annotated[CurrentMember, Depends(current_member)],
+    service: Annotated[AnalystService, Depends(get_analyst_service)],
+    cursor: Annotated[str | None, Query()] = None,
+    limit: Annotated[int, Query(ge=1, le=100)] = 50,
+) -> AnalystConversationList:
+    return service.list_conversations(member=member, cursor=cursor, limit=limit)
+
+
+@router.get(
+    "/conversations/{conversation_id}",
+    status_code=status.HTTP_200_OK,
+    response_model=AnalystConversationResponse,
+    operation_id="getAnalystConversation",
+)
+def get_conversation(
+    conversation_id: UUID,
+    member: Annotated[CurrentMember, Depends(current_member)],
+    service: Annotated[AnalystService, Depends(get_analyst_service)],
+) -> AnalystConversationResponse:
+    resp = service.get_conversation(member=member, conversation_id=conversation_id)
+    if resp is None:
+        raise NotFoundError(details={"resource": "analyst_conversation"})
+    return resp

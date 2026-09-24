@@ -26,7 +26,7 @@ from procurepilot_api.config import get_settings
 from procurepilot_api.deps import CurrentMember
 from procurepilot_api.errors import NotFoundError
 from procurepilot_api.modules.analyst.intent import FakeIntentProvider
-from procurepilot_api.modules.analyst.service import AnalystService
+from procurepilot_api.modules.analyst.service import AnalystService, get_analyst_service
 from procurepilot_api.modules.auth.jwt import MemberRole
 
 TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL")
@@ -197,14 +197,36 @@ def _seed_reorder_proposal(cur: psycopg.Cursor, tenant_id: UUID) -> UUID:
     return proposal_id
 
 
-def _member(tenant_id: UUID, user_id: UUID, membership_id: UUID) -> CurrentMember:
+def _member(
+    tenant_id: UUID,
+    user_id: UUID,
+    membership_id: UUID,
+    *,
+    role: MemberRole = MemberRole.owner,
+    email: str = "analyst-e2e@example.test",
+) -> CurrentMember:
     return CurrentMember(
         membership_id=membership_id,
         tenant_id=tenant_id,
         user_id=user_id,
-        email="analyst-e2e@example.test",
-        role=MemberRole.owner,
+        email=email,
+        role=role,
     )
+
+
+def _seed_additional_member(
+    cur: psycopg.Cursor, tenant_id: UUID, *, role: str, email: str
+) -> tuple[UUID, UUID]:
+    """Add a second (or third) member to an already-seeded tenant — for scoping tests
+    that need more than one member in the same workspace."""
+    user_id, membership_id = uuid4(), uuid4()
+    cur.execute("insert into auth.users (id,email) values (%s,%s)", (user_id, email))
+    cur.execute(
+        "insert into membership (id,tenant_id,user_id,email,role,is_active_workspace) "
+        "values (%s,%s,%s,%s,%s,true)",
+        (membership_id, tenant_id, user_id, email, role),
+    )
+    return user_id, membership_id
 
 
 def test_ask_persists_a_real_cited_turn_and_replays_on_idempotency_key() -> None:
@@ -626,3 +648,113 @@ def test_continuation_of_a_nonexistent_conversation_raises_not_found() -> None:
             bearer_token="unused-in-this-path",
             conversation_id=uuid4(),
         )
+
+def test_conversation_list_scoping_by_member_and_role() -> None:
+    with psycopg.connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
+        with conn.cursor() as cur:
+            tenant_id, user_1_id, member_1_id = _seed_workspace_with_spend(cur)
+            user_2_id, member_2_id = _seed_additional_member(
+                cur, tenant_id, role="viewer", email="analyst-e2e-viewer2@example.test"
+            )
+            user_3_id, member_3_id = _seed_additional_member(
+                cur, tenant_id, role="owner", email="analyst-e2e-owner3@example.test"
+            )
+        conn.commit()
+
+    service = get_analyst_service()
+    mem_1 = _member(tenant_id, user_1_id, member_1_id, role=MemberRole.viewer)
+    mem_2 = _member(
+        tenant_id, user_2_id, member_2_id, role=MemberRole.viewer, email="viewer2@example.test"
+    )
+    mem_3 = _member(
+        tenant_id, user_3_id, member_3_id, role=MemberRole.owner, email="owner3@example.test"
+    )
+
+    # member 1 asks two questions
+    c1 = service.ask(
+        member=mem_1,
+        question_text="First question",
+        idempotency_key=uuid4(),
+        bearer_token="mock_token",
+    )
+    c2 = service.ask(
+        member=mem_1,
+        question_text="Second question",
+        idempotency_key=uuid4(),
+        bearer_token="mock_token",
+    )
+
+    # list for member 1
+    l1 = service.list_conversations(member=mem_1)
+    assert len(l1.items) == 2
+    assert {c.id for c in l1.items} == {c1.id, c2.id}
+
+    # list for member 2 (viewer)
+    l2 = service.list_conversations(member=mem_2)
+    assert len(l2.items) == 0
+
+    # list for member 3 (owner)
+    l3 = service.list_conversations(member=mem_3)
+    assert len(l3.items) == 2
+    assert {c.id for c in l3.items} == {c1.id, c2.id}
+
+
+def test_get_conversation_replays_original_turn_unchanged() -> None:
+    with psycopg.connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
+        with conn.cursor() as cur:
+            tenant_id, user_id, membership_id = _seed_workspace_with_spend(cur)
+        conn.commit()
+
+    service = get_analyst_service()
+    member = _member(tenant_id, user_id, membership_id, role=MemberRole.viewer)
+
+    original = service.ask(
+        member=member,
+        question_text="What is my total spend?",
+        idempotency_key=uuid4(),
+        bearer_token="unused-in-this-path",
+    )
+
+    reopened = service.get_conversation(member=member, conversation_id=original.id)
+    assert reopened is not None
+    assert len(reopened.turns) == len(original.turns)
+
+    orig_turn = original.turns[0]
+    reop_turn = reopened.turns[0]
+
+    assert reop_turn.answer_text == orig_turn.answer_text
+    assert reop_turn.calculation == orig_turn.calculation
+    assert len(reop_turn.citations) == len(orig_turn.citations)
+    if orig_turn.citations:
+        assert reop_turn.citations[0].source_id == orig_turn.citations[0].source_id
+
+
+def test_get_conversation_access_control() -> None:
+    with psycopg.connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
+        with conn.cursor() as cur:
+            t1_id, u1_id, m1_id = _seed_workspace_with_spend(cur)
+            t2_id, u2_id, m2_id = _seed_tenant(cur, email_suffix="t2")
+            u3_id, m3_id = _seed_additional_member(
+                cur, t1_id, role="viewer", email="analyst-e2e-viewer3@example.test"
+            )
+        conn.commit()
+
+    service = get_analyst_service()
+    mem1 = _member(t1_id, u1_id, m1_id, role=MemberRole.viewer)
+    mem2 = _member(t2_id, u2_id, m2_id, role=MemberRole.viewer, email="t2@example.test")
+    mem3 = _member(
+        t1_id, u3_id, m3_id, role=MemberRole.viewer, email="viewer3@example.test"
+    )
+
+    c1 = service.ask(
+        member=mem1,
+        question_text="Hello",
+        idempotency_key=uuid4(),
+        bearer_token="unused-in-this-path",
+    )
+
+    # mem2 is another tenant
+    assert service.get_conversation(member=mem2, conversation_id=c1.id) is None
+    
+    # mem3 is another member same tenant, but viewer role
+    assert service.get_conversation(member=mem3, conversation_id=c1.id) is None
