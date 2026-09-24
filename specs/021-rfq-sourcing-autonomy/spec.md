@@ -219,9 +219,9 @@ accurate statuses.
   channel, and MUST explain why for that specific recipient without blocking the rest of the RFQ.
 - **FR-003**: An RFQ MUST NOT be dispatched until a human (owner or buyer) explicitly sends it;
   drafting and editing an RFQ before send has no external effect.
-- **FR-004**: Each dispatched RFQ MUST carry enough structured detail (product identity,
-  quantity, needed-by date, any tenant-specified terms) that a supplier can respond without
-  needing to contact the buyer first.
+- **FR-004**: Each dispatched RFQ MUST include, at minimum, the product identity, the requested
+  quantity, the needed-by date, and any tenant-specified terms — the concrete fields a supplier
+  needs to respond without contacting the buyer first for clarification.
 - **FR-005**: A supplier's reply to a dispatched RFQ MUST be captured and extracted into a
   structured quotation using the same extraction, confidence-scoring, and mandatory-review-on-
   arithmetic-mismatch pipeline the existing quotation inbox already applies to any other

@@ -45,4 +45,11 @@
 - FR-005/FR-006 deliberately point at the existing `003-quotation-inbox-extraction` pipeline
   rather than re-specifying extraction behavior — RFQ response capture is a routing/linking
   concern on top of that pipeline, not a new extraction capability.
-- Ready for `/speckit.plan`.
+- 2026-09-24, post-`/speckit.analyze` remediation: reworded FR-004 so its MUST clause is the
+  concrete field list itself, not the subjective "enough... without needing to contact" wrapper
+  (the latter is now framing, not the testable condition). No coverage gaps found in spec.md
+  itself; the two coverage gaps `/speckit.analyze` found (FR-012's "shown to the buyer" UI
+  surfacing, and FR-015's audit-event breadth beyond RFQ send) were both in `tasks.md`, not
+  `spec.md` — the requirements themselves were already correct and complete; fixed in tasks.md
+  directly (T038, T015, T023, T036).
+- Ready for `/speckit.implement`.

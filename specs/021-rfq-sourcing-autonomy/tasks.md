@@ -92,7 +92,7 @@ without blocking the other two.
 - [ ] T014 [US1] Implement `build_rfq_message()` in
       `apps/api/src/procurepilot_api/modules/rfq/service.py`
 - [ ] T015 [US1] Implement `RfqService.create()` — draft-only, per-recipient `contact_email`
-      validation (FR-001, FR-002)
+      validation (FR-001, FR-002), and records an "RFQ created" audit event (FR-015)
 - [ ] T016 [US1] Implement `RfqService.send()` — calls `mailer.send()` per recipient, persists the
       outbound `Message-ID` on `rfq_recipient`, records an audit event (FR-015), and leaves a
       recipient `draft` on send failure rather than marking it `sent`
@@ -127,9 +127,9 @@ open RFQ falls through to the ordinary quotation-ingestion path unchanged.
       still captured but the RFQ's status stays `expired`, not `responded`; an arithmetic-mismatch
       response still hits the existing mandatory review task with no RFQ-specific exemption
       (FR-005)
-- [ ] T021 [US2] Cross-tenant matching-isolation test (completes T004's proof now that matching
-      exists): tenant B's inbound webhook cannot match a reply against tenant A's outbound
-      `Message-ID`
+- [ ] T021 [US2] Write the failing cross-tenant matching-isolation test — will complete T004's
+      isolation proof once T022/T023 land: tenant B's inbound webhook must not be able to match a
+      reply against tenant A's outbound `Message-ID`
 
 ### Implementation for User Story 2
 
@@ -138,7 +138,8 @@ open RFQ falls through to the ordinary quotation-ingestion path unchanged.
       plus a tenant's open RFQ recipients → matched `rfq_recipient_id` or `None`
 - [ ] T023 [US2] Wire `response_matching.py` into
       `apps/api/src/procurepilot_api/modules/ingestion/router.py`'s inbound webhook handler as an
-      additive step after existing quotation/supplier matching completes
+      additive step after existing quotation/supplier matching completes, and record a "response
+      received" audit event on a match (FR-015)
 - [ ] T024 [US2] Run the full existing ingestion suite
       (`test_email_ingestion_worker.py`, `test_capture_service.py`, the quotation-matching
       suites) to confirm the additive matching step regresses nothing already shipping
@@ -231,12 +232,21 @@ response failing even one condition falls back to requiring the manual US3 actio
       `RequestsService.create_request()` on a fire, recording an append-only
       `auto_preparation_event` row with the triggering rule (FR-011)
 - [ ] T036 [US4] Add guardrail management endpoints `POST`/`GET`/`PATCH /rfq/guardrails`,
-      owner-only per FR-010, with the FR-013 rejection wired into create/update
-- [ ] T037 [P] [US4] Write a failing component test for guardrail settings in
-      `apps/web/src/app/features/rfq/guardrails/guardrails.component.spec.ts` — owner-only route
-      guard, matching the existing `*appRole="'owner'"` convention
+      owner-only per FR-010, with the FR-013 rejection wired into create/update, and a
+      "guardrail changed" audit event recorded on every create/update (FR-015)
+- [ ] T037 [P] [US4] Write failing component tests: guardrail settings in
+      `apps/web/src/app/features/rfq/guardrails/guardrails.component.spec.ts` (owner-only route
+      guard, matching the existing `*appRole="'owner'"` convention), and — extending US3's compare
+      view spec (`apps/web/src/app/features/rfq/compare/compare.component.spec.ts`) — a response
+      that failed to auto-fire an active guardrail shows the reason it didn't (FR-012)
 - [ ] T038 [US4] Implement the guardrail settings UI in
-      `apps/web/src/app/features/rfq/guardrails/`
+      `apps/web/src/app/features/rfq/guardrails/`; extend `RfqService.list_responses()` (T026) to
+      compute each response's guardrail-evaluation outcome on demand by calling `guardrails.py`
+      read-only against the tenant's active guardrails (no new persistence — a non-fire is never
+      stored, only a fire is, per FR-011/T035) and include the reason in the response payload;
+      extend T030's compare view (`apps/web/src/app/features/rfq/compare/`) to render it when one
+      applies (FR-012) — this is the correct phase to add it, not US3 (T029/T030), since
+      guardrails don't exist until this phase
 
 **Checkpoint**: All P1/P2 stories done — the full guarded-autonomy loop the roadmap names for
 R4.3 works end to end, and every auto-prepared draft is indistinguishable in the approval queue
