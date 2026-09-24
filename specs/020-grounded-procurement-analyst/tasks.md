@@ -214,7 +214,7 @@ conversations, and an owner sees both.
       entities in `docs/architecture/api-specification.md` and `docs/architecture/data-dictionary.md`
 - [x] T035 [P] Record ADR-017 in `docs/architecture/adrs.md`: question understanding reuses the
       existing Bedrock/Claude provider (ADR-004/ADR-014), no new LLM provider is introduced
-- [ ] T036 Run API unit, integration, contract, web unit, `pnpm test:a11y` (axe-core/WCAG 2.1 AA —
+- [x] T036 Run API unit, integration, contract, web unit, `pnpm test:a11y` (axe-core/WCAG 2.1 AA —
       a separate gate from web unit tests, per FR-014 and the constitution's Quality Gates table),
       and production build gates
 - [ ] T037 Run the G3 evidence command, confirm output remains unmet, and record the R4.2
