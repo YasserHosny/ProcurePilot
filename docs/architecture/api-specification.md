@@ -2711,3 +2711,32 @@ reliability 25%, and single-source exposure 20%. Exactly three available compone
 renormalized; fewer than three suppress the total. Risk bands are low below 0.35, medium from
 0.35 to below 0.65, and high from 0.65. Currency amounts are bucketed and never summed or
 converted across currencies.
+
+## R4.2 Grounded Procurement Analyst
+
+R4.2 introduces grounded question answering. Every response returns `release_posture = "g3_unmet"` as it provides read-only analytical insight and cannot mutate records or execute purchases.
+
+### `POST /analyst/conversations`
+
+- Accepts `Idempotency-Key` (required) to prevent duplicate turns on retry.
+- Request fields: `question_text` (1-4000 chars), optional `conversation_id`.
+- Creates a new conversation and first turn, or continues an existing conversation if `conversation_id` is supplied.
+- Any active tenant member may call this endpoint.
+- Returns `201` with an `AnalystConversationResponse`.
+- Continuing a conversation is gated more strictly than FR-009's read scope: only the
+  conversation's original creator may supply its `conversation_id` here. A cross-tenant id, or
+  another member's conversation (including an owner or buyer), returns `404 not_found` — the
+  owner/buyer oversight exception applies to the two `GET` endpoints below, not to this write.
+
+### `GET /analyst/conversations`
+
+- Lists conversations in the active workspace.
+- Query parameters: optional `cursor`, optional `limit` capped at 100 and defaulting to 50.
+- Returns `200` with `items` containing `AnalystConversationResponse` resources and a nullable `next_cursor`.
+- Scoped by FR-009 read access: a caller sees only conversations they created, unless they are an owner or buyer, who see all workspace conversations.
+
+### `GET /analyst/conversations/{conversation_id}`
+
+- Returns a conversation in the active workspace.
+- Returns `200` with an `AnalystConversationResponse`.
+- Returns `404` when the conversation is not found or not accessible by the caller (enforced by RLS and application logic according to FR-009).

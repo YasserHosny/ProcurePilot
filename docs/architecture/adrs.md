@@ -228,3 +228,13 @@
   - Development may proceed into Phase 3 specification, architecture, and implementation.
   - Third-party penetration testing is scoped in `docs/operations/pentest-scope.md` and ready for
     external engagement prior to general commercial availability.
+
+## ADR-017 — Grounded Procurement Analyst Retrieval Architecture
+
+- **Status:** Accepted
+- **Context:** R4.2 introduces the Grounded Procurement Analyst feature. To comply with Constitution Principle I (Evidence Over Assertion) and ensure deterministic, auditable answers, the system must separate question understanding (intent classification) from answer generation (factual content, numbers, and citations).
+- **Decision:** Question understanding for R4.2 reuses the existing Bedrock/Claude provider pattern from ADR-004 (initial provider choice) and ADR-014 (fallback chain) — no new LLM provider was introduced. The language model in `intent.py`'s `BedrockIntentProvider` ONLY classifies the question into a category + entities (FR-005) — it never generates the answer's factual content, numbers, or citations; those come exclusively from `retrieval.py`'s deterministic pure functions.
+- **Consequences:**
+  - The feature provides retrieval-augmented question routing, not free generation.
+  - The `IntentResult` Pydantic model enforces this at the boundary, ensuring no free text leaks through from the LLM.
+  - Calculation and formatting logic inside `retrieval.py` guarantees replay-determinism (Constitution Principle II) and relies on explicit typed input objects passed by the caller.

@@ -210,9 +210,9 @@ conversations, and an owner sees both.
 
 ## Final Phase: Polish & Cross-Cutting Concerns
 
-- [ ] T034 [P] Add API and data-dictionary contracts for the conversation, turn, and citation
+- [x] T034 [P] Add API and data-dictionary contracts for the conversation, turn, and citation
       entities in `docs/architecture/api-specification.md` and `docs/architecture/data-dictionary.md`
-- [ ] T035 [P] Record ADR-017 in `docs/architecture/adrs.md`: question understanding reuses the
+- [x] T035 [P] Record ADR-017 in `docs/architecture/adrs.md`: question understanding reuses the
       existing Bedrock/Claude provider (ADR-004/ADR-014), no new LLM provider is introduced
 - [ ] T036 Run API unit, integration, contract, web unit, `pnpm test:a11y` (axe-core/WCAG 2.1 AA —
       a separate gate from web unit tests, per FR-014 and the constitution's Quality Gates table),
