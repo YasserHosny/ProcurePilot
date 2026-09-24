@@ -77,31 +77,31 @@ without blocking the other two.
 
 ### Tests for User Story 1
 
-- [ ] T012 [P] [US1] Unit test for `build_rfq_message()` in
+- [x] T012 [P] [US1] Unit test for `build_rfq_message()` in
       `apps/api/tests/unit/test_rfq_dispatch.py`: real content only (product identity, quantity,
       needed-by date, tenant terms), and a stable `Message-ID` derived from
       `(tenant_id, rfq_id, recipient_id)` so a resend under the same idempotency key doesn't
       fork the thread
-- [ ] T013 [P] [US1] Integration test in `apps/api/tests/integration/test_rfq_api.py`: creating an
+- [x] T013 [P] [US1] Integration test in `apps/api/tests/integration/test_rfq_api.py`: creating an
       RFQ with a recipient lacking `contact_email` rejects that recipient specifically (FR-002);
       an RFQ is never dispatched on create, only on an explicit send call (FR-003); a Mailgun send
       failure leaves the recipient `draft`, never `sent`
 
 ### Implementation for User Story 1
 
-- [ ] T014 [US1] Implement `build_rfq_message()` in
+- [x] T014 [US1] Implement `build_rfq_message()` in
       `apps/api/src/procurepilot_api/modules/rfq/service.py`
-- [ ] T015 [US1] Implement `RfqService.create()` — draft-only, per-recipient `contact_email`
+- [x] T015 [US1] Implement `RfqService.create()` — draft-only, per-recipient `contact_email`
       validation (FR-001, FR-002), and records an "RFQ created" audit event (FR-015)
-- [ ] T016 [US1] Implement `RfqService.send()` — calls `mailer.send()` per recipient, persists the
+- [x] T016 [US1] Implement `RfqService.send()` — calls `mailer.send()` per recipient, persists the
       outbound `Message-ID` on `rfq_recipient`, records an audit event (FR-015), and leaves a
       recipient `draft` on send failure rather than marking it `sent`
-- [ ] T017 [US1] Add router endpoints `POST /rfq` and `POST /rfq/{id}/send` in
+- [x] T017 [US1] Add router endpoints `POST /rfq` and `POST /rfq/{id}/send` in
       `apps/api/src/procurepilot_api/modules/rfq/router.py`, with `Idempotency-Key` on both
       mutations matching this codebase's convention
-- [ ] T018 [P] [US1] Write a failing component test for RFQ creation and send in
+- [x] T018 [P] [US1] Write a failing component test for RFQ creation and send in
       `apps/web/src/app/features/rfq/create/create.component.spec.ts`
-- [ ] T019 [US1] Implement the RFQ creation + send UI in
+- [x] T019 [US1] Implement the RFQ creation + send UI in
       `apps/web/src/app/features/rfq/create/`, using `apps/web/src/app/features/rfq/rfq-api.ts`
 
 **Checkpoint**: A buyer can send a real RFQ end to end. Nothing to compare or capture yet — that's

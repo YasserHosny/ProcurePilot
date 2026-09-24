@@ -17,6 +17,7 @@ class Rfq(BaseModel):
     created_by_membership_id: UUID
     status: RfqStatus
     needed_by_date: date
+    idempotency_key: UUID
     created_at: datetime
 
 

@@ -146,9 +146,10 @@ def _make_rfq_workspace(cur: psycopg.Cursor, label: str) -> RfqWorkspace:
     # rfq
     rfq_id = uuid4()
     cur.execute(
-        "insert into rfq (id,tenant_id,created_by_membership_id,status,needed_by_date) "
-        "values (%s,%s,%s,'sent',current_date + interval '7 days')",
-        (rfq_id, tenant_id, membership_id),
+        "insert into rfq (id,tenant_id,created_by_membership_id,status,needed_by_date,"
+        "idempotency_key) "
+        "values (%s,%s,%s,'sent',current_date + interval '7 days',%s)",
+        (rfq_id, tenant_id, membership_id, uuid4()),
     )
 
     rfq_line_id = uuid4()
@@ -306,9 +307,10 @@ def test_member_cannot_insert_rfq_into_another_tenant(
         _act_as(cur, alpha)
         with pytest.raises(psycopg.errors.InsufficientPrivilege):
             cur.execute(
-                "insert into rfq (tenant_id,created_by_membership_id,status,needed_by_date) "
-                "values (%s,%s,'draft',current_date)",
-                (beta.tenant_id, alpha.membership_id),
+                "insert into rfq (tenant_id,created_by_membership_id,status,needed_by_date,"
+                "idempotency_key) "
+                "values (%s,%s,'draft',current_date,%s)",
+                (beta.tenant_id, alpha.membership_id, uuid4()),
             )
 
 

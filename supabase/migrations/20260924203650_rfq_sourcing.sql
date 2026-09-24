@@ -7,9 +7,11 @@ create table rfq (
   created_by_membership_id uuid not null,
   status                text not null check (status in ('draft', 'sent', 'responded', 'expired', 'converted')),
   needed_by_date        date not null,
+  idempotency_key       uuid not null,
   created_at            timestamptz not null default now(),
 
   constraint rfq_tenant_id_key unique (tenant_id, id),
+  constraint rfq_idempotency_key_unique unique (tenant_id, idempotency_key),
   constraint rfq_created_by_membership_fkey
     foreign key (tenant_id, created_by_membership_id) references membership (tenant_id, id)
 );

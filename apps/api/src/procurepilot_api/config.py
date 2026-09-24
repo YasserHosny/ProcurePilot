@@ -264,6 +264,10 @@ class Settings(BaseSettings):
     rate_limit_analyst_ask: str = Field(
         default="20/minute", validation_alias="RATE_LIMIT_ANALYST_ASK"
     )
+    rate_limit_rfq_create: str = Field(
+        default="30/minute", validation_alias="RATE_LIMIT_RFQ_CREATE"
+    )
+    rate_limit_rfq_send: str = Field(default="30/minute", validation_alias="RATE_LIMIT_RFQ_SEND")
     # Provider mode for the analyst intent classifier (FR-005). Mirrors
     # EXTRACTION_PROVIDER_MODE's own stub/bedrock naming convention exactly.
     # "stub" is the default so tests, local development, and CI never make real
