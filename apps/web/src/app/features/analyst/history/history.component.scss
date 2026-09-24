@@ -1,0 +1,82 @@
+:host {
+  display: block;
+  padding: 24px;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.header-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+
+  h1 {
+    margin: 0;
+    font-size: 24px;
+    font-weight: 500;
+  }
+}
+
+.loading-state, .empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 0;
+  color: var(--mat-sys-outline, #64748b);
+
+  mat-icon {
+    font-size: 48px;
+    width: 48px;
+    height: 48px;
+    margin-bottom: 16px;
+  }
+}
+
+.history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.history-card {
+  cursor: pointer;
+  transition: background-color 0.2s;
+
+  &:hover, &:focus-visible {
+    background-color: var(--mat-sys-surface-container-high, #e2e8f0);
+  }
+
+  mat-card-content {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+}
+
+.history-card-header {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--mat-sys-outline, #64748b);
+}
+
+.history-card-question {
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--mat-sys-on-surface, #0f172a);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.load-more-container {
+  display: flex;
+  justify-content: center;
+  margin-top: 24px;
+
+  button {
+    min-width: 120px;
+  }
+}

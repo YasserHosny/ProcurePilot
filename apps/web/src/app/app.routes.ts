@@ -127,6 +127,27 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'analyst',
+        loadComponent: () =>
+          import('./features/analyst/conversation/conversation.component').then(
+            (m) => m.AnalystConversationComponent,
+          ),
+      },
+      {
+        path: 'analyst/history',
+        loadComponent: () =>
+          import('./features/analyst/history/history.component').then(
+            (m) => m.AnalystHistoryComponent,
+          ),
+      },
+      {
+        path: 'analyst/:conversationId',
+        loadComponent: () =>
+          import('./features/analyst/conversation/conversation.component').then(
+            (m) => m.AnalystConversationComponent,
+          ),
+      },
+      {
         path: 'negotiation-briefs/:id',
         loadComponent: () =>
           import('./features/supplier-risk/brief-detail/brief-detail.component').then(

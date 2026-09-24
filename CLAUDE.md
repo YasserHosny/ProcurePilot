@@ -1,6 +1,6 @@
 # ProcurePilot — Development Guidelines
 
-Last updated: 2026-09-19 · Active feature: `008-requests-approvals`
+Last updated: 2026-09-24 · Active feature: `020-grounded-procurement-analyst`
 
 ProcurePilot turns fragmented supplier information into trusted, comparable purchasing
 decisions and proves the money saved. Read `.specify/memory/constitution.md` before writing
@@ -135,6 +135,13 @@ breakdown (R3.0–R3.4).
 - Supabase Postgres 17 (unchanged). New tables: `accounting_connection`, (014-accounting-integration)
 - Python 3.12 (`apps/api`), TypeScript 5.6 / Angular 19 (`apps/web`) — + FastAPI (existing), `httpx` (existing — sufficient for Square's plain (015-pos-inventory-integration)
 - Supabase Postgres 17 (unchanged). New tables: `pos_connection`, (015-pos-inventory-integration)
+- Python 3.12 (`apps/api`), TypeScript 5.6 / Angular 19 (`apps/web`) — no new provider: question
+  understanding reuses the existing Bedrock/Claude client (ADR-004/ADR-014), extended with a new
+  `analyst` module (020-grounded-procurement-analyst)
+- Supabase Postgres 17 (unchanged). New tables: `analyst_conversation`, `analyst_turn`,
+  `analyst_turn_citation` (020-grounded-procurement-analyst)
 
 ## Recent Changes
+- 020-grounded-procurement-analyst: R4.2 spec and plan committed on branch 020 (planning only,
+  implementation not started)
 - 002-catalogue-suppliers: Added unchanged — Python 3.12 (backend), TypeScript 5.6 / Angular 19 (web), SQL + unchanged from chunk 4.1. One addition under consideration for CSV

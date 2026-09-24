@@ -1,0 +1,58 @@
+<div class="header-container">
+  <h1>{{ 'analyst.history.title' | translate }}</h1>
+  <button mat-stroked-button routerLink="/analyst" color="primary">
+    <mat-icon>chat</mat-icon>
+    {{ 'analyst.history.newConversation' | translate }}
+  </button>
+</div>
+
+@if (isLoading()) {
+  <div class="loading-state">
+    <mat-spinner diameter="40"></mat-spinner>
+  </div>
+} @else if (conversations().length === 0) {
+  <div class="empty-state" data-testid="analyst-history-empty">
+    <mat-icon>history</mat-icon>
+    <p>{{ 'analyst.history.empty' | translate }}</p>
+  </div>
+} @else {
+  <div class="history-list">
+    @for (conv of conversations(); track conv.id) {
+      <mat-card
+        class="history-card"
+        data-testid="analyst-history-item"
+        role="button"
+        tabindex="0"
+        [attr.aria-label]="conv.turns[0]?.question_text ?? ('analyst.history.noTurns' | translate)"
+        (click)="openConversation(conv.id)"
+        (keyup.enter)="openConversation(conv.id)"
+      >
+        <mat-card-content>
+          <div class="history-card-header">
+            <span class="date">{{ conv.created_at | formatDate }}</span>
+            <span class="turn-count">{{ 'analyst.history.turns' | translate:{ count: conv.turns.length } }}</span>
+          </div>
+          <div class="history-card-question">
+            @if (conv.turns.length > 0) {
+              {{ conv.turns[0].question_text }}
+            } @else {
+              {{ 'analyst.history.noTurns' | translate }}
+            }
+          </div>
+        </mat-card-content>
+      </mat-card>
+    }
+  </div>
+
+  @if (nextCursor()) {
+    <div class="load-more-container">
+      <button mat-stroked-button (click)="loadMore()" [disabled]="isLoadingMore()">
+        @if (isLoadingMore()) {
+          <mat-spinner diameter="20"></mat-spinner>
+        } @else {
+          {{ 'analyst.history.loadMore' | translate }}
+        }
+      </button>
+    </div>
+  }
+}

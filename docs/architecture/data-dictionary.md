@@ -2144,3 +2144,56 @@ branch and `purchase_request_id`; it does not create a purchase order or bypass 
 
 RLS is enabled and forced. All tenant members may read. Owners and buyers may insert or update,
 and every preparation is appended to `audit_event`.
+
+## R4.2 Grounded Procurement Analyst
+
+### `AnalystConversation`
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | uuid | PK, default `gen_random_uuid()` |
+| `tenant_id` | uuid | Required FK -> Tenant; RLS key |
+| `creating_member_id` | uuid | Required FK -> Membership |
+| `created_at` | timestamptz | Audit field; default `now()` |
+
+`AnalystConversation` represents a tenant- and member-scoped thread of question/answer turns. RLS allows the creating member or any member with the owner or buyer role to read it (FR-009 oversight). Cross-tenant reads return not found, never forbidden. It relies on a unique constraint for `(tenant_id, id)`.
+
+### `AnalystTurn`
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | uuid | PK, default `gen_random_uuid()` |
+| `tenant_id` | uuid | Required FK -> Tenant; RLS key |
+| `conversation_id` | uuid | Required FK -> AnalystConversation |
+| `creating_member_id` | uuid | Required FK -> Membership |
+| `question_text` | text | Required user question |
+| `category` | text | Required question category (a stored sentinel value when `is_unsupported`) |
+| `answer_text` | text | Required answer, or the fixed refusal string when `is_unsupported` |
+| `calculation_version` | text | Required formula/calculation rule identifier |
+| `release_posture` | text | Required posture; default `g3_unmet` and check constraint restricts to `g3_unmet` |
+| `next_step_url` | text | Optional next step link (FR-003A) — set only for `supplier_performance_risk` (existing negotiation brief), `reorder_forecasts`, and `spend_savings` answers |
+| `idempotency_key` | uuid | Required; unique per `(tenant_id, idempotency_key)` — a retried request with the same key replays the original turn rather than creating a second one |
+| `calculation` | jsonb | Nullable — the stored `CalculationDetail` (FR-004); null for the unsupported refusal and the no-grounding-data answer |
+| `is_unsupported` | boolean | Required, default `false` — distinguishes an explicit "can't answer that yet" refusal from a supported-but-ungrounded answer |
+| `entities` | jsonb | Nullable — the `IntentEntities` this turn was classified with, read back by the immediately-following turn to resolve a follow-up's omitted subject (FR-008); null when `is_unsupported` |
+| `created_at` | timestamptz | Audit field; default `now()` |
+
+`AnalystTurn` records the immutable question and answer for a single turn in a conversation. It is append-only: authenticated users get INSERT/SELECT only. RLS inherits read policy from `AnalystConversation` (creator or owner/buyer oversight). Continuing a conversation (supplying its id on a new `POST /analyst/conversations`) is gated more strictly than this read policy — only the conversation's original creator may append a follow-up turn; a different member, even an owner or buyer, gets `404 not_found`.
+
+### `AnalystTurnCitation`
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | uuid | PK, default `gen_random_uuid()` |
+| `tenant_id` | uuid | Required FK -> Tenant; RLS key |
+| `turn_id` | uuid | Required FK -> AnalystTurn |
+| `purchase_order_id` | uuid | Optional FK -> `purchase_order` |
+| `quotation_line_id` | uuid | Optional FK -> `quotation_line` |
+| `landed_cost_id` | uuid | Optional FK -> `landed_cost` |
+| `saving_record_id` | uuid | Optional FK -> `saving_record` |
+| `supplier_scorecard_snapshot_id` | uuid | Optional FK -> `supplier_scorecard_snapshot` |
+| `delivery_receipt_id` | uuid | Optional FK -> `delivery_receipt` |
+| `reorder_proposal_id` | uuid | Optional FK -> `reorder_proposal` |
+| `created_at` | timestamptz | Audit field; default `now()` |
+
+`AnalystTurnCitation` (table `analyst_turn_citation`) records exactly one typed, tenant-pinned source reference per row. It inherits read permissions from `AnalystTurn`. The table deliberately uses one nullable FK column per source kind rather than a generic `(source_kind, source_id)` pair, with a constraint enforcing that `num_nonnulls` equals 1. This is a deliberate, established pattern in this codebase.

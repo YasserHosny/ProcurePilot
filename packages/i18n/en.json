@@ -161,6 +161,7 @@
     "navProducts": "Products",
     "navSuppliers": "Suppliers",
     "navSupplierRisk": "Supplier Risk",
+    "navAnalyst": "Procurement Analyst",
     "navImport": "Import Catalogue",
     "navQuotations": "Quotation Inbox",
     "navMatching": "Match Resolution",
@@ -185,6 +186,58 @@
     "navAlerts": "Alerts Inbox",
     "navIntelligence": "Price Intelligence",
     "navForecasting": "Reorder Forecasts"
+  },
+  "analyst": {
+    "title": "Procurement Analyst",
+    "subtitle": "Ask a question about your own tenant data. Every answer cites a source record and shows its calculation.",
+    "threadLabel": "Conversation",
+    "g3": {
+      "title": "G3 evidence is still unmet",
+      "message": "This analyst only answers from your own data and never places, drafts, or sends a purchase. Advisory only, reviewed by a human."
+    },
+    "form": {
+      "title": "Ask a question",
+      "label": "Ask a question",
+      "submit": "Ask"
+    },
+    "empty": {
+      "title": "No questions yet",
+      "message": "Ask about spend and savings, supplier performance and risk, orders and quotations, or reorder forecasts."
+    },
+    "calculation": {
+      "title": "Show calculation"
+    },
+    "citations": {
+      "label": "Sources:",
+      "kind": {
+        "purchase_order": "Purchase order",
+        "quotation_line": "Quotation line",
+        "landed_cost": "Landed cost",
+        "saving_record": "Saving record",
+        "supplier_scorecard_snapshot": "Supplier scorecard",
+        "delivery_receipt": "Delivery receipt",
+        "reorder_proposal": "Reorder proposal"
+      }
+    },
+    "nextStep": {
+      "label": "View details",
+      "negotiationBrief": "View negotiation brief",
+      "reorderQueue": "View reorder queue",
+      "report": "View report"
+    },
+    "errors": {
+      "ask": "The question could not be answered.",
+      "load": "This conversation could not be loaded."
+    },
+    "navHistory": "Analyst History",
+    "history": {
+      "title": "Question History",
+      "newConversation": "New Conversation",
+      "empty": "No past conversations found.",
+      "turns": "{{count}} turn(s)",
+      "noTurns": "Empty conversation",
+      "loadMore": "Load More"
+    }
   },
   "forecasting": {
     "title": "Reorder Forecasts",
@@ -1041,8 +1094,8 @@
       "badgeAutoAccepted": "Auto-matched",
       "badgeResolved": "Resolved",
       "autoAcceptedBanner": "Auto-matched above threshold without human review. View details only.",
-      "emptyAutoAccepted": "No auto-accepted lines to show for the current filters."
-      ,"refreshReviews": {
+      "emptyAutoAccepted": "No auto-accepted lines to show for the current filters.",
+      "refreshReviews": {
         "title": "Catalogue refreshes awaiting review",
         "subtitle": "Review normalized supplier prices before they enter the matching pipeline.",
         "pending": "Pending review",

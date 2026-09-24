@@ -7,6 +7,7 @@ from procurepilot_api.config import Settings, get_settings
 from procurepilot_api.errors import register_exception_handlers
 from procurepilot_api.modules.accounting.router import router as accounting_router
 from procurepilot_api.modules.alerts.router import router as alerts_router
+from procurepilot_api.modules.analyst.router import router as analyst_router
 from procurepilot_api.modules.auth.router import router as auth_router
 from procurepilot_api.modules.billing.router import router as billing_router
 from procurepilot_api.modules.catalogue.router import router as catalogue_router
@@ -78,6 +79,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(orders_router, prefix=API_PREFIX)
     app.include_router(requests_router, prefix=API_PREFIX)
     app.include_router(alerts_router, prefix=API_PREFIX)
+    app.include_router(analyst_router, prefix=API_PREFIX)
     app.include_router(savings_router, prefix=API_PREFIX)
     app.include_router(exports_router, prefix=API_PREFIX)
     app.include_router(reports_router, prefix=API_PREFIX)

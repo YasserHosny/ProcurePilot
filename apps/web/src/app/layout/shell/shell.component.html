@@ -150,6 +150,27 @@
 
       <a
         mat-list-item
+        routerLink="/analyst"
+        routerLinkActive="active"
+        [routerLinkActiveOptions]="{exact: true}"
+        class="nav-item"
+      >
+        <mat-icon aria-hidden="true">forum</mat-icon>
+        <span class="nav-label">{{ 'shell.navAnalyst' | translate }}</span>
+      </a>
+
+      <a
+        mat-list-item
+        routerLink="/analyst/history"
+        routerLinkActive="active"
+        class="nav-item"
+      >
+        <mat-icon aria-hidden="true">history</mat-icon>
+        <span class="nav-label">{{ 'analyst.navHistory' | translate }}</span>
+      </a>
+
+      <a
+        mat-list-item
         routerLink="/import"
         routerLinkActive="active"
         class="nav-item"
