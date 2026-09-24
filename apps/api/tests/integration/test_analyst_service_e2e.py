@@ -1,4 +1,4 @@
-"""Real (non-mocked) end-to-end test for AnalystService.ask() (R4.2, T013).
+"""Real (non-mocked) end-to-end test for AnalystService.ask() (R4.2, T013, T019, T021).
 
 Written during orchestrator review of the Phase 3 dispatch: the dispatch's own
 integration test (test_analyst_api.py) mocks AnalystService entirely via a FastAPI
@@ -6,11 +6,17 @@ dependency override, so it never once exercised service.py's actual SQL against 
 real database. This test does — it proves the full round trip (conversation +
 turn + citation + audit event, atomically, against real RLS) actually works,
 not just that the HTTP layer wires a mock correctly.
+
+T019/T021 (Phase 4, US2/FR-003A) extend this file with the deep-link-to-existing-
+surface behaviour: a risky supplier with an existing negotiation brief links to it,
+one without a brief links nowhere, a reorder-forecast answer links to the reorder
+queue, and a spend/savings answer links to the reports center.
 """
 
 from __future__ import annotations
 
 import os
+from datetime import date
 from uuid import UUID, uuid4
 
 import psycopg
@@ -30,11 +36,10 @@ pytestmark = pytest.mark.skipif(
 )
 
 
-def _seed_workspace_with_spend(cur: psycopg.Cursor) -> tuple[UUID, UUID, UUID]:
-    """One tenant, one owner member, one purchase order — enough to ground a
-    spend_savings question with a real citation."""
+def _seed_tenant(cur: psycopg.Cursor, *, email_suffix: str) -> tuple[UUID, UUID, UUID]:
+    """One tenant and one owner member — the common base every scenario below extends."""
     tenant_id, user_id, membership_id, invitation_id = uuid4(), uuid4(), uuid4(), uuid4()
-    supplier_id, order_id = uuid4(), uuid4()
+    email = f"analyst-e2e-{email_suffix}@example.test"
 
     cur.execute(
         "insert into supported_region (code,label_en,label_ar) values ('GB','UK','ب') "
@@ -48,14 +53,11 @@ def _seed_workspace_with_spend(cur: psycopg.Cursor) -> tuple[UUID, UUID, UUID]:
         "insert into supported_tax_model (code,label_en,label_ar,region_code) "
         "values ('uk_vat','UK VAT','ض','GB') on conflict do nothing"
     )
-    cur.execute(
-        "insert into auth.users (id,email) values (%s,%s)",
-        (user_id, "analyst-e2e@example.test"),
-    )
+    cur.execute("insert into auth.users (id,email) values (%s,%s)", (user_id, email))
     cur.execute(
         "insert into platform_invitation (id,email,token_hash,expires_at) "
         "values (%s,%s,%s, now() + interval '7 days')",
-        (invitation_id, "analyst-e2e@example.test", f"hash-{invitation_id}"),
+        (invitation_id, email, f"hash-{invitation_id}"),
     )
     cur.execute(
         "insert into tenant (id,name,slug,region,currency,tax_model,platform_invitation_id) "
@@ -65,8 +67,17 @@ def _seed_workspace_with_spend(cur: psycopg.Cursor) -> tuple[UUID, UUID, UUID]:
     cur.execute(
         "insert into membership (id,tenant_id,user_id,email,role,is_active_workspace) "
         "values (%s,%s,%s,%s,'owner',true)",
-        (membership_id, tenant_id, user_id, "analyst-e2e@example.test"),
+        (membership_id, tenant_id, user_id, email),
     )
+    return tenant_id, user_id, membership_id
+
+
+def _seed_workspace_with_spend(cur: psycopg.Cursor) -> tuple[UUID, UUID, UUID]:
+    """One tenant, one owner member, one purchase order — enough to ground a
+    spend_savings question with a real citation."""
+    tenant_id, user_id, membership_id = _seed_tenant(cur, email_suffix="spend")
+    supplier_id, order_id = uuid4(), uuid4()
+
     cur.execute(
         "insert into supplier (id,tenant_id,name) values (%s,%s,%s)",
         (supplier_id, tenant_id, "Analyst E2E Supplier"),
@@ -83,6 +94,106 @@ def _seed_workspace_with_spend(cur: psycopg.Cursor) -> tuple[UUID, UUID, UUID]:
         (order_id, tenant_id, supplier_id, membership_id),
     )
     return tenant_id, user_id, membership_id
+
+
+def _seed_supplier_with_snapshot(
+    cur: psycopg.Cursor,
+    tenant_id: UUID,
+    membership_id: UUID,
+    *,
+    supplier_name: str,
+    with_negotiation_brief: bool,
+) -> UUID:
+    """One supplier with a ready, high-risk supplier_scorecard_snapshot (v2 rule), and
+    optionally an existing negotiation_brief generated from that snapshot (FR-003A)."""
+    supplier_id, snapshot_id = uuid4(), uuid4()
+    cur.execute(
+        "insert into supplier (id,tenant_id,name) values (%s,%s,%s)",
+        (supplier_id, tenant_id, supplier_name),
+    )
+    cur.execute(
+        """
+        insert into supplier_scorecard_snapshot
+          (id, tenant_id, supplier_id, window_start, window_end, rule_version,
+           metrics, risk_score, source_counts, state, confidence, release_posture,
+           valid_from, valid_until, source_fingerprint)
+        values (%s, %s, %s, current_date - interval '30 days', current_date,
+                'supplier-scorecard-v2', '{}'::jsonb, %s::jsonb, '{}'::jsonb,
+                'ready', 'high', 'g3_unmet', now(), now() + interval '30 days', %s)
+        """,
+        (
+            snapshot_id,
+            tenant_id,
+            supplier_id,
+            '{"total": 0.8}',
+            f"fp-{snapshot_id}",
+        ),
+    )
+    if with_negotiation_brief:
+        cur.execute(
+            """
+            insert into negotiation_brief
+              (id, tenant_id, supplier_id, snapshot_id, brief_version, source_fingerprint,
+               valid_from, valid_until, created_by_membership_id)
+            values (%s, %s, %s, %s, 'brief-v1', %s, now(), now() + interval '30 days', %s)
+            """,
+            (
+                uuid4(),
+                tenant_id,
+                supplier_id,
+                snapshot_id,
+                f"brief-fp-{snapshot_id}",
+                membership_id,
+            ),
+        )
+    return supplier_id
+
+
+def _seed_reorder_proposal(cur: psycopg.Cursor, tenant_id: UUID) -> UUID:
+    """One workspace product with a ready demand forecast and an open reorder proposal —
+    enough to ground a reorder_forecasts question."""
+    canonical_id, product_id, forecast_id, proposal_id = (
+        uuid4(),
+        uuid4(),
+        uuid4(),
+        uuid4(),
+    )
+    cur.execute(
+        "insert into canonical_product (id,name,gtin,base_unit) values (%s,%s,null,'litre')",
+        (canonical_id, "Analyst E2E Canonical Product"),
+    )
+    cur.execute(
+        "insert into workspace_product (id,tenant_id,canonical_product_id,tenant_name) "
+        "values (%s,%s,%s,%s)",
+        (product_id, tenant_id, canonical_id, "Analyst E2E Product"),
+    )
+    today = date.today()
+    cur.execute(
+        """
+        insert into demand_forecast (
+          id, tenant_id, workspace_product_id, source_fingerprint, model_version,
+          horizon_days, source_window_start, source_window_end, observed_history_days,
+          expected_daily_demand, expected_demand, uncertainty_lower, uncertainty_upper,
+          stock_on_hand, suggested_quantity, confidence, state, release_posture,
+          valid_from, valid_until
+        ) values (
+          %s, %s, %s, %s, 'forecast-v1', 30, %s, %s, 200,
+          1.5, 45.0, 40.0, 50.0, 10.0, 35.0,
+          'high', 'ready', 'g3_unmet',
+          now(), now() + interval '30 days'
+        )
+        """,
+        (forecast_id, tenant_id, product_id, f"forecast-fp-{forecast_id}", today, today),
+    )
+    cur.execute(
+        """
+        insert into reorder_proposal
+          (id, tenant_id, demand_forecast_id, workspace_product_id, status)
+        values (%s, %s, %s, %s, 'open')
+        """,
+        (proposal_id, tenant_id, forecast_id, product_id),
+    )
+    return proposal_id
 
 
 def _member(tenant_id: UUID, user_id: UUID, membership_id: UUID) -> CurrentMember:
@@ -164,3 +275,189 @@ def test_ask_unsupported_question_returns_explicit_refusal_with_no_citations() -
     turn = result.turns[0]
     assert not turn.citations
     assert "can't answer" in turn.answer_text.lower()
+
+
+# ---------------------------------------------------------------------------
+# Phase 4 (T019/T021): citation resolution and FR-003A next-step links
+# ---------------------------------------------------------------------------
+
+
+def test_citations_resolve_to_real_existing_tenant_records_across_categories() -> None:
+    """T019: every citation kind this feature actually produces must point at a real,
+    existing row in its source table — not a dangling or fabricated id.
+
+    Scoped to the citation kinds the current retrieval loaders actually emit
+    (purchase_order, saving_record, supplier_scorecard_snapshot, reorder_proposal).
+    quotation_line, landed_cost, and delivery_receipt are not wired into any
+    retrieval loader yet (landed_cost/delivery_receipt aren't wired into any FR-002
+    category at all), so there is nothing to seed or assert for them here.
+    """
+    with psycopg.connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
+        with conn.cursor() as cur:
+            tenant_id, user_id, membership_id = _seed_workspace_with_spend(cur)
+            _seed_supplier_with_snapshot(
+                cur,
+                tenant_id,
+                membership_id,
+                supplier_name="Citation Check Supplier",
+                with_negotiation_brief=False,
+            )
+            _seed_reorder_proposal(cur, tenant_id)
+        conn.commit()
+
+    member = _member(tenant_id, user_id, membership_id)
+    service = AnalystService(settings=get_settings(), intent_provider=FakeIntentProvider())
+
+    scenarios = [
+        ("How much have we spent this month?", "purchase_order", "purchase_order"),
+        (
+            "What is our supplier risk score?",
+            "supplier_scorecard_snapshot",
+            "supplier_scorecard_snapshot",
+        ),
+        ("What does our reorder forecast look like?", "reorder_proposal", "reorder_proposal"),
+    ]
+
+    for question, expected_kind, table in scenarios:
+        result = service.ask(
+            member=member,
+            question_text=question,
+            idempotency_key=uuid4(),
+            bearer_token="unused-in-this-path",
+        )
+        turn = result.turns[-1]
+        assert turn.citations, f"expected at least one citation for: {question!r}"
+        matching = [c for c in turn.citations if c.source_kind.value == expected_kind]
+        assert matching, f"expected a {expected_kind} citation for: {question!r}"
+
+        with psycopg.connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
+            with conn.cursor() as cur:
+                for citation in matching:
+                    cur.execute(
+                        f"select 1 from {table} where tenant_id = %s and id = %s",  # noqa: S608
+                        (tenant_id, citation.source_id),
+                    )
+                    assert cur.fetchone() is not None, (
+                        f"citation {citation.source_id} does not resolve to a real "
+                        f"row in {table}"
+                    )
+
+
+def test_next_step_link_points_to_existing_negotiation_brief_when_one_exists() -> None:
+    with psycopg.connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
+        with conn.cursor() as cur:
+            tenant_id, user_id, membership_id = _seed_tenant(cur, email_suffix="brief-yes")
+            _seed_supplier_with_snapshot(
+                cur,
+                tenant_id,
+                membership_id,
+                supplier_name="Supplier With Brief",
+                with_negotiation_brief=True,
+            )
+        conn.commit()
+
+    member = _member(tenant_id, user_id, membership_id)
+    service = AnalystService(settings=get_settings(), intent_provider=FakeIntentProvider())
+    result = service.ask(
+        member=member,
+        question_text="What is our supplier risk score?",
+        idempotency_key=uuid4(),
+        bearer_token="unused-in-this-path",
+    )
+    turn = result.turns[0]
+    assert turn.next_step_url is not None
+    assert turn.next_step_url.startswith("/negotiation-briefs/")
+
+    with psycopg.connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
+        with conn.cursor() as cur:
+            brief_id = turn.next_step_url.removeprefix("/negotiation-briefs/")
+            cur.execute(
+                "select 1 from negotiation_brief where tenant_id = %s and id = %s",
+                (tenant_id, brief_id),
+            )
+            assert cur.fetchone() is not None, "next_step_url must point at a real brief"
+
+
+def test_next_step_link_is_absent_when_no_negotiation_brief_exists() -> None:
+    with psycopg.connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
+        with conn.cursor() as cur:
+            tenant_id, user_id, membership_id = _seed_tenant(cur, email_suffix="brief-no")
+            _seed_supplier_with_snapshot(
+                cur,
+                tenant_id,
+                membership_id,
+                supplier_name="Supplier Without Brief",
+                with_negotiation_brief=False,
+            )
+        conn.commit()
+
+    member = _member(tenant_id, user_id, membership_id)
+    service = AnalystService(settings=get_settings(), intent_provider=FakeIntentProvider())
+    result = service.ask(
+        member=member,
+        question_text="What is our supplier risk score?",
+        idempotency_key=uuid4(),
+        bearer_token="unused-in-this-path",
+    )
+    turn = result.turns[0]
+    assert turn.next_step_url is None, (
+        "must never fabricate a next-step link to a brief that doesn't exist yet"
+    )
+
+
+def test_next_step_link_points_to_reorder_queue_for_reorder_forecast_answers() -> None:
+    with psycopg.connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
+        with conn.cursor() as cur:
+            tenant_id, user_id, membership_id = _seed_tenant(cur, email_suffix="reorder")
+            _seed_reorder_proposal(cur, tenant_id)
+        conn.commit()
+
+    member = _member(tenant_id, user_id, membership_id)
+    service = AnalystService(settings=get_settings(), intent_provider=FakeIntentProvider())
+    result = service.ask(
+        member=member,
+        question_text="What does our reorder forecast look like?",
+        idempotency_key=uuid4(),
+        bearer_token="unused-in-this-path",
+    )
+    turn = result.turns[0]
+    assert turn.next_step_url == "/forecasting"
+
+
+def test_next_step_link_points_to_reports_for_spend_savings_answers() -> None:
+    with psycopg.connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
+        with conn.cursor() as cur:
+            tenant_id, user_id, membership_id = _seed_workspace_with_spend(cur)
+        conn.commit()
+
+    member = _member(tenant_id, user_id, membership_id)
+    service = AnalystService(settings=get_settings(), intent_provider=FakeIntentProvider())
+    result = service.ask(
+        member=member,
+        question_text="How much have we spent this month?",
+        idempotency_key=uuid4(),
+        bearer_token="unused-in-this-path",
+    )
+    turn = result.turns[0]
+    assert turn.next_step_url == "/reports"
+
+
+def test_next_step_link_is_absent_for_orders_quotations_answers() -> None:
+    with psycopg.connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
+        with conn.cursor() as cur:
+            tenant_id, user_id, membership_id = _seed_workspace_with_spend(cur)
+        conn.commit()
+
+    member = _member(tenant_id, user_id, membership_id)
+    service = AnalystService(settings=get_settings(), intent_provider=FakeIntentProvider())
+    result = service.ask(
+        member=member,
+        question_text="What's the status of our purchase orders?",
+        idempotency_key=uuid4(),
+        bearer_token="unused-in-this-path",
+    )
+    turn = result.turns[0]
+    assert turn.category.value == "orders_quotations"
+    assert turn.next_step_url is None, (
+        "FR-003A names no existing surface for orders_quotations — never invent one"
+    )

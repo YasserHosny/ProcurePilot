@@ -159,6 +159,7 @@ class SupplierRiskRecord:
     risk_score: Decimal | None
     state: str  # "ready", "provisional", "insufficient_data"
     window_end: date
+    latest_negotiation_brief_id: UUID | None = None
 
 
 @dataclass(frozen=True)
@@ -313,6 +314,7 @@ def retrieve_spend_savings(inputs: SpendSavingsInput) -> AnalystResult:
                 formula="per-currency sum only — no cross-currency aggregation",
             ),
             citations=tuple(citation_list),
+            next_step_url="/reports",
         )
 
     # Single currency path
@@ -348,6 +350,7 @@ def retrieve_spend_savings(inputs: SpendSavingsInput) -> AnalystResult:
             result=_money(total_spend, ccy),
         ),
         citations=citations,
+        next_step_url="/reports",
     )
 
 
@@ -425,6 +428,15 @@ def retrieve_supplier_performance_risk(
     else:
         answer_text = "Supplier risk summary: " + " | ".join(summary_lines) + "."
 
+    # FR-003A: link to the first cited supplier's existing negotiation brief, in the
+    # same supplier order already used above. Never fabricate a brief that doesn't exist.
+    next_step_url: str | None = None
+    for _supplier_id, records in sorted(by_supplier.items(), key=lambda kv: str(kv[0])):
+        latest = sorted(records, key=lambda r: r.window_end, reverse=True)[0]
+        if latest.latest_negotiation_brief_id is not None:
+            next_step_url = f"/negotiation-briefs/{latest.latest_negotiation_brief_id}"
+            break
+
     return AnalystAnswer(
         answer_text=answer_text,
         calculation=CalculationDetail(
@@ -444,6 +456,7 @@ def retrieve_supplier_performance_risk(
             ),
         ),
         citations=tuple(citations),
+        next_step_url=next_step_url,
     )
 
 
@@ -600,4 +613,5 @@ def retrieve_reorder_forecasts(inputs: ReorderForecastsInput) -> AnalystResult:
             formula="status distribution and urgency count across all proposals",
         ),
         citations=citations,
+        next_step_url="/forecasting",
     )

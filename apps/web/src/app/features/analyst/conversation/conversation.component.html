@@ -86,8 +86,8 @@
             }
 
             @if (turn.next_step_url) {
-              <a [href]="turn.next_step_url" class="next-step-link">
-                {{ 'analyst.nextStep.label' | translate }}
+              <a [routerLink]="turn.next_step_url" class="next-step-link">
+                {{ nextStepLabelKey(turn) | translate }}
               </a>
             }
           </div>

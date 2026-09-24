@@ -154,14 +154,17 @@ class AnalystService:
                 answer_text = _UNSUPPORTED_ANSWER
                 calculation: CalculationDetail | None = None
                 citations: tuple[AnalystCitationCreate, ...] = ()
+                next_step_url: str | None = None
             elif isinstance(result, NoGroundingData):
                 answer_text = _NO_GROUNDING_ANSWER_PREFIX + result.explanation
                 calculation = None
                 citations = ()
+                next_step_url = None
             else:
                 answer_text = result.answer_text
                 calculation = result.calculation
                 citations = result.citations
+                next_step_url = result.next_step_url
 
             # 4. Persist atomically (conversation + turn + citations + audit)
             if conversation_id is None:
@@ -177,6 +180,7 @@ class AnalystService:
                 calculation=calculation,
                 idempotency_key=idempotency_key,
                 is_unsupported=is_unsupported,
+                next_step_url=next_step_url,
             )
             for citation in citations:
                 _insert_citation(conn, member.tenant_id, turn_id, citation)
@@ -345,6 +349,22 @@ def _load_supplier_performance_risk(
         )
         rows = cur.fetchall()
 
+        supplier_ids = {UUID(str(r["supplier_id"])) for r in rows}
+        latest_brief_by_supplier: dict[UUID, UUID] = {}
+        if supplier_ids:
+            cur.execute(
+                """
+                select distinct on (supplier_id) supplier_id, id
+                from negotiation_brief
+                where tenant_id = %s and supplier_id = any(%s)
+                order by supplier_id, created_at desc
+                """,
+                (member.tenant_id, list(supplier_ids)),
+            )
+            latest_brief_by_supplier = {
+                UUID(str(r["supplier_id"])): UUID(str(r["id"])) for r in cur.fetchall()
+            }
+
     snapshots = tuple(
         SupplierRiskRecord(
             id=UUID(str(r["id"])),
@@ -354,6 +374,9 @@ def _load_supplier_performance_risk(
             risk_score=_extract_total_risk_score(r.get("risk_score")),
             state=str(r["state"]),
             window_end=_to_date(r["window_end"]),
+            latest_negotiation_brief_id=latest_brief_by_supplier.get(
+                UUID(str(r["supplier_id"]))
+            ),
         )
         for r in rows
     )
@@ -537,6 +560,7 @@ def _insert_turn(
     calculation: CalculationDetail | None,
     idempotency_key: UUID,
     is_unsupported: bool,
+    next_step_url: str | None = None,
 ) -> UUID:
     calculation_json = calculation.model_dump(mode="json") if calculation else None
     with conn.cursor() as cur:
@@ -545,8 +569,8 @@ def _insert_turn(
             insert into analyst_turn (
                 tenant_id, conversation_id, creating_member_id,
                 question_text, category, answer_text, calculation_version,
-                release_posture, calculation, idempotency_key, is_unsupported
-            ) values (%s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb, %s, %s)
+                release_posture, next_step_url, calculation, idempotency_key, is_unsupported
+            ) values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb, %s, %s)
             returning id
             """,
             (
@@ -558,6 +582,7 @@ def _insert_turn(
                 answer_text,
                 CALCULATION_VERSION,
                 RELEASE_POSTURE,
+                next_step_url,
                 Jsonb(calculation_json) if calculation_json is not None else None,
                 str(idempotency_key),
                 is_unsupported,
@@ -646,7 +671,8 @@ def _build_conversation_response(
         cur.execute(
             """
             select id, conversation_id, creating_member_id, question_text, category,
-                   answer_text, calculation_version, release_posture, calculation, created_at
+                   answer_text, calculation_version, release_posture, next_step_url,
+                   calculation, created_at
             from analyst_turn
             where conversation_id = %s
             order by created_at asc, id asc
@@ -690,7 +716,7 @@ def _build_conversation_response(
                     release_posture="g3_unmet",
                     calculation=calculation,
                     citations=citations,
-                    next_step_url=None,
+                    next_step_url=tr["next_step_url"],
                     created_at=tr["created_at"],
                 )
             )

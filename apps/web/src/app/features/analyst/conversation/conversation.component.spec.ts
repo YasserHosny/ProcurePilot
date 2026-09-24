@@ -1,5 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
+import { provideRouter } from '@angular/router';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { of, throwError } from 'rxjs';
 
@@ -62,7 +63,11 @@ describe('AnalystConversationComponent (R4.2)', () => {
 
     await TestBed.configureTestingModule({
       imports: [AnalystConversationComponent, TranslateModule.forRoot()],
-      providers: [provideNoopAnimations(), { provide: AnalystApiService, useValue: analystApi }],
+      providers: [
+        provideNoopAnimations(),
+        provideRouter([]),
+        { provide: AnalystApiService, useValue: analystApi },
+      ],
     }).compileComponents();
 
     const translate = TestBed.inject(TranslateService);
@@ -80,7 +85,12 @@ describe('AnalystConversationComponent (R4.2)', () => {
           label: 'Sources:',
           kind: { purchase_order: 'Purchase order' },
         },
-        nextStep: { label: 'View details' },
+        nextStep: {
+          label: 'View details',
+          negotiationBrief: 'View negotiation brief',
+          reorderQueue: 'View reorder queue',
+          report: 'View report',
+        },
         errors: { ask: 'The question could not be answered.' },
       },
     });
@@ -151,5 +161,65 @@ describe('AnalystConversationComponent (R4.2)', () => {
     component.questionText.set('   ');
     component.ask();
     expect(analystApi.askQuestion).not.toHaveBeenCalled();
+  });
+
+  it('expands the calculation detail on click', () => {
+    analystApi.askQuestion.and.returnValue(of(conversationWith(citedTurn)));
+    fixture.detectChanges();
+    component.questionText.set('How much have we spent this month?');
+    component.ask();
+    fixture.detectChanges();
+
+    const el = fixture.nativeElement as HTMLElement;
+    const header = el.querySelector('mat-expansion-panel-header') as HTMLElement;
+    expect(header).toBeTruthy();
+    header.click();
+    fixture.detectChanges();
+
+    expect(el.querySelector('.formula')?.textContent).toContain('sum of all spend amounts');
+  });
+
+  it('renders a next-step link when the turn has one (FR-003A)', () => {
+    const turnWithNextStep: AnalystTurn = {
+      ...citedTurn,
+      category: 'supplier_performance_risk',
+      next_step_url: '/negotiation-briefs/brief-1',
+    };
+    analystApi.askQuestion.and.returnValue(of(conversationWith(turnWithNextStep)));
+    fixture.detectChanges();
+    component.questionText.set('What is our supplier risk score?');
+    component.ask();
+    fixture.detectChanges();
+
+    const el = fixture.nativeElement as HTMLElement;
+    const link = el.querySelector('.next-step-link') as HTMLAnchorElement;
+    expect(link).toBeTruthy();
+    expect(link.textContent).toContain('View negotiation brief');
+  });
+
+  it('renders no next-step link when the turn has none', () => {
+    analystApi.askQuestion.and.returnValue(of(conversationWith(citedTurn)));
+    fixture.detectChanges();
+    component.questionText.set('How much have we spent this month?');
+    component.ask();
+    fixture.detectChanges();
+
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.querySelector('.next-step-link')).toBeFalsy();
+  });
+
+  it('maps each category to its own next-step label key', () => {
+    expect(component.nextStepLabelKey({ ...citedTurn, category: 'supplier_performance_risk' })).toBe(
+      'analyst.nextStep.negotiationBrief',
+    );
+    expect(component.nextStepLabelKey({ ...citedTurn, category: 'reorder_forecasts' })).toBe(
+      'analyst.nextStep.reorderQueue',
+    );
+    expect(component.nextStepLabelKey({ ...citedTurn, category: 'spend_savings' })).toBe(
+      'analyst.nextStep.report',
+    );
+    expect(component.nextStepLabelKey({ ...citedTurn, category: 'orders_quotations' })).toBe(
+      'analyst.nextStep.label',
+    );
   });
 });

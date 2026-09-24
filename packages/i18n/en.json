@@ -220,7 +220,10 @@
       }
     },
     "nextStep": {
-      "label": "View details"
+      "label": "View details",
+      "negotiationBrief": "View negotiation brief",
+      "reorderQueue": "View reorder queue",
+      "report": "View report"
     },
     "errors": {
       "ask": "The question could not be answered."

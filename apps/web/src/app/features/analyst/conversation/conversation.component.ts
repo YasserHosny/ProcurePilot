@@ -1,6 +1,7 @@
 import { JsonPipe } from '@angular/common';
 import { Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatExpansionModule } from '@angular/material/expansion';
@@ -11,7 +12,13 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { finalize } from 'rxjs';
 
-import { AnalystApiService, type AnalystTurn } from '../analyst-api';
+import { AnalystApiService, type AnalystCategory, type AnalystTurn } from '../analyst-api';
+
+const NEXT_STEP_LABEL_KEY_BY_CATEGORY: Partial<Record<AnalystCategory, string>> = {
+  supplier_performance_risk: 'analyst.nextStep.negotiationBrief',
+  reorder_forecasts: 'analyst.nextStep.reorderQueue',
+  spend_savings: 'analyst.nextStep.report',
+};
 
 @Component({
   selector: 'app-analyst-conversation',
@@ -26,6 +33,7 @@ import { AnalystApiService, type AnalystTurn } from '../analyst-api';
     MatIconModule,
     MatInputModule,
     MatProgressSpinnerModule,
+    RouterLink,
     TranslatePipe,
   ],
   templateUrl: './conversation.component.html',
@@ -67,5 +75,9 @@ export class AnalystConversationComponent {
 
   isRefusal(turn: AnalystTurn): boolean {
     return turn.citations.length === 0 && turn.calculation === null;
+  }
+
+  nextStepLabelKey(turn: AnalystTurn): string {
+    return NEXT_STEP_LABEL_KEY_BY_CATEGORY[turn.category] ?? 'analyst.nextStep.label';
   }
 }

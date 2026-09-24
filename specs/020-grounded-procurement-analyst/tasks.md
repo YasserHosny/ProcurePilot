@@ -128,25 +128,25 @@ next-step link routes to the existing negotiation-brief or reorder-queue screen.
 
 ### Tests for User Story 2
 
-- [ ] T019 [P] [US2] Integration test: each citation kind (purchase order, quotation line, landed
+- [x] T019 [P] [US2] Integration test: each citation kind (purchase order, quotation line, landed
       cost, saving record, scorecard/risk snapshot, delivery receipt, reorder proposal) resolves
       to a real, existing tenant record, in `apps/api/tests/integration/test_analyst_api.py`
-- [ ] T020 [P] [US2] Component test: calculation detail expands and citation links navigate to the
+- [x] T020 [P] [US2] Component test: calculation detail expands and citation links navigate to the
       correct existing screens, in `conversation.component.spec.ts`
-- [ ] T021 [P] [US2] Integration test (FR-003A / SC-007): an answer about a risky supplier, a
+- [x] T021 [P] [US2] Integration test (FR-003A / SC-007): an answer about a risky supplier, a
       low-stock forecast, and a spend/savings question each include the correct deep link to
       their existing actionable surface; a question with no such surface includes none
 
 ### Implementation for User Story 2
 
-- [ ] T022 [US2] Ensure the citation payload from `retrieval.py`/`service.py` carries stable IDs/
+- [x] T022 [US2] Ensure the citation payload from `retrieval.py`/`service.py` carries stable IDs/
       links to the exact underlying record for each source kind (extends T008/T013)
-- [ ] T023 [US2] Implement the next-step deep-link field per category in
+- [x] T023 [US2] Implement the next-step deep-link field per category in
       `retrieval.py`/`service.py` (FR-003A) — links to existing negotiation-brief, reorder-queue,
       or report screens only, never a new action capability
-- [ ] T024 [US2] Implement the citation and "show calculation" UI in
+- [x] T024 [US2] Implement the citation and "show calculation" UI in
       `conversation.component.html`/`.ts` — inline expansion, links out to existing record screens
-- [ ] T025 [US2] Implement the next-step link in the UI, rendered only when the answer includes one
+- [x] T025 [US2] Implement the next-step link in the UI, rendered only when the answer includes one
 
 **Checkpoint**: US1 + US2 together deliver the full "ask and verify" MVP, including the
 Constitution Principle IV next-step requirement.
