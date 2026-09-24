@@ -21,9 +21,9 @@ implementation and testing of each story.
 
 **Purpose**: Project skeleton and the new outbound-email configuration surface, no behavior yet.
 
-- [ ] T001 Create the `rfq` module skeleton: `apps/api/src/procurepilot_api/modules/rfq/__init__.py`
-- [ ] T002 [P] Create the Angular RFQ feature directory skeleton at `apps/web/src/app/features/rfq/`
-- [ ] T003 [P] Add `MAILGUN_API_KEY`/`MAILGUN_SENDING_DOMAIN`/`RFQ_MAILER_MODE` to
+- [x] T001 Create the `rfq` module skeleton: `apps/api/src/procurepilot_api/modules/rfq/__init__.py`
+- [x] T002 [P] Create the Angular RFQ feature directory skeleton at `apps/web/src/app/features/rfq/`
+- [x] T003 [P] Add `MAILGUN_API_KEY`/`MAILGUN_SENDING_DOMAIN`/`RFQ_MAILER_MODE` to
       `apps/api/src/procurepilot_api/config.py` and document them in `.env.example`
       (`MAILGUN_SIGNING_KEY` already exists for inbound verification — these are new, outbound-only)
 
@@ -35,29 +35,29 @@ implementation and testing of each story.
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete.
 
-- [ ] T004 Write failing isolation fixtures for two tenants — one RFQ with a recipient, a response,
+- [x] T004 Write failing isolation fixtures for two tenants — one RFQ with a recipient, a response,
       a guardrail, and an auto-preparation event each — in
       `apps/api/tests/integration/test_rfq_isolation.py`
-- [ ] T005 Add migration `supabase/migrations/<ts>_rfq_sourcing.sql`: `rfq`, `rfq_recipient`,
+- [x] T005 Add migration `supabase/migrations/<ts>_rfq_sourcing.sql`: `rfq`, `rfq_recipient`,
       `rfq_response`, `auto_preparation_guardrail`, `auto_preparation_event` (append-only — no
       `UPDATE`/`DELETE` grant, same discipline as `audit_event`), each with composite tenant
       foreign keys, forced RLS, and `USING`/`WITH CHECK` policies scoped to the creating member
       plus owner/buyer read-all (FR-016) — mirror `analyst_conversation`'s policy shape exactly
-- [ ] T006 Add migration `supabase/migrations/<ts>_supplier_contact_email.sql`: nullable
+- [x] T006 Add migration `supabase/migrations/<ts>_supplier_contact_email.sql`: nullable
       `supplier.contact_email` — confirmed against the live schema that no outbound contact
       address exists today (`email_domains` is an inbound-matching heuristic only)
-- [ ] T007 Run the isolation test (T004) against the new migrations and verify cross-tenant reads
+- [x] T007 Run the isolation test (T004) against the new migrations and verify cross-tenant reads
       of every new table return no rows
-- [ ] T008 [P] Write failing unit tests for the mailer interface in
+- [x] T008 [P] Write failing unit tests for the mailer interface in
       `apps/api/tests/unit/test_rfq_mailer.py`: `FakeMailer` is deterministic and network-free;
       `SendResult` always carries a `Message-ID`
-- [ ] T009 Implement `apps/api/src/procurepilot_api/shared/mailer.py`: a pure `send(to, subject,
+- [x] T009 Implement `apps/api/src/procurepilot_api/shared/mailer.py`: a pure `send(to, subject,
       body, headers) -> SendResult` interface, a real `MailgunMailer` (Messages API), and a
       `FakeMailer` stub, selected by `RFQ_MAILER_MODE=stub|mailgun` (stub is the test/CI default,
       matching the `FakeIntentProvider`/`FakeExtractionProvider` convention)
-- [ ] T010 [P] Define `Rfq`/`RfqRecipient`/`RfqResponse`/`AutoPreparationGuardrail` Pydantic
+- [x] T010 [P] Define `Rfq`/`RfqRecipient`/`RfqResponse`/`AutoPreparationGuardrail` Pydantic
       schemas in `apps/api/src/procurepilot_api/modules/rfq/schemas.py`
-- [ ] T011 Record ADR-018 (reuse Mailgun for outbound, don't add a second vendor) in
+- [x] T011 Record ADR-018 (reuse Mailgun for outbound, don't add a second vendor) in
       `docs/architecture/adrs.md`
 
 **Checkpoint**: Foundation ready — schema exists, isolation is proven, the mailer works against a
