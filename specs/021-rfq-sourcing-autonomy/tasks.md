@@ -137,8 +137,14 @@ open RFQ falls through to the ordinary quotation-ingestion path unchanged.
       pure function, `ingestion_email_log` row (already carries `in_reply_to`/`references_list`)
       plus a tenant's open RFQ recipients → matched `rfq_recipient_id` or `None`
 - [ ] T023 [US2] Wire `response_matching.py` into
-      `apps/api/src/procurepilot_api/modules/ingestion/router.py`'s inbound webhook handler as an
-      additive step after existing quotation/supplier matching completes, and record a "response
+      `apps/api/src/procurepilot_api/modules/ingestion/orchestrator.py`'s `process_inbound_email()`
+      (corrected from `ingestion/router.py`, which only verifies and enqueues — matching actually
+      happens in the orchestrator, called async from `workers/email_ingestion_worker.py`) as an
+      additive step after existing quotation/supplier matching completes; query/insert against
+      `rfq`/`rfq_recipient`/`rfq_response` under `set local role service_role` with an explicit
+      tenant_id filter, since those tables' RLS policies require a real membership/owner-buyer
+      claim that the orchestrator's tenant-only session does not carry (`ingestion_email_log`'s
+      simpler tenant-only policy is why the existing code works without this); record a "response
       received" audit event on a match (FR-015)
 - [ ] T024 [US2] Run the full existing ingestion suite
       (`test_email_ingestion_worker.py`, `test_capture_service.py`, the quotation-matching

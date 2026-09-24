@@ -137,8 +137,12 @@ API sends from the same verified domain and its inbound webhook already threads 
 ### Task 3: Match inbound replies to RFQs and capture responses (FR-005, FR-006)
 
 **Files:**
-- Update: `apps/api/src/procurepilot_api/modules/ingestion/router.py` — after existing supplier/
-  quotation matching, add RFQ-reply matching as an additional, non-exclusive classification (an
+- Update: `apps/api/src/procurepilot_api/modules/ingestion/orchestrator.py`'s
+  `process_inbound_email()` — corrected during Phase 4 research: the inbound webhook handler in
+  `ingestion/router.py` only verifies/enqueues (`job_type='email_ingest'`); all supplier/quotation
+  matching actually happens inside `process_inbound_email()`, called from
+  `workers/email_ingestion_worker.py`'s `_process_job()`. RFQ-reply matching goes there, as an
+  additional, non-exclusive classification alongside the existing `match_supplier()` call (an
   inbound email can be an ordinary quotation AND happen to match an open RFQ's `Message-ID` in
   `in_reply_to`/`references_list`)
 - Create: `apps/api/src/procurepilot_api/modules/rfq/response_matching.py` — pure function,
@@ -146,14 +150,29 @@ API sends from the same verified domain and its inbound webhook already threads 
   recipients for the tenant → matched `rfq_recipient_id` or `None`
 - Test: `apps/api/tests/integration/test_rfq_response_capture.py`
 
+**RLS note (found during Phase 4 research):** `process_inbound_email()` runs under
+`_act_as_tenant()`, which sets only the `tenant_id`/`role` JWT claims — no `sub` (user id) or
+`member_role`. `rfq`/`rfq_recipient`/`rfq_response` RLS policies require either
+`created_by_membership_id = current_membership_id()` (a live lookup keyed off `sub`, which is
+unset here) or `current_member_role() in ('owner', 'buyer')` (also unset here) — so a plain
+tenant-scoped query against these tables from inside the orchestrator returns zero rows, silently,
+never an error. `quotation`/`ingestion_email_log`, by contrast, use plain
+`tenant_id = current_tenant_id()` policies, which is why the existing orchestrator code works
+unmodified. The RFQ-matching/response-insert step must use `set local role service_role` (the
+same pattern already used by `workers/accounting_sync_worker.py`, `workers/pos_sync_worker.py`,
+etc. for system-initiated writes) with an explicit manual `tenant_id = %s` filter on every query,
+since RLS is bypassed under `service_role`.
+
 - [ ] **Step 1: Write failing tests** for: a reply matching an open RFQ's `Message-ID` captures a
   linked `rfq_response`; a reply that matches no open RFQ falls through to the existing general
   quotation path unchanged (FR-006); a reply matching an RFQ that has since expired is still
   captured as a response but the RFQ's own status stays `expired` (per the spec's edge case,
   not `responded`); an arithmetic-mismatch response still hits the existing mandatory review task
   with no RFQ-specific exemption (FR-005).
-- [ ] **Step 2: Implement `response_matching.py`** and wire it into the ingestion webhook path
-  as an additive step after the existing quotation/supplier matching completes.
+- [ ] **Step 2: Implement `response_matching.py`** and wire it into `orchestrator.py`'s
+  `process_inbound_email()` as an additive step after the existing quotation/supplier matching
+  completes, using a `service_role` connection with an explicit tenant_id filter (see the RLS
+  note above).
 - [ ] **Step 3: Complete Task 2 Step 4's** cross-tenant matching-isolation test now that matching
   exists; all green.
 - [ ] **Step 4: Run the full existing ingestion test suite** (`test_email_ingestion_worker.py`,
