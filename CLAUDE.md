@@ -1,6 +1,6 @@
 # ProcurePilot — Development Guidelines
 
-Last updated: 2026-09-24 · Active feature: `020-grounded-procurement-analyst`
+Last updated: 2026-09-24 · Active feature: `021-rfq-sourcing-autonomy`
 
 ProcurePilot turns fragmented supplier information into trusted, comparable purchasing
 decisions and proves the money saved. Read `.specify/memory/constitution.md` before writing
@@ -140,8 +140,16 @@ breakdown (R3.0–R3.4).
   `analyst` module (020-grounded-procurement-analyst)
 - Supabase Postgres 17 (unchanged). New tables: `analyst_conversation`, `analyst_turn`,
   `analyst_turn_citation` (020-grounded-procurement-analyst)
+- Python 3.12 (`apps/api`), TypeScript 5.6 / Angular 19 (`apps/web`) — Mailgun Messages API for
+  outbound sending (new, ADR-018 — reuses the existing inbound Mailgun vendor relationship from
+  003-quotation-inbox-extraction rather than adding a second one); no new LLM usage (021-rfq-sourcing-autonomy)
+- Supabase Postgres 17 (unchanged). New tables: `rfq`, `rfq_recipient`, `rfq_response`,
+  `auto_preparation_guardrail`, `auto_preparation_event`; new column `supplier.contact_email`
+  (021-rfq-sourcing-autonomy)
 
 ## Recent Changes
-- 020-grounded-procurement-analyst: R4.2 spec and plan committed on branch 020 (planning only,
+- 021-rfq-sourcing-autonomy: R4.3 spec and plan committed on branch 021 (planning only,
   implementation not started)
+- 020-grounded-procurement-analyst: R4.2 merged to main (PR #25) — grounded, cited
+  question-answering over tenant data, all four user stories plus Polish complete
 - 002-catalogue-suppliers: Added unchanged — Python 3.12 (backend), TypeScript 5.6 / Angular 19 (web), SQL + unchanged from chunk 4.1. One addition under consideration for CSV
