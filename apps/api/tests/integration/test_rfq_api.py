@@ -16,7 +16,7 @@ def _seed_tenant(cur: psycopg.Cursor) -> tuple[uuid.UUID, uuid.UUID, uuid.UUID]:
         uuid.uuid4(),
         uuid.uuid4(),
     )
-    email = "rfq-e2e@example.test"
+    email = f"rfq-e2e-{user_id}@example.test"
     cur.execute("insert into auth.users (id,email) values (%s,%s)", (user_id, email))
     cur.execute(
         "insert into supported_region (code,label_en,label_ar) values ('GB','UK','ب') "
@@ -103,7 +103,7 @@ async def test_create_rfq_rejects_missing_email_supplier(
     def override_current_member() -> CurrentMember:
         return CurrentMember(
             user_id=user_id,
-            email="rfq-e2e@example.test",
+            email=f"rfq-e2e-{user_id}@example.test",
             membership_id=membership_id,
             tenant_id=tenant_id,
             role=MemberRole.owner,
@@ -163,7 +163,7 @@ async def test_create_rfq_replays_on_idempotency_key_not_duplicates(
     def override_current_member() -> CurrentMember:
         return CurrentMember(
             user_id=user_id,
-            email="rfq-e2e@example.test",
+            email=f"rfq-e2e-{user_id}@example.test",
             membership_id=membership_id,
             tenant_id=tenant_id,
             role=MemberRole.owner,
@@ -219,7 +219,7 @@ async def test_send_rfq_partial_failure_leaves_failed_draft(
     def override_current_member() -> CurrentMember:
         return CurrentMember(
             user_id=user_id,
-            email="rfq-e2e@example.test",
+            email=f"rfq-e2e-{user_id}@example.test",
             membership_id=membership_id,
             tenant_id=tenant_id,
             role=MemberRole.owner,

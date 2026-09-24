@@ -9,7 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field
 IngestionEmailStatus = Literal[
     "received", "processing", "completed", "failed", "duplicate", "rejected"
 ]
-SupplierMatchMethod = Literal["address", "domain", "thread", "manual"]
+SupplierMatchMethod = Literal["address", "domain", "thread", "manual", "rfq_reply"]
 
 
 class TenantEmailConfig(BaseModel):

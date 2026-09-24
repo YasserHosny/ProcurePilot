@@ -98,6 +98,40 @@ def process_inbound_email(
             references=email_data.references,
         )
 
+        from procurepilot_api.modules.rfq.response_matching import match_rfq_response
+        
+        matched_rfq_recipient_id = None
+        matched_rfq_id = None
+        
+        with conn.cursor(row_factory=dict_row) as service_cur:
+            service_cur.execute("set local role service_role")
+            service_cur.execute(
+                """
+                select id, outbound_message_id, rfq_id, supplier_id
+                from rfq_recipient
+                where tenant_id = %s and outbound_message_id is not null
+                """,
+                (tenant_id,)
+            )
+            open_recipients = service_cur.fetchall()
+            
+            matched_rfq_recipient_id = match_rfq_response(
+                in_reply_to=email_data.in_reply_to,
+                references=email_data.references,
+                open_recipients=open_recipients,
+            )
+            
+            if matched_rfq_recipient_id:
+                for rec in open_recipients:
+                    if rec["id"] == matched_rfq_recipient_id:
+                        matched_rfq_id = rec["rfq_id"]
+                        if supplier_id is None:
+                            supplier_id = rec["supplier_id"]
+                            match_method = "rfq_reply"
+                        break
+        
+        _act_as_tenant(conn, tenant_id)
+
         document_id, mime_type, filename = _store_primary_document(
             settings, conn, tenant_id=tenant_id, email_data=email_data
         )
@@ -111,6 +145,40 @@ def process_inbound_email(
         )
 
         job_id = _insert_extraction_job(conn, tenant_id=tenant_id, quotation_id=quotation_id)
+
+        if matched_rfq_recipient_id and matched_rfq_id:
+            with conn.cursor() as service_cur:
+                service_cur.execute("set local role service_role")
+                service_cur.execute(
+                    """
+                    insert into rfq_response (tenant_id, rfq_recipient_id, quotation_id)
+                    values (%s, %s, %s)
+                    """,
+                    (tenant_id, matched_rfq_recipient_id, quotation_id)
+                )
+                service_cur.execute(
+                    """
+                    update rfq
+                    set status = 'responded'
+                    where tenant_id = %s and id = %s and status = 'sent'
+                    """,
+                    (tenant_id, matched_rfq_id)
+                )
+                service_cur.execute(
+                    "select record_audit_event(%s, 'success'::audit_outcome, "
+                    "%s, null, %s, %s::jsonb, null)",
+                    (
+                        "rfq.response_received",
+                        tenant_id,
+                        "ingestion-worker@procurepilot.local",
+                        json.dumps({
+                            "rfq_id": str(matched_rfq_id),
+                            "rfq_recipient_id": str(matched_rfq_recipient_id),
+                            "quotation_id": str(quotation_id),
+                        }),
+                    ),
+                )
+            _act_as_tenant(conn, tenant_id)
 
         _mark_log_completed(
             conn,

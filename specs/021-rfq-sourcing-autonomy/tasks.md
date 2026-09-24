@@ -120,23 +120,23 @@ open RFQ falls through to the ordinary quotation-ingestion path unchanged.
 
 ### Tests for User Story 2
 
-- [ ] T020 [P] [US2] Integration tests in
+- [x] T020 [P] [US2] Integration tests in
       `apps/api/tests/integration/test_rfq_response_capture.py`: a reply matching an open RFQ's
       `Message-ID` captures a linked `rfq_response`; a reply matching no open RFQ falls through to
       the existing general quotation path unchanged (FR-006); a reply matching an *expired* RFQ is
       still captured but the RFQ's status stays `expired`, not `responded`; an arithmetic-mismatch
       response still hits the existing mandatory review task with no RFQ-specific exemption
       (FR-005)
-- [ ] T021 [US2] Write the failing cross-tenant matching-isolation test — will complete T004's
+- [x] T021 [US2] Write the failing cross-tenant matching-isolation test — will complete T004's
       isolation proof once T022/T023 land: tenant B's inbound webhook must not be able to match a
       reply against tenant A's outbound `Message-ID`
 
 ### Implementation for User Story 2
 
-- [ ] T022 [US2] Implement `apps/api/src/procurepilot_api/modules/rfq/response_matching.py`: a
+- [x] T022 [US2] Implement `apps/api/src/procurepilot_api/modules/rfq/response_matching.py`: a
       pure function, `ingestion_email_log` row (already carries `in_reply_to`/`references_list`)
       plus a tenant's open RFQ recipients → matched `rfq_recipient_id` or `None`
-- [ ] T023 [US2] Wire `response_matching.py` into
+- [x] T023 [US2] Wire `response_matching.py` into
       `apps/api/src/procurepilot_api/modules/ingestion/orchestrator.py`'s `process_inbound_email()`
       (corrected from `ingestion/router.py`, which only verifies and enqueues — matching actually
       happens in the orchestrator, called async from `workers/email_ingestion_worker.py`) as an
@@ -146,7 +146,7 @@ open RFQ falls through to the ordinary quotation-ingestion path unchanged.
       claim that the orchestrator's tenant-only session does not carry (`ingestion_email_log`'s
       simpler tenant-only policy is why the existing code works without this); record a "response
       received" audit event on a match (FR-015)
-- [ ] T024 [US2] Run the full existing ingestion suite
+- [x] T024 [US2] Run the full existing ingestion suite
       (`test_email_ingestion_worker.py`, `test_capture_service.py`, the quotation-matching
       suites) to confirm the additive matching step regresses nothing already shipping
 
