@@ -217,10 +217,10 @@ conversations, and an owner sees both.
 - [x] T036 Run API unit, integration, contract, web unit, `pnpm test:a11y` (axe-core/WCAG 2.1 AA —
       a separate gate from web unit tests, per FR-014 and the constitution's Quality Gates table),
       and production build gates
-- [ ] T037 Run the G3 evidence command, confirm output remains unmet, and record the R4.2
+- [x] T037 Run the G3 evidence command, confirm output remains unmet, and record the R4.2
       exception posture in a new `docs/quality/r4.2-release-evidence.md` (its own file, matching
       the one-doc-per-release convention already used for R3.4/R4.1 — not appended to R4.1's file)
-- [ ] T038 Run a live hosted walkthrough — one question per supported category, in English and
+- [x] T038 Run a live hosted walkthrough — one question per supported category, in English and
       Arabic, including at least one answer with a next-step link (FR-003A) — mirroring the
       R4.0/R4.1 verification pattern, and record it in the release evidence doc
 
