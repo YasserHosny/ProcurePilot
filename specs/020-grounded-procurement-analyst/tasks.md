@@ -75,39 +75,39 @@ user story.
 
 ### Tests for User Story 1
 
-- [ ] T009 [P] [US1] Contract test for `POST /api/v1/analyst/conversations` (create + first turn)
+- [x] T009 [P] [US1] Contract test for `POST /api/v1/analyst/conversations` (create + first turn)
       in `apps/api/tests/contract/test_analyst_contract.py` — response envelope, role checks,
       `Idempotency-Key`, rate-limit headers
-- [ ] T010 [P] [US1] Integration test: ask one question per FR-002 category and one unsupported
+- [x] T010 [P] [US1] Integration test: ask one question per FR-002 category and one unsupported
       question, in `apps/api/tests/integration/test_analyst_api.py`
-- [ ] T011 [P] [US1] Adversarial unit test (FR-005) in `apps/api/tests/unit/test_analyst_intent.py`:
+- [x] T011 [P] [US1] Adversarial unit test (FR-005) in `apps/api/tests/unit/test_analyst_intent.py`:
       a classification with no matching retrieval result must still produce an explicit refusal —
       the turn service must reject any answer content that didn't come from Task 2's retrieval
       return value, never let the model's own wording leak into the stored answer
 
 ### Implementation for User Story 1
 
-- [ ] T012 [US1] Implement question understanding in
+- [x] T012 [US1] Implement question understanding in
       `apps/api/src/procurepilot_api/modules/analyst/intent.py` — reuses the existing Bedrock/
       Claude client (ADR-004/ADR-014) to classify free text into a supported category or
       "unsupported" plus entities (supplier, product, date range), with a strict output schema;
       it must never pass free text through into the answer itself (depends on T011)
-- [ ] T013 [US1] Implement the turn service in
+- [x] T013 [US1] Implement the turn service in
       `apps/api/src/procurepilot_api/modules/analyst/service.py`: classify (T012) → retrieve
       (T008) → persist the immutable turn + citations atomically → append an audit event and
       assert the row exists in the integration test, not just that the call was made (FR-012) →
       expose `release_posture = g3_unmet` on every response (depends on T008, T012)
-- [ ] T014 [US1] Implement the ask-question endpoint in
+- [x] T014 [US1] Implement the ask-question endpoint in
       `apps/api/src/procurepilot_api/modules/analyst/router.py` and register it in
       `apps/api/src/procurepilot_api/main.py` / `apps/api/src/procurepilot_api/config.py`
       (depends on T013)
-- [ ] T015 [US1] Add per-member rate limiting on the ask-question endpoint (FR-015)
-- [ ] T016 [P] [US1] Write a failing component test for asking a question and seeing a cited,
+- [x] T015 [US1] Add per-member rate limiting on the ask-question endpoint (FR-015)
+- [x] T016 [P] [US1] Write a failing component test for asking a question and seeing a cited,
       calculated answer (and the unsupported-category state) in
       `apps/web/src/app/features/analyst/conversation/conversation.component.spec.ts`
-- [ ] T017 [US1] Implement the API client and standalone conversation component in
+- [x] T017 [US1] Implement the API client and standalone conversation component in
       `apps/web/src/app/features/analyst/conversation/conversation.component.ts`/`.html`/`.scss`
-- [ ] T018 [US1] Add the route to `apps/web/src/app/app.routes.ts`, the nav entry, and i18n keys
+- [x] T018 [US1] Add the route to `apps/web/src/app/app.routes.ts`, the nav entry, and i18n keys
       in `packages/i18n/en.json` / `packages/i18n/ar.json`
 
 **Checkpoint**: User Story 1 is fully functional and testable independently — ask a question,

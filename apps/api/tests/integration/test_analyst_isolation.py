@@ -168,8 +168,8 @@ def _make_analyst_workspace(cur: psycopg.Cursor, label: str) -> AnalystWorkspace
     cur.execute(
         "insert into analyst_turn "
         "(id,tenant_id,conversation_id,creating_member_id,question_text,category,"
-        "answer_text,calculation_version) "
-        "values (%s,%s,%s,%s,%s,'spend_savings',%s,'analyst-retrieval-v1')",
+        "answer_text,calculation_version,idempotency_key) "
+        "values (%s,%s,%s,%s,%s,'spend_savings',%s,'analyst-retrieval-v1',%s)",
         (
             turn_id,
             tenant_id,
@@ -177,6 +177,7 @@ def _make_analyst_workspace(cur: psycopg.Cursor, label: str) -> AnalystWorkspace
             membership_id,
             f"What is the total spend for {label}?",
             f"Total spend for {label}: GBP 1,000.",
+            uuid4(),
         ),
     )
 
@@ -331,9 +332,9 @@ def test_worker_session_cannot_insert_turn_into_another_tenant(
             cur.execute(
                 "insert into analyst_turn "
                 "(tenant_id,conversation_id,creating_member_id,question_text,category,"
-                "answer_text,calculation_version) "
-                "values (%s,%s,%s,'hijack?','spend_savings','hijack','v1')",
-                (beta.tenant_id, beta.conversation_id, beta.membership_id),
+                "answer_text,calculation_version,idempotency_key) "
+                "values (%s,%s,%s,'hijack?','spend_savings','hijack','v1',%s)",
+                (beta.tenant_id, beta.conversation_id, beta.membership_id, uuid4()),
             )
 
 

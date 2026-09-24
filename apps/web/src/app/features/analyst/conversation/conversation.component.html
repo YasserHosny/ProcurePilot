@@ -1,0 +1,98 @@
+<main class="analyst-page">
+  <header class="page-header">
+    <h1 class="page-title">{{ 'analyst.title' | translate }}</h1>
+    <p>{{ 'analyst.subtitle' | translate }}</p>
+  </header>
+
+  <section class="gate-banner" role="note">
+    <mat-icon aria-hidden="true">science</mat-icon>
+    <div>
+      <strong>{{ 'analyst.g3.title' | translate }}</strong>
+      <p>{{ 'analyst.g3.message' | translate }}</p>
+    </div>
+  </section>
+
+  <section class="ask-form">
+    <form (ngSubmit)="ask()">
+      <mat-form-field appearance="outline" class="question-field">
+        <mat-label>{{ 'analyst.form.label' | translate }}</mat-label>
+        <input
+          matInput
+          type="text"
+          data-testid="analyst-question-input"
+          [ngModel]="questionText()"
+          (ngModelChange)="questionText.set($event)"
+          name="questionText"
+          [attr.aria-label]="'analyst.form.label' | translate"
+        />
+      </mat-form-field>
+      <button
+        mat-flat-button
+        color="primary"
+        type="submit"
+        data-testid="analyst-ask-button"
+        [disabled]="isAsking() || !questionText().trim()"
+      >
+        @if (isAsking()) {
+          <mat-spinner diameter="18" [attr.aria-label]="'common.loading' | translate" />
+        } @else {
+          <mat-icon aria-hidden="true">send</mat-icon>
+        }
+        <span>{{ 'analyst.form.submit' | translate }}</span>
+      </button>
+    </form>
+    @if (errorMessage()) {
+      <p class="notice notice-error" role="alert">{{ errorMessage() }}</p>
+    }
+  </section>
+
+  @if (turns().length === 0) {
+    <section class="state-panel" aria-live="polite">
+      <mat-icon aria-hidden="true">forum</mat-icon>
+      <h2>{{ 'analyst.empty.title' | translate }}</h2>
+      <p>{{ 'analyst.empty.message' | translate }}</p>
+    </section>
+  } @else {
+    <section class="turn-list" [attr.aria-label]="'analyst.threadLabel' | translate" aria-live="polite">
+      @for (turn of turns(); track trackById($index, turn)) {
+        <article class="turn-card" data-testid="analyst-turn">
+          <p class="question-text">{{ turn.question_text }}</p>
+          <div class="answer-block" [class.refusal]="isRefusal(turn)">
+            <p class="answer-text" data-testid="analyst-answer-text">{{ turn.answer_text }}</p>
+
+            @if (turn.calculation) {
+              <mat-expansion-panel class="calculation-panel">
+                <mat-expansion-panel-header>
+                  <mat-panel-title>{{ 'analyst.calculation.title' | translate }}</mat-panel-title>
+                </mat-expansion-panel-header>
+                <p class="formula">{{ turn.calculation.formula }}</p>
+                <ul class="calculation-inputs">
+                  @for (input of turn.calculation.inputs; track $index) {
+                    <li>{{ input | json }}</li>
+                  }
+                </ul>
+              </mat-expansion-panel>
+            }
+
+            @if (turn.citations.length > 0) {
+              <div class="citations" data-testid="analyst-citations">
+                <span class="citations-label">{{ 'analyst.citations.label' | translate }}</span>
+                <ul>
+                  @for (citation of turn.citations; track citation.id) {
+                    <li>{{ ('analyst.citations.kind.' + citation.source_kind) | translate }}</li>
+                  }
+                </ul>
+              </div>
+            }
+
+            @if (turn.next_step_url) {
+              <a [href]="turn.next_step_url" class="next-step-link">
+                {{ 'analyst.nextStep.label' | translate }}
+              </a>
+            }
+          </div>
+        </article>
+      }
+    </section>
+  }
+</main>

@@ -248,6 +248,20 @@ class Settings(BaseSettings):
     rate_limit_order_mutation: str = Field(
         default="30/minute", validation_alias="RATE_LIMIT_ORDER_MUTATION"
     )
+    # R4.2 Grounded Procurement Analyst (020-grounded-procurement-analyst, FR-015):
+    # Per-member rate limit on the ask-question endpoint to bound language-model spend
+    # and prevent abuse — mirrors every other mutation endpoint's own rate_limit_*
+    # convention (see rate_limit_export_create, rate_limit_catalogue_import, etc.).
+    rate_limit_analyst_ask: str = Field(
+        default="20/minute", validation_alias="RATE_LIMIT_ANALYST_ASK"
+    )
+    # Provider mode for the analyst intent classifier (FR-005). Mirrors
+    # EXTRACTION_PROVIDER_MODE's own stub/bedrock naming convention exactly.
+    # "stub" is the default so tests, local development, and CI never make real
+    # Bedrock calls. "bedrock" uses the real AWS Bedrock/Claude provider.
+    analyst_intent_provider_mode: Literal["stub", "bedrock"] = Field(
+        default="stub", validation_alias="ANALYST_INTENT_PROVIDER_MODE"
+    )
 
     # POS & inventory integration (R3.2, 015-pos-inventory-integration):
     # Provider mode defaults to "stub" so tests, local development, and CI can run
