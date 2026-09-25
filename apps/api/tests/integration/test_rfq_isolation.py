@@ -173,13 +173,19 @@ def _make_rfq_workspace(cur: psycopg.Cursor, label: str) -> RfqWorkspace:
         (rfq_response_id, tenant_id, rfq_recipient_id, quotation_id),
     )
 
+    branch_id = uuid4()
+    cur.execute(
+        "insert into branch (id,tenant_id,name) values (%s,%s,%s)",
+        (branch_id, tenant_id, f"Branch {label}"),
+    )
+
     guardrail_id = uuid4()
     cur.execute(
         "insert into auto_preparation_guardrail "
         "(id,tenant_id,created_by_membership_id,max_order_value_amount,max_order_value_currency,"
-        "min_response_count,max_price_variance_pct,enabled) "
-        "values (%s,%s,%s,1000,'GBP',1,0.05,true)",
-        (guardrail_id, tenant_id, membership_id),
+        "min_response_count,max_price_variance_pct,enabled,default_branch_id) "
+        "values (%s,%s,%s,1000,'GBP',1,0.05,true,%s)",
+        (guardrail_id, tenant_id, membership_id, branch_id),
     )
 
     event_id = uuid4()

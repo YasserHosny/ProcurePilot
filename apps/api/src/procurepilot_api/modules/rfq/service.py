@@ -20,6 +20,9 @@ from procurepilot_api.modules.requests.schemas import (
 )
 from procurepilot_api.modules.requests.service import RequestsService
 from procurepilot_api.modules.rfq.schemas import (
+    AutoPreparationGuardrail,
+    GuardrailCreateInput,
+    GuardrailUpdateInput,
     PrepareRequestResponse,
     Rfq,
     RfqLine,
@@ -566,6 +569,124 @@ class RfqService:
                     conn.commit()
 
         return PrepareRequestResponse(purchase_request_id=purchase_request.id)
+
+    def create_guardrail(
+        self,
+        *,
+        member: CurrentMember,
+        payload: GuardrailCreateInput,
+    ) -> AutoPreparationGuardrail:
+        with _authenticated_db(self.settings, member) as conn:
+            with conn.cursor(row_factory=dict_row) as cur:
+                cur.execute(
+                    """
+                    insert into auto_preparation_guardrail
+                    (tenant_id, created_by_membership_id, max_order_value_amount,
+                     max_order_value_currency, supplier_allowlist, category_allowlist,
+                     min_response_count, max_price_variance_pct, enabled, default_branch_id)
+                    values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    returning *
+                    """,
+                    (
+                        member.tenant_id,
+                        member.membership_id,
+                        payload.max_order_value_amount,
+                        payload.max_order_value_currency,
+                        payload.supplier_allowlist,
+                        payload.category_allowlist,
+                        payload.min_response_count,
+                        payload.max_price_variance_pct,
+                        payload.enabled,
+                        payload.default_branch_id,
+                    ),
+                )
+                row = cur.fetchone()
+
+                cur.execute(
+                    "select record_audit_event(%s, 'success'::audit_outcome, "
+                    "%s, %s, %s, %s::jsonb, null)",
+                    (
+                        "rfq.guardrail_changed",
+                        member.tenant_id,
+                        member.membership_id,
+                        member.email,
+                        json.dumps({"guardrail_id": str(row["id"]), "action": "created"}),
+                    ),
+                )
+
+                conn.commit()
+                return AutoPreparationGuardrail.model_validate(row)
+
+    def list_guardrails(
+        self,
+        *,
+        member: CurrentMember,
+    ) -> list[AutoPreparationGuardrail]:
+        with _authenticated_db(self.settings, member) as conn:
+            with conn.cursor(row_factory=dict_row) as cur:
+                cur.execute(
+                    "select * from auto_preparation_guardrail "
+                    "where tenant_id = %s order by created_at desc",
+                    (member.tenant_id,),
+                )
+                rows = cur.fetchall()
+                return [AutoPreparationGuardrail.model_validate(r) for r in rows]
+
+    def update_guardrail(
+        self,
+        *,
+        member: CurrentMember,
+        guardrail_id: uuid.UUID,
+        payload: GuardrailUpdateInput,
+    ) -> AutoPreparationGuardrail:
+        updates = payload.model_dump(exclude_unset=True)
+
+        with _authenticated_db(self.settings, member) as conn:
+            with conn.cursor(row_factory=dict_row) as cur:
+                if not updates:
+                    cur.execute(
+                        "select * from auto_preparation_guardrail where tenant_id = %s and id = %s",
+                        (member.tenant_id, guardrail_id),
+                    )
+                    row = cur.fetchone()
+                    if not row:
+                        raise NotFoundError(details={"resource": "auto_preparation_guardrail"})
+                    return AutoPreparationGuardrail.model_validate(row)
+
+                set_clauses = [f"{key} = %s" for key in updates]
+                values: list[object] = list(updates.values())
+                values.extend([member.tenant_id, guardrail_id])
+
+                query = (
+                    "update auto_preparation_guardrail "
+                    f"set {', '.join(set_clauses)} "
+                    "where tenant_id = %s and id = %s returning *"
+                )
+                cur.execute(query, values)
+                row = cur.fetchone()
+                if not row:
+                    raise NotFoundError(details={"resource": "auto_preparation_guardrail"})
+
+                cur.execute(
+                    "select record_audit_event(%s, 'success'::audit_outcome, "
+                    "%s, %s, %s, %s::jsonb, null)",
+                    (
+                        "rfq.guardrail_changed",
+                        member.tenant_id,
+                        member.membership_id,
+                        member.email,
+                        json.dumps(
+                            {
+                                "guardrail_id": str(row["id"]),
+                                "action": "updated",
+                                "changes": list(updates.keys()),
+                            }
+                        ),
+                    ),
+                )
+
+                conn.commit()
+                return AutoPreparationGuardrail.model_validate(row)
 
 
 def get_rfq_service() -> RfqService:

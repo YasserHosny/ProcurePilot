@@ -68,6 +68,7 @@ class AutoPreparationGuardrail(BaseModel):
     min_response_count: int
     max_price_variance_pct: Decimal
     enabled: bool
+    default_branch_id: UUID
     created_at: datetime
 
 
@@ -115,3 +116,23 @@ class PrepareRequestInput(BaseModel):
 
 class PrepareRequestResponse(BaseModel):
     purchase_request_id: UUID
+
+class GuardrailCreateInput(BaseModel):
+    max_order_value_amount: Decimal
+    max_order_value_currency: str
+    supplier_allowlist: list[UUID] | None = None
+    category_allowlist: list[str] | None = None
+    min_response_count: int = 1
+    max_price_variance_pct: Decimal
+    default_branch_id: UUID
+    enabled: bool = True
+
+class GuardrailUpdateInput(BaseModel):
+    max_order_value_amount: Decimal | None = None
+    max_order_value_currency: str | None = None
+    supplier_allowlist: list[UUID] | None = None
+    category_allowlist: list[str] | None = None
+    min_response_count: int | None = None
+    max_price_variance_pct: Decimal | None = None
+    default_branch_id: UUID | None = None
+    enabled: bool | None = None

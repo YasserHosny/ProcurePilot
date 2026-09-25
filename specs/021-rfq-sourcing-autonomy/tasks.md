@@ -212,15 +212,15 @@ response failing even one condition falls back to requiring the manual US3 actio
 
 ### Tests for User Story 4
 
-- [ ] T031 [P] [US4] Unit tests for `guardrails.py` in
+- [x] T031 [P] [US4] Unit tests for `guardrails.py` in
       `apps/api/tests/unit/test_rfq_guardrails.py` covering every FR-010–FR-014 condition as its
       own case: no guardrail configured → never fires (default-off); every condition met → fires
       with the triggering rule identified; wrong supplier, over value, under minimum response
       count, price variance exceeded, tied responses, partial-line response, expired RFQ, and
       mismatched currency (FR-018) each individually prevent firing — never silently approximated
-- [ ] T032 [P] [US4] Test for rejected guardrail configuration (FR-013): a zero, negative, or
+- [x] T032 [P] [US4] Test for rejected guardrail configuration (FR-013): a zero, negative, or
       degenerate max-value guardrail is refused at creation, never silently accepted
-- [ ] T033 [US4] Real-Postgres end-to-end test in
+- [x] T033 [US4] Real-Postgres end-to-end test in
       `apps/api/tests/integration/test_rfq_guardrails_e2e.py`: configure a guardrail, capture a
       qualifying response through the *full* ingestion path (not a direct service call — prove
       the whole chain), assert a real `purchase_request` appears in the approval queue with the
@@ -229,15 +229,15 @@ response failing even one condition falls back to requiring the manual US3 actio
 
 ### Implementation for User Story 4
 
-- [ ] T034 [US4] Implement `apps/api/src/procurepilot_api/modules/rfq/guardrails.py`: a pure
+- [x] T034 [US4] Implement `apps/api/src/procurepilot_api/modules/rfq/guardrails.py`: a pure
       function, `AutoPreparationGuardrail` + `RfqResponse` typed inputs → fire/no-fire + reason,
       no database access, calculation-version-pinned the same way `retrieval.py`'s
       `CALCULATION_VERSION` is (R4.2 precedent) — a guardrail firing is exactly the kind of
       consequential, replayable decision Constitution Principle II governs
-- [ ] T035 [US4] Wire guardrail evaluation into the response-capture path (T023) and call
+- [x] T035 [US4] Wire guardrail evaluation into the response-capture path (T023) and call
       `RequestsService.create_request()` on a fire, recording an append-only
       `auto_preparation_event` row with the triggering rule (FR-011)
-- [ ] T036 [US4] Add guardrail management endpoints `POST`/`GET`/`PATCH /rfq/guardrails`,
+- [x] T036 [US4] Add guardrail management endpoints `POST`/`GET`/`PATCH /rfq/guardrails`,
       owner-only per FR-010, with the FR-013 rejection wired into create/update, and a
       "guardrail changed" audit event recorded on every create/update (FR-015)
 - [ ] T037 [P] [US4] Write failing component tests: guardrail settings in

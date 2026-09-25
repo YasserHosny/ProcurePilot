@@ -10,8 +10,11 @@ from pydantic import BaseModel
 
 from procurepilot_api.config import get_settings
 from procurepilot_api.deps import CurrentMember, bearer_token, current_member
-from procurepilot_api.errors import UnprocessableEntityError
+from procurepilot_api.errors import PermissionDeniedError, UnprocessableEntityError
 from procurepilot_api.modules.rfq.schemas import (
+    AutoPreparationGuardrail,
+    GuardrailCreateInput,
+    GuardrailUpdateInput,
     PrepareRequestInput,
     PrepareRequestResponse,
     Rfq,
@@ -162,3 +165,62 @@ def prepare_request(
         required_by_date=payload.required_by_date,
         idempotency_key=idempotency_key,
     )
+
+
+@router.post(
+    "/guardrails",
+    status_code=status.HTTP_201_CREATED,
+    response_model=AutoPreparationGuardrail,
+    operation_id="createGuardrail",
+)
+def create_guardrail(
+    payload: Annotated[GuardrailCreateInput, Body()],
+    member: Annotated[CurrentMember, Depends(current_member)],
+    service: Annotated[RfqService, Depends(get_rfq_service)],
+) -> AutoPreparationGuardrail:
+    if member.role != "owner":
+        raise PermissionDeniedError(details={"role": "owner_required"})
+
+    if payload.max_order_value_amount <= Decimal("0"):
+        raise UnprocessableEntityError(details={"max_order_value_amount": "Must be greater than 0"})
+
+    return service.create_guardrail(member=member, payload=payload)
+
+
+@router.get(
+    "/guardrails",
+    status_code=status.HTTP_200_OK,
+    response_model=list[AutoPreparationGuardrail],
+    operation_id="listGuardrails",
+)
+def list_guardrails(
+    member: Annotated[CurrentMember, Depends(current_member)],
+    service: Annotated[RfqService, Depends(get_rfq_service)],
+) -> list[AutoPreparationGuardrail]:
+    if member.role != "owner":
+        raise PermissionDeniedError(details={"role": "owner_required"})
+
+    return service.list_guardrails(member=member)
+
+
+@router.patch(
+    "/guardrails/{guardrail_id}",
+    status_code=status.HTTP_200_OK,
+    response_model=AutoPreparationGuardrail,
+    operation_id="updateGuardrail",
+)
+def update_guardrail(
+    guardrail_id: uuid.UUID,
+    payload: Annotated[GuardrailUpdateInput, Body()],
+    member: Annotated[CurrentMember, Depends(current_member)],
+    service: Annotated[RfqService, Depends(get_rfq_service)],
+) -> AutoPreparationGuardrail:
+    if member.role != "owner":
+        raise PermissionDeniedError(details={"role": "owner_required"})
+
+    if payload.max_order_value_amount is not None and payload.max_order_value_amount <= Decimal(
+        "0"
+    ):
+        raise UnprocessableEntityError(details={"max_order_value_amount": "Must be greater than 0"})
+
+    return service.update_guardrail(member=member, guardrail_id=guardrail_id, payload=payload)
