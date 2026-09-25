@@ -270,17 +270,17 @@ response, and confirm the history view shows all three with distinct, accurate s
 
 ### Tests for User Story 5
 
-- [ ] T039 [P] [US5] Write a failing component test for RFQ history in
+- [x] T039 [P] [US5] Write a failing component test for RFQ history in
       `apps/web/src/app/features/rfq/history/history.component.spec.ts`: status, recipients,
       response counts, and — where applicable — the converted purchase-request link
 
 ### Implementation for User Story 5
 
-- [ ] T040 [US5] Add `GET /rfq` (list, cursor-paginated, scoped per FR-016 — creator plus
+- [x] T040 [US5] Add `GET /rfq` (list, cursor-paginated, scoped per FR-016 — creator plus
       owner/buyer oversight, mirroring `analyst_conversation`'s RLS-enforced pattern) to
       `apps/api/src/procurepilot_api/modules/rfq/router.py`/`service.py`
-- [ ] T041 [US5] Implement the RFQ history UI in `apps/web/src/app/features/rfq/history/`
-- [ ] T042 [US5] Add the route (`apps/web/src/app/app.routes.ts`), shell nav entry (mirror the
+- [x] T041 [US5] Implement the RFQ history UI in `apps/web/src/app/features/rfq/history/`
+- [x] T042 [US5] Add the route (`apps/web/src/app/app.routes.ts`), shell nav entry (mirror the
       existing nav-item structure exactly, no tooltip —
       `apps/web/src/app/layout/shell/shell.component.html`), and i18n keys in both
       `packages/i18n/en.json` and `packages/i18n/ar.json` under a new `rfq` namespace, with

@@ -1,3 +1,4 @@
+import base64
 import json
 import uuid
 from collections.abc import Iterator, Sequence
@@ -26,9 +27,11 @@ from procurepilot_api.modules.rfq.schemas import (
     PrepareRequestResponse,
     Rfq,
     RfqLine,
+    RfqList,
     RfqRecipient,
     RfqResponseComparison,
     RfqResponseComparisonList,
+    RfqSummary,
 )
 from procurepilot_api.shared.mailer import get_mailer
 
@@ -688,8 +691,89 @@ class RfqService:
                 conn.commit()
                 return AutoPreparationGuardrail.model_validate(row)
 
+    def list_rfqs(
+        self,
+        *,
+        member: CurrentMember,
+        status: str | None = None,
+        cursor: str | None = None,
+        limit: int = 50,
+    ) -> RfqList:
+        capped_limit = _cap_limit(limit)
+        offset = _decode_cursor(cursor)
+
+        query_filters = ["tenant_id = %s"]
+        params: list[str | uuid.UUID | int] = [member.tenant_id]
+
+        if status:
+            query_filters.append("status = %s")
+            params.append(status)
+
+        query = f"""
+            SELECT
+                r.id,
+                r.status,
+                r.needed_by_date,
+                r.created_at,
+                (SELECT count(*) FROM rfq_recipient rr WHERE rr.rfq_id = r.id) as recipient_count,
+                (
+                    SELECT count(*)
+                    FROM rfq_response resp
+                    JOIN rfq_recipient rr2 ON resp.rfq_recipient_id = rr2.id
+                    WHERE rr2.rfq_id = r.id
+                ) as response_count,
+                (
+                    SELECT pr.id 
+                    FROM purchase_request pr 
+                    JOIN rfq_response resp ON pr.source_rfq_response_id = resp.id
+                    JOIN rfq_recipient rr3 ON resp.rfq_recipient_id = rr3.id
+                    WHERE rr3.rfq_id = r.id 
+                    LIMIT 1
+                ) as converted_purchase_request_id
+            FROM rfq r
+            WHERE {" AND ".join(query_filters)}
+            ORDER BY r.created_at DESC, r.id DESC
+            LIMIT %s OFFSET %s
+        """
+        
+        with _authenticated_db(self.settings, member) as conn:
+            with conn.cursor(row_factory=dict_row) as cur:
+                cur.execute(query, (*params, capped_limit + 1, offset))
+                rows = cur.fetchall()
+
+        has_next = len(rows) > capped_limit
+        if has_next:
+            rows = rows[:capped_limit]
+            next_cursor = _encode_cursor(offset + capped_limit)
+        else:
+            next_cursor = None
+
+        items = [RfqSummary.model_validate(row) for row in rows]
+        return RfqList(items=items, next_cursor=next_cursor)
+
+
+def _cap_limit(limit: int) -> int:
+    return max(1, min(limit, 100))
+
+
+def _encode_cursor(offset: int) -> str:
+    raw = json.dumps({"offset": offset}, separators=(",", ":")).encode("utf-8")
+    return base64.urlsafe_b64encode(raw).decode("ascii")
+
+
+def _decode_cursor(cursor: str | None) -> int:
+    if cursor is None:
+        return 0
+    try:
+        raw = base64.urlsafe_b64decode(cursor.encode("ascii"))
+        payload = json.loads(raw.decode("utf-8"))
+        return payload["offset"]
+    except (KeyError, ValueError, TypeError, json.JSONDecodeError) as exc:
+        raise UnprocessableEntityError(details={"cursor": "invalid_format"}) from exc
+
 
 def get_rfq_service() -> RfqService:
     from procurepilot_api.config import get_settings
 
     return RfqService(settings=get_settings())
+

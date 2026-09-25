@@ -1,0 +1,80 @@
+<div class="page-container">
+  <div class="header">
+    <h1>{{ 'rfq.history.title' | translate }}</h1>
+    <p class="subtitle">{{ 'rfq.history.subtitle' | translate }}</p>
+  </div>
+
+  <mat-card class="content-card">
+    @if (loading()) {
+      <div class="loading-state">
+        <mat-spinner diameter="40"></mat-spinner>
+        <p>{{ 'rfq.history.loading' | translate }}</p>
+      </div>
+    } @else {
+      @if (rfqs().length === 0) {
+        <div class="empty-state">
+          <mat-icon>history</mat-icon>
+          <p>{{ 'rfq.history.noRfqs' | translate }}</p>
+        </div>
+      } @else {
+        <div class="table-container">
+          <table mat-table [dataSource]="rfqs()">
+
+            <!-- Status Column -->
+            <ng-container matColumnDef="status">
+              <th mat-header-cell *matHeaderCellDef>{{ 'rfq.history.status' | translate }}</th>
+              <td mat-cell *matCellDef="let rfq">
+                <span class="status-badge" [ngClass]="getStatusClass(rfq.status)">
+                  {{ 'rfq.history.status_' + rfq.status | translate }}
+                </span>
+              </td>
+            </ng-container>
+
+            <!-- Needed By Column -->
+            <ng-container matColumnDef="neededBy">
+              <th mat-header-cell *matHeaderCellDef>{{ 'rfq.history.neededBy' | translate }}</th>
+              <td mat-cell *matCellDef="let rfq">
+                {{ rfq.needed_by_date | formatDate }}
+              </td>
+            </ng-container>
+
+            <!-- Sent At Column -->
+            <ng-container matColumnDef="sentAt">
+              <th mat-header-cell *matHeaderCellDef>{{ 'rfq.history.sentAt' | translate }}</th>
+              <td mat-cell *matCellDef="let rfq">
+                {{ rfq.created_at | formatDate }}
+              </td>
+            </ng-container>
+
+            <!-- Recipients Column -->
+            <ng-container matColumnDef="recipients">
+              <th mat-header-cell *matHeaderCellDef class="number-cell">{{ 'rfq.history.recipients' | translate }}</th>
+              <td mat-cell *matCellDef="let rfq" class="number-cell">
+                {{ rfq.recipient_count }}
+              </td>
+            </ng-container>
+
+            <!-- Responses Column -->
+            <ng-container matColumnDef="responses">
+              <th mat-header-cell *matHeaderCellDef class="number-cell">{{ 'rfq.history.responses' | translate }}</th>
+              <td mat-cell *matCellDef="let rfq" class="number-cell">
+                {{ rfq.response_count }}
+              </td>
+            </ng-container>
+
+            <!-- Actions Column -->
+            <ng-container matColumnDef="actions">
+              <th mat-header-cell *matHeaderCellDef></th>
+              <td mat-cell *matCellDef="let rfq">
+                <mat-icon>chevron_right</mat-icon>
+              </td>
+            </ng-container>
+
+            <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+            <tr mat-row *matRowDef="let row; columns: displayedColumns;" class="clickable-row" (click)="onRowClick(row)"></tr>
+          </table>
+        </div>
+      }
+    }
+  </mat-card>
+</div>

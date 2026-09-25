@@ -473,3 +473,31 @@ def test_prepare_request_pending_match() -> None:
             idempotency_key=idem_key,
         )
     assert exc.value.details == {"reason": "pending_matches"}
+
+
+def test_list_rfqs() -> None:
+    with psycopg.connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
+        with conn.cursor() as cur:
+            tenant_id, user_id, membership_id = _seed_tenant(cur, email_suffix="list-rfqs")
+            rfq_id, resp1_id, resp2_id, branch_id = _seed_rfq_and_responses(
+                cur, tenant_id, membership_id
+            )
+        conn.commit()
+
+    member = _member(tenant_id, user_id, membership_id)
+    service = RfqService(settings=get_settings())
+
+    result = service.list_rfqs(member=member)
+    assert len(result.items) == 1
+    summary = result.items[0]
+    assert summary.id == rfq_id
+    assert summary.status == "responded"
+    assert summary.recipient_count == 2
+    assert summary.response_count == 2
+    assert summary.converted_purchase_request_id is None
+
+    # status filter
+    matching = service.list_rfqs(member=member, status="responded")
+    assert len(matching.items) == 1
+    none_matching = service.list_rfqs(member=member, status="expired")
+    assert len(none_matching.items) == 0

@@ -241,6 +241,12 @@ export const routes: Routes = [
           import('./features/rfq/create/create.component').then((m) => m.RfqCreateComponent),
       },
       {
+        path: 'rfq/history',
+        canActivate: [roleGuard('owner', 'buyer')],
+        loadComponent: () =>
+          import('./features/rfq/history/history.component').then((m) => m.HistoryComponent),
+      },
+      {
         path: 'rfq/compare/:id',
         canActivate: [roleGuard('owner', 'buyer')],
         loadComponent: () =>

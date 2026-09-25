@@ -136,3 +136,18 @@ class GuardrailUpdateInput(BaseModel):
     max_price_variance_pct: Decimal | None = None
     default_branch_id: UUID | None = None
     enabled: bool | None = None
+
+class RfqSummary(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    status: RfqStatus
+    needed_by_date: date
+    created_at: datetime
+    recipient_count: int
+    response_count: int
+    converted_purchase_request_id: UUID | None
+
+class RfqList(BaseModel):
+    items: list[RfqSummary]
+    next_cursor: str | None = None

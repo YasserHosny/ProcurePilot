@@ -1,5 +1,5 @@
 import { inject, Injectable } from '@angular/core';
-import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 
 import { environment } from '../../../environments/environment';
@@ -73,6 +73,21 @@ export interface RfqResponseComparisonList {
   items: RfqResponseComparison[];
 }
 
+export interface RfqSummary {
+  id: string;
+  status: 'draft' | 'sent' | 'responded' | 'expired' | 'converted';
+  needed_by_date: string;
+  created_at: string;
+  recipient_count: number;
+  response_count: number;
+  converted_purchase_request_id: string | null;
+}
+
+export interface RfqList {
+  items: RfqSummary[];
+  next_cursor: string | null;
+}
+
 export interface PrepareRequestPayload {
   rfq_response_id: string;
   branch_id: string;
@@ -114,5 +129,14 @@ export class RfqApi {
     return this.http.post<PrepareRequestResponse>(
       `${this.baseUrl}/${rfqId}/prepare-request`, payload, { headers },
     );
+  }
+
+  listRfqs(status?: string, cursor?: string, limit?: number): Observable<RfqList> {
+    let params = new HttpParams();
+    if (status) params = params.set('status', status);
+    if (cursor) params = params.set('cursor', cursor);
+    if (limit) params = params.set('limit', limit.toString());
+
+    return this.http.get<RfqList>(this.baseUrl, { params });
   }
 }

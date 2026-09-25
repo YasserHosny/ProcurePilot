@@ -19,6 +19,7 @@ from procurepilot_api.modules.rfq.schemas import (
     PrepareRequestResponse,
     Rfq,
     RfqLine,
+    RfqList,
     RfqRecipient,
     RfqResponseComparisonList,
 )
@@ -58,6 +59,27 @@ class RfqCreateResponse(BaseModel):
 class RfqSendResponse(BaseModel):
     rfq: Rfq
     recipients: list[RfqRecipient]
+
+
+@router.get(
+    "",
+    status_code=status.HTTP_200_OK,
+    response_model=RfqList,
+    operation_id="listRfqs",
+)
+def list_rfqs(
+    member: Annotated[CurrentMember, Depends(current_member)],
+    service: Annotated[RfqService, Depends(get_rfq_service)],
+    status: str | None = None,
+    cursor: str | None = None,
+    limit: int = 50,
+) -> RfqList:
+    return service.list_rfqs(
+        member=member,
+        status=status,
+        cursor=cursor,
+        limit=limit,
+    )
 
 
 @router.post(

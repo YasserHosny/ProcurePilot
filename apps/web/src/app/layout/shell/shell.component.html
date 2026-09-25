@@ -212,6 +212,16 @@
 
       <a
         mat-list-item
+        routerLink="/rfq/history"
+        routerLinkActive="active"
+        class="nav-item"
+      >
+        <mat-icon aria-hidden="true">history</mat-icon>
+        <span class="nav-label">{{ 'shell.navRfq' | translate }}</span>
+      </a>
+
+      <a
+        mat-list-item
         routerLink="/offers/compare"
         routerLinkActive="active"
         class="nav-item"

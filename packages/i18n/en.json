@@ -185,7 +185,8 @@
     "navBasketSplit": "Basket Split",
     "navAlerts": "Alerts Inbox",
     "navIntelligence": "Price Intelligence",
-    "navForecasting": "Reorder Forecasts"
+    "navForecasting": "Reorder Forecasts",
+    "navRfq": "RFQ History"
   },
   "analyst": {
     "title": "Procurement Analyst",
@@ -3441,6 +3442,24 @@
       "noResponses": "No responses found for this RFQ yet.",
       "loading": "Loading responses...",
       "loadError": "Failed to load RFQ responses."
+    },
+    "history": {
+      "title": "RFQ History",
+      "subtitle": "Track your requests for quotation.",
+      "status": "Status",
+      "neededBy": "Needed By",
+      "sentAt": "Sent Date",
+      "recipients": "Recipients",
+      "responses": "Responses",
+      "noRfqs": "No RFQs found.",
+      "loading": "Loading RFQs...",
+      "status_sent": "Sent",
+      "status_responded": "Responded",
+      "status_expired": "Expired",
+      "status_converted": "Converted",
+      "status_draft": "Draft",
+      "loadError": "Failed to load RFQs.",
+      "dismiss": "Close"
     }
   }
 }
