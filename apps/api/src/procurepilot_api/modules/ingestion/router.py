@@ -186,11 +186,23 @@ async def inbound_email_webhook(
         recipient = str(form.get("recipient") or "")
         
         msg = EmailMessage(policy=email_policy)
+        # These three describe the ORIGINAL message's MIME structure (e.g. "multipart/
+        # alternative; boundary=..." for a completely ordinary Gmail reply). We are not
+        # preserving that structure -- we rebuild a new one below via set_content()/
+        # add_alternative()/add_attachment(), which manage these same headers themselves.
+        # Copying the original values first and then calling set_content() raises
+        # `TypeError: set_content not valid on multipart` on any multipart source message,
+        # which is the common case, not the exception -- a plain, unformatted Gmail reply is
+        # still multipart/alternative (text/plain + text/html) unless the sender explicitly
+        # composed in plain-text mode.
+        _managed_headers = {"content-type", "mime-version", "content-transfer-encoding"}
         message_headers_raw = str(form.get("message-headers") or "[]")
         try:
             headers = json.loads(message_headers_raw)
             if isinstance(headers, list):
                 for name, value in headers:
+                    if str(name).lower() in _managed_headers:
+                        continue
                     msg[name] = value
         except Exception:
             pass

@@ -187,12 +187,19 @@ async def test_mailgun_webhook_payload_structure(monkeypatch: pytest.MonkeyPatch
         sig = generate_mailgun_signature(timestamp, token)
         
         reply_msg_id = f"<{uuid.uuid4()}@mail.example.com>"
+        # A real Gmail reply -- even a plain, unformatted one -- is multipart/alternative
+        # (text/plain + text/html) by default, not a bare text/plain message. Content-Type
+        # and Mime-Version are included here deliberately: they're exactly what caused
+        # `TypeError: set_content not valid on multipart` when copied verbatim into the
+        # reconstructed message before set_content() was called.
         headers_json = json.dumps([
             ["Message-Id", reply_msg_id],
             ["From", "Supplier <supplier@example.com>"],
             ["To", forwarding_address],
             ["Subject", "Re: Request for Quotation"],
-            ["In-Reply-To", outbound_msg_id]
+            ["In-Reply-To", outbound_msg_id],
+            ["Mime-Version", "1.0"],
+            ["Content-Type", 'multipart/alternative; boundary="0000000000005ff9ce063405da3f"'],
         ])
 
         data = {
@@ -202,6 +209,7 @@ async def test_mailgun_webhook_payload_structure(monkeypatch: pytest.MonkeyPatch
             "recipient": forwarding_address,
             "message-headers": headers_json,
             "body-plain": "This is a real quote response text.",
+            "body-html": "<div dir=\"ltr\">This is a real quote response text.</div>",
             "attachment-count": "1",
         }
         
