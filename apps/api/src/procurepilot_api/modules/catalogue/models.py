@@ -129,6 +129,7 @@ class Supplier(BaseModel):
     minimum_order_value: Money | None = None
     delivery_fee: Money | None = None
     reliability_score: str | None = None
+    contact_email: str | None = None
     status: SupplierStatus
     created_at: datetime | None = None
 
@@ -144,6 +145,7 @@ class SupplierCreate(StrictApiModel):
     lead_time_days: int | None = Field(default=None, ge=0)
     minimum_order_value: Money | None = None
     delivery_fee: Money | None = None
+    contact_email: str | None = None
 
 
 class SupplierUpdate(StrictApiModel):
@@ -152,6 +154,7 @@ class SupplierUpdate(StrictApiModel):
     lead_time_days: int | None = Field(default=None, ge=0)
     minimum_order_value: Money | None = None
     delivery_fee: Money | None = None
+    contact_email: str | None = None
     status: SupplierStatus | None = None
 
 
