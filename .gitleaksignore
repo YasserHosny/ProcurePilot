@@ -14,3 +14,26 @@
 # value even though no file in the tree does. The alternative was rewriting 37 commits of an
 # open pull request, which is a worse trade for a string that was never secret.
 031a050fbc4185095fc4b9b62a3e2dd1c68ffa23:apps/web/src/app/features/team/invite-dialog/invite-dialog.component.spec.ts:generic-api-key:56
+
+# ---------------------------------------------------------------------------
+# R4.3: apps/api/tests/conftest.py's SUPABASE_ANON_KEY/SUPABASE_SERVICE_ROLE_KEY test-env values,
+# and the bearer_token fixture values in test_capture_service.py that reuse the same shape.
+#
+# The real supabase-py client validates that a key is JWT-shaped before it will even attempt a
+# connection, so the original plain placeholder strings ("test-anon-key" etc.) started failing
+# with `SupabaseException: Invalid API key` the moment a test exercised that code path (fixed in
+# this same commit). Replaced with `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.signature` -- valid
+# JWT structure (header.payload.signature), an empty payload, and the literal word "signature" as
+# the signature, deliberately not a real one. It is never sent to a real Supabase instance; the
+# tests that touch a real Postgres connection use TEST_DATABASE_URL instead, and this value exists
+# only so client construction doesn't raise before a test can mock/stub the parts that matter.
+# Looking JWT-shaped is exactly what made this trip the generic-api-key rule, same as the mock
+# invitation token above -- the rule working as intended on a value that was never a credential.
+3ca85994224cf89b0309681efce45c306c464216:apps/api/tests/conftest.py:generic-api-key:21
+3ca85994224cf89b0309681efce45c306c464216:apps/api/tests/conftest.py:generic-api-key:22
+3ca85994224cf89b0309681efce45c306c464216:apps/api/tests/integration/test_capture_service.py:generic-api-key:77
+3ca85994224cf89b0309681efce45c306c464216:apps/api/tests/integration/test_capture_service.py:generic-api-key:130
+3ca85994224cf89b0309681efce45c306c464216:apps/api/tests/integration/test_capture_service.py:generic-api-key:182
+3ca85994224cf89b0309681efce45c306c464216:apps/api/tests/integration/test_capture_service.py:generic-api-key:204
+3ca85994224cf89b0309681efce45c306c464216:apps/api/tests/integration/test_capture_service.py:generic-api-key:224
+3ca85994224cf89b0309681efce45c306c464216:apps/api/tests/integration/test_capture_service.py:generic-api-key:246
