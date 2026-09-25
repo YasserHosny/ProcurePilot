@@ -1,7 +1,7 @@
 # ProcurePilot User Flows
 
 > Navigation paths for every user-facing page, with journey visualisations.
-> Last updated: 25 Sep 2026.
+> Last updated: 26 Sep 2026.
 >
 > Covers the web app only. The mobile app uses named routes rather than URLs; see
 > [ProcurePilot Mobile App User Documentation](mobile-app-user-documentation.md) for its screens
@@ -296,7 +296,7 @@ journey
 - `/home` -> **Reorder Forecasts** -> `/forecasting` -> pick branch + required-by date -> **Prepare draft request** -> draft appears in `/requests`
 - `/home` -> **Supplier Risk** -> `/supplier-risk` -> **View scorecard** -> `/suppliers/:id/scorecard` -> **Prepare negotiation brief** -> `/negotiation-briefs/:id` -> acknowledge or dismiss
 - `/home` -> **Procurement Analyst** -> `/analyst` -> ask a question -> follow a next-step link, or **Question History** -> `/analyst/history` -> reopen a conversation -> `/analyst/:conversationId`
-- `/rfq/create` -> add lines + pick suppliers -> **Save Draft** -> **Send RFQ** -> supplier replies captured automatically (not yet linked from navigation — see [Known Issues](user-documentation.md#36-known-issues))
+- `/home` -> **RFQ History** -> `/rfq/history` -> **Create RFQ** -> `/rfq/create` -> add lines + pick suppliers -> **Save Draft** -> **Send RFQ** -> supplier replies captured automatically
 - `/home` -> **RFQ History** -> `/rfq/history` -> open a row -> `/rfq/compare/:id` -> **Prepare Request** -> draft appears in `/requests`; a `Converted` row instead opens `/requests/:id` directly
 
 ```mermaid
@@ -323,14 +323,11 @@ journey
         Follow next-step link: 5: User
     section RFQ Sourcing
         Go to RFQ History: 3: User
+        Create RFQ: 3: User
         Open RFQ: 3: User
         Compare responses: 4: User
         Prepare request: 5: User
 ```
-
-> **Note:** `/rfq/create` has no navigation entry point anywhere in the app shell as of this
-> writing — it is reachable only by URL. Every other route above is reachable from the side
-> navigation under `/home`.
 
 ---
 
