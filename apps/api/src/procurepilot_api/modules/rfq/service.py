@@ -555,6 +555,14 @@ class RfqService:
                         ),
                     )
 
+                    # 'converted' is a real, intended terminal RFQ status (spec.md's Key
+                    # Entities section, FR-017's history view) -- a successful preparation
+                    # closes the sourcing loop for this RFQ.
+                    cur.execute(
+                        "update rfq set status = 'converted' where id = %s and tenant_id = %s",
+                        (rfq_id, member.tenant_id),
+                    )
+
                     conn.commit()
 
         return PrepareRequestResponse(purchase_request_id=purchase_request.id)

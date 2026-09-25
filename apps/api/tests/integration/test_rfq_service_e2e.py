@@ -386,6 +386,9 @@ def test_prepare_request_and_idempotency(monkeypatch: pytest.MonkeyPatch) -> Non
             assert total_currency == "GBP"
             assert incomplete is False
 
+            cur.execute("select status from rfq where id = %s", (rfq_id,))
+            assert cur.fetchone()[0] == "converted"
+
             cur.execute(
                 "select estimated_unit_price_amount from purchase_request_line "
                 "where purchase_request_id = %s order by estimated_unit_price_amount",
