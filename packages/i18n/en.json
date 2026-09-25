@@ -3471,6 +3471,7 @@
     "history": {
       "title": "RFQ History",
       "subtitle": "Track your requests for quotation.",
+      "createRfq": "Create RFQ",
       "status": "Status",
       "neededBy": "Needed By",
       "sentAt": "Sent Date",
