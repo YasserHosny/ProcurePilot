@@ -1,7 +1,7 @@
 # ProcurePilot User Documentation
 
 > Complete system journey with annotated screenshots for every screen.
-> Last updated: 25 Sep 2026.
+> Last updated: 26 Sep 2026.
 >
 > Covers the web app only. For the mobile app (sign-in, biometric unlock, role-aware home
 > screen), see [ProcurePilot Mobile App User Documentation](mobile-app-user-documentation.md).
@@ -223,10 +223,11 @@ A supplier may quote "1 case of 12 x 500ml bottles" while another quotes "1 pack
 | # | Element | Description |
 |---|---------|-------------|
 | 1 | **Supplier Name** (required) | The only mandatory field — a supplier can be created with just a name and completed later. |
-| 2 | **Payment Terms** | Free text, e.g. "Net 30". |
-| 3 | **Lead Time (Days)** | Typical delivery lead time, used in Smart Compare's scoring. |
-| 4 | **Minimum Order Amount / Currency** | Both fields are required together — Constitution Principle VII: no bare numbers for money. Leave both blank if there is no minimum. |
-| 5 | **Delivery Fee Amount / Currency** | Same paired-currency rule as the minimum order amount. |
+| 2 | **Contact Email** | The address ProcurePilot sends RFQs to when you include this supplier in a Create RFQ send (§34). Optional, but validated as a real email address if you enter one. A supplier with no contact email on file simply won't appear in the RFQ supplier picker — there's no other purchasing workflow it blocks. |
+| 3 | **Payment Terms** | Free text, e.g. "Net 30". |
+| 4 | **Lead Time (Days)** | Typical delivery lead time, used in Smart Compare's scoring. |
+| 5 | **Minimum Order Amount / Currency** | Both fields are required together — Constitution Principle VII: no bare numbers for money. Leave both blank if there is no minimum. |
+| 6 | **Delivery Fee Amount / Currency** | Same paired-currency rule as the minimum order amount. |
 
 ---
 
@@ -1016,23 +1017,21 @@ A grounded, cited question-and-answer assistant over your own tenant data — sp
 
 ## 34. RFQ Sourcing & Response Comparison
 
-**Route:** `/rfq/create` (Owner or Buyer)
+**Route:** `/rfq/create` (Owner or Buyer) — reached via the **Create RFQ** button on RFQ History (below), or by navigating directly.
 
 ![Create RFQ](screenshots/34-rfq-create.jpg)
 
-Sends a structured request for quotation to one or more suppliers by email. Replies are captured and matched automatically; a buyer then compares them side by side and turns a chosen response into a draft purchase request.
+Sends a structured request for quotation to one or more suppliers by email. Replies are captured and matched automatically; a buyer then compares them side by side and turns a chosen response into a draft purchase request. The screen uses the same Material form components, and is translated into Arabic, like the rest of the app.
 
 | # | Element | Description |
 |---|---------|-------------|
-| 1 | **Items section** | One row per line: a Product ID field and a Quantity field. **Add Line** adds another row; **Remove** deletes one (at least one line must remain). |
-| 2 | **Supplier IDs selector** | A multi-select list of suppliers to send the RFQ to. A supplier with no on-file contact email is silently excluded from the send and reported back as a rejected recipient rather than failing the whole RFQ. |
-| 3 | **Needed By Date field** | The date the buyer needs the goods by. |
-| 4 | **Tenant Terms field** | Optional free text included with the RFQ (e.g. delivery or payment terms suppliers should quote against). |
+| 1 | **Items section** | One row per line: a **Product** dropdown (populated from your catalogue, showing product name and variant — not a raw ID) and a **Quantity** field. **Add Line** adds another row; **Remove** deletes one (at least one line must remain). |
+| 2 | **Suppliers dropdown** | A multi-select populated with your active suppliers, showing supplier name. Only suppliers that have a contact email on file (§5) appear in the list — a supplier without one simply isn't selectable here. |
+| 3 | **Needed By Date field** | A date picker for the date the buyer needs the goods by. |
+| 4 | **Terms and Conditions field** | Optional free text included with the RFQ (e.g. delivery or payment terms suppliers should quote against). |
 | 5 | **Save Draft button** | Creates the RFQ in `draft` status. Once created, the button disables — the draft is saved once per visit to this form. |
-| 6 | **Rejected Suppliers list** | Appears if any selected supplier was excluded from the RFQ (e.g. missing contact email), naming the supplier and the reason. |
+| 6 | **Rejected Suppliers list** | Appears only if the backend still excluded a selected supplier from the RFQ (for example, its contact email was removed between when the page loaded and when you saved). Since the dropdown already limits selection to suppliers with a contact email on file, this list is expected to stay empty in normal use. |
 | 7 | **Send RFQ button** | Appears once the draft is saved. Dispatches the RFQ by email to every recipient still pending, and shows the current RFQ status ("draft" or "sent"). |
-
-**Current display limitation:** this screen is functionally complete but visibly unfinished compared to the rest of the app — it uses plain HTML labels and a native multi-select instead of the Material form components used everywhere else, product and supplier are entered/selected by raw ID rather than name, and none of its on-screen text is translated (no Arabic support yet, unlike every other screen in this document). There is also no link to it anywhere in the app's navigation or from RFQ History (below) — it must currently be reached by typing `/rfq/create` directly. Functionally, creating and sending an RFQ works end to end; only the polish and discoverability are behind the rest of R4.3. See [§36 Known Issues](#36-known-issues).
 
 ### RFQ History
 
@@ -1043,8 +1042,9 @@ Sends a structured request for quotation to one or more suppliers by email. Repl
 | # | Element | Description |
 |---|---------|-------------|
 | 1 | **Page title — "RFQ History"** | Tracks every request for quotation you've created. |
-| 2 | **RFQ table** | One row per RFQ: status (Draft/Sent/Responded/Expired/Converted), needed-by date, sent date, recipient count, and response count. |
-| 3 | **Row click** | Opens the RFQ. A `Converted` row opens the purchase request it produced (§18); any other status opens the Compare RFQ Responses screen (below). |
+| 2 | **Create RFQ button** | Top-right of the header. Navigates to `/rfq/create` (above) — this is the app's navigation entry point into Create RFQ. |
+| 3 | **RFQ table** | One row per RFQ: status (Draft/Sent/Responded/Expired/Converted), needed-by date, sent date, recipient count, and response count. |
+| 4 | **Row click** | Opens the RFQ. A `Converted` row opens the purchase request it produced (§18); any other status opens the Compare RFQ Responses screen (below). |
 
 ### Compare RFQ Responses
 
@@ -1111,17 +1111,16 @@ A: Nothing breaks. The RFQ stays in `Sent` status with a response count lower th
 
 ## 36. Known Issues
 
-Originally found during the 6 Sep 2026 documentation pass; re-checked and updated 12 Sep 2026 against current `main`; extended 25 Sep 2026 to cover R4.0–R4.3.
+Originally found during the 6 Sep 2026 documentation pass; re-checked and updated 12 Sep 2026 against current `main`; extended 25 Sep 2026 to cover R4.0–R4.3; re-checked 26 Sep 2026 against Create RFQ's Material/i18n rewrite (PR #29).
 
 | # | Where | Issue |
 |---|-------|-------|
 | 1 | Purchase Requests (§17) | Submitted request rows can display the raw branch UUID in the Branch column instead of the branch name. Still present as of 12 Sep 2026. |
 | 2 | Purchase Request detail (§18) | Existing request line items can display the saved product UUID rather than the product's catalogue name. The linked product still exists and the relationship is stored correctly. Still present as of 12 Sep 2026. |
 | 3 | Quotation review detail (§9) | The CSV sample upload completed and opened the review screen, but the header fields extracted from the CSV sample left some optional quotation fields blank. The PDF/image sample path depends on external extraction-provider credentials; during the original pass Bedrock fell back because AWS SSO was expired, while CSV extraction still completed successfully. Not re-verified in the 12 Sep pass. |
-| 4 | Create RFQ (§34) | The screen works end to end but hasn't been brought up to the rest of the app's standard yet: plain HTML controls instead of Material, product/supplier entered by raw ID rather than name, and no Arabic translation. It also isn't linked from anywhere in the app — reach it by navigating directly to `/rfq/create`. Found 25 Sep 2026. |
-| 5 | RFQ auto-preparation guardrails (§34) | Configuring the guardrail (max order value, allowlists, minimum responses, price variance) is API-only and owner-restricted — there is no settings screen for it yet. Found 25 Sep 2026. |
+| 4 | RFQ auto-preparation guardrails (§34) | Configuring the guardrail (max order value, allowlists, minimum responses, price variance) is API-only and owner-restricted — there is no settings screen for it yet. Found 25 Sep 2026, still present as of 26 Sep 2026. |
 
-**Resolved since the original pass:** the Approval Queue (§19) previously rendered only its title/subtitle with no request cards. It is now fully functional — pending requests, budget status, expandable line detail, and an approve/reject dialog with an optional comment — and an approval-delegation management UI (§21) has been added.
+**Resolved since the original pass:** the Approval Queue (§19) previously rendered only its title/subtitle with no request cards. It is now fully functional — pending requests, budget status, expandable line detail, and an approve/reject dialog with an optional comment — and an approval-delegation management UI (§21) has been added. **Also resolved 26 Sep 2026:** Create RFQ (§34) previously used plain HTML controls with no Material styling, no Arabic translation, a supplier picker hardcoded to placeholder `sup-1`/`sup-2` options, and no navigation entry point (reachable only by typing `/rfq/create`). It now uses full Material form components, is translated into English and Arabic, populates real suppliers and products from your workspace data, and is reachable from a **Create RFQ** button on RFQ History.
 
 If you hit any of these, it's not something wrong with your setup — flag it to the product team.
 
