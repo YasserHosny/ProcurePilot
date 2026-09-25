@@ -1,5 +1,9 @@
 import base64
+import json
 import logging
+from email.message import EmailMessage
+from email.policy import default as email_policy
+from email.utils import make_msgid
 from typing import Annotated
 from uuid import UUID, uuid4
 
@@ -180,10 +184,66 @@ async def inbound_email_webhook(
         signature = str(form.get("signature") or "")
         verify_mailgun_signature(settings, timestamp=timestamp, token=token, signature=signature)
         recipient = str(form.get("recipient") or "")
-        raw_mime = form.get("body-mime")
-        raw_email_bytes = (
-            raw_mime.encode("utf-8") if isinstance(raw_mime, str) else b""
-        )
+        
+        msg = EmailMessage(policy=email_policy)
+        # These three describe the ORIGINAL message's MIME structure (e.g. "multipart/
+        # alternative; boundary=..." for a completely ordinary Gmail reply). We are not
+        # preserving that structure -- we rebuild a new one below via set_content()/
+        # add_alternative()/add_attachment(), which manage these same headers themselves.
+        # Copying the original values first and then calling set_content() raises
+        # `TypeError: set_content not valid on multipart` on any multipart source message,
+        # which is the common case, not the exception -- a plain, unformatted Gmail reply is
+        # still multipart/alternative (text/plain + text/html) unless the sender explicitly
+        # composed in plain-text mode.
+        _managed_headers = {"content-type", "mime-version", "content-transfer-encoding"}
+        message_headers_raw = str(form.get("message-headers") or "[]")
+        try:
+            headers = json.loads(message_headers_raw)
+            if isinstance(headers, list):
+                for name, value in headers:
+                    if str(name).lower() in _managed_headers:
+                        continue
+                    msg[name] = value
+        except Exception:
+            pass
+
+        if "Message-ID" not in msg:
+            msg["Message-ID"] = str(form.get("Message-Id") or make_msgid())
+        if "From" not in msg:
+            msg["From"] = str(form.get("From") or str(form.get("sender") or ""))
+        if "To" not in msg:
+            msg["To"] = str(form.get("To") or recipient)
+        if "Subject" not in msg:
+            msg["Subject"] = str(form.get("Subject") or str(form.get("subject") or ""))
+        if "In-Reply-To" not in msg and form.get("In-Reply-To"):
+            msg["In-Reply-To"] = str(form.get("In-Reply-To"))
+
+        body_plain = form.get("body-plain")
+        body_html = form.get("body-html")
+
+        if body_plain:
+            msg.set_content(str(body_plain))
+            if body_html:
+                msg.add_alternative(str(body_html), subtype="html")
+        elif body_html:
+            msg.set_content(str(body_html), subtype="html")
+        else:
+            msg.set_content("")
+
+        attachment_count = int(str(form.get("attachment-count") or "0"))
+        for i in range(1, attachment_count + 1):
+            attachment = form.get(f"attachment-{i}")
+            if isinstance(attachment, StarletteUploadFile):
+                content = await attachment.read()
+                filename = attachment.filename or f"attachment-{i}"
+                maintype, subtype = "application", "octet-stream"
+                if attachment.content_type:
+                    parts = attachment.content_type.split("/", 1)
+                    if len(parts) == 2:
+                        maintype, subtype = parts
+                msg.add_attachment(content, maintype=maintype, subtype=subtype, filename=filename)
+
+        raw_email_bytes = msg.as_bytes()
     else:
         verify_shared_secret(settings, provided_secret=x_ingestion_webhook_secret)
         body = await request.json()
