@@ -293,7 +293,7 @@ response, and confirm the history view shows all three with distinct, accurate s
 
 ## Final Phase: Polish & Cross-Cutting Concerns
 
-- [ ] T043 [P] Write the Principle-III boundary proof: an integration test that attempts, and
+- [x] T043 [P] Write the Principle-III boundary proof: an integration test that attempts, and
       fails, to find any code path from an `auto_preparation_event` firing to a transmitted
       purchase order or a bypassed approval step — this is the one test in this release that
       exists purely to make the constitution's NON-NEGOTIABLE guarantee executable, not just
