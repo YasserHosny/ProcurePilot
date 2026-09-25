@@ -233,6 +233,13 @@ export const routes: Routes = [
             (m) => m.OrderDetailComponent,
           ),
       },
+      // --- RFQ sourcing (R4.3) ---
+      {
+        path: 'rfq/create',
+        canActivate: [roleGuard('owner', 'buyer')],
+        loadComponent: () =>
+          import('./features/rfq/create/create.component').then((m) => m.RfqCreateComponent),
+      },
       // --- smart compare and intelligence (Chunk 4.5) ---
       {
         path: 'offers/compare',
