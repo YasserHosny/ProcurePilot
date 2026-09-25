@@ -18,13 +18,30 @@ class Mailer(Protocol):
     ) -> SendResult: ...
 
 
+class FakeMessage(BaseModel):
+    to: str
+    subject: str
+    body: str
+    headers: dict[str, str] | None
+    message_id: str
+
+
 class FakeMailer:
+    sent_messages: list[FakeMessage] = []
+
     def send(
         self, *, to: str, subject: str, body: str, headers: dict[str, str] | None = None
     ) -> SendResult:
         # Deterministic-enough fake Message-ID
         msg_id = f"fake-{uuid.uuid4().hex}@stub.mail"
+        self.sent_messages.append(
+            FakeMessage(to=to, subject=subject, body=body, headers=headers, message_id=msg_id)
+        )
         return SendResult(message_id=msg_id)
+
+    @classmethod
+    def clear(cls) -> None:
+        cls.sent_messages.clear()
 
 
 class MailgunMailer:

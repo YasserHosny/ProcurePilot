@@ -44,6 +44,7 @@ def build_rfq_message(
     product_names: dict[uuid.UUID, str],
     recipient: RfqRecipient,
     tenant_terms: str | None = None,
+    reply_to: str | None = None,
 ) -> tuple[str, str, str]:
     subject = f"Request for Quotation - {rfq.needed_by_date}"
 
@@ -62,6 +63,15 @@ def build_rfq_message(
             f"Needed by: {rfq.needed_by_date.isoformat()}",
         ]
     )
+
+    if reply_to:
+        body_lines.extend(
+            [
+                "",
+                "To submit your quotation, please reply directly to this email or send it to:",
+                reply_to,
+            ]
+        )
 
     if tenant_terms:
         body_lines.extend(["", "Terms:", tenant_terms])
@@ -282,6 +292,15 @@ class RfqService:
                 recipient_rows = cur.fetchall()
                 draft_recipients = [RfqRecipient(**r) for r in recipient_rows]
 
+                cur.execute(
+                    "select * from tenant_email_config where tenant_id = %s",
+                    (member.tenant_id,),
+                )
+                email_config_row = cur.fetchone()
+                reply_to = None
+                if email_config_row and email_config_row["enabled"]:
+                    reply_to = email_config_row["forwarding_address"]
+
                 any_sent = False
                 updated_recipients = []
 
@@ -301,14 +320,19 @@ class RfqService:
                         lines=lines,
                         product_names=product_names,
                         recipient=recipient,
+                        reply_to=reply_to,
                     )
 
+                    send_kwargs = {
+                        "to": contact_email,
+                        "subject": subject,
+                        "body": body,
+                    }
+                    if reply_to:
+                        send_kwargs["headers"] = {"Reply-To": reply_to}
+
                     try:
-                        res = mailer.send(
-                            to=contact_email,
-                            subject=subject,
-                            body=body,
-                        )
+                        res = mailer.send(**send_kwargs)
                         # On success
                         sent_msg_id = res.message_id
                         cur.execute(
@@ -735,7 +759,7 @@ class RfqService:
             ORDER BY r.created_at DESC, r.id DESC
             LIMIT %s OFFSET %s
         """
-        
+
         with _authenticated_db(self.settings, member) as conn:
             with conn.cursor(row_factory=dict_row) as cur:
                 cur.execute(query, (*params, capped_limit + 1, offset))
@@ -776,4 +800,3 @@ def get_rfq_service() -> RfqService:
     from procurepilot_api.config import get_settings
 
     return RfqService(settings=get_settings())
-
