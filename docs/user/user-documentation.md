@@ -1,7 +1,7 @@
 # ProcurePilot User Documentation
 
 > Complete system journey with annotated screenshots for every screen.
-> Last updated: 20 Sep 2026.
+> Last updated: 25 Sep 2026.
 >
 > Covers the web app only. For the mobile app (sign-in, biometric unlock, role-aware home
 > screen), see [ProcurePilot Mobile App User Documentation](mobile-app-user-documentation.md).
@@ -40,8 +40,12 @@
 28. [Email Ingestion Log](#28-email-ingestion-log)
 29. [Capture a Quotation (Photo or Upload)](#29-capture-a-quotation-photo-or-upload)
 30. [Catalogue Import (Bulk Price List)](#30-catalogue-import-bulk-price-list)
-31. [FAQ](#31-faq)
-32. [Known Issues](#32-known-issues)
+31. [Reorder Forecasts & Reorder Queue](#31-reorder-forecasts--reorder-queue)
+32. [Supplier Risk Queue & Negotiation Briefs](#32-supplier-risk-queue--negotiation-briefs)
+33. [Procurement Analyst](#33-procurement-analyst)
+34. [RFQ Sourcing & Response Comparison](#34-rfq-sourcing--response-comparison)
+35. [FAQ](#35-faq)
+36. [Known Issues](#36-known-issues)
 
 ---
 
@@ -464,6 +468,8 @@ After AI extraction finishes, each quotation lands in the review queue. Open a r
 
 **Business value:** Supplier IQ transforms fragmented operational and commercial records into defensible risk indicators, empowering buyers to detect vendor drift and quality issues before awarding orders.
 
+**R4.1 extension:** this page now ends with a **Supplier Risk Evidence** panel (the v2 risk model, with a component-level evidence table and a **Prepare negotiation brief** button) and is also reachable from a workspace-wide **Supplier Risk Queue**. See [§32 Supplier Risk Queue & Negotiation Briefs](#32-supplier-risk-queue--negotiation-briefs).
+
 ---
 
 ## 14. Alerts Inbox & Anomaly Detection
@@ -693,7 +699,7 @@ Reached from **Record Purchase** on any Smart Compare offer, or **+ Record Purch
 
 **Business value:** organisation settings connect procurement activity to the way the business is managed. Branches, cost centres, and budgets turn isolated purchases into accountable spend by location, department, and financial period.
 
-**Display note:** the Settings screen now resolves branch names in the Branch and Cost Centre tables. See [§32 Known Issues](#32-known-issues) for remaining raw-ID display issues in the Purchase Requests area.
+**Display note:** the Settings screen now resolves branch names in the Branch and Cost Centre tables. See [§36 Known Issues](#36-known-issues) for remaining raw-ID display issues in the Purchase Requests area.
 
 ---
 
@@ -886,7 +892,181 @@ Bulk-import supplier price lists and catalogues from CSV or Excel spreadsheets i
 
 ---
 
-## 31. FAQ
+## 31. Reorder Forecasts & Reorder Queue
+
+**Route:** `/forecasting` (Owner or Buyer)
+
+![Reorder Forecasts](screenshots/31-reorder-queue.jpg)
+
+Demand forecasting per product, surfaced as a queue of reorder proposals a buyer reviews and can turn into a draft purchase request.
+
+| # | Element | Description |
+|---|---------|-------------|
+| 1 | **Page title — "Reorder Forecasts"** | Lists demand-forecast-driven reorder proposals for products with enough purchase and stock history to forecast. |
+| 2 | **Refresh forecasts button** | Recomputes forecasts and reorder proposals on demand; shows a snackbar confirmation on completion. |
+| 3 | **G3 evidence banner** | A persistent notice stating these forecasts are an R4 preview: connected commercial history has not yet validated the model, so every provisional result must be reviewed by a human before acting on it. |
+| 4 | **Draft request details panel** | Two controls used when preparing a request from a proposal: a **Branch** selector (defaults to your first active branch) and a **Required by date** field (defaults to 14 days out). These apply to whichever proposal you next prepare. |
+| 5 | **Proposal cards** | One card per product with an open or prepared proposal, showing stock on hand, expected demand, an uncertainty range (low–high), and a suggested reorder quantity. |
+| 6 | **Evidence row** | Below the metrics, each card shows the observed history length in days, the forecast's evidence state (Full history / Provisional history / Insufficient evidence), and how long the current forecast stays valid. |
+| 7 | **Prepare draft request button** | Turns an open proposal into a draft purchase request using the selected branch and required-by date. Once prepared, the card shows "Draft request is ready in Purchase Requests" instead of the button — the draft still goes through the normal submit/approve workflow. |
+
+**Evidence states:**
+- **Full history** — at least 180 days of observed demand history back the forecast.
+- **Provisional history** — fewer than 180 days of history; the card carries a warning that it must be reviewed before use.
+- **Insufficient evidence** — neither demand nor stock evidence is available yet; no quantity can be suggested and the Prepare button is hidden.
+
+**Tips:**
+- A proposal only appears after a matched POS signal has been synchronized and a forecast has been computed — if the list is empty, refreshing forecasts after new sales/stock data has landed is usually the fix.
+- **Prepare draft request** never submits or approves anything — it only creates a **Draft** row in Purchase Requests (§17), which still needs to be reviewed, submitted, and approved like any other request.
+- This screen, like Basket Split (§12), is Owner/Buyer only — other roles won't see **Reorder Forecasts** in the side navigation.
+
+**Business value:** reorder forecasting turns historical demand into a reviewed, evidence-backed replenishment suggestion instead of a buyer's guess or a stockout after the fact. Because every proposal shows its uncertainty range and evidence state up front, and preparing a request never bypasses approval, the feature speeds up routine restocking without weakening spend control — see `docs/product/function-business-value.md` for how this connects to reduced stockouts and carrying cost.
+
+---
+
+## 32. Supplier Risk Queue & Negotiation Briefs
+
+**Route:** `/supplier-risk`
+
+![Supplier Risk Queue](screenshots/32-supplier-risk-queue.jpg)
+
+A workspace-wide queue of the latest evidence-based risk snapshot for every active supplier, extending Supplier IQ (§13) with a comparative view across your whole supplier base.
+
+| # | Element | Description |
+|---|---------|-------------|
+| 1 | **Page title — "Supplier Risk"** | Scans the latest risk position for every active supplier in one table instead of opening each supplier's scorecard individually. |
+| 2 | **Recompute risk button** | Recomputes risk snapshots for all suppliers. Visible to Owner/Buyer only; other roles see a read-only notice instead. |
+| 3 | **G3 evidence banner** | States these risk signals are advisory and require human review — they cannot authorise a purchase. |
+| 4 | **Risk table** | One row per supplier: name (links to that supplier's scorecard), risk level (Low/Medium/High or "Insufficient data") with the underlying percentage, confidence (Low/Medium/High), evidence state (Ready/Provisional/Insufficient data), top risk driver (spend concentration, price drift, delivery reliability, or single-source exposure), release posture, and validity (Current or Stale, with the exact valid-until date). |
+| 5 | **View scorecard action** | Opens that supplier's full Supplier IQ scorecard (§13), where the detailed risk evidence and the option to prepare a negotiation brief live. |
+| 6 | **Load more** | Cursor-paginated in pages of 50; click to fetch older/lower-ranked snapshots. |
+| 7 | **Empty state** | "No supplier risk snapshots yet" — shown until an owner or buyer computes the first snapshots. |
+
+### Supplier Risk Evidence panel (on the Supplier Scorecard, §13)
+
+The Supplier Scorecard page (`/suppliers/:id/scorecard`) now ends with a **Supplier Risk Evidence** panel — the v2 risk model underneath the Supplier IQ metrics already documented in §13.
+
+| # | Element | Description |
+|---|---------|-------------|
+| 1 | **Evidence state & posture tags** | Shows the snapshot's evidence state, release posture, and whether it's current or stale, with the exact valid-until date. |
+| 2 | **Prepare negotiation brief button** | Visible to Owner/Buyer when a ready or provisional, non-stale v2 snapshot exists. Generates a negotiation brief and navigates straight to it. |
+| 3 | **Component evidence table** | One row per risk component (spend concentration, price drift, delivery reliability, single-source exposure): its risk percentage, weight in the overall score, confidence, the sample count and calculation numerator/denominator behind it, any excluded evidence (e.g. cancelled orders, out-of-window records) with counts, and links to the underlying purchase orders or catalogue products. |
+| 4 | **Spend by currency table** | Shown only for the concentration component when the supplier is quoted in more than one currency: supplier spend, workspace spend, share, and sample count per currency — so a risk score is never built by silently mixing currencies. |
+
+### Negotiation Brief detail
+
+**Route:** `/negotiation-briefs/:id`
+
+![Negotiation Brief](screenshots/32b-negotiation-brief.jpg)
+
+An AI-generated, evidence-backed set of talking points for a risky supplier, reached from the **Prepare negotiation brief** button above.
+
+| # | Element | Description |
+|---|---------|-------------|
+| 1 | **Back to supplier risk link** | Returns to the Supplier Risk Queue. |
+| 2 | **Status tag** | Prepared, Acknowledged, or Dismissed. |
+| 3 | **G3 posture notice** | States plainly the brief is advisory and cannot authorise or send a purchase. |
+| 4 | **Validity row** | Valid-from and valid-until dates, with a stale/"Expired" tag once the brief is past its validity window. |
+| 5 | **Brief items** | A ranked list of talking points — price trajectory, comparable alternatives, service performance, concentration and volume, payment context, or purchase pattern — each with its underlying value, risk percentage, monetary amount (with currency) where relevant, the calculation version used, links to its source evidence (purchase orders, delivery receipts, landed-cost observations, etc.), and a suggested question to ask the supplier. |
+| 6 | **Record your review panel** | Visible to Owner/Buyer while the brief is still "Prepared". A required dismissal-reason field, plus **Acknowledge brief** and **Dismiss brief** buttons. Acting records an append-only decision — it never contacts the supplier or changes a purchase itself. |
+
+**Business value:** Supplier Risk and negotiation briefs turn scattered delivery, pricing, and concentration signals into a defensible case a buyer can use in a real supplier conversation. Because every driver, score, and talking point cites its source evidence, and every action taken on a brief is logged rather than automated, buyers get real leverage in negotiation without the system ever contacting a supplier or committing spend on its own — see `docs/product/function-business-value.md` for the wider risk-reduction rationale.
+
+---
+
+## 33. Procurement Analyst
+
+**Route:** `/analyst` or `/analyst/:conversationId`
+
+![Procurement Analyst](screenshots/33-analyst-conversation.jpg)
+
+A grounded, cited question-and-answer assistant over your own tenant data — spend and savings, supplier performance and risk, orders and quotations, and reorder forecasts.
+
+| # | Element | Description |
+|---|---------|-------------|
+| 1 | **Page title — "Procurement Analyst"** | States plainly the assistant only answers from your own data and shows its calculation and sources with every answer. |
+| 2 | **Question History button** | Opens the Question History screen (below). |
+| 3 | **G3 evidence banner** | Confirms the analyst never places, drafts, or sends a purchase — advisory only, reviewed by a human. |
+| 4 | **Ask a question field** | A single-line text input. Submitting sends the question to the analyst; the field clears once an answer is added to the thread. |
+| 5 | **Conversation thread** | Each turn shows your question and the analyst's answer. A turn with no citations and no calculation is a refusal (the analyst declined to answer, e.g. because it couldn't find grounding data) and is styled distinctly from an answered turn. |
+| 6 | **Show calculation panel** | An expandable panel on turns that computed a number: the exact formula used and its inputs, so the figure can be checked rather than taken on faith. |
+| 7 | **Sources list** | Every citation backing the answer, labelled by kind — purchase order, quotation line, landed cost, saving record, supplier scorecard, delivery receipt, or reorder proposal. |
+| 8 | **Next-step link** | Some answers (supplier performance/risk, reorder forecasts, spend/savings) include a deep link straight to the relevant screen — the supplier's negotiation brief, the Reorder Queue, or a report — so an answer can be acted on immediately. |
+| 9 | **Empty state** | "No questions yet" with example topics (spend and savings, supplier performance and risk, orders and quotations, reorder forecasts) to prompt a first question. |
+
+**Follow-up questions:** asking a second question in the same browser session continues the same conversation — the analyst resolves context from the immediately preceding turn on the server, not from anything held in the browser. Opening the page via a history entry reopens that specific conversation by its ID in the route.
+
+### Question History
+
+**Route:** `/analyst/history`
+
+![Question History](screenshots/33b-analyst-history.jpg)
+
+| # | Element | Description |
+|---|---------|-------------|
+| 1 | **Page title — "Question History"** | Lists every past conversation with the analyst. |
+| 2 | **New Conversation button** | Returns to `/analyst` to start a fresh conversation. |
+| 3 | **History cards** | One card per conversation: the date it started, how many turns it contains, and the first question asked. Click anywhere on a card (or press Enter) to reopen that conversation. |
+| 4 | **Load More button** | Cursor-paginated in pages of 50. |
+| 5 | **Empty state** | "No past conversations found" when nothing has been asked yet. |
+
+**Business value:** the analyst collapses the time it takes to answer a commercial question — "how much have we saved with Supplier X this quarter", "which suppliers are our biggest concentration risk" — from a manual spreadsheet exercise into a cited, checkable answer with a direct link to act on it. Because every answer shows its formula and sources (or explicitly refuses rather than guessing), it extends trust rather than spending it — see `docs/product/function-business-value.md` for the broader case.
+
+---
+
+## 34. RFQ Sourcing & Response Comparison
+
+**Route:** `/rfq/create` (Owner or Buyer)
+
+![Create RFQ](screenshots/34-rfq-create.jpg)
+
+Sends a structured request for quotation to one or more suppliers by email. Replies are captured and matched automatically; a buyer then compares them side by side and turns a chosen response into a draft purchase request.
+
+| # | Element | Description |
+|---|---------|-------------|
+| 1 | **Items section** | One row per line: a Product ID field and a Quantity field. **Add Line** adds another row; **Remove** deletes one (at least one line must remain). |
+| 2 | **Supplier IDs selector** | A multi-select list of suppliers to send the RFQ to. A supplier with no on-file contact email is silently excluded from the send and reported back as a rejected recipient rather than failing the whole RFQ. |
+| 3 | **Needed By Date field** | The date the buyer needs the goods by. |
+| 4 | **Tenant Terms field** | Optional free text included with the RFQ (e.g. delivery or payment terms suppliers should quote against). |
+| 5 | **Save Draft button** | Creates the RFQ in `draft` status. Once created, the button disables — the draft is saved once per visit to this form. |
+| 6 | **Rejected Suppliers list** | Appears if any selected supplier was excluded from the RFQ (e.g. missing contact email), naming the supplier and the reason. |
+| 7 | **Send RFQ button** | Appears once the draft is saved. Dispatches the RFQ by email to every recipient still pending, and shows the current RFQ status ("draft" or "sent"). |
+
+**Current display limitation:** this screen is functionally complete but visibly unfinished compared to the rest of the app — it uses plain HTML labels and a native multi-select instead of the Material form components used everywhere else, product and supplier are entered/selected by raw ID rather than name, and none of its on-screen text is translated (no Arabic support yet, unlike every other screen in this document). There is also no link to it anywhere in the app's navigation or from RFQ History (below) — it must currently be reached by typing `/rfq/create` directly. Functionally, creating and sending an RFQ works end to end; only the polish and discoverability are behind the rest of R4.3. See [§36 Known Issues](#36-known-issues).
+
+### RFQ History
+
+**Route:** `/rfq/history` (Owner or Buyer)
+
+![RFQ History](screenshots/34b-rfq-history.jpg)
+
+| # | Element | Description |
+|---|---------|-------------|
+| 1 | **Page title — "RFQ History"** | Tracks every request for quotation you've created. |
+| 2 | **RFQ table** | One row per RFQ: status (Draft/Sent/Responded/Expired/Converted), needed-by date, sent date, recipient count, and response count. |
+| 3 | **Row click** | Opens the RFQ. A `Converted` row opens the purchase request it produced (§18); any other status opens the Compare RFQ Responses screen (below). |
+
+### Compare RFQ Responses
+
+**Route:** `/rfq/compare/:id` (Owner or Buyer)
+
+![Compare RFQ Responses](screenshots/34c-rfq-compare.jpg)
+
+| # | Element | Description |
+|---|---------|-------------|
+| 1 | **Page title — "RFQ Responses"** | Compares every captured supplier response to this RFQ side by side. |
+| 2 | **Deliver to Branch / Required By controls** | Set once and used for whichever response you prepare into a request. |
+| 3 | **Response cards** | One card per supplier response: supplier name, submitted date, and a line table (product, quantity, unit price, total value). A line whose product hasn't been matched yet to a catalogue product shows a **Pending Match** badge instead of a price line. |
+| 4 | **Prepare Request button** | Creates a draft purchase request priced from this response's actual quoted prices (not a landed-cost estimate) and marks the RFQ `Converted`. Disabled while any line on the response is still a pending match — a request is only ever prepared from a fully-priced response. The confirmation includes a **View Request** action that jumps straight to the new draft. |
+| 5 | **No responses state** | Shown until at least one supplier reply has been captured and matched. |
+
+**Guarded automatic preparation:** a tenant owner can configure an auto-preparation guardrail (maximum order value, optional supplier/category allowlist, minimum response count, maximum price variance) via the API; when every condition is met and one response is unambiguously the lowest-priced eligible one, ProcurePilot runs the same prepare-request step automatically and the RFQ simply appears here already `Converted` — there is no separate confirmation step for it. **There is currently no settings screen for configuring this guardrail** — it exists only as a backend capability (owner-only), so until a UI ships, turning it on needs API/engineering support. Whether prepared manually or automatically, every path still produces an ordinary draft purchase request that goes through the unchanged approval workflow — nothing in this release creates, submits, or sends a purchase order to a supplier.
+
+**Business value:** automated RFQ sourcing collapses the slowest part of competitive sourcing — chasing multiple suppliers by email and re-keying their replies into a comparison — into an automatic capture-and-compare step, while keeping the final purchasing decision with a human on every path, guarded or manual. See `docs/product/function-business-value.md` for how faster, evidence-backed sourcing rounds translate into negotiating leverage and cycle-time savings.
+
+---
+
+## 35. FAQ
 
 **Q: Can I edit a verified saving?**
 A: No. Verified savings are immutable. If a correction is needed, a new adjustment record is created.
@@ -921,17 +1101,25 @@ A: If you have configured a domain allowlist, any incoming email sent from an un
 **Q: What happens if some rows in my catalogue spreadsheet contain errors?**
 A: ProcurePilot uses partial import resilience. All valid rows are imported into the supplier catalogue immediately, while rows with errors (such as missing product names or invalid currency codes) are reported in the expandable Error Details table with their row number and reason so you can fix and re-import them.
 
+**Q: Why didn't my RFQ auto-prepare a request through the guardrail?**
+A: Every condition has to hold at once: the RFQ still open, at least the configured minimum number of responses received, every line on that response matched to a catalogue product, its currency matching the guardrail's currency exactly, its supplier (and category, if configured) allowed, its total under the configured maximum, its price within the configured variance of your recent purchase history for that product, and it must be the single lowest-priced eligible response — a tie never fires. If even one condition fails, the response is simply left for you to prepare manually from RFQ Responses (§34). There's also no settings screen yet for configuring the guardrail itself — see [§36 Known Issues](#36-known-issues).
+
+**Q: What happens if a supplier never replies to an RFQ?**
+A: Nothing breaks. The RFQ stays in `Sent` status with a response count lower than its recipient count, and you can still compare and prepare a request from whichever suppliers do reply. A supplier that never responds simply never produces a card on the Compare RFQ Responses screen (§34).
+
 ---
 
-## 32. Known Issues
+## 36. Known Issues
 
-Originally found during the 6 Sep 2026 documentation pass; re-checked and updated 12 Sep 2026 against current `main`.
+Originally found during the 6 Sep 2026 documentation pass; re-checked and updated 12 Sep 2026 against current `main`; extended 25 Sep 2026 to cover R4.0–R4.3.
 
 | # | Where | Issue |
 |---|-------|-------|
 | 1 | Purchase Requests (§17) | Submitted request rows can display the raw branch UUID in the Branch column instead of the branch name. Still present as of 12 Sep 2026. |
 | 2 | Purchase Request detail (§18) | Existing request line items can display the saved product UUID rather than the product's catalogue name. The linked product still exists and the relationship is stored correctly. Still present as of 12 Sep 2026. |
 | 3 | Quotation review detail (§9) | The CSV sample upload completed and opened the review screen, but the header fields extracted from the CSV sample left some optional quotation fields blank. The PDF/image sample path depends on external extraction-provider credentials; during the original pass Bedrock fell back because AWS SSO was expired, while CSV extraction still completed successfully. Not re-verified in the 12 Sep pass. |
+| 4 | Create RFQ (§34) | The screen works end to end but hasn't been brought up to the rest of the app's standard yet: plain HTML controls instead of Material, product/supplier entered by raw ID rather than name, and no Arabic translation. It also isn't linked from anywhere in the app — reach it by navigating directly to `/rfq/create`. Found 25 Sep 2026. |
+| 5 | RFQ auto-preparation guardrails (§34) | Configuring the guardrail (max order value, allowlists, minimum responses, price variance) is API-only and owner-restricted — there is no settings screen for it yet. Found 25 Sep 2026. |
 
 **Resolved since the original pass:** the Approval Queue (§19) previously rendered only its title/subtitle with no request cards. It is now fully functional — pending requests, budget status, expandable line detail, and an approve/reject dialog with an optional comment — and an approval-delegation management UI (§21) has been added.
 
