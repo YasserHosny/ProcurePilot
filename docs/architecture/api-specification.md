@@ -2740,3 +2740,110 @@ R4.2 introduces grounded question answering. Every response returns `release_pos
 - Returns a conversation in the active workspace.
 - Returns `200` with an `AnalystConversationResponse`.
 - Returns `404` when the conversation is not found or not accessible by the caller (enforced by RLS and application logic according to FR-009).
+
+## R4.3 Automated RFQ Sourcing and Guarded Autonomous Workflows
+
+R4.3 lets a buyer send a structured RFQ to multiple suppliers, automatically captures and
+compares their replies, and lets a member turn a chosen response into a draft purchase request —
+manually, or automatically under a tenant-configured guardrail. Every path, manual or automatic,
+produces an ordinary draft `purchase_request` that enters the existing, unmodified approval
+workflow; nothing in this release creates, submits, or transmits a purchase order, per
+Constitution Principle III (see `test_rfq_guardrail_boundary.py`'s executable proof of this).
+
+### `POST /rfq`
+
+- Accepts `Idempotency-Key` (required). A retry with the same key returns the original RFQ, never
+  a duplicate.
+- Request fields: one or more `lines` (`workspace_product_id`, `quantity`), one or more
+  `recipient_supplier_ids`, `needed_by_date`, optional `tenant_terms`.
+- Any owner or buyer may call this endpoint.
+- A recipient supplier with no on-file contact email is silently excluded from the created RFQ
+  and reported back in `rejected_recipients`, rather than failing the whole request.
+- Returns `201` with the created `Rfq`, its `RfqLine`s, its `RfqRecipient`s, and
+  `rejected_recipients`.
+
+### `POST /rfq/{rfq_id}/send`
+
+- Accepts `Idempotency-Key` (required).
+- Dispatches the RFQ by email (via Mailgun — ADR-018) to every recipient still in `draft` status;
+  a recipient already `sent` from a prior call is left untouched, making a retry naturally
+  idempotent without needing the idempotency key for this specific case.
+- A per-recipient send failure leaves that one recipient `draft` (not `failed` unless the mailer
+  itself reports a hard failure) rather than failing the whole call — the RFQ's own `status`
+  moves to `sent` as soon as at least one recipient succeeds.
+- Returns `200` with the updated `Rfq` and all its `RfqRecipient`s.
+
+### `GET /rfq/{rfq_id}/responses`
+
+- Lists every captured response to one RFQ for comparison, each with its per-line matched product
+  (or an explicit `pending_match` flag when a line's extraction/matching hasn't completed yet —
+  independent of and possibly lagging RFQ response capture) and quoted quantity/price.
+- Scoped per FR-016: the RFQ's creator, or any owner/buyer, may read it.
+- Returns `200` with an `RfqResponseComparisonList`.
+
+### `POST /rfq/{rfq_id}/prepare-request`
+
+- Accepts `Idempotency-Key` (required); a retry replays the same request rather than duplicating
+  it, via `RequestsService.create_request()`'s own existing idempotency handling.
+- Request fields: `rfq_response_id` (the chosen response), `branch_id`, optional
+  `cost_centre_id`, `required_by_date`.
+- Refuses (`422`) a response with any unmatched line, or one with no quotation lines at all — a
+  request is only ever prepared from a fully-priced response.
+- Creates a real `purchase_request`/`purchase_request_line` via the same
+  `RequestsService.create_request()` a manually-typed request uses, then overrides each new
+  line's `estimated_unit_price` with the response's actual quoted price (not a landed-cost
+  estimate), and sets `purchase_request.source_rfq_response_id` so the draft cites which response
+  it came from (FR-008). The RFQ's own `status` moves to `converted`.
+- Returns `201` with a `PrepareRequestResponse` (`purchase_request_id`).
+
+### `GET /rfq`
+
+- Lists every RFQ visible to the caller, cursor-paginated (`limit` capped at 100), each with its
+  recipient count, response count, and — once `status = converted` — the id of the purchase
+  request it produced.
+- Optional `status` filter.
+- Scoped per FR-016, same creator-plus-owner/buyer pattern as every list endpoint in this release.
+- Returns `200` with an `RfqList`.
+
+### `POST /rfq/guardrails`
+
+- Owner-only (FR-010) — enforced by both RLS and an explicit application-layer check.
+- Request fields: `max_order_value_amount`, `max_order_value_currency`, optional
+  `supplier_allowlist`/`category_allowlist`, `min_response_count` (default `1`),
+  `max_price_variance_pct`, `default_branch_id` (required — an automatic firing has no human to
+  pick a branch, so the owner must configure one explicitly), optional `enabled` (default
+  `true`).
+- Refuses (`422`, FR-013) a `max_order_value_amount` of zero or negative.
+- Records an `rfq.guardrail_changed` audit event.
+- Returns `201` with the created `AutoPreparationGuardrail`.
+
+### `GET /rfq/guardrails`
+
+- Owner-only. Lists every guardrail configured for the tenant, newest first.
+- Returns `200` with a list of `AutoPreparationGuardrail`.
+
+### `PATCH /rfq/guardrails/{guardrail_id}`
+
+- Owner-only. Partial update — only the supplied fields change.
+- Same FR-013 rejection as creation applies to a supplied `max_order_value_amount`.
+- Records an `rfq.guardrail_changed` audit event naming which fields changed.
+- Returns `200` with the updated `AutoPreparationGuardrail`, or `404` if the guardrail doesn't
+  exist in this tenant.
+
+### Guarded auto-preparation (no endpoint — a background effect of email capture)
+
+When a captured RFQ response makes every condition of an enabled guardrail true — the RFQ still
+open, the tenant's configured minimum number of responses received, the response's every line
+matched, its currency matching the guardrail's exactly (FR-018 — never a cross-currency
+comparison), its supplier (and, if configured, category — always fails closed, since no
+product-category data exists anywhere in this schema) allowed, its total within the configured
+maximum, and its price within the configured variance of the tenant's own recent purchase history
+for the same product (a product with no purchase history at all is treated as ineligible, never
+guessed) — and it is the single lowest-priced such response (a tie between otherwise-eligible
+responses never fires; FR-012) — the system automatically calls the exact same
+`RfqService.prepare_request()` path described above, acting as the guardrail's own creator, and
+records an `auto_preparation_event` (`guardrail_id`, `rfq_response_id`, `purchase_request_id`)
+plus a dedicated `rfq.auto_prepared` audit event distinct from the manual path's own event. A
+response that fails even one condition is left for the manual `POST /rfq/{rfq_id}/prepare-request`
+path with no special treatment. Disabling or tightening a guardrail only affects responses
+evaluated after the change (FR-014) — an already-fired event is never retroactively altered.

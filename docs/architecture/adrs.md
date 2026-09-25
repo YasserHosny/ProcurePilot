@@ -238,3 +238,13 @@
   - The feature provides retrieval-augmented question routing, not free generation.
   - The `IntentResult` Pydantic model enforces this at the boundary, ensuring no free text leaks through from the LLM.
   - Calculation and formatting logic inside `retrieval.py` guarantees replay-determinism (Constitution Principle II) and relies on explicit typed input objects passed by the caller.
+
+## ADR-018 — Reuse Mailgun for Outbound RFQ Dispatch
+
+- **Status:** Accepted
+- **Context:** R4.3 introduces outbound RFQ email dispatch. The inbound side of email ingestion already runs on Mailgun (via webhook security configured with `MAILGUN_SIGNING_KEY`). We need an email provider to dispatch these outbound RFQs. Introducing a second transactional email vendor just for outbound would duplicate domain verification and configuration complexity.
+- **Decision:** Outbound RFQ dispatch reuses the Mailgun vendor relationship already established for inbound ingestion, rather than introducing a second transactional-email vendor. A thin outbound wrapper (`MailgunMailer`) will interact with the Mailgun Messages API using `MAILGUN_API_KEY` and `MAILGUN_SENDING_DOMAIN`. Note that `ingestion_email_provider` currently defaults to `"stub"` in this deployment; Mailgun is the chosen vendor via real webhook-verification code, but not yet a fully live-in-production inbound integration.
+- **Consequences:**
+  - One email vendor for both inbound and outbound routing.
+  - Reduced DNS and credentials management overhead.
+  - Mailgun send failures must leave the RFQ recipient in a `draft` status, never silently marking it as `sent`.

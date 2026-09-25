@@ -13,6 +13,15 @@ pytestmark = pytest.mark.skipif(
     reason="TEST_DATABASE_URL is not set; needs a migrated local Postgres",
 )
 
+class _FakeAuditWriter:
+    def record(self, *args: object, **kwargs: object) -> None:
+        pass
+
+
+@pytest.fixture(autouse=True)
+def _mock_audit(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(capture_service_module, "get_audit_writer", lambda: _FakeAuditWriter())
+
 # A minimal real PDF header — enough for libmagic to detect application/pdf, one of
 # CaptureService's accepted mime types.
 _PDF_BYTES = b"%PDF-1.4\n%\xe2\xe3\xcf\xd3\n1 0 obj\n<< /Type /Catalog >>\nendobj\n"
@@ -65,7 +74,7 @@ def test_capture_creates_pending_quotation_and_queues_extraction(
             filename="delivery-note.pdf",
             supplier_id=supplier_id,
             notes="left at reception",
-            bearer_token="test-bearer-token",
+            bearer_token="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.signature",
         )
 
         assert result["status"] == "pending"
@@ -118,7 +127,7 @@ def test_capture_creates_pending_quotation_for_an_image_upload(
             filename="delivery-photo.jpg",
             supplier_id=supplier_id,
             notes="left at reception",
-            bearer_token="test-bearer-token",
+            bearer_token="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.signature",
         )
 
         assert result["status"] == "pending"
@@ -170,7 +179,7 @@ def test_capture_without_supplier_id_is_allowed(
             filename="receipt.pdf",
             supplier_id=None,
             notes=None,
-            bearer_token="test-bearer-token",
+            bearer_token="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.signature",
         )
 
         assert result["status"] == "pending"
@@ -192,7 +201,7 @@ def test_capture_rejects_oversized_file(
                 filename="huge.pdf",
                 supplier_id=None,
                 notes=None,
-                bearer_token="test-bearer-token",
+                bearer_token="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.signature",
             )
 
         assert _fake_queue == []
@@ -212,7 +221,7 @@ def test_capture_rejects_unsupported_mime_type(
                 filename="notes.txt",
                 supplier_id=None,
                 notes=None,
-                bearer_token="test-bearer-token",
+                bearer_token="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.signature",
             )
 
         assert _fake_queue == []
@@ -234,7 +243,7 @@ def test_capture_unknown_supplier_id_not_found(
                 filename="delivery-note.pdf",
                 supplier_id=uuid4(),
                 notes=None,
-                bearer_token="test-bearer-token",
+                bearer_token="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.signature",
             )
 
         assert _fake_queue == []

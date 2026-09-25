@@ -31,6 +31,7 @@ from procurepilot_api.modules.pos.router import router as pos_router
 from procurepilot_api.modules.quotations.router import router as quotations_router
 from procurepilot_api.modules.reports.router import router as reports_router
 from procurepilot_api.modules.requests.router import router as requests_router
+from procurepilot_api.modules.rfq.router import router as rfq_router
 from procurepilot_api.modules.savings.router import router as savings_router
 from procurepilot_api.modules.tenants.router import router as tenants_router
 from procurepilot_api.modules.webhooks.router import router as webhooks_router
@@ -83,6 +84,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(savings_router, prefix=API_PREFIX)
     app.include_router(exports_router, prefix=API_PREFIX)
     app.include_router(reports_router, prefix=API_PREFIX)
+    app.include_router(rfq_router, prefix=API_PREFIX)
     app.include_router(digests_router, prefix=API_PREFIX)
     app.include_router(billing_router, prefix=API_PREFIX)
     app.include_router(ingestion_router, prefix=API_PREFIX)

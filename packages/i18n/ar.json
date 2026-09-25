@@ -185,7 +185,8 @@
     "navBasketSplit": "تقسيم السلة",
     "navAlerts": "صندوق التنبيهات",
     "navIntelligence": "ذكاء الأسعار",
-    "navForecasting": "توقعات إعادة الطلب"
+    "navForecasting": "توقعات إعادة الطلب",
+    "navRfq": "سجل طلبات عروض الأسعار"
   },
   "analyst": {
     "title": "محلل المشتريات",
@@ -3417,6 +3418,48 @@
       "fullVelocity": "{{velocity}} وحدة/يوم · متوسط {{days}} يوماً",
       "provisionalBadge": "تقديري",
       "unitsPerDay": "وحدة/يوم"
+    }
+  },
+  "rfq": {
+    "compare": {
+      "title": "ردود طلب عروض الأسعار",
+      "subtitle": "قارن ردود الموردين وقم بإعداد طلب شراء.",
+      "supplier": "المورد",
+      "submittedAt": "تاريخ التقديم",
+      "product": "المنتج",
+      "quantity": "الكمية",
+      "unitPrice": "سعر الوحدة",
+      "totalValue": "القيمة الإجمالية",
+      "pendingMatch": "في انتظار المطابقة",
+      "pendingMatchExplanation": "غير مرتبط بمنتج في الكتالوج بعد.",
+      "prepareRequest": "إعداد طلب",
+      "cannotPreparePending": "لا يمكن إعداد الطلب بينما توجد بنود غير مطابقة",
+      "prepareSuccess": "تم إعداد مسودة طلب الشراء بنجاح.",
+      "prepareError": "فشل إعداد الطلب. قد تكون البنود أصبحت غير مطابقة.",
+      "viewRequest": "عرض الطلب",
+      "branchLabel": "التوصيل إلى الفرع",
+      "requiredByLabel": "مطلوب بحلول",
+      "noResponses": "لم يتم العثور على ردود لطلب عروض الأسعار هذا بعد.",
+      "loading": "جاري تحميل الردود...",
+      "loadError": "فشل تحميل ردود طلب عروض الأسعار."
+    },
+    "history": {
+      "title": "سجل طلبات عروض الأسعار",
+      "subtitle": "تتبع طلبات عروض الأسعار الخاصة بك.",
+      "status": "الحالة",
+      "neededBy": "مطلوب بحلول",
+      "sentAt": "تاريخ الإرسال",
+      "recipients": "المستلمون",
+      "responses": "الردود",
+      "noRfqs": "لم يتم العثور على طلبات عروض أسعار.",
+      "loading": "جاري تحميل طلبات عروض الأسعار...",
+      "status_sent": "مرسل",
+      "status_responded": "تم الرد",
+      "status_expired": "منتهي",
+      "status_converted": "محول",
+      "status_draft": "مسودة",
+      "loadError": "فشل تحميل طلبات عروض الأسعار.",
+      "dismiss": "إغلاق"
     }
   }
 }

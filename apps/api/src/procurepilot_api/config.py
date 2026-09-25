@@ -110,6 +110,15 @@ class Settings(BaseSettings):
     mailgun_signing_key: SecretStr | None = Field(
         default=None, validation_alias="MAILGUN_SIGNING_KEY"
     )
+    rfq_mailer_mode: Literal["stub", "mailgun"] = Field(
+        default="stub", validation_alias="RFQ_MAILER_MODE"
+    )
+    mailgun_api_key: SecretStr | None = Field(
+        default=None, validation_alias="MAILGUN_API_KEY"
+    )
+    mailgun_sending_domain: str | None = Field(
+        default=None, validation_alias="MAILGUN_SENDING_DOMAIN"
+    )
     # R3.0 security review (T042): the HMAC alone proves the payload was signed by Mailgun, not
     # that it is fresh — a captured valid webhook call could otherwise be replayed indefinitely
     # to drain a tenant's daily quota and create unbounded raw-email storage objects. Mailgun's
@@ -255,6 +264,10 @@ class Settings(BaseSettings):
     rate_limit_analyst_ask: str = Field(
         default="20/minute", validation_alias="RATE_LIMIT_ANALYST_ASK"
     )
+    rate_limit_rfq_create: str = Field(
+        default="30/minute", validation_alias="RATE_LIMIT_RFQ_CREATE"
+    )
+    rate_limit_rfq_send: str = Field(default="30/minute", validation_alias="RATE_LIMIT_RFQ_SEND")
     # Provider mode for the analyst intent classifier (FR-005). Mirrors
     # EXTRACTION_PROVIDER_MODE's own stub/bedrock naming convention exactly.
     # "stub" is the default so tests, local development, and CI never make real
