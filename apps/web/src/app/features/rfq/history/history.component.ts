@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { RouterModule, Router } from '@angular/router';
 import { MatCardModule } from '@angular/material/card';
 import { MatTableModule } from '@angular/material/table';
+import { MatButtonModule } from '@angular/material/button';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatIconModule } from '@angular/material/icon';
 import { MatChipsModule } from '@angular/material/chips';
@@ -23,6 +24,7 @@ import { FormatDatePipe } from '../../../core/format/date.pipe';
     MatProgressSpinnerModule,
     MatIconModule,
     MatChipsModule,
+    MatButtonModule,
     TranslateModule,
     FormatDatePipe,
   ],

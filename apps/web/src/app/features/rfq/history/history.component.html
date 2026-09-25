@@ -1,7 +1,15 @@
 <div class="page-container">
   <div class="header">
-    <h1>{{ 'rfq.history.title' | translate }}</h1>
-    <p class="subtitle">{{ 'rfq.history.subtitle' | translate }}</p>
+    <div class="header-titles">
+      <h1>{{ 'rfq.history.title' | translate }}</h1>
+      <p class="subtitle">{{ 'rfq.history.subtitle' | translate }}</p>
+    </div>
+    <div class="header-actions">
+      <a mat-flat-button color="primary" routerLink="/rfq/create">
+        <mat-icon>add</mat-icon>
+        {{ 'rfq.history.createRfq' | translate }}
+      </a>
+    </div>
   </div>
 
   <mat-card class="content-card">

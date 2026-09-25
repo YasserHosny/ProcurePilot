@@ -144,6 +144,7 @@ export interface Supplier {
   readonly minimum_order_value?: Money | null;
   readonly delivery_fee?: Money | null;
   readonly reliability_score?: string | null;
+  readonly contact_email?: string | null;
   readonly status: 'active' | 'preferred' | 'blocked' | 'archived';
   readonly created_at: string;
 }
@@ -154,6 +155,7 @@ export interface SupplierCreate {
   readonly lead_time_days?: number | null;
   readonly minimum_order_value?: Money | null;
   readonly delivery_fee?: Money | null;
+  readonly contact_email?: string | null;
 }
 
 export interface SupplierUpdate {
@@ -162,6 +164,7 @@ export interface SupplierUpdate {
   readonly lead_time_days?: number | null;
   readonly minimum_order_value?: Money | null;
   readonly delivery_fee?: Money | null;
+  readonly contact_email?: string | null;
   readonly status?: 'active' | 'preferred' | 'blocked' | 'archived';
 }
 

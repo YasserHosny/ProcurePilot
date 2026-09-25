@@ -1,70 +1,103 @@
 <div class="rfq-create-container">
-  <h2>Create RFQ</h2>
+  <div class="header">
+    <div class="header-titles">
+      <h2>{{ 'rfq.create.title' | translate }}</h2>
+      <p class="subtitle">{{ 'rfq.create.subtitle' | translate }}</p>
+    </div>
+  </div>
 
-  <form [formGroup]="form" (ngSubmit)="onSave()">
-    
-    <div formArrayName="lines" class="lines-section">
-      <h3>Items</h3>
-      <div *ngFor="let line of linesFormArray.controls; let i=index" [formGroupName]="i" class="line-row">
-        <label>
-          Product ID
-          <input formControlName="workspace_product_id" type="text" />
-        </label>
-        <label>
-          Quantity
-          <input formControlName="quantity" type="number" step="0.01" />
-        </label>
-        <button type="button" (click)="removeLine(i)" [disabled]="linesFormArray.length === 1">
-          Remove
+  <mat-card class="form-card">
+    <form [formGroup]="form" (ngSubmit)="onSave()" class="rfq-form">
+      
+      <div formArrayName="lines" class="lines-section">
+        <h3>{{ 'rfq.create.itemsLabel' | translate }}</h3>
+        
+        <div *ngFor="let line of linesFormArray.controls; let i=index" [formGroupName]="i" class="line-row">
+          <mat-form-field appearance="outline" class="item-product-field">
+            <mat-label>{{ 'rfq.create.productIdLabel' | translate }}</mat-label>
+            <mat-select formControlName="workspace_product_id" required [placeholder]="'rfq.create.productIdPlaceholder' | translate">
+              @for (prod of products(); track prod.id) {
+                <mat-option [value]="prod.id">
+                  {{ prod.tenant_name }} @if (prod.variant) { ({{ prod.variant }}) }
+                </mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" class="item-qty-field">
+            <mat-label>{{ 'rfq.create.quantityLabel' | translate }}</mat-label>
+            <input matInput type="number" step="0.01" min="0.01" formControlName="quantity" required [placeholder]="'rfq.create.quantityPlaceholder' | translate" />
+          </mat-form-field>
+
+          <button mat-icon-button type="button" color="warn" (click)="removeLine(i)" [disabled]="linesFormArray.length === 1" [attr.aria-label]="'rfq.create.removeLineButton' | translate">
+            <mat-icon>delete</mat-icon>
+          </button>
+        </div>
+        
+        <button mat-stroked-button type="button" (click)="addLine()">
+          <mat-icon>add</mat-icon>
+          {{ 'rfq.create.addLineButton' | translate }}
         </button>
       </div>
-      <button type="button" (click)="addLine()">Add Line</button>
-    </div>
 
-    <div class="field-row">
-      <label>
-        Supplier IDs (comma separated or multi-select component in real app)
-        <select multiple formControlName="supplierIds">
-          <option value="sup-1">Supplier 1</option>
-          <option value="sup-2">Supplier 2</option>
-        </select>
-      </label>
-    </div>
+      <div class="form-section">
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>{{ 'rfq.create.suppliersLabel' | translate }}</mat-label>
+          <mat-select multiple formControlName="supplierIds" required [placeholder]="'rfq.create.suppliersPlaceholder' | translate">
+            @for (supp of suppliers(); track supp.id) {
+              <mat-option [value]="supp.id">{{ supp.name }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+      </div>
 
-    <div class="field-row">
-      <label>
-        Needed By Date
-        <input type="date" formControlName="neededByDate" />
-      </label>
-    </div>
+      <div class="form-section">
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>{{ 'rfq.create.neededByDateLabel' | translate }}</mat-label>
+          <input matInput [matDatepicker]="picker" formControlName="neededByDate" required />
+          <mat-datepicker-toggle matIconSuffix [for]="picker"></mat-datepicker-toggle>
+          <mat-datepicker #picker></mat-datepicker>
+        </mat-form-field>
+      </div>
 
-    <div class="field-row">
-      <label>
-        Tenant Terms
-        <textarea formControlName="tenantTerms"></textarea>
-      </label>
-    </div>
+      <div class="form-section">
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>{{ 'rfq.create.tenantTermsLabel' | translate }}</mat-label>
+          <textarea matInput formControlName="tenantTerms" rows="4" [placeholder]="'rfq.create.tenantTermsPlaceholder' | translate"></textarea>
+        </mat-form-field>
+      </div>
 
-    <div class="actions">
-      <button type="submit" [disabled]="form.invalid || isSaving() || rfqId() !== null">
-        Save Draft
-      </button>
-    </div>
-  </form>
+      <div class="actions">
+        <button mat-flat-button color="primary" type="submit" [disabled]="form.invalid || isSaving() || rfqId() !== null">
+          @if (isSaving()) {
+            <mat-spinner diameter="18"></mat-spinner>
+            <span>{{ 'rfq.create.submittingButton' | translate }}</span>
+          } @else {
+            {{ 'rfq.create.saveDraftButton' | translate }}
+          }
+        </button>
+      </div>
+    </form>
+  </mat-card>
 
-  <div *ngIf="rejectedSuppliers().length > 0" class="rejections">
-    <h4>Rejected Suppliers</h4>
+  <mat-card *ngIf="rejectedSuppliers().length > 0" class="rejections-card">
+    <h4>{{ 'rfq.create.rejectedSuppliersTitle' | translate }}</h4>
     <ul>
       <li *ngFor="let rej of rejectedSuppliers()">
-        Supplier ID: {{ rej.supplier_id }} - Reason: {{ rej.reason }}
+        {{ rej.supplier_id }} - {{ rej.reason }}
       </li>
     </ul>
-  </div>
+  </mat-card>
 
-  <div *ngIf="rfqId() !== null" class="send-section">
-    <p>RFQ Status: {{ rfqStatus() }}</p>
-    <button type="button" (click)="onSend()" [disabled]="isSending() || rfqStatus() === 'sent'">
-      Send RFQ
+  <mat-card *ngIf="rfqId() !== null" class="send-card">
+    <p>{{ 'rfq.create.rfqStatusLabel' | translate }}: <strong>{{ rfqStatus() }}</strong></p>
+    <button mat-flat-button color="accent" type="button" (click)="onSend()" [disabled]="isSending() || rfqStatus() === 'sent'">
+      @if (isSending()) {
+        <mat-spinner diameter="18"></mat-spinner>
+        <span>{{ 'rfq.create.sendingButton' | translate }}</span>
+      } @else {
+        {{ 'rfq.create.sendButton' | translate }}
+      }
     </button>
-  </div>
+  </mat-card>
 </div>

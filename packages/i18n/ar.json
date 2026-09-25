@@ -575,6 +575,9 @@
         "namePlaceholder": "مثلاً: شركة الأغذية الطازجة المحدودة",
         "nameRequired": "اسم المورد مطلوب",
         "nameMaxLength": "لا يمكن أن يتجاوز اسم المورد 200 حرف",
+        "contactEmailLabel": "البريد الإلكتروني لجهة الاتصال",
+        "contactEmailPlaceholder": "مثلاً: sales@supplier.com (اختياري)",
+        "contactEmailInvalid": "يرجى إدخال عنوان بريد إلكتروني صالح",
         "paymentTermsLabel": "شروط الدفع",
         "paymentTermsPlaceholder": "مثلاً: الدفع بعد 30 يوماً (اختياري)",
         "leadTimeLabel": "مدة التوريد (بالأيام)",
@@ -3421,6 +3424,28 @@
     }
   },
   "rfq": {
+    "create": {
+      "title": "إنشاء طلب عرض أسعار",
+      "subtitle": "طلب عروض أسعار من الموردين لمنتجاتك.",
+      "itemsLabel": "العناصر",
+      "productIdLabel": "المنتج",
+      "productIdPlaceholder": "ابحث عن المنتجات...",
+      "quantityLabel": "الكمية",
+      "quantityPlaceholder": "أدخل الكمية",
+      "addLineButton": "إضافة سطر",
+      "removeLineButton": "إزالة",
+      "suppliersLabel": "الموردين",
+      "suppliersPlaceholder": "اختر الموردين",
+      "neededByDateLabel": "مطلوب بحلول تاريخ",
+      "tenantTermsLabel": "الشروط والأحكام",
+      "tenantTermsPlaceholder": "أدخل الشروط للموردين (اختياري)",
+      "saveDraftButton": "حفظ كمسودة",
+      "sendButton": "إرسال الطلب",
+      "rejectedSuppliersTitle": "الموردين المرفوضين",
+      "rfqStatusLabel": "حالة الطلب",
+      "submittingButton": "جاري الحفظ...",
+      "sendingButton": "جاري الإرسال..."
+    },
     "compare": {
       "title": "ردود طلب عروض الأسعار",
       "subtitle": "قارن ردود الموردين وقم بإعداد طلب شراء.",
