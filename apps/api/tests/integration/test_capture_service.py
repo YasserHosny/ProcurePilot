@@ -14,12 +14,12 @@ pytestmark = pytest.mark.skipif(
 )
 
 class _FakeAuditWriter:
-    def record(self, *args, **kwargs) -> None:
+    def record(self, *args: object, **kwargs: object) -> None:
         pass
+
 
 @pytest.fixture(autouse=True)
 def _mock_audit(monkeypatch: pytest.MonkeyPatch) -> None:
-    from procurepilot_api.shared.audit import AuditWriter
     monkeypatch.setattr(capture_service_module, "get_audit_writer", lambda: _FakeAuditWriter())
 
 # A minimal real PDF header — enough for libmagic to detect application/pdf, one of
