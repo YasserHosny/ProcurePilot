@@ -126,6 +126,7 @@ describe("SupplierFormComponent (T025)", () => {
       lead_time_days: null,
       minimum_order_value: { amount: "150.00", currency: "GBP" },
       delivery_fee: null,
+      contact_email: null,
     });
     expect(snackBarSpy.open).toHaveBeenCalled();
   });

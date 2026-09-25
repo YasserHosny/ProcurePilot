@@ -575,6 +575,9 @@
         "namePlaceholder": "e.g. Fresh Foods Wholesale Ltd",
         "nameRequired": "Supplier name is required",
         "nameMaxLength": "Supplier name cannot exceed 200 characters",
+        "contactEmailLabel": "Contact Email",
+        "contactEmailPlaceholder": "e.g. sales@supplier.com (optional)",
+        "contactEmailInvalid": "Please enter a valid email address",
         "paymentTermsLabel": "Payment Terms",
         "paymentTermsPlaceholder": "e.g. Net 30 days (optional)",
         "leadTimeLabel": "Lead Time (Days)",
@@ -3421,6 +3424,28 @@
     }
   },
   "rfq": {
+    "create": {
+      "title": "Create RFQ",
+      "subtitle": "Request quotes from suppliers for your products.",
+      "itemsLabel": "Items",
+      "productIdLabel": "Product",
+      "productIdPlaceholder": "Search products...",
+      "quantityLabel": "Quantity",
+      "quantityPlaceholder": "Enter quantity",
+      "addLineButton": "Add Line",
+      "removeLineButton": "Remove",
+      "suppliersLabel": "Suppliers",
+      "suppliersPlaceholder": "Select suppliers",
+      "neededByDateLabel": "Needed By Date",
+      "tenantTermsLabel": "Terms and Conditions",
+      "tenantTermsPlaceholder": "Enter terms for suppliers (optional)",
+      "saveDraftButton": "Save Draft",
+      "sendButton": "Send RFQ",
+      "rejectedSuppliersTitle": "Rejected Suppliers",
+      "rfqStatusLabel": "RFQ Status",
+      "submittingButton": "Saving...",
+      "sendingButton": "Sending..."
+    },
     "compare": {
       "title": "RFQ Responses",
       "subtitle": "Compare supplier responses and prepare a purchase request.",
@@ -3446,6 +3471,7 @@
     "history": {
       "title": "RFQ History",
       "subtitle": "Track your requests for quotation.",
+      "createRfq": "Create RFQ",
       "status": "Status",
       "neededBy": "Needed By",
       "sentAt": "Sent Date",

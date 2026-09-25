@@ -113,6 +113,7 @@ export class SupplierFormComponent implements OnInit {
       min_order_currency: [""],
       delivery_fee_amount: ["", [Validators.pattern(/^\d+(\.\d{1,4})?$/)]],
       delivery_fee_currency: [""],
+      contact_email: ["", [Validators.email]],
       status: ["active"],
     },
     {
@@ -181,6 +182,7 @@ export class SupplierFormComponent implements OnInit {
       min_order_currency: sup.minimum_order_value ? sup.minimum_order_value.currency : "",
       delivery_fee_amount: sup.delivery_fee ? sup.delivery_fee.amount : "",
       delivery_fee_currency: sup.delivery_fee ? sup.delivery_fee.currency : "",
+      contact_email: sup.contact_email || "",
       status: sup.status || "active",
     });
   }
@@ -217,6 +219,7 @@ export class SupplierFormComponent implements OnInit {
         lead_time_days: leadTime,
         minimum_order_value: minOrderVal,
         delivery_fee: deliveryFeeVal,
+        contact_email: fv.contact_email?.trim() || null,
         status: fv.status,
       };
 
@@ -242,6 +245,7 @@ export class SupplierFormComponent implements OnInit {
         lead_time_days: leadTime,
         minimum_order_value: minOrderVal,
         delivery_fee: deliveryFeeVal,
+        contact_email: fv.contact_email?.trim() || null,
       };
 
       this.api.createSupplier(createPayload).subscribe({

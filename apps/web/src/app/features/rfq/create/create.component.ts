@@ -1,18 +1,47 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ReactiveFormsModule, FormBuilder, Validators, FormArray } from '@angular/forms';
+import { MatCardModule } from '@angular/material/card';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
+import { MatSelectModule } from '@angular/material/select';
+import { MatButtonModule } from '@angular/material/button';
+import { MatIconModule } from '@angular/material/icon';
+import { MatDatepickerModule } from '@angular/material/datepicker';
+import { MatNativeDateModule } from '@angular/material/core';
+import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { TranslateModule } from '@ngx-translate/core';
 import { RfqApi } from '../rfq-api';
+import { ApiService } from '../../../core/api/api.service';
+import { Product, Supplier } from '../../../core/api/models';
 
 @Component({
   selector: 'app-rfq-create',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule],
+  imports: [
+    CommonModule, 
+    ReactiveFormsModule,
+    MatCardModule,
+    MatFormFieldModule,
+    MatInputModule,
+    MatSelectModule,
+    MatButtonModule,
+    MatIconModule,
+    MatDatepickerModule,
+    MatNativeDateModule,
+    MatProgressSpinnerModule,
+    TranslateModule
+  ],
   templateUrl: './create.component.html',
   styleUrl: './create.component.scss'
 })
-export class RfqCreateComponent {
+export class RfqCreateComponent implements OnInit {
   private readonly fb = inject(FormBuilder);
   private readonly rfqApi = inject(RfqApi);
+  private readonly apiService = inject(ApiService);
+
+  readonly products = signal<Product[]>([]);
+  readonly suppliers = signal<Supplier[]>([]);
 
   readonly form = this.fb.nonNullable.group({
     lines: this.fb.array([
@@ -31,6 +60,16 @@ export class RfqCreateComponent {
   readonly rfqId = signal<string | null>(null);
   readonly rfqStatus = signal<'draft' | 'sent' | null>(null);
   readonly rejectedSuppliers = signal<{ supplier_id: string; reason: string }[]>([]);
+
+  ngOnInit(): void {
+    this.apiService.products({ limit: 100, status: 'active' }).subscribe(res => {
+      this.products.set(res.items);
+    });
+    this.apiService.suppliers({ limit: 100, status: 'active' }).subscribe(res => {
+      // Filter out suppliers with no contact_email as requested in the prompt
+      this.suppliers.set(res.items.filter(s => !!s.contact_email));
+    });
+  }
 
   get linesFormArray() {
     return this.form.get('lines') as FormArray;

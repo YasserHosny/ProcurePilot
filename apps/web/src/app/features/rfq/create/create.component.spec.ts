@@ -1,26 +1,35 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { RfqCreateComponent } from './create.component';
 import { RfqApi, Rfq } from '../rfq-api';
+import { ApiService } from '../../../core/api/api.service';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { of } from 'rxjs';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
+import { TranslateModule } from '@ngx-translate/core';
+import { Product, Supplier } from '../../../core/api/models';
 
 describe('RfqCreateComponent', () => {
   let component: RfqCreateComponent;
   let fixture: ComponentFixture<RfqCreateComponent>;
   let rfqApiSpy: jasmine.SpyObj<RfqApi>;
+  let apiSpy: jasmine.SpyObj<ApiService>;
 
   beforeEach(async () => {
     rfqApiSpy = jasmine.createSpyObj('RfqApi', ['createRfq', 'sendRfq']);
+    apiSpy = jasmine.createSpyObj('ApiService', ['products', 'suppliers']);
     
+    apiSpy.products.and.returnValue(of({ items: [{ id: 'prod-1', tenant_name: 'Product 1' } as Product], next_cursor: null }));
+    apiSpy.suppliers.and.returnValue(of({ items: [{ id: 'sup-1', name: 'Supplier 1', contact_email: 'sup@test.com' } as Supplier], next_cursor: null }));
+
     await TestBed.configureTestingModule({
-      imports: [RfqCreateComponent],
+      imports: [RfqCreateComponent, TranslateModule.forRoot()],
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
         provideNoopAnimations(),
-        { provide: RfqApi, useValue: rfqApiSpy }
+        { provide: RfqApi, useValue: rfqApiSpy },
+        { provide: ApiService, useValue: apiSpy }
       ]
     }).compileComponents();
 

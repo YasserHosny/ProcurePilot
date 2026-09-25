@@ -47,7 +47,7 @@
       <mat-card class="form-card">
         <!-- Identity & Operational Terms -->
         <div class="form-section">
-          <div class="form-row">
+          <div class="form-row two-col">
             <mat-form-field appearance="outline" class="form-field full-width">
               <mat-label>{{ 'catalogue.suppliers.form.nameLabel' | translate }}</mat-label>
               <input
@@ -61,6 +61,19 @@
               }
               @if (form.get('name')?.hasError('maxlength')) {
                 <mat-error>{{ 'catalogue.suppliers.form.nameMaxLength' | translate }}</mat-error>
+              }
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" class="form-field full-width">
+              <mat-label>{{ 'catalogue.suppliers.form.contactEmailLabel' | translate }}</mat-label>
+              <input
+                matInput
+                type="email"
+                formControlName="contact_email"
+                [placeholder]="'catalogue.suppliers.form.contactEmailPlaceholder' | translate"
+              />
+              @if (form.get('contact_email')?.hasError('email')) {
+                <mat-error>{{ 'catalogue.suppliers.form.contactEmailInvalid' | translate }}</mat-error>
               }
             </mat-form-field>
           </div>

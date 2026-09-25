@@ -7,15 +7,15 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { TranslateModule } from '@ngx-translate/core';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
 import { HttpErrorResponse } from '@angular/common/http';
-
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
+import { provideRouter } from '@angular/router';
 
 describe('HistoryComponent', () => {
   let component: HistoryComponent;
   let fixture: ComponentFixture<HistoryComponent>;
   let rfqApiSpy: jasmine.SpyObj<RfqApi>;
-  let routerSpy: jasmine.SpyObj<Router>;
+  let router: Router;
   let snackBarSpy: jasmine.SpyObj<MatSnackBar>;
 
   const mockRfqs: RfqSummary[] = [
@@ -46,7 +46,6 @@ describe('HistoryComponent', () => {
 
   beforeEach(async () => {
     rfqApiSpy = jasmine.createSpyObj('RfqApi', ['listRfqs']);
-    routerSpy = jasmine.createSpyObj('Router', ['navigate']);
     snackBarSpy = jasmine.createSpyObj('MatSnackBar', ['open']);
 
     rfqApiSpy.listRfqs.and.returnValue(of(mockRfqList));
@@ -56,14 +55,16 @@ describe('HistoryComponent', () => {
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
+        provideRouter([]),
         { provide: RfqApi, useValue: rfqApiSpy },
-        { provide: Router, useValue: routerSpy },
         { provide: MatSnackBar, useValue: snackBarSpy }
       ]
     }).compileComponents();
 
     fixture = TestBed.createComponent(HistoryComponent);
     component = fixture.componentInstance;
+    router = TestBed.inject(Router);
+    spyOn(router, 'navigate');
     fixture.detectChanges(); // triggers ngOnInit
   });
 
@@ -76,12 +77,12 @@ describe('HistoryComponent', () => {
 
   it('should navigate to compare view for non-converted RFQ', () => {
     component.onRowClick(mockRfqs[0]);
-    expect(routerSpy.navigate).toHaveBeenCalledWith(['/rfq/compare', 'rfq-1']);
+    expect(router.navigate).toHaveBeenCalledWith(['/rfq/compare', 'rfq-1']);
   });
 
   it('should navigate to request view for converted RFQ', () => {
     component.onRowClick(mockRfqs[1]);
-    expect(routerSpy.navigate).toHaveBeenCalledWith(['/requests', 'pr-1']);
+    expect(router.navigate).toHaveBeenCalledWith(['/requests', 'pr-1']);
   });
 
   it('should display error snackbar on load failure', () => {
