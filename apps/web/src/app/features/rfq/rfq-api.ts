@@ -53,6 +53,37 @@ export interface RfqSendResponse {
   recipients: RfqRecipient[];
 }
 
+export interface RfqResponseLineComparison {
+  workspace_product_id: string | null;
+  quoted_quantity: string;
+  quoted_unit_price_amount: string;
+  quoted_unit_price_currency: string;
+  pending_match: boolean;
+}
+
+export interface RfqResponseComparison {
+  id: string;
+  rfq_id: string;
+  supplier_id: string;
+  submitted_at: string;
+  lines: RfqResponseLineComparison[];
+}
+
+export interface RfqResponseComparisonList {
+  items: RfqResponseComparison[];
+}
+
+export interface PrepareRequestPayload {
+  rfq_response_id: string;
+  branch_id: string;
+  cost_centre_id?: string;
+  required_by_date: string;
+}
+
+export interface PrepareRequestResponse {
+  purchase_request_id: string;
+}
+
 @Injectable({
   providedIn: 'root',
 })
@@ -72,5 +103,16 @@ export class RfqApi {
       'Idempotency-Key': crypto.randomUUID(),
     });
     return this.http.post<RfqSendResponse>(`${this.baseUrl}/${rfqId}/send`, {}, { headers });
+  }
+
+  listResponses(rfqId: string): Observable<RfqResponseComparisonList> {
+    return this.http.get<RfqResponseComparisonList>(`${this.baseUrl}/${rfqId}/responses`);
+  }
+
+  prepareRequest(rfqId: string, payload: PrepareRequestPayload): Observable<PrepareRequestResponse> {
+    const headers = new HttpHeaders({ 'Idempotency-Key': crypto.randomUUID() });
+    return this.http.post<PrepareRequestResponse>(
+      `${this.baseUrl}/${rfqId}/prepare-request`, payload, { headers },
+    );
   }
 }

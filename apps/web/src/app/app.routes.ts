@@ -240,6 +240,12 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./features/rfq/create/create.component').then((m) => m.RfqCreateComponent),
       },
+      {
+        path: 'rfq/compare/:id',
+        canActivate: [roleGuard('owner', 'buyer')],
+        loadComponent: () =>
+          import('./features/rfq/compare/compare.component').then((m) => m.CompareComponent),
+      },
       // --- smart compare and intelligence (Chunk 4.5) ---
       {
         path: 'offers/compare',

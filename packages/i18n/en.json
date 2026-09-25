@@ -3418,5 +3418,29 @@
       "provisionalBadge": "Provisional",
       "unitsPerDay": "units/day"
     }
+  },
+  "rfq": {
+    "compare": {
+      "title": "RFQ Responses",
+      "subtitle": "Compare supplier responses and prepare a purchase request.",
+      "supplier": "Supplier",
+      "submittedAt": "Submitted At",
+      "product": "Product",
+      "quantity": "Quantity",
+      "unitPrice": "Unit Price",
+      "totalValue": "Total Value",
+      "pendingMatch": "Pending Match",
+      "pendingMatchExplanation": "Not yet linked to a catalogue product.",
+      "prepareRequest": "Prepare Request",
+      "cannotPreparePending": "Cannot prepare request while lines are unmatched",
+      "prepareSuccess": "Draft purchase request prepared successfully.",
+      "prepareError": "Failed to prepare request. Lines may have become unmatched.",
+      "viewRequest": "View Request",
+      "branchLabel": "Deliver to Branch",
+      "requiredByLabel": "Required By",
+      "noResponses": "No responses found for this RFQ yet.",
+      "loading": "Loading responses...",
+      "loadError": "Failed to load RFQ responses."
+    }
   }
 }

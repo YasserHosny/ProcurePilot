@@ -186,11 +186,11 @@ approval queue exactly like any other purchase request.
       response's quoted price, not landed cost — do not silently fall back
 - [x] T028 [US3] Add router endpoints `GET /rfq/{id}/responses` and
       `POST /rfq/{id}/prepare-request`
-- [ ] T029 [P] [US3] Write a failing component test for the comparison view in
+- [x] T029 [P] [US3] Write a failing component test for the comparison view in
       `apps/web/src/app/features/rfq/compare/compare.component.spec.ts` — reuses the existing
       offer-comparison component/pattern scoped to one RFQ's responses, not a new comparison
       implementation
-- [ ] T030 [US3] Implement the comparison + manual "prepare request" UI in
+- [x] T030 [US3] Implement the comparison + manual "prepare request" UI in
       `apps/web/src/app/features/rfq/compare/`
 
 **Checkpoint**: US1 + US2 + US3 together are the full manual MVP — send, capture, compare,
