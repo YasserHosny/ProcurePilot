@@ -24,10 +24,10 @@ from procurepilot_api.modules.rfq.schemas import (
     AutoPreparationGuardrail,
     GuardrailCreateInput,
     GuardrailUpdateInput,
-    PrepareRequestResponse,
     Rfq,
     RfqLine,
     RfqList,
+    RfqPrepareRequestResponse,
     RfqRecipient,
     RfqResponseComparison,
     RfqResponseComparisonList,
@@ -427,7 +427,7 @@ class RfqService:
         cost_centre_id: uuid.UUID | None = None,
         required_by_date: date,
         idempotency_key: uuid.UUID,
-    ) -> PrepareRequestResponse:
+    ) -> RfqPrepareRequestResponse:
         with _authenticated_db(self.settings, member) as conn:
             with conn.cursor(row_factory=dict_row) as cur:
                 cur.execute(
@@ -571,7 +571,7 @@ class RfqService:
 
                     conn.commit()
 
-        return PrepareRequestResponse(purchase_request_id=purchase_request.id)
+        return RfqPrepareRequestResponse(purchase_request_id=purchase_request.id)
 
     def create_guardrail(
         self,

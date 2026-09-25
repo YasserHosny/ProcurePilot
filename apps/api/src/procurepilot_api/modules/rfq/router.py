@@ -15,11 +15,11 @@ from procurepilot_api.modules.rfq.schemas import (
     AutoPreparationGuardrail,
     GuardrailCreateInput,
     GuardrailUpdateInput,
-    PrepareRequestInput,
-    PrepareRequestResponse,
     Rfq,
     RfqLine,
     RfqList,
+    RfqPrepareRequestInput,
+    RfqPrepareRequestResponse,
     RfqRecipient,
     RfqResponseComparisonList,
 )
@@ -161,19 +161,19 @@ def list_responses(
 @router.post(
     "/{rfq_id}/prepare-request",
     status_code=status.HTTP_201_CREATED,
-    response_model=PrepareRequestResponse,
+    response_model=RfqPrepareRequestResponse,
     operation_id="prepareRequestFromRfq",
 )
 @mutation_limiter.limit(_rfq_create_limit)
 def prepare_request(
     request: Request,
     rfq_id: uuid.UUID,
-    payload: Annotated[PrepareRequestInput, Body()],
+    payload: Annotated[RfqPrepareRequestInput, Body()],
     token: Annotated[str, Depends(bearer_token)],
     member: Annotated[CurrentMember, Depends(current_member)],
     service: Annotated[RfqService, Depends(get_rfq_service)],
     idempotency_key: Annotated[uuid.UUID | None, Header(alias="Idempotency-Key")] = None,
-) -> PrepareRequestResponse:
+) -> RfqPrepareRequestResponse:
     if idempotency_key is None:
         raise UnprocessableEntityError(details={"header": "Idempotency-Key is required"})
 

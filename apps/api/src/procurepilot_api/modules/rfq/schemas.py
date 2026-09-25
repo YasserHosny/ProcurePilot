@@ -107,14 +107,14 @@ class RfqResponseComparisonList(BaseModel):
     items: list[RfqResponseComparison]
 
 
-class PrepareRequestInput(BaseModel):
+class RfqPrepareRequestInput(BaseModel):
     rfq_response_id: UUID
     branch_id: UUID
     cost_centre_id: UUID | None = None
     required_by_date: date
 
 
-class PrepareRequestResponse(BaseModel):
+class RfqPrepareRequestResponse(BaseModel):
     purchase_request_id: UUID
 
 class GuardrailCreateInput(BaseModel):
