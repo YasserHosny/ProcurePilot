@@ -1,7 +1,7 @@
 # ProcurePilot User Flows
 
 > Navigation paths for every user-facing page, with journey visualisations.
-> Last updated: 12 Sep 2026.
+> Last updated: 25 Sep 2026.
 >
 > Covers the web app only. The mobile app uses named routes rather than URLs; see
 > [ProcurePilot Mobile App User Documentation](mobile-app-user-documentation.md) for its screens
@@ -288,6 +288,49 @@ journey
         Redirect to /: 3: System
         Redirect to /home: 5: System
 ```
+
+---
+
+## Predictive Procurement and Sourcing
+
+- `/home` -> **Reorder Forecasts** -> `/forecasting` -> pick branch + required-by date -> **Prepare draft request** -> draft appears in `/requests`
+- `/home` -> **Supplier Risk** -> `/supplier-risk` -> **View scorecard** -> `/suppliers/:id/scorecard` -> **Prepare negotiation brief** -> `/negotiation-briefs/:id` -> acknowledge or dismiss
+- `/home` -> **Procurement Analyst** -> `/analyst` -> ask a question -> follow a next-step link, or **Question History** -> `/analyst/history` -> reopen a conversation -> `/analyst/:conversationId`
+- `/rfq/create` -> add lines + pick suppliers -> **Save Draft** -> **Send RFQ** -> supplier replies captured automatically (not yet linked from navigation — see [Known Issues](user-documentation.md#36-known-issues))
+- `/home` -> **RFQ History** -> `/rfq/history` -> open a row -> `/rfq/compare/:id` -> **Prepare Request** -> draft appears in `/requests`; a `Converted` row instead opens `/requests/:id` directly
+
+```mermaid
+journey
+    title Reorder Forecasts and Supplier Risk
+    section Reorder Forecasts
+        Go to Forecasting: 3: User
+        Review proposal: 3: User
+        Prepare draft request: 4: User
+        View in Requests: 5: User
+    section Supplier Risk
+        Go to Supplier Risk: 3: User
+        Open scorecard: 4: User
+        Prepare negotiation brief: 4: User
+        Acknowledge or dismiss: 5: User
+```
+
+```mermaid
+journey
+    title Analyst and RFQ Sourcing
+    section Procurement Analyst
+        Ask a question: 3: User
+        Read cited answer: 4: User
+        Follow next-step link: 5: User
+    section RFQ Sourcing
+        Go to RFQ History: 3: User
+        Open RFQ: 3: User
+        Compare responses: 4: User
+        Prepare request: 5: User
+```
+
+> **Note:** `/rfq/create` has no navigation entry point anywhere in the app shell as of this
+> writing — it is reachable only by URL. Every other route above is reachable from the side
+> navigation under `/home`.
 
 ---
 
