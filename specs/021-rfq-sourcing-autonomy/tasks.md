@@ -298,7 +298,7 @@ response, and confirm the history view shows all three with distinct, accurate s
       purchase order or a bypassed approval step — this is the one test in this release that
       exists purely to make the constitution's NON-NEGOTIABLE guarantee executable, not just
       asserted in the plan's prose
-- [ ] T044 [P] Add R4.3 sections to `docs/architecture/api-specification.md` and
+- [x] T044 [P] Add R4.3 sections to `docs/architecture/api-specification.md` and
       `docs/architecture/data-dictionary.md`, mirroring the R4.0–R4.2 entries already there
 - [ ] T045 Run API unit, integration, contract, web unit, `pnpm test:a11y` (axe-core/WCAG 2.1 AA,
       English + Arabic), and production build gates

@@ -2197,3 +2197,95 @@ and every preparation is appended to `audit_event`.
 | `created_at` | timestamptz | Audit field; default `now()` |
 
 `AnalystTurnCitation` (table `analyst_turn_citation`) records exactly one typed, tenant-pinned source reference per row. It inherits read permissions from `AnalystTurn`. The table deliberately uses one nullable FK column per source kind rather than a generic `(source_kind, source_id)` pair, with a constraint enforcing that `num_nonnulls` equals 1. This is a deliberate, established pattern in this codebase.
+
+## R4.3 Automated RFQ Sourcing and Guarded Autonomous Workflows
+
+### `Rfq`
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | uuid | PK, default `gen_random_uuid()` |
+| `tenant_id` | uuid | Required FK -> Tenant; RLS key |
+| `created_by_membership_id` | uuid | Required FK -> Membership |
+| `status` | text | Required; `draft`, `sent`, `responded`, `expired`, or `converted` |
+| `needed_by_date` | date | Required |
+| `idempotency_key` | uuid | Required; unique per `(tenant_id, idempotency_key)` — a retried create replays the original RFQ rather than creating a second one |
+| `created_at` | timestamptz | Audit field; default `now()` |
+
+`Rfq` (table `rfq`) is a tenant-scoped, buyer-authored request for one or more products/quantities by a needed-by date, sent to one or more suppliers. Its own status tracks the RFQ as a whole, independently of any individual response — `converted` is set once a purchase request has been prepared from one of its responses, whether manually or by a guardrail firing, and never reverts. RLS: creator, or any owner/buyer (FR-016, mirroring `AnalystConversation`'s own pattern).
+
+### `RfqLine`
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | uuid | PK, default `gen_random_uuid()` |
+| `tenant_id` | uuid | Required FK -> Tenant; RLS key |
+| `rfq_id` | uuid | Required FK -> Rfq, `on delete cascade` |
+| `workspace_product_id` | uuid | Required FK -> WorkspaceProduct |
+| `quantity` | numeric(18,6) | Required, > 0 |
+| `created_at` | timestamptz | Audit field; default `now()` |
+
+`RfqLine` (table `rfq_line`) is one requested product/quantity within an RFQ. RLS inherits read/write access from the parent `Rfq`.
+
+### `RfqRecipient`
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | uuid | PK, default `gen_random_uuid()` |
+| `tenant_id` | uuid | Required FK -> Tenant; RLS key |
+| `rfq_id` | uuid | Required FK -> Rfq, `on delete cascade` |
+| `supplier_id` | uuid | Required FK -> Supplier |
+| `status` | text | Required; `draft`, `sent`, or `failed` |
+| `outbound_message_id` | text | Nullable — the outbound email's Message-ID once sent, matched against an inbound reply's `In-Reply-To`/`References` to capture a response |
+| `sent_at` | timestamptz | Nullable |
+| `created_at` | timestamptz | Audit field; default `now()` |
+
+`RfqRecipient` (table `rfq_recipient`) is one supplier asked within one RFQ, tracking that specific supplier's send status independently of any reply.
+
+### `RfqResponse`
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | uuid | PK, default `gen_random_uuid()` |
+| `tenant_id` | uuid | Required FK -> Tenant; RLS key |
+| `rfq_recipient_id` | uuid | Required FK -> RfqRecipient, `on delete cascade` |
+| `quotation_id` | uuid | Required FK -> Quotation |
+| `created_at` | timestamptz | Audit field; default `now()` |
+
+`RfqResponse` (table `rfq_response`) links a captured inbound reply to the `RfqRecipient` it answers and the ordinary `Quotation` it was extracted into — it does not duplicate quotation data, only the linkage. Captured automatically by matching an inbound email's thread headers against `rfq_recipient.outbound_message_id`; a reply matching no open RFQ falls through to the general quotation-ingestion path unchanged (FR-006).
+
+### `AutoPreparationGuardrail`
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | uuid | PK, default `gen_random_uuid()` |
+| `tenant_id` | uuid | Required FK -> Tenant; RLS key |
+| `created_by_membership_id` | uuid | Required FK -> Membership — the owner an automatic firing under this guardrail acts as |
+| `max_order_value_amount` | numeric(18,4) | Required, > 0 (FR-013 — a zero or negative value is refused at creation) |
+| `max_order_value_currency` | text | Required |
+| `supplier_allowlist` | uuid[] | Nullable — no restriction when null/empty |
+| `category_allowlist` | text[] | Nullable — a non-empty list always fails closed (never fires via this path); no product-category data exists anywhere in this schema to check against |
+| `min_response_count` | integer | Required, > 0 — the RFQ's total response count (any, not only eligible ones) must meet this before any firing is considered |
+| `max_price_variance_pct` | numeric(5,4) | Required, >= 0 — maximum acceptable variance from the tenant's own recent (90-day) purchase-price history for the same product; a product with no history at all is ineligible, never guessed |
+| `default_branch_id` | uuid | Required FK -> Branch — an automatic firing has no human to pick a branch, so the owner configures one explicitly |
+| `enabled` | boolean | Required, default `false` — off until an owner explicitly enables it (FR-010) |
+| `created_at` | timestamptz | Audit field; default `now()` |
+
+`AutoPreparationGuardrail` (table `auto_preparation_guardrail`) is a tenant-configured, owner-only set of conditions under which a qualifying RFQ response is auto-prepared into a draft purchase request without a human reviewing responses first. RLS: creator, or any owner/buyer, may read; only an owner may insert/update/delete.
+
+### `AutoPreparationEvent`
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | uuid | PK, default `gen_random_uuid()` |
+| `tenant_id` | uuid | Required FK -> Tenant; RLS key |
+| `guardrail_id` | uuid | Required FK -> AutoPreparationGuardrail |
+| `rfq_response_id` | uuid | Required FK -> RfqResponse |
+| `purchase_request_id` | uuid | Nullable FK -> PurchaseRequest |
+| `created_at` | timestamptz | Audit field; default `now()` |
+
+`AutoPreparationEvent` (table `auto_preparation_event`) is an append-only record of exactly which guardrail rule fired, for which response, producing which purchase request (FR-011). No role — including `service_role` — has `UPDATE`, `DELETE`, or `TRUNCATE` on this table; disabling or tightening the guardrail afterward never touches an already-recorded event (FR-014).
+
+### `PurchaseRequest.source_rfq_response_id` (R4.3 extension)
+
+`purchase_request` gains one nullable column, `source_rfq_response_id` (FK -> `RfqResponse`, composite tenant FK), set whenever a request is prepared — manually or automatically — from an RFQ response, satisfying FR-008's requirement that the draft cite the response it came from. Most purchase requests have no RFQ origin and leave this null.
