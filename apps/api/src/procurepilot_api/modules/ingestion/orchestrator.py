@@ -11,6 +11,7 @@ from psycopg.rows import dict_row
 from supabase import Client, create_client
 
 from procurepilot_api.config import Settings
+from procurepilot_api.modules.catalogue.normalisation import normalised_base_quantity
 from procurepilot_api.modules.ingestion.email_parser import (
     EmailParseError,
     InboundEmail,
@@ -332,6 +333,8 @@ def _evaluate_guardrails_for_rfq(
                 rec.supplier_id,
                 ql.id as ql_id,
                 ql.quantity,
+                ql.pack_count,
+                ql.unit_size,
                 ql.unit_price_amount,
                 ql.unit_price_currency,
                 md.matched_workspace_product_id
@@ -353,8 +356,9 @@ def _evaluate_guardrails_for_rfq(
         # else in this codebase) -- a candidate line's raw quotation_line.unit_price_amount is
         # priced per quoted pack instead (e.g. per ream, not per sheet), so the two are only
         # directly comparable when a product's pack normalises 1:1. Fetch each matched product's
-        # pack_definition.base_quantity up front so candidate line prices can be normalised onto
-        # the same per-base-unit scale before ever reaching evaluate_guardrail's variance check.
+        # pack_definition.base_quantity up front as the fallback when the quoted line has no own
+        # pack details, so candidate line prices can be normalised onto the same per-base-unit
+        # scale before ever reaching evaluate_guardrail's variance check.
         matched_product_ids = {
             row["matched_workspace_product_id"]
             for row in rows
@@ -388,7 +392,11 @@ def _evaluate_guardrails_for_rfq(
                 if candidates_dict[rid]["currency"] is None:
                     candidates_dict[rid]["currency"] = row["unit_price_currency"]
                 product_id = row["matched_workspace_product_id"]
-                base_quantity = base_quantity_by_product.get(product_id)
+                base_quantity = (
+                    normalised_base_quantity(row["pack_count"], row["unit_size"])
+                    if row["pack_count"] is not None and row["unit_size"] is not None
+                    else base_quantity_by_product.get(product_id)
+                )
                 normalised_unit_price = (
                     row["unit_price_amount"] / base_quantity
                     if base_quantity

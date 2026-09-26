@@ -36,9 +36,13 @@ from test_rfq_response_capture import (  # noqa: E402, F401
 from test_rfq_service_e2e import _patch_requests_service_for_test  # noqa: E402
 
 
-@pytest.mark.asyncio
-async def test_guardrail_fires_with_non_unary_pack_normalisation(
-    mock_supabase_client: None, monkeypatch: pytest.MonkeyPatch  # noqa: F811
+async def _run_guardrail_pack_normalisation_test(
+    _mock_supabase_client: None,
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    line_pack_count: int | None,
+    line_unit_size: int | None,
+    line_price: int,
 ) -> None:
     settings = get_settings()
     test_db = settings.database_url.get_secret_value()
@@ -169,9 +173,7 @@ async def test_guardrail_fires_with_non_unary_pack_normalisation(
         supplier_id: uuid.UUID,
         ingestion_email_id: uuid.UUID,
     ) -> uuid.UUID:
-        """New reply: 1 pack @ 2625.00 -- 105.00/base-unit once normalised (25 base units/pack),
-        well within the guardrail's 10% variance against the 100.00/base-unit baseline. Raw vs.
-        raw (the pre-fix comparison) would be |2625 - 100| / 100 = 2525% -- always blocked."""
+        """Insert the new reply line with the pack details for this scenario."""
         qid = orig_insert_quotation(
             conn2,
             tenant_id=tenant_id,
@@ -184,9 +186,9 @@ async def test_guardrail_fires_with_non_unary_pack_normalisation(
             cur2.execute(
                 "insert into quotation_line "
                 "(id, tenant_id, quotation_id, line_number, original_text, quantity, "
-                "unit_price_amount, unit_price_currency) "
-                "values (%s, %s, %s, 1, 'text', 1, 2625, 'USD')",
-                (ql_id, tenant_id, qid),
+                "pack_count, unit_size, unit_price_amount, unit_price_currency) "
+                "values (%s, %s, %s, 1, 'text', 1, %s, %s, %s, 'USD')",
+                (ql_id, tenant_id, qid, line_pack_count, line_unit_size, line_price),
             )
             cur2.execute(
                 "insert into match_decision "
@@ -231,3 +233,29 @@ async def test_guardrail_fires_with_non_unary_pack_normalisation(
             event_row = cur.fetchone()
             assert event_row is not None
             assert event_row[0] is not None
+
+
+@pytest.mark.asyncio
+async def test_guardrail_fires_with_non_unary_pack_normalisation(
+    mock_supabase_client: None, monkeypatch: pytest.MonkeyPatch  # noqa: F811
+) -> None:
+    await _run_guardrail_pack_normalisation_test(
+        mock_supabase_client,
+        monkeypatch,
+        line_pack_count=None,
+        line_unit_size=None,
+        line_price=2625,
+    )
+
+
+@pytest.mark.asyncio
+async def test_guardrail_prefers_quoted_line_pack_over_catalogue_pack(
+    mock_supabase_client: None, monkeypatch: pytest.MonkeyPatch  # noqa: F811
+) -> None:
+    await _run_guardrail_pack_normalisation_test(
+        mock_supabase_client,
+        monkeypatch,
+        line_pack_count=1,
+        line_unit_size=1,
+        line_price=100,
+    )
