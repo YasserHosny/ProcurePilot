@@ -348,6 +348,28 @@ def _evaluate_guardrails_for_rfq(
         cur.execute("select count(*) as cnt from rfq_line where rfq_id = %s", (rfq_id,))
         rfq_line_count = cur.fetchone()["cnt"]
 
+        # `baseline` below is priced per normalised base unit (total_amount / normalised_base_
+        # quantity, the same convention Smart Compare/Savings Ledger/Supplier IQ use everywhere
+        # else in this codebase) -- a candidate line's raw quotation_line.unit_price_amount is
+        # priced per quoted pack instead (e.g. per ream, not per sheet), so the two are only
+        # directly comparable when a product's pack normalises 1:1. Fetch each matched product's
+        # pack_definition.base_quantity up front so candidate line prices can be normalised onto
+        # the same per-base-unit scale before ever reaching evaluate_guardrail's variance check.
+        matched_product_ids = {
+            row["matched_workspace_product_id"]
+            for row in rows
+            if row["ql_id"] and row["matched_workspace_product_id"]
+        }
+        base_quantity_by_product: dict[UUID, Decimal] = {}
+        if matched_product_ids:
+            cur.execute(
+                "select workspace_product_id, base_quantity from pack_definition "
+                "where tenant_id = %s and workspace_product_id = any(%s)",
+                (tenant_id, list(matched_product_ids)),
+            )
+            for prow in cur.fetchall():
+                base_quantity_by_product[prow["workspace_product_id"]] = prow["base_quantity"]
+
         candidates_dict: dict[UUID, dict[str, object]] = {}
         workspace_product_ids: set[UUID] = set()
 
@@ -365,17 +387,22 @@ def _evaluate_guardrails_for_rfq(
             if row["ql_id"] and row["matched_workspace_product_id"]:
                 if candidates_dict[rid]["currency"] is None:
                     candidates_dict[rid]["currency"] = row["unit_price_currency"]
+                product_id = row["matched_workspace_product_id"]
+                base_quantity = base_quantity_by_product.get(product_id)
+                normalised_unit_price = (
+                    row["unit_price_amount"] / base_quantity
+                    if base_quantity
+                    else row["unit_price_amount"]
+                )
                 candidates_dict[rid]["matched_lines"].append(
                     GuardrailCandidateLine(
-                        workspace_product_id=row["matched_workspace_product_id"],
-                        unit_price_amount=row["unit_price_amount"],
+                        workspace_product_id=product_id,
+                        unit_price_amount=normalised_unit_price,
                     )
                 )
                 candidates_dict[rid]["total_amount"] += row["quantity"] * row["unit_price_amount"]
-                candidates_dict[rid]["matched_workspace_product_ids_set"].add(
-                    row["matched_workspace_product_id"]
-                )
-                workspace_product_ids.add(row["matched_workspace_product_id"])
+                candidates_dict[rid]["matched_workspace_product_ids_set"].add(product_id)
+                workspace_product_ids.add(product_id)
 
         candidates = []
         for c in candidates_dict.values():
