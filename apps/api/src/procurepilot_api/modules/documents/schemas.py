@@ -6,7 +6,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, StrictStr
 
-DocumentSourceChannel = Literal["upload"]
+DocumentSourceChannel = Literal["upload", "email", "capture", "catalogue_import"]
 DocumentStatus = Literal["uploaded", "failed_to_read"]
 
 

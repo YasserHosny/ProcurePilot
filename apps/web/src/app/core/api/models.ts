@@ -273,7 +273,7 @@ export interface Document {
   readonly storage_path: string;
   readonly mime_type: string;
   readonly content_hash?: string | null;
-  readonly source_channel: 'upload';
+  readonly source_channel: 'upload' | 'email' | 'capture' | 'catalogue_import';
   readonly status: 'uploaded' | 'failed_to_read';
   readonly created_at: string;
   readonly created_by?: string;
