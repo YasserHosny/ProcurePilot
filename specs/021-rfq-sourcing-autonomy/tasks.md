@@ -300,12 +300,12 @@ response, and confirm the history view shows all three with distinct, accurate s
       asserted in the plan's prose
 - [x] T044 [P] Add R4.3 sections to `docs/architecture/api-specification.md` and
       `docs/architecture/data-dictionary.md`, mirroring the R4.0–R4.2 entries already there
-- [ ] T045 Run API unit, integration, contract, web unit, `pnpm test:a11y` (axe-core/WCAG 2.1 AA,
+- [x] T045 Run API unit, integration, contract, web unit, `pnpm test:a11y` (axe-core/WCAG 2.1 AA,
       English + Arabic), and production build gates
-- [ ] T046 Run the G3 evidence command, confirm output remains unmet, and record the R4.3
+- [x] T046 Run the G3 evidence command, confirm output remains unmet, and record the R4.3
       exception posture in a new `docs/quality/r4.3-release-evidence.md` (its own file, matching
       the one-doc-per-release convention)
-- [ ] T047 Run a live walkthrough: send a real RFQ, reply from a real test-supplier mailbox
+- [x] T047 Run a live walkthrough: send a real RFQ, reply from a real test-supplier mailbox
       through the actual Mailgun round trip (not the stub), confirm capture, compare, manual
       prepare, and — separately — a guardrail-triggered auto-prepare; English and Arabic; record
       it in the release evidence doc, mirroring the R4.0–R4.2 walkthrough pattern
