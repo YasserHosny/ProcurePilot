@@ -3,7 +3,7 @@ from decimal import Decimal
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 RfqStatus = Literal["draft", "sent", "responded", "expired", "converted"]
 RfqRecipientStatus = Literal["draft", "sent", "failed"]
@@ -93,6 +93,12 @@ class RfqResponseLineComparison(BaseModel):
     pending_match: bool
 
 
+class RfqGuardrailEvaluation(BaseModel):
+    guardrail_id: UUID
+    fired: bool
+    reason: str
+
+
 class RfqResponseComparison(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -101,6 +107,7 @@ class RfqResponseComparison(BaseModel):
     supplier_id: UUID
     submitted_at: datetime
     lines: list[RfqResponseLineComparison]
+    guardrail_evaluations: list[RfqGuardrailEvaluation] = Field(default_factory=list)
 
 
 class RfqResponseComparisonList(BaseModel):
@@ -117,6 +124,7 @@ class RfqPrepareRequestInput(BaseModel):
 class RfqPrepareRequestResponse(BaseModel):
     purchase_request_id: UUID
 
+
 class GuardrailCreateInput(BaseModel):
     max_order_value_amount: Decimal
     max_order_value_currency: str
@@ -126,6 +134,7 @@ class GuardrailCreateInput(BaseModel):
     max_price_variance_pct: Decimal
     default_branch_id: UUID
     enabled: bool = True
+
 
 class GuardrailUpdateInput(BaseModel):
     max_order_value_amount: Decimal | None = None
@@ -137,6 +146,7 @@ class GuardrailUpdateInput(BaseModel):
     default_branch_id: UUID | None = None
     enabled: bool | None = None
 
+
 class RfqSummary(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -147,6 +157,7 @@ class RfqSummary(BaseModel):
     recipient_count: int
     response_count: int
     converted_purchase_request_id: UUID | None
+
 
 class RfqList(BaseModel):
     items: list[RfqSummary]

@@ -10,6 +10,8 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
+import { signal } from '@angular/core';
+import { SessionService } from '../../../core/auth/session.service';
 
 describe('HistoryComponent', () => {
   let component: HistoryComponent;
@@ -57,7 +59,16 @@ describe('HistoryComponent', () => {
         provideHttpClientTesting(),
         provideRouter([]),
         { provide: RfqApi, useValue: rfqApiSpy },
-        { provide: MatSnackBar, useValue: snackBarSpy }
+        { provide: MatSnackBar, useValue: snackBarSpy },
+        {
+          provide: SessionService,
+          useValue: {
+            role: signal<'owner' | null>('owner'),
+            hasRole: () => true,
+            isAuthenticated: () => true,
+            activeLocale: () => 'en',
+          },
+        },
       ]
     }).compileComponents();
 

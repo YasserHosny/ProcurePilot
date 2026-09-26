@@ -12,6 +12,7 @@ import { TranslateModule, TranslateService } from '@ngx-translate/core';
 
 import { RfqApi, RfqSummary } from '../rfq-api';
 import { FormatDatePipe } from '../../../core/format/date.pipe';
+import { RoleDirective } from '../../../core/auth/role.directive';
 
 @Component({
   selector: 'app-rfq-history',
@@ -27,6 +28,7 @@ import { FormatDatePipe } from '../../../core/format/date.pipe';
     MatButtonModule,
     TranslateModule,
     FormatDatePipe,
+    RoleDirective,
   ],
   templateUrl: './history.component.html',
   styleUrl: './history.component.scss'

@@ -17,10 +17,11 @@ import { MatIconModule } from '@angular/material/icon';
 import { TranslateModule, TranslatePipe, TranslateService } from '@ngx-translate/core';
 
 import { ApiService } from '../../../core/api/api.service';
-import { RfqApi, RfqResponseComparison } from '../rfq-api';
+import { RfqApi, RfqGuardrail, RfqResponseComparison } from '../rfq-api';
 import { FormatMoneyPipe } from '../../../core/format/money.pipe';
 import { FormatDatePipe } from '../../../core/format/date.pipe';
 import type { ApiError, Branch } from '../../../core/api/models';
+import { SessionService } from '../../../core/auth/session.service';
 
 @Component({
   selector: 'app-rfq-compare',
@@ -52,6 +53,7 @@ export class CompareComponent implements OnInit {
   private readonly router = inject(Router);
   private readonly api = inject(ApiService);
   private readonly rfqApi = inject(RfqApi);
+  private readonly session = inject(SessionService);
   private readonly snackBar = inject(MatSnackBar);
   private readonly translate = inject(TranslateService);
 
@@ -64,6 +66,7 @@ export class CompareComponent implements OnInit {
   readonly supplierNames = signal<Record<string, string>>({});
   readonly productNames = signal<Record<string, string>>({});
   readonly errorMessage = signal<string | null>(null);
+  readonly guardrails = signal<readonly RfqGuardrail[]>([]);
 
   readonly displayedColumns = ['product', 'quantity', 'unitPrice', 'totalValue'];
 
@@ -86,6 +89,11 @@ export class CompareComponent implements OnInit {
     this.rfqApi.listResponses(rfqId).subscribe({
       next: (res) => {
         this.responses.set(res.items);
+        if (this.session.hasRole('owner')) {
+          this.rfqApi.listGuardrails().subscribe({
+            next: (guardrails) => this.guardrails.set(guardrails),
+          });
+        }
         this.resolveSuppliers();
         this.resolveProducts();
         this.isLoading.set(false);
@@ -100,6 +108,17 @@ export class CompareComponent implements OnInit {
           this.errorMessage.set(this.translate.instant('rfq.compare.loadError'));
         }
       },
+    });
+  }
+
+  guardrailLabel(guardrailId: string): string {
+    const guardrail = this.guardrails().find((item) => item.id === guardrailId);
+    if (!guardrail) {
+      return this.translate.instant('rfq.compare.guardrail');
+    }
+    return this.translate.instant('rfq.compare.guardrailLabel', {
+      amount: guardrail.max_order_value_amount,
+      currency: guardrail.max_order_value_currency,
     });
   }
 

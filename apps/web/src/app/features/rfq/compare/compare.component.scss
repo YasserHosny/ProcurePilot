@@ -1,3 +1,7 @@
+.guardrail-outcomes { margin-block-start: 16px; }
+.guardrail-outcome { display: flex; justify-content: space-between; gap: 12px; padding-block: 6px; }
+.outcome-reason { color: var(--mat-sys-error); }
+.outcome-reason.fired { color: var(--mat-sys-primary); }
 .page-container {
   padding: 24px;
   max-width: 1200px;

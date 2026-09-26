@@ -90,6 +90,15 @@
           <mat-icon color="warn">info</mat-icon>
           <span>{{ 'rfq.compare.cannotPreparePending' | translate }}</span>
         </div>
+        <div class="guardrail-outcomes" *ngIf="response.guardrail_evaluations?.length">
+          <h3>{{ 'rfq.compare.guardrailOutcomes' | translate }}</h3>
+          <div class="guardrail-outcome" *ngFor="let evaluation of response.guardrail_evaluations">
+            <span>{{ guardrailLabel(evaluation.guardrail_id) }}</span>
+            <span class="outcome-reason" [class.fired]="evaluation.fired">
+              {{ 'rfq.guardrails.reasons.' + evaluation.reason | translate }}
+            </span>
+          </div>
+        </div>
       </mat-card-content>
 
       <mat-card-actions align="end">

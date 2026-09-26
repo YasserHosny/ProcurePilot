@@ -112,8 +112,9 @@ directions.
 
 Phase 4 (Predictive Procurement, R4.0–R4.3) is merged to `main`. R4.3 (RFQ sourcing + guarded
 auto-preparation) passed its T047 live hosted walkthrough end to end, including a guardrail firing
-autonomously on hosted (evidence: `docs/quality/r4.3-release-evidence.md`). One R4.3 item remains:
-the owner-facing guardrail settings UI (T037/T038) — guardrails are API-only until it ships.
+autonomously on hosted (evidence: `docs/quality/r4.3-release-evidence.md`). The owner-facing
+guardrail settings UI (T037/T038, `/rfq/guardrails`) and per-response guardrail explanations in the
+RFQ compare view complete R4.3's task list.
 Guardrails are evaluated at match-decision time, not email capture (ADR-019). The G3 stage gate
 remains unmet on operational metrics (pilot accounts, 180-day history, integration-sourced quotes).
 
@@ -151,7 +152,8 @@ remains unmet on operational metrics (pilot accounts, 180-day history, integrati
 - 021-rfq-sourcing-autonomy: R4.3 merged (PR #26) plus T047 live-walkthrough fixes (PRs #28–#40):
   real Mailgun inbound payload parsing, deployed email-ingestion worker, document source-channel
   and empty-extraction review fixes, guardrail pack-size normalisation, and guardrail evaluation
-  moved to match-decision time (ADR-019). Remaining: guardrail settings UI (T037/T038)
+  moved to match-decision time (ADR-019); guardrail settings UI + compare-view explanations
+  (T037/T038)
 - 020-grounded-procurement-analyst: R4.2 merged to main (PR #25) — grounded, cited
   question-answering over tenant data, all four user stories plus Polish complete
 - 002-catalogue-suppliers: Added unchanged — Python 3.12 (backend), TypeScript 5.6 / Angular 19 (web), SQL + unchanged from chunk 4.1. One addition under consideration for CSV

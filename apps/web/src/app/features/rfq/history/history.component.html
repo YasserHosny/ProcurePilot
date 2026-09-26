@@ -5,6 +5,9 @@
       <p class="subtitle">{{ 'rfq.history.subtitle' | translate }}</p>
     </div>
     <div class="header-actions">
+      <a *appRole="'owner'" mat-button routerLink="/rfq/guardrails">
+        {{ 'rfq.history.guardrails' | translate }}
+      </a>
       <a mat-flat-button color="primary" routerLink="/rfq/create">
         <mat-icon>add</mat-icon>
         {{ 'rfq.history.createRfq' | translate }}
