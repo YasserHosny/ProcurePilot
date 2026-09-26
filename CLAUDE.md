@@ -1,6 +1,6 @@
 # ProcurePilot — Development Guidelines
 
-Last updated: 2026-09-24 · Active feature: `021-rfq-sourcing-autonomy`
+Last updated: 2026-09-26 · Active feature: `021-rfq-sourcing-autonomy`
 
 ProcurePilot turns fragmented supplier information into trusted, comparable purchasing
 decisions and proves the money saved. Read `.specify/memory/constitution.md` before writing
@@ -110,12 +110,12 @@ directions.
 
 ## Current phase
 
-Phase 2 (releases R2.0–R2.5, Team Workflow + Mobile + Intelligence Hardening) is complete, merged
-to `main`, and fully verified across all CI gates (CI run #35146371910). The G2 stage gate evaluation
-is recorded in `docs/quality/g2-stage-gate-evaluation.md` and authorized via ADR-016. The project is
-initiating Phase 3 (Connected Procurement, starting with R3.0 Automated Ingestion: email forwarding +
-WhatsApp quotation capture). See `docs/roadmap/procurepilot_roadmap.md` §8 for the Phase 3 scope
-breakdown (R3.0–R3.4).
+Phase 4 (Predictive Procurement, R4.0–R4.3) is merged to `main`. R4.3 (RFQ sourcing + guarded
+auto-preparation) passed its T047 live hosted walkthrough end to end, including a guardrail firing
+autonomously on hosted (evidence: `docs/quality/r4.3-release-evidence.md`). One R4.3 item remains:
+the owner-facing guardrail settings UI (T037/T038) — guardrails are API-only until it ships.
+Guardrails are evaluated at match-decision time, not email capture (ADR-019). The G3 stage gate
+remains unmet on operational metrics (pilot accounts, 180-day history, integration-sourced quotes).
 
 <!-- MANUAL ADDITIONS START -->
 <!-- MANUAL ADDITIONS END -->
@@ -148,8 +148,10 @@ breakdown (R3.0–R3.4).
   (021-rfq-sourcing-autonomy)
 
 ## Recent Changes
-- 021-rfq-sourcing-autonomy: R4.3 spec and plan committed on branch 021 (planning only,
-  implementation not started)
+- 021-rfq-sourcing-autonomy: R4.3 merged (PR #26) plus T047 live-walkthrough fixes (PRs #28–#40):
+  real Mailgun inbound payload parsing, deployed email-ingestion worker, document source-channel
+  and empty-extraction review fixes, guardrail pack-size normalisation, and guardrail evaluation
+  moved to match-decision time (ADR-019). Remaining: guardrail settings UI (T037/T038)
 - 020-grounded-procurement-analyst: R4.2 merged to main (PR #25) — grounded, cited
   question-answering over tenant data, all four user stories plus Polish complete
 - 002-catalogue-suppliers: Added unchanged — Python 3.12 (backend), TypeScript 5.6 / Angular 19 (web), SQL + unchanged from chunk 4.1. One addition under consideration for CSV
