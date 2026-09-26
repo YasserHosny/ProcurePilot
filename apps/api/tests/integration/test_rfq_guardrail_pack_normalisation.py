@@ -1,9 +1,16 @@
-"""Real end-to-end test for R4.3 Phase 6 (T033, US4): a qualifying response captured through
-the FULL ingestion path (process_inbound_email(), not a direct service call) auto-prepares a
-real purchase request when an enabled guardrail's conditions are met.
+"""Regression test for a real bug found via T047's live walkthrough: guardrail price-variance
+evaluation compared a candidate line's raw quotation_line.unit_price_amount (priced per quoted
+pack, e.g. per ream) directly against the price-history baseline (priced per normalised base
+unit, e.g. per sheet -- the same convention Smart Compare/Savings Ledger/Supplier IQ use
+everywhere else in this codebase). For any product whose pack doesn't normalise 1:1, this scale
+mismatch made price_variance_exceeded fire on essentially every real quote, silently blocking
+guardrail auto-prepare regardless of how reasonable the actual price was. The existing
+test_rfq_guardrails_e2e.py never caught this because its seeded product has no pack_definition
+row at all (an implicit 1:1 case).
 
-The reply is captured first with no extracted lines. Extraction, review, matching, and worker
-evaluation are then simulated in their production order.
+This test seeds a product with a real pack_definition (1 pack = 25 base units) and a price
+history baseline consistent with that packing, then completes extraction and matching after
+capture before running the guardrail worker.
 """
 
 import os
@@ -30,9 +37,13 @@ from procurepilot_api.modules.ingestion.guardrail_jobs import enqueue_guardrail_
 from procurepilot_api.workers.email_ingestion_worker import _process_job
 
 
-@pytest.mark.asyncio
-async def test_guardrail_e2e(
-    mock_supabase_client: None, monkeypatch: pytest.MonkeyPatch  # noqa: F811
+async def _run_guardrail_pack_normalisation_test(
+    _mock_supabase_client: None,
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    line_pack_count: int | None,
+    line_unit_size: int | None,
+    line_price: int,
 ) -> None:
     settings = get_settings()
     test_db = settings.database_url.get_secret_value()
@@ -47,7 +58,6 @@ async def test_guardrail_e2e(
                 "insert into branch (id, tenant_id, name) values (%s, %s, %s)",
                 (branch_id, tenant_id, "Test Branch"),
             )
-
             cur.execute(
                 "select id, user_id from membership where tenant_id = %s limit 1", (tenant_id,)
             )
@@ -56,25 +66,32 @@ async def test_guardrail_e2e(
             wp_id = uuid.uuid4()
             cur.execute(
                 "insert into canonical_product (id, name, base_unit) values (%s, %s, 'each')",
-                (uuid.uuid4(), "Guardrail Test Product"),
+                (uuid.uuid4(), "Packed Guardrail Test Product"),
             )
             cur.execute(
-                "select id from canonical_product where name = 'Guardrail Test Product'"
+                "select id from canonical_product where name = 'Packed Guardrail Test Product'"
             )
             canonical_id = cur.fetchone()[0]
             cur.execute(
                 "insert into workspace_product (id, tenant_id, canonical_product_id, "
                 "tenant_name) values (%s, %s, %s, %s)",
-                (wp_id, tenant_id, canonical_id, "Guardrail Test Product"),
+                (wp_id, tenant_id, canonical_id, "Packed Guardrail Test Product"),
             )
             cur.execute(
                 "insert into rfq_line (id, tenant_id, rfq_id, workspace_product_id, quantity) "
                 "values (%s, %s, %s, %s, 1)",
                 (uuid.uuid4(), tenant_id, rfq_id, wp_id),
             )
+            # 1 pack = 25 base units -- a real, non-1:1 pack normalisation. base_quantity is a
+            # generated column (pack_count * unit_size); do not insert it explicitly.
+            cur.execute(
+                "insert into pack_definition "
+                "(id, tenant_id, workspace_product_id, pack_count, unit_size) "
+                "values (%s, %s, %s, 1, 25)",
+                (uuid.uuid4(), tenant_id, wp_id),
+            )
 
-            # Prior purchase history for the same product, at 100.00/unit -- the price-variance
-            # baseline the guardrail's max_price_variance_pct will check the new quote against.
+            # Price history: 1 pack @ 2500.00 = 100.00 per base unit (the normalised baseline).
             hist_doc_id, hist_quot_id, hist_ql_id, hist_md_id = (
                 uuid.uuid4(),
                 uuid.uuid4(),
@@ -102,7 +119,7 @@ async def test_guardrail_e2e(
                 "insert into quotation_line "
                 "(id,tenant_id,quotation_id,line_number,original_text,quantity,"
                 "unit_price_amount,unit_price_currency) "
-                "values (%s,%s,%s,1,'historical',1,100,'USD')",
+                "values (%s,%s,%s,1,'historical',1,2500,'USD')",
                 (hist_ql_id, tenant_id, hist_quot_id),
             )
             cur.execute(
@@ -119,8 +136,8 @@ async def test_guardrail_e2e(
                 "vat_amount,vat_currency,delivery_fee_amount,delivery_fee_currency,"
                 "discount_amount,discount_currency,other_charges_amount,other_charges_currency,"
                 "total_amount,total_currency,raw_inputs,rule_version,valid_from) "
-                "values (%s,%s,%s,%s,1,1,'each',100,'USD',0,'USD',0,'USD',0,'USD',0,'USD',"
-                "100,'USD','{}','v1',now())",
+                "values (%s,%s,%s,%s,1,25,'each',2500,'USD',0,'USD',0,'USD',0,'USD',0,'USD',"
+                "2500,'USD','{}','v1',now())",
                 (uuid.uuid4(), tenant_id, hist_ql_id, hist_md_id),
             )
 
@@ -136,7 +153,7 @@ async def test_guardrail_e2e(
                     tenant_id,
                     membership_id,
                     branch_id,
-                    Decimal("1000.00"),
+                    Decimal("10000.00"),
                     "USD",
                     1,
                     Decimal("0.10"),
@@ -145,10 +162,6 @@ async def test_guardrail_e2e(
             )
         conn.commit()
 
-    # The guardrail fire calls RequestsService.create_request() over a real PostgREST HTTP
-    # call. conftest.py's SUPABASE_SERVICE_ROLE_KEY is a deliberate fake ("...e30.signature",
-    # not a real signature), so it can't authenticate against a live stack -- same fix as
-    # test_rfq_service_e2e.py's own prepare_request() tests: a psycopg-backed fake client.
     _patch_requests_service_for_test(
         monkeypatch, tenant_id=tenant_id, user_id=user_id, membership_id=membership_id
     )
@@ -169,9 +182,16 @@ async def test_guardrail_e2e(
             cur.execute(
                 "insert into quotation_line "
                 "(id, tenant_id, quotation_id, line_number, original_text, quantity, "
-                "unit_price_amount, unit_price_currency) "
-                "values (%s, %s, %s, 1, 'text', 1, 105, 'USD') returning id",
-                (uuid.uuid4(), tenant_id, quotation_id),
+                "pack_count, unit_size, unit_price_amount, unit_price_currency) "
+                "values (%s, %s, %s, 1, 'text', 1, %s, %s, %s, 'USD') returning id",
+                (
+                    uuid.uuid4(),
+                    tenant_id,
+                    quotation_id,
+                    line_pack_count,
+                    line_unit_size,
+                    line_price,
+                ),
             )
             ql_id = cur.fetchone()[0]
             cur.execute("update quotation set status = 'reviewed' where id = %s", (quotation_id,))
@@ -215,7 +235,11 @@ async def test_guardrail_e2e(
             cur.execute("set local role service_role")
 
             cur.execute("select status from rfq where id = %s", (rfq_id,))
-            assert cur.fetchone()[0] == "converted"
+            assert cur.fetchone()[0] == "converted", (
+                "guardrail should have fired: normalised price (105/base-unit) is within 10% of "
+                "the normalised baseline (100/base-unit) -- if this fails, the pack-normalisation "
+                "fix in orchestrator.py's guardrail candidate-line pricing has regressed"
+            )
 
             cur.execute(
                 "select purchase_request_id from auto_preparation_event where guardrail_id = %s",
@@ -223,29 +247,30 @@ async def test_guardrail_e2e(
             )
             event_row = cur.fetchone()
             assert event_row is not None
-            purchase_request_id = event_row[0]
-            assert purchase_request_id is not None
+            assert event_row[0] is not None
 
-            cur.execute(
-                "select source_rfq_response_id from purchase_request where id = %s",
-                (purchase_request_id,),
-            )
-            pr_row = cur.fetchone()
-            assert pr_row is not None
-            assert pr_row[0] is not None
 
-            # FR-014: disabling the guardrail after it fired must not retroactively touch the
-            # event or the request it already created.
-            cur.execute(
-                "update auto_preparation_guardrail set enabled = false where id = %s",
-                (guardrail_id,),
-            )
-            conn.commit()
+@pytest.mark.asyncio
+async def test_guardrail_fires_with_non_unary_pack_normalisation(
+    mock_supabase_client: None, monkeypatch: pytest.MonkeyPatch  # noqa: F811
+) -> None:
+    await _run_guardrail_pack_normalisation_test(
+        mock_supabase_client,
+        monkeypatch,
+        line_pack_count=None,
+        line_unit_size=None,
+        line_price=2625,
+    )
 
-            cur.execute(
-                "select id from auto_preparation_event where guardrail_id = %s", (guardrail_id,)
-            )
-            assert cur.fetchone() is not None
 
-            cur.execute("select id from purchase_request where id = %s", (purchase_request_id,))
-            assert cur.fetchone() is not None
+@pytest.mark.asyncio
+async def test_guardrail_prefers_quoted_line_pack_over_catalogue_pack(
+    mock_supabase_client: None, monkeypatch: pytest.MonkeyPatch  # noqa: F811
+) -> None:
+    await _run_guardrail_pack_normalisation_test(
+        mock_supabase_client,
+        monkeypatch,
+        line_pack_count=1,
+        line_unit_size=1,
+        line_price=100,
+    )

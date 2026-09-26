@@ -1,3 +1,4 @@
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from uuid import UUID, uuid4
 
@@ -363,3 +364,23 @@ def test_guardrail_fired(
     assert decision.fired
     assert decision.reason == "guardrail_fired"
     assert decision.winning_response_id == base_candidate.rfq_response_id
+
+
+def test_response_captured_before_guardrail_is_ineligible(
+    base_guardrail: AutoPreparationGuardrail,
+    base_candidate: GuardrailCandidate,
+    product_id: UUID,
+) -> None:
+    base_guardrail.created_at = datetime.now(UTC)
+    base_candidate.captured_at = base_guardrail.created_at - timedelta(seconds=1)
+    decision = evaluate_guardrail(
+        GuardrailEvaluationInput(
+            guardrail=base_guardrail,
+            rfq_status="responded",
+            total_response_count=1,
+            candidates=[base_candidate],
+            recent_average_price_by_product={product_id: Decimal("100.00")},
+        )
+    )
+    assert not decision.fired
+    assert decision.reason == "captured_before_guardrail"

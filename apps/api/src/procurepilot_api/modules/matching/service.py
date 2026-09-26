@@ -15,6 +15,7 @@ from supabase import create_client
 from procurepilot_api.config import Settings, get_settings
 from procurepilot_api.deps import CurrentMember
 from procurepilot_api.errors import ConflictError, NotFoundError, ServiceUnavailableError
+from procurepilot_api.modules.ingestion.guardrail_jobs import enqueue_guardrail_evaluation
 from procurepilot_api.modules.landed_cost.service import LandedCostService
 from procurepilot_api.modules.matching.deterministic import find_deterministic_candidate
 from procurepilot_api.modules.matching.embeddings import StubEmbeddingProvider, vector_literal
@@ -652,6 +653,9 @@ class MatchingService:
         except APIError as exc:
             raise ServiceUnavailableError(details={"dependency": "database"}) from exc
         decision = _one_row(response.data, resource="match_decision")
+        enqueue_guardrail_evaluation(
+            self._settings, tenant_id=member.tenant_id, quotation_id=UUID(str(line["quotation_id"]))
+        )
         if bearer_token is not None:
             self._record(
                 bearer_token=bearer_token,

@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
 
@@ -19,6 +20,7 @@ class GuardrailCandidate:
     total_amount: Decimal
     all_lines_matched: bool
     matched_lines: list[GuardrailCandidateLine]
+    captured_at: datetime | None = None
 
 
 @dataclass
@@ -34,6 +36,7 @@ class AutoPreparationGuardrail:
     category_allowlist: list[str] | None
     default_branch_id: UUID
     created_by_membership_id: UUID
+    created_at: datetime | None = None
 
 
 @dataclass
@@ -99,6 +102,13 @@ def evaluate_guardrail(input: GuardrailEvaluationInput) -> GuardrailDecision:
     reasons = []
 
     for candidate in input.candidates:
+        if (
+            candidate.captured_at is not None
+            and input.guardrail.created_at is not None
+            and candidate.captured_at < input.guardrail.created_at
+        ):
+            reasons.append("captured_before_guardrail")
+            continue
         reason = _evaluate_candidate(
             candidate, input.guardrail, input.recent_average_price_by_product
         )
