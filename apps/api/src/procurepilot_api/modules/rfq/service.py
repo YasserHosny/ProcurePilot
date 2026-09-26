@@ -468,6 +468,16 @@ class RfqService:
                     raise NotFoundError(details={"resource": "rfq_response"})
 
                 cur.execute(
+                    "select status, deleted_at from quotation where id = %s and tenant_id = %s",
+                    (resp_row["quotation_id"], member.tenant_id),
+                )
+                quotation_row = cur.fetchone()
+                if quotation_row and quotation_row["deleted_at"] is not None:
+                    raise UnprocessableEntityError(details={"reason": "quotation_archived"})
+                if quotation_row and quotation_row["status"] == "refused":
+                    raise UnprocessableEntityError(details={"reason": "quotation_refused"})
+
+                cur.execute(
                     """
                     select ql.unit_price_amount, ql.unit_price_currency, \
                            md.matched_workspace_product_id

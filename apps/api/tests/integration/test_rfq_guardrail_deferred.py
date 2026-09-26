@@ -6,6 +6,7 @@ import os
 import sys
 import threading
 import uuid
+from datetime import date
 from decimal import Decimal
 from typing import Any
 
@@ -21,7 +22,13 @@ from test_rfq_service_e2e import (  # noqa: E402
 )
 
 from procurepilot_api.config import Settings, get_settings
+from procurepilot_api.deps import CurrentMember
+from procurepilot_api.errors import UnprocessableEntityError
+from procurepilot_api.modules.auth.jwt import MemberRole
 from procurepilot_api.modules.ingestion.orchestrator import _evaluate_guardrails_for_rfq
+from procurepilot_api.modules.quotations.review_service import QuotationReviewService
+from procurepilot_api.modules.quotations.service import QuotationService
+from procurepilot_api.modules.rfq.service import RfqService
 
 TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL")
 pytestmark = pytest.mark.skipif(
@@ -178,6 +185,244 @@ def _thread_local_requests_client(
         requests_service_module.RequestsService, "_record", lambda self, **kwargs: None
     )
     return connections
+
+
+def _complete_response(
+    settings: Settings,
+    *,
+    tenant_id: uuid.UUID,
+    rfq_id: uuid.UUID,
+    response_id: uuid.UUID,
+) -> None:
+    """Add the missing real match to the fixture's initially pending response."""
+    with psycopg.connect(settings.database_url.get_secret_value()) as conn:
+        with conn.cursor() as cur:
+            cur.execute("select quotation_id from rfq_response where id = %s", (response_id,))
+            quotation_id = cur.fetchone()[0]
+            cur.execute(
+                "select id from quotation_line where quotation_id = %s and line_number = 2",
+                (quotation_id,),
+            )
+            line_id = cur.fetchone()[0]
+            cur.execute(
+                "select workspace_product_id from rfq_line where rfq_id = %s "
+                "order by created_at limit 2 offset 1",
+                (rfq_id,),
+            )
+            product_id = cur.fetchone()[0]
+            cur.execute(
+                "insert into match_decision "
+                "(id,tenant_id,quotation_line_id,matched_workspace_product_id,outcome,"
+                "is_automatic,confidence) values (%s,%s,%s,%s,'no_match_new_product',true,1)",
+                (uuid.uuid4(), tenant_id, line_id, product_id),
+            )
+        conn.commit()
+
+
+def _quotation_id(settings: Settings, response_id: uuid.UUID) -> uuid.UUID:
+    with psycopg.connect(settings.database_url.get_secret_value()) as conn:
+        with conn.cursor() as cur:
+            cur.execute("select quotation_id from rfq_response where id = %s", (response_id,))
+            return cur.fetchone()[0]
+
+
+def _wire_quotation_lifecycle_services(
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    tenant_id: uuid.UUID,
+    user_id: uuid.UUID,
+    membership_id: uuid.UUID,
+) -> None:
+    """Use the real quotation services while backing their authenticated client with psycopg."""
+    from procurepilot_api.modules.quotations import review_service
+    from procurepilot_api.modules.quotations import service as quotation_service
+
+    conn = psycopg.connect(get_settings().database_url.get_secret_value(), autocommit=True)
+    with conn.cursor() as cur:
+        cur.execute("set role authenticated")
+        cur.execute(
+            "select set_config('request.jwt.claims', %s, false)",
+            (
+                f'{{"sub":"{user_id}","tenant_id":"{tenant_id}",'
+                f'"role":"authenticated","member_role":"owner"}}',
+            ),
+        )
+    def client(_settings: object, _token: str) -> _FakeAuthenticatedClient:
+        return _FakeAuthenticatedClient(conn)
+
+    monkeypatch.setattr(quotation_service, "authenticated_client", client)
+    monkeypatch.setattr(review_service, "authenticated_client", client)
+    monkeypatch.setattr(quotation_service, "get_audit_writer", lambda: _NoopAuditWriter())
+    monkeypatch.setattr(review_service, "get_audit_writer", lambda: _NoopAuditWriter())
+
+
+class _NoopAuditWriter:
+    def record(self, *args: object, **kwargs: object) -> None:
+        return None
+
+
+def _member(
+    tenant_id: uuid.UUID, user_id: uuid.UUID, membership_id: uuid.UUID
+) -> CurrentMember:
+    return CurrentMember(
+        membership_id=membership_id,
+        tenant_id=tenant_id,
+        user_id=user_id,
+        email="rfq-e2e@example.test",
+        role=MemberRole.owner,
+    )
+
+
+def _latest_guardrail_job(
+    settings: Settings, tenant_id: uuid.UUID, quotation_id: uuid.UUID
+) -> dict[str, object]:
+    with psycopg.connect(settings.database_url.get_secret_value()) as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "select id, tenant_id, job_type, status, payload, attempts, max_attempts "
+                "from ingestion_jobs where tenant_id = %s and job_type = 'guardrail_eval' "
+                "and payload->>'quotation_id' = %s order by created_at desc limit 1",
+                (tenant_id, str(quotation_id)),
+            )
+            row = cur.fetchone()
+    assert row is not None
+    return dict(
+        zip(
+            ("id", "tenant_id", "job_type", "status", "payload", "attempts", "max_attempts"),
+            row,
+            strict=True,
+        )
+    )
+
+
+def _process_enqueued_guardrail_job(
+    settings: Settings, tenant_id: uuid.UUID, quotation_id: uuid.UUID
+) -> str:
+    from procurepilot_api.workers.email_ingestion_worker import _process_job
+
+    return _process_job(settings, _latest_guardrail_job(settings, tenant_id, quotation_id))
+
+
+def _event_response_id(settings: Settings, tenant_id: uuid.UUID) -> uuid.UUID | None:
+    with psycopg.connect(settings.database_url.get_secret_value()) as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "select rfq_response_id from auto_preparation_event "
+                "where tenant_id = %s order by created_at desc limit 1",
+                (tenant_id,),
+            )
+            row = cur.fetchone()
+    return row[0] if row else None
+
+
+def test_archived_cheapest_response_is_never_chosen(monkeypatch: pytest.MonkeyPatch) -> None:
+    settings = get_settings()
+    tenant_id, user_id, membership_id, rfq_id, response_a, response_b = _make_fixture()
+    _complete_response(settings, tenant_id=tenant_id, rfq_id=rfq_id, response_id=response_b)
+    _set_response_prices_on_fixture(settings, response_a, (14, 25), response_b, (16, 30))
+    _thread_local_requests_client(monkeypatch, tenant_id, user_id)
+    _wire_quotation_lifecycle_services(
+        monkeypatch, tenant_id=tenant_id, user_id=user_id, membership_id=membership_id
+    )
+
+    member = _member(tenant_id, user_id, membership_id)
+    archived_quotation_id = _quotation_id(settings, response_a)
+    QuotationService(settings).archive_quotation(
+        bearer_token="unused-token", member=member, quotation_id=archived_quotation_id
+    )
+
+    with pytest.raises(UnprocessableEntityError) as exc:
+        RfqService(settings).prepare_request(
+            bearer_token="unused-token",
+            member=member,
+            rfq_id=rfq_id,
+            rfq_response_id=response_a,
+            branch_id=uuid.uuid4(),
+            required_by_date=date.today(),
+            idempotency_key=uuid.uuid4(),
+        )
+    assert exc.value.details == {"reason": "quotation_archived"}
+
+    assert (
+        _process_enqueued_guardrail_job(settings, tenant_id, archived_quotation_id)
+        == "completed"
+    )
+    assert _event_response_id(settings, tenant_id) == response_b
+
+
+@pytest.mark.parametrize("unblock_action", ["refuse", "archive"])
+def test_refusing_or_archiving_blocking_response_unblocks_guardrail(
+    monkeypatch: pytest.MonkeyPatch, unblock_action: str
+) -> None:
+    settings = get_settings()
+    tenant_id, user_id, membership_id, rfq_id, response_a, response_b = _make_fixture()
+    _set_response_prices_on_fixture(settings, response_a, (16, 30), response_b, (14, 25))
+    _thread_local_requests_client(monkeypatch, tenant_id, user_id)
+    _wire_quotation_lifecycle_services(
+        monkeypatch, tenant_id=tenant_id, user_id=user_id, membership_id=membership_id
+    )
+
+    response_b_quotation_id = _quotation_id(settings, response_b)
+    with psycopg.connect(settings.database_url.get_secret_value()) as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "update quotation set status = 'in_review' where id = %s",
+                (response_b_quotation_id,),
+            )
+        conn.commit()
+
+    member = _member(tenant_id, user_id, membership_id)
+    if unblock_action == "refuse":
+        QuotationReviewService(settings).refuse_quotation(
+            bearer_token="unused-token",
+            member=member,
+            quotation_id=response_b_quotation_id,
+            reason="not selected",
+        )
+    else:
+        QuotationService(settings).archive_quotation(
+            bearer_token="unused-token", member=member, quotation_id=response_b_quotation_id
+        )
+
+    assert (
+        _process_enqueued_guardrail_job(settings, tenant_id, response_b_quotation_id)
+        == "completed"
+    )
+    assert _event_response_id(settings, tenant_id) == response_a
+
+
+def test_archived_response_does_not_count_toward_minimum_response_count(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = get_settings()
+    tenant_id, user_id, membership_id, rfq_id, response_a, response_b = _make_fixture()
+    _complete_response(settings, tenant_id=tenant_id, rfq_id=rfq_id, response_id=response_b)
+    _set_response_prices_on_fixture(settings, response_a, (16, 30), response_b, (14, 25))
+    _thread_local_requests_client(monkeypatch, tenant_id, user_id)
+    _wire_quotation_lifecycle_services(
+        monkeypatch, tenant_id=tenant_id, user_id=user_id, membership_id=membership_id
+    )
+
+    with psycopg.connect(settings.database_url.get_secret_value()) as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "update auto_preparation_guardrail set min_response_count = 2 "
+                "where tenant_id = %s",
+                (tenant_id,),
+            )
+        conn.commit()
+
+    archived_quotation_id = _quotation_id(settings, response_b)
+    QuotationService(settings).archive_quotation(
+        bearer_token="unused-token",
+        member=_member(tenant_id, user_id, membership_id),
+        quotation_id=archived_quotation_id,
+    )
+    assert (
+        _process_enqueued_guardrail_job(settings, tenant_id, archived_quotation_id)
+        == "completed"
+    )
+    assert _event_response_id(settings, tenant_id) is None
 
 
 def test_concurrent_evaluations_fire_once(monkeypatch: pytest.MonkeyPatch) -> None:
