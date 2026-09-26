@@ -11,6 +11,7 @@ from procurepilot_api.config import Settings, get_settings
 from procurepilot_api.deps import CurrentMember
 from procurepilot_api.errors import ConflictError, NotFoundError, ServiceUnavailableError
 from procurepilot_api.modules.catalogue.service import CatalogueService
+from procurepilot_api.modules.ingestion.guardrail_jobs import enqueue_guardrail_evaluation
 from procurepilot_api.modules.landed_cost.service import LandedCostService
 from procurepilot_api.modules.matching.alias_service import AliasLearningService
 from procurepilot_api.modules.matching.schemas import MatchDecision, MatchResolutionRequest
@@ -126,6 +127,9 @@ class MatchResolutionService:
         except APIError as exc:
             raise ServiceUnavailableError(details={"dependency": "database"}) from exc
         decision = _decision(client, _one_row(response.data, resource="match_decision"))
+        enqueue_guardrail_evaluation(
+            self._settings, tenant_id=member.tenant_id, quotation_id=UUID(str(line["quotation_id"]))
+        )
         self._complete_resolution_side_effects(
             client=client,
             bearer_token=bearer_token,

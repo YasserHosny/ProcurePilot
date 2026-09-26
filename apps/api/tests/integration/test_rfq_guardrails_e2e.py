@@ -2,13 +2,8 @@
 the FULL ingestion path (process_inbound_email(), not a direct service call) auto-prepares a
 real purchase request when an enabled guardrail's conditions are met.
 
-`process_inbound_email()` evaluates guardrails against whatever `quotation_line`/`match_decision`
-rows exist for the just-captured quotation at the moment of capture -- real extraction/matching is
-async and wouldn't have run yet in this synchronous test. To exercise a genuinely qualifying
-response without standing up the full extraction pipeline, this test monkeypatches
-`orchestrator._insert_quotation` to also insert a line, a match decision, and a prior landed-cost
-data point (the price-history baseline) for the same product -- simulating "extraction and
-matching already completed for this response" and "the tenant has purchased this product before".
+The reply is captured first with no extracted lines. Extraction, review, matching, and worker
+evaluation are then simulated in their production order.
 """
 
 import os
@@ -30,6 +25,9 @@ from test_rfq_response_capture import (  # noqa: E402, F401
     mock_supabase_client,
 )
 from test_rfq_service_e2e import _patch_requests_service_for_test  # noqa: E402
+
+from procurepilot_api.modules.ingestion.guardrail_jobs import enqueue_guardrail_evaluation
+from procurepilot_api.workers.email_ingestion_worker import _process_job
 
 
 @pytest.mark.asyncio
@@ -147,48 +145,6 @@ async def test_guardrail_e2e(
             )
         conn.commit()
 
-    import procurepilot_api.modules.ingestion.orchestrator as orch
-
-    orig_insert_quotation = orch._insert_quotation
-
-    def fake_insert_quotation(
-        conn2: psycopg.Connection,
-        *,
-        tenant_id: uuid.UUID,
-        document_id: uuid.UUID,
-        supplier_id: uuid.UUID,
-        ingestion_email_id: uuid.UUID,
-    ) -> uuid.UUID:
-        """Stand in for real (async) extraction+matching: give the just-captured quotation one
-        line, matched to the same product the RFQ/history above use, at a price within the
-        guardrail's variance tolerance of the 100.00 baseline."""
-        qid = orig_insert_quotation(
-            conn2,
-            tenant_id=tenant_id,
-            document_id=document_id,
-            supplier_id=supplier_id,
-            ingestion_email_id=ingestion_email_id,
-        )
-        ql_id = uuid.uuid4()
-        with conn2.cursor() as cur2:
-            cur2.execute(
-                "insert into quotation_line "
-                "(id, tenant_id, quotation_id, line_number, original_text, quantity, "
-                "unit_price_amount, unit_price_currency) "
-                "values (%s, %s, %s, 1, 'text', 1, 105, 'USD')",
-                (ql_id, tenant_id, qid),
-            )
-            cur2.execute(
-                "insert into match_decision "
-                "(id, tenant_id, quotation_line_id, matched_workspace_product_id, outcome, "
-                "is_automatic, confidence) "
-                "values (%s, %s, %s, %s, 'no_match_new_product', true, 1.0)",
-                (uuid.uuid4(), tenant_id, ql_id, wp_id),
-            )
-        return qid
-
-    orch._insert_quotation = fake_insert_quotation
-
     # The guardrail fire calls RequestsService.create_request() over a real PostgREST HTTP
     # call. conftest.py's SUPABASE_SERVICE_ROLE_KEY is a deliberate fake ("...e30.signature",
     # not a real signature), so it can't authenticate against a live stack -- same fix as
@@ -198,14 +154,61 @@ async def test_guardrail_e2e(
     )
 
     email_bytes = _create_email_bytes(f"<{uuid.uuid4()}@mail.com>", in_reply_to=msg_id)
-    try:
-        result = process_inbound_email(
-            settings, tenant_id=tenant_id, raw_email_bytes=email_bytes, raw_email_ref="s3://path"
-        )
-    finally:
-        orch._insert_quotation = orig_insert_quotation
+    result = process_inbound_email(
+        settings, tenant_id=tenant_id, raw_email_bytes=email_bytes, raw_email_ref="s3://path"
+    )
 
     assert result["status"] == "completed"
+    quotation_id = uuid.UUID(str(result["quotation_id"]))
+
+    with psycopg.connect(test_db) as conn:
+        with conn.cursor() as cur:
+            cur.execute("set local role service_role")
+            cur.execute("select status from rfq where id = %s", (rfq_id,))
+            assert cur.fetchone()[0] == "responded"
+            cur.execute(
+                "insert into quotation_line "
+                "(id, tenant_id, quotation_id, line_number, original_text, quantity, "
+                "unit_price_amount, unit_price_currency) "
+                "values (%s, %s, %s, 1, 'text', 1, 105, 'USD') returning id",
+                (uuid.uuid4(), tenant_id, quotation_id),
+            )
+            ql_id = cur.fetchone()[0]
+            cur.execute("update quotation set status = 'reviewed' where id = %s", (quotation_id,))
+            cur.execute(
+                "insert into match_decision "
+                "(id, tenant_id, quotation_line_id, matched_workspace_product_id, outcome, "
+                "is_automatic, confidence) values "
+                "(%s, %s, %s, %s, 'no_match_new_product', true, 1.0)",
+                (uuid.uuid4(), tenant_id, ql_id, wp_id),
+            )
+            conn.commit()
+
+    enqueue_guardrail_evaluation(settings, tenant_id=tenant_id, quotation_id=quotation_id)
+    with psycopg.connect(test_db) as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "select id, tenant_id, job_type, status, payload, attempts, max_attempts "
+                "from ingestion_jobs where tenant_id = %s and job_type = 'guardrail_eval' "
+                "order by created_at desc limit 1",
+                (tenant_id,),
+            )
+            job = dict(
+                zip(
+                    (
+                        "id",
+                        "tenant_id",
+                        "job_type",
+                        "status",
+                        "payload",
+                        "attempts",
+                        "max_attempts",
+                    ),
+                    cur.fetchone(),
+                    strict=True,
+                )
+            )
+    assert _process_job(settings, job) == "completed"
 
     with psycopg.connect(test_db) as conn:
         with conn.cursor() as cur:

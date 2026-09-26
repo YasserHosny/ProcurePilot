@@ -10,11 +10,14 @@ from psycopg.rows import dict_row
 from supabase import create_client
 
 from procurepilot_api.config import Settings, get_settings
-from procurepilot_api.modules.ingestion.orchestrator import process_inbound_email
+from procurepilot_api.modules.ingestion.orchestrator import (
+    _evaluate_guardrails_for_rfq,
+    process_inbound_email,
+)
 
 logger = logging.getLogger(__name__)
 
-# T012: polls `ingestion_jobs` for job_type = 'email_ingest' via FOR UPDATE SKIP LOCKED —
+# T012: polls `ingestion_jobs` for email_ingest and guardrail_eval via FOR UPDATE SKIP LOCKED —
 # identical worker-queue shape to report_scheduler, export_worker, and digest_worker (R7: no
 # Redis for THIS queue, database-backed only). `tenant_id` is read from the claimed job ROW, not
 # from its payload — the same untrusted-payload discipline export_worker/digest_worker already
@@ -54,7 +57,7 @@ def _claim_pending_jobs(
         cur.execute(
             """
             select * from ingestion_jobs
-            where job_type = 'email_ingest'
+            where job_type in ('email_ingest', 'guardrail_eval')
               and (
                 status = 'pending'
                 or (
@@ -141,6 +144,41 @@ def _process_job(settings: Settings, job: dict[str, object]) -> str:
     job_id = UUID(str(job["id"]))
     tenant_id = UUID(str(job["tenant_id"]))
     payload = job.get("payload") or {}
+    job_type = str(job["job_type"])
+    if job_type == "guardrail_eval":
+        try:
+            quotation_id = UUID(str(payload["quotation_id"])) if isinstance(payload, dict) else None
+            if quotation_id is None:
+                raise ValueError("guardrail_eval payload missing quotation_id")
+            with psycopg.connect(settings.database_url.get_secret_value()) as conn:
+                with conn.cursor(row_factory=dict_row) as cur:
+                    cur.execute(
+                        """
+                        select rec.rfq_id
+                        from quotation q
+                        join rfq_response response
+                          on response.quotation_id = q.id and response.tenant_id = q.tenant_id
+                        join rfq_recipient rec
+                          on rec.id = response.rfq_recipient_id
+                         and rec.tenant_id = response.tenant_id
+                        where q.id = %s and q.tenant_id = %s
+                        limit 1
+                        """,
+                        (quotation_id, tenant_id),
+                    )
+                    mapping = cur.fetchone()
+                    if mapping:
+                        _evaluate_guardrails_for_rfq(
+                            settings, conn, tenant_id=tenant_id, rfq_id=mapping["rfq_id"]
+                        )
+                conn.commit()
+            _mark_job_completed(settings, job_id)
+            return "completed"
+        except Exception as exc:
+            logger.exception("Guardrail evaluation job %s failed", job_id)
+            _mark_job_failed(settings, job_id, attempts=int(job["attempts"]),
+                             max_attempts=int(job["max_attempts"]), error=str(exc))
+            return "failed"
     raw_email_path = payload.get("raw_email_path") if isinstance(payload, dict) else None
 
     try:

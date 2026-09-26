@@ -105,10 +105,10 @@ def process_inbound_email(
         )
 
         from procurepilot_api.modules.rfq.response_matching import match_rfq_response
-        
+
         matched_rfq_recipient_id = None
         matched_rfq_id = None
-        
+
         with conn.cursor(row_factory=dict_row) as service_cur:
             service_cur.execute("set local role service_role")
             service_cur.execute(
@@ -117,16 +117,16 @@ def process_inbound_email(
                 from rfq_recipient
                 where tenant_id = %s and outbound_message_id is not null
                 """,
-                (tenant_id,)
+                (tenant_id,),
             )
             open_recipients = service_cur.fetchall()
-            
+
             matched_rfq_recipient_id = match_rfq_response(
                 in_reply_to=email_data.in_reply_to,
                 references=email_data.references,
                 open_recipients=open_recipients,
             )
-            
+
             if matched_rfq_recipient_id:
                 for rec in open_recipients:
                     if rec["id"] == matched_rfq_recipient_id:
@@ -135,7 +135,7 @@ def process_inbound_email(
                             supplier_id = rec["supplier_id"]
                             match_method = "rfq_reply"
                         break
-        
+
         _act_as_tenant(conn, tenant_id)
 
         document_id, mime_type, filename = _store_primary_document(
@@ -160,7 +160,7 @@ def process_inbound_email(
                     insert into rfq_response (tenant_id, rfq_recipient_id, quotation_id)
                     values (%s, %s, %s)
                     """,
-                    (tenant_id, matched_rfq_recipient_id, quotation_id)
+                    (tenant_id, matched_rfq_recipient_id, quotation_id),
                 )
                 service_cur.execute(
                     """
@@ -168,7 +168,7 @@ def process_inbound_email(
                     set status = 'responded'
                     where tenant_id = %s and id = %s and status = 'sent'
                     """,
-                    (tenant_id, matched_rfq_id)
+                    (tenant_id, matched_rfq_id),
                 )
                 service_cur.execute(
                     "select record_audit_event(%s, 'success'::audit_outcome, "
@@ -177,35 +177,16 @@ def process_inbound_email(
                         "rfq.response_received",
                         tenant_id,
                         "ingestion-worker@procurepilot.local",
-                        json.dumps({
-                            "rfq_id": str(matched_rfq_id),
-                            "rfq_recipient_id": str(matched_rfq_recipient_id),
-                            "quotation_id": str(quotation_id),
-                        }),
+                        json.dumps(
+                            {
+                                "rfq_id": str(matched_rfq_id),
+                                "rfq_recipient_id": str(matched_rfq_recipient_id),
+                                "quotation_id": str(quotation_id),
+                            }
+                        ),
                     ),
                 )
             _act_as_tenant(conn, tenant_id)
-
-            # T035's guardrail path, if it fires, calls prepare_request() -> create_request(),
-            # which reads the just-inserted rfq_response/quotation over a SEPARATE PostgREST
-            # connection -- it cannot see this transaction's writes until they're committed.
-            # Commit now, before evaluating, so that read is guaranteed to find them.
-            conn.commit()
-
-            # T035: guardrail auto-preparation is best-effort -- a bug here must never break
-            # the core capture pipeline this response just completed.
-            try:
-                _evaluate_guardrails_for_rfq(
-                    settings, conn, tenant_id=tenant_id, rfq_id=matched_rfq_id
-                )
-            except Exception:
-                logger.exception("Guardrail evaluation failed for rfq %s", matched_rfq_id)
-            finally:
-                # _evaluate_guardrails_for_rfq's own service_role block is local to the
-                # transaction it opened and never commits/resets it -- restore the
-                # authenticated/tenant-scoped context the rest of this function expects.
-                conn.commit()
-                _act_as_tenant(conn, tenant_id)
 
         _mark_log_completed(
             conn,
@@ -292,263 +273,340 @@ def _evaluate_guardrails_for_rfq(
         evaluate_guardrail,
     )
 
-    with conn.cursor(row_factory=dict_row) as cur:
-        cur.execute("set local role service_role")
-
+    advisory_key = f"{tenant_id}:{rfq_id}"
+    with conn.cursor() as cur:
         cur.execute(
-            "select status, needed_by_date from rfq where id = %s and tenant_id = %s",
-            (rfq_id, tenant_id),
+            "select pg_advisory_lock(hashtextextended(%s, 0))",
+            (advisory_key,),
         )
-        rfq_row = cur.fetchone()
-        if not rfq_row or rfq_row["status"] == "converted":
-            return
 
-        cur.execute(
-            "select id, tenant_id, enabled, min_response_count, max_order_value_amount, "
-            "max_order_value_currency, max_price_variance_pct, supplier_allowlist, "
-            "category_allowlist, default_branch_id, created_by_membership_id "
-            "from auto_preparation_guardrail where tenant_id = %s and enabled = true",
-            (tenant_id,),
-        )
-        guardrail_rows = cur.fetchall()
-        if not guardrail_rows:
-            return
-        guardrails = [AutoPreparationGuardrail(**r) for r in guardrail_rows]
+    try:
+        with conn.cursor(row_factory=dict_row) as cur:
+            cur.execute("set local role service_role")
 
-        cur.execute(
-            """
-            select count(distinct r.id) as cnt
-            from rfq_response r
-            join rfq_recipient rec on r.rfq_recipient_id = rec.id
-            where rec.rfq_id = %s and r.tenant_id = %s
-            """,
-            (rfq_id, tenant_id),
-        )
-        total_responses = cur.fetchone()["cnt"]
-
-        cur.execute(
-            """
-            select
-                r.id as response_id,
-                rec.supplier_id,
-                ql.id as ql_id,
-                ql.quantity,
-                ql.pack_count,
-                ql.unit_size,
-                ql.unit_price_amount,
-                ql.unit_price_currency,
-                md.matched_workspace_product_id
-            from rfq_response r
-            join rfq_recipient rec on r.rfq_recipient_id = rec.id
-            left join quotation_line ql on r.quotation_id = ql.quotation_id
-            left join match_decision md on ql.id = md.quotation_line_id
-            where r.tenant_id = %s and rec.rfq_id = %s
-            """,
-            (tenant_id, rfq_id),
-        )
-        rows = cur.fetchall()
-
-        cur.execute("select count(*) as cnt from rfq_line where rfq_id = %s", (rfq_id,))
-        rfq_line_count = cur.fetchone()["cnt"]
-
-        # `baseline` below is priced per normalised base unit (total_amount / normalised_base_
-        # quantity, the same convention Smart Compare/Savings Ledger/Supplier IQ use everywhere
-        # else in this codebase) -- a candidate line's raw quotation_line.unit_price_amount is
-        # priced per quoted pack instead (e.g. per ream, not per sheet), so the two are only
-        # directly comparable when a product's pack normalises 1:1. Fetch each matched product's
-        # pack_definition.base_quantity up front as the fallback when the quoted line has no own
-        # pack details, so candidate line prices can be normalised onto the same per-base-unit
-        # scale before ever reaching evaluate_guardrail's variance check.
-        matched_product_ids = {
-            row["matched_workspace_product_id"]
-            for row in rows
-            if row["ql_id"] and row["matched_workspace_product_id"]
-        }
-        base_quantity_by_product: dict[UUID, Decimal] = {}
-        if matched_product_ids:
             cur.execute(
-                "select workspace_product_id, base_quantity from pack_definition "
-                "where tenant_id = %s and workspace_product_id = any(%s)",
-                (tenant_id, list(matched_product_ids)),
+                "select status, needed_by_date from rfq where id = %s and tenant_id = %s",
+                (rfq_id, tenant_id),
             )
-            for prow in cur.fetchall():
-                base_quantity_by_product[prow["workspace_product_id"]] = prow["base_quantity"]
+            rfq_row = cur.fetchone()
+            if not rfq_row or rfq_row["status"] == "converted":
+                return
 
-        candidates_dict: dict[UUID, dict[str, object]] = {}
-        workspace_product_ids: set[UUID] = set()
-
-        for row in rows:
-            rid = row["response_id"]
-            if rid not in candidates_dict:
-                candidates_dict[rid] = {
-                    "rfq_response_id": rid,
-                    "supplier_id": row["supplier_id"],
-                    "currency": None,
-                    "total_amount": Decimal("0"),
-                    "matched_workspace_product_ids_set": set(),
-                    "matched_lines": [],
-                }
-            if row["ql_id"] and row["matched_workspace_product_id"]:
-                if candidates_dict[rid]["currency"] is None:
-                    candidates_dict[rid]["currency"] = row["unit_price_currency"]
-                product_id = row["matched_workspace_product_id"]
-                base_quantity = (
-                    normalised_base_quantity(row["pack_count"], row["unit_size"])
-                    if row["pack_count"] is not None and row["unit_size"] is not None
-                    else base_quantity_by_product.get(product_id)
-                )
-                normalised_unit_price = (
-                    row["unit_price_amount"] / base_quantity
-                    if base_quantity
-                    else row["unit_price_amount"]
-                )
-                candidates_dict[rid]["matched_lines"].append(
-                    GuardrailCandidateLine(
-                        workspace_product_id=product_id,
-                        unit_price_amount=normalised_unit_price,
-                    )
-                )
-                candidates_dict[rid]["total_amount"] += row["quantity"] * row["unit_price_amount"]
-                candidates_dict[rid]["matched_workspace_product_ids_set"].add(product_id)
-                workspace_product_ids.add(product_id)
-
-        candidates = []
-        for c in candidates_dict.values():
-            all_lines_matched = (
-                rfq_line_count > 0
-                and len(c["matched_workspace_product_ids_set"]) == rfq_line_count
+            cur.execute(
+                "select id, tenant_id, enabled, min_response_count, max_order_value_amount, "
+                "max_order_value_currency, max_price_variance_pct, supplier_allowlist, "
+                "category_allowlist, default_branch_id, created_by_membership_id, created_at "
+                "from auto_preparation_guardrail where tenant_id = %s and enabled = true",
+                (tenant_id,),
             )
-            candidates.append(
-                GuardrailCandidate(
-                    rfq_response_id=c["rfq_response_id"],
-                    supplier_id=c["supplier_id"],
-                    # A response with no matched/priced lines has no real currency yet;
-                    # never guess one -- an unset currency correctly fails the guardrail's
-                    # currency-match check (FR-018) rather than silently assuming one.
-                    currency=c["currency"] or "",
-                    total_amount=c["total_amount"],
-                    all_lines_matched=all_lines_matched,
-                    matched_lines=c["matched_lines"],
-                )
-            )
+            guardrail_rows = cur.fetchall()
+            if not guardrail_rows:
+                return
+            guardrails = [AutoPreparationGuardrail(**r) for r in guardrail_rows]
 
-        baseline: dict[UUID, Decimal] = {}
-        if workspace_product_ids:
             cur.execute(
                 """
-                select md.matched_workspace_product_id,
-                       avg(lc.total_amount / lc.normalised_base_quantity) as avg_price
-                from landed_cost lc
-                join match_decision md on lc.match_decision_id = md.id
-                where lc.tenant_id = %s and lc.created_at >= now() - interval '90 days'
-                  and md.matched_workspace_product_id = any(%s)
-                group by md.matched_workspace_product_id
+                select count(distinct r.id) as cnt
+                from rfq_response r
+                join rfq_recipient rec on r.rfq_recipient_id = rec.id
+                where rec.rfq_id = %s and r.tenant_id = %s
                 """,
-                (tenant_id, list(workspace_product_ids)),
+                (rfq_id, tenant_id),
             )
-            for brow in cur.fetchall():
-                baseline[brow["matched_workspace_product_id"]] = brow["avg_price"]
+            total_responses = cur.fetchone()["cnt"]
 
-        fires = []
-        for g in guardrails:
-            decision = evaluate_guardrail(
-                GuardrailEvaluationInput(
-                    guardrail=g,
-                    rfq_status=rfq_row["status"],
-                    total_response_count=total_responses,
-                    candidates=candidates,
-                    recent_average_price_by_product=baseline,
-                )
+            cur.execute(
+                """
+                select
+                    r.id as response_id,
+                    r.created_at as captured_at,
+                    rec.supplier_id,
+                    q.status as quotation_status,
+                    q.deleted_at as quotation_deleted_at,
+                    ql.id as ql_id,
+                    ql.quantity,
+                    ql.pack_count,
+                    ql.unit_size,
+                    ql.unit_price_amount,
+                    ql.unit_price_currency,
+                    md.matched_workspace_product_id
+                from rfq_response r
+                join rfq_recipient rec on r.rfq_recipient_id = rec.id
+                join quotation q on q.id = r.quotation_id and q.tenant_id = r.tenant_id
+                left join quotation_line ql on r.quotation_id = ql.quotation_id
+                left join match_decision md on ql.id = md.quotation_line_id
+                where r.tenant_id = %s and rec.rfq_id = %s
+                """,
+                (tenant_id, rfq_id),
             )
-            if decision.fired:
-                fires.append((g, decision))
+            rows = cur.fetchall()
 
-        # More than one guardrail firing for the same response is ambiguous -- the same
-        # "don't guess when the outcome isn't singular" principle as a tie between responses.
-        if len(fires) != 1:
-            return
-
-        guardrail, decision = fires[0]
-        winning_response_id = decision.winning_response_id
-
-        cur.execute(
-            "select user_id, email from membership where id = %s and tenant_id = %s",
-            (guardrail.created_by_membership_id, tenant_id),
-        )
-        member_row = cur.fetchone()
-        if not member_row:
-            logger.error(
-                "Guardrail %s's creator membership no longer exists; skipping auto-preparation",
-                guardrail.id,
-            )
-            return
-
-        from procurepilot_api.deps import CurrentMember
-        from procurepilot_api.modules.rfq.service import RfqService
-
-        # Acting as the guardrail's own creator (an owner), not an anonymous system actor --
-        # but there is no real, signed user session to authenticate the PostgREST call
-        # RfqService.prepare_request() -> RequestsService.create_request() makes. Minting a
-        # synthetic per-user JWT was tried and doesn't work against this stack's JWKS (its
-        # HS256 key carries no `kid`, so PostgREST can't match a hand-signed token to it).
-        # The service-role key is this app's own existing credential for exactly this kind of
-        # system-initiated write -- it authenticates the PostgREST call itself (bypassing RLS,
-        # like `set local role service_role` does at the raw-SQL layer elsewhere in this file),
-        # while every actual field value (tenant_id, requested_by_membership_id, branch_id...)
-        # still comes from the `member`/`payload` this function constructs, not from the token.
-        token = settings.supabase_service_role_key.get_secret_value()
-
-        member = CurrentMember(
-            user_id=member_row["user_id"],
-            tenant_id=tenant_id,
-            membership_id=guardrail.created_by_membership_id,
-            email=member_row["email"],
-            role="owner",
-        )
-
-        # Deterministic per (tenant, rfq, guardrail): a retry over the same RFQ+guardrail
-        # combination must replay, not duplicate -- prepare_request()/create_request() already
-        # handle idempotent replay given a stable key, so derive one instead of a fresh uuid4().
-        idem_key = uuid5(
-            GUARDRAIL_PREPARE_NAMESPACE, f"{tenant_id}:{rfq_id}:{guardrail.id}"
-        )
-
-        rfq_service = RfqService(settings)
-        res = rfq_service.prepare_request(
-            bearer_token=token,
-            member=member,
-            rfq_id=rfq_id,
-            rfq_response_id=winning_response_id,
-            branch_id=guardrail.default_branch_id,
-            cost_centre_id=None,
-            required_by_date=rfq_row["needed_by_date"],
-            idempotency_key=idem_key,
-        )
-
-        cur.execute(
-            "insert into auto_preparation_event "
-            "(tenant_id, guardrail_id, rfq_response_id, purchase_request_id) "
-            "values (%s, %s, %s, %s)",
-            (tenant_id, guardrail.id, winning_response_id, res.purchase_request_id),
-        )
-
-        cur.execute(
-            "select record_audit_event(%s, 'success'::audit_outcome, "
-            "%s, null, %s, %s::jsonb, null)",
-            (
-                "rfq.auto_prepared",
-                tenant_id,
-                "ingestion-worker@procurepilot.local",
-                json.dumps(
+            # Pending responses block the whole RFQ indefinitely in v1.
+            response_state: dict[UUID, dict[str, object]] = {}
+            for row in rows:
+                state = response_state.setdefault(
+                    row["response_id"],
                     {
-                        "rfq_id": str(rfq_id),
-                        "guardrail_id": str(guardrail.id),
-                        "rfq_response_id": str(winning_response_id),
-                        "purchase_request_id": str(res.purchase_request_id),
+                        "status": row["quotation_status"],
+                        "deleted_at": row["quotation_deleted_at"],
+                        "line_count": 0,
+                        "decision_count": 0,
+                    },
+                )
+                if row["ql_id"]:
+                    state["line_count"] += 1
+                    if row["matched_workspace_product_id"]:
+                        state["decision_count"] += 1
+            if any(
+                state["status"] not in ("refused", "deleted")
+                and state["deleted_at"] is None
+                and not (
+                    state["status"] == "reviewed" and state["line_count"] == state["decision_count"]
+                )
+                for state in response_state.values()
+            ):
+                return
+
+            cur.execute("select count(*) as cnt from rfq_line where rfq_id = %s", (rfq_id,))
+            rfq_line_count = cur.fetchone()["cnt"]
+
+            # `baseline` below is priced per normalised base unit (total_amount / normalised_base_
+            # quantity, the same convention Smart Compare/Savings Ledger/Supplier IQ use everywhere
+            # else in this codebase) -- a candidate line's raw quotation_line.unit_price_amount is
+            # priced per quoted pack instead (e.g. per ream, not per sheet), so the two are only
+            # directly comparable when a product's pack normalises 1:1. Fetch each matched product's
+            # pack_definition.base_quantity up front as the fallback when the quoted line has no own
+            # pack details, so candidate line prices can be normalised onto the same per-base-unit
+            # scale before ever reaching evaluate_guardrail's variance check.
+            matched_product_ids = {
+                row["matched_workspace_product_id"]
+                for row in rows
+                if row["ql_id"] and row["matched_workspace_product_id"]
+            }
+            base_quantity_by_product: dict[UUID, Decimal] = {}
+            if matched_product_ids:
+                cur.execute(
+                    "select workspace_product_id, base_quantity from pack_definition "
+                    "where tenant_id = %s and workspace_product_id = any(%s)",
+                    (tenant_id, list(matched_product_ids)),
+                )
+                for prow in cur.fetchall():
+                    base_quantity_by_product[prow["workspace_product_id"]] = prow["base_quantity"]
+
+            candidates_dict: dict[UUID, dict[str, object]] = {}
+            workspace_product_ids: set[UUID] = set()
+
+            for row in rows:
+                rid = row["response_id"]
+                if rid not in candidates_dict:
+                    candidates_dict[rid] = {
+                        "rfq_response_id": rid,
+                        "supplier_id": row["supplier_id"],
+                        "currency": None,
+                        "total_amount": Decimal("0"),
+                        "matched_workspace_product_ids_set": set(),
+                        "matched_lines": [],
+                        "captured_at": row["captured_at"],
                     }
+                if row["ql_id"] and row["matched_workspace_product_id"]:
+                    if candidates_dict[rid]["currency"] is None:
+                        candidates_dict[rid]["currency"] = row["unit_price_currency"]
+                    product_id = row["matched_workspace_product_id"]
+                    base_quantity = (
+                        normalised_base_quantity(row["pack_count"], row["unit_size"])
+                        if row["pack_count"] is not None and row["unit_size"] is not None
+                        else base_quantity_by_product.get(product_id)
+                    )
+                    normalised_unit_price = (
+                        row["unit_price_amount"] / base_quantity
+                        if base_quantity
+                        else row["unit_price_amount"]
+                    )
+                    candidates_dict[rid]["matched_lines"].append(
+                        GuardrailCandidateLine(
+                            workspace_product_id=product_id,
+                            unit_price_amount=normalised_unit_price,
+                        )
+                    )
+                    candidates_dict[rid]["total_amount"] += (
+                        row["quantity"] * row["unit_price_amount"]
+                    )
+                    candidates_dict[rid]["matched_workspace_product_ids_set"].add(product_id)
+                    workspace_product_ids.add(product_id)
+
+            candidates = []
+            for c in candidates_dict.values():
+                all_lines_matched = (
+                    rfq_line_count > 0
+                    and len(c["matched_workspace_product_ids_set"]) == rfq_line_count
+                )
+                candidates.append(
+                    GuardrailCandidate(
+                        rfq_response_id=c["rfq_response_id"],
+                        supplier_id=c["supplier_id"],
+                        # A response with no matched/priced lines has no real currency yet;
+                        # never guess one -- an unset currency correctly fails the guardrail's
+                        # currency-match check (FR-018) rather than silently assuming one.
+                        currency=c["currency"] or "",
+                        total_amount=c["total_amount"],
+                        all_lines_matched=all_lines_matched,
+                        matched_lines=c["matched_lines"],
+                        captured_at=c["captured_at"],
+                    )
+                )
+
+            baseline: dict[UUID, Decimal] = {}
+            if workspace_product_ids:
+                cur.execute(
+                    """
+                    select md.matched_workspace_product_id,
+                           avg(lc.total_amount / lc.normalised_base_quantity) as avg_price
+                    from landed_cost lc
+                    join match_decision md on lc.match_decision_id = md.id
+                    where lc.tenant_id = %s and lc.created_at >= now() - interval '90 days'
+                      and md.matched_workspace_product_id = any(%s)
+                      and not exists (
+                        select 1
+                        from quotation_line candidate_ql
+                        join rfq_response candidate_response
+                          on candidate_response.quotation_id = candidate_ql.quotation_id
+                         and candidate_response.tenant_id = candidate_ql.tenant_id
+                        join rfq_recipient candidate_recipient
+                          on candidate_recipient.id = candidate_response.rfq_recipient_id
+                         and candidate_recipient.tenant_id = candidate_response.tenant_id
+                        where candidate_ql.id = lc.quotation_line_id
+                          and candidate_recipient.rfq_id = %s
+                          and candidate_response.tenant_id = %s
+                      )
+                    group by md.matched_workspace_product_id
+                    """,
+                    (tenant_id, list(workspace_product_ids), rfq_id, tenant_id),
+                )
+                for brow in cur.fetchall():
+                    baseline[brow["matched_workspace_product_id"]] = brow["avg_price"]
+
+            fires = []
+            for g in guardrails:
+                decision = evaluate_guardrail(
+                    GuardrailEvaluationInput(
+                        guardrail=g,
+                        rfq_status=rfq_row["status"],
+                        total_response_count=total_responses,
+                        candidates=candidates,
+                        recent_average_price_by_product=baseline,
+                    )
+                )
+                if decision.fired:
+                    fires.append((g, decision))
+
+            # More than one guardrail firing for the same response is ambiguous -- the same
+            # "don't guess when the outcome isn't singular" principle as a tie between responses.
+            if len(fires) != 1:
+                return
+
+            guardrail, decision = fires[0]
+            winning_response_id = decision.winning_response_id
+
+            # The session-level advisory lock acquired before any reads serializes evaluators for
+            # this tenant/RFQ while prepare_request() uses its own connection to update the RFQ.
+            # Keep it until the event and audit rows are committed, so a waiting evaluator cannot
+            # observe an incomplete firing. The outer finally always releases it, including returns.
+            cur.execute(
+                "select 1 from auto_preparation_event "
+                "where tenant_id = %s and guardrail_id = %s and rfq_response_id = %s",
+                (tenant_id, guardrail.id, winning_response_id),
+            )
+            if cur.fetchone():
+                return
+
+            cur.execute(
+                "select user_id, email from membership where id = %s and tenant_id = %s",
+                (guardrail.created_by_membership_id, tenant_id),
+            )
+            member_row = cur.fetchone()
+            if not member_row:
+                logger.error(
+                    "Guardrail %s's creator membership no longer exists; skipping auto-preparation",
+                    guardrail.id,
+                )
+                return
+
+            from procurepilot_api.deps import CurrentMember
+            from procurepilot_api.modules.rfq.service import RfqService
+
+            # Acting as the guardrail's own creator (an owner), not an anonymous system actor --
+            # but there is no real, signed user session to authenticate the PostgREST call
+            # RfqService.prepare_request() -> RequestsService.create_request() makes. Minting a
+            # synthetic per-user JWT was tried and doesn't work against this stack's JWKS (its
+            # HS256 key carries no `kid`, so PostgREST can't match a hand-signed token to it).
+            # The service-role key is this app's own existing credential for exactly this kind of
+            # system-initiated write -- it authenticates the PostgREST call itself (bypassing RLS,
+            # like `set local role service_role` does at the raw-SQL layer elsewhere in this file),
+            # while every actual field value (tenant_id, requested_by_membership_id, branch_id...)
+            # still comes from the `member`/`payload` this function constructs, not from the token.
+            token = settings.supabase_service_role_key.get_secret_value()
+
+            member = CurrentMember(
+                user_id=member_row["user_id"],
+                tenant_id=tenant_id,
+                membership_id=guardrail.created_by_membership_id,
+                email=member_row["email"],
+                role="owner",
+            )
+
+            # Deterministic per (tenant, rfq, guardrail): a retry over the same RFQ+guardrail
+            # combination must replay, not duplicate -- prepare_request()/create_request() already
+            # handle idempotent replay given a stable key, so derive one instead of a fresh uuid4().
+            idem_key = uuid5(GUARDRAIL_PREPARE_NAMESPACE, f"{tenant_id}:{rfq_id}:{guardrail.id}")
+
+            rfq_service = RfqService(settings)
+            res = rfq_service.prepare_request(
+                bearer_token=token,
+                member=member,
+                rfq_id=rfq_id,
+                rfq_response_id=winning_response_id,
+                branch_id=guardrail.default_branch_id,
+                cost_centre_id=None,
+                required_by_date=rfq_row["needed_by_date"],
+                idempotency_key=idem_key,
+            )
+
+            cur.execute(
+                "insert into auto_preparation_event "
+                "(tenant_id, guardrail_id, rfq_response_id, purchase_request_id) "
+                "values (%s, %s, %s, %s)",
+                (tenant_id, guardrail.id, winning_response_id, res.purchase_request_id),
+            )
+
+            cur.execute(
+                "select record_audit_event(%s, 'success'::audit_outcome, "
+                "%s, null, %s, %s::jsonb, null)",
+                (
+                    "rfq.auto_prepared",
+                    tenant_id,
+                    "ingestion-worker@procurepilot.local",
+                    json.dumps(
+                        {
+                            "rfq_id": str(rfq_id),
+                            "guardrail_id": str(guardrail.id),
+                            "rfq_response_id": str(winning_response_id),
+                            "purchase_request_id": str(res.purchase_request_id),
+                        }
+                    ),
                 ),
-            ),
-        )
+            )
+            # Commit the event and audit before releasing the session-level lock. A concurrent
+            # evaluator must either see the replay marker or wait for this transaction to finish.
+            conn.commit()
+    finally:
+        # A failed SQL statement leaves the transaction unusable, so rollback first. This does
+        # not release a session-level advisory lock; the explicit unlock below is still needed.
+        conn.rollback()
+        with conn.cursor() as cur:
+            cur.execute(
+                "select pg_advisory_unlock(hashtextextended(%s, 0))",
+                (advisory_key,),
+            )
 
 
 def _validate_content(settings: Settings, email_data: InboundEmail) -> str | None:
