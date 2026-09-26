@@ -278,6 +278,11 @@ class QuotationService:
             action="quotation.archived",
             target={"quotation_id": str(quotation_id)},
         )
+        from procurepilot_api.modules.ingestion.guardrail_jobs import enqueue_guardrail_evaluation
+
+        enqueue_guardrail_evaluation(
+            self._settings, tenant_id=member.tenant_id, quotation_id=quotation_id
+        )
         return _quotation(row)
 
     def restore_quotation(
@@ -305,6 +310,11 @@ class QuotationService:
             member=member,
             action="quotation.restored",
             target={"quotation_id": str(quotation_id)},
+        )
+        from procurepilot_api.modules.ingestion.guardrail_jobs import enqueue_guardrail_evaluation
+
+        enqueue_guardrail_evaluation(
+            self._settings, tenant_id=member.tenant_id, quotation_id=quotation_id
         )
         return _quotation(row)
 

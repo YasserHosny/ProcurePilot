@@ -227,6 +227,11 @@ class QuotationReviewService:
             ),
             bearer_token=bearer_token,
         )
+        from procurepilot_api.modules.ingestion.guardrail_jobs import enqueue_guardrail_evaluation
+
+        enqueue_guardrail_evaluation(
+            self._settings, tenant_id=member.tenant_id, quotation_id=quotation_id
+        )
         return row
 
     def _record(

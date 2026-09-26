@@ -309,7 +309,10 @@ def _evaluate_guardrails_for_rfq(
                 select count(distinct r.id) as cnt
                 from rfq_response r
                 join rfq_recipient rec on r.rfq_recipient_id = rec.id
+                join quotation q on q.id = r.quotation_id and q.tenant_id = r.tenant_id
                 where rec.rfq_id = %s and r.tenant_id = %s
+                  and q.deleted_at is null
+                  and q.status <> 'refused'
                 """,
                 (rfq_id, tenant_id),
             )
@@ -397,6 +400,8 @@ def _evaluate_guardrails_for_rfq(
             workspace_product_ids: set[UUID] = set()
 
             for row in rows:
+                if row["quotation_deleted_at"] is not None or row["quotation_status"] == "refused":
+                    continue
                 rid = row["response_id"]
                 if rid not in candidates_dict:
                     candidates_dict[rid] = {
