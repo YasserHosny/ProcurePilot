@@ -3538,6 +3538,7 @@
         "not_lowest_price": "This is not the lowest eligible response.",
         "no_eligible_response": "No eligible response was found.",
         "would_fire": "This response would fire the guardrail.",
+        "ambiguous_guardrails": "Would fire, but another guardrail also matches — ambiguous, so neither fires",
         "fired": "Guardrail fired and prepared a draft request."
       }
     }

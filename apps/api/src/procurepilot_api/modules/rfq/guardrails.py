@@ -165,6 +165,39 @@ def explain_guardrail_evaluations(
     candidate = next((item for item in candidates if item.rfq_response_id == response_id), None)
     explanations: list[GuardrailExplanation] = []
 
+    def eligible_for_guardrail(guardrail: AutoPreparationGuardrail) -> list[GuardrailCandidate]:
+        return [
+            item
+            for item in candidates
+            if item.response_state == "active"
+            and not (
+                item.captured_at is not None
+                and guardrail.created_at is not None
+                and item.captured_at < guardrail.created_at
+            )
+        ]
+
+    independent_decisions = {
+        guardrail.id: evaluate_guardrail(
+            GuardrailEvaluationInput(
+                guardrail=guardrail,
+                rfq_status=rfq_status,
+                total_response_count=total_response_count,
+                candidates=eligible_for_guardrail(guardrail),
+                recent_average_price_by_product=recent_average_price_by_product,
+            )
+        )
+        for guardrail in guardrails
+        if guardrail.enabled
+    }
+    ambiguous_guardrail_ids = {
+        guardrail_id
+        for guardrail_id, decision in independent_decisions.items()
+        if decision.fired
+    }
+    if len(ambiguous_guardrail_ids) <= 1:
+        ambiguous_guardrail_ids = set()
+
     for guardrail in guardrails:
         if guardrail.id in fired_ids:
             explanations.append(GuardrailExplanation(guardrail.id, True, "fired"))
@@ -196,14 +229,8 @@ def explain_guardrail_evaluations(
             else:
                 eligible = [
                     item
-                    for item in candidates
-                    if item.response_state == "active"
-                    and not (
-                        item.captured_at is not None
-                        and guardrail.created_at is not None
-                        and item.captured_at < guardrail.created_at
-                    )
-                    and _evaluate_candidate(item, guardrail, recent_average_price_by_product)
+                    for item in eligible_for_guardrail(guardrail)
+                    if _evaluate_candidate(item, guardrail, recent_average_price_by_product)
                     is None
                 ]
                 lowest = min((item.total_amount for item in eligible), default=None)
@@ -216,6 +243,8 @@ def explain_guardrail_evaluations(
                     reason = "not_lowest_price"
                 else:
                     reason = "would_fire"
+                    if guardrail.id in ambiguous_guardrail_ids:
+                        reason = "ambiguous_guardrails"
         explanations.append(GuardrailExplanation(guardrail.id, False, reason))
 
     return explanations

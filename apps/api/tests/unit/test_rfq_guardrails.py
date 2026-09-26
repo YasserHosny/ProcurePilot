@@ -1,9 +1,14 @@
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from uuid import UUID, uuid4
 
 import pytest
+from fastapi.testclient import TestClient
 
+from procurepilot_api.deps import CurrentMember, current_member
+from procurepilot_api.main import create_app
+from procurepilot_api.modules.auth.jwt import MemberRole
 from procurepilot_api.modules.rfq.guardrails import (
     AutoPreparationGuardrail,
     GuardrailCandidate,
@@ -12,6 +17,7 @@ from procurepilot_api.modules.rfq.guardrails import (
     evaluate_guardrail,
     explain_guardrail_evaluations,
 )
+from procurepilot_api.modules.rfq.service import get_rfq_service
 
 
 @pytest.fixture
@@ -542,3 +548,90 @@ def test_explain_guardrail_evaluations_event_takes_precedence(
     )
     assert result[0].fired is True
     assert result[0].reason == "fired"
+
+
+def test_explain_guardrail_evaluations_marks_independent_winners_ambiguous(
+    base_guardrail: AutoPreparationGuardrail,
+    base_candidate: GuardrailCandidate,
+    product_id: UUID,
+) -> None:
+    second_guardrail = replace(base_guardrail, id=uuid4())
+
+    result = explain_guardrail_evaluations(
+        guardrails=[base_guardrail, second_guardrail],
+        rfq_status="responded",
+        total_response_count=1,
+        candidates=[base_candidate],
+        recent_average_price_by_product={product_id: Decimal("100.00")},
+        response_id=base_candidate.rfq_response_id,
+    )
+
+    assert [item.reason for item in result] == [
+        "ambiguous_guardrails",
+        "ambiguous_guardrails",
+    ]
+
+
+def test_explain_guardrail_evaluations_ignores_archived_candidate_for_ambiguity(
+    base_guardrail: AutoPreparationGuardrail,
+    base_candidate: GuardrailCandidate,
+    product_id: UUID,
+) -> None:
+    archived_supplier_id = uuid4()
+    archived = replace(
+        base_candidate,
+        rfq_response_id=uuid4(),
+        supplier_id=archived_supplier_id,
+        total_amount=Decimal("10.00"),
+        response_state="archived",
+    )
+    guardrail_for_archived = replace(
+        base_guardrail,
+        id=uuid4(),
+        supplier_allowlist=[archived_supplier_id],
+    )
+    guardrail_for_active = replace(
+        base_guardrail,
+        id=uuid4(),
+        supplier_allowlist=[base_candidate.supplier_id],
+    )
+
+    result = explain_guardrail_evaluations(
+        guardrails=[guardrail_for_archived, guardrail_for_active],
+        rfq_status="responded",
+        total_response_count=2,
+        candidates=[base_candidate, archived],
+        recent_average_price_by_product={product_id: Decimal("100.00")},
+        response_id=base_candidate.rfq_response_id,
+    )
+
+    assert [item.reason for item in result] == [
+        "supplier_not_allowed",
+        "would_fire",
+    ]
+
+
+@pytest.mark.parametrize("currency", ["usd", "US", "USDE", "ÄBC"])
+def test_guardrail_currency_validation_returns_422(currency: str) -> None:
+    app = create_app()
+    app.dependency_overrides[current_member] = lambda: CurrentMember(
+        membership_id=uuid4(),
+        tenant_id=uuid4(),
+        user_id=uuid4(),
+        email="owner@example.test",
+        role=MemberRole.owner,
+    )
+    app.dependency_overrides[get_rfq_service] = lambda: object()
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/v1/rfq/guardrails",
+            json={
+                "max_order_value_amount": "100",
+                "max_order_value_currency": currency,
+                "max_price_variance_pct": "0.1",
+                "default_branch_id": str(uuid4()),
+            },
+        )
+
+    assert response.status_code == 422

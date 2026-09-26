@@ -214,7 +214,7 @@ def test_pending_response_explanation_is_owner_only_and_cross_tenant_guardrails_
     assert len(owner_reasons) == 2
 
 
-def test_buyer_never_receives_guardrail_explanations() -> None:
+def test_buyer_receives_the_same_guardrail_explanations_as_owner() -> None:
     tenant_id, owner_user_id, owner_membership, rfq_id, _a, _b, _g, _ = _seed_explanation_fixture()
     buyer_user_id, buyer_membership = uuid4(), uuid4()
     email = f"buyer-{uuid4().hex}@example.test"
@@ -228,9 +228,16 @@ def test_buyer_never_receives_guardrail_explanations() -> None:
             )
         conn.commit()
 
-    buyer_results = RfqService(get_settings()).list_responses(
+    service = RfqService(get_settings())
+    owner_results = service.list_responses(
+        member=_member(tenant_id, owner_user_id, owner_membership, MemberRole.owner),
+        rfq_id=rfq_id,
+    )
+    buyer_results = service.list_responses(
         member=_member(tenant_id, buyer_user_id, buyer_membership, MemberRole.buyer),
         rfq_id=rfq_id,
     )
-    assert buyer_results.items
-    assert all(item.guardrail_evaluations == [] for item in buyer_results.items)
+    owner_evaluations = {item.id: item.guardrail_evaluations for item in owner_results.items}
+    buyer_evaluations = {item.id: item.guardrail_evaluations for item in buyer_results.items}
+    assert buyer_evaluations == owner_evaluations
+    assert all(item.guardrail_evaluations for item in buyer_results.items)

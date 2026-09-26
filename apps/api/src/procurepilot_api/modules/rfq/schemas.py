@@ -1,9 +1,10 @@
+import re
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 RfqStatus = Literal["draft", "sent", "responded", "expired", "converted"]
 RfqRecipientStatus = Literal["draft", "sent", "failed"]
@@ -135,6 +136,13 @@ class GuardrailCreateInput(BaseModel):
     default_branch_id: UUID
     enabled: bool = True
 
+    @field_validator("max_order_value_currency")
+    @classmethod
+    def validate_currency(cls, value: str) -> str:
+        if re.fullmatch(r"[A-Z]{3}", value) is None:
+            raise ValueError("Currency must be exactly three uppercase letters")
+        return value
+
 
 class GuardrailUpdateInput(BaseModel):
     max_order_value_amount: Decimal | None = None
@@ -145,6 +153,13 @@ class GuardrailUpdateInput(BaseModel):
     max_price_variance_pct: Decimal | None = None
     default_branch_id: UUID | None = None
     enabled: bool | None = None
+
+    @field_validator("max_order_value_currency")
+    @classmethod
+    def validate_currency(cls, value: str | None) -> str | None:
+        if value is not None and re.fullmatch(r"[A-Z]{3}", value) is None:
+            raise ValueError("Currency must be exactly three uppercase letters")
+        return value
 
 
 class RfqSummary(BaseModel):

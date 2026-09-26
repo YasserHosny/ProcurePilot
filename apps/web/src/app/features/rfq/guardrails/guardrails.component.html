@@ -13,7 +13,7 @@
     <h2>{{ (editingId() ? 'rfq.guardrails.editTitle' : 'rfq.guardrails.createTitle') | translate }}</h2>
     <div class="form-grid">
       <mat-form-field appearance="outline"><mat-label>{{ 'rfq.guardrails.maxOrderValue' | translate }}</mat-label><input matInput type="number" min="0.01" [(ngModel)]="maxOrderValue"></mat-form-field>
-      <mat-form-field appearance="outline"><mat-label>{{ 'rfq.guardrails.currency' | translate }}</mat-label><input matInput maxlength="3" [(ngModel)]="currency"></mat-form-field>
+      <mat-form-field appearance="outline"><mat-label>{{ 'rfq.guardrails.currency' | translate }}</mat-label><mat-select [(ngModel)]="currency"><mat-option *ngFor="let option of currencies()" [value]="option.code">{{ currencyLabel(option) }}</mat-option></mat-select></mat-form-field>
       <mat-form-field appearance="outline"><mat-label>{{ 'rfq.guardrails.minResponses' | translate }}</mat-label><input matInput type="number" min="1" step="1" [(ngModel)]="minResponseCount"></mat-form-field>
       <mat-form-field appearance="outline"><mat-label>{{ 'rfq.guardrails.priceVariance' | translate }}</mat-label><input matInput type="number" min="0" max="100" [(ngModel)]="maxPriceVariancePercent"><span matTextSuffix>%</span></mat-form-field>
       <mat-form-field appearance="outline"><mat-label>{{ 'rfq.guardrails.suppliers' | translate }}</mat-label><mat-select multiple [(ngModel)]="supplierAllowlist"><mat-option *ngFor="let supplier of suppliers()" [value]="supplier.id">{{ supplier.name }}</mat-option></mat-select></mat-form-field>

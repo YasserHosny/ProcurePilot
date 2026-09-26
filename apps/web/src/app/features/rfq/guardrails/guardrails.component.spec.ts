@@ -26,11 +26,19 @@ describe('GuardrailsComponent', () => {
     rfqApi.listGuardrails.and.returnValue(of([guardrail]));
     rfqApi.createGuardrail.and.returnValue(of(guardrail));
     rfqApi.updateGuardrail.and.returnValue(of({ ...guardrail, enabled: false }));
-    api = jasmine.createSpyObj('ApiService', ['suppliers', 'listBranches']);
+    api = jasmine.createSpyObj('ApiService', ['suppliers', 'listBranches', 'configOptions']);
     api.suppliers.and.returnValue(of({ items: [], next_cursor: null }));
     api.listBranches.and.returnValue(of({
       items: [{ id: 'b-1', name: 'Main', is_active: true, created_at: '2026-09-25T10:00:00Z' }],
       next_cursor: null,
+    }));
+    api.configOptions.and.returnValue(of({
+      regions: [],
+      currencies: [
+        { code: 'USD', label_en: 'US Dollar', label_ar: 'دولار أمريكي' },
+        { code: 'GBP', label_en: 'Pound Sterling', label_ar: 'جنيه إسترليني' },
+      ],
+      tax_models: [],
     }));
 
     await TestBed.configureTestingModule({

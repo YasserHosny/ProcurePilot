@@ -11,9 +11,12 @@ import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatIconModule } from '@angular/material/icon';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
+import { of } from 'rxjs';
+import { catchError } from 'rxjs/operators';
 
 import { ApiService } from '../../../core/api/api.service';
-import type { Branch, Supplier } from '../../../core/api/models';
+import type { Branch, ConfigOptions, ReferenceOption, Supplier } from '../../../core/api/models';
+import { I18nService } from '../../../core/i18n/i18n.service';
 import {
   RfqApi,
   RfqGuardrail,
@@ -43,10 +46,12 @@ export class GuardrailsComponent implements OnInit {
   private readonly rfqApi = inject(RfqApi);
   private readonly api = inject(ApiService);
   private readonly translate = inject(TranslateService);
+  private readonly i18n = inject(I18nService);
 
   readonly guardrails = signal<RfqGuardrail[]>([]);
   readonly suppliers = signal<readonly Supplier[]>([]);
   readonly branches = signal<readonly Branch[]>([]);
+  readonly currencies = signal<readonly ReferenceOption[]>([]);
   readonly loading = signal(true);
   readonly saving = signal(false);
   readonly errorMessage = signal<string | null>(null);
@@ -64,6 +69,14 @@ export class GuardrailsComponent implements OnInit {
     this.loadGuardrails();
     this.api.suppliers({ limit: 100 }).subscribe({ next: (response) => this.suppliers.set(response.items) });
     this.api.listBranches({ is_active: true, limit: 100 }).subscribe({ next: (response) => this.branches.set(response.items) });
+    this.api.configOptions()
+      .pipe(catchError(() => of<ConfigOptions>({ regions: [], currencies: [], tax_models: [] })))
+      .subscribe((response) => this.currencies.set(response.currencies));
+  }
+
+  currencyLabel(option: ReferenceOption): string {
+    const label = this.i18n.currentLocale() === 'ar' ? option.label_ar : option.label_en;
+    return `${label || option.code} (${option.code})`;
   }
 
   loadGuardrails(): void {

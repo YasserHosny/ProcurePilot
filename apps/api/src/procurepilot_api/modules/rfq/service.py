@@ -417,47 +417,43 @@ class RfqService:
                 rows = cur.fetchall()
 
                 evaluation_by_response: dict[uuid.UUID, list[RfqGuardrailEvaluation]] = {}
-                # Owner-only (FR-013 settings are owner-managed). Read on the owner's own
-                # RLS-enforced connection -- every table this touches is owner-readable, so no
-                # service-role bypass is needed on a user request path.
-                if member.role.value == "owner":
-                    response_ids = list({row["response_id"] for row in rows})
-                    snapshot = compute_guardrail_evaluation(
-                        cur, tenant_id=member.tenant_id, rfq_id=rfq_id
+                response_ids = list({row["response_id"] for row in rows})
+                snapshot = compute_guardrail_evaluation(
+                    cur, tenant_id=member.tenant_id, rfq_id=rfq_id
+                )
+                if snapshot is not None and snapshot.guardrails:
+                    cur.execute(
+                        "select guardrail_id, rfq_response_id "
+                        "from auto_preparation_event "
+                        "where tenant_id = %s and rfq_response_id = any(%s)",
+                        (member.tenant_id, response_ids),
                     )
-                    if snapshot is not None and snapshot.guardrails:
-                        cur.execute(
-                            "select guardrail_id, rfq_response_id "
-                            "from auto_preparation_event "
-                            "where tenant_id = %s and rfq_response_id = any(%s)",
-                            (member.tenant_id, response_ids),
+                    fired_by_response: dict[uuid.UUID, set[uuid.UUID]] = {}
+                    for event in cur.fetchall():
+                        fired_by_response.setdefault(
+                            event["rfq_response_id"], set()
+                        ).add(event["guardrail_id"])
+                    for response_id in response_ids:
+                        explanations = explain_guardrail_evaluations(
+                            guardrails=snapshot.guardrails,
+                            rfq_status=snapshot.rfq_status,
+                            total_response_count=snapshot.total_response_count,
+                            candidates=snapshot.candidates,
+                            recent_average_price_by_product=snapshot.recent_average_price_by_product,
+                            response_id=response_id,
+                            responses_pending=snapshot.responses_pending,
+                            fired_guardrail_ids=fired_by_response.get(
+                                response_id, set()
+                            ),
                         )
-                        fired_by_response: dict[uuid.UUID, set[uuid.UUID]] = {}
-                        for event in cur.fetchall():
-                            fired_by_response.setdefault(
-                                event["rfq_response_id"], set()
-                            ).add(event["guardrail_id"])
-                        for response_id in response_ids:
-                            explanations = explain_guardrail_evaluations(
-                                guardrails=snapshot.guardrails,
-                                rfq_status=snapshot.rfq_status,
-                                total_response_count=snapshot.total_response_count,
-                                candidates=snapshot.candidates,
-                                recent_average_price_by_product=snapshot.recent_average_price_by_product,
-                                response_id=response_id,
-                                responses_pending=snapshot.responses_pending,
-                                fired_guardrail_ids=fired_by_response.get(
-                                    response_id, set()
-                                ),
+                        evaluation_by_response[response_id] = [
+                            RfqGuardrailEvaluation(
+                                guardrail_id=item.guardrail_id,
+                                fired=item.fired,
+                                reason=item.reason,
                             )
-                            evaluation_by_response[response_id] = [
-                                RfqGuardrailEvaluation(
-                                    guardrail_id=item.guardrail_id,
-                                    fired=item.fired,
-                                    reason=item.reason,
-                                )
-                                for item in explanations
-                            ]
+                            for item in explanations
+                        ]
 
                 responses_by_id = {}
                 for row in rows:
