@@ -330,6 +330,15 @@ def _review_reason(
     threshold: float,
     supplier_match: SupplierMatch,
 ) -> str | None:
+    # A provider can report a clean "succeeded" job while genuinely extracting nothing -- e.g.
+    # Azure DI's prebuilt-invoice model not recognising the document as an invoice and its
+    # table-extraction fallback finding no table structure either. With zero lines and zero
+    # header fields, low_confidence_fields() has nothing to flag (there's nothing to be
+    # low-confidence ABOUT), so without this check the quotation silently reaches "extracted"
+    # indistinguishable from a genuine, fully-parsed success. Found via T047's live walkthrough:
+    # a real PDF quote extracted to zero lines/currency/total with no review task raised.
+    if not result.lines and not result.header:
+        return "read_failure"
     if arithmetic_status == "mismatch":
         return "arithmetic_mismatch"
     if low_confidence_fields(result, threshold):
