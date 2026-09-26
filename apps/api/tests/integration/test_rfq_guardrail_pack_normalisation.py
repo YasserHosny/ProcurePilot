@@ -9,10 +9,8 @@ test_rfq_guardrails_e2e.py never caught this because its seeded product has no p
 row at all (an implicit 1:1 case).
 
 This test seeds a product with a real pack_definition (1 pack = 25 base units) and a price
-history baseline consistent with that packing, then a new reply priced consistently with that
-same packing (well within variance once normalised) -- and asserts the guardrail fires. Without
-the orchestrator.py fix, the raw per-pack price compared against the per-base-unit baseline would
-show a >2000% variance and the guardrail would never fire.
+history baseline consistent with that packing, then completes extraction and matching after
+capture before running the guardrail worker.
 """
 
 import os
@@ -34,6 +32,9 @@ from test_rfq_response_capture import (  # noqa: E402, F401
     mock_supabase_client,
 )
 from test_rfq_service_e2e import _patch_requests_service_for_test  # noqa: E402
+
+from procurepilot_api.modules.ingestion.guardrail_jobs import enqueue_guardrail_evaluation
+from procurepilot_api.workers.email_ingestion_worker import _process_job
 
 
 async def _run_guardrail_pack_normalisation_test(
@@ -161,59 +162,73 @@ async def _run_guardrail_pack_normalisation_test(
             )
         conn.commit()
 
-    import procurepilot_api.modules.ingestion.orchestrator as orch
-
-    orig_insert_quotation = orch._insert_quotation
-
-    def fake_insert_quotation(
-        conn2: psycopg.Connection,
-        *,
-        tenant_id: uuid.UUID,
-        document_id: uuid.UUID,
-        supplier_id: uuid.UUID,
-        ingestion_email_id: uuid.UUID,
-    ) -> uuid.UUID:
-        """Insert the new reply line with the pack details for this scenario."""
-        qid = orig_insert_quotation(
-            conn2,
-            tenant_id=tenant_id,
-            document_id=document_id,
-            supplier_id=supplier_id,
-            ingestion_email_id=ingestion_email_id,
-        )
-        ql_id = uuid.uuid4()
-        with conn2.cursor() as cur2:
-            cur2.execute(
-                "insert into quotation_line "
-                "(id, tenant_id, quotation_id, line_number, original_text, quantity, "
-                "pack_count, unit_size, unit_price_amount, unit_price_currency) "
-                "values (%s, %s, %s, 1, 'text', 1, %s, %s, %s, 'USD')",
-                (ql_id, tenant_id, qid, line_pack_count, line_unit_size, line_price),
-            )
-            cur2.execute(
-                "insert into match_decision "
-                "(id, tenant_id, quotation_line_id, matched_workspace_product_id, outcome, "
-                "is_automatic, confidence) "
-                "values (%s, %s, %s, %s, 'no_match_new_product', true, 1.0)",
-                (uuid.uuid4(), tenant_id, ql_id, wp_id),
-            )
-        return qid
-
-    orch._insert_quotation = fake_insert_quotation
-
     _patch_requests_service_for_test(
         monkeypatch, tenant_id=tenant_id, user_id=user_id, membership_id=membership_id
     )
 
     email_bytes = _create_email_bytes(f"<{uuid.uuid4()}@mail.com>", in_reply_to=msg_id)
-    try:
-        result = process_inbound_email(
-            settings, tenant_id=tenant_id, raw_email_bytes=email_bytes, raw_email_ref="s3://path"
-        )
-    finally:
-        orch._insert_quotation = orig_insert_quotation
+    result = process_inbound_email(
+        settings, tenant_id=tenant_id, raw_email_bytes=email_bytes, raw_email_ref="s3://path"
+    )
 
     assert result["status"] == "completed"
+    quotation_id = uuid.UUID(str(result["quotation_id"]))
+
+    with psycopg.connect(test_db) as conn:
+        with conn.cursor() as cur:
+            cur.execute("set local role service_role")
+            cur.execute("select status from rfq where id = %s", (rfq_id,))
+            assert cur.fetchone()[0] == "responded"
+            cur.execute(
+                "insert into quotation_line "
+                "(id, tenant_id, quotation_id, line_number, original_text, quantity, "
+                "pack_count, unit_size, unit_price_amount, unit_price_currency) "
+                "values (%s, %s, %s, 1, 'text', 1, %s, %s, %s, 'USD') returning id",
+                (
+                    uuid.uuid4(),
+                    tenant_id,
+                    quotation_id,
+                    line_pack_count,
+                    line_unit_size,
+                    line_price,
+                ),
+            )
+            ql_id = cur.fetchone()[0]
+            cur.execute("update quotation set status = 'reviewed' where id = %s", (quotation_id,))
+            cur.execute(
+                "insert into match_decision "
+                "(id, tenant_id, quotation_line_id, matched_workspace_product_id, outcome, "
+                "is_automatic, confidence) values "
+                "(%s, %s, %s, %s, 'no_match_new_product', true, 1.0)",
+                (uuid.uuid4(), tenant_id, ql_id, wp_id),
+            )
+            conn.commit()
+
+    enqueue_guardrail_evaluation(settings, tenant_id=tenant_id, quotation_id=quotation_id)
+    with psycopg.connect(test_db) as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "select id, tenant_id, job_type, status, payload, attempts, max_attempts "
+                "from ingestion_jobs where tenant_id = %s and job_type = 'guardrail_eval' "
+                "order by created_at desc limit 1",
+                (tenant_id,),
+            )
+            job = dict(
+                zip(
+                    (
+                        "id",
+                        "tenant_id",
+                        "job_type",
+                        "status",
+                        "payload",
+                        "attempts",
+                        "max_attempts",
+                    ),
+                    cur.fetchone(),
+                    strict=True,
+                )
+            )
+    assert _process_job(settings, job) == "completed"
 
     with psycopg.connect(test_db) as conn:
         with conn.cursor() as cur:

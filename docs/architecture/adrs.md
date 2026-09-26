@@ -248,3 +248,43 @@
   - One email vendor for both inbound and outbound routing.
   - Reduced DNS and credentials management overhead.
   - Mailgun send failures must leave the RFQ recipient in a `draft` status, never silently marking it as `sent`.
+
+## ADR-019 — Evaluate RFQ Auto-Preparation Guardrails at Match-Decision Time
+
+- **Status:** Accepted
+- **Context:** R4.3 evaluated auto-preparation guardrails inline in `process_inbound_email()`,
+  immediately after a supplier's reply was captured. At that point the reply has no extracted
+  lines and no product matches: extraction is asynchronous (the extraction worker), and matching
+  only runs once a human has confirmed the quotation in Quotation Review (`status='reviewed'`).
+  Every candidate therefore failed `all_lines_matched`, and guardrail-triggered auto-preparation
+  could never fire on a real captured response. The R4.3 end-to-end test hid this by
+  monkeypatching a pre-matched line into the capture call. Found during the T047 live hosted
+  walkthrough.
+- **Decision:**
+  - Guardrails are evaluated when a `match_decision` is created — the only point at which a
+    response's eligibility can actually change. Both decision paths (automatic acceptance and
+    human resolution in Match Resolution) enqueue a `guardrail_eval` job on `ingestion_jobs` for
+    quotations linked to an RFQ response; the standing email-ingestion worker evaluates it. The
+    capture-time evaluation is removed.
+  - Evaluation runs through the queue, not inline in the match-resolution request: the
+    auto-preparation keeps acting as the guardrail's creator rather than the person resolving the
+    match, a guardrail failure cannot break or slow match resolution, and failed evaluations retry.
+  - **Settled response set:** a guardrail only fires once every captured response for the RFQ is
+    settled — either terminal (refused/deleted) or reviewed with every line matched. Otherwise the
+    first response a human happened to review could auto-prepare ahead of a cheaper response still
+    in review, breaking FR-012's "single lowest-priced qualifying response".
+  - **FR-014, conservative reading:** a guardrail only applies to responses captured after the
+    guardrail was created.
+  - **Human data review stays in the loop:** auto-preparation still requires a human-confirmed
+    quotation. The guardrail saves the buyer the compare-and-prepare step, not the review step.
+  - Pending responses block firing indefinitely in v1 (no response-window cutoff).
+  - The RFQ row is locked for the duration of an evaluation, the prepare-request idempotency key
+    stays deterministic per (tenant, RFQ, guardrail), and the price-history baseline excludes the
+    candidate responses' own landed costs (which now exist by the time evaluation runs).
+- **Consequences:**
+  - Guardrail auto-preparation can fire on real captured responses; draft purchase requests still
+    enter the unmodified human approval workflow (Constitution Principle III unchanged).
+  - A response stuck in review delays auto-preparation for its whole RFQ. Revisit with real usage;
+    a response-window cutoff (e.g. the RFQ's needed-by date) is the likely follow-on.
+  - Fuller autonomy — auto-matching quotations whose extraction was fully high-confidence and
+    reconciled, without human review — remains a separate, explicit product decision.
