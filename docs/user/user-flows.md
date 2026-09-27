@@ -296,7 +296,7 @@ journey
 - `/home` -> **Reports** -> `/reports` -> **Artifacts** tab -> filter by kind/status -> **Download**
 - `/reports` -> **Schedules** tab -> **+ New Schedule** -> `/reports/schedule-form` -> pick kind, format, filters, delivery day, locale -> save -> back to `/reports`
 - `/savings/export` -> **Schedule as Weekly Report** -> `/reports/schedule-form` (pre-populated with the export's kind/format/filters)
-- `/home` -> account menu or digest link -> `/reports/digest-settings` -> choose channel + locale -> browse the latest in-app digest -> follow a deep link into the relevant screen
+- `/home` -> **Reports** -> `/reports` -> **Weekly Procurement Digest** button -> `/reports/digest-settings` -> choose channel + locale -> browse the latest in-app digest -> follow a deep link into the relevant screen
 - `/home` -> **Ingestion** -> `/ingestion` -> open a channel card -> **Email Forwarding** (`/ingestion/email-config`), **Email Log** (`/ingestion/email-log`), **Capture** (`/ingestion/capture`), **Catalogue Import** (`/ingestion/catalogue-import`), or **Refresh Schedules** (`/ingestion/refresh-schedules`)
 - `/ingestion/capture` -> upload or take a photo -> quotation created -> **View Quotation** -> `/quotations/:id/review`
 - `/ingestion/catalogue-import` -> pick supplier -> upload spreadsheet -> import results + error details
@@ -345,7 +345,7 @@ journey
 - `/home` -> **Order Tracking** -> `/orders` -> open a row -> `/orders/:id` -> **Record confirmation** or **Record delivery** -> evidence timeline updates
 - `/orders/:id` (Draft only) -> **Submit order** -> status becomes Submitted
 - `/home` -> **Accounting** -> `/accounting` -> **Connect** (Owner) -> provider OAuth -> back to `/accounting` -> **View Synced Bills** -> `/accounting/bills` -> **Sync now** -> filter by match status
-- `/accounting` -> **View Synced Bills** -> back link -> **Reconciliation Discrepancies** is reached at `/accounting/discrepancies` -> filter Open/Resolved -> **Resolve** with an optional note
+- `/accounting/discrepancies` (direct URL only — no in-app link reaches it yet) -> filter Open/Resolved -> **Resolve** with an optional note
 - `/home` -> **POS** -> `/pos` -> **Connect** (Owner) -> Square OAuth -> back to `/pos` -> **View Synced Signals** -> `/pos/signals` -> **Sync now** -> match an unmatched signal to a catalogue product
 
 ```mermaid

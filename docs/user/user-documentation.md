@@ -411,8 +411,6 @@ After AI extraction finishes, each quotation lands in the review queue. Open a r
 
 **Route:** `/orders`
 
-![Order Tracking](screenshots/35-order-list.jpg)
-
 Tracks a purchase order's lifecycle — submitted, confirmed by the supplier, delivered, and (where an accounting connection exists) reconciled against the supplier's invoice. ProcurePilot never sends, changes, cancels, or pays an order through any integration; every write on these screens is an internal evidence record.
 
 | # | Element | Description |
@@ -425,13 +423,11 @@ Tracks a purchase order's lifecycle — submitted, confirmed by the supplier, de
 
 **Order statuses:** Draft, Submitted, Confirmed, Partially Received, Received, Cancelled, Closed.
 
-**There is no "Create Order" button anywhere in the web app.** Purchase orders are created via the API only — entered manually by an integration, imported, or synced read-only from a connected accounting/POS provider (`source_kind`: manual, import, or provider). Approving a purchase request (§20) does not automatically create an order; the two are separate records today.
+**There is no "Create Order" button anywhere in the web app.** Purchase orders are created via the API only (`POST /orders`), by whoever is integrating with it — there is no import tool and no accounting/POS provider writer yet, so nothing in ProcurePilot itself ever creates one automatically today. `source_kind` (manual, import, or provider) is just a label the API caller sets on that one request; only `manual` is ever actually produced by anything currently running. Approving a purchase request (§20) does not automatically create an order; the two are separate records today.
 
 ### Order Detail
 
 **Route:** `/orders/:id` (Owner or Buyer — opening this page with any other role redirects you back to the Dashboard)
-
-![Order Detail](screenshots/35b-order-detail.jpg)
 
 | # | Element | Description |
 |---|---------|-------------|
@@ -978,8 +974,6 @@ Configures how often a supplier catalogue import should be treated as due for a 
 
 **Route:** `/accounting`
 
-![Accounting Integration](screenshots/33-accounting-connection.jpg)
-
 Connects your accounting software so supplier bills can be synced and reconciled against ProcurePilot's own purchase and delivery records. ProcurePilot only ever reads from the connected provider — it never creates, edits, or pays a bill.
 
 | # | Element | Description |
@@ -1008,7 +1002,7 @@ Connects your accounting software so supplier bills can be synced and reconciled
 
 ### Reconciliation Discrepancies (Three-Way Match)
 
-**Route:** `/accounting/discrepancies`
+**Route:** `/accounting/discrepancies` — no in-app link reaches it yet; open it directly by URL.
 
 | # | Element | Description |
 |---|---------|-------------|
@@ -1029,8 +1023,6 @@ Connects your accounting software so supplier bills can be synced and reconciled
 
 **Route:** `/pos`
 
-![POS Integration](screenshots/34-pos-connection.jpg)
-
 Connects a point-of-sale/inventory system (Square) so sales velocity and stock-on-hand data can inform reorder forecasting (§35). ProcurePilot only reads from the connected provider — it never writes sales, inventory, or catalogue data back to it.
 
 | # | Element | Description |
@@ -1048,8 +1040,8 @@ Connects a point-of-sale/inventory system (Square) so sales velocity and stock-o
 
 | # | Element | Description |
 |---|---------|-------------|
-| 1 | **Sync now button** | Triggers an on-demand sync from Square. |
-| 2 | **Unmatched Signals table** | Square catalogue items that couldn't be automatically matched to a ProcurePilot product: item name, stock on hand (with last-synced time), sales velocity per day, and a **Match to Product** action — pick a catalogue product from the dropdown and confirm. A velocity figure carries a **Provisional** tag when the observed window is shorter than the full velocity window the metric is normally computed over. |
+| 1 | **Sync now button** | Triggers an on-demand sync from Square. Owner or Buyer only — see Known Issues below. |
+| 2 | **Unmatched Signals table** | Square catalogue items that couldn't be automatically matched to a ProcurePilot product: item name, stock on hand (with last-synced time), sales velocity per day, and a **Match to Product** action (Owner or Buyer only — see Known Issues below) — pick a catalogue product from the dropdown and confirm. A velocity figure carries a **Provisional** tag when the observed window is shorter than the full velocity window the metric is normally computed over. |
 | 3 | **Matched Signals table** | Signals already linked to a catalogue product: item name, the matched product, stock on hand, sales velocity, and a Matched status badge. |
 | 4 | **Empty states** | Shown separately for each table when there's nothing to review or nothing matched yet. |
 
@@ -1326,9 +1318,10 @@ Originally found during the 6 Sep 2026 documentation pass; re-checked and update
 | 1 | Purchase Requests (§18) | Submitted request rows can display the raw branch UUID in the Branch column instead of the branch name. Still present as of 27 Sep 2026. |
 | 2 | Purchase Request detail (§19) | Existing request line items can display the saved product UUID rather than the product's catalogue name. The linked product still exists and the relationship is stored correctly. Still present as of 27 Sep 2026. |
 | 3 | Quotation review detail (§9) | The CSV sample upload completed and opened the review screen, but the header fields extracted from the CSV sample left some optional quotation fields blank. The PDF/image sample path depends on external extraction-provider credentials; during the original pass Bedrock fell back because AWS SSO was expired, while CSV extraction still completed successfully. Not re-verified since the 12 Sep pass. |
-| 4 | Order Tracking (§11) | There is no way to create a purchase order from the web app itself — orders exist only via direct API creation, import, or a connected provider sync, and an approved purchase request does not automatically become an order. Found 27 Sep 2026, still present as of 27 Sep 2026. |
+| 4 | Order Tracking (§11) | There is no way to create a purchase order from the web app itself, and no import tool or accounting/POS provider writer exists yet either — the only path that produces an order today is a direct `POST /orders` API call. An approved purchase request does not automatically become an order. Found 27 Sep 2026, still present as of 27 Sep 2026. |
 | 5 | Accounting Integration (§33) | The connection screen's static copy ("Connect QuickBooks", "QuickBooks Online", "Link your QuickBooks Online account…") always reads as QuickBooks, even on a workspace deployment configured to use Xero as its accounting provider. The actual connection and OAuth flow work correctly for whichever provider is configured, and the connected-state header does show the real provider name dynamically — only the static empty-state and subtitle copy is mislabelled. Found 27 Sep 2026, still present as of 27 Sep 2026. |
 | 6 | Accounting Integration & POS Integration (§33, §34), never-connected empty state | The **Connect** button is shown to every role, not just Owner, before a connection exists (unlike the connected-state screen, where connect/disconnect/reconnect are correctly hidden from non-owners behind an informational notice). A non-owner who clicks it gets a permission error back from the API rather than never seeing the button. Found 27 Sep 2026, still present as of 27 Sep 2026. |
+| 7 | POS Integration (§34), Synced Product Signals screen | **Sync now** and **Match to Product** are shown to every role once a connection is active, but the API requires Owner or Buyer for both (`/pos/sync`, `/pos/signals/{id}/match`) — an Approver, Viewer, or Branch Manager sees fully clickable controls that will fail with a permission error. Found 27 Sep 2026, still present as of 27 Sep 2026. |
 
 **Resolved since the original pass:** the Approval Queue (§20) previously rendered only its title/subtitle with no request cards. It is now fully functional — pending requests, budget status, expandable line detail, and an approve/reject dialog with an optional comment — and an approval-delegation management UI (§22) has been added. **Resolved 26 Sep 2026:** Create RFQ (§38) previously used plain HTML controls with no Material styling, no Arabic translation, a supplier picker hardcoded to placeholder `sup-1`/`sup-2` options, and no navigation entry point (reachable only by typing `/rfq/create`). It now uses full Material form components, is translated into English and Arabic, populates real suppliers and products from your workspace data, and is reachable from a **Create RFQ** button on RFQ History. **Resolved 27 Sep 2026 (PR #42):** RFQ auto-preparation guardrails previously required API/engineering support to configure — there is now a full owner-only settings screen at `/rfq/guardrails` (§38), reachable from a **Guardrails** button on RFQ History, and the Compare RFQ Responses screen now explains in plain language why each guardrail did or didn't fire for every response.
 
