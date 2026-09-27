@@ -75,7 +75,7 @@ class SingleSupplierBaseline(StrictModel):
 class InfeasibleBasketItem(StrictModel):
     workspace_product_id: UUID
     requested_quantity: StrictStr
-    reason: Literal["no_offer_from_named_suppliers"]
+    reason: Literal["no_offer_from_named_suppliers", "mixed_currency_offers"]
     missing_supplier_ids: list[UUID]
 
 

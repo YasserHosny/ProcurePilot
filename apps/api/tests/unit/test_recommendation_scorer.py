@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from procurepilot_api.modules.offers.recommendation import TIE_BREAK_RULE, WEIGHTS, recommend_offer
 from procurepilot_api.modules.offers.schemas import Money, Offer
@@ -11,21 +11,24 @@ from procurepilot_api.modules.offers.schemas import Money, Offer
 def offer(
     *,
     amount: str,
+    supplier_id: UUID | None = None,
+    workspace_product_id: UUID | None = None,
     confidence: str = "0.9200",
     reliability: str | None = "0.900",
     lead_time: int | None = 2,
     valid_to: datetime | None = None,
     supplier_name: str = "Supplier",
+    currency: str = "GBP",
 ) -> Offer:
     return Offer(
         id=uuid4(),
-        workspace_product_id=uuid4(),
-        supplier_id=uuid4(),
+        workspace_product_id=workspace_product_id or uuid4(),
+        supplier_id=supplier_id or uuid4(),
         supplier_name=supplier_name,
         quotation_line_id=uuid4(),
         match_decision_id=uuid4(),
-        landed_cost=Money(amount=amount, currency="GBP"),
-        normalised_unit_price=Money(amount=amount, currency="GBP"),
+        landed_cost=Money(amount=amount, currency=currency),
+        normalised_unit_price=Money(amount=amount, currency=currency),
         requested_quantity="1.000000",
         base_unit="kg",
         lead_time_days=lead_time,
@@ -79,6 +82,32 @@ def test_recommendation_uses_research_r2_weights_thresholds_risks_and_null_neutr
         "low_match_confidence",
         "low_supplier_reliability",
     ]
+
+
+def test_recommendation_excludes_non_reference_currency_before_comparing_costs() -> None:
+    reference_supplier = UUID("00000000-0000-4000-8000-000000000001")
+    other_supplier = UUID("00000000-0000-4000-8000-000000000002")
+    product_id = uuid4()
+    reference_offer = offer(
+        amount="10.0000",
+        supplier_id=reference_supplier,
+        workspace_product_id=product_id,
+        supplier_name="Reference currency",
+        currency="GBP",
+    )
+    other_offer = offer(
+        amount="1.0000",
+        supplier_id=other_supplier,
+        workspace_product_id=product_id,
+        supplier_name="Other currency",
+        currency="EUR",
+    )
+    recommendation = recommend_offer(
+        [reference_offer, other_offer]
+    )
+
+    assert recommendation is not None
+    assert recommendation.recommended_offer_id == reference_offer.id
 
 
 def test_sc006_honest_gap_has_no_ml_eval_until_outcome_history_exists() -> None:

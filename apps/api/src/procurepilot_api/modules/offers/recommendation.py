@@ -52,6 +52,21 @@ def recommend_offer(
     eligible = [offer for offer in offers if not offer.is_expired]
     if not eligible:
         return None
+    currency_supplier_ids: dict[str, list[UUID]] = {}
+    for offer in eligible:
+        currency_supplier_ids.setdefault(offer.landed_cost.currency, []).append(offer.supplier_id)
+    reference_currency = min(
+        currency_supplier_ids,
+        key=lambda currency: (
+            -len(currency_supplier_ids[currency]),
+            min(currency_supplier_ids[currency]),
+            currency,
+        ),
+    )
+    # Mirror the guardrails.py currency_mismatch precedent: do not compare unlike money.
+    eligible = [offer for offer in eligible if offer.landed_cost.currency == reference_currency]
+    if not eligible:
+        return None
     evaluated_at = now or datetime.now(UTC)
     cheapest = min(_money_amount(offer) for offer in eligible)
     weights = SUPPLIER_IQ_WEIGHTS if supplier_risk_scores else WEIGHTS
