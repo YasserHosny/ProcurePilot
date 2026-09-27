@@ -1,7 +1,7 @@
 # ProcurePilot Mobile App User Documentation
 
 > Screen-by-screen guide to the ProcurePilot mobile app (Flutter, iOS + Android).
-> Last updated: 12 Sep 2026.
+> Last updated: 27 Sep 2026.
 
 ---
 
@@ -67,14 +67,15 @@ access, identity, and request awareness.
 | Web capability | Mobile status today | Where to act |
 |---|---|---|
 | Sign in | Shipped | Mobile or web |
-| Password reset / workspace creation / invitation acceptance | Web-only | Web sections 1 and 19 |
+| Password reset / workspace creation / invitation acceptance | Web-only | Web section 1 |
 | Product catalogue and suppliers | Web-only | Web sections 3–5 |
-| Import, quotation upload, quotation review, and matching | Web-only; quotation capture is responsive and camera-friendly in the web app | Web sections 6–10 and 29 |
-| Smart Compare, Basket Split, Alerts, and Savings | Web-only | Web sections 11–15 |
-| Purchase request creation | Preview only | Web sections 16–17 |
-| Approval decisions | Read-only pending count only | Web section 18 |
-| Team management and organisation settings | Web-only | Web sections 19–20 |
-| Reports Center, report schedules, weekly digests | Web-only | Web sections 22–24 (digest deep links open web routes) |
+| Import, quotation upload, quotation review, and matching | Web-only; quotation capture is responsive and camera-friendly in the web app | Web sections 6–10 and 30 |
+| Order tracking, accounting, and POS/inventory integration | Web-only | Web sections 11 and 33–34 |
+| Smart Compare, Basket Split, Alerts, and Savings | Web-only | Web sections 12–16 |
+| Purchase request creation | Preview only | Web sections 18–19 |
+| Approval decisions | Read-only pending count only | Web section 20 |
+| Team management and organisation settings | Web-only | Web sections 21–22 |
+| Reports Center, report schedules, weekly digests | Web-only | Web sections 23–25 (digest deep links open web routes) |
 
 The R3.0 capture flow is a mobile-friendly web workflow, not a native Flutter screen. On a phone,
 open the web app's **Capture a Quotation** route to take a photo or upload a PDF; the native app
@@ -214,13 +215,13 @@ anything other than success.
 | # | Element | Description |
 |---|---------|-------------|
 | 1 | **App bar — "Home"** | With a sign-out icon button in the top-right corner. |
-| 2 | **Your role** | Shows your workspace role (Owner, Buyer, Branch Manager, Approver, or Viewer) — the same roles as the web app (section 21 of the web documentation). |
+| 2 | **Your role** | Shows your workspace role (Owner, Buyer, Branch Manager, Approver, or Viewer) — the same roles as the web app (section 26 of the web documentation). |
 | 3 | **Request items button** | Visible to Owner, Buyer, and Branch Manager roles. **Currently shown disabled** — a deliberate placeholder rather than a fake working flow. Request submission from mobile is a later release. |
 | 4 | **Pending decisions count** | Visible only to Approver (and Owner) roles: a card reading "N request(s) awaiting your decision," loaded from the same pending-approvals list used by the web Approval Queue. Shows a spinner while loading and an inline error message if the count can't be fetched. |
 
 **What's deliberately absent:** there is no approve, reject, or any other decision control on
 this screen or anywhere else in the app — see section 12. The pending count is read-only; to act
-on a request, use the web app's Approval Queue (section 18 of the web documentation).
+on a request, use the web app's Approval Queue (section 20 of the web documentation).
 
 **Workflow:**
 1. Land on Home after sign-in or biometric unlock.
@@ -334,7 +335,7 @@ web product.
 
 **Q: Why can't I submit a purchase request from my phone?**
 A: That flow hasn't shipped yet. For now, create and submit requests from the web app
-(sections 16–17 of the web documentation); the mobile app will grow this capability in a later
+(sections 18–19 of the web documentation); the mobile app will grow this capability in a later
 release. The "Request items" button on Home is a visible placeholder, not a bug.
 
 **Q: I'm an approver — why can't I approve or reject from my phone?**
@@ -401,7 +402,7 @@ every image below as a target design, not a feature you can use today.
 
 Mobile-native request submission: destination branch, required-by date, a product search/catalogue
 picker, quantity steppers per line, and a budget pre-check before submitting. This is the mobile
-equivalent of the web app's New Purchase Request screen (section 17 of the web documentation).
+equivalent of the web app's New Purchase Request screen (section 19 of the web documentation).
 
 **Expected workflow:** choose branch, add product lines and quantities, review budget status,
 then submit for approval when online.
@@ -430,7 +431,7 @@ happened without asking procurement for manual status updates.
 
 A read-only, requester-facing view of a decided request: line items, the approver's decision
 comment, and a lifecycle timeline (Submitted → In Review → Approved/Rejected). This mirrors the
-Approval section already shown on the web request detail view (section 17 of the web
+Approval section already shown on the web request detail view (section 19 of the web
 documentation) — it does not add any approve/reject control on mobile.
 
 **Expected workflow:** open a request from My Requests, inspect lines, read the approver's
