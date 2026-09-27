@@ -68,7 +68,29 @@ def test_web_public_samples_survive_dockerignore(tmp_path: Path) -> None:
 
     Without the fix (bare `samples` / `**/samples` patterns in `.dockerignore`), this build
     fails at the first RUN step because `apps/web/public/samples/` never lands in `/ctx`.
+
+    Builds a SANITIZED, minimal context — not `REPO_ROOT` — so this never sends a developer's
+    real working tree (a `.env`, `*.pem`, `*.key`, `*.tfvars`, or anything else untracked and
+    ignored-by-git-but-not-by-.dockerignore) to the Docker daemon or a configured remote
+    `DOCKER_HOST`. `.dockerignore`'s pattern MATCHING only cares about relative paths, not file
+    contents, so a context containing just the real `.dockerignore` plus two empty placeholder
+    files at the exact paths under test proves the same thing a full-repo build would, without
+    the exposure. (Codex review of PR #44.)
     """
+    context_dir = tmp_path / "context"
+    (context_dir / "apps" / "web" / "public" / "samples").mkdir(parents=True)
+    (
+        context_dir
+        / "apps"
+        / "web"
+        / "public"
+        / "samples"
+        / "sample-quotation-al-faisal-trading.pdf"
+    ).write_bytes(b"")
+    (context_dir / "samples" / "quotations").mkdir(parents=True)
+    (context_dir / "samples" / "quotations" / "placeholder.pdf").write_bytes(b"")
+    shutil.copy(REPO_ROOT / ".dockerignore", context_dir / ".dockerignore")
+
     dockerfile_path = tmp_path / "Dockerfile.contextcheck"
     dockerfile_path.write_text(CONTEXT_CHECK_DOCKERFILE)
 
@@ -83,7 +105,7 @@ def test_web_public_samples_survive_dockerignore(tmp_path: Path) -> None:
                 str(dockerfile_path),
                 "-t",
                 tag,
-                str(REPO_ROOT),
+                str(context_dir),
             ],
             capture_output=True,
             text=True,
@@ -94,6 +116,8 @@ def test_web_public_samples_survive_dockerignore(tmp_path: Path) -> None:
             f"by .dockerignore again.\nstdout:\n{result.stdout}\nstderr:\n{result.stderr}"
         )
     finally:
+        # The context is sanitized (no real secrets ever enter it), so there is nothing sensitive
+        # left in BuildKit's cache to worry about clearing beyond the tagged image itself.
         subprocess.run(["docker", "rmi", "-f", tag], capture_output=True, check=False)
 
 
