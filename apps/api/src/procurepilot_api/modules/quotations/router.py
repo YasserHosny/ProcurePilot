@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Annotated, Literal
 from uuid import UUID
 
-from fastapi import APIRouter, Body, Depends, Header, Query, status
+from fastapi import APIRouter, Body, Depends, Header, Query, Response, status
 from fastapi.responses import StreamingResponse
 
 from procurepilot_api.deps import CurrentMember, bearer_token, current_member
@@ -43,9 +43,15 @@ def create_quotation(
     token: Annotated[str, Depends(bearer_token)],
     member: Annotated[CurrentMember, Depends(require_role(*WRITE_ROLES))],
     service: Annotated[QuotationService, Depends(get_quotation_service)],
-    _idempotency_key: Annotated[UUID | None, Header(alias="Idempotency-Key")] = None,
+    response: Response,
+    idempotency_key: Annotated[UUID | None, Header(alias="Idempotency-Key")] = None,
 ) -> Quotation:
-    return service.create_quotation(bearer_token=token, member=member, payload=payload)
+    quotation, created = service.create_quotation(
+        bearer_token=token, member=member, payload=payload, idempotency_key=idempotency_key
+    )
+    if not created:
+        response.status_code = status.HTTP_200_OK
+    return quotation
 
 
 @router.get("/quotations/{quotation_id}", response_model=QuotationDetail)
@@ -65,9 +71,7 @@ def get_quotation_audit_trail(
     member: Annotated[CurrentMember, Depends(current_member)],
     service: Annotated[QuotationService, Depends(get_quotation_service)],
 ) -> AuditTrailResponse:
-    return service.get_audit_trail(
-        bearer_token=token, member=member, quotation_id=quotation_id
-    )
+    return service.get_audit_trail(bearer_token=token, member=member, quotation_id=quotation_id)
 
 
 @router.post("/quotations/{quotation_id}/archive", response_model=Quotation)
@@ -76,10 +80,12 @@ def archive_quotation(
     token: Annotated[str, Depends(bearer_token)],
     member: Annotated[CurrentMember, Depends(require_role(*WRITE_ROLES))],
     service: Annotated[QuotationService, Depends(get_quotation_service)],
-    _idempotency_key: Annotated[UUID | None, Header(alias="Idempotency-Key")] = None,
+    idempotency_key: Annotated[UUID | None, Header(alias="Idempotency-Key")] = None,
 ) -> Quotation:
     return service.archive_quotation(
-        bearer_token=token, member=member, quotation_id=quotation_id
+        bearer_token=token,
+        member=member,
+        quotation_id=quotation_id,
     )
 
 
@@ -91,9 +97,7 @@ def restore_quotation(
     service: Annotated[QuotationService, Depends(get_quotation_service)],
     _idempotency_key: Annotated[UUID | None, Header(alias="Idempotency-Key")] = None,
 ) -> Quotation:
-    return service.restore_quotation(
-        bearer_token=token, member=member, quotation_id=quotation_id
-    )
+    return service.restore_quotation(bearer_token=token, member=member, quotation_id=quotation_id)
 
 
 @router.post("/quotations/{quotation_id}/retry-extraction", response_model=Quotation)
@@ -102,11 +106,18 @@ def retry_extraction(
     token: Annotated[str, Depends(bearer_token)],
     member: Annotated[CurrentMember, Depends(require_role(*WRITE_ROLES))],
     service: Annotated[QuotationService, Depends(get_quotation_service)],
-    _idempotency_key: Annotated[UUID | None, Header(alias="Idempotency-Key")] = None,
+    response: Response,
+    idempotency_key: Annotated[UUID | None, Header(alias="Idempotency-Key")] = None,
 ) -> Quotation:
-    return service.retry_extraction(
-        bearer_token=token, member=member, quotation_id=quotation_id
+    quotation, created = service.retry_extraction(
+        bearer_token=token,
+        member=member,
+        quotation_id=quotation_id,
+        idempotency_key=idempotency_key,
     )
+    if not created:
+        response.status_code = status.HTTP_200_OK
+    return quotation
 
 
 @router.post("/quotations/{quotation_id}/replace-document", response_model=Quotation)
@@ -140,11 +151,7 @@ def export_quotation(
     return StreamingResponse(
         iter([csv_body]),
         media_type="text/csv",
-        headers={
-            "Content-Disposition": (
-                f'attachment; filename="quotation-{quotation_id}.csv"'
-            )
-        },
+        headers={"Content-Disposition": (f'attachment; filename="quotation-{quotation_id}.csv"')},
     )
 
 

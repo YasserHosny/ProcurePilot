@@ -67,7 +67,8 @@ class QuotationService:
         bearer_token: str,
         member: CurrentMember,
         payload: QuotationCreate,
-    ) -> Quotation:
+        idempotency_key: UUID | None = None,
+    ) -> tuple[Quotation, bool]:
         client = authenticated_client(self._settings, bearer_token)
         _document_row(client, payload.document_id)
         if payload.supplier_id is not None:
@@ -75,17 +76,31 @@ class QuotationService:
         if _active_or_existing_quotation_for_document(client, payload.document_id):
             raise ConflictError(details={"reason": "document_already_has_quotation"})
         try:
-            response = client.table("quotation").insert(
-                {
-                    "tenant_id": str(member.tenant_id),
-                    "document_id": str(payload.document_id),
-                    "supplier_id": str(payload.supplier_id) if payload.supplier_id else None,
-                    "status": "pending",
-                }
-            ).execute()
+            response = (
+                client.table("quotation")
+                .insert(
+                    {
+                        "tenant_id": str(member.tenant_id),
+                        "document_id": str(payload.document_id),
+                        "supplier_id": str(payload.supplier_id) if payload.supplier_id else None,
+                        "status": "pending",
+                        "idempotency_key": str(idempotency_key) if idempotency_key else None,
+                    }
+                )
+                .execute()
+            )
         except APIError as exc:
+            if idempotency_key is not None and getattr(exc, "code", None) == "23505":
+                existing = (
+                    client.table("quotation")
+                    .select(QUOTATION_COLUMNS)
+                    .eq("idempotency_key", str(idempotency_key))
+                    .limit(1)
+                    .execute()
+                )
+                return _quotation(_one_row(existing.data, resource="quotation")), False
             raise ServiceUnavailableError(details={"dependency": "database"}) from exc
-        return _quotation(_one_row(response.data, resource="quotation"))
+        return _quotation(_one_row(response.data, resource="quotation")), True
 
     def get_quotation(self, *, bearer_token: str, quotation_id: UUID) -> QuotationDetail:
         client = authenticated_client(self._settings, bearer_token)
@@ -167,7 +182,8 @@ class QuotationService:
         rows = [row for row in rows if not _task_quotation_deleted(row)]
         if clean_search:
             rows = [
-                r for r in rows
+                r
+                for r in rows
                 if clean_search in str(r.get("quotation_id", "")).lower()
                 or clean_search in _nested_supplier_name(r).lower()
             ]
@@ -175,9 +191,7 @@ class QuotationService:
         return ReviewTaskList(
             items=[_task(row) for row in visible],
             next_cursor=(
-                _encode_cursor(offset + capped_limit)
-                if len(rows) > capped_limit
-                else None
+                _encode_cursor(offset + capped_limit) if len(rows) > capped_limit else None
             ),
         )
 
@@ -267,9 +281,7 @@ class QuotationService:
             )
             client.table("review_task").update(
                 {"status": "resolved", "resolved_at": archived_at}
-            ).eq("quotation_id", str(quotation_id)).in_(
-                "status", ["open", "in_progress"]
-            ).execute()
+            ).eq("quotation_id", str(quotation_id)).in_("status", ["open", "in_progress"]).execute()
         except APIError as exc:
             raise ServiceUnavailableError(details={"dependency": "database"}) from exc
         self._record(
@@ -324,9 +336,21 @@ class QuotationService:
         bearer_token: str,
         member: CurrentMember,
         quotation_id: UUID,
-    ) -> Quotation:
+        idempotency_key: UUID | None = None,
+    ) -> tuple[Quotation, bool]:
         client = authenticated_client(self._settings, bearer_token)
         quote = _quotation_row(client, quotation_id)
+        if idempotency_key is not None:
+            existing = (
+                client.table("extraction_job")
+                .select("id")
+                .eq("quotation_id", str(quotation_id))
+                .eq("idempotency_key", str(idempotency_key))
+                .limit(1)
+                .execute()
+            )
+            if existing.data:
+                return _quotation(quote), False
         if quote["status"] in {"pending", "extracting"}:
             raise ConflictError(details={"reason": "quotation_extraction_already_active"})
         try:
@@ -347,6 +371,7 @@ class QuotationService:
                         "tenant_id": str(member.tenant_id),
                         "quotation_id": str(quotation_id),
                         "status": "queued",
+                        "idempotency_key": str(idempotency_key) if idempotency_key else None,
                     }
                 )
                 .execute()
@@ -362,6 +387,8 @@ class QuotationService:
                 resource="quotation",
             )
         except APIError as exc:
+            if idempotency_key is not None and getattr(exc, "code", None) == "23505":
+                return _quotation(quote), False
             raise ServiceUnavailableError(details={"dependency": "database"}) from exc
         try:
             _enqueue_extraction(self._settings, job_row, quote, member)
@@ -379,7 +406,7 @@ class QuotationService:
             action="quotation.extraction_retried",
             target={"quotation_id": str(quotation_id)},
         )
-        return _quotation(row)
+        return _quotation(row), True
 
     def replace_document(
         self,
@@ -477,9 +504,7 @@ class QuotationService:
         writer = csv.writer(output)
         writer.writerow(["supplier_name", supplier_name])
         writer.writerow(["issue_date", quote.get("issue_date") or ""])
-        writer.writerow(
-            ["stated_total", decimal_string(quote.get("stated_total_amount")) or ""]
-        )
+        writer.writerow(["stated_total", decimal_string(quote.get("stated_total_amount")) or ""])
         writer.writerow(
             [
                 "currency",
@@ -577,11 +602,7 @@ def _quotation_row(client: object, quotation_id: UUID) -> dict[str, object]:
 def _supplier_row(client: object, supplier_id: UUID) -> dict[str, object]:
     try:
         response = (
-            client.table("supplier")
-            .select("id")
-            .eq("id", str(supplier_id))
-            .limit(2)
-            .execute()
+            client.table("supplier").select("id").eq("id", str(supplier_id)).limit(2).execute()
         )
     except APIError as exc:
         raise ServiceUnavailableError(details={"dependency": "database"}) from exc
@@ -591,11 +612,7 @@ def _supplier_row(client: object, supplier_id: UUID) -> dict[str, object]:
 def _supplier_name(client: object, supplier_id: UUID) -> str:
     try:
         response = (
-            client.table("supplier")
-            .select("name")
-            .eq("id", str(supplier_id))
-            .limit(2)
-            .execute()
+            client.table("supplier").select("name").eq("id", str(supplier_id)).limit(2).execute()
         )
     except APIError as exc:
         raise ServiceUnavailableError(details={"dependency": "database"}) from exc

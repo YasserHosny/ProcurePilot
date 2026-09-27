@@ -1,7 +1,7 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Body, Depends, Header, Request, status
+from fastapi import APIRouter, Body, Depends, Header, Request, Response, status
 
 from procurepilot_api.config import get_settings
 from procurepilot_api.deps import CurrentMember, bearer_token, current_member
@@ -29,9 +29,15 @@ def create_export(
     member: Annotated[CurrentMember, Depends(require_role(*WRITE_ROLES))],
     service: Annotated[ExportService, Depends(get_export_service)],
     token: Annotated[str, Depends(bearer_token)],
-    _idempotency_key: Annotated[UUID | None, Header(alias="Idempotency-Key")] = None,
+    response: Response,
+    idempotency_key: Annotated[UUID | None, Header(alias="Idempotency-Key")] = None,
 ) -> ExportJob:
-    return service.create_job(member=member, payload=payload, bearer_token=token)
+    job, created = service.create_job(
+        member=member, payload=payload, bearer_token=token, idempotency_key=idempotency_key
+    )
+    if not created:
+        response.status_code = status.HTTP_200_OK
+    return job
 
 
 @router.get("/exports/{id}", response_model=ExportJob)

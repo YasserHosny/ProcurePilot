@@ -48,9 +48,15 @@ def create_subscription(
     member: Annotated[CurrentMember, Depends(current_member)],
     service: Annotated[DigestsService, Depends(get_digests_service)],
     token: Annotated[str, Depends(bearer_token)],
-    _idempotency_key: Annotated[UUID | None, Header(alias="Idempotency-Key")] = None,
+    response: Response,
+    idempotency_key: Annotated[UUID | None, Header(alias="Idempotency-Key")] = None,
 ) -> DigestSubscription:
-    return service.create_subscription(member=member, payload=payload, bearer_token=token)
+    subscription, created = service.create_subscription(
+        member=member, payload=payload, bearer_token=token, idempotency_key=idempotency_key
+    )
+    if not created:
+        response.status_code = status.HTTP_200_OK
+    return subscription
 
 
 @router.patch("/digests/subscriptions/{subscription_id}", response_model=DigestSubscription)

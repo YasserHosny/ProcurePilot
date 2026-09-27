@@ -36,10 +36,11 @@ def record_purchase(
     *,
     actual: str = "8.0000",
 ) -> SavingRecord:
-    return service.record_purchase(
+    outcome, _created = service.record_purchase(
         member=context.member,
         payload=purchase_payload(context, actual=actual),
-    ).saving_record
+    )
+    return outcome.saving_record
 
 
 def export_request(*, supplier_id: UUID | None = None) -> ExportCreate:

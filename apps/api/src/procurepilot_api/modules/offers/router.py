@@ -2,7 +2,7 @@ from decimal import Decimal
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Body, Depends, Header, Query, Request, status
+from fastapi import APIRouter, Body, Depends, Header, Query, Request, Response, status
 
 from procurepilot_api.config import get_settings
 from procurepilot_api.deps import CurrentMember, bearer_token, current_member
@@ -79,9 +79,15 @@ def create_refresh_schedule(
     payload: Annotated[RefreshScheduleCreate, Body()],
     token: Annotated[str, Depends(bearer_token)],
     member: Annotated[CurrentMember, Depends(require_role(*WRITE_ROLES))],
-    _idempotency_key: Annotated[UUID | None, Header(alias="Idempotency-Key")] = None,
+    response: Response,
+    idempotency_key: Annotated[UUID | None, Header(alias="Idempotency-Key")] = None,
 ) -> RefreshSchedule:
-    return create_schedule(member=member, payload=payload, bearer_token=token)
+    schedule, created = create_schedule(
+        member=member, payload=payload, bearer_token=token, idempotency_key=idempotency_key
+    )
+    if not created:
+        response.status_code = status.HTTP_200_OK
+    return schedule
 
 
 @router.patch("/refresh-schedules/{schedule_id}", response_model=RefreshSchedule)
@@ -343,6 +349,12 @@ def create_supplier_commercial_term(
     payload: Annotated[SupplierCommercialTermCreate, Body()],
     member: Annotated[CurrentMember, Depends(require_role(*WRITE_ROLES))],
     service: Annotated[SupplierTermsService, Depends(get_supplier_terms_service)],
-    _idempotency_key: Annotated[UUID | None, Header(alias="Idempotency-Key")] = None,
+    response: Response,
+    idempotency_key: Annotated[UUID | None, Header(alias="Idempotency-Key")] = None,
 ) -> SupplierCommercialTerm:
-    return service.create_term(member=member, supplier_id=supplier_id, payload=payload)
+    term, created = service.create_term(
+        member=member, supplier_id=supplier_id, payload=payload, idempotency_key=idempotency_key
+    )
+    if not created:
+        response.status_code = status.HTTP_200_OK
+    return term

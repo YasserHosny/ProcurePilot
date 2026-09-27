@@ -47,7 +47,7 @@ def test_export_create_queues_durable_job_without_tenant_input(
 
         monkeypatch.setattr(export_service_module, "_enqueue_export_job", fake_enqueue)
         monkeypatch.setattr(export_service_module, "get_audit_writer", lambda: _NoAuditWriter())
-        job = ExportService(settings).create_job(
+        job, _created = ExportService(settings).create_job(
             member=context.member,
             payload=export_request(),
         )
@@ -106,7 +106,9 @@ def test_cross_tenant_export_read_returns_not_found(monkeypatch: pytest.MonkeyPa
                 lambda *_args, **_kwargs: None,
             )
             monkeypatch.setattr(export_service_module, "get_audit_writer", lambda: _NoAuditWriter())
-            job = ExportService(settings).create_job(member=alpha.member, payload=export_request())
+            job, _created = ExportService(settings).create_job(
+                member=alpha.member, payload=export_request()
+            )
 
             with pytest.raises(NotFoundError):
                 ExportService(settings).get_job(member=beta.member, job_id=job.id)
@@ -150,7 +152,9 @@ def test_worker_failure_persists_failed_status_from_separate_connection(
             lambda *_args, **_kwargs: None,
         )
         monkeypatch.setattr(export_service_module, "get_audit_writer", lambda: _NoAuditWriter())
-        job = ExportService(settings).create_job(member=context.member, payload=export_request())
+        job, _created = ExportService(settings).create_job(
+            member=context.member, payload=export_request()
+        )
         monkeypatch.setattr(
             export_worker,
             "render_xlsx",

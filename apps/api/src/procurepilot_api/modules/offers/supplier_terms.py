@@ -52,7 +52,8 @@ class SupplierTermsService:
         member: CurrentMember,
         supplier_id: UUID,
         payload: SupplierCommercialTermCreate,
-    ) -> SupplierCommercialTerm:
+        idempotency_key: UUID | None = None,
+    ) -> tuple[SupplierCommercialTerm, bool]:
         _validate_term_payload(payload)
         with _authenticated_db(self._settings, member) as conn:
             _supplier_visible(conn, supplier_id)
@@ -75,6 +76,7 @@ class SupplierTermsService:
                             quantity_tiers,
                             rule_version,
                             created_by_membership_id
+                            , idempotency_key
                           )
                         values
                           (
@@ -91,6 +93,7 @@ class SupplierTermsService:
                             %(quantity_tiers)s,
                             %(rule_version)s,
                             %(created_by_membership_id)s
+                            , %(idempotency_key)s
                           )
                         returning *
                         """,
@@ -113,13 +116,25 @@ class SupplierTermsService:
                             ),
                             "rule_version": SUPPLIER_TERMS_RULE_VERSION,
                             "created_by_membership_id": member.membership_id,
+                            "idempotency_key": idempotency_key,
                         },
                     )
                     row = dict(cur.fetchone())
             except Exception as exc:
+                if idempotency_key is not None and getattr(exc, "sqlstate", None) == "23505":
+                    conn.rollback()
+                    with conn.cursor(row_factory=dict_row) as cur:
+                        cur.execute(
+                            "select * from supplier_commercial_term "
+                            "where tenant_id = %s and idempotency_key = %s",
+                            (member.tenant_id, idempotency_key),
+                        )
+                        replay_row = cur.fetchone()
+                    if replay_row is not None:
+                        return _term(dict(replay_row)), False
                 _raise_term_write_error(exc)
                 raise
-        return _term(row)
+        return _term(row), True
 
 
 def get_supplier_terms_service() -> SupplierTermsService:

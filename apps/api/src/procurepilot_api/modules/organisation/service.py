@@ -70,10 +70,15 @@ class OrganisationService:
             query = client.table("branch").select(BRANCH_COLUMNS)
             if is_active is not None:
                 query = query.eq("is_active", is_active)
-            response = query.order("created_at").order("id").range(
-                offset,
-                offset + capped_limit,
-            ).execute()
+            response = (
+                query.order("created_at")
+                .order("id")
+                .range(
+                    offset,
+                    offset + capped_limit,
+                )
+                .execute()
+            )
         except APIError as exc:
             raise ServiceUnavailableError(details={"dependency": "database"}) from exc
 
@@ -91,18 +96,35 @@ class OrganisationService:
         bearer_token: str,
         member: CurrentMember,
         payload: BranchCreate,
-    ) -> Branch:
+        idempotency_key: UUID | None = None,
+    ) -> tuple[Branch, bool]:
         client = authenticated_client(self._settings, bearer_token)
         try:
-            response = client.table("branch").insert(
-                {
-                    "tenant_id": str(member.tenant_id),
-                    "name": payload.name,
-                    "address": payload.address,
-                    "region": payload.region,
-                }
-            ).execute()
+            response = (
+                client.table("branch")
+                .insert(
+                    {
+                        "tenant_id": str(member.tenant_id),
+                        "name": payload.name,
+                        "address": payload.address,
+                        "region": payload.region,
+                        "idempotency_key": str(idempotency_key) if idempotency_key else None,
+                    }
+                )
+                .execute()
+            )
         except APIError as exc:
+            if idempotency_key is not None and _api_error_code(exc) == "23505":
+                existing = (
+                    client.table("branch")
+                    .select(BRANCH_COLUMNS)
+                    .eq("idempotency_key", str(idempotency_key))
+                    .limit(1)
+                    .execute()
+                )
+                return _branch(
+                    _one_row(existing.data, reason="branch_idempotency_lookup_failed")
+                ), False
             raise _write_error(exc, duplicate_reason="branch_conflict") from exc
 
         branch = _branch(_one_row(response.data, reason="branch_write_failed"))
@@ -112,7 +134,7 @@ class OrganisationService:
             action="organisation.branch_created",
             target={"branch_id": str(branch.id)},
         )
-        return branch
+        return branch, True
 
     def update_branch(
         self,
@@ -189,10 +211,15 @@ class OrganisationService:
                 query = query.eq("branch_id", str(branch_id))
             if is_archived is not None:
                 query = query.eq("is_archived", is_archived)
-            response = query.order("created_at").order("id").range(
-                offset,
-                offset + capped_limit,
-            ).execute()
+            response = (
+                query.order("created_at")
+                .order("id")
+                .range(
+                    offset,
+                    offset + capped_limit,
+                )
+                .execute()
+            )
         except APIError as exc:
             raise ServiceUnavailableError(details={"dependency": "database"}) from exc
 
@@ -210,28 +237,49 @@ class OrganisationService:
         bearer_token: str,
         member: CurrentMember,
         payload: CostCentreCreate,
-    ) -> CostCentre:
+        idempotency_key: UUID | None = None,
+    ) -> tuple[CostCentre, bool]:
         client = authenticated_client(self._settings, bearer_token)
         try:
-            response = client.table("cost_centre").insert(
-                {
-                    "tenant_id": str(member.tenant_id),
-                    "name": payload.name,
-                    "code": payload.code,
-                    "budget_owner_membership_id": (
-                        str(payload.budget_owner_membership_id)
-                        if payload.budget_owner_membership_id is not None
-                        else None
-                    ),
-                    "branch_id": str(payload.branch_id) if payload.branch_id is not None else None,
-                }
-            ).execute()
+            response = (
+                client.table("cost_centre")
+                .insert(
+                    {
+                        "tenant_id": str(member.tenant_id),
+                        "name": payload.name,
+                        "code": payload.code,
+                        "budget_owner_membership_id": (
+                            str(payload.budget_owner_membership_id)
+                            if payload.budget_owner_membership_id is not None
+                            else None
+                        ),
+                        "branch_id": str(payload.branch_id)
+                        if payload.branch_id is not None
+                        else None,
+                        "idempotency_key": str(idempotency_key) if idempotency_key else None,
+                    }
+                )
+                .execute()
+            )
         except APIError as exc:
+            if idempotency_key is not None and _api_error_code(exc) == "23505":
+                existing = (
+                    client.table("cost_centre")
+                    .select(COST_CENTRE_COLUMNS)
+                    .eq("idempotency_key", str(idempotency_key))
+                    .limit(1)
+                    .execute()
+                )
+                return _cost_centre(
+                    self._with_orphan_reasons(
+                        client,
+                        [_one_row(existing.data, reason="cost_centre_idempotency_lookup_failed")],
+                    )[0]
+                ), False
             raise _write_error(exc, duplicate_reason="cost_centre_conflict") from exc
 
         cost_centre = _cost_centre(
-            _one_row(response.data, reason="cost_centre_write_failed")
-            | {"orphan_reason": None}
+            _one_row(response.data, reason="cost_centre_write_failed") | {"orphan_reason": None}
         )
         self._record(
             bearer_token=bearer_token,
@@ -239,7 +287,7 @@ class OrganisationService:
             action="organisation.cost_centre_created",
             target={"cost_centre_id": str(cost_centre.id)},
         )
-        return cost_centre
+        return cost_centre, True
 
     def update_cost_centre(
         self,
@@ -271,10 +319,7 @@ class OrganisationService:
 
         try:
             response = (
-                client.table("cost_centre")
-                .update(updates)
-                .eq("id", str(cost_centre_id))
-                .execute()
+                client.table("cost_centre").update(updates).eq("id", str(cost_centre_id)).execute()
             )
         except APIError as exc:
             raise _write_error(exc, duplicate_reason="cost_centre_update_conflict") from exc
@@ -310,10 +355,15 @@ class OrganisationService:
                 query = query.eq("branch_id", str(branch_id))
             if cost_centre_id is not None:
                 query = query.eq("cost_centre_id", str(cost_centre_id))
-            response = query.order("created_at").order("id").range(
-                offset,
-                offset + capped_limit,
-            ).execute()
+            response = (
+                query.order("created_at")
+                .order("id")
+                .range(
+                    offset,
+                    offset + capped_limit,
+                )
+                .execute()
+            )
         except APIError as exc:
             raise ServiceUnavailableError(details={"dependency": "database"}) from exc
 
@@ -331,29 +381,51 @@ class OrganisationService:
         bearer_token: str,
         member: CurrentMember,
         payload: BudgetCreate,
-    ) -> BudgetCreated:
+        idempotency_key: UUID | None = None,
+    ) -> tuple[BudgetCreated, bool]:
         client = authenticated_client(self._settings, bearer_token)
         self._validate_budget_target(client, payload)
         overlap_warning = self._budget_overlap_warning(client, payload)
         try:
-            response = client.table("budget").insert(
-                {
-                    "tenant_id": str(member.tenant_id),
-                    "amount": payload.amount,
-                    "currency": payload.currency,
-                    "period": payload.period,
-                    "period_start": payload.period_start.isoformat(),
-                    "scope": payload.scope,
-                    "branch_id": str(payload.branch_id) if payload.branch_id is not None else None,
-                    "cost_centre_id": (
-                        str(payload.cost_centre_id)
-                        if payload.cost_centre_id is not None
-                        else None
-                    ),
-                    "created_by": str(member.membership_id),
-                }
-            ).execute()
+            response = (
+                client.table("budget")
+                .insert(
+                    {
+                        "tenant_id": str(member.tenant_id),
+                        "amount": payload.amount,
+                        "currency": payload.currency,
+                        "period": payload.period,
+                        "period_start": payload.period_start.isoformat(),
+                        "scope": payload.scope,
+                        "branch_id": str(payload.branch_id)
+                        if payload.branch_id is not None
+                        else None,
+                        "cost_centre_id": (
+                            str(payload.cost_centre_id)
+                            if payload.cost_centre_id is not None
+                            else None
+                        ),
+                        "created_by": str(member.membership_id),
+                        "idempotency_key": str(idempotency_key) if idempotency_key else None,
+                    }
+                )
+                .execute()
+            )
         except APIError as exc:
+            if idempotency_key is not None and _api_error_code(exc) == "23505":
+                existing = (
+                    client.table("budget")
+                    .select(BUDGET_COLUMNS)
+                    .eq("idempotency_key", str(idempotency_key))
+                    .limit(1)
+                    .execute()
+                )
+                return BudgetCreated(
+                    **_budget(
+                        _one_row(existing.data, reason="budget_idempotency_lookup_failed")
+                    ).model_dump(),
+                    overlap_warning=None,
+                ), False
             raise _write_error(exc, duplicate_reason="budget_conflict") from exc
 
         budget = _budget(_one_row(response.data, reason="budget_write_failed"))
@@ -363,7 +435,7 @@ class OrganisationService:
             action="organisation.budget_created",
             target={"budget_id": str(budget.id)},
         )
-        return BudgetCreated(**budget.model_dump(), overlap_warning=overlap_warning)
+        return BudgetCreated(**budget.model_dump(), overlap_warning=overlap_warning), True
 
     def _branch_row(self, client: Client, branch_id: UUID) -> dict[str, object]:
         try:
@@ -422,11 +494,7 @@ class OrganisationService:
 
     def _budget_overlap_warning(self, client: Client, payload: BudgetCreate) -> bool:
         try:
-            query = (
-                client.table("budget")
-                .select("period,period_start")
-                .eq("scope", payload.scope)
-            )
+            query = client.table("budget").select("period,period_start").eq("scope", payload.scope)
             if payload.scope == "branch":
                 if payload.branch_id is None:
                     return False
@@ -457,9 +525,7 @@ class OrganisationService:
     ) -> list[dict[str, object]]:
         orphaned_rows = [row for row in rows if row.get("is_orphaned") is True]
         branch_ids = {
-            str(row["branch_id"])
-            for row in orphaned_rows
-            if row.get("branch_id") is not None
+            str(row["branch_id"]) for row in orphaned_rows if row.get("branch_id") is not None
         }
         membership_ids = {
             str(row["budget_owner_membership_id"])
@@ -502,15 +568,11 @@ class OrganisationService:
             if row.get("is_orphaned") is True:
                 branch_id = row.get("branch_id")
                 membership_id = row.get("budget_owner_membership_id")
-                if (
-                    branch_id is not None
-                    and branch_active_by_id.get(str(branch_id)) is False
-                ):
+                if branch_id is not None and branch_active_by_id.get(str(branch_id)) is False:
                     orphan_reason = "branch_deactivated"
-                elif (
-                    membership_id is not None
-                    and membership_status_by_id.get(str(membership_id)) not in {None, "active"}
-                ):
+                elif membership_id is not None and membership_status_by_id.get(
+                    str(membership_id)
+                ) not in {None, "active"}:
                     orphan_reason = "owner_removed"
             enriched["orphan_reason"] = orphan_reason
             enriched_rows.append(enriched)

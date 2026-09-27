@@ -139,7 +139,7 @@ def test_download_for_job_without_artifact_returns_not_found(
                 return None
 
         monkeypatch.setattr(export_service_module, "get_audit_writer", lambda: _NoAuditWriter())
-        job = ExportService(settings).create_job(
+        job, _created = ExportService(settings).create_job(
             member=context.member,
             payload=export_request(),
         )

@@ -82,7 +82,7 @@ class MatchResolutionService:
         if payload.outcome == "no_match_new_product":
             if payload.create_product is None:
                 raise ConflictError(details={"reason": "create_product_required"})
-            product = self._catalogue.create_product(
+            product, _created = self._catalogue.create_product(
                 bearer_token=bearer_token, member=member, payload=payload.create_product
             )
             candidate_id = None

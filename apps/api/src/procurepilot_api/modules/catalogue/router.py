@@ -63,9 +63,15 @@ def create_product(
     token: Annotated[str, Depends(bearer_token)],
     member: Annotated[CurrentMember, Depends(require_role(*WRITE_ROLES))],
     service: Annotated[CatalogueService, Depends(get_catalogue_service)],
-    _idempotency_key: Annotated[UUID | None, Header(alias="Idempotency-Key")] = None,
+    response: Response,
+    idempotency_key: Annotated[UUID | None, Header(alias="Idempotency-Key")] = None,
 ) -> Product:
-    return service.create_product(bearer_token=token, member=member, payload=payload)
+    product, created = service.create_product(
+        bearer_token=token, member=member, payload=payload, idempotency_key=idempotency_key
+    )
+    if not created:
+        response.status_code = status.HTTP_200_OK
+    return product
 
 
 @router.get("/products/{product_id}", response_model=Product)
@@ -154,9 +160,15 @@ def create_supplier(
     token: Annotated[str, Depends(bearer_token)],
     member: Annotated[CurrentMember, Depends(require_role(*WRITE_ROLES))],
     service: Annotated[CatalogueService, Depends(get_catalogue_service)],
-    _idempotency_key: Annotated[UUID | None, Header(alias="Idempotency-Key")] = None,
+    response: Response,
+    idempotency_key: Annotated[UUID | None, Header(alias="Idempotency-Key")] = None,
 ) -> Supplier:
-    return service.create_supplier(bearer_token=token, member=member, payload=payload)
+    supplier, created = service.create_supplier(
+        bearer_token=token, member=member, payload=payload, idempotency_key=idempotency_key
+    )
+    if not created:
+        response.status_code = status.HTTP_200_OK
+    return supplier
 
 
 @router.get("/suppliers/{supplier_id}", response_model=Supplier)

@@ -101,7 +101,8 @@ class DigestsService:
         member: CurrentMember,
         payload: DigestSubscriptionCreate,
         bearer_token: str | None = None,
-    ) -> DigestSubscription:
+        idempotency_key: UUID | None = None,
+    ) -> tuple[DigestSubscription, bool]:
         filter_dict = payload.filters.model_dump(mode="json")
         digest = canonical_filters_digest(filter_dict)
         with _authenticated_db(self._settings, member) as conn:
@@ -124,10 +125,11 @@ class DigestsService:
                         """
                         insert into digest_subscription
                           (tenant_id, membership_id, kind, locale, filters, filters_digest,
-                           channel, status, next_run_at)
+                           channel, status, next_run_at, idempotency_key)
                         values
                           (%(tenant_id)s, %(membership_id)s, 'weekly_digest', %(locale)s,
-                           %(filters)s, %(digest)s, %(channel)s, 'active', %(next_run)s)
+                           %(filters)s, %(digest)s, %(channel)s, 'active', %(next_run)s,
+                           %(idempotency_key)s)
                         returning *
                         """,
                         {
@@ -138,11 +140,21 @@ class DigestsService:
                             "digest": digest,
                             "channel": payload.channel,
                             "next_run": next_run,
+                            "idempotency_key": idempotency_key,
                         },
                     )
                     row = dict(cur.fetchone())
                 conn.commit()
             except psycopg.errors.UniqueViolation as exc:
+                if idempotency_key is not None:
+                    conn.rollback()
+                    with conn.cursor(row_factory=dict_row) as cur:
+                        cur.execute(
+                            "select * from digest_subscription where idempotency_key = %s",
+                            (idempotency_key,),
+                        )
+                        row = dict(cur.fetchone())
+                    return self._map_subscription(row), False
                 raise ConflictError(details={"subscription": "already_exists"}) from exc
 
         sub = self._map_subscription(row)
@@ -152,7 +164,7 @@ class DigestsService:
             action="digests.subscription_created",
             target={"subscription_id": str(sub.id), "channel": sub.channel},
         )
-        return sub
+        return sub, True
 
     def update_subscription(
         self,
@@ -644,9 +656,7 @@ class DigestsService:
         )
 
 
-def _enforce_subscription_cap(
-    conn: psycopg.Connection, *, member: CurrentMember, cap: int
-) -> None:
+def _enforce_subscription_cap(conn: psycopg.Connection, *, member: CurrentMember, cap: int) -> None:
     """T035 (FR-020): each active digest subscription is a standing recurring worker cost, so
     the count of a member's own active subscriptions is capped independently of how fast they
     were created."""

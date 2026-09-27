@@ -144,7 +144,10 @@ def test_large_period_export_creation_stays_async_and_does_not_render(
         lambda *_args, **_kwargs: None,
     )
 
-    job = ExportService(settings=type("Settings", (), {"export_row_cap": 10_000})()).create_job(
+    export_service = ExportService(
+        settings=type("Settings", (), {"export_row_cap": 10_000})()
+    )
+    job, _created = export_service.create_job(
         member=_member().model_copy(update={"tenant_id": tenant_id}),
         payload=ExportCreate(
             kind="savings_ledger",

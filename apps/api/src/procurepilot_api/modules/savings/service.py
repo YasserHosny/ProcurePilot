@@ -6,6 +6,7 @@ from datetime import date
 from decimal import Decimal
 from uuid import UUID
 
+import psycopg.errors
 from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 
@@ -37,7 +38,8 @@ class SavingsService:
         *,
         member: CurrentMember,
         payload: PurchaseOutcomeCreate,
-    ) -> PurchaseOutcomeCreated:
+        idempotency_key: UUID | None = None,
+    ) -> tuple[PurchaseOutcomeCreated, bool]:
         if payload.unit_price.currency != payload.total_paid.currency:
             raise UnprocessableEntityError(details={"currency": "unit_price_total_paid_mismatch"})
         with _authenticated_db(self._settings, member) as conn:
@@ -58,42 +60,69 @@ class SavingsService:
                 actual=payload.total_paid,
             )
             with conn.cursor(row_factory=dict_row) as cur:
-                cur.execute(
-                    """
+                try:
+                    cur.execute(
+                        """
                     insert into purchase_record (
                       tenant_id, workspace_product_id, supplier_id, quotation_line_id,
                       match_decision_id, landed_cost_id, recorded_by, quantity, base_unit,
                       unit_price_amount, unit_price_currency, total_paid_amount,
-                      total_paid_currency, delivery_result, ordered_at, delivered_at, notes
+                      total_paid_currency, delivery_result, ordered_at, delivered_at, notes,
+                      idempotency_key
                     ) values (
                       %(tenant_id)s, %(workspace_product_id)s, %(supplier_id)s,
                       %(quotation_line_id)s, %(match_decision_id)s, %(landed_cost_id)s,
                       %(recorded_by)s, %(quantity)s, %(base_unit)s, %(unit_price_amount)s,
                       %(unit_price_currency)s, %(total_paid_amount)s, %(total_paid_currency)s,
-                      %(delivery_result)s, %(ordered_at)s, %(delivered_at)s, %(notes)s
+                      %(delivery_result)s, %(ordered_at)s, %(delivered_at)s, %(notes)s,
+                      %(idempotency_key)s
                     )
                     returning *
                     """,
-                    {
-                        "tenant_id": member.tenant_id,
-                        "workspace_product_id": payload.workspace_product_id,
-                        "supplier_id": payload.supplier_id,
-                        "quotation_line_id": payload.quotation_line_id,
-                        "match_decision_id": payload.match_decision_id,
-                        "landed_cost_id": payload.landed_cost_id,
-                        "recorded_by": member.membership_id,
-                        "quantity": payload.quantity,
-                        "base_unit": payload.base_unit,
-                        "unit_price_amount": payload.unit_price.amount,
-                        "unit_price_currency": payload.unit_price.currency,
-                        "total_paid_amount": payload.total_paid.amount,
-                        "total_paid_currency": payload.total_paid.currency,
-                        "delivery_result": payload.delivery_result,
-                        "ordered_at": payload.ordered_at,
-                        "delivered_at": payload.delivered_at,
-                        "notes": payload.notes,
-                    },
-                )
+                        {
+                            "tenant_id": member.tenant_id,
+                            "workspace_product_id": payload.workspace_product_id,
+                            "supplier_id": payload.supplier_id,
+                            "quotation_line_id": payload.quotation_line_id,
+                            "match_decision_id": payload.match_decision_id,
+                            "landed_cost_id": payload.landed_cost_id,
+                            "recorded_by": member.membership_id,
+                            "quantity": payload.quantity,
+                            "base_unit": payload.base_unit,
+                            "unit_price_amount": payload.unit_price.amount,
+                            "unit_price_currency": payload.unit_price.currency,
+                            "total_paid_amount": payload.total_paid.amount,
+                            "total_paid_currency": payload.total_paid.currency,
+                            "delivery_result": payload.delivery_result,
+                            "ordered_at": payload.ordered_at,
+                            "delivered_at": payload.delivered_at,
+                            "notes": payload.notes,
+                            "idempotency_key": idempotency_key,
+                        },
+                    )
+                except psycopg.errors.UniqueViolation:
+                    if idempotency_key is None:
+                        raise
+                    conn.rollback()
+                    with conn.cursor(row_factory=dict_row) as lookup:
+                        lookup.execute(
+                            "select * from purchase_record "
+                            "where tenant_id = %s and idempotency_key = %s",
+                            (member.tenant_id, idempotency_key),
+                        )
+                        purchase = dict(lookup.fetchone())
+                        lookup.execute(
+                            "select * from saving_record "
+                            "where tenant_id = %s and purchase_record_id = %s",
+                            (member.tenant_id, purchase["id"]),
+                        )
+                        saving = dict(lookup.fetchone())
+                    return (
+                        PurchaseOutcomeCreated(
+                            purchase_record=_purchase(purchase), saving_record=_saving(saving)
+                        ),
+                        False,
+                    )
                 purchase = dict(cur.fetchone())
                 cur.execute(
                     """
@@ -146,9 +175,12 @@ class SavingsService:
                     },
                 )
                 saving = dict(cur.fetchone())
-            return PurchaseOutcomeCreated(
-                purchase_record=_purchase(purchase),
-                saving_record=_saving(saving),
+            return (
+                PurchaseOutcomeCreated(
+                    purchase_record=_purchase(purchase),
+                    saving_record=_saving(saving),
+                ),
+                True,
             )
 
     def list_savings(

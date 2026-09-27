@@ -94,10 +94,15 @@ class CatalogueService:
                 query = query.eq("status", status)
             if q:
                 query = query.ilike("tenant_name", f"%{q}%")
-            response = query.order("created_at").order("id").range(
-                offset,
-                offset + capped_limit,
-            ).execute()
+            response = (
+                query.order("created_at")
+                .order("id")
+                .range(
+                    offset,
+                    offset + capped_limit,
+                )
+                .execute()
+            )
         except APIError as exc:
             raise ServiceUnavailableError(details={"dependency": "database"}) from exc
 
@@ -120,7 +125,8 @@ class CatalogueService:
         bearer_token: str,
         member: CurrentMember,
         payload: ProductCreate,
-    ) -> Product:
+        idempotency_key: UUID | None = None,
+    ) -> tuple[Product, bool]:
         BillingService(self._settings).ensure_can_add_active_product(member=member)
         client = authenticated_client(self._settings, bearer_token)
         self._require_supplier_visible(client, payload.preferred_supplier_id)
@@ -137,19 +143,35 @@ class CatalogueService:
                 str(payload.preferred_supplier_id) if payload.preferred_supplier_id else None
             ),
         }
+        if idempotency_key is not None:
+            product_payload["idempotency_key"] = str(idempotency_key)
         try:
             product_response = client.table("workspace_product").insert(product_payload).execute()
             product = _one_row(product_response.data, reason="product_write_failed")
-            pack_response = client.table("pack_definition").insert(
-                {
-                    "tenant_id": str(member.tenant_id),
-                    "workspace_product_id": str(product["id"]),
-                    "pack_count": payload.pack.pack_count,
-                    "unit_size": payload.pack.unit_size,
-                }
-            ).execute()
+            pack_response = (
+                client.table("pack_definition")
+                .insert(
+                    {
+                        "tenant_id": str(member.tenant_id),
+                        "workspace_product_id": str(product["id"]),
+                        "pack_count": payload.pack.pack_count,
+                        "unit_size": payload.pack.unit_size,
+                    }
+                )
+                .execute()
+            )
             _one_row(pack_response.data, reason="pack_write_failed")
         except APIError as exc:
+            if idempotency_key is not None and _api_error_code(exc) == "23505":
+                existing = (
+                    client.table("workspace_product")
+                    .select(PRODUCT_COLUMNS)
+                    .eq("idempotency_key", str(idempotency_key))
+                    .limit(1)
+                    .execute()
+                )
+                row = _one_row(existing.data, reason="product_idempotency_lookup_failed")
+                return self._products_from_rows(client, [row])[0], False
             raise _write_error(exc, duplicate_reason="product_exists") from exc
 
         created = self.get_product(bearer_token=bearer_token, product_id=UUID(str(product["id"])))
@@ -159,7 +181,7 @@ class CatalogueService:
             action="catalogue.product_created",
             target={"product_id": str(created.id), "canonical_product_id": str(canonical["id"])},
         )
-        return created
+        return created, True
 
     def update_product(
         self,
@@ -322,10 +344,15 @@ class CatalogueService:
             query = client.table("supplier").select(SUPPLIER_COLUMNS)
             if status != "all":
                 query = query.eq("status", status)
-            response = query.order("created_at").order("id").range(
-                offset,
-                offset + capped_limit,
-            ).execute()
+            response = (
+                query.order("created_at")
+                .order("id")
+                .range(
+                    offset,
+                    offset + capped_limit,
+                )
+                .execute()
+            )
         except APIError as exc:
             raise ServiceUnavailableError(details={"dependency": "database"}) from exc
         rows = _rows(response.data)
@@ -346,7 +373,8 @@ class CatalogueService:
         bearer_token: str,
         member: CurrentMember,
         payload: SupplierCreate,
-    ) -> Supplier:
+        idempotency_key: UUID | None = None,
+    ) -> tuple[Supplier, bool]:
         client = authenticated_client(self._settings, bearer_token)
         row = {
             "tenant_id": str(member.tenant_id),
@@ -357,9 +385,23 @@ class CatalogueService:
             **money_columns("minimum_order_value", payload.minimum_order_value),
             **money_columns("delivery_fee", payload.delivery_fee),
         }
+        if idempotency_key is not None:
+            row["idempotency_key"] = str(idempotency_key)
         try:
             response = client.table("supplier").insert(row).execute()
         except APIError as exc:
+            if idempotency_key is not None and _api_error_code(exc) == "23505":
+                existing = (
+                    client.table("supplier")
+                    .select(SUPPLIER_COLUMNS)
+                    .eq("idempotency_key", str(idempotency_key))
+                    .limit(1)
+                    .execute()
+                )
+                return (
+                    _supplier(_one_row(existing.data, reason="supplier_idempotency_lookup_failed")),
+                    False,
+                )
             raise _write_error(exc, duplicate_reason="supplier_conflict") from exc
         supplier = _supplier(_one_row(response.data, reason="supplier_write_failed"))
         self._record(
@@ -368,7 +410,7 @@ class CatalogueService:
             action="catalogue.supplier_created",
             target={"supplier_id": str(supplier.id)},
         )
-        return supplier
+        return supplier, True
 
     def update_supplier(
         self,
@@ -456,15 +498,19 @@ class CatalogueService:
         self._product_row(client, payload.workspace_product_id)
         self._require_supplier_visible(client, payload.supplier_id)
         try:
-            response = client.table("product_alias").insert(
-                {
-                    "tenant_id": str(member.tenant_id),
-                    "workspace_product_id": str(payload.workspace_product_id),
-                    "supplier_id": str(payload.supplier_id) if payload.supplier_id else None,
-                    "alias_text": payload.alias_text,
-                    "created_by": str(member.membership_id),
-                }
-            ).execute()
+            response = (
+                client.table("product_alias")
+                .insert(
+                    {
+                        "tenant_id": str(member.tenant_id),
+                        "workspace_product_id": str(payload.workspace_product_id),
+                        "supplier_id": str(payload.supplier_id) if payload.supplier_id else None,
+                        "alias_text": payload.alias_text,
+                        "created_by": str(member.membership_id),
+                    }
+                )
+                .execute()
+            )
         except APIError as exc:
             raise _write_error(exc, duplicate_reason="alias_exists") from exc
         alias = _alias(_one_row(response.data, reason="alias_write_failed"))
@@ -739,24 +785,29 @@ class CatalogueService:
             self._ensure_canonical_embedding(row)
             return row
         try:
-            response = self._service_role_client().table("canonical_product").insert(
-                {
-                    "brand": brand,
-                    "name": name,
-                    "variant": variant,
-                    "gtin": gtin,
-                    "base_unit": base_unit,
-                    "canonical_embedding": _embedding_literal(
-                        self._embedding_provider(),
-                        _canonical_embedding_text(
-                            brand=brand,
-                            name=name,
-                            variant=variant,
+            response = (
+                self._service_role_client()
+                .table("canonical_product")
+                .insert(
+                    {
+                        "brand": brand,
+                        "name": name,
+                        "variant": variant,
+                        "gtin": gtin,
+                        "base_unit": base_unit,
+                        "canonical_embedding": _embedding_literal(
+                            self._embedding_provider(),
+                            _canonical_embedding_text(
+                                brand=brand,
+                                name=name,
+                                variant=variant,
+                            ),
                         ),
-                    ),
-                    "canonical_embedding_model": self._embedding_provider().model,
-                }
-            ).execute()
+                        "canonical_embedding_model": self._embedding_provider().model,
+                    }
+                )
+                .execute()
+            )
         except APIError as exc:
             if _api_error_code(exc) == "23505" and gtin:
                 row = self._find_canonical(
@@ -808,9 +859,7 @@ class CatalogueService:
                 query = query.eq("name", name)
                 query = query.is_("gtin", "null")
                 query = (
-                    query.eq("brand", brand)
-                    if brand is not None
-                    else query.is_("brand", "null")
+                    query.eq("brand", brand) if brand is not None else query.is_("brand", "null")
                 )
                 query = (
                     query.eq("variant", variant)

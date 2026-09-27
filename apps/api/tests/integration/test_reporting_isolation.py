@@ -676,7 +676,9 @@ def test_export_worker_refuses_a_tenant_job_mismatch_payload(
             )
             from integration.value_proof_helpers import export_request
 
-            job = ExportService(settings).create_job(member=alpha.member, payload=export_request())
+            job, _created = ExportService(settings).create_job(
+                member=alpha.member, payload=export_request()
+            )
             monkeypatch.setattr(export_worker, "get_settings", lambda: settings)
 
             with pytest.raises(RuntimeError):

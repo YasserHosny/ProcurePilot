@@ -24,15 +24,18 @@ def register_device(
     token: Annotated[str, Depends(bearer_token)],
     member: Annotated[CurrentMember, Depends(current_member)],
     service: Annotated[DevicesService, Depends(get_devices_service)],
-    _idempotency_key: Annotated[
-        UUID | None, Header(alias="Idempotency-Key")
-    ] = None,
+    response: Response,
+    idempotency_key: Annotated[UUID | None, Header(alias="Idempotency-Key")] = None,
 ) -> DeviceRegistration:
-    return service.register_device(
+    device, created = service.register_device(
         bearer_token=token,
         member=member,
         payload=payload,
+        idempotency_key=idempotency_key,
     )
+    if not created:
+        response.status_code = status.HTTP_200_OK
+    return device
 
 
 @router.delete("/devices/{device_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -42,7 +45,5 @@ def delete_device(
     member: Annotated[CurrentMember, Depends(current_member)],
     service: Annotated[DevicesService, Depends(get_devices_service)],
 ) -> Response:
-    service.delete_device(
-        bearer_token=token, member=member, device_id=device_id
-    )
+    service.delete_device(bearer_token=token, member=member, device_id=device_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)

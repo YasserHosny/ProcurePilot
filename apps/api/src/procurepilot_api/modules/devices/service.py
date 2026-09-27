@@ -27,32 +27,46 @@ class DevicesService:
         bearer_token: str,
         member: CurrentMember,
         payload: DeviceRegistrationCreate,
-    ) -> DeviceRegistration:
+        idempotency_key: UUID | None = None,
+    ) -> tuple[DeviceRegistration, bool]:
         del bearer_token
         with _authenticated_db(self._settings, member) as conn:
+            replay = False
             with conn.cursor(row_factory=dict_row) as cur:
-                cur.execute(
-                    """
+                try:
+                    cur.execute(
+                        """
                     insert into device_registration
-                      (tenant_id, member_id, platform, push_token)
-                    values (%s, %s, %s, %s)
+                      (tenant_id, member_id, platform, push_token, idempotency_key)
+                    values (%s, %s, %s, %s, %s)
                     on conflict (tenant_id, member_id, push_token)
                     do update set last_seen_at = now()
                     returning id, member_id, platform, push_token, last_seen_at
-                    """,
-                    (
-                        member.tenant_id,
-                        member.membership_id,
-                        payload.platform,
-                        payload.push_token,
-                    ),
-                )
+                        """,
+                        (
+                            member.tenant_id,
+                            member.membership_id,
+                            payload.platform,
+                            payload.push_token,
+                            idempotency_key,
+                        ),
+                    )
+                except psycopg.errors.UniqueViolation:
+                    if idempotency_key is None:
+                        raise
+                    conn.rollback()
+                    cur.execute(
+                        "select id, member_id, platform, push_token, last_seen_at "
+                        "from device_registration where idempotency_key = %s",
+                        (idempotency_key,),
+                    )
+                    replay = True
                 row = cur.fetchone()
             if row is None:
                 raise ServiceUnavailableError(
                     details={"reason": "device_registration_write_failed"}
                 )
-            return DeviceRegistration.model_validate(dict(row))
+            return DeviceRegistration.model_validate(dict(row)), not replay
 
     def delete_device(
         self,
@@ -82,9 +96,7 @@ def get_devices_service() -> DevicesService:
 
 
 @contextmanager
-def _authenticated_db(
-    settings: Settings, member: CurrentMember
-) -> Iterator[psycopg.Connection]:
+def _authenticated_db(settings: Settings, member: CurrentMember) -> Iterator[psycopg.Connection]:
     try:
         with psycopg.connect(settings.database_url.get_secret_value()) as conn:
             with conn.cursor() as cur:
@@ -101,6 +113,4 @@ def _authenticated_db(
                 )
             yield conn
     except psycopg.Error as exc:
-        raise ServiceUnavailableError(
-            details={"dependency": "database"}
-        ) from exc
+        raise ServiceUnavailableError(details={"dependency": "database"}) from exc
