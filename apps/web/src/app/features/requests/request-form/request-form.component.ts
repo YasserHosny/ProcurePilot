@@ -13,15 +13,17 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { ActivatedRoute, Router } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
-import { of } from 'rxjs';
-import { catchError } from 'rxjs/operators';
+import { forkJoin, of, type Observable } from 'rxjs';
+import { catchError, finalize, tap } from 'rxjs/operators';
 
 import { ApiService } from '../../../core/api/api.service';
 import { FormatDatePipe } from '../../../core/format/date.pipe';
 import type {
   ApiError,
   Branch,
+  BranchList,
   CostCentre,
+  CostCentreList,
   Member,
   PurchaseRequest,
   PurchaseRequestLine,
@@ -100,17 +102,31 @@ export class RequestFormComponent implements OnInit {
   }
 
   ngOnInit(): void {
-    this.loadBranches();
-    this.loadCostCentres();
+    this.isLoading.set(true);
 
     const requestId = this.route.snapshot.paramMap.get('id');
-    if (requestId) {
+    const isEditMode = requestId !== null;
+    if (isEditMode) {
       this.isEditMode.set(true);
       this.loadMembers();
-      this.loadRequest(requestId);
-    } else {
-      this.addLine();
     }
+
+    forkJoin({
+      branches: this.loadBranches(),
+      costCentres: this.loadCostCentres(),
+      request: requestId ? this.loadRequest(requestId) : of(null),
+    })
+      .pipe(
+        finalize(() => {
+          this.isLoading.set(false);
+          if (!isEditMode) {
+            this.addLine();
+          }
+        }),
+      )
+      .subscribe({
+        error: (err: unknown) => this.handleError(err),
+      });
   }
 
   addLine(): void {
@@ -212,16 +228,16 @@ export class RequestFormComponent implements OnInit {
     return `${line.estimated_unit_price.currency} ${line.estimated_unit_price.amount}`;
   }
 
-  private loadBranches(): void {
-    this.organisationApi.listBranches({ is_active: true }).subscribe({
-      next: (res) => this.branches.set([...res.items]),
-    });
+  private loadBranches(): Observable<BranchList> {
+    return this.organisationApi
+      .listBranches({ is_active: true })
+      .pipe(tap((res) => this.branches.set([...res.items])));
   }
 
-  private loadCostCentres(): void {
-    this.organisationApi.listCostCentres({ is_archived: false }).subscribe({
-      next: (res) => this.costCentres.set([...res.items]),
-    });
+  private loadCostCentres(): Observable<CostCentreList> {
+    return this.organisationApi
+      .listCostCentres({ is_archived: false })
+      .pipe(tap((res) => this.costCentres.set([...res.items])));
   }
 
   private loadMembers(): void {
@@ -238,10 +254,9 @@ export class RequestFormComponent implements OnInit {
       .subscribe((res) => this.members.set([...res.items]));
   }
 
-  private loadRequest(requestId: string): void {
-    this.isLoading.set(true);
-    this.requestsApi.getRequest(requestId).subscribe({
-      next: (req) => {
+  private loadRequest(requestId: string): Observable<PurchaseRequest> {
+    return this.requestsApi.getRequest(requestId).pipe(
+      tap((req) => {
         this.existingRequest.set(req);
         this.form.patchValue({
           branch_id: req.branch_id,
@@ -268,13 +283,8 @@ export class RequestFormComponent implements OnInit {
         if (req.status !== 'draft') {
           this.form.disable();
         }
-        this.isLoading.set(false);
-      },
-      error: (err: unknown) => {
-        this.isLoading.set(false);
-        this.handleError(err);
-      },
-    });
+      }),
+    );
   }
 
   private handleError(err: unknown): void {
