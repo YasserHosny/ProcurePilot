@@ -33,5 +33,4 @@ playwright-report
 **/playwright-report
 test-results
 **/test-results
-samples
-**/samples
+/samples
