@@ -1,7 +1,7 @@
 # ProcurePilot User Flows
 
 > Navigation paths for every user-facing page, with journey visualisations.
-> Last updated: 26 Sep 2026.
+> Last updated: 27 Sep 2026.
 >
 > Covers the web app only. The mobile app uses named routes rather than URLs; see
 > [ProcurePilot Mobile App User Documentation](mobile-app-user-documentation.md) for its screens
@@ -291,13 +291,102 @@ journey
 
 ---
 
+## Reporting and Automated Ingestion
+
+- `/home` -> **Reports** -> `/reports` -> **Artifacts** tab -> filter by kind/status -> **Download**
+- `/reports` -> **Schedules** tab -> **+ New Schedule** -> `/reports/schedule-form` -> pick kind, format, filters, delivery day, locale -> save -> back to `/reports`
+- `/savings/export` -> **Schedule as Weekly Report** -> `/reports/schedule-form` (pre-populated with the export's kind/format/filters)
+- `/home` -> account menu or digest link -> `/reports/digest-settings` -> choose channel + locale -> browse the latest in-app digest -> follow a deep link into the relevant screen
+- `/home` -> **Ingestion** -> `/ingestion` -> open a channel card -> **Email Forwarding** (`/ingestion/email-config`), **Email Log** (`/ingestion/email-log`), **Capture** (`/ingestion/capture`), **Catalogue Import** (`/ingestion/catalogue-import`), or **Refresh Schedules** (`/ingestion/refresh-schedules`)
+- `/ingestion/capture` -> upload or take a photo -> quotation created -> **View Quotation** -> `/quotations/:id/review`
+- `/ingestion/catalogue-import` -> pick supplier -> upload spreadsheet -> import results + error details
+- `/ingestion/refresh-schedules` -> pick product + supplier + cadence -> **Add schedule** -> assign a source catalogue import inline
+
+```mermaid
+journey
+    title Reports and Digest
+    section Reports Center
+        Go to Reports: 3: User
+        View artifacts: 3: User
+        Download artifact: 4: User
+    section Schedules
+        New schedule: 3: User
+        Configure kind and format: 4: User
+        Save schedule: 5: User
+    section Digest
+        Open digest settings: 3: User
+        Choose channel: 4: User
+        Read latest digest: 4: User
+        Follow deep link: 5: User
+```
+
+```mermaid
+journey
+    title Automated Ingestion
+    section Dashboard
+        Go to Ingestion: 3: User
+        Check stats and coverage: 3: User
+    section Channels
+        Open Email Config: 3: User
+        Open Email Log: 3: User
+        Open Capture: 3: User
+        Open Catalogue Import: 3: User
+        Open Refresh Schedules: 3: User
+    section Capture Flow
+        Upload or photo: 3: User
+        Quotation created: 4: System
+        Open review: 5: User
+```
+
+---
+
+## Connected Operations (Orders, Accounting, POS)
+
+- `/home` -> **Order Tracking** -> `/orders` -> open a row -> `/orders/:id` -> **Record confirmation** or **Record delivery** -> evidence timeline updates
+- `/orders/:id` (Draft only) -> **Submit order** -> status becomes Submitted
+- `/home` -> **Accounting** -> `/accounting` -> **Connect** (Owner) -> provider OAuth -> back to `/accounting` -> **View Synced Bills** -> `/accounting/bills` -> **Sync now** -> filter by match status
+- `/accounting` -> **View Synced Bills** -> back link -> **Reconciliation Discrepancies** is reached at `/accounting/discrepancies` -> filter Open/Resolved -> **Resolve** with an optional note
+- `/home` -> **POS** -> `/pos` -> **Connect** (Owner) -> Square OAuth -> back to `/pos` -> **View Synced Signals** -> `/pos/signals` -> **Sync now** -> match an unmatched signal to a catalogue product
+
+```mermaid
+journey
+    title Order Tracking
+    section View
+        Go to Orders: 3: User
+        Open order: 4: User
+    section Evidence
+        Record confirmation: 4: User
+        Record delivery: 4: User
+        View timeline: 5: User
+```
+
+```mermaid
+journey
+    title Accounting and POS Integration
+    section Accounting
+        Connect provider: 3: User
+        View synced bills: 3: User
+        Sync now: 4: User
+        Review discrepancies: 4: User
+        Resolve discrepancy: 5: User
+    section POS
+        Connect Square: 3: User
+        View synced signals: 3: User
+        Match signal to product: 4: User
+```
+
+> **Note:** neither Order Tracking, Accounting, nor POS has a create/connect-provider-choice flow beyond what's listed above — orders are created via the API only (§11 of the user documentation), and the accounting provider (QuickBooks or Xero) is fixed by workspace configuration, not chosen in the UI.
+
+---
+
 ## Predictive Procurement and Sourcing
 
 - `/home` -> **Reorder Forecasts** -> `/forecasting` -> pick branch + required-by date -> **Prepare draft request** -> draft appears in `/requests`
 - `/home` -> **Supplier Risk** -> `/supplier-risk` -> **View scorecard** -> `/suppliers/:id/scorecard` -> **Prepare negotiation brief** -> `/negotiation-briefs/:id` -> acknowledge or dismiss
 - `/home` -> **Procurement Analyst** -> `/analyst` -> ask a question -> follow a next-step link, or **Question History** -> `/analyst/history` -> reopen a conversation -> `/analyst/:conversationId`
 - `/home` -> **RFQ History** -> `/rfq/history` -> **Create RFQ** -> `/rfq/create` -> add lines + pick suppliers -> **Save Draft** -> **Send RFQ** -> supplier replies captured automatically
-- `/home` -> **RFQ History** -> `/rfq/history` -> open a row -> `/rfq/compare/:id` -> **Prepare Request** -> draft appears in `/requests`; a `Converted` row instead opens `/requests/:id` directly
+- `/home` -> **RFQ History** -> `/rfq/history` -> open a row -> `/rfq/compare/:id` -> review each response's guardrail-outcome panel -> **Prepare Request** -> draft appears in `/requests`; a `Converted` row instead opens `/requests/:id` directly
+- `/rfq/history` -> **Guardrails** (Owner only) -> `/rfq/guardrails` -> create or edit a guardrail -> save -> guardrail can now auto-prepare a matching RFQ response
 
 ```mermaid
 journey
@@ -327,6 +416,10 @@ journey
         Open RFQ: 3: User
         Compare responses: 4: User
         Prepare request: 5: User
+    section Guardrails
+        Open Guardrails: 3: User
+        Configure guardrail: 4: User
+        Save guardrail: 5: User
 ```
 
 ---

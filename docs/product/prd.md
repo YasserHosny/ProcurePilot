@@ -115,4 +115,7 @@
 
 1. Should savings baseline be customer-configurable or a single conservative default?
 2. Does WhatsApp ingestion require a direct integration or manual file export?
-3. Which accounting/POS providers are pilot priorities for Phase 3?
+3. ~~Which accounting/POS providers are pilot priorities for Phase 3?~~ Resolved: QuickBooks
+   Online and Xero for accounting (014-accounting-integration, 016-order-tracking-three-way-match)
+   and Square for POS/inventory (015-pos-inventory-integration) shipped in Phase 3 and are live
+   in the product today.

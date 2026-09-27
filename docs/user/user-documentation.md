@@ -1,7 +1,7 @@
 # ProcurePilot User Documentation
 
 > Complete system journey with annotated screenshots for every screen.
-> Last updated: 26 Sep 2026.
+> Last updated: 27 Sep 2026.
 >
 > Covers the web app only. For the mobile app (sign-in, biometric unlock, role-aware home
 > screen), see [ProcurePilot Mobile App User Documentation](mobile-app-user-documentation.md).
@@ -20,32 +20,36 @@
 8. [Upload Supplier Quotation](#8-upload-supplier-quotation)
 9. [Quotation Review & Authorization](#9-quotation-review--authorization)
 10. [Match Resolution Queue](#10-match-resolution-queue)
-11. [Smart Compare](#11-smart-compare)
-12. [Basket Split & Advanced Optimiser](#12-basket-split--advanced-optimiser)
-13. [Supplier Scorecards & Supplier IQ](#13-supplier-scorecards--supplier-iq)
-14. [Alerts Inbox & Anomaly Detection](#14-alerts-inbox--anomaly-detection)
-15. [Savings Ledger](#15-savings-ledger)
-16. [Export Savings](#16-export-savings)
-17. [Purchase Requests](#17-purchase-requests)
-18. [New Purchase Request](#18-new-purchase-request)
-19. [Approval Queue](#19-approval-queue)
-20. [Team Management](#20-team-management)
-21. [Organisation Settings](#21-organisation-settings)
-22. [Reports Center](#22-reports-center)
-23. [Report Schedules & Schedule Form](#23-report-schedules--schedule-form)
-24. [Weekly Digest & Digest Settings](#24-weekly-digest--digest-settings)
-25. [Roles & Permissions](#25-roles--permissions)
-26. [Ingestion Dashboard](#26-ingestion-dashboard)
-27. [Email Forwarding Setup](#27-email-forwarding-setup)
-28. [Email Ingestion Log](#28-email-ingestion-log)
-29. [Capture a Quotation (Photo or Upload)](#29-capture-a-quotation-photo-or-upload)
-30. [Catalogue Import (Bulk Price List)](#30-catalogue-import-bulk-price-list)
-31. [Reorder Forecasts & Reorder Queue](#31-reorder-forecasts--reorder-queue)
-32. [Supplier Risk Queue & Negotiation Briefs](#32-supplier-risk-queue--negotiation-briefs)
-33. [Procurement Analyst](#33-procurement-analyst)
-34. [RFQ Sourcing & Response Comparison](#34-rfq-sourcing--response-comparison)
-35. [FAQ](#35-faq)
-36. [Known Issues](#36-known-issues)
+11. [Order Tracking & Three-Way Match](#11-order-tracking--three-way-match)
+12. [Smart Compare](#12-smart-compare)
+13. [Basket Split & Advanced Optimiser](#13-basket-split--advanced-optimiser)
+14. [Supplier Scorecards & Supplier IQ](#14-supplier-scorecards--supplier-iq)
+15. [Alerts Inbox & Anomaly Detection](#15-alerts-inbox--anomaly-detection)
+16. [Savings Ledger](#16-savings-ledger)
+17. [Export Savings](#17-export-savings)
+18. [Purchase Requests](#18-purchase-requests)
+19. [New Purchase Request](#19-new-purchase-request)
+20. [Approval Queue](#20-approval-queue)
+21. [Team Management](#21-team-management)
+22. [Organisation Settings](#22-organisation-settings)
+23. [Reports Center](#23-reports-center)
+24. [Report Schedules & Schedule Form](#24-report-schedules--schedule-form)
+25. [Weekly Digest & Digest Settings](#25-weekly-digest--digest-settings)
+26. [Roles & Permissions](#26-roles--permissions)
+27. [Ingestion Dashboard](#27-ingestion-dashboard)
+28. [Email Forwarding Setup](#28-email-forwarding-setup)
+29. [Email Ingestion Log](#29-email-ingestion-log)
+30. [Capture a Quotation (Photo or Upload)](#30-capture-a-quotation-photo-or-upload)
+31. [Catalogue Import (Bulk Price List)](#31-catalogue-import-bulk-price-list)
+32. [Catalogue Refresh Schedules](#32-catalogue-refresh-schedules)
+33. [Accounting Integration](#33-accounting-integration)
+34. [POS & Inventory Integration](#34-pos--inventory-integration)
+35. [Reorder Forecasts & Reorder Queue](#35-reorder-forecasts--reorder-queue)
+36. [Supplier Risk Queue & Negotiation Briefs](#36-supplier-risk-queue--negotiation-briefs)
+37. [Procurement Analyst](#37-procurement-analyst)
+38. [RFQ Sourcing & Response Comparison](#38-rfq-sourcing--response-comparison)
+39. [FAQ](#39-faq)
+40. [Known Issues](#40-known-issues)
 
 ---
 
@@ -93,7 +97,7 @@ Enter your work email and submit the form to request a reset email. The flow sta
 
 ![Create Workspace](screenshots/01c-workspace-signup.jpg)
 
-Workspace creation is invitation-gated during the pilot programme. The form captures the platform invitation token, business name, owner email, password, operating region, primary currency, tax model, and default locale; successful completion creates the isolated tenant and first owner account.
+Workspace creation is invitation-gated during the pilot programme. The form captures the platform invitation token, business name, owner email, password, operating region, primary currency, tax model, and default locale; successful completion creates the isolated tenant and first owner account, then takes you to a **Plan Confirmation** screen (`/onboarding/plan`) before entering the workspace.
 
 ### Accept invitation
 
@@ -102,6 +106,12 @@ Workspace creation is invitation-gated during the pilot programme. The form capt
 ![Accept Invitation](screenshots/01d-accept-invitation.jpg)
 
 Invited members arrive here from their email link. The token identifies the pending invitation, then the user signs in or creates credentials before being added to the workspace with the role assigned by the owner.
+
+### Plan Confirmation
+
+**Route:** `/onboarding/plan` (reached automatically after Create Workspace)
+
+The final step of workspace creation: a summary card showing the workspace's plan name, a features-included checklist (AI matching, Smart Compare, Basket Split, Savings Ledger, Alerts), and how many active catalogue products the plan allows versus how many currently exist. A **Continue** button proceeds into the authenticated app. The same screen also exists at `/plan` inside the authenticated shell, but nothing in the app links to it there — it's reachable only by typing the URL directly once signed in.
 
 ---
 
@@ -119,7 +129,7 @@ Invited members arrive here from their email link. The token identifies the pend
 | 4 | **Tenant & Security card** | Shows your Tenant ID, workspace slug, and the isolation level (PostgreSQL Row-Level Security, FORCED). This is read-only and confirms your data is fully isolated. |
 | 5 | **Regional & Financial Settings card** | Displays your region (e.g. GB), primary currency (e.g. GBP), tax model (e.g. uk_vat_standard), and default locale. These are set at sign-up and are immutable. |
 | 6 | **Current User Authority card** | Shows your email, assigned role (Owner, Buyer, etc.), and MFA status. |
-| 7 | **Procurement Intelligence Modules** | A roadmap card describing each module. **Note:** the "Active"/"Upcoming" labels on this card describe the original chunk plan and have not been refreshed since — Quotation Inbox, Smart Compare, and Savings Ledger are fully built and in active use even though the card may still read "Upcoming." Use the side navigation, not this card, to judge what's actually available. |
+| 7 | **Procurement Intelligence Modules** | A roadmap card describing each module. **Note:** the "Active"/"Upcoming" labels on this card describe the original chunk plan and have not been refreshed since — nearly every module described as "Upcoming" (Quotation Inbox, Smart Compare, Savings Ledger, RFQ sourcing, Order Tracking, Accounting/POS integration, forecasting, supplier risk, the analyst) is fully built and in active use. Use the side navigation, not this card, to judge what's actually available. |
 
 ### Authenticated app sidebar
 
@@ -131,15 +141,25 @@ Invited members arrive here from their email link. The token identifies the pend
 | 2 | **Overview** | Opens the Dashboard and workspace security summary. |
 | 3 | **Products** | Opens the Product Catalogue. |
 | 4 | **Suppliers** | Opens supplier records and supplier profile management. |
-| 5 | **Import Catalogue** | Opens the CSV import workflow for bulk product updates. |
-| 6 | **Quotation Inbox** | Opens quotation upload, review, authorization, and audit-trail workflows. |
-| 7 | **Match Resolution** | Opens quotation-line product matching tasks. |
-| 8 | **Smart Compare** | Opens supplier offer comparison and price intelligence tools. |
-| 9 | **Basket Split** | Opens the two-supplier basket optimisation workflow. |
-| 10 | **Alerts Inbox** | Opens detected pricing and procurement alerts. |
-| 11 | **Savings Ledger** | Opens savings records, evidence, outcome capture, and export workflows. |
-| 12 | **Purchase Requests / Approval Queue** | Opens request intake and approval tracking screens for enabled roles. |
-| 13 | **Team Management / Settings** | Opens member administration and organisation configuration screens. |
+| 5 | **Supplier Risk** | Opens the workspace-wide Supplier Risk Queue (§36). |
+| 6 | **Procurement Analyst / Question History** | Opens the grounded Q&A assistant and its conversation history (§37). |
+| 7 | **Import Catalogue** | Opens the CSV import workflow for bulk product/supplier updates (Owner/Buyer). |
+| 8 | **Quotation Inbox** | Opens quotation upload, review, authorization, and audit-trail workflows. |
+| 9 | **Match Resolution** | Opens quotation-line product matching tasks. |
+| 10 | **Order Tracking** | Opens the purchase order lifecycle screens (§11). |
+| 11 | **RFQ History** | Opens the RFQ sourcing history, create, and compare screens (§38). |
+| 12 | **Smart Compare** | Opens supplier offer comparison and price intelligence tools. |
+| 13 | **Basket Split** | Opens the multi-supplier basket optimisation workflow (Owner/Buyer). |
+| 14 | **Alerts Inbox** | Opens detected pricing and procurement alerts. |
+| 15 | **Reorder Forecasts** | Opens the demand-forecast reorder queue (§35, Owner/Buyer only). |
+| 16 | **Savings Ledger** | Opens savings records, evidence, outcome capture, and export workflows. |
+| 17 | **Reports** | Opens the Reports Center (§23). |
+| 18 | **Ingestion** | Opens the automated-ingestion hub (§27). |
+| 19 | **Accounting** | Opens Accounting Integration (§33). |
+| 20 | **POS** | Opens POS & Inventory Integration (§34). |
+| 21 | **Purchase Requests / Approval Queue** | Opens request intake and approval tracking screens. |
+| 22 | **Team Management** | Opens member administration (Owner only). |
+| 23 | **Settings** | Opens organisation configuration screens. |
 
 **Business value:** the dashboard gives users a quick confidence check that they are in the right workspace, under the right role, with the right tenant isolation and financial settings. That reduces setup uncertainty before they begin uploading quotes, comparing offers, or approving spend.
 
@@ -223,7 +243,7 @@ A supplier may quote "1 case of 12 x 500ml bottles" while another quotes "1 pack
 | # | Element | Description |
 |---|---------|-------------|
 | 1 | **Supplier Name** (required) | The only mandatory field — a supplier can be created with just a name and completed later. |
-| 2 | **Contact Email** | The address ProcurePilot sends RFQs to when you include this supplier in a Create RFQ send (§34). Optional, but validated as a real email address if you enter one. A supplier with no contact email on file simply won't appear in the RFQ supplier picker — there's no other purchasing workflow it blocks. |
+| 2 | **Contact Email** | The address ProcurePilot sends RFQs to when you include this supplier in a Create RFQ send (§38). Optional, but validated as a real email address if you enter one. A supplier with no contact email on file simply won't appear in the RFQ supplier picker — there's no other purchasing workflow it blocks. |
 | 3 | **Payment Terms** | Free text, e.g. "Net 30". |
 | 4 | **Lead Time (Days)** | Typical delivery lead time, used in Smart Compare's scoring. |
 | 5 | **Minimum Order Amount / Currency** | Both fields are required together — Constitution Principle VII: no bare numbers for money. Leave both blank if there is no minimum. |
@@ -387,7 +407,49 @@ After AI extraction finishes, each quotation lands in the review queue. Open a r
 
 ---
 
-## 11. Smart Compare
+## 11. Order Tracking & Three-Way Match
+
+**Route:** `/orders`
+
+![Order Tracking](screenshots/35-order-list.jpg)
+
+Tracks a purchase order's lifecycle — submitted, confirmed by the supplier, delivered, and (where an accounting connection exists) reconciled against the supplier's invoice. ProcurePilot never sends, changes, cancels, or pays an order through any integration; every write on these screens is an internal evidence record.
+
+| # | Element | Description |
+|---|---------|-------------|
+| 1 | **Page title — "Order Tracking"** | Lists every purchase order in your workspace, newest first. Open to every role, including Viewer. |
+| 2 | **Refresh button** | Reloads the list from the server. |
+| 3 | **Order rows** | Each row: order number (links to detail), a status chip, the order date, line count, and total value. |
+| 4 | **Load more** | Cursor-paginated; click to fetch older orders. |
+| 5 | **Empty state** | "No purchase orders yet" — shown until an order exists. |
+
+**Order statuses:** Draft, Submitted, Confirmed, Partially Received, Received, Cancelled, Closed.
+
+**There is no "Create Order" button anywhere in the web app.** Purchase orders are created via the API only — entered manually by an integration, imported, or synced read-only from a connected accounting/POS provider (`source_kind`: manual, import, or provider). Approving a purchase request (§20) does not automatically create an order; the two are separate records today.
+
+### Order Detail
+
+**Route:** `/orders/:id` (Owner or Buyer — opening this page with any other role redirects you back to the Dashboard)
+
+![Order Detail](screenshots/35b-order-detail.jpg)
+
+| # | Element | Description |
+|---|---------|-------------|
+| 1 | **Back to orders link** | Returns to the order list. |
+| 2 | **Header** | Order number, a status chip, and the creation date. |
+| 3 | **Summary cards** | Order date, expected delivery date, order total, and two evidence-state cards — **Supplier confirmation** and **Delivery receipt** — each reading **Pending**, **Available**, or **Unavailable** rather than silently showing zero when no evidence has been recorded yet. |
+| 4 | **Evidence by line** | One row per order line: description, unit price and base unit, ordered quantity, confirmed quantity (with its own evidence state), received quantity (with its own evidence state), and the remaining quantity still outstanding. |
+| 5 | **Submit order button** | Visible only while the order is `Draft`; moves it to `Submitted`. |
+| 6 | **Record confirmation / Record delivery buttons** | Visible for any order that isn't `Cancelled` or `Closed`. Each opens an inline form: a reference, a date, and a quantity field per line (confirmed quantity, or received quantity). Delivery receipts are cumulative — recording a second, partial receipt adds to the first rather than replacing it; the line's remaining quantity is recomputed deterministically each time. |
+| 7 | **Evidence timeline** | A chronological log: order created, confirmation recorded (if any), and one entry per delivery receipt (with its reference). |
+
+**Business value:** order tracking closes the loop after a purchase request is approved. It gives buyers one place to see whether a supplier confirmed what was ordered and how much has actually arrived, without ProcurePilot ever contacting the supplier itself — every write here is an internal evidence record that later feeds three-way-match reconciliation.
+
+**Related screen:** when an accounting connection exists, mismatches between what was ordered, confirmed, received, and invoiced surface as three-way-match discrepancies on the Reconciliation Discrepancies screen — see [§33 Accounting Integration](#33-accounting-integration).
+
+---
+
+## 12. Smart Compare
 
 **Route:** `/offers/compare`
 
@@ -401,7 +463,7 @@ After AI extraction finishes, each quotation lands in the review queue. Open a r
 | 4 | **Include expired offers toggle** | Check to include expired quotation offers in the comparison. |
 | 5 | **Recommended Offer banner** | Shown when a matched and costed offer exists: a confidence badge (High/Medium/Low), a recommendation score, risk considerations (e.g. "Product match confidence is below 85%"), validity window, and scoring evidence breakdown. When Supplier IQ risk evaluation influenced the recommendation, a **Supplier IQ / Risk** evidence chip and risk panel appear with a direct **View Supplier Scorecard** link. |
 | 6 | **Comparison table** | Each row is one supplier offer: unit price, total landed cost, lead time, reliability, stock availability, match confidence, validity, and status. Next to each supplier's name, a scorecard icon button allows navigating directly to that supplier's detailed Supplier IQ scorecard (`/suppliers/:id/scorecard`). |
-| 7 | **Record Purchase action** | From the banner or any table row, click "Record Purchase" to open the outcome-capture form (section 15) and have the savings automatically calculated. |
+| 7 | **Record Purchase action** | From the banner or any table row, click "Record Purchase" to open the outcome-capture form (section 16) and have the savings automatically calculated. |
 
 **Business value:** Smart Compare converts cleaned data into a buying decision. It lowers recurring purchasing cost, gives buyers evidence for negotiation, and helps owners see why a recommendation was made before money is spent.
 
@@ -428,7 +490,7 @@ After AI extraction finishes, each quotation lands in the review queue. Open a r
 
 ---
 
-## 12. Basket Split & Advanced Optimiser
+## 13. Basket Split & Advanced Optimiser
 
 **Route:** `/offers/basket-split`
 
@@ -454,7 +516,7 @@ After AI extraction finishes, each quotation lands in the review queue. Open a r
 
 ---
 
-## 13. Supplier Scorecards & Supplier IQ
+## 14. Supplier Scorecards & Supplier IQ
 
 **Route:** `/suppliers/:id/scorecard`
 
@@ -469,11 +531,11 @@ After AI extraction finishes, each quotation lands in the review queue. Open a r
 
 **Business value:** Supplier IQ transforms fragmented operational and commercial records into defensible risk indicators, empowering buyers to detect vendor drift and quality issues before awarding orders.
 
-**R4.1 extension:** this page now ends with a **Supplier Risk Evidence** panel (the v2 risk model, with a component-level evidence table and a **Prepare negotiation brief** button) and is also reachable from a workspace-wide **Supplier Risk Queue**. See [§32 Supplier Risk Queue & Negotiation Briefs](#32-supplier-risk-queue--negotiation-briefs).
+**R4.1 extension:** this page now ends with a **Supplier Risk Evidence** panel (the v2 risk model, with a component-level evidence table and a **Prepare negotiation brief** button) and is also reachable from a workspace-wide **Supplier Risk Queue**. See [§36 Supplier Risk Queue & Negotiation Briefs](#36-supplier-risk-queue--negotiation-briefs).
 
 ---
 
-## 14. Alerts Inbox & Anomaly Detection
+## 15. Alerts Inbox & Anomaly Detection
 
 **Route:** `/alerts`
 
@@ -502,7 +564,7 @@ After AI extraction finishes, each quotation lands in the review queue. Open a r
 
 ---
 
-## 15. Savings Ledger
+## 16. Savings Ledger
 
 **Route:** `/savings`
 
@@ -554,7 +616,7 @@ Reached from **Record Purchase** on any Smart Compare offer, or **+ Record Purch
 
 ---
 
-## 16. Export Savings
+## 17. Export Savings
 
 **Route:** `/savings/export`
 
@@ -568,14 +630,14 @@ Reached from **Record Purchase** on any Smart Compare offer, or **+ Record Purch
 | 4 | **Export Format selector** | Choose **Excel Spreadsheet (.xlsx)**, **CSV Spreadsheet (.csv)**, or **PDF Summary Report (.pdf)**. |
 | 5 | **Period Start Date / Period End Date** | Filters the export by recorded date; default to year-to-date. |
 | 6 | **Filter by Branch / Supplier** | Optionally restrict the export to an enabled branch or specific supplier. |
-| 7 | **Schedule as Weekly Report link** | Pre-populates the Report Schedule form (§23) with the selected kind, format, and filters. |
+| 7 | **Schedule as Weekly Report link** | Pre-populates the Report Schedule form (§24) with the selected kind, format, and filters. |
 | 8 | **Generate Export button** | Submits the export job. A progress indicator shows processing status, and a download link appears when complete. |
 
 **Business value:** exports make procurement value portable. Finance, owners, and external advisors can review verified savings and spend intelligence outside the app without losing the evidence discipline that produced the numbers. Export generation is capped at 10,000 rows with a strict 60-second execution budget to protect workspace performance.
 
 ---
 
-## 17. Purchase Requests
+## 18. Purchase Requests
 
 **Route:** `/requests`
 
@@ -599,7 +661,7 @@ Reached from **Record Purchase** on any Smart Compare offer, or **+ Record Purch
 
 ---
 
-## 18. New Purchase Request
+## 19. New Purchase Request
 
 **Route:** `/requests/new` or `/requests/:id`
 
@@ -608,7 +670,7 @@ Reached from **Record Purchase** on any Smart Compare offer, or **+ Record Purch
 | # | Element | Description |
 |---|---------|-------------|
 | 1 | **Page title** | Reads "New Purchase Request" when creating a draft and "Edit Purchase Request" when opening an existing draft/submitted request. |
-| 2 | **Branch selector** (required) | Select the branch this request is for. Branches are defined in Organisation Settings (section 21) — a request cannot be created until at least one branch exists. Existing requests show the saved branch. |
+| 2 | **Branch selector** (required) | Select the branch this request is for. Branches are defined in Organisation Settings (section 22) — a request cannot be created until at least one branch exists. Existing requests show the saved branch. |
 | 3 | **Cost Centre selector** (optional) | Optionally assign the request to a cost centre for budget tracking. |
 | 4 | **Required By date** (required) | The date by which the goods are needed. |
 | 5 | **Line Items section** | Each line needs a **Product**, a **Quantity**, and an optional **Note**. |
@@ -617,13 +679,13 @@ Reached from **Record Purchase** on any Smart Compare offer, or **+ Record Purch
 
 **Current display limitation:** existing submitted requests can show the saved product UUID in the line-item field instead of the product name. The underlying relationship is stored correctly, but the detail display still needs the same friendly-name resolution used elsewhere in the app.
 
-**Approval status (once submitted):** once a request has been routed to an approver, the detail view shows an **Approval** section below the budget status: a status chip (Pending / Approved / Rejected), who it's assigned to, and — once a decision has been made — the approver's comment (if any) and the decision timestamp. This is read-only; only the assigned approver can act on it, from the Approval Queue (section 19).
+**Approval status (once submitted):** once a request has been routed to an approver, the detail view shows an **Approval** section below the budget status: a status chip (Pending / Approved / Rejected), who it's assigned to, and — once a decision has been made — the approver's comment (if any) and the decision timestamp. This is read-only; only the assigned approver can act on it, from the Approval Queue (section 20).
 
 **Business value:** a structured request preserves the context that is usually lost in chat messages: who needs the item, where it is needed, when it is needed, and what budget or price history should influence the decision.
 
 ---
 
-## 19. Approval Queue
+## 20. Approval Queue
 
 **Route:** `/approvals`
 
@@ -631,7 +693,7 @@ Reached from **Record Purchase** on any Smart Compare offer, or **+ Record Purch
 
 | # | Element | Description |
 |---|---------|-------------|
-| 1 | **Page title — "Approval Queue"** | Requests awaiting your decision. Only requests routed to you — directly, or via an active delegation (section 21) — based on threshold approval rules appear here. |
+| 1 | **Page title — "Approval Queue"** | Requests awaiting your decision. Only requests routed to you — directly, or via an active delegation (section 22) — based on threshold approval rules appear here. |
 | 2 | **Approvals table** | One row per pending request: required-by date, requester, branch, cost centre, estimated total (with an "incomplete estimate" badge when some lines lack pricing), budget status, and line count. |
 | 3 | **Budget Status column** | Shows the remaining budget after this request, or an amber "Budget Exceeded" badge with a tooltip and the remaining-budget figure when the request would exceed the applicable budget. Blank when no budget applies. |
 | 4 | **Lines column + expand toggle** | Shows the line count; the expand icon reveals a nested table underneath the row with each line's product, quantity, unit price, and note — so you can review the full request without leaving the queue. |
@@ -641,13 +703,13 @@ Reached from **Record Purchase** on any Smart Compare offer, or **+ Record Purch
 **Approve / Reject dialog:**
 - A comment is optional on both approve and reject — use it to record why, especially on a rejection.
 - Ctrl+Enter (or Cmd+Enter) submits the dialog without reaching for the mouse.
-- Confirming removes the request from the queue immediately and shows a snackbar confirmation; the request's own detail page (section 18) then shows the decision, approver's comment, and timestamp.
+- Confirming removes the request from the queue immediately and shows a snackbar confirmation; the request's own detail page (section 19) then shows the decision, approver's comment, and timestamp.
 
 **Business value:** approval routing reduces cycle time without giving up spend control. The queue surfaces the commercial context needed to decide quickly — branch, amount, budget impact, and full line detail — right where the decision is made, and every decision (with its comment) becomes part of the request's own audit trail.
 
 ---
 
-## 20. Team Management
+## 21. Team Management
 
 **Route:** `/team` (Owner only)
 
@@ -671,7 +733,7 @@ Reached from **Record Purchase** on any Smart Compare offer, or **+ Record Purch
 
 ---
 
-## 21. Organisation Settings
+## 22. Organisation Settings
 
 **Route:** `/settings`
 
@@ -683,7 +745,7 @@ Reached from **Record Purchase** on any Smart Compare offer, or **+ Record Purch
 | 2 | **Branches section** | Define your physical locations or operational divisions. Click **+ New Branch** to add one — only a name is required; address and region are optional. |
 | 3 | **Cost Centres section** | Define cost centres for budget tracking, each with a required **Code** and an optional link to a **Branch**. |
 | 4 | **Budgets section** | Define budgets scoped to the whole organisation, a specific branch, or a specific cost centre, with an amount, currency, period (Monthly/Quarterly/Annual), and period start date. |
-| 5 | **Approval Delegations section** | Lets an approver delegate their pending decisions to a colleague for a date range (e.g. while on leave). Shows a table of the current member's own delegations: delegate, start date, end date, and a cancel action. **+ New Delegation** opens a dialog to pick the delegate (from a dropdown of workspace members), a start date, and an end date. While a delegation is active, requests that would route to the delegating approver are routed to the delegate instead, and appear in the delegate's own Approval Queue (section 19). |
+| 5 | **Approval Delegations section** | Lets an approver delegate their pending decisions to a colleague for a date range (e.g. while on leave). Shows a table of the current member's own delegations: delegate, start date, end date, and a cancel action. **+ New Delegation** opens a dialog to pick the delegate (from a dropdown of workspace members), a start date, and an end date. While a delegation is active, requests that would route to the delegating approver are routed to the delegate instead, and appear in the delegate's own Approval Queue (section 20). |
 
 **Create Cost Centre form:**
 
@@ -694,17 +756,17 @@ Reached from **Record Purchase** on any Smart Compare offer, or **+ Record Purch
 ![Budget Form](screenshots/19c-budget-form.jpg)
 
 **Why this matters:**
-- Purchase requests require a **branch** — this determines who can see and approve the request. A branch must exist before you can create your first request (section 18).
+- Purchase requests require a **branch** — this determines who can see and approve the request. A branch must exist before you can create your first request (section 19).
 - Cost centres and budgets enable budget-impact visibility on purchase requests.
 - When a request's estimated total would exceed a budget, a warning is shown.
 
 **Business value:** organisation settings connect procurement activity to the way the business is managed. Branches, cost centres, and budgets turn isolated purchases into accountable spend by location, department, and financial period.
 
-**Display note:** the Settings screen now resolves branch names in the Branch and Cost Centre tables. See [§36 Known Issues](#36-known-issues) for remaining raw-ID display issues in the Purchase Requests area.
+**Display note:** the Settings screen now resolves branch names in the Branch and Cost Centre tables. See [§40 Known Issues](#40-known-issues) for remaining raw-ID display issues in the Purchase Requests area.
 
 ---
 
-## 22. Reports Center
+## 23. Reports Center
 
 **Route:** `/reports`
 
@@ -725,7 +787,7 @@ The unified workspace hub for generated reporting artifacts and recurring report
 
 ---
 
-## 23. Report Schedules & Schedule Form
+## 24. Report Schedules & Schedule Form
 
 **Route:** `/reports/schedule-form` (or via **+ New Schedule** in the Reports Center)
 
@@ -746,7 +808,7 @@ Configure automated recurring weekly reports delivered directly to the Reports C
 
 ---
 
-## 24. Weekly Digest & Digest Settings
+## 25. Weekly Digest & Digest Settings
 
 **Route:** `/reports/digest-settings`
 
@@ -764,7 +826,7 @@ Personalized weekly intelligence digests assembling key procurement metrics and 
 
 ---
 
-## 25. Roles & Permissions
+## 26. Roles & Permissions
 
 | Role | Description | Key capabilities |
 |------|-------------|-----------------|
@@ -777,33 +839,34 @@ Personalized weekly intelligence digests assembling key procurement metrics and 
 **Notes:**
 - Roles are assigned at invitation time and can be changed by the Owner from Team Management.
 - Role-based visibility is enforced for selected navigation items and route guards.
-- Current client-side route guards restrict product/supplier creation, catalogue import, quotation upload, savings outcome/export, and Team Management. Other authenticated pages still rely on backend authorization for unsafe operations.
+- Current client-side route guards restrict product/supplier creation, catalogue import, quotation upload, savings outcome/export, order detail, RFQ create/history/compare, the RFQ guardrail settings screen (Owner only), reorder forecasting, and Team Management. Other authenticated pages still rely on backend authorization for unsafe operations.
 
 **Business value:** roles and permissions protect the purchasing process from accidental or unauthorized action. They let the business separate request, buying, approval, administration, and read-only oversight while preserving a clear audit trail of who was allowed to do what.
 
 ---
 
-## 26. Ingestion Dashboard
+## 27. Ingestion Dashboard
 
 **Route:** `/ingestion`
 
 ![Ingestion Dashboard](screenshots/26-ingestion-dashboard.jpg)
 
-The hub page for automated quotation intake — the landing screen for the three channels documented
+The hub page for automated quotation intake — the landing screen for the five channels documented
 in the sections that follow, plus a rolling view of recent activity.
 
 | # | Element | Description |
 |---|---------|-------------|
 | 1 | **Stat cards** | Three counters: **Emails Today**, **Capture Uploads**, and **Catalogue Imports** — same-day activity across all three inbound channels. |
 | 2 | **Rate indicators** | **Supplier Match Rate** and **Extraction Success Rate** — how often inbound documents are automatically linked to a known supplier and successfully parsed into structured line items. |
-| 3 | **Channel cards** | One card per inbound channel — **Email Forwarding** (§27), **Email Ingestion Log** (§28), **Capture a Quotation** (§29), and **Catalogue Import** (§30) — each with a direct action button into that screen. |
-| 4 | **Recent Emails panel** | A short preview of the most recently received inbound emails, with a **View All** link into the full Email Ingestion Log (§28). Shows an empty state when nothing has arrived yet. |
+| 3 | **Integration Coverage cards** | Three cards below the rate indicators: the share of active quotations sourced from an integration rather than a manual upload (with the raw count), how many days of purchase history the workspace has accumulated (with a "Ready"/"Collecting" state), and how many active catalogue refresh schedules are linked to a completed import versus how many exist in total. |
+| 4 | **Channel cards** | One card per inbound channel — **Email Forwarding** (§28), **Email Ingestion Log** (§29), **Capture a Quotation** (§30), **Catalogue Import** (§31), and **Refresh Schedules** (§32) — each with a direct action button into that screen. |
+| 5 | **Recent Emails panel** | A short preview of the most recently received inbound emails, with a **View All** link into the full Email Ingestion Log (§29). Shows an empty state when nothing has arrived yet. |
 
-**Business value:** the dashboard turns "did automated ingestion actually work today" into a single glance, instead of requiring a buyer to open each channel separately to check whether emails are arriving, captures are processing, or catalogue imports are landing cleanly.
+**Business value:** the dashboard turns "did automated ingestion actually work today" into a single glance, instead of requiring a buyer to open each channel separately to check whether emails are arriving, captures are processing, catalogue imports are landing cleanly, or refresh schedules are actually wired to a source.
 
 ---
 
-## 27. Email Forwarding Setup
+## 28. Email Forwarding Setup
 
 **Route:** `/ingestion/email-config`
 
@@ -824,7 +887,7 @@ Configure automated inbound email forwarding and domain security to receive and 
 
 ---
 
-## 28. Email Ingestion Log
+## 29. Email Ingestion Log
 
 **Route:** `/ingestion/email-log`
 
@@ -844,14 +907,14 @@ was successfully turned into a quotation.
 | 7 | **Empty state** | Shown when no emails have been received yet. |
 
 **Tips:**
-- An email rejected for an unapproved sender domain (see §27's domain allowlist) still appears here with a rejected status, so you can confirm the block worked as expected rather than wondering if the email was simply lost.
+- An email rejected for an unapproved sender domain (see §28's domain allowlist) still appears here with a rejected status, so you can confirm the block worked as expected rather than wondering if the email was simply lost.
 - The quotation link only appears once an email has been successfully parsed into a quotation — use the error details column to see why a failed email didn't produce one.
 
 **Business value:** the log is what makes an automated, unattended intake channel trustworthy. Without it, a rejected or failed email is invisible; with it, a buyer can confirm every forwarded quote either became a quotation or has a clear, specific reason it didn't.
 
 ---
 
-## 29. Capture a Quotation (Photo or Upload)
+## 30. Capture a Quotation (Photo or Upload)
 
 **Route:** `/ingestion/capture`
 
@@ -872,7 +935,7 @@ Quickly capture paper quotes using your mobile device camera or upload quotation
 
 ---
 
-## 30. Catalogue Import (Bulk Price List)
+## 31. Catalogue Import (Bulk Price List)
 
 **Route:** `/ingestion/catalogue-import`
 
@@ -893,7 +956,108 @@ Bulk-import supplier price lists and catalogues from CSV or Excel spreadsheets i
 
 ---
 
-## 31. Reorder Forecasts & Reorder Queue
+## 32. Catalogue Refresh Schedules
+
+**Route:** `/ingestion/refresh-schedules`
+
+Configures how often a supplier catalogue import should be treated as due for a refresh, and which completed catalogue import feeds each product/supplier pairing.
+
+| # | Element | Description |
+|---|---------|-------------|
+| 1 | **Refresh button** | Reloads the schedule list. |
+| 2 | **Add refresh schedule form** | Four fields: **Catalogue product**, **Supplier**, **Cadence (days)** (1–365), and an optional **Source catalogue** (a completed catalogue import for that supplier — or "Assign later" to leave it unset). **Add schedule** creates it. |
+| 3 | **Schedule table** | One row per schedule: product, supplier, cadence in days, next refresh date, a **Source catalogue** picker (assignable/changeable inline — the choices are filtered to completed imports for that row's supplier), and status (**Active**, **Paused**, or **Due**). |
+| 4 | **Pause / Resume action** | Toggles a schedule between Active and Paused without deleting it. |
+| 5 | **Empty state** | "No refresh schedules configured yet." |
+
+**Business value:** refresh schedules turn "is this supplier's pricing stale" from a guess into a tracked cadence, and the Ingestion Dashboard's coverage cards (§27) show how many of them are actually linked to a real source import versus still needing one assigned — closing the loop between "we imported a price list once" and "we keep it current."
+
+---
+
+## 33. Accounting Integration
+
+**Route:** `/accounting`
+
+![Accounting Integration](screenshots/33-accounting-connection.jpg)
+
+Connects your accounting software so supplier bills can be synced and reconciled against ProcurePilot's own purchase and delivery records. ProcurePilot only ever reads from the connected provider — it never creates, edits, or pays a bill.
+
+| # | Element | Description |
+|---|---------|-------------|
+| 1 | **Page title — "Accounting Integration"** | States the purpose: sync bills and reconcile spend against purchase records. |
+| 2 | **Empty state (never connected)** | "Connect your accounting system" with a **Connect** button that starts an OAuth authorization flow. The button itself is visible to every role, but the underlying API only accepts the request from an Owner — see [§40 Known Issues](#40-known-issues). |
+| 3 | **Connection status card** | Once connected: the account's display name, provider, a status badge (**Active**, **Needs Re-authorization**, or **Disconnected**), connected date, and last-synced date. |
+| 4 | **Needs re-authorization banner** | Shown when the provider's OAuth token has expired or was revoked; a **Reconnect** button restarts authorization. |
+| 5 | **View Synced Bills button** | Opens the Synced Bills screen (below). Open to any role while a connection is active. |
+| 6 | **Disconnect / Reconnect button** | Owner only. Disconnecting stops future syncs but does not delete already-synced bills or discrepancy history. |
+
+**Which provider:** the specific accounting system (QuickBooks Online or Xero) is configured for your workspace's deployment — it is not chosen on this screen. Once connected, the connection status card's account name reflects whichever provider is actually configured; see [§40 Known Issues](#40-known-issues) for a labelling inconsistency elsewhere on this screen.
+
+### Synced Bills & Invoices
+
+**Route:** `/accounting/bills`
+
+| # | Element | Description |
+|---|---------|-------------|
+| 1 | **Page title — "Synced Bills & Invoices"** | Supplier bills imported from your accounting software and their purchase-record matches. |
+| 2 | **Sync now button** | Owner/Buyer only. Triggers an on-demand sync from the provider; disabled while a sync is already running or no connection exists. |
+| 3 | **Match Status filter** | All, Matched, or Unmatched. |
+| 4 | **Bills table** | One row per synced bill: vendor/supplier name, amount (with currency), bill date, provider status (Open/Paid/Void), and reconciliation status (Matched/Unmatched). |
+| 5 | **Load more** | Cursor-paginated. |
+| 6 | **Empty state** | "No synced bills found" — shown until a sync has run and produced at least one bill. |
+
+### Reconciliation Discrepancies (Three-Way Match)
+
+**Route:** `/accounting/discrepancies`
+
+| # | Element | Description |
+|---|---------|-------------|
+| 1 | **Page title — "Reconciliation Discrepancies"** | Discrepancies found between synced bills, purchase records, and — where an order's evidence chain exists — the order/confirmation/receipt lifecycle from Order Tracking (§11). |
+| 2 | **Status filter** | Open or Resolved. |
+| 3 | **Discrepancy types** | Amount Mismatch, Unmatched Bill, Unmatched Purchase Record, Missing Supplier Confirmation, Missing Delivery Receipt, Quantity Variance, Price Variance, Currency Mismatch, Invoice Without Order, Ambiguous Order, Over-billed Quantity, and Over-billed Price. |
+| 4 | **Three-way comparison detail** | For discrepancies tied to a purchase order: the order number and status, then ordered/confirmed/received/invoiced quantities side by side (each confirmed/received cell showing its own evidence state — Pending/Available/Unavailable), the unit price before and after invoicing, the tolerance ruleset version applied, and when it was evaluated (and reopened, if applicable). |
+| 5 | **Amount-mismatch / unmatched detail** | For accounting-only discrepancies: the synced bill's vendor and amount side by side with the matching (or missing) purchase record. |
+| 6 | **Resolve action** | Owner/Buyer only, on open discrepancies: an inline form with an optional resolution note, then **Resolve**. |
+| 7 | **Resolution info** | On resolved discrepancies: who resolved it (or a "System resolved" badge if it cleared automatically once the underlying data reconciled), when, and the note if one was left. |
+| 8 | **Load more** | Cursor-paginated. |
+
+**Business value:** reconciliation closes the gap between what procurement agreed to buy, what a supplier actually delivered, and what accounting was actually billed for. Because ProcurePilot never writes back to the accounting provider, every match or discrepancy here is a read-only cross-check a buyer can act on with confidence — see `docs/product/function-business-value.md` for the wider case.
+
+---
+
+## 34. POS & Inventory Integration
+
+**Route:** `/pos`
+
+![POS Integration](screenshots/34-pos-connection.jpg)
+
+Connects a point-of-sale/inventory system (Square) so sales velocity and stock-on-hand data can inform reorder forecasting (§35). ProcurePilot only reads from the connected provider — it never writes sales, inventory, or catalogue data back to it.
+
+| # | Element | Description |
+|---|---------|-------------|
+| 1 | **Page title — "Point of Sale & Inventory Integration"** | States the purpose: sync sales velocity and stock-on-hand signals. |
+| 2 | **Empty state (never connected)** | "Connect your POS & inventory system" with a **Connect** button that starts a Square OAuth authorization flow. As with Accounting Integration, the button is visible to every role but the API only accepts the request from an Owner — see [§40 Known Issues](#40-known-issues). |
+| 3 | **Connection status card** | Once connected: display name, provider (Square), a status badge (**Active**, **Needs Re-authorization**, or **Disconnected**), connected date, and last-synced date. |
+| 4 | **Needs re-authorization banner** | Shown when Square's OAuth token has expired or was revoked; a **Reconnect** button restarts authorization. |
+| 5 | **View Synced Signals button** | Opens the Signals Review screen (below). Open to any role while a connection is active. |
+| 6 | **Disconnect / Reconnect button** | Owner only. |
+
+### Synced Product Signals
+
+**Route:** `/pos/signals`
+
+| # | Element | Description |
+|---|---------|-------------|
+| 1 | **Sync now button** | Triggers an on-demand sync from Square. |
+| 2 | **Unmatched Signals table** | Square catalogue items that couldn't be automatically matched to a ProcurePilot product: item name, stock on hand (with last-synced time), sales velocity per day, and a **Match to Product** action — pick a catalogue product from the dropdown and confirm. A velocity figure carries a **Provisional** tag when the observed window is shorter than the full velocity window the metric is normally computed over. |
+| 3 | **Matched Signals table** | Signals already linked to a catalogue product: item name, the matched product, stock on hand, sales velocity, and a Matched status badge. |
+| 4 | **Empty states** | Shown separately for each table when there's nothing to review or nothing matched yet. |
+
+**Business value:** matching POS signals to catalogue products is what lets Reorder Forecasts (§35) work from real, current stock and sales data instead of purchase history alone — without ProcurePilot ever writing anything back into the POS system itself.
+
+---
+
+## 35. Reorder Forecasts & Reorder Queue
 
 **Route:** `/forecasting` (Owner or Buyer)
 
@@ -917,21 +1081,21 @@ Demand forecasting per product, surfaced as a queue of reorder proposals a buyer
 - **Insufficient evidence** — neither demand nor stock evidence is available yet; no quantity can be suggested and the Prepare button is hidden.
 
 **Tips:**
-- A proposal only appears after a matched POS signal has been synchronized and a forecast has been computed — if the list is empty, refreshing forecasts after new sales/stock data has landed is usually the fix.
-- **Prepare draft request** never submits or approves anything — it only creates a **Draft** row in Purchase Requests (§17), which still needs to be reviewed, submitted, and approved like any other request.
-- This screen, like Basket Split (§12), is Owner/Buyer only — other roles won't see **Reorder Forecasts** in the side navigation.
+- A proposal only appears after a matched POS signal has been synchronized and a forecast has been computed — if the list is empty, refreshing forecasts after new sales/stock data has landed is usually the fix. Matching a POS signal happens on the Synced Product Signals screen (§34).
+- **Prepare draft request** never submits or approves anything — it only creates a **Draft** row in Purchase Requests (§18), which still needs to be reviewed, submitted, and approved like any other request.
+- This screen, like Basket Split (§13), is Owner/Buyer only — other roles won't see **Reorder Forecasts** in the side navigation.
 
 **Business value:** reorder forecasting turns historical demand into a reviewed, evidence-backed replenishment suggestion instead of a buyer's guess or a stockout after the fact. Because every proposal shows its uncertainty range and evidence state up front, and preparing a request never bypasses approval, the feature speeds up routine restocking without weakening spend control — see `docs/product/function-business-value.md` for how this connects to reduced stockouts and carrying cost.
 
 ---
 
-## 32. Supplier Risk Queue & Negotiation Briefs
+## 36. Supplier Risk Queue & Negotiation Briefs
 
 **Route:** `/supplier-risk`
 
 ![Supplier Risk Queue](screenshots/32-supplier-risk-queue.jpg)
 
-A workspace-wide queue of the latest evidence-based risk snapshot for every active supplier, extending Supplier IQ (§13) with a comparative view across your whole supplier base.
+A workspace-wide queue of the latest evidence-based risk snapshot for every active supplier, extending Supplier IQ (§14) with a comparative view across your whole supplier base.
 
 | # | Element | Description |
 |---|---------|-------------|
@@ -939,13 +1103,13 @@ A workspace-wide queue of the latest evidence-based risk snapshot for every acti
 | 2 | **Recompute risk button** | Recomputes risk snapshots for all suppliers. Visible to Owner/Buyer only; other roles see a read-only notice instead. |
 | 3 | **G3 evidence banner** | States these risk signals are advisory and require human review — they cannot authorise a purchase. |
 | 4 | **Risk table** | One row per supplier: name (links to that supplier's scorecard), risk level (Low/Medium/High or "Insufficient data") with the underlying percentage, confidence (Low/Medium/High), evidence state (Ready/Provisional/Insufficient data), top risk driver (spend concentration, price drift, delivery reliability, or single-source exposure), release posture, and validity (Current or Stale, with the exact valid-until date). |
-| 5 | **View scorecard action** | Opens that supplier's full Supplier IQ scorecard (§13), where the detailed risk evidence and the option to prepare a negotiation brief live. |
+| 5 | **View scorecard action** | Opens that supplier's full Supplier IQ scorecard (§14), where the detailed risk evidence and the option to prepare a negotiation brief live. |
 | 6 | **Load more** | Cursor-paginated in pages of 50; click to fetch older/lower-ranked snapshots. |
 | 7 | **Empty state** | "No supplier risk snapshots yet" — shown until an owner or buyer computes the first snapshots. |
 
-### Supplier Risk Evidence panel (on the Supplier Scorecard, §13)
+### Supplier Risk Evidence panel (on the Supplier Scorecard, §14)
 
-The Supplier Scorecard page (`/suppliers/:id/scorecard`) now ends with a **Supplier Risk Evidence** panel — the v2 risk model underneath the Supplier IQ metrics already documented in §13.
+The Supplier Scorecard page (`/suppliers/:id/scorecard`) now ends with a **Supplier Risk Evidence** panel — the v2 risk model underneath the Supplier IQ metrics already documented in §14.
 
 | # | Element | Description |
 |---|---------|-------------|
@@ -975,7 +1139,7 @@ An AI-generated, evidence-backed set of talking points for a risky supplier, rea
 
 ---
 
-## 33. Procurement Analyst
+## 37. Procurement Analyst
 
 **Route:** `/analyst` or `/analyst/:conversationId`
 
@@ -1015,7 +1179,7 @@ A grounded, cited question-and-answer assistant over your own tenant data — sp
 
 ---
 
-## 34. RFQ Sourcing & Response Comparison
+## 38. RFQ Sourcing & Response Comparison
 
 **Route:** `/rfq/create` (Owner or Buyer) — reached via the **Create RFQ** button on RFQ History (below), or by navigating directly.
 
@@ -1043,8 +1207,25 @@ Sends a structured request for quotation to one or more suppliers by email. Repl
 |---|---------|-------------|
 | 1 | **Page title — "RFQ History"** | Tracks every request for quotation you've created. |
 | 2 | **Create RFQ button** | Top-right of the header. Navigates to `/rfq/create` (above) — this is the app's navigation entry point into Create RFQ. |
-| 3 | **RFQ table** | One row per RFQ: status (Draft/Sent/Responded/Expired/Converted), needed-by date, sent date, recipient count, and response count. |
-| 4 | **Row click** | Opens the RFQ. A `Converted` row opens the purchase request it produced (§18); any other status opens the Compare RFQ Responses screen (below). |
+| 3 | **Guardrails button** | Owner only. Navigates to the guardrail settings screen (below). |
+| 4 | **RFQ table** | One row per RFQ: status (Draft/Sent/Responded/Expired/Converted), needed-by date, sent date, recipient count, and response count. |
+| 5 | **Row click** | Opens the RFQ. A `Converted` row opens the purchase request it produced (§19); any other status opens the Compare RFQ Responses screen (below). |
+
+### Guardrail settings
+
+**Route:** `/rfq/guardrails` (Owner only — reached from the **Guardrails** button on RFQ History, or by navigating directly)
+
+A screen for owners to configure auto-preparation guardrails without needing API/engineering support: list existing guardrails, create a new one, edit one, or enable/disable one.
+
+| # | Element | Description |
+|---|---------|-------------|
+| 1 | **Human-approval note** | A standing banner: "Guardrails only prepare DRAFT requests. A human must still approve every purchase." |
+| 2 | **Create/Edit guardrail form** | **Maximum order value** (a positive amount) plus a **Currency** dropdown (loaded from the workspace's configured currency list). **Minimum responses** (a whole number, at least 1) — how many responses the RFQ needs before the guardrail is even considered. **Maximum price variance** — entered as a percent (e.g. `10` for 10%); the form stores it as a fraction under the hood, so what you type and what you see afterwards are both percentages. **Supplier allowlist** — a multi-select of suppliers; leave it empty to allow any supplier. **Default branch** — the branch a request is drafted into when this guardrail fires (required). An **Enabled** toggle. |
+| 3 | **Save guardrail button** | Validates all four numeric/required fields client-side before submitting (maximum order value > 0, minimum responses ≥ 1, price variance between 0–100%, a branch selected) and surfaces the same validation inline if the API rejects the payload (e.g. an invalid currency code). |
+| 4 | **Guardrail list** | One card per configured guardrail: its maximum order value and currency as the heading, a one-line summary ("At least N response(s), price variance up to X%."), an Enabled/Disabled status chip, and **Edit** / **Enable**-**Disable** actions. |
+| 5 | **Empty state** | "No guardrails configured." |
+
+**What isn't on this screen:** a category allowlist exists in the underlying data model, but this screen doesn't expose a field for it — a guardrail created here always has an empty category allowlist. (If one were ever set through the API directly, every candidate response would currently fail with "Category rules are unavailable," since category-based filtering isn't implemented yet — the reason code is deliberately explicit about this rather than silently ignoring the rule.)
 
 ### Compare RFQ Responses
 
@@ -1057,16 +1238,40 @@ Sends a structured request for quotation to one or more suppliers by email. Repl
 | 1 | **Page title — "RFQ Responses"** | Compares every captured supplier response to this RFQ side by side. |
 | 2 | **Deliver to Branch / Required By controls** | Set once and used for whichever response you prepare into a request. |
 | 3 | **Response cards** | One card per supplier response: supplier name, submitted date, and a line table (product, quantity, unit price, total value). A line whose product hasn't been matched yet to a catalogue product shows a **Pending Match** badge instead of a price line. |
-| 4 | **Prepare Request button** | Creates a draft purchase request priced from this response's actual quoted prices (not a landed-cost estimate) and marks the RFQ `Converted`. Disabled while any line on the response is still a pending match — a request is only ever prepared from a fully-priced response. The confirmation includes a **View Request** action that jumps straight to the new draft. |
-| 5 | **No responses state** | Shown until at least one supplier reply has been captured and matched. |
+| 4 | **Guardrail outcomes panel** | Shown on each response card, for both Owners and Buyers, whenever at least one guardrail is configured: one row per guardrail, labelled by its limit ("Up to 500.00 GBP"), with a plain-language reason for why it did or didn't fire for *this* response. A fired guardrail's row is visually distinguished from the rest. |
+| 5 | **Prepare Request button** | Creates a draft purchase request priced from this response's actual quoted prices (not a landed-cost estimate) and marks the RFQ `Converted`. Disabled while any line on the response is still a pending match — a request is only ever prepared from a fully-priced response. The confirmation includes a **View Request** action that jumps straight to the new draft. |
+| 6 | **No responses state** | Shown until at least one supplier reply has been captured and matched. |
 
-**Guarded automatic preparation:** a tenant owner can configure an auto-preparation guardrail (maximum order value, optional supplier/category allowlist, minimum response count, maximum price variance) via the API; when every condition is met and one response is unambiguously the lowest-priced eligible one, ProcurePilot runs the same prepare-request step automatically and the RFQ simply appears here already `Converted` — there is no separate confirmation step for it. **There is currently no settings screen for configuring this guardrail** — it exists only as a backend capability (owner-only), so until a UI ships, turning it on needs API/engineering support. Whether prepared manually or automatically, every path still produces an ordinary draft purchase request that goes through the unchanged approval workflow — nothing in this release creates, submits, or sends a purchase order to a supplier.
+**Guardrail outcome reasons (what each one means):**
 
-**Business value:** automated RFQ sourcing collapses the slowest part of competitive sourcing — chasing multiple suppliers by email and re-keying their replies into a comparison — into an automatic capture-and-compare step, while keeping the final purchasing decision with a human on every path, guarded or manual. See `docs/product/function-business-value.md` for how faster, evidence-backed sourcing rounds translate into negotiating leverage and cycle-time savings.
+| Reason shown | Meaning |
+|---|---|
+| Guardrail fired and prepared a draft request. | This guardrail is the one that actually auto-prepared the request. |
+| This response would fire the guardrail. | Every condition currently holds for this response — it just hasn't been evaluated at match-decision time yet, or another response tied/won first. |
+| Would fire, but another guardrail also matches — ambiguous, so neither fires. | More than one enabled guardrail would independently fire for this RFQ; to avoid an arbitrary pick between them, neither fires automatically. |
+| This is not the lowest eligible response. | Another response on the same RFQ is cheaper and also eligible — only the single lowest-priced eligible response can fire a guardrail. |
+| Responses are tied at the lowest price. | Two or more eligible responses share the exact same lowest total — a tie never fires. |
+| Other responses are still pending review. | The RFQ has responses that haven't finished the capture/matching pipeline yet; the guardrail waits for all of them to settle before it will fire. |
+| The minimum response count is not met. | Fewer responses have arrived than the guardrail's configured minimum. |
+| The RFQ is not open. | The RFQ isn't in `Sent` or `Responded` status (e.g. it's still a draft, expired, or already converted). |
+| Not all RFQ lines are matched. | At least one line on this response is still a **Pending Match** — see the line table above. |
+| The response currency does not match. | This response's currency differs from the guardrail's configured currency. |
+| The supplier is not allowlisted. | The guardrail has a supplier allowlist configured, and this response's supplier isn't on it. |
+| The order exceeds the maximum value. | This response's total is above the guardrail's configured maximum order value. |
+| There is not enough price history. | ProcurePilot doesn't have enough recent purchase history for one of this response's products to check the price-variance condition. |
+| The price variance is too high. | At least one line's unit price is further from recent purchase history than the guardrail's configured maximum variance allows. |
+| This response predates the guardrail. | The response was captured before this guardrail was created, so it was never eligible for it. |
+| This response is archived. / This response was refused. | The response itself is no longer active, so no guardrail can fire on it. |
+| No eligible response was found. | No response on this RFQ currently passes every guardrail condition. |
+| Category rules are unavailable. | The guardrail has a category allowlist configured (via the API — this screen doesn't expose one), which isn't supported yet; every response fails this check. |
+
+**Guarded automatic preparation:** a tenant owner can configure an auto-preparation guardrail (maximum order value, optional supplier allowlist, minimum response count, maximum price variance, default branch) from the Guardrail settings screen above; when every condition is met and one response is unambiguously the lowest-priced eligible one, ProcurePilot runs the same prepare-request step automatically and the RFQ simply appears here already `Converted` — there is no separate confirmation step for it. Guardrails are evaluated at match-decision time (ADR-019), not at the moment an email reply is captured. Whether prepared manually or automatically, every path still produces an ordinary draft purchase request that goes through the unchanged approval workflow — nothing in this release creates, submits, or sends a purchase order to a supplier.
+
+**Business value:** automated RFQ sourcing collapses the slowest part of competitive sourcing — chasing multiple suppliers by email and re-keying their replies into a comparison — into an automatic capture-and-compare step, while keeping the final purchasing decision with a human on every path, guarded or manual. Because every guardrail outcome is explained in plain language rather than left as a silent yes/no, a buyer can trust why a request was (or wasn't) auto-prepared instead of treating it as a black box. See `docs/product/function-business-value.md` for how faster, evidence-backed sourcing rounds translate into negotiating leverage and cycle-time savings.
 
 ---
 
-## 35. FAQ
+## 39. FAQ
 
 **Q: Can I edit a verified saving?**
 A: No. Verified savings are immutable. If a correction is needed, a new adjustment record is created.
@@ -1093,7 +1298,7 @@ A: Not yet. It's a heuristic score used to rank and route candidates — the app
 A: Yes. If you belong to multiple workspaces, use the workspace switcher in the top bar to switch. Each workspace has its own data, members, and settings — completely isolated.
 
 **Q: Who can approve purchase requests?**
-A: Users with the Approver or Owner role. Approval routing is based on configurable thresholds — requests above a certain amount may require a higher-level approver. If the assigned approver has set up an active delegation (section 21), the request routes to the delegate instead, and the decision is made from the delegate's own Approval Queue.
+A: Users with the Approver or Owner role. Approval routing is based on configurable thresholds — requests above a certain amount may require a higher-level approver. If the assigned approver has set up an active delegation (section 22), the request routes to the delegate instead, and the decision is made from the delegate's own Approval Queue.
 
 **Q: What happens if an email is forwarded from a domain not on the allowlist?**
 A: If you have configured a domain allowlist, any incoming email sent from an unapproved domain is rejected. It will not be processed into a quotation or added to your review queue, protecting your workspace from spam and unverified submissions.
@@ -1101,26 +1306,31 @@ A: If you have configured a domain allowlist, any incoming email sent from an un
 **Q: What happens if some rows in my catalogue spreadsheet contain errors?**
 A: ProcurePilot uses partial import resilience. All valid rows are imported into the supplier catalogue immediately, while rows with errors (such as missing product names or invalid currency codes) are reported in the expandable Error Details table with their row number and reason so you can fix and re-import them.
 
+**Q: Who can create a purchase order, and where?**
+A: There's no "Create Order" screen in the web app today. Orders are created via the API — entered manually, imported, or synced from a connected accounting/POS provider. Once an order exists, use Order Tracking (§11) to submit it, record supplier confirmations, and record deliveries.
+
 **Q: Why didn't my RFQ auto-prepare a request through the guardrail?**
-A: Every condition has to hold at once: the RFQ still open, at least the configured minimum number of responses received, every line on that response matched to a catalogue product, its currency matching the guardrail's currency exactly, its supplier (and category, if configured) allowed, its total under the configured maximum, its price within the configured variance of your recent purchase history for that product, and it must be the single lowest-priced eligible response — a tie never fires. If even one condition fails, the response is simply left for you to prepare manually from RFQ Responses (§34). There's also no settings screen yet for configuring the guardrail itself — see [§36 Known Issues](#36-known-issues).
+A: Every condition has to hold at once: the RFQ still open, at least the configured minimum number of responses received, every line on that response matched to a catalogue product, its currency matching the guardrail's currency exactly, its supplier allowed (if a supplier allowlist is configured), its total under the configured maximum, its price within the configured variance of your recent purchase history for that product, and it must be the single lowest-priced eligible response — a tie never fires, and if more than one guardrail would independently fire the result is treated as ambiguous rather than picked arbitrarily. If even one condition fails, the response is simply left for you to prepare manually from RFQ Responses (§38) — which now also tells you exactly which condition failed for each response, per guardrail.
 
 **Q: What happens if a supplier never replies to an RFQ?**
-A: Nothing breaks. The RFQ stays in `Sent` status with a response count lower than its recipient count, and you can still compare and prepare a request from whichever suppliers do reply. A supplier that never responds simply never produces a card on the Compare RFQ Responses screen (§34).
+A: Nothing breaks. The RFQ stays in `Sent` status with a response count lower than its recipient count, and you can still compare and prepare a request from whichever suppliers do reply. A supplier that never responds simply never produces a card on the Compare RFQ Responses screen (§38).
 
 ---
 
-## 36. Known Issues
+## 40. Known Issues
 
-Originally found during the 6 Sep 2026 documentation pass; re-checked and updated 12 Sep 2026 against current `main`; extended 25 Sep 2026 to cover R4.0–R4.3; re-checked 26 Sep 2026 against Create RFQ's Material/i18n rewrite (PR #29).
+Originally found during the 6 Sep 2026 documentation pass; re-checked and updated 12 Sep 2026 against current `main`; extended 25 Sep 2026 to cover R4.0–R4.3; re-checked 26 Sep 2026 against Create RFQ's Material/i18n rewrite (PR #29); re-audited 27 Sep 2026 across the entire app for this documentation pass (PR #42 and earlier).
 
 | # | Where | Issue |
 |---|-------|-------|
-| 1 | Purchase Requests (§17) | Submitted request rows can display the raw branch UUID in the Branch column instead of the branch name. Still present as of 12 Sep 2026. |
-| 2 | Purchase Request detail (§18) | Existing request line items can display the saved product UUID rather than the product's catalogue name. The linked product still exists and the relationship is stored correctly. Still present as of 12 Sep 2026. |
-| 3 | Quotation review detail (§9) | The CSV sample upload completed and opened the review screen, but the header fields extracted from the CSV sample left some optional quotation fields blank. The PDF/image sample path depends on external extraction-provider credentials; during the original pass Bedrock fell back because AWS SSO was expired, while CSV extraction still completed successfully. Not re-verified in the 12 Sep pass. |
-| 4 | RFQ auto-preparation guardrails (§34) | Configuring the guardrail (max order value, allowlists, minimum responses, price variance) is API-only and owner-restricted — there is no settings screen for it yet. Found 25 Sep 2026, still present as of 26 Sep 2026. |
+| 1 | Purchase Requests (§18) | Submitted request rows can display the raw branch UUID in the Branch column instead of the branch name. Still present as of 27 Sep 2026. |
+| 2 | Purchase Request detail (§19) | Existing request line items can display the saved product UUID rather than the product's catalogue name. The linked product still exists and the relationship is stored correctly. Still present as of 27 Sep 2026. |
+| 3 | Quotation review detail (§9) | The CSV sample upload completed and opened the review screen, but the header fields extracted from the CSV sample left some optional quotation fields blank. The PDF/image sample path depends on external extraction-provider credentials; during the original pass Bedrock fell back because AWS SSO was expired, while CSV extraction still completed successfully. Not re-verified since the 12 Sep pass. |
+| 4 | Order Tracking (§11) | There is no way to create a purchase order from the web app itself — orders exist only via direct API creation, import, or a connected provider sync, and an approved purchase request does not automatically become an order. Found 27 Sep 2026, still present as of 27 Sep 2026. |
+| 5 | Accounting Integration (§33) | The connection screen's static copy ("Connect QuickBooks", "QuickBooks Online", "Link your QuickBooks Online account…") always reads as QuickBooks, even on a workspace deployment configured to use Xero as its accounting provider. The actual connection and OAuth flow work correctly for whichever provider is configured, and the connected-state header does show the real provider name dynamically — only the static empty-state and subtitle copy is mislabelled. Found 27 Sep 2026, still present as of 27 Sep 2026. |
+| 6 | Accounting Integration & POS Integration (§33, §34), never-connected empty state | The **Connect** button is shown to every role, not just Owner, before a connection exists (unlike the connected-state screen, where connect/disconnect/reconnect are correctly hidden from non-owners behind an informational notice). A non-owner who clicks it gets a permission error back from the API rather than never seeing the button. Found 27 Sep 2026, still present as of 27 Sep 2026. |
 
-**Resolved since the original pass:** the Approval Queue (§19) previously rendered only its title/subtitle with no request cards. It is now fully functional — pending requests, budget status, expandable line detail, and an approve/reject dialog with an optional comment — and an approval-delegation management UI (§21) has been added. **Also resolved 26 Sep 2026:** Create RFQ (§34) previously used plain HTML controls with no Material styling, no Arabic translation, a supplier picker hardcoded to placeholder `sup-1`/`sup-2` options, and no navigation entry point (reachable only by typing `/rfq/create`). It now uses full Material form components, is translated into English and Arabic, populates real suppliers and products from your workspace data, and is reachable from a **Create RFQ** button on RFQ History.
+**Resolved since the original pass:** the Approval Queue (§20) previously rendered only its title/subtitle with no request cards. It is now fully functional — pending requests, budget status, expandable line detail, and an approve/reject dialog with an optional comment — and an approval-delegation management UI (§22) has been added. **Resolved 26 Sep 2026:** Create RFQ (§38) previously used plain HTML controls with no Material styling, no Arabic translation, a supplier picker hardcoded to placeholder `sup-1`/`sup-2` options, and no navigation entry point (reachable only by typing `/rfq/create`). It now uses full Material form components, is translated into English and Arabic, populates real suppliers and products from your workspace data, and is reachable from a **Create RFQ** button on RFQ History. **Resolved 27 Sep 2026 (PR #42):** RFQ auto-preparation guardrails previously required API/engineering support to configure — there is now a full owner-only settings screen at `/rfq/guardrails` (§38), reachable from a **Guardrails** button on RFQ History, and the Compare RFQ Responses screen now explains in plain language why each guardrail did or didn't fire for every response.
 
 If you hit any of these, it's not something wrong with your setup — flag it to the product team.
 
