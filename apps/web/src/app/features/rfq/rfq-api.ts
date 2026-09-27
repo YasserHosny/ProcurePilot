@@ -67,6 +67,38 @@ export interface RfqResponseComparison {
   supplier_id: string;
   submitted_at: string;
   lines: RfqResponseLineComparison[];
+  guardrail_evaluations?: RfqGuardrailEvaluation[];
+}
+
+export interface RfqGuardrailEvaluation {
+  guardrail_id: string;
+  fired: boolean;
+  reason: string;
+}
+
+export interface RfqGuardrail {
+  id: string;
+  tenant_id: string;
+  created_by_membership_id: string;
+  max_order_value_amount: string;
+  max_order_value_currency: string;
+  supplier_allowlist: string[] | null;
+  category_allowlist: string[] | null;
+  min_response_count: number;
+  max_price_variance_pct: string;
+  enabled: boolean;
+  default_branch_id: string;
+  created_at: string;
+}
+
+export interface RfqGuardrailPayload {
+  max_order_value_amount: string;
+  max_order_value_currency: string;
+  supplier_allowlist: string[];
+  min_response_count: number;
+  max_price_variance_pct: string;
+  default_branch_id: string;
+  enabled: boolean;
 }
 
 export interface RfqResponseComparisonList {
@@ -138,5 +170,17 @@ export class RfqApi {
     if (limit) params = params.set('limit', limit.toString());
 
     return this.http.get<RfqList>(this.baseUrl, { params });
+  }
+
+  listGuardrails(): Observable<RfqGuardrail[]> {
+    return this.http.get<RfqGuardrail[]>(`${this.baseUrl}/guardrails`);
+  }
+
+  createGuardrail(payload: RfqGuardrailPayload): Observable<RfqGuardrail> {
+    return this.http.post<RfqGuardrail>(`${this.baseUrl}/guardrails`, payload);
+  }
+
+  updateGuardrail(id: string, payload: Partial<RfqGuardrailPayload>): Observable<RfqGuardrail> {
+    return this.http.patch<RfqGuardrail>(`${this.baseUrl}/guardrails/${id}`, payload);
   }
 }

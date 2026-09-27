@@ -240,12 +240,12 @@ response failing even one condition falls back to requiring the manual US3 actio
 - [x] T036 [US4] Add guardrail management endpoints `POST`/`GET`/`PATCH /rfq/guardrails`,
       owner-only per FR-010, with the FR-013 rejection wired into create/update, and a
       "guardrail changed" audit event recorded on every create/update (FR-015)
-- [ ] T037 [P] [US4] Write failing component tests: guardrail settings in
+- [x] T037 [P] [US4] Write failing component tests: guardrail settings in
       `apps/web/src/app/features/rfq/guardrails/guardrails.component.spec.ts` (owner-only route
       guard, matching the existing `*appRole="'owner'"` convention), and — extending US3's compare
       view spec (`apps/web/src/app/features/rfq/compare/compare.component.spec.ts`) — a response
       that failed to auto-fire an active guardrail shows the reason it didn't (FR-012)
-- [ ] T038 [US4] Implement the guardrail settings UI in
+- [x] T038 [US4] Implement the guardrail settings UI in
       `apps/web/src/app/features/rfq/guardrails/`; extend `RfqService.list_responses()` (T026) to
       compute each response's guardrail-evaluation outcome on demand by calling `guardrails.py`
       read-only against the tenant's active guardrails (no new persistence — a non-fire is never

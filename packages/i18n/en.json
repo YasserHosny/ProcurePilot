@@ -3466,7 +3466,10 @@
       "requiredByLabel": "Required By",
       "noResponses": "No responses found for this RFQ yet.",
       "loading": "Loading responses...",
-      "loadError": "Failed to load RFQ responses."
+      "loadError": "Failed to load RFQ responses.",
+      "guardrailOutcomes": "Guardrail outcomes",
+      "guardrail": "Guardrail",
+      "guardrailLabel": "Up to {{amount}} {{currency}}"
     },
     "history": {
       "title": "RFQ History",
@@ -3485,7 +3488,59 @@
       "status_converted": "Converted",
       "status_draft": "Draft",
       "loadError": "Failed to load RFQs.",
-      "dismiss": "Close"
+      "dismiss": "Close",
+      "guardrails": "Guardrails"
+    },
+    "guardrails": {
+      "title": "Guardrail settings",
+      "subtitle": "Define when a qualifying response may prepare a draft request.",
+      "humanApprovalNote": "Guardrails only prepare DRAFT requests. A human must still approve every purchase.",
+      "createTitle": "Create guardrail",
+      "editTitle": "Edit guardrail",
+      "maxOrderValue": "Maximum order value",
+      "currency": "Currency",
+      "minResponses": "Minimum responses",
+      "priceVariance": "Maximum price variance",
+      "suppliers": "Supplier allowlist",
+      "branch": "Default branch",
+      "enabled": "Enabled",
+      "save": "Save guardrail",
+      "cancel": "Cancel",
+      "edit": "Edit",
+      "enable": "Enable",
+      "disable": "Disable",
+      "on": "Enabled",
+      "off": "Disabled",
+      "empty": "No guardrails configured.",
+      "summary": "At least {{min}} response(s), price variance up to {{variance}}%.",
+      "validation": {
+        "maxOrderValue": "Maximum order value must be greater than zero.",
+        "minResponses": "Minimum responses must be at least one.",
+        "priceVariance": "Price variance must be between 0% and 100%.",
+        "branch": "Select a default branch."
+      },
+      "errors": { "save": "Unable to save guardrail settings." },
+      "reasons": {
+        "rfq_not_open": "The RFQ is not open.",
+        "min_response_count_not_met": "The minimum response count is not met.",
+        "responses_pending": "Other responses are still pending review.",
+        "captured_before_guardrail": "This response predates the guardrail.",
+        "response_archived": "This response is archived.",
+        "response_refused": "This response was refused.",
+        "partial_line_response": "Not all RFQ lines are matched.",
+        "currency_mismatch": "The response currency does not match.",
+        "supplier_not_allowed": "The supplier is not allowlisted.",
+        "exceeds_max_order_value": "The order exceeds the maximum value.",
+        "category_allowlist_unsupported": "Category rules are unavailable.",
+        "no_price_history_baseline": "There is not enough price history.",
+        "price_variance_exceeded": "The price variance is too high.",
+        "tied_responses": "Responses are tied at the lowest price.",
+        "not_lowest_price": "This is not the lowest eligible response.",
+        "no_eligible_response": "No eligible response was found.",
+        "would_fire": "This response would fire the guardrail.",
+        "ambiguous_guardrails": "Would fire, but another guardrail also matches — ambiguous, so neither fires",
+        "fired": "Guardrail fired and prepared a draft request."
+      }
     }
   }
 }

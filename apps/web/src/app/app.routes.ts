@@ -2,6 +2,8 @@ import { Routes } from '@angular/router';
 
 import { authGuard, roleGuard } from './core/auth/auth.guard';
 
+export const rfqGuardrailsOwnerGuard = roleGuard('owner');
+
 /**
  * Public routes and guarded routes are kept in separate blocks (FR-016).
  *
@@ -245,6 +247,12 @@ export const routes: Routes = [
         canActivate: [roleGuard('owner', 'buyer')],
         loadComponent: () =>
           import('./features/rfq/history/history.component').then((m) => m.HistoryComponent),
+      },
+      {
+        path: 'rfq/guardrails',
+        canActivate: [rfqGuardrailsOwnerGuard],
+        loadComponent: () =>
+          import('./features/rfq/guardrails/guardrails.component').then((m) => m.GuardrailsComponent),
       },
       {
         path: 'rfq/compare/:id',

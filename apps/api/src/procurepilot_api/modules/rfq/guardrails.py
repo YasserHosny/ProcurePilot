@@ -21,6 +21,7 @@ class GuardrailCandidate:
     all_lines_matched: bool
     matched_lines: list[GuardrailCandidateLine]
     captured_at: datetime | None = None
+    response_state: str = "active"
 
 
 @dataclass
@@ -54,6 +55,13 @@ class GuardrailDecision:
     reason: str
     winning_response_id: UUID | None
     guardrail_version: str = GUARDRAIL_VERSION
+
+
+@dataclass(frozen=True)
+class GuardrailExplanation:
+    guardrail_id: UUID
+    fired: bool
+    reason: str
 
 
 def _evaluate_candidate(
@@ -134,3 +142,109 @@ def evaluate_guardrail(input: GuardrailEvaluationInput) -> GuardrailDecision:
     return GuardrailDecision(
         fired=True, reason="guardrail_fired", winning_response_id=winning.rfq_response_id
     )
+
+
+def explain_guardrail_evaluations(
+    *,
+    guardrails: list[AutoPreparationGuardrail],
+    rfq_status: str,
+    total_response_count: int,
+    candidates: list[GuardrailCandidate],
+    recent_average_price_by_product: dict[UUID, Decimal],
+    response_id: UUID,
+    responses_pending: bool = False,
+    fired_guardrail_ids: set[UUID] | None = None,
+) -> list[GuardrailExplanation]:
+    """Explain every enabled guardrail for one response without touching the database.
+
+    The ordering here is deliberate: RFQ-wide blockers hide candidate details, then the
+    selected response's own data is explained, and only then do we compare it with its
+    eligible peers.
+    """
+    fired_ids = fired_guardrail_ids or set()
+    candidate = next((item for item in candidates if item.rfq_response_id == response_id), None)
+    explanations: list[GuardrailExplanation] = []
+
+    def eligible_for_guardrail(guardrail: AutoPreparationGuardrail) -> list[GuardrailCandidate]:
+        return [
+            item
+            for item in candidates
+            if item.response_state == "active"
+            and not (
+                item.captured_at is not None
+                and guardrail.created_at is not None
+                and item.captured_at < guardrail.created_at
+            )
+        ]
+
+    independent_decisions = {
+        guardrail.id: evaluate_guardrail(
+            GuardrailEvaluationInput(
+                guardrail=guardrail,
+                rfq_status=rfq_status,
+                total_response_count=total_response_count,
+                candidates=eligible_for_guardrail(guardrail),
+                recent_average_price_by_product=recent_average_price_by_product,
+            )
+        )
+        for guardrail in guardrails
+        if guardrail.enabled
+    }
+    ambiguous_guardrail_ids = {
+        guardrail_id
+        for guardrail_id, decision in independent_decisions.items()
+        if decision.fired
+    }
+    if len(ambiguous_guardrail_ids) <= 1:
+        ambiguous_guardrail_ids = set()
+
+    for guardrail in guardrails:
+        if guardrail.id in fired_ids:
+            explanations.append(GuardrailExplanation(guardrail.id, True, "fired"))
+            continue
+        if rfq_status not in ("sent", "responded"):
+            reason = "rfq_not_open"
+        elif total_response_count < guardrail.min_response_count:
+            reason = "min_response_count_not_met"
+        elif responses_pending:
+            reason = "responses_pending"
+        elif candidate is None:
+            reason = "no_eligible_response"
+        elif candidate.response_state == "archived":
+            reason = "response_archived"
+        elif candidate.response_state == "refused":
+            reason = "response_refused"
+        elif (
+            candidate.captured_at is not None
+            and guardrail.created_at is not None
+            and candidate.captured_at < guardrail.created_at
+        ):
+            reason = "captured_before_guardrail"
+        else:
+            candidate_reason = _evaluate_candidate(
+                candidate, guardrail, recent_average_price_by_product
+            )
+            if candidate_reason is not None:
+                reason = candidate_reason
+            else:
+                eligible = [
+                    item
+                    for item in eligible_for_guardrail(guardrail)
+                    if _evaluate_candidate(item, guardrail, recent_average_price_by_product)
+                    is None
+                ]
+                lowest = min((item.total_amount for item in eligible), default=None)
+                tied = [item for item in eligible if item.total_amount == lowest]
+                if len(tied) > 1:
+                    reason = "tied_responses"
+                elif lowest is None:
+                    reason = "no_eligible_response"
+                elif candidate.total_amount != lowest:
+                    reason = "not_lowest_price"
+                else:
+                    reason = "would_fire"
+                    if guardrail.id in ambiguous_guardrail_ids:
+                        reason = "ambiguous_guardrails"
+        explanations.append(GuardrailExplanation(guardrail.id, False, reason))
+
+    return explanations

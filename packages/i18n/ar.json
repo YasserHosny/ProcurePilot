@@ -3466,7 +3466,10 @@
       "requiredByLabel": "مطلوب بحلول",
       "noResponses": "لم يتم العثور على ردود لطلب عروض الأسعار هذا بعد.",
       "loading": "جاري تحميل الردود...",
-      "loadError": "فشل تحميل ردود طلب عروض الأسعار."
+      "loadError": "فشل تحميل ردود طلب عروض الأسعار.",
+      "guardrailOutcomes": "نتائج الضوابط",
+      "guardrail": "الضابط",
+      "guardrailLabel": "حتى {{amount}} {{currency}}"
     },
     "history": {
       "title": "سجل طلبات عروض الأسعار",
@@ -3485,7 +3488,59 @@
       "status_converted": "محول",
       "status_draft": "مسودة",
       "loadError": "فشل تحميل طلبات عروض الأسعار.",
-      "dismiss": "إغلاق"
+      "dismiss": "إغلاق",
+      "guardrails": "الضوابط"
+    },
+    "guardrails": {
+      "title": "إعدادات الضوابط",
+      "subtitle": "حدد متى يمكن لرد مؤهل إعداد مسودة طلب.",
+      "humanApprovalNote": "الضوابط تُعد مسودات فقط. يجب أن يوافق شخص على كل عملية شراء.",
+      "createTitle": "إنشاء ضابط",
+      "editTitle": "تعديل الضابط",
+      "maxOrderValue": "الحد الأقصى لقيمة الطلب",
+      "currency": "العملة",
+      "minResponses": "الحد الأدنى للردود",
+      "priceVariance": "الحد الأقصى لتباين السعر",
+      "suppliers": "قائمة الموردين المسموحين",
+      "branch": "الفرع الافتراضي",
+      "enabled": "مفعّل",
+      "save": "حفظ الضابط",
+      "cancel": "إلغاء",
+      "edit": "تعديل",
+      "enable": "تفعيل",
+      "disable": "تعطيل",
+      "on": "مفعّل",
+      "off": "معطّل",
+      "empty": "لا توجد ضوابط مُعدة.",
+      "summary": "رد واحد على الأقل: {{min}}، وتباين سعر يصل إلى {{variance}}٪.",
+      "validation": {
+        "maxOrderValue": "يجب أن تكون قيمة الطلب أكبر من صفر.",
+        "minResponses": "يجب ألا يقل الحد الأدنى للردود عن واحد.",
+        "priceVariance": "يجب أن يكون تباين السعر بين 0٪ و100٪.",
+        "branch": "اختر فرعاً افتراضياً."
+      },
+      "errors": { "save": "تعذر حفظ إعدادات الضابط." },
+      "reasons": {
+        "rfq_not_open": "طلب عروض الأسعار غير مفتوح.",
+        "min_response_count_not_met": "لم يتحقق الحد الأدنى للردود.",
+        "responses_pending": "لا تزال هناك ردود أخرى قيد المراجعة.",
+        "captured_before_guardrail": "هذا الرد أسبق من الضابط.",
+        "response_archived": "هذا الرد مؤرشف.",
+        "response_refused": "تم رفض هذا الرد.",
+        "partial_line_response": "لم تتم مطابقة كل بنود الطلب.",
+        "currency_mismatch": "عملة الرد مختلفة.",
+        "supplier_not_allowed": "المورد غير مسموح به.",
+        "exceeds_max_order_value": "تتجاوز قيمة الطلب الحد الأقصى.",
+        "category_allowlist_unsupported": "قواعد الفئات غير متاحة.",
+        "no_price_history_baseline": "لا يوجد سجل أسعار كافٍ.",
+        "price_variance_exceeded": "تباين السعر مرتفع جداً.",
+        "tied_responses": "هناك تعادل في أقل سعر.",
+        "not_lowest_price": "هذا ليس أقل رد مؤهل سعراً.",
+        "no_eligible_response": "لم يتم العثور على رد مؤهل.",
+        "would_fire": "سيُفعّل هذا الرد الضابط.",
+        "ambiguous_guardrails": "سيُفعّل هذا الضابط، لكن ضابطاً آخر ينطبق أيضاً — النتيجة ملتبسة، لذلك لا يتم تفعيل أي منهما",
+        "fired": "تم تفعيل الضابط وإعداد مسودة طلب."
+      }
     }
   }
 }

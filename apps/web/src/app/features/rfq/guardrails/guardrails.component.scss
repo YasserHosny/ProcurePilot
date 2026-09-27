@@ -1,0 +1,14 @@
+.page-container { padding: 24px; max-width: 1100px; margin-inline: auto; }
+.page-header { margin-block-end: 24px; }
+.page-header h1, .page-header p, h2 { margin-block: 0 8px; }
+.page-header p, .guardrail-card p { color: var(--mat-sys-on-surface-variant); }
+.note { display: flex; gap: 12px; align-items: center; padding: 16px; margin-block-end: 16px; }
+.error { color: var(--mat-sys-on-error-container); background: var(--mat-sys-error-container); padding: 12px; margin-block-end: 16px; }
+.form-card { padding: 20px; margin-block-end: 20px; }
+.form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.form-actions, .card-actions { display: flex; gap: 8px; justify-content: flex-end; margin-block-start: 16px; }
+.guardrail-list { display: grid; gap: 12px; }
+.guardrail-card { padding: 16px; display: grid; grid-template-columns: 1fr auto; align-items: center; }
+.status { color: var(--mat-sys-primary); }
+.empty { padding: 24px; }
+@media (max-width: 700px) { .form-grid { grid-template-columns: 1fr; } .guardrail-card { grid-template-columns: 1fr; } }
