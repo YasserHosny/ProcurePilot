@@ -108,6 +108,14 @@ def test_recommendation_excludes_non_reference_currency_before_comparing_costs()
 
     assert recommendation is not None
     assert recommendation.recommended_offer_id == reference_offer.id
+    assert "currency_mismatch_excluded" in recommendation.risk_notes
+
+
+def test_recommendation_does_not_note_currency_exclusion_for_same_currency_offers() -> None:
+    recommendation = recommend_offer([offer(amount="10.0000"), offer(amount="11.0000")])
+
+    assert recommendation is not None
+    assert "currency_mismatch_excluded" not in recommendation.risk_notes
 
 
 def test_sc006_honest_gap_has_no_ml_eval_until_outcome_history_exists() -> None:

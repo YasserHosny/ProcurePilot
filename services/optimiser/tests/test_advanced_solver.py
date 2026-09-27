@@ -55,14 +55,15 @@ def _offer(
     supplier_id: UUID,
     total: str,
     unit: str | None = None,
+    currency: str = "GBP",
 ) -> AdvancedOfferInput:
     return AdvancedOfferInput(
         offer_id=uuid4(),
         workspace_product_id=product_id,
         supplier_id=supplier_id,
         quantity="1.000000",
-        total_landed_cost=_money(total),
-        unit_landed_cost=_money(unit or total),
+        total_landed_cost=_money(total, currency),
+        unit_landed_cost=_money(unit or total, currency),
         source_landed_cost_id=uuid4(),
     )
 
@@ -163,6 +164,43 @@ def test_advanced_input_refuses_mixed_offer_and_term_currencies() -> None:
             ],
         )
 
+
+def test_advanced_solver_excludes_basket_minority_currency() -> None:
+    supplier_a, supplier_b = uuid4(), uuid4()
+    product_a = UUID("00000000-0000-4000-8000-000000000001")
+    product_b = UUID("00000000-0000-4000-8000-000000000002")
+    request = _request(
+        supplier_ids=[supplier_a, supplier_b],
+        items=[_item(product_a), _item(product_b)],
+    )
+    offers = [
+        _offer(product_id=product_a, supplier_id=supplier_a, total="10.0000", currency="GBP"),
+        _offer(product_id=product_a, supplier_id=supplier_b, total="11.0000", currency="GBP"),
+        _offer(product_id=product_b, supplier_id=supplier_a, total="10.0000", currency="EUR"),
+        _offer(product_id=product_b, supplier_id=supplier_b, total="11.0000", currency="EUR"),
+    ]
+    payload = AdvancedOptimisationInput.model_construct(
+        request=request,
+        offers=offers,
+        supplier_terms=[],
+        supplier_risks=[],
+    )
+
+    result = _advanced_solver(payload)
+
+    mixed_violation = next(
+        violation
+        for violation in result.violated_constraints
+        if violation.kind == "mixed_currency"
+    )
+    assert result.feasible is True
+    assert mixed_violation.workspace_product_id == product_b
+    assert result.total_landed_cost == _money("10.0000", "GBP")
+    assert all(
+        line.workspace_product_id != product_b
+        for allocation in result.allocation
+        for line in allocation.lines
+    )
 
 def test_advanced_models_carry_terms_risk_confidence_and_evidence() -> None:
     supplier_id = uuid4()

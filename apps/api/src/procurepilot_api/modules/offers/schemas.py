@@ -24,6 +24,7 @@ RiskNote = Literal[
     "low_supplier_reliability",
     "high_supplier_risk",
     "elevated_supplier_risk",
+    "currency_mismatch_excluded",
 ]
 StockSignal = Literal["in_stock", "low_stock", "out_of_stock", "unknown"]
 BasketStatus = Literal["queued", "running", "completed", "failed"]

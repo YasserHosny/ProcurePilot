@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from procurepilot_optimiser_worker.models import (
     AdvancedBasketRequest,
@@ -103,6 +103,31 @@ def test_solver_reports_mixed_currency_offers_as_infeasible_without_cost_totals(
     assert result.total_landed_cost is None
     assert result.allocation == []
     assert all(baseline.total_landed_cost is None for baseline in result.single_supplier_baselines)
+
+
+def test_solver_reports_basket_wide_currency_mixing() -> None:
+    supplier_a, supplier_b = uuid4(), uuid4()
+    product_a = UUID("00000000-0000-4000-8000-000000000001")
+    product_b = UUID("00000000-0000-4000-8000-000000000002")
+    result = solve_two_supplier_split(
+        supplier_ids=[supplier_a, supplier_b],
+        items=[
+            BasketItem(workspace_product_id=product_a, quantity="1.000000"),
+            BasketItem(workspace_product_id=product_b, quantity="1.000000"),
+        ],
+        offers=[
+            _offer(product_a, supplier_a, "10.0000", currency="GBP"),
+            _offer(product_a, supplier_b, "11.0000", currency="GBP"),
+            _offer(product_b, supplier_a, "10.0000", currency="EUR"),
+            _offer(product_b, supplier_b, "11.0000", currency="EUR"),
+        ],
+    )
+
+    assert result.feasible is False
+    assert [item.workspace_product_id for item in result.infeasible_items] == [product_b]
+    assert result.infeasible_items[0].reason == "mixed_currency_offers"
+    assert result.total_landed_cost is None
+    assert result.allocation == []
 
 
 def test_advanced_solver_reports_mixed_currency_and_excludes_offer_from_totals() -> None:

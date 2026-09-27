@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections import defaultdict
+from collections import Counter, defaultdict
 from collections.abc import Iterable
 from datetime import UTC, datetime
 from decimal import ROUND_HALF_UP, Decimal
@@ -288,6 +288,7 @@ def _infeasible_items(
     offers: dict[tuple[UUID, UUID], OfferInput],
 ) -> list[InfeasibleBasketItem]:
     blocked = []
+    consistent_currencies: dict[UUID, str] = {}
     for item in items:
         available_currencies = {
             offers[(item.workspace_product_id, supplier_id)].total_landed_cost.currency
@@ -304,6 +305,8 @@ def _infeasible_items(
                 )
             )
             continue
+        if len(available_currencies) == 1:
+            consistent_currencies[item.workspace_product_id] = next(iter(available_currencies))
         missing = [
             supplier_id
             for supplier_id in supplier_ids
@@ -318,7 +321,48 @@ def _infeasible_items(
                     missing_supplier_ids=missing,
                 )
             )
+    reference_currency = _basket_reference_currency(consistent_currencies)
+    if reference_currency is not None:
+        already_blocked = {item.workspace_product_id for item in blocked}
+        for item in items:
+            currency = consistent_currencies.get(item.workspace_product_id)
+            if (
+                currency is not None
+                and currency != reference_currency
+                and item.workspace_product_id not in already_blocked
+            ):
+                blocked.append(
+                    InfeasibleBasketItem(
+                        workspace_product_id=item.workspace_product_id,
+                        requested_quantity=item.quantity,
+                        reason="mixed_currency_offers",
+                        missing_supplier_ids=[],
+                    )
+                )
     return blocked
+
+
+def _basket_reference_currency(consistent_currencies: dict[UUID, str]) -> str | None:
+    """Choose the basket currency deterministically from internally consistent items.
+
+    Each item contributes one vote for its only available currency. Ties use the smallest
+    workspace_product_id for that currency, mirroring recommendation's deterministic
+    supplier-id tie-break where no supplier is the relevant basket-level identity.
+    """
+    if not consistent_currencies:
+        return None
+    counts = Counter(consistent_currencies.values())
+    first_product_by_currency = {
+        currency: min(
+            product_id for product_id, item_currency in consistent_currencies.items()
+            if item_currency == currency
+        )
+        for currency in counts
+    }
+    return min(
+        counts,
+        key=lambda currency: (-counts[currency], first_product_by_currency[currency], currency),
+    )
 
 
 def _baselines(
@@ -655,6 +699,7 @@ def _candidate_violations(
 ) -> list[ViolatedConstraint]:
     violations = []
     eligible = set(eligible_supplier_ids)
+    consistent_currencies: dict[UUID, str] = {}
     for item in items:
         available_currencies = {
             offers[(item.workspace_product_id, supplier_id)].total_landed_cost.currency
@@ -670,6 +715,8 @@ def _candidate_violations(
                     message="available offers for this item use multiple currencies",
                 )
             )
+        elif len(available_currencies) == 1:
+            consistent_currencies[item.workspace_product_id] = next(iter(available_currencies))
         any_selected_offer = any(
             (item.workspace_product_id, supplier_id) in offers for supplier_id in supplier_ids
         )
@@ -685,6 +732,28 @@ def _candidate_violations(
                     message="no eligible supplier has a current offer for this item",
                 )
             )
+    reference_currency = _basket_reference_currency(consistent_currencies)
+    if reference_currency is not None:
+        already_mixed = {
+            violation.workspace_product_id
+            for violation in violations
+            if violation.kind == "mixed_currency"
+        }
+        for item in items:
+            currency = consistent_currencies.get(item.workspace_product_id)
+            if (
+                currency is not None
+                and currency != reference_currency
+                and item.workspace_product_id not in already_mixed
+            ):
+                violations.append(
+                    ViolatedConstraint(
+                        kind="mixed_currency",
+                        workspace_product_id=item.workspace_product_id,
+                        requested_quantity=item.quantity,
+                        message="available offers for this basket use multiple currencies",
+                    )
+                )
     for supplier_id in supplier_ids:
         terms = terms_by_supplier.get(supplier_id)
         subtotal = sum(
