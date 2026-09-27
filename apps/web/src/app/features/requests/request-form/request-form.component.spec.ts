@@ -4,11 +4,11 @@ import { TestBed } from '@angular/core/testing';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { ActivatedRoute, Router } from '@angular/router';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
-import { of, throwError } from 'rxjs';
+import { of, Subject, throwError } from 'rxjs';
 
 import enCatalog from '../../../../../../../packages/i18n/en.json';
 import { ApiService } from '../../../core/api/api.service';
-import type { Member, PurchaseRequest } from '../../../core/api/models';
+import type { BranchList, Member, PurchaseRequest } from '../../../core/api/models';
 import { OrganisationApiService } from '../../settings/organisation-api';
 import { RequestsApiService } from '../requests-api';
 import { RequestFormComponent } from './request-form.component';
@@ -95,6 +95,29 @@ describe('RequestFormComponent — create mode (T017)', () => {
   it('should start with one empty line in create mode', () => {
     expect(component.isEditMode()).toBeFalse();
     expect(component.lines.length).toBe(1);
+  });
+
+  it('should keep the form gated until branch options finish loading', () => {
+    const delayedBranches$ = new Subject<BranchList>();
+    organisationApi.listBranches.and.returnValue(delayedBranches$);
+
+    const delayedFixture = TestBed.createComponent(RequestFormComponent);
+    const delayedComponent = delayedFixture.componentInstance;
+    delayedFixture.detectChanges();
+
+    expect(delayedComponent.isLoading()).toBeTrue();
+    expect(delayedFixture.nativeElement.querySelector('.loading-state')).not.toBeNull();
+    expect(delayedFixture.nativeElement.querySelector('mat-select')).toBeNull();
+
+    delayedBranches$.next({
+      items: [{ id: 'b1', name: 'Main branch', is_active: true, created_at: '2026-01-01T00:00:00Z' }],
+      next_cursor: null,
+    });
+    delayedBranches$.complete();
+    delayedFixture.detectChanges();
+
+    expect(delayedComponent.isLoading()).toBeFalse();
+    expect(delayedFixture.nativeElement.querySelector('mat-select')).not.toBeNull();
   });
 
   it('should add and remove lines', () => {
@@ -231,6 +254,30 @@ describe('RequestFormComponent — edit mode (T017)', () => {
     expect(component.form.controls.required_by_date.value).toBe('2026-09-15');
     expect(component.lines.length).toBe(1);
     expect(component.lines.at(0).controls.workspace_product_id.value).toBe('wp1');
+  });
+
+  it('should wait for branches before rendering an edit form with a patched branch', () => {
+    const delayedBranches$ = new Subject<BranchList>();
+    organisationApi.listBranches.and.returnValue(delayedBranches$);
+    requestsApi.getRequest.and.returnValue(of(mockRequest));
+
+    const delayedFixture = TestBed.createComponent(RequestFormComponent);
+    const delayedComponent = delayedFixture.componentInstance;
+    delayedFixture.detectChanges();
+
+    expect(delayedComponent.isLoading()).toBeTrue();
+    expect(delayedFixture.nativeElement.querySelector('mat-select')).toBeNull();
+
+    delayedBranches$.next({
+      items: [{ id: 'b1', name: 'Main branch', is_active: true, created_at: '2026-01-01T00:00:00Z' }],
+      next_cursor: null,
+    });
+    delayedBranches$.complete();
+    delayedFixture.detectChanges();
+
+    expect(delayedComponent.isLoading()).toBeFalse();
+    expect(delayedComponent.form.controls.branch_id.value).toBe('b1');
+    expect(delayedFixture.nativeElement.querySelector('mat-select')).not.toBeNull();
   });
 
   it('should update an existing draft via updateRequest', () => {
