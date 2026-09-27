@@ -37,3 +37,12 @@
 3ca85994224cf89b0309681efce45c306c464216:apps/api/tests/integration/test_capture_service.py:generic-api-key:204
 3ca85994224cf89b0309681efce45c306c464216:apps/api/tests/integration/test_capture_service.py:generic-api-key:224
 3ca85994224cf89b0309681efce45c306c464216:apps/api/tests/integration/test_capture_service.py:generic-api-key:246
+
+# ---------------------------------------------------------------------------
+# 021: three FastAPI route handlers each declare
+# `idempotency_key: Annotated[UUID | None, Header(alias="Idempotency-Key")] = None` -- a header
+# name, not a credential value. The generic-api-key rule matches on the substring "Key" in
+# `Idempotency-Key`; there is no secret material anywhere on these lines.
+e96bf3fdfa6b1638d4defcc8acba665490e97736:apps/api/src/procurepilot_api/modules/digests/router.py:generic-api-key:55
+e96bf3fdfa6b1638d4defcc8acba665490e97736:apps/api/src/procurepilot_api/modules/exports/router.py:generic-api-key:36
+e96bf3fdfa6b1638d4defcc8acba665490e97736:apps/api/src/procurepilot_api/modules/offers/router.py:generic-api-key:86
