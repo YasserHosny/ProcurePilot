@@ -273,14 +273,16 @@ def make_workspace(cur: psycopg.Cursor, label: str) -> Workspace:
         (review_task_id, tenant_id, quotation_id),
     )
     cur.execute(
-        "insert into storage.objects (bucket_id,name,owner) "
-        "values ('quotation-documents',%s,%s)",
+        "insert into storage.objects (bucket_id,name,owner) values ('quotation-documents',%s,%s)",
         (storage_path, user_id),
     )
 
     # Matching and normalisation — chunk 4.4 (004-matching-normalisation), T052.
     match_candidate_id, match_task_id, match_decision_id, landed_cost_id = (
-        uuid4(), uuid4(), uuid4(), uuid4()
+        uuid4(),
+        uuid4(),
+        uuid4(),
+        uuid4(),
     )
     cur.execute(
         "insert into match_candidate "
@@ -387,15 +389,17 @@ def make_workspace(cur: psycopg.Cursor, label: str) -> Workspace:
 
     # Organisation Model — chunk R2.0 (007-organisation-model), T008.
     branch_id, cost_centre_id, budget_id, branch_role_assignment_id = (
-        uuid4(), uuid4(), uuid4(), uuid4()
+        uuid4(),
+        uuid4(),
+        uuid4(),
+        uuid4(),
     )
     cur.execute(
         "insert into branch (id,tenant_id,name,region) values (%s,%s,%s,'GB')",
         (branch_id, tenant_id, f"{label} Branch"),
     )
     cur.execute(
-        "insert into cost_centre (id,tenant_id,name,code,branch_id) "
-        "values (%s,%s,%s,%s,%s)",
+        "insert into cost_centre (id,tenant_id,name,code,branch_id) values (%s,%s,%s,%s,%s)",
         (cost_centre_id, tenant_id, f"{label} Cost Centre", f"{label}-cc", branch_id),
     )
     cur.execute(
@@ -469,9 +473,7 @@ def make_workspace(cur: psycopg.Cursor, label: str) -> Workspace:
     )
 
     # Mobile MVP — chunk R2.2 (009-mobile-app-mvp), T007.
-    device_registration_id, low_stock_report_id, push_notification_id = (
-        uuid4(), uuid4(), uuid4()
-    )
+    device_registration_id, low_stock_report_id, push_notification_id = (uuid4(), uuid4(), uuid4())
     cur.execute(
         "insert into device_registration (id,tenant_id,member_id,platform,push_token) "
         "values (%s,%s,%s,'ios',%s)",
@@ -843,9 +845,7 @@ def test_a_cross_workspace_update_changes_nothing(
     conn, alpha, beta = workspaces
     with conn.cursor() as cur:
         act_as(cur, alpha)
-        cur.execute(
-            "update membership set role = 'viewer' where tenant_id = %s", (beta.tenant_id,)
-        )
+        cur.execute("update membership set role = 'viewer' where tenant_id = %s", (beta.tenant_id,))
         assert cur.rowcount == 0
         cur.execute("reset role")
         cur.execute("select role from membership where id = %s", (beta.membership_id,))
@@ -890,9 +890,7 @@ def test_a_malformed_tenant_claim_sees_nothing(
     conn, _alpha, _beta = workspaces
     with conn.cursor() as cur:
         cur.execute("set local role authenticated")
-        cur.execute(
-            "select set_config('request.jwt.claims', '{\"tenant_id\":\"\"}', true)"
-        )
+        cur.execute("select set_config('request.jwt.claims', '{\"tenant_id\":\"\"}', true)")
         cur.execute("select count(*) from tenant")
         row = cur.fetchone()
     assert row is not None and row[0] == 0
@@ -907,9 +905,7 @@ def test_another_workspaces_products_are_invisible(
     conn, alpha, beta = workspaces
     with conn.cursor() as cur:
         act_as(cur, alpha)
-        cur.execute(
-            "select id from workspace_product where id = %s", (beta.workspace_product_id,)
-        )
+        cur.execute("select id from workspace_product where id = %s", (beta.workspace_product_id,))
         assert cur.fetchall() == []
 
 
@@ -1002,9 +998,7 @@ def test_a_cross_workspace_supplier_update_changes_nothing(
     conn, alpha, beta = workspaces
     with conn.cursor() as cur:
         act_as(cur, alpha)
-        cur.execute(
-            "update supplier set name = 'renamed' where id = %s", (beta.supplier_id,)
-        )
+        cur.execute("update supplier set name = 'renamed' where id = %s", (beta.supplier_id,))
         assert cur.rowcount == 0
         cur.execute("reset role")
         cur.execute("select name from supplier where id = %s", (beta.supplier_id,))
@@ -1108,9 +1102,7 @@ def test_a_cross_workspace_quotation_update_changes_nothing(
     conn, alpha, beta = workspaces
     with conn.cursor() as cur:
         act_as(cur, alpha)
-        cur.execute(
-            "update quotation set status = 'refused' where id = %s", (beta.quotation_id,)
-        )
+        cur.execute("update quotation set status = 'refused' where id = %s", (beta.quotation_id,))
         assert cur.rowcount == 0
         cur.execute("reset role")
         cur.execute("select status from quotation where id = %s", (beta.quotation_id,))
@@ -1274,9 +1266,7 @@ def test_workspace_products_tenant_name_embedding_stays_tenant_scoped(
             (dummy_vector, beta.workspace_product_id),
         )
         assert cur.rowcount == 0
-        cur.execute(
-            "select id from workspace_product where id = %s", (beta.workspace_product_id,)
-        )
+        cur.execute("select id from workspace_product where id = %s", (beta.workspace_product_id,))
         assert cur.fetchall() == []
 
 
@@ -1370,9 +1360,7 @@ def test_another_workspaces_saving_records_are_invisible(
     conn, alpha, beta = workspaces
     with conn.cursor() as cur:
         act_as(cur, alpha)
-        cur.execute(
-            "select count(*) from saving_record where id = %s", (beta.saving_record_id,)
-        )
+        cur.execute("select count(*) from saving_record where id = %s", (beta.saving_record_id,))
         row = cur.fetchone()
     assert row is not None and row[0] == 0
 
@@ -1446,9 +1434,14 @@ def test_verified_saving_record_is_immutable_to_every_role(
     workspaces: tuple[psycopg.Connection, Workspace, Workspace],
 ) -> None:
     """FR-004 / research.md R7: once verified, no role — not even the recording buyer, not even
-    a service-role connection — may update or delete the row. Verified here as the authenticated
-    role would exercise it; a second check confirms even the migration-owning role is blocked
-    (FORCE ROW LEVEL SECURITY only matters for RLS, this trigger has no role exception at all)."""
+    a service-role connection — may update or delete the row.
+
+    Two independent layers now guard this (PR2 follow-up finding 5,
+    20260927000000_saving_record_rls_hardening.sql): the `authenticated` role's own RLS policy
+    only ever matches a saving_record for UPDATE while it is still 'pending', so a verified row is
+    invisible to this UPDATE and silently affects zero rows — checked first. The immutability
+    TRIGGER is the second, RLS-independent layer and is what `service_role` (which carries
+    `bypassrls`, so RLS plays no part in this second check) is used to prove directly."""
     conn, alpha, _beta = workspaces
     with conn.cursor() as cur:
         act_as(cur, alpha)
@@ -1457,6 +1450,16 @@ def test_verified_saving_record_is_immutable_to_every_role(
             "where id = %s",
             (alpha.membership_id, alpha.saving_record_id),
         )
+
+        # Layer 1: RLS itself no longer matches a verified row for UPDATE at all.
+        cur.execute(
+            "update saving_record set actual_value_amount = 999 where id = %s",
+            (alpha.saving_record_id,),
+        )
+        assert cur.rowcount == 0
+
+        # Layer 2: bypass RLS entirely and prove the trigger's own guarantee independently.
+        cur.execute("set local role service_role")
         with pytest.raises(psycopg.errors.RestrictViolation, match="immutable"):
             cur.execute(
                 "update saving_record set actual_value_amount = 999 where id = %s",
@@ -1703,9 +1706,7 @@ def test_a_cross_workspace_device_registration_delete_removes_nothing(
     conn, alpha, beta = workspaces
     with conn.cursor() as cur:
         act_as(cur, alpha)
-        cur.execute(
-            "delete from device_registration where id = %s", (beta.device_registration_id,)
-        )
+        cur.execute("delete from device_registration where id = %s", (beta.device_registration_id,))
         assert cur.rowcount == 0
         cur.execute("reset role")
         cur.execute(
@@ -1722,9 +1723,7 @@ def test_another_workspaces_low_stock_reports_are_invisible(
     conn, alpha, beta = workspaces
     with conn.cursor() as cur:
         act_as(cur, alpha)
-        cur.execute(
-            "select id from low_stock_report where id = %s", (beta.low_stock_report_id,)
-        )
+        cur.execute("select id from low_stock_report where id = %s", (beta.low_stock_report_id,))
         assert cur.fetchall() == []
 
 
@@ -1745,9 +1744,7 @@ def test_authenticated_has_no_delete_or_update_privilege_on_low_stock_report(
 
         cur.execute("savepoint no_delete_privilege")
         with pytest.raises(psycopg.errors.InsufficientPrivilege):
-            cur.execute(
-                "delete from low_stock_report where id = %s", (beta.low_stock_report_id,)
-            )
+            cur.execute("delete from low_stock_report where id = %s", (beta.low_stock_report_id,))
         cur.execute("rollback to savepoint no_delete_privilege")
 
         cur.execute("savepoint no_update_privilege")
@@ -1918,8 +1915,11 @@ def test_a_member_cannot_write_tenant_email_config_into_another_workspace(
                 "insert into tenant_email_config "
                 "(tenant_id,forwarding_address,daily_limit,created_by) "
                 "values (%s,%s,100,%s)",
-                (beta.tenant_id, f"hijack-{uuid4().hex[:8]}@ingest.procurepilot.test",
-                 alpha.membership_id),
+                (
+                    beta.tenant_id,
+                    f"hijack-{uuid4().hex[:8]}@ingest.procurepilot.test",
+                    alpha.membership_id,
+                ),
             )
 
 
@@ -2249,26 +2249,68 @@ def test_rls_is_enabled_and_forced_on_every_tenant_scoped_table(
     """
     conn, _alpha, _beta = workspaces
     expected = {
-        "tenant", "membership", "member_invitation", "audit_event", "platform_invitation",
-        "workspace_product", "pack_definition", "product_substitute", "supplier",
-        "product_alias", "import_job", "canonical_product",
-        "document", "quotation", "quotation_line", "field_extraction", "extraction_job",
+        "tenant",
+        "membership",
+        "member_invitation",
+        "audit_event",
+        "platform_invitation",
+        "workspace_product",
+        "pack_definition",
+        "product_substitute",
+        "supplier",
+        "product_alias",
+        "import_job",
+        "canonical_product",
+        "document",
+        "quotation",
+        "quotation_line",
+        "field_extraction",
+        "extraction_job",
         "review_task",
-        "match_candidate", "match_task", "match_decision", "landed_cost",
+        "match_candidate",
+        "match_task",
+        "match_decision",
+        "landed_cost",
         "match_resolution_idempotency",
-        "basket_split_job", "alert_dismissal",
-        "purchase_record", "saving_record", "export_job", "billing_account", "plan",
-        "branch", "cost_centre", "budget", "branch_role_assignment",
-        "purchase_request", "purchase_request_line", "approval_step", "threshold_rule",
+        "basket_split_job",
+        "alert_dismissal",
+        "purchase_record",
+        "saving_record",
+        "export_job",
+        "billing_account",
+        "plan",
+        "branch",
+        "cost_centre",
+        "budget",
+        "branch_role_assignment",
+        "purchase_request",
+        "purchase_request_line",
+        "approval_step",
+        "threshold_rule",
         "approval_delegation",
-        "device_registration", "low_stock_report", "push_notification",
-        "supplier_commercial_term", "supplier_scorecard_snapshot",
-        "supplier_scorecard_metric", "supplier_scorecard_evidence", "negotiation_brief",
-        "negotiation_brief_item", "negotiation_brief_item_evidence", "negotiation_brief_action",
-        "tenant_email_config", "ingestion_email_log", "ingestion_jobs", "catalogue_imports",
-        "accounting_connection", "synced_vendor", "synced_bill", "purchase_bill_match",
+        "device_registration",
+        "low_stock_report",
+        "push_notification",
+        "supplier_commercial_term",
+        "supplier_scorecard_snapshot",
+        "supplier_scorecard_metric",
+        "supplier_scorecard_evidence",
+        "negotiation_brief",
+        "negotiation_brief_item",
+        "negotiation_brief_item_evidence",
+        "negotiation_brief_action",
+        "tenant_email_config",
+        "ingestion_email_log",
+        "ingestion_jobs",
+        "catalogue_imports",
+        "accounting_connection",
+        "synced_vendor",
+        "synced_bill",
+        "purchase_bill_match",
         "reconciliation_discrepancy",
-        "pos_connection", "synced_product_signal", "pos_product_match",
+        "pos_connection",
+        "synced_product_signal",
+        "pos_product_match",
     }
     with conn.cursor() as cur:
         cur.execute(
@@ -2281,3 +2323,298 @@ def test_rls_is_enabled_and_forced_on_every_tenant_scoped_table(
     for name, enabled, forced in rows:
         assert enabled, f"row level security is not ENABLED on {name}"
         assert forced, f"row level security is not FORCED on {name}"
+
+
+# --- PR2 follow-up findings 5 & 6 (2026-09-27) -------------------------------
+#
+# Finding 5: saving_record's single uniform `for all` policy let any authenticated tenant member
+# — any role, not just the app's own WRITE_ROLES = (owner, buyer) — insert a saving_record already
+# at status='verified' with fabricated amounts, bypassing require_role() entirely, since the
+# immutability trigger only fires on UPDATE/DELETE, never INSERT. Closed by
+# 20260927000000_saving_record_rls_hardening.sql: four operation-specific policies replace it.
+#
+# Finding 6: a plain single-column FK from a tenant-scoped child to another tenant-scoped parent
+# only checks the referenced row exists ANYWHERE, not that it belongs to the same tenant as the
+# child's own tenant_id — a cross-tenant existence oracle and a real data-corruption risk, distinct
+# from (and not caught by) the ordinary tenant_id RLS check. Closed for 45 confirmed instances by
+# 20260927000001_composite_tenant_foreign_keys.sql; pack_definition is the originally-diagnosed
+# case, plus two more of the 45 as a representative sample of the fix's different shapes
+# (self-referential, and a membership-referencing column).
+
+
+def _insert_second_member(
+    cur: psycopg.Cursor, workspace: Workspace, *, role: str, label: str
+) -> tuple[UUID, UUID]:
+    """A second real membership in `workspace`'s own tenant, carrying a different role."""
+    user_id, membership_id = uuid4(), uuid4()
+    cur.execute("reset role")
+    cur.execute("select set_config('request.jwt.claims', '{}', true)")
+    cur.execute(
+        "insert into auth.users (id,email) values (%s,%s)",
+        (user_id, f"{workspace.name}-{label}@example.test"),
+    )
+    cur.execute(
+        "insert into membership (id,tenant_id,user_id,email,role,is_active_workspace) "
+        "values (%s,%s,%s,%s,%s,true)",
+        (
+            membership_id,
+            workspace.tenant_id,
+            user_id,
+            f"{workspace.name}-{label}@example.test",
+            role,
+        ),
+    )
+    return user_id, membership_id
+
+
+def _act_as_role(cur: psycopg.Cursor, workspace: Workspace, user_id: UUID, role: str) -> None:
+    cur.execute("set local role authenticated")
+    cur.execute(
+        "select set_config('request.jwt.claims', %s, true)",
+        (
+            f'{{"sub":"{user_id}","tenant_id":"{workspace.tenant_id}",'
+            f'"role":"authenticated","member_role":"{role}"}}',
+        ),
+    )
+
+
+def _insert_extra_purchase_record(cur: psycopg.Cursor, workspace: Workspace) -> UUID:
+    """A fresh purchase_record, distinct from the fixture's own — saving_record_unique_purchase
+    means the fixture's pre-seeded purchase_record_id can back only one saving_record."""
+    purchase_record_id = uuid4()
+    cur.execute(
+        "insert into purchase_record (id,tenant_id,workspace_product_id,supplier_id,"
+        "recorded_by,quantity,base_unit,unit_price_amount,unit_price_currency,"
+        "total_paid_amount,total_paid_currency,delivery_result) "
+        "values (%s,%s,%s,%s,%s,1,'each',100,'GBP',100,'GBP','delivered')",
+        (
+            purchase_record_id,
+            workspace.tenant_id,
+            workspace.workspace_product_id,
+            workspace.supplier_id,
+            workspace.membership_id,
+        ),
+    )
+    return purchase_record_id
+
+
+def _pending_saving_record_payload(
+    workspace: Workspace, purchase_record_id: UUID
+) -> tuple[str, tuple[object, ...]]:
+    sql = (
+        "insert into saving_record (id,tenant_id,purchase_record_id,workspace_product_id,"
+        "supplier_id,baseline_policy,baseline_source_landed_cost_ids,actual_value_amount,"
+        "actual_value_currency,calculation_version,calculation_inputs,recorded_by) "
+        "values (%s,%s,%s,%s,%s,'none_available','{}',100,'GBP','test-v1','{}'::jsonb,%s)"
+    )
+    return sql, (
+        uuid4(),
+        workspace.tenant_id,
+        purchase_record_id,
+        workspace.workspace_product_id,
+        workspace.supplier_id,
+        workspace.membership_id,
+    )
+
+
+def test_a_demoted_member_cannot_insert_a_saving_record_on_a_stale_token(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    """Codex review of PR2 follow-up finding 5: current_member_role() reads the JWT claim, which
+    can be stale relative to the live membership row. A member demoted from owner to viewer must
+    lose write access on their VERY NEXT statement, not only once their token is refreshed --
+    current_membership_role() (a live lookup, not a claim read) is what makes that true."""
+    conn, alpha, _beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        purchase_record_id = _insert_extra_purchase_record(cur, alpha)
+
+        # The owner-guard trigger refuses to demote a tenant's last active owner -- mint a second
+        # one first so alpha's own membership can legitimately be demoted.
+        _insert_second_member(cur, alpha, role="owner", label="second-owner")
+        cur.execute("reset role")
+        cur.execute("select set_config('request.jwt.claims', '{}', true)")
+        cur.execute("update membership set role = 'viewer' where id = %s", (alpha.membership_id,))
+
+        # alpha's own claims() still says "owner" -- a stale, unrefreshed token, exactly as a real
+        # demoted member's existing session would present until they next sign in.
+        act_as(cur, alpha)
+        sql, params = _pending_saving_record_payload(alpha, purchase_record_id)
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            cur.execute(sql, params)
+
+
+def test_a_verification_update_cannot_also_smuggle_in_evidence_changes(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    """Codex review of PR2 follow-up finding 5: the pending -> verified UPDATE must only ever
+    touch status/verified_at/verified_by. Proves the trigger, not just the RLS check, refuses a
+    single statement that verifies AND rewrites the evidence it is meant to freeze."""
+    conn, alpha, _beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        purchase_record_id = _insert_extra_purchase_record(cur, alpha)
+        sql, params = _pending_saving_record_payload(alpha, purchase_record_id)
+        saving_id = params[0]
+        cur.execute(sql, params)
+
+        with pytest.raises(psycopg.errors.RestrictViolation, match="metadata"):
+            cur.execute(
+                "update saving_record set status='verified', verified_at=now(), "
+                "verified_by=%s, actual_value_amount=999999 where id=%s and status='pending'",
+                (alpha.membership_id, saving_id),
+            )
+        conn.rollback()
+
+
+def test_a_viewer_cannot_insert_a_saving_record(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, alpha, _beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        purchase_record_id = _insert_extra_purchase_record(cur, alpha)
+
+        viewer_user_id, _viewer_membership_id = _insert_second_member(
+            cur, alpha, role="viewer", label="viewer5"
+        )
+        _act_as_role(cur, alpha, viewer_user_id, "viewer")
+        sql, params = _pending_saving_record_payload(alpha, purchase_record_id)
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            cur.execute(sql, params)
+
+
+def test_a_member_cannot_insert_an_already_verified_saving_record(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    """The exact PR2 finding-5 exploit: an owner-role INSERT that starts pre-verified."""
+    conn, alpha, _beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            cur.execute(
+                "insert into saving_record (id,tenant_id,purchase_record_id,"
+                "workspace_product_id,supplier_id,status,baseline_policy,"
+                "baseline_source_landed_cost_ids,actual_value_amount,actual_value_currency,"
+                "delta_amount,delta_currency,calculation_version,calculation_inputs,"
+                "recorded_by,verified_by,verified_at) "
+                "values (%s,%s,%s,%s,%s,'verified','none_available','{}',100,'GBP',"
+                "0,'GBP','test-v1','{}'::jsonb,%s,%s,now())",
+                (
+                    uuid4(),
+                    alpha.tenant_id,
+                    alpha.purchase_record_id,
+                    alpha.workspace_product_id,
+                    alpha.supplier_id,
+                    alpha.membership_id,
+                    alpha.membership_id,
+                ),
+            )
+
+
+def test_an_owner_can_record_and_then_verify_a_saving(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    """The legitimate two-step flow still works after the RLS hardening."""
+    conn, alpha, _beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        second_purchase_id = _insert_extra_purchase_record(cur, alpha)
+        sql, params = _pending_saving_record_payload(alpha, second_purchase_id)
+        saving_id = params[0]
+        cur.execute(sql, params)  # succeeds: pending, owner, no verification metadata
+
+        cur.execute(
+            "update saving_record set status='verified', verified_at=now(), "
+            "verified_by=%s where id=%s and status='pending' returning status",
+            (alpha.membership_id, saving_id),
+        )
+        assert cur.fetchone() == ("verified",)
+
+
+def test_a_viewer_cannot_verify_a_pending_saving_record(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, alpha, _beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        purchase_record_id = _insert_extra_purchase_record(cur, alpha)
+        sql, params = _pending_saving_record_payload(alpha, purchase_record_id)
+        saving_id = params[0]
+        cur.execute(sql, params)
+
+        viewer_user_id, _ = _insert_second_member(cur, alpha, role="viewer", label="viewer5b")
+        _act_as_role(cur, alpha, viewer_user_id, "viewer")
+        cur.execute(
+            "update saving_record set status='verified', verified_at=now(), "
+            "verified_by=%s where id=%s and status='pending'",
+            (alpha.membership_id, saving_id),
+        )
+        assert cur.rowcount == 0  # RLS's USING clause hides the row from this role entirely
+
+
+def test_nobody_can_delete_a_saving_record_via_authenticated_role(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, alpha, _beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            cur.execute("delete from saving_record where id = %s", (alpha.saving_record_id,))
+
+
+def test_a_member_cannot_write_a_cross_tenant_pack_definition_reference(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    """PR2 follow-up finding 6, the originally-diagnosed instance. Before the composite FK,
+    this insert succeeded: tenant_id RLS only checks tenant_id itself, and the single-column FK
+    only checked that beta's workspace_product_id existed SOMEWHERE, not that it belonged to
+    alpha. It must now fail at the FK, not the RLS layer.
+    """
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        with pytest.raises(psycopg.errors.ForeignKeyViolation):
+            cur.execute(
+                "insert into pack_definition (tenant_id,workspace_product_id,pack_count,"
+                "unit_size) values (%s,%s,6,1)",
+                (alpha.tenant_id, beta.workspace_product_id),
+            )
+
+
+def test_a_member_cannot_write_a_cross_tenant_quotation_line_reference(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    """A second shape: ON DELETE CASCADE, quotation_line -> quotation."""
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        with pytest.raises(psycopg.errors.ForeignKeyViolation):
+            cur.execute(
+                "insert into quotation_line (id,tenant_id,quotation_id,line_number,"
+                "original_text,quantity,unit_price_amount,unit_price_currency) "
+                "values (%s,%s,%s,1,'cross-tenant test',1,10,'GBP')",
+                (uuid4(), alpha.tenant_id, beta.quotation_id),
+            )
+
+
+def test_a_member_cannot_write_a_cross_tenant_membership_reference(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    """A third shape: a column referencing membership, the table the composite-FK pattern
+    (GitHub issue #7) was originally introduced for."""
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        with pytest.raises(psycopg.errors.ForeignKeyViolation):
+            cur.execute(
+                "insert into document (id,tenant_id,storage_bucket,storage_path,mime_type,"
+                "source_channel,created_by) values (%s,%s,'quotations',%s,"
+                "'application/pdf','upload',%s)",
+                (
+                    uuid4(),
+                    alpha.tenant_id,
+                    f"tenants/{alpha.tenant_id}/quotations/cross-tenant-test.pdf",
+                    beta.membership_id,
+                ),
+            )
