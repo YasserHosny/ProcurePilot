@@ -33,6 +33,20 @@ class DevicesService:
         with _authenticated_db(self._settings, member) as conn:
             replay = False
             with conn.cursor(row_factory=dict_row) as cur:
+                if idempotency_key is not None:
+                    # device_registration's own (tenant_id, member_id, push_token) upsert target
+                    # below silently absorbs a retried registration too -- it always returns a row
+                    # via DO UPDATE, so the idempotency_key's own unique index never gets a chance
+                    # to raise and this insert's except branch alone cannot detect a genuine
+                    # replay. Check for one explicitly, first, before ever attempting the insert.
+                    cur.execute(
+                        "select id, member_id, platform, push_token, last_seen_at "
+                        "from device_registration where tenant_id = %s and idempotency_key = %s",
+                        (member.tenant_id, idempotency_key),
+                    )
+                    existing = cur.fetchone()
+                    if existing is not None:
+                        return DeviceRegistration.model_validate(dict(existing)), False
                 try:
                     cur.execute(
                         """
@@ -57,8 +71,8 @@ class DevicesService:
                     conn.rollback()
                     cur.execute(
                         "select id, member_id, platform, push_token, last_seen_at "
-                        "from device_registration where idempotency_key = %s",
-                        (idempotency_key,),
+                        "from device_registration where tenant_id = %s and idempotency_key = %s",
+                        (member.tenant_id, idempotency_key),
                     )
                     replay = True
                 row = cur.fetchone()

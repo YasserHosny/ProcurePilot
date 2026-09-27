@@ -420,11 +420,14 @@ class OrganisationService:
                     .limit(1)
                     .execute()
                 )
+                # overlap_warning is already computed above (from the SAME payload/tenant, before
+                # the insert was ever attempted) -- reuse it rather than passing None into a
+                # non-optional bool field on the replay path.
                 return BudgetCreated(
                     **_budget(
                         _one_row(existing.data, reason="budget_idempotency_lookup_failed")
                     ).model_dump(),
-                    overlap_warning=None,
+                    overlap_warning=overlap_warning,
                 ), False
             raise _write_error(exc, duplicate_reason="budget_conflict") from exc
 

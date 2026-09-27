@@ -70,6 +70,20 @@ class QuotationService:
         idempotency_key: UUID | None = None,
     ) -> tuple[Quotation, bool]:
         client = authenticated_client(self._settings, bearer_token)
+        if idempotency_key is not None:
+            # A genuine replay of THIS create must short-circuit before the document-conflict
+            # check below -- otherwise the very quotation the first call created makes that check
+            # fire on the replay too, turning a safe retry into a spurious 409 instead of the
+            # original resource.
+            existing = (
+                client.table("quotation")
+                .select(QUOTATION_COLUMNS)
+                .eq("idempotency_key", str(idempotency_key))
+                .limit(1)
+                .execute()
+            )
+            if existing.data:
+                return _quotation(_one_row(existing.data, resource="quotation")), False
         _document_row(client, payload.document_id)
         if payload.supplier_id is not None:
             _supplier_row(client, payload.supplier_id)
