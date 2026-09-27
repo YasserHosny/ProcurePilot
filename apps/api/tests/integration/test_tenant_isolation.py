@@ -2417,6 +2417,56 @@ def _pending_saving_record_payload(
     )
 
 
+def test_a_demoted_member_cannot_insert_a_saving_record_on_a_stale_token(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    """Codex review of PR2 follow-up finding 5: current_member_role() reads the JWT claim, which
+    can be stale relative to the live membership row. A member demoted from owner to viewer must
+    lose write access on their VERY NEXT statement, not only once their token is refreshed --
+    current_membership_role() (a live lookup, not a claim read) is what makes that true."""
+    conn, alpha, _beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        purchase_record_id = _insert_extra_purchase_record(cur, alpha)
+
+        # The owner-guard trigger refuses to demote a tenant's last active owner -- mint a second
+        # one first so alpha's own membership can legitimately be demoted.
+        _insert_second_member(cur, alpha, role="owner", label="second-owner")
+        cur.execute("reset role")
+        cur.execute("select set_config('request.jwt.claims', '{}', true)")
+        cur.execute("update membership set role = 'viewer' where id = %s", (alpha.membership_id,))
+
+        # alpha's own claims() still says "owner" -- a stale, unrefreshed token, exactly as a real
+        # demoted member's existing session would present until they next sign in.
+        act_as(cur, alpha)
+        sql, params = _pending_saving_record_payload(alpha, purchase_record_id)
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            cur.execute(sql, params)
+
+
+def test_a_verification_update_cannot_also_smuggle_in_evidence_changes(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    """Codex review of PR2 follow-up finding 5: the pending -> verified UPDATE must only ever
+    touch status/verified_at/verified_by. Proves the trigger, not just the RLS check, refuses a
+    single statement that verifies AND rewrites the evidence it is meant to freeze."""
+    conn, alpha, _beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        purchase_record_id = _insert_extra_purchase_record(cur, alpha)
+        sql, params = _pending_saving_record_payload(alpha, purchase_record_id)
+        saving_id = params[0]
+        cur.execute(sql, params)
+
+        with pytest.raises(psycopg.errors.RestrictViolation, match="metadata"):
+            cur.execute(
+                "update saving_record set status='verified', verified_at=now(), "
+                "verified_by=%s, actual_value_amount=999999 where id=%s and status='pending'",
+                (alpha.membership_id, saving_id),
+            )
+        conn.rollback()
+
+
 def test_a_viewer_cannot_insert_a_saving_record(
     workspaces: tuple[psycopg.Connection, Workspace, Workspace],
 ) -> None:
