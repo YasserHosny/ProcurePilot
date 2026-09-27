@@ -223,6 +223,11 @@ def make_reporting_tenant(cur: psycopg.Cursor, label: str) -> ReportingTenant:
             yesterday,
         ),
     )
+    # PR2 follow-up finding 5 (20260927000000_saving_record_rls_hardening.sql): an authenticated
+    # insert must now start at status='pending' with no verification metadata -- exactly the
+    # shape a real record-then-verify flow produces, not this fixture's single already-verified
+    # row. Seed it as postgres (bypasses RLS) instead of pretending it went through that flow.
+    reset_role(cur)
     cur.execute(
         """
         insert into saving_record
@@ -247,6 +252,7 @@ def make_reporting_tenant(cur: psycopg.Cursor, label: str) -> ReportingTenant:
             yesterday,
         ),
     )
+    act_as(cur, workspace)
 
     # The R2.5 marker rows themselves: one schedule, one subscription, one scheduled
     # artifact (exercising every widened export_job column), and two branch-filtered
