@@ -128,11 +128,12 @@ def test_redis_enqueue_failure_does_not_leave_quotation_stuck(
         assert cur.fetchone() == ("failed", "redis_enqueue_failed")
 
         monkeypatch.setattr(extraction_service_module, "_enqueue_redis_job", lambda *_args: None)
-        job = ExtractionService().enqueue_extraction(
+        job, created = ExtractionService().enqueue_extraction(
             bearer_token="test-token",
             member=member,
             quotation_id=quotation_id,
         )
+        assert created is True
         assert job.status == "queued"
 
 

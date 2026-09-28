@@ -5,6 +5,7 @@ from datetime import UTC, datetime
 from uuid import UUID
 from zoneinfo import ZoneInfo
 
+import psycopg.errors
 from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 
@@ -33,7 +34,8 @@ class ExportService:
         member: CurrentMember,
         payload: ExportCreate,
         bearer_token: str | None = None,
-    ) -> ExportJob:
+        idempotency_key: UUID | None = None,
+    ) -> tuple[ExportJob, bool]:
         with _authenticated_db(self._settings, member) as conn:
             workspace = workspace_context(conn, member)
             filters = _resolved_filters(payload.filters, workspace)
@@ -53,24 +55,38 @@ class ExportService:
             locale = payload.locale or str(
                 workspace["preferred_locale"] or workspace["default_locale"]
             )
-            with conn.cursor(row_factory=dict_row) as cur:
-                cur.execute(
-                    """
+            try:
+                with conn.cursor(row_factory=dict_row) as cur:
+                    cur.execute(
+                        """
                     insert into export_job
-                      (tenant_id, requested_by, kind, format, filters, status, locale)
-                    values (%s, %s, %s, %s, %s, 'queued', %s)
+                      (tenant_id, requested_by, kind, format, filters, status, locale,
+                       idempotency_key)
+                    values (%s, %s, %s, %s, %s, 'queued', %s, %s)
                     returning *
                     """,
-                    (
-                        member.tenant_id,
-                        member.membership_id,
-                        payload.kind,
-                        payload.format,
-                        Jsonb(filters.model_dump(mode="json")),
-                        locale,
-                    ),
-                )
-                row = dict(cur.fetchone())
+                        (
+                            member.tenant_id,
+                            member.membership_id,
+                            payload.kind,
+                            payload.format,
+                            Jsonb(filters.model_dump(mode="json")),
+                            locale,
+                            idempotency_key,
+                        ),
+                    )
+                    row = dict(cur.fetchone())
+            except psycopg.errors.UniqueViolation:
+                if idempotency_key is None:
+                    raise
+                conn.rollback()
+                with conn.cursor(row_factory=dict_row) as cur:
+                    cur.execute(
+                        "select * from export_job where idempotency_key = %s", (idempotency_key,)
+                    )
+                    row = dict(cur.fetchone())
+                conn.commit()
+                return _job(row), False
             try:
                 _enqueue_export_job(self._settings, row, member)
             except ServiceUnavailableError:
@@ -90,7 +106,7 @@ class ExportService:
                 "period_end": filters.period_end.isoformat(),
             },
         )
-        return _job(row)
+        return _job(row), True
 
     def get_job(self, *, member: CurrentMember, job_id: UUID) -> ExportJob:
         with _authenticated_db(self._settings, member) as conn:

@@ -4,7 +4,7 @@ from datetime import date
 from typing import Annotated, Literal
 from uuid import UUID
 
-from fastapi import APIRouter, Body, Depends, Header, Query, status
+from fastapi import APIRouter, Body, Depends, Header, Query, Response, status
 
 from procurepilot_api.deps import CurrentMember, current_member
 from procurepilot_api.modules.auth.jwt import MemberRole
@@ -32,9 +32,15 @@ def record_purchase(
     payload: Annotated[PurchaseOutcomeCreate, Body()],
     member: Annotated[CurrentMember, Depends(require_role(*WRITE_ROLES))],
     service: Annotated[SavingsService, Depends(get_savings_service)],
-    _idempotency_key: Annotated[UUID | None, Header(alias="Idempotency-Key")] = None,
+    response: Response,
+    idempotency_key: Annotated[UUID | None, Header(alias="Idempotency-Key")] = None,
 ) -> PurchaseOutcomeCreated:
-    return service.record_purchase(member=member, payload=payload)
+    outcome, created = service.record_purchase(
+        member=member, payload=payload, idempotency_key=idempotency_key
+    )
+    if not created:
+        response.status_code = status.HTTP_200_OK
+    return outcome
 
 
 @router.get("/savings", response_model=SavingList)

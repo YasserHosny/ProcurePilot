@@ -55,12 +55,12 @@ def test_registering_the_same_token_twice_upserts_the_same_row(conn: object) -> 
     member = _member(workspace)
     service = DevicesService()
 
-    first = service.register_device(
+    first, _first_created = service.register_device(
         bearer_token="unused",
         member=member,
         payload=DeviceRegistrationCreate(platform="ios", push_token="tok-upsert"),
     )
-    second = service.register_device(
+    second, _second_created = service.register_device(
         bearer_token="unused",
         member=member,
         payload=DeviceRegistrationCreate(platform="ios", push_token="tok-upsert"),
@@ -77,7 +77,7 @@ def test_deleting_a_device_twice_the_second_time_is_not_found(conn: object) -> N
     member = _member(workspace)
     service = DevicesService()
 
-    created = service.register_device(
+    created, _created = service.register_device(
         bearer_token="unused",
         member=member,
         payload=DeviceRegistrationCreate(platform="android", push_token="tok-delete"),

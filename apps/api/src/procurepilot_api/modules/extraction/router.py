@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Header, status
+from fastapi import APIRouter, Depends, Header, Response, status
 
 from procurepilot_api.deps import CurrentMember, bearer_token
 from procurepilot_api.modules.auth.jwt import MemberRole
@@ -25,6 +25,15 @@ def extract_quotation(
     token: Annotated[str, Depends(bearer_token)],
     member: Annotated[CurrentMember, Depends(require_role(*WRITE_ROLES))],
     service: Annotated[ExtractionService, Depends(get_extraction_service)],
-    _idempotency_key: Annotated[UUID | None, Header(alias="Idempotency-Key")] = None,
+    response: Response,
+    idempotency_key: Annotated[UUID | None, Header(alias="Idempotency-Key")] = None,
 ) -> Job:
-    return service.enqueue_extraction(bearer_token=token, member=member, quotation_id=quotation_id)
+    job, created = service.enqueue_extraction(
+        bearer_token=token,
+        member=member,
+        quotation_id=quotation_id,
+        idempotency_key=idempotency_key,
+    )
+    if not created:
+        response.status_code = status.HTTP_200_OK
+    return job

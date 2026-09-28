@@ -73,7 +73,7 @@ def test_ten_thousand_row_export_renders_and_uploads_within_budget(
             "procurepilot_api.modules.exports.service.get_audit_writer",
             lambda: _NoAuditWriter(),
         )
-        job = ExportService(settings).create_job(
+        job, _created = ExportService(settings).create_job(
             member=context.member,
             payload=export_request(),
         )

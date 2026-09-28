@@ -24,7 +24,8 @@ class ExtractionService:
         bearer_token: str,
         member: CurrentMember,
         quotation_id: UUID,
-    ) -> Job:
+        idempotency_key: UUID | None = None,
+    ) -> tuple[Job, bool]:
         client = authenticated_client(self._settings, bearer_token)
         quote = _one_row(
             client.table("quotation")
@@ -35,11 +36,26 @@ class ExtractionService:
             .data,
             resource="quotation",
         )
+        if idempotency_key is not None:
+            existing = (
+                client.table("extraction_job")
+                .select("*")
+                .eq("idempotency_key", str(idempotency_key))
+                .limit(1)
+                .execute()
+            )
+            if existing.data:
+                return Job.model_validate(existing.data[0]), False
         if quote["status"] not in {"pending", "refused"}:
             raise ConflictError(details={"reason": "quotation_not_extractable"})
-        active = client.table("extraction_job").select("id").eq(
-            "quotation_id", str(quotation_id)
-        ).in_("status", ["queued", "running"]).limit(1).execute()
+        active = (
+            client.table("extraction_job")
+            .select("id")
+            .eq("quotation_id", str(quotation_id))
+            .in_("status", ["queued", "running"])
+            .limit(1)
+            .execute()
+        )
         if active.data:
             raise ConflictError(details={"reason": "extraction_already_running"})
         try:
@@ -50,6 +66,7 @@ class ExtractionService:
                         "tenant_id": str(member.tenant_id),
                         "quotation_id": str(quotation_id),
                         "status": "queued",
+                        "idempotency_key": str(idempotency_key) if idempotency_key else None,
                     }
                 )
                 .execute()
@@ -60,6 +77,16 @@ class ExtractionService:
                 "id", str(quotation_id)
             ).execute()
         except APIError as exc:
+            if idempotency_key is not None and getattr(exc, "code", None) == "23505":
+                existing = (
+                    client.table("extraction_job")
+                    .select("*")
+                    .eq("idempotency_key", str(idempotency_key))
+                    .limit(1)
+                    .execute()
+                )
+                if existing.data:
+                    return Job.model_validate(existing.data[0]), False
             raise ServiceUnavailableError(details={"dependency": "database"}) from exc
 
         try:
@@ -73,7 +100,7 @@ class ExtractionService:
             )
             raise
         job = Job.model_validate({key: job_row.get(key) for key in JOB_COLUMNS.split(",")})
-        return job
+        return job, True
 
 
 def get_extraction_service() -> ExtractionService:

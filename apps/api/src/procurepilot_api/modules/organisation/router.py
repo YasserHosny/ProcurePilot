@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Body, Depends, Header, Query, status
+from fastapi import APIRouter, Body, Depends, Header, Query, Response, status
 
 from procurepilot_api.deps import CurrentMember, bearer_token, current_member
 from procurepilot_api.modules.auth.jwt import MemberRole
@@ -57,9 +57,15 @@ def create_branch(
     token: Annotated[str, Depends(bearer_token)],
     member: Annotated[CurrentMember, Depends(require_role(MemberRole.owner))],
     service: Annotated[OrganisationService, Depends(get_organisation_service)],
-    _idempotency_key: Annotated[UUID | None, Header(alias="Idempotency-Key")] = None,
+    response: Response,
+    idempotency_key: Annotated[UUID | None, Header(alias="Idempotency-Key")] = None,
 ) -> Branch:
-    return service.create_branch(bearer_token=token, member=member, payload=payload)
+    branch, created = service.create_branch(
+        bearer_token=token, member=member, payload=payload, idempotency_key=idempotency_key
+    )
+    if not created:
+        response.status_code = status.HTTP_200_OK
+    return branch
 
 
 @router.patch("/organisation/branches/{branch_id}", response_model=Branch)
@@ -107,9 +113,15 @@ def create_cost_centre(
     token: Annotated[str, Depends(bearer_token)],
     member: Annotated[CurrentMember, Depends(require_role(MemberRole.owner))],
     service: Annotated[OrganisationService, Depends(get_organisation_service)],
-    _idempotency_key: Annotated[UUID | None, Header(alias="Idempotency-Key")] = None,
+    response: Response,
+    idempotency_key: Annotated[UUID | None, Header(alias="Idempotency-Key")] = None,
 ) -> CostCentre:
-    return service.create_cost_centre(bearer_token=token, member=member, payload=payload)
+    cost_centre, created = service.create_cost_centre(
+        bearer_token=token, member=member, payload=payload, idempotency_key=idempotency_key
+    )
+    if not created:
+        response.status_code = status.HTTP_200_OK
+    return cost_centre
 
 
 @router.patch("/organisation/cost-centres/{cost_centre_id}", response_model=CostCentre)
@@ -159,6 +171,12 @@ def create_budget(
     token: Annotated[str, Depends(bearer_token)],
     member: Annotated[CurrentMember, Depends(require_role(MemberRole.owner))],
     service: Annotated[OrganisationService, Depends(get_organisation_service)],
-    _idempotency_key: Annotated[UUID | None, Header(alias="Idempotency-Key")] = None,
+    response: Response,
+    idempotency_key: Annotated[UUID | None, Header(alias="Idempotency-Key")] = None,
 ) -> BudgetCreated:
-    return service.create_budget(bearer_token=token, member=member, payload=payload)
+    budget, created = service.create_budget(
+        bearer_token=token, member=member, payload=payload, idempotency_key=idempotency_key
+    )
+    if not created:
+        response.status_code = status.HTTP_200_OK
+    return budget

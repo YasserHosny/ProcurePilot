@@ -55,7 +55,7 @@ def test_saving_evidence_with_a_real_match_decision_link(
             context, supplier_id=context.supplier_ids[0], amount=Decimal("300.0000")
         )
         service = SavingsService(settings)
-        created = service.record_purchase(
+        created, _created = service.record_purchase(
             member=context.member,
             payload=PurchaseOutcomeCreate(
                 workspace_product_id=context.product_id,

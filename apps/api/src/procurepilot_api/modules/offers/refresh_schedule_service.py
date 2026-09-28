@@ -71,7 +71,8 @@ def create_schedule(
     payload: RefreshScheduleCreate,
     bearer_token: str | None = None,
     settings: Settings | None = None,
-) -> RefreshSchedule:
+    idempotency_key: UUID | None = None,
+) -> tuple[RefreshSchedule, bool]:
     active_settings = settings or get_settings()
     with _authenticated_db(active_settings, member) as conn:
         _validate_product_and_supplier(
@@ -82,8 +83,8 @@ def create_schedule(
                 cur.execute(
                     f"""
                     insert into offer_refresh_schedule
-                      (tenant_id, workspace_product_id, supplier_id, cadence_days)
-                    values (%s, %s, %s, %s)
+                      (tenant_id, workspace_product_id, supplier_id, cadence_days, idempotency_key)
+                    values (%s, %s, %s, %s, %s)
                     returning {_SCHEDULE_COLUMNS}
                     """,
                     (
@@ -91,12 +92,23 @@ def create_schedule(
                         payload.workspace_product_id,
                         payload.supplier_id,
                         payload.cadence_days,
+                        idempotency_key,
                     ),
                 )
                 row = cur.fetchone()
             conn.commit()
         except psycopg.errors.UniqueViolation as exc:
             conn.rollback()
+            if idempotency_key is not None:
+                with conn.cursor(row_factory=dict_row) as cur:
+                    cur.execute(
+                        f"select {_SCHEDULE_COLUMNS} from offer_refresh_schedule "
+                        "where tenant_id = %s and idempotency_key = %s",
+                        (member.tenant_id, idempotency_key),
+                    )
+                    replay_row = cur.fetchone()
+                if replay_row is not None:
+                    return _schedule_from_row(replay_row), False
             raise ConflictError(details={"reason": "refresh_schedule_exists"}) from exc
     if row is None:
         raise ConflictError(details={"reason": "refresh_schedule_not_created"})
@@ -106,7 +118,7 @@ def create_schedule(
         action="offers.refresh_schedule_created",
         target={"refresh_schedule_id": str(row["id"])},
     )
-    return _schedule_from_row(row)
+    return _schedule_from_row(row), True
 
 
 def update_schedule(
