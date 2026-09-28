@@ -155,6 +155,11 @@ def test_retry_extraction_enqueue_failure_fails_job_without_discarding_review_da
         )
         monkeypatch.setattr(
             quotation_service_module,
+            "get_audit_writer",
+            lambda: type("AuditWriter", (), {"record": lambda *_args, **_kwargs: None})(),
+        )
+        monkeypatch.setattr(
+            quotation_service_module,
             "_enqueue_extraction",
             lambda *_args, **_kwargs: (_ for _ in ()).throw(
                 ServiceUnavailableError(details={"dependency": "redis"})
@@ -257,6 +262,71 @@ def test_replace_document_replays_after_extraction_finished_without_duplicate_jo
             (fixture.quotation_id,),
         )
         assert cur.fetchone() == (1,)
+
+
+def test_replace_document_retries_failed_enqueue_for_the_same_idempotency_key(
+    conn: object,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from integration.quotation_helpers import make_extracted_quotation
+
+    with conn.cursor() as cur:
+        workspace = make_workspace(cur, "replace-document-failed-retry")
+        fixture = make_extracted_quotation(cur, workspace)
+        new_document_id = make_document(cur, workspace, filename="replacement-retry.pdf")
+        act_as(cur, workspace)
+        monkeypatch.setattr(
+            quotation_service_module,
+            "authenticated_client",
+            lambda _settings, _token: PsycopgSupabaseClient(conn),
+        )
+        monkeypatch.setattr(
+            quotation_service_module,
+            "get_audit_writer",
+            lambda: type("AuditWriter", (), {"record": lambda *_args, **_kwargs: None})(),
+        )
+        attempts = 0
+
+        def enqueue(*_args: object, **_kwargs: object) -> None:
+            nonlocal attempts
+            attempts += 1
+            if attempts == 1:
+                raise ServiceUnavailableError(details={"dependency": "redis"})
+
+        monkeypatch.setattr(quotation_service_module, "_enqueue_extraction", enqueue)
+        member = CurrentMember(
+            membership_id=workspace.membership_id,
+            tenant_id=workspace.tenant_id,
+            user_id=workspace.user_id,
+            email="buyer@example.test",
+            role=MemberRole.buyer,
+        )
+        key = uuid4()
+
+        with pytest.raises(ServiceUnavailableError):
+            QuotationService().replace_document(
+                bearer_token="test-token",
+                member=member,
+                quotation_id=fixture.quotation_id,
+                new_document_id=new_document_id,
+                idempotency_key=key,
+            )
+        retried, created = QuotationService().replace_document(
+            bearer_token="test-token",
+            member=member,
+            quotation_id=fixture.quotation_id,
+            new_document_id=new_document_id,
+            idempotency_key=key,
+        )
+
+        assert created is True
+        assert retried.document_id == new_document_id
+        assert attempts == 2
+        cur.execute(
+            "select status from extraction_job where quotation_id = %s and idempotency_key = %s",
+            (fixture.quotation_id, key),
+        )
+        assert cur.fetchone() == ("queued",)
         cur.execute(
             "select count(*) from field_extraction where quotation_id = %s",
             (fixture.quotation_id,),

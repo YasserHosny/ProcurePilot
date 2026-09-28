@@ -132,3 +132,43 @@ def test_create_job_replays_on_idempotency_key_without_reenqueuing(
         assert second.id == first.id
         assert enqueued == [first.id]
         assert len(fetch_basket_jobs(context.workspace.tenant_id)) == 1
+
+
+def test_failed_enqueue_is_retried_for_the_same_idempotency_key(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = settings_for_test_db(monkeypatch)
+    with committed_smart_context("basket-failed-retry") as context:
+        for supplier_id in context.supplier_ids:
+            add_costed_offer(context, supplier_id=supplier_id, amount=Decimal("3.0000"))
+        payload = BasketOptimiseRequest(
+            supplier_ids=context.supplier_ids,
+            items=[
+                BasketItemRequest(
+                    workspace_product_id=context.product_id,
+                    quantity="2.000000",
+                )
+            ],
+        )
+        key = UUID("00000000-0000-0000-0000-000000000003")
+        attempts = 0
+
+        def enqueue(_settings: object, _row: dict[str, object], _member: object) -> None:
+            nonlocal attempts
+            attempts += 1
+            if attempts == 1:
+                raise ServiceUnavailableError(details={"dependency": "redis"})
+
+        monkeypatch.setattr(basket_service, "_enqueue_redis_job", enqueue)
+        with pytest.raises(ServiceUnavailableError):
+            BasketService(settings).create_job(
+                member=context.member, payload=payload, idempotency_key=key
+            )
+
+        job, created = BasketService(settings).create_job(
+            member=context.member, payload=payload, idempotency_key=key
+        )
+        assert created is True
+        assert job.status == "queued"
+        assert attempts == 2
+        assert fetch_basket_jobs(context.workspace.tenant_id)[0]["status"] == "queued"

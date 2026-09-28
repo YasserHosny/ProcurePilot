@@ -52,7 +52,38 @@ class BasketService:
                     )
                     existing = cur.fetchone()
                 if existing is not None:
-                    return _job(dict(existing)), False
+                    existing = dict(existing)
+                    if existing["status"] != "failed":
+                        return _job(existing), False
+                    try:
+                        _enqueue_redis_job(self._settings, existing, member)
+                    except ServiceUnavailableError:
+                        _compensate_failed_enqueue(conn, UUID(str(existing["id"])))
+                        conn.commit()
+                        raise
+                    with conn.cursor(row_factory=dict_row) as cur:
+                        cur.execute(
+                            "update basket_split_job "
+                            "set status = 'queued', error = null, completed_at = null "
+                            "where id = %s returning *",
+                            (existing["id"],),
+                        )
+                        job = _job(dict(cur.fetchone()))
+                    if isinstance(payload, AdvancedBasketOptimiseRequest):
+                        _record_audit(
+                            bearer_token=bearer_token,
+                            member=member,
+                            action="offers.advanced_basket_submitted",
+                            target={
+                                "basket_split_job_id": str(job.id),
+                                "supplier_ids": [
+                                    str(supplier_id) for supplier_id in payload.supplier_ids
+                                ],
+                                "line_count": len(payload.items),
+                                "rule_version": ADVANCED_BASKET_RULE_VERSION,
+                            },
+                        )
+                    return job, True
             _visible_suppliers(conn, payload.supplier_ids)
             _visible_products(conn, [item.workspace_product_id for item in payload.items])
             request_snapshot = _request_snapshot(conn, member, payload)
