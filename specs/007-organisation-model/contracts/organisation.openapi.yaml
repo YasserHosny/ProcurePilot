@@ -60,6 +60,13 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Branch' }
+        '200':
+          description: >
+            Idempotent replay: a prior request with the same Idempotency-Key already created this
+            branch. Returns the original record rather than creating a duplicate.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Branch' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '422': { $ref: '#/components/responses/Unprocessable' }
 
@@ -129,6 +136,13 @@ paths:
       responses:
         '201':
           description: Cost centre created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CostCentre' }
+        '200':
+          description: >
+            Idempotent replay: a prior request with the same Idempotency-Key already created this
+            cost centre. Returns the original record rather than creating a duplicate.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/CostCentre' }
@@ -211,6 +225,13 @@ paths:
       responses:
         '201':
           description: Budget created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BudgetCreated' }
+        '200':
+          description: >
+            Idempotent replay: a prior request with the same Idempotency-Key already created this
+            budget. Returns the original record rather than creating a duplicate.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/BudgetCreated' }

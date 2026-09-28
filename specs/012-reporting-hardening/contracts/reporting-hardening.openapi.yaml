@@ -260,6 +260,13 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/DigestSubscription' }
+        '200':
+          description: >
+            Idempotent replay: a prior request with the same Idempotency-Key already created this
+            subscription. Returns the original record rather than creating a duplicate.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DigestSubscription' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409':

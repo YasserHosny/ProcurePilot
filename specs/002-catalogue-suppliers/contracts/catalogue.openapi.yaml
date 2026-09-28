@@ -55,6 +55,13 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Product' }
+        '200':
+          description: >
+            Idempotent replay: a prior request with the same Idempotency-Key already created this
+            product. Returns the original record rather than creating a duplicate.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Product' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '422': { $ref: '#/components/responses/Unprocessable' }
 
@@ -148,6 +155,13 @@ paths:
       responses:
         '201':
           description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Supplier' }
+        '200':
+          description: >
+            Idempotent replay: a prior request with the same Idempotency-Key already created this
+            supplier. Returns the original record rather than creating a duplicate.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Supplier' }
