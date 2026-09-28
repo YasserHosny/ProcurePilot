@@ -85,6 +85,13 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Quotation' }
+        '200':
+          description: >
+            Idempotent replay: a prior request with the same Idempotency-Key already created this
+            quotation. Returns the original record rather than creating a duplicate.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Quotation' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409':
