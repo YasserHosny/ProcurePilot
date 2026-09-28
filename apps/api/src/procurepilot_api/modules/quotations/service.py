@@ -39,7 +39,7 @@ QUOTATION_COLUMNS = (
     "id,document_id,supplier_id,suggested_supplier_id,supplier_match_confidence,currency,"
     "issue_date,expiry_date,status,previous_quotation_id,stated_total_amount,"
     "stated_total_currency,arithmetic_status,created_at,reviewed_by,reviewed_at,deleted_at,"
-    "reviewer_notes"
+    "reviewer_notes,archive_idempotency_key"
 )
 LINE_COLUMNS = (
     "id,line_number,original_text,quantity,pack_count,unit_size,pack_unit,unit_price_amount,"
@@ -280,19 +280,61 @@ class QuotationService:
         bearer_token: str,
         member: CurrentMember,
         quotation_id: UUID,
+        idempotency_key: UUID | None = None,
     ) -> Quotation:
         client = authenticated_client(self._settings, bearer_token)
-        _quotation_row(client, quotation_id)
+        quote = _quotation_row(client, quotation_id)
+        if quote["deleted_at"] is not None:
+            if idempotency_key is not None:
+                if _archive_key_matches(quote, idempotency_key):
+                    if not _archive_key_was_recorded(client, quotation_id, idempotency_key):
+                        self._record(
+                            bearer_token=bearer_token,
+                            member=member,
+                            action="quotation.archived",
+                            target={
+                                "quotation_id": str(quotation_id),
+                                "idempotency_key": str(idempotency_key),
+                            },
+                        )
+                    return _quotation(quote)
+                raise ConflictError(details={"reason": "quotation_already_archived"})
+            return _quotation(quote)
         archived_at = datetime.now(UTC).isoformat()
         try:
-            row = _one_row(
+            response = (
                 client.table("quotation")
-                .update({"deleted_at": archived_at})
+                .update(
+                    {
+                        "deleted_at": archived_at,
+                        "archive_idempotency_key": (
+                            str(idempotency_key) if idempotency_key is not None else None
+                        ),
+                    }
+                )
                 .eq("id", str(quotation_id))
+                .is_("deleted_at", "null")
                 .execute()
-                .data,
-                resource="quotation",
             )
+            if not response.data:
+                quote = _quotation_row(client, quotation_id)
+                if (
+                    idempotency_key is not None
+                    and _archive_key_matches(quote, idempotency_key)
+                ):
+                    if not _archive_key_was_recorded(client, quotation_id, idempotency_key):
+                        self._record(
+                            bearer_token=bearer_token,
+                            member=member,
+                            action="quotation.archived",
+                            target={
+                                "quotation_id": str(quotation_id),
+                                "idempotency_key": str(idempotency_key),
+                            },
+                        )
+                    return _quotation(quote)
+                raise ConflictError(details={"reason": "quotation_already_archived"})
+            row = _quotation_row(client, quotation_id)
             client.table("review_task").update(
                 {"status": "resolved", "resolved_at": archived_at}
             ).eq("quotation_id", str(quotation_id)).in_("status", ["open", "in_progress"]).execute()
@@ -302,7 +344,14 @@ class QuotationService:
             bearer_token=bearer_token,
             member=member,
             action="quotation.archived",
-            target={"quotation_id": str(quotation_id)},
+            target={
+                "quotation_id": str(quotation_id),
+                **(
+                    {"idempotency_key": str(idempotency_key)}
+                    if idempotency_key is not None
+                    else {}
+                ),
+            },
         )
         from procurepilot_api.modules.ingestion.guardrail_jobs import enqueue_guardrail_evaluation
 
@@ -429,9 +478,72 @@ class QuotationService:
         member: CurrentMember,
         quotation_id: UUID,
         new_document_id: UUID,
-    ) -> Quotation:
+        idempotency_key: UUID | None = None,
+    ) -> tuple[Quotation, bool]:
         client = authenticated_client(self._settings, bearer_token)
         quote = _quotation_row(client, quotation_id)
+        if idempotency_key is not None:
+            existing = (
+                client.table("extraction_job")
+                .select("id,status")
+                .eq("quotation_id", str(quotation_id))
+                .eq("idempotency_key", str(idempotency_key))
+                .limit(1)
+                .execute()
+            )
+            if existing.data:
+                existing_job = _one_row(existing.data, resource="job")
+                if existing_job.get("status") != "failed":
+                    return _quotation(quote), False
+                _document_row(client, new_document_id)
+                old_document_id = str(quote["document_id"])
+                try:
+                    active = (
+                        client.table("extraction_job")
+                        .select("id")
+                        .eq("quotation_id", str(quotation_id))
+                        .in_("status", ["queued", "running"])
+                        .limit(1)
+                        .execute()
+                    )
+                    if active.data:
+                        raise ConflictError(details={"reason": "extraction_already_running"})
+                    client.table("extraction_job").update(
+                        {"status": "queued", "error": None, "completed_at": None}
+                    ).eq("id", str(existing_job["id"])).execute()
+                    client.table("quotation").update(
+                        {"document_id": str(new_document_id), "status": "extracting"}
+                    ).eq("id", str(quotation_id)).execute()
+                    row = _quotation_row(client, quotation_id)
+                except APIError as exc:
+                    raise ServiceUnavailableError(details={"dependency": "database"}) from exc
+                try:
+                    _enqueue_extraction(
+                        self._settings,
+                        existing_job,
+                        {**quote, "document_id": str(new_document_id)},
+                        member,
+                    )
+                except ServiceUnavailableError:
+                    _mark_extraction_enqueue_failed(
+                        client=client,
+                        job_id=UUID(str(existing_job["id"])),
+                        quotation_id=quotation_id,
+                        prior_status=str(quote["status"]),
+                        document_id=UUID(old_document_id),
+                    )
+                    raise
+                self._record(
+                    bearer_token=bearer_token,
+                    member=member,
+                    action="quotation.document_replaced",
+                    target={
+                        "quotation_id": str(quotation_id),
+                        "old_document_id": old_document_id,
+                        "new_document_id": str(new_document_id),
+                    },
+                )
+                return _quotation(row), True
         if quote["status"] in {"pending", "extracting"}:
             raise ConflictError(details={"reason": "quotation_extraction_already_active"})
         _document_row(client, new_document_id)
@@ -454,6 +566,7 @@ class QuotationService:
                         "tenant_id": str(member.tenant_id),
                         "quotation_id": str(quotation_id),
                         "status": "queued",
+                        "idempotency_key": str(idempotency_key) if idempotency_key else None,
                     }
                 )
                 .execute()
@@ -469,6 +582,8 @@ class QuotationService:
                 resource="quotation",
             )
         except APIError as exc:
+            if idempotency_key is not None and getattr(exc, "code", None) == "23505":
+                return _quotation(quote), False
             raise ServiceUnavailableError(details={"dependency": "database"}) from exc
         try:
             _enqueue_extraction(
@@ -496,7 +611,7 @@ class QuotationService:
                 "new_document_id": str(new_document_id),
             },
         )
-        return _quotation(row)
+        return _quotation(row), True
 
     def export_quotation_csv(
         self,
@@ -611,6 +726,27 @@ def _quotation_row(client: object, quotation_id: UUID) -> dict[str, object]:
     except APIError as exc:
         raise ServiceUnavailableError(details={"dependency": "database"}) from exc
     return _one_row(response.data, resource="quotation")
+
+
+def _archive_key_was_recorded(client: object, quotation_id: UUID, idempotency_key: UUID) -> bool:
+    try:
+        response = (
+            client.table("audit_event")
+            .select("id")
+            .eq("action", "quotation.archived")
+            .eq("target->>quotation_id", str(quotation_id))
+            .eq("target->>idempotency_key", str(idempotency_key))
+            .limit(1)
+            .execute()
+        )
+    except APIError as exc:
+        raise ServiceUnavailableError(details={"dependency": "database"}) from exc
+    return bool(response.data)
+
+
+def _archive_key_matches(quote: dict[str, object], idempotency_key: UUID) -> bool:
+    archive_key = quote.get("archive_idempotency_key")
+    return archive_key is not None and str(archive_key) == str(idempotency_key)
 
 
 def _supplier_row(client: object, supplier_id: UUID) -> dict[str, object]:

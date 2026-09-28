@@ -165,9 +165,18 @@ def optimise_basket(
     token: Annotated[str, Depends(bearer_token)],
     member: Annotated[CurrentMember, Depends(require_role(*WRITE_ROLES))],
     service: Annotated[BasketService, Depends(get_basket_service)],
-    _idempotency_key: Annotated[UUID | None, Header(alias="Idempotency-Key")] = None,
+    response: Response,
+    idempotency_key: Annotated[UUID | None, Header(alias="Idempotency-Key")] = None,
 ) -> BasketSplitJob:
-    return service.create_job(member=member, payload=payload, bearer_token=token)
+    job, created = service.create_job(
+        member=member,
+        payload=payload,
+        bearer_token=token,
+        idempotency_key=idempotency_key,
+    )
+    if not created:
+        response.status_code = status.HTTP_200_OK
+    return job
 
 
 @router.get("/baskets/{id}", response_model=BasketSplitJob)
