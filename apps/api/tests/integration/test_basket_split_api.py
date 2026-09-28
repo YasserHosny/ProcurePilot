@@ -40,7 +40,7 @@ def test_create_job_persists_queued_row_for_real_visible_suppliers_and_products(
             enqueued.append((UUID(str(row["id"])), member.tenant_id))
 
         monkeypatch.setattr(basket_service, "_enqueue_redis_job", fake_enqueue)
-        job = BasketService(settings).create_job(
+        job, created = BasketService(settings).create_job(
             member=context.member,
             payload=BasketOptimiseRequest(
                 supplier_ids=context.supplier_ids,
@@ -53,6 +53,7 @@ def test_create_job_persists_queued_row_for_real_visible_suppliers_and_products(
             ),
         )
 
+        assert created is True
         assert job.status == "queued"
         assert enqueued == [(job.id, context.workspace.tenant_id)]
         persisted = fetch_basket_jobs(context.workspace.tenant_id)
@@ -94,3 +95,40 @@ def test_redis_enqueue_failure_durably_marks_job_failed_after_exception_unwinds(
         assert len(persisted) == 1
         assert persisted[0]["status"] == "failed"
         assert persisted[0]["error"]["code"] == "redis_enqueue_failed"
+
+
+def test_create_job_replays_on_idempotency_key_without_reenqueuing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = settings_for_test_db(monkeypatch)
+    with committed_smart_context("basket-replay") as context:
+        for supplier_id in context.supplier_ids:
+            add_costed_offer(context, supplier_id=supplier_id, amount=Decimal("3.0000"))
+        enqueued: list[UUID] = []
+        monkeypatch.setattr(
+            basket_service,
+            "_enqueue_redis_job",
+            lambda _settings, row, _member: enqueued.append(UUID(str(row["id"]))),
+        )
+        payload = BasketOptimiseRequest(
+            supplier_ids=context.supplier_ids,
+            items=[
+                BasketItemRequest(
+                    workspace_product_id=context.product_id,
+                    quantity="2.000000",
+                )
+            ],
+        )
+        key = UUID("00000000-0000-0000-0000-000000000001")
+        first, first_created = BasketService(settings).create_job(
+            member=context.member, payload=payload, idempotency_key=key
+        )
+        second, second_created = BasketService(settings).create_job(
+            member=context.member, payload=payload, idempotency_key=key
+        )
+
+        assert first_created is True
+        assert second_created is False
+        assert second.id == first.id
+        assert enqueued == [first.id]
+        assert len(fetch_basket_jobs(context.workspace.tenant_id)) == 1

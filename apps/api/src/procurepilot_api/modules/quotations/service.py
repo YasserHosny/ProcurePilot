@@ -280,9 +280,16 @@ class QuotationService:
         bearer_token: str,
         member: CurrentMember,
         quotation_id: UUID,
+        idempotency_key: UUID | None = None,
     ) -> Quotation:
         client = authenticated_client(self._settings, bearer_token)
-        _quotation_row(client, quotation_id)
+        quote = _quotation_row(client, quotation_id)
+        if quote["deleted_at"] is not None:
+            if idempotency_key is not None and not _archive_key_was_recorded(
+                client, quotation_id, idempotency_key
+            ):
+                raise ConflictError(details={"reason": "quotation_already_archived"})
+            return _quotation(quote)
         archived_at = datetime.now(UTC).isoformat()
         try:
             row = _one_row(
@@ -302,7 +309,14 @@ class QuotationService:
             bearer_token=bearer_token,
             member=member,
             action="quotation.archived",
-            target={"quotation_id": str(quotation_id)},
+            target={
+                "quotation_id": str(quotation_id),
+                **(
+                    {"idempotency_key": str(idempotency_key)}
+                    if idempotency_key is not None
+                    else {}
+                ),
+            },
         )
         from procurepilot_api.modules.ingestion.guardrail_jobs import enqueue_guardrail_evaluation
 
@@ -429,9 +443,21 @@ class QuotationService:
         member: CurrentMember,
         quotation_id: UUID,
         new_document_id: UUID,
-    ) -> Quotation:
+        idempotency_key: UUID | None = None,
+    ) -> tuple[Quotation, bool]:
         client = authenticated_client(self._settings, bearer_token)
         quote = _quotation_row(client, quotation_id)
+        if idempotency_key is not None:
+            existing = (
+                client.table("extraction_job")
+                .select("id")
+                .eq("quotation_id", str(quotation_id))
+                .eq("idempotency_key", str(idempotency_key))
+                .limit(1)
+                .execute()
+            )
+            if existing.data:
+                return _quotation(quote), False
         if quote["status"] in {"pending", "extracting"}:
             raise ConflictError(details={"reason": "quotation_extraction_already_active"})
         _document_row(client, new_document_id)
@@ -454,6 +480,7 @@ class QuotationService:
                         "tenant_id": str(member.tenant_id),
                         "quotation_id": str(quotation_id),
                         "status": "queued",
+                        "idempotency_key": str(idempotency_key) if idempotency_key else None,
                     }
                 )
                 .execute()
@@ -469,6 +496,8 @@ class QuotationService:
                 resource="quotation",
             )
         except APIError as exc:
+            if idempotency_key is not None and getattr(exc, "code", None) == "23505":
+                return _quotation(quote), False
             raise ServiceUnavailableError(details={"dependency": "database"}) from exc
         try:
             _enqueue_extraction(
@@ -496,7 +525,7 @@ class QuotationService:
                 "new_document_id": str(new_document_id),
             },
         )
-        return _quotation(row)
+        return _quotation(row), True
 
     def export_quotation_csv(
         self,
@@ -611,6 +640,22 @@ def _quotation_row(client: object, quotation_id: UUID) -> dict[str, object]:
     except APIError as exc:
         raise ServiceUnavailableError(details={"dependency": "database"}) from exc
     return _one_row(response.data, resource="quotation")
+
+
+def _archive_key_was_recorded(client: object, quotation_id: UUID, idempotency_key: UUID) -> bool:
+    try:
+        response = (
+            client.table("audit_event")
+            .select("id")
+            .eq("action", "quotation.archived")
+            .eq("target->>quotation_id", str(quotation_id))
+            .eq("target->>idempotency_key", str(idempotency_key))
+            .limit(1)
+            .execute()
+        )
+    except APIError as exc:
+        raise ServiceUnavailableError(details={"dependency": "database"}) from exc
+    return bool(response.data)
 
 
 def _supplier_row(client: object, supplier_id: UUID) -> dict[str, object]:

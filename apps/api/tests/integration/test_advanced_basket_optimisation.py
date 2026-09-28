@@ -38,7 +38,7 @@ def test_advanced_basket_accepts_two_to_ten_suppliers(
     monkeypatch.setattr(basket_service, "_enqueue_redis_job", _noop_enqueue)
 
     with committed_smart_context("advanced-two", supplier_count=2) as context:
-        job = BasketService(settings).create_job(
+        job, _created = BasketService(settings).create_job(
             member=context.member,
             payload=_advanced_payload(context.supplier_ids, context.product_id),
         )
@@ -46,7 +46,7 @@ def test_advanced_basket_accepts_two_to_ten_suppliers(
         assert job.supplier_ids == context.supplier_ids
 
     with committed_smart_context("advanced-ten", supplier_count=10) as context:
-        job = BasketService(settings).create_job(
+        job, _created = BasketService(settings).create_job(
             member=context.member,
             payload=_advanced_payload(context.supplier_ids, context.product_id),
         )
@@ -117,7 +117,7 @@ def test_advanced_basket_persists_constraint_snapshot_and_worker_metadata(
             excluded_supplier_ids=[context.supplier_ids[1]],
         )
 
-        job = BasketService(settings).create_job(member=context.member, payload=request)
+        job, _created = BasketService(settings).create_job(member=context.member, payload=request)
 
         persisted = _basket_jobs(context.workspace.tenant_id)
         snapshot = persisted[0]["request_snapshot"]
@@ -167,7 +167,7 @@ def test_advanced_basket_is_advisory_only(
     with committed_smart_context("advanced-advisory") as context:
         before_purchase_requests = _purchase_request_count(context.workspace.tenant_id)
 
-        job = BasketService(settings).create_job(
+        job, _created = BasketService(settings).create_job(
             member=context.member,
             payload=_advanced_payload(context.supplier_ids, context.product_id),
         )

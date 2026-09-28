@@ -86,6 +86,7 @@ def archive_quotation(
         bearer_token=token,
         member=member,
         quotation_id=quotation_id,
+        idempotency_key=idempotency_key,
     )
 
 
@@ -127,14 +128,19 @@ def replace_document(
     token: Annotated[str, Depends(bearer_token)],
     member: Annotated[CurrentMember, Depends(require_role(*WRITE_ROLES))],
     service: Annotated[QuotationService, Depends(get_quotation_service)],
-    _idempotency_key: Annotated[UUID | None, Header(alias="Idempotency-Key")] = None,
+    response: Response,
+    idempotency_key: Annotated[UUID | None, Header(alias="Idempotency-Key")] = None,
 ) -> Quotation:
-    return service.replace_document(
+    quotation, created = service.replace_document(
         bearer_token=token,
         member=member,
         quotation_id=quotation_id,
         new_document_id=payload.document_id,
+        idempotency_key=idempotency_key,
     )
+    if not created:
+        response.status_code = status.HTTP_200_OK
+    return quotation
 
 
 @router.get("/quotations/{quotation_id}/export")

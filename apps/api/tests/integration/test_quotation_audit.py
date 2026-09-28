@@ -222,3 +222,52 @@ def test_refuse_archive_and_restore_appear_in_quotation_audit_trail(
         assert "quotation.refused" in refused_actions
         assert "quotation.archived" in archived_actions
         assert "quotation.restored" in archived_actions
+
+
+def test_archive_replay_skips_update_audit_and_guardrail_side_effects(
+    conn: object,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _wire_services(conn, monkeypatch)
+    guardrail_calls: list[UUID] = []
+    from procurepilot_api.modules.ingestion import guardrail_jobs
+
+    monkeypatch.setattr(
+        guardrail_jobs,
+        "enqueue_guardrail_evaluation",
+        lambda _settings, *, tenant_id, quotation_id: guardrail_calls.append(quotation_id),
+    )
+    with conn.cursor() as cur:
+        workspace = make_workspace(cur, "archive-replay")
+        member = _member(workspace)
+        fixture = make_extracted_quotation(cur, workspace)
+        make_review_task(cur, workspace, fixture.quotation_id, reason="low_confidence")
+        act_as(cur, workspace)
+        key = UUID("00000000-0000-0000-0000-000000000002")
+
+        QuotationService().archive_quotation(
+            bearer_token="test-token",
+            member=member,
+            quotation_id=fixture.quotation_id,
+            idempotency_key=key,
+        )
+        QuotationService().archive_quotation(
+            bearer_token="test-token",
+            member=member,
+            quotation_id=fixture.quotation_id,
+            idempotency_key=key,
+        )
+
+        cur.execute(
+            "select count(*) from audit_event "
+            "where tenant_id = %s and action = 'quotation.archived' "
+            "and target->>'quotation_id' = %s",
+            (workspace.tenant_id, str(fixture.quotation_id)),
+        )
+        assert cur.fetchone() == (1,)
+        cur.execute(
+            "select count(*) from review_task where quotation_id = %s and status = 'resolved'",
+            (fixture.quotation_id,),
+        )
+        assert cur.fetchone() == (1,)
+        assert guardrail_calls == [fixture.quotation_id]

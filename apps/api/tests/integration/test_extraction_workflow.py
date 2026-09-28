@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
+from uuid import uuid4
 
 import pytest
 
@@ -183,6 +184,76 @@ def test_retry_extraction_enqueue_failure_fails_job_without_discarding_review_da
         assert cur.fetchone() == ("failed", "redis_enqueue_failed")
         cur.execute(
             "select count(*) from quotation_line where quotation_id = %s",
+            (fixture.quotation_id,),
+        )
+        assert cur.fetchone() == (1,)
+
+
+def test_replace_document_replays_after_extraction_finished_without_duplicate_job(
+    conn: object,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from integration.quotation_helpers import make_extracted_quotation
+
+    with conn.cursor() as cur:
+        workspace = make_workspace(cur, "replace-document-replay")
+        fixture = make_extracted_quotation(cur, workspace)
+        new_document_id = make_document(cur, workspace, filename="replacement.pdf")
+        act_as(cur, workspace)
+        monkeypatch.setattr(
+            quotation_service_module,
+            "authenticated_client",
+            lambda _settings, _token: PsycopgSupabaseClient(conn),
+        )
+        monkeypatch.setattr(
+            quotation_service_module,
+            "get_audit_writer",
+            lambda: type("AuditWriter", (), {"record": lambda *_args, **_kwargs: None})(),
+        )
+        enqueued: list[object] = []
+        monkeypatch.setattr(
+            quotation_service_module,
+            "_enqueue_extraction",
+            lambda *_args: enqueued.append(True),
+        )
+        member = CurrentMember(
+            membership_id=workspace.membership_id,
+            tenant_id=workspace.tenant_id,
+            user_id=workspace.user_id,
+            email="buyer@example.test",
+            role=MemberRole.buyer,
+        )
+        key = uuid4()
+        first, first_created = QuotationService().replace_document(
+            bearer_token="test-token",
+            member=member,
+            quotation_id=fixture.quotation_id,
+            new_document_id=new_document_id,
+            idempotency_key=key,
+        )
+        cur.execute(
+            "update quotation set status = 'extracted' where id = %s",
+            (fixture.quotation_id,),
+        )
+        cur.execute(
+            "update extraction_job set status = 'succeeded', completed_at = now() "
+            "where quotation_id = %s",
+            (fixture.quotation_id,),
+        )
+        second, second_created = QuotationService().replace_document(
+            bearer_token="test-token",
+            member=member,
+            quotation_id=fixture.quotation_id,
+            new_document_id=new_document_id,
+            idempotency_key=key,
+        )
+
+        assert first_created is True
+        assert second_created is False
+        assert second.id == first.id
+        assert len(enqueued) == 1
+        cur.execute(
+            "select count(*) from extraction_job where quotation_id = %s",
             (fixture.quotation_id,),
         )
         assert cur.fetchone() == (1,)
