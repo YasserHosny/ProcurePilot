@@ -101,11 +101,11 @@ def test_match_task_is_created_once_then_resolved_by_human_decision(
         matching._route_or_accept(client, member, line, [candidate])  # noqa: SLF001
 
         cur.execute(
-            "select status, resolved_at from match_task where quotation_line_id = %s",
+            "select status, resolved_at, reason from match_task where quotation_line_id = %s",
             (line_id,),
         )
         row = cur.fetchone()
-        assert row == ("open", None)
+        assert row == ("open", None, "low_confidence")
         cur.execute("select count(*) from match_task where quotation_line_id = %s", (line_id,))
         assert cur.fetchone() == (1,)
 
