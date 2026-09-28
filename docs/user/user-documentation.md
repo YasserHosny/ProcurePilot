@@ -1,7 +1,7 @@
 # ProcurePilot User Documentation
 
 > Complete system journey with annotated screenshots for every screen.
-> Last updated: 27 Sep 2026.
+> Last updated: 28 Sep 2026.
 >
 > Covers the web app only. For the mobile app (sign-in, biometric unlock, role-aware home
 > screen), see [ProcurePilot Mobile App User Documentation](mobile-app-user-documentation.md).
@@ -461,6 +461,8 @@ Tracks a purchase order's lifecycle — submitted, confirmed by the supplier, de
 | 6 | **Comparison table** | Each row is one supplier offer: unit price, total landed cost, lead time, reliability, stock availability, match confidence, validity, and status. Next to each supplier's name, a scorecard icon button allows navigating directly to that supplier's detailed Supplier IQ scorecard (`/suppliers/:id/scorecard`). |
 | 7 | **Record Purchase action** | From the banner or any table row, click "Record Purchase" to open the outcome-capture form (section 16) and have the savings automatically calculated. |
 
+**Mixed-currency offers:** ProcurePilot has no foreign-exchange rate data, so it never converts or silently mixes currencies when scoring a recommendation. If the offers for the selected product span more than one currency — for example, one supplier quoted in USD and the rest in GBP — the comparison table (item 6 above) still lists every offer regardless of currency, but the Recommended Offer banner only scores and ranks offers in a single reference currency: whichever currency the most suppliers quoted in, tied-broken first by the lowest supplier ID and then by the currency code itself. Offer(s) in any other currency are excluded from the recommendation and its ranking entirely. When this happens, the banner's Risk Considerations list includes a note: "One or more offers in a different currency were excluded from this comparison rather than converted." See [§40 Known Issues](#40-known-issues) for a current display defect affecting this specific note.
+
 **Business value:** Smart Compare converts cleaned data into a buying decision. It lowers recurring purchasing cost, gives buyers evidence for negotiation, and helps owners see why a recommendation was made before money is spent.
 
 **Data readiness:** Smart Compare depends on the full chain being complete: upload quotation → review and authorize → resolve product matching where needed → compute landed cost. If an expected quote is missing from comparison, check the Quotation Review Queue and Match Resolution Queue first.
@@ -507,6 +509,8 @@ Tracks a purchase order's lifecycle — submitted, confirmed by the supplier, de
 - **Single-Supplier Baselines:** Evaluates whether splitting across suppliers saves money versus purchasing entirely from a single supplier.
 - **Applied & Violated Constraints:** Inspect which commercial terms (MOV, delivery fee) were applied and which constraints were violated if infeasible.
 - **Advisory-Only Protection:** In strict adherence to system principles, basket optimisation is purely advisory and never autonomously creates orders or commits funds.
+
+**Mixed-currency offers:** as in Smart Compare, ProcurePilot never converts or mixes currencies here either — the two paths just handle a mismatch differently. In the **Two-Supplier Basket Split**, if any basket item's offers span more than one currency (or that item's currency doesn't match the currency the rest of the basket is priced in), the whole optimisation is reported as infeasible in the Commercial Infeasibility Report, the same as any other item with no eligible offer. In the **Advanced Multi-Supplier Optimiser**, the same mismatch is handled per item instead: only the affected item is excluded from the allocation and listed under **Violated Constraints** as **Currency Consistency**, while the rest of the basket can still solve around it.
 
 **Business value:** basket optimisation finds the lowest total landed cost across a real order, not just the cheapest line item. It accounts for supplier minimums, delivery fees, price tiers, urgency, risk, and quality so buyers can avoid overpaying because of supplier constraints while still keeping the final purchasing decision human-authorized.
 
@@ -1311,7 +1315,7 @@ A: Nothing breaks. The RFQ stays in `Sent` status with a response count lower th
 
 ## 40. Known Issues
 
-Originally found during the 6 Sep 2026 documentation pass; re-checked and updated 12 Sep 2026 against current `main`; extended 25 Sep 2026 to cover R4.0–R4.3; re-checked 26 Sep 2026 against Create RFQ's Material/i18n rewrite (PR #29); re-audited 27 Sep 2026 across the entire app for this documentation pass (PR #42 and earlier).
+Originally found during the 6 Sep 2026 documentation pass; re-checked and updated 12 Sep 2026 against current `main`; extended 25 Sep 2026 to cover R4.0–R4.3; re-checked 26 Sep 2026 against Create RFQ's Material/i18n rewrite (PR #29); re-audited 27 Sep 2026 across the entire app for this documentation pass (PR #42 and earlier); re-checked 28 Sep 2026 against the mixed-currency comparison fix (PR #47).
 
 | # | Where | Issue |
 |---|-------|-------|
@@ -1322,6 +1326,7 @@ Originally found during the 6 Sep 2026 documentation pass; re-checked and update
 | 5 | Accounting Integration (§33) | The connection screen's static copy ("Connect QuickBooks", "QuickBooks Online", "Link your QuickBooks Online account…") always reads as QuickBooks, even on a workspace deployment configured to use Xero as its accounting provider. The actual connection and OAuth flow work correctly for whichever provider is configured, and the connected-state header does show the real provider name dynamically — only the static empty-state and subtitle copy is mislabelled. Found 27 Sep 2026, still present as of 27 Sep 2026. |
 | 6 | Accounting Integration & POS Integration (§33, §34), never-connected empty state | The **Connect** button is shown to every role, not just Owner, before a connection exists (unlike the connected-state screen, where connect/disconnect/reconnect are correctly hidden from non-owners behind an informational notice). A non-owner who clicks it gets a permission error back from the API rather than never seeing the button. Found 27 Sep 2026, still present as of 27 Sep 2026. |
 | 7 | POS Integration (§34), Synced Product Signals screen | **Sync now** and **Match to Product** are shown to every role once a connection is active, but the API requires Owner or Buyer for both (`/pos/sync`, `/pos/signals/{id}/match`) — an Approver, Viewer, or Branch Manager sees fully clickable controls that will fail with a permission error. Found 27 Sep 2026, still present as of 27 Sep 2026. |
+| 8 | Smart Compare (§12), Recommended Offer banner's Risk Considerations list | When offers for a product span more than one currency, PR #47 added a `currency_mismatch_excluded` risk note explaining the exclusion, but its English and Arabic translation strings were never added alongside it. The banner currently renders the raw, untranslated key `compare.recommendation.riskNotes.currency_mismatch_excluded` instead of readable text. A fix exists (PR #51) but had not merged to `main` as of 28 Sep 2026. |
 
 **Resolved since the original pass:** the Approval Queue (§20) previously rendered only its title/subtitle with no request cards. It is now fully functional — pending requests, budget status, expandable line detail, and an approve/reject dialog with an optional comment — and an approval-delegation management UI (§22) has been added. **Resolved 26 Sep 2026:** Create RFQ (§38) previously used plain HTML controls with no Material styling, no Arabic translation, a supplier picker hardcoded to placeholder `sup-1`/`sup-2` options, and no navigation entry point (reachable only by typing `/rfq/create`). It now uses full Material form components, is translated into English and Arabic, populates real suppliers and products from your workspace data, and is reachable from a **Create RFQ** button on RFQ History. **Resolved 27 Sep 2026 (PR #42):** RFQ auto-preparation guardrails previously required API/engineering support to configure — there is now a full owner-only settings screen at `/rfq/guardrails` (§38), reachable from a **Guardrails** button on RFQ History, and the Compare RFQ Responses screen now explains in plain language why each guardrail did or didn't fire for every response.
 
