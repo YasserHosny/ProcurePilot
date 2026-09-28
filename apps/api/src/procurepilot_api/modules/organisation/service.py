@@ -263,6 +263,9 @@ class OrganisationService:
             )
         except APIError as exc:
             if idempotency_key is not None and _api_error_code(exc) == "23505":
+                # The 23505 might be cost_centre_tenant_code_key (a genuine duplicate-code
+                # conflict), not the idempotency index -- only treat this as a replay if the
+                # key actually resolves to a row.
                 existing = (
                     client.table("cost_centre")
                     .select(COST_CENTRE_COLUMNS)
@@ -270,12 +273,17 @@ class OrganisationService:
                     .limit(1)
                     .execute()
                 )
-                return _cost_centre(
-                    self._with_orphan_reasons(
-                        client,
-                        [_one_row(existing.data, reason="cost_centre_idempotency_lookup_failed")],
-                    )[0]
-                ), False
+                if existing.data:
+                    return _cost_centre(
+                        self._with_orphan_reasons(
+                            client,
+                            [
+                                _one_row(
+                                    existing.data, reason="cost_centre_idempotency_lookup_failed"
+                                )
+                            ],
+                        )[0]
+                    ), False
             raise _write_error(exc, duplicate_reason="cost_centre_conflict") from exc
 
         cost_centre = _cost_centre(

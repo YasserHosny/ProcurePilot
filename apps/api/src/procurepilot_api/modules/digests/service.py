@@ -106,6 +106,20 @@ class DigestsService:
         filter_dict = payload.filters.model_dump(mode="json")
         digest = canonical_filters_digest(filter_dict)
         with _authenticated_db(self._settings, member) as conn:
+            if idempotency_key is not None:
+                # A retry of an already-successful create must short-circuit before the
+                # subscription cap check below -- otherwise the very subscription that pushed
+                # the caller's count TO the cap makes their own retry of it fail with
+                # cap_exceeded instead of returning the original.
+                with conn.cursor(row_factory=dict_row) as cur:
+                    cur.execute(
+                        "select * from digest_subscription "
+                        "where tenant_id = %s and idempotency_key = %s",
+                        (member.tenant_id, idempotency_key),
+                    )
+                    existing = cur.fetchone()
+                if existing is not None:
+                    return self._map_subscription(dict(existing)), False
             ctx = _tenant_context(conn, member.tenant_id, member.membership_id)
             _authorize_branch(conn, member=member, branch_id=payload.filters.branch_id)
             _enforce_subscription_cap(
@@ -147,14 +161,19 @@ class DigestsService:
                 conn.commit()
             except psycopg.errors.UniqueViolation as exc:
                 if idempotency_key is not None:
+                    # The 23505 might be digest_subscription_owner_unique (a genuine
+                    # duplicate-filters conflict for this member), not the idempotency index --
+                    # only treat this as a replay if the key actually resolves to a row.
                     conn.rollback()
                     with conn.cursor(row_factory=dict_row) as cur:
                         cur.execute(
-                            "select * from digest_subscription where idempotency_key = %s",
-                            (idempotency_key,),
+                            "select * from digest_subscription "
+                            "where tenant_id = %s and idempotency_key = %s",
+                            (member.tenant_id, idempotency_key),
                         )
-                        row = dict(cur.fetchone())
-                    return self._map_subscription(row), False
+                        existing = cur.fetchone()
+                    if existing is not None:
+                        return self._map_subscription(dict(existing)), False
                 raise ConflictError(details={"subscription": "already_exists"}) from exc
 
         sub = self._map_subscription(row)

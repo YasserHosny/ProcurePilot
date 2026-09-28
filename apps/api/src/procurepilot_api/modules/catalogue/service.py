@@ -163,6 +163,9 @@ class CatalogueService:
             _one_row(pack_response.data, reason="pack_write_failed")
         except APIError as exc:
             if idempotency_key is not None and _api_error_code(exc) == "23505":
+                # The 23505 might be workspace_product_one_view_per_canonical (a genuine
+                # duplicate-product conflict), not the idempotency index -- only treat this as
+                # a replay if the key actually resolves to a row.
                 existing = (
                     client.table("workspace_product")
                     .select(PRODUCT_COLUMNS)
@@ -170,8 +173,9 @@ class CatalogueService:
                     .limit(1)
                     .execute()
                 )
-                row = _one_row(existing.data, reason="product_idempotency_lookup_failed")
-                return self._products_from_rows(client, [row])[0], False
+                if existing.data:
+                    row = _one_row(existing.data, reason="product_idempotency_lookup_failed")
+                    return self._products_from_rows(client, [row])[0], False
             raise _write_error(exc, duplicate_reason="product_exists") from exc
 
         created = self.get_product(bearer_token=bearer_token, product_id=UUID(str(product["id"])))
