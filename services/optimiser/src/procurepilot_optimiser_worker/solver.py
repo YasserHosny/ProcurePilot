@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections import defaultdict
+from collections import Counter, defaultdict
 from collections.abc import Iterable
 from datetime import UTC, datetime
 from decimal import ROUND_HALF_UP, Decimal
@@ -46,7 +46,17 @@ def solve_two_supplier_split(
         (offer.workspace_product_id, offer.supplier_id): offer for offer in offers
     }
     infeasible = _infeasible_items(supplier_ids, items, by_product_supplier)
-    baselines = _baselines(supplier_ids, items, by_product_supplier)
+    mixed_currency_product_ids = {
+        item.workspace_product_id
+        for item in infeasible
+        if item.reason == "mixed_currency_offers"
+    }
+    baselines = _baselines(
+        supplier_ids,
+        items,
+        by_product_supplier,
+        excluded_product_ids=mixed_currency_product_ids,
+    )
     now = computed_at or datetime.now(UTC)
     if infeasible:
         return BasketSplitResult(
@@ -113,7 +123,6 @@ def solve_advanced_basket(
         for supplier_id in sorted(request.supplier_ids)
         if supplier_id not in set(request.hard_constraints.excluded_supplier_ids)
     ]
-    currency = _advanced_currency(input_payload.offers, input_payload.supplier_terms)
     offers = _advanced_offers_by_item_supplier(
         request.items,
         input_payload.offers,
@@ -146,15 +155,34 @@ def solve_advanced_basket(
         risks_by_supplier,
         max_risk,
     )
+    mixed_currency_product_ids = {
+        violation.workspace_product_id
+        for violation in violations
+        if violation.kind == "mixed_currency" and violation.workspace_product_id is not None
+    }
+    working_items = [
+        item
+        for item in request.items
+        if item.workspace_product_id not in mixed_currency_product_ids
+    ]
+    currency = _advanced_currency(
+        [
+            offer
+            for offer in offers.values()
+            if offer.workspace_product_id not in mixed_currency_product_ids
+        ],
+        input_payload.supplier_terms,
+    )
     baselines = _advanced_baselines(
         request.supplier_ids,
         request.items,
         offers,
         terms_by_supplier,
         currency,
+        excluded_product_ids=mixed_currency_product_ids,
     )
     if not eligible_supplier_ids or _has_uncovered_item(
-        request.items,
+        working_items,
         eligible_supplier_ids,
         offers,
     ):
@@ -170,7 +198,7 @@ def solve_advanced_basket(
         )
 
     solved = _minimum_weighted_advanced_assignment(
-        request=request,
+        request=request.model_copy(update={"items": working_items}),
         supplier_ids=eligible_supplier_ids,
         offers=offers,
         terms_by_supplier=terms_by_supplier,
@@ -190,7 +218,7 @@ def solve_advanced_basket(
 
     chosen, fee_by_supplier = solved
     allocations, total, chosen_applied = _advanced_allocations(
-        request.items,
+        working_items,
         chosen,
         offers,
         terms_by_supplier,
@@ -260,7 +288,25 @@ def _infeasible_items(
     offers: dict[tuple[UUID, UUID], OfferInput],
 ) -> list[InfeasibleBasketItem]:
     blocked = []
+    consistent_currencies: dict[UUID, str] = {}
     for item in items:
+        available_currencies = {
+            offers[(item.workspace_product_id, supplier_id)].total_landed_cost.currency
+            for supplier_id in supplier_ids
+            if (item.workspace_product_id, supplier_id) in offers
+        }
+        if len(available_currencies) > 1:
+            blocked.append(
+                InfeasibleBasketItem(
+                    workspace_product_id=item.workspace_product_id,
+                    requested_quantity=item.quantity,
+                    reason="mixed_currency_offers",
+                    missing_supplier_ids=[],
+                )
+            )
+            continue
+        if len(available_currencies) == 1:
+            consistent_currencies[item.workspace_product_id] = next(iter(available_currencies))
         missing = [
             supplier_id
             for supplier_id in supplier_ids
@@ -275,20 +321,66 @@ def _infeasible_items(
                     missing_supplier_ids=missing,
                 )
             )
+    reference_currency = _basket_reference_currency(consistent_currencies)
+    if reference_currency is not None:
+        already_blocked = {item.workspace_product_id for item in blocked}
+        for item in items:
+            currency = consistent_currencies.get(item.workspace_product_id)
+            if (
+                currency is not None
+                and currency != reference_currency
+                and item.workspace_product_id not in already_blocked
+            ):
+                blocked.append(
+                    InfeasibleBasketItem(
+                        workspace_product_id=item.workspace_product_id,
+                        requested_quantity=item.quantity,
+                        reason="mixed_currency_offers",
+                        missing_supplier_ids=[],
+                    )
+                )
     return blocked
+
+
+def _basket_reference_currency(consistent_currencies: dict[UUID, str]) -> str | None:
+    """Choose the basket currency deterministically from internally consistent items.
+
+    Each item contributes one vote for its only available currency. Ties use the smallest
+    workspace_product_id for that currency, mirroring recommendation's deterministic
+    supplier-id tie-break where no supplier is the relevant basket-level identity.
+    """
+    if not consistent_currencies:
+        return None
+    counts = Counter(consistent_currencies.values())
+    first_product_by_currency = {
+        currency: min(
+            product_id for product_id, item_currency in consistent_currencies.items()
+            if item_currency == currency
+        )
+        for currency in counts
+    }
+    return min(
+        counts,
+        key=lambda currency: (-counts[currency], first_product_by_currency[currency], currency),
+    )
 
 
 def _baselines(
     supplier_ids: list[UUID],
     items: list[BasketItem],
     offers: dict[tuple[UUID, UUID], OfferInput],
+    excluded_product_ids: set[UUID] | None = None,
 ) -> list[SingleSupplierBaseline]:
     baselines = []
     for supplier_id in supplier_ids:
         supplier_offers = [
             offers.get((item.workspace_product_id, supplier_id))
             for item in items
+            if not excluded_product_ids or item.workspace_product_id not in excluded_product_ids
         ]
+        has_excluded_item = any(
+            item.workspace_product_id in (excluded_product_ids or set()) for item in items
+        )
         feasible = all(offer is not None for offer in supplier_offers)
         currency = next(
             (offer.total_landed_cost.currency for offer in supplier_offers if offer),
@@ -299,7 +391,7 @@ def _baselines(
                 sum((offer.amount for offer in supplier_offers if offer), Decimal("0.0000")),
                 currency,
             )
-            if feasible
+            if feasible and not has_excluded_item
             else None
         )
         baselines.append(
@@ -607,7 +699,24 @@ def _candidate_violations(
 ) -> list[ViolatedConstraint]:
     violations = []
     eligible = set(eligible_supplier_ids)
+    consistent_currencies: dict[UUID, str] = {}
     for item in items:
+        available_currencies = {
+            offers[(item.workspace_product_id, supplier_id)].total_landed_cost.currency
+            for supplier_id in supplier_ids
+            if (item.workspace_product_id, supplier_id) in offers
+        }
+        if len(available_currencies) > 1:
+            violations.append(
+                ViolatedConstraint(
+                    kind="mixed_currency",
+                    workspace_product_id=item.workspace_product_id,
+                    requested_quantity=item.quantity,
+                    message="available offers for this item use multiple currencies",
+                )
+            )
+        elif len(available_currencies) == 1:
+            consistent_currencies[item.workspace_product_id] = next(iter(available_currencies))
         any_selected_offer = any(
             (item.workspace_product_id, supplier_id) in offers for supplier_id in supplier_ids
         )
@@ -623,6 +732,28 @@ def _candidate_violations(
                     message="no eligible supplier has a current offer for this item",
                 )
             )
+    reference_currency = _basket_reference_currency(consistent_currencies)
+    if reference_currency is not None:
+        already_mixed = {
+            violation.workspace_product_id
+            for violation in violations
+            if violation.kind == "mixed_currency"
+        }
+        for item in items:
+            currency = consistent_currencies.get(item.workspace_product_id)
+            if (
+                currency is not None
+                and currency != reference_currency
+                and item.workspace_product_id not in already_mixed
+            ):
+                violations.append(
+                    ViolatedConstraint(
+                        kind="mixed_currency",
+                        workspace_product_id=item.workspace_product_id,
+                        requested_quantity=item.quantity,
+                        message="available offers for this basket use multiple currencies",
+                    )
+                )
     for supplier_id in supplier_ids:
         terms = terms_by_supplier.get(supplier_id)
         subtotal = sum(
@@ -660,11 +791,20 @@ def _advanced_baselines(
     offers: dict[tuple[UUID, UUID], AdvancedOfferInput],
     terms_by_supplier: dict[UUID, SupplierCommercialTerms],
     currency: str,
+    excluded_product_ids: set[UUID] | None = None,
 ) -> list[SingleSupplierBaseline]:
     baselines = []
+    excluded_product_ids = excluded_product_ids or set()
     for supplier_id in sorted(supplier_ids):
-        supplier_offers = [offers.get((item.workspace_product_id, supplier_id)) for item in items]
+        supplier_offers = [
+            offers.get((item.workspace_product_id, supplier_id))
+            for item in items
+            if item.workspace_product_id not in excluded_product_ids
+        ]
         feasible = all(offer is not None for offer in supplier_offers)
+        has_excluded_item = any(
+            item.workspace_product_id in excluded_product_ids for item in items
+        )
         total = sum((offer.amount for offer in supplier_offers if offer), Decimal("0.0000"))
         terms = terms_by_supplier.get(supplier_id)
         if feasible and terms is not None and terms.minimum_order_value is not None:
@@ -673,7 +813,11 @@ def _advanced_baselines(
             SingleSupplierBaseline(
                 supplier_id=supplier_id,
                 feasible=feasible,
-                total_landed_cost=_money(total, currency) if feasible else None,
+                total_landed_cost=(
+                    _money(total, currency)
+                    if feasible and not has_excluded_item
+                    else None
+                ),
             )
         )
     return baselines

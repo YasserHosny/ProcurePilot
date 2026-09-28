@@ -52,6 +52,22 @@ def recommend_offer(
     eligible = [offer for offer in offers if not offer.is_expired]
     if not eligible:
         return None
+    currency_supplier_ids: dict[str, list[UUID]] = {}
+    for offer in eligible:
+        currency_supplier_ids.setdefault(offer.landed_cost.currency, []).append(offer.supplier_id)
+    currency_mismatch_excluded = len(currency_supplier_ids) > 1
+    reference_currency = min(
+        currency_supplier_ids,
+        key=lambda currency: (
+            -len(currency_supplier_ids[currency]),
+            min(currency_supplier_ids[currency]),
+            currency,
+        ),
+    )
+    # Mirror the guardrails.py currency_mismatch precedent: do not compare unlike money.
+    eligible = [offer for offer in eligible if offer.landed_cost.currency == reference_currency]
+    if not eligible:
+        return None
     evaluated_at = now or datetime.now(UTC)
     cheapest = min(_money_amount(offer) for offer in eligible)
     weights = SUPPLIER_IQ_WEIGHTS if supplier_risk_scores else WEIGHTS
@@ -68,7 +84,12 @@ def recommend_offer(
         confidence=_confidence(winner.score, margin),
         valid_from=winner.offer.valid_from,
         valid_to=winner.offer.valid_to,
-        risk_notes=_risk_notes(winner.offer, evaluated_at, supplier_risk_scores),
+        risk_notes=_risk_notes(
+            winner.offer,
+            evaluated_at,
+            supplier_risk_scores,
+            currency_mismatch_excluded=currency_mismatch_excluded,
+        ),
         evidence=RecommendationEvidence(
             weights={key: format(value, "f") for key, value in weights.items()},
             components={key: _score_string(value) for key, value in winner.components.items()},
@@ -146,6 +167,8 @@ def _risk_notes(
     offer: Offer,
     now: datetime,
     supplier_risk_scores: dict[UUID, str | Decimal] | None = None,
+    *,
+    currency_mismatch_excluded: bool = False,
 ) -> list[RiskNote]:
     risks: list[RiskNote] = []
     if offer.valid_to is not None and now <= offer.valid_to <= now + timedelta(days=7):
@@ -162,6 +185,8 @@ def _risk_notes(
                 risks.append("high_supplier_risk")
             elif w_risk >= Decimal("0.30"):
                 risks.append("elevated_supplier_risk")
+    if currency_mismatch_excluded:
+        risks.append("currency_mismatch_excluded")
     return risks
 
 
