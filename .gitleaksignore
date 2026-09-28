@@ -46,3 +46,13 @@
 e96bf3fdfa6b1638d4defcc8acba665490e97736:apps/api/src/procurepilot_api/modules/digests/router.py:generic-api-key:55
 e96bf3fdfa6b1638d4defcc8acba665490e97736:apps/api/src/procurepilot_api/modules/exports/router.py:generic-api-key:36
 e96bf3fdfa6b1638d4defcc8acba665490e97736:apps/api/src/procurepilot_api/modules/offers/router.py:generic-api-key:86
+
+# ---------------------------------------------------------------------------
+# Same three lines as directly above, re-flagged after PR #48 squash-merged to main: a squash
+# merge creates one brand-new commit (044b2165) that reintroduces every changed line, including
+# these three whose content never changed, so their gitleaks fingerprint's commit hash shifted
+# and the entries above stopped matching. Re-pinned to the new commit rather than replacing the
+# old entries, so the history stays legible.
+044b2165cf735616ee5b7af188192873e55b9877:apps/api/src/procurepilot_api/modules/digests/router.py:generic-api-key:55
+044b2165cf735616ee5b7af188192873e55b9877:apps/api/src/procurepilot_api/modules/exports/router.py:generic-api-key:36
+044b2165cf735616ee5b7af188192873e55b9877:apps/api/src/procurepilot_api/modules/offers/router.py:generic-api-key:86
