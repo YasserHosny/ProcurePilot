@@ -11,14 +11,15 @@ all existing purchasing workflows.
 ## Architecture
 
 Extend the existing accounting module and connector protocol rather than creating a new service.
-Internal order/receipt workflows live in a focused order-tracking module. The reconciliation
-service consumes normalized order, receipt, and bill projections. A dedicated sync worker reuses
-the advisory-lock and encrypted-token patterns from R3.1.
+Internal order/receipt workflows live in a focused order-tracking module. It also creates draft
+purchase orders from approved requests without changing the request's approval state. The
+reconciliation service consumes normalized order, receipt, and bill projections. A dedicated sync
+worker reuses the advisory-lock and encrypted-token patterns from R3.1.
 
 ## Files and Boundaries
 
 - `apps/api/src/procurepilot_api/modules/orders/`: order, confirmation, and receipt schemas,
-  services, and routers.
+  services, and routers. Handles draft order creation and request traceability.
 - `apps/api/src/procurepilot_api/modules/accounting/connector.py`: add normalized read-only order
   and bill capability types.
 - `apps/api/src/procurepilot_api/modules/accounting/xero_client.py`: Xero OAuth and read-only API
@@ -28,7 +29,8 @@ the advisory-lock and encrypted-token patterns from R3.1.
 - `apps/api/src/procurepilot_api/workers/accounting_sync_worker.py`: include provider capability
   sync without changing the existing claim and advisory-lock behavior.
 - `supabase/migrations/`: forward-only order, receipt, match, and discrepancy extensions with RLS.
-- `apps/web/src/app/features/orders/`: order detail, confirmation, receipt, and evidence timeline.
+- `apps/web/src/app/features/orders/`: draft order creation UI from approved requests, order
+  detail, confirmation, receipt, and evidence timeline.
 - `apps/web/src/app/features/accounting/`: Xero connection and three-way discrepancy presentation.
 - `packages/i18n/{en,ar}.json`: all new UI messages.
 - `docs/architecture/api-specification.md`, `docs/architecture/data-dictionary.md`,
@@ -39,7 +41,9 @@ the advisory-lock and encrypted-token patterns from R3.1.
 ### Phase 1: Data and provider foundation
 
 1. Add the migration for `purchase_order` and `purchase_order_line` with tenant-pinned supplier,
-   product, and member references, forced RLS, lifecycle checks, and explicit currency columns.
+   product, member, request, and request-line references. Enforce same-tenant references in the
+   database; cross-tenant references resolve as not found. Include forced RLS, lifecycle checks,
+   and explicit currency columns.
 2. Add supplier-confirmation and delivery-receipt migrations with immutable source references,
    cumulative quantity constraints, and forced RLS.
 3. Add `three_way_match` and extend reconciliation discrepancy types/evidence with unique source
@@ -52,13 +56,18 @@ the advisory-lock and encrypted-token patterns from R3.1.
 
 ### Phase 2: Internal order and receipt workflow
 
-1. Write failing API tests for order creation, line validation, confirmation, partial receipt, and
-   multiple-receipt accumulation.
-2. Implement Pydantic schemas and order service methods with owner/buyer mutation authorization.
-3. Implement order, confirmation, and receipt routers with idempotency keys and not-found behavior.
-4. Add audit events for order submitted, confirmation recorded, and receipt recorded.
-5. Add frontend order detail/evidence timeline with explicit pending/unavailable states.
-6. Add English/Arabic translations and RTL/a11y component tests.
+1. Write failing API tests for draft order creation from request, explicit price requirement, order
+   creation, line validation, transactional allocation limits, cancellation with unreceived
+   quantity release, confirmation, partial receipt, and multiple-receipt accumulation.
+2. Implement Pydantic schemas and order service methods with owner/buyer mutation authorization,
+   tenant-safe `source_request_id` and `source_request_line_id` linkage, and request-scoped
+   transactional allocation locks. Cross-tenant references resolve as not found.
+3. Implement order, cancellation, confirmation, and receipt routers with idempotency keys and not-found behavior.
+4. Add audit events for draft order created, order edited, order submitted, order cancelled, confirmation recorded, and receipt recorded.
+5. Add frontend order detail/evidence timeline with explicit pending/unavailable states, plus
+   localized English/Arabic UI for creating a draft PO with actuals from a request and cancelling
+   an order.
+6. Add English/Arabic translations (including for split allocations, remaining quantities, and cancellation) and RTL/a11y component tests.
 
 ### Phase 3: Three-way reconciliation
 
@@ -93,7 +102,8 @@ pnpm test:e2e -- --grep 'three-way|order tracking'
 ```
 
 ## Constitutional Checks
-
+- Request estimated prices must never silently become purchase order actual prices.
+- Tenant-safe explicit traceability from order line to source request line is preserved.
 - No autonomous purchasing or provider write-back.
 - Every money field has an explicit currency and every derived comparison stores its ruleset basis.
 - Every tenant table ships with forced RLS and both policy predicates.
