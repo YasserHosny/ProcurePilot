@@ -15,6 +15,7 @@ from integration.catalogue_helpers import (
     TEST_DATABASE_URL,
     Workspace,
     act_as,
+    delete_tenant_scoped_rows,
     make_workspace,
     make_workspace_product,
     reset_role,
@@ -226,19 +227,7 @@ def cleanup_workspace(workspace: Workspace) -> None:
             # removed explicitly before deleting the tenant.
             cur.execute("set session_replication_role = replica")
             try:
-                cur.execute(
-                    "delete from saving_record where tenant_id = %s",
-                    (workspace.tenant_id,),
-                )
-                cur.execute(
-                    "delete from purchase_record where tenant_id = %s",
-                    (workspace.tenant_id,),
-                )
-                cur.execute("delete from export_job where tenant_id = %s", (workspace.tenant_id,))
-                cur.execute(
-                    "delete from billing_account where tenant_id = %s",
-                    (workspace.tenant_id,),
-                )
+                delete_tenant_scoped_rows(cur, workspace.tenant_id)
                 cur.execute("delete from tenant where id = %s", (workspace.tenant_id,))
                 cur.execute("delete from auth.users where id = %s", (workspace.user_id,))
                 cur.execute(

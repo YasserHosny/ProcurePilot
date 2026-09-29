@@ -9,6 +9,7 @@ from integration.catalogue_helpers import (
     TEST_DATABASE_URL,
     act_as,
     connection,
+    delete_tenant_scoped_rows,
     make_workspace,
     psycopg,
 )
@@ -114,6 +115,7 @@ def test_failed_import_commit_leaves_catalogue_unchanged(conn: object) -> None:
             # fully-committed workspace needs to bypass it explicitly.
             cur.execute("set session_replication_role = replica")
             try:
+                delete_tenant_scoped_rows(cur, workspace.tenant_id)
                 cur.execute("delete from tenant where id = %s", (workspace.tenant_id,))
                 cur.execute("delete from auth.users where id = %s", (workspace.user_id,))
                 cur.execute(

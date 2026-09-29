@@ -8,6 +8,7 @@ from uuid import UUID, uuid4
 import pytest
 
 psycopg = pytest.importorskip("psycopg")
+sql = psycopg.sql
 
 TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL")
 
@@ -89,6 +90,29 @@ def act_as(cur: psycopg.Cursor, workspace: Workspace) -> None:
 def reset_role(cur: psycopg.Cursor) -> None:
     cur.execute("reset role")
     cur.execute("select set_config('request.jwt.claims', '{}', true)")
+
+
+def delete_tenant_scoped_rows(cur: psycopg.Cursor, tenant_id: UUID) -> None:
+    cur.execute(
+        """
+        select c.table_name
+        from information_schema.columns c
+        join information_schema.tables t
+          on t.table_schema = c.table_schema and t.table_name = c.table_name
+        where c.table_schema = 'public'
+          and c.column_name = 'tenant_id'
+          and t.table_type = 'BASE TABLE'
+        order by c.table_name
+        """
+    )
+    for (table_name,) in cur.fetchall():
+        if table_name == "audit_event":
+            # audit_event is append-only by constitution; never delete its rows in cleanup.
+            continue
+        cur.execute(
+            sql.SQL("delete from {} where tenant_id = %s").format(sql.Identifier(table_name)),
+            (tenant_id,),
+        )
 
 
 def make_canonical_product(cur: psycopg.Cursor, name: str, *, gtin: str | None = None) -> UUID:
