@@ -2618,3 +2618,59 @@ def test_a_member_cannot_write_a_cross_tenant_membership_reference(
                     beta.membership_id,
                 ),
             )
+
+
+def test_a_member_cannot_write_a_cross_tenant_document_reference(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    """One of the 6 FKs 20260927000001 deferred because the parent (document) first needed its
+    own unique (tenant_id, id). Before 20260929000000 this insert succeeded: the row carries
+    alpha's own tenant_id, so RLS passes, and beta's document_id exists, so the FK passed."""
+    conn, alpha, beta = workspaces
+    with conn.cursor() as cur:
+        act_as(cur, alpha)
+        with pytest.raises(psycopg.errors.ForeignKeyViolation):
+            cur.execute(
+                "insert into quotation (tenant_id,document_id) values (%s,%s)",
+                (alpha.tenant_id, beta.document_id),
+            )
+
+
+def test_no_single_column_foreign_key_links_two_tenant_scoped_tables(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    """Schema invariant, not a sample: every FK from a tenant-scoped child to a tenant-scoped
+    parent must include tenant_id, or a cross-tenant reference can satisfy it. Catches any future
+    migration that reintroduces the pattern, not just the 51 already fixed."""
+    conn, _alpha, _beta = workspaces
+    with conn.cursor() as cur:
+        cur.execute("reset role")
+        cur.execute(
+            """
+            select ct.relname, c.conname
+            from pg_constraint c
+            join pg_class ct on ct.oid = c.conrelid
+            join pg_namespace n on n.oid = ct.relnamespace
+            join pg_class pt on pt.oid = c.confrelid
+            where c.contype = 'f' and n.nspname = 'public'
+              and not exists (
+                select 1
+                from unnest(c.conkey, c.confkey) as k(child_attnum, parent_attnum)
+                join pg_attribute ca
+                  on ca.attrelid = c.conrelid and ca.attnum = k.child_attnum
+                join pg_attribute pa
+                  on pa.attrelid = c.confrelid and pa.attnum = k.parent_attnum
+                where ca.attname = 'tenant_id' and pa.attname = 'tenant_id'
+              )
+              and exists (
+                select 1 from pg_attribute a
+                where a.attrelid = ct.oid and a.attname = 'tenant_id' and not a.attisdropped
+              )
+              and exists (
+                select 1 from pg_attribute a
+                where a.attrelid = pt.oid and a.attname = 'tenant_id' and not a.attisdropped
+              )
+            order by 1, 2
+            """
+        )
+        assert cur.fetchall() == []
