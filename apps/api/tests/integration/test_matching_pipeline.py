@@ -130,6 +130,19 @@ def test_reviewed_typo_line_persists_ranked_similarity_candidates_and_routes_to_
         assert [row[0] for row in cur.fetchall()] == [STUB_EMBEDDING_MODEL] * 3
 
         cur.execute(
+            "select wp.id, cp.canonical_embedding_model "
+            "from workspace_product wp "
+            "join canonical_product cp on cp.id = wp.canonical_product_id "
+            "where wp.id in (%s, %s, %s)",
+            (intended_id, plausible_id, distractor_id),
+        )
+        assert {row[0]: row[1] for row in cur.fetchall()} == {
+            intended_id: STUB_EMBEDDING_MODEL,
+            plausible_id: STUB_EMBEDDING_MODEL,
+            distractor_id: STUB_EMBEDDING_MODEL,
+        }
+
+        cur.execute(
             "select target from audit_event "
             "where tenant_id = %s and action = 'matching.task_routed'",
             (workspace.tenant_id,),

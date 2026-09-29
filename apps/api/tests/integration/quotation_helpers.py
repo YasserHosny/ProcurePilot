@@ -209,12 +209,14 @@ class PsycopgRpcQuery:
         self._params = params
 
     def execute(self) -> _Response:
+        unknown_params = set(self._params) - _RPC_PARAM_TYPES.keys()
+        if unknown_params:
+            parameter = next(iter(unknown_params))
+            raise KeyError(f"Unknown parameter {parameter!r} for RPC function {self._function!r}")
         query = sql.SQL("select * from {}({})").format(
             sql.Identifier(self._function),
             sql.SQL(",").join(
-                sql.SQL("{}::{}").format(
-                    sql.Placeholder(key), sql.SQL(_RPC_PARAM_TYPES.get(key, "text"))
-                )
+                sql.SQL("{}::{}").format(sql.Placeholder(key), sql.SQL(_RPC_PARAM_TYPES[key]))
                 for key in self._params
             ),
         )
@@ -315,8 +317,11 @@ class PsycopgTableQuery:
         return self
 
     def execute(self) -> object:
+        current_user: str | None = None
         if self._service_role:
             with self._conn.cursor() as cur:
+                cur.execute("select current_user")
+                current_user = cur.fetchone()[0]
                 cur.execute("reset role")
         try:
             if self._operation == "insert":
@@ -325,9 +330,13 @@ class PsycopgTableQuery:
                 return self._execute_update()
             return self._execute_select()
         finally:
-            if self._service_role:
+            if (
+                self._service_role
+                and current_user is not None
+                and self._conn.info.transaction_status != psycopg.pq.TransactionStatus.INERROR
+            ):
                 with self._conn.cursor() as cur:
-                    cur.execute("set local role authenticated")
+                    cur.execute(sql.SQL("set local role {}").format(sql.Identifier(current_user)))
 
     def _execute_select(self) -> object:
         query = sql.SQL("select * from {}").format(sql.Identifier(self._table))
