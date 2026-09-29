@@ -2654,9 +2654,13 @@ def test_no_single_column_foreign_key_links_two_tenant_scoped_tables(
             join pg_class pt on pt.oid = c.confrelid
             where c.contype = 'f' and n.nspname = 'public'
               and not exists (
-                select 1 from pg_attribute a
-                where a.attrelid = c.conrelid and a.attnum = any(c.conkey)
-                  and a.attname = 'tenant_id'
+                select 1
+                from unnest(c.conkey, c.confkey) as k(child_attnum, parent_attnum)
+                join pg_attribute ca
+                  on ca.attrelid = c.conrelid and ca.attnum = k.child_attnum
+                join pg_attribute pa
+                  on pa.attrelid = c.confrelid and pa.attnum = k.parent_attnum
+                where ca.attname = 'tenant_id' and pa.attname = 'tenant_id'
               )
               and exists (
                 select 1 from pg_attribute a
