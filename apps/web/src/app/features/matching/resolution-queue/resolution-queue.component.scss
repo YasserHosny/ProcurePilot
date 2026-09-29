@@ -87,6 +87,7 @@
 .reason-chip {
   &.reason-low_confidence { background: #fef3c7; color: #92400e; }
   &.reason-close_candidates { background: #e0e7ff; color: #3730a3; }
+  &.reason-fuzzy_match_review { background: #fef3c7; color: #92400e; }
   &.reason-no_candidate { background: #fee2e2; color: #991b1b; }
   &.reason-alias_conflict { background: #fce7f3; color: #9d174d; }
   &.reason-auto_accepted { background: #dcfce7; color: #166534; }

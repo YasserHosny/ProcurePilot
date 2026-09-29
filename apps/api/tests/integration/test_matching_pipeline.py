@@ -42,6 +42,7 @@ class _PipelineSettings:
     matching_trigram_threshold = 0.30
     matching_auto_accept_threshold = 0.99
     matching_review_margin = 0.0
+    matching_fuzzy_auto_accept_enabled = False
 
 
 class _PsycopgAuditWriter:

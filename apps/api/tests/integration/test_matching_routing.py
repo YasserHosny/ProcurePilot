@@ -44,6 +44,11 @@ class _RoutingSettings:
     matching_trigram_threshold = 0.30
     matching_auto_accept_threshold = 0.92
     matching_review_margin = 0.05
+    matching_fuzzy_auto_accept_enabled = False
+
+
+class _EnabledFuzzyRoutingSettings(_RoutingSettings):
+    matching_fuzzy_auto_accept_enabled = True
 
 
 @pytest.fixture
@@ -58,6 +63,50 @@ def test_top_candidate_at_threshold_without_close_competitor_auto_accepts(
         workspace, line_id = _reviewed_line(cur, "routing-auto")
         product_id = make_workspace_product(cur, workspace, name="Routing accepted product")
         candidate = _candidate(cur, workspace, line_id, product_id, confidence=Decimal("0.9200"))
+        service = _service(_EnabledFuzzyRoutingSettings())
+
+        act_as(cur, workspace)
+        service._route_or_accept(  # noqa: SLF001
+            PsycopgSupabaseClient(conn), _member(workspace), _line(cur, line_id), [candidate]
+        )
+
+        assert _count(cur, "match_decision", line_id) == 1
+        assert _count(cur, "match_task", line_id) == 0
+
+
+def test_fuzzy_candidate_above_threshold_routes_to_fuzzy_review_when_disabled(
+    conn: object,
+) -> None:
+    with conn.cursor() as cur:
+        workspace, line_id = _reviewed_line(cur, "routing-fuzzy-review")
+        product_id = make_workspace_product(cur, workspace, name="Routing fuzzy product")
+        candidate = _candidate(cur, workspace, line_id, product_id, confidence=Decimal("0.9200"))
+        service = _service()
+
+        act_as(cur, workspace)
+        service._route_or_accept(  # noqa: SLF001
+            PsycopgSupabaseClient(conn), _member(workspace), _line(cur, line_id), [candidate]
+        )
+
+        assert _count(cur, "match_decision", line_id) == 0
+        assert _count(cur, "match_task", line_id) == 1
+        assert _task_reason(cur, line_id) == "fuzzy_match_review"
+
+
+def test_deterministic_candidate_auto_accepts_when_fuzzy_auto_accept_is_disabled(
+    conn: object,
+) -> None:
+    with conn.cursor() as cur:
+        workspace, line_id = _reviewed_line(cur, "routing-deterministic")
+        product_id = make_workspace_product(cur, workspace, name="Routing deterministic product")
+        candidate = _candidate(
+            cur,
+            workspace,
+            line_id,
+            product_id,
+            confidence=Decimal("0.9200"),
+            deterministic=True,
+        )
         service = _service()
 
         act_as(cur, workspace)
@@ -114,8 +163,8 @@ def test_no_candidates_routes_to_no_candidate_task(conn: object) -> None:
         assert _task_reason(cur, line_id) == "no_candidate"
 
 
-def _service() -> MatchingService:
-    service = MatchingService(cast(Settings, _RoutingSettings()))
+def _service(settings: object | None = None) -> MatchingService:
+    service = MatchingService(cast(Settings, settings or _RoutingSettings()))
     service._landed_cost = _NoopLandedCost()  # noqa: SLF001
     return service
 
@@ -162,6 +211,7 @@ def _candidate(
     *,
     confidence: Decimal,
     rank: int = 1,
+    deterministic: bool = False,
 ) -> dict[str, object]:
     candidate_id = uuid4()
     act_as(cur, workspace)
@@ -181,7 +231,7 @@ def _candidate(
             confidence,
             Jsonb(
                 {
-                    "alias_hit": False,
+                    "alias_hit": deterministic,
                     "gtin_match": False,
                     "supplier_code_match": False,
                     "lexical_similarity": "1.0000",

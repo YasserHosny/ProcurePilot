@@ -52,6 +52,7 @@ class _MatchingSettings:
     matching_trigram_threshold = 0.30
     matching_auto_accept_threshold = 0.92
     matching_review_margin = 0.05
+    matching_fuzzy_auto_accept_enabled = False
 
 
 @pytest.fixture

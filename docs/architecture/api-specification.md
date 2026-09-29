@@ -475,7 +475,7 @@ Every monetary value is a `Money` object with `amount` as a decimal string and e
 - Query parameters: optional `cursor`, optional `limit` capped at 100 and defaulting to 50,
   optional `status` (`open`, `in_progress`, `resolved`, or `all`) defaulting to `open`, optional
   `priority` (`low`, `normal`, or `high`), optional `reason` (`low_confidence`,
-  `close_candidates`, `no_candidate`, or `alias_conflict`), and optional `quotation_id`.
+  `close_candidates`, `fuzzy_match_review`, `no_candidate`, or `alias_conflict`), and optional `quotation_id`.
 - Returns `200` with lightweight `MatchQueueItem` resources and nullable `next_cursor`.
 - Queue items preserve the fields rendered by the queue: quotation header, line number and text,
   quoted exposure, reason, status, priority, top candidate name and score, timestamps, and grouping

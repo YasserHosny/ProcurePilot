@@ -65,7 +65,7 @@ paths:
           in: query
           schema:
             type: string
-            enum: [low_confidence, close_candidates, no_candidate, alias_conflict]
+            enum: [low_confidence, close_candidates, fuzzy_match_review, no_candidate, alias_conflict]
         - name: quotation_id
           in: query
           schema: { type: string, format: uuid }
@@ -339,7 +339,7 @@ components:
         quotation_line: { $ref: '#/components/schemas/QuotationLineSummary' }
         status: { type: string, enum: [open, in_progress, resolved] }
         priority: { type: string, enum: [low, normal, high] }
-        reason: { type: string, enum: [low_confidence, close_candidates, no_candidate, alias_conflict] }
+        reason: { type: string, enum: [low_confidence, close_candidates, fuzzy_match_review, no_candidate, alias_conflict] }
         candidates:
           type: array
           items: { $ref: '#/components/schemas/MatchCandidate' }
@@ -371,7 +371,7 @@ components:
         quotation_line: { $ref: '#/components/schemas/QuotationLineSummary' }
         status: { type: string, enum: [open, in_progress, resolved, auto_accepted] }
         priority: { type: string, enum: [low, normal, high] }
-        reason: { type: string, enum: [low_confidence, close_candidates, no_candidate, alias_conflict, auto_accepted] }
+        reason: { type: string, enum: [low_confidence, close_candidates, fuzzy_match_review, no_candidate, alias_conflict, auto_accepted] }
         top_candidate:
           allOf: [{ $ref: '#/components/schemas/MatchQueueCandidateSummary' }]
           nullable: true
