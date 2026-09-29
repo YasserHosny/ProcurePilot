@@ -26,7 +26,8 @@ pytestmark = pytest.mark.skipif(
 
 
 @pytest.fixture(autouse=True)
-def _park_existing_claimable_jobs() -> None:
+def _park_existing_claimable_jobs(monkeypatch: pytest.MonkeyPatch) -> None:
+    settings = settings_for_test_db(monkeypatch)
     with psycopg.connect(TEST_DATABASE_URL or "") as conn:
         with conn.cursor() as cur:
             cur.execute(
@@ -40,10 +41,11 @@ def _park_existing_claimable_jobs() -> None:
                     status = 'pending'
                     or (
                         status = 'processing'
-                        and locked_at < now() - interval '600 seconds'
+                        and locked_at < now() - make_interval(secs => %s)
                     )
                   )
-                """
+                """,
+                (settings.email_ingestion_stale_lock_seconds,),
             )
         conn.commit()
 
