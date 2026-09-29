@@ -191,17 +191,64 @@ def make_extracted_quotation(cur: psycopg.Cursor, workspace: Workspace) -> Quota
 
 
 class PsycopgSupabaseClient:
-    def __init__(self, conn: psycopg.Connection) -> None:
+    def __init__(self, conn: psycopg.Connection, *, service_role: bool = False) -> None:
         self._conn = conn
+        self._service_role = service_role
 
     def table(self, name: str) -> PsycopgTableQuery:
-        return PsycopgTableQuery(self._conn, name)
+        return PsycopgTableQuery(self._conn, name, service_role=self._service_role)
+
+    def rpc(self, name: str, params: dict[str, object]) -> PsycopgRpcQuery:
+        return PsycopgRpcQuery(self._conn, name, params)
+
+
+class PsycopgRpcQuery:
+    def __init__(self, conn: psycopg.Connection, function: str, params: dict[str, object]) -> None:
+        self._conn = conn
+        self._function = function
+        self._params = params
+
+    def execute(self) -> _Response:
+        unknown_params = set(self._params) - _RPC_PARAM_TYPES.keys()
+        if unknown_params:
+            parameter = next(iter(unknown_params))
+            raise KeyError(f"Unknown parameter {parameter!r} for RPC function {self._function!r}")
+        query = sql.SQL("select * from {}({})").format(
+            sql.Identifier(self._function),
+            sql.SQL(",").join(
+                sql.SQL("{}::{}").format(sql.Placeholder(key), sql.SQL(_RPC_PARAM_TYPES[key]))
+                for key in self._params
+            ),
+        )
+        adapted = {
+            key: Jsonb(value) if isinstance(value, dict | list) else value
+            for key, value in self._params.items()
+        }
+        with self._conn.cursor(row_factory=psycopg.rows.dict_row) as cur:
+            cur.execute(query, adapted)
+            rows = cur.fetchall()
+        return _Response(
+            [
+                {key: _adapt_response_value(value) for key, value in dict(row).items()}
+                for row in rows
+            ]
+        )
+
+
+_RPC_PARAM_TYPES = {
+    "p_line_text": "text",
+    "p_line_embedding": "vector",
+    "p_trigram_threshold": "real",
+    "p_semantic_threshold": "real",
+    "p_limit": "integer",
+}
 
 
 class PsycopgTableQuery:
-    def __init__(self, conn: psycopg.Connection, table: str) -> None:
+    def __init__(self, conn: psycopg.Connection, table: str, *, service_role: bool = False) -> None:
         self._conn = conn
         self._table = table
+        self._service_role = service_role
         self._operation = "select"
         self._payload: dict[str, object] | None = None
         self._where: list[tuple[str, str, object]] = []
@@ -270,11 +317,26 @@ class PsycopgTableQuery:
         return self
 
     def execute(self) -> object:
-        if self._operation == "insert":
-            return self._execute_insert()
-        if self._operation == "update":
-            return self._execute_update()
-        return self._execute_select()
+        current_user: str | None = None
+        if self._service_role:
+            with self._conn.cursor() as cur:
+                cur.execute("select current_user")
+                current_user = cur.fetchone()[0]
+                cur.execute("reset role")
+        try:
+            if self._operation == "insert":
+                return self._execute_insert()
+            if self._operation == "update":
+                return self._execute_update()
+            return self._execute_select()
+        finally:
+            if (
+                self._service_role
+                and current_user is not None
+                and self._conn.info.transaction_status != psycopg.pq.TransactionStatus.INERROR
+            ):
+                with self._conn.cursor() as cur:
+                    cur.execute(sql.SQL("set local role {}").format(sql.Identifier(current_user)))
 
     def _execute_select(self) -> object:
         query = sql.SQL("select * from {}").format(sql.Identifier(self._table))
@@ -312,8 +374,7 @@ class PsycopgTableQuery:
         query = sql.SQL("update {} set {}").format(
             sql.Identifier(self._table),
             sql.SQL(",").join(
-                sql.SQL("{} = {}").format(sql.Identifier(key), sql.Placeholder())
-                for key in keys
+                sql.SQL("{} = {}").format(sql.Identifier(key), sql.Placeholder()) for key in keys
             ),
         )
         where_sql, where_params = self._where_sql()
@@ -333,9 +394,7 @@ class PsycopgTableQuery:
             elif operator == "in":
                 values = list(value) if isinstance(value, list) else []
                 placeholders = sql.SQL(",").join(sql.Placeholder() for _item in values)
-                clauses.append(
-                    sql.SQL("{} in ({})").format(column_sql, placeholders)
-                )
+                clauses.append(sql.SQL("{} in ({})").format(column_sql, placeholders))
                 params.extend(values)
             elif operator == "ilike":
                 clauses.append(sql.SQL("{} ilike {}").format(column_sql, sql.Placeholder()))
@@ -358,8 +417,7 @@ class PsycopgTableQuery:
             cur.execute(query, params)
             rows = cur.fetchall()
         return [
-            {key: _adapt_response_value(value) for key, value in dict(row).items()}
-            for row in rows
+            {key: _adapt_response_value(value) for key, value in dict(row).items()} for row in rows
         ]
 
 
