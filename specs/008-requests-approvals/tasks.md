@@ -111,7 +111,7 @@ description: "Task list for Requests + Approvals implementation"
 - [x] T030 [P] [US3] Write contract tests for `GET/POST /approvals/threshold-rules`, `PATCH/DELETE /approvals/threshold-rules/{id}`, and `GET/POST /approvals/delegations`+`DELETE /approvals/delegations/{id}` in `apps/api/tests/contract/test_threshold_rules_contract.py`, covering owner-only writes and 403/404/422 envelopes
 - [x] T031 [P] [US3] Write end-to-end routing integration tests in `apps/api/tests/integration/test_request_routing.py`, proving a real submitted request lands in the correct approver's `GET /approvals/pending` per threshold tier and branch, that an active delegation redirects it, and that `requests.approval_step_escalated` is recorded when routing falls through to the owner
 - [x] T032 [P] [US3] Write frontend unit tests for threshold-rule and delegation management in `apps/web/src/app/features/settings/threshold-rule-list/threshold-rule-list.component.spec.ts`, covering tier creation, branch scoping, and owner-only visibility of write actions
-- [ ] T033 [P] [US3] Write routing/delegation E2E coverage in `apps/web/tests/e2e/threshold-routing.spec.ts`, proving requests at different value tiers route to the correct approver through the real UI/API, and a delegation redirects a newly submitted request to the delegate
+- [x] T033 [P] [US3] Write routing/delegation E2E coverage in `apps/web/tests/e2e/threshold-routing.spec.ts`, proving requests at different value tiers route to the correct approver through the real UI/API, and a delegation redirects a newly submitted request to the delegate — **re-verified 2026-09-29**: file exists and is real (256 lines), was already complete, just never marked done
 
 ### Implementation for User Story 3
 
@@ -135,7 +135,7 @@ description: "Task list for Requests + Approvals implementation"
 - [x] T038 [P] [US4] Write unit tests for the budget-remaining-amount comparison in `apps/api/tests/unit/test_budget_status.py`, covering within-budget (no warning), exceeding (warning with correct remaining amount), and no-applicable-budget (no `budget_status` at all, per FR-012)
 - [x] T039 [P] [US4] Write integration tests in `apps/api/tests/integration/test_request_budget_status.py`, proving `budget_status` appears correctly on both `GET /requests/{id}` and the matching row in `GET /approvals/pending`, and that an exceeding request still submits and can still be approved (FR-011)
 - [x] T040 [P] [US4] Write frontend unit tests for the budget-status display in `apps/web/src/app/features/requests/request-detail/request-detail.component.spec.ts` and the approval-queue row, covering the warning's presence/absence
-- [ ] T041 [P] [US4] Write budget-status E2E coverage in `apps/web/tests/e2e/request-budget-status.spec.ts`, proving the warning appears on both the requester's and the approver's view for an exceeding request, and is absent for one within budget or with no applicable budget
+- [x] T041 [P] [US4] Write budget-status E2E coverage in `apps/web/tests/e2e/request-budget-status.spec.ts`, proving the warning appears on both the requester's and the approver's view for an exceeding request, and is absent for one within budget or with no applicable budget — **re-verified 2026-09-29**: file exists and is real (192 lines), was already complete, just never marked done
 
 ### Implementation for User Story 4
 
