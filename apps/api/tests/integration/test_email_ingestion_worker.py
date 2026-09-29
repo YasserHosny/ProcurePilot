@@ -25,6 +25,31 @@ pytestmark = pytest.mark.skipif(
 )
 
 
+@pytest.fixture(autouse=True)
+def _park_existing_claimable_jobs(monkeypatch: pytest.MonkeyPatch) -> None:
+    settings = settings_for_test_db(monkeypatch)
+    with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                update ingestion_jobs
+                set status = 'failed',
+                    last_error = 'parked by test isolation fixture',
+                    locked_by = null
+                where job_type in ('email_ingest', 'guardrail_eval')
+                  and (
+                    status = 'pending'
+                    or (
+                        status = 'processing'
+                        and locked_at < now() - make_interval(secs => %s)
+                    )
+                  )
+                """,
+                (settings.email_ingestion_stale_lock_seconds,),
+            )
+        conn.commit()
+
+
 class _FakeBucket:
     def __init__(
         self,
@@ -533,9 +558,7 @@ def test_stale_processing_job_reclaimed_and_processed_on_tick(
                 )
             conn.commit()
 
-        raw_email = _build_email(
-            from_addr="sales@acme.com", message_id="<worker-stale@acme.com>"
-        )
+        raw_email = _build_email(from_addr="sales@acme.com", message_id="<worker-stale@acme.com>")
         raw_email_path = f"tenants/{context.workspace.tenant_id}/raw/worker-stale.eml"
         uploads, enqueued = _patch_storage_and_queue(
             monkeypatch, downloads={raw_email_path: raw_email}
@@ -662,4 +685,3 @@ def test_stale_job_exceeding_max_attempts_marked_failed_directly(
         # Subsequent tick() does not touch terminal-failed job
         stats2 = tick(settings)
         assert stats2["claimed"] == 0
-

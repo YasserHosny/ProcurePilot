@@ -15,6 +15,7 @@ from integration.catalogue_helpers import (
     TEST_DATABASE_URL,
     Workspace,
     act_as,
+    delete_tenant_scoped_rows,
     make_workspace,
     make_workspace_product,
     reset_role,
@@ -223,29 +224,13 @@ def cleanup_workspace(workspace: Workspace) -> None:
             # The owner-guard trigger refuses to delete the last active owner's membership row,
             # even via cascade from a tenant delete — same fix as test_import_atomicity.py.
             # Replica mode also disables FK cascade triggers, so value-proof children must be
-            # removed explicitly before deleting the tenant.
-            cur.execute("set session_replication_role = replica")
-            try:
-                cur.execute(
-                    "delete from saving_record where tenant_id = %s",
-                    (workspace.tenant_id,),
-                )
-                cur.execute(
-                    "delete from purchase_record where tenant_id = %s",
-                    (workspace.tenant_id,),
-                )
-                cur.execute("delete from export_job where tenant_id = %s", (workspace.tenant_id,))
-                cur.execute(
-                    "delete from billing_account where tenant_id = %s",
-                    (workspace.tenant_id,),
-                )
-                cur.execute("delete from tenant where id = %s", (workspace.tenant_id,))
-                cur.execute("delete from auth.users where id = %s", (workspace.user_id,))
-                cur.execute(
-                    "delete from platform_invitation where email = %s", (_email(workspace),)
-                )
-            finally:
-                cur.execute("set session_replication_role = default")
+            # removed explicitly before deleting the tenant. SET LOCAL reverts on commit or
+            # rollback, preserving the original delete error if cleanup fails.
+            cur.execute("set local session_replication_role = replica")
+            delete_tenant_scoped_rows(cur, workspace.tenant_id)
+            cur.execute("delete from tenant where id = %s", (workspace.tenant_id,))
+            cur.execute("delete from auth.users where id = %s", (workspace.user_id,))
+            cur.execute("delete from platform_invitation where email = %s", (_email(workspace),))
         conn.commit()
 
 

@@ -9,6 +9,7 @@ from integration.catalogue_helpers import (
     TEST_DATABASE_URL,
     act_as,
     connection,
+    delete_tenant_scoped_rows,
     make_workspace,
     psycopg,
 )
@@ -111,15 +112,14 @@ def test_failed_import_commit_leaves_catalogue_unchanged(conn: object) -> None:
             # The owner-guard trigger (migration 20260819000005) refuses to delete the last
             # active owner's membership row, including via cascade from a tenant delete — by
             # design, for the normal application paths it protects. Test-only cleanup of a
-            # fully-committed workspace needs to bypass it explicitly.
-            cur.execute("set session_replication_role = replica")
-            try:
-                cur.execute("delete from tenant where id = %s", (workspace.tenant_id,))
-                cur.execute("delete from auth.users where id = %s", (workspace.user_id,))
-                cur.execute(
-                    "delete from canonical_product where name in (%s,%s)",
-                    ("Atomic first product", "Atomic failing product"),
-                )
-            finally:
-                cur.execute("set session_replication_role = default")
+            # fully-committed workspace needs to bypass it explicitly. SET LOCAL reverts on
+            # commit or rollback, preserving the original delete error if cleanup fails.
+            cur.execute("set local session_replication_role = replica")
+            delete_tenant_scoped_rows(cur, workspace.tenant_id)
+            cur.execute("delete from tenant where id = %s", (workspace.tenant_id,))
+            cur.execute("delete from auth.users where id = %s", (workspace.user_id,))
+            cur.execute(
+                "delete from canonical_product where name in (%s,%s)",
+                ("Atomic first product", "Atomic failing product"),
+            )
             conn.commit()

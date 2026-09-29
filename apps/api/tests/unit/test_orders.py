@@ -1,6 +1,7 @@
 from contextlib import nullcontext
 from datetime import UTC, date, datetime
 from decimal import Decimal
+from pathlib import Path
 from types import SimpleNamespace
 from uuid import UUID
 
@@ -408,6 +409,12 @@ def test_receipt_insertion_and_audit_are_called(monkeypatch: pytest.MonkeyPatch)
 
 
 def test_migration_has_tenant_scoped_nullable_header_keys() -> None:
-    migration = open("supabase/migrations/20260919000008_order_tracking_idempotency.sql").read()
+    migration_path = (
+        Path(__file__).resolve().parents[4]
+        / "supabase"
+        / "migrations"
+        / "20260919000008_order_tracking_idempotency.sql"
+    )
+    migration = migration_path.read_text()
     assert "add column if not exists idempotency_key uuid" in migration
     assert "where idempotency_key is not null" in migration
