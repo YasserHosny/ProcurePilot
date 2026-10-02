@@ -55,6 +55,17 @@ class _QualityIssueScreenState extends State<QualityIssueScreen> {
     if (!_cameraChecked) {
       _cameraChecked = true;
       _checkCameraAvailability();
+      _recoverLostCapture();
+    }
+  }
+
+  Future<void> _recoverLostCapture() async {
+    try {
+      final recovered = await _cameraCapture.recoverLostCapture();
+      if (!mounted || recovered == null || _capturedPhoto != null) return;
+      setState(() => _capturedPhoto = recovered);
+    } on Exception catch (e) {
+      debugPrint('Failed to recover a lost capture: $e');
     }
   }
 

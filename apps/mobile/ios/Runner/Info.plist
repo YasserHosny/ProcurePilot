@@ -35,6 +35,10 @@
 	     to the Xcode project's localization structure. -->
 	<key>NSFaceIDUsageDescription</key>
 	<string>ProcurePilot uses Face ID to unlock the app with your saved sign-in, instead of your password.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>ProcurePilot uses the camera to attach photos to quality issue reports.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>ProcurePilot uses the photo library to access photos attached to quality issue reports.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

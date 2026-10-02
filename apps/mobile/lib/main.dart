@@ -105,7 +105,7 @@ void main() async {
       mobileApiClient: mobileApiClient,
       approvalsApiClient: approvalsApiClient,
       requestsApiClient: requestsApiClient,
-      cameraCapture: const StandInCameraCapture(),
+      cameraCapture: const ImagePickerCameraCapture(),
       offlineQueueService: offlineQueueService,
       notificationPermission: StandInNotificationPermission(),
     ),
@@ -121,7 +121,7 @@ class ProcurePilotApp extends StatefulWidget {
     required this.mobileApiClient,
     required this.approvalsApiClient,
     required this.requestsApiClient,
-    this.cameraCapture = const StandInCameraCapture(),
+    this.cameraCapture = const ImagePickerCameraCapture(),
     this.offlineQueueService,
     this.notificationPermission,
   });
