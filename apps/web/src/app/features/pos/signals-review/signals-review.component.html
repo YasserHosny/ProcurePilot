@@ -6,6 +6,7 @@
     </div>
     <div class="header-actions">
       <button
+        *appRole="['owner', 'buyer']"
         mat-flat-button
         color="primary"
         type="button"
@@ -15,13 +16,26 @@
         data-testid="sync-btn"
       >
         @if (isSyncing()) {
-          <mat-spinner diameter="18" [attr.aria-label]="'pos.signals.syncing' | translate" />
-          <span>{{ 'pos.signals.syncing' | translate }}</span>
+          <ng-container>
+            <mat-spinner diameter="18" [attr.aria-label]="'pos.signals.syncing' | translate" />
+            <span>{{ 'pos.signals.syncing' | translate }}</span>
+          </ng-container>
         } @else {
-          <mat-icon aria-hidden="true">sync</mat-icon>
-          <span>{{ 'pos.signals.syncNow' | translate }}</span>
+          <ng-container>
+            <mat-icon aria-hidden="true">sync</mat-icon>
+            <span>{{ 'pos.signals.syncNow' | translate }}</span>
+          </ng-container>
         }
       </button>
+      <div
+        *appRole="['approver', 'viewer', 'branch_manager']"
+        class="read-only-notice"
+        role="note"
+        data-testid="signals-read-only-notice"
+      >
+        <mat-icon aria-hidden="true">info</mat-icon>
+        <span>{{ 'pos.signals.readOnly' | translate }}</span>
+      </div>
     </div>
   </div>
 
@@ -111,7 +125,7 @@
               <ng-container matColumnDef="actions">
                 <th mat-header-cell *matHeaderCellDef>{{ 'pos.signals.unmatched.matchAction' | translate }}</th>
                 <td mat-cell *matCellDef="let signal" class="actions-cell">
-                  <div class="match-control-group">
+                  <div *appRole="['owner', 'buyer']" class="match-control-group">
                     <mat-form-field appearance="outline" class="picker-field" subscriptSizing="dynamic">
                       <mat-select
                         [placeholder]="'pos.signals.unmatched.selectProduct' | translate"
@@ -143,6 +157,13 @@
                       <span>{{ 'pos.signals.unmatched.matchAction' | translate }}</span>
                     </button>
                   </div>
+                  <span
+                    *appRole="['approver', 'viewer', 'branch_manager']"
+                    class="read-only-inline"
+                    data-testid="match-read-only-notice"
+                  >
+                    {{ 'pos.signals.readOnlyShort' | translate }}
+                  </span>
                 </td>
               </ng-container>
 

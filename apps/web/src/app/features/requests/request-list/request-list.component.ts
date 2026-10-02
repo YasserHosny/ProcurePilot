@@ -1,5 +1,5 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
@@ -12,8 +12,11 @@ import { MatTableModule } from '@angular/material/table';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { Router } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
+import { forkJoin, of } from 'rxjs';
+import { catchError } from 'rxjs/operators';
 
-import type { ApiError, PurchaseRequest, PurchaseRequestStatus } from '../../../core/api/models';
+import type { ApiError, Branch, BranchList, PurchaseRequest, PurchaseRequestStatus } from '../../../core/api/models';
+import { OrganisationApiService } from '../../settings/organisation-api';
 import { RequestsApiService } from '../requests-api';
 
 const I18N = 'requests';
@@ -39,6 +42,7 @@ const I18N = 'requests';
 })
 export class RequestListComponent implements OnInit {
   private readonly requestsApi = inject(RequestsApiService);
+  private readonly organisationApi = inject(OrganisationApiService);
   private readonly router = inject(Router);
   private readonly dialog = inject(MatDialog);
   private readonly snackBar = inject(MatSnackBar);
@@ -46,9 +50,18 @@ export class RequestListComponent implements OnInit {
 
   readonly isLoading = signal<boolean>(true);
   readonly requests = signal<PurchaseRequest[]>([]);
+  readonly branches = signal<Branch[]>([]);
   readonly errorMessage = signal<string | null>(null);
   readonly errorTraceId = signal<string | null>(null);
   readonly statusFilter = signal<PurchaseRequestStatus | ''>('');
+
+  readonly branchNameById = computed<Map<string, string>>(() => {
+    const byId = new Map<string, string>();
+    for (const branch of this.branches()) {
+      byId.set(branch.id, branch.name);
+    }
+    return byId;
+  });
 
   readonly displayedColumns: readonly string[] = [
     'requiredByDate',
@@ -67,10 +80,13 @@ export class RequestListComponent implements OnInit {
     this.errorMessage.set(null);
     this.errorTraceId.set(null);
 
-    const status = this.statusFilter() || undefined;
-    this.requestsApi.listRequests({ status }).subscribe({
-      next: (res) => {
-        this.requests.set([...res.items]);
+    forkJoin({
+      requests: this.requestsApi.listRequests({ status: this.statusFilter() || undefined }),
+      branches: this.loadBranches(),
+    }).subscribe({
+      next: ({ requests, branches }) => {
+        this.requests.set([...requests.items]);
+        this.branches.set([...branches.items]);
         this.isLoading.set(false);
       },
       error: (err: unknown) => {
@@ -112,6 +128,21 @@ export class RequestListComponent implements OnInit {
       return '—';
     }
     return `${request.estimated_total.currency} ${request.estimated_total.amount}`;
+  }
+
+  getBranchName(branchId: string): string {
+    return this.branchNameById().get(branchId) ?? branchId;
+  }
+
+  private loadBranches() {
+    return this.organisationApi.listBranches({ limit: 100 }).pipe(
+      catchError(() =>
+        of<BranchList>({
+          items: [],
+          next_cursor: null,
+        }),
+      ),
+    );
   }
 
   private handleError(err: unknown): void {

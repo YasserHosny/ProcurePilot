@@ -1,3 +1,4 @@
+import { type WritableSignal, signal } from '@angular/core';
 import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { By } from '@angular/platform-browser';
@@ -7,7 +8,8 @@ import { of } from 'rxjs';
 
 import enCatalog from '../../../../../../../packages/i18n/en.json';
 import { ApiService } from '../../../core/api/api.service';
-import type { Product } from '../../../core/api/models';
+import type { Product, Role } from '../../../core/api/models';
+import { SessionService } from '../../../core/auth/session.service';
 import { PosApiService, type PosProductMatch, type SyncedProductSignal, type TriggerSyncResponse } from '../pos-api';
 import { SignalsReviewComponent } from './signals-review.component';
 
@@ -17,6 +19,7 @@ describe('SignalsReviewComponent (T027)', () => {
   let posApiService: jasmine.SpyObj<PosApiService>;
   let apiService: jasmine.SpyObj<ApiService>;
   let snackBarSpy: jasmine.SpyObj<MatSnackBar>;
+  let mockRoleSignal: WritableSignal<Role | null>;
 
   const mockProduct: Product = {
     id: 'prod-001',
@@ -63,6 +66,7 @@ describe('SignalsReviewComponent (T027)', () => {
   };
 
   beforeEach(async () => {
+    mockRoleSignal = signal<Role | null>('owner');
     posApiService = jasmine.createSpyObj<PosApiService>('PosApiService', [
       'listSignals',
       'triggerSync',
@@ -98,12 +102,25 @@ describe('SignalsReviewComponent (T027)', () => {
     };
     posApiService.manuallyMatchSignal.and.returnValue(of(mockMatchResult));
 
+    const mockSessionService = {
+      role: mockRoleSignal,
+      hasRole: (...roles: readonly Role[]) => {
+        const current = mockRoleSignal();
+        return current !== null && roles.includes(current);
+      },
+      isAuthenticated: signal(true),
+      activeLocale: signal('en'),
+      currentMember: signal(null),
+      tenant: signal(null),
+    };
+
     await TestBed.configureTestingModule({
       imports: [SignalsReviewComponent, TranslateModule.forRoot()],
       providers: [
         provideNoopAnimations(),
         { provide: PosApiService, useValue: posApiService },
         { provide: ApiService, useValue: apiService },
+        { provide: SessionService, useValue: mockSessionService },
       ],
     })
       // A plain top-level provider override is silently ignored for MatSnackBar on this
@@ -183,4 +200,15 @@ describe('SignalsReviewComponent (T027)', () => {
     expect(posApiService.triggerSync).toHaveBeenCalled();
     expect(snackBarSpy.open).toHaveBeenCalled();
   }));
+
+  it('hides sync and match actions for read-only roles', () => {
+    mockRoleSignal.set('viewer');
+    fixture.detectChanges();
+
+    expect(fixture.debugElement.query(By.css('[data-testid="sync-btn"]'))).toBeNull();
+    expect(fixture.debugElement.query(By.css('[data-testid="signals-read-only-notice"]'))).not.toBeNull();
+    expect(fixture.debugElement.query(By.css('[data-testid="product-picker"]'))).toBeNull();
+    expect(fixture.debugElement.query(By.css('[data-testid="match-btn"]'))).toBeNull();
+    expect(fixture.debugElement.query(By.css('[data-testid="match-read-only-notice"]'))).not.toBeNull();
+  });
 });

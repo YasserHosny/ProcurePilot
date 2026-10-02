@@ -3,6 +3,7 @@ from __future__ import annotations
 import csv
 import io
 from collections.abc import Iterable
+from decimal import Decimal
 
 from procurepilot_extraction_worker.models import ExtractedField, ExtractedLine, ExtractionResult
 from procurepilot_extraction_worker.validation import decimal_from_extracted
@@ -43,8 +44,26 @@ def _parse_rows(rows: Iterable[dict[str, object]]) -> ExtractionResult:
     header: dict[str, ExtractedField] = {}
     lines: list[ExtractedLine] = []
     stated_total: ExtractedField | None = None
+
+    aliases = {
+        "supplier": "supplier_name",
+        "quotation_date": "issue_date",
+        "valid_until": "expiry_date",
+        "product": "description",
+        "pack_size": "pack_count",
+        "unit": "pack_unit",
+        "vat_percent": "vat_rate",
+        "total": "stated_total",
+    }
+
     for index, row in enumerate(rows, start=1):
         normalised = {str(key).strip().lower(): value for key, value in row.items()}
+        for alias, canonical in aliases.items():
+            if alias in normalised and canonical not in normalised:
+                value = normalised[alias]
+                if alias == "vat_percent" and value not in {None, ""}:
+                    value = format(decimal_from_extracted(value) / Decimal("100"), "f")
+                normalised[canonical] = value
         currency = str(normalised.get("currency") or "GBP").strip().upper()
         if "currency" not in header:
             header["currency"] = _field("currency", currency)

@@ -3100,6 +3100,42 @@
     "orderDate": "تم الطلب في {{date}}",
     "lineCount": "{{count}} بند",
     "notProvided": "غير متوفر",
+    "createButton": "إنشاء طلب",
+    "create": {
+      "title": "إنشاء أمر شراء",
+      "subtitle": "تسجيل أمر شراء داخلي يدويًا.",
+      "orderNumber": "رقم الطلب",
+      "orderNumberPlaceholder": "مثال: PO-2026-001",
+      "supplier": "المورد",
+      "orderDate": "تاريخ الطلب",
+      "expectedDeliveryDate": "تاريخ التسليم المتوقع",
+      "currency": "العملة",
+      "orderTax": "ضريبة الطلب",
+      "lines": "بنود الطلب",
+      "addLine": "إضافة بند",
+      "removeLine": "إزالة البند",
+      "product": "المنتج (اختياري)",
+      "description": "الوصف",
+      "quantity": "الكمية",
+      "baseUnit": "الوحدة الأساسية",
+      "unitPrice": "سعر الوحدة",
+      "lineTax": "ضريبة البند",
+      "lineTotal": "إجمالي البند",
+      "orderTotal": "إجمالي الطلب",
+      "submit": "إنشاء أمر شراء",
+      "submitting": "جاري الإنشاء...",
+      "success": "تم إنشاء الطلب بنجاح.",
+      "linesTotalLabel": "إجمالي البنود",
+      "linePrefix": "البند",
+      "noProduct": "-- لا يوجد --",
+      "currencyPlaceholder": "مثال: USD, GBP",
+      "errors": {
+        "required": "مطلوب",
+        "currencyFormat": "رمز من 3 أحرف",
+        "positiveQuantity": "يجب أن يكون > 0",
+        "nonNegativePrice": "يجب أن يكون >= 0"
+      }
+    },
     "status": {
       "draft": "مسودة",
       "submitted": "مرسل",
@@ -3158,11 +3194,14 @@
       "subtitle": "اربط برنامج المحاسبة لمزامنة الفواتير ومطابقة النفقات مع سجلات الشراء.",
       "empty": {
         "title": "اربط نظام المحاسبة الخاص بك",
-        "description": "اربط حساب QuickBooks Online لاستيراد الفواتير تلقائياً ومطابقتها مع سجلات الشراء.",
-        "connect": "ربط QuickBooks"
+        "description": "اربط مزود المحاسبة المُهيأ لاستيراد الفواتير تلقائياً ومطابقتها مع سجلات الشراء.",
+        "connect": "ربط المحاسبة"
       },
       "statusCardTitle": "الحساب المتصل",
-      "providerQuickbooks": "QuickBooks Online",
+      "providers": {
+        "quickbooks": "QuickBooks Online",
+        "xero": "Xero"
+      },
       "status": {
         "active": "نشط",
         "needs_reauth": "يتطلب إعادة التفويض",
@@ -3178,7 +3217,7 @@
       "ownerOnly": "يمكن لمالكي مساحة العمل فقط ربط أو فصل تكامل المحاسبة.",
       "needsReauth": {
         "title": "مطلوب إعادة التفويض",
-        "message": "انتهت صلاحية تفويض حساب QuickBooks أو تم إلغاؤه. يُرجى إعادة الربط لاستئناف مزامنة الفواتير.",
+        "message": "انتهت صلاحية تفويض اتصال المحاسبة أو تم إلغاؤه. يُرجى إعادة الربط لاستئناف مزامنة الفواتير.",
         "action": "إعادة الربط"
       },
       "error": {
@@ -3386,6 +3425,8 @@
       "syncNoConnection": "لم يتم العثور على اتصال نشط بنقاط البيع.",
       "syncFailed": "فشل بدء مزامنة نقاط البيع. يُرجى المحاولة مرة أخرى.",
       "loadError": "فشل تحميل المؤشرات المتزامنة.",
+      "readOnly": "يمكنك مراجعة المؤشرات المتزامنة. يمكن للمالكين والمشترين فقط مزامنة بيانات نقاط البيع أو ربط المنتجات.",
+      "readOnlyShort": "يتطلب مالكاً أو مشترياً",
       "unmatched": {
         "title": "مؤشرات غير مطابقة",
         "description": "عناصر من كتالوج Square لم تتم مطابقتها تلقائياً مع أي منتج في الكتالوج.",

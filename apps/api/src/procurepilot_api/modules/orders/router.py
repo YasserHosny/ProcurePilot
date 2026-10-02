@@ -13,6 +13,7 @@ from procurepilot_api.modules.orders.schemas import (
     PurchaseOrder,
     PurchaseOrderCreate,
     PurchaseOrderList,
+    RequestAllocation,
     SupplierConfirmationCreate,
 )
 from procurepilot_api.modules.orders.service import OrdersService, get_orders_service
@@ -38,11 +39,23 @@ def create_order(
     idempotency_key: Annotated[UUID | None, Header(alias="Idempotency-Key")] = None,
 ) -> PurchaseOrder:
     result, created = service.create_order(
-        bearer_token=token, member=member, payload=payload, idempotency_key=idempotency_key
+        bearer_token=token, member=_member, payload=payload, idempotency_key=idempotency_key
     )
     if not created:
         response.status_code = status.HTTP_200_OK
     return result
+
+
+@router.get("/orders/allocations", response_model=RequestAllocation)
+def get_allocations(
+    source_request_id: UUID,
+    token: Annotated[str, Depends(bearer_token)],
+    _member: Annotated[CurrentMember, Depends(current_member)],
+    service: Annotated[OrdersService, Depends(get_orders_service)],
+) -> RequestAllocation:
+    return service.get_request_allocation(
+        bearer_token=token, member=_member, source_request_id=source_request_id
+    )
 
 
 @router.get("/orders", response_model=PurchaseOrderList)
@@ -77,7 +90,7 @@ def submit_order(
     idempotency_key: Annotated[UUID | None, Header(alias="Idempotency-Key")] = None,
 ) -> PurchaseOrder:
     return service.submit_order(
-        bearer_token=token, member=member, order_id=order_id, idempotency_key=idempotency_key
+        bearer_token=token, member=_member, order_id=order_id, idempotency_key=idempotency_key
     )
 
 

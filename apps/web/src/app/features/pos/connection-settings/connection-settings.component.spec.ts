@@ -130,6 +130,7 @@ describe('ConnectionSettingsComponent (T014)', () => {
 
   describe('Initial load empty state (404 / never connected)', () => {
     it('should show empty state with Connect button when getConnection 404s', () => {
+      mockRoleSignal.set('owner');
       fixture.detectChanges();
 
       const req = httpTestingController.expectOne('/api/v1/pos/connection');
@@ -151,8 +152,30 @@ describe('ConnectionSettingsComponent (T014)', () => {
       const connectBtn = fixture.debugElement.query(By.css('[data-testid="connect-btn"]'));
       expect(connectBtn).not.toBeNull();
 
+      const ownerNotice = fixture.debugElement.query(By.css('[data-testid="owner-notice"]'));
+      expect(ownerNotice).toBeNull();
+
       const statusCard = fixture.debugElement.query(By.css('[data-testid="connection-status-card"]'));
       expect(statusCard).toBeNull();
+    });
+
+    it('should hide the empty-state connect button for non-owner roles', () => {
+      mockRoleSignal.set('viewer');
+      fixture.detectChanges();
+
+      const req = httpTestingController.expectOne('/api/v1/pos/connection');
+      req.flush(
+        { message: 'No connection exists for this tenant' },
+        { status: 404, statusText: 'Not Found' },
+      );
+
+      fixture.detectChanges();
+
+      const connectBtn = fixture.debugElement.query(By.css('[data-testid="connect-btn"]'));
+      expect(connectBtn).toBeNull();
+
+      const ownerNotice = fixture.debugElement.query(By.css('[data-testid="owner-notice"]'));
+      expect(ownerNotice).not.toBeNull();
     });
   });
 

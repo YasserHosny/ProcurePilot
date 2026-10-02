@@ -1,0 +1,189 @@
+<div class="order-create-container">
+  <div class="page-header">
+    <div>
+      <h1>{{ 'orders.create.title' | translate }}</h1>
+      <p>{{ 'orders.create.subtitle' | translate }}</p>
+    </div>
+  </div>
+
+  @if (errorMessage(); as error) {
+    <mat-card class="state error" role="alert">
+      <mat-card-content>
+        <mat-icon aria-hidden="true">error_outline</mat-icon>
+        <span>{{ error }}</span>
+      </mat-card-content>
+    </mat-card>
+  }
+
+  <form [formGroup]="form" (ngSubmit)="submit()">
+    <mat-card class="form-card">
+      <div class="form-row">
+        <mat-form-field appearance="outline">
+          <mat-label>{{ 'orders.create.orderNumber' | translate }}</mat-label>
+          <input matInput formControlName="order_number" [placeholder]="'orders.create.orderNumberPlaceholder' | translate" />
+          @if (form.controls.order_number.hasError('required')) {
+            <mat-error>{{ 'orders.create.errors.required' | translate }}</mat-error>
+          }
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>{{ 'orders.create.supplier' | translate }}</mat-label>
+          <mat-select formControlName="supplier_id">
+            @for (s of suppliers(); track s.id) {
+              <mat-option [value]="s.id">{{ s.name }}</mat-option>
+            }
+          </mat-select>
+          @if (form.controls.supplier_id.hasError('required')) {
+            <mat-error>{{ 'orders.create.errors.required' | translate }}</mat-error>
+          }
+        </mat-form-field>
+      </div>
+
+      <div class="form-row">
+        <mat-form-field appearance="outline">
+          <mat-label>{{ 'orders.create.orderDate' | translate }}</mat-label>
+          <input matInput [matDatepicker]="orderDatePicker" formControlName="order_date" />
+          <mat-datepicker-toggle matIconSuffix [for]="orderDatePicker"></mat-datepicker-toggle>
+          <mat-datepicker #orderDatePicker></mat-datepicker>
+          @if (form.controls.order_date.hasError('required')) {
+            <mat-error>{{ 'orders.create.errors.required' | translate }}</mat-error>
+          }
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>{{ 'orders.create.expectedDeliveryDate' | translate }}</mat-label>
+          <input matInput [matDatepicker]="deliveryDatePicker" formControlName="expected_delivery_date" />
+          <mat-datepicker-toggle matIconSuffix [for]="deliveryDatePicker"></mat-datepicker-toggle>
+          <mat-datepicker #deliveryDatePicker></mat-datepicker>
+        </mat-form-field>
+      </div>
+
+      <div class="form-row">
+        <mat-form-field appearance="outline">
+          <mat-label>{{ 'orders.create.currency' | translate }}</mat-label>
+          <input matInput formControlName="currency" [placeholder]="'orders.create.currencyPlaceholder' | translate" />
+          @if (form.controls.currency.hasError('required')) {
+            <mat-error>{{ 'orders.create.errors.required' | translate }}</mat-error>
+          }
+          @if (form.controls.currency.hasError('pattern')) {
+            <mat-error>{{ 'orders.create.errors.currencyFormat' | translate }}</mat-error>
+          }
+        </mat-form-field>
+      </div>
+
+      <h2 class="section-title">{{ 'orders.create.lines' | translate }}</h2>
+
+      <div class="lines-container" formArrayName="lines">
+        @for (line of lines.controls; track line; let i = $index) {
+          <mat-card class="line-card" [formGroupName]="i">
+            <div class="line-header">
+              <h3>{{ 'orders.create.linePrefix' | translate }} {{ i + 1 }}</h3>
+              <button mat-icon-button type="button" color="warn" (click)="removeLine(i)" [attr.aria-label]="'orders.create.removeLine' | translate">
+                <mat-icon>delete</mat-icon>
+              </button>
+            </div>
+
+            <div class="form-row">
+              <mat-form-field appearance="outline">
+                <mat-label>{{ 'orders.create.product' | translate }}</mat-label>
+                <mat-select formControlName="workspace_product_id" (selectionChange)="onProductSelected(i, $event.value)">
+                  <mat-option [value]="null">{{ 'orders.create.noProduct' | translate }}</mat-option>
+                  @for (p of products(); track p.id) {
+                    <mat-option [value]="p.id">{{ p.tenant_name }}</mat-option>
+                  }
+                </mat-select>
+              </mat-form-field>
+
+              <mat-form-field appearance="outline">
+                <mat-label>{{ 'orders.create.description' | translate }}</mat-label>
+                <input matInput formControlName="description" />
+                @if (line.controls.description.hasError('required')) {
+                  <mat-error>{{ 'orders.create.errors.required' | translate }}</mat-error>
+                }
+              </mat-form-field>
+            </div>
+
+            <div class="form-row">
+              <mat-form-field appearance="outline">
+                <mat-label>{{ 'orders.create.quantity' | translate }}</mat-label>
+                <input matInput type="number" step="0.01" formControlName="quantity" />
+                @if (line.controls.quantity.hasError('required')) {
+                  <mat-error>{{ 'orders.create.errors.required' | translate }}</mat-error>
+                }
+                @if (line.controls.quantity.hasError('min')) {
+                  <mat-error>{{ 'orders.create.errors.positiveQuantity' | translate }}</mat-error>
+                }
+              </mat-form-field>
+
+              <mat-form-field appearance="outline">
+                <mat-label>{{ 'orders.create.baseUnit' | translate }}</mat-label>
+                <input matInput formControlName="base_unit" />
+                @if (line.controls.base_unit.hasError('required')) {
+                  <mat-error>{{ 'orders.create.errors.required' | translate }}</mat-error>
+                }
+              </mat-form-field>
+            </div>
+
+            <div class="form-row">
+              <mat-form-field appearance="outline">
+                <mat-label>{{ 'orders.create.unitPrice' | translate }}</mat-label>
+                <input matInput type="number" step="0.01" formControlName="unit_price" />
+                @if (line.controls.unit_price.hasError('required')) {
+                  <mat-error>{{ 'orders.create.errors.required' | translate }}</mat-error>
+                }
+                @if (line.controls.unit_price.hasError('min')) {
+                  <mat-error>{{ 'orders.create.errors.nonNegativePrice' | translate }}</mat-error>
+                }
+              </mat-form-field>
+
+              <mat-form-field appearance="outline">
+                <mat-label>{{ 'orders.create.lineTax' | translate }}</mat-label>
+                <input matInput type="number" step="0.01" formControlName="line_tax" />
+                @if (line.controls.line_tax.hasError('min')) {
+                  <mat-error>{{ 'orders.create.errors.nonNegativePrice' | translate }}</mat-error>
+                }
+              </mat-form-field>
+            </div>
+          </mat-card>
+        }
+      </div>
+
+      <div class="actions actions-start">
+        <button mat-stroked-button type="button" (click)="addLine()">
+          <mat-icon>add</mat-icon>
+          {{ 'orders.create.addLine' | translate }}
+        </button>
+      </div>
+
+      <mat-card class="totals-card">
+        <div>
+          <span>{{ 'orders.create.linesTotalLabel' | translate }}:</span>
+          <span>{{ form.value.currency || 'USD' }} {{ computedTotals().linesTotal | number:'1.2-2' }}</span>
+        </div>
+        <div class="tax-row">
+          <span>{{ 'orders.create.orderTax' | translate }}:</span>
+          <mat-form-field appearance="outline" subscriptSizing="dynamic" class="tax-field">
+            <input matInput type="number" step="0.01" formControlName="order_tax" />
+          </mat-form-field>
+        </div>
+        <div class="grand-total">
+          <span>{{ 'orders.create.orderTotal' | translate }}:</span>
+          <span>{{ form.value.currency || 'USD' }} {{ computedTotals().orderTotal | number:'1.2-2' }}</span>
+        </div>
+      </mat-card>
+
+      <div class="actions">
+        <button mat-button type="button" routerLink="/orders" [disabled]="isSubmitting()">
+          {{ 'common.cancel' | translate }}
+        </button>
+        <button mat-flat-button color="primary" type="submit" [disabled]="form.invalid || lines.length === 0 || isSubmitting()">
+          @if (isSubmitting()) {
+            {{ 'orders.create.submitting' | translate }}
+          } @else {
+            {{ 'orders.create.submit' | translate }}
+          }
+        </button>
+      </div>
+    </mat-card>
+  </form>
+</div>

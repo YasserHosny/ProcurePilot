@@ -7,13 +7,13 @@ import type { ApiError } from '../../core/api/models';
 
 export type { ApiError };
 
-export type AccountingProvider = 'quickbooks';
+export type AccountingProvider = 'quickbooks' | 'xero';
 
 export type AccountingConnectionStatus = 'active' | 'needs_reauth' | 'disconnected';
 
 export interface AccountingConnection {
   id: string;
-  provider: 'quickbooks';
+  provider: AccountingProvider;
   display_name: string;
   status: 'active' | 'needs_reauth' | 'disconnected';
   connected_at: string;
@@ -165,7 +165,7 @@ export class AccountingApiService {
   private readonly base = environment.apiBaseUrl;
 
   /**
-   * Starts the QuickBooks OAuth authorization flow.
+   * Starts the configured accounting provider OAuth authorization flow.
    * Returns the authorization URL that the client should redirect to.
    * On failure, emits an error matching {@link ApiError}.
    */

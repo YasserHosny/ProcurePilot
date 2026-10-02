@@ -71,7 +71,7 @@
             <th mat-header-cell *matHeaderCellDef>
               {{ 'requests.columns.branch' | translate }}
             </th>
-            <td mat-cell *matCellDef="let req">{{ req.branch_id }}</td>
+            <td mat-cell *matCellDef="let req">{{ getBranchName(req.branch_id) }}</td>
           </ng-container>
 
           <ng-container matColumnDef="status">

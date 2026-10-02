@@ -1,5 +1,5 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
@@ -17,14 +17,21 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatTableModule } from '@angular/material/table';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
+import { forkJoin, of } from 'rxjs';
+import { catchError } from 'rxjs/operators';
 
+import { ApiService } from '../../../core/api/api.service';
 import type {
   ApiError,
   ApprovalDecisionInput,
+  Branch,
+  BranchList,
+  Product,
   PurchaseRequest,
   PurchaseRequestLine,
 } from '../../../core/api/models';
 import { RequestsApiService } from '../../requests/requests-api';
+import { OrganisationApiService } from '../../settings/organisation-api';
 import { ApprovalsApiService } from '../approvals-api';
 
 const I18N = 'approvals';
@@ -140,12 +147,16 @@ export class ApprovalDecisionDialogComponent {
 export class ApprovalQueueComponent implements OnInit {
   private readonly approvalsApi = inject(ApprovalsApiService);
   private readonly requestsApi = inject(RequestsApiService);
+  private readonly organisationApi = inject(OrganisationApiService);
+  private readonly api = inject(ApiService);
   private readonly dialog = inject(MatDialog);
   private readonly snackBar = inject(MatSnackBar);
   private readonly translate = inject(TranslateService);
 
   readonly isLoading = signal<boolean>(true);
   readonly pendingRequests = signal<PurchaseRequest[]>([]);
+  readonly branches = signal<Branch[]>([]);
+  readonly products = signal<Product[]>([]);
   readonly errorMessage = signal<string | null>(null);
   readonly errorTraceId = signal<string | null>(null);
   readonly expandedRequestIds = signal<ReadonlySet<string>>(new Set<string>());
@@ -162,6 +173,22 @@ export class ApprovalQueueComponent implements OnInit {
     'actions',
   ];
 
+  readonly branchNameById = computed<Map<string, string>>(() => {
+    const byId = new Map<string, string>();
+    for (const branch of this.branches()) {
+      byId.set(branch.id, branch.name);
+    }
+    return byId;
+  });
+
+  readonly productNameById = computed<Map<string, string>>(() => {
+    const byId = new Map<string, string>();
+    for (const product of this.products()) {
+      byId.set(product.id, product.tenant_name);
+    }
+    return byId;
+  });
+
   ngOnInit(): void {
     this.loadPendingApprovals();
   }
@@ -171,9 +198,15 @@ export class ApprovalQueueComponent implements OnInit {
     this.errorMessage.set(null);
     this.errorTraceId.set(null);
 
-    this.approvalsApi.listPendingApprovals({ limit: 50 }).subscribe({
-      next: (res) => {
-        this.pendingRequests.set([...res.items]);
+    forkJoin({
+      approvals: this.approvalsApi.listPendingApprovals({ limit: 50 }),
+      branches: this.loadBranches(),
+      products: this.loadProducts(),
+    }).subscribe({
+      next: ({ approvals, branches, products }) => {
+        this.pendingRequests.set([...approvals.items]);
+        this.branches.set([...branches.items]);
+        this.products.set([...products.items]);
         this.isLoading.set(false);
       },
       error: (err: unknown) => {
@@ -262,6 +295,36 @@ export class ApprovalQueueComponent implements OnInit {
       return this.translate.instant(`${I18N}.notAvailable`);
     }
     return `${line.estimated_unit_price.currency} ${line.estimated_unit_price.amount}`;
+  }
+
+  getBranchName(branchId: string): string {
+    return this.branchNameById().get(branchId) ?? branchId;
+  }
+
+  getProductName(productId: string): string {
+    return this.productNameById().get(productId) ?? productId;
+  }
+
+  private loadBranches() {
+    return this.organisationApi.listBranches({ limit: 100 }).pipe(
+      catchError(() =>
+        of<BranchList>({
+          items: [],
+          next_cursor: null,
+        }),
+      ),
+    );
+  }
+
+  private loadProducts() {
+    return this.api.products({ status: 'all', limit: 100 }).pipe(
+      catchError(() =>
+        of<{ items: Product[]; next_cursor: string | null }>({
+          items: [],
+          next_cursor: null,
+        }),
+      ),
+    );
   }
 
   private handleError(err: unknown): void {

@@ -235,6 +235,42 @@ class RequestsService:
             client, request_row, line_rows, step_row
         )
 
+    def validate_approved_request_for_order(
+        self,
+        *,
+        bearer_token: str,
+        request_id: UUID,
+    ) -> PurchaseRequest:
+        client = authenticated_client(self._settings, bearer_token)
+        request_row = self._fetch_request(client, request_id)
+        rid = str(request_id)
+
+        try:
+            response = (
+                client.table("approval_step")
+                .select(STEP_COLUMNS)
+                .eq("purchase_request_id", rid)
+                .eq("status", "approved")
+                .not_.is_("decided_by_membership_id", "null")
+                .not_.is_("decided_at", "null")
+                .limit(1)
+                .execute()
+            )
+        except APIError as exc:
+            raise ServiceUnavailableError(
+                details={"dependency": "database"}
+            ) from exc
+
+        rows = _rows(response.data)
+        if not rows:
+            raise ConflictError(details={"reason": "request_not_approved"})
+
+        step_row = rows[0]
+        line_rows = self._fetch_lines_for(client, rid)
+        return self._purchase_request_with_budget_status(
+            client, request_row, line_rows, step_row
+        )
+
     def list_requests(
         self,
         *,

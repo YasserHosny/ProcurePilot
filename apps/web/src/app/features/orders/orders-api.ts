@@ -151,6 +151,30 @@ export interface DeliveryReceiptCreate {
   }[];
 }
 
+export interface PurchaseOrderLineInput {
+  line_number: number;
+  workspace_product_id: string | null;
+  description: string;
+  ordered_quantity: string;
+  base_unit: string;
+  unit_price: Money;
+  tax: Money;
+  line_total: Money;
+}
+
+export interface PurchaseOrderCreate {
+  order_number: string;
+  supplier_id: string;
+  order_date: string;
+  expected_delivery_date: string | null;
+  total: Money;
+  tax: Money;
+  source_kind: 'manual';
+  source_reference: string;
+  source_hash?: string | null;
+  lines: PurchaseOrderLineInput[];
+}
+
 @Injectable({ providedIn: 'root' })
 export class OrdersApiService {
   private readonly http = inject(HttpClient);
@@ -193,6 +217,13 @@ export class OrdersApiService {
       payload,
       { headers: this.idempotencyHeaders() },
     );
+  }
+
+  createOrder(payload: PurchaseOrderCreate, idempotencyKey?: string): Observable<PurchaseOrder> {
+    const headers = idempotencyKey
+      ? new HttpHeaders({ 'Idempotency-Key': idempotencyKey })
+      : this.idempotencyHeaders();
+    return this.http.post<PurchaseOrder>(`${this.base}/orders`, payload, { headers });
   }
 
   private idempotencyHeaders(): HttpHeaders {

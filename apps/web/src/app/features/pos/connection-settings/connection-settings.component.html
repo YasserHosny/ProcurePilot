@@ -37,6 +37,7 @@
       </div>
       <div class="empty-actions">
         <button
+          *appRole="'owner'"
           mat-flat-button
           color="primary"
           type="button"
@@ -52,6 +53,15 @@
           }
           <span>{{ 'pos.connection.empty.connect' | translate }}</span>
         </button>
+        <div
+          *appRole="['buyer', 'approver', 'viewer', 'branch_manager']"
+          class="owner-notice"
+          role="note"
+          data-testid="owner-notice"
+        >
+          <mat-icon aria-hidden="true">info</mat-icon>
+          <span>{{ 'pos.connection.ownerOnly' | translate }}</span>
+        </div>
       </div>
     </mat-card>
   } @else {

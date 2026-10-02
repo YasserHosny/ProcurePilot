@@ -382,11 +382,15 @@
               data-testid="load-more-btn"
             >
               @if (isLoadingMore()) {
-                <mat-spinner diameter="18" [attr.aria-label]="'accounting.discrepancies.pagination.loadingMore' | translate" />
-                <span>{{ 'accounting.discrepancies.pagination.loadingMore' | translate }}</span>
+                <ng-container>
+                  <mat-spinner diameter="18" [attr.aria-label]="'accounting.discrepancies.pagination.loadingMore' | translate" />
+                  <span>{{ 'accounting.discrepancies.pagination.loadingMore' | translate }}</span>
+                </ng-container>
               } @else {
-                <mat-icon aria-hidden="true">expand_more</mat-icon>
-                <span>{{ 'accounting.discrepancies.pagination.loadMore' | translate }}</span>
+                <ng-container>
+                  <mat-icon aria-hidden="true">expand_more</mat-icon>
+                  <span>{{ 'accounting.discrepancies.pagination.loadMore' | translate }}</span>
+                </ng-container>
               }
             </button>
           } @else {

@@ -68,7 +68,16 @@
             <div class="line-row">
               <mat-form-field appearance="outline" class="line-product">
                 <mat-label>{{ 'requests.form.productLabel' | translate }}</mat-label>
-                <input matInput [formControl]="lineGroup.controls.workspace_product_id" />
+                <mat-select [formControl]="lineGroup.controls.workspace_product_id">
+                  @if (lineGroup.controls.workspace_product_id.value && !hasProductName(lineGroup.controls.workspace_product_id.value)) {
+                    <mat-option [value]="lineGroup.controls.workspace_product_id.value">
+                      {{ lineGroup.controls.workspace_product_id.value }}
+                    </mat-option>
+                  }
+                  @for (product of products(); track product.id) {
+                    <mat-option [value]="product.id">{{ product.tenant_name }}</mat-option>
+                  }
+                </mat-select>
               </mat-form-field>
 
               <mat-form-field appearance="outline" class="line-quantity">

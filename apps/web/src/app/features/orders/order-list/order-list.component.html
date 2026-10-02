@@ -4,10 +4,16 @@
       <h1>{{ 'orders.title' | translate }}</h1>
       <p>{{ 'orders.subtitle' | translate }}</p>
     </div>
-    <button mat-stroked-button type="button" (click)="loadOrders()" [disabled]="isLoading()" data-testid="orders-refresh">
-      <mat-icon aria-hidden="true">refresh</mat-icon>
-      {{ 'orders.refresh' | translate }}
-    </button>
+    <div class="header-actions">
+      <button mat-stroked-button type="button" (click)="loadOrders()" [disabled]="isLoading()" data-testid="orders-refresh">
+        <mat-icon aria-hidden="true">refresh</mat-icon>
+        {{ 'orders.refresh' | translate }}
+      </button>
+      <a *appRole="['owner', 'buyer']" mat-flat-button color="primary" routerLink="/orders/new" data-testid="order-create-btn">
+        <mat-icon aria-hidden="true">add</mat-icon>
+        {{ 'orders.createButton' | translate }}
+      </a>
+    </div>
   </div>
 
   @if (errorMessage(); as error) {
