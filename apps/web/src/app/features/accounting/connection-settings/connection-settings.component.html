@@ -37,6 +37,7 @@
       </div>
       <div class="empty-actions">
         <button
+          *appRole="'owner'"
           mat-flat-button
           color="primary"
           type="button"
@@ -52,6 +53,15 @@
           }
           <span>{{ 'accounting.connection.empty.connect' | translate }}</span>
         </button>
+        <div
+          *appRole="['buyer', 'approver', 'viewer', 'branch_manager']"
+          class="owner-notice"
+          role="note"
+          data-testid="owner-notice"
+        >
+          <mat-icon aria-hidden="true">info</mat-icon>
+          <span>{{ 'accounting.connection.ownerOnly' | translate }}</span>
+        </div>
       </div>
     </mat-card>
   } @else {
@@ -93,7 +103,7 @@
               <mat-icon class="provider-icon" aria-hidden="true">account_balance</mat-icon>
               <div class="header-titles">
                 <h2 class="card-title" data-testid="connection-display-name">{{ conn.display_name }}</h2>
-                <span class="provider-subtitle">{{ 'accounting.connection.providerQuickbooks' | translate }}</span>
+                <span class="provider-subtitle" data-testid="connection-provider-label">{{ getProviderLabel(conn.provider) }}</span>
               </div>
             </div>
             <span

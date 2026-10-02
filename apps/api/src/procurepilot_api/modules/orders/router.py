@@ -12,7 +12,9 @@ from procurepilot_api.modules.orders.schemas import (
     OrderEvidenceProjection,
     PurchaseOrder,
     PurchaseOrderCreate,
+    PurchaseOrderDraftUpdate,
     PurchaseOrderList,
+    RequestAllocation,
     SupplierConfirmationCreate,
 )
 from procurepilot_api.modules.orders.service import OrdersService, get_orders_service
@@ -43,6 +45,18 @@ def create_order(
     if not created:
         response.status_code = status.HTTP_200_OK
     return result
+
+
+@router.get("/orders/allocations", response_model=RequestAllocation)
+def get_allocations(
+    source_request_id: UUID,
+    token: Annotated[str, Depends(bearer_token)],
+    _member: Annotated[CurrentMember, Depends(current_member)],
+    service: Annotated[OrdersService, Depends(get_orders_service)],
+) -> RequestAllocation:
+    return service.get_request_allocation(
+        bearer_token=token, member=_member, source_request_id=source_request_id
+    )
 
 
 @router.get("/orders", response_model=PurchaseOrderList)
@@ -78,6 +92,44 @@ def submit_order(
 ) -> PurchaseOrder:
     return service.submit_order(
         bearer_token=token, member=member, order_id=order_id, idempotency_key=idempotency_key
+    )
+
+
+@router.put("/orders/{order_id}", response_model=PurchaseOrder)
+@mutation_limiter.limit(_order_limit)
+def update_draft_order(
+    request: Request,
+    order_id: UUID,
+    payload: Annotated[PurchaseOrderDraftUpdate, Body()],
+    token: Annotated[str, Depends(bearer_token)],
+    member: Annotated[CurrentMember, Depends(require_role(*WRITE_ROLES))],
+    service: Annotated[OrdersService, Depends(get_orders_service)],
+    idempotency_key: Annotated[UUID | None, Header(alias="Idempotency-Key")] = None,
+) -> PurchaseOrder:
+    return service.update_draft_order(
+        bearer_token=token,
+        member=member,
+        order_id=order_id,
+        payload=payload,
+        idempotency_key=idempotency_key,
+    )
+
+
+@router.post("/orders/{order_id}/cancel", response_model=PurchaseOrder)
+@mutation_limiter.limit(_order_limit)
+def cancel_order(
+    request: Request,
+    order_id: UUID,
+    token: Annotated[str, Depends(bearer_token)],
+    member: Annotated[CurrentMember, Depends(require_role(*WRITE_ROLES))],
+    service: Annotated[OrdersService, Depends(get_orders_service)],
+    idempotency_key: Annotated[UUID | None, Header(alias="Idempotency-Key")] = None,
+) -> PurchaseOrder:
+    return service.cancel_order(
+        bearer_token=token,
+        member=member,
+        order_id=order_id,
+        idempotency_key=idempotency_key,
     )
 
 

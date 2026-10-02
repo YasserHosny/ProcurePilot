@@ -55,7 +55,7 @@
               {{ 'approvals.columns.branch' | translate }}
             </th>
             <td mat-cell *matCellDef="let req" class="branch-cell">
-              {{ req.branch_id }}
+              {{ getBranchName(req.branch_id) }}
             </td>
           </ng-container>
 
@@ -188,7 +188,7 @@
                         <tbody>
                           @for (line of req.lines; track line.id) {
                             <tr class="line-item-row">
-                              <td class="product-col">{{ line.workspace_product_id }}</td>
+                              <td class="product-col">{{ getProductName(line.workspace_product_id) }}</td>
                               <td class="quantity-col">{{ line.quantity }}</td>
                               <td class="price-col">{{ formatLinePrice(line) }}</td>
                               <td class="note-col">

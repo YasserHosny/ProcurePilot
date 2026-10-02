@@ -14,6 +14,7 @@ import { FormatDatePipe } from '../../../core/format/date.pipe';
 import {
   AccountingApiService,
   type AccountingConnection,
+  type AccountingProvider,
 } from '../accounting-api';
 
 @Component({
@@ -122,6 +123,10 @@ export class ConnectionSettingsComponent implements OnInit {
 
   redirectToUrl(url: string): void {
     window.location.href = url;
+  }
+
+  getProviderLabel(provider: AccountingProvider): string {
+    return this.translate.instant(`accounting.connection.providers.${provider}`);
   }
 
   private handleOAuthCallbackParams(): void {

@@ -1163,6 +1163,63 @@ exception is member removal, which re-routes a still-`pending` step to the owner
 `approval_step_scoped_visibility` (RESTRICTIVE, SELECT-only): owner sees all; the assignee sees
 their own step; the requester sees the step on their own request.
 
+## `PurchaseOrder`
+
+Internal tenant-scoped order evidence. Purchase orders are prepared and submitted inside
+ProcurePilot only; no provider-send/write/cancel method exists.
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | uuid | PK, default `gen_random_uuid()` |
+| `tenant_id` | uuid | Required FK -> Tenant; RLS key |
+| `order_number` | text | Required, unique per tenant |
+| `supplier_id` | uuid | Required composite FK -> Supplier `(tenant_id, id)` |
+| `status` | enum | `draft`, `submitted`, `confirmed`, `partially_received`, `received`, `cancelled`, or `closed`; default `draft` |
+| `order_date` | date | Required |
+| `expected_delivery_date` | date | Optional; cannot precede `order_date` |
+| `total_amount` / `total_currency` | numeric(18,4) / text | Required explicit order total and currency |
+| `tax_amount` / `tax_currency` | numeric(18,4) / text | Required explicit tax and currency; non-zero tax must use `total_currency` |
+| `source_kind` | text | `manual`, `import`, or `provider`; current draft-from-request flow uses `manual` |
+| `source_reference` | text | Required provenance reference |
+| `source_hash` | text | Optional provenance hash |
+| `source_request_id` | uuid | Nullable composite FK -> PurchaseRequest `(tenant_id, id)`. One PO references at most one request; many POs may split one request |
+| `created_by` | uuid | Required composite FK -> Membership `(tenant_id, id)` |
+| `submit_idempotency_key` | uuid | Nullable unique per tenant |
+| `edit_idempotency_key` | uuid | Nullable unique per tenant |
+| `cancel_idempotency_key` | uuid | Nullable unique per tenant |
+| `created_at` / `updated_at` | timestamptz | Audit fields |
+
+State transitions for US4: create yields `draft`; `PUT /orders/{id}` may edit only `draft`;
+`POST /orders/{id}/submit` moves `draft -> submitted`; `POST /orders/{id}/cancel` moves a
+cancellable order to `cancelled`. Cancellation is internal and preserves receipt/confirmation
+evidence.
+
+## `PurchaseOrderLine`
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | uuid | PK, default `gen_random_uuid()` |
+| `tenant_id` | uuid | Required FK -> Tenant; RLS key |
+| `purchase_order_id` | uuid | Required composite FK -> PurchaseOrder `(tenant_id, id)`, `on delete cascade` |
+| `line_number` | integer | Required, unique per order |
+| `workspace_product_id` | uuid | Optional composite FK -> WorkspaceProduct `(tenant_id, id)` |
+| `description` | text | Required |
+| `ordered_quantity` | numeric(18,6) | Required non-negative ordered/reserved quantity |
+| `base_unit` | text | Required FK -> `supported_base_unit(code)` |
+| `unit_price_amount` / `unit_price_currency` | numeric(18,4) / text | Required buyer-entered actual price and currency |
+| `tax_amount` / `tax_currency` | numeric(18,4) / text | Required buyer-entered tax and currency |
+| `line_total_amount` / `line_total_currency` | numeric(18,4) / text | Required explicit line total and currency |
+| `source_request_id` | uuid | Nullable mirror of the parent order's `source_request_id` for composite FK enforcement |
+| `source_request_line_id` | uuid | Nullable request-line traceability FK |
+| `created_at` / `updated_at` | timestamptz | Audit fields |
+
+Request linkage is all-or-nothing at line level: both `source_request_id` and
+`source_request_line_id` are null for manual orders, or both are populated for request-derived
+orders. Composite FKs enforce that the line's `source_request_id` matches the parent PO header and
+that `source_request_line_id` belongs to that same purchase request:
+`(tenant_id, purchase_order_id, source_request_id) -> purchase_order` and
+`(tenant_id, source_request_id, source_request_line_id) -> purchase_request_line`.
+
 ## `ThresholdRule`
 
 | Field | Type | Notes |

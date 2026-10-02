@@ -71,7 +71,7 @@
             <th mat-header-cell *matHeaderCellDef>
               {{ 'requests.columns.branch' | translate }}
             </th>
-            <td mat-cell *matCellDef="let req">{{ req.branch_id }}</td>
+            <td mat-cell *matCellDef="let req">{{ getBranchName(req.branch_id) }}</td>
           </ng-container>
 
           <ng-container matColumnDef="status">
@@ -112,6 +112,20 @@
                 >
                   <mat-icon aria-hidden="true">visibility</mat-icon>
                 </button>
+
+                @if (canCreateOrder(req)) {
+                  <button
+                    *appRole="['owner', 'buyer']"
+                    mat-icon-button
+                    type="button"
+                    (click)="navigateToCreateOrder(req); $event.stopPropagation()"
+                    [attr.aria-label]="'requests.actions.createOrder' | translate"
+                    [matTooltip]="'requests.actions.createOrder' | translate"
+                    color="primary"
+                  >
+                    <mat-icon aria-hidden="true">shopping_cart</mat-icon>
+                  </button>
+                }
 
                 @if (req.status === 'draft' || req.status === 'submitted') {
                   <button

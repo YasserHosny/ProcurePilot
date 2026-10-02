@@ -1313,7 +1313,13 @@ export interface BranchRoleAssignmentCreate {
 
 // --- requests + approvals (008) ---------------------------------------------
 
-export type PurchaseRequestStatus = 'draft' | 'submitted' | 'approved' | 'rejected' | 'withdrawn';
+export type PurchaseRequestStatus =
+  | 'draft'
+  | 'submitted'
+  | 'approved'
+  | 'ordered'
+  | 'rejected'
+  | 'withdrawn';
 export type ApprovalStepStatus = 'pending' | 'approved' | 'rejected';
 export type ApprovalStepSource = 'threshold_match' | 'delegate' | 'owner_fallback';
 

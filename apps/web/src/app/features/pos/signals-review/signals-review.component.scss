@@ -46,6 +46,15 @@
   gap: 0.5rem;
 }
 
+.read-only-notice,
+.read-only-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: #64748b;
+  font-size: 0.8125rem;
+}
+
 .loading-wrap {
   display: flex;
   justify-content: center;

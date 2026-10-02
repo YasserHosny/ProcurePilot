@@ -15,6 +15,7 @@ import { forkJoin } from 'rxjs';
 
 import { ApiService } from '../../../core/api/api.service';
 import type { Product } from '../../../core/api/models';
+import { RoleDirective } from '../../../core/auth/role.directive';
 import { FormatDatePipe } from '../../../core/format/date.pipe';
 import {
   PosApiService,
@@ -37,6 +38,7 @@ import {
     MatTableModule,
     TranslatePipe,
     FormatDatePipe,
+    RoleDirective,
   ],
   templateUrl: './signals-review.component.html',
   styleUrl: './signals-review.component.scss',

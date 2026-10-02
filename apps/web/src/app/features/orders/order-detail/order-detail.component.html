@@ -41,13 +41,33 @@
     <mat-card class="actions-card">
       <div class="section-heading"><div><h2>{{ 'orders.detail.actionsTitle' | translate }}</h2><p>{{ 'orders.detail.actionsSubtitle' | translate }}</p></div></div>
       <div class="actions">
-        @if (data.order.status === 'draft') { <button mat-flat-button color="primary" type="button" (click)="submitOrder()" [disabled]="isSaving()" data-testid="submit-order"><mat-icon aria-hidden="true">send</mat-icon>{{ 'orders.detail.submit' | translate }}</button> }
-        @if (data.order.status !== 'cancelled' && data.order.status !== 'closed') {
+        @if (data.order.status === 'draft') {
+          <button mat-stroked-button color="primary" type="button" [routerLink]="['/orders', data.order.id, 'edit']" [disabled]="isSaving()" data-testid="edit-order">
+            <mat-icon aria-hidden="true">edit</mat-icon>{{ 'orders.detail.edit' | translate }}
+          </button>
+          <button mat-stroked-button color="warn" type="button" (click)="cancelOrder()" [disabled]="isSaving()" data-testid="cancel-order">
+            <mat-icon aria-hidden="true">cancel</mat-icon>{{ 'orders.detail.cancel' | translate }}
+          </button>
+          <button mat-flat-button color="primary" type="button" (click)="submitOrder()" [disabled]="isSaving()" data-testid="submit-order">
+            <mat-icon aria-hidden="true">send</mat-icon>{{ 'orders.detail.submit' | translate }}
+          </button>
+        }
+        @if (data.order.status !== 'cancelled' && data.order.status !== 'closed' && data.order.status !== 'draft') {
           <button mat-stroked-button type="button" (click)="confirmationOpen.set(!confirmationOpen())" [disabled]="isSaving()" data-testid="open-confirmation-form"><mat-icon aria-hidden="true">handshake</mat-icon>{{ 'orders.detail.recordConfirmation' | translate }}</button>
           <button mat-stroked-button type="button" (click)="receiptOpen.set(!receiptOpen())" [disabled]="isSaving()" data-testid="open-receipt-form"><mat-icon aria-hidden="true">inventory_2</mat-icon>{{ 'orders.detail.recordReceipt' | translate }}</button>
         }
       </div>
 
+      @if (cancelOpen()) {
+        <div class="evidence-form cancel-form">
+          <h3>{{ 'orders.detail.cancelConfirmTitle' | translate }}</h3>
+          <p>{{ 'orders.detail.cancelConfirmMessage' | translate }}</p>
+          <div class="actions">
+            <button mat-button type="button" (click)="cancelOpen.set(false)" [disabled]="isSaving()">{{ 'common.cancel' | translate }}</button>
+            <button mat-flat-button color="warn" type="button" (click)="confirmCancel()" [disabled]="isSaving()" data-testid="confirm-cancel">{{ 'orders.detail.cancelOrder' | translate }}</button>
+          </div>
+        </div>
+      }
       @if (confirmationOpen()) {
         <form class="evidence-form" (ngSubmit)="recordConfirmation()">
           <h3>{{ 'orders.detail.confirmationFormTitle' | translate }}</h3>

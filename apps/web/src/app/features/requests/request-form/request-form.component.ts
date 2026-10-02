@@ -25,6 +25,7 @@ import type {
   CostCentre,
   CostCentreList,
   Member,
+  Product,
   PurchaseRequest,
   PurchaseRequestLine,
 } from '../../../core/api/models';
@@ -76,6 +77,7 @@ export class RequestFormComponent implements OnInit {
   readonly branches = signal<Branch[]>([]);
   readonly costCentres = signal<CostCentre[]>([]);
   readonly members = signal<Member[]>([]);
+  readonly products = signal<Product[]>([]);
   readonly existingRequest = signal<PurchaseRequest | null>(null);
   readonly isEditMode = signal<boolean>(false);
 
@@ -83,6 +85,14 @@ export class RequestFormComponent implements OnInit {
     const byId = new Map<string, string>();
     for (const member of this.members()) {
       byId.set(member.id, member.email);
+    }
+    return byId;
+  });
+
+  readonly productNameById = computed<Map<string, string>>(() => {
+    const byId = new Map<string, string>();
+    for (const product of this.products()) {
+      byId.set(product.id, product.tenant_name);
     }
     return byId;
   });
@@ -114,6 +124,7 @@ export class RequestFormComponent implements OnInit {
     forkJoin({
       branches: this.loadBranches(),
       costCentres: this.loadCostCentres(),
+      products: this.loadProducts(),
       request: requestId ? this.loadRequest(requestId) : of(null),
     })
       .pipe(
@@ -228,6 +239,10 @@ export class RequestFormComponent implements OnInit {
     return `${line.estimated_unit_price.currency} ${line.estimated_unit_price.amount}`;
   }
 
+  hasProductName(productId: string): boolean {
+    return this.productNameById().has(productId);
+  }
+
   private loadBranches(): Observable<BranchList> {
     return this.organisationApi
       .listBranches({ is_active: true })
@@ -252,6 +267,20 @@ export class RequestFormComponent implements OnInit {
         ),
       )
       .subscribe((res) => this.members.set([...res.items]));
+  }
+
+  private loadProducts(): Observable<{ items: Product[]; next_cursor: string | null }> {
+    return this.api
+      .products({ status: 'all', limit: 100 })
+      .pipe(
+        catchError(() =>
+          of<{ items: Product[]; next_cursor: string | null }>({
+            items: [],
+            next_cursor: null,
+          }),
+        ),
+        tap((res) => this.products.set([...res.items])),
+      );
   }
 
   private loadRequest(requestId: string): Observable<PurchaseRequest> {

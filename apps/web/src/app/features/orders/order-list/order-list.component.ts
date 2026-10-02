@@ -6,6 +6,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { RouterLink } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
+import { RoleDirective } from '../../../core/auth/role.directive';
 import { FormatDatePipe } from '../../../core/format/date.pipe';
 import { FormatMoneyPipe } from '../../../core/format/money.pipe';
 import { OrdersApiService, type OrderStatus, type PurchaseOrder } from '../orders-api';
@@ -22,6 +23,7 @@ import { OrdersApiService, type OrderStatus, type PurchaseOrder } from '../order
     TranslatePipe,
     FormatDatePipe,
     FormatMoneyPipe,
+    RoleDirective,
   ],
   templateUrl: './order-list.component.html',
   styleUrl: './order-list.component.scss',

@@ -52,6 +52,16 @@ describe('ConnectionSettingsComponent (T016)', () => {
     disconnected_at: '2026-09-01T12:00:00Z',
   };
 
+  const mockXeroConnection: AccountingConnection = {
+    id: 'conn-004',
+    provider: 'xero',
+    display_name: 'Acme Xero Organisation',
+    status: 'active',
+    connected_at: '2026-09-18T08:00:00Z',
+    last_synced_at: null,
+    disconnected_at: null,
+  };
+
   beforeEach(async () => {
     mockRoleSignal = signal<Role | null>('owner');
     snackBarSpy = jasmine.createSpyObj('MatSnackBar', ['open']);
@@ -100,6 +110,15 @@ describe('ConnectionSettingsComponent (T016)', () => {
     translate.setTranslation('en', {
       accounting: {
         connection: {
+          empty: {
+            title: 'Connect your accounting system',
+            description: 'Link the configured accounting provider.',
+            connect: 'Connect accounting',
+          },
+          providers: {
+            quickbooks: 'QuickBooks Online',
+            xero: 'Xero',
+          },
           neverSynced: 'Never synced yet',
           status: {
             active: 'Active',
@@ -129,6 +148,7 @@ describe('ConnectionSettingsComponent (T016)', () => {
 
   describe('Initial load empty state (404 / never connected)', () => {
     it('should show "Connect your accounting system" empty state with Connect button when getConnection 404s', () => {
+      mockRoleSignal.set('owner');
       fixture.detectChanges();
 
       const req = httpTestingController.expectOne('/api/v1/accounting/connection');
@@ -150,8 +170,30 @@ describe('ConnectionSettingsComponent (T016)', () => {
       const connectBtn = fixture.debugElement.query(By.css('[data-testid="connect-btn"]'));
       expect(connectBtn).not.toBeNull();
 
+      const ownerNotice = fixture.debugElement.query(By.css('[data-testid="owner-notice"]'));
+      expect(ownerNotice).toBeNull();
+
       const statusCard = fixture.debugElement.query(By.css('[data-testid="connection-status-card"]'));
       expect(statusCard).toBeNull();
+    });
+
+    it('should hide the empty-state connect button for non-owner roles', () => {
+      mockRoleSignal.set('viewer');
+      fixture.detectChanges();
+
+      const req = httpTestingController.expectOne('/api/v1/accounting/connection');
+      req.flush(
+        { message: 'No connection exists for this tenant' },
+        { status: 404, statusText: 'Not Found' },
+      );
+
+      fixture.detectChanges();
+
+      const connectBtn = fixture.debugElement.query(By.css('[data-testid="connect-btn"]'));
+      expect(connectBtn).toBeNull();
+
+      const ownerNotice = fixture.debugElement.query(By.css('[data-testid="owner-notice"]'));
+      expect(ownerNotice).not.toBeNull();
     });
   });
 
@@ -173,6 +215,9 @@ describe('ConnectionSettingsComponent (T016)', () => {
       const displayNameEl = fixture.debugElement.query(By.css('[data-testid="connection-display-name"]'));
       expect(displayNameEl.nativeElement.textContent.trim()).toBe('Acme QuickBooks Production');
 
+      const providerLabel = fixture.debugElement.query(By.css('[data-testid="connection-provider-label"]'));
+      expect(providerLabel.nativeElement.textContent.trim()).toBe('QuickBooks Online');
+
       const statusBadge = fixture.debugElement.query(By.css('[data-testid="connection-status-badge"]'));
       expect(statusBadge.nativeElement.textContent.trim()).toContain('Active');
       expect(statusBadge.nativeElement.classList).toContain('active');
@@ -185,6 +230,18 @@ describe('ConnectionSettingsComponent (T016)', () => {
 
       const emptyCard = fixture.debugElement.query(By.css('[data-testid="empty-connection-card"]'));
       expect(emptyCard).toBeNull();
+    });
+
+    it('should display Xero provider label when the connected accounting provider is Xero', () => {
+      fixture.detectChanges();
+
+      const req = httpTestingController.expectOne('/api/v1/accounting/connection');
+      req.flush(mockXeroConnection);
+
+      fixture.detectChanges();
+
+      const providerLabel = fixture.debugElement.query(By.css('[data-testid="connection-provider-label"]'));
+      expect(providerLabel.nativeElement.textContent.trim()).toBe('Xero');
     });
 
     it('should display formatted last_synced_at when last_synced_at is not null', () => {

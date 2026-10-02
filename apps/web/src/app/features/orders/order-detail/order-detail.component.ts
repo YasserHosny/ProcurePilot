@@ -49,6 +49,7 @@ export class OrderDetailComponent implements OnInit {
   readonly errorMessage = signal<string | null>(null);
   readonly confirmationOpen = signal(false);
   readonly receiptOpen = signal(false);
+  readonly cancelOpen = signal(false);
   readonly confirmationReference = signal('');
   readonly confirmationDate = signal('');
   readonly receiptReference = signal('');
@@ -94,6 +95,26 @@ export class OrderDetailComponent implements OnInit {
     this.ordersApi.submitOrder(this.orderId).subscribe({
       next: () => { this.loadOrder(); this.isSaving.set(false); },
       error: () => { this.errorMessage.set(this.translate.instant('orders.saveError')); this.isSaving.set(false); },
+    });
+  }
+
+  
+  cancelOrder(): void {
+    this.cancelOpen.set(true);
+  }
+
+  confirmCancel(): void {
+    this.isSaving.set(true);
+    this.ordersApi.cancelOrder(this.orderId).subscribe({
+      next: () => { 
+        this.loadOrder(); 
+        this.cancelOpen.set(false); 
+        this.isSaving.set(false); 
+      },
+      error: () => { 
+        this.errorMessage.set(this.translate.instant('orders.saveError')); 
+        this.isSaving.set(false); 
+      },
     });
   }
 

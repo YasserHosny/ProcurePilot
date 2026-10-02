@@ -89,6 +89,41 @@ work.
 4. Given an integration is disconnected, then no purchasing screen blocks, loses drafts, or
    changes manual quantity entry behavior.
 
+### User Story 4: Create draft purchase order from approved request (Priority: P1)
+
+A buyer creates a draft purchase order based on a previously approved purchase request, preparing
+the order for buyer review rather than establishing a commitment or purchase. The legacy request
+service represents a human-approved request as status `ordered` (legacy R2.3 behavior); this legacy
+status is not evidence that a `purchase_order` exists. Draft PO creation preserves the existing
+request state and approval decision.
+
+**Independent Test**: Create an approved purchase request, generate a draft order from it by
+selecting a supplier and specifying actual prices, then verify the draft order traces to the request
+and the request's approval status remains unchanged.
+
+**Acceptance Scenarios**
+
+1. Given an approved purchase request, when an authorized buyer initiates order creation, then they MUST select a supplier and manually provide/confirm actual unit prices, currency, tax, dates, and order quantities.
+2. Given a purchase request with estimated prices, when creating a draft order, then the estimates
+   MUST NEVER silently become the purchase order actual prices. Request estimates can be shown as
+   reference only; actual unit price, currency, and tax remain buyer-entered and confirmed.
+3. Given a created draft purchase order, then the action does NOT submit, send, authorize, or
+   execute a purchase, and the underlying request's approval decision/status remains unchanged.
+   The request's recorded approval step is the evidence of human approval; its legacy `ordered`
+   status is not sufficient proof of approval by itself and does not prove a `purchase_order`
+   exists.
+4. Given a draft purchase order, submit is a separate explicit human operation. It changes internal
+   status only; no external provider send/write is performed.
+5. Given a purchase order line, it MUST preserve explicit traceability back to the originating purchase request line. One purchase order may reference only one purchase request; one approved request may be split across multiple supplier purchase orders.
+6. Given a request line, it may be allocated across multiple PO lines/orders. Creating or editing a linked draft MUST NOT allocate more than the approved requested quantity.
+7. Given an order, all non-cancelled POs (draft, submitted, confirmed, received) reserve their full ordered quantity. The remaining quantity MUST be computed from these allocations.
+8. Given a cancelled PO, its immutable received quantity remains consumed, while its unreceived quantity is released. A cancel operation is an explicit internal human action and MUST NOT call a provider or delete evidence.
+9. Given concurrent create, edit, or cancel operations, they MUST serialize atomically at the
+   request scope (transaction/locking or equivalent) so no race condition can exceed the approved
+   quantity, and mutations remain idempotent.
+10. Given a request whose status is `ordered` but which has no recorded human approval decision,
+    when a buyer attempts to create a draft purchase order, then creation is rejected.
+
 ## Functional Requirements
 
 - **FR-001**: The system MUST store purchase orders and order lines with tenant-scoped RLS and
@@ -120,12 +155,17 @@ work.
   disconnected, stale, or temporarily unavailable.
 - **FR-015**: All user-facing strings MUST come from `packages/i18n` in English and Arabic, and new
   screens MUST support RTL and WCAG 2.1 AA.
+- **FR-016**: The system MUST restrict draft order creation to authorized buyer/owner roles and require a recorded human approval decision for the source request; the request's legacy `ordered` status alone MUST NOT be treated as proof of approval or of an existing purchase order. The system MUST audit draft creation and preserve traceability to the source request and lines. References MUST be tenant-pinned and enforced by the database; cross-tenant references MUST resolve as not found.
+- **FR-017**: The system MUST support splitting one approved purchase request across multiple supplier purchase orders. One purchase order MUST reference at most one purchase request.
+- **FR-018**: The system MUST reserve the full ordered quantity for all non-cancelled POs (draft, submitted, confirmed, received) and compute remaining quantities from these allocations.
+- **FR-019**: The system MUST serialize concurrent create, edit, and cancel operations atomically at the purchase request scope to prevent over-allocation races. Mutations MUST remain idempotent.
+- **FR-020**: The system MUST NOT delete evidence on PO cancellation. The cancel operation MUST leave immutable received quantity consumed, release unreceived quantity, and MUST NOT call an external provider.
 
 ## Data Entities
 
-- `purchase_order`: internal order header, supplier, lifecycle status, dates, currency, and totals.
-- `purchase_order_line`: product/description, ordered quantity, unit price, currency, tax, and line
-  total.
+- `purchase_order`: internal order header, supplier, lifecycle status, dates, currency, totals, and `source_request_id` to link to at most one purchase request.
+- `purchase_order_line`: product/description, ordered quantity, unit price, currency, tax, line
+  total, and `source_request_line_id` for request traceability.
 - `supplier_confirmation`: supplier reference, confirmed dates, and confirmation metadata.
 - `supplier_confirmation_line`: confirmed quantity and price per order line.
 - `delivery_receipt`: receipt reference, receipt date, receiving member, and source metadata.

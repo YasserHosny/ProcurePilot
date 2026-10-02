@@ -7,8 +7,10 @@ import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { of, throwError } from 'rxjs';
 
 import enCatalog from '../../../../../../../packages/i18n/en.json';
+import { ApiService } from '../../../core/api/api.service';
 import type { PurchaseRequest } from '../../../core/api/models';
 import { RequestsApiService } from '../../requests/requests-api';
+import { OrganisationApiService } from '../../settings/organisation-api';
 import { ApprovalsApiService } from '../approvals-api';
 import { ApprovalQueueComponent } from './approval-queue.component';
 
@@ -69,6 +71,8 @@ describe('ApprovalQueueComponent', () => {
   let fixture: ComponentFixture<ApprovalQueueComponent>;
   let approvalsApi: jasmine.SpyObj<ApprovalsApiService>;
   let requestsApi: jasmine.SpyObj<RequestsApiService>;
+  let organisationApi: jasmine.SpyObj<OrganisationApiService>;
+  let api: jasmine.SpyObj<ApiService>;
   let dialogSpy: jasmine.SpyObj<MatDialog>;
   let snackBarSpy: jasmine.SpyObj<MatSnackBar>;
 
@@ -78,11 +82,47 @@ describe('ApprovalQueueComponent', () => {
       'approveRequest',
       'rejectRequest',
     ]);
+    organisationApi = jasmine.createSpyObj('OrganisationApiService', ['listBranches']);
+    api = jasmine.createSpyObj('ApiService', ['products']);
     dialogSpy = jasmine.createSpyObj('MatDialog', ['open']);
     snackBarSpy = jasmine.createSpyObj('MatSnackBar', ['open']);
 
     approvalsApi.listPendingApprovals.and.returnValue(
       of({ items: mockPendingRequests, next_cursor: null }),
+    );
+    organisationApi.listBranches.and.returnValue(
+      of({
+        items: [
+          { id: 'branch-north', name: 'North Branch', is_active: true, created_at: '2026-01-01T00:00:00Z' },
+          { id: 'branch-south', name: 'South Branch', is_active: true, created_at: '2026-01-01T00:00:00Z' },
+        ],
+        next_cursor: null,
+      }),
+    );
+    api.products.and.returnValue(
+      of({
+        items: [
+          {
+            id: 'prod-gloves',
+            tenant_name: 'Latex Gloves',
+            canonical_name: 'Gloves',
+            base_unit: 'each',
+            pack: { pack_count: 1, unit_size: '1.000000' },
+            status: 'active',
+            created_at: '2026-01-01T00:00:00Z',
+          },
+          {
+            id: 'prod-masks',
+            tenant_name: 'Surgical Masks',
+            canonical_name: 'Masks',
+            base_unit: 'each',
+            pack: { pack_count: 1, unit_size: '1.000000' },
+            status: 'active',
+            created_at: '2026-01-01T00:00:00Z',
+          },
+        ],
+        next_cursor: null,
+      }),
     );
 
     await TestBed.configureTestingModule({
@@ -90,6 +130,8 @@ describe('ApprovalQueueComponent', () => {
       providers: [
         { provide: ApprovalsApiService, useValue: approvalsApi },
         { provide: RequestsApiService, useValue: requestsApi },
+        { provide: OrganisationApiService, useValue: organisationApi },
+        { provide: ApiService, useValue: api },
       ],
     })
       .overrideComponent(ApprovalQueueComponent, {
@@ -113,6 +155,8 @@ describe('ApprovalQueueComponent', () => {
 
   it('should load pending approvals with limit 50 on init', () => {
     expect(approvalsApi.listPendingApprovals).toHaveBeenCalledWith({ limit: 50 });
+    expect(organisationApi.listBranches).toHaveBeenCalledWith({ limit: 100 });
+    expect(api.products).toHaveBeenCalledWith({ status: 'all', limit: 100 });
     expect(component.pendingRequests().length).toBe(2);
     expect(component.isLoading()).toBeFalse();
   });
@@ -123,13 +167,13 @@ describe('ApprovalQueueComponent', () => {
     expect(rows.length).toBe(2);
 
     expect(compiled.textContent).toContain('mem-requester-1');
-    expect(compiled.textContent).toContain('branch-north');
+    expect(compiled.textContent).toContain('North Branch');
     expect(compiled.textContent).toContain('cc-ops');
     expect(compiled.textContent).toContain('2026-09-20');
     expect(compiled.textContent).toContain('SAR 1250.00');
 
     expect(compiled.textContent).toContain('mem-requester-2');
-    expect(compiled.textContent).toContain('branch-south');
+    expect(compiled.textContent).toContain('South Branch');
   });
 
   it('should render incomplete estimate badge and budget warning when applicable', () => {
@@ -205,12 +249,27 @@ describe('ApprovalQueueComponent', () => {
     fixture.detectChanges();
 
     const compiled = fixture.nativeElement as HTMLElement;
-    expect(compiled.textContent).toContain('prod-gloves');
-    expect(compiled.textContent).toContain('prod-masks');
+    expect(compiled.textContent).toContain('Latex Gloves');
+    expect(compiled.textContent).toContain('Surgical Masks');
+    expect(compiled.textContent).not.toContain('prod-gloves');
+    expect(compiled.textContent).not.toContain('prod-masks');
     expect(compiled.textContent).toContain('Latex-free boxes');
 
     component.toggleExpand('req-001');
     expect(component.isExpanded('req-001')).toBeFalse();
+  });
+
+  it('should fall back to raw IDs when lookup data is missing', () => {
+    organisationApi.listBranches.and.returnValue(of({ items: [], next_cursor: null }));
+    api.products.and.returnValue(of({ items: [], next_cursor: null }));
+
+    component.loadPendingApprovals();
+    component.toggleExpand('req-001');
+    fixture.detectChanges();
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    expect(compiled.textContent).toContain('branch-north');
+    expect(compiled.textContent).toContain('prod-gloves');
   });
 
   it('should open decision dialog for approve and call approveRequest on confirm', () => {

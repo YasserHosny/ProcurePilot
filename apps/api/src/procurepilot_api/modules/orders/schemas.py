@@ -65,6 +65,7 @@ class PurchaseOrderLine(StrictModel):
     unit_price: Money
     tax: Money
     line_total: Money
+    source_request_line_id: UUID | None = None
 
     _validate_quantity_scale = field_validator("ordered_quantity")(
         lambda value: _require_scale(value, 6, "ordered quantity")
@@ -92,6 +93,7 @@ class PurchaseOrder(StrictModel):
     source_kind: SourceKind
     source_reference: str = Field(min_length=1, max_length=500)
     source_hash: str | None = None
+    source_request_id: UUID | None = None
     created_by: UUID
     created_at: datetime
     updated_at: datetime
@@ -249,6 +251,7 @@ class PurchaseOrderLineInput(StrictModel):
     unit_price: Money
     tax: Money
     line_total: Money
+    source_request_line_id: UUID | None = None
 
     _validate_quantity_scale = field_validator("ordered_quantity")(
         lambda value: _require_scale(value, 6, "ordered quantity")
@@ -265,6 +268,7 @@ class PurchaseOrderCreate(StrictModel):
     source_kind: SourceKind = "manual"
     source_reference: str = Field(min_length=1, max_length=500)
     source_hash: str | None = None
+    source_request_id: UUID | None = None
     lines: tuple[PurchaseOrderLineInput, ...] = Field(min_length=1)
 
     @model_validator(mode="after")
@@ -284,6 +288,10 @@ class PurchaseOrderCreate(StrictModel):
         if len(set(line_numbers)) != len(line_numbers):
             raise ValueError("order line numbers must be unique")
         return self
+
+
+class PurchaseOrderDraftUpdate(PurchaseOrderCreate):
+    pass
 
 
 class SupplierConfirmationLineInput(StrictModel):
@@ -329,3 +337,15 @@ class DeliveryReceiptCreate(StrictModel):
 class PurchaseOrderList(StrictModel):
     items: tuple[PurchaseOrder, ...]
     next_cursor: str | None = None
+
+
+class RequestLineAllocation(StrictModel):
+    source_request_line_id: UUID
+    requested_quantity: Decimal
+    allocated_quantity: Decimal
+    remaining_quantity: Decimal
+
+
+class RequestAllocation(StrictModel):
+    source_request_id: UUID
+    lines: tuple[RequestLineAllocation, ...]

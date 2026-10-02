@@ -53,13 +53,14 @@ describe('RequestFormComponent — create mode (T017)', () => {
       'listBranches',
       'listCostCentres',
     ]);
-    api = jasmine.createSpyObj('ApiService', ['members']);
+    api = jasmine.createSpyObj('ApiService', ['members', 'products']);
     snackBarSpy = jasmine.createSpyObj('MatSnackBar', ['open']);
     routerSpy = jasmine.createSpyObj('Router', ['navigate']);
 
     organisationApi.listBranches.and.returnValue(of({ items: [], next_cursor: null }));
     organisationApi.listCostCentres.and.returnValue(of({ items: [], next_cursor: null }));
     api.members.and.returnValue(of({ items: [], next_cursor: null }));
+    api.products.and.returnValue(of({ items: [], next_cursor: null }));
 
     await TestBed.configureTestingModule({
       imports: [RequestFormComponent, TranslateModule.forRoot()],
@@ -206,13 +207,29 @@ describe('RequestFormComponent — edit mode (T017)', () => {
       'listBranches',
       'listCostCentres',
     ]);
-    api = jasmine.createSpyObj('ApiService', ['members']);
+    api = jasmine.createSpyObj('ApiService', ['members', 'products']);
     snackBarSpy = jasmine.createSpyObj('MatSnackBar', ['open']);
     routerSpy = jasmine.createSpyObj('Router', ['navigate']);
 
     organisationApi.listBranches.and.returnValue(of({ items: [], next_cursor: null }));
     organisationApi.listCostCentres.and.returnValue(of({ items: [], next_cursor: null }));
     api.members.and.returnValue(of({ items: [], next_cursor: null }));
+    api.products.and.returnValue(
+      of({
+        items: [
+          {
+            id: 'wp1',
+            tenant_name: 'Nitrile Gloves',
+            canonical_name: 'Gloves',
+            base_unit: 'each',
+            pack: { pack_count: 1, unit_size: '1.000000' },
+            status: 'active',
+            created_at: '2026-01-01T00:00:00Z',
+          },
+        ],
+        next_cursor: null,
+      }),
+    );
     requestsApi.getRequest.and.returnValue(of(mockRequest));
 
     await TestBed.configureTestingModule({
@@ -254,6 +271,8 @@ describe('RequestFormComponent — edit mode (T017)', () => {
     expect(component.form.controls.required_by_date.value).toBe('2026-09-15');
     expect(component.lines.length).toBe(1);
     expect(component.lines.at(0).controls.workspace_product_id.value).toBe('wp1');
+    expect(component.products()[0]?.tenant_name).toBe('Nitrile Gloves');
+    expect(api.products).toHaveBeenCalledWith({ status: 'all', limit: 100 });
   });
 
   it('should wait for branches before rendering an edit form with a patched branch', () => {

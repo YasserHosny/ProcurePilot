@@ -1882,7 +1882,8 @@
     "actions": {
       "view": "View request",
       "edit": "Edit request",
-      "withdraw": "Withdraw request"
+      "withdraw": "Withdraw request",
+      "createOrder": "Create Order"
     },
     "form": {
       "createTitle": "New Purchase Request",
@@ -3100,6 +3101,46 @@
     "orderDate": "Ordered {{date}}",
     "lineCount": "{{count}} line(s)",
     "notProvided": "Not provided",
+    "createButton": "Create Order",
+    "create": {
+      "title": "Create Purchase Order",
+      "subtitle": "Manually record an internal purchase order.",
+      "orderNumber": "Order Number",
+      "orderNumberPlaceholder": "e.g. PO-2026-001",
+      "supplier": "Supplier",
+      "orderDate": "Order Date",
+      "expectedDeliveryDate": "Expected Delivery Date",
+      "currency": "Currency",
+      "orderTax": "Order Tax",
+      "lines": "Order Lines",
+      "addLine": "Add Line",
+      "removeLine": "Remove Line",
+      "product": "Product (Optional)",
+      "description": "Description",
+      "quantity": "Quantity",
+      "baseUnit": "Base Unit",
+      "unitPrice": "Unit Price",
+      "lineTax": "Line Tax",
+      "lineTotal": "Line Total",
+      "orderTotal": "Order Total",
+      "submit": "Create Purchase Order",
+      "submitting": "Creating...",
+      "success": "Order created successfully.",
+      "linesTotalLabel": "Lines Total",
+      "linePrefix": "Line",
+      "noProduct": "-- None --",
+      "currencyPlaceholder": "e.g. USD, GBP",
+      "errors": {
+        "required": "Required",
+        "currencyFormat": "3-letter code",
+        "positiveQuantity": "Must be > 0",
+        "nonNegativePrice": "Must be >= 0",
+        "maxQuantity": "Cannot exceed remaining quantity"
+      },
+      "creatingFromRequest": "Creating from Request",
+      "estimateReference": "Estimate",
+      "remainingQuantity": "Remaining Allocatable"
+    },
     "status": {
       "draft": "Draft",
       "submitted": "Submitted",
@@ -3148,7 +3189,12 @@
       "timelineTitle": "Evidence timeline",
       "orderCreated": "Purchase order created",
       "confirmationRecorded": "Supplier confirmation recorded",
-      "receiptRecorded": "Delivery receipt {{reference}} recorded"
+      "receiptRecorded": "Delivery receipt {{reference}} recorded",
+      "edit": "Edit Draft",
+      "cancel": "Cancel Order",
+      "cancelConfirmTitle": "Cancel Purchase Order?",
+      "cancelConfirmMessage": "Are you sure you want to cancel this order? Any received quantity will remain consumed, and any unreceived quantity will be released back to the source request.",
+      "cancelOrder": "Yes, Cancel Order"
     }
   },
   "accounting": {
@@ -3158,11 +3204,14 @@
       "subtitle": "Connect your accounting software to sync bills and reconcile spend against purchase records.",
       "empty": {
         "title": "Connect your accounting system",
-        "description": "Link your QuickBooks Online account to automatically import bills and match them against purchase records.",
-        "connect": "Connect QuickBooks"
+        "description": "Link the configured accounting provider to automatically import bills and match them against purchase records.",
+        "connect": "Connect accounting"
       },
       "statusCardTitle": "Connected Account",
-      "providerQuickbooks": "QuickBooks Online",
+      "providers": {
+        "quickbooks": "QuickBooks Online",
+        "xero": "Xero"
+      },
       "status": {
         "active": "Active",
         "needs_reauth": "Needs Re-authorization",
@@ -3178,7 +3227,7 @@
       "ownerOnly": "Only workspace owners can connect or disconnect accounting integrations.",
       "needsReauth": {
         "title": "Re-authorization Required",
-        "message": "Authorization for your QuickBooks connection has expired or was revoked. Please reconnect to resume bill synchronization.",
+        "message": "Authorization for your accounting connection has expired or was revoked. Please reconnect to resume bill synchronization.",
         "action": "Reconnect"
       },
       "error": {
@@ -3386,6 +3435,8 @@
       "syncNoConnection": "No active POS connection found.",
       "syncFailed": "Failed to trigger POS sync. Please try again.",
       "loadError": "Failed to load synced signals.",
+      "readOnly": "You can review synced signals. Only owners and buyers can sync POS data or match products.",
+      "readOnlyShort": "Owner or buyer required",
       "unmatched": {
         "title": "Unmatched Signals",
         "description": "Square catalog items that could not be automatically matched to a catalogue product.",
@@ -3521,7 +3572,9 @@
         "priceVariance": "Price variance must be between 0% and 100%.",
         "branch": "Select a default branch."
       },
-      "errors": { "save": "Unable to save guardrail settings." },
+      "errors": {
+        "save": "Unable to save guardrail settings."
+      },
       "reasons": {
         "rfq_not_open": "The RFQ is not open.",
         "min_response_count_not_met": "The minimum response count is not met.",

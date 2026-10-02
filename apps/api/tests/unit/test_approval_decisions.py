@@ -50,6 +50,16 @@ class SelectQuery:
     def order(self, *_args: object, **_kwargs: object) -> SelectQuery:
         return self
 
+    def limit(self, limit: int) -> SelectQuery:
+        return self
+
+    @property
+    def not_(self) -> object:
+        class NotProxy:
+            def is_(proxy, column: str, value: str) -> SelectQuery:
+                return self
+        return NotProxy()
+
     def range(self, start: int, end: int) -> SelectQuery:
         self.ranges.append((start, end))
         return self
@@ -450,3 +460,85 @@ def test_pending_router_passes_member_and_pagination_to_service() -> None:
         "cursor": "abc",
         "limit": 25,
     }
+
+
+def test_validate_approved_request_for_order_locates_evidence(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    req = request_row(uuid4(), uuid4())
+    req["status"] = "ordered"
+
+    class FakeQuery:
+        def select(self, *args: object) -> FakeQuery: return self
+        def eq(self, *args: object) -> FakeQuery: return self
+        def limit(self, *args: object) -> FakeQuery: return self
+        def execute(self) -> SimpleNamespace:
+            return SimpleNamespace(data=[{
+                "id": str(uuid4()),
+                "purchase_request_id": str(req["id"]),
+                "status": "approved",
+                "decided_by_membership_id": str(uuid4()),
+                "decided_at": "2026-09-30",
+                "assigned_membership_id": str(uuid4()),
+                "source": "owner_fallback",
+                "comment": "ok"
+            }])
+        @property
+        def not_(self) -> object:
+            class NotProxy:
+                def is_(proxy, col: str, val: str) -> FakeQuery: return self
+            return NotProxy()
+
+    class DummyClient:
+        def table(self, name: str) -> FakeQuery:
+            if name == "approval_step":
+                return FakeQuery()
+            raise ValueError()
+
+    monkeypatch.setattr(requests_module, "authenticated_client", lambda _s, _t: DummyClient())
+    service = RequestsService()
+    monkeypatch.setattr(service, "_fetch_request", lambda _client, _id: req)
+    monkeypatch.setattr(service, "_fetch_lines_for", lambda _client, _id: [line_row()])
+    monkeypatch.setattr(service, "_budget_status_for", lambda _client, _row: None)
+
+    result = service.validate_approved_request_for_order(
+        bearer_token="token", request_id=req["id"]
+    )
+    assert result.id == req["id"]
+
+
+def test_validate_approved_request_for_order_rejects_missing_evidence(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    req = request_row(uuid4(), uuid4())
+    req["status"] = "ordered"
+
+    class FakeQuery:
+        def select(self, *args: object) -> FakeQuery: return self
+        def eq(self, *args: object) -> FakeQuery: return self
+        def limit(self, *args: object) -> FakeQuery: return self
+        def execute(self) -> SimpleNamespace:
+            return SimpleNamespace(data=[])
+        @property
+        def not_(self) -> object:
+            class NotProxy:
+                def is_(proxy, col: str, val: str) -> FakeQuery: return self
+            return NotProxy()
+
+    class DummyClient:
+        def table(self, name: str) -> FakeQuery:
+            if name == "approval_step":
+                return FakeQuery()
+            raise ValueError()
+
+    monkeypatch.setattr(requests_module, "authenticated_client", lambda _s, _t: DummyClient())
+    service = RequestsService()
+    monkeypatch.setattr(service, "_fetch_request", lambda _client, _id: req)
+    monkeypatch.setattr(service, "_fetch_lines_for", lambda _client, _id: [line_row()])
+    monkeypatch.setattr(service, "_budget_status_for", lambda _client, _row: None)
+
+    with pytest.raises(ConflictError) as exc_info:
+        service.validate_approved_request_for_order(
+            bearer_token="token", request_id=req["id"]
+        )
+    assert exc_info.value.details == {"reason": "request_not_approved"}

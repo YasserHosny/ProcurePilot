@@ -6,15 +6,33 @@ import { provideRouter } from '@angular/router';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 
 import { OrderListComponent } from './order-list.component';
+import { SessionService } from '../../../core/auth/session.service';
+import { signal, WritableSignal, computed, Signal } from '@angular/core';
+import { Role } from '../../../core/api/models';
 
 describe('OrderListComponent', () => {
   let fixture: ComponentFixture<OrderListComponent>;
   let http: HttpTestingController;
+  let mockRole: WritableSignal<Role | null>;
+  let mockSession: Partial<SessionService>;
 
   beforeEach(async () => {
+    mockRole = signal<Role | null>('owner');
+    mockSession = {
+      role: mockRole as unknown as Signal<Role | null>,
+      isAuthenticated: computed(() => true),
+      activeLocale: computed(() => 'en'),
+    };
+
     await TestBed.configureTestingModule({
       imports: [OrderListComponent, TranslateModule.forRoot()],
-      providers: [provideHttpClient(), provideHttpClientTesting(), provideNoopAnimations(), provideRouter([])],
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        provideNoopAnimations(),
+        provideRouter([]),
+        { provide: SessionService, useValue: mockSession }
+      ],
     }).compileComponents();
     TestBed.inject(TranslateService).setTranslation('en', {
       orders: {
@@ -47,5 +65,18 @@ describe('OrderListComponent', () => {
     expect(fixture.nativeElement.querySelector('[data-testid="orders-list"]').textContent).toContain('PO-1001');
     expect(fixture.nativeElement.textContent).toContain('Submitted');
     expect(fixture.nativeElement.textContent).toContain('120.00');
+  });
+
+  it('shows create button for owner and hides for viewer', () => {
+    mockRole.set('owner');
+    fixture.detectChanges();
+    http.expectOne('/api/v1/orders?limit=50').flush({ items: [], next_cursor: null });
+    let btn = fixture.nativeElement.querySelector('[data-testid="order-create-btn"]');
+    expect(btn).toBeTruthy();
+
+    mockRole.set('viewer');
+    fixture.detectChanges();
+    btn = fixture.nativeElement.querySelector('[data-testid="order-create-btn"]');
+    expect(btn).toBeNull();
   });
 });

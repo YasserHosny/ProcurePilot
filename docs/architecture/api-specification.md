@@ -2536,6 +2536,65 @@ Role-based access control is evaluated individually per endpoint:
 
 ---
 
+## Internal Order Tracking API (R3.3)
+
+All routes require bearer auth. Tenant scope is always resolved from the verified JWT claim.
+Owner and buyer may mutate; other roles are read-only where a read route exists. Cross-tenant
+order, request, or request-line references return `404` or a tenant-pinned FK failure, never a
+different response that confirms existence.
+
+### `POST /orders`
+
+- Requires owner or buyer role and `Idempotency-Key`.
+- Creates or replays a `draft` internal purchase order. It never submits, sends, authorizes, or
+  writes to an external provider.
+- Request fields include `supplier_id`, `order_date`, optional `expected_delivery_date`, explicit
+  `total` and `tax` money objects, `source_reference`, optional `source_request_id`, and one or
+  more lines. Every line includes buyer-entered `unit_price`, `tax`, `line_total`, quantity, unit,
+  and optional `source_request_line_id`.
+- When `source_request_id` is present, every line must carry a `source_request_line_id` from that
+  same approved request. The request must have a recorded human-approved `approval_step`; legacy
+  `purchase_request.status = 'ordered'` alone is rejected.
+- The service acquires a request-scoped advisory transaction lock before checking allocations.
+  Non-cancelled POs reserve full ordered quantity. Cancelled POs reserve only already received
+  quantity. Over-allocation returns `409 quantity_exceeds_allocation`.
+- Returns `201` with `PurchaseOrder`; idempotent replay returns `200` with the original order.
+
+### `PUT /orders/{order_id}`
+
+- Requires owner or buyer role and `Idempotency-Key`.
+- Replaces an existing `draft` order's editable header and line content. Non-draft orders return
+  `409 order_not_draft`.
+- Uses the same request approval proof, request-line traceability, one-request-per-PO rule,
+  allocation check, and request-scoped advisory lock as create.
+- Records `orders.purchase_order_edited`.
+
+### `POST /orders/{order_id}/cancel`
+
+- Requires owner or buyer role and `Idempotency-Key`.
+- Performs an internal cancellation only; no provider call exists. `received` and `closed` orders
+  are not cancellable.
+- Preserves confirmations and receipt evidence. Allocation projections continue to count received
+  quantities and release only the unreceived portion.
+- Records `orders.purchase_order_cancelled`. Idempotent replay with the same key returns the
+  cancelled order; a different key on an already-cancelled order returns a conflict.
+
+### `POST /orders/{order_id}/submit`
+
+- Requires owner or buyer role and `Idempotency-Key`.
+- Changes internal status from `draft` to `submitted` and records
+  `orders.purchase_order_submitted`. It does not send or write to a provider.
+
+### `GET /orders/allocations?source_request_id={uuid}`
+
+- Requires bearer auth.
+- Returns `RequestAllocation` with one item per request line: `source_request_line_id`,
+  `requested_quantity`, `allocated_quantity`, and `remaining_quantity`.
+- Allocation is computed from all PO lines linked to the request line. Non-cancelled orders count
+  ordered quantity; cancelled orders count received quantity only.
+
+---
+
 ## Partner API Beta (R3.4)
 
 The first R3.4 increment exposes a provider-neutral, read-only surface for external systems. It

@@ -8,6 +8,7 @@ import { of, throwError } from 'rxjs';
 
 import enCatalog from '../../../../../../../packages/i18n/en.json';
 import type { PurchaseRequest } from '../../../core/api/models';
+import { OrganisationApiService } from '../../settings/organisation-api';
 import { RequestsApiService } from '../requests-api';
 import { RequestListComponent } from './request-list.component';
 
@@ -40,6 +41,7 @@ describe('RequestListComponent (T017)', () => {
   let component: RequestListComponent;
   let fixture: ComponentFixture<RequestListComponent>;
   let requestsApi: jasmine.SpyObj<RequestsApiService>;
+  let organisationApi: jasmine.SpyObj<OrganisationApiService>;
   let snackBarSpy: jasmine.SpyObj<MatSnackBar>;
   let routerSpy: jasmine.SpyObj<Router>;
 
@@ -48,16 +50,27 @@ describe('RequestListComponent (T017)', () => {
       'listRequests',
       'withdrawRequest',
     ]);
+    organisationApi = jasmine.createSpyObj('OrganisationApiService', ['listBranches']);
     snackBarSpy = jasmine.createSpyObj('MatSnackBar', ['open']);
     routerSpy = jasmine.createSpyObj('Router', ['navigate']);
 
     requestsApi.listRequests.and.returnValue(of({ items: mockRequests, next_cursor: null }));
+    organisationApi.listBranches.and.returnValue(
+      of({
+        items: [
+          { id: 'b1', name: 'North Branch', is_active: true, created_at: '2026-01-01T00:00:00Z' },
+          { id: 'b2', name: 'South Branch', is_active: true, created_at: '2026-01-01T00:00:00Z' },
+        ],
+        next_cursor: null,
+      }),
+    );
 
     await TestBed.configureTestingModule({
       imports: [RequestListComponent, TranslateModule.forRoot()],
       providers: [
         provideRouter([]),
         { provide: RequestsApiService, useValue: requestsApi },
+        { provide: OrganisationApiService, useValue: organisationApi },
       ],
     })
       .overrideComponent(RequestListComponent, {
@@ -81,8 +94,27 @@ describe('RequestListComponent (T017)', () => {
 
   it('should load requests on init', () => {
     expect(requestsApi.listRequests).toHaveBeenCalledWith({ status: undefined });
+    expect(organisationApi.listBranches).toHaveBeenCalledWith({ limit: 100 });
     expect(component.requests().length).toBe(2);
     expect(component.isLoading()).toBeFalse();
+  });
+
+  it('should display branch names instead of raw branch IDs when lookup data is available', () => {
+    const compiled = fixture.nativeElement as HTMLElement;
+    expect(compiled.textContent).toContain('North Branch');
+    expect(compiled.textContent).toContain('South Branch');
+    expect(compiled.textContent).not.toContain('b1');
+    expect(compiled.textContent).not.toContain('b2');
+  });
+
+  it('should fall back to the branch ID when a branch lookup is missing', () => {
+    organisationApi.listBranches.and.returnValue(of({ items: [], next_cursor: null }));
+
+    component.loadRequests();
+    fixture.detectChanges();
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    expect(compiled.textContent).toContain('b1');
   });
 
   it('should show the empty state when no requests exist', () => {
@@ -103,6 +135,25 @@ describe('RequestListComponent (T017)', () => {
   it('should navigate to detail on row click', () => {
     component.navigateToDetail(mockRequests[0]);
     expect(routerSpy.navigate).toHaveBeenCalledWith(['/requests', 'r1']);
+  });
+
+  it('should expose create-order only for requests with an approved approval step', () => {
+    expect(
+      component.canCreateOrder({
+        ...mockRequests[1],
+        id: 'ordered-with-approval',
+        status: 'ordered',
+        approval_step: {
+          id: 'step-1',
+          assigned_membership_id: 'm1',
+          source: 'owner_fallback',
+          status: 'approved',
+          decided_by_membership_id: 'm1',
+          decided_at: '2026-09-30T00:00:00Z',
+        },
+      }),
+    ).toBeTrue();
+    expect(component.canCreateOrder({ ...mockRequests[1], status: 'ordered' })).toBeFalse();
   });
 
   it('should withdraw a request and reload', () => {
