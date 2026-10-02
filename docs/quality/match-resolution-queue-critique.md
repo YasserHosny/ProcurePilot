@@ -46,7 +46,7 @@ handoff is:
 2. The buyer verifies supplier, arithmetic, and extracted quotation fields.
 3. The quotation is confirmed as reviewed.
 4. Product matching creates open tasks for lines whose match confidence is below the auto-accept
-   threshold or where no candidate is found.
+   threshold, whose only match is by wording similarity, or where no candidate is found.
 5. The Match Resolution Queue shows those open line-level tasks.
 
 The mental model breaks because the queue uses generic labels such as `Status: Open` and `Reason:

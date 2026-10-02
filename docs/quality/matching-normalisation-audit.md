@@ -147,6 +147,10 @@ exists (don't call it "confidence" or imply a probability). Consider making auto
 explicitly reason-gated (deterministic reasons only) rather than purely score-gated, so the
 threshold isn't doing work it was never validated to do.
 
+Addressed 2026-10-02 (PR #59): auto-accept is now limited to exact-key matches by default;
+similarity-only candidates route to `fuzzy_match_review`. The score is labelled "Match Score" in
+the UI; the API field keeps its name.
+
 ### 3.3 Stub embedding live in production with real scoring weight
 
 **Verdict: Agree, medium-high — confirmed independently, with an added detail that matters.**
@@ -249,6 +253,9 @@ From the adversarial pass, and confirmed as directionally sound in the debate:
   candidates, which should require actual benchmark-proven calibration before any unsupervised
   acceptance — right now one threshold does both jobs, and only survives scrutiny today because of
   the incidental 0.30-weight ceiling described in §3.2, not because it was designed that way.
+  Addressed 2026-10-02 (PR #59): auto-accept is now limited to exact-key matches by default;
+  similarity-only candidates route to `fuzzy_match_review`. The score is labelled "Match Score" in
+  the UI; the API field keeps its name.
 - **The biggest missing strategic piece is treating labelled feedback as a first-class dataset**,
   not just `ProductAlias`. Alias learning improves repeat-exact-wording cases but doesn't produce
   hard negatives, near-miss examples, supplier-specific ambiguity cases, or calibration data — the

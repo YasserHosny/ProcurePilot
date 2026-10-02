@@ -450,6 +450,7 @@ export type MatchTaskPriority = 'low' | 'normal' | 'high';
 export type MatchTaskReason =
   | 'low_confidence'
   | 'close_candidates'
+  | 'fuzzy_match_review'
   | 'no_candidate'
   | 'alias_conflict'
   | 'auto_accepted';

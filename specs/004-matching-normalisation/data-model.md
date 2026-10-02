@@ -65,7 +65,7 @@ Constraints:
 | `quotation_line_id` | uuid | not null, FK -> `quotation_line.id` |
 | `status` **[new]** | enum | `open` \| `in_progress` \| `resolved` |
 | `priority` **[new]** | enum | `low` \| `normal` \| `high` |
-| `reason` **[new]** | enum | `low_confidence` \| `close_candidates` \| `no_candidate` \| `alias_conflict` |
+| `reason` **[new]** | enum | `low_confidence` \| `close_candidates` \| `fuzzy_match_review` \| `no_candidate` \| `alias_conflict` |
 | `created_at` | timestamptz | not null |
 | `resolved_at` | timestamptz | nullable |
 

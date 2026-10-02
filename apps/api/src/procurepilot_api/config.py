@@ -113,9 +113,7 @@ class Settings(BaseSettings):
     rfq_mailer_mode: Literal["stub", "mailgun"] = Field(
         default="stub", validation_alias="RFQ_MAILER_MODE"
     )
-    mailgun_api_key: SecretStr | None = Field(
-        default=None, validation_alias="MAILGUN_API_KEY"
-    )
+    mailgun_api_key: SecretStr | None = Field(default=None, validation_alias="MAILGUN_API_KEY")
     mailgun_sending_domain: str | None = Field(
         default=None, validation_alias="MAILGUN_SENDING_DOMAIN"
     )
@@ -177,6 +175,9 @@ class Settings(BaseSettings):
     matching_auto_accept_threshold: float = Field(
         default=0.9200, validation_alias="MATCHING_AUTO_ACCEPT_THRESHOLD", ge=0, le=1
     )
+    matching_fuzzy_auto_accept_enabled: bool = Field(
+        default=False, validation_alias="MATCHING_FUZZY_AUTO_ACCEPT_ENABLED"
+    )
     matching_auto_reject_threshold: float = Field(
         default=0.2500, validation_alias="MATCHING_AUTO_REJECT_THRESHOLD", ge=0, le=1
     )
@@ -206,9 +207,7 @@ class Settings(BaseSettings):
     accounting_provider_mode: Literal["stub", "quickbooks", "xero"] = Field(
         default="stub", validation_alias="ACCOUNTING_PROVIDER_MODE"
     )
-    quickbooks_client_id: str | None = Field(
-        default=None, validation_alias="QUICKBOOKS_CLIENT_ID"
-    )
+    quickbooks_client_id: str | None = Field(default=None, validation_alias="QUICKBOOKS_CLIENT_ID")
     quickbooks_client_secret: SecretStr | None = Field(
         default=None, validation_alias="QUICKBOOKS_CLIENT_SECRET"
     )
@@ -289,9 +288,7 @@ class Settings(BaseSettings):
     square_application_secret: SecretStr | None = Field(
         default=None, validation_alias="SQUARE_APPLICATION_SECRET"
     )
-    square_redirect_uri: str | None = Field(
-        default=None, validation_alias="SQUARE_REDIRECT_URI"
-    )
+    square_redirect_uri: str | None = Field(default=None, validation_alias="SQUARE_REDIRECT_URI")
     square_environment: Literal["sandbox", "production"] = Field(
         default="sandbox", validation_alias="SQUARE_ENVIRONMENT"
     )
@@ -305,12 +302,8 @@ class Settings(BaseSettings):
     webhook_request_timeout_seconds: float = Field(
         default=10.0, validation_alias="WEBHOOK_REQUEST_TIMEOUT_SECONDS", gt=0
     )
-    rate_limit_pos_sync: str = Field(
-        default="10/minute", validation_alias="RATE_LIMIT_POS_SYNC"
-    )
-    rate_limit_pos_match: str = Field(
-        default="30/minute", validation_alias="RATE_LIMIT_POS_MATCH"
-    )
+    rate_limit_pos_sync: str = Field(default="10/minute", validation_alias="RATE_LIMIT_POS_SYNC")
+    rate_limit_pos_match: str = Field(default="30/minute", validation_alias="RATE_LIMIT_POS_MATCH")
     # A bare POS item name carries none of the deterministic (GTIN), brand, variant, or pack
     # signals that quotation-line matching's score_candidate() formula is weighted around — that
     # formula caps out well below matching_auto_accept_threshold (0.92) even for a perfect name

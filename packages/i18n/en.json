@@ -1046,6 +1046,7 @@
       "reason": {
         "low_confidence": "Below Match Threshold",
         "close_candidates": "Close Candidates",
+        "fuzzy_match_review": "Close Match — Needs Confirmation",
         "no_candidate": "No Candidate",
         "alias_conflict": "Alias Conflict",
         "all": "All Reasons"
@@ -1310,7 +1311,7 @@
       "weightsTitle": "Criteria Weights",
       "weights": {
         "cost": "Landed Cost ({{weight}}%)",
-        "matchConfidence": "Match Confidence ({{weight}}%)",
+        "matchConfidence": "Match Score ({{weight}}%)",
         "reliability": "Supplier Reliability ({{weight}}%)",
         "leadTime": "Lead Time ({{weight}}%)",
         "supplierRisk": "Supplier IQ / Risk ({{weight}}%)"
@@ -1318,7 +1319,7 @@
       "riskNotesTitle": "Risk Considerations",
       "riskNotes": {
         "price_expiring_soon": "Price is expiring within 7 days. Prompt action recommended.",
-        "low_match_confidence": "Product match confidence is below 85%. Verify product specifications.",
+        "low_match_confidence": "Product match score is below 85%. Verify product specifications.",
         "low_supplier_reliability": "Supplier reliability score is below 60%.",
         "high_supplier_risk": "Supplier IQ indicates elevated risk for this supplier. Review scorecard.",
         "supplier_quality_risk": "Recent quality incidents reported for this supplier.",
@@ -1341,7 +1342,7 @@
       "reliabilityUnknown": "No rating",
       "stockSignal": "Stock Availability",
       "stockUnknown": "Unknown",
-      "matchConfidence": "Match Confidence",
+      "matchConfidence": "Match Score",
       "validUntil": "Valid Until",
       "validOpenEnded": "Open-ended",
       "status": "Status",

@@ -121,7 +121,7 @@ export class ResolutionQueueComponent implements OnInit {
       this.priorityFilter.set(priority);
     }
     const reason = qp.get('reason') as MatchTaskReason | 'all' | null;
-    if (reason && ['all', 'low_confidence', 'close_candidates', 'no_candidate', 'alias_conflict', 'auto_accepted'].includes(reason)) {
+    if (reason && ['all', 'low_confidence', 'close_candidates', 'fuzzy_match_review', 'no_candidate', 'alias_conflict', 'auto_accepted'].includes(reason)) {
       this.reasonFilter.set(reason);
     }
     const search = qp.get('search');

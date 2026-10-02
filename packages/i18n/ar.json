@@ -1046,6 +1046,7 @@
       "reason": {
         "low_confidence": "أقل من حد المطابقة",
         "close_candidates": "مرشحون متقاربون",
+        "fuzzy_match_review": "تطابق قريب — يحتاج إلى تأكيد",
         "no_candidate": "لا يوجد مرشح",
         "alias_conflict": "تعارض في الاسم المرادف",
         "all": "جميع الأسباب"
@@ -1310,7 +1311,7 @@
       "weightsTitle": "أوزان المعايير",
       "weights": {
         "cost": "التكلفة الإجمالية ({{weight}}%)",
-        "matchConfidence": "دقة المطابقة ({{weight}}%)",
+        "matchConfidence": "درجة المطابقة ({{weight}}%)",
         "reliability": "موثوقية المورد ({{weight}}%)",
         "leadTime": "مدة التوريد ({{weight}}%)",
         "supplierRisk": "ذكاء المورّد / المخاطر ({{weight}}%)"
@@ -1318,7 +1319,7 @@
       "riskNotesTitle": "ملاحظات المخاطر",
       "riskNotes": {
         "price_expiring_soon": "السعر سينتهي خلال 7 أيام. يُوصى باتخاذ إجراء سريع.",
-        "low_match_confidence": "دقة مطابقة المنتج أقل من 85%. يُرجى التحقق من مواصفات المنتج.",
+        "low_match_confidence": "درجة مطابقة المنتج أقل من 85%. يُرجى التحقق من مواصفات المنتج.",
         "low_supplier_reliability": "تقييم موثوقية المورد أقل من 60%.",
         "high_supplier_risk": "يشير ذكاء المورّد إلى مخاطر مرتفعة لهذا المورّد. راجع بطاقة الأداء.",
         "supplier_quality_risk": "تم الإبلاغ عن حوادث جودة حديثة لهذا المورّد.",
@@ -1341,7 +1342,7 @@
       "reliabilityUnknown": "بدون تقييم",
       "stockSignal": "حالة المخزون",
       "stockUnknown": "غير معروف",
-      "matchConfidence": "دقة المطابقة",
+      "matchConfidence": "درجة المطابقة",
       "validUntil": "صالح حتى",
       "validOpenEnded": "مفتوح المدة",
       "status": "الحالة",

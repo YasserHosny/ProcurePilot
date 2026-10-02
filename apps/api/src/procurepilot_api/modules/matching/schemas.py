@@ -13,7 +13,12 @@ MatchTaskStatus = Literal["open", "in_progress", "resolved", "auto_accepted"]
 MatchTaskStatusFilter = Literal["open", "in_progress", "resolved", "auto_accepted", "all"]
 MatchTaskPriority = Literal["low", "normal", "high"]
 MatchTaskReason = Literal[
-    "low_confidence", "close_candidates", "no_candidate", "alias_conflict", "auto_accepted"
+    "low_confidence",
+    "close_candidates",
+    "fuzzy_match_review",
+    "no_candidate",
+    "alias_conflict",
+    "auto_accepted",
 ]
 QuotedExposureIssue = Literal["currency_mismatch"]
 MatchOutcome = Literal[

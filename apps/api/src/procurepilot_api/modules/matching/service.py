@@ -57,9 +57,7 @@ LINE_COLUMNS = (
 PRODUCT_COLUMNS = (
     "id,tenant_id,canonical_product_id,tenant_name,preferred_supplier_id,status,created_at"
 )
-CANONICAL_COLUMNS = (
-    "id,brand,name,variant,gtin,base_unit,canonical_embedding_model,created_at"
-)
+CANONICAL_COLUMNS = "id,brand,name,variant,gtin,base_unit,canonical_embedding_model,created_at"
 CANDIDATE_COLUMNS = (
     "id,quotation_line_id,candidate_workspace_product_id,confidence,reasons,rank,scoring_version,"
     "embedding_model,created_at"
@@ -246,9 +244,7 @@ class MatchingService:
         return MatchTaskList(
             items=tasks,
             next_cursor=(
-                _encode_cursor(offset + capped_limit)
-                if len(rows) > start + capped_limit
-                else None
+                _encode_cursor(offset + capped_limit) if len(rows) > start + capped_limit else None
             ),
         )
 
@@ -549,9 +545,7 @@ class MatchingService:
                     for candidate in candidates
                 ],
             )
-            self._route_or_accept(
-                client, member, line, persisted, bearer_token=bearer_token
-            )
+            self._route_or_accept(client, member, line, persisted, bearer_token=bearer_token)
 
     def _persist_candidates(
         self,
@@ -606,21 +600,31 @@ class MatchingService:
         close_call = second is not None and top_confidence - Decimal(
             str(second["confidence"])
         ) < Decimal(str(self._settings.matching_review_margin))
-        if (
+        deterministic = _candidate_is_deterministic(top)
+        threshold_and_margin_pass = (
             top_confidence >= Decimal(str(self._settings.matching_auto_accept_threshold))
             and not close_call
+        )
+        if threshold_and_margin_pass and (
+            deterministic or self._settings.matching_fuzzy_auto_accept_enabled
         ):
-            self._create_automatic_decision(
-                client, member, line, top, bearer_token=bearer_token
-            )
+            self._create_automatic_decision(client, member, line, top, bearer_token=bearer_token)
             return
+        fuzzy_auto_accept_withheld = threshold_and_margin_pass and not deterministic
         self._create_task(
             client,
             member,
             line,
-            reason="close_candidates" if close_call else "low_confidence",
+            reason=(
+                "close_candidates"
+                if close_call
+                else "fuzzy_match_review"
+                if fuzzy_auto_accept_withheld
+                else "low_confidence"
+            ),
             bearer_token=bearer_token,
             candidate=top,
+            fuzzy_auto_accept_withheld=fuzzy_auto_accept_withheld,
         )
 
     def _create_automatic_decision(
@@ -666,14 +670,10 @@ class MatchingService:
                     "quotation_line_id": str(line["id"]),
                     "decision_id": str(decision["id"]),
                     "candidate_id": str(candidate["id"]),
-                    "matched_product_id": str(
-                        candidate["candidate_workspace_product_id"]
-                    ),
+                    "matched_product_id": str(candidate["candidate_workspace_product_id"]),
                     "outcome": "same_product",
                     "score": decimal_string(candidate["confidence"]),
-                    "threshold": decimal_string(
-                        self._settings.matching_auto_accept_threshold
-                    ),
+                    "threshold": decimal_string(self._settings.matching_auto_accept_threshold),
                     "scoring_version": candidate.get("scoring_version") or SCORING_VERSION,
                 },
             )
@@ -691,19 +691,24 @@ class MatchingService:
         reason: MatchTaskReason,
         bearer_token: str | None = None,
         candidate: dict[str, object] | None = None,
+        fuzzy_auto_accept_withheld: bool = False,
     ) -> None:
         existing = _open_task_for_line(client, UUID(str(line["id"])))
         if existing is not None:
             return
         try:
-            response = client.table("match_task").insert(
-                {
-                    "tenant_id": str(member.tenant_id),
-                    "quotation_line_id": str(line["id"]),
-                    "reason": reason,
-                    "priority": "normal",
-                }
-            ).execute()
+            response = (
+                client.table("match_task")
+                .insert(
+                    {
+                        "tenant_id": str(member.tenant_id),
+                        "quotation_line_id": str(line["id"]),
+                        "reason": reason,
+                        "priority": "normal",
+                    }
+                )
+                .execute()
+            )
         except APIError as exc:
             raise ServiceUnavailableError(details={"dependency": "database"}) from exc
         task = _one_row(response.data, resource="match_task")
@@ -720,13 +725,12 @@ class MatchingService:
                     {
                         "candidate_id": str(candidate["id"]),
                         "score": decimal_string(candidate["confidence"]),
-                        "threshold": decimal_string(
-                            self._settings.matching_auto_accept_threshold
-                        ),
-                        "scoring_version": candidate.get("scoring_version")
-                        or SCORING_VERSION,
+                        "threshold": decimal_string(self._settings.matching_auto_accept_threshold),
+                        "scoring_version": candidate.get("scoring_version") or SCORING_VERSION,
                     }
                 )
+            if fuzzy_auto_accept_withheld:
+                target["fuzzy_auto_accept_withheld"] = True
             self._record(
                 bearer_token=bearer_token,
                 member=member,
@@ -875,9 +879,7 @@ class MatchingService:
             supplier_id=UUID(str(quote["supplier_id"])) if quote.get("supplier_id") else None,
             issue_date=quote.get("issue_date"),
             reviewed_at=quote.get("reviewed_at"),
-            reviewed_by=(
-                UUID(str(quote["reviewed_by"])) if quote.get("reviewed_by") else None
-            ),
+            reviewed_by=(UUID(str(quote["reviewed_by"])) if quote.get("reviewed_by") else None),
             reviewed_by_email=reviewer_email,
             line_count=len(quotation_lines),
             open_match_task_count=_open_task_count(
@@ -975,11 +977,7 @@ def _quotation_row(client: object, quotation_id: UUID) -> dict[str, object]:
 def _supplier_name(client: object, supplier_id: UUID) -> str:
     try:
         response = (
-            client.table("supplier")
-            .select("name")
-            .eq("id", str(supplier_id))
-            .limit(1)
-            .execute()
+            client.table("supplier").select("name").eq("id", str(supplier_id)).limit(1).execute()
         )
     except APIError as exc:
         raise ServiceUnavailableError(details={"dependency": "database"}) from exc
@@ -1137,8 +1135,7 @@ def _supplier_code_aliases_for_line(
     return [
         row
         for row in rows
-        if row.get("supplier_id") is None
-        or str(row["supplier_id"]) == str(supplier_id)
+        if row.get("supplier_id") is None or str(row["supplier_id"]) == str(supplier_id)
     ]
 
 
@@ -1271,9 +1268,7 @@ def _update_canonical_embedding(
 
 
 def _canonical_embedding_text(canonical: dict[str, object]) -> str:
-    return " ".join(
-        str(canonical.get(key) or "") for key in ("brand", "name", "variant")
-    ).strip()
+    return " ".join(str(canonical.get(key) or "") for key in ("brand", "name", "variant")).strip()
 
 
 def _canonical_by_id(client: object, canonical_ids: list[UUID]) -> dict[str, dict[str, object]]:
@@ -1302,6 +1297,13 @@ def _candidate_rows(client: object, line_id: UUID) -> list[dict[str, object]]:
         )
     except APIError as exc:
         raise ServiceUnavailableError(details={"dependency": "database"}) from exc
+
+
+def _candidate_is_deterministic(candidate: dict[str, object]) -> bool:
+    reasons = candidate.get("reasons")
+    return isinstance(reasons, dict) and any(
+        bool(reasons.get(key)) for key in ("alias_hit", "gtin_match", "supplier_code_match")
+    )
 
 
 def _decision_for_line(client: object, line_id: UUID) -> dict[str, object] | None:
@@ -1531,6 +1533,7 @@ def _decode_cursor(cursor: str | None) -> int:
     except (ValueError, UnicodeDecodeError) as exc:
         raise NotFoundError(details={"cursor": "invalid"}) from exc
 
+
 def _prefetch_search_context(client: object, line_ids: list[str]) -> dict[str, dict[str, object]]:
     context: dict[str, dict[str, object]] = {}
     for i in range(0, len(line_ids), 100):
@@ -1559,12 +1562,7 @@ def _prefetch_search_context(client: object, line_ids: list[str]) -> dict[str, d
     for i in range(0, len(supplier_ids), 100):
         chunk = supplier_ids[i : i + 100]
         try:
-            resp = (
-                client.table("supplier")
-                .select("id, name")
-                .in_("id", chunk)
-                .execute()
-            )
+            resp = client.table("supplier").select("id, name").in_("id", chunk).execute()
             for r in _rows(resp.data):
                 suppliers_by_id[str(r["id"])] = str(r.get("name") or "")
         except APIError as exc:

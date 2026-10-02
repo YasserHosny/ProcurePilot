@@ -206,11 +206,14 @@ chunk 4.3's extraction threshold pattern:
 | `MATCHING_AUTO_ACCEPT_THRESHOLD` | `0.9200` | top candidate can be automatically accepted |
 | `MATCHING_AUTO_REJECT_THRESHOLD` | `0.2500` | no useful candidate was found; still opens a no-match task |
 | `MATCHING_REVIEW_MARGIN` | `0.0500` | if top two candidates differ by less than this, route to review |
+| `MATCHING_FUZZY_AUTO_ACCEPT_ENABLED` | `false` | allow similarity-only candidates to auto-accept |
 
-Auto-accept happens only when the top candidate meets the threshold and is not a close call. Below
-auto-accept, the line routes to the match queue, including lines with no candidate at all. The
-auto-reject threshold is therefore a reason for queue presentation (`no_candidate`), not a silent
-drop.
+Auto-accept happens only when the top candidate meets the threshold, is not a close call, and is an
+exact-key match unless `MATCHING_FUZZY_AUTO_ACCEPT_ENABLED=true`. Below auto-accept, the line
+routes to the match queue, including lines with no candidate at all. The auto-reject threshold is
+therefore a reason for queue presentation (`no_candidate`), not a silent drop; similarity-only
+candidates that clear the score threshold while fuzzy auto-accept is disabled route as
+`fuzzy_match_review`.
 
 **Rationale**: thresholds are routing controls that must be tuned from real data. They are not
 schema constants. The initial auto-accept value mirrors the product quality gate: at least 92%

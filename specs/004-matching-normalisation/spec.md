@@ -167,10 +167,12 @@ was first computed.
   reason for why it was proposed (for example: alias hit, code match, wording similarity, price
   plausibility) — a confidence number with no reason is not sufficient.
 - **FR-006**: System MUST automatically accept a match when its confidence meets or exceeds the
-  configured auto-accept threshold, requiring no human action.
+  configured auto-accept threshold and the top candidate is an exact-key match (GTIN, supplier
+  product code, or learned alias), unless fuzzy auto-accept is explicitly enabled.
 - **FR-007**: System MUST route a line to a human match-resolution queue whenever no candidate
   meets the auto-accept threshold, or whenever multiple candidates score closely enough that
-  choosing automatically would be a guess.
+  choosing automatically would be a guess, or whenever a similarity-only top candidate clears the
+  auto-accept score while fuzzy auto-accept is disabled (`fuzzy_match_review`).
 - **FR-008**: Reviewers MUST be able to resolve a queued line with one of: confirm the top
   candidate, choose a different candidate, mark it a different pack size of the same product, mark
   it a different variant, mark it a compatible alternative, or mark it as no match.
