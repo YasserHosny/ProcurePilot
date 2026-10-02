@@ -11,7 +11,9 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatTableModule } from '@angular/material/table';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { Router } from '@angular/router';
-import { TranslatePipe, TranslateService } from '@ngx-translate/core';
+import { TranslatePipe,
+TranslateService } from '@ngx-translate/core';
+import { RoleDirective } from '../../../core/auth/role.directive';
 import { forkJoin, of } from 'rxjs';
 import { catchError } from 'rxjs/operators';
 
@@ -36,6 +38,7 @@ const I18N = 'requests';
     MatDialogModule,
     MatTooltipModule,
     TranslatePipe,
+    RoleDirective,
   ],
   templateUrl: './request-list.component.html',
   styleUrl: './request-list.component.scss',
@@ -103,6 +106,11 @@ export class RequestListComponent implements OnInit {
 
   navigateToCreate(): void {
     this.router.navigate(['/requests/new']);
+  }
+
+  
+  navigateToCreateOrder(request: PurchaseRequest): void {
+    this.router.navigate(['/orders/new'], { queryParams: { source_request_id: request.id } });
   }
 
   navigateToDetail(request: PurchaseRequest): void {

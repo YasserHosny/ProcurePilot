@@ -236,6 +236,15 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'orders/:id/edit',
+        canActivate: [roleGuard('owner', 'buyer')],
+        loadComponent: () =>
+          import('./features/orders/order-create/order-create.component').then(
+            (m) => m.OrderCreateComponent,
+          ),
+      },
+
+      {
         path: 'orders/:id',
         canActivate: [roleGuard('owner', 'buyer')],
         loadComponent: () =>

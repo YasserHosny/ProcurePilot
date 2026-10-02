@@ -16,7 +16,16 @@
   }
 
   <form [formGroup]="form" (ngSubmit)="submit()">
+    
+    @if (sourceRequest()) {
+      <div class="source-request-banner">
+        <mat-icon color="primary">info</mat-icon>
+        <span>{{ 'orders.create.creatingFromRequest' | translate }}: {{ sourceRequest()?.id }}</span>
+      </div>
+    }
+
     <mat-card class="form-card">
+
       <div class="form-row">
         <mat-form-field appearance="outline">
           <mat-label>{{ 'orders.create.orderNumber' | translate }}</mat-label>
@@ -78,6 +87,16 @@
           <mat-card class="line-card" [formGroupName]="i">
             <div class="line-header">
               <h3>{{ 'orders.create.linePrefix' | translate }} {{ i + 1 }}</h3>
+              
+              @if (line.controls.source_request_line_id.value) {
+                <div class="line-reference-info">
+                  @if (line.controls.estimated_price.value !== null) {
+                    <span class="estimate-badge">{{ 'orders.create.estimateReference' | translate }}: {{ line.controls.estimated_price.value | number:'1.2-2' }}</span>
+                  }
+                  <span class="remaining-badge">{{ 'orders.create.remainingQuantity' | translate }}: {{ line.controls.remaining_quantity.value }}</span>
+                </div>
+              }
+
               <button mat-icon-button type="button" color="warn" (click)="removeLine(i)" [attr.aria-label]="'orders.create.removeLine' | translate">
                 <mat-icon>delete</mat-icon>
               </button>
@@ -112,6 +131,9 @@
                 }
                 @if (line.controls.quantity.hasError('min')) {
                   <mat-error>{{ 'orders.create.errors.positiveQuantity' | translate }}</mat-error>
+                }
+                @if (line.controls.quantity.hasError('max')) {
+                  <mat-error>{{ 'orders.create.errors.maxQuantity' | translate }} ({{ line.controls.remaining_quantity.value }})</mat-error>
                 }
               </mat-form-field>
 

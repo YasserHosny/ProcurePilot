@@ -11,7 +11,10 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { RequestsApiService } from '../../requests/requests-api';
+import type { PurchaseRequest } from '../../../core/api/models';
+import type { RequestAllocation } from '../orders-api';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { catchError, forkJoin, of } from 'rxjs';
 
@@ -26,6 +29,9 @@ interface OrderLineForm {
   base_unit: FormControl<string>;
   unit_price: FormControl<number | null>;
   line_tax: FormControl<number | null>;
+  source_request_line_id: FormControl<string | null>;
+  remaining_quantity: FormControl<number | null>;
+  estimated_price: FormControl<number | null>;
 }
 
 @Component({
@@ -55,12 +61,17 @@ export class OrderCreateComponent implements OnInit {
   private readonly translate = inject(TranslateService);
   private readonly api = inject(ApiService);
   private readonly ordersApi = inject(OrdersApiService);
+  private readonly route = inject(ActivatedRoute);
+  private readonly requestsApi = inject(RequestsApiService);
 
   readonly suppliers = signal<Supplier[]>([]);
   readonly products = signal<Product[]>([]);
 
   readonly isSubmitting = signal(false);
   readonly errorMessage = signal<string | null>(null);
+  readonly sourceRequest = signal<PurchaseRequest | null>(null);
+  readonly requestAllocations = signal<RequestAllocation | null>(null);
+  readonly editOrderId = signal<string | null>(null);
 
   readonly form = new FormGroup({
     order_number: new FormControl<string>('', { nonNullable: true, validators: [Validators.required] }),
@@ -94,13 +105,83 @@ export class OrderCreateComponent implements OnInit {
   }
 
   ngOnInit(): void {
+    const sourceRequestId = this.route.snapshot.queryParamMap.get('source_request_id');
+    const editId = this.route.snapshot.paramMap.get('id');
+    
+    if (editId) {
+      this.editOrderId.set(editId);
+    }
+
     forkJoin({
       suppliers: this.api.suppliers({ limit: 100 }).pipe(catchError(() => of({ items: [], next_cursor: null }))),
       products: this.api.products({ status: 'all', limit: 100 }).pipe(catchError(() => of({ items: [], next_cursor: null }))),
-    }).subscribe(({ suppliers, products }) => {
+      request: sourceRequestId ? this.requestsApi.getRequest(sourceRequestId).pipe(catchError(() => of(null))) : of(null),
+      allocations: sourceRequestId ? this.ordersApi.getAllocations(sourceRequestId).pipe(catchError(() => of(null))) : of(null),
+      orderToEdit: editId ? this.ordersApi.getOrder(editId).pipe(catchError(() => of(null))) : of(null),
+    }).subscribe(({ suppliers, products, request, allocations, orderToEdit }) => {
       this.suppliers.set(suppliers.items);
       this.products.set(products.items);
-      this.addLine();
+      
+      if (orderToEdit) {
+        const order = orderToEdit.order;
+        this.form.patchValue({
+          order_number: order.order_number,
+          supplier_id: order.supplier_id,
+          order_date: new Date(order.order_date),
+          expected_delivery_date: order.expected_delivery_date ? new Date(order.expected_delivery_date) : null,
+          currency: order.total.currency,
+          order_tax: parseFloat(order.tax.amount),
+        });
+        
+        this.lines.clear();
+        order.lines.forEach((line) => {
+          this.lines.push(
+            new FormGroup<OrderLineForm>({
+              workspace_product_id: new FormControl<string | null>(line.workspace_product_id),
+              description: new FormControl<string>(line.description, { nonNullable: true, validators: [Validators.required] }),
+              quantity: new FormControl<number | null>(parseFloat(line.ordered_quantity), { validators: [Validators.required, Validators.min(0.0001)] }),
+              base_unit: new FormControl<string>(line.base_unit, { nonNullable: true, validators: [Validators.required] }),
+              unit_price: new FormControl<number | null>(parseFloat(line.unit_price.amount), { validators: [Validators.required, Validators.min(0)] }),
+              line_tax: new FormControl<number | null>(parseFloat(line.tax.amount), { validators: [Validators.min(0)] }),
+              source_request_line_id: new FormControl<string | null>(line.source_request_line_id || null),
+              remaining_quantity: new FormControl<number | null>(null),
+              estimated_price: new FormControl<number | null>(null),
+            })
+          );
+        });
+      } else if (request && allocations) {
+        this.sourceRequest.set(request);
+        this.requestAllocations.set(allocations);
+        this.lines.clear();
+        
+        request.lines.forEach(reqLine => {
+          const allocation = allocations.lines.find(a => a.source_request_line_id === reqLine.id);
+          const remainingStr = allocation?.remaining_quantity || '0';
+          const remaining = parseFloat(remainingStr);
+          
+          if (remaining > 0) {
+            this.lines.push(
+              new FormGroup<OrderLineForm>({
+                workspace_product_id: new FormControl<string | null>(reqLine.workspace_product_id || null),
+                description: new FormControl<string>(products.items.find(p => p.id === reqLine.workspace_product_id)?.tenant_name || '', { nonNullable: true, validators: [Validators.required] }),
+                quantity: new FormControl<number | null>(remaining, { validators: [Validators.required, Validators.min(0.0001), Validators.max(remaining)] }),
+                base_unit: new FormControl<string>(products.items.find(p => p.id === reqLine.workspace_product_id)?.base_unit || 'EA', { nonNullable: true, validators: [Validators.required] }),
+                unit_price: new FormControl<number | null>(null, { validators: [Validators.required, Validators.min(0)] }),
+                line_tax: new FormControl<number | null>(0, { validators: [Validators.min(0)] }),
+                source_request_line_id: new FormControl<string | null>(reqLine.id),
+                remaining_quantity: new FormControl<number | null>(remaining),
+                estimated_price: new FormControl<number | null>(reqLine.estimated_unit_price ? parseFloat(reqLine.estimated_unit_price.amount) : null),
+              })
+            );
+          }
+        });
+        
+        if (this.lines.length === 0) {
+          this.addLine();
+        }
+      } else {
+        this.addLine();
+      }
     });
   }
 
@@ -113,6 +194,9 @@ export class OrderCreateComponent implements OnInit {
         base_unit: new FormControl<string>('EA', { nonNullable: true, validators: [Validators.required] }),
         unit_price: new FormControl<number | null>(0, { validators: [Validators.required, Validators.min(0)] }),
         line_tax: new FormControl<number | null>(0, { validators: [Validators.min(0)] }),
+        source_request_line_id: new FormControl<string | null>(null),
+        remaining_quantity: new FormControl<number | null>(null),
+        estimated_price: new FormControl<number | null>(null),
       })
     );
   }
@@ -165,6 +249,7 @@ export class OrderCreateComponent implements OnInit {
         unit_price: { amount: price.toFixed(4), currency },
         tax: { amount: tax.toFixed(4), currency },
         line_total: { amount: lineTotal.toFixed(4), currency },
+        source_request_line_id: line.source_request_line_id,
       };
     });
 
@@ -179,10 +264,15 @@ export class OrderCreateComponent implements OnInit {
       tax: { amount: orderTaxAmount.toFixed(4), currency },
       source_kind: 'manual',
       source_reference: value.order_number,
+      source_request_id: this.sourceRequest()?.id || undefined,
       lines: mappedLines,
     };
 
-    this.ordersApi.createOrder(payload).subscribe({
+    const request$ = this.editOrderId() 
+      ? this.ordersApi.editDraftOrder(this.editOrderId()!, payload) 
+      : this.ordersApi.createOrder(payload);
+
+    request$.subscribe({
       next: (order) => {
         this.isSubmitting.set(false);
         this.snackBar.open(this.translate.instant('orders.create.success'), undefined, { duration: 3500 });

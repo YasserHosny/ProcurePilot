@@ -1882,7 +1882,8 @@
     "actions": {
       "view": "عرض الطلب",
       "edit": "تعديل الطلب",
-      "withdraw": "سحب الطلب"
+      "withdraw": "سحب الطلب",
+      "createOrder": "إنشاء طلب شراء"
     },
     "form": {
       "createTitle": "طلب شراء جديد",
@@ -3133,8 +3134,12 @@
         "required": "مطلوب",
         "currencyFormat": "رمز من 3 أحرف",
         "positiveQuantity": "يجب أن يكون > 0",
-        "nonNegativePrice": "يجب أن يكون >= 0"
-      }
+        "nonNegativePrice": "يجب أن يكون >= 0",
+        "maxQuantity": "لا يمكن تجاوز الكمية المتبقية"
+      },
+      "creatingFromRequest": "الإنشاء من الطلب",
+      "estimateReference": "التقدير",
+      "remainingQuantity": "الكمية المتبقية للتخصيص"
     },
     "status": {
       "draft": "مسودة",
@@ -3184,7 +3189,12 @@
       "timelineTitle": "الخط الزمني للدليل",
       "orderCreated": "تم إنشاء أمر الشراء",
       "confirmationRecorded": "تم تسجيل تأكيد المورد",
-      "receiptRecorded": "تم تسجيل إيصال التسليم {{reference}}"
+      "receiptRecorded": "تم تسجيل إيصال التسليم {{reference}}",
+      "edit": "تعديل المسودة",
+      "cancel": "إلغاء الطلب",
+      "cancelConfirmTitle": "هل تريد إلغاء طلب الشراء؟",
+      "cancelConfirmMessage": "هل أنت متأكد من رغبتك في إلغاء هذا الطلب؟ ستبقى أي كمية مستلمة مستهلكة، وسيتم إعادة أي كمية غير مستلمة إلى طلب المصدر.",
+      "cancelOrder": "نعم، إلغاء الطلب"
     }
   },
   "accounting": {
@@ -3562,7 +3572,9 @@
         "priceVariance": "يجب أن يكون تباين السعر بين 0٪ و100٪.",
         "branch": "اختر فرعاً افتراضياً."
       },
-      "errors": { "save": "تعذر حفظ إعدادات الضابط." },
+      "errors": {
+        "save": "تعذر حفظ إعدادات الضابط."
+      },
       "reasons": {
         "rfq_not_open": "طلب عروض الأسعار غير مفتوح.",
         "min_response_count_not_met": "لم يتحقق الحد الأدنى للردود.",

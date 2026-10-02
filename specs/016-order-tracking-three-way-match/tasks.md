@@ -39,11 +39,11 @@ description: "Focused task list for User Story 4: Create draft purchase order fr
 
 ## Phase 4: User Interface & Localization
 
-- [ ] T011 [US4] Add a frontend entry point in `apps/web/src/app/features/requests/request-list/request-list.component.ts` (and corresponding HTML) to initiate draft PO creation from an approved request.
-- [ ] T012 [US4] Add/update UI components in `apps/web/src/app/features/orders/order-create/order-create.component.ts` to surface request estimates as reference only and mandate buyer-entered actual prices, currencies, and tax. Integrate with the new remaining-quantity read contract to display accurate allocations.
-- [ ] T013 [US4] Add an order detail edit/cancel affordance in `apps/web/src/app/features/orders/order-detail/order-detail.component.ts` (and HTML) for modifying drafts or cancelling orders, displaying computed remaining quantities based on non-cancelled PO allocations.
-- [ ] T014 [US4] Add English and Arabic localization keys in `packages/i18n/en.json` and `packages/i18n/ar.json` for the entry points, draft edit/creation, split allocations, remaining quantities, and cancellation flows.
-- [ ] T015 [US4] Verify RTL layout integrity and add an E2E path (via Playwright) testing the order detail edit/cancel flow and ensuring zero WCAG 2.1 AA violations using `axe-core`.
+- [x] T011 [US4] Add a frontend entry point in `apps/web/src/app/features/requests/request-list/request-list.component.ts` (and corresponding HTML) to initiate draft PO creation from an approved request.
+- [x] T012 [US4] Add/update UI components in `apps/web/src/app/features/orders/order-create/order-create.component.ts` to surface request estimates as reference only and mandate buyer-entered actual prices, currencies, and tax. Integrate with the new remaining-quantity read contract to display accurate allocations.
+- [x] T013 [US4] Add an order detail edit/cancel affordance in `apps/web/src/app/features/orders/order-detail/order-detail.component.ts` (and HTML) for modifying drafts or cancelling orders, displaying computed remaining quantities based on non-cancelled PO allocations.
+- [x] T014 [US4] Add English and Arabic localization keys in `packages/i18n/en.json` and `packages/i18n/ar.json` for the entry points, draft edit/creation, split allocations, remaining quantities, and cancellation flows.
+- [x] T015 [US4] Verify RTL layout integrity and add an E2E path (via Playwright) testing the order detail edit/cancel flow and ensuring zero WCAG 2.1 AA violations using `axe-core`.
 
 ## Phase 5: Documentation & Verification
 

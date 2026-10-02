@@ -29,6 +29,7 @@ export interface PurchaseOrderLine {
   unit_price: Money;
   tax: Money;
   line_total: Money;
+  source_request_line_id?: string | null;
 }
 
 export interface PurchaseOrder {
@@ -151,6 +152,19 @@ export interface DeliveryReceiptCreate {
   }[];
 }
 
+
+export interface RequestLineAllocation {
+  source_request_line_id: string;
+  requested_quantity: string;
+  allocated_quantity: string;
+  remaining_quantity: string;
+}
+
+export interface RequestAllocation {
+  source_request_id: string;
+  lines: RequestLineAllocation[];
+}
+
 export interface PurchaseOrderLineInput {
   line_number: number;
   workspace_product_id: string | null;
@@ -160,6 +174,7 @@ export interface PurchaseOrderLineInput {
   unit_price: Money;
   tax: Money;
   line_total: Money;
+  source_request_line_id?: string | null;
 }
 
 export interface PurchaseOrderCreate {
@@ -172,6 +187,7 @@ export interface PurchaseOrderCreate {
   source_kind: 'manual';
   source_reference: string;
   source_hash?: string | null;
+  source_request_id?: string | null;
   lines: PurchaseOrderLineInput[];
 }
 
@@ -224,6 +240,26 @@ export class OrdersApiService {
       ? new HttpHeaders({ 'Idempotency-Key': idempotencyKey })
       : this.idempotencyHeaders();
     return this.http.post<PurchaseOrder>(`${this.base}/orders`, payload, { headers });
+  }
+
+  
+  getAllocations(sourceRequestId: string): Observable<RequestAllocation> {
+    const query = new URLSearchParams({ source_request_id: sourceRequestId });
+    return this.http.get<RequestAllocation>(`${this.base}/orders/allocations?${query.toString()}`);
+  }
+
+  editDraftOrder(orderId: string, payload: PurchaseOrderCreate, idempotencyKey?: string): Observable<PurchaseOrder> {
+    const headers = idempotencyKey
+      ? new HttpHeaders({ 'Idempotency-Key': idempotencyKey })
+      : this.idempotencyHeaders();
+    return this.http.put<PurchaseOrder>(`${this.base}/orders/${encodeURIComponent(orderId)}`, payload, { headers });
+  }
+
+  cancelOrder(orderId: string, idempotencyKey?: string): Observable<PurchaseOrder> {
+    const headers = idempotencyKey
+      ? new HttpHeaders({ 'Idempotency-Key': idempotencyKey })
+      : this.idempotencyHeaders();
+    return this.http.post<PurchaseOrder>(`${this.base}/orders/${encodeURIComponent(orderId)}/cancel`, {}, { headers });
   }
 
   private idempotencyHeaders(): HttpHeaders {

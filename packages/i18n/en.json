@@ -1882,7 +1882,8 @@
     "actions": {
       "view": "View request",
       "edit": "Edit request",
-      "withdraw": "Withdraw request"
+      "withdraw": "Withdraw request",
+      "createOrder": "Create Order"
     },
     "form": {
       "createTitle": "New Purchase Request",
@@ -3133,8 +3134,12 @@
         "required": "Required",
         "currencyFormat": "3-letter code",
         "positiveQuantity": "Must be > 0",
-        "nonNegativePrice": "Must be >= 0"
-      }
+        "nonNegativePrice": "Must be >= 0",
+        "maxQuantity": "Cannot exceed remaining quantity"
+      },
+      "creatingFromRequest": "Creating from Request",
+      "estimateReference": "Estimate",
+      "remainingQuantity": "Remaining Allocatable"
     },
     "status": {
       "draft": "Draft",
@@ -3184,7 +3189,12 @@
       "timelineTitle": "Evidence timeline",
       "orderCreated": "Purchase order created",
       "confirmationRecorded": "Supplier confirmation recorded",
-      "receiptRecorded": "Delivery receipt {{reference}} recorded"
+      "receiptRecorded": "Delivery receipt {{reference}} recorded",
+      "edit": "Edit Draft",
+      "cancel": "Cancel Order",
+      "cancelConfirmTitle": "Cancel Purchase Order?",
+      "cancelConfirmMessage": "Are you sure you want to cancel this order? Any received quantity will remain consumed, and any unreceived quantity will be released back to the source request.",
+      "cancelOrder": "Yes, Cancel Order"
     }
   },
   "accounting": {
@@ -3562,7 +3572,9 @@
         "priceVariance": "Price variance must be between 0% and 100%.",
         "branch": "Select a default branch."
       },
-      "errors": { "save": "Unable to save guardrail settings." },
+      "errors": {
+        "save": "Unable to save guardrail settings."
+      },
       "reasons": {
         "rfq_not_open": "The RFQ is not open.",
         "min_response_count_not_met": "The minimum response count is not met.",

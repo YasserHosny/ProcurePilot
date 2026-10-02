@@ -113,6 +113,20 @@
                   <mat-icon aria-hidden="true">visibility</mat-icon>
                 </button>
 
+                @if (req.status === 'approved') {
+                  <button
+                    *appRole="['owner', 'buyer']"
+                    mat-icon-button
+                    type="button"
+                    (click)="navigateToCreateOrder(req); $event.stopPropagation()"
+                    [attr.aria-label]="'requests.actions.createOrder' | translate"
+                    [matTooltip]="'requests.actions.createOrder' | translate"
+                    color="primary"
+                  >
+                    <mat-icon aria-hidden="true">shopping_cart</mat-icon>
+                  </button>
+                }
+
                 @if (req.status === 'draft' || req.status === 'submitted') {
                   <button
                     mat-icon-button
