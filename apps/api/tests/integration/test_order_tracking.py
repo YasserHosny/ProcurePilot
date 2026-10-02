@@ -11,7 +11,8 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from integration.catalogue_helpers import TEST_DATABASE_URL, Workspace
+from integration.catalogue_helpers import TEST_DATABASE_URL, Workspace, act_as
+from integration.quotation_helpers import PsycopgSupabaseClient
 from integration.smart_compare_helpers import (
     committed_smart_context,
     member_from_workspace,
@@ -20,6 +21,7 @@ from integration.smart_compare_helpers import (
 from procurepilot_api.deps import bearer_token, current_member
 from procurepilot_api.main import create_app
 from procurepilot_api.modules.auth.jwt import MemberRole
+from procurepilot_api.modules.requests import service as requests_service
 
 pytestmark = pytest.mark.skipif(
     not TEST_DATABASE_URL,
@@ -139,11 +141,18 @@ def test_approved_request_list_item_can_create_and_edit_linked_draft_order(
         with psycopg.connect(TEST_DATABASE_URL) as conn:
             req_id, line_id = _setup_approved_request(conn, context.workspace, context.product_id)
 
-        res_requests = client.get("/api/v1/requests")
-        assert res_requests.status_code == 200, res_requests.text
-        listed = {item["id"]: item for item in res_requests.json()["items"]}
-        assert listed[str(req_id)]["status"] == "ordered"
-        assert listed[str(req_id)]["approval_step"]["status"] == "approved"
+            act_as(conn, context.workspace)
+            monkeypatch.setattr(
+                requests_service,
+                "authenticated_client",
+                lambda _settings, _bearer_token: PsycopgSupabaseClient(conn),
+            )
+
+            res_requests = client.get("/api/v1/requests")
+            assert res_requests.status_code == 200, res_requests.text
+            listed = {item["id"]: item for item in res_requests.json()["items"]}
+            assert listed[str(req_id)]["status"] == "ordered"
+            assert listed[str(req_id)]["approval_step"]["status"] == "approved"
 
         payload = _base_order_payload(context.supplier_ids[0], req_id, line_id, context.product_id)
         res_create = client.post(
