@@ -28,5 +28,31 @@ void main() {
 
       expect(await camera.capturePhoto(), isNull);
     });
+
+    test('recovers a photo lost to activity destruction', () async {
+      final camera = ImagePickerCameraCapture(
+        retrieveLostData: () async =>
+            LostDataResponse(file: XFile('/tmp/recovered.jpg')),
+      );
+
+      final recovered = await camera.recoverLostCapture();
+      expect(recovered?.filePath, '/tmp/recovered.jpg');
+    });
+
+    test('returns null when there is nothing to recover', () async {
+      final camera = ImagePickerCameraCapture(
+        retrieveLostData: () async => LostDataResponse.empty(),
+      );
+
+      expect(await camera.recoverLostCapture(), isNull);
+    });
+
+    test('returns null when recovery throws', () async {
+      final camera = ImagePickerCameraCapture(
+        retrieveLostData: () async => throw Exception('platform error'),
+      );
+
+      expect(await camera.recoverLostCapture(), isNull);
+    });
   });
 }

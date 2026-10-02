@@ -301,6 +301,9 @@ class FakeCameraCapture implements CameraCapture {
     captureCalls += 1;
     return captureResult;
   }
+
+  @override
+  Future<CapturedPhoto?> recoverLostCapture() async => null;
 }
 
 /// In-memory test double for [OfflineQueue].

@@ -23,22 +23,36 @@ class CapturedPhoto {
 abstract class CameraCapture {
   Future<bool> isAvailable();
   Future<CapturedPhoto?> capturePhoto();
+
+  /// Recovers a photo whose [capturePhoto] call never returned because the
+  /// OS reclaimed this app's process while the external camera activity was
+  /// in front (common under memory pressure on Android). Callers should
+  /// invoke this once when the screen that initiated capture is restored,
+  /// before assuming "no photo" means the user never took one.
+  Future<CapturedPhoto?> recoverLostCapture();
 }
 
 typedef CameraPhotoPicker = Future<XFile?> Function({
   required ImageSource source,
 });
 
+typedef LostCaptureRetriever = Future<LostDataResponse> Function();
+
 Future<XFile?> _pickWithImagePicker({required ImageSource source}) =>
     ImagePicker().pickImage(source: source);
+
+Future<LostDataResponse> _retrieveLostDataWithImagePicker() =>
+    ImagePicker().retrieveLostData();
 
 /// CameraCapture adapter backed by the official Flutter image picker plugin.
 class ImagePickerCameraCapture implements CameraCapture {
   const ImagePickerCameraCapture({
     this.pickImage = _pickWithImagePicker,
+    this.retrieveLostData = _retrieveLostDataWithImagePicker,
   });
 
   final CameraPhotoPicker pickImage;
+  final LostCaptureRetriever retrieveLostData;
 
   @override
   Future<bool> isAvailable() async {
@@ -58,6 +72,18 @@ class ImagePickerCameraCapture implements CameraCapture {
       return null;
     }
   }
+
+  @override
+  Future<CapturedPhoto?> recoverLostCapture() async {
+    try {
+      final response = await retrieveLostData();
+      if (response.isEmpty || response.file == null) return null;
+      return CapturedPhoto(filePath: response.file!.path);
+    } on Object catch (error, stackTrace) {
+      debugPrint('Lost-capture recovery failed: $error\n$stackTrace');
+      return null;
+    }
+  }
 }
 
 /// Null-object implementation retained for callers that explicitly need to
@@ -70,4 +96,7 @@ class StandInCameraCapture implements CameraCapture {
 
   @override
   Future<CapturedPhoto?> capturePhoto() async => null;
+
+  @override
+  Future<CapturedPhoto?> recoverLostCapture() async => null;
 }
