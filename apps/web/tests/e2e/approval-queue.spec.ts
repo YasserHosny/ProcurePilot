@@ -49,15 +49,17 @@ test.describe('Approval Queue (chunk 008 US2)', () => {
   async function seedSubmittedRequest(label: string): Promise<{
     requestId: string;
     branchId: string;
+    branchName: string;
     requesterId: string;
     requiredByDate: string;
   }> {
+    const branchName = `Approval E2E ${label} ${Date.now()}`;
     const branch = await apiAsUser<{ id: string }>(
       ownerToken,
       'POST',
       '/organisation/branches',
       {
-        name: `Approval E2E ${label} ${Date.now()}`,
+        name: branchName,
         address: '42 Approval Road',
         region: 'GB',
       },
@@ -84,6 +86,7 @@ test.describe('Approval Queue (chunk 008 US2)', () => {
     return {
       requestId: submitted.id,
       branchId: branch.id,
+      branchName,
       requesterId: submitted.requested_by_membership_id,
       requiredByDate,
     };
@@ -96,7 +99,8 @@ test.describe('Approval Queue (chunk 008 US2)', () => {
     await page.goto('/approvals');
     await expect(page.locator('.approval-queue-title')).toContainText('Approval Queue');
 
-    const row = page.locator('tr.request-row', { hasText: request.branchId });
+    // The branch column renders the branch's name (getBranchName), never its raw id.
+    const row = page.locator('tr.request-row', { hasText: request.branchName });
     await expect(row).toBeVisible();
     await expect(row).toContainText(request.requesterId);
     await expect(row).toContainText(request.requiredByDate);

@@ -120,8 +120,10 @@ test.describe('Purchase Request Submission (chunk 008 US1)', () => {
     const future = new Date(Date.now() + 30 * 86_400_000).toISOString().split('T')[0]!;
     await page.fill('input[formControlName="required_by_date"]', future);
 
-    // Fill the first line item
-    await page.fill('.line-product input', product.id);
+    // Fill the first line item. .line-product is a mat-select (options list by
+    // product name), not a text input — there's no real <input> inside it to fill.
+    await page.click('.line-product mat-select');
+    await page.locator('mat-option', { hasText: product.tenant_name }).click();
     await page.fill('.line-quantity input', '5');
 
     // Save draft
