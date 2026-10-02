@@ -7,7 +7,11 @@ from uuid import UUID
 from postgrest.exceptions import APIError
 
 from procurepilot_api.errors import ServiceUnavailableError
-from procurepilot_api.modules.matching.embeddings import StubEmbeddingProvider, vector_literal
+from procurepilot_api.modules.matching.embeddings import (
+    BedrockEmbeddingProvider,
+    StubEmbeddingProvider,
+    vector_literal,
+)
 from procurepilot_api.modules.matching.scoring import (
     STUB_EMBEDDING_MODEL,
     ScoreInputs,
@@ -34,7 +38,7 @@ def build_similarity_candidates(
     *,
     client: object,
     line: dict[str, object],
-    embedding_provider: StubEmbeddingProvider,
+    embedding_provider: StubEmbeddingProvider | BedrockEmbeddingProvider,
     trigram_threshold: float,
     limit: int = 5,
 ) -> list[SimilarityCandidate]:

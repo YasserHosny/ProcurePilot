@@ -18,7 +18,12 @@ from procurepilot_api.errors import ConflictError, NotFoundError, ServiceUnavail
 from procurepilot_api.modules.ingestion.guardrail_jobs import enqueue_guardrail_evaluation
 from procurepilot_api.modules.landed_cost.service import LandedCostService
 from procurepilot_api.modules.matching.deterministic import find_deterministic_candidate
-from procurepilot_api.modules.matching.embeddings import StubEmbeddingProvider, vector_literal
+from procurepilot_api.modules.matching.embeddings import (
+    BedrockEmbeddingProvider,
+    StubEmbeddingProvider,
+    get_embedding_provider,
+    vector_literal,
+)
 from procurepilot_api.modules.matching.quoted_exposure import quoted_exposure
 from procurepilot_api.modules.matching.schemas import (
     MatchCandidate,
@@ -73,7 +78,7 @@ ALIAS_COLUMNS = "id,workspace_product_id,supplier_id,alias_text,created_by,creat
 class MatchingService:
     def __init__(self, settings: Settings | None = None) -> None:
         self._settings = settings or get_settings()
-        self._embeddings = StubEmbeddingProvider(self._settings.matching_embedding_model)
+        self._embeddings = get_embedding_provider(self._settings)
         self._landed_cost = LandedCostService(self._settings)
 
     def quotation_matches(
@@ -1235,7 +1240,7 @@ def _update_workspace_embedding(
     client: object,
     product_id: UUID,
     tenant_name: str,
-    embedding_provider: StubEmbeddingProvider,
+    embedding_provider: StubEmbeddingProvider | BedrockEmbeddingProvider,
 ) -> None:
     try:
         client.table("workspace_product").update(
@@ -1252,7 +1257,7 @@ def _update_canonical_embedding(
     *,
     client: object,
     canonical: dict[str, object],
-    embedding_provider: StubEmbeddingProvider,
+    embedding_provider: StubEmbeddingProvider | BedrockEmbeddingProvider,
 ) -> None:
     try:
         client.table("canonical_product").update(
