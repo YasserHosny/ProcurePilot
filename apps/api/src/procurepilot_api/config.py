@@ -187,6 +187,9 @@ class Settings(BaseSettings):
     matching_trigram_threshold: float = Field(
         default=0.30, validation_alias="MATCHING_TRIGRAM_THRESHOLD", ge=0, le=1
     )
+    matching_embedding_provider_mode: Literal["stub", "bedrock"] = Field(
+        default="stub", validation_alias="MATCHING_EMBEDDING_PROVIDER_MODE"
+    )
     matching_embedding_model: str = Field(
         default="stub-hash-v1", validation_alias="MATCHING_EMBEDDING_MODEL"
     )
