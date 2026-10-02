@@ -333,7 +333,7 @@ def test_cancellation_releases_unreceived_quantity_but_retains_receipts(
                 cur.execute(
                     "select sum(received_quantity) from delivery_receipt_line "
                     "join delivery_receipt on delivery_receipt_id = delivery_receipt.id "
-                    "where purchase_order_id = %s",
+                    "where delivery_receipt.purchase_order_id = %s",
                     (order_id,),
                 )
                 assert cur.fetchone()[0] == Decimal("4")
@@ -392,3 +392,47 @@ def test_cross_tenant_and_role_rejections(
             404,
             422,
         ), "Should reject missing/invalid source_request_line_id"
+
+
+def test_database_rejects_line_from_different_source_request() -> None:
+    with committed_smart_context("order-line-integrity") as context:
+        with psycopg.connect(TEST_DATABASE_URL) as conn:
+            req_id_a, _line_id_a = _setup_approved_request(
+                conn, context.workspace, context.product_id
+            )
+            _req_id_b, line_id_b = _setup_approved_request(
+                conn, context.workspace, context.product_id
+            )
+            order_id = uuid4()
+            with conn.cursor() as cur:
+                cur.execute(
+                    "insert into purchase_order (id,tenant_id,order_number,supplier_id,"
+                    "order_date,total_amount,total_currency,tax_amount,tax_currency,"
+                    "source_reference,created_by,source_request_id) "
+                    "values (%s,%s,%s,%s,current_date,10,'USD',0,'USD','test',%s,%s)",
+                    (
+                        order_id,
+                        context.workspace.tenant_id,
+                        f"PO-INTEGRITY-{uuid4().hex[:8]}",
+                        context.supplier_ids[0],
+                        context.workspace.membership_id,
+                        req_id_a,
+                    ),
+                )
+                with pytest.raises(psycopg.errors.ForeignKeyViolation):
+                    cur.execute(
+                        "insert into purchase_order_line (tenant_id,purchase_order_id,"
+                        "line_number,workspace_product_id,description,ordered_quantity,"
+                        "base_unit,unit_price_amount,unit_price_currency,tax_amount,"
+                        "tax_currency,line_total_amount,line_total_currency,"
+                        "source_request_id,source_request_line_id) "
+                        "values (%s,%s,1,%s,'wrong request line',1,'each',10,'USD',"
+                        "0,'USD',10,'USD',%s,%s)",
+                        (
+                            context.workspace.tenant_id,
+                            order_id,
+                            context.product_id,
+                            req_id_a,
+                            line_id_b,
+                        ),
+                    )

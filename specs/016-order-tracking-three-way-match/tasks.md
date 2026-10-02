@@ -15,7 +15,7 @@ description: "Focused task list for User Story 4: Create draft purchase order fr
 
 > **NOTE: Write these tests FIRST, ensure they FAIL before implementation**
 
-- [ ] T001 [US4] Write failing API integration tests in `apps/api/tests/integration/test_order_tracking.py` sequentially for:
+- [x] T001 [US4] Write failing API integration tests in `apps/api/tests/integration/test_order_tracking.py` sequentially for:
   - Draft order creation from request with explicit price requirement and line validation.
   - Idempotent draft edit mutations.
   - Transactional allocation limits (concurrency) at request scope.
@@ -24,18 +24,18 @@ description: "Focused task list for User Story 4: Create draft purchase order fr
 
 ## Phase 2: Database & Linkage
 
-- [ ] T002 [US4] Create forward-only DB migration in `supabase/migrations/` extending `purchase_order` with `source_request_id` and `purchase_order_line` with `source_request_line_id`. Ensure tenant-pinned composite foreign keys, forced RLS with `USING` and `WITH CHECK` policies, and preserve backwards compatibility.
+- [x] T002 [US4] Create forward-only DB migration in `supabase/migrations/` extending `purchase_order` with `source_request_id` and `purchase_order_line` with `source_request_line_id`. Ensure tenant-pinned composite foreign keys, forced RLS with `USING` and `WITH CHECK` policies, and preserve backwards compatibility.
 
 ## Phase 3: API Allocation Invariants
 
-- [ ] T003 [US4] Update schemas in `apps/api/src/procurepilot_api/modules/orders/schemas.py` to support `source_request_id` and `source_request_line_id` linkages, enforcing actual price, currency, and tax inputs. Add an edit-draft schema.
-- [ ] T004 [US4] Expose a defined interface in `apps/api/src/procurepilot_api/modules/requests/service.py` to validate a recorded human approval decision (do not use legacy `ordered` status as sole proof).
-- [ ] T005 [US4] Implement draft order creation logic in `apps/api/src/procurepilot_api/modules/orders/service.py`. Enforce the human approval decision via the new requests interface. Ensure one source request per PO and support splitting a request across multiple POs without exceeding allocated quantities.
-- [ ] T006 [US4] Implement an idempotent draft-edit service method in `apps/api/src/procurepilot_api/modules/orders/service.py` allowing modification of a draft purchase order.
-- [ ] T007 [US4] Implement transactional allocation limits in `apps/api/src/procurepilot_api/modules/orders/service.py` using advisory locks at the request scope to serialize every linked draft mutation (create/edit/cancel) atomically.
-- [ ] T008 [US4] Implement internal cancellation logic in `apps/api/src/procurepilot_api/modules/orders/service.py`. Ensure cancellation retains immutable received evidence, releases unreceived quantity, and explicitly prevents external provider calls.
-- [ ] T009 [US4] Implement a tenant-scoped allocation projection endpoint in `apps/api/src/procurepilot_api/modules/orders/router.py` that exposes allocated and remaining quantities per source request line, including the cancelled-order received-quantity rule.
-- [ ] T010 [US4] Implement router endpoints in `apps/api/src/procurepilot_api/modules/orders/router.py` for draft creation, draft edit, and cancellation. Enforce owner/buyer role RBAC, `Idempotency-Key` headers, and record audit events. Handle cross-tenant references as not found. Note: submit changes internal state only; no external provider call is made.
+- [x] T003 [US4] Update schemas in `apps/api/src/procurepilot_api/modules/orders/schemas.py` to support `source_request_id` and `source_request_line_id` linkages, enforcing actual price, currency, and tax inputs. Add an edit-draft schema.
+- [x] T004 [US4] Expose a defined interface in `apps/api/src/procurepilot_api/modules/requests/service.py` to validate a recorded human approval decision (do not use legacy `ordered` status as sole proof).
+- [x] T005 [US4] Implement draft order creation logic in `apps/api/src/procurepilot_api/modules/orders/service.py`. Enforce the human approval decision via the new requests interface. Ensure one source request per PO and support splitting a request across multiple POs without exceeding allocated quantities.
+- [x] T006 [US4] Implement an idempotent draft-edit service method in `apps/api/src/procurepilot_api/modules/orders/service.py` allowing modification of a draft purchase order.
+- [x] T007 [US4] Implement transactional allocation limits in `apps/api/src/procurepilot_api/modules/orders/service.py` using advisory locks at the request scope to serialize every linked draft mutation (create/edit/cancel) atomically.
+- [x] T008 [US4] Implement internal cancellation logic in `apps/api/src/procurepilot_api/modules/orders/service.py`. Ensure cancellation retains immutable received evidence, releases unreceived quantity, and explicitly prevents external provider calls.
+- [x] T009 [US4] Implement a tenant-scoped allocation projection endpoint in `apps/api/src/procurepilot_api/modules/orders/router.py` that exposes allocated and remaining quantities per source request line, including the cancelled-order received-quantity rule.
+- [x] T010 [US4] Implement router endpoints in `apps/api/src/procurepilot_api/modules/orders/router.py` for draft creation, draft edit, and cancellation. Enforce owner/buyer role RBAC, `Idempotency-Key` headers, and record audit events. Handle cross-tenant references as not found. Note: submit changes internal state only; no external provider call is made.
 
 ## Phase 4: User Interface & Localization
 
@@ -47,7 +47,7 @@ description: "Focused task list for User Story 4: Create draft purchase order fr
 
 ## Phase 5: Documentation & Verification
 
-- [ ] T016 [US4] Update `docs/architecture/api-specification.md` and `docs/architecture/data-dictionary.md` to document the new `source_request_id` relationships, the draft edit API, and draft/cancel state transitions.
+- [x] T016 [US4] Update `docs/architecture/api-specification.md` and `docs/architecture/data-dictionary.md` to document the new `source_request_id` relationships, the draft edit API, and draft/cancel state transitions.
 
 ## Verification Commands
 

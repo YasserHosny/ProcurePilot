@@ -58,7 +58,8 @@ ORDER_HEADER_COLUMNS = (
 )
 ORDER_LINE_COLUMNS = (
     "id,line_number,workspace_product_id,description,ordered_quantity,base_unit,"
-    "unit_price_amount,unit_price_currency,tax_amount,tax_currency,line_total_amount,line_total_currency"
+    "unit_price_amount,unit_price_currency,tax_amount,tax_currency,line_total_amount,"
+    "line_total_currency,source_request_line_id"
 )
 CONFIRMATION_COLUMNS = (
     "id,tenant_id,purchase_order_id,supplier_reference,confirmed_at,expected_delivery_date,"
@@ -96,7 +97,7 @@ class OrdersService:
 
             requests_service = RequestsService(self._settings)
             source_request = requests_service.validate_approved_request_for_order(
-                bearer_token=bearer_token, request_id=payload.source_request_id
+                bearer_token=bearer_token, member=member, request_id=payload.source_request_id
             )
             request_lines_by_id = {line.id: line for line in source_request.lines}
             for line in payload.lines:
@@ -144,35 +145,12 @@ class OrdersService:
             if payload.source_request_id:
                 self._lock_requests(cur, member.tenant_id, {payload.source_request_id})
 
-                cur.execute(
-                    "select pol.source_request_line_id, sum(case when po.status != .cancelled. then pol.ordered_quantity "  # noqa: E501
-                    "else coalesce(receipts.total_received, 0) end) as allocated "  # noqa: E501
-                    "from purchase_order_line pol "
-                    "join purchase_order po on po.tenant_id = pol.tenant_id and po.id = pol.purchase_order_id "  # noqa: E501
-                    "left join (select tenant_id, purchase_order_line_id, sum(received_quantity) as total_received "  # noqa: E501
-                    "from delivery_receipt_line where tenant_id = %s group by tenant_id, purchase_order_line_id) receipts "  # noqa: E501
-                    "on receipts.tenant_id = pol.tenant_id and receipts.purchase_order_line_id = pol.id "  # noqa: E501
-                    "where po.tenant_id = %s and pol.source_request_line_id = any(%s) "  # noqa: E501
-                    "group by pol.source_request_line_id",
-                    (member.tenant_id, member.tenant_id, list(request_lines_by_id.keys())),
+                self._assert_request_allocation_available(
+                    cur=cur,
+                    tenant_id=member.tenant_id,
+                    request_lines_by_id=request_lines_by_id,
+                    lines=payload.lines,
                 )
-                allocations = {
-                    str(r["source_request_line_id"]): r["allocated"] for r in cur.fetchall()
-                }
-
-                from collections import defaultdict
-                from decimal import Decimal
-
-                incoming = defaultdict(Decimal)
-                for line in payload.lines:
-                    incoming[str(line.source_request_line_id)] += line.ordered_quantity
-
-                for req_line_id_str, qty in incoming.items():
-                    req_line_id = UUID(req_line_id_str)
-                    req_line = request_lines_by_id[req_line_id]
-                    allocated = Decimal(str(allocations.get(req_line_id_str, "0")))
-                    if qty > (req_line.quantity - allocated):
-                        raise UnprocessableEntityError(details={"reason": "allocation_exceeded"})
 
             cur.execute(
                 f"insert into purchase_order ({','.join(data)}) "
@@ -197,8 +175,8 @@ class OrdersService:
                 "insert into purchase_order_line (tenant_id,purchase_order_id,line_number,"
                 "workspace_product_id,description,ordered_quantity,base_unit,unit_price_amount,"
                 "unit_price_currency,tax_amount,tax_currency,line_total_amount,"
-                "line_total_currency,source_request_line_id) "
-                "values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+                "line_total_currency,source_request_id,source_request_line_id) "
+                "values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
                 [
                     (
                         member.tenant_id,
@@ -214,6 +192,7 @@ class OrdersService:
                         line.tax.currency,
                         line.line_total.amount,
                         line.line_total.currency,
+                        payload.source_request_id,
                         line.source_request_line_id,
                     )
                     for line in payload.lines
@@ -240,7 +219,7 @@ class OrdersService:
 
             requests_service = RequestsService(self._settings)
             source_request = requests_service.validate_approved_request_for_order(
-                bearer_token=bearer_token, request_id=payload.source_request_id
+                bearer_token=bearer_token, member=member, request_id=payload.source_request_id
             )
             request_lines_by_id = {line.id: line for line in source_request.lines}
             for line in payload.lines:
@@ -294,41 +273,13 @@ class OrdersService:
                 self._lock_requests(cur, member.tenant_id, requests_to_lock)
 
             if payload.source_request_id:
-                cur.execute(
-                    "select pol.source_request_line_id, sum(case when po.status != .cancelled. then pol.ordered_quantity "  # noqa: E501
-                    "else coalesce(receipts.total_received, 0) end) as allocated "  # noqa: E501
-                    "from purchase_order_line pol "
-                    "join purchase_order po on po.tenant_id = pol.tenant_id and po.id = pol.purchase_order_id "  # noqa: E501
-                    "left join (select tenant_id, purchase_order_line_id, sum(received_quantity) as total_received "  # noqa: E501
-                    "from delivery_receipt_line where tenant_id = %s group by tenant_id, purchase_order_line_id) receipts "  # noqa: E501
-                    "on receipts.tenant_id = pol.tenant_id and receipts.purchase_order_line_id = pol.id "  # noqa: E501
-                    "where po.tenant_id = %s and pol.source_request_line_id = any(%s) "  # noqa: E501
-                    "and pol.purchase_order_id != %s "
-                    "group by pol.source_request_line_id",
-                    (
-                        member.tenant_id,
-                        member.tenant_id,
-                        list(request_lines_by_id.keys()),
-                        order_id,
-                    ),
+                self._assert_request_allocation_available(
+                    cur=cur,
+                    tenant_id=member.tenant_id,
+                    request_lines_by_id=request_lines_by_id,
+                    lines=payload.lines,
+                    excluded_order_id=order_id,
                 )
-                allocations = {
-                    str(r["source_request_line_id"]): r["allocated"] for r in cur.fetchall()
-                }
-
-                from collections import defaultdict
-                from decimal import Decimal
-
-                incoming = defaultdict(Decimal)
-                for line in payload.lines:
-                    incoming[str(line.source_request_line_id)] += line.ordered_quantity
-
-                for req_line_id_str, qty in incoming.items():
-                    req_line_id = UUID(req_line_id_str)
-                    req_line = request_lines_by_id[req_line_id]
-                    allocated = Decimal(str(allocations.get(req_line_id_str, "0")))
-                    if qty > (req_line.quantity - allocated):
-                        raise UnprocessableEntityError(details={"reason": "allocation_exceeded"})
 
             cur.execute(
                 "update purchase_order set order_number = %s, supplier_id = %s, order_date = %s, "
@@ -366,8 +317,8 @@ class OrdersService:
                 "insert into purchase_order_line (tenant_id,purchase_order_id,line_number,"
                 "workspace_product_id,description,ordered_quantity,base_unit,unit_price_amount,"
                 "unit_price_currency,tax_amount,tax_currency,line_total_amount,"
-                "line_total_currency,source_request_line_id) "
-                "values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+                "line_total_currency,source_request_id,source_request_line_id) "
+                "values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
                 [
                     (
                         member.tenant_id,
@@ -383,6 +334,7 @@ class OrdersService:
                         line.tax.currency,
                         line.line_total.amount,
                         line.line_total.currency,
+                        payload.source_request_id,
                         line.source_request_line_id,
                     )
                     for line in payload.lines
@@ -436,7 +388,7 @@ class OrdersService:
                 raise ConflictError(details={"reason": "order_number_or_idempotency_exists"})
 
             cur.execute(
-                "update purchase_order set status = .cancelled., cancel_idempotency_key = %s, updated_at = now() "  # noqa: E501
+                "update purchase_order set status = 'cancelled', cancel_idempotency_key = %s, updated_at = now() "  # noqa: E501
                 "where tenant_id = %s and id = %s",
                 (idempotency_key, member.tenant_id, order_id),
             )
@@ -455,14 +407,14 @@ class OrdersService:
 
         requests_service = RequestsService(self._settings)
         request = requests_service.get_request(
-            bearer_token=bearer_token, request_id=source_request_id
+            bearer_token=bearer_token, member=member, request_id=source_request_id
         )
 
         req_line_ids = [line.id for line in request.lines]
 
         with self._transaction(member) as cur:
             cur.execute(
-                "select pol.source_request_line_id, sum(case when po.status != .cancelled. then pol.ordered_quantity "  # noqa: E501
+                "select pol.source_request_line_id, sum(case when po.status != 'cancelled' then pol.ordered_quantity "  # noqa: E501
                 "else coalesce(receipts.total_received, 0) end) as allocated_quantity "  # noqa: E501
                 "from purchase_order_line pol "
                 "join purchase_order po on po.tenant_id = pol.tenant_id and po.id = pol.purchase_order_id "  # noqa: E501
@@ -480,11 +432,12 @@ class OrdersService:
         line_allocations = []
         for line in request.lines:
             allocated = Decimal(str(allocations.get(str(line.id), 0)))
-            remaining = line.quantity - allocated
+            requested_quantity = Decimal(str(line.quantity))
+            remaining = requested_quantity - allocated
             line_allocations.append(
                 RequestLineAllocation(
                     source_request_line_id=line.id,
-                    requested_quantity=line.quantity,
+                    requested_quantity=requested_quantity,
                     allocated_quantity=allocated,
                     remaining_quantity=remaining,
                 )
@@ -500,6 +453,61 @@ class OrdersService:
         for req_id in sorted(request_ids):
             lock_id = (tenant_id.int ^ req_id.int) & 0x7FFFFFFFFFFFFFFF
             cur.execute("select pg_advisory_xact_lock(%s)", (lock_id,))
+
+    @staticmethod
+    def _assert_request_allocation_available(
+        *,
+        cur: psycopg.Cursor,
+        tenant_id: UUID,
+        request_lines_by_id: dict[UUID, object],
+        lines: tuple[object, ...],
+        excluded_order_id: UUID | None = None,
+    ) -> None:
+        from collections import defaultdict
+
+        incoming: dict[str, Decimal] = defaultdict(Decimal)
+        for line in lines:
+            incoming[str(line.source_request_line_id)] += line.ordered_quantity
+
+        if not incoming:
+            return
+
+        excluded_clause = ""
+        params: tuple[object, ...] = (
+            tenant_id,
+            tenant_id,
+            list(request_lines_by_id.keys()),
+        )
+        if excluded_order_id is not None:
+            excluded_clause = "and pol.purchase_order_id != %s "
+            params = (*params, excluded_order_id)
+
+        cur.execute(
+            "select pol.source_request_line_id, "
+            "sum(case when po.status != 'cancelled' then pol.ordered_quantity "
+            "else coalesce(receipts.total_received, 0) end) as allocated "
+            "from purchase_order_line pol "
+            "join purchase_order po on po.tenant_id = pol.tenant_id "
+            "and po.id = pol.purchase_order_id "
+            "left join (select tenant_id, purchase_order_line_id, "
+            "sum(received_quantity) as total_received "
+            "from delivery_receipt_line where tenant_id = %s "
+            "group by tenant_id, purchase_order_line_id) receipts "
+            "on receipts.tenant_id = pol.tenant_id "
+            "and receipts.purchase_order_line_id = pol.id "
+            "where po.tenant_id = %s and pol.source_request_line_id = any(%s) "
+            f"{excluded_clause}"
+            "group by pol.source_request_line_id",
+            params,
+        )
+        allocations = {str(r["source_request_line_id"]): r["allocated"] for r in cur.fetchall()}
+
+        for req_line_id_str, qty in incoming.items():
+            req_line = request_lines_by_id[UUID(req_line_id_str)]
+            allocated = Decimal(str(allocations.get(req_line_id_str, "0")))
+            requested_quantity = Decimal(str(req_line.quantity))
+            if qty > (requested_quantity - allocated):
+                raise ConflictError(details={"reason": "quantity_exceeds_allocation"})
 
     def list_orders(
         self, *, bearer_token: str, limit: int = 50, cursor: str | None = None
@@ -961,6 +969,17 @@ def _decimal(value: Decimal | object) -> str:
     return str(value)
 
 
+def _money_payload(amount: object, currency: object) -> dict[str, object]:
+    value = Decimal(str(amount))
+    normalized = format(value.normalize(), "f")
+    if "." not in normalized:
+        normalized = f"{normalized}.00"
+    whole, fraction = normalized.split(".", 1)
+    if len(fraction) == 1:
+        normalized = f"{whole}.{fraction}0"
+    return {"amount": normalized, "currency": currency}
+
+
 def _submit_action(row: dict[str, object], key: UUID) -> str:
     if str(row.get("submit_idempotency_key")) == str(key):
         return "replay"
@@ -987,9 +1006,8 @@ def _order_model(
             "status": row["status"],
             "order_date": row["order_date"],
             "expected_delivery_date": row["expected_delivery_date"],
-            "total": {"amount": row["total_amount"], "currency": row["total_currency"]},
-            "tax": {"amount": row["tax_amount"], "currency": row["tax_currency"]},
-            "source_request_line_id": row.get("source_request_line_id"),
+            "total": _money_payload(row["total_amount"], row["total_currency"]),
+            "tax": _money_payload(row["tax_amount"], row["tax_currency"]),
             "source_kind": row["source_kind"],
             "source_reference": row["source_reference"],
             "source_hash": row["source_hash"],
@@ -1012,16 +1030,10 @@ def _order_line_model(row: dict[str, object]) -> PurchaseOrderLine:
             "description": row["description"],
             "ordered_quantity": row["ordered_quantity"],
             "base_unit": row["base_unit"],
-            "unit_price": {
-                "amount": row["unit_price_amount"],
-                "currency": row["unit_price_currency"],
-            },
-            "tax": {"amount": row["tax_amount"], "currency": row["tax_currency"]},
+            "unit_price": _money_payload(row["unit_price_amount"], row["unit_price_currency"]),
+            "tax": _money_payload(row["tax_amount"], row["tax_currency"]),
             "source_request_line_id": row.get("source_request_line_id"),
-            "line_total": {
-                "amount": row["line_total_amount"],
-                "currency": row["line_total_currency"],
-            },
+            "line_total": _money_payload(row["line_total_amount"], row["line_total_currency"]),
         },
     )
 
@@ -1041,7 +1053,6 @@ def _confirmation_model(
             "source_kind": row["source_kind"],
             "source_reference": row["source_reference"],
             "source_hash": row["source_hash"],
-            "source_request_id": row.get("source_request_id"),
             "recorded_by": row["recorded_by"],
             "created_at": row["created_at"],
             "lines": [_confirmation_line_model(line) for line in lines],
@@ -1058,7 +1069,7 @@ def _confirmation_line_model(row: dict[str, object]) -> SupplierConfirmationLine
             "purchase_order_line_id": row["purchase_order_line_id"],
             "confirmed_quantity": row["confirmed_quantity"],
             "confirmed_unit_price": (
-                {"amount": amount, "currency": row["confirmed_unit_price_currency"]}
+                _money_payload(amount, row["confirmed_unit_price_currency"])
                 if amount is not None
                 else None
             ),
@@ -1081,7 +1092,6 @@ def _receipt_model(
             "source_kind": row["source_kind"],
             "source_reference": row["source_reference"],
             "source_hash": row["source_hash"],
-            "source_request_id": row.get("source_request_id"),
             "created_at": row["created_at"],
             "lines": [_receipt_line_model(line) for line in lines],
         },

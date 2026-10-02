@@ -90,18 +90,13 @@ THRESHOLD_RULE_COLUMNS = (
     "created_by,created_at,updated_at"
 )
 DELEGATION_COLUMNS = (
-    "id,delegator_membership_id,delegate_membership_id,starts_on,ends_on,"
-    "created_at"
+    "id,delegator_membership_id,delegate_membership_id,starts_on,ends_on,created_at"
 )
-BUDGET_COLUMNS = (
-    "id,amount,currency,period,period_start,scope,branch_id,cost_centre_id"
-)
+BUDGET_COLUMNS = "id,amount,currency,period,period_start,scope,branch_id,cost_centre_id"
 QUALITY_ISSUE_COLUMNS = (
     "id,tenant_id,purchase_request_id,reported_by_membership_id,description,created_at"
 )
-QUALITY_ISSUE_PHOTO_COLUMNS = (
-    "id,tenant_id,delivery_quality_issue_id,storage_path,created_at"
-)
+QUALITY_ISSUE_PHOTO_COLUMNS = "id,tenant_id,delivery_quality_issue_id,storage_path,created_at"
 
 logger = logging.getLogger(__name__)
 
@@ -128,29 +123,21 @@ class RequestsService:
         product_ids = [line.workspace_product_id for line in payload.lines]
         estimates = self._estimate_products(product_ids)
         quantities = [line.quantity for line in payload.lines]
-        total_amount, total_currency, has_incomplete = _compute_totals(
-            quantities, estimates
-        )
+        total_amount, total_currency, has_incomplete = _compute_totals(quantities, estimates)
 
         client = authenticated_client(self._settings, bearer_token)
-        self._authorize_branch_for_write(
-            client, member=member, branch_id=payload.branch_id
-        )
+        self._authorize_branch_for_write(client, member=member, branch_id=payload.branch_id)
         row_data: dict[str, object] = {
             "tenant_id": str(member.tenant_id),
             "branch_id": str(payload.branch_id),
             "cost_centre_id": (
-                str(payload.cost_centre_id)
-                if payload.cost_centre_id is not None
-                else None
+                str(payload.cost_centre_id) if payload.cost_centre_id is not None else None
             ),
             "requested_by_membership_id": str(member.membership_id),
             "required_by_date": payload.required_by_date.isoformat(),
             "status": "draft",
             "estimated_total_amount": (
-                _format_decimal(total_amount, scale=4)
-                if total_amount is not None
-                else None
+                _format_decimal(total_amount, scale=4) if total_amount is not None else None
             ),
             "estimated_total_currency": total_currency,
             "has_incomplete_estimate": has_incomplete,
@@ -159,9 +146,7 @@ class RequestsService:
             row_data["idempotency_key"] = str(idempotency_key)
 
         try:
-            response = (
-                client.table("purchase_request").insert(row_data).execute()
-            )
+            response = client.table("purchase_request").insert(row_data).execute()
         except APIError as exc:
             if idempotency_key is not None and _api_error_code(exc) == "23505":
                 existing_row = self._fetch_request_by_idempotency_key(
@@ -213,34 +198,36 @@ class RequestsService:
                 .execute()
             )
         except APIError as exc:
-            raise ServiceUnavailableError(
-                details={"dependency": "database"}
-            ) from exc
-        return _one_row(
-            response.data, reason="purchase_request_idempotency_lookup_failed"
-        )
+            raise ServiceUnavailableError(details={"dependency": "database"}) from exc
+        return _one_row(response.data, reason="purchase_request_idempotency_lookup_failed")
 
     def get_request(
         self,
         *,
         bearer_token: str,
         request_id: UUID,
+        member: CurrentMember | None = None,
     ) -> PurchaseRequest:
+        if member is not None:
+            return self._get_request_for_member(member=member, request_id=request_id)
         client = authenticated_client(self._settings, bearer_token)
         request_row = self._fetch_request(client, request_id)
         rid = str(request_id)
         line_rows = self._fetch_lines_for(client, rid)
         step_row = self._fetch_step(client, rid)
-        return self._purchase_request_with_budget_status(
-            client, request_row, line_rows, step_row
-        )
+        return self._purchase_request_with_budget_status(client, request_row, line_rows, step_row)
 
     def validate_approved_request_for_order(
         self,
         *,
         bearer_token: str,
         request_id: UUID,
+        member: CurrentMember | None = None,
     ) -> PurchaseRequest:
+        if member is not None:
+            return self._get_request_for_member(
+                member=member, request_id=request_id, require_approval=True
+            )
         client = authenticated_client(self._settings, bearer_token)
         request_row = self._fetch_request(client, request_id)
         rid = str(request_id)
@@ -257,9 +244,7 @@ class RequestsService:
                 .execute()
             )
         except APIError as exc:
-            raise ServiceUnavailableError(
-                details={"dependency": "database"}
-            ) from exc
+            raise ServiceUnavailableError(details={"dependency": "database"}) from exc
 
         rows = _rows(response.data)
         if not rows:
@@ -267,9 +252,67 @@ class RequestsService:
 
         step_row = rows[0]
         line_rows = self._fetch_lines_for(client, rid)
-        return self._purchase_request_with_budget_status(
-            client, request_row, line_rows, step_row
+        return self._purchase_request_with_budget_status(client, request_row, line_rows, step_row)
+
+    def _get_request_for_member(
+        self,
+        *,
+        member: CurrentMember,
+        request_id: UUID,
+        require_approval: bool = False,
+    ) -> PurchaseRequest:
+        claims = json.dumps(
+            {
+                "sub": str(member.user_id),
+                "tenant_id": str(member.tenant_id),
+                "role": "authenticated",
+                "member_role": member.role.value,
+            }
         )
+        try:
+            with psycopg.connect(
+                self._settings.database_url.get_secret_value(),
+                row_factory=dict_row,
+                prepare_threshold=None,
+            ) as conn:
+                conn.execute("set local role authenticated")
+                conn.execute("select set_config('request.jwt.claims', %s, true)", (claims,))
+                request_row = conn.execute(
+                    f"select {REQUEST_COLUMNS} from purchase_request "
+                    "where tenant_id = %s and id = %s",
+                    (member.tenant_id, request_id),
+                ).fetchone()
+                if request_row is None:
+                    raise NotFoundError(details={"resource": "purchase_request"})
+
+                step_filter = (
+                    " and status = 'approved'"
+                    " and decided_by_membership_id is not null"
+                    " and decided_at is not null"
+                    if require_approval
+                    else ""
+                )
+                step_row = conn.execute(
+                    f"select {STEP_COLUMNS} from approval_step "
+                    "where tenant_id = %s and purchase_request_id = %s"
+                    f"{step_filter} limit 1",
+                    (member.tenant_id, request_id),
+                ).fetchone()
+                if require_approval and step_row is None:
+                    raise UnprocessableEntityError(details={"reason": "request_not_approved"})
+
+                line_rows = conn.execute(
+                    f"select {LINE_COLUMNS} from purchase_request_line "
+                    "where tenant_id = %s and purchase_request_id = %s "
+                    "order by created_at, id",
+                    (member.tenant_id, request_id),
+                ).fetchall()
+        except (ConflictError, NotFoundError, UnprocessableEntityError):
+            raise
+        except psycopg.Error as exc:
+            raise ServiceUnavailableError(details={"dependency": "database"}) from exc
+
+        return _purchase_request(request_row, line_rows, step_row)
 
     def list_requests(
         self,
@@ -297,15 +340,11 @@ class RequestsService:
                 .execute()
             )
         except APIError as exc:
-            raise ServiceUnavailableError(
-                details={"dependency": "database"}
-            ) from exc
+            raise ServiceUnavailableError(details={"dependency": "database"}) from exc
 
         rows = _rows(response.data)
         visible = rows[:capped]
-        next_cursor = (
-            _encode_cursor(offset + capped) if len(rows) > capped else None
-        )
+        next_cursor = _encode_cursor(offset + capped) if len(rows) > capped else None
 
         if not visible:
             return PurchaseRequestList(items=[], next_cursor=next_cursor)
@@ -338,15 +377,9 @@ class RequestsService:
         offset = _decode_cursor(cursor)
 
         try:
-            query = (
-                client.table("approval_step")
-                .select(STEP_COLUMNS)
-                .eq("status", "pending")
-            )
+            query = client.table("approval_step").select(STEP_COLUMNS).eq("status", "pending")
             if member.role is not MemberRole.owner:
-                query = query.eq(
-                    "assigned_membership_id", str(member.membership_id)
-                )
+                query = query.eq("assigned_membership_id", str(member.membership_id))
             response = (
                 query.order("created_at", desc=True)
                 .order("id")
@@ -354,28 +387,18 @@ class RequestsService:
                 .execute()
             )
         except APIError as exc:
-            raise ServiceUnavailableError(
-                details={"dependency": "database"}
-            ) from exc
+            raise ServiceUnavailableError(details={"dependency": "database"}) from exc
 
         step_rows = _rows(response.data)
         visible_steps = step_rows[:capped]
-        next_cursor = (
-            _encode_cursor(offset + capped)
-            if len(step_rows) > capped
-            else None
-        )
+        next_cursor = _encode_cursor(offset + capped) if len(step_rows) > capped else None
         if not visible_steps:
             return PurchaseRequestList(items=[], next_cursor=next_cursor)
 
-        request_ids = [
-            str(step["purchase_request_id"]) for step in visible_steps
-        ]
+        request_ids = [str(step["purchase_request_id"]) for step in visible_steps]
         request_rows = self._fetch_requests_batch(client, request_ids)
         lines_by_request = self._fetch_lines_batch(client, request_ids)
-        steps_by_request = {
-            str(step["purchase_request_id"]): step for step in visible_steps
-        }
+        steps_by_request = {str(step["purchase_request_id"]): step for step in visible_steps}
 
         items = [
             self._purchase_request_with_budget_status(
@@ -407,9 +430,7 @@ class RequestsService:
         codebase yet (research.md R4 revised).
         """
         client = authenticated_client(self._settings, bearer_token)
-        self._authorize_branch_for_write(
-            client, member=member, branch_id=payload.branch_id
-        )
+        self._authorize_branch_for_write(client, member=member, branch_id=payload.branch_id)
         row_data = {
             "tenant_id": str(member.tenant_id),
             "branch_id": str(payload.branch_id),
@@ -421,9 +442,7 @@ class RequestsService:
             row_data["idempotency_key"] = str(idempotency_key)
 
         try:
-            response = (
-                client.table("low_stock_report").insert(row_data).execute()
-            )
+            response = client.table("low_stock_report").insert(row_data).execute()
         except APIError as exc:
             if idempotency_key is not None and _api_error_code(exc) == "23505":
                 existing = self._fetch_low_stock_report_by_key(
@@ -467,9 +486,7 @@ class RequestsService:
                 .execute()
             )
         except APIError as exc:
-            raise ServiceUnavailableError(
-                details={"dependency": "database"}
-            ) from exc
+            raise ServiceUnavailableError(details={"dependency": "database"}) from exc
         assignments = _rows(response.data)
         if not assignments:
             return
@@ -510,12 +527,8 @@ class RequestsService:
                 .execute()
             )
         except APIError as exc:
-            raise ServiceUnavailableError(
-                details={"dependency": "database"}
-            ) from exc
-        return _one_row(
-            response.data, reason="low_stock_report_idempotency_lookup_failed"
-        )
+            raise ServiceUnavailableError(details={"dependency": "database"}) from exc
+        return _one_row(response.data, reason="low_stock_report_idempotency_lookup_failed")
 
     def list_low_stock_reports(
         self,
@@ -535,9 +548,7 @@ class RequestsService:
             if branch_id is not None:
                 query = query.eq("branch_id", str(branch_id))
             if workspace_product_id is not None:
-                query = query.eq(
-                    "workspace_product_id", str(workspace_product_id)
-                )
+                query = query.eq("workspace_product_id", str(workspace_product_id))
             response = (
                 query.order("created_at", desc=True)
                 .order("id")
@@ -545,15 +556,11 @@ class RequestsService:
                 .execute()
             )
         except APIError as exc:
-            raise ServiceUnavailableError(
-                details={"dependency": "database"}
-            ) from exc
+            raise ServiceUnavailableError(details={"dependency": "database"}) from exc
 
         rows = _rows(response.data)
         visible = rows[:capped]
-        next_cursor = (
-            _encode_cursor(offset + capped) if len(rows) > capped else None
-        )
+        next_cursor = _encode_cursor(offset + capped) if len(rows) > capped else None
         items = [_low_stock_report(row) for row in visible]
         return LowStockReportList(items=items, next_cursor=next_cursor)
 
@@ -573,9 +580,7 @@ class RequestsService:
         _require_requester(existing, member)
 
         if "branch_id" in patch.model_fields_set and patch.branch_id is not None:
-            self._authorize_branch_for_write(
-                client, member=member, branch_id=patch.branch_id
-            )
+            self._authorize_branch_for_write(client, member=member, branch_id=patch.branch_id)
 
         updates: dict[str, object] = {}
         for field in ("branch_id", "cost_centre_id", "required_by_date"):
@@ -594,13 +599,9 @@ class RequestsService:
             product_ids = [ln.workspace_product_id for ln in patch.lines]
             estimates = self._estimate_products(product_ids)
             quantities = [ln.quantity for ln in patch.lines]
-            total_amount, total_currency, has_incomplete = _compute_totals(
-                quantities, estimates
-            )
+            total_amount, total_currency, has_incomplete = _compute_totals(quantities, estimates)
             updates["estimated_total_amount"] = (
-                _format_decimal(total_amount, scale=4)
-                if total_amount is not None
-                else None
+                _format_decimal(total_amount, scale=4) if total_amount is not None else None
             )
             updates["estimated_total_currency"] = total_currency
             updates["has_incomplete_estimate"] = has_incomplete
@@ -610,9 +611,7 @@ class RequestsService:
                     "purchase_request_id", str(request_id)
                 ).execute()
             except APIError as exc:
-                raise ServiceUnavailableError(
-                    details={"dependency": "database"}
-                ) from exc
+                raise ServiceUnavailableError(details={"dependency": "database"}) from exc
 
             new_line_rows = self._insert_lines(
                 client,
@@ -633,9 +632,7 @@ class RequestsService:
                 )
             except APIError as exc:
                 raise _write_error(exc) from exc
-            request_row = _one_row_or_not_found(
-                response.data, resource="purchase_request"
-            )
+            request_row = _one_row_or_not_found(response.data, resource="purchase_request")
         else:
             request_row = existing
 
@@ -674,9 +671,7 @@ class RequestsService:
         if not line_rows:
             raise UnprocessableEntityError(details={"reason": "no_lines"})
 
-        product_ids = [
-            UUID(str(lr["workspace_product_id"])) for lr in line_rows
-        ]
+        product_ids = [UUID(str(lr["workspace_product_id"])) for lr in line_rows]
         estimates = self._estimate_products(product_ids)
 
         now = _now_iso()
@@ -699,14 +694,10 @@ class RequestsService:
                     }
                 ).eq("id", str(lr["id"])).execute()
             except APIError as exc:
-                raise ServiceUnavailableError(
-                    details={"dependency": "database"}
-                ) from exc
+                raise ServiceUnavailableError(details={"dependency": "database"}) from exc
 
         quantities = [_decimal(lr["quantity"], scale=6) for lr in line_rows]
-        total_amount, total_currency, has_incomplete = _compute_totals(
-            quantities, estimates
-        )
+        total_amount, total_currency, has_incomplete = _compute_totals(quantities, estimates)
 
         try:
             response = (
@@ -731,9 +722,7 @@ class RequestsService:
         except APIError as exc:
             raise _write_error(exc) from exc
 
-        request_row = _one_row_or_not_found(
-            response.data, resource="purchase_request"
-        )
+        request_row = _one_row_or_not_found(response.data, resource="purchase_request")
         routed_step = self._create_submission_approval_step(
             client,
             bearer_token=bearer_token,
@@ -763,9 +752,7 @@ class RequestsService:
         existing = self._fetch_request(client, request_id)
 
         if str(existing["status"]) not in ("draft", "submitted"):
-            raise ConflictError(
-                details={"reason": "already_decided_or_withdrawn"}
-            )
+            raise ConflictError(details={"reason": "already_decided_or_withdrawn"})
         _require_requester(existing, member)
 
         rid = str(request_id)
@@ -786,9 +773,7 @@ class RequestsService:
         except APIError as exc:
             raise _write_error(exc) from exc
 
-        request_row = _one_row_or_not_found(
-            response.data, resource="purchase_request"
-        )
+        request_row = _one_row_or_not_found(response.data, resource="purchase_request")
         line_rows = self._fetch_lines_for(client, rid)
         step_row = self._fetch_step(client, rid)
 
@@ -798,9 +783,7 @@ class RequestsService:
             action="requests.purchase_request_withdrawn",
             target={"purchase_request_id": rid},
         )
-        return self._purchase_request_with_budget_status(
-            client, request_row, line_rows, step_row
-        )
+        return self._purchase_request_with_budget_status(client, request_row, line_rows, step_row)
 
     def confirm_delivery(
         self,
@@ -815,9 +798,7 @@ class RequestsService:
 
         if str(existing["status"]) != "ordered":
             raise ConflictError(details={"reason": "not_ordered"})
-        self._authorize_delivery_confirmation(
-            client, member=member, request_row=existing
-        )
+        self._authorize_delivery_confirmation(client, member=member, request_row=existing)
 
         rid = str(request_id)
         line_rows = self._fetch_lines_for(client, rid)
@@ -826,14 +807,10 @@ class RequestsService:
         for line in payload.lines:
             line_id = str(line.purchase_request_line_id)
             if line_id in received_by_line_id:
-                raise UnprocessableEntityError(
-                    details={"reason": "duplicate_line"}
-                )
+                raise UnprocessableEntityError(details={"reason": "duplicate_line"})
             if line_id not in line_rows_by_id:
                 # Reject instead of ignoring: the payload must describe this request's lines only.
-                raise UnprocessableEntityError(
-                    details={"reason": "line_not_in_request"}
-                )
+                raise UnprocessableEntityError(details={"reason": "line_not_in_request"})
             received_by_line_id[line_id] = Decimal(line.quantity_received)
 
         has_discrepancy = False
@@ -849,11 +826,7 @@ class RequestsService:
         for line_id, received in received_by_line_id.items():
             try:
                 client.table("purchase_request_line").update(
-                    {
-                        "quantity_received": _format_decimal(
-                            received, scale=6
-                        )
-                    }
+                    {"quantity_received": _format_decimal(received, scale=6)}
                 ).eq("id", line_id).execute()
             except APIError as exc:
                 raise _write_error(exc) from exc
@@ -866,9 +839,7 @@ class RequestsService:
                     {
                         "status": "delivered",
                         "delivered_at": now,
-                        "delivery_confirmed_by_membership_id": str(
-                            member.membership_id
-                        ),
+                        "delivery_confirmed_by_membership_id": str(member.membership_id),
                         "has_delivery_discrepancy": has_discrepancy,
                         "updated_at": now,
                     }
@@ -879,9 +850,7 @@ class RequestsService:
         except APIError as exc:
             raise _write_error(exc) from exc
 
-        request_row = _one_row_or_not_found(
-            response.data, resource="purchase_request"
-        )
+        request_row = _one_row_or_not_found(response.data, resource="purchase_request")
         confirmed_lines = self._fetch_lines_for(client, rid)
         step_row = self._fetch_step(client, rid)
 
@@ -952,17 +921,14 @@ class RequestsService:
                 .execute()
             )
         except APIError as exc:
-            raise ServiceUnavailableError(
-                details={"dependency": "database"}
-            ) from exc
+            raise ServiceUnavailableError(details={"dependency": "database"}) from exc
 
         rows = _rows(response.data)
         photos_by_issue = self._fetch_quality_issue_photos_batch(
             client, [str(row["id"]) for row in rows]
         )
         items = [
-            _quality_issue(row, photos=photos_by_issue.get(str(row["id"]), []))
-            for row in rows
+            _quality_issue(row, photos=photos_by_issue.get(str(row["id"]), [])) for row in rows
         ]
         return QualityIssueList(items=items)
 
@@ -1003,13 +969,9 @@ class RequestsService:
                     {"content-type": content_type} if content_type else None,
                 )
             except Exception as exc:
-                raise ServiceUnavailableError(
-                    details={"dependency": "supabase_storage"}
-                ) from exc
+                raise ServiceUnavailableError(details={"dependency": "supabase_storage"}) from exc
         except Exception as exc:
-            raise ServiceUnavailableError(
-                details={"dependency": "supabase_storage"}
-            ) from exc
+            raise ServiceUnavailableError(details={"dependency": "supabase_storage"}) from exc
 
         try:
             response = (
@@ -1025,9 +987,7 @@ class RequestsService:
             )
         except APIError as exc:
             raise _write_error(exc) from exc
-        row = _one_row(
-            response.data, reason="quality_issue_photo_write_failed"
-        )
+        row = _one_row(response.data, reason="quality_issue_photo_write_failed")
 
         url = self._create_quality_issue_photo_url(client, storage_path)
         self._record(
@@ -1091,17 +1051,11 @@ class RequestsService:
                 .execute()
             )
         except APIError as exc:
-            raise ServiceUnavailableError(
-                details={"dependency": "database"}
-            ) from exc
+            raise ServiceUnavailableError(details={"dependency": "database"}) from exc
         rows = _rows(response.data)
         return ThresholdRuleList(
             items=[_threshold_rule(row) for row in rows[:capped]],
-            next_cursor=(
-                _encode_cursor(offset + capped)
-                if len(rows) > capped
-                else None
-            ),
+            next_cursor=(_encode_cursor(offset + capped) if len(rows) > capped else None),
         )
 
     def create_threshold_rule(
@@ -1120,16 +1074,12 @@ class RequestsService:
                     {
                         "tenant_id": str(member.tenant_id),
                         "branch_id": (
-                            str(payload.branch_id)
-                            if payload.branch_id is not None
-                            else None
+                            str(payload.branch_id) if payload.branch_id is not None else None
                         ),
                         "min_amount": payload.min_amount,
                         "max_amount": payload.max_amount,
                         "currency": payload.currency,
-                        "approver_membership_id": str(
-                            payload.approver_membership_id
-                        ),
+                        "approver_membership_id": str(payload.approver_membership_id),
                         "created_by": str(member.membership_id),
                     }
                 )
@@ -1172,16 +1122,11 @@ class RequestsService:
         client = authenticated_client(self._settings, bearer_token)
         try:
             response = (
-                client.table("threshold_rule")
-                .update(updates)
-                .eq("id", str(rule_id))
-                .execute()
+                client.table("threshold_rule").update(updates).eq("id", str(rule_id)).execute()
             )
         except APIError as exc:
             raise _write_error(exc) from exc
-        row = _one_row_or_not_found(
-            response.data, resource="threshold_rule"
-        )
+        row = _one_row_or_not_found(response.data, resource="threshold_rule")
         self._record(
             bearer_token=bearer_token,
             member=member,
@@ -1200,12 +1145,7 @@ class RequestsService:
         _require_owner(member)
         client = authenticated_client(self._settings, bearer_token)
         try:
-            response = (
-                client.table("threshold_rule")
-                .delete()
-                .eq("id", str(rule_id))
-                .execute()
-            )
+            response = client.table("threshold_rule").delete().eq("id", str(rule_id)).execute()
         except APIError as exc:
             raise _write_error(exc) from exc
         _one_row_or_not_found(response.data, resource="threshold_rule")
@@ -1225,9 +1165,7 @@ class RequestsService:
     ) -> ApprovalDelegationList:
         if membership_id is not None and member.role is not MemberRole.owner:
             if str(membership_id) != str(member.membership_id):
-                raise PermissionDeniedError(
-                    details={"reason": "not_delegator_or_owner"}
-                )
+                raise PermissionDeniedError(details={"reason": "not_delegator_or_owner"})
         client = authenticated_client(self._settings, bearer_token)
         delegator_id = membership_id or member.membership_id
         try:
@@ -1240,9 +1178,7 @@ class RequestsService:
                 .execute()
             )
         except APIError as exc:
-            raise ServiceUnavailableError(
-                details={"dependency": "database"}
-            ) from exc
+            raise ServiceUnavailableError(details={"dependency": "database"}) from exc
         return ApprovalDelegationList(
             items=[_approval_delegation(row) for row in _rows(response.data)]
         )
@@ -1255,12 +1191,8 @@ class RequestsService:
         payload: ApprovalDelegationCreate,
     ) -> ApprovalDelegation:
         delegator_id = payload.delegator_membership_id or member.membership_id
-        if member.role is not MemberRole.owner and str(delegator_id) != str(
-            member.membership_id
-        ):
-            raise PermissionDeniedError(
-                details={"reason": "not_delegator_or_owner"}
-            )
+        if member.role is not MemberRole.owner and str(delegator_id) != str(member.membership_id):
+            raise PermissionDeniedError(details={"reason": "not_delegator_or_owner"})
 
         client = authenticated_client(self._settings, bearer_token)
         try:
@@ -1270,9 +1202,7 @@ class RequestsService:
                     {
                         "tenant_id": str(member.tenant_id),
                         "delegator_membership_id": str(delegator_id),
-                        "delegate_membership_id": str(
-                            payload.delegate_membership_id
-                        ),
+                        "delegate_membership_id": str(payload.delegate_membership_id),
                         "starts_on": payload.starts_on.isoformat(),
                         "ends_on": payload.ends_on.isoformat(),
                     }
@@ -1299,18 +1229,13 @@ class RequestsService:
     ) -> None:
         client = authenticated_client(self._settings, bearer_token)
         existing = self._fetch_delegation(client, delegation_id)
-        if member.role is not MemberRole.owner and str(
-            existing["delegator_membership_id"]
-        ) != str(member.membership_id):
-            raise PermissionDeniedError(
-                details={"reason": "not_delegator_or_owner"}
-            )
+        if member.role is not MemberRole.owner and str(existing["delegator_membership_id"]) != str(
+            member.membership_id
+        ):
+            raise PermissionDeniedError(details={"reason": "not_delegator_or_owner"})
         try:
             response = (
-                client.table("approval_delegation")
-                .delete()
-                .eq("id", str(delegation_id))
-                .execute()
+                client.table("approval_delegation").delete().eq("id", str(delegation_id)).execute()
             )
         except APIError as exc:
             raise _write_error(exc) from exc
@@ -1327,10 +1252,7 @@ class RequestsService:
     def _estimate_products(self, product_ids: list[UUID]) -> list[LineEstimate]:
         db_url = self._settings.database_url.get_secret_value()
         with psycopg.connect(db_url) as conn:
-            return [
-                estimate_line_value(conn, workspace_product_id=pid)
-                for pid in product_ids
-            ]
+            return [estimate_line_value(conn, workspace_product_id=pid) for pid in product_ids]
 
     def _insert_lines(
         self,
@@ -1363,16 +1285,12 @@ class RequestsService:
             for line, est in zip(payload_lines, estimates, strict=True)
         ]
         try:
-            response = (
-                client.table("purchase_request_line").insert(inserts).execute()
-            )
+            response = client.table("purchase_request_line").insert(inserts).execute()
         except APIError as exc:
             raise _write_error(exc) from exc
         return _rows(response.data)
 
-    def _fetch_request(
-        self, client: Client, request_id: UUID
-    ) -> dict[str, object]:
+    def _fetch_request(self, client: Client, request_id: UUID) -> dict[str, object]:
         try:
             response = (
                 client.table("purchase_request")
@@ -1382,16 +1300,10 @@ class RequestsService:
                 .execute()
             )
         except APIError as exc:
-            raise ServiceUnavailableError(
-                details={"dependency": "database"}
-            ) from exc
-        return _one_row_or_not_found(
-            response.data, resource="purchase_request"
-        )
+            raise ServiceUnavailableError(details={"dependency": "database"}) from exc
+        return _one_row_or_not_found(response.data, resource="purchase_request")
 
-    def _fetch_quality_issue(
-        self, client: Client, issue_id: UUID
-    ) -> dict[str, object]:
+    def _fetch_quality_issue(self, client: Client, issue_id: UUID) -> dict[str, object]:
         try:
             response = (
                 client.table("delivery_quality_issue")
@@ -1401,12 +1313,8 @@ class RequestsService:
                 .execute()
             )
         except APIError as exc:
-            raise ServiceUnavailableError(
-                details={"dependency": "database"}
-            ) from exc
-        return _one_row_or_not_found(
-            response.data, resource="delivery_quality_issue"
-        )
+            raise ServiceUnavailableError(details={"dependency": "database"}) from exc
+        return _one_row_or_not_found(response.data, resource="delivery_quality_issue")
 
     def _fetch_quality_issue_photos_batch(
         self, client: Client, issue_ids: list[str]
@@ -1423,13 +1331,9 @@ class RequestsService:
                 .execute()
             )
         except APIError as exc:
-            raise ServiceUnavailableError(
-                details={"dependency": "database"}
-            ) from exc
+            raise ServiceUnavailableError(details={"dependency": "database"}) from exc
 
-        result: dict[str, list[QualityIssuePhoto]] = {
-            issue_id: [] for issue_id in issue_ids
-        }
+        result: dict[str, list[QualityIssuePhoto]] = {issue_id: [] for issue_id in issue_ids}
         for row in _rows(response.data):
             issue_id = str(row["delivery_quality_issue_id"])
             if issue_id not in result:
@@ -1437,9 +1341,7 @@ class RequestsService:
             result[issue_id].append(
                 _quality_issue_photo(
                     row,
-                    url=self._create_quality_issue_photo_url(
-                        client, str(row["storage_path"])
-                    ),
+                    url=self._create_quality_issue_photo_url(client, str(row["storage_path"])),
                 )
             )
         return result
@@ -1457,19 +1359,11 @@ class RequestsService:
                 .execute()
             )
         except APIError as exc:
-            raise ServiceUnavailableError(
-                details={"dependency": "database"}
-            ) from exc
+            raise ServiceUnavailableError(details={"dependency": "database"}) from exc
         rows_by_id = {str(row["id"]): row for row in _rows(response.data)}
-        return [
-            rows_by_id[request_id]
-            for request_id in request_ids
-            if request_id in rows_by_id
-        ]
+        return [rows_by_id[request_id] for request_id in request_ids if request_id in rows_by_id]
 
-    def _fetch_lines_for(
-        self, client: Client, request_id: str
-    ) -> list[dict[str, object]]:
+    def _fetch_lines_for(self, client: Client, request_id: str) -> list[dict[str, object]]:
         try:
             response = (
                 client.table("purchase_request_line")
@@ -1480,9 +1374,7 @@ class RequestsService:
                 .execute()
             )
         except APIError as exc:
-            raise ServiceUnavailableError(
-                details={"dependency": "database"}
-            ) from exc
+            raise ServiceUnavailableError(details={"dependency": "database"}) from exc
         return _rows(response.data)
 
     def _fetch_lines_batch(
@@ -1500,21 +1392,15 @@ class RequestsService:
                 .execute()
             )
         except APIError as exc:
-            raise ServiceUnavailableError(
-                details={"dependency": "database"}
-            ) from exc
-        result: dict[str, list[dict[str, object]]] = {
-            rid: [] for rid in request_ids
-        }
+            raise ServiceUnavailableError(details={"dependency": "database"}) from exc
+        result: dict[str, list[dict[str, object]]] = {rid: [] for rid in request_ids}
         for row in _rows(response.data):
             rid = str(row["purchase_request_id"])
             if rid in result:
                 result[rid].append(row)
         return result
 
-    def _fetch_step(
-        self, client: Client, request_id: str
-    ) -> dict[str, object] | None:
+    def _fetch_step(self, client: Client, request_id: str) -> dict[str, object] | None:
         try:
             response = (
                 client.table("approval_step")
@@ -1524,30 +1410,18 @@ class RequestsService:
                 .execute()
             )
         except APIError as exc:
-            raise ServiceUnavailableError(
-                details={"dependency": "database"}
-            ) from exc
+            raise ServiceUnavailableError(details={"dependency": "database"}) from exc
         rows = _rows(response.data)
         return rows[0] if rows else None
 
-    def _fetch_threshold_rules(
-        self, client: Client
-    ) -> list[ThresholdRuleRow]:
+    def _fetch_threshold_rules(self, client: Client) -> list[ThresholdRuleRow]:
         try:
-            response = (
-                client.table("threshold_rule")
-                .select(THRESHOLD_RULE_COLUMNS)
-                .execute()
-            )
+            response = client.table("threshold_rule").select(THRESHOLD_RULE_COLUMNS).execute()
         except APIError as exc:
-            raise ServiceUnavailableError(
-                details={"dependency": "database"}
-            ) from exc
+            raise ServiceUnavailableError(details={"dependency": "database"}) from exc
         return [_threshold_rule_row(row) for row in _rows(response.data)]
 
-    def _fetch_active_delegations(
-        self, client: Client, *, as_of: date
-    ) -> list[DelegationRow]:
+    def _fetch_active_delegations(self, client: Client, *, as_of: date) -> list[DelegationRow]:
         try:
             response = (
                 client.table("approval_delegation")
@@ -1557,9 +1431,7 @@ class RequestsService:
                 .execute()
             )
         except APIError as exc:
-            raise ServiceUnavailableError(
-                details={"dependency": "database"}
-            ) from exc
+            raise ServiceUnavailableError(details={"dependency": "database"}) from exc
         return [_delegation_row(row) for row in _rows(response.data)]
 
     def _fetch_owner_membership_id(self, client: Client) -> UUID:
@@ -1573,33 +1445,22 @@ class RequestsService:
                 .execute()
             )
         except APIError as exc:
-            raise ServiceUnavailableError(
-                details={"dependency": "database"}
-            ) from exc
+            raise ServiceUnavailableError(details={"dependency": "database"}) from exc
         row = _one_row(response.data, reason="owner_membership_not_found")
         return UUID(str(row["id"]))
 
     def _fetch_removed_membership_ids(self, client: Client) -> set[UUID]:
         try:
-            response = (
-                client.table("membership")
-                .select("id")
-                .neq("status", "active")
-                .execute()
-            )
+            response = client.table("membership").select("id").neq("status", "active").execute()
         except APIError as exc:
-            raise ServiceUnavailableError(
-                details={"dependency": "database"}
-            ) from exc
+            raise ServiceUnavailableError(details={"dependency": "database"}) from exc
         return {UUID(str(row["id"])) for row in _rows(response.data)}
 
     def _fetch_budget_rows(self, client: Client) -> list[BudgetRow]:
         try:
             response = client.table("budget").select(BUDGET_COLUMNS).execute()
         except APIError as exc:
-            raise ServiceUnavailableError(
-                details={"dependency": "database"}
-            ) from exc
+            raise ServiceUnavailableError(details={"dependency": "database"}) from exc
         return [_budget_row(row) for row in _rows(response.data)]
 
     def _fetch_committed_spend_rows(self, client: Client) -> list[SpendRow]:
@@ -1614,9 +1475,7 @@ class RequestsService:
                 .execute()
             )
         except APIError as exc:
-            raise ServiceUnavailableError(
-                details={"dependency": "database"}
-            ) from exc
+            raise ServiceUnavailableError(details={"dependency": "database"}) from exc
         spend_rows = []
         for row in _rows(response.data):
             if (
@@ -1627,9 +1486,7 @@ class RequestsService:
             spend_rows.append(_spend_row(row))
         return spend_rows
 
-    def _fetch_delegation(
-        self, client: Client, delegation_id: UUID
-    ) -> dict[str, object]:
+    def _fetch_delegation(self, client: Client, delegation_id: UUID) -> dict[str, object]:
         try:
             response = (
                 client.table("approval_delegation")
@@ -1639,12 +1496,8 @@ class RequestsService:
                 .execute()
             )
         except APIError as exc:
-            raise ServiceUnavailableError(
-                details={"dependency": "database"}
-            ) from exc
-        return _one_row_or_not_found(
-            response.data, resource="approval_delegation"
-        )
+            raise ServiceUnavailableError(details={"dependency": "database"}) from exc
+        return _one_row_or_not_found(response.data, resource="approval_delegation")
 
     def _fetch_steps_batch(
         self, client: Client, request_ids: list[str]
@@ -1659,12 +1512,8 @@ class RequestsService:
                 .execute()
             )
         except APIError as exc:
-            raise ServiceUnavailableError(
-                details={"dependency": "database"}
-            ) from exc
-        result: dict[str, dict[str, object] | None] = {
-            rid: None for rid in request_ids
-        }
+            raise ServiceUnavailableError(details={"dependency": "database"}) from exc
+        result: dict[str, dict[str, object] | None] = {rid: None for rid in request_ids}
         for row in _rows(response.data):
             rid = str(row["purchase_request_id"])
             if rid in result:
@@ -1725,9 +1574,7 @@ class RequestsService:
                     {
                         "tenant_id": str(member.tenant_id),
                         "purchase_request_id": str(request_row["id"]),
-                        "assigned_membership_id": str(
-                            resolved.assigned_membership_id
-                        ),
+                        "assigned_membership_id": str(resolved.assigned_membership_id),
                         "source": resolved.source,
                         "status": "pending",
                     }
@@ -1745,9 +1592,7 @@ class RequestsService:
                 target={
                     "purchase_request_id": str(request_row["id"]),
                     "approval_step_id": str(row["id"]),
-                    "assigned_membership_id": str(
-                        resolved.assigned_membership_id
-                    ),
+                    "assigned_membership_id": str(resolved.assigned_membership_id),
                 },
             )
         return row
@@ -1783,9 +1628,7 @@ class RequestsService:
                 .execute()
             )
         except APIError as exc:
-            raise ServiceUnavailableError(
-                details={"dependency": "database"}
-            ) from exc
+            raise ServiceUnavailableError(details={"dependency": "database"}) from exc
 
         pending_rows = _rows(pending_response.data)
         if not pending_rows:
@@ -1997,9 +1840,7 @@ class RequestsService:
                 )
                 notification_row = cur.fetchone()
                 notification_id = (
-                    UUID(str(notification_row["id"]))
-                    if notification_row is not None
-                    else None
+                    UUID(str(notification_row["id"])) if notification_row is not None else None
                 )
             # Exiting the `with psycopg.connect(...)` block here commits all three writes above
             # atomically (or rolls all of them back if any exception was raised) — psycopg's own
@@ -2048,17 +1889,13 @@ class RequestsService:
             committed_spend=self._fetch_committed_spend_rows(client),
         )
 
-    def _create_quality_issue_photo_url(
-        self, client: Client, storage_path: str
-    ) -> str:
+    def _create_quality_issue_photo_url(self, client: Client, storage_path: str) -> str:
         try:
             result = client.storage.from_(
                 self._settings.quality_issue_photos_bucket
             ).create_signed_url(storage_path, expires_in=300)
         except Exception as exc:
-            raise ServiceUnavailableError(
-                details={"dependency": "supabase_storage"}
-            ) from exc
+            raise ServiceUnavailableError(details={"dependency": "supabase_storage"}) from exc
         return _signed_url(result)
 
 
@@ -2069,18 +1906,12 @@ def get_requests_service() -> RequestsService:
 # ── module-level helpers ──────────────────────────────────────────────
 
 
-def _require_requester(
-    request_row: dict[str, object], member: CurrentMember
-) -> None:
-    if str(request_row["requested_by_membership_id"]) != str(
-        member.membership_id
-    ):
+def _require_requester(request_row: dict[str, object], member: CurrentMember) -> None:
+    if str(request_row["requested_by_membership_id"]) != str(member.membership_id):
         raise PermissionDeniedError(details={"reason": "not_requester"})
 
 
-def _require_assigned_approver_or_owner(
-    step_row: dict[str, object], member: CurrentMember
-) -> None:
+def _require_assigned_approver_or_owner(step_row: dict[str, object], member: CurrentMember) -> None:
     if member.role is MemberRole.owner:
         return
     if str(step_row["assigned_membership_id"]) == str(member.membership_id):
@@ -2103,14 +1934,8 @@ def _purchase_request(
     return PurchaseRequest(
         id=UUID(str(row["id"])),
         branch_id=UUID(str(row["branch_id"])),
-        cost_centre_id=(
-            UUID(str(row["cost_centre_id"]))
-            if row.get("cost_centre_id")
-            else None
-        ),
-        requested_by_membership_id=UUID(
-            str(row["requested_by_membership_id"])
-        ),
+        cost_centre_id=(UUID(str(row["cost_centre_id"])) if row.get("cost_centre_id") else None),
+        requested_by_membership_id=UUID(str(row["requested_by_membership_id"])),
         required_by_date=_parse_date(row["required_by_date"]),
         status=str(row["status"]),
         lines=[_purchase_request_line(lr) for lr in line_rows],
@@ -2118,9 +1943,7 @@ def _purchase_request(
             row.get("estimated_total_amount"),
             row.get("estimated_total_currency"),
         ),
-        has_incomplete_estimate=bool(
-            row.get("has_incomplete_estimate", False)
-        ),
+        has_incomplete_estimate=bool(row.get("has_incomplete_estimate", False)),
         budget_status=budget_status,
         approval_step=_approval_step(step_row) if step_row else None,
         submitted_at=row.get("submitted_at"),
@@ -2131,9 +1954,7 @@ def _purchase_request(
             if row.get("delivery_confirmed_by_membership_id")
             else None
         ),
-        has_delivery_discrepancy=bool(
-            row.get("has_delivery_discrepancy", False)
-        ),
+        has_delivery_discrepancy=bool(row.get("has_delivery_discrepancy", False)),
         created_at=row["created_at"],
         updated_at=row.get("updated_at"),
     )
@@ -2198,29 +2019,21 @@ def _low_stock_report(row: dict[str, object]) -> LowStockReport:
     )
 
 
-def _quality_issue(
-    row: dict[str, object], *, photos: list[QualityIssuePhoto]
-) -> QualityIssue:
+def _quality_issue(row: dict[str, object], *, photos: list[QualityIssuePhoto]) -> QualityIssue:
     return QualityIssue(
         id=UUID(str(row["id"])),
         purchase_request_id=UUID(str(row["purchase_request_id"])),
-        reported_by_membership_id=UUID(
-            str(row["reported_by_membership_id"])
-        ),
+        reported_by_membership_id=UUID(str(row["reported_by_membership_id"])),
         description=str(row["description"]),
         photos=photos,
         created_at=row["created_at"],
     )
 
 
-def _quality_issue_photo(
-    row: dict[str, object], *, url: str
-) -> QualityIssuePhoto:
+def _quality_issue_photo(row: dict[str, object], *, url: str) -> QualityIssuePhoto:
     return QualityIssuePhoto(
         id=UUID(str(row["id"])),
-        delivery_quality_issue_id=UUID(
-            str(row["delivery_quality_issue_id"])
-        ),
+        delivery_quality_issue_id=UUID(str(row["delivery_quality_issue_id"])),
         url=url,
         created_at=row["created_at"],
     )
@@ -2229,14 +2042,10 @@ def _quality_issue_photo(
 def _threshold_rule(row: dict[str, object]) -> ThresholdRule:
     return ThresholdRule(
         id=UUID(str(row["id"])),
-        branch_id=(
-            UUID(str(row["branch_id"])) if row.get("branch_id") else None
-        ),
+        branch_id=(UUID(str(row["branch_id"])) if row.get("branch_id") else None),
         min_amount=_decimal(row["min_amount"], scale=4),
         max_amount=(
-            _decimal(row["max_amount"], scale=4)
-            if row.get("max_amount") is not None
-            else None
+            _decimal(row["max_amount"], scale=4) if row.get("max_amount") is not None else None
         ),
         currency=str(row["currency"]),
         approver_membership_id=UUID(str(row["approver_membership_id"])),
@@ -2249,15 +2058,9 @@ def _threshold_rule(row: dict[str, object]) -> ThresholdRule:
 def _threshold_rule_row(row: dict[str, object]) -> ThresholdRuleRow:
     return ThresholdRuleRow(
         id=UUID(str(row["id"])),
-        branch_id=(
-            UUID(str(row["branch_id"])) if row.get("branch_id") else None
-        ),
+        branch_id=(UUID(str(row["branch_id"])) if row.get("branch_id") else None),
         min_amount=Decimal(str(row["min_amount"])),
-        max_amount=(
-            Decimal(str(row["max_amount"]))
-            if row.get("max_amount") is not None
-            else None
-        ),
+        max_amount=(Decimal(str(row["max_amount"])) if row.get("max_amount") is not None else None),
         currency=str(row["currency"]),
         approver_membership_id=UUID(str(row["approver_membership_id"])),
     )
@@ -2282,14 +2085,8 @@ def _budget_row(row: dict[str, object]) -> BudgetRow:
         period=str(row["period"]),
         period_start=_parse_date(row["period_start"]),
         scope=str(row["scope"]),
-        branch_id=(
-            UUID(str(row["branch_id"])) if row.get("branch_id") else None
-        ),
-        cost_centre_id=(
-            UUID(str(row["cost_centre_id"]))
-            if row.get("cost_centre_id")
-            else None
-        ),
+        branch_id=(UUID(str(row["branch_id"])) if row.get("branch_id") else None),
+        cost_centre_id=(UUID(str(row["cost_centre_id"])) if row.get("cost_centre_id") else None),
     )
 
 
@@ -2299,11 +2096,7 @@ def _spend_row(row: dict[str, object]) -> SpendRow:
         amount=Decimal(str(row["estimated_total_amount"])),
         currency=str(row["estimated_total_currency"]),
         branch_id=UUID(str(row["branch_id"])),
-        cost_centre_id=(
-            UUID(str(row["cost_centre_id"]))
-            if row.get("cost_centre_id")
-            else None
-        ),
+        cost_centre_id=(UUID(str(row["cost_centre_id"])) if row.get("cost_centre_id") else None),
         required_by_date=_parse_date(row["required_by_date"]),
     )
 
@@ -2357,9 +2150,7 @@ def _now_iso() -> str:
     return datetime.now(UTC).isoformat()
 
 
-def _quality_issue_storage_path(
-    *, tenant_id: UUID, issue_id: UUID, filename: str
-) -> str:
+def _quality_issue_storage_path(*, tenant_id: UUID, issue_id: UUID, filename: str) -> str:
     name = PurePosixPath(filename).name.replace("/", "_")
     if not name:
         name = "photo"
@@ -2410,16 +2201,12 @@ def _one_row(data: object, *, reason: str) -> dict[str, object]:
     return rows[0]
 
 
-def _one_row_or_not_found(
-    data: object, *, resource: str
-) -> dict[str, object]:
+def _one_row_or_not_found(data: object, *, resource: str) -> dict[str, object]:
     rows = _rows(data)
     if len(rows) == 0:
         raise NotFoundError(details={"resource": resource})
     if len(rows) != 1:
-        raise ServiceUnavailableError(
-            details={"reason": f"{resource}_write_ambiguous"}
-        )
+        raise ServiceUnavailableError(details={"reason": f"{resource}_write_ambiguous"})
     return rows[0]
 
 
@@ -2437,9 +2224,7 @@ def _cap_limit(limit: int) -> int:
 
 
 def _encode_cursor(offset: int) -> str:
-    raw = json.dumps({"offset": offset}, separators=(",", ":")).encode(
-        "utf-8"
-    )
+    raw = json.dumps({"offset": offset}, separators=(",", ":")).encode("utf-8")
     return base64.urlsafe_b64encode(raw).decode("ascii")
 
 
@@ -2456,9 +2241,7 @@ def _decode_cursor(cursor: str | None) -> int:
         TypeError,
         json.JSONDecodeError,
     ) as exc:
-        raise UnprocessableEntityError(
-            details={"cursor": "invalid"}
-        ) from exc
+        raise UnprocessableEntityError(details={"cursor": "invalid"}) from exc
     if not isinstance(offset, int) or offset < 0:
         raise UnprocessableEntityError(details={"cursor": "invalid"})
     return offset
@@ -2469,9 +2252,7 @@ def _write_error(
 ) -> ConflictError | ServiceUnavailableError | UnprocessableEntityError:
     code = _api_error_code(exc)
     if code in {"23503", "23514", "22P02"}:
-        return UnprocessableEntityError(
-            details={"reason": "database_constraint"}
-        )
+        return UnprocessableEntityError(details={"reason": "database_constraint"})
     if code == "23505":
         return ConflictError(details={"reason": "duplicate"})
     return ServiceUnavailableError(details={"dependency": "database"})
