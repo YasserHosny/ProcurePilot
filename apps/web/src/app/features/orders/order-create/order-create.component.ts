@@ -149,6 +149,31 @@ export class OrderCreateComponent implements OnInit {
             })
           );
         });
+        if (order.source_request_id) {
+          forkJoin({
+            request: this.requestsApi.getRequest(order.source_request_id).pipe(catchError(() => of(null))),
+            allocations: this.ordersApi.getAllocations(order.source_request_id).pipe(catchError(() => of(null))),
+          }).subscribe(({ request, allocations }) => {
+            if (!request || !allocations) return;
+            this.sourceRequest.set(request);
+            this.requestAllocations.set(allocations);
+
+            for (const lineGroup of this.lines.controls) {
+              const lineId = lineGroup.controls.source_request_line_id.value;
+              if (!lineId) continue;
+              const requestLine = request.lines.find(line => line.id === lineId);
+              const allocation = allocations.lines.find(line => line.source_request_line_id === lineId);
+              const currentQuantity = lineGroup.controls.quantity.value || 0;
+              const remaining = parseFloat(allocation?.remaining_quantity || '0') + currentQuantity;
+              lineGroup.controls.remaining_quantity.setValue(remaining);
+              lineGroup.controls.estimated_price.setValue(
+                requestLine?.estimated_unit_price ? parseFloat(requestLine.estimated_unit_price.amount) : null,
+              );
+              lineGroup.controls.quantity.addValidators(Validators.max(remaining));
+              lineGroup.controls.quantity.updateValueAndValidity({ emitEvent: false });
+            }
+          });
+        }
       } else if (request && allocations) {
         this.sourceRequest.set(request);
         this.requestAllocations.set(allocations);

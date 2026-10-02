@@ -45,6 +45,7 @@ export interface PurchaseOrder {
   source_kind: 'manual' | 'import' | 'provider';
   source_reference: string;
   source_hash: string | null;
+  source_request_id?: string | null;
   created_by: string;
   created_at: string;
   updated_at: string;

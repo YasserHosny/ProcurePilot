@@ -2311,6 +2311,7 @@ def test_rls_is_enabled_and_forced_on_every_tenant_scoped_table(
         "pos_connection",
         "synced_product_signal",
         "pos_product_match",
+        "purchase_order_edit_idempotency",
     }
     with conn.cursor() as cur:
         cur.execute(
@@ -2699,6 +2700,62 @@ def test_a_member_cannot_link_purchase_order_to_cross_tenant_request_or_line(
                 ),
             )
         cur.execute("rollback to savepoint cross_tenant_order_line")
+
+
+def test_purchase_order_line_direct_delete_requires_draft_parent(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, alpha, _beta = workspaces
+    draft_order_id = uuid4()
+    submitted_order_id = uuid4()
+    draft_line_id = uuid4()
+    submitted_line_id = uuid4()
+
+    with conn.cursor() as cur:
+        cur.execute("reset role")
+        for order_id, status, line_id in (
+            (draft_order_id, "draft", draft_line_id),
+            (submitted_order_id, "submitted", submitted_line_id),
+        ):
+            cur.execute(
+                "insert into purchase_order (id,tenant_id,order_number,supplier_id,status,"
+                "order_date,total_amount,total_currency,tax_amount,tax_currency,"
+                "source_reference,created_by) "
+                "values (%s,%s,%s,%s,%s,current_date,10,'GBP',0,'GBP','rls-delete',%s)",
+                (
+                    order_id,
+                    alpha.tenant_id,
+                    f"PO-RLS-{status}-{uuid4().hex[:8]}",
+                    alpha.supplier_id,
+                    status,
+                    alpha.membership_id,
+                ),
+            )
+            cur.execute(
+                "insert into purchase_order_line (id,tenant_id,purchase_order_id,line_number,"
+                "workspace_product_id,description,ordered_quantity,base_unit,unit_price_amount,"
+                "unit_price_currency,tax_amount,tax_currency,line_total_amount,"
+                "line_total_currency) "
+                "values (%s,%s,%s,1,%s,%s,1,'each',10,'GBP',0,'GBP',10,'GBP')",
+                (
+                    line_id,
+                    alpha.tenant_id,
+                    order_id,
+                    alpha.workspace_product_id,
+                    f"{status} line",
+                ),
+            )
+
+        act_as(cur, alpha)
+        cur.execute("delete from purchase_order_line where id = %s", (submitted_line_id,))
+        assert cur.rowcount == 0
+        cur.execute("select count(*) from purchase_order_line where id = %s", (submitted_line_id,))
+        assert cur.fetchone()[0] == 1
+
+        cur.execute("delete from purchase_order_line where id = %s", (draft_line_id,))
+        assert cur.rowcount == 1
+        cur.execute("select count(*) from purchase_order_line where id = %s", (draft_line_id,))
+        assert cur.fetchone()[0] == 0
 
 
 def test_no_single_column_foreign_key_links_two_tenant_scoped_tables(

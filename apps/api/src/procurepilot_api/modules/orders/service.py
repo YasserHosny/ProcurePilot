@@ -54,7 +54,8 @@ ORDER_COLUMNS = "*"
 ORDER_HEADER_COLUMNS = (
     "id,tenant_id,order_number,supplier_id,status,order_date,expected_delivery_date,"
     "total_amount,total_currency,tax_amount,tax_currency,source_kind,source_reference,"
-    "source_hash,source_request_id,created_by,created_at,updated_at,submit_idempotency_key,edit_idempotency_key,cancel_idempotency_key"
+    "source_hash,source_request_id,created_by,created_at,updated_at,create_idempotency_key,"
+    "submit_idempotency_key,edit_idempotency_key,cancel_idempotency_key"
 )
 ORDER_LINE_COLUMNS = (
     "id,line_number,workspace_product_id,description,ordered_quantity,base_unit,"
@@ -139,7 +140,7 @@ class OrdersService:
             if payload.source_request_id
             else None,
             "created_by": str(member.membership_id),
-            "submit_idempotency_key": str(idempotency_key),
+            "create_idempotency_key": str(idempotency_key),
         }
         with self._transaction(member) as cur:
             if payload.source_request_id:
@@ -162,7 +163,7 @@ class OrdersService:
             if row is None:
                 cur.execute(
                     f"select {ORDER_HEADER_COLUMNS} from purchase_order "
-                    "where tenant_id = %s and submit_idempotency_key = %s for update",
+                    "where tenant_id = %s and create_idempotency_key = %s for update",
                     (member.tenant_id, idempotency_key),
                 )
                 row = cur.fetchone()
@@ -252,17 +253,14 @@ class OrdersService:
                 raise NotFoundError(details={"resource": "purchase_order"})
             if row["status"] != "draft":
                 raise ConflictError(details={"reason": "order_not_draft"})
-            if row.get("edit_idempotency_key") and str(row["edit_idempotency_key"]) == str(
-                idempotency_key
-            ):
-                return self._load_order_cursor(cur, order_id)
-            cur.execute(
-                "select 1 from purchase_order where tenant_id = %s "
-                "and edit_idempotency_key = %s and id != %s",
-                (member.tenant_id, idempotency_key, order_id),
+            replay = self._record_edit_idempotency_key(
+                cur=cur,
+                tenant_id=member.tenant_id,
+                order_id=order_id,
+                idempotency_key=idempotency_key,
             )
-            if cur.fetchone() is not None:
-                raise ConflictError(details={"reason": "order_number_or_idempotency_exists"})
+            if replay:
+                return self._load_order_cursor(cur, order_id)
 
             requests_to_lock = set()
             if row.get("source_request_id"):
@@ -285,7 +283,7 @@ class OrdersService:
                 "update purchase_order set order_number = %s, supplier_id = %s, order_date = %s, "
                 "expected_delivery_date = %s, total_amount = %s, total_currency = %s, "
                 "tax_amount = %s, tax_currency = %s, source_kind = %s, source_reference = %s, "
-                "source_hash = %s, source_request_id = %s, edit_idempotency_key = %s, updated_at = now() "  # noqa: E501
+                "source_hash = %s, source_request_id = %s, updated_at = now() "
                 "where tenant_id = %s and id = %s",
                 (
                     payload.order_number,
@@ -302,7 +300,6 @@ class OrdersService:
                     payload.source_reference,
                     payload.source_hash,
                     payload.source_request_id,
-                    idempotency_key,
                     member.tenant_id,
                     order_id,
                 ),
@@ -397,6 +394,37 @@ class OrdersService:
             self._audit_cursor(cur, member, "orders.purchase_order_cancelled", order_id)
 
         return order
+
+    @staticmethod
+    def _record_edit_idempotency_key(
+        *,
+        cur: psycopg.Cursor,
+        tenant_id: UUID,
+        order_id: UUID,
+        idempotency_key: UUID,
+    ) -> bool:
+        try:
+            with cur.connection.transaction():
+                cur.execute(
+                    "insert into purchase_order_edit_idempotency "
+                    "(tenant_id,purchase_order_id,idempotency_key) values (%s,%s,%s)",
+                    (tenant_id, order_id, idempotency_key),
+                )
+                return False
+        except psycopg.errors.UniqueViolation:
+            cur.execute(
+                "select purchase_order_id from purchase_order_edit_idempotency "
+                "where tenant_id = %s and idempotency_key = %s",
+                (tenant_id, idempotency_key),
+            )
+            existing = cur.fetchone()
+            if existing is not None:
+                if UUID(str(existing["purchase_order_id"])) != order_id:
+                    raise ConflictError(
+                        details={"reason": "idempotency_key_used_for_another_order"}
+                    ) from None
+                return True
+            raise
 
     def get_request_allocation(
         self, *, bearer_token: str, member: CurrentMember, source_request_id: UUID

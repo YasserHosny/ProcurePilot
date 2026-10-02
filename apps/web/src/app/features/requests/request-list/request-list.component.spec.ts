@@ -137,6 +137,25 @@ describe('RequestListComponent (T017)', () => {
     expect(routerSpy.navigate).toHaveBeenCalledWith(['/requests', 'r1']);
   });
 
+  it('should expose create-order only for requests with an approved approval step', () => {
+    expect(
+      component.canCreateOrder({
+        ...mockRequests[1],
+        id: 'ordered-with-approval',
+        status: 'ordered',
+        approval_step: {
+          id: 'step-1',
+          assigned_membership_id: 'm1',
+          source: 'owner_fallback',
+          status: 'approved',
+          decided_by_membership_id: 'm1',
+          decided_at: '2026-09-30T00:00:00Z',
+        },
+      }),
+    ).toBeTrue();
+    expect(component.canCreateOrder({ ...mockRequests[1], status: 'ordered' })).toBeFalse();
+  });
+
   it('should withdraw a request and reload', () => {
     requestsApi.withdrawRequest.and.returnValue(
       of({ ...mockRequests[0], status: 'withdrawn' } as PurchaseRequest),

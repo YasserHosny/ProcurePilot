@@ -280,10 +280,24 @@ class _FakeClient:
         return table
 
 
+class _FakeConnection:
+    def transaction(self) -> "_FakeConnection":
+        return self
+
+    def __enter__(self) -> "_FakeConnection":
+        return self
+
+    def __exit__(
+        self, exc_type: type[BaseException] | None, exc_val: BaseException | None, exc_tb: object
+    ) -> None:
+        pass
+
+
 class _FakeCursor:
     def __init__(self) -> None:
         self.last_row: dict[str, object] | None = None
         self.executed: list[tuple[str, object]] = []
+        self.connection = _FakeConnection()
 
     def execute(self, statement: str, params: object = None) -> None:
         self.executed.append((statement, params))

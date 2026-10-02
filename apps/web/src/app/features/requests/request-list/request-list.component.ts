@@ -113,6 +113,10 @@ export class RequestListComponent implements OnInit {
     this.router.navigate(['/orders/new'], { queryParams: { source_request_id: request.id } });
   }
 
+  canCreateOrder(request: PurchaseRequest): boolean {
+    return request.approval_step?.status === 'approved';
+  }
+
   navigateToDetail(request: PurchaseRequest): void {
     this.router.navigate(['/requests', request.id]);
   }

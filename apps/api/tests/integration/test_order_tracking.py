@@ -128,6 +128,48 @@ def test_create_draft_from_approved_request(monkeypatch: pytest.MonkeyPatch) -> 
                 assert cur.fetchone()[0] == "ordered"
 
 
+def test_approved_request_list_item_can_create_and_edit_linked_draft_order(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    with committed_smart_context("order-request-edit") as context:
+        member = member_from_workspace(context.workspace, role=MemberRole.owner)
+        app = _app(monkeypatch, member)
+        client = TestClient(app, raise_server_exceptions=False)
+
+        with psycopg.connect(TEST_DATABASE_URL) as conn:
+            req_id, line_id = _setup_approved_request(conn, context.workspace, context.product_id)
+
+        res_requests = client.get("/api/v1/requests")
+        assert res_requests.status_code == 200, res_requests.text
+        listed = {item["id"]: item for item in res_requests.json()["items"]}
+        assert listed[str(req_id)]["status"] == "ordered"
+        assert listed[str(req_id)]["approval_step"]["status"] == "approved"
+
+        payload = _base_order_payload(context.supplier_ids[0], req_id, line_id, context.product_id)
+        res_create = client.post(
+            "/api/v1/orders", json=payload, headers={"Idempotency-Key": str(uuid4())}
+        )
+        assert res_create.status_code == 201, res_create.text
+        order = res_create.json()
+        assert order["source_request_id"] == str(req_id)
+        assert order["lines"][0]["source_request_line_id"] == str(line_id)
+
+        edit_payload = _base_order_payload(
+            context.supplier_ids[0], req_id, line_id, context.product_id, qty="7"
+        )
+        edit_payload["order_number"] = order["order_number"]
+        res_edit = client.put(
+            f"/api/v1/orders/{order['id']}",
+            json=edit_payload,
+            headers={"Idempotency-Key": str(uuid4())},
+        )
+        assert res_edit.status_code == 200, res_edit.text
+        edited = res_edit.json()
+        assert edited["source_request_id"] == str(req_id)
+        assert edited["lines"][0]["source_request_line_id"] == str(line_id)
+        assert edited["lines"][0]["ordered_quantity"] == "7.000000"
+
+
 def test_reject_ordered_status_without_approval_proof(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -221,6 +263,89 @@ def test_idempotent_draft_editing_and_allocation(
             409,
             422,
         ), "Should reject over-allocation"
+
+
+def test_stale_edit_idempotency_retry_does_not_overwrite_newer_edit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    with committed_smart_context("order-stale-edit") as context:
+        member = member_from_workspace(context.workspace, role=MemberRole.owner)
+        app = _app(monkeypatch, member)
+        client = TestClient(app, raise_server_exceptions=False)
+
+        with psycopg.connect(TEST_DATABASE_URL) as conn:
+            req_id, line_id = _setup_approved_request(conn, context.workspace, context.product_id)
+
+        payload = _base_order_payload(context.supplier_ids[0], req_id, line_id, context.product_id)
+        res_create = client.post(
+            "/api/v1/orders", json=payload, headers={"Idempotency-Key": str(uuid4())}
+        )
+        assert res_create.status_code == 201, res_create.text
+        order_id = res_create.json()["id"]
+
+        key_first = str(uuid4())
+        first_payload = _base_order_payload(
+            context.supplier_ids[0], req_id, line_id, context.product_id, qty="6"
+        )
+        first_payload["order_number"] = payload["order_number"]
+        res_first = client.put(
+            f"/api/v1/orders/{order_id}",
+            json=first_payload,
+            headers={"Idempotency-Key": key_first},
+        )
+        assert res_first.status_code == 200, res_first.text
+
+        second_payload = _base_order_payload(
+            context.supplier_ids[0], req_id, line_id, context.product_id, qty="7"
+        )
+        second_payload["order_number"] = payload["order_number"]
+        res_second = client.put(
+            f"/api/v1/orders/{order_id}",
+            json=second_payload,
+            headers={"Idempotency-Key": str(uuid4())},
+        )
+        assert res_second.status_code == 200, res_second.text
+        assert res_second.json()["lines"][0]["ordered_quantity"] == "7.000000"
+
+        stale_retry = client.put(
+            f"/api/v1/orders/{order_id}",
+            json=first_payload,
+            headers={"Idempotency-Key": key_first},
+        )
+        assert stale_retry.status_code == 200, stale_retry.text
+        assert stale_retry.json()["lines"][0]["ordered_quantity"] == "7.000000"
+
+
+def test_create_order_replay_after_submit_uses_create_idempotency_key(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    with committed_smart_context("order-create-submit-replay") as context:
+        member = member_from_workspace(context.workspace, role=MemberRole.owner)
+        app = _app(monkeypatch, member)
+        client = TestClient(app, raise_server_exceptions=False)
+
+        payload = _base_order_payload(context.supplier_ids[0], uuid4(), uuid4(), context.product_id)
+        payload.pop("source_request_id")
+        payload["lines"][0].pop("source_request_line_id")
+        create_key = str(uuid4())
+
+        res_create = client.post(
+            "/api/v1/orders", json=payload, headers={"Idempotency-Key": create_key}
+        )
+        assert res_create.status_code == 201, res_create.text
+        order_id = res_create.json()["id"]
+
+        res_submit = client.post(
+            f"/api/v1/orders/{order_id}/submit",
+            headers={"Idempotency-Key": str(uuid4())},
+        )
+        assert res_submit.status_code == 200, res_submit.text
+
+        replay = client.post(
+            "/api/v1/orders", json=payload, headers={"Idempotency-Key": create_key}
+        )
+        assert replay.status_code == 200, replay.text
+        assert replay.json()["id"] == order_id
 
 
 def test_concurrent_allocation_limits(monkeypatch: pytest.MonkeyPatch) -> None:

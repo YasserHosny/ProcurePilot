@@ -29,15 +29,15 @@ test.describe('Order Draft (US4)', () => {
   test('creates, edits, and cancels a draft order with zero a11y violations', async ({ page }) => {
     const credentials = await createIsolatedWorkspace();
     const token = await signIn(credentials.ownerEmail, credentials.ownerPassword);
-    const supplier = await createTestSupplier(token, \`E2E Draft Supplier \${Date.now()}\`);
-    const product = await createTestProduct(token, { tenant_name: \`E2E Draft Product \${Date.now()}\` });
+    const supplier = await createTestSupplier(token, `E2E Draft Supplier ${Date.now()}`);
+    const product = await createTestProduct(token, { tenant_name: `E2E Draft Product ${Date.now()}` });
     const order = await createTestOrder(token, { supplier_id: supplier.id, product_id: product.id }); // This might create a draft order, let's assume so based on the other spec, or we can just start from order details of a draft order.
     
     // Sign in and go to the order
     await signInUi(page, credentials.ownerEmail, credentials.ownerPassword);
     
     // Go to order detail
-    await page.goto(\`/orders/\${order.id}\`);
+    await page.goto(`/orders/${order.id}`);
     await expect(page.locator('.status-chip')).toContainText('Draft');
     
     // Check accessibility on order detail
@@ -46,7 +46,7 @@ test.describe('Order Draft (US4)', () => {
 
     // Click edit
     await page.locator('[data-testid="edit-order"]').click();
-    await expect(page).toHaveURL(new RegExp(\`/orders/\${order.id}/edit\$\`));
+    await expect(page).toHaveURL(new RegExp(`/orders/${order.id}/edit$`));
 
     // Wait for form
     await expect(page.locator('input[formControlName="order_number"]')).toBeVisible();
@@ -55,9 +55,12 @@ test.describe('Order Draft (US4)', () => {
     const editA11y = await runAxe(page);
     expect(editA11y.violations).toEqual([]);
 
-    // We can cancel back to order detail
+    // We can cancel back to order list
     await page.getByRole('button', { name: /cancel/i }).first().click();
-    await expect(page).toHaveURL(new RegExp(\`/orders/\${order.id}\$\`));
+    await expect(page).toHaveURL(new RegExp(`/orders$`));
+
+    // Go back to order detail to cancel the order
+    await page.goto(`/orders/${order.id}`);
 
     // Cancel the order
     await page.locator('[data-testid="cancel-order"]').click();
@@ -65,7 +68,7 @@ test.describe('Order Draft (US4)', () => {
 
     // Confirm cancel
     const cancelResponse = page.waitForResponse(
-      (response) => response.url().endsWith(\`/orders/\${order.id}/cancel\`) && response.request().method() === 'POST',
+      (response) => response.url().endsWith(`/orders/${order.id}/cancel`) && response.request().method() === 'POST',
     );
     await page.locator('[data-testid="confirm-cancel"]').click();
     expect((await cancelResponse).status()).toBe(200);

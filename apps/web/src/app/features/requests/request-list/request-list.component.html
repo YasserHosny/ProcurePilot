@@ -113,7 +113,7 @@
                   <mat-icon aria-hidden="true">visibility</mat-icon>
                 </button>
 
-                @if (req.status === 'approved') {
+                @if (canCreateOrder(req)) {
                   <button
                     *appRole="['owner', 'buyer']"
                     mat-icon-button
