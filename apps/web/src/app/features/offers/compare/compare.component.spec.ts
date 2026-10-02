@@ -18,6 +18,12 @@ describe('CompareComponent (US1, SC-002, T020, T029)', () => {
   let apiService: jasmine.SpyObj<ApiService>;
   let posApiService: jasmine.SpyObj<PosApiService>;
 
+  const daysFromNow = (days: number): string => {
+    const date = new Date();
+    date.setUTCDate(date.getUTCDate() + days);
+    return date.toISOString();
+  };
+
   const mockComparison: OfferComparison = {
     product: {
       id: '00000000-0000-4000-8000-000000000001',
@@ -41,7 +47,7 @@ describe('CompareComponent (US1, SC-002, T020, T029)', () => {
         stock_signal: null,
         match_confidence: '0.9800',
         valid_from: '2026-08-01T00:00:00Z',
-        valid_to: '2026-10-01T00:00:00Z',
+        valid_to: daysFromNow(30),
         is_expired: false,
         rule_version: '1.0',
         recorded_at: '2026-08-01T00:00:00Z',
@@ -62,7 +68,7 @@ describe('CompareComponent (US1, SC-002, T020, T029)', () => {
         stock_signal: null,
         match_confidence: '0.9000',
         valid_from: '2026-08-01T00:00:00Z',
-        valid_to: '2026-10-01T00:00:00Z',
+        valid_to: daysFromNow(30),
         is_expired: false,
         rule_version: '1.0',
         recorded_at: '2026-08-01T00:00:00Z',
@@ -83,7 +89,7 @@ describe('CompareComponent (US1, SC-002, T020, T029)', () => {
         stock_signal: null,
         match_confidence: '0.9900',
         valid_from: '2026-07-01T00:00:00Z',
-        valid_to: '2026-07-15T00:00:00Z',
+        valid_to: daysFromNow(-30),
         is_expired: true,
         rule_version: '1.0',
         recorded_at: '2026-07-01T00:00:00Z',
@@ -94,7 +100,7 @@ describe('CompareComponent (US1, SC-002, T020, T029)', () => {
       score: '0.9450',
       confidence: 'high',
       valid_from: '2026-08-01T00:00:00Z',
-      valid_to: '2026-10-01T00:00:00Z',
+      valid_to: daysFromNow(30),
       risk_notes: [],
       evidence: {
         weights: {
