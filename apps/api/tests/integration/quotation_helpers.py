@@ -241,6 +241,7 @@ _RPC_PARAM_TYPES = {
     "p_trigram_threshold": "real",
     "p_semantic_threshold": "real",
     "p_limit": "integer",
+    "p_offset": "integer",
 }
 
 

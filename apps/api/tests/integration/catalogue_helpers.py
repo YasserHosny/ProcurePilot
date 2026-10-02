@@ -105,14 +105,20 @@ def delete_tenant_scoped_rows(cur: psycopg.Cursor, tenant_id: UUID) -> None:
         order by c.table_name
         """
     )
-    for (table_name,) in cur.fetchall():
-        if table_name == "audit_event":
-            # audit_event is append-only by constitution; never delete its rows in cleanup.
-            continue
-        cur.execute(
-            sql.SQL("delete from {} where tenant_id = %s").format(sql.Identifier(table_name)),
-            (tenant_id,),
-        )
+    tables = [table_name for (table_name,) in cur.fetchall() if table_name != "audit_event"]
+    # Plain alphabetical order ignores FK dependencies between tenant-scoped tables (e.g.
+    # demand_forecast sorts before reorder_proposal, which references it) — disable trigger/FK
+    # enforcement for this teardown-only, test-infrastructure delete, same pattern already used
+    # for the owner-retention trigger elsewhere in this test suite.
+    cur.execute("set session_replication_role = replica")
+    try:
+        for table_name in tables:
+            cur.execute(
+                sql.SQL("delete from {} where tenant_id = %s").format(sql.Identifier(table_name)),
+                (tenant_id,),
+            )
+    finally:
+        cur.execute("set session_replication_role = default")
 
 
 def make_canonical_product(cur: psycopg.Cursor, name: str, *, gtin: str | None = None) -> UUID:
