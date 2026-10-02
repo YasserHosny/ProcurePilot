@@ -187,16 +187,22 @@ the caller's own tenant.
   implements via `latest_by_product.setdefault(...)` — has no test anywhere that seeds two
   proposals for the same product and asserts only the latest comes back. Confirmed by grepping
   all forecasting test files for "latest": no hits.
-- [x] **T012** [US1] — Implement `ForecastingService` (`service.py`) tenant-scoped list query
+- [ ] **T012** [US1] — Implement `ForecastingService` (`service.py`) tenant-scoped list query
   returning the latest open proposal per matched `workspace_product`, cursor-paginated and capped
   at `limit=100` per the repo's API conventions (spec.md FR-006).
-  **Verified 2026-10-03**: read `service.py::list_proposals` (lines 135-197) directly —
-  deduplicates by `workspace_product_id` keeping the first (most-recent, since the query orders
-  `created_at desc`) row per product, applies an offset-based cursor, and
-  `capped = min(max(limit, 1), 100)` enforces the 100 cap regardless of what the caller passed
-  (confirmed by `test_list_reorder_proposals_limit_capped_at_100` returning 422 at the FastAPI
-  layer for `limit=999` before this even runs). The implementation is correct; see T011 for why
-  the dedup behavior specifically is untested.
+  **Corrected 2026-10-03** (a 2026-10-03 pass of this file first checked this off, then a Codex
+  review of the resulting PR caught a real bug the first pass missed — re-verified and confirmed
+  directly against `service.py::list_proposals`, lines 135-197): `capped = min(max(limit, 1),
+  100)` and the `created_at desc` dedup-keeps-first logic are both correct, but the underlying
+  fetch is `.range(0, 1000)` — the 1001 most recent non-dismissed *rows tenant-wide*, fetched
+  BEFORE deduping to one-per-product. If a tenant accumulates more than 1001 non-dismissed
+  `reorder_proposal` rows, a product whose only non-dismissed proposal is older than the other
+  1001 rows (for different products) never enters `latest_by_product` at all — it silently
+  disappears from the list for every page, not just a later one; pagination (`offset`/`cursor`)
+  only slices the already-deduped, already-truncated `latest_rows`, so no amount of paging
+  recovers it. Not fixed here — this is shipped, already-relied-upon logic; it deserves its own
+  scoped fix (e.g. dedup via a window function in SQL instead of in Python after a fixed-size
+  fetch), not a change folded into this documentation-verification PR.
 - [x] **T013** [US1] — Implement a forecast-generation/recompute path in `service.py` that calls
   the Phase 2 calculator against matched POS signal data and persists an immutable
   `demand_forecast` row, and append an audit event for every generation (spec.md FR-001, FR-010;
@@ -281,10 +287,14 @@ draft request is returned, not a duplicate.
   the deterministic `uuid5(tenant_id, proposal_id, branch_id)` key passed down to
   `RequestsService.create_request`, plus the `reorder_proposal_forecast_key`/
   `reorder_proposal_request_key` DB uniqueness and the proposal's own `open`→`prepared` status
-  guard. This is a different mechanism than the task text describes, but it satisfies the same
-  FR-008 requirement (repeat preparation returns the original, never duplicates) through a
-  design the service already enforces end-to-end — not a hole, just not literally an
-  `Idempotency-Key` header. An audit event (`forecasting.reorder_proposal_prepared`) is appended
+  guard. A Codex review of this exact note asked whether checking this off was right, given the
+  task's own wording specifically names an `Idempotency-Key` header — on re-confirmation, yes: the
+  requirement this task actually exists to satisfy is FR-008 (repeat preparation returns the
+  original, never duplicates), not the specific header mechanism, and FR-008 is genuinely met —
+  confirmed by the deterministic key making a repeat call collide on the same DB uniqueness
+  constraint rather than insert a second row. This is a mismatch between the task's wording and
+  the mechanism actually built, not an unmet requirement; kept checked. An audit event
+  (`forecasting.reorder_proposal_prepared`) is appended
   for every successful preparation, confirmed at `service.py` lines 276-284.
 - [ ] **T019** [US2] — Run the contract and integration tests focused on prepare-request and
   confirm they pass, including the idempotent-repeat and cross-tenant-not-found cases.

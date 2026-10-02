@@ -1,12 +1,13 @@
 # ProcurePilot — Development Guidelines
 
 Last updated: 2026-10-03 · Active feature: none mid-build. Every numbered spec, `001` through
-`021`, is complete and merged — including `018-forecasting-reorder` and
-`019-supplier-risk-negotiation`, both of which were already fully built and shipped (as "R4.0"
-and "R4.1" in commit history) despite their `specs/` folders lagging behind: `018` had no
-`tasks.md` and `019` had neither a `plan.md` nor a `tasks.md` until 2026-10-03, when both were
-reconstructed retroactively against the real shipped code (see the dated verification notes
-inside each). `019`'s reconstruction found one real, still-open requirement gap — FR-011A's
+`021`, has shipped to `main` — including `018-forecasting-reorder` and
+`019-supplier-risk-negotiation`, both already fully built and merged (as "R4.0" and "R4.1" in
+commit history) despite their `specs/` folders lagging behind: `018` had no `tasks.md` and `019`
+had neither a `plan.md` nor a `tasks.md` until 2026-10-03, when both were reconstructed
+retroactively against the real shipped code (see the dated verification notes inside each). That
+verification is not a clean bill of health across the board: it found one real, still-open
+requirement gap — `019`'s FR-011A's
 three-signal service-risk formula — tracked in its own `tasks.md` (T019), not fixed yet. There is
 currently no visible not-yet-started spec in `specs/`; the next feature has not been scoped.
 
@@ -152,7 +153,13 @@ quality_incidents_per_qualifying_completed_order)`; the shipped code only comput
 component — `supplier_iq_v2.py` never queries `three_way_match` or `delivery_quality_issue` at
 all, so service risk can be understated for a supplier whose real problem is mismatches or quality
 incidents rather than reliability specifically. Tracked as `specs/019-supplier-risk-negotiation/
-tasks.md` T019, not yet fixed.
+tasks.md` T019, not yet fixed. A Codex review of that same verification PR caught a second real
+bug missed on the first pass, this time in `018`: `ForecastingService.list_proposals()`
+(`apps/api/src/procurepilot_api/modules/forecasting/service.py`) fetches the 1001 most recent
+non-dismissed `reorder_proposal` rows tenant-wide, then dedupes to one-per-product in Python —
+a product whose only non-dismissed proposal is older than 1001 other rows (for other products)
+silently never appears, on any page. Tracked as `specs/018-forecasting-reorder/tasks.md` T012,
+not yet fixed.
 
 With `018`/`019` closed out, there is no visible not-yet-started spec anywhere in `specs/` right
 now — the next feature has not been scoped.
