@@ -350,8 +350,8 @@ def test_post_low_stock_reports_records_low_stock_report_created(
 # Same gap this file was written to close, for three more actions this chunk adds: a real
 # TestClient(app) round trip through the actual endpoints, not just a check that the service's
 # own source code emits the right action string. `workspace` is the OWNER in every case here
-# (make_workspace's own row), so `_require_assigned_approver_or_owner`'s and
-# `_authorize_delivery_confirmation`'s owner-bypass branches let one caller drive
+# (make_workspace's own row), so `_require_assigned_approver_or_owner`'s owner-bypass branch, and
+# RLS's owner-sees-everything clause for confirm-delivery, let one caller drive
 # create -> submit -> approve -> confirm-delivery -> quality-issue without any extra
 # branch-assignment plumbing.
 

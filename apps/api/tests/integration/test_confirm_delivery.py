@@ -8,6 +8,7 @@ import pytest
 from integration.catalogue_helpers import (
     TEST_DATABASE_URL,
     Workspace,
+    act_as,
     connection,
     make_workspace,
     make_workspace_product,
@@ -15,7 +16,7 @@ from integration.catalogue_helpers import (
 )
 from integration.quotation_helpers import PsycopgSupabaseClient
 from procurepilot_api.deps import CurrentMember
-from procurepilot_api.errors import ConflictError, PermissionDeniedError
+from procurepilot_api.errors import ConflictError, NotFoundError
 from procurepilot_api.modules.auth.jwt import MemberRole
 from procurepilot_api.modules.requests import service as requests_service_module
 from procurepilot_api.modules.requests.schemas import DeliveryConfirmationCreate
@@ -286,9 +287,27 @@ def test_not_ordered_request_refuses_with_not_ordered_conflict(
     assert exc.value.details == {"reason": "not_ordered"}
 
 
-def test_visible_different_branch_without_write_scope_refuses_with_403(
+def test_branch_scoped_member_assigned_elsewhere_resolves_404_not_403(
     conn: psycopg.Connection, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    """T018's literal scenario, proven against real RLS (not the app-layer mock).
+
+    A member who IS branch-scoped (has at least one `branch_role_assignment` row) but is
+    assigned to some OTHER branch has no `branch_role_assignment` row matching this request's
+    own branch — `purchase_request_scoped_visibility`'s restrictive SELECT policy excludes the
+    row entirely, so `_fetch_request` gets zero rows back and raises 404 before
+    `confirm_delivery` ever reaches a branch-authorization check. Confirmed independently with a
+    real end-to-end HTTP call through a live local stack (real RLS via PostgREST, real JWT):
+    identical 404, `{"resource": "purchase_request"}`.
+
+    This requires `act_as()` to actually switch the connection to `receiver`'s role and JWT
+    claims before calling the service — unlike the rest of this file's tests, which run every
+    query as the unrestricted connection owner and so never exercise real RLS. Skipping that step
+    is exactly how the test this replaced asserted 403 for this same fixture: the row was never
+    actually gated by RLS in that version, only by `_authorize_branch_for_write`'s app-layer
+    check — which is correct for `low_stock_report` (no RLS row-scoping there to pre-empt it) but
+    was unreachable dead code when reused for `confirm_delivery`, since RLS always wins first.
+    """
     with conn.cursor() as cur:
         owner = make_workspace(cur, "delivery-forbidden")
         requester = _make_member(
@@ -310,7 +329,9 @@ def test_visible_different_branch_without_write_scope_refuses_with_403(
     conn.commit()
 
     service, _recorded = _service(conn, monkeypatch)
-    with pytest.raises(PermissionDeniedError) as exc:
+    with conn.cursor() as cur:
+        act_as(cur, receiver)
+    with pytest.raises(NotFoundError) as exc:
         service.confirm_delivery(
             bearer_token="token",
             member=_current_member(owner, receiver),
@@ -318,8 +339,8 @@ def test_visible_different_branch_without_write_scope_refuses_with_403(
             payload=_payload([(line_id, "3.000000")]),
         )
 
-    assert exc.value.status_code == 403
-    assert exc.value.details == {"reason": "branch_not_assigned"}
+    assert exc.value.status_code == 404
+    assert exc.value.details == {"resource": "purchase_request"}
 
 
 def test_requester_without_branch_assignment_can_confirm_own_order(
