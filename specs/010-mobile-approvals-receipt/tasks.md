@@ -24,25 +24,29 @@ completable and testable, mirroring 009-mobile-app-mvp/tasks.md's own structure 
 (research.md R2) — nothing here alters the decision data model, only what a request records once
 it moves past being decided.
 
-- [ ] T001 Migration adding `'ordered'` and `'delivered'` to the `purchase_request_status` enum,
+- [x] T001 Migration adding `'ordered'` and `'delivered'` to the `purchase_request_status` enum,
   **in its own migration file with no other statement** — `ALTER TYPE ... ADD VALUE` cannot be
   referenced in the same transaction block it runs in (data-model.md Migration Note). File:
   `supabase/migrations/<next>_purchase_request_delivery_status.sql`
-- [ ] T002 Migration adding `delivered_at`, `delivery_confirmed_by_membership_id`,
+  **Verified 2026-10-02**: implemented and tested, just never checked off — see the dated audit evidence table this update is based on (file:line citations for schema/RLS, FastAPI endpoints, Flutter screens/widgets, and tests).
+- [x] T002 Migration adding `delivered_at`, `delivery_confirmed_by_membership_id`,
   `has_delivery_discrepancy` to `purchase_request`, and `quantity_received` to
   `purchase_request_line`, with the `check (quantity_received is null or quantity_received >= 0)`
   constraint (data-model.md). Must run **after** T001 lands (needs the new enum values to exist
   before anything can reference them, even indirectly via a later migration). File:
   `supabase/migrations/<next>_purchase_request_delivery_columns.sql`
-- [ ] T003 [P] Migration creating `delivery_quality_issue` (tenant-scoped, FK to `purchase_request`,
+  **Verified 2026-10-02**: implemented and tested, just never checked off — see the dated audit evidence table this update is based on (file:line citations for schema/RLS, FastAPI endpoints, Flutter screens/widgets, and tests).
+- [x] T003 [P] Migration creating `delivery_quality_issue` (tenant-scoped, FK to `purchase_request`,
   `check (char_length(description) > 0)`, `ENABLE`+`FORCE` RLS with a derived-visibility
   RESTRICTIVE policy via `EXISTS` join to the parent request, insert-only grant to `authenticated`
   per data-model.md's RLS Summary). File:
   `supabase/migrations/<next>_delivery_quality_issue.sql`
-- [ ] T004 [P] Migration creating `delivery_quality_issue_photo` (tenant-scoped, FK to
+  **Verified 2026-10-02**: implemented and tested, just never checked off — see the dated audit evidence table this update is based on (file:line citations for schema/RLS, FastAPI endpoints, Flutter screens/widgets, and tests).
+- [x] T004 [P] Migration creating `delivery_quality_issue_photo` (tenant-scoped, FK to
   `delivery_quality_issue`, same derived-visibility/insert-only shape as T003). File:
   `supabase/migrations/<next>_delivery_quality_issue_photo.sql`
-- [ ] T005 [P] Migration creating the `quality-issue-photos` Storage bucket and its
+  **Verified 2026-10-02**: implemented and tested, just never checked off — see the dated audit evidence table this update is based on (file:line citations for schema/RLS, FastAPI endpoints, Flutter screens/widgets, and tests).
+- [x] T005 [P] Migration creating the `quality-issue-photos` Storage bucket and its
   tenant-isolation-by-object-path policy, mirroring
   `supabase/migrations/20260819000020_quotation_storage.sql` exactly (research.md R3 — read that
   file first, copy its policy shape, do not invent a new one). File:
@@ -53,6 +57,7 @@ show every pre-existing test passing — these migrations are purely additive.
 
 ---
 
+  **Verified 2026-10-02**: implemented and tested, just never checked off — see the dated audit evidence table this update is based on (file:line citations for schema/RLS, FastAPI endpoints, Flutter screens/widgets, and tests).
 ## Phase 2: Foundational (blocking prerequisites)
 
 **Purpose**: The one backend change every later story either triggers or depends on, plus the
@@ -60,14 +65,16 @@ mobile-side plumbing more than one story needs.
 
 **⚠️ CRITICAL**: No user-story phase below should be started until this phase is done.
 
-- [ ] T006 Wire the `approved -> ordered` automatic transition into
+- [x] T006 Wire the `approved -> ordered` automatic transition into
   `RequestsService.approve_request()` in
   `apps/api/src/procurepilot_api/modules/requests/service.py` — the moment a decision approves a
   request, its status becomes `ordered` in the same write, not a second call (research.md R1: no
   separate "place the order" action exists this release). `reject_request()` is unaffected.
-- [ ] T007 [P] Add `deliveredAt`, `deliveryConfirmedByMembershipId`, `hasDeliveryDiscrepancy` to the
+  **Verified 2026-10-02**: implemented and tested, just never checked off — see the dated audit evidence table this update is based on (file:line citations for schema/RLS, FastAPI endpoints, Flutter screens/widgets, and tests).
+- [x] T007 [P] Add `deliveredAt`, `deliveryConfirmedByMembershipId`, `hasDeliveryDiscrepancy` to the
   `PurchaseRequest` Dart model, and `quantityReceived` to `PurchaseRequestLine`, in
   `apps/mobile/lib/core/api/models.dart`.
+  **Verified 2026-10-02**: implemented and tested, just never checked off — see the dated audit evidence table this update is based on (file:line citations for schema/RLS, FastAPI endpoints, Flutter screens/widgets, and tests).
 - [ ] T008 [P] Define a `NotificationPermission`-style injectable camera abstraction (an interface
   plus a real implementation and a test fake, mirroring
   `apps/mobile/lib/core/auth/biometric_gate.dart`'s own shape exactly — research.md R4) in
@@ -82,6 +89,7 @@ verify it.
 
 ---
 
+  **Left open 2026-10-02**: the `CameraCapture` interface and a fake test double exist and are correctly wired into T030's quality-issue screen, but no real camera/image-picker package was ever added to `pubspec.yaml` — `StandInCameraCapture.isAvailable()`/`capturePhoto()` unconditionally return `false`/`null` (see its own doc comment). In a real build the camera button never appears. Needs an actual platform plugin wired behind the existing abstraction before this can be checked off.
 ## Phase 3: User Story 1 - Decide on a pending request from mobile (Priority: P1) 🎯 MVP
 
 **Goal**: An approver reviews full decision context and approves/rejects a pending request from
@@ -94,40 +102,47 @@ approval queue.
 
 ### Tests for User Story 1
 
-- [ ] T009 [P] [US1] Widget test for the approval queue screen in
+- [x] T009 [P] [US1] Widget test for the approval queue screen in
   `apps/mobile/test/features/approvals/approval_queue_screen_test.dart`: renders pending requests
   from `ApprovalsApiClient.listPendingApprovals()`, empty state when none are pending.
-- [ ] T010 [P] [US1] Widget test for the decision detail screen in
+  **Verified 2026-10-02**: implemented and tested, just never checked off — see the dated audit evidence table this update is based on (file:line citations for schema/RLS, FastAPI endpoints, Flutter screens/widgets, and tests).
+- [x] T010 [P] [US1] Widget test for the decision detail screen in
   `apps/mobile/test/features/approvals/approval_decision_screen_test.dart`: renders lines,
   estimated total, budget status (when present), requester identity; approve and reject both call
   the right client method with the entered comment; a request already decided by someone else
   shows the conflict message from Acceptance Scenario 4, not a silent failure.
 
+  **Verified 2026-10-02**: implemented and tested, just never checked off — see the dated audit evidence table this update is based on (file:line citations for schema/RLS, FastAPI endpoints, Flutter screens/widgets, and tests).
 ### Implementation for User Story 1
 
-- [ ] T011 [US1] Replace `PendingApprovalsList`'s deliberately-untyped `Map<String, dynamic>` items
+- [x] T011 [US1] Replace `PendingApprovalsList`'s deliberately-untyped `Map<String, dynamic>` items
   (added in 009 specifically so action-relevant fields could not be rendered — see that class's
   own doc comment) with proper `PurchaseRequest` objects, now that mobile is authorized to act on
   them, in `apps/mobile/lib/core/api/approvals_api_client.dart`.
-- [ ] T012 [US1] Add `approveRequest(requestId, {comment})` and `rejectRequest(requestId,
+  **Verified 2026-10-02**: implemented and tested, just never checked off — see the dated audit evidence table this update is based on (file:line citations for schema/RLS, FastAPI endpoints, Flutter screens/widgets, and tests).
+- [x] T012 [US1] Add `approveRequest(requestId, {comment})` and `rejectRequest(requestId,
   {comment})` methods to `ApprovalsApiClient` (or `RequestsApiClient`, whichever this codebase's
   existing convention favors — check where `submitRequest`/`withdrawRequest` already live and
   match it) calling `POST /requests/{id}/approve`\|`/reject` — the exact unchanged
   008-requests-approvals endpoints (research.md R2), in
   `apps/mobile/lib/core/api/approvals_api_client.dart`.
-- [ ] T013 [US1] Build the approval queue screen in
+  **Verified 2026-10-02**: implemented and tested, just never checked off — see the dated audit evidence table this update is based on (file:line citations for schema/RLS, FastAPI endpoints, Flutter screens/widgets, and tests).
+- [x] T013 [US1] Build the approval queue screen in
   `apps/mobile/lib/features/approvals/approval_queue_screen.dart` listing pending requests via
   T011's typed client call.
-- [ ] T014 [US1] Build the decision detail screen in
+  **Verified 2026-10-02**: implemented and tested, just never checked off — see the dated audit evidence table this update is based on (file:line citations for schema/RLS, FastAPI endpoints, Flutter screens/widgets, and tests).
+- [x] T014 [US1] Build the decision detail screen in
   `apps/mobile/lib/features/approvals/approval_decision_screen.dart` — lines, estimated total,
   budget status, requester (reuse `RequestDetailScreen`'s existing rendering pieces where they
   already fit, don't duplicate that layout logic), a comment field, and approve/reject actions
   calling T012. On a `409` conflict response, show the request was already decided (Acceptance
   Scenario 4) rather than a generic error.
-- [ ] T015 [US1] Turn the existing read-only pending-approvals count on
+  **Verified 2026-10-02**: implemented and tested, just never checked off — see the dated audit evidence table this update is based on (file:line citations for schema/RLS, FastAPI endpoints, Flutter screens/widgets, and tests).
+- [x] T015 [US1] Turn the existing read-only pending-approvals count on
   `apps/mobile/lib/features/home/home_screen.dart` (009) into a tappable link into T013's approval
   queue, for a member holding approval authority only.
-- [ ] T016 [US1] Add `approvals.*` i18n keys for the new screens to `packages/i18n/en.json` and
+  **Verified 2026-10-02**: implemented and tested, just never checked off — see the dated audit evidence table this update is based on (file:line citations for schema/RLS, FastAPI endpoints, Flutter screens/widgets, and tests).
+- [x] T016 [US1] Add `approvals.*` i18n keys for the new screens to `packages/i18n/en.json` and
   `packages/i18n/ar.json` in exact parity — check first whether anything reusable already exists
   from the web approval queue's own keys before adding new ones.
 
@@ -136,6 +151,7 @@ its result, from one made on web.
 
 ---
 
+  **Verified 2026-10-02**: implemented and tested, just never checked off — see the dated audit evidence table this update is based on (file:line citations for schema/RLS, FastAPI endpoints, Flutter screens/widgets, and tests).
 ## Phase 4: User Story 2 - Confirm delivery of an approved order (Priority: P1)
 
 **Goal**: A branch member records what was actually received against an `ordered` request,
@@ -149,10 +165,11 @@ against that line.
 
 ### Tests for User Story 2
 
-- [ ] T017 [P] [US2] Contract test for `POST /requests/{request_id}/confirm-delivery` in
+- [x] T017 [P] [US2] Contract test for `POST /requests/{request_id}/confirm-delivery` in
   `apps/api/tests/contract/test_confirm_delivery_contract.py`: request/response shape matches
   `contracts/mobile-approvals-receipt.openapi.yaml`, `409` with reason `not_ordered` for a request
   not in `ordered` status.
+  **Verified 2026-10-02**: implemented and tested, just never checked off — see the dated audit evidence table this update is based on (file:line citations for schema/RLS, FastAPI endpoints, Flutter screens/widgets, and tests).
 - [ ] T018 [P] [US2] Integration test in
   `apps/api/tests/integration/test_confirm_delivery.py` against a real disposable Postgres:
   full-quantity delivery leaves `has_delivery_discrepancy = false`; a short quantity on one line
@@ -161,22 +178,27 @@ against that line.
   request refuses with `409 not_ordered`; a same-tenant different-branch request resolves `404`,
   never `403` (constitution Principle III).
 
+  **Left open 2026-10-02**: 3 of 4 scenarios are implemented and pass (full quantity, short quantity with per-line discrepancy, `409 not_ordered`). The 4th, as literally written here ("same-tenant different-branch resolves 404, never 403"), was not built — the actual test (`test_visible_different_branch_without_write_scope_refuses_with_403`) asserts `403 branch_not_assigned` for a request that IS visible to the actor but who lacks branch-write authority, matching the same `_authorize_branch_for_write` pattern already used elsewhere in `service.py` for other write actions on already-visible rows. No test anywhere exercises a genuinely RLS-invisible different-branch request against confirm-delivery returning 404. Also: this task cites "constitution Principle III" for the not-found-vs-forbidden rule, but Principle III is "Human Authority Over Automation" — the actual rule lives in Principle V (Tenant Isolation) / CLAUDE.md non-negotiable #3, which governs cross-tenant/cross-visibility reads, not a same-tenant write-authorization check. That citation drift likely explains the deviation. Needs a product decision: add the literal 404-on-invisible-branch test, or correct this task's description to match the 403 behavior that was deliberately built.
 ### Implementation for User Story 2
 
-- [ ] T019 [US2] `RequestsService.confirm_delivery()` in
+- [x] T019 [US2] `RequestsService.confirm_delivery()` in
   `apps/api/src/procurepilot_api/modules/requests/service.py` — the `ordered -> delivered`
   transition, per-line `quantity_received` write, and `has_delivery_discrepancy` derivation
   (data-model.md). Requires the caller to be the requester or hold branch-scoped write access,
   matching this file's own existing authorization pattern for other requester-initiated actions.
-- [ ] T020 [US2] `POST /requests/{request_id}/confirm-delivery` route and its Pydantic
+  **Verified 2026-10-02**: implemented and tested, just never checked off — see the dated audit evidence table this update is based on (file:line citations for schema/RLS, FastAPI endpoints, Flutter screens/widgets, and tests).
+- [x] T020 [US2] `POST /requests/{request_id}/confirm-delivery` route and its Pydantic
   request/response schemas in
   `apps/api/src/procurepilot_api/modules/requests/router.py` and `schemas.py`.
-- [ ] T021 [US2] `confirmDelivery(requestId, lines)` method on `RequestsApiClient` in
+  **Verified 2026-10-02**: implemented and tested, just never checked off — see the dated audit evidence table this update is based on (file:line citations for schema/RLS, FastAPI endpoints, Flutter screens/widgets, and tests).
+- [x] T021 [US2] `confirmDelivery(requestId, lines)` method on `RequestsApiClient` in
   `apps/mobile/lib/core/api/requests_api_client.dart`.
-- [ ] T022 [US2] Delivery confirmation screen in
+  **Verified 2026-10-02**: implemented and tested, just never checked off — see the dated audit evidence table this update is based on (file:line citations for schema/RLS, FastAPI endpoints, Flutter screens/widgets, and tests).
+- [x] T022 [US2] Delivery confirmation screen in
   `apps/mobile/lib/features/delivery/delivery_confirmation_screen.dart` — one quantity-received
   field per line, pre-filled with the ordered quantity, submitting via T021.
-- [ ] T023 [US2] Add `delivery.*` i18n keys for the new screen to `packages/i18n/en.json`/`ar.json`
+  **Verified 2026-10-02**: implemented and tested, just never checked off — see the dated audit evidence table this update is based on (file:line citations for schema/RLS, FastAPI endpoints, Flutter screens/widgets, and tests).
+- [x] T023 [US2] Add `delivery.*` i18n keys for the new screen to `packages/i18n/en.json`/`ar.json`
   in exact parity.
 
 **Checkpoint**: User Stories 1 AND 2 both independently functional. A request can now go all the
@@ -184,6 +206,7 @@ way from submitted to delivered without leaving the app.
 
 ---
 
+  **Verified 2026-10-02**: implemented and tested, just never checked off — see the dated audit evidence table this update is based on (file:line citations for schema/RLS, FastAPI endpoints, Flutter screens/widgets, and tests).
 ## Phase 5: User Story 3 - Report a delivery quality issue with photo evidence (Priority: P2)
 
 **Goal**: A branch member reports a problem with a delivered request, with an optional
@@ -197,12 +220,14 @@ quality issue can be submitted with no photo at all.
 
 ### Tests for User Story 3
 
-- [ ] T024 [P] [US3] Contract test for `POST`/`GET /requests/{request_id}/quality-issues` in
+- [x] T024 [P] [US3] Contract test for `POST`/`GET /requests/{request_id}/quality-issues` in
   `apps/api/tests/contract/test_quality_issues_contract.py`: shapes match the OpenAPI contract;
   `409 not_delivered` for a request not yet `delivered`.
-- [ ] T025 [P] [US3] Contract test for `POST /quality-issues/{issue_id}/photos` in the same file:
+  **Verified 2026-10-02**: implemented and tested, just never checked off — see the dated audit evidence table this update is based on (file:line citations for schema/RLS, FastAPI endpoints, Flutter screens/widgets, and tests).
+- [x] T025 [P] [US3] Contract test for `POST /quality-issues/{issue_id}/photos` in the same file:
   multipart upload accepted, returns a signed URL, never a raw/public path.
-- [ ] T026 [P] [US3] Integration test in
+  **Verified 2026-10-02**: implemented and tested, just never checked off — see the dated audit evidence table this update is based on (file:line citations for schema/RLS, FastAPI endpoints, Flutter screens/widgets, and tests).
+- [x] T026 [P] [US3] Integration test in
   `apps/api/tests/integration/test_quality_issues.py` against a real disposable Postgres: a
   quality issue with zero photos is valid (FR-007); a quality issue against a non-`delivered`
   request refuses with `409 not_delivered`; an uploaded photo's Storage path is
@@ -211,54 +236,65 @@ quality issue can be submitted with no photo at all.
   R3 — check `test_tenant_isolation.py` for that existing test's shape and mirror it, don't
   reinvent the assertion style).
 
+  **Verified 2026-10-02**: implemented and tested, just never checked off — see the dated audit evidence table this update is based on (file:line citations for schema/RLS, FastAPI endpoints, Flutter screens/widgets, and tests).
 ### Implementation for User Story 3
 
-- [ ] T027 [US3] `RequestsService.create_quality_issue()` and `.attach_quality_issue_photo()` in
+- [x] T027 [US3] `RequestsService.create_quality_issue()` and `.attach_quality_issue_photo()` in
   `apps/api/src/procurepilot_api/modules/requests/service.py` — the `delivered`-status precondition
   check (FR-006) and the server-side Storage path allocation (research.md R3; never trust a
   client-supplied path).
-- [ ] T028 [US3] `POST`/`GET /requests/{request_id}/quality-issues` and
+  **Verified 2026-10-02**: implemented and tested, just never checked off — see the dated audit evidence table this update is based on (file:line citations for schema/RLS, FastAPI endpoints, Flutter screens/widgets, and tests).
+- [x] T028 [US3] `POST`/`GET /requests/{request_id}/quality-issues` and
   `POST /quality-issues/{issue_id}/photos` routes and schemas in
   `apps/api/src/procurepilot_api/modules/requests/router.py` and `schemas.py`.
-- [ ] T029 [US3] `reportQualityIssue(requestId, description)` and
+  **Verified 2026-10-02**: implemented and tested, just never checked off — see the dated audit evidence table this update is based on (file:line citations for schema/RLS, FastAPI endpoints, Flutter screens/widgets, and tests).
+- [x] T029 [US3] `reportQualityIssue(requestId, description)` and
   `uploadQualityIssuePhoto(issueId, file)` methods on `RequestsApiClient` in
   `apps/mobile/lib/core/api/requests_api_client.dart`.
-- [ ] T030 [US3] Quality-issue report screen in
+  **Verified 2026-10-02**: implemented and tested, just never checked off — see the dated audit evidence table this update is based on (file:line citations for schema/RLS, FastAPI endpoints, Flutter screens/widgets, and tests).
+- [x] T030 [US3] Quality-issue report screen in
   `apps/mobile/lib/features/delivery/quality_issue_screen.dart` — description field, camera
   capture via T008's abstraction, photo preview/remove before submit; submitting with zero photos
   MUST succeed (FR-007) — a declined or absent camera permission must never block submission.
-- [ ] T031 [US3] Wire quality-issue reporting (and its photo attachment) into the existing
+  **Verified 2026-10-02**: implemented and tested, just never checked off — see the dated audit evidence table this update is based on (file:line citations for schema/RLS, FastAPI endpoints, Flutter screens/widgets, and tests).
+- [x] T031 [US3] Wire quality-issue reporting (and its photo attachment) into the existing
   `OfflineQueue` interface (`apps/mobile/lib/core/offline_queue/`, Wave 7) so a report made offline
   queues and replays automatically once connectivity returns (spec.md FR-009) — a queued photo
   file must be cached locally and its upload deferred until the record it belongs to has synced,
   not attempted independently first.
-- [ ] T032 [US3] Add `qualityIssue.*` i18n keys for the new screen to `packages/i18n/en.json`/
+  **Verified 2026-10-02**: implemented and tested, just never checked off — see the dated audit evidence table this update is based on (file:line citations for schema/RLS, FastAPI endpoints, Flutter screens/widgets, and tests).
+- [x] T032 [US3] Add `qualityIssue.*` i18n keys for the new screen to `packages/i18n/en.json`/
   `ar.json` in exact parity.
 
 **Checkpoint**: All three user stories independently functional and integrated.
 
 ---
 
+  **Verified 2026-10-02**: implemented and tested, just never checked off — see the dated audit evidence table this update is based on (file:line citations for schema/RLS, FastAPI endpoints, Flutter screens/widgets, and tests).
 ## Phase 6: Polish & Cross-Cutting Concerns
 
 **Purpose**: Branch-scoped visibility proof, audit coverage, accessibility, and docs — mirroring
 009-mobile-app-mvp's own Phase 8 exactly, for the entities and screens this chunk adds.
 
-- [ ] T033 [P] Extend `apps/api/tests/integration/test_branch_scoped_visibility.py` with cases for
+- [x] T033 [P] Extend `apps/api/tests/integration/test_branch_scoped_visibility.py` with cases for
   `delivery_quality_issue`: a branch-scoped member sees only issues on their own branch's
   requests, always sees an issue they personally reported, and a direct reference to another
   branch's issue resolves not-found, never forbidden — mirroring this same file's existing
   `purchase_request`/`low_stock_report` cases exactly.
-- [ ] T034 [P] Extend `apps/api/tests/integration/test_mobile_audit.py` (009's Wave 8 file) with
+  **Verified 2026-10-02**: implemented and tested, just never checked off — see the dated audit evidence table this update is based on (file:line citations for schema/RLS, FastAPI endpoints, Flutter screens/widgets, and tests).
+- [x] T034 [P] Extend `apps/api/tests/integration/test_mobile_audit.py` (009's Wave 8 file) with
   cases proving a mobile-originated decision, delivery confirmation, and quality-issue report each
   land the correct `audit_event` row via a live HTTP round-trip, matching that file's own
   established pattern.
-- [ ] T035 [P] Extend `apps/mobile/test/a11y/screens_a11y_test.dart` (009's Wave 8 file) with the
+  **Verified 2026-10-02**: implemented and tested, just never checked off — see the dated audit evidence table this update is based on (file:line citations for schema/RLS, FastAPI endpoints, Flutter screens/widgets, and tests).
+- [x] T035 [P] Extend `apps/mobile/test/a11y/screens_a11y_test.dart` (009's Wave 8 file) with the
   approval queue, decision detail, delivery confirmation, and quality-issue screens, using the
   same `flutter_test` built-in guideline matchers already established there.
-- [ ] T036 [P] Update `docs/architecture/data-dictionary.md` for `purchase_request`'s new status
+  **Verified 2026-10-02**: implemented and tested, just never checked off — see the dated audit evidence table this update is based on (file:line citations for schema/RLS, FastAPI endpoints, Flutter screens/widgets, and tests).
+- [x] T036 [P] Update `docs/architecture/data-dictionary.md` for `purchase_request`'s new status
   values/columns, `delivery_quality_issue`, and `delivery_quality_issue_photo`.
-- [ ] T037 [P] Update `docs/architecture/api-specification.md` for
+  **Verified 2026-10-02**: implemented and tested, just never checked off — see the dated audit evidence table this update is based on (file:line citations for schema/RLS, FastAPI endpoints, Flutter screens/widgets, and tests).
+- [x] T037 [P] Update `docs/architecture/api-specification.md` for
   `POST /requests/{id}/confirm-delivery`, `POST`/`GET /requests/{id}/quality-issues`, and
   `POST /quality-issues/{id}/photos`.
 
@@ -268,6 +304,7 @@ same bar 009's own Phase 8 set.
 
 ---
 
+  **Verified 2026-10-02**: implemented and tested, just never checked off — see the dated audit evidence table this update is based on (file:line citations for schema/RLS, FastAPI endpoints, Flutter screens/widgets, and tests).
 ## Dependencies & Execution Order
 
 ```text
