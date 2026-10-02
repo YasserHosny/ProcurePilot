@@ -40,6 +40,7 @@
 | GHSA-jj27-h5hq-8x99        | @angular/core, @angular/compiler | 19.2.25 | none | FE/Agy | i18n XSS via event-handler attributes. This is the one advisory in this batch with real exposure for a non-SSR app (any `$localize`-templated content with event bindings). No patched version on 19.x — flagged in the security review record for compensating review of translated templates until a fix ships. |
 | GHSA-p297-fm68-3q8c        | @angular/common   | 19.2.25   | none            | FE/Agy | Information leak via `HttpTransferCache` bypass with `withRequestsMadeViaParent`. Not used (no SSR). No fix on 19.x. |
 | GHSA-hh8m-fm6v-7cvg        | @angular/core, @angular/compiler | 19.2.25 | none | FE/Agy | Sanitization bypass via directive host bindings on concrete host elements. No patched version on 19.x. |
+| GHSA-ff3f-86qr-9cv3        | @angular/router   | 19.2.25   | none            | FE/Agy | SSR-only DoS via numeric URL matrix parameters. This app has no SSR, so it is not exposed; no fix on 19.x; added 2026-10-02. |
 
 All ten JS findings and all four Python findings share one root cause category: **no upstream
 fix exists yet** at the pinned major/minor line this project is on (Angular 19, FastAPI 0.115.6 /
