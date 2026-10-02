@@ -10,6 +10,9 @@ import {
   uploadQuotationAndOpenReview,
 } from './support/canonical-flow';
 
+// Each test signs in as its own buyer member, rather than the shared workspace owner.
+test.use({ storageState: { cookies: [], origins: [] } });
+
 /**
  * End-to-End test suite for Quotation Side-by-Side Review & Confirmation (T053, US2).
  *

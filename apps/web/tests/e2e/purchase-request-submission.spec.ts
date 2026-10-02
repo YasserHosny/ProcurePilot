@@ -1,12 +1,13 @@
 import { test, expect, type Page } from '@playwright/test';
 
+import { authFile } from '../../playwright.config';
 import {
-  credentials,
-  type Credentials,
   signInOwner,
   apiAsUser,
   createTestProduct,
 } from './support/api';
+
+test.use({ storageState: authFile });
 
 /**
  * End-to-End tests for Purchase Request submission (chunk 008, User Story 1).
@@ -21,7 +22,13 @@ import {
 // The shared owner's preferred_locale persists server-side, and other spec files switch it to
 // Arabic without restoring (their RTL tests are declared last within their own file only).
 // Every test here asserts English text, so pin the language right after sign-in.
+//
+// storageState restores cookies/localStorage but never navigates — a brand new page starts on
+// about:blank, so checking `dir` here before landing on any real page would always see nothing
+// and skip the reset. Go to a known authenticated page first so this reflects the real state,
+// and so the sidebar/account menu these tests click into actually exists on the page.
 async function ensureEnglish(page: Page) {
+  await page.goto('/home');
   if ((await page.locator('html').getAttribute('dir')) === 'rtl') {
     await page.click('.account-btn');
     await page.locator('button[mat-menu-item]', { hasText: 'English' }).click();
@@ -30,10 +37,7 @@ async function ensureEnglish(page: Page) {
 }
 
 test.describe('Purchase Request Submission (chunk 008 US1)', () => {
-  let creds: Credentials;
-
   test.beforeAll(async () => {
-    creds = credentials();
     const token = await signInOwner();
     await apiAsUser(token, 'POST', '/organisation/branches', {
       name: `Submission Branch ${Date.now()}`,
@@ -43,11 +47,6 @@ test.describe('Purchase Request Submission (chunk 008 US1)', () => {
   });
 
   test.beforeEach(async ({ page }) => {
-    await page.goto('/auth/sign-in');
-    await page.fill('input[formControlName="email"]', creds.ownerEmail);
-    await page.fill('input[formControlName="password"]', creds.ownerPassword);
-    await page.click('button[type="submit"]');
-    await page.waitForURL('**/home');
     await ensureEnglish(page);
   });
 
@@ -121,8 +120,10 @@ test.describe('Purchase Request Submission (chunk 008 US1)', () => {
     const future = new Date(Date.now() + 30 * 86_400_000).toISOString().split('T')[0]!;
     await page.fill('input[formControlName="required_by_date"]', future);
 
-    // Fill the first line item
-    await page.fill('.line-product input', product.id);
+    // Fill the first line item. .line-product is a mat-select (options list by
+    // product name), not a text input — there's no real <input> inside it to fill.
+    await page.click('.line-product mat-select');
+    await page.locator('mat-option', { hasText: product.tenant_name }).click();
     await page.fill('.line-quantity input', '5');
 
     // Save draft

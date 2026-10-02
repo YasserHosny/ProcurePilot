@@ -1,26 +1,23 @@
 import { test, expect, type Page } from '@playwright/test';
 
+import { authFile } from '../../playwright.config';
 import {
   apiAsUser,
   createMember,
   createTestProduct,
-  credentials,
   signIn,
   signInOwner,
-  type Credentials,
 } from './support/api';
+
+test.use({ storageState: authFile });
 
 const API = process.env['E2E_API_URL'] ?? 'http://localhost:8000/api/v1';
 
-async function signInUi(page: Page, creds: Credentials) {
-  await page.goto('/auth/sign-in');
-  await page.fill('input[formControlName="email"]', creds.ownerEmail);
-  await page.fill('input[formControlName="password"]', creds.ownerPassword);
-  await page.click('button[type="submit"]');
-  await page.waitForURL('**/home');
-}
-
+// storageState restores cookies/localStorage but never navigates — a brand new page starts on
+// about:blank, so checking `dir` here before landing on any real page would always see nothing
+// and skip the reset. Go to a known authenticated page first so this reflects the real state.
 async function ensureEnglish(page: Page) {
+  await page.goto('/home');
   if ((await page.locator('html').getAttribute('dir')) === 'rtl') {
     await page.click('.account-btn');
     await page.locator('button[mat-menu-item]', { hasText: 'English' }).click();
@@ -43,26 +40,26 @@ async function apiStatus(
 }
 
 test.describe('Approval Queue (chunk 008 US2)', () => {
-  let creds: Credentials;
   let ownerToken: string;
 
   test.beforeAll(async () => {
-    creds = credentials();
     ownerToken = await signInOwner();
   });
 
   async function seedSubmittedRequest(label: string): Promise<{
     requestId: string;
     branchId: string;
+    branchName: string;
     requesterId: string;
     requiredByDate: string;
   }> {
+    const branchName = `Approval E2E ${label} ${Date.now()}`;
     const branch = await apiAsUser<{ id: string }>(
       ownerToken,
       'POST',
       '/organisation/branches',
       {
-        name: `Approval E2E ${label} ${Date.now()}`,
+        name: branchName,
         address: '42 Approval Road',
         region: 'GB',
       },
@@ -89,6 +86,7 @@ test.describe('Approval Queue (chunk 008 US2)', () => {
     return {
       requestId: submitted.id,
       branchId: branch.id,
+      branchName,
       requesterId: submitted.requested_by_membership_id,
       requiredByDate,
     };
@@ -97,12 +95,12 @@ test.describe('Approval Queue (chunk 008 US2)', () => {
   test('approver sees full queued context and approves the request', async ({ page }) => {
     const request = await seedSubmittedRequest('approve');
 
-    await signInUi(page, creds);
     await ensureEnglish(page);
     await page.goto('/approvals');
     await expect(page.locator('.approval-queue-title')).toContainText('Approval Queue');
 
-    const row = page.locator('tr.request-row', { hasText: request.branchId });
+    // The branch column renders the branch's name (getBranchName), never its raw id.
+    const row = page.locator('tr.request-row', { hasText: request.branchName });
     await expect(row).toBeVisible();
     await expect(row).toContainText(request.requesterId);
     await expect(row).toContainText(request.requiredByDate);
@@ -149,7 +147,7 @@ test.describe('Approval Queue (chunk 008 US2)', () => {
 
   test('Arabic RTL layout renders the approval queue', async ({ page }) => {
     await seedSubmittedRequest('arabic');
-    await signInUi(page, creds);
+    await ensureEnglish(page);
     await page.click('.account-btn');
     await page.locator('button[mat-menu-item]', { hasText: 'العربية' }).click();
     await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');

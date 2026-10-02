@@ -32,6 +32,8 @@ coverage/
 htmlcov/
 playwright-report/
 test-results/
+apps/web/tests/e2e/.auth/
+apps/web/tests/e2e/.credentials.json
 
 # Local coding-agent configuration
 opencode.json
