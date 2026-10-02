@@ -4,21 +4,11 @@ import {
   apiAsUser,
   createMember,
   createTestProduct,
-  credentials,
   signIn,
   signInOwner,
-  type Credentials,
 } from './support/api';
 
 const API = process.env['E2E_API_URL'] ?? 'http://localhost:8000/api/v1';
-
-async function signInUi(page: Page, creds: Credentials) {
-  await page.goto('/auth/sign-in');
-  await page.fill('input[formControlName="email"]', creds.ownerEmail);
-  await page.fill('input[formControlName="password"]', creds.ownerPassword);
-  await page.click('button[type="submit"]');
-  await page.waitForURL('**/home');
-}
 
 async function ensureEnglish(page: Page) {
   if ((await page.locator('html').getAttribute('dir')) === 'rtl') {
@@ -43,11 +33,9 @@ async function apiStatus(
 }
 
 test.describe('Approval Queue (chunk 008 US2)', () => {
-  let creds: Credentials;
   let ownerToken: string;
 
   test.beforeAll(async () => {
-    creds = credentials();
     ownerToken = await signInOwner();
   });
 
@@ -97,7 +85,6 @@ test.describe('Approval Queue (chunk 008 US2)', () => {
   test('approver sees full queued context and approves the request', async ({ page }) => {
     const request = await seedSubmittedRequest('approve');
 
-    await signInUi(page, creds);
     await ensureEnglish(page);
     await page.goto('/approvals');
     await expect(page.locator('.approval-queue-title')).toContainText('Approval Queue');
@@ -149,7 +136,6 @@ test.describe('Approval Queue (chunk 008 US2)', () => {
 
   test('Arabic RTL layout renders the approval queue', async ({ page }) => {
     await seedSubmittedRequest('arabic');
-    await signInUi(page, creds);
     await page.click('.account-btn');
     await page.locator('button[mat-menu-item]', { hasText: 'العربية' }).click();
     await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');

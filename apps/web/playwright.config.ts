@@ -1,4 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
+import { join } from 'node:path';
+
+const authFile = join(__dirname, 'tests', 'e2e', '.auth', 'owner.json');
 
 /**
  * End-to-end configuration.
@@ -14,6 +17,7 @@ import { defineConfig, devices } from '@playwright/test';
  */
 export default defineConfig({
   testDir: './tests/e2e',
+  testMatch: '**/*.spec.ts',
   globalSetup: require.resolve('./tests/e2e/global-setup'),
   testIgnore: ['**/global-setup.ts'],
   timeout: 60_000,
@@ -30,8 +34,17 @@ export default defineConfig({
   },
   projects: [
     {
+      name: 'setup',
+      testMatch: '**/auth.setup.ts',
+    },
+    {
       name: 'chrome',
-      use: { ...devices['Desktop Chrome'], channel: 'chrome' },
+      dependencies: ['setup'],
+      use: {
+        ...devices['Desktop Chrome'],
+        channel: 'chrome',
+        storageState: authFile,
+      },
     },
   ],
 });

@@ -1,8 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 
 import {
-  credentials,
-  type Credentials,
   signInOwner,
   apiAsUser,
   createTestProduct,
@@ -30,10 +28,7 @@ async function ensureEnglish(page: Page) {
 }
 
 test.describe('Purchase Request Submission (chunk 008 US1)', () => {
-  let creds: Credentials;
-
   test.beforeAll(async () => {
-    creds = credentials();
     const token = await signInOwner();
     await apiAsUser(token, 'POST', '/organisation/branches', {
       name: `Submission Branch ${Date.now()}`,
@@ -43,11 +38,6 @@ test.describe('Purchase Request Submission (chunk 008 US1)', () => {
   });
 
   test.beforeEach(async ({ page }) => {
-    await page.goto('/auth/sign-in');
-    await page.fill('input[formControlName="email"]', creds.ownerEmail);
-    await page.fill('input[formControlName="password"]', creds.ownerPassword);
-    await page.click('button[type="submit"]');
-    await page.waitForURL('**/home');
     await ensureEnglish(page);
   });
 

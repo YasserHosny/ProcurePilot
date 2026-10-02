@@ -2,6 +2,9 @@ import { test, expect, type Locator, type Page } from '@playwright/test';
 
 import { createIsolatedWorkspace, type Credentials } from './support/api';
 
+// This spec owns a separate workspace and must authenticate its own owner.
+test.use({ storageState: { cookies: [], origins: [] } });
+
 /**
  * End-to-End test suite for Organisation Budget Management (chunk 007, User Story 3).
  *
