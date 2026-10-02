@@ -343,7 +343,11 @@ journey
 ## Connected Operations (Orders, Accounting, POS)
 
 - `/home` -> **Order Tracking** -> `/orders` -> open a row -> `/orders/:id` -> **Record confirmation** or **Record delivery** -> evidence timeline updates
+- `/orders` -> **Create Order** (Owner/Buyer) -> `/orders/new` -> fill supplier, dates, currency, lines -> **Create Purchase Order** -> `/orders/:id`
+- `/requests` -> **Create Order** action on an `approved` request (Owner/Buyer) -> `/orders/new?source_request_id=...` -> form pre-filled from the request, quantity capped at what's still unallocated, estimated price shown as a reference-only badge -> **Create Purchase Order** -> `/orders/:id`
 - `/orders/:id` (Draft only) -> **Submit order** -> status becomes Submitted
+- `/orders/:id` (Draft only) -> **Edit Draft** -> `/orders/:id/edit` -> same form, pre-filled from the order -> save
+- `/orders/:id` (Draft only) -> **Cancel Order** -> confirmation dialog -> status becomes Cancelled
 - `/home` -> **Accounting** -> `/accounting` -> **Connect** (Owner) -> provider OAuth -> back to `/accounting` -> **View Synced Bills** -> `/accounting/bills` -> **Sync now** -> filter by match status
 - `/accounting/discrepancies` (direct URL only — no in-app link reaches it yet) -> filter Open/Resolved -> **Resolve** with an optional note
 - `/home` -> **POS** -> `/pos` -> **Connect** (Owner) -> Square OAuth -> back to `/pos` -> **View Synced Signals** -> `/pos/signals` -> **Sync now** -> match an unmatched signal to a catalogue product
@@ -351,6 +355,10 @@ journey
 ```mermaid
 journey
     title Order Tracking
+    section Create
+        Create order (manual or from request): 3: User
+        Edit draft: 3: User
+        Cancel draft: 2: User
     section View
         Go to Orders: 3: User
         Open order: 4: User
@@ -375,7 +383,7 @@ journey
         Match signal to product: 4: User
 ```
 
-> **Note:** neither Order Tracking, Accounting, nor POS has a create/connect-provider-choice flow beyond what's listed above — orders are created via the API only (§11 of the user documentation), and the accounting provider (QuickBooks or Xero) is fixed by workspace configuration, not chosen in the UI.
+> **Note:** Order Tracking now has an in-app **Create Order** flow — manual, or pre-filled from an approved request — plus **Edit Draft** and **Cancel Order** (§11 of the user documentation). ProcurePilot still never sends, confirms, or cancels an order with the supplier through any integration; every one of these writes is an internal evidence record. Accounting and POS have no connect/provider-choice flow beyond what's listed above — the accounting provider (QuickBooks or Xero) is fixed by workspace configuration, not chosen in the UI.
 
 ---
 
