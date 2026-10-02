@@ -75,13 +75,19 @@ mobile-side plumbing more than one story needs.
   `PurchaseRequest` Dart model, and `quantityReceived` to `PurchaseRequestLine`, in
   `apps/mobile/lib/core/api/models.dart`.
   **Verified 2026-10-02**: implemented and tested, just never checked off — see the dated audit evidence table this update is based on (file:line citations for schema/RLS, FastAPI endpoints, Flutter screens/widgets, and tests).
-- [ ] T008 [P] Define a `NotificationPermission`-style injectable camera abstraction (an interface
+- [x] T008 [P] Define a `NotificationPermission`-style injectable camera abstraction (an interface
   plus a real implementation and a test fake, mirroring
   `apps/mobile/lib/core/auth/biometric_gate.dart`'s own shape exactly — research.md R4) in
   `apps/mobile/lib/core/camera/`. Do not add a concrete camera/image-picker package to
   `pubspec.yaml` as part of this task if one isn't already selected — pick the current
   ecosystem-standard package at this point, pin an exact version, and wire it behind this
   abstraction so screens never depend on the concrete plugin directly.
+  **Resolved 2026-10-02 (PR #64)**: `image_picker: ^1.2.3` wired behind `CameraCapture` as
+  `ImagePickerCameraCapture` (`apps/mobile/lib/core/camera/camera_capture.dart`), set as the
+  default in `main.dart`, plus Android `CAMERA` and iOS `NSCameraUsageDescription`/
+  `NSPhotoLibraryUsageDescription`. `StandInCameraCapture` remains as an explicit null-object.
+  `apps/mobile/test/core/camera/camera_capture_test.dart` covers availability, user-cancel, and
+  plugin-failure paths.
 
 **Checkpoint**: An existing `approved` request now auto-carries `ordered` status on approval — this
 is directly observable via the existing web approval flow already, with no mobile UI needed yet to
