@@ -1,6 +1,9 @@
 # ProcurePilot — Development Guidelines
 
-Last updated: 2026-09-26 · Active feature: `021-rfq-sourcing-autonomy`
+Last updated: 2026-10-02 · Active feature: none mid-build. `021-rfq-sourcing-autonomy` and
+`016-order-tracking-three-way-match` are both complete and merged. `018-forecasting-reorder` has a
+spec and plan but no `tasks.md` yet; `019-supplier-risk-negotiation` has only a spec. Neither is
+referenced in the roadmap's phase breakdown yet.
 
 ProcurePilot turns fragmented supplier information into trusted, comparable purchasing
 decisions and proves the money saved. Read `.specify/memory/constitution.md` before writing
@@ -28,15 +31,18 @@ pydantic-settings · python-jose 3.3.0 · httpx 0.28.1 · SlowAPI 0.1.9 · supab
 **Web** — TypeScript 5.6 · Angular 19 · Angular Material + CDK · RxJS · @ngx-translate/core ^16 +
 http-loader (runtime i18n) · Zod
 
-**Data** — Supabase Postgres 17 (`pgvector`, `pg_trgm`) · Supabase Auth · Supabase Storage.
-No Redis yet — deferred to chunk 4.3 (see `specs/001-platform-foundation/research.md` R7).
+**Data** — Supabase Postgres 17 (`pgvector`, `pg_trgm`) · Supabase Auth · Supabase Storage ·
+Redis + RQ (job queues: extraction, basket-split, exports, report scheduling, push notifications —
+`config.py`'s `redis_url`).
 
 **Infra** — Docker · Nginx · bunny.net Magic Containers · GitHub Actions · Terraform
 
 **Testing** — pytest 8.3.4 + pytest-asyncio 0.25.2 · httpx TestClient · Karma 6.4 / Jasmine
 5.4 · Playwright ^1.60 · ruff · axe-core · gitleaks
 
-**Mobile** — Flutter, placeholder only until Phase 2.
+**Mobile** — Flutter. Shipped, not a placeholder: auth (sign-in, biometric, device registration),
+home, purchase requests, approvals, low-stock reporting, delivery confirmation and quality-issue
+photos, push notifications. 31 Dart source files, 22 test files (`apps/mobile/lib/features/`).
 
 ## Project structure
 
@@ -47,10 +53,12 @@ apps/api/          FastAPI modular monolith — the only backend deployable
   tests/{unit,integration,contract}/
 apps/web/          Angular 19 SPA
   src/app/{core,layout,features}/
-apps/mobile/       placeholder (Phase 2)
+apps/mobile/       Flutter app — shipped (auth, requests, approvals, low-stock, delivery, push)
 packages/          domain-types · ui · validation · i18n
-services/          placeholders only — no code until chunk 4.3+
-ml/                placeholders only
+services/          extraction-worker (quotation extraction) · optimiser (basket-split solver) —
+                   both real, independently deployed workers, not placeholders
+ml/                evals/product_matching (precision/recall/ECE against a held-out benchmark) ·
+                   benchmarks/product_matching (benchmark format) — real, not placeholders
 infra/             docker · nginx · terraform
 specs/             Speckit feature specs, plans, tasks
 docs/              product, architecture, roadmap, quality, operations
@@ -110,13 +118,26 @@ directions.
 
 ## Current phase
 
-Phase 4 (Predictive Procurement, R4.0–R4.3) is merged to `main`. R4.3 (RFQ sourcing + guarded
-auto-preparation) passed its T047 live hosted walkthrough end to end, including a guardrail firing
-autonomously on hosted (evidence: `docs/quality/r4.3-release-evidence.md`). The owner-facing
-guardrail settings UI (T037/T038, `/rfq/guardrails`) and per-response guardrail explanations in the
-RFQ compare view complete R4.3's task list.
+Every spec through `021-rfq-sourcing-autonomy` is complete and merged (`specs/*/tasks.md` fully
+checked, or verified against actual code where the checkboxes themselves were stale — see the
+dated notes inside `specs/004-matching-normalisation/tasks.md` and
+`specs/008-requests-approvals/tasks.md` for examples of that verification). That includes:
+Phase 4 (Predictive Procurement, R4.0–R4.3 — RFQ sourcing with guarded auto-preparation, passed its
+T047 live hosted walkthrough including a guardrail firing autonomously on hosted, evidence
+`docs/quality/r4.3-release-evidence.md`); `016-order-tracking-three-way-match`, including its final
+User Story 4 (draft purchase orders generated from an approved request, with edit/cancel) merged
+2026-10-02; and a follow-on matching-quality round merged the same day: fuzzy (similarity-only)
+candidates no longer auto-accept by default, a real Bedrock embedding provider exists behind a
+still-off-by-default switch, and score calibration was investigated and found genuinely not
+feasible yet — the hosted database has only 9 confirmed human match decisions (1 of them fuzzy),
+far short of the 500+ labelled benchmark `specs/004-matching-normalisation/research.md` R5/R10
+requires before fitting anything; the existing eval harness (`ml/evals/product_matching/`) already
+reports this honestly rather than faking a number.
+
 Guardrails are evaluated at match-decision time, not email capture (ADR-019). The G3 stage gate
 remains unmet on operational metrics (pilot accounts, 180-day history, integration-sourced quotes).
+`018-forecasting-reorder` (planned, no tasks yet) and `019-supplier-risk-negotiation` (spec only)
+are the nearest not-yet-started work, but neither is scheduled against a named phase.
 
 <!-- MANUAL ADDITIONS START -->
 <!-- MANUAL ADDITIONS END -->
@@ -149,6 +170,11 @@ remains unmet on operational metrics (pilot accounts, 180-day history, integrati
   (021-rfq-sourcing-autonomy)
 
 ## Recent Changes
+- 2026-10-02: 016-order-tracking-three-way-match's final story shipped — draft purchase orders
+  generated from an approved request, with edit and cancel (PR #61). Same day: fuzzy product
+  matches no longer auto-accept by default (PR #59), a real Bedrock embedding provider landed
+  behind an off-by-default switch (PR #62), and CI's date-bomb test fixture plus two dependency
+  advisories were fixed (PR #60).
 - 021-rfq-sourcing-autonomy: R4.3 merged (PR #26) plus T047 live-walkthrough fixes (PRs #28–#40):
   real Mailgun inbound payload parsing, deployed email-ingestion worker, document source-channel
   and empty-extraction review fixes, guardrail pack-size normalisation, and guardrail evaluation
