@@ -499,23 +499,6 @@ class RequestsService:
             # not-found convention.
             raise PermissionDeniedError(details={"reason": "branch_not_assigned"})
 
-    def _authorize_delivery_confirmation(
-        self,
-        client: Client,
-        *,
-        member: CurrentMember,
-        request_row: dict[str, object],
-    ) -> None:
-        try:
-            _require_requester(request_row, member)
-            return
-        except PermissionDeniedError:
-            self._authorize_branch_for_write(
-                client,
-                member=member,
-                branch_id=UUID(str(request_row["branch_id"])),
-            )
-
     def _fetch_low_stock_report_by_key(
         self, client: Client, *, idempotency_key: UUID
     ) -> dict[str, object]:
@@ -798,7 +781,13 @@ class RequestsService:
 
         if str(existing["status"]) != "ordered":
             raise ConflictError(details={"reason": "not_ordered"})
-        self._authorize_delivery_confirmation(client, member=member, request_row=existing)
+        # No branch-write check here on purpose: `_fetch_request` above already went through
+        # `purchase_request_scoped_visibility`'s restrictive RLS policy, which is a strict
+        # superset of a branch-assignment check (same `branch_role_assignment` row, same
+        # owner/unscoped/assigned-branch shape) — a branch mismatch has already failed as a 404
+        # by this point, so re-checking it here could only ever be unreachable. The requester
+        # confirming their own delivery, or an owner/unscoped/correctly-assigned member doing so
+        # for someone else, are both already the only ways to have reached this line at all.
 
         rid = str(request_id)
         line_rows = self._fetch_lines_for(client, rid)

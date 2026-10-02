@@ -1607,9 +1607,12 @@ surface, only what happens after a decision (research.md R2). Full contract:
 
 ### `POST /requests/{request_id}/confirm-delivery`
 
-- Requires bearer auth. The caller must be the request's own requester or hold branch-scoped
-  write access for the request's branch (the same authorization shape `low_stock_report` already
-  uses for its own requester-initiated action) — an owner or an unscoped member always qualifies.
+- Requires bearer auth. Visibility and write access both follow the request's own branch-scoped
+  RLS policy (`purchase_request_scoped_visibility`): the caller must be able to see the request at
+  all — its own requester, an owner, an unscoped member, or a member assigned to the request's
+  branch. There is no separate branch-write authorization check on top of that (unlike
+  `low_stock_report`, which still enforces one explicitly); a branch mismatch simply makes the row
+  invisible.
 - Requires the request's `status` to be `ordered`.
 - Request fields: required `lines`, an array of `{purchase_request_line_id, quantity_received}`
   (decimal string, `>= 0`) — at least one line required.
@@ -1620,7 +1623,9 @@ surface, only what happens after a decision (research.md R2). Full contract:
 - Returns `200` with the `PurchaseRequest` (now including `delivered_at`,
   `delivery_confirmed_by_membership_id`, `has_delivery_discrepancy`, and each line's
   `quantity_received`).
-- Returns `403` when the caller is neither the requester nor authorized for the branch.
+- Returns `404` when the request is outside the caller's workspace or branch-scoped visibility
+  (the standard not-found-vs-forbidden convention, CLAUDE.md non-negotiable #3) — this includes a
+  branch-scoped member assigned to a different branch than the request.
 - Returns `409` (`not_ordered`) when the request is not currently `ordered`.
 
 Request:

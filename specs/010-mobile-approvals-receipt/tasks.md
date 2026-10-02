@@ -176,15 +176,32 @@ against that line.
   `contracts/mobile-approvals-receipt.openapi.yaml`, `409` with reason `not_ordered` for a request
   not in `ordered` status.
   **Verified 2026-10-02**: implemented and tested, just never checked off — see the dated audit evidence table this update is based on (file:line citations for schema/RLS, FastAPI endpoints, Flutter screens/widgets, and tests).
-- [ ] T018 [P] [US2] Integration test in
+- [x] T018 [P] [US2] Integration test in
   `apps/api/tests/integration/test_confirm_delivery.py` against a real disposable Postgres:
   full-quantity delivery leaves `has_delivery_discrepancy = false`; a short quantity on one line
   leaves it `true` and records the exact `quantity_received` on that line only; a `draft`/
   `submitted`/`approved`-but-not-yet-`ordered` (should not occur post-T006, but assert it anyway)
   request refuses with `409 not_ordered`; a same-tenant different-branch request resolves `404`,
-  never `403` (constitution Principle III).
+  never `403` (CLAUDE.md non-negotiable #3 — this task's own "Principle III" citation was wrong;
+  that's Human Authority Over Automation, not tenant isolation).
 
-  **Left open 2026-10-02**: 3 of 4 scenarios are implemented and pass (full quantity, short quantity with per-line discrepancy, `409 not_ordered`). The 4th, as literally written here ("same-tenant different-branch resolves 404, never 403"), was not built — the actual test (`test_visible_different_branch_without_write_scope_refuses_with_403`) asserts `403 branch_not_assigned` for a request that IS visible to the actor but who lacks branch-write authority, matching the same `_authorize_branch_for_write` pattern already used elsewhere in `service.py` for other write actions on already-visible rows. No test anywhere exercises a genuinely RLS-invisible different-branch request against confirm-delivery returning 404. Also: this task cites "constitution Principle III" for the not-found-vs-forbidden rule, but Principle III is "Human Authority Over Automation" — the actual rule lives in Principle V (Tenant Isolation) / CLAUDE.md non-negotiable #3, which governs cross-tenant/cross-visibility reads, not a same-tenant write-authorization check. That citation drift likely explains the deviation. Needs a product decision: add the literal 404-on-invisible-branch test, or correct this task's description to match the 403 behavior that was deliberately built.
+  **Resolved 2026-10-03**: the literal 404 scenario was real and genuinely untested — proven by
+  reproducing it end-to-end against a live local stack (real RLS via PostgREST, a real crafted
+  JWT, no mocks): a branch-scoped member assigned to a *different* branch than the request got a
+  real `404 {"resource": "purchase_request"}`, not 403. The previous test
+  (`test_visible_different_branch_without_write_scope_refuses_with_403`) asserted 403 for this
+  exact fixture only because its harness never switched the connection into the acting member's
+  RLS context (`act_as()` was never called), so `purchase_request_scoped_visibility`'s
+  restrictive SELECT policy never actually ran — the row looked "visible" only because RLS was
+  silently bypassed. Fixed the test to call `act_as()` and assert the real 404
+  (`test_branch_scoped_member_assigned_elsewhere_resolves_404_not_403`), confirmed passing against
+  a real Postgres. Also removed `confirm_delivery`'s `_authorize_delivery_confirmation` call and
+  the now-dead `_authorize_delivery_confirmation` method: `_fetch_request` already runs through
+  this same RLS policy before that check could ever run, so every path into it was unreachable —
+  confirmed by temporarily restoring the old code and re-running the new test, which still passed
+  identically. `_authorize_branch_for_write` itself is untouched and still used by
+  `low_stock_report`'s create/update paths, where it remains the only authorization gate (no
+  row-level RLS scoping to pre-empt it there).
 ### Implementation for User Story 2
 
 - [x] T019 [US2] `RequestsService.confirm_delivery()` in
