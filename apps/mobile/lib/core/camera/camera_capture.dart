@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:image_picker/image_picker.dart';
 
 /// A photo captured through [CameraCapture.capturePhoto].
 @immutable
@@ -24,14 +25,43 @@ abstract class CameraCapture {
   Future<CapturedPhoto?> capturePhoto();
 }
 
-/// Platform-agnostic stand-in until a real camera plugin is introduced.
-///
-/// No concrete camera/image-picker package is wired into this codebase yet
-/// (research.md R4, 010-mobile-approvals-receipt) — this stand-in lets the
-/// rest of this chunk's plumbing (screens, the offline queue, upload) be
-/// built and tested against a real *shape* now, with the actual platform
-/// integration left to whichever task builds the quality-issue report
-/// screen that needs to call a real camera.
+typedef CameraPhotoPicker = Future<XFile?> Function({
+  required ImageSource source,
+});
+
+Future<XFile?> _pickWithImagePicker({required ImageSource source}) =>
+    ImagePicker().pickImage(source: source);
+
+/// CameraCapture adapter backed by the official Flutter image picker plugin.
+class ImagePickerCameraCapture implements CameraCapture {
+  const ImagePickerCameraCapture({
+    this.pickImage = _pickWithImagePicker,
+  });
+
+  final CameraPhotoPicker pickImage;
+
+  @override
+  Future<bool> isAvailable() async {
+    // A camera is expected on supported mobile devices; image_picker reports
+    // absent hardware or denied access as a null/failed capture. Keeping this
+    // true lets the optional capture action be attempted without gating flow.
+    return true;
+  }
+
+  @override
+  Future<CapturedPhoto?> capturePhoto() async {
+    try {
+      final image = await pickImage(source: ImageSource.camera);
+      return image == null ? null : CapturedPhoto(filePath: image.path);
+    } on Object catch (error, stackTrace) {
+      debugPrint('Camera capture was unavailable: $error\n$stackTrace');
+      return null;
+    }
+  }
+}
+
+/// Null-object implementation retained for callers that explicitly need to
+/// disable camera capture (for example, platform-independent setup).
 class StandInCameraCapture implements CameraCapture {
   const StandInCameraCapture();
 
