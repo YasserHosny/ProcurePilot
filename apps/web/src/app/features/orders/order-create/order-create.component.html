@@ -185,7 +185,13 @@
         <div class="tax-row">
           <span>{{ 'orders.create.orderTax' | translate }}:</span>
           <mat-form-field appearance="outline" subscriptSizing="dynamic" class="tax-field">
-            <input matInput type="number" step="0.01" formControlName="order_tax" />
+            <input
+              matInput
+              type="number"
+              step="0.01"
+              formControlName="order_tax"
+              [attr.aria-label]="'orders.create.orderTax' | translate"
+            />
           </mat-form-field>
         </div>
         <div class="grand-total">
