@@ -1,5 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 
+import { authFile } from '../../playwright.config';
 import {
   apiAsUser,
   createMember,
@@ -8,9 +9,15 @@ import {
   signInOwner,
 } from './support/api';
 
+test.use({ storageState: authFile });
+
 const API = process.env['E2E_API_URL'] ?? 'http://localhost:8000/api/v1';
 
+// storageState restores cookies/localStorage but never navigates — a brand new page starts on
+// about:blank, so checking `dir` here before landing on any real page would always see nothing
+// and skip the reset. Go to a known authenticated page first so this reflects the real state.
 async function ensureEnglish(page: Page) {
+  await page.goto('/home');
   if ((await page.locator('html').getAttribute('dir')) === 'rtl') {
     await page.click('.account-btn');
     await page.locator('button[mat-menu-item]', { hasText: 'English' }).click();
@@ -136,6 +143,7 @@ test.describe('Approval Queue (chunk 008 US2)', () => {
 
   test('Arabic RTL layout renders the approval queue', async ({ page }) => {
     await seedSubmittedRequest('arabic');
+    await ensureEnglish(page);
     await page.click('.account-btn');
     await page.locator('button[mat-menu-item]', { hasText: 'العربية' }).click();
     await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');

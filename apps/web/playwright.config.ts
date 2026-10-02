@@ -1,7 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 import { join } from 'node:path';
 
-const authFile = join(__dirname, 'tests', 'e2e', '.auth', 'owner.json');
+export const authFile = join(__dirname, 'tests', 'e2e', '.auth', 'owner.json');
 
 /**
  * End-to-end configuration.
@@ -42,12 +42,18 @@ export default defineConfig({
       },
     },
     {
+      // No storageState here: setting it project-wide would silently hand the shared owner's
+      // session (and its cached locale) to every spec using this project, including the ~20
+      // that were never meant to touch it (found the hard way — rtl.spec.ts's own
+      // "should render in English and LTR by default" test started failing because the
+      // shared owner's leftover Arabic localStorage got preloaded into its supposedly-fresh,
+      // unauthenticated context). Only approval-queue.spec.ts and
+      // purchase-request-submission.spec.ts opt in, via their own `test.use({ storageState })`.
       name: 'chrome',
       dependencies: ['setup'],
       use: {
         ...devices['Desktop Chrome'],
         channel: 'chrome',
-        storageState: authFile,
       },
     },
   ],
