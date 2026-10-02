@@ -503,7 +503,7 @@ Constraints:
 | `quotation_line_id` | uuid | Required FK -> QuotationLine needing human resolution |
 | `status` | enum | `open`, `in_progress`, or `resolved`; default `open` |
 | `priority` | enum | `low`, `normal`, or `high`; default `normal` |
-| `reason` | enum | `low_confidence`, `close_candidates`, `no_candidate`, or `alias_conflict` |
+| `reason` | enum | `low_confidence`, `close_candidates`, `fuzzy_match_review`, `no_candidate`, or `alias_conflict` |
 | `created_at` | timestamptz | Audit field |
 | `resolved_at` | timestamptz | Optional resolution timestamp |
 

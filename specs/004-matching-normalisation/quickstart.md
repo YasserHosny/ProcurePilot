@@ -60,7 +60,8 @@ GET /api/v1/quotations/{quotation_id}/matches
 
 Lines with exact GTIN, supplier-code or alias hits should have ranked candidates with confidence
 and structured reasons. If the top candidate meets the configured auto-accept threshold and is not
-a close call, the response includes a `match_decision` with `is_automatic = true`.
+a close call, the response includes a `match_decision` with `is_automatic = true`. Similarity-only
+candidates require human confirmation unless `MATCHING_FUZZY_AUTO_ACCEPT_ENABLED=true`.
 
 ## 5. Work the match queue
 
@@ -136,8 +137,10 @@ labelled product-match pairs including hard negatives.
 quotations, not extracted or in-review quotations.
 
 **A line with good candidates still entered the queue.** The top score may be below
-`MATCHING_AUTO_ACCEPT_THRESHOLD`, or the top two candidates may be within `MATCHING_REVIEW_MARGIN`.
-Close calls go to a human rather than being guessed.
+`MATCHING_AUTO_ACCEPT_THRESHOLD`, the top two candidates may be within `MATCHING_REVIEW_MARGIN`, or
+the only score-clearing match may be by wording similarity while fuzzy auto-accept is disabled.
+Close calls go to a human rather than being guessed; wording-only score-clearing matches route as
+`fuzzy_match_review`.
 
 **Landed cost is missing.** The line needs a `match_decision` first. Candidates alone are not a
 match.

@@ -39,7 +39,7 @@ curl -I https://<project>.<domain>/index.html
 ### 3.3 Matching precision drops
 1. Run AI eval harness on latest benchmark.
 2. Check for new supplier description patterns not in training data.
-3. Lower auto-accept threshold temporarily if human review capacity exists.
+3. Lower auto-accept threshold temporarily if human review capacity exists. This only affects exact-key matches unless `MATCHING_FUZZY_AUTO_ACCEPT_ENABLED=true`; do not enable that until the match score is calibrated.
 4. Add new aliases from recent corrections.
 
 ### 3.4 Review queue backlog
