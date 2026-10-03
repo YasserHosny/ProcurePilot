@@ -30,6 +30,7 @@ from procurepilot_api.modules.digests.schemas import (
     DigestSubscriptionUpdate,
     DigestView,
 )
+from procurepilot_api.modules.matching.router import WRITE_ROLES as MATCH_WRITE_ROLES
 from procurepilot_api.modules.offers.service import _authenticated_db
 from procurepilot_api.modules.reports.schedules import (
     canonical_filters_digest,
@@ -561,9 +562,11 @@ class DigestsService:
             )
         sections.append(DigestSection(kind="pending_approvals", items=approval_items))
 
-        # 4. pending_match_resolutions (owner/buyer subscribers can resolve any task)
+        # 4. pending_match_resolutions -- gated to whoever can actually resolve one, reusing
+        # the matching module's own WRITE_ROLES rather than re-deriving the same set here, so
+        # the two can't silently drift if that gate ever changes.
         match_items: list[DigestItem] = []
-        if role in {MemberRole.owner, MemberRole.buyer}:
+        if role in MATCH_WRITE_ROLES:
             with conn.cursor(row_factory=dict_row) as cur:
                 cur.execute(
                     """

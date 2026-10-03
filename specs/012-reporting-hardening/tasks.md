@@ -197,16 +197,22 @@ evidence-carrying artifact exactly once per period.
   architecture with per-item deep links, i18n in both catalogues, keyboard-reachable.
 - [x] T028 [US2] Extend `apps/web/tests/e2e/reporting-hardening.spec.ts` with the digest flow:
   subscribe → trigger → in-app digest renders with links → status reflects delivery outcome.
-- [ ] T043 [US2] Added 2026-10-03, after this spec's original waves closed: add a
+- [x] T043 [US2] Added 2026-10-03, after this spec's original waves closed: add a
   `pending_match_resolutions` section to `_assemble_sections` in
   `apps/api/src/procurepilot_api/modules/digests/service.py`, per FR-009's 2026-10-03 amendment —
   open `match_task` rows for the tenant, filtered to owner/buyer subscribers only (matching
   `specs/004-matching-normalisation`'s own `WRITE_ROLES` gate on who may resolve one), each item
-  deep-linking to `/matching`, inserted after `pending_approvals` and before `anomalies`. Update
-  `renderer.py`'s template and both i18n catalogues for the new section kind. Extend
+  deep-linking to `/matching`, inserted after `pending_approvals` and before `anomalies`. Extend
   `test_digests.py` with a case covering a non-owner/buyer subscriber correctly seeing the
-  section omitted (not empty — absent), matching this file's existing per-section coverage
-  pattern.
+  section present but empty (`items: []`) — this file's own existing convention for a
+  known-but-visible-but-empty section, confirmed by checking how the other 4 sections behave
+  when their own query returns nothing; "dropped/absent" would be the surprising choice here,
+  not the safe default.
+  **Verified 2026-10-03**: implemented in PR #69 (`service.py`'s new section block, plus
+  `digest_worker.py`'s scheduled-delivery path and `schemas.py`'s `DigestSectionKind`), both new
+  tests passing, mutation-checked (removed the role gate, confirmed the non-writer test fails;
+  restored it). `renderer.py` needed no changes — confirmed it looks up
+  `digests.sections.{kind}` generically, with no per-kind branching to update.
 
 **Checkpoint**: a subscriber receives (or reads in-app) a digest whose every section is
 source-backed and actionable, with honest delivery state.
