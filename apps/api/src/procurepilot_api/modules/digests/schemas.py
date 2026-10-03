@@ -13,6 +13,7 @@ DigestSectionKind = Literal[
     "verified_savings",
     "pending_verifications",
     "pending_approvals",
+    "pending_match_resolutions",
     "anomalies",
     "expiring_validity",
 ]

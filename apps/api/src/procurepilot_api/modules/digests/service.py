@@ -315,6 +315,7 @@ class DigestsService:
                 branch_id=branch_id,
                 now=now,
                 locale=sub_locale,
+                role=member.role,
             )
 
         if last_status not in ("succeeded", "failed", "email_unconfigured"):
@@ -417,9 +418,10 @@ class DigestsService:
         period_end: date,
         branch_id: UUID | None,
         now: datetime,
+        role: MemberRole,
         locale: str = "en",
     ) -> list[DigestSection]:
-        """Assemble the 5 sections in strict FR-009 order."""
+        """Assemble digest sections in strict FR-009 order."""
         sections: list[DigestSection] = []
 
         # 1. verified_savings (hero)
@@ -559,7 +561,38 @@ class DigestsService:
             )
         sections.append(DigestSection(kind="pending_approvals", items=approval_items))
 
-        # 4. anomalies
+        # 4. pending_match_resolutions (owner/buyer subscribers can resolve any task)
+        match_items: list[DigestItem] = []
+        if role in {MemberRole.owner, MemberRole.buyer}:
+            with conn.cursor(row_factory=dict_row) as cur:
+                cur.execute(
+                    """
+                    select mt.id, mt.reason, mt.priority, mt.created_at, ql.original_text
+                    from match_task mt
+                    join quotation_line ql
+                      on ql.tenant_id = mt.tenant_id and ql.id = mt.quotation_line_id
+                    where mt.tenant_id = %(tenant_id)s and mt.status = 'open'
+                    order by mt.created_at desc, mt.id desc
+                    """,
+                    {"tenant_id": tenant_id},
+                )
+                match_rows = [dict(r) for r in cur.fetchall()]
+            match_items = [
+                DigestItem(
+                    label=t(
+                        "digests.itemLabels.matchResolutionTask",
+                        locale,
+                        text=str(row["original_text"]),
+                    ),
+                    money=None,
+                    evidence_ref=None,
+                    deep_link="/matching",
+                )
+                for row in match_rows
+            ]
+        sections.append(DigestSection(kind="pending_match_resolutions", items=match_items))
+
+        # 5. anomalies
         with conn.cursor(row_factory=dict_row) as cur:
             cur.execute(
                 """
@@ -597,7 +630,7 @@ class DigestsService:
             )
         sections.append(DigestSection(kind="anomalies", items=anomaly_items))
 
-        # 5. expiring_validity (next 7 days)
+        # 6. expiring_validity (next 7 days)
         with conn.cursor(row_factory=dict_row) as cur:
             cur.execute(
                 """
