@@ -206,6 +206,12 @@ anywhere in `specs/` right now — the next feature has not been scoped.
   (021-rfq-sourcing-autonomy)
 
 ## Recent Changes
+- 2026-10-03/04: Added a `docs-screenshots` CI job (`.github/workflows/docs-screenshots.yml`,
+  PR #70) that regenerates `docs/user/screenshots/` against a real local stack on frontend/i18n
+  PRs plus a weekly cron, and fails with an uploaded diff artifact on drift — catching the same
+  category of staleness that let §25 of the user docs describe a five-section digest for days
+  after `pending_match_resolutions` shipped as the sixth section; that prose was also fixed
+  directly (PR #71).
 - 2026-10-03: E2E flakiness root-caused and fixed (PR #63/#65 — Playwright `setup` project's
   chrome channel, `storageState` scoped to only the files that need it, two deterministic
   test-locator bugs); specs 018/019 retroactively verified against already-shipped code (PR #66),
