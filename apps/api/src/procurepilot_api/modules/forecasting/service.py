@@ -143,23 +143,14 @@ class ForecastingService:
         offset = _decode_cursor(cursor)
         capped = min(max(limit, 1), 100)
         try:
-            response = (
-                client.table("reorder_proposal")
-                .select(PROPOSAL_COLUMNS)
-                .neq("status", "dismissed")
-                .order("created_at", desc=True)
-                .order("id")
-                .range(0, 1000)
-                .execute()
-            )
+            response = client.rpc(
+                "forecasting_latest_reorder_proposals",
+                {"p_offset": offset, "p_limit": capped + 1},
+            ).execute()
         except APIError as exc:
             raise ServiceUnavailableError(details={"dependency": "database"}) from exc
-        proposal_rows = _rows(response.data)
-        latest_by_product: dict[str, dict[str, object]] = {}
-        for row in proposal_rows:
-            latest_by_product.setdefault(str(row["workspace_product_id"]), row)
-        latest_rows = list(latest_by_product.values())
-        visible = latest_rows[offset : offset + capped]
+        page_rows = _rows(response.data)
+        visible = page_rows[:capped]
         if not visible:
             return ReorderProposalList(items=[], next_cursor=None)
 
@@ -189,11 +180,7 @@ class ForecastingService:
             if str(proposal["demand_forecast_id"]) in forecast_by_id
             and str(proposal["workspace_product_id"]) in product_names
         ]
-        next_cursor = (
-            _encode_cursor(offset + capped)
-            if len(latest_rows) > offset + capped
-            else None
-        )
+        next_cursor = _encode_cursor(offset + capped) if len(page_rows) > capped else None
         return ReorderProposalList(items=items, next_cursor=next_cursor)
 
     def prepare_request(
