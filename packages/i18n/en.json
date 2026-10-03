@@ -2672,6 +2672,7 @@
       "verified_savings": "Verified Savings Realised",
       "pending_verifications": "Pending Savings Verifications",
       "pending_approvals": "Pending Approvals",
+      "pending_match_resolutions": "Pending Product Match Reviews",
       "anomalies": "Pricing & Quality Alerts",
       "expiring_validity": "Expiring Quotation Offers"
     },
@@ -2714,6 +2715,7 @@
     "itemLabels": {
       "pendingVerification": "Pending saving verification: {{product}}",
       "approvalRequest": "Approval request #{{number}}",
+      "matchResolutionTask": "Match review needed: {{text}}",
       "priceAnomaly": "Price anomaly: {{product}} from {{supplier}}",
       "expiringOffer": "Offer expiring soon: {{product}} from {{supplier}}"
     }

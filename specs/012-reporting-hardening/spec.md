@@ -228,10 +228,22 @@ test scope document exists and names every in-scope surface.
   workspace has email configured), disclosed in the invitation flow with one-click pause.
 - **FR-009**: System MUST render the weekly digest with verified savings in the hero position
   (explicit currency), followed by actionable backlog sections — purchase outcomes pending
-  verification and purchase requests awaiting the subscriber's approval — then new anomalies
-  detected in the period, then offers whose validity ends within seven days, with every item
-  carrying a deep link into the acting surface. No section may present history without an
-  available action.
+  verification, purchase requests awaiting the subscriber's approval, and open product-match
+  resolution tasks (owner/buyer subscribers only, matching the resolution queue's own write-role
+  gate) — then new anomalies detected in the period, then offers whose validity ends within
+  seven days, with every item carrying a deep link into the acting surface. No section may
+  present history without an available action.
+  **Added 2026-10-03**: the match-resolution section closes a gap found during an unrelated
+  investigation (specs/004-matching-normalisation's resolution queue has no notification path
+  at all — no sidebar badge, not in this digest — so a real backlog would pile up silently on
+  a tenant where nobody proactively opens `/matching`). Placed with the other pending-decision
+  sections, before anomalies/expiring-validity (which are findings, not a backlog), since a
+  match task is the same kind of "waiting for a human" item as a pending verification or
+  approval. Deliberately does NOT add a sidebar badge — that would be a new UI pattern with no
+  existing precedent anywhere in this app, and sits closer to the "passive dashboard" surface
+  specs/004-matching-normalisation's own plan.md explicitly designed against (Principle IV:
+  the resolution queue is the only in-app surface for outstanding match work). The digest is a
+  separate, already-established notification channel, not a new one.
 - **FR-010**: System MUST deliver digests by email through an environment-configured SMTP provider
   when configured, and MUST expose the digest in-app regardless, with an explicit
   "email not configured" status when the provider is absent. Digest email MUST be multipart (HTML

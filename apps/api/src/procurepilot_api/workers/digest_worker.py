@@ -15,6 +15,7 @@ import psycopg
 from psycopg.rows import dict_row
 
 from procurepilot_api.config import Settings, get_settings
+from procurepilot_api.modules.auth.jwt import MemberRole
 from procurepilot_api.modules.digests.renderer import render_digest
 from procurepilot_api.modules.digests.service import DigestsService
 from procurepilot_api.modules.reports.schedules import derive_weekly_window, next_run_after
@@ -120,7 +121,7 @@ def _process_subscription(
     with conn.cursor(row_factory=dict_row) as cur:
         cur.execute(
             """
-            select m.status as member_status, m.email as member_email,
+            select m.status as member_status, m.email as member_email, m.role as member_role,
                    t.reporting_timezone
             from membership m
             join tenant t on t.id = m.tenant_id
@@ -159,6 +160,7 @@ def _process_subscription(
         period_end=period_end,
         branch_id=branch_id,
         now=now,
+        role=MemberRole(str(ctx["member_role"])),
         locale=locale,
     )
 

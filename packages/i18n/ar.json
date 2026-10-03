@@ -2672,6 +2672,7 @@
       "verified_savings": "الوفورات المحققة المؤكدة",
       "pending_verifications": "عمليات التحقق من الوفورات المعلقة",
       "pending_approvals": "الموافقات المعلقة",
+      "pending_match_resolutions": "مراجعات مطابقة المنتجات المعلقة",
       "anomalies": "تنبيهات الأسعار والجودة",
       "expiring_validity": "عروض الأسعار التي توشك على الانتهاء"
     },
@@ -2714,6 +2715,7 @@
     "itemLabels": {
       "pendingVerification": "التحقق من التوفير معلق: {{product}}",
       "approvalRequest": "طلب موافقة رقم #{{number}}",
+      "matchResolutionTask": "مطلوب مراجعة مطابقة: {{text}}",
       "priceAnomaly": "شذوذ في السعر: {{product}} من {{supplier}}",
       "expiringOffer": "عرض ينتهي قريباً: {{product}} من {{supplier}}"
     }

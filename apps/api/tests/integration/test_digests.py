@@ -8,7 +8,8 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from integration.catalogue_helpers import TEST_DATABASE_URL
+from integration.catalogue_helpers import TEST_DATABASE_URL, act_as
+from integration.quotation_helpers import make_document, make_line, make_quotation
 from integration.smart_compare_helpers import (
     committed_smart_context,
     member_from_workspace,
@@ -16,6 +17,7 @@ from integration.smart_compare_helpers import (
 )
 from procurepilot_api.deps import bearer_token, current_member
 from procurepilot_api.main import create_app
+from procurepilot_api.modules.auth.jwt import MemberRole
 from procurepilot_api.workers.digest_worker import tick
 
 pytestmark = pytest.mark.skipif(
@@ -24,7 +26,16 @@ pytestmark = pytest.mark.skipif(
 )
 
 
+class _NoopAuditWriter:
+    def record(self, *_args: object, **_kwargs: object) -> None:
+        return
+
+
 def _app(monkeypatch: pytest.MonkeyPatch, member: object) -> FastAPI:
+    monkeypatch.setattr(
+        "procurepilot_api.modules.digests.service.get_audit_writer",
+        lambda: _NoopAuditWriter(),
+    )
     app = create_app(settings_for_test_db(monkeypatch))
     app.dependency_overrides[current_member] = lambda: member
     app.dependency_overrides[bearer_token] = lambda: "test-token"
@@ -119,7 +130,7 @@ def test_digest_cross_tenant_isolation(
 def test_latest_digest_content_assembly(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """FR-009: latest digest assembled in strict 5-section order with hero verified savings."""
+    """FR-009: latest digest assembled in strict 6-section order with hero verified savings."""
     with committed_smart_context("digest-latest-view") as context:
         member = member_from_workspace(context.workspace)
         client = TestClient(_app(monkeypatch, member), raise_server_exceptions=False)
@@ -132,17 +143,83 @@ def test_latest_digest_content_assembly(
         assert "period_end" in digest
         assert "sections" in digest
         sections = digest["sections"]
-        assert len(sections) == 5
+        assert len(sections) == 6
 
         expected_order = [
             "verified_savings",
             "pending_verifications",
             "pending_approvals",
+            "pending_match_resolutions",
             "anomalies",
             "expiring_validity",
         ]
         actual_order = [s["kind"] for s in sections]
         assert actual_order == expected_order
+
+
+def _add_open_match_task(context: object, marker: str) -> None:
+    workspace = context.workspace
+    with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+        with conn.cursor() as cur:
+            document_id = make_document(cur, workspace)
+            quotation_id = make_quotation(cur, workspace, document_id=document_id)
+            line_id = make_line(cur, workspace, quotation_id)
+            act_as(cur, workspace)
+            cur.execute(
+                "update quotation_line set original_text = %s where id = %s",
+                (marker, line_id),
+            )
+            cur.execute(
+                """insert into match_task (tenant_id, quotation_line_id, reason, priority)
+                   values (%s, %s, 'low_confidence', 'high')""",
+                (workspace.tenant_id, line_id),
+            )
+        conn.commit()
+
+
+def test_digest_pending_match_resolutions_owner_buyer_and_tenant_scope(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    with (
+        committed_smart_context("digest-match-owner") as own,
+        committed_smart_context("digest-match-other") as other,
+    ):
+        _add_open_match_task(own, "Own tenant tomatoes")
+        _add_open_match_task(other, "Other tenant secret marker")
+        member = member_from_workspace(own.workspace, role=MemberRole.buyer)
+        client = TestClient(_app(monkeypatch, member), raise_server_exceptions=False)
+
+        res = client.get("/api/v1/digests/latest")
+        assert res.status_code == 200, res.text
+        sections = res.json()["sections"]
+        kinds = [section["kind"] for section in sections]
+        assert kinds.index("pending_approvals") + 1 == kinds.index("pending_match_resolutions")
+        assert kinds.index("pending_match_resolutions") + 1 == kinds.index("anomalies")
+        match_section = sections[kinds.index("pending_match_resolutions")]
+        assert len(match_section["items"]) == 1
+        item = match_section["items"][0]
+        assert item["label"] == "Match review needed: Own tenant tomatoes"
+        assert item["money"] is None
+        assert item["evidence_ref"] is None
+        assert item["deep_link"] == "/matching"
+
+
+def test_digest_pending_match_resolutions_non_writer_gets_empty_section(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    with committed_smart_context("digest-match-viewer") as context:
+        _add_open_match_task(context, "Viewer should not see this")
+        member = member_from_workspace(context.workspace, role=MemberRole.viewer)
+        client = TestClient(_app(monkeypatch, member), raise_server_exceptions=False)
+
+        res = client.get("/api/v1/digests/latest")
+        assert res.status_code == 200, res.text
+        section = next(
+            section
+            for section in res.json()["sections"]
+            if section["kind"] == "pending_match_resolutions"
+        )
+        assert section["items"] == []
 
 
 def test_digest_worker_execution_and_skip_inactive(
@@ -153,6 +230,10 @@ def test_digest_worker_execution_and_skip_inactive(
     and skips inactive memberships.
     """
     settings = settings_for_test_db(monkeypatch)
+    monkeypatch.setattr(
+        "procurepilot_api.workers.digest_worker.get_audit_writer",
+        lambda: _NoopAuditWriter(),
+    )
     with committed_smart_context("digest-worker-run") as context:
         member = member_from_workspace(context.workspace)
 

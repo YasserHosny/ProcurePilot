@@ -591,7 +591,7 @@ components:
       properties:
         kind:
           type: string
-          enum: [verified_savings, pending_verifications, pending_approvals, anomalies, expiring_validity]
+          enum: [verified_savings, pending_verifications, pending_approvals, pending_match_resolutions, anomalies, expiring_validity]
         items:
           type: array
           items:
