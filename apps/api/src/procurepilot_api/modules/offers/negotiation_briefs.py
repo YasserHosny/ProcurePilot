@@ -41,8 +41,8 @@ from procurepilot_api.modules.offers.supplier_iq_repository import (
 )
 from procurepilot_api.modules.offers.supplier_iq_v2 import QUALIFYING, PurchaseOrder
 
-BRIEF_VERSION = "negotiation-brief-v1"
-CALCULATION_VERSION = "negotiation-brief-v1"
+BRIEF_VERSION = "negotiation-brief-v2"
+CALCULATION_VERSION = "negotiation-brief-v2"
 __all__ = [
     "BRIEF_VERSION",
     "BriefContext",
@@ -143,11 +143,15 @@ def _service_performance_item(
 ) -> NegotiationBriefItem | None:
     reliability = snapshot.components["reliability"]
     # Exact ties keep the earlier signal: reliability, then reconciliation, then quality.
-    candidates: list[tuple[Decimal, tuple[UUID, ...], str, str]] = []
+    # `value` is tracked separately from `risk` -- reliability's own on-time rate is a
+    # distinct number from its risk (the complement/decay-adjusted figure); the two new
+    # rates have no such split, so their rate serves as both.
+    candidates: list[tuple[Decimal, Decimal, tuple[UUID, ...], str, str]] = []
     if reliability.risk is not None and reliability.source_ids:
         candidates.append(
             (
                 reliability.risk,
+                reliability.value if reliability.value is not None else reliability.risk,
                 reliability.source_ids,
                 reliability.confidence,
                 reliability.calculation_version,
@@ -164,6 +168,7 @@ def _service_performance_item(
         candidates.append(
             (
                 rate,
+                rate,
                 tuple(row[0] for row in qualifying_matches),
                 "high" if len(qualifying_matches) >= 10 else "medium",
                 CALCULATION_VERSION,
@@ -179,6 +184,7 @@ def _service_performance_item(
         candidates.append(
             (
                 rate,
+                rate,
                 (*context.quality_issue_ids, *context.completed_order_ids),
                 "high" if len(context.completed_order_ids) >= 10 else "medium",
                 CALCULATION_VERSION,
@@ -186,11 +192,13 @@ def _service_performance_item(
         )
     if not candidates:
         return None
-    risk, evidence_ids, confidence, calculation_version = max(candidates, key=lambda item: item[0])
+    risk, value, evidence_ids, confidence, calculation_version = max(
+        candidates, key=lambda item: item[0]
+    )
     return NegotiationBriefItem(
         kind="service_performance",
         rank=1,
-        value=_decimal_text(risk),
+        value=_decimal_text(value),
         confidence=confidence,
         risk=_decimal_text(risk),
         valid_from=snapshot.window_start,
@@ -741,10 +749,11 @@ def _ensure_service_evidence(
               and not exists (
                 select 1 from supplier_scorecard_evidence existing
                 where existing.tenant_id = source.tenant_id
+                  and existing.metric_id = %s
                   and existing.{column} = source.id
               )
             """,
-            (tenant_id, metric_id, tenant_id, list(source_ids)),
+            (tenant_id, metric_id, tenant_id, list(source_ids), metric_id),
         )
 
 

@@ -174,7 +174,12 @@ def test_prepare_builds_ranked_source_linked_categories() -> None:
         as_of=END,
         three_way_results=tuple((item_id, "unmatched", "received") for item_id in ids),
     )
-    high_reliability = reliability.model_copy(update={"risk": Decimal("1")})
+    # risk=1 with a distinct value=0.4 -- a real, if contrived, divergence (on-time rate and
+    # risk are different numbers in general) so the assertion below actually exercises value
+    # being threaded through separately from risk, not coincidentally equal to it.
+    high_reliability = reliability.model_copy(
+        update={"risk": Decimal("1"), "value": Decimal("0.4")}
+    )
     tied_snapshot = snapshot.model_copy(
         update={"components": {**snapshot.components, "reliability": high_reliability}}
     )
@@ -185,6 +190,9 @@ def test_prepare_builds_ranked_source_linked_categories() -> None:
     )
     assert tied.risk == "1.0000"
     assert tied.evidence_ids == reliability.source_ids
+    # Regression: `value` must come from reliability's own on-time rate (distinct from its
+    # risk), not be collapsed into the winning risk number -- caught by a Codex review.
+    assert tied.value == "0.4000"
 
 
 def test_payment_and_purchase_pattern_require_sufficient_evidence() -> None:

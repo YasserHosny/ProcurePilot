@@ -94,14 +94,25 @@ def load_service_risk_evidence(
             join purchase_order po
               on po.tenant_id = dqi.tenant_id
              and po.source_request_id = dqi.purchase_request_id
-            where po.supplier_id = %s and dqi.created_at >= %s and dqi.created_at < %s
+            where po.supplier_id = %s
+              and po.order_date >= %s and po.order_date < %s
+              and po.status in ('received', 'closed')
+              -- purchase_order.source_request_id is deliberately non-unique (one request can
+              -- fan out to several POs via basket-split) -- a quality issue reported against
+              -- the request has no per-order attribution, so counting it for every supplier
+              -- who fulfilled any part of a split request would double-count one incident
+              -- across innocent suppliers. Excluding split requests entirely from this rate is
+              -- conservative but correct; the single-supplier-per-request case (the common one)
+              -- is unaffected.
+              and not exists (
+                select 1 from purchase_order other
+                where other.tenant_id = po.tenant_id
+                  and other.source_request_id = po.source_request_id
+                  and other.supplier_id <> po.supplier_id
+              )
             order by dqi.id
             """,
-            (
-                supplier_id,
-                datetime.combine(window_start, time.min, tzinfo=UTC),
-                datetime.combine(window_end, time.min, tzinfo=UTC),
-            ),
+            (supplier_id, window_start, window_end),
         )
         issues = tuple(UUID(str(row["id"])) for row in cur.fetchall())
         cur.execute(
