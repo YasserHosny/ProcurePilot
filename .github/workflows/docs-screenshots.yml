@@ -1,0 +1,164 @@
+name: Docs screenshots drift
+
+# Regenerates docs/user/screenshots/ from a real running stack and fails if the result differs
+# from what's committed -- the same category of staleness that let §25's digest section describe
+# a "five-section hierarchy" for days after a 6th section shipped, just for the screenshots
+# instead of the prose. This job only catches VISUAL drift (a screenshot that no longer matches
+# the real UI); it does not catch stale *text* describing behaviour that changed without any
+# visual difference -- that still relies on this project's standing practice of a docs-freshness
+# review on every user-facing PR, not a script.
+#
+# Mirrors the "End-to-end" job in ci.yml's own stack setup (Supabase CLI, seed, API, extraction
+# worker, web app) exactly, since apps/web/tests/e2e/user-documentation-screenshots.spec.ts
+# exercises the real quotation-extraction pipeline, not a mock. See that job's own comments for
+# why each piece is there.
+#
+# Deliberately does NOT auto-commit regenerated screenshots back into the PR -- a bot silently
+# rewriting binary files in someone else's branch is more surprising than useful. On drift, this
+# job fails with a stat diff and uploads the regenerated screenshots as an artifact so a reviewer
+# can see exactly what changed without running the capture themselves; the fix is to run
+# `pnpm --filter web docs:screenshots` locally and commit the result.
+
+on:
+  pull_request:
+    paths:
+      - 'apps/web/src/app/**'
+      - 'apps/web/tests/e2e/user-documentation-screenshots.spec.ts'
+      - 'apps/web/tests/e2e/support/canonical-flow.ts'
+      - 'apps/web/playwright.docs.config.ts'
+      - 'packages/i18n/**'
+  workflow_dispatch: {}
+  schedule:
+    # Safety net for drift a path filter can't see (a dependency bump changing font rendering,
+    # a backend response shape change with no frontend diff in this PR, etc.) -- not relied on as
+    # the primary signal, just a backstop.
+    - cron: '17 3 * * 1'
+
+concurrency:
+  group: docs-screenshots-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: '3.12'
+  NODE_VERSION: '20'
+
+jobs:
+  screenshots:
+    name: Regenerate and diff
+    runs-on: ubuntu-latest
+    services:
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          enable-cache: false
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Start Supabase
+        run: supabase start
+
+      - name: Export Supabase credentials
+        run: |
+          {
+            echo "SUPABASE_URL=$(supabase status -o env | grep '^API_URL=' | cut -d= -f2- | tr -d '\"')"
+            echo "SUPABASE_ANON_KEY=$(supabase status -o env | grep '^ANON_KEY=' | cut -d= -f2- | tr -d '\"')"
+            echo "SUPABASE_SERVICE_ROLE_KEY=$(supabase status -o env | grep '^SERVICE_ROLE_KEY=' | cut -d= -f2- | tr -d '\"')"
+            echo "SUPABASE_JWT_SECRET=$(supabase status -o env | grep '^JWT_SECRET=' | cut -d= -f2- | tr -d '\"')"
+            echo "DATABASE_URL=$(supabase status -o env | grep '^DB_URL=' | cut -d= -f2- | tr -d '\"')"
+          } >> "$GITHUB_ENV"
+
+      - name: Seed reference data
+        env:
+          API_HOST: 127.0.0.1
+          API_PORT: '8000'
+          API_ENV: local
+          API_LOG_LEVEL: info
+          API_CORS_ORIGINS: http://localhost:4200
+          SUPABASE_JWT_AUDIENCE: authenticated
+          PLATFORM_INVITATION_TTL_DAYS: '7'
+          MEMBER_INVITATION_TTL_DAYS: '7'
+          RATE_LIMIT_AUTH: 60/minute
+          WEB_API_BASE_URL: http://localhost:8000/api/v1
+          WEB_DEFAULT_LOCALE: en
+        run: uv run --project apps/api python apps/api/scripts/seed.py
+
+      - name: Start the API
+        env:
+          API_HOST: 127.0.0.1
+          API_PORT: '8000'
+          API_ENV: local
+          API_LOG_LEVEL: info
+          API_CORS_ORIGINS: http://localhost:4200
+          SUPABASE_JWT_AUDIENCE: authenticated
+          PLATFORM_INVITATION_TTL_DAYS: '7'
+          MEMBER_INVITATION_TTL_DAYS: '7'
+          RATE_LIMIT_AUTH: 60/minute
+          WEB_API_BASE_URL: http://localhost:8000/api/v1
+          WEB_DEFAULT_LOCALE: en
+        run: |
+          SUPABASE_JWT_ISSUER="${SUPABASE_URL}/auth/v1" \
+            uv run --project apps/api uvicorn procurepilot_api.main:app \
+            --host 127.0.0.1 --port 8000 --app-dir apps/api/src &
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:8000/api/v1/health && break
+            sleep 2
+          done
+          curl -sf http://localhost:8000/api/v1/health
+
+      - name: Start the extraction worker
+        env:
+          EXTRACTION_PROVIDER_MODE: stub
+        run: |
+          uv run --project services/extraction-worker python -m procurepilot_extraction_worker &
+          sleep 5
+          pgrep -f procurepilot_extraction_worker >/dev/null || {
+            echo "::error::extraction worker did not start or exited immediately"; exit 1;
+          }
+
+      - name: Install web dependencies
+        working-directory: apps/web
+        run: pnpm install --ignore-workspace --frozen-lockfile
+
+      - name: Start the web app
+        working-directory: apps/web
+        run: |
+          pnpm exec ng serve --port 4200 &
+          for i in $(seq 1 60); do
+            curl -sf http://localhost:4200/ >/dev/null && break
+            sleep 2
+          done
+          curl -sf http://localhost:4200/ >/dev/null
+
+      - name: Regenerate documentation screenshots
+        working-directory: apps/web
+        run: |
+          google-chrome --version
+          pnpm run docs:screenshots
+
+      - name: Fail on drift
+        run: |
+          if ! git diff --quiet -- docs/user/screenshots/; then
+            echo "::error::Documentation screenshots are stale. Regenerate locally with \`pnpm --filter web docs:screenshots\` (requires the local stack running — see docs/user/screenshots' own README or quickstart.md) and commit the result."
+            echo "--- files that changed ---"
+            git diff --stat -- docs/user/screenshots/
+            exit 1
+          fi
+          echo "Screenshots match what's committed -- no drift."
+
+      - name: Upload regenerated screenshots on drift
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: regenerated-doc-screenshots
+          path: docs/user/screenshots/
+          retention-days: 14
