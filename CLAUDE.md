@@ -6,10 +6,12 @@ Last updated: 2026-10-03 · Active feature: none mid-build. Every numbered spec,
 commit history) despite their `specs/` folders lagging behind: `018` had no `tasks.md` and `019`
 had neither a `plan.md` nor a `tasks.md` until 2026-10-03, when both were reconstructed
 retroactively against the real shipped code (see the dated verification notes inside each). That
-verification is not a clean bill of health across the board: it found one real, still-open
-requirement gap — `019`'s FR-011A's
-three-signal service-risk formula — tracked in its own `tasks.md` (T019), not fixed yet. There is
-currently no visible not-yet-started spec in `specs/`; the next feature has not been scoped.
+reconstruction surfaced two real bugs — T012 (forecasting's proposal-list pagination) and T019
+(FR-011A's three-signal service-risk formula) — both fixed and merged the same day (PRs #67, #68).
+`012-reporting-hardening`'s weekly digest also gained a 6th section the same day
+(`pending_match_resolutions`, T043, PR #69), closing a real notification gap found during the
+018/019 investigation. There is currently no visible not-yet-started spec in `specs/`; the next
+feature has not been scoped.
 
 ProcurePilot turns fragmented supplier information into trusted, comparable purchasing
 decisions and proves the money saved. Read `.specify/memory/constitution.md` before writing
@@ -146,23 +148,32 @@ remains unmet on operational metrics (pilot accounts, 180-day history, integrati
 `018-forecasting-reorder` and `019-supplier-risk-negotiation` are also both complete and merged
 (2026-10-03 finding: both were already fully shipped, just undocumented in `specs/` — `018` had
 no `tasks.md`, `019` had neither a `plan.md` nor a `tasks.md`; both were reconstructed
-retroactively against the real code, see the dated verification notes in each). `019`'s
-reconstruction surfaced one real open gap: FR-011A requires the negotiation brief's
-`service_performance` risk to be `max(reliability_risk, non_matched_qualifying_three_way_rate,
-quality_incidents_per_qualifying_completed_order)`; the shipped code only computes the reliability
-component — `supplier_iq_v2.py` never queries `three_way_match` or `delivery_quality_issue` at
-all, so service risk can be understated for a supplier whose real problem is mismatches or quality
-incidents rather than reliability specifically. Tracked as `specs/019-supplier-risk-negotiation/
-tasks.md` T019, not yet fixed. A Codex review of that same verification PR caught a second real
-bug missed on the first pass, this time in `018`: `ForecastingService.list_proposals()`
-(`apps/api/src/procurepilot_api/modules/forecasting/service.py`) fetches the 1001 most recent
-non-dismissed `reorder_proposal` rows tenant-wide, then dedupes to one-per-product in Python —
-a product whose only non-dismissed proposal is older than 1001 other rows (for other products)
-silently never appears, on any page. Tracked as `specs/018-forecasting-reorder/tasks.md` T012,
-not yet fixed.
+retroactively against the real code, see the dated verification notes in each). That
+reconstruction surfaced two real bugs, both now fixed:
 
-With `018`/`019` closed out, there is no visible not-yet-started spec anywhere in `specs/` right
-now — the next feature has not been scoped.
+- **T019 (FR-011A)**: the shipped negotiation brief only ever used reliability risk for
+  `service_performance`, never the three-way-match or quality-incident signals FR-011A requires.
+  Fixed in PR #68 — a new `load_service_risk_evidence()` repository query plus
+  `_service_performance_item()` taking the max of all three signals. A Codex review of that PR
+  caught and fixed 5 further real bugs before merge (most seriously, evidence-row deduplication
+  not scoped by `metric_id`, which could abort the whole `prepare` transaction on a later
+  snapshot — see the PR's own commit history for the full list).
+- **T012 (forecasting pagination)**: `ForecastingService.list_proposals()` fetched the 1001 most
+  recent non-dismissed `reorder_proposal` rows tenant-wide, then deduped to one-per-product in
+  Python — a product whose only proposal was older than 1001 other rows silently never appeared,
+  on any page. Fixed in PR #67 by moving the dedup into Postgres (`ROW_NUMBER() OVER (PARTITION
+  BY ...)` via a new `forecasting_latest_reorder_proposals` RPC).
+
+Investigating T019/T012 also surfaced a real, separate product gap: `specs/004-matching-
+normalisation`'s resolution queue (`/matching`) had zero notification path — no sidebar badge,
+not in the weekly digest — so a real match-task backlog would pile up silently with nobody
+prompted to look. Decided to extend the weekly digest rather than add a sidebar badge (no UI
+precedent for one anywhere in this app, and closer to the "no passive dashboard" principle
+`specs/004`'s own `plan.md` explicitly designed against). Shipped as `012-reporting-hardening`'s
+6th digest section (`pending_match_resolutions`, FR-009 amended, T043, PR #69).
+
+With `018`/`019` closed out and both real bugs fixed, there is no visible not-yet-started spec
+anywhere in `specs/` right now — the next feature has not been scoped.
 
 <!-- MANUAL ADDITIONS START -->
 <!-- MANUAL ADDITIONS END -->
@@ -195,6 +206,13 @@ now — the next feature has not been scoped.
   (021-rfq-sourcing-autonomy)
 
 ## Recent Changes
+- 2026-10-03: E2E flakiness root-caused and fixed (PR #63/#65 — Playwright `setup` project's
+  chrome channel, `storageState` scoped to only the files that need it, two deterministic
+  test-locator bugs); specs 018/019 retroactively verified against already-shipped code (PR #66),
+  surfacing and fixing two real bugs — T012 forecasting pagination (PR #67) and T019's FR-011A
+  service-risk formula, which also absorbed 5 Codex-caught fixes before merge (PR #68); weekly
+  digest gained a 6th section, `pending_match_resolutions` (T043, PR #69), closing a real
+  notification gap in the match-resolution queue.
 - 2026-10-02: 016-order-tracking-three-way-match's final story shipped — draft purchase orders
   generated from an approved request, with edit and cancel (PR #61). Same day: fuzzy product
   matches no longer auto-accept by default (PR #59), a real Bedrock embedding provider landed
