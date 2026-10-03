@@ -35,11 +35,14 @@ from procurepilot_api.modules.offers.schemas import (
     SupplierRiskResult,
 )
 from procurepilot_api.modules.offers.service import _authenticated_db
-from procurepilot_api.modules.offers.supplier_iq_repository import load_risk_input
-from procurepilot_api.modules.offers.supplier_iq_v2 import PurchaseOrder
+from procurepilot_api.modules.offers.supplier_iq_repository import (
+    load_risk_input,
+    load_service_risk_evidence,
+)
+from procurepilot_api.modules.offers.supplier_iq_v2 import QUALIFYING, PurchaseOrder
 
-BRIEF_VERSION = "negotiation-brief-v1"
-CALCULATION_VERSION = "negotiation-brief-v1"
+BRIEF_VERSION = "negotiation-brief-v2"
+CALCULATION_VERSION = "negotiation-brief-v2"
 __all__ = [
     "BRIEF_VERSION",
     "BriefContext",
@@ -65,8 +68,10 @@ class BriefContext:
     orders: tuple[PurchaseOrder, ...] = ()
     bills: tuple[BriefBill, ...] = ()
     payment_term_source_id: UUID | None = None
-    quality_issue_ids: tuple[UUID, ...] = ()
     discrepancy_ids: tuple[UUID, ...] = ()
+    three_way_results: tuple[tuple[UUID, str, str], ...] = ()
+    quality_issue_ids: tuple[UUID, ...] = ()
+    completed_order_ids: tuple[UUID, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -109,12 +114,7 @@ def build_negotiation_brief(
         _risk_component_item(
             snapshot, "single_source", "alternatives", "negotiationBrief.alternatives.question"
         ),
-        _risk_component_item(
-            snapshot,
-            "reliability",
-            "service_performance",
-            "negotiationBrief.servicePerformance.question",
-        ),
+        _service_performance_item(snapshot, context),
         _concentration_item(snapshot, "negotiationBrief.concentrationVolume.question"),
         _payment_item(context, "negotiationBrief.paymentContext.question"),
         _purchase_pattern_item(context, "negotiationBrief.purchasePattern.question"),
@@ -135,6 +135,77 @@ def build_negotiation_brief(
         valid_from=snapshot.window_end,
         valid_until=context.as_of + timedelta(days=1),
         items=ranked,
+    )
+
+
+def _service_performance_item(
+    snapshot: SupplierRiskResult, context: BriefContext
+) -> NegotiationBriefItem | None:
+    reliability = snapshot.components["reliability"]
+    # Exact ties keep the earlier signal: reliability, then reconciliation, then quality.
+    # `value` is tracked separately from `risk` -- reliability's own on-time rate is a
+    # distinct number from its risk (the complement/decay-adjusted figure); the two new
+    # rates have no such split, so their rate serves as both.
+    candidates: list[tuple[Decimal, Decimal, tuple[UUID, ...], str, str]] = []
+    if reliability.risk is not None and reliability.source_ids:
+        candidates.append(
+            (
+                reliability.risk,
+                reliability.value if reliability.value is not None else reliability.risk,
+                reliability.source_ids,
+                reliability.confidence,
+                reliability.calculation_version,
+            )
+        )
+
+    qualifying_matches = [row for row in context.three_way_results if row[2] in QUALIFYING]
+    # FR-009's three-observation floor applies to these newly added count-based rates too.
+    if len(qualifying_matches) >= 3:
+        # 'unavailable' is a qualifying evaluation outcome and therefore non-matched risk.
+        rate = Decimal(sum(result != "matched" for _, result, _ in qualifying_matches)) / Decimal(
+            len(qualifying_matches)
+        )
+        candidates.append(
+            (
+                rate,
+                rate,
+                tuple(row[0] for row in qualifying_matches),
+                "high" if len(qualifying_matches) >= 10 else "medium",
+                CALCULATION_VERSION,
+            )
+        )
+
+    if len(context.completed_order_ids) >= 3:
+        # A completed order means received/closed; open orders cannot be denominator observations.
+        rate = min(
+            Decimal(len(context.quality_issue_ids)) / Decimal(len(context.completed_order_ids)),
+            Decimal("1"),
+        )
+        candidates.append(
+            (
+                rate,
+                rate,
+                (*context.quality_issue_ids, *context.completed_order_ids),
+                "high" if len(context.completed_order_ids) >= 10 else "medium",
+                CALCULATION_VERSION,
+            )
+        )
+    if not candidates:
+        return None
+    risk, value, evidence_ids, confidence, calculation_version = max(
+        candidates, key=lambda item: item[0]
+    )
+    return NegotiationBriefItem(
+        kind="service_performance",
+        rank=1,
+        value=_decimal_text(value),
+        confidence=confidence,
+        risk=_decimal_text(risk),
+        valid_from=snapshot.window_start,
+        valid_until=snapshot.window_end,
+        question_i18n_key="negotiationBrief.servicePerformance.question",
+        calculation_version=calculation_version,
+        evidence_ids=evidence_ids,
     )
 
 
@@ -285,6 +356,12 @@ class NegotiationBriefService:
                 window_start=result.window_start,
                 window_end=result.window_end,
             )
+            service_evidence = load_service_risk_evidence(
+                conn,
+                supplier_id=supplier_id,
+                window_start=result.window_start,
+                window_end=result.window_end,
+            )
             context = BriefContext(
                 supplier_id=supplier_id,
                 as_of=datetime.now(UTC).date(),
@@ -292,6 +369,9 @@ class NegotiationBriefService:
                     order for order in payload.purchase_orders if order.supplier_id == supplier_id
                 ),
                 bills=_brief_bills(conn, supplier_id),
+                three_way_results=service_evidence.three_way_results,
+                quality_issue_ids=service_evidence.quality_issue_ids,
+                completed_order_ids=service_evidence.completed_order_ids,
             )
             draft = build_negotiation_brief(result, context)
             brief_id = _insert_brief(conn, member, snapshot, draft)
@@ -546,6 +626,13 @@ def _insert_brief(
         metric_ids = _metric_ids(cur, snapshot["id"])
         for item in draft.items:
             metric_id = metric_ids.get(item.kind)
+            if item.kind == "service_performance":
+                _ensure_service_evidence(
+                    cur,
+                    tenant_id=member.tenant_id,
+                    metric_id=metric_id,
+                    source_ids=item.evidence_ids,
+                )
             if item.kind == "payment_context":
                 _ensure_bill_evidence(
                     cur,
@@ -621,7 +708,8 @@ def _evidence_ids(
         where (%s::uuid is null or metric_id = %s) and (
           purchase_order_id = any(%s::uuid[]) or delivery_receipt_id = any(%s::uuid[])
           or landed_cost_id = any(%s::uuid[]) or workspace_product_id = any(%s::uuid[])
-          or synced_bill_id = any(%s::uuid[])
+          or synced_bill_id = any(%s::uuid[]) or three_way_match_id = any(%s::uuid[])
+          or delivery_quality_issue_id = any(%s::uuid[])
         )
         """,
         (
@@ -632,9 +720,41 @@ def _evidence_ids(
             list(source_ids),
             list(source_ids),
             list(source_ids),
+            list(source_ids),
+            list(source_ids),
         ),
     )
     return tuple(UUID(str(row[0])) for row in cur.fetchall())
+
+
+def _ensure_service_evidence(
+    cur: psycopg.Cursor,
+    *,
+    tenant_id: UUID,
+    metric_id: UUID | None,
+    source_ids: tuple[UUID, ...],
+) -> None:
+    if metric_id is None or not source_ids:
+        return
+    for column, table in (
+        ("three_way_match_id", "three_way_match"),
+        ("delivery_quality_issue_id", "delivery_quality_issue"),
+        ("purchase_order_id", "purchase_order"),
+    ):
+        cur.execute(
+            f"""
+            insert into supplier_scorecard_evidence (tenant_id, metric_id, {column})
+            select %s, %s, source.id from {table} source
+            where source.tenant_id = %s and source.id = any(%s::uuid[])
+              and not exists (
+                select 1 from supplier_scorecard_evidence existing
+                where existing.tenant_id = source.tenant_id
+                  and existing.metric_id = %s
+                  and existing.{column} = source.id
+              )
+            """,
+            (tenant_id, metric_id, tenant_id, list(source_ids), metric_id),
+        )
 
 
 def _ensure_bill_evidence(

@@ -129,6 +129,70 @@ def test_prepare_builds_ranked_source_linked_categories() -> None:
     assert all(item.evidence_ids for item in draft.items)
     assert [item.rank for item in draft.items] == list(range(1, len(draft.items) + 1))
     assert draft.release_posture == "g3_unmet"
+    base_service = next(item for item in draft.items if item.kind == "service_performance")
+    assert base_service.risk == (
+        None
+        if snapshot.components["reliability"].risk is None
+        else format(snapshot.components["reliability"].risk.quantize(Decimal("0.0001")), "f")
+    )
+
+    reliability = snapshot.components["reliability"]
+    low_reliability = reliability.model_copy(update={"risk": Decimal("0.1")})
+    adjusted = snapshot.model_copy(
+        update={"components": {**snapshot.components, "reliability": low_reliability}}
+    )
+    ids = (UUID(int=8101), UUID(int=8102), UUID(int=8103))
+    three_way_context = BriefContext(
+        supplier_id=S,
+        as_of=END,
+        three_way_results=tuple((item_id, "unmatched", "received") for item_id in ids),
+    )
+    service_item = next(
+        item
+        for item in NegotiationBriefService.prepare(adjusted, three_way_context).items
+        if item.kind == "service_performance"
+    )
+    assert service_item.risk == "1.0000"
+    assert service_item.evidence_ids == ids
+
+    quality_context = BriefContext(
+        supplier_id=S,
+        as_of=END,
+        quality_issue_ids=ids[:2],
+        completed_order_ids=ids,
+    )
+    quality_item = next(
+        item
+        for item in NegotiationBriefService.prepare(adjusted, quality_context).items
+        if item.kind == "service_performance"
+    )
+    assert quality_item.risk == "0.6667"
+    assert quality_item.evidence_ids == (*ids[:2], *ids)
+
+    tied_context = BriefContext(
+        supplier_id=S,
+        as_of=END,
+        three_way_results=tuple((item_id, "unmatched", "received") for item_id in ids),
+    )
+    # risk=1 with a distinct value=0.4 -- a real, if contrived, divergence (on-time rate and
+    # risk are different numbers in general) so the assertion below actually exercises value
+    # being threaded through separately from risk, not coincidentally equal to it.
+    high_reliability = reliability.model_copy(
+        update={"risk": Decimal("1"), "value": Decimal("0.4")}
+    )
+    tied_snapshot = snapshot.model_copy(
+        update={"components": {**snapshot.components, "reliability": high_reliability}}
+    )
+    tied = next(
+        item
+        for item in NegotiationBriefService.prepare(tied_snapshot, tied_context).items
+        if item.kind == "service_performance"
+    )
+    assert tied.risk == "1.0000"
+    assert tied.evidence_ids == reliability.source_ids
+    # Regression: `value` must come from reliability's own on-time rate (distinct from its
+    # risk), not be collapsed into the winning risk number -- caught by a Codex review.
+    assert tied.value == "0.4000"
 
 
 def test_payment_and_purchase_pattern_require_sufficient_evidence() -> None:
@@ -211,6 +275,8 @@ def test_evidence_lookup_types_a_missing_metric_id_as_uuid() -> None:
             assert params == (
                 None,
                 None,
+                [source_id],
+                [source_id],
                 [source_id],
                 [source_id],
                 [source_id],
