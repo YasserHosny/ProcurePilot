@@ -842,7 +842,7 @@ Personalized weekly intelligence digests assembling key procurement metrics and 
 |---|---------|-------------|
 | 1 | **Subscription Controls** | Configure your personal weekly digest subscription, choose delivery channel (**In-App** or **Email**), and select locale. |
 | 2 | **Delivery Status & Onboarding** | Displays current delivery state (e.g. "Delivered", or "Email not configured" if workspace SMTP settings are unset). New members receive an active default in-app subscription on invitation acceptance. |
-| 3 | **Latest In-App Digest View** | Browse the latest complete weekly digest organized in the standardized five-section hierarchy: **Verified Savings** (hero), **Pending Verifications**, **Pending Approvals**, **Commercial Anomalies**, and **Expiring Validity**. |
+| 3 | **Latest In-App Digest View** | Browse the latest complete weekly digest organized in the standardized six-section hierarchy: **Verified Savings** (hero), **Pending Verifications**, **Pending Approvals**, **Pending Product Match Reviews**, **Commercial Anomalies**, and **Expiring Validity**. The Pending Product Match Reviews section surfaces open product-matching decisions from the Match Resolution Queue (§10) and is only populated for Owner/Buyer subscribers — other roles see it present but empty, since only Owner/Buyer can resolve a match task. |
 | 4 | **Actionable Deep Links** | Every digest section and flagged item contains direct deep links to the responsible review, compare, or approval screen. |
 | 5 | **Strictly Advisory** | Digests never execute autonomous purchasing, approvals, or ordering (FR-017). Human authorization is required on the respective surface. |
 
