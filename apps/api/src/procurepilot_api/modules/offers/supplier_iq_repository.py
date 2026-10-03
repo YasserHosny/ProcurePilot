@@ -30,6 +30,7 @@ __all__ = [
     "SupplierIqRepository",
     "load_latest_scorecard_v2",
     "load_risk_input",
+    "load_service_risk_evidence",
     "persist_snapshot",
     "list_latest",
 ]
@@ -53,6 +54,68 @@ class SnapshotWrite:
 class SnapshotPage:
     items: tuple[SnapshotRow, ...]
     next_cursor: str | None
+
+
+@dataclass(frozen=True)
+class ServiceRiskEvidence:
+    three_way_results: tuple[tuple[UUID, str, str], ...]
+    quality_issue_ids: tuple[UUID, ...]
+    completed_order_ids: tuple[UUID, ...]
+
+
+def load_service_risk_evidence(
+    conn: psycopg.Connection,
+    *,
+    supplier_id: UUID,
+    window_start: date,
+    window_end: date,
+) -> ServiceRiskEvidence:
+    """Load tenant-visible reconciliation and quality rows within the risk window."""
+    with conn.cursor(row_factory=dict_row) as cur:
+        cur.execute(
+            """
+            select twm.id, twm.result::text as result, po.status::text as order_status
+            from three_way_match twm
+            join purchase_order po
+              on po.tenant_id = twm.tenant_id and po.id = twm.purchase_order_id
+            where po.supplier_id = %s and po.order_date >= %s and po.order_date < %s
+            order by twm.evaluated_at, twm.id
+            """,
+            (supplier_id, window_start, window_end),
+        )
+        matches = tuple(
+            (UUID(str(row["id"])), str(row["result"]), str(row["order_status"]))
+            for row in cur.fetchall()
+        )
+        cur.execute(
+            """
+            select distinct dqi.id
+            from delivery_quality_issue dqi
+            join purchase_order po
+              on po.tenant_id = dqi.tenant_id
+             and po.source_request_id = dqi.purchase_request_id
+            where po.supplier_id = %s and dqi.created_at >= %s and dqi.created_at < %s
+            order by dqi.id
+            """,
+            (
+                supplier_id,
+                datetime.combine(window_start, time.min, tzinfo=UTC),
+                datetime.combine(window_end, time.min, tzinfo=UTC),
+            ),
+        )
+        issues = tuple(UUID(str(row["id"])) for row in cur.fetchall())
+        cur.execute(
+            """
+            select po.id
+            from purchase_order po
+            where po.supplier_id = %s and po.order_date >= %s and po.order_date < %s
+              and po.status in ('received', 'closed')
+            order by po.id
+            """,
+            (supplier_id, window_start, window_end),
+        )
+        completed = tuple(UUID(str(row["id"])) for row in cur.fetchall())
+    return ServiceRiskEvidence(matches, issues, completed)
 
 
 def load_risk_input(
