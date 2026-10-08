@@ -61,7 +61,17 @@ Seed hosted reference data and a platform invitation:
 pnpm db:seed
 ```
 
-Both commands require `DATABASE_URL` from `.env` to point at the hosted Supabase Postgres database.
+Invite someone into an existing workspace on behalf of one of its owners (the CLI equivalent of
+Team -> Invite; prints a one-time acceptance link to send by hand — the app does not email it):
+
+```bash
+pnpm db:invite-member --owner-email owner@example.com --email new.person@example.com --role buyer
+```
+
+Add `--tenant-id` if the owner owns several workspaces, and `--replace` to revoke and re-issue a
+still-pending invitation. Set `WEB_ORIGIN` to the hosted web app so the link points there.
+
+All three commands require `DATABASE_URL` from `.env` to point at the hosted Supabase Postgres database.
 
 ## Stop
 
