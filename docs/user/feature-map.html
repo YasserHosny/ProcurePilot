@@ -1,0 +1,545 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ProcurePilot Feature Map</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* Layout concept: a vertical tree — module spine (teal rule) -> page cards (route chip) -> feature leaves (tick connector) */
+:root{
+  --bg:#F2F7F6;
+  --surface:#FFFFFF;
+  --surface-2:#EAF1EF;
+  --ink:#0B2545;
+  --ink-soft:#3C5068;
+  --muted:#6B7E8C;
+  --line:#CFE0DC;
+  --accent:#0C7A6E;
+  --accent-bright:#0C7A6E;
+  --accent-soft:#E3F3F0;
+  --chip-bg:#0B254512;
+  --shadow: 0 1px 2px rgba(11,37,69,.06), 0 6px 20px -8px rgba(11,37,69,.10);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0A1620;
+    --surface:#0F2027;
+    --surface-2:#13262E;
+    --ink:#E7F1EF;
+    --ink-soft:#AFC8C6;
+    --muted:#7E9CA0;
+    --line:#1E3A3C;
+    --accent:#2FD3BE;
+    --accent-bright:#5CE8D6;
+    --accent-soft:#11332F;
+    --chip-bg:#2FD3BE22;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 10px 24px -10px rgba(0,0,0,.5);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0A1620;
+  --surface:#0F2027;
+  --surface-2:#13262E;
+  --ink:#E7F1EF;
+  --ink-soft:#AFC8C6;
+  --muted:#7E9CA0;
+  --line:#1E3A3C;
+  --accent:#2FD3BE;
+  --accent-bright:#5CE8D6;
+  --accent-soft:#11332F;
+  --chip-bg:#2FD3BE22;
+  --shadow: 0 1px 2px rgba(0,0,0,.3), 0 10px 24px -10px rgba(0,0,0,.5);
+  color-scheme: dark;
+}
+
+*{box-sizing:border-box;}
+body{
+  background:var(--bg);
+  color:var(--ink);
+  font-family:"IBM Plex Sans", system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  padding-inline:16px;
+  padding-block:28px 64px;
+}
+.wrap{max-width:860px;margin:0 auto;}
+
+code,.mono{font-family:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;}
+
+/* ---------- header ---------- */
+header.page{margin-bottom:28px;}
+.eyebrow{
+  display:flex;align-items:center;gap:8px;
+  font-family:"IBM Plex Mono",monospace;font-size:12px;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--accent);margin-bottom:10px;
+}
+.eyebrow .dot{width:6px;height:6px;border-radius:50%;background:var(--accent);flex:none;}
+h1{
+  font-size:clamp(26px,5vw,34px);line-height:1.12;margin:0 0 10px;
+  font-weight:700;letter-spacing:-0.01em;text-wrap:balance;color:var(--ink);
+}
+p.lede{
+  font-size:15px;line-height:1.6;color:var(--ink-soft);max-width:62ch;margin:0 0 18px;
+}
+.stats{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:20px;}
+.stat{
+  background:var(--surface);border:1px solid var(--line);border-radius:10px;
+  padding:9px 14px;display:flex;flex-direction:column;gap:2px;min-width:92px;
+  box-shadow:var(--shadow);
+}
+.stat b{font-size:19px;font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;color:var(--ink);}
+.stat span{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;}
+
+/* ---------- controls ---------- */
+.controls{
+  display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:22px;
+  position:sticky;top:env(safe-area-inset-top,0px);z-index:5;
+  background:color-mix(in srgb, var(--bg) 92%, transparent);
+  backdrop-filter:blur(6px);
+  padding-block:8px;
+  margin-inline:-16px;padding-inline:16px;
+  border-bottom:1px solid var(--line);
+}
+.controls input[type="search"]{
+  flex:1 1 180px;min-width:0;
+  font-family:inherit;font-size:13px;color:var(--ink);
+  background:var(--surface);border:1px solid var(--line);border-radius:8px;
+  padding:8px 12px;
+}
+.controls input[type="search"]::placeholder{color:var(--muted);}
+.btn{
+  font-family:inherit;font-size:12.5px;font-weight:600;color:var(--accent);
+  background:var(--accent-soft);border:1px solid var(--line);border-radius:8px;
+  padding:8px 12px;cursor:pointer;white-space:nowrap;
+}
+.btn:hover{border-color:var(--accent);}
+.btn:focus-visible, input:focus-visible, summary:focus-visible{
+  outline:2px solid var(--accent-bright);outline-offset:1px;
+}
+#noResults{display:none;color:var(--muted);font-size:13px;padding:18px 4px;}
+
+/* ---------- tree ---------- */
+.tree{display:flex;flex-direction:column;gap:14px;}
+
+.module{
+  border-left:3px solid var(--accent);
+  padding-left:14px;
+}
+.module > summary{
+  list-style:none;cursor:pointer;display:flex;align-items:baseline;gap:10px;
+  padding:4px 0 8px;flex-wrap:wrap;
+}
+.module > summary::-webkit-details-marker{display:none;}
+.module > summary::before{
+  content:"▸";color:var(--accent);font-size:12px;margin-right:2px;
+  transition:transform .15s ease;display:inline-block;
+}
+.module[open] > summary::before{transform:rotate(90deg);}
+.module-name{font-size:17px;font-weight:700;color:var(--ink);}
+.module-blurb{font-size:12.5px;color:var(--muted);}
+.module-count{
+  font-family:"IBM Plex Mono",monospace;font-size:10.5px;color:var(--accent);
+  background:var(--chip-bg);border-radius:999px;padding:2px 8px;margin-left:auto;
+  white-space:nowrap;
+}
+
+.pages{
+  display:flex;flex-direction:column;gap:10px;
+  margin-left:2px;padding-left:16px;border-left:1px dashed var(--line);
+}
+
+.page{
+  background:var(--surface);border:1px solid var(--line);border-radius:10px;
+  box-shadow:var(--shadow);overflow:hidden;
+}
+.page > summary{
+  list-style:none;cursor:pointer;display:flex;align-items:center;gap:10px;
+  padding:10px 14px;flex-wrap:wrap;
+}
+.page > summary::-webkit-details-marker{display:none;}
+.page > summary::before{
+  content:"+";color:var(--muted);font-size:13px;width:14px;flex:none;text-align:center;
+}
+.page[open] > summary::before{content:"–";}
+.page-name{font-size:14.5px;font-weight:600;color:var(--ink);}
+.route{
+  font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--accent);
+  background:var(--accent-soft);border-radius:6px;padding:2px 7px;
+}
+.role-tag{
+  font-size:10.5px;color:var(--muted);border:1px solid var(--line);border-radius:6px;
+  padding:1px 6px;margin-left:auto;white-space:nowrap;
+}
+
+.features{
+  list-style:none;margin:0;padding:2px 14px 12px 36px;
+  border-top:1px solid var(--line);
+  display:flex;flex-direction:column;gap:9px;
+}
+.features li{
+  position:relative;padding-left:16px;font-size:13px;line-height:1.5;color:var(--ink-soft);
+}
+.features li::before{
+  content:"";position:absolute;left:0;top:9px;width:9px;height:1px;background:var(--line);
+}
+.features li b{color:var(--ink);font-weight:600;}
+
+mark{
+  background:var(--chip-bg);color:var(--ink);border-radius:3px;padding:0 2px;
+}
+
+footer.note{
+  margin-top:28px;font-size:12px;color:var(--muted);line-height:1.6;
+  border-top:1px solid var(--line);padding-top:14px;
+}
+footer.note code{font-size:11px;}
+
+[hidden]{display:none!important;}
+
+@media (max-width:480px){
+  .pages{padding-left:10px;}
+  .module{padding-left:10px;}
+  .controls{margin-inline:-16px;}
+}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header class="page">
+    <div class="eyebrow"><span class="dot"></span>docs/user/user-documentation.md</div>
+    <h1>ProcurePilot Feature Map</h1>
+    <p class="lede">Every page in the web app, grouped by module, with its key features in one navigable tree — built from the table of contents and the element tables of the user documentation.</p>
+    <div class="stats">
+      <div class="stat"><b>13</b><span>Modules</span></div>
+      <div class="stat"><b>38</b><span>Pages</span></div>
+      <div class="stat"><b id="featCount">—</b><span>Features</span></div>
+      <div class="stat"><b>001–021</b><span>Source specs</span></div>
+    </div>
+  </header>
+
+  <div class="controls">
+    <input id="search" type="search" placeholder="Filter pages or features…" aria-label="Filter the feature map">
+    <button class="btn" id="expandAll" type="button">Expand all</button>
+    <button class="btn" id="collapseAll" type="button">Collapse all</button>
+  </div>
+
+  <div class="tree" id="tree"></div>
+  <p id="noResults">No pages or features match that filter.</p>
+
+  <footer class="note">
+    Scope: web app only (<code>apps/web</code>). Mobile and the read-only partner API have their own
+    documentation. Route paths are shown as written in the source doc; a few screens (e.g. order
+    detail, RFQ history) are reached only as sub-screens of the page they're grouped under here.
+  </footer>
+</div>
+
+<script>
+const DATA = [
+  { cat:"Identity & Workspace", blurb:"Sign-in, tenant confirmation, workspace setup.", pages:[
+    { name:"Sign In", route:"/auth/sign-in", features:[
+      {t:"Password sign-in", d:"Email + password, with a Forgot Password reset flow."},
+      {t:"Create Workspace", d:"Invitation-gated tenant creation — business, owner, region, currency, tax model."},
+      {t:"Accept Invitation", d:"Token-based onboarding for invited members from an email link."},
+      {t:"Plan Confirmation", d:"Shows plan features and product-count limits before entering the app."},
+    ]},
+    { name:"Dashboard", route:"/home", features:[
+      {t:"Tenant & Security card", d:"Confirms tenant ID, slug, and that Postgres RLS is enabled and forced."},
+      {t:"Regional & Financial Settings", d:"Region, primary currency, tax model, and locale — set at sign-up, immutable."},
+      {t:"Current User Authority", d:"Your email, assigned role, and MFA status at a glance."},
+      {t:"Side navigation", d:"The module switcher into every other screen in the app."},
+    ]},
+  ]},
+
+  { cat:"Catalogue & Suppliers", blurb:"The products and vendors every comparison is built on.", pages:[
+    { name:"Product Catalogue", route:"/products", features:[
+      {t:"Searchable product master", d:"Instant, case-insensitive search with Active/Archived/All status filter."},
+      {t:"Import Products", d:"Entry point into the Import Wizard for bulk CSV upload."},
+      {t:"Soft-delete only", d:"Products are archived, never hard-deleted."},
+    ]},
+    { name:"Create / Edit Product", route:"/products/new", features:[
+      {t:"Pack normalisation", d:"Pack Count × Unit Size → Normalised Base Quantity, calculated live."},
+      {t:"GTIN / Barcode", d:"The strongest signal for automatic quotation-line matching."},
+      {t:"Preferred Supplier", d:"Optional default supplier assignment per product."},
+    ]},
+    { name:"Suppliers", route:"/suppliers", features:[
+      {t:"Status model", d:"Active, Preferred, Blocked, or Archived — Blocked offers flag in Smart Compare."},
+      {t:"Create Supplier form", d:"Name is the only required field; terms, lead time, and fees can follow."},
+      {t:"Contact email", d:"Required for a supplier to appear in the RFQ recipient picker (§38)."},
+    ]},
+    { name:"Import Wizard", route:"/import", features:[
+      {t:"Validate before save", d:"Preview and confirm — nothing is written during validation."},
+      {t:"Duplicate handling", d:"Detected by GTIN (products) or name (suppliers); skip or update."},
+    ]},
+  ]},
+
+  { cat:"Quotation Inbox", blurb:"Turning a supplier document into trusted commercial data.", pages:[
+    { name:"Quotation Review Queue", route:"/quotations", features:[
+      {t:"Priority routing", d:"An arithmetic mismatch is always High priority."},
+      {t:"Bulk actions", d:"Archive, refuse, or re-prioritise a whole selection at once."},
+    ]},
+    { name:"Upload Supplier Quotation", route:"/quotations/upload", features:[
+      {t:"Six formats", d:"PDF, PNG, JPEG, TIFF, CSV, XLS/XLSX up to 25MB."},
+      {t:"Sample quotations", d:"Six pre-built samples to test extraction without a real document."},
+    ]},
+    { name:"Quotation Review & Authorization", route:"/quotations/:id/review", features:[
+      {t:"Arithmetic verification", d:"VAT-aware check between line subtotals and the stated total."},
+      {t:"Field-level confidence", d:"85% threshold badges plus a provenance panel per field."},
+      {t:"Supplier auto-match", d:"Suggests an existing supplier by name similarity; never auto-selects."},
+      {t:"Confirm & Authorize", d:"Irreversible — triggers product matching for this quotation only."},
+    ]},
+  ]},
+
+  { cat:"Matching", blurb:"Where supplier wording becomes a known catalogue product.", pages:[
+    { name:"Match Resolution Queue", route:"/matching", features:[
+      {t:"Quotation-grouped tasks", d:"Routing reason per line — threshold, alias conflict, close candidates."},
+      {t:"No silent fuzzy accepts", d:"A similarity-only match always routes to a human by default."},
+      {t:"Keyboard-only resolution", d:"1–9 picks a candidate, arrows navigate, Enter confirms."},
+      {t:"Learns aliases", d:"Confirming a match teaches the exact supplier wording for next time."},
+    ]},
+  ]},
+
+  { cat:"Order Tracking", blurb:"The purchase-order lifecycle and its three-way-match evidence.", pages:[
+    { name:"Order Tracking & Three-Way Match", route:"/orders", features:[
+      {t:"Lifecycle", d:"Draft → Submitted → Confirmed → Partially Received/Received → Closed."},
+      {t:"Create / Edit / Cancel draft", d:"Quantity capped to what remains unallocated on the source request."},
+      {t:"Record confirmation / delivery", d:"Cumulative receipts; remaining quantity recomputed each time."},
+      {t:"Reconciliation Discrepancies", d:"Three-way comparison against synced accounting bills (§33)."},
+    ]},
+  ]},
+
+  { cat:"Compare & Optimise", blurb:"Turning cleaned offers into a defensible buying decision.", pages:[
+    { name:"Smart Compare", route:"/offers/compare", features:[
+      {t:"Landed-cost ranking", d:"Confidence badge, recommendation score, and risk considerations."},
+      {t:"No currency mixing", d:"Offers in a different currency are excluded, never converted."},
+      {t:"Product Price Intelligence", d:"Historical landed-cost trend per product, filterable by supplier."},
+    ]},
+    { name:"Basket Split & Advanced Optimiser", route:"/offers/basket-split", features:[
+      {t:"CP-SAT solver", d:"Exact optimisation across 2–10 suppliers for minimum landed cost."},
+      {t:"Commercial constraints", d:"MOVs, free-delivery thresholds, delivery fees, quantity tiers."},
+      {t:"Advisory only", d:"Never creates an order or commits funds on its own."},
+    ]},
+  ]},
+
+  { cat:"Supplier Intelligence & Alerts", blurb:"Risk and anomaly signals computed from live commercial data.", pages:[
+    { name:"Supplier Scorecards & Supplier IQ", route:"/suppliers/:id/scorecard", features:[
+      {t:"Composite risk score", d:"Weighted 0–100% score with a component-level breakdown."},
+      {t:"Supplier Risk Evidence panel", d:"v2 model with per-component evidence and spend-by-currency."},
+    ]},
+    { name:"Alerts Inbox & Anomaly Detection", route:"/alerts", features:[
+      {t:"Eight alert kinds", d:"Price swing/spike, supplier disappeared, duplicate line, quality trend, and more."},
+      {t:"Recurrence-aware dismissal", d:"A dismissed alert only resurfaces if the underlying evidence changes."},
+    ]},
+  ]},
+
+  { cat:"Savings & Reporting", blurb:"Proving — and routinising — the money procurement actually saved.", pages:[
+    { name:"Savings Ledger", route:"/savings", features:[
+      {t:"Record Purchase Outcome", d:"Captures the actual price paid against a historical baseline."},
+      {t:"Saving Evidence", d:"Immutable once verified; shows the full baseline → saving calculation."},
+    ]},
+    { name:"Export Savings", route:"/savings/export", features:[
+      {t:"Three kinds, three formats", d:"Savings Ledger, Spend by Supplier, Alerts Summary × Excel/CSV/PDF."},
+      {t:"Verified-only compliance", d:"Pending rows are excluded from every export by rule."},
+    ]},
+    { name:"Reports Center", route:"/reports", features:[
+      {t:"Unified hub", d:"Generated artifacts and recurring schedules in one place."},
+      {t:"Signed-URL downloads", d:"Short-lived secure links; expired artifacts say so."},
+    ]},
+    { name:"Report Schedules & Schedule Form", route:"/reports/schedule-form", features:[
+      {t:"Weekly recurring exports", d:"Pick a weekday, locale, and optional branch/supplier filter."},
+      {t:"Survives creator deactivation", d:"A paused/resumed schedule keeps running operationally."},
+    ]},
+    { name:"Weekly Digest & Digest Settings", route:"/reports/digest-settings", features:[
+      {t:"Six-section digest", d:"Savings, verifications, approvals, match reviews, anomalies, expiring quotes."},
+      {t:"Strictly advisory", d:"Never executes an approval, purchase, or order on its own."},
+    ]},
+  ]},
+
+  { cat:"Requests & Approvals", blurb:"Capturing demand before spend happens, with a human decision gate.", pages:[
+    { name:"Purchase Requests", route:"/requests", features:[
+      {t:"Lifecycle", d:"Draft → Submitted → Approved / Rejected / Withdrawn."},
+      {t:"Create Order from approved", d:"An approved request exposes a direct Create Order action (§Order Tracking)."},
+    ]},
+    { name:"New Purchase Request", route:"/requests/new", features:[
+      {t:"Branch + cost centre", d:"Required branch, optional cost centre, required-by date."},
+      {t:"Approval status", d:"Read-only decision, assignee, comment, and timestamp once routed."},
+    ]},
+    { name:"Approval Queue", route:"/approvals", features:[
+      {t:"Budget-impact badge", d:"Remaining budget, or an amber Budget Exceeded warning."},
+      {t:"Expandable line detail", d:"Review every line without leaving the queue."},
+      {t:"Approve / Reject with comment", d:"Optional comment on either decision; Ctrl+Enter submits."},
+    ]},
+  ]},
+
+  { cat:"Team & Organisation", blurb:"Membership, structure, and the roles that gate everything above.", pages:[
+    { name:"Team Management", route:"/team", features:[
+      {t:"Invite by email", d:"Assign a role at invitation time; owner cannot be removed."},
+      {t:"Pending invitations", d:"Tracked by status — Pending, Accepted, Revoked, Expired."},
+    ]},
+    { name:"Organisation Settings", route:"/settings", features:[
+      {t:"Branches, cost centres, budgets", d:"The structure that purchase requests and budgets attach to."},
+      {t:"Approval delegation", d:"Route a colleague's pending decisions to you for a date range."},
+    ]},
+    { name:"Roles & Permissions", route:"(reference)", features:[
+      {t:"Five roles", d:"Owner, Buyer, Branch Manager, Approver, Viewer — assigned at invitation."},
+      {t:"Backend-enforced", d:"A hidden button is never the only control; the API checks role too."},
+    ]},
+  ]},
+
+  { cat:"Automated Ingestion", blurb:"Five channels that bring supplier quotes in without manual retyping.", pages:[
+    { name:"Ingestion Dashboard", route:"/ingestion", features:[
+      {t:"Same-day stat cards", d:"Emails, capture uploads, catalogue imports today."},
+      {t:"Integration coverage", d:"Share of quotations sourced from an integration vs. manual upload."},
+    ]},
+    { name:"Email Forwarding Setup", route:"/ingestion/email-config", features:[
+      {t:"Domain allowlist", d:"Empty = accept all; once set, unapproved domains are rejected."},
+      {t:"SPF/DKIM verification", d:"Confirms inbound mail genuinely came from the sender's domain."},
+    ]},
+    { name:"Email Ingestion Log", route:"/ingestion/email-log", features:[
+      {t:"Full inbound audit", d:"Every email received, matched or rejected, with a reason."},
+    ]},
+    { name:"Capture a Quotation", route:"/ingestion/capture", features:[
+      {t:"Camera or upload", d:"Photo a paper quote on mobile, or drop a file on desktop."},
+      {t:"Auto supplier detection", d:"Extraction identifies the supplier when none is selected."},
+    ]},
+    { name:"Catalogue Import", route:"/ingestion/catalogue-import", features:[
+      {t:"Bulk price lists", d:"Supplier-scoped CSV/XLSX import feeding product matching directly."},
+      {t:"Partial-import resilience", d:"Bad rows are skipped and listed; good rows import regardless."},
+    ]},
+    { name:"Catalogue Refresh Schedules", route:"/ingestion/refresh-schedules", features:[
+      {t:"Cadence tracking", d:"1–365 day cadence per product/supplier pairing, Active/Paused/Due."},
+    ]},
+  ]},
+
+  { cat:"Connected Systems", blurb:"Read-only links to accounting and point-of-sale — never a writer.", pages:[
+    { name:"Accounting Integration", route:"/accounting", features:[
+      {t:"OAuth connect", d:"QuickBooks Online or Xero, configured per workspace deployment."},
+      {t:"Synced Bills & Invoices", d:"Vendor bills with Matched/Unmatched reconciliation status."},
+      {t:"Reconciliation Discrepancies", d:"12 discrepancy types against the order lifecycle."},
+    ]},
+    { name:"POS & Inventory Integration", route:"/pos", features:[
+      {t:"OAuth connect (Square)", d:"Read-only sync of sales velocity and stock on hand."},
+      {t:"Synced Product Signals", d:"Match POS catalogue items to ProcurePilot products."},
+    ]},
+  ]},
+
+  { cat:"Predictive Procurement", blurb:"Forecasting, risk, grounded Q&A, and guarded RFQ automation.", pages:[
+    { name:"Reorder Forecasts & Reorder Queue", route:"/forecasting", features:[
+      {t:"Evidence states", d:"Full (180+ days), Provisional, or Insufficient history, shown per proposal."},
+      {t:"Prepare draft request", d:"Creates a Draft only — still goes through normal approval."},
+    ]},
+    { name:"Supplier Risk Queue & Negotiation Briefs", route:"/supplier-risk", features:[
+      {t:"Workspace-wide risk table", d:"Every active supplier ranked by driver, confidence, and validity."},
+      {t:"Negotiation Brief", d:"Cited talking points; acknowledge or dismiss only — never contacts the supplier."},
+    ]},
+    { name:"Procurement Analyst", route:"/analyst", features:[
+      {t:"Grounded Q&A", d:"Answers cite sources and show the exact calculation used."},
+      {t:"Question History", d:"Every past conversation, reopenable by its own ID."},
+    ]},
+    { name:"RFQ Sourcing & Response Comparison", route:"/rfq/create", features:[
+      {t:"Email RFQ", d:"Sent only to suppliers with a contact email on file (§Suppliers)."},
+      {t:"Compare RFQ Responses", d:"Side-by-side offers; Prepare Request needs every line matched."},
+      {t:"Guardrails", d:"Auto-prepare a draft under owner-set limits — a human still approves every purchase."},
+    ]},
+  ]},
+];
+
+const tree = document.getElementById('tree');
+let totalFeatures = 0;
+
+DATA.forEach((mod, mi) => {
+  const modEl = document.createElement('details');
+  modEl.className = 'module';
+  modEl.open = true;
+  modEl.dataset.kind = 'module';
+
+  const pageCount = mod.pages.length;
+  const summary = document.createElement('summary');
+  summary.innerHTML = `
+    <span class="module-name">${mod.cat}</span>
+    <span class="module-blurb">${mod.blurb}</span>
+    <span class="module-count">${pageCount} page${pageCount === 1 ? '' : 's'}</span>
+  `;
+  modEl.appendChild(summary);
+
+  const pagesWrap = document.createElement('div');
+  pagesWrap.className = 'pages';
+
+  mod.pages.forEach(page => {
+    const pageEl = document.createElement('details');
+    pageEl.className = 'page';
+    pageEl.open = true;
+    pageEl.dataset.kind = 'page';
+    pageEl.dataset.search = (page.name + ' ' + page.route + ' ' +
+      page.features.map(f => f.t + ' ' + f.d).join(' ')).toLowerCase();
+
+    const pSummary = document.createElement('summary');
+    pSummary.innerHTML = `
+      <span class="page-name">${page.name}</span>
+      <span class="route mono">${page.route}</span>
+    `;
+    pageEl.appendChild(pSummary);
+
+    const ul = document.createElement('ul');
+    ul.className = 'features';
+    page.features.forEach(f => {
+      totalFeatures++;
+      const li = document.createElement('li');
+      li.innerHTML = `<b>${f.t}</b> — ${f.d}`;
+      ul.appendChild(li);
+    });
+    pageEl.appendChild(ul);
+    pagesWrap.appendChild(pageEl);
+  });
+
+  modEl.appendChild(pagesWrap);
+  modEl.dataset.search = mod.cat.toLowerCase();
+  tree.appendChild(modEl);
+});
+
+document.getElementById('featCount').textContent = totalFeatures;
+
+document.getElementById('expandAll').addEventListener('click', () => {
+  document.querySelectorAll('#tree details').forEach(d => d.open = true);
+});
+document.getElementById('collapseAll').addEventListener('click', () => {
+  document.querySelectorAll('#tree details.page').forEach(d => d.open = false);
+});
+
+const searchInput = document.getElementById('search');
+const noResults = document.getElementById('noResults');
+
+function normalize(s){ return s.toLowerCase(); }
+
+searchInput.addEventListener('input', () => {
+  const q = normalize(searchInput.value.trim());
+  let anyVisible = false;
+
+  document.querySelectorAll('#tree > details.module').forEach(modEl => {
+    let modMatches = !q || modEl.dataset.search.includes(q);
+    let anyPageVisible = false;
+
+    modEl.querySelectorAll('details.page').forEach(pageEl => {
+      const match = !q || pageEl.dataset.search.includes(q);
+      pageEl.hidden = !match;
+      if (match) {
+        anyPageVisible = true;
+        if (q) pageEl.open = true;
+      }
+    });
+
+    const show = modMatches || anyPageVisible;
+    modEl.hidden = !show;
+    if (show) {
+      anyVisible = true;
+      if (q) modEl.open = true;
+    }
+  });
+
+  noResults.style.display = anyVisible ? 'none' : 'block';
+});
+</script>
+</body>
+</html>

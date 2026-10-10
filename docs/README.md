@@ -38,8 +38,9 @@
 ## User-facing
 
 - [`user/user-documentation.md`](user/user-documentation.md) — Help center guides for upload, compare, request, approve, and delivery confirmation (web app).
+- [`user/feature-map.html`](user/feature-map.html) — Hierarchical, filterable map of every web-app page and its key features, grouped by module (open in a browser).
 - [`user/user-flows.md`](user/user-flows.md) — Route-by-route navigation paths and journey diagrams for the web app.
-- [`user/mobile-app-user-documentation.md`](user/mobile-app-user-documentation.md) — Screen-by-screen guide to the mobile app (sign-in, biometric unlock, role-aware home screen).
+- [`user/mobile-app-user-documentation.md`](user/mobile-app-user-documentation.md) — Screen-by-screen guide to the mobile app (sign-in, biometric unlock, purchase requests, approvals, delivery confirmation, quality-issue reporting).
 
 ---
 
