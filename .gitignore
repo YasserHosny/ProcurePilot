@@ -55,3 +55,6 @@ samples/
 *.tfstate.*
 .terraform.tfstate.lock.info
 *.tfvars
+
+# Local orchestration scratch (briefs, one-off scripts) -- never committed
+scratch/
