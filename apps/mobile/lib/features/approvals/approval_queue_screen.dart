@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/api/approvals_api_client.dart';
 import '../../core/api/models.dart';
 import '../../core/i18n/i18n_loader.dart';
+import '../../core/format/money_format.dart';
 import '../service_provider.dart';
 
 class ApprovalQueueScreen extends StatefulWidget {
@@ -99,6 +100,8 @@ class _ApprovalQueueScreenState extends State<ApprovalQueueScreen> {
 
   Widget? _moneyText(Money? money) {
     if (money == null) return null;
-    return Text('${money.currency} ${money.amount}');
+    return Text(
+      formatMoney(money.amount, money.currency, locale: _i18n.locale),
+    );
   }
 }

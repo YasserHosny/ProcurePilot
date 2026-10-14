@@ -1,0 +1,61 @@
+import 'package:intl/intl.dart';
+
+/// Formats a decimal amount for display without converting its full precision
+/// through a binary floating point value.
+String formatMoney(String amount, String currency, {required String locale}) {
+  final code = currency.toUpperCase();
+  final digits = switch (code) {
+    'KWD' || 'BHD' || 'OMR' => 3,
+    'JPY' || 'KRW' || 'CLP' || 'VND' || 'ISK' => 0,
+    _ => 2,
+  };
+  try {
+    final value = amount.trim();
+    final match = RegExp(r'^([+-]?)(\d+)(?:\.(\d*))?$').firstMatch(value);
+    if (match == null) return '$code $amount';
+    final negative = match.group(1) == '-';
+    final whole = BigInt.parse(match.group(2)!);
+    final fraction = match.group(3) ?? '';
+    final padded = fraction.padRight(digits + 1, '0');
+    var minor = digits == 0
+        ? BigInt.zero
+        : BigInt.parse(padded.substring(0, digits));
+    var roundedWhole = whole;
+    if (digits < padded.length && padded.codeUnitAt(digits) >= 53) {
+      minor += BigInt.one;
+      final limit = BigInt.from(10).pow(digits);
+      if (digits > 0 && minor >= limit) {
+        roundedWhole += BigInt.one;
+        minor -= limit;
+      }
+      if (digits == 0) roundedWhole += BigInt.one;
+    }
+    final symbols = NumberFormat.decimalPattern(locale).symbols;
+    final wholeText = roundedWhole.toString();
+    final groups = <String>[];
+    for (var end = wholeText.length; end > 0; end -= 3) {
+      final start = end - 3 < 0 ? 0 : end - 3;
+      groups.insert(0, wholeText.substring(start, end));
+    }
+    final groupedWhole = groups.join(symbols.GROUP_SEP);
+    final fractionText = digits == 0
+        ? ''
+        : minor.toString().padLeft(digits, '0');
+    var number =
+        '${negative ? '-' : ''}$groupedWhole'
+        '${digits == 0 ? '' : '${symbols.DECIMAL_SEP}$fractionText'}';
+    if (locale == 'ar') {
+      number = number
+          .replaceAll(symbols.GROUP_SEP, '٬')
+          .replaceAll(symbols.DECIMAL_SEP, '٫')
+          .replaceAllMapped(
+            RegExp(r'[0-9]'),
+            (match) => String.fromCharCode(0x0660 + int.parse(match[0]!)),
+          );
+    }
+    final formatted = '$code $number';
+    return locale == 'ar' ? '\u2068$formatted\u2069' : formatted;
+  } on Object {
+    return '$code $amount';
+  }
+}
