@@ -140,7 +140,9 @@ def _extract(
         )
     logger.info("using bedrock provider")
     try:
-        return BedrockExtractionProvider(settings).extract(**common)
+        return BedrockExtractionProvider(settings).extract(
+            **common, fallback_currency=fallback_currency
+        )
     except Exception:
         logger.warning("bedrock failed, falling back to azure_di", exc_info=True)
         return AzureDocumentIntelligenceProvider(settings).extract(
@@ -355,7 +357,7 @@ def _review_reason(
         return "read_failure"
     currency = result.header.get("currency")
     if currency is not None and currency.confidence < threshold:
-        return "currency_fallback"
+        return "low_confidence"
     if _has_uncurried_money(result):
         return "low_confidence"
     if arithmetic_status == "mismatch":

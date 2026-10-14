@@ -4,6 +4,9 @@ import json
 from typing import Any
 
 import boto3
+import re
+
+from procurepilot_extraction_worker.currency import detect_currency
 
 from procurepilot_extraction_worker.models import (
     ExtractedField,
@@ -77,6 +80,7 @@ class BedrockExtractionProvider:
         mime_type: str,
         storage_path: str,
         document_bytes: bytes | None = None,
+        fallback_currency: str | None = None,
     ) -> ExtractionResult:
         if document_bytes is None:
             raise ExtractionProviderError("document_bytes required for Bedrock extraction")
@@ -140,7 +144,19 @@ class BedrockExtractionProvider:
         output_tokens = usage.get("outputTokens", 0)
         cost_usd = _estimate_cost(input_tokens, output_tokens, self._settings.bedrock_model_id)
 
-        return _parse_response(text, self._settings.bedrock_model_id, cost_usd)
+        result = _parse_response(text, self._settings.bedrock_model_id, cost_usd)
+        document_text = document_bytes.decode("utf-8", errors="ignore")
+        evidenced = detect_currency(document_text)
+        if evidenced is None:
+            markers = set(re.findall(r"(?<![A-Z])(?:USD|GBP|EUR|SAR|AED|KWD|BHD|OMR|JPY|CAD|AUD)(?![A-Z])|[$£€]", document_text.upper()))
+            evidenced = {"$": "USD", "£": "GBP", "€": "EUR"}.get(next(iter(markers))) if len(markers) == 1 else None
+        currency_field = result.header.get("currency")
+        if currency_field is None or evidenced is None or currency_field.value != evidenced:
+            if fallback_currency:
+                result.header["currency"] = ExtractedField("currency", fallback_currency, 0.50, 1, None)
+            else:
+                result.header.pop("currency", None)
+        return result
 
 
 def _estimate_cost(input_tokens: int, output_tokens: int, model_id: str) -> float:

@@ -7,7 +7,7 @@ from azure.ai.documentintelligence import DocumentIntelligenceClient
 from azure.ai.documentintelligence.models import AnalyzeDocumentRequest
 from azure.core.credentials import AzureKeyCredential
 
-from procurepilot_extraction_worker.currency import detect_currency
+from procurepilot_extraction_worker.currency import detect_currency, parse_localised_decimal
 from procurepilot_extraction_worker.models import (
     ExtractedField,
     ExtractedLine,
@@ -80,8 +80,9 @@ def _parse_invoice_result(
     if vendor:
         header["supplier_name"] = _make_field("supplier_name", vendor, fields, "VendorName")
 
-    currency = _infer_currency(fields) or fallback_currency
-    currency_confidence = 0.50 if currency and _infer_currency(fields) is None else 0.90
+    inferred_currency, currency_conflict = _infer_currency_state(fields)
+    currency = inferred_currency or fallback_currency
+    currency_confidence = 0.50 if currency and (inferred_currency is None or currency_conflict) else 0.90
     if currency is not None:
         header["currency"] = ExtractedField("currency", currency, currency_confidence, 1, None)
 
@@ -168,7 +169,9 @@ def _fallback_from_tables(
                 ef: dict[str, ExtractedField] = {}
                 qty = row_data.get("quantity") or row_data.get("qty")
                 if qty:
-                    ef["quantity"] = ExtractedField("quantity", qty, 0.80, 1, None)
+                    cleaned_qty = _clean_number(qty)
+                    if cleaned_qty:
+                        ef["quantity"] = ExtractedField("quantity", cleaned_qty, 0.80, 1, None)
                 price = (
                     row_data.get("unit price") or row_data.get("price") or row_data.get("rate")
                 )
@@ -281,21 +284,24 @@ def _make_field(
 
 
 def _clean_number(s: str) -> str | None:
-    cleaned = re.sub(r"[^\d.,\-]", "", s)
-    if not cleaned or cleaned in (".", ",", "-"):
+    cleaned = re.sub(r"[^\d.,\-٠-٩۰-۹٫٬−﹣]", "", s)
+    if not cleaned or cleaned in (".", ",", "٫", "-"):
         return None
-    if "," in cleaned and "." in cleaned:
-        if cleaned.rfind(",") > cleaned.rfind("."):
-            cleaned = cleaned.replace(".", "").replace(",", ".")
-        else:
-            cleaned = cleaned.replace(",", "")
-    elif "," in cleaned:
+    if "٫" in cleaned or "٬" in cleaned:
+        try:
+            return format(parse_localised_decimal(cleaned), "f")
+        except ValueError:
+            return None
+    if "," in cleaned and "." not in cleaned:
         parts = cleaned.split(",")
         if len(parts) == 2 and len(parts[1]) <= 2:
             cleaned = cleaned.replace(",", ".")
-        else:
-            cleaned = cleaned.replace(",", "")
-    return cleaned
+    elif "," in cleaned:
+        cleaned = cleaned.replace(",", "")
+    try:
+        return format(parse_localised_decimal(cleaned), "f")
+    except ValueError:
+        return None
 
 
 def _normalise_date(value: str) -> str:
@@ -305,9 +311,17 @@ def _normalise_date(value: str) -> str:
 
 
 def _infer_currency(fields: dict[str, Any]) -> str | None:
+    return _infer_currency_state(fields)[0]
+
+
+def _infer_currency_state(fields: dict[str, Any]) -> tuple[str | None, bool]:
     all_content = " ".join(str(getattr(field, "content", "") or "") for field in fields.values())
     marker_currency = detect_currency(all_content)
     codes: set[str] = set()
+    for field in fields.values():
+        marker = detect_currency(str(getattr(field, "content", "") or ""))
+        if marker:
+            codes.add(marker)
     for name in ("InvoiceTotal", "SubTotal", "AmountDue"):
         field = fields.get(name)
         if field is None:
@@ -321,4 +335,5 @@ def _infer_currency(fields: dict[str, Any]) -> str | None:
                 codes.add(code)
     if marker_currency:
         codes.add(marker_currency)
-    return next(iter(codes)) if len(codes) == 1 else None
+    conflict = len(codes) > 1
+    return (next(iter(codes)) if len(codes) == 1 else None, conflict)

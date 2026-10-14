@@ -40,7 +40,7 @@ def test_review_reason_not_triggered_when_header_has_data_but_no_lines() -> None
     assert _review_reason(result, "not_applicable", 0.75, _NO_MATCH) is None
 
 
-def test_currency_fallback_uses_existing_review_reason_field() -> None:
+def test_currency_fallback_uses_low_confidence_review_reason() -> None:
     result = ExtractionResult(
         method="structured_parse",
         model_version="test",
@@ -48,7 +48,7 @@ def test_currency_fallback_uses_existing_review_reason_field() -> None:
         lines=[],
     )
 
-    assert _review_reason(result, "not_applicable", 0.85, _NO_MATCH) == "currency_fallback"
+    assert _review_reason(result, "not_applicable", 0.85, _NO_MATCH) == "low_confidence"
 
 
 def test_uncurried_money_is_routed_to_review_and_not_persisted_as_amount() -> None:
