@@ -28,7 +28,8 @@ set up, what is next, who does it, and what blocks what.
 | Products | Jira (**business tier only** — no Jira Software: no Epic, no Bug, no sprints, no GitHub dev panel), Jira Product Discovery, Confluence, Loom |
 | Space `PP` | ProcurePilot — non-code work + demo/pilot gaps |
 | Space `SP` | Sales Pipeline — one Lead per prospect company |
-| Space `MDP` | JPD sample data (MDP-1..6) — **ignore** |
+| Space `MDP` | JPD sample data (MDP-1..6) — in the Jira trash; **ignore** |
+| Members | Yasser (owner); Omar Medhat (mr.omarmedhat@gmail.com) invited 2026-10-14 — JPD "User (creator)", Goals/Projects/Studio user, not admin; free plan gives every member access to PP and SP |
 
 **Tool capabilities:**
 
@@ -126,11 +127,15 @@ Atlassian connector) · **Lane** (code lane via Speckit: Codex / agy / OpenCode)
 
 ### D — Decisions (user only)
 
-- [ ] **D-1 Pilot environment**: self-hosted production ($0, user owns uptime/backups) vs. a
-  separate paid hosted production project. Owner: User. Blocks: E-1. Done: choice recorded in
-  handoff log + GTM plan.
-- [ ] **D-2 Post-pilot price** (monthly price or range). Owner: User. Blocks: G-6 (agreement
-  final). Done: number written into the pilot agreement.
+- [x] **D-1 Pilot environment** — **decided 2026-10-14: Option B, separate paid hosted
+  production** (own Supabase project + containers, isolated from staging). Self-hosting stays a
+  later option. Recorded on PP-4; confirm plan tier with the user before creating anything
+  billable.
+- [~] **D-2 Post-pilot price** — **recommended 2026-10-14, awaiting user confirmation**:
+  EGP 1,500 per branch per month (minimum 2 branches), annual = 10 months' price; founding-customer
+  50% off for the first 12 months in exchange for case study + logo; savings guarantee — if
+  verified savings in a month are below 3× the fee, the next month is free. Revisit after the
+  first pilot's real savings data. Blocks: G-6 (PP-10).
 - [ ] **D-3 Add Jira's free software plan?** (gets Epic/Bug/GitHub linking). Owner: User.
   Blocks: nothing. Done: yes/no recorded. Default if undecided: no.
 
@@ -141,7 +146,7 @@ Atlassian connector) · **Lane** (code lane via Speckit: Codex / agy / OpenCode)
 | [x] J-1 | Verify Contact, Role, City are saved on Lead; add Branches (number) and Source (dropdown, 4 options); click "Save changes" | Browser | — | All 5 fields visible on a new Lead's create screen | SP |
 | [ ] J-2 | Confirm the template fields (Company size, Website, Email, Phone number, Start date, Category, Team) are still present; hide any unused from the create screen only if the user wants | Browser | J-1 | Create screen reviewed | SP |
 | [ ] J-3 | Verify board column order is Target, Contacted, Talked, Qualified, Pilot offered, Pilot, Not now; reorder if "Pilot offered" is last | Browser | — | Board columns in stage order | SP |
-| [~] J-4 | End-to-end test via connector: create dummy Lead → transition to Talked → add comment → set due date → run JQL `project = SP AND duedate <= now() AND status != "Not now"` and confirm it returns the dummy. **Passed 2026-10-14 (SP-1).** Remaining: **user** deletes SP-1 in the Jira UI (models do not hard-delete) | User | J-1 | SP-1 deleted | SP |
+| [x] J-4 | End-to-end test via connector: create dummy Lead → transition to Talked → add comment → set due date → run JQL `project = SP AND duedate <= now() AND status != "Not now"` and confirm it returns the dummy. **Passed 2026-10-14 (SP-1).** SP-1 deleted by the user 2026-10-14 | User | J-1 | SP-1 deleted | SP |
 | [x] J-5 | Create PP tasks G-1..G-9, P-1..P-3 (as `from-demo`), E-1 below; put the task ID from this file in each summary (e.g. `[G-2] Demo video`) | Orch | G-0 | Issues exist; keys written back into this file's tables | PP |
 | [ ] J-6 | Save the "weekly review" JQL as a filter (needs browser if connector can't save filters) | Browser | J-4 | Filter "SP — due or overdue" exists | SP |
 
@@ -223,4 +228,5 @@ Append one row per session. Newest at the bottom. Include Jira keys and PR numbe
 |---|---|---|---|
 | 2026-10-14 | Claude (orchestrator) | Revised GTM plan (uncommitted); created Jira spaces PP and SP; SP workflow (7 statuses) + 5 Lead custom fields done; J-4 test passed on SP-1 (parked at Not now); wrote this file | User deletes SP-1; J-3 (column order); get user approval → G-0, then J-5 |
 | 2026-10-14 | Claude (orchestrator) | User approved both docs → committed (G-0); created PP-1..PP-13 (J-5); teammate invite to the site dispatched to a side agent (result pending) | Start P-1 / P-2 specs (Speckit) and G-3 draft; user: D-1, D-2, delete SP-1 |
+| 2026-10-14 | Claude (orchestrator) | Spec `specs/022-home-currency-readiness/spec.md` (covers PP-1, PP-2, PP-3 fix) committed c8e2c1a and pushed on branch `022-home-currency-readiness` — **plan/tasks are being produced by a separate Claude CLI session in the main checkout; it owns the 022 PR**. PP-7: three pitch-line drafts posted (recommend C for DMs, A for one-pager). PP-3: 5 synthetic Egyptian test quotes + expected.json attached (no real quotes publicly available). D-1 = B recorded on PP-4. D-2 recommendation posted (awaiting confirmation). Omar invited. SP-1 deleted. This file pushed as PR #72. | User: confirm D-2, pick PP-7 line, merge #72. Then: G-6 draft (PP-10) once D-2 confirmed; E-1 setup (PP-4) after tier confirmation; run PP-3 fixtures before + after 022 ships |
 | | | | |
