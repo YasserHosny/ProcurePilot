@@ -71,10 +71,14 @@ test.describe('Organisation Budget Management (chunk 007 US3)', () => {
    * forever -- the CI flake in the overlap test. Retry the click until a panel actually shows.
    */
   async function openAsyncSelect(page: Page, select: Locator): Promise<void> {
+    // Key on THIS select's own aria-expanded, not on any visible mat-option: a previously used
+    // select's panel is still in the DOM while it animates closed.
+    const trigger = select.locator('xpath=descendant-or-self::mat-select').first();
     await expect(async () => {
-      if (!(await page.locator('mat-option').first().isVisible())) {
+      if ((await trigger.getAttribute('aria-expanded')) !== 'true') {
         await select.click();
       }
+      await expect(trigger).toHaveAttribute('aria-expanded', 'true', { timeout: 2000 });
       await expect(page.locator('mat-option').first()).toBeVisible({ timeout: 2000 });
     }).toPass({ timeout: 15000 });
   }
