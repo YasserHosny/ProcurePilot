@@ -13,6 +13,7 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { RequestsApiService } from '../../requests/requests-api';
+import { SessionService } from '../../../core/auth/session.service';
 import type { PurchaseRequest } from '../../../core/api/models';
 import type { RequestAllocation } from '../orders-api';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
@@ -63,6 +64,7 @@ export class OrderCreateComponent implements OnInit {
   private readonly ordersApi = inject(OrdersApiService);
   private readonly route = inject(ActivatedRoute);
   private readonly requestsApi = inject(RequestsApiService);
+  private readonly session = inject(SessionService);
 
   readonly suppliers = signal<Supplier[]>([]);
   readonly products = signal<Product[]>([]);
@@ -78,7 +80,7 @@ export class OrderCreateComponent implements OnInit {
     supplier_id: new FormControl<string>('', { nonNullable: true, validators: [Validators.required] }),
     order_date: new FormControl<Date | null>(new Date(), { validators: [Validators.required] }),
     expected_delivery_date: new FormControl<Date | null>(null),
-    currency: new FormControl<string>('USD', { nonNullable: true, validators: [Validators.required, Validators.pattern(/^[A-Z]{3}$/)] }),
+    currency: new FormControl<string>(this.session.homeCurrency() ?? 'USD', { nonNullable: true, validators: [Validators.required, Validators.pattern(/^[A-Z]{3}$/)] }),
     order_tax: new FormControl<number>(0, { nonNullable: true, validators: [Validators.min(0)] }),
     lines: new FormArray<FormGroup<OrderLineForm>>([]),
   });

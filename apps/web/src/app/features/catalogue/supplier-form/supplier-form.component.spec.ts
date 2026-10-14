@@ -43,6 +43,7 @@ describe("SupplierFormComponent (T025)", () => {
       currentMember: signal(null),
       isAuthenticated: signal(true),
       tenant: signal(null),
+      homeCurrency: signal(undefined),
       activeLocale: signal("en"),
     };
 
@@ -91,15 +92,14 @@ describe("SupplierFormComponent (T025)", () => {
     expect(component.form.get("min_order_currency")?.hasError("currencyRequired")).toBeTrue();
   });
 
-  it("should refuse currency selection without monetary amount", () => {
+  it("allows a currency to be preselected before an amount is entered", () => {
     component.form.patchValue({
       name: "Test Supplier",
       min_order_amount: "",
       min_order_currency: "GBP",
     });
 
-    expect(component.form.invalid).toBeTrue();
-    expect(component.form.get("min_order_amount")?.hasError("amountRequired")).toBeTrue();
+    expect(component.form.valid).toBeTrue();
   });
 
   it("should create supplier when valid with explicit money currency", () => {

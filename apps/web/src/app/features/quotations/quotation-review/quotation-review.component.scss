@@ -191,6 +191,18 @@
   }
 }
 
+.field-needs-review {
+  border-inline-start: 3px solid var(--color-warning, #b45309);
+  padding-inline-start: 0.5rem;
+}
+
+.review-reason {
+  display: block;
+  color: var(--color-warning, #92400e);
+  font-size: 0.8rem;
+  margin-block: 0.25rem 0.5rem;
+}
+
 ::ng-deep .flagged-highlight .mdc-notched-outline__leading,
 ::ng-deep .flagged-highlight .mdc-notched-outline__notch,
 ::ng-deep .flagged-highlight .mdc-notched-outline__trailing {

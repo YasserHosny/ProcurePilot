@@ -23,6 +23,7 @@ export class SessionService {
   readonly isAuthenticated = computed(() => this.member() !== null);
   readonly role = computed<Role | null>(() => this.member()?.role ?? null);
   readonly tenant = computed(() => this.member()?.tenant ?? null);
+  readonly homeCurrency = computed(() => this.tenant()?.currency ?? undefined);
   readonly activeLocale = computed(
     () => this.member()?.preferred_locale ?? this.member()?.tenant.default_locale ?? 'en',
   );
@@ -71,5 +72,10 @@ export class SessionService {
     localStorage.setItem(ACCESS_TOKEN_KEY, session.access_token);
     localStorage.setItem(REFRESH_TOKEN_KEY, session.refresh_token);
     this.member.set(session.user);
+  }
+
+  updateTenant(tenant: import('../api/models').Tenant): void {
+    const current = this.member();
+    if (current) this.member.set({ ...current, tenant });
   }
 }
