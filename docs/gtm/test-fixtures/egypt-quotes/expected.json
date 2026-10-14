@@ -18,10 +18,10 @@
   "tests": "FR-009 LE / L.E.; edge case: 'LE' inside TABLE/BOTTLE/LEMON must not confuse"
  },
  "q4-no-currency-marker.pdf": {
-  "currency": "tenant home (EGP)",
+  "currency": "none (unresolved)",
   "flagged": true,
   "total": "6771.00",
-  "tests": "FR-011 fallback to home currency + review flag; FR-012 no hard-coded GBP"
+  "tests": "Unresolved currency goes to human review: no guessed currency stored — not GBP, not the tenant currency"
  },
  "q5-mixed-markers.png": {
   "currency": "unclear",
