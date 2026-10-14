@@ -40,11 +40,11 @@ becomes a product task (see "How work from this plan is tracked").
 
 | # | Gap | Where | Pilot impact | Action |
 |---|---|---|---|---|
-| C1 | No tenant home/default currency; web forms fall back to **USD** | `order-create.component.ts:81`, `guardrails.component.ts:61`, quotation-review fallbacks | Buyer must switch to EGP on every PO; one miss puts a USD PO against an EGP budget | **Product task, before pilot** — tenant default currency setting used by all forms |
-| C2 | Extraction falls back to **GBP** when a quote's currency is unclear; Azure DI fallback only recognises £/$/€ (not ج.م / جنيه / LE) and hard-codes USD on one path | `structured_parse.py:67`, `azure_di.py:77,153,281`; landed cost defaults GBP (`landed_cost/service.py:89`) | Egyptian quotes can be stored in the wrong currency silently | **Test first** with 5 real Egyptian quotes (incl. Arabic-Indic digits ١٢٣); fix the fallback to the tenant default regardless |
+| C1 | The tenant currency already exists (`tenant.currency`, required at sign-up, returned by `/me`, already the default in the budget and threshold-rule forms) — but several web forms ignore it and fall back to **USD** | `order-create.component.ts:81`, `guardrails.component.ts:61`, quotation-review fallbacks | Buyer must switch to EGP on every PO; one miss puts a USD PO against an EGP budget | **Product task, before pilot** — wire the existing `tenant.currency` into the remaining forms; no new setting or schema |
+| C2 | Extraction falls back to **GBP** when a quote's currency is unclear; Azure DI fallback only recognises £/$/€ (not ج.م / جنيه / LE) and hard-codes USD on one path | `structured_parse.py:67`, `azure_di.py:77,153,281`; landed cost defaults GBP (`landed_cost/service.py:89`) | Egyptian quotes can be stored in the wrong currency silently | **Test first** with 5 real Egyptian quotes (incl. Arabic-Indic digits ١٢٣); fix the fallback: recognise Egyptian markers, and route any still-unresolved currency to **human review** — never default it to the tenant currency (project ingestion rule: an unresolved currency is an error, not a fallback) |
 | C3 | Mobile shows raw amounts (`EGP 12500.000000`) — no grouping, no locale formatting | `approval_queue_screen.dart:102`, `request_detail_screen.dart:104-148` | It is the closing shot of the demo video | **Product task, before demo video** — locale-aware money formatting on mobile |
 | C4 | No FX — no exchange rates anywhere; cross-currency arithmetic is refused by design | `money.ts` (`assertSameCurrency`) | Imported items quoted in USD can't be compared with EGP quotes; EGP volatility can erode a week-0 baseline by day 90 | **Workaround:** pilot limited to EGP-quoting suppliers; record baseline and day-90 prices in EGP. Product task after pilot |
-| C5 | No VAT model — only `tax_amount`; no rate, no inclusive/exclusive flag | quotation schema | Egyptian VAT is 14% and suppliers mix inclusive/exclusive prices; savings can be overstated | **Workaround:** ask pilot suppliers to quote ex-VAT. Product task after pilot |
+| C5 | A VAT rate exists (`quotation_line.vat_rate`, used by landed cost) but there is no way to record whether a quoted price **includes** VAT | quotation schema | Egyptian VAT is 14% and suppliers mix inclusive/exclusive prices; savings can be overstated | **Workaround:** ask pilot suppliers to quote ex-VAT. Product task after pilot |
 
 ### Before expanding to the GCC
 
@@ -174,7 +174,10 @@ Either way, the environment needs: automated daily database backups with one tes
 migrations applied as an explicit deploy step, and secrets separate from staging.
 
 Product prerequisites before the first real customer record: C1 shipped, C2 tested against
-real Egyptian quotes (and the GBP fallback fixed). The pilot agreement states the C4/C5
+real Egyptian quotes (and the GBP fallback replaced by review). Security and verification
+before any real data, whichever environment D-1 picks: database and admin consoles not
+exposed publicly, OS/host hardening, `pnpm test:isolation` green against that environment,
+and a full live walkthrough on it. The pilot agreement states the C4/C5
 workarounds: EGP-quoting suppliers only, prices compared ex-VAT.
 
 ### The pilot

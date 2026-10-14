@@ -56,8 +56,9 @@ set up, what is next, who does it, and what blocks what.
   fallback). **Tenancy work (RLS, tenancy migrations, JWT path) stays in-house.**
 - **Commit a checkpoint before any Codex dispatch** (Codex once wiped a clone). Run Codex with
   `< /dev/null`, in the foreground.
-- **agy needs a real `git clone`** under `~/agy-clones/`, not `git worktree add`; always
-  `--dangerously-skip-permissions`; clear a bloated `.angular` cache first.
+- **agy needs a real `git clone`** under `~/agy-clones/`, not `git worktree add`; the user has a standing
+  approval for `--dangerously-skip-permissions` on Agy dispatches (AGENTS.md requires explicit
+  approval — this is it; keep the task/file scope narrow and rerun the gates before merging); clear a bloated `.angular` cache first.
 - Check `df -h /` before dispatch (root disk nearly full).
 - Concurrent agents share this checkout — use isolation or wait; don't run git while another
   agent is working.
@@ -172,22 +173,23 @@ PR → CI → merge → link PR on the PP task. Refs are in the GTM plan's curre
 
 | ID | Gap | Task | Owner | Depends on | Done when |
 |---|---|---|---|---|---|
-| [ ] P-1 | **C1** | Tenant default/home currency setting; all web forms (PO create, guardrails, quotation review fallbacks) default to it instead of USD. Touches tenant settings — **schema/RLS part stays in-house** | Orch (spec + tenancy part), Lane (forms) | — | Merged; demo tenant set to EGP and every form opens in EGP |
+| [ ] P-1 | **C1** | Wire the **existing** `tenant.currency` (required at sign-up, returned by `/me`, already used by budget/threshold forms) into the forms that still default to USD: PO create, guardrails, quotation review fallbacks. No new setting, no schema/RLS change | Orch (spec + tenancy part), Lane (forms) | — | Merged; demo tenant set to EGP and every form opens in EGP |
 | [ ] P-2 | **C3** | Locale-aware money formatting on mobile (grouping, currency minor units, ar/en) for approval queue + request detail | Lane | — | Merged; `flutter test` green; screenshots show `EGP 12,500.00` (and Arabic locale equivalent) |
-| [ ] P-3 | **C2** | Test extraction with 5 real Egyptian quotes (incl. Arabic-Indic digits, ج.م / جنيه / LE); fix GBP fallback → tenant default (also Azure DI £/$/€-only + hard-coded USD path; landed-cost GBP default) | Orch (test), Lane (fix) | P-1 (tenant default exists) | Test results recorded on PP task; fix merged; the 5 quotes extract in EGP |
+| [ ] P-3 | **C2** | Test extraction with 5 real Egyptian quotes (incl. Arabic-Indic digits, ج.م / جنيه / LE); recognise Egyptian markers; replace the GBP fallback with **human review** for unresolved currency — never a tenant-currency default (also Azure DI £/$/€-only + hard-coded USD path; landed-cost GBP default) | Orch (test), Lane (fix) | — | Test results recorded on PP task; fix merged; q1–q3 extract as EGP; q4–q5 land flagged for review with no guessed currency |
 
 ### E — Pilot environment
 
 - [ ] **E-1 Stand up the pilot environment** per D-1. If self-hosted: Phases 1–2 of
   `docs/operations/self-hosted-deployment-plan.md` (ops only, no code). Either way: daily automated
   DB backups + **one tested restore**, migrations as an explicit deploy step, secrets separate
-  from staging. Owner: Orch + User (infra access). Depends on: D-1. Done: restore tested and
+  from staging; database and admin consoles not publicly exposed; host hardening; `pnpm test:isolation`
+  green against it; a full live walkthrough on it. Owner: Orch + User (infra access). Depends on: D-1. Done: restore tested and
   recorded; app reachable over HTTPS; Mailgun inbound reaches it. Space: PP.
 
 ### B — Backlog (after pilot / before GCC; not blocking customer #1)
 
 - [ ] **B-C4** FX / exchange rates (pilot workaround: EGP-only suppliers, EGP baseline). Lane, after pilot.
-- [ ] **B-C5** VAT model: rate + inclusive/exclusive flag (workaround: ex-VAT quotes). Lane, after pilot.
+- [ ] **B-C5** VAT: add inclusive/exclusive semantics on top of the existing `quotation_line.vat_rate` — not a second rate (workaround: ex-VAT quotes). Lane, after pilot.
 - [ ] **B-G1** One shared currency list (add QAR, KWD, BHD, OMR). Before first GCC prospect.
 - [ ] **B-G2** 3-decimal currencies (KWD/BHD/OMR) rounded to 2 in ~23 places → use currency minor units. Before GCC.
 - [ ] **B-G3** Extraction: recognise ر.س / د.إ / د.ك / ر.ق / ر.ع. Before GCC (pairs with P-3).
@@ -231,4 +233,5 @@ Append one row per session. Newest at the bottom. Include Jira keys and PR numbe
 | 2026-10-14 | Claude (orchestrator) | Spec `specs/022-home-currency-readiness/spec.md` (covers PP-1, PP-2, PP-3 fix) committed c8e2c1a and pushed on branch `022-home-currency-readiness` — **plan/tasks are being produced by a separate Claude CLI session in the main checkout; it owns the 022 PR**. PP-7: three pitch-line drafts posted (recommend C for DMs, A for one-pager). PP-3: 5 synthetic Egyptian test quotes + expected.json attached (no real quotes publicly available). D-1 = B recorded on PP-4. D-2 recommendation posted (awaiting confirmation). Omar invited. SP-1 deleted. This file pushed as PR #72. | User: confirm D-2, pick PP-7 line, merge #72. Then: G-6 draft (PP-10) once D-2 confirmed; E-1 setup (PP-4) after tier confirmation; run PP-3 fixtures before + after 022 ships |
 | 2026-10-14 | Claude (orchestrator) | D-2 confirmed. Pilot agreement drafted as a Claude Doc (EN + AR, 15 clauses, Annex A week-0 baseline): https://claude.ai/code/artifact/7f1d9481-a2a7-43a7-a0e4-b397c64e042b — linked on PP-10. Open question in the doc: liability cap. | User: review agreement, answer liability-cap comment, lawyer review before first signature |
 | 2026-10-14 | Claude (orchestrator) | All GTM docs moved to `docs/gtm/` (README indexes them + live Claude Doc / canvas links); one-pager PDF and PP-3 test fixtures added there. PP-7, PP-8, PP-9 Done. **Note for the 022 session:** `specs/022-home-currency-readiness/spec.md` still cites `docs/product/first-customer-gtm-plan.md` — update to `docs/gtm/` when convenient. | PP-10 user review; PP-11 prospect list |
+| 2026-10-14 | Claude (orchestrator) | Codex review on PR #72 verified and applied: `tenant.currency` already exists (C1/P-1 = wire it into forms, no schema); `quotation_line.vat_rate` exists (C5/B-C5 = inclusive/exclusive only); unresolved currency → human review, never a tenant default (C2/P-3); production hardening + `test:isolation` + live walkthrough before onboarding (E-1); Agy flag wording. **Spec 022 is now out of step:** US1 FR-001..FR-003 (new owner-set home currency) are unnecessary, and FR-011 (fallback to home currency) contradicts the ingestion rule — the 022 session must revise before planning further. | 022 session revises spec; merge #72 |
 | | | | |
