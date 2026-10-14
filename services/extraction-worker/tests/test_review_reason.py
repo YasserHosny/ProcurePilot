@@ -38,3 +38,14 @@ def test_review_reason_not_triggered_when_header_has_data_but_no_lines() -> None
         stated_total=None,
     )
     assert _review_reason(result, "not_applicable", 0.75, _NO_MATCH) is None
+
+
+def test_currency_fallback_uses_existing_review_reason_field() -> None:
+    result = ExtractionResult(
+        method="structured_parse",
+        model_version="test",
+        header={"currency": ExtractedField("currency", "EGP", 0.5)},
+        lines=[],
+    )
+
+    assert _review_reason(result, "not_applicable", 0.85, _NO_MATCH) == "currency_fallback"

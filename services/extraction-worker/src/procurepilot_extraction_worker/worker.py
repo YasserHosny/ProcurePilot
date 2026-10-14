@@ -45,9 +45,15 @@ def process_extraction_job(payload: dict[str, str]) -> None:
     # "_pg3_0" already exists) the moment a second job runs.
     with psycopg.connect(settings.database_url, prepare_threshold=None) as conn:
         document = _document(conn, tenant_id, document_id)
+        fallback_currency = _tenant_currency(conn, tenant_id)
         _mark_running(conn, job_id)
         try:
-            result = _extract(settings, document_id=document_id, document=document)
+            result = _extract(
+                settings,
+                document_id=document_id,
+                document=document,
+                fallback_currency=fallback_currency,
+            )
             arithmetic = validate_arithmetic(result)
             _persist_result(conn, tenant_id, quotation_id, result, arithmetic.status)
             supplier_match = _match_supplier(conn, tenant_id, result.header)
@@ -102,6 +108,7 @@ def _extract(
     *,
     document_id: UUID,
     document: dict[str, object],
+    fallback_currency: str | None = None,
 ) -> ExtractionResult:
     mime_type = str(document["mime_type"])
     storage_path = str(document["storage_path"])
@@ -111,7 +118,9 @@ def _extract(
 
         logger.info("using structured parser", extra={"mime_type": mime_type})
         content = _download_storage_object(settings, bucket=bucket, path=storage_path)
-        return parse_structured_content(content, mime_type=mime_type)
+        return parse_structured_content(
+            content, mime_type=mime_type, fallback_currency=fallback_currency
+        )
     if settings.provider_mode == "stub":
         logger.info("using stub provider")
         return FakeExtractionProvider().extract(
@@ -126,13 +135,17 @@ def _extract(
     )
     if settings.provider_mode == "azure_di":
         logger.info("using azure_di provider")
-        return AzureDocumentIntelligenceProvider(settings).extract(**common)
+        return AzureDocumentIntelligenceProvider(settings).extract(
+            **common, fallback_currency=fallback_currency
+        )
     logger.info("using bedrock provider")
     try:
         return BedrockExtractionProvider(settings).extract(**common)
     except Exception:
         logger.warning("bedrock failed, falling back to azure_di", exc_info=True)
-        return AzureDocumentIntelligenceProvider(settings).extract(**common)
+        return AzureDocumentIntelligenceProvider(settings).extract(
+            **common, fallback_currency=fallback_currency
+        )
 
 
 def _persist_result(
@@ -339,6 +352,9 @@ def _review_reason(
     # a real PDF quote extracted to zero lines/currency/total with no review task raised.
     if not result.lines and not result.header:
         return "read_failure"
+    currency = result.header.get("currency")
+    if currency is not None and currency.confidence < threshold:
+        return "currency_fallback"
     if arithmetic_status == "mismatch":
         return "arithmetic_mismatch"
     if low_confidence_fields(result, threshold):
@@ -346,6 +362,13 @@ def _review_reason(
     if supplier_match.had_candidates and supplier_match.supplier_id is None:
         return "no_supplier_match"
     return None
+
+
+def _tenant_currency(conn: psycopg.Connection, tenant_id: UUID) -> str | None:
+    with conn.cursor() as cur:
+        cur.execute("select currency from tenant where id = %s", (tenant_id,))
+        row = cur.fetchone()
+    return str(row[0]).upper() if row and row[0] else None
 
 
 def _upsert_review_task(
