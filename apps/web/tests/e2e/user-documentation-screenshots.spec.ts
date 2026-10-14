@@ -151,8 +151,19 @@ test.describe('User documentation screenshots', () => {
         `/quotations/${fixtures.quotationId}/review`,
         '08c-quotation-review-lines.jpg',
         async () => {
-          await expect(page.locator('.lines-card')).toBeVisible();
-          await page.locator('.lines-card').first().scrollIntoViewIfNeeded();
+          await expect(page.locator('.lines-card').first()).toBeVisible();
+          // Let the source-document panel settle (its height changes when the PDF viewer
+          // resolves or errors), then always align the lines card to the top. scrollIntoViewIfNeeded
+          // only scrolled when the card happened to be off-screen, so the capture flipped between
+          // scroll positions from run to run.
+          await page.waitForLoadState('networkidle');
+          await page
+            .locator('.lines-card')
+            .first()
+            .evaluate((el) => el.scrollIntoView({ block: 'start' }));
+          await page.evaluate(
+            () => new Promise<void>((done) => requestAnimationFrame(() => done())),
+          );
         },
       );
     }
