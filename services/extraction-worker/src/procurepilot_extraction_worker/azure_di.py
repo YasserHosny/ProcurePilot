@@ -33,7 +33,6 @@ class AzureDocumentIntelligenceProvider:
         mime_type: str,
         storage_path: str,
         document_bytes: bytes | None = None,
-        fallback_currency: str | None = None,
     ) -> ExtractionResult:
         if document_bytes is None:
             raise ExtractionProviderError("document_bytes required for Azure DI extraction")
@@ -58,12 +57,12 @@ class AzureDocumentIntelligenceProvider:
             raise ExtractionProviderError(f"Azure DI analysis failed: {exc}") from exc
 
         return _parse_invoice_result(
-            result, self.model_version, fallback_currency=fallback_currency
+            result, self.model_version
         )
 
 
 def _parse_invoice_result(
-    result: Any, model_version: str, *, fallback_currency: str | None = None
+    result: Any, model_version: str
 ) -> ExtractionResult:
     header: dict[str, ExtractedField] = {}
     lines: list[ExtractedLine] = []
@@ -71,7 +70,7 @@ def _parse_invoice_result(
 
     documents = getattr(result, "documents", None) or []
     if not documents:
-        return _fallback_from_tables(result, model_version, fallback_currency=fallback_currency)
+        return _fallback_from_tables(result, model_version)
 
     doc = documents[0]
     fields = doc.fields or {}
@@ -80,11 +79,9 @@ def _parse_invoice_result(
     if vendor:
         header["supplier_name"] = _make_field("supplier_name", vendor, fields, "VendorName")
 
-    inferred_currency, currency_conflict = _infer_currency_state(fields)
-    currency = inferred_currency or fallback_currency
-    currency_confidence = 0.50 if currency and (inferred_currency is None or currency_conflict) else 0.90
+    currency = _infer_currency_state(fields)[0]
     if currency is not None:
-        header["currency"] = ExtractedField("currency", currency, currency_confidence, 1, None)
+        header["currency"] = ExtractedField("currency", currency, 0.90, 1, None)
 
     invoice_date = _content(fields, "InvoiceDate")
     if invoice_date:
@@ -129,7 +126,7 @@ def _parse_invoice_result(
 
 
 def _fallback_from_tables(
-    result: Any, model_version: str, *, fallback_currency: str | None = None
+    result: Any, model_version: str
 ) -> ExtractionResult:
     tables = getattr(result, "tables", None) or []
     lines: list[ExtractedLine] = []
@@ -139,16 +136,8 @@ def _fallback_from_tables(
         for cell in (getattr(table, "cells", None) or [])
     )
     detected_currency = detect_currency(marker_text)
-    currency = detected_currency or fallback_currency
-    header = (
-        {
-            "currency": ExtractedField(
-                "currency", currency, 0.50 if not detected_currency else 0.90, 1, None
-            )
-        }
-        if currency
-        else {}
-    )
+    currency = detected_currency
+    header = {"currency": ExtractedField("currency", currency, 0.90, 1, None)} if currency else {}
     for table in tables:
         cells = table.cells or []
         headers_row = [c for c in cells if c.row_index == 0]

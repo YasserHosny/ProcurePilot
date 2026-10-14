@@ -11,19 +11,19 @@ def test_arabic_decimal_is_preserved_in_total_quantity_and_unit_price() -> None:
             "UnitPrice": NS(content="١٢٥٠٫٥٠", confidence=0.9),
         })]),
     }
-    result = _parse_invoice_result(NS(documents=[NS(fields=fields)]), "test", fallback_currency="EGP")
+    result = _parse_invoice_result(NS(documents=[NS(fields=fields)]), "test")
     assert result.stated_total.value["amount"] == "1250.50"
     assert result.lines[0].fields["quantity"].value == "1250.50"
     assert result.lines[0].fields["unit_price"].value["amount"] == "1250.50"
     assert _clean_number("1,234") is None
 
 
-def test_conflicting_currency_markers_keep_fallback_low_confidence() -> None:
+def test_conflicting_currency_markers_store_no_currency() -> None:
     fields = {
         "InvoiceTotal": NS(content="$10", confidence=0.9),
         "AmountDue": NS(content="ج.م 10", confidence=0.9),
     }
-    result = _parse_invoice_result(NS(documents=[NS(fields=fields)]), "test", fallback_currency="EGP")
-    assert result.header["currency"].value == "EGP"
-    assert result.header["currency"].confidence == 0.5
+    result = _parse_invoice_result(NS(documents=[NS(fields=fields)]), "test")
+    assert "currency" not in result.header
+    assert result.stated_total.value["currency"] is None
 

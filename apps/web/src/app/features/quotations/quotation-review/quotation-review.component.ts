@@ -239,7 +239,7 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
 
     for (const fe of q.field_extractions) {
       const conf = parseFloat(fe.confidence);
-      if (conf < 0.85 || !fe.extracted_value || (fe.field_name === 'currency' && fe.review_reason === 'currency_fallback')) {
+      if (conf < 0.85 || !fe.extracted_value) {
         flagged.push({
           id: fe.id,
           entityType: fe.entity_type,
@@ -609,7 +609,7 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
   }
 
   isCurrencyFallback(fe: FieldExtraction | undefined): boolean {
-    return !!fe && fe.field_name === 'currency' && (fe.review_reason === 'currency_fallback' || parseFloat(fe.confidence) < 0.85);
+    return !!fe && fe.field_name === 'currency' && parseFloat(fe.confidence) < 0.85;
   }
 
   normalizeMoneyInput(value: string): string {

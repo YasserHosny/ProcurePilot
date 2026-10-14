@@ -29,19 +29,6 @@ def test_csv_structured_parser_rejects_ambiguous_decimal() -> None:
         raise AssertionError("ambiguous decimal should be refused into review")
 
 
-def test_csv_currency_fallback_is_low_confidence_and_used_for_money_values() -> None:
-    content = b"description,quantity,unit_price\nTomatoes,1,10.00\n"
-
-    result = parse_structured_content(content, mime_type="text/csv", fallback_currency="EGP")
-
-    assert result.header["currency"].value == "EGP"
-    assert result.header["currency"].confidence < 0.85
-    assert result.lines[0].fields["unit_price"].value == {
-        "amount": "10.00",
-        "currency": "EGP",
-    }
-
-
 def test_csv_without_currency_or_fallback_does_not_invent_one() -> None:
     content = b"description,quantity,unit_price\nTomatoes,1,10.00\n"
 

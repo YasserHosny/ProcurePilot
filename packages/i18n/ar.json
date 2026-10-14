@@ -742,7 +742,8 @@
         "arithmetic_mismatch": "عدم تطابق حسابي",
         "read_failure": "تعذر قراءة المستند",
         "review_required": "تتطلب مراجعة بشرية",
-        "no_supplier_match": "لا يوجد تطابق مورد"
+        "no_supplier_match": "لا يوجد تطابق مورد",
+        "currency_unresolved": "العملة غير محددة"
       },
       "columns": {
         "id": "معرف عرض السعر",

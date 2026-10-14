@@ -24,7 +24,7 @@
 
 - [x] T010 [P] [US2] New `currency.py` in extraction-worker: marker detection (`ج.م`, `جنيه`, `جنيه مصري`, `LE`, `L.E.`, `EGP`; adjacent to a number, word-boundary safe; mixed markers → unknown) + Arabic-Indic digit/`٫`/`٬` → exact `Decimal`. **Tests first**, incl. "TABLE"/"Le Pain" negatives and negative amounts
 - [x] T011 [US2] Worker: read `tenant.currency` by `tenant_id` on its existing connection; pass as `fallback_currency` into providers/parsers — `worker.py`
-- [x] T012 [US2] `structured_parse.py:67` and `azure_di.py:77,153,290-293`: use T010 detection, tenant fallback, remove hard-coded GBP/USD confident values; defaulted currency stored low-confidence with reason `currency_fallback` (reuse existing review marker; confirm threshold constant first)
+- [x] T012 [US2] `structured_parse.py:67` and `azure_di.py:77,153,290-293`: use T010 detection, tenant fallback, remove hard-coded GBP/USD confident values; unresolved currency stores none and routes to review as `currency_unresolved`; tenant currency kept only as `suggested_currency` (amended 2026-10-14)
 - [x] T013 [P] [US2] Landed cost: `service.py:89,99,104` GBP → line currency → quote currency → tenant currency → report missing; test all four branches
 - [x] T014 [US2] Quotation review UI shows the currency-fallback flag and clears it on confirm/edit (spec, en + ar)
 - [ ] T015 [US2] **PP-3 evidence (orchestrator)**: run 5 real/representative Egyptian quotes (incl. Arabic-Indic digits, one unmarked) through extraction; record results on PP-3 and in `specs/022-.../research.md`. SC-002/003

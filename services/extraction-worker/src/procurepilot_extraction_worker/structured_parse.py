@@ -20,32 +20,32 @@ def is_structured_mime_type(mime_type: str) -> bool:
 
 
 def parse_structured_content(
-    content: bytes, *, mime_type: str, fallback_currency: str | None = None
+    content: bytes, *, mime_type: str
 ) -> ExtractionResult:
     if mime_type in XLSX_MIME_TYPES:
-        return _parse_xlsx(content, fallback_currency=fallback_currency)
+        return _parse_xlsx(content)
     text = content.decode("utf-8-sig")
-    return _parse_rows(csv.DictReader(io.StringIO(text)), fallback_currency=fallback_currency)
+    return _parse_rows(csv.DictReader(io.StringIO(text)))
 
 
-def _parse_xlsx(content: bytes, *, fallback_currency: str | None = None) -> ExtractionResult:
+def _parse_xlsx(content: bytes) -> ExtractionResult:
     from openpyxl import load_workbook
 
     workbook = load_workbook(io.BytesIO(content), read_only=True, data_only=True)
     sheet = workbook.active
     rows = list(sheet.iter_rows(values_only=True))
     if not rows:
-        return _parse_rows([], fallback_currency=fallback_currency)
+        return _parse_rows([])
     headers = [str(value or "").strip() for value in rows[0]]
     dict_rows = [
         {headers[index]: value for index, value in enumerate(row) if index < len(headers)}
         for row in rows[1:]
     ]
-    return _parse_rows(dict_rows, fallback_currency=fallback_currency)
+    return _parse_rows(dict_rows)
 
 
 def _parse_rows(
-    rows: Iterable[dict[str, object]], *, fallback_currency: str | None = None
+    rows: Iterable[dict[str, object]]
 ) -> ExtractionResult:
     rows = list(rows)
     header: dict[str, ExtractedField] = {}
@@ -80,11 +80,11 @@ def _parse_rows(
         currency = (
             explicit_currency
             if explicit_currency and re.fullmatch(r"[A-Z]{3}", explicit_currency)
-            else detected_currency or fallback_currency
+            else detected_currency
         )
-        defaulted = not explicit_currency and detected_currency is None and currency is not None
         if currency is not None and "currency" not in header:
-            header["currency"] = _field("currency", currency, confidence=0.5 if defaulted else 1.0)
+            header["currency"] = _field("currency", currency)
+
         for name in ("supplier_name", "issue_date", "expiry_date"):
             value = normalised.get(name)
             if value not in {None, ""} and name not in header:

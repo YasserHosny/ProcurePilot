@@ -59,10 +59,10 @@ def test_pdf_uses_document_content_block() -> None:
     assert document_block["document"]["format"] == "pdf"
 
 
-def test_bedrock_guessed_currency_uses_tenant_fallback() -> None:
+def test_bedrock_guessed_currency_is_discarded() -> None:
     mock_client = MagicMock()
     mock_client.converse.return_value = {
-        "output": {"message": {"content": [{"text": '{"header":{"currency":"USD"},"lines":[]}'}]}},
+        "output": {"message": {"content": [{"text": '{"header":{"currency":"USD"},"lines":[],"stated_total":{"amount":"1250","currency":"USD"}}'}]}},
         "usage": {},
     }
     mock_session = MagicMock()
@@ -70,7 +70,7 @@ def test_bedrock_guessed_currency_uses_tenant_fallback() -> None:
     with patch("procurepilot_extraction_worker.bedrock.boto3.Session", return_value=mock_session):
         result = BedrockExtractionProvider(settings=_settings()).extract(
             document_id="doc", mime_type="application/pdf", storage_path="path",
-            document_bytes=b"quotation total 1250", fallback_currency="EGP",
+            document_bytes=b"quotation total 1250",
         )
-    assert result.header["currency"].value == "EGP"
-    assert result.header["currency"].confidence == 0.5
+    assert "currency" not in result.header
+    assert result.stated_total.value == {"amount": "1250", "currency": None}

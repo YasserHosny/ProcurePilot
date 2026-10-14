@@ -423,7 +423,8 @@ export type ReviewTaskReason =
   | 'arithmetic_mismatch'
   | 'read_failure'
   | 'review_required'
-  | 'no_supplier_match';
+  | 'no_supplier_match'
+  | 'currency_unresolved';
 
 export interface ReviewTask {
   readonly id: string;

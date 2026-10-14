@@ -210,7 +210,7 @@ anywhere in `specs/` right now — the next feature has not been scoped.
 ## Recent Changes
 - 2026-10-14: 022-home-currency-readiness (PR #73) -- the existing `tenant.currency` is now the home
   currency: web forms default to it instead of USD, `PATCH /tenant` accepts and audits it, extraction
-  recognises EGP markers/Arabic-Indic digits and falls back to it flagged `currency_fallback` (no more
+  recognises EGP markers/Arabic-Indic digits and stores no currency when none is evidenced and routes to review as `currency_unresolved` with the home currency only as a suggestion (no more
   silent GBP), landed cost no longer defaults to GBP, mobile approval screens format money per locale.
 - 2026-10-03/04: Added a `docs-screenshots` CI job (`.github/workflows/docs-screenshots.yml`,
   PR #70) that regenerates `docs/user/screenshots/` against a real local stack on frontend/i18n

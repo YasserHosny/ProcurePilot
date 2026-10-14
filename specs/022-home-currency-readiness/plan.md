@@ -39,7 +39,7 @@ carve-out is not triggered; the audit write is the only server-side change).
 2. **FR-002** — owner-only edit already enforced (`require_role(owner)`); non-owner read already works. Needs a settings UI + test only.
 3. **FR-003 audit** — `PATCH /tenant` does **not** currently audit (verify in T-task). Add an `audit_event` with old/new currency.
 4. **Currency validation** — `TenantUpdate` should restrict to the supported list (`supported_currency`), not any 3 letters.
-5. **US2 AS4 ("no home currency")** — replaced by: fallback uses `tenant.currency`; if the lookup fails, flag and store no confident currency.
+5. **US2 AS4 ("no home currency")** — replaced by: no fallback is stored (amended 2026-10-14): an unresolved currency stores nothing and routes to review as `currency_unresolved`; `tenant.currency` is only a reviewer suggestion.
 
 ## Project Structure
 

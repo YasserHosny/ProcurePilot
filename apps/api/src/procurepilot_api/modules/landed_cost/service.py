@@ -80,9 +80,8 @@ class LandedCostService:
         quantity = Decimal(str(line.get("quantity") or "1"))
         base_quantity = Decimal(str(pack["base_quantity"]))
         quote_currency = _quotation_currency(client, UUID(str(line["quotation_id"])))
-        tenant_currency = _tenant_currency(client, member.tenant_id)
         unit_currency = _required_currency(
-            _resolve_currency(line.get("unit_price_currency"), quote_currency, tenant_currency)
+            _resolve_currency(line.get("unit_price_currency"), quote_currency)
         )
         result = compute_landed_cost(
             LandedCostInputs(
@@ -221,13 +220,10 @@ def _line_row(client: object, line_id: UUID) -> dict[str, object]:
     return _one_row(response.data, resource="quotation_line")
 
 
-def _resolve_currency(
-    line_currency: object, quote_currency: object, tenant_currency: object
-) -> str | None:
-    return next(
-        (str(value).upper() for value in (line_currency, quote_currency, tenant_currency) if value),
-        None,
-    )
+def _resolve_currency(line_currency: object, quote_currency: object) -> str | None:
+    # The tenant's home currency is deliberately not a step here: a quote whose currency was
+    # never established is reported missing, not costed in a guessed currency (spec 022 FR-011).
+    return next((str(value).upper() for value in (line_currency, quote_currency) if value), None)
 
 
 def _required_currency(currency: str | None) -> str:
@@ -241,18 +237,6 @@ def _quotation_currency(client: object, quotation_id: UUID) -> str | None:
         client.table("quotation")
         .select("currency")
         .eq("id", str(quotation_id))
-        .limit(1)
-        .execute()
-    )
-    rows = getattr(response, "data", None) or []
-    return str(rows[0]["currency"]).upper() if rows and rows[0].get("currency") else None
-
-
-def _tenant_currency(client: object, tenant_id: UUID) -> str | None:
-    response = (
-        client.table("tenant")
-        .select("currency")
-        .eq("id", str(tenant_id))
         .limit(1)
         .execute()
     )

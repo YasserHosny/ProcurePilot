@@ -742,7 +742,8 @@
         "arithmetic_mismatch": "Arithmetic Mismatch",
         "read_failure": "Read Failure",
         "review_required": "Review Required",
-        "no_supplier_match": "No Supplier Match"
+        "no_supplier_match": "No Supplier Match",
+        "currency_unresolved": "Currency Not Found"
       },
       "columns": {
         "id": "Quotation ID",

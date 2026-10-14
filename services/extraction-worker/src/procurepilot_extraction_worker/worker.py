@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from dataclasses import replace
 from datetime import UTC, datetime
 from typing import NamedTuple
 from urllib.error import URLError
@@ -45,15 +46,14 @@ def process_extraction_job(payload: dict[str, str]) -> None:
     # "_pg3_0" already exists) the moment a second job runs.
     with psycopg.connect(settings.database_url, prepare_threshold=None) as conn:
         document = _document(conn, tenant_id, document_id)
-        fallback_currency = _tenant_currency(conn, tenant_id)
         _mark_running(conn, job_id)
         try:
             result = _extract(
                 settings,
                 document_id=document_id,
                 document=document,
-                fallback_currency=fallback_currency,
             )
+            result = _with_currency_suggestion(result, _tenant_currency(conn, tenant_id))
             arithmetic = validate_arithmetic(result)
             _persist_result(conn, tenant_id, quotation_id, result, arithmetic.status)
             supplier_match = _match_supplier(conn, tenant_id, result.header)
@@ -108,7 +108,6 @@ def _extract(
     *,
     document_id: UUID,
     document: dict[str, object],
-    fallback_currency: str | None = None,
 ) -> ExtractionResult:
     mime_type = str(document["mime_type"])
     storage_path = str(document["storage_path"])
@@ -118,9 +117,7 @@ def _extract(
 
         logger.info("using structured parser", extra={"mime_type": mime_type})
         content = _download_storage_object(settings, bucket=bucket, path=storage_path)
-        return parse_structured_content(
-            content, mime_type=mime_type, fallback_currency=fallback_currency
-        )
+        return parse_structured_content(content, mime_type=mime_type)
     if settings.provider_mode == "stub":
         logger.info("using stub provider")
         return FakeExtractionProvider().extract(
@@ -135,19 +132,13 @@ def _extract(
     )
     if settings.provider_mode == "azure_di":
         logger.info("using azure_di provider")
-        return AzureDocumentIntelligenceProvider(settings).extract(
-            **common, fallback_currency=fallback_currency
-        )
+        return AzureDocumentIntelligenceProvider(settings).extract(**common)
     logger.info("using bedrock provider")
     try:
-        return BedrockExtractionProvider(settings).extract(
-            **common, fallback_currency=fallback_currency
-        )
+        return BedrockExtractionProvider(settings).extract(**common)
     except Exception:
         logger.warning("bedrock failed, falling back to azure_di", exc_info=True)
-        return AzureDocumentIntelligenceProvider(settings).extract(
-            **common, fallback_currency=fallback_currency
-        )
+        return AzureDocumentIntelligenceProvider(settings).extract(**common)
 
 
 def _persist_result(
@@ -220,6 +211,16 @@ def _persist_result(
                 "quotation",
                 quotation_id,
                 result.stated_total,
+                result,
+            )
+        if result.suggested_currency:
+            _insert_field(
+                cur,
+                tenant_id,
+                quotation_id,
+                "quotation",
+                quotation_id,
+                ExtractedField("suggested_currency", result.suggested_currency, 0.0),
                 result,
             )
         if arithmetic_status == "mismatch":
@@ -356,9 +357,10 @@ def _review_reason(
     if not result.lines and not result.header:
         return "read_failure"
     currency = result.header.get("currency")
-    if currency is not None and currency.confidence < threshold:
-        return "low_confidence"
-    if _has_uncurried_money(result):
+    if currency is None or _has_uncurried_money(result):
+        # No evidenced currency: nothing is guessed, a human supplies it (FR-011).
+        return "currency_unresolved"
+    if currency.confidence < threshold:
         return "low_confidence"
     if arithmetic_status == "mismatch":
         return "arithmetic_mismatch"
@@ -367,6 +369,12 @@ def _review_reason(
     if supplier_match.had_candidates and supplier_match.supplier_id is None:
         return "no_supplier_match"
     return None
+
+
+def _with_currency_suggestion(result: ExtractionResult, tenant_currency: str | None) -> ExtractionResult:
+    if "currency" in result.header and not _has_uncurried_money(result):
+        return result
+    return replace(result, suggested_currency=tenant_currency)
 
 
 def _tenant_currency(conn: psycopg.Connection, tenant_id: UUID) -> str | None:

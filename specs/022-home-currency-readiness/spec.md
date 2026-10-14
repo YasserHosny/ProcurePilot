@@ -67,8 +67,8 @@ product's core claim. Real Egyptian quotes are the pilot's daily input.
 
 **Independent Test**: submit sample quotes (EGP marked with ج.م / جنيه / LE / L.E. / EGP; one
 with Arabic-Indic digits; one with no currency marker) to a tenant with home currency EGP;
-confirm the first set extract as EGP with correct amounts, and the unmarked one extracts as EGP
-with its currency flagged for review.
+confirm the first set extract as EGP with correct amounts, and the unmarked one stores no currency
+and is routed to review (`currency_unresolved`) with EGP offered as a suggestion.
 
 **Acceptance Scenarios**:
 
@@ -77,13 +77,14 @@ with its currency flagged for review.
 2. **Given** a quote with amounts in Arabic-Indic digits (e.g. `١٢٥٠٫٥٠`), **When** it is
    extracted, **Then** the stored amounts equal the Western-digit values (1250.50).
 3. **Given** a quote with no recognisable currency, **When** it is extracted for a tenant whose
-   home currency is EGP, **Then** the currency is EGP **and** the currency field is marked as
-   needing review in quotation review.
-4. **Given** a quote with no recognisable currency and the tenant currency cannot be read,
-   **When** it is extracted, **Then** the currency is flagged for review and no hard-coded
-   currency is presented as confident.
+   home currency is EGP, **Then** **no currency is stored**, the quotation is routed to review with
+   reason `currency_unresolved`, and EGP is offered to the reviewer only as a suggestion.
+4. **Given** a quote with mixed currency markers (e.g. USD and EGP lines), **When** it is
+   extracted, **Then** the same no-currency, `currency_unresolved` outcome applies — mixed markers
+   are never silently resolved.
 5. **Given** a landed-cost calculation over a line missing its currency, **When** it runs, **Then**
-   it uses the quote's currency or the tenant home currency — never a hard-coded GBP.
+   it uses the quote's currency, else reports the currency as missing — never the tenant currency
+   and never a hard-coded GBP.
 
 ---
 
@@ -151,13 +152,16 @@ KWD, BHD and OMR, in English and Arabic; confirm grouping, decimal places and cu
   `LE`, `L.E.`, `EGP` (as currency markers adjacent to amounts, not inside words).
 - **FR-010**: Extraction MUST convert Arabic-Indic digits and Arabic decimal/thousands separators
   in amounts to their exact decimal values.
-- **FR-011**: When extraction cannot determine a quote's currency, it MUST use the tenant home
-  currency if set, and MUST mark the currency as a fallback needing human review in quotation
-  review.
+- **FR-011**: When extraction cannot determine a quote's currency (none found, or mixed
+  markers), it MUST store **no currency** — not the tenant home currency, not GBP/USD — and MUST
+  route the quotation to review with reason `currency_unresolved`. The tenant home currency MAY be
+  recorded only as a *suggestion* shown to the reviewer; it is never stored as the quote's
+  currency until a human confirms it. (Amended 2026-10-14 after review: silently defaulting to the
+  tenant currency would misprice a foreign-currency quote.)
 - **FR-012**: No extraction path MUST store GBP, USD, or any other hard-coded currency as a
   confident value when the currency was not actually found in the document.
 - **FR-013**: Landed-cost calculations MUST NOT default to a hard-coded currency; a missing line
-  currency MUST resolve to the quote's currency, else the tenant home currency, else be reported as
+  currency MUST resolve to the quote's currency, else be reported as
   missing.
 
 **Mobile display (US3)**
@@ -172,9 +176,11 @@ KWD, BHD and OMR, in English and Arabic; confirm grouping, decimal places and cu
 ### Key Entities
 
 - **Tenant home currency**: the existing `tenant.currency`; set at signup, changed by an owner; used only as a
-  default for new money entries and as the extraction fallback. Changes are audited.
-- **Currency fallback flag**: a marker on an extracted quote's currency meaning "not found in the
-  document; defaulted — please confirm". Cleared when a reviewer confirms or corrects it.
+  default for new money entries and as the reviewer's currency *suggestion* in extraction review (never
+  stored as an extracted quote's currency). Changes are audited.
+- **Unresolved currency**: an extracted quote whose currency was not evidenced by the document. It
+  has no stored currency, a `currency_unresolved` review task, and a `suggested_currency` extraction
+  field (tenant home currency, confidence 0) for the reviewer. Resolved when a reviewer sets it.
 
 ## Success Criteria *(mandatory)*
 

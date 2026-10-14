@@ -1,7 +1,13 @@
 from __future__ import annotations
 
 from procurepilot_extraction_worker.models import ExtractedField, ExtractedLine, ExtractionResult
-from procurepilot_extraction_worker.worker import SupplierMatch, _money_amount, _review_reason
+from procurepilot_extraction_worker.structured_parse import parse_structured_content
+from procurepilot_extraction_worker.worker import (
+    SupplierMatch,
+    _money_amount,
+    _review_reason,
+    _with_currency_suggestion,
+)
 
 _NO_MATCH = SupplierMatch(supplier_id=None, confidence=None, had_candidates=False)
 
@@ -40,7 +46,7 @@ def test_review_reason_not_triggered_when_header_has_data_but_no_lines() -> None
     assert _review_reason(result, "not_applicable", 0.75, _NO_MATCH) is None
 
 
-def test_currency_fallback_uses_low_confidence_review_reason() -> None:
+def test_low_confidence_currency_uses_low_confidence_review_reason() -> None:
     result = ExtractionResult(
         method="structured_parse",
         model_version="test",
@@ -49,6 +55,30 @@ def test_currency_fallback_uses_low_confidence_review_reason() -> None:
     )
 
     assert _review_reason(result, "not_applicable", 0.85, _NO_MATCH) == "low_confidence"
+
+
+def test_unresolved_currency_is_routed_to_review_without_a_guess() -> None:
+    result = parse_structured_content(
+        b"description,quantity,unit_price\nTomatoes,1,10.00\n", mime_type="text/csv"
+    )
+
+    assert "currency" not in result.header
+    assert result.lines[0].fields["unit_price"].value == {"amount": "10.00", "currency": None}
+    assert _review_reason(result, "not_applicable", 0.75, _NO_MATCH) == "currency_unresolved"
+    suggested = _with_currency_suggestion(result, "EGP")
+    assert suggested.suggested_currency == "EGP"
+    assert "currency" not in suggested.header
+
+
+def test_resolved_currency_gets_no_suggestion() -> None:
+    result = ExtractionResult(
+        method="structured_parse",
+        model_version="test",
+        header={"currency": ExtractedField("currency", "EGP", 1.0)},
+        lines=[],
+    )
+
+    assert _with_currency_suggestion(result, "USD").suggested_currency is None
 
 
 def test_uncurried_money_is_routed_to_review_and_not_persisted_as_amount() -> None:
@@ -69,4 +99,4 @@ def test_uncurried_money_is_routed_to_review_and_not_persisted_as_amount() -> No
     )
 
     assert _money_amount(line, "unit_price") is None
-    assert _review_reason(result, "not_applicable", 0.85, _NO_MATCH) == "low_confidence"
+    assert _review_reason(result, "not_applicable", 0.85, _NO_MATCH) == "currency_unresolved"
