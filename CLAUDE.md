@@ -1,6 +1,6 @@
 # ProcurePilot — Development Guidelines
 
-Last updated: 2026-10-03 · Active feature: none mid-build. Every numbered spec, `001` through
+Last updated: 2026-10-14 · Active feature: none mid-build. Every numbered spec, `001` through
 `021`, has shipped to `main` — including `018-forecasting-reorder` and
 `019-supplier-risk-negotiation`, both already fully built and merged (as "R4.0" and "R4.1" in
 commit history) despite their `specs/` folders lagging behind: `018` had no `tasks.md` and `019`
@@ -204,6 +204,8 @@ anywhere in `specs/` right now — the next feature has not been scoped.
 - Supabase Postgres 17 (unchanged). New tables: `rfq`, `rfq_recipient`, `rfq_response`,
   `auto_preparation_guardrail`, `auto_preparation_event`; new column `supplier.contact_email`
   (021-rfq-sourcing-autonomy)
+- Python 3.12 (`apps/api`, `services/extraction-worker`), TypeScript 5.6 / Angular 19 (`apps/web`), Dart/Flutter (`apps/mobile`) + existing only. Mobile: add `intl` to `pubspec.yaml` (the one new dependency; check it is already transitively present via `flutter_localizations` before adding). (022-home-currency-readiness)
+- Supabase Postgres 17, unchanged. Reuses `tenant.currency`; audit via existing `record_audit_event`. (022-home-currency-readiness)
 
 ## Recent Changes
 - 2026-10-03/04: Added a `docs-screenshots` CI job (`.github/workflows/docs-screenshots.yml`,

@@ -2,7 +2,7 @@
 
 **Feature Branch**: `022-home-currency-readiness`
 **Created**: 2026-10-14
-**Status**: Draft
+**Status**: Draft (amended 2026-10-14 after planning research: the home currency is the existing `tenant.currency`; see plan.md)
 **Tracking**: Jira PP-1 (gap C1), PP-2 (gap C3), PP-3 fix part (gap C2) — see
 `docs/product/first-customer-gtm-plan.md` § "Currency gaps — Egypt" and
 `docs/product/gtm-execution-plan.md` (P-1..P-3)
@@ -50,8 +50,8 @@ delivery fee); confirm EGP is pre-selected; change one document to USD and confi
    EGP, **Then** that document stays in USD (no retroactive change to stored amounts).
 5. **Given** a member who is not an owner, **When** they view organisation settings, **Then** they
    can see the home currency but cannot change it.
-6. **Given** an existing tenant that never set a home currency, **When** any money form opens,
-   **Then** it behaves as today (current default) and nothing breaks.
+6. **Given** the tenant record is not yet loaded in the session, **When** a money form opens,
+   **Then** it falls back to today's default and nothing breaks.
 
 ---
 
@@ -79,7 +79,7 @@ with its currency flagged for review.
 3. **Given** a quote with no recognisable currency, **When** it is extracted for a tenant whose
    home currency is EGP, **Then** the currency is EGP **and** the currency field is marked as
    needing review in quotation review.
-4. **Given** a quote with no recognisable currency for a tenant with **no** home currency set,
+4. **Given** a quote with no recognisable currency and the tenant currency cannot be read,
    **When** it is extracted, **Then** the currency is flagged for review and no hard-coded
    currency is presented as confident.
 5. **Given** a landed-cost calculation over a line missing its currency, **When** it runs, **Then**
@@ -113,7 +113,7 @@ KWD, BHD and OMR, in English and Arabic; confirm grouping, decimal places and cu
 ### Edge Cases
 
 - Home currency changed after documents exist → existing documents keep their own currency (US1-4).
-- Tenant with no home currency (all existing tenants on release) → current behaviour, no failure.
+- Every tenant already has a currency (`tenant.currency`, set at signup) → no migration and no "unset" state.
 - A quote mixes markers (e.g. `$` on one line, `ج.م` on the total) → treated as unclear: flagged
   for review, not silently resolved.
 - `LE` appearing inside ordinary words or product names must not be read as a currency marker.
@@ -128,8 +128,8 @@ KWD, BHD and OMR, in English and Arabic; confirm grouping, decimal places and cu
 
 **Home currency (US1)**
 
-- **FR-001**: Each tenant MUST be able to have one home currency, chosen from the currencies the
-  product already supports.
+- **FR-001**: The tenant's existing currency (`tenant.currency`) IS the home currency; it MUST be
+  restricted to the currencies the product already supports (no new storage).
 - **FR-002**: Only an owner MUST be able to set or change the home currency; every member MUST be
   able to see it.
 - **FR-003**: Setting or changing the home currency MUST be recorded in the audit trail with the
@@ -141,7 +141,7 @@ KWD, BHD and OMR, in English and Arabic; confirm grouping, decimal places and cu
 - **FR-005**: A user MUST still be able to choose a different currency per document; the home
   currency is a default, never a constraint.
 - **FR-006**: Changing the home currency MUST NOT change any stored amount or currency.
-- **FR-007**: When no home currency is set, forms MUST behave as they do today.
+- **FR-007**: Until the session's tenant record is loaded, forms MUST behave as they do today.
 - **FR-008**: The home currency MUST be tenant-isolated like all other tenant data; no tenant can
   read or infer another tenant's setting.
 
@@ -171,7 +171,7 @@ KWD, BHD and OMR, in English and Arabic; confirm grouping, decimal places and cu
 
 ### Key Entities
 
-- **Tenant home currency**: one optional currency per tenant; set by an owner; used only as a
+- **Tenant home currency**: the existing `tenant.currency`; set at signup, changed by an owner; used only as a
   default for new money entries and as the extraction fallback. Changes are audited.
 - **Currency fallback flag**: a marker on an extracted quote's currency meaning "not found in the
   document; defaulted — please confirm". Cleared when a reviewer confirms or corrects it.
@@ -188,7 +188,7 @@ KWD, BHD and OMR, in English and Arabic; confirm grouping, decimal places and cu
   document; every defaulted currency is visibly flagged for review.
 - **SC-004**: On mobile, amounts in EGP, SAR, AED, KWD, BHD and OMR display with the correct
   decimals and grouping in both English and Arabic (verified on screenshots).
-- **SC-005**: Existing tenants with no home currency see no behaviour change and no errors.
+- **SC-005**: Existing tenants see no behaviour change unless their currency differs from the old hard-coded default, and no errors.
 
 ## Assumptions
 
@@ -196,8 +196,7 @@ KWD, BHD and OMR, in English and Arabic; confirm grouping, decimal places and cu
   codes is backlog item G1, out of scope here.
 - Only the two named mobile screens are in scope for formatting; other mobile money displays
   follow later if any exist.
-- The home currency is optional for backward compatibility; the pilot and demo tenants will set
-  it.
+- No schema change: the pilot and demo tenants just set `tenant.currency` to EGP.
 - The existing quotation-review flow already supports per-field "needs review" marking; the
   fallback flag reuses it.
 
