@@ -1,6 +1,7 @@
 import { test, expect } from "@playwright/test";
 import { createMember, type CreatedMember } from "./support/api";
 
+import { openAsyncSelect } from "./support/select";
 /**
  * End-to-End test suite for Catalogue Product Master (T018, US1, SC-001).
  *
@@ -38,7 +39,7 @@ test.describe("Catalogue Product Master (T018)", () => {
 
     // Select base unit. The select trigger collapses under the floating label on this form, so
     // click the whole form field — Material opens the option panel for a click anywhere in it.
-    await page.locator('mat-form-field', { hasText: 'Base Measurement Unit' }).click();
+    await openAsyncSelect(page, page.locator('mat-form-field', { hasText: 'Base Measurement Unit' }));
     await page.click('mat-option:has-text("Litre")');
 
     // Enter pack definition: 6 x 5.0

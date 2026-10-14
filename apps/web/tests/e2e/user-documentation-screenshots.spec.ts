@@ -26,6 +26,7 @@ import {
   uploadQuotationAndOpenReview,
 } from './support/canonical-flow';
 
+import { openAsyncSelect } from './support/select';
 const RUN_CAPTURE = process.env['CAPTURE_USER_DOC_SCREENSHOTS'] === '1';
 const REPO_ROOT = join(__dirname, '..', '..', '..', '..');
 const SCREENSHOT_DIR = process.env['DOCS_SCREENSHOT_DIR']
@@ -428,7 +429,7 @@ async function seedIngestionData(page: Page, fixtures: ScreenshotFixtures): Prom
   try {
     await page.goto('/ingestion/catalogue-import');
     await expect(page.locator('.page-title')).toContainText('Catalogue Import');
-    await page.locator('mat-select').click();
+    await openAsyncSelect(page, page.locator('mat-select'));
     await page.locator('mat-option', { hasText: supplier.name }).click();
     const csvFixturePath = join(REPO_ROOT, 'apps', 'web', 'tests', 'e2e', 'fixtures', 'test-catalogue.csv');
     await page.locator('input.file-input').setInputFiles(csvFixturePath);
@@ -722,7 +723,7 @@ async function captureAndResolveMatchScreenshots(
   await expect(page.locator('.new-product-section')).toBeVisible();
   await captureCurrentPage(page, '09c-match-resolution-outcomes.jpg');
   await page.fill('input[formControlName="tenant_name"]', productName);
-  await page.locator('mat-select[formControlName="base_unit"]').click();
+  await openAsyncSelect(page, page.locator('mat-select[formControlName="base_unit"]'));
   await page.locator('mat-option', { hasText: '(kilogram)' }).click();
   await page.locator('.confirm-resolution-btn.mat-mdc-unelevated-button').click();
   await expect(page.locator('.decision-banner')).toBeVisible({ timeout: 15_000 });

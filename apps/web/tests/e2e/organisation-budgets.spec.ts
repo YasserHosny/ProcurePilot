@@ -1,6 +1,7 @@
 import { test, expect, type Locator, type Page } from '@playwright/test';
 
 import { createIsolatedWorkspace, type Credentials } from './support/api';
+import { openAsyncSelect } from './support/select';
 
 // This spec owns a separate workspace and must authenticate its own owner.
 test.use({ storageState: { cookies: [], origins: [] } });
@@ -62,21 +63,6 @@ test.describe('Organisation Budget Management (chunk 007 US3)', () => {
    */
   function budgetRow(page: Page, formattedAmount: string): Locator {
     return page.locator('app-budget-list tr[mat-row]', { hasText: formattedAmount });
-  }
-
-  /**
-   * Opens a mat-select whose options arrive asynchronously (currencies from /config/options,
-   * branch and cost-centre lookups). MatSelect._canOpen() is false while it has zero options, so
-   * a click that lands before the response is silently ignored and the option lookup then waits
-   * forever -- the CI flake in the overlap test. Retry the click until a panel actually shows.
-   */
-  async function openAsyncSelect(page: Page, select: Locator): Promise<void> {
-    await expect(async () => {
-      if (!(await page.locator('mat-option').first().isVisible())) {
-        await select.click();
-      }
-      await expect(page.locator('mat-option').first()).toBeVisible({ timeout: 2000 });
-    }).toPass({ timeout: 15000 });
   }
 
   interface BudgetDraft {

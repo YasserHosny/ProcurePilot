@@ -19,6 +19,7 @@ import { expect, type Page } from '@playwright/test';
 
 import { createTestSupplier, fetchQuotationMatches, findProductByName, signInOwner } from './api';
 
+import { openAsyncSelect } from './select';
 /** The stub provider's fixed line arithmetic: 3×12 + (2×20 − 1) = 75.00, always. */
 export const STUB_COMPUTED_TOTAL = '75.00';
 
@@ -74,7 +75,7 @@ export async function uploadQuotationAndOpenReview(
 
 export async function selectReviewSupplier(page: Page, supplierName: string): Promise<void> {
   // mat-select cannot be driven by selectOption(); open the overlay, then click the option.
-  await page.locator('mat-select[required]').click();
+  await openAsyncSelect(page, page.locator('mat-select[required]'));
   await page.locator('mat-option', { hasText: supplierName }).click();
 }
 
@@ -195,7 +196,7 @@ export async function resolveLineAsNewProduct(
   await expect(page.locator('.new-product-section')).toBeVisible();
 
   await page.fill('input[formControlName="tenant_name"]', productName);
-  await page.locator('mat-select[formControlName="base_unit"]').click();
+  await openAsyncSelect(page, page.locator('mat-select[formControlName="base_unit"]'));
   await page.locator('mat-option', { hasText: '(kilogram)' }).click();
 
   // Two buttons share .confirm-resolution-btn (Confirm Match Decision / Resolve and Next);

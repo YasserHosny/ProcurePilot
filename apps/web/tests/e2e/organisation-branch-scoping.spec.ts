@@ -2,6 +2,7 @@ import { test, expect, type Page } from '@playwright/test';
 
 import { apiAsUser, createIsolatedWorkspace, createMember, signIn, type Credentials } from './support/api';
 
+import { openAsyncSelect } from './support/select';
 /**
  * End-to-End test suite for Branch-Scoped Visibility (chunk 007, User Story 4 / T038).
  *
@@ -173,7 +174,7 @@ test.describe('Organisation Branch-Scoped Visibility (chunk 007 US4)', () => {
     await expect(branchPicker).toBeVisible();
 
     if (data.branchName) {
-      await branchPicker.click();
+      await openAsyncSelect(page, branchPicker);
       await page.locator('mat-option').filter({ hasText: data.branchName }).click();
     }
 
@@ -221,7 +222,7 @@ test.describe('Organisation Branch-Scoped Visibility (chunk 007 US4)', () => {
 
     const branchPicker = dialog.locator('mat-select[formControlName="branch_id"]');
     await expect(branchPicker).toBeVisible();
-    await branchPicker.click();
+    await openAsyncSelect(page, branchPicker);
     await page.locator('mat-option').filter({ hasText: branchA.label }).click();
 
     await dialog.locator('button[type="submit"][form="change-role-form"]').click();
