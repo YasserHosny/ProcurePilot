@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from procurepilot_extraction_worker.models import ExtractedField, ExtractionResult
-from procurepilot_extraction_worker.worker import SupplierMatch, _review_reason
+from procurepilot_extraction_worker.models import ExtractedField, ExtractedLine, ExtractionResult
+from procurepilot_extraction_worker.worker import SupplierMatch, _money_amount, _review_reason
 
 _NO_MATCH = SupplierMatch(supplier_id=None, confidence=None, had_candidates=False)
 
@@ -49,3 +49,24 @@ def test_currency_fallback_uses_existing_review_reason_field() -> None:
     )
 
     assert _review_reason(result, "not_applicable", 0.85, _NO_MATCH) == "currency_fallback"
+
+
+def test_uncurried_money_is_routed_to_review_and_not_persisted_as_amount() -> None:
+    line = ExtractedLine(
+        line_number=1,
+        original_text="Tomatoes 10.00",
+        fields={
+            "unit_price": ExtractedField(
+                "unit_price", {"amount": "10.00", "currency": None}, 1.0
+            )
+        },
+    )
+    result = ExtractionResult(
+        method="structured_parse",
+        model_version="test",
+        header={},
+        lines=[line],
+    )
+
+    assert _money_amount(line, "unit_price") is None
+    assert _review_reason(result, "not_applicable", 0.85, _NO_MATCH) == "low_confidence"

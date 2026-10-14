@@ -29,8 +29,18 @@ def test_mixed_currency_markers_are_unknown() -> None:
 
 def test_arabic_indic_digits_and_separators_are_exact_decimal() -> None:
     assert parse_localised_decimal("١٬٢٣٤٫٥٠") == Decimal("1234.50")
+    assert parse_localised_decimal("١٢٣٤٫٥٠") == Decimal("1234.50")
     assert parse_localised_decimal("-١٢٫٧٥") == Decimal("-12.75")
     assert parse_localised_decimal("−١٬٠٠٠٫٠٠") == Decimal("-1000.00")
+
+
+def test_ascii_comma_only_decimal_remains_ambiguous() -> None:
+    try:
+        parse_localised_decimal("1,234")
+    except ValueError as exc:
+        assert "ambiguous decimal separator" in str(exc)
+    else:
+        raise AssertionError("ASCII comma-only amount must be refused")
 
 
 def test_negative_amount_with_marker_is_detected() -> None:

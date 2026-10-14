@@ -276,8 +276,9 @@ def _update_quotation_status(
     supplier_match: SupplierMatch,
 ) -> None:
     stated = result.stated_total.value if result.stated_total is not None else None
-    amount = stated.get("amount") if isinstance(stated, dict) else None
     currency = stated.get("currency") if isinstance(stated, dict) else None
+    amount = stated.get("amount") if isinstance(stated, dict) and currency else None
+    currency = currency or None
     header = result.header
     with conn.cursor() as cur:
         cur.execute(
@@ -355,6 +356,8 @@ def _review_reason(
     currency = result.header.get("currency")
     if currency is not None and currency.confidence < threshold:
         return "currency_fallback"
+    if _has_uncurried_money(result):
+        return "low_confidence"
     if arithmetic_status == "mismatch":
         return "arithmetic_mismatch"
     if low_confidence_fields(result, threshold):
@@ -522,12 +525,27 @@ def _field_value(line: ExtractedLine, name: str) -> object | None:
 
 def _money_amount(line: ExtractedLine, name: str) -> object | None:
     value = _field_value(line, name)
-    return value.get("amount") if isinstance(value, dict) else None
+    return value.get("amount") if isinstance(value, dict) and value.get("currency") else None
 
 
 def _money_currency(line: ExtractedLine, name: str) -> str | None:
     value = _field_value(line, name)
     return str(value["currency"]) if isinstance(value, dict) and value.get("currency") else None
+
+
+def _has_uncurried_money(result: ExtractionResult) -> bool:
+    money_fields = ("unit_price", "delivery_fee", "discount")
+    for line in result.lines:
+        for name in money_fields:
+            value = _field_value(line, name)
+            if (
+                isinstance(value, dict)
+                and value.get("amount") is not None
+                and not value.get("currency")
+            ):
+                return True
+    stated = result.stated_total.value if result.stated_total is not None else None
+    return isinstance(stated, dict) and stated.get("amount") is not None and not stated.get("currency")
 
 
 def _header_value(header: dict[str, ExtractedField], name: str) -> object | None:

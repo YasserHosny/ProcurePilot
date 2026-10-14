@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import re
 import unicodedata
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal
+
+from procurepilot_extraction_worker.validation import decimal_from_extracted
 
 _EGP_MARKER = re.compile(
     r"(?<![^\W\d_])(?:جنيه\s+مصري|جنيه|ج\.م\.?|L\.E\.|LE|EGP)(?![^\W\d_])",
@@ -40,13 +42,10 @@ def parse_localised_decimal(value: str | int | Decimal) -> Decimal:
         return value
     text = str(value).translate(_ARABIC_DIGITS).replace("٫", ".").replace("٬", "")
     text = text.replace("−", "-").replace("﹣", "-").strip()
-    text = _EGP_MARKER.sub("", text).replace(",", "").strip()
-    if not text or not re.fullmatch(r"[+-]?(?:\d+(?:\.\d*)?|\.\d+)", text):
-        raise ValueError(f"invalid decimal amount: {value!r}")
-    try:
-        return Decimal(text)
-    except InvalidOperation as exc:
-        raise ValueError(f"invalid decimal amount: {value!r}") from exc
+    text = _EGP_MARKER.sub("", text).strip()
+    # Leave ASCII separators intact so the established import parser can reject
+    # ambiguous comma-only values (for example, "1,234") consistently.
+    return decimal_from_extracted(text)
 
 
 def _adjacent_to_number(text: str, start: int, end: int) -> bool:
