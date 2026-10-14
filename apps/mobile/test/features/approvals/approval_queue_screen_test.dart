@@ -17,11 +17,13 @@ void main() {
         ];
     });
 
-    Future<void> pumpQueue(WidgetTester tester) async {
+    Future<void> pumpQueue(WidgetTester tester, {String locale = 'en'}) async {
+      await tester.pumpWidget(const SizedBox.shrink());
       await pumpWithServices(
         tester,
         child: const ApprovalQueueScreen(),
         approvalsApiClient: fakeClient,
+        locale: locale,
       );
       await tester.pumpAndSettle();
     }
@@ -50,12 +52,29 @@ void main() {
       );
       expect(find.byKey(const Key('approvalQueueList')), findsNothing);
     });
+
+    testWidgets('formats money in English and Arabic', (tester) async {
+      fakeClient.pendingResults = [
+        pendingRequest(
+          id: 'req-egp',
+          requester: 'member-egp',
+          total: const Money(amount: '12500', currency: 'EGP'),
+        ),
+      ];
+      await pumpQueue(tester);
+      expect(find.text('EGP 12,500.00'), findsOneWidget);
+
+      await pumpQueue(tester, locale: 'ar');
+      expect(find.textContaining('١٢٬٥٠٠٫٠٠'), findsOneWidget);
+      expect(find.byType(Directionality), findsWidgets);
+    });
   });
 }
 
 PurchaseRequest pendingRequest({
   required String id,
   required String requester,
+  Money total = const Money(amount: '125.00', currency: 'USD'),
 }) {
   return PurchaseRequest(
     id: id,
@@ -70,7 +89,7 @@ PurchaseRequest pendingRequest({
         quantity: '5',
       ),
     ],
-    estimatedTotal: const Money(amount: '125.00', currency: 'USD'),
+    estimatedTotal: total,
     hasIncompleteEstimate: false,
     approvalStep: const ApprovalStep(
       id: 'step-1',

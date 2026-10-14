@@ -45,7 +45,7 @@ class TestAssetBundle extends AssetBundle {
 }
 
 /// Returns a loaded [I18nLoader] backed by a minimal English catalogue.
-Future<I18nLoader> loadTestI18n() async {
+Future<I18nLoader> loadTestI18n({String locale = 'en'}) async {
   final bundle = TestAssetBundle({
     '../../packages/i18n/en.json': jsonEncode({
       'common': {
@@ -241,7 +241,7 @@ Future<I18nLoader> loadTestI18n() async {
     '../../packages/i18n/ar.json': jsonEncode({}),
   });
   final i18n = I18nLoader(bundle: bundle);
-  await i18n.load('en');
+  await i18n.load(locale);
   return i18n;
 }
 
@@ -834,9 +834,9 @@ class TestServiceProvider extends StatelessWidget {
       i18n: i18n,
       offlineQueueService: offlineQueueService,
       child: MaterialApp(
-        locale: const Locale('en'),
+        locale: Locale(i18n.locale),
         builder: (context, child) => Directionality(
-          textDirection: TextDirection.ltr,
+          textDirection: i18n.textDirection,
           child: child ?? const SizedBox.shrink(),
         ),
         routes: {
@@ -870,8 +870,9 @@ Future<TestServiceProvider> pumpWithServices(
   CameraCapture? cameraCapture,
   OfflineQueue? offlineQueueService,
   I18nLoader? i18n,
+  String locale = 'en',
 }) async {
-  final i18nValue = i18n ?? await loadTestI18n();
+  final i18nValue = i18n ?? await loadTestI18n(locale: locale);
   final authServiceValue =
       authService ??
       FakeAuthService(

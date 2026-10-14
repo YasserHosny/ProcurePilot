@@ -67,8 +67,10 @@ void main() {
   group('RequestDetailScreen', () {
     Future<void> pumpDetail(
       WidgetTester tester,
-      PurchaseRequest request,
-    ) async {
+      PurchaseRequest request, {
+      String locale = 'en',
+    }) async {
+      await tester.pumpWidget(const SizedBox.shrink());
       await pumpWithServices(
         tester,
         child: Builder(
@@ -84,6 +86,7 @@ void main() {
             child: const Text('Open'),
           ),
         ),
+        locale: locale,
       );
       await tester.tap(find.text('Open'));
       await tester.pumpAndSettle();
@@ -149,6 +152,40 @@ void main() {
 
       expect(find.text('Decision comment'), findsNothing);
       expect(find.text('Decided on'), findsNothing);
+    });
+
+    testWidgets('formats request money in English and Arabic', (tester) async {
+      final request = PurchaseRequest(
+        id: 'req-money',
+        branchId: 'branch-1',
+        requestedByMembershipId: 'member-1',
+        requiredByDate: '2026-10-01',
+        status: 'submitted',
+        lines: const [
+          PurchaseRequestLine(
+            id: 'line-money',
+            workspaceProductId: 'product-money',
+            quantity: '2',
+            estimatedUnitPrice: Money(amount: '1.23456', currency: 'EGP'),
+          ),
+        ],
+        estimatedTotal: const Money(amount: '12500', currency: 'EGP'),
+        budgetStatus: const BudgetStatus(
+          remainingAmount: Money(amount: '-12.5', currency: 'KWD'),
+          exceeds: false,
+        ),
+        hasIncompleteEstimate: false,
+        createdAt: DateTime.now(),
+      );
+      await pumpDetail(tester, request);
+      expect(find.text('EGP 12,500.00'), findsOneWidget);
+      expect(find.text('EGP 1.23'), findsOneWidget);
+      expect(find.text('KWD -12.500'), findsOneWidget);
+
+      await pumpDetail(tester, request, locale: 'ar');
+      expect(find.textContaining('١٢٬٥٠٠٫٠٠'), findsOneWidget);
+      expect(find.textContaining('١٫٢٣'), findsOneWidget);
+      expect(find.textContaining('١٢٫٥٠٠'), findsOneWidget);
     });
   });
 }
