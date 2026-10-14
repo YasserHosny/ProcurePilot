@@ -20,7 +20,8 @@ Exploration canvas (all directions, identity system, in-context mockups):
 | `procurepilot-mark.svg` / `-1024/512/192/32px.png` | Mark alone, full colour |
 | `procurepilot-mark-reversed.svg` | Mark on navy |
 | `procurepilot-mark-mono-navy.svg`, `-mono-white.svg` | One-colour printing, embossing, watermarks |
-| `procurepilot-app-icon.svg` / `-1024/512/192/32px.png` | App icons, favicon, chat avatar |
+| `procurepilot-app-icon.svg` / `-1024/512/192/32px.png` | **Store and OS app icons** (iOS, Android adaptive, PWA): full-bleed opaque square, no transparency — the OS applies its own corner mask |
+| `procurepilot-app-icon-rounded.svg` / `-1024/512/192/32px.png` | Rounded icon for avatars, favicons, slides and marketing (transparent corners) |
 
 All SVG lettering is converted to outlines, so the files need no font installed.
 
