@@ -62,13 +62,13 @@ def sting_events(scale):
 
 # 16:9 — sting starts on the track beat at 2:50.25, end card follows seamlessly
 mix("sting-16x9.wav", 170.25, 4.5, sting_events(1.0), dip=(1.45, 2.1))
-mix("endcard-16x9.wav", 174.75, 5.5, [], fade_out=1.5)
-# 9:16 fast — sting on the beat at 2:53.52 (two-thirds speed: pop on beat 2)
-mix("sting-9x16-fast.wav", 173.52, 3.0, sting_events(2 / 3), dip=(0.95, 1.45))
-mix("endcard-9x16.wav", 176.52, 5.5, [], fade_out=1.5)
+mix("endcard-16x9.wav", 174.75, 157 / 30, [], fade_out=1.5)  # 5.233 s: outro ends at 3:00
+# 9:16 fast — sting on the beat at 2:51.34 so the outro ends inside the 60-s cut (track 2:00-3:00) (two-thirds speed: pop on beat 2)
+mix("sting-9x16-fast.wav", 171.34, 3.0, sting_events(2 / 3), dip=(0.95, 1.45))
+mix("endcard-9x16.wav", 174.34, 5.5, [], fade_out=1.5)
 print("mixed:", sorted(p.name for p in OUT.iterdir()))
 
 # Combined outros (sting + end card) mixed as one piece so the level is continuous across the cut
-mix("outro-16x9.wav", 170.25, 10.0, sting_events(1.0), fade_out=1.5, dip=(1.45, 2.1))
-mix("outro-9x16.wav", 173.52, 8.5, sting_events(2 / 3), fade_out=1.5, dip=(0.95, 1.45))
+mix("outro-16x9.wav", 170.25, 4.5 + 157 / 30, sting_events(1.0), fade_out=1.5, dip=(1.45, 2.1))
+mix("outro-9x16.wav", 171.34, 8.5, sting_events(2 / 3), fade_out=1.5, dip=(0.95, 1.45))
 print("mixed outros")

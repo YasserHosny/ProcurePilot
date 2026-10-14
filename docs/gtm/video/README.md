@@ -39,10 +39,10 @@ Music: **Antalya Beaches — DayFox** (below). Its sections line up with the sto
 | 1:40–2:20 | Line-by-line comparison, saving in EGP; guardrail drafts the request | Breakdown (1:28–2:20) |
 | 2:20–2:50 | Manager approves on phone → PO generated → savings report | **Chorus 2 (2:20–2:46)** |
 | **2:50.25–2:54.75** | **Logo sting** | Outro |
-| 2:54.75–3:00 | **End card** (CTA, ~5.5 s) | Track's natural end at 3:00 |
+| 2:54.75–3:00 | **End card** (CTA, 5.23 s) | Track's natural end at 3:00 |
 
 60-second cut: uses the track's last minute (2:00 → 3:00); fast sting on the beat at track
-**2:53.52** (0:53.5 into the cut), end card for the final ~5.5 s.
+**2:51.34** (0:51.3 into the cut), end card 5.5 s — the outro ends at 0:59.8, inside the cut.
 
 ## Logo sting (decided)
 
@@ -89,14 +89,14 @@ committed (re-download from the links); `music/antalya-beaches-beats.csv` holds 
 times from librosa so alignment can be redone without re-analysing.
 
 Mix: music −4 dB under cues; cue gains tick −6, swish −4, pop 0, whoosh −6, chime −3 dB; final
-loudness ≈ −14 LUFS (social standard), true peak ≤ −1 dBTP.
+loudness ≈ −14 LUFS for the outros (social standard), peaks ≤ −1.6 dBFS on every file.
 
 ## Rendered files
 
 | File | Length | Note |
 |---|---|---|
-| `outro-16x9.mp4` | 10.0 s | sting + end card, one continuous mix — **use this in the edit** |
-| `outro-9x16.mp4` | 8.5 s | fast sting + end card |
+| `outro-16x9.mp4` | 9.75 s | sting + end card, one continuous mix — **place at 2:50.25; ends at 3:00** |
+| `outro-9x16.mp4` | 8.5 s | fast sting + end card — **place at 0:51.34 of the 60-s cut; ends at 0:59.8** |
 | `logo-sting-16x9.mp4`, `end-card-16x9.mp4`, `logo-sting-9x16-fast.mp4`, `end-card-9x16.mp4` | — | separate pieces for flexible editing |
 
 Approved by the user 2026-10-15; in `renders/`.

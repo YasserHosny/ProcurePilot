@@ -157,7 +157,7 @@ Atlassian connector) · **Lane** (code lane via Speckit: Codex / agy / OpenCode)
 |---|---|---|---|---|---|
 | [x] G-0 | Commit `first-customer-gtm-plan.md` after user approval (that file only) | Orch | user approval | Commit on `main` (or PR) containing only that file | — (git) |
 | [ ] G-1 | Demo tenant on hosted: dedicated tenant, Arabic supplier names, ~30-item F&B catalogue, 2–3 branches, EGP prices, one RFQ ready to send; no test leftovers | Orch + User | P-1 (forms default to EGP) | Tenant walkthrough runs clean end-to-end | PP |
-| [ ] G-2 | 3-min demo video, Arabic narration + Arabic UI, Loom or OBS. Script must follow the corrected walkthrough (human sends RFQ; guardrail on → draft purchase request; mobile approves the *request*; PO generated on web) | User (record), Orch (script) | G-1, P-1, P-2 | Video link stored on the PP task | PP |
+| [ ] G-2 | 3-min demo video + 60-s vertical cut: Arabic UI, Arabic on-screen text + music (no voice-over), recorded with OBS; spec, storyboard and finished logo sting/end card in `docs/gtm/video/`. Script must follow the corrected walkthrough (human sends RFQ; guardrail on → draft purchase request; mobile approves the *request*; PO generated on web) | User (record), Orch (script) | G-1, P-1, P-2 | Video link stored on the PP task | PP |
 | [ ] G-3 | Pitch line (Arabic + English) finalised | Orch draft, User approve | — | Approved text on the PP task | PP |
 | [ ] G-4 | One-pager (Arabic + English): before (WhatsApp + Excel) vs. after (RFQ → compare → approve → PO) | Orch copy, User design | G-3 | Published PDF/link | PP |
 | [ ] G-5 | Outreach DM script (Arabic + English), diagnostic-question first | Orch draft, User approve | G-3 | Approved script on PP task | PP |
