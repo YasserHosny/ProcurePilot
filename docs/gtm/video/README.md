@@ -1,6 +1,6 @@
 # Demo video — spec and decisions (PP-6)
 
-Status 2026-10-15: **logo sting + end card rendered** (in review); the 3-minute screencast and the
+Status 2026-10-15: **logo sting + end card rendered and approved** (`renders/`); the 3-minute screencast and the
 60-second cut are not recorded yet — they wait on the demo tenant (PP-5), which waits on #73-era
 product work being verified on hosted.
 
@@ -99,7 +99,7 @@ loudness ≈ −14 LUFS (social standard), true peak ≤ −1 dBTP.
 | `outro-9x16.mp4` | 8.5 s | fast sting + end card |
 | `logo-sting-16x9.mp4`, `end-card-16x9.mp4`, `logo-sting-9x16-fast.mp4`, `end-card-9x16.mp4` | — | separate pieces for flexible editing |
 
-Rendered files are added to `renders/` once approved.
+Approved by the user 2026-10-15; in `renders/`.
 
 ## Rebuilding
 
