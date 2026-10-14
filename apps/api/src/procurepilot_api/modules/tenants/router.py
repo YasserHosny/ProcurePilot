@@ -1,6 +1,7 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Body, Depends
+from postgrest.exceptions import APIError
 
 from procurepilot_api.config import Settings, get_settings
 from procurepilot_api.deps import CurrentMember, bearer_token, current_member
@@ -59,39 +60,23 @@ def update_tenant(
     update = payload.model_dump(exclude_none=True)
     if update:
         client = authenticated_client(settings, token)
-        previous_currency: str | None = None
-        if "currency" in update:
-            # The home currency drives form defaults and the extraction fallback, so it must be
-            # a currency the product supports (same reference table sign-up validates against).
-            supported = (
-                client.table("supported_currency")
-                .select("code")
-                .eq("code", update["currency"])
-                .eq("is_enabled", True)
-                .limit(1)
-                .execute()
-            )
-            if not supported.data:
-                raise UnprocessableEntityError(details={"currency": "unsupported"})
-            current = (
-                client.table("tenant")
-                .select("currency")
-                .eq("id", str(member.tenant_id))
-                .limit(1)
-                .execute()
-            )
-            previous_currency = current.data[0]["currency"] if current.data else None
-        client.table("tenant").update(update).eq("id", str(member.tenant_id)).execute()
-        if "currency" in update and previous_currency != update["currency"]:
-            client.rpc(
-                "record_audit_event",
-                {
-                    "p_action": "tenant.currency_changed",
-                    "p_outcome": "success",
-                    "p_tenant_id": str(member.tenant_id),
-                    "p_actor_membership_id": str(member.membership_id),
-                    "p_actor_email": member.email,
-                    "p_target": {"from": previous_currency, "to": update["currency"]},
-                },
-            ).execute()
+        currency = update.pop("currency", None)
+        if currency is not None:
+            # One database transaction validates the currency against supported_currency, updates
+            # the tenant and writes the audit event, so a change can never commit unaudited.
+            try:
+                client.rpc(
+                    "set_tenant_currency",
+                    {
+                        "p_currency": currency,
+                        "p_actor_membership_id": str(member.membership_id),
+                        "p_actor_email": member.email,
+                    },
+                ).execute()
+            except APIError as exc:
+                if exc.code == "22023":
+                    raise UnprocessableEntityError(details={"currency": "unsupported"}) from exc
+                raise
+        if update:
+            client.table("tenant").update(update).eq("id", str(member.tenant_id)).execute()
     return load_me_for_token(settings=settings, bearer_token=token, member=member).tenant
