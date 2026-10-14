@@ -7,6 +7,7 @@ from azure.ai.documentintelligence import DocumentIntelligenceClient
 from azure.ai.documentintelligence.models import AnalyzeDocumentRequest
 from azure.core.credentials import AzureKeyCredential
 
+from procurepilot_extraction_worker.currency import detect_currency
 from procurepilot_extraction_worker.models import (
     ExtractedField,
     ExtractedLine,
@@ -32,6 +33,7 @@ class AzureDocumentIntelligenceProvider:
         mime_type: str,
         storage_path: str,
         document_bytes: bytes | None = None,
+        fallback_currency: str | None = None,
     ) -> ExtractionResult:
         if document_bytes is None:
             raise ExtractionProviderError("document_bytes required for Azure DI extraction")
@@ -55,17 +57,21 @@ class AzureDocumentIntelligenceProvider:
         except Exception as exc:
             raise ExtractionProviderError(f"Azure DI analysis failed: {exc}") from exc
 
-        return _parse_invoice_result(result, self.model_version)
+        return _parse_invoice_result(
+            result, self.model_version, fallback_currency=fallback_currency
+        )
 
 
-def _parse_invoice_result(result: Any, model_version: str) -> ExtractionResult:
+def _parse_invoice_result(
+    result: Any, model_version: str, *, fallback_currency: str | None = None
+) -> ExtractionResult:
     header: dict[str, ExtractedField] = {}
     lines: list[ExtractedLine] = []
     stated_total: ExtractedField | None = None
 
     documents = getattr(result, "documents", None) or []
     if not documents:
-        return _fallback_from_tables(result, model_version)
+        return _fallback_from_tables(result, model_version, fallback_currency=fallback_currency)
 
     doc = documents[0]
     fields = doc.fields or {}
@@ -74,8 +80,10 @@ def _parse_invoice_result(result: Any, model_version: str) -> ExtractionResult:
     if vendor:
         header["supplier_name"] = _make_field("supplier_name", vendor, fields, "VendorName")
 
-    currency = _infer_currency(fields) or "GBP"
-    header["currency"] = ExtractedField("currency", currency, 0.90, 1, None)
+    currency = _infer_currency(fields) or fallback_currency
+    currency_confidence = 0.50 if currency and _infer_currency(fields) is None else 0.90
+    if currency is not None:
+        header["currency"] = ExtractedField("currency", currency, currency_confidence, 1, None)
 
     invoice_date = _content(fields, "InvoiceDate")
     if invoice_date:
@@ -119,9 +127,27 @@ def _parse_invoice_result(result: Any, model_version: str) -> ExtractionResult:
     )
 
 
-def _fallback_from_tables(result: Any, model_version: str) -> ExtractionResult:
+def _fallback_from_tables(
+    result: Any, model_version: str, *, fallback_currency: str | None = None
+) -> ExtractionResult:
     tables = getattr(result, "tables", None) or []
     lines: list[ExtractedLine] = []
+    marker_text = " ".join(
+        str(getattr(cell, "content", "") or "")
+        for table in tables
+        for cell in (getattr(table, "cells", None) or [])
+    )
+    detected_currency = detect_currency(marker_text)
+    currency = detected_currency or fallback_currency
+    header = (
+        {
+            "currency": ExtractedField(
+                "currency", currency, 0.50 if not detected_currency else 0.90, 1, None
+            )
+        }
+        if currency
+        else {}
+    )
     for table in tables:
         cells = table.cells or []
         headers_row = [c for c in cells if c.row_index == 0]
@@ -150,7 +176,7 @@ def _fallback_from_tables(result: Any, model_version: str) -> ExtractionResult:
                     amount = _clean_number(price)
                     if amount:
                         ef["unit_price"] = ExtractedField(
-                            "unit_price", {"amount": amount, "currency": "USD"}, 0.80, 1, None
+                            "unit_price", {"amount": amount, "currency": currency}, 0.80, 1, None
                         )
                 desc = (
                     row_data.get("description")
@@ -168,7 +194,7 @@ def _fallback_from_tables(result: Any, model_version: str) -> ExtractionResult:
     return ExtractionResult(
         method="azure_di",
         model_version=model_version,
-        header={},
+        header=header,
         lines=lines,
         stated_total=None,
         cost_usd=0.0,
@@ -279,18 +305,20 @@ def _normalise_date(value: str) -> str:
 
 
 def _infer_currency(fields: dict[str, Any]) -> str | None:
+    all_content = " ".join(str(getattr(field, "content", "") or "") for field in fields.values())
+    marker_currency = detect_currency(all_content)
+    codes: set[str] = set()
     for name in ("InvoiceTotal", "SubTotal", "AmountDue"):
         field = fields.get(name)
         if field is None:
             continue
         cur = getattr(field, "currency_code", None)
         if cur:
-            return str(cur)
+            codes.add(str(cur).upper())
         content = getattr(field, "content", "") or ""
-        if "£" in content or "GBP" in content:
-            return "GBP"
-        if "$" in content or "USD" in content:
-            return "USD"
-        if "€" in content or "EUR" in content:
-            return "EUR"
-    return None
+        for code, marker in (("GBP", "£"), ("USD", "$"), ("EUR", "€")):
+            if marker in content or code in content.upper():
+                codes.add(code)
+    if marker_currency:
+        codes.add(marker_currency)
+    return next(iter(codes)) if len(codes) == 1 else None
