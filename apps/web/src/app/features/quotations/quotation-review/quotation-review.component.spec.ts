@@ -16,6 +16,7 @@ describe('QuotationReviewComponent (T051, T057, T062)', () => {
   let component: QuotationReviewComponent;
   let fixture: ComponentFixture<QuotationReviewComponent>;
   let apiService: jasmine.SpyObj<ApiService>;
+  const homeCurrency = signal<string | undefined>('EGP');
 
   const mockQuotationDetail: QuotationDetail = {
     id: 'q-review-1',
@@ -124,6 +125,7 @@ describe('QuotationReviewComponent (T051, T057, T062)', () => {
       isAuthenticated: signal(true),
       tenant: signal(null),
       activeLocale: signal('en'),
+      homeCurrency,
     };
 
     await TestBed.configureTestingModule({
@@ -160,6 +162,35 @@ describe('QuotationReviewComponent (T051, T057, T062)', () => {
     expect(component.quotation()?.id).toBe('q-review-1');
     expect(component.suppliers().length).toBe(1);
     expect(component.flaggedFields().length).toBe(1);
+  });
+
+  it('uses the home currency for a quote total when the quote and its lines omit currency', () => {
+    component.quotation.set({
+      ...mockQuotationDetail,
+      currency: null,
+      lines: [{ ...mockQuotationDetail.lines[0], unit_price: { amount: '25.00', currency: null } }],
+    } as unknown as QuotationDetail);
+
+    expect(component.computedLinesTotal()?.currency).toBe('EGP');
+  });
+
+  it('uses the home currency when adding a priced line to a quote without currency', () => {
+    component.quotation.set({ ...mockQuotationDetail, currency: null, lines: [] } as unknown as QuotationDetail);
+    component.newLineText.set('New item');
+    component.newLinePriceAmount.set('12.50');
+
+    component.addNewLine();
+
+    expect(component.pendingNewLines()[0].unit_price_currency).toBe('EGP');
+  });
+
+  it('keeps a quote currency when adding a priced line', () => {
+    component.newLineText.set('New item');
+    component.newLinePriceAmount.set('12.50');
+
+    component.addNewLine();
+
+    expect(component.pendingNewLines()[0].unit_price_currency).toBe('GBP');
   });
 
   it('should offer to create an extracted supplier even when other suppliers exist', () => {

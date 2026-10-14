@@ -43,7 +43,7 @@ describe("SupplierFormComponent (T025)", () => {
       currentMember: signal(null),
       isAuthenticated: signal(true),
       tenant: signal(null),
-      homeCurrency: signal(undefined),
+      homeCurrency: signal<string | undefined>("EGP"),
       activeLocale: signal("en"),
     };
 
@@ -90,6 +90,27 @@ describe("SupplierFormComponent (T025)", () => {
 
     expect(component.form.invalid).toBeTrue();
     expect(component.form.get("min_order_currency")?.hasError("currencyRequired")).toBeTrue();
+  });
+
+  it("preselects the home currency for both new-supplier money fields", () => {
+    expect(component.form.get("min_order_currency")?.value).toBe("EGP");
+    expect(component.form.get("delivery_fee_currency")?.value).toBe("EGP");
+  });
+
+  it("omits empty money values from the create payload", () => {
+    apiService.createSupplier.and.returnValue(of({
+      id: "s-empty-money", name: "Test Supplier", status: "active" as const,
+      created_at: "2026-08-20T10:00:00Z",
+    }));
+    component.form.patchValue({ name: "Test Supplier" });
+    component.onSubmit();
+    expect(apiService.createSupplier).toHaveBeenCalledWith(jasmine.objectContaining({
+      name: "Test Supplier", payment_terms: null, lead_time_days: null, contact_email: null,
+    }));
+    expect(apiService.createSupplier.calls.mostRecent().args[0]).toEqual(jasmine.objectContaining({
+      minimum_order_value: null,
+      delivery_fee: null,
+    }));
   });
 
   it("allows a currency to be preselected before an amount is entered", () => {
