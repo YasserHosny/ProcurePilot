@@ -69,7 +69,7 @@ basket-pegged.
    realistic Arabic supplier names, an F&B catalogue (~30 items), 2–3 branches, EGP prices,
    and one RFQ ready to send. Every demo and the video run from this tenant. Prospects must
    never see test leftovers.
-2. **3-minute demo video** (Arabic narration, Arabic UI), recorded with Loom (available on
+2. **3-minute demo video + 60-second vertical cut** (Arabic UI, Arabic on-screen text + music, no voice-over — full spec in `docs/gtm/video/README.md`), recorded with Loom (available on
    the Atlassian site) or OBS. The walkthrough must match what the product actually does:
    - a buyer builds an RFQ (from a request or by hand) and **sends it to several suppliers
      with one click** — sending is always a human action;
