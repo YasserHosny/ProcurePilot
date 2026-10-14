@@ -11,7 +11,7 @@ set up, what is next, who does it, and what blocks what.
 **Read first, in order:**
 
 1. `CLAUDE.md` — project rules (8 non-negotiables, stack, commands). Binding.
-2. `docs/product/first-customer-gtm-plan.md` — the plan: ICP, fit gaps, currency gaps C1–C5 /
+2. `docs/gtm/first-customer-gtm-plan.md` — the plan: ICP, fit gaps, currency gaps C1–C5 /
    G1–G5 (with file:line refs), demo walkthrough, pilot prerequisites, pipeline stages.
 3. This file — sections 2 (state), 3 (tasks), 4 (dependencies), 5 (handoff log).
 4. Only if working on the pilot environment: `docs/operations/self-hosted-deployment-plan.md`
@@ -74,7 +74,7 @@ set up, what is next, who does it, and what blocks what.
 
 | Item | State |
 |---|---|
-| `docs/product/first-customer-gtm-plan.md` | Revised and approved 2026-10-14; committed with this file (G-0). Other untracked files under `docs/` are unrelated — don't sweep them into commits. |
+| `docs/gtm/first-customer-gtm-plan.md` | Revised and approved 2026-10-14; committed with this file (G-0). Other untracked files under `docs/` are unrelated — don't sweep them into commits. |
 
 ### Space `PP` — ProcurePilot
 
@@ -230,4 +230,5 @@ Append one row per session. Newest at the bottom. Include Jira keys and PR numbe
 | 2026-10-14 | Claude (orchestrator) | User approved both docs → committed (G-0); created PP-1..PP-13 (J-5); teammate invite to the site dispatched to a side agent (result pending) | Start P-1 / P-2 specs (Speckit) and G-3 draft; user: D-1, D-2, delete SP-1 |
 | 2026-10-14 | Claude (orchestrator) | Spec `specs/022-home-currency-readiness/spec.md` (covers PP-1, PP-2, PP-3 fix) committed c8e2c1a and pushed on branch `022-home-currency-readiness` — **plan/tasks are being produced by a separate Claude CLI session in the main checkout; it owns the 022 PR**. PP-7: three pitch-line drafts posted (recommend C for DMs, A for one-pager). PP-3: 5 synthetic Egyptian test quotes + expected.json attached (no real quotes publicly available). D-1 = B recorded on PP-4. D-2 recommendation posted (awaiting confirmation). Omar invited. SP-1 deleted. This file pushed as PR #72. | User: confirm D-2, pick PP-7 line, merge #72. Then: G-6 draft (PP-10) once D-2 confirmed; E-1 setup (PP-4) after tier confirmation; run PP-3 fixtures before + after 022 ships |
 | 2026-10-14 | Claude (orchestrator) | D-2 confirmed. Pilot agreement drafted as a Claude Doc (EN + AR, 15 clauses, Annex A week-0 baseline): https://claude.ai/code/artifact/7f1d9481-a2a7-43a7-a0e4-b397c64e042b — linked on PP-10. Open question in the doc: liability cap. | User: review agreement, answer liability-cap comment, lawyer review before first signature |
+| 2026-10-14 | Claude (orchestrator) | All GTM docs moved to `docs/gtm/` (README indexes them + live Claude Doc / canvas links); one-pager PDF and PP-3 test fixtures added there. PP-7, PP-8, PP-9 Done. **Note for the 022 session:** `specs/022-home-currency-readiness/spec.md` still cites `docs/product/first-customer-gtm-plan.md` — update to `docs/gtm/` when convenient. | PP-10 user review; PP-11 prospect list |
 | | | | |

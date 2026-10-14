@@ -1,0 +1,32 @@
+{
+ "q1-arabic-western-digits-gm.pdf": {
+  "currency": "EGP",
+  "flagged": false,
+  "total": "16012.50",
+  "tests": "FR-009 ج.م"
+ },
+ "q2-arabic-indic-digits-geneih.pdf": {
+  "currency": "EGP",
+  "flagged": false,
+  "total": "3185.00",
+  "tests": "FR-009 جنيه, FR-010 Arabic-Indic digits + ٫ ٬ separators"
+ },
+ "q3-english-le-marker.pdf": {
+  "currency": "EGP",
+  "flagged": false,
+  "total": "5303.00",
+  "tests": "FR-009 LE / L.E.; edge case: 'LE' inside TABLE/BOTTLE/LEMON must not confuse"
+ },
+ "q4-no-currency-marker.pdf": {
+  "currency": "tenant home (EGP)",
+  "flagged": true,
+  "total": "6771.00",
+  "tests": "FR-011 fallback to home currency + review flag; FR-012 no hard-coded GBP"
+ },
+ "q5-mixed-markers.png": {
+  "currency": "unclear",
+  "flagged": true,
+  "total": "3200.00 EGP stated (USD line 420.00 + EGP lines 3200.00 — stated total ignores the USD line)",
+  "tests": "Edge case: mixed markers must be flagged, not silently resolved; image (photo-like) input path"
+ }
+}
