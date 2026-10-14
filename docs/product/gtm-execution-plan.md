@@ -131,7 +131,7 @@ Atlassian connector) · **Lane** (code lane via Speckit: Codex / agy / OpenCode)
   production** (own Supabase project + containers, isolated from staging). Self-hosting stays a
   later option. Recorded on PP-4; confirm plan tier with the user before creating anything
   billable.
-- [~] **D-2 Post-pilot price** — **recommended 2026-10-14, awaiting user confirmation**:
+- [x] **D-2 Post-pilot price** — **confirmed by user 2026-10-14**:
   EGP 1,500 per branch per month (minimum 2 branches), annual = 10 months' price; founding-customer
   50% off for the first 12 months in exchange for case study + logo; savings guarantee — if
   verified savings in a month are below 3× the fee, the next month is free. Revisit after the
@@ -229,4 +229,5 @@ Append one row per session. Newest at the bottom. Include Jira keys and PR numbe
 | 2026-10-14 | Claude (orchestrator) | Revised GTM plan (uncommitted); created Jira spaces PP and SP; SP workflow (7 statuses) + 5 Lead custom fields done; J-4 test passed on SP-1 (parked at Not now); wrote this file | User deletes SP-1; J-3 (column order); get user approval → G-0, then J-5 |
 | 2026-10-14 | Claude (orchestrator) | User approved both docs → committed (G-0); created PP-1..PP-13 (J-5); teammate invite to the site dispatched to a side agent (result pending) | Start P-1 / P-2 specs (Speckit) and G-3 draft; user: D-1, D-2, delete SP-1 |
 | 2026-10-14 | Claude (orchestrator) | Spec `specs/022-home-currency-readiness/spec.md` (covers PP-1, PP-2, PP-3 fix) committed c8e2c1a and pushed on branch `022-home-currency-readiness` — **plan/tasks are being produced by a separate Claude CLI session in the main checkout; it owns the 022 PR**. PP-7: three pitch-line drafts posted (recommend C for DMs, A for one-pager). PP-3: 5 synthetic Egyptian test quotes + expected.json attached (no real quotes publicly available). D-1 = B recorded on PP-4. D-2 recommendation posted (awaiting confirmation). Omar invited. SP-1 deleted. This file pushed as PR #72. | User: confirm D-2, pick PP-7 line, merge #72. Then: G-6 draft (PP-10) once D-2 confirmed; E-1 setup (PP-4) after tier confirmation; run PP-3 fixtures before + after 022 ships |
+| 2026-10-14 | Claude (orchestrator) | D-2 confirmed. Pilot agreement drafted as a Claude Doc (EN + AR, 15 clauses, Annex A week-0 baseline): https://claude.ai/code/artifact/7f1d9481-a2a7-43a7-a0e4-b397c64e042b — linked on PP-10. Open question in the doc: liability cap. | User: review agreement, answer liability-cap comment, lawyer review before first signature |
 | | | | |
