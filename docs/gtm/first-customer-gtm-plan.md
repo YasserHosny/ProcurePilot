@@ -43,7 +43,7 @@ becomes a product task (see "How work from this plan is tracked").
 | C1 | The tenant currency already exists (`tenant.currency`, required at sign-up, returned by `/me`, already the default in the budget and threshold-rule forms) — but several web forms ignore it and fall back to **USD** | `order-create.component.ts:81`, `guardrails.component.ts:61`, quotation-review fallbacks | Buyer must switch to EGP on every PO; one miss puts a USD PO against an EGP budget | **Product task, before pilot** — wire the existing `tenant.currency` into the remaining forms; no new setting or schema |
 | C2 | Extraction falls back to **GBP** when a quote's currency is unclear; Azure DI fallback only recognises £/$/€ (not ج.م / جنيه / LE) and hard-codes USD on one path | `structured_parse.py:67`, `azure_di.py:77,153,281`; landed cost defaults GBP (`landed_cost/service.py:89`) | Egyptian quotes can be stored in the wrong currency silently | **Test first** with 5 real Egyptian quotes (incl. Arabic-Indic digits ١٢٣); fix the fallback: recognise Egyptian markers, and route any still-unresolved currency to **human review** — never default it to the tenant currency (project ingestion rule: an unresolved currency is an error, not a fallback) |
 | C3 | Mobile shows raw amounts (`EGP 12500.000000`) — no grouping, no locale formatting | `approval_queue_screen.dart:102`, `request_detail_screen.dart:104-148` | It is the closing shot of the demo video | **Product task, before demo video** — locale-aware money formatting on mobile |
-| C4 | No FX — no exchange rates anywhere; cross-currency arithmetic is refused by design | `money.ts` (`assertSameCurrency`) | Imported items quoted in USD can't be compared with EGP quotes; EGP volatility can erode a week-0 baseline by day 90 | **Workaround:** pilot limited to EGP-quoting suppliers; record baseline and day-90 prices in EGP. Product task after pilot |
+| C4 | No FX — no exchange rates anywhere; cross-currency arithmetic is refused by design | `money.ts` (`assertSameCurrency`) | Imported items quoted in USD can't be compared with EGP quotes; EGP volatility can erode a week-0 baseline before the pilot ends | **Workaround:** pilot limited to EGP-quoting suppliers; record baseline and end-of-pilot prices in EGP. Product task after pilot |
 | C5 | A VAT rate exists (`quotation_line.vat_rate`, used by landed cost) but there is no way to record whether a quoted price **includes** VAT | quotation schema | Egyptian VAT is 14% and suppliers mix inclusive/exclusive prices; savings can be overstated | **Workaround:** ask pilot suppliers to quote ex-VAT. Product task after pilot |
 
 ### Before expanding to the GCC
@@ -154,7 +154,7 @@ Sheet with the same columns is an acceptable fallback.
 - 2+ branches (or 1 branch with a central kitchen/warehouse).
 - Repeat purchasing from 5+ suppliers, with at least weekly orders.
 - Quotes are collected manually today (WhatsApp, phone, Excel).
-- One named decision-maker who will attend a weekly 30-minute check-in.
+- One named decision-maker who will attend two 30-minute check-ins (end of week 1 and day 14).
 - Willing to share last month's prices for 10–20 key items as a baseline.
 
 ## Phase 2 — Convert one conversation into a pilot (weeks 2–4)
@@ -182,14 +182,15 @@ workarounds: EGP-quoting suppliers only, prices compared ex-VAT.
 
 ### The pilot
 
-- Offer a **free 60–90 day pilot** to the first 1–2 qualified prospects — in exchange for
-  weekly check-ins, permission to use their name/logo as a case study, and a testimonial if
+- Offer a **free 2-week (14-day) pilot** to the first 1–2 qualified prospects — in exchange for
+  two check-ins (end of week 1 and day 14), permission to use their name/logo as a case study, and a testimonial if
   it works.
 - **Pilot agreement** (one page, Arabic + English) covering: duration and end date, the
-  success metric and baseline, what happens on day 90 (see below), data ownership (theirs),
+  success metric and baseline, what happens on day 14 (see below), data ownership (theirs),
   confidentiality of supplier pricing, data deletion/export on exit, and a data-protection
   clause consistent with Egypt's Personal Data Protection Law (Law 151/2020).
-- **Week 0 — record the baseline** before changing anything: current quote turnaround
+- **Week 0 — set up and record the baseline** before the 14 days start (the clock starts
+  after onboarding and the first live RFQ, so the customer gets 14 full days of real use): current quote turnaround
   (request → all quotes received), and last month's unit prices for the 10–20 key items.
   Without a baseline the savings report has nothing to prove against.
 - **White-glove the onboarding yourself** — load their suppliers and catalogue (CSV import /
@@ -198,14 +199,15 @@ workarounds: EGP-quoting suppliers only, prices compared ex-VAT.
   to the inbound address, or upload). You're selling outcome + your own hands-on effort,
   which a future competitor with more funding can't easily out-discount.
 - **Set one concrete success metric up front** (e.g. "cut quote turnaround from 3 days to
-  1" or "save X% on next month's supply spend", measured against the week-0 baseline). That
+  1" or "save X% on the baseline items bought during the pilot", measured against the week-0
+  baseline — a monthly-spend figure can't be measured in 2 weeks). That
   number becomes the case study and the opening line for customer #2.
 - **Support:** one WhatsApp group with the pilot's decision-maker and buyer; response within
   4 working hours; anything blocking is fixed or worked around within 2 working days.
 
-### Day 90 — how the pilot ends
+### Day 14 — how the pilot ends
 
-Agree this in the pilot agreement, not on day 89:
+Agree this in the pilot agreement, not on day 13:
 
 - A named monthly price (or price range) for continuing after the pilot.
 - A go/no-go review on the success metric in the last check-in.
