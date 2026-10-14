@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import csv
 import io
+import re
 from collections.abc import Iterable
 from decimal import Decimal
 
+from procurepilot_extraction_worker.currency import detect_currency, parse_localised_decimal
 from procurepilot_extraction_worker.models import ExtractedField, ExtractedLine, ExtractionResult
 from procurepilot_extraction_worker.validation import decimal_from_extracted
 
@@ -17,7 +19,9 @@ def is_structured_mime_type(mime_type: str) -> bool:
     return mime_type in CSV_MIME_TYPES | XLSX_MIME_TYPES
 
 
-def parse_structured_content(content: bytes, *, mime_type: str) -> ExtractionResult:
+def parse_structured_content(
+    content: bytes, *, mime_type: str
+) -> ExtractionResult:
     if mime_type in XLSX_MIME_TYPES:
         return _parse_xlsx(content)
     text = content.decode("utf-8-sig")
@@ -40,7 +44,10 @@ def _parse_xlsx(content: bytes) -> ExtractionResult:
     return _parse_rows(dict_rows)
 
 
-def _parse_rows(rows: Iterable[dict[str, object]]) -> ExtractionResult:
+def _parse_rows(
+    rows: Iterable[dict[str, object]]
+) -> ExtractionResult:
+    rows = list(rows)
     header: dict[str, ExtractedField] = {}
     lines: list[ExtractedLine] = []
     stated_total: ExtractedField | None = None
@@ -56,6 +63,11 @@ def _parse_rows(rows: Iterable[dict[str, object]]) -> ExtractionResult:
         "total": "stated_total",
     }
 
+    document_text = " ".join(
+        str(value) for row in rows for value in row.values() if value is not None
+    )
+    detected_currency = detect_currency(document_text)
+
     for index, row in enumerate(rows, start=1):
         normalised = {str(key).strip().lower(): value for key, value in row.items()}
         for alias, canonical in aliases.items():
@@ -64,9 +76,15 @@ def _parse_rows(rows: Iterable[dict[str, object]]) -> ExtractionResult:
                 if alias == "vat_percent" and value not in {None, ""}:
                     value = format(decimal_from_extracted(value) / Decimal("100"), "f")
                 normalised[canonical] = value
-        currency = str(normalised.get("currency") or "GBP").strip().upper()
-        if "currency" not in header:
+        explicit_currency = str(normalised.get("currency") or "").strip().upper()
+        currency = (
+            explicit_currency
+            if explicit_currency and re.fullmatch(r"[A-Z]{3}", explicit_currency)
+            else detected_currency
+        )
+        if currency is not None and "currency" not in header:
             header["currency"] = _field("currency", currency)
+
         for name in ("supplier_name", "issue_date", "expiry_date"):
             value = normalised.get(name)
             if value not in {None, ""} and name not in header:
@@ -105,11 +123,11 @@ def _parse_rows(rows: Iterable[dict[str, object]]) -> ExtractionResult:
     )
 
 
-def _field(name: str, value: object) -> ExtractedField:
+def _field(name: str, value: object, *, confidence: float = 1.0) -> ExtractedField:
     return ExtractedField(
         name=name,
         value=value,
-        confidence=1.0,
+        confidence=confidence,
         source_page=None,
         source_region=None,
     )
@@ -124,4 +142,9 @@ def _normalise_scalar(name: str, value: object) -> object:
 
 
 def _decimal_string(value: object) -> str:
+    if isinstance(value, str):
+        try:
+            return format(parse_localised_decimal(value), "f")
+        except ValueError:
+            pass
     return format(decimal_from_extracted(value), "f")

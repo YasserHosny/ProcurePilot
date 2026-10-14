@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/api/models.dart';
 import '../../core/i18n/i18n_loader.dart';
+import '../../core/format/money_format.dart';
 import '../service_provider.dart';
 
 /// Read-only purchase-request detail screen.
@@ -100,14 +101,12 @@ class RequestContextSection extends StatelessWidget {
         if (request.estimatedTotal != null)
           RequestInfoRow(
             label: i18n.t('requests.columns.estimatedTotal'),
-            value:
-                '${request.estimatedTotal!.currency} ${request.estimatedTotal!.amount}',
+            value: _formatMoney(i18n, request.estimatedTotal!),
           ),
         if (request.budgetStatus != null) ...[
           RequestInfoRow(
             label: i18n.t('requests.budgetStatus.remainingLabel'),
-            value:
-                '${request.budgetStatus!.remainingAmount.currency} ${request.budgetStatus!.remainingAmount.amount}',
+            value: _formatMoney(i18n, request.budgetStatus!.remainingAmount),
           ),
           if (request.budgetStatus!.exceeds)
             Padding(
@@ -144,9 +143,7 @@ class RequestContextSection extends StatelessWidget {
               title: Text(line.workspaceProductId),
               subtitle: Text(subtitleLines.join('\n')),
               trailing: line.estimatedUnitPrice != null
-                  ? Text(
-                      '${line.estimatedUnitPrice!.currency} ${line.estimatedUnitPrice!.amount}',
-                    )
+                  ? Text(_formatMoney(i18n, line.estimatedUnitPrice!))
                   : null,
             ),
           );
@@ -155,6 +152,9 @@ class RequestContextSection extends StatelessWidget {
     );
   }
 }
+
+String _formatMoney(I18nLoader i18n, Money money) =>
+    formatMoney(money.amount, money.currency, locale: i18n.locale);
 
 class RequestApprovalStepSection extends StatelessWidget {
   const RequestApprovalStepSection({super.key, required this.request});

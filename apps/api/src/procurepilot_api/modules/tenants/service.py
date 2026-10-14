@@ -29,6 +29,7 @@ from procurepilot_api.modules.tenants.models import (
 
 logger = logging.getLogger(__name__)
 
+
 class PostgresPlatformInvitationStore(PlatformInvitationStore):
     def __init__(self, cursor: psycopg.Cursor) -> None:
         self._cursor = cursor

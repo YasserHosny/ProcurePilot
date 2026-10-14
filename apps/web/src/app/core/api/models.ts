@@ -359,6 +359,7 @@ export interface FieldExtraction {
   readonly corrected_value?: unknown | null;
   readonly corrected_by?: string | null;
   readonly corrected_at?: string | null;
+  readonly review_reason?: string | null;
 }
 
 export interface FieldCorrection {
@@ -422,7 +423,8 @@ export type ReviewTaskReason =
   | 'arithmetic_mismatch'
   | 'read_failure'
   | 'review_required'
-  | 'no_supplier_match';
+  | 'no_supplier_match'
+  | 'currency_unresolved';
 
 export interface ReviewTask {
   readonly id: string;

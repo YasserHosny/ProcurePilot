@@ -17,6 +17,7 @@ import { catchError } from 'rxjs/operators';
 import { ApiService } from '../../../core/api/api.service';
 import type { Branch, ConfigOptions, ReferenceOption, Supplier } from '../../../core/api/models';
 import { I18nService } from '../../../core/i18n/i18n.service';
+import { SessionService } from '../../../core/auth/session.service';
 import {
   RfqApi,
   RfqGuardrail,
@@ -47,6 +48,7 @@ export class GuardrailsComponent implements OnInit {
   private readonly api = inject(ApiService);
   private readonly translate = inject(TranslateService);
   private readonly i18n = inject(I18nService);
+  private readonly session = inject(SessionService);
 
   readonly guardrails = signal<RfqGuardrail[]>([]);
   readonly suppliers = signal<readonly Supplier[]>([]);
@@ -58,7 +60,7 @@ export class GuardrailsComponent implements OnInit {
   readonly editingId = signal<string | null>(null);
 
   maxOrderValue = '';
-  currency = 'USD';
+  currency = this.session.homeCurrency() ?? 'USD';
   minResponseCount = 1;
   maxPriceVariancePercent = '';
   supplierAllowlist: string[] = [];
@@ -158,7 +160,7 @@ export class GuardrailsComponent implements OnInit {
 
   private resetForm(): void {
     this.maxOrderValue = '';
-    this.currency = 'USD';
+    this.currency = this.session.homeCurrency() ?? 'USD';
     this.minResponseCount = 1;
     this.maxPriceVariancePercent = '';
     this.supplierAllowlist = [];

@@ -27,3 +27,12 @@ def test_csv_structured_parser_rejects_ambiguous_decimal() -> None:
         assert "ambiguous decimal separator" in str(exc)
     else:
         raise AssertionError("ambiguous decimal should be refused into review")
+
+
+def test_csv_without_currency_or_fallback_does_not_invent_one() -> None:
+    content = b"description,quantity,unit_price\nTomatoes,1,10.00\n"
+
+    result = parse_structured_content(content, mime_type="text/csv")
+
+    assert "currency" not in result.header
+    assert result.lines[0].fields["unit_price"].value["currency"] is None

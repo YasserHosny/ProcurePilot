@@ -41,6 +41,7 @@ class TenantUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=200)
     default_locale: Locale | None = None
     reporting_timezone: str | None = None
+    currency: str | None = Field(default=None, pattern=r"^[A-Z]{3}$")
 
     @field_validator("reporting_timezone")
     @classmethod

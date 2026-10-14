@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from dataclasses import replace
 from datetime import UTC, datetime
 from typing import NamedTuple
 from urllib.error import URLError
@@ -47,7 +48,12 @@ def process_extraction_job(payload: dict[str, str]) -> None:
         document = _document(conn, tenant_id, document_id)
         _mark_running(conn, job_id)
         try:
-            result = _extract(settings, document_id=document_id, document=document)
+            result = _extract(
+                settings,
+                document_id=document_id,
+                document=document,
+            )
+            result = _with_currency_suggestion(result, _tenant_currency(conn, tenant_id))
             arithmetic = validate_arithmetic(result)
             _persist_result(conn, tenant_id, quotation_id, result, arithmetic.status)
             supplier_match = _match_supplier(conn, tenant_id, result.header)
@@ -207,6 +213,16 @@ def _persist_result(
                 result.stated_total,
                 result,
             )
+        if result.suggested_currency:
+            _insert_field(
+                cur,
+                tenant_id,
+                quotation_id,
+                "quotation",
+                quotation_id,
+                ExtractedField("suggested_currency", result.suggested_currency, 0.0),
+                result,
+            )
         if arithmetic_status == "mismatch":
             _upsert_review_task(conn, tenant_id, quotation_id, "arithmetic_mismatch")
 
@@ -263,8 +279,9 @@ def _update_quotation_status(
     supplier_match: SupplierMatch,
 ) -> None:
     stated = result.stated_total.value if result.stated_total is not None else None
-    amount = stated.get("amount") if isinstance(stated, dict) else None
     currency = stated.get("currency") if isinstance(stated, dict) else None
+    amount = stated.get("amount") if isinstance(stated, dict) and currency else None
+    currency = currency or None
     header = result.header
     with conn.cursor() as cur:
         cur.execute(
@@ -339,6 +356,12 @@ def _review_reason(
     # a real PDF quote extracted to zero lines/currency/total with no review task raised.
     if not result.lines and not result.header:
         return "read_failure"
+    currency = result.header.get("currency")
+    if currency is None or _has_uncurried_money(result):
+        # No evidenced currency: nothing is guessed, a human supplies it (FR-011).
+        return "currency_unresolved"
+    if currency.confidence < threshold:
+        return "low_confidence"
     if arithmetic_status == "mismatch":
         return "arithmetic_mismatch"
     if low_confidence_fields(result, threshold):
@@ -346,6 +369,19 @@ def _review_reason(
     if supplier_match.had_candidates and supplier_match.supplier_id is None:
         return "no_supplier_match"
     return None
+
+
+def _with_currency_suggestion(result: ExtractionResult, tenant_currency: str | None) -> ExtractionResult:
+    if "currency" in result.header and not _has_uncurried_money(result):
+        return result
+    return replace(result, suggested_currency=tenant_currency)
+
+
+def _tenant_currency(conn: psycopg.Connection, tenant_id: UUID) -> str | None:
+    with conn.cursor() as cur:
+        cur.execute("select currency from tenant where id = %s", (tenant_id,))
+        row = cur.fetchone()
+    return str(row[0]).upper() if row and row[0] else None
 
 
 def _upsert_review_task(
@@ -499,12 +535,27 @@ def _field_value(line: ExtractedLine, name: str) -> object | None:
 
 def _money_amount(line: ExtractedLine, name: str) -> object | None:
     value = _field_value(line, name)
-    return value.get("amount") if isinstance(value, dict) else None
+    return value.get("amount") if isinstance(value, dict) and value.get("currency") else None
 
 
 def _money_currency(line: ExtractedLine, name: str) -> str | None:
     value = _field_value(line, name)
     return str(value["currency"]) if isinstance(value, dict) and value.get("currency") else None
+
+
+def _has_uncurried_money(result: ExtractionResult) -> bool:
+    money_fields = ("unit_price", "delivery_fee", "discount")
+    for line in result.lines:
+        for name in money_fields:
+            value = _field_value(line, name)
+            if (
+                isinstance(value, dict)
+                and value.get("amount") is not None
+                and not value.get("currency")
+            ):
+                return True
+    stated = result.stated_total.value if result.stated_total is not None else None
+    return isinstance(stated, dict) and stated.get("amount") is not None and not stated.get("currency")
 
 
 def _header_value(header: dict[str, ExtractedField], name: str) -> object | None:

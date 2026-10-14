@@ -742,7 +742,8 @@
         "arithmetic_mismatch": "عدم تطابق حسابي",
         "read_failure": "تعذر قراءة المستند",
         "review_required": "تتطلب مراجعة بشرية",
-        "no_supplier_match": "لا يوجد تطابق مورد"
+        "no_supplier_match": "لا يوجد تطابق مورد",
+        "currency_unresolved": "العملة غير محددة"
       },
       "columns": {
         "id": "معرف عرض السعر",
@@ -788,6 +789,7 @@
     },
     "review": {
       "title": "مراجعة واعتماد عرض السعر",
+      "currencyFallbackReview": "تم تعيين العملة من العملة الأساسية. يُرجى تأكيدها أو تصحيحها.",
       "subtitle": "فحص الحقول المستخرجة جنباً إلى جنب مع المستند الأصلي. تحقق من المورد وعالج أي فروقات.",
       "backToQueue": "العودة إلى قائمة المراجعة",
       "downloadOriginal": "تحميل المستند الأصلي",
@@ -1710,6 +1712,7 @@
   "organisation": {
     "title": "إعدادات المنشأة",
     "subtitle": "إدارة فروع منشأتك ومراكز التكلفة والميزانيات من مكان واحد.",
+    "homeCurrency": { "title": "العملة الأساسية", "label": "العملة الأساسية", "save": "حفظ العملة", "value": "العملة الأساسية" },
     "branchesSectionTitle": "الفروع",
     "costCentresSectionTitle": "مراكز التكلفة",
     "budgetsSectionTitle": "الميزانيات",

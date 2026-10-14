@@ -5,11 +5,13 @@ import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { provideRouter } from '@angular/router';
 import { TranslateModule } from '@ngx-translate/core';
 import { of } from 'rxjs';
+import { signal } from '@angular/core';
 
 import { ApiService } from '../../../core/api/api.service';
 import type { OrderEvidenceProjection } from '../orders-api';
 import { OrdersApiService } from '../orders-api';
 import { RequestsApiService } from '../../requests/requests-api';
+import { SessionService } from '../../../core/auth/session.service';
 import { OrderCreateComponent } from './order-create.component';
 
 import { ActivatedRoute, Router, convertToParamMap } from '@angular/router';
@@ -22,6 +24,7 @@ describe('OrderCreateComponent', () => {
   let requestsApiService: jasmine.SpyObj<RequestsApiService>;
   let router: Router;
   let routeSnapshot: { paramMap: ReturnType<typeof convertToParamMap>; queryParamMap: ReturnType<typeof convertToParamMap> };
+  let homeCurrency: ReturnType<typeof signal<string | undefined>>;
 
   beforeEach(async () => {
     apiService = jasmine.createSpyObj('ApiService', ['suppliers', 'products']);
@@ -36,6 +39,7 @@ describe('OrderCreateComponent', () => {
       paramMap: convertToParamMap({}),
       queryParamMap: convertToParamMap({}),
     };
+    homeCurrency = signal<string | undefined>(undefined);
 
     const mockSupplier = { id: 's1', name: 'Supplier 1' } as import('../../../core/api/models').Supplier;
     const mockProduct = { id: 'p1', tenant_name: 'Product 1', base_unit: 'KG' } as import('../../../core/api/models').Product;
@@ -53,6 +57,7 @@ describe('OrderCreateComponent', () => {
         { provide: ApiService, useValue: apiService },
         { provide: OrdersApiService, useValue: ordersApiService },
         { provide: RequestsApiService, useValue: requestsApiService },
+        { provide: SessionService, useValue: { homeCurrency } },
         { provide: ActivatedRoute, useValue: { snapshot: routeSnapshot } },
       ],
     }).compileComponents();
@@ -72,6 +77,30 @@ describe('OrderCreateComponent', () => {
     expect(component.suppliers().length).toBe(1);
     expect(component.products().length).toBe(1);
     expect(component.lines.length).toBe(1); // One empty line added by default
+  });
+
+  it('defaults the currency to the home currency and submits the selected currency', () => {
+    fixture.destroy();
+    homeCurrency.set('EGP');
+    fixture = TestBed.createComponent(OrderCreateComponent);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+    expect(component.form.controls.currency.value).toBe('EGP');
+
+    component.form.patchValue({
+      order_number: 'PO-EGP-1', supplier_id: 's1',
+      order_date: new Date('2026-09-29T12:00:00Z'), currency: 'USD',
+    });
+    component.lines.at(0).patchValue({ description: 'Test Item', quantity: 1, base_unit: 'EA', unit_price: 10, line_tax: 0 });
+    ordersApiService.createOrder.and.returnValue(of({ id: 'order-egp' } as import('../orders-api').PurchaseOrder));
+
+    component.submit();
+
+    expect(ordersApiService.createOrder.calls.mostRecent().args[0].total.currency).toBe('USD');
+  });
+
+  it('defaults to USD when no home currency is configured', () => {
+    expect(component.form.controls.currency.value).toBe('USD');
   });
 
   it('loads a source request when editing a request-derived draft and preserves links on submit', () => {

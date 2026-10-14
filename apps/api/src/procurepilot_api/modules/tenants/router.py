@@ -1,9 +1,11 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Body, Depends
+from postgrest.exceptions import APIError
 
 from procurepilot_api.config import Settings, get_settings
 from procurepilot_api.deps import CurrentMember, bearer_token, current_member
+from procurepilot_api.errors import UnprocessableEntityError
 from procurepilot_api.modules.auth.jwt import MemberRole
 from procurepilot_api.modules.auth.rbac import require_role
 from procurepilot_api.modules.members.models import SessionResponse
@@ -57,7 +59,24 @@ def update_tenant(
 ) -> Tenant:
     update = payload.model_dump(exclude_none=True)
     if update:
-        authenticated_client(settings, token).table("tenant").update(update).eq(
-            "id", str(member.tenant_id)
-        ).execute()
+        client = authenticated_client(settings, token)
+        currency = update.pop("currency", None)
+        if currency is not None:
+            # One database transaction validates the currency against supported_currency, updates
+            # the tenant and writes the audit event, so a change can never commit unaudited.
+            try:
+                client.rpc(
+                    "set_tenant_currency",
+                    {
+                        "p_currency": currency,
+                        "p_actor_membership_id": str(member.membership_id),
+                        "p_actor_email": member.email,
+                    },
+                ).execute()
+            except APIError as exc:
+                if exc.code == "22023":
+                    raise UnprocessableEntityError(details={"currency": "unsupported"}) from exc
+                raise
+        if update:
+            client.table("tenant").update(update).eq("id", str(member.tenant_id)).execute()
     return load_me_for_token(settings=settings, bearer_token=token, member=member).tenant

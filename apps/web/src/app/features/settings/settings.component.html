@@ -2,6 +2,23 @@
   <h1 class="settings-title">{{ 'organisation.title' | translate }}</h1>
   <p class="settings-subtitle">{{ 'organisation.subtitle' | translate }}</p>
 
+  <section class="home-currency" aria-labelledby="home-currency-title">
+    <h2 id="home-currency-title">{{ 'organisation.homeCurrency.title' | translate }}</h2>
+    @if (session.hasRole('owner')) {
+      <mat-form-field appearance="outline">
+        <mat-label>{{ 'organisation.homeCurrency.label' | translate }}</mat-label>
+        <mat-select [value]="selectedCurrency()" (selectionChange)="selectedCurrency.set($event.value)">
+          @for (currency of currencies(); track currency.code) {
+            <mat-option [value]="currency.code">{{ currencyLabel(currency) }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+      <button mat-flat-button type="button" [disabled]="saving() || selectedCurrency() === session.homeCurrency()" (click)="saveCurrency()">{{ 'organisation.homeCurrency.save' | translate }}</button>
+    } @else {
+      <p>{{ 'organisation.homeCurrency.value' | translate }}: {{ session.homeCurrency() }}</p>
+    }
+  </section>
+
   <app-branch-list></app-branch-list>
 
   <app-cost-centre-list></app-cost-centre-list>

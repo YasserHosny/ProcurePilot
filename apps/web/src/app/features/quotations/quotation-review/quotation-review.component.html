@@ -256,6 +256,7 @@
               <!-- Currency (B8: constrained select) -->
               <div
                 class="field-box"
+                [class.field-needs-review]="isCurrencyFallback(getFieldExtraction('quotation', q.id, 'currency')) && !isFieldCorrected('quotation', q.id, 'currency')"
                 [id]="'field-' + (getFieldExtraction('quotation', q.id, 'currency')?.id || 'currency')"
                 tabindex="0"
                 role="button"
@@ -283,6 +284,9 @@
                   <span class="confidence-pill" [class.low-conf]="getFieldConfidence('quotation', q.id, 'currency') < 0.85">
                     {{ formatConfidence(fe.confidence) }}%
                   </span>
+                }
+                @if (isCurrencyFallback(getFieldExtraction('quotation', q.id, 'currency')) && !isFieldCorrected('quotation', q.id, 'currency')) {
+                  <span class="review-reason">{{ 'quotations.review.currencyFallbackReview' | translate }}</span>
                 }
                 @if (getFieldConfidence('quotation', q.id, 'currency') < 0.85 && !isFieldCorrected('quotation', q.id, 'currency')) {
                   <button

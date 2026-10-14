@@ -30,4 +30,7 @@ class ExtractionResult:
     lines: list[ExtractedLine]
     stated_total: ExtractedField | None = None
     cost_usd: float = 0.0
+    # Never stored as the quotation's currency: tenant home currency offered to the reviewer
+    # only when the document itself did not evidence one (spec 022 FR-011).
+    suggested_currency: str | None = None
     warnings: tuple[str, ...] = field(default_factory=tuple)

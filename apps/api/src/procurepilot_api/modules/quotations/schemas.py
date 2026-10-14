@@ -21,6 +21,7 @@ ReviewTaskReason = Literal[
     "read_failure",
     "review_required",
     "no_supplier_match",
+    "currency_unresolved",
 ]
 
 

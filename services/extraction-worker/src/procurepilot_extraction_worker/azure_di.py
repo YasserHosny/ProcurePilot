@@ -7,6 +7,7 @@ from azure.ai.documentintelligence import DocumentIntelligenceClient
 from azure.ai.documentintelligence.models import AnalyzeDocumentRequest
 from azure.core.credentials import AzureKeyCredential
 
+from procurepilot_extraction_worker.currency import detect_currency, parse_localised_decimal
 from procurepilot_extraction_worker.models import (
     ExtractedField,
     ExtractedLine,
@@ -55,10 +56,14 @@ class AzureDocumentIntelligenceProvider:
         except Exception as exc:
             raise ExtractionProviderError(f"Azure DI analysis failed: {exc}") from exc
 
-        return _parse_invoice_result(result, self.model_version)
+        return _parse_invoice_result(
+            result, self.model_version
+        )
 
 
-def _parse_invoice_result(result: Any, model_version: str) -> ExtractionResult:
+def _parse_invoice_result(
+    result: Any, model_version: str
+) -> ExtractionResult:
     header: dict[str, ExtractedField] = {}
     lines: list[ExtractedLine] = []
     stated_total: ExtractedField | None = None
@@ -74,8 +79,9 @@ def _parse_invoice_result(result: Any, model_version: str) -> ExtractionResult:
     if vendor:
         header["supplier_name"] = _make_field("supplier_name", vendor, fields, "VendorName")
 
-    currency = _infer_currency(fields) or "GBP"
-    header["currency"] = ExtractedField("currency", currency, 0.90, 1, None)
+    currency = _infer_currency_state(fields)[0]
+    if currency is not None:
+        header["currency"] = ExtractedField("currency", currency, 0.90, 1, None)
 
     invoice_date = _content(fields, "InvoiceDate")
     if invoice_date:
@@ -119,9 +125,19 @@ def _parse_invoice_result(result: Any, model_version: str) -> ExtractionResult:
     )
 
 
-def _fallback_from_tables(result: Any, model_version: str) -> ExtractionResult:
+def _fallback_from_tables(
+    result: Any, model_version: str
+) -> ExtractionResult:
     tables = getattr(result, "tables", None) or []
     lines: list[ExtractedLine] = []
+    marker_text = " ".join(
+        str(getattr(cell, "content", "") or "")
+        for table in tables
+        for cell in (getattr(table, "cells", None) or [])
+    )
+    detected_currency = detect_currency(marker_text)
+    currency = detected_currency
+    header = {"currency": ExtractedField("currency", currency, 0.90, 1, None)} if currency else {}
     for table in tables:
         cells = table.cells or []
         headers_row = [c for c in cells if c.row_index == 0]
@@ -142,7 +158,9 @@ def _fallback_from_tables(result: Any, model_version: str) -> ExtractionResult:
                 ef: dict[str, ExtractedField] = {}
                 qty = row_data.get("quantity") or row_data.get("qty")
                 if qty:
-                    ef["quantity"] = ExtractedField("quantity", qty, 0.80, 1, None)
+                    cleaned_qty = _clean_number(qty)
+                    if cleaned_qty:
+                        ef["quantity"] = ExtractedField("quantity", cleaned_qty, 0.80, 1, None)
                 price = (
                     row_data.get("unit price") or row_data.get("price") or row_data.get("rate")
                 )
@@ -150,7 +168,7 @@ def _fallback_from_tables(result: Any, model_version: str) -> ExtractionResult:
                     amount = _clean_number(price)
                     if amount:
                         ef["unit_price"] = ExtractedField(
-                            "unit_price", {"amount": amount, "currency": "USD"}, 0.80, 1, None
+                            "unit_price", {"amount": amount, "currency": currency}, 0.80, 1, None
                         )
                 desc = (
                     row_data.get("description")
@@ -168,7 +186,7 @@ def _fallback_from_tables(result: Any, model_version: str) -> ExtractionResult:
     return ExtractionResult(
         method="azure_di",
         model_version=model_version,
-        header={},
+        header=header,
         lines=lines,
         stated_total=None,
         cost_usd=0.0,
@@ -255,21 +273,24 @@ def _make_field(
 
 
 def _clean_number(s: str) -> str | None:
-    cleaned = re.sub(r"[^\d.,\-]", "", s)
-    if not cleaned or cleaned in (".", ",", "-"):
+    cleaned = re.sub(r"[^\d.,\-٠-٩۰-۹٫٬−﹣]", "", s)
+    if not cleaned or cleaned in (".", ",", "٫", "-"):
         return None
-    if "," in cleaned and "." in cleaned:
-        if cleaned.rfind(",") > cleaned.rfind("."):
-            cleaned = cleaned.replace(".", "").replace(",", ".")
-        else:
-            cleaned = cleaned.replace(",", "")
-    elif "," in cleaned:
+    if "٫" in cleaned or "٬" in cleaned:
+        try:
+            return format(parse_localised_decimal(cleaned), "f")
+        except ValueError:
+            return None
+    if "," in cleaned and "." not in cleaned:
         parts = cleaned.split(",")
         if len(parts) == 2 and len(parts[1]) <= 2:
             cleaned = cleaned.replace(",", ".")
-        else:
-            cleaned = cleaned.replace(",", "")
-    return cleaned
+    elif "," in cleaned:
+        cleaned = cleaned.replace(",", "")
+    try:
+        return format(parse_localised_decimal(cleaned), "f")
+    except ValueError:
+        return None
 
 
 def _normalise_date(value: str) -> str:
@@ -279,18 +300,29 @@ def _normalise_date(value: str) -> str:
 
 
 def _infer_currency(fields: dict[str, Any]) -> str | None:
+    return _infer_currency_state(fields)[0]
+
+
+def _infer_currency_state(fields: dict[str, Any]) -> tuple[str | None, bool]:
+    all_content = " ".join(str(getattr(field, "content", "") or "") for field in fields.values())
+    marker_currency = detect_currency(all_content)
+    codes: set[str] = set()
+    for field in fields.values():
+        marker = detect_currency(str(getattr(field, "content", "") or ""))
+        if marker:
+            codes.add(marker)
     for name in ("InvoiceTotal", "SubTotal", "AmountDue"):
         field = fields.get(name)
         if field is None:
             continue
         cur = getattr(field, "currency_code", None)
         if cur:
-            return str(cur)
+            codes.add(str(cur).upper())
         content = getattr(field, "content", "") or ""
-        if "£" in content or "GBP" in content:
-            return "GBP"
-        if "$" in content or "USD" in content:
-            return "USD"
-        if "€" in content or "EUR" in content:
-            return "EUR"
-    return None
+        for code, marker in (("GBP", "£"), ("USD", "$"), ("EUR", "€")):
+            if marker in content or code in content.upper():
+                codes.add(code)
+    if marker_currency:
+        codes.add(marker_currency)
+    conflict = len(codes) > 1
+    return (next(iter(codes)) if len(codes) == 1 else None, conflict)

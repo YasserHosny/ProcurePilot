@@ -79,6 +79,10 @@ class LandedCostService:
         pack = _pack_row(client, UUID(str(product["id"])))
         quantity = Decimal(str(line.get("quantity") or "1"))
         base_quantity = Decimal(str(pack["base_quantity"]))
+        quote_currency = _quotation_currency(client, UUID(str(line["quotation_id"])))
+        unit_currency = _required_currency(
+            _resolve_currency(line.get("unit_price_currency"), quote_currency)
+        )
         result = compute_landed_cost(
             LandedCostInputs(
                 quantity=quantity,
@@ -86,7 +90,7 @@ class LandedCostService:
                 base_unit=str(canonical["base_unit"]),
                 unit_price=MoneyValue(
                     Decimal(str(line.get("unit_price_amount") or "0")),
-                    str(line.get("unit_price_currency") or "GBP"),
+                    unit_currency,
                 ),
                 vat_rate=Decimal(str(line["vat_rate"]))
                 if line.get("vat_rate") is not None
@@ -95,13 +99,15 @@ class LandedCostService:
                     Decimal(str(line.get("delivery_fee_amount") or "0")),
                     str(
                         line.get("delivery_fee_currency")
-                        or line.get("unit_price_currency")
-                        or "GBP"
+                        or unit_currency
                     ),
                 ),
                 discount=MoneyValue(
                     Decimal(str(line.get("discount_amount") or "0")),
-                    str(line.get("discount_currency") or line.get("unit_price_currency") or "GBP"),
+                    str(
+                        line.get("discount_currency")
+                        or unit_currency
+                    ),
                 ),
             ),
             rule_version=version,
@@ -212,6 +218,30 @@ def _line_row(client: object, line_id: UUID) -> dict[str, object]:
     except APIError as exc:
         raise ServiceUnavailableError(details={"dependency": "database"}) from exc
     return _one_row(response.data, resource="quotation_line")
+
+
+def _resolve_currency(line_currency: object, quote_currency: object) -> str | None:
+    # The tenant's home currency is deliberately not a step here: a quote whose currency was
+    # never established is reported missing, not costed in a guessed currency (spec 022 FR-011).
+    return next((str(value).upper() for value in (line_currency, quote_currency) if value), None)
+
+
+def _required_currency(currency: str | None) -> str:
+    if currency is None:
+        raise ConflictError(details={"reason": "currency_missing"})
+    return currency
+
+
+def _quotation_currency(client: object, quotation_id: UUID) -> str | None:
+    response = (
+        client.table("quotation")
+        .select("currency")
+        .eq("id", str(quotation_id))
+        .limit(1)
+        .execute()
+    )
+    rows = getattr(response, "data", None) or []
+    return str(rows[0]["currency"]).upper() if rows and rows[0].get("currency") else None
 
 
 def _product_row(client: object, product_id: UUID) -> dict[str, object]:

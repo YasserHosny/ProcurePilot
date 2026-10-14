@@ -15,9 +15,9 @@ name: Docs screenshots drift
 #
 # Deliberately does NOT auto-commit regenerated screenshots back into the PR -- a bot silently
 # rewriting binary files in someone else's branch is more surprising than useful. On drift, this
-# job fails with a stat diff and uploads the regenerated screenshots as an artifact so a reviewer
-# can see exactly what changed without running the capture themselves; the fix is to run
-# `pnpm --filter web docs:screenshots` locally and commit the result.
+# job fails (images beyond a 1% pixel-change threshold, resized, added or removed) and uploads the
+# regenerated screenshots as an artifact so a reviewer can see exactly what changed; the fix is to
+# commit the artifact's images (CI-rendered, so they match the runner's fonts) or regenerate locally.
 
 on:
   pull_request:
@@ -26,6 +26,7 @@ on:
       - 'apps/web/tests/e2e/user-documentation-screenshots.spec.ts'
       - 'apps/web/tests/e2e/support/canonical-flow.ts'
       - 'apps/web/playwright.docs.config.ts'
+      - 'scripts/docs_screenshots_diff.py'
       - 'packages/i18n/**'
   workflow_dispatch: {}
   schedule:
@@ -147,13 +148,12 @@ jobs:
 
       - name: Fail on drift
         run: |
-          if ! git diff --quiet -- docs/user/screenshots/; then
-            echo "::error::Documentation screenshots are stale. Regenerate locally with \`pnpm --filter web docs:screenshots\` (requires the local stack running — see docs/user/screenshots' own README or quickstart.md) and commit the result."
-            echo "--- files that changed ---"
-            git diff --stat -- docs/user/screenshots/
+          # Pixel-threshold comparison, not byte-exact: two CI runs of identical code differ by
+          # up to ~0.5% of pixels (timestamps, seeded data). See scripts/docs_screenshots_diff.py.
+          if ! uv run --with pillow python scripts/docs_screenshots_diff.py; then
+            echo "::error::Documentation screenshots are stale. Download the regenerated-doc-screenshots artifact (or run \`pnpm --filter web docs:screenshots\` against a local stack) and commit the result."
             exit 1
           fi
-          echo "Screenshots match what's committed -- no drift."
 
       - name: Upload regenerated screenshots on drift
         if: failure()

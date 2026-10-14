@@ -41,11 +41,6 @@ function moneyGroupValidator(amountKey: string, currencyKey: string) {
       group.get(currencyKey)?.setErrors({ currencyRequired: true });
       return { currencyRequired: true };
     }
-    if (currency && !amount) {
-      group.get(amountKey)?.setErrors({ amountRequired: true });
-      return { amountRequired: true };
-    }
-
     if (group.get(currencyKey)?.hasError("currencyRequired")) {
       group.get(currencyKey)?.setErrors(null);
     }
@@ -110,9 +105,9 @@ export class SupplierFormComponent implements OnInit {
       payment_terms: [""],
       lead_time_days: [null, [Validators.min(0)]],
       min_order_amount: ["", [Validators.pattern(/^\d+(\.\d{1,4})?$/)]],
-      min_order_currency: [""],
+      min_order_currency: [this.session.homeCurrency() ?? "USD"],
       delivery_fee_amount: ["", [Validators.pattern(/^\d+(\.\d{1,4})?$/)]],
-      delivery_fee_currency: [""],
+      delivery_fee_currency: [this.session.homeCurrency() ?? "USD"],
       contact_email: ["", [Validators.email]],
       status: ["active"],
     },

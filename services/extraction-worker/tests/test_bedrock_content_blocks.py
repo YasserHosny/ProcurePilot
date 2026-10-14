@@ -57,3 +57,20 @@ def test_pdf_uses_document_content_block() -> None:
     assert not any("image" in block for block in content)
     document_block = next(block for block in content if "document" in block)
     assert document_block["document"]["format"] == "pdf"
+
+
+def test_bedrock_guessed_currency_is_discarded() -> None:
+    mock_client = MagicMock()
+    mock_client.converse.return_value = {
+        "output": {"message": {"content": [{"text": '{"header":{"currency":"USD"},"lines":[],"stated_total":{"amount":"1250","currency":"USD"}}'}]}},
+        "usage": {},
+    }
+    mock_session = MagicMock()
+    mock_session.client.return_value = mock_client
+    with patch("procurepilot_extraction_worker.bedrock.boto3.Session", return_value=mock_session):
+        result = BedrockExtractionProvider(settings=_settings()).extract(
+            document_id="doc", mime_type="application/pdf", storage_path="path",
+            document_bytes=b"quotation total 1250",
+        )
+    assert "currency" not in result.header
+    assert result.stated_total.value == {"amount": "1250", "currency": None}
