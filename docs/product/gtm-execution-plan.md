@@ -1,0 +1,226 @@
+# GTM Execution Plan — First Customer (handoff + tracking)
+
+Status: **active** · Created: 2026-10-14 · Source of truth for *content*:
+[`first-customer-gtm-plan.md`](first-customer-gtm-plan.md). This file tracks *execution*: what is
+set up, what is next, who does it, and what blocks what.
+
+---
+
+## 1. How to use this file (cold start, any model)
+
+**Read first, in order:**
+
+1. `CLAUDE.md` — project rules (8 non-negotiables, stack, commands). Binding.
+2. `docs/product/first-customer-gtm-plan.md` — the plan: ICP, fit gaps, currency gaps C1–C5 /
+   G1–G5 (with file:line refs), demo walkthrough, pilot prerequisites, pipeline stages.
+3. This file — sections 2 (state), 3 (tasks), 4 (dependencies), 5 (handoff log).
+4. Only if working on the pilot environment: `docs/operations/self-hosted-deployment-plan.md`
+   (status: draft, not started).
+
+**Then:** append a row to the handoff log (section 5) before you stop.
+
+### Atlassian
+
+| Item | Value |
+|---|---|
+| Site | `https://yasser-hosny.atlassian.net` |
+| cloudId | `125b7789-fa8b-449d-b2de-ef10f5400fd4` |
+| Products | Jira (**business tier only** — no Jira Software: no Epic, no Bug, no sprints, no GitHub dev panel), Jira Product Discovery, Confluence, Loom |
+| Space `PP` | ProcurePilot — non-code work + demo/pilot gaps |
+| Space `SP` | Sales Pipeline — one Lead per prospect company |
+| Space `MDP` | JPD sample data (MDP-1..6) — **ignore** |
+
+**Tool capabilities:**
+
+| Tool | Can | Cannot |
+|---|---|---|
+| Atlassian MCP connector (Claude Code) | create / edit / transition / comment issues, JQL search, Confluence pages | create spaces, rename statuses, add/edit custom fields, reorder board columns |
+| Browser (Claude in Chrome, user's signed-in session) | space/field/workflow/board admin | — (still: no deletes, no sends without user OK) |
+| Non-Claude models (Codex, agy, OpenCode) | code + docs in the repo | no Atlassian access assumed — leave Jira steps for an orchestrator with the connector, or the user |
+
+### Workflow split (decided, user-approved 2026-10-14)
+
+- **Code** → Speckit (`spec.md` → `plan.md` → `tasks.md`) → delegation lanes → PR → CI → merge.
+  Never duplicated into Jira.
+- **GTM / ops** → Jira `PP`. Done = sent / published / held / signed (not "drafted").
+  Drafting (scripts, one-pager copy, agreements) can be done directly by the orchestrator — no
+  code lane needed.
+- **Bridge (one-way)**: demo/pilot gap → `PP` task labelled `from-demo` / `from-pilot` → if it
+  needs code, a Speckit spec → the `PP` task links to the PR.
+- **Sales conversations** → `SP` only, never `PP`.
+
+### Repo / delegation rules that bite (from user memory; details in `CLAUDE.md` + memory)
+
+- Orchestrator dispatches and reviews; implementation goes through lanes (Codex / agy / OpenCode
+  fallback). **Tenancy work (RLS, tenancy migrations, JWT path) stays in-house.**
+- **Commit a checkpoint before any Codex dispatch** (Codex once wiped a clone). Run Codex with
+  `< /dev/null`, in the foreground.
+- **agy needs a real `git clone`** under `~/agy-clones/`, not `git worktree add`; always
+  `--dangerously-skip-permissions`; clear a bloated `.angular` cache first.
+- Check `df -h /` before dispatch (root disk nearly full).
+- Concurrent agents share this checkout — use isolation or wait; don't run git while another
+  agent is working.
+- Proof of execution required: a task is not done until its tests/commands were actually run.
+- Drive the real UI end-to-end after a change, not just unit tests.
+- Hosted (`procurepilot.iron-sys.com`) is the **test/staging** DB — fine for demos, **not** for
+  real customer data.
+
+---
+
+## 2. Current state (snapshot 2026-10-14)
+
+### GTM plan file
+
+| Item | State |
+|---|---|
+| `docs/product/first-customer-gtm-plan.md` | Revised and approved 2026-10-14; committed with this file (G-0). Other untracked files under `docs/` are unrelated — don't sweep them into commits. |
+
+### Space `PP` — ProcurePilot
+
+| Setting | Value | State |
+|---|---|---|
+| Template | Task tracking (team-managed, business) | Done |
+| Work types | Task, Sub-task | Done |
+| Labels in use | `from-demo` (product gaps), `gtm`, `ops`; `from-pilot` reserved | In use |
+| Issues | 13 tasks created 2026-10-14 (J-5) — mapping below | Done |
+
+**Plan ID → Jira key** (summaries are prefixed with the plan ID, e.g. `[G-2] …`):
+
+| Plan ID | Key | Plan ID | Key | Plan ID | Key |
+|---|---|---|---|---|---|
+| P-1 (C1) | PP-1 | G-1 | PP-5 | G-6 | PP-10 |
+| P-2 (C3) | PP-2 | G-2 | PP-6 | G-7 | PP-11 |
+| P-3 (C2) | PP-3 | G-3 | PP-7 | G-8 | PP-12 |
+| E-1 | PP-4 | G-4 | PP-8 | G-9 | PP-13 |
+| | | G-5 | PP-9 | | |
+
+D-1..D-3 (user decisions), J-* (setup) and G-0 (commit) are tracked in this file only.
+
+### Space `SP` — Sales Pipeline
+
+| Setting | Value | State |
+|---|---|---|
+| Template | Sales pipeline (team-managed) | Done |
+| Work types | Lead (id `10006`), Customer (id `10005`) — one shared workflow | Done |
+| Statuses | Target (new) → Contacted, Talked, Qualified, Pilot offered (in progress) → Pilot, Not now (done); every status reachable from any status | Done, verified via connector |
+| Board column order | "Pilot offered" may have been appended at the end | **Verify** (J-3) |
+| Template fields on Lead | Company size, Website, Email, Phone number, Start date, Category, Team | Done |
+| Custom field: Contact (short text) | `customfield_10074` | Done |
+| Custom field: Role (short text) | `customfield_10073` | Done |
+| Custom field: City (short text) | `customfield_10072` | Done |
+| Custom field: Branches (number) | `customfield_10071` | Done |
+| Custom field: Source (dropdown: Personal network / Community / LinkedIn / In person) | `customfield_10070` | Done |
+| Transition IDs (any → status) | Target `21` · Contacted `31` · Talked `41` · Qualified `51` · Pilot offered `2` · Pilot `61` · Not now `71` | Verified |
+| Conventions | Due date = next-step date · one comment per touch · one Lead per company | Agreed |
+| End-to-end test | SP-1 `[TEST] Example Bakery Co.` — create with all 5 custom fields, comment, → Talked, overdue JQL, Talked+ count JQL all passed; parked at Not now | Done — **SP-1 awaits deletion by the user** |
+
+Connector field names work directly: `createJiraIssue` with `additional_fields: {"Contact": ..., "Role": ..., "City": ..., "Branches": 6, "Source": "LinkedIn", "duedate": "YYYY-MM-DD"}`.
+
+---
+
+## 3. Task list
+
+Owner types: **User** (only the user can do it) · **Orch** (orchestrator model with repo +
+Atlassian connector) · **Lane** (code lane via Speckit: Codex / agy / OpenCode) · **Browser**
+(Claude in Chrome on the user's session).
+
+### D — Decisions (user only)
+
+- [ ] **D-1 Pilot environment**: self-hosted production ($0, user owns uptime/backups) vs. a
+  separate paid hosted production project. Owner: User. Blocks: E-1. Done: choice recorded in
+  handoff log + GTM plan.
+- [ ] **D-2 Post-pilot price** (monthly price or range). Owner: User. Blocks: G-6 (agreement
+  final). Done: number written into the pilot agreement.
+- [ ] **D-3 Add Jira's free software plan?** (gets Epic/Bug/GitHub linking). Owner: User.
+  Blocks: nothing. Done: yes/no recorded. Default if undecided: no.
+
+### J — Jira setup
+
+| ID | Task | Owner | Depends on | Done when | Space |
+|---|---|---|---|---|---|
+| [x] J-1 | Verify Contact, Role, City are saved on Lead; add Branches (number) and Source (dropdown, 4 options); click "Save changes" | Browser | — | All 5 fields visible on a new Lead's create screen | SP |
+| [ ] J-2 | Confirm the template fields (Company size, Website, Email, Phone number, Start date, Category, Team) are still present; hide any unused from the create screen only if the user wants | Browser | J-1 | Create screen reviewed | SP |
+| [ ] J-3 | Verify board column order is Target, Contacted, Talked, Qualified, Pilot offered, Pilot, Not now; reorder if "Pilot offered" is last | Browser | — | Board columns in stage order | SP |
+| [~] J-4 | End-to-end test via connector: create dummy Lead → transition to Talked → add comment → set due date → run JQL `project = SP AND duedate <= now() AND status != "Not now"` and confirm it returns the dummy. **Passed 2026-10-14 (SP-1).** Remaining: **user** deletes SP-1 in the Jira UI (models do not hard-delete) | User | J-1 | SP-1 deleted | SP |
+| [x] J-5 | Create PP tasks G-1..G-9, P-1..P-3 (as `from-demo`), E-1 below; put the task ID from this file in each summary (e.g. `[G-2] Demo video`) | Orch | G-0 | Issues exist; keys written back into this file's tables | PP |
+| [ ] J-6 | Save the "weekly review" JQL as a filter (needs browser if connector can't save filters) | Browser | J-4 | Filter "SP — due or overdue" exists | SP |
+
+### G — GTM assets (non-code, Jira PP)
+
+| ID | Task | Owner | Depends on | Done when | Space |
+|---|---|---|---|---|---|
+| [x] G-0 | Commit `first-customer-gtm-plan.md` after user approval (that file only) | Orch | user approval | Commit on `main` (or PR) containing only that file | — (git) |
+| [ ] G-1 | Demo tenant on hosted: dedicated tenant, Arabic supplier names, ~30-item F&B catalogue, 2–3 branches, EGP prices, one RFQ ready to send; no test leftovers | Orch + User | P-1 (forms default to EGP) | Tenant walkthrough runs clean end-to-end | PP |
+| [ ] G-2 | 3-min demo video, Arabic narration + Arabic UI, Loom or OBS. Script must follow the corrected walkthrough (human sends RFQ; guardrail on → draft purchase request; mobile approves the *request*; PO generated on web) | User (record), Orch (script) | G-1, P-1, P-2 | Video link stored on the PP task | PP |
+| [ ] G-3 | Pitch line (Arabic + English) finalised | Orch draft, User approve | — | Approved text on the PP task | PP |
+| [ ] G-4 | One-pager (Arabic + English): before (WhatsApp + Excel) vs. after (RFQ → compare → approve → PO) | Orch copy, User design | G-3 | Published PDF/link | PP |
+| [ ] G-5 | Outreach DM script (Arabic + English), diagnostic-question first | Orch draft, User approve | G-3 | Approved script on PP task | PP |
+| [ ] G-6 | Pilot agreement (1 page, Arabic + English) + week-0 baseline template: duration, success metric + baseline, day-90 terms, data ownership, supplier-price confidentiality, export/deletion on exit, Egypt PDPL (Law 151/2020) clause, C4/C5 workarounds (EGP-only suppliers, ex-VAT) | Orch draft, User approve (legal review advisable) | D-2 | Signed-ready PDF; baseline template (10–20 items, unit price, quote turnaround) | PP |
+| [ ] G-7 | Community + target list: personal network audit, Egyptian founder/SME communities, LinkedIn search; each prospect → an SP Lead at Target | User (list), Orch (create Leads) | J-1, J-4 | ≥20 Leads in SP | SP |
+| [ ] G-8 | Pilot onboarding runbook: CSV/manual supplier + catalogue load, branches/approvers, inbound-email address for WhatsApp-forwarded quotes, first live RFQ, support WhatsApp group (4 working-hour response) | Orch | E-1, P-1, P-3 | Runbook doc linked on PP task, dry-run on demo tenant | PP |
+| [ ] G-9 | Outreach: work SP to 20 conversations at Talked+ | User | G-2, G-5, G-7 | 20 Leads at Talked or beyond | SP |
+
+### P — Product tasks (PP `from-demo` → Speckit spec → code lane)
+
+Each: create PP task labelled `from-demo` → write Speckit spec/plan/tasks → dispatch to a lane →
+PR → CI → merge → link PR on the PP task. Refs are in the GTM plan's currency-gap tables.
+
+| ID | Gap | Task | Owner | Depends on | Done when |
+|---|---|---|---|---|---|
+| [ ] P-1 | **C1** | Tenant default/home currency setting; all web forms (PO create, guardrails, quotation review fallbacks) default to it instead of USD. Touches tenant settings — **schema/RLS part stays in-house** | Orch (spec + tenancy part), Lane (forms) | — | Merged; demo tenant set to EGP and every form opens in EGP |
+| [ ] P-2 | **C3** | Locale-aware money formatting on mobile (grouping, currency minor units, ar/en) for approval queue + request detail | Lane | — | Merged; `flutter test` green; screenshots show `EGP 12,500.00` (and Arabic locale equivalent) |
+| [ ] P-3 | **C2** | Test extraction with 5 real Egyptian quotes (incl. Arabic-Indic digits, ج.م / جنيه / LE); fix GBP fallback → tenant default (also Azure DI £/$/€-only + hard-coded USD path; landed-cost GBP default) | Orch (test), Lane (fix) | P-1 (tenant default exists) | Test results recorded on PP task; fix merged; the 5 quotes extract in EGP |
+
+### E — Pilot environment
+
+- [ ] **E-1 Stand up the pilot environment** per D-1. If self-hosted: Phases 1–2 of
+  `docs/operations/self-hosted-deployment-plan.md` (ops only, no code). Either way: daily automated
+  DB backups + **one tested restore**, migrations as an explicit deploy step, secrets separate
+  from staging. Owner: Orch + User (infra access). Depends on: D-1. Done: restore tested and
+  recorded; app reachable over HTTPS; Mailgun inbound reaches it. Space: PP.
+
+### B — Backlog (after pilot / before GCC; not blocking customer #1)
+
+- [ ] **B-C4** FX / exchange rates (pilot workaround: EGP-only suppliers, EGP baseline). Lane, after pilot.
+- [ ] **B-C5** VAT model: rate + inclusive/exclusive flag (workaround: ex-VAT quotes). Lane, after pilot.
+- [ ] **B-G1** One shared currency list (add QAR, KWD, BHD, OMR). Before first GCC prospect.
+- [ ] **B-G2** 3-decimal currencies (KWD/BHD/OMR) rounded to 2 in ~23 places → use currency minor units. Before GCC.
+- [ ] **B-G3** Extraction: recognise ر.س / د.إ / د.ك / ر.ق / ر.ع. Before GCC (pairs with P-3).
+- [ ] **B-G4** Per-country VAT (builds on B-C5). Before GCC.
+- [ ] **B-G5** KSA ZATCA e-invoicing — only when accounting matters for a Saudi customer.
+- [ ] Fit gaps from the GTM plan (WhatsApp channel, non-Square POS, Odoo/local accounting, PO
+  approval on mobile) — only if a real pilot is blocked; enter as `from-pilot`.
+
+---
+
+## 4. Dependency order
+
+```text
+user approval ─► G-0 (commit plan) ─► J-5 (create PP tasks)
+J-1 ─► J-2, J-4 ─► J-6 ; J-3 independent
+J-1 + J-4 ─► G-7 (Leads) ─┐
+G-3 ─► G-4, G-5 ──────────┤
+P-1 (C1) ─► G-1 (demo tenant) ─┐
+P-2 (C3) ──────────────────────┴─► G-2 (demo video) ─► G-9 (outreach, 20 conversations)
+P-1 ─► P-3 (C2 test + fix)
+D-1 ─► E-1 (pilot env)
+D-2 ─► G-6 (pilot agreement)
+E-1 + P-1 + P-3 ─► G-8 (onboarding runbook) ─► first real customer record
+G-9 ─► Qualified Lead ─► G-6 offered ─► Pilot (needs G-8 done)
+```
+
+**Critical path to the demo video:** P-1 + P-2 + G-1 → G-2.
+**Critical path to onboarding a pilot:** D-1 → E-1, plus P-1 → P-3, then G-8.
+Can start now with no blockers: J-1, J-3, G-3, P-1, P-2, D-1/D-2/D-3.
+
+---
+
+## 5. Handoff log
+
+Append one row per session. Newest at the bottom. Include Jira keys and PR numbers.
+
+| Date | Model / agent | What was done | Next step |
+|---|---|---|---|
+| 2026-10-14 | Claude (orchestrator) | Revised GTM plan (uncommitted); created Jira spaces PP and SP; SP workflow (7 statuses) + 5 Lead custom fields done; J-4 test passed on SP-1 (parked at Not now); wrote this file | User deletes SP-1; J-3 (column order); get user approval → G-0, then J-5 |
+| 2026-10-14 | Claude (orchestrator) | User approved both docs → committed (G-0); created PP-1..PP-13 (J-5); teammate invite to the site dispatched to a side agent (result pending) | Start P-1 / P-2 specs (Speckit) and G-3 draft; user: D-1, D-2, delete SP-1 |
+| | | | |
