@@ -2,16 +2,19 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { TranslateModule } from '@ngx-translate/core';
 import { of, throwError } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
+import { signal } from '@angular/core';
 
 import { GuardrailsComponent } from './guardrails.component';
 import { RfqApi, RfqGuardrail } from '../rfq-api';
 import { ApiService } from '../../../core/api/api.service';
+import { SessionService } from '../../../core/auth/session.service';
 
 describe('GuardrailsComponent', () => {
   let component: GuardrailsComponent;
   let fixture: ComponentFixture<GuardrailsComponent>;
   let rfqApi: jasmine.SpyObj<RfqApi>;
   let api: jasmine.SpyObj<ApiService>;
+  const homeCurrency = signal<string | undefined>('EGP');
 
   const guardrail: RfqGuardrail = {
     id: 'g-1', tenant_id: 't-1', created_by_membership_id: 'm-1',
@@ -46,6 +49,11 @@ describe('GuardrailsComponent', () => {
       providers: [
         { provide: RfqApi, useValue: rfqApi },
         { provide: ApiService, useValue: api },
+        { provide: SessionService, useValue: {
+          homeCurrency,
+          isAuthenticated: signal(false),
+          activeLocale: signal('en'),
+        } },
       ],
     }).compileComponents();
 
@@ -57,6 +65,13 @@ describe('GuardrailsComponent', () => {
   it('renders the configured guardrail list', () => {
     expect(component.guardrails()).toEqual([guardrail]);
     expect(fixture.nativeElement.textContent).toContain('rfq.guardrails.title');
+  });
+
+  it('defaults and resets the form currency to the home currency', () => {
+    expect(component.currency).toBe('EGP');
+    component.currency = 'GBP';
+    component.cancelEdit();
+    expect(component.currency).toBe('EGP');
   });
 
   it('rejects a non-positive order value and invalid variance', () => {

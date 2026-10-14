@@ -359,6 +359,7 @@ export interface FieldExtraction {
   readonly corrected_value?: unknown | null;
   readonly corrected_by?: string | null;
   readonly corrected_at?: string | null;
+  readonly review_reason?: string | null;
 }
 
 export interface FieldCorrection {

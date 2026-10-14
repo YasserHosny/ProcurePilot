@@ -171,7 +171,7 @@ export class ApiService {
     return this.http.get<Tenant>(`${this.base}/tenant`);
   }
 
-  updateTenant(body: { name?: string; default_locale?: 'en' | 'ar' }): Observable<Tenant> {
+  updateTenant(body: { name?: string; default_locale?: 'en' | 'ar'; currency?: string }): Observable<Tenant> {
     return this.http.patch<Tenant>(`${this.base}/tenant`, body);
   }
 

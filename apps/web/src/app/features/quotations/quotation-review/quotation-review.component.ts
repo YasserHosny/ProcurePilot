@@ -239,7 +239,7 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
 
     for (const fe of q.field_extractions) {
       const conf = parseFloat(fe.confidence);
-      if (conf < 0.85 || !fe.extracted_value) {
+      if (conf < 0.85 || !fe.extracted_value || (fe.field_name === 'currency' && fe.review_reason === 'currency_fallback')) {
         flagged.push({
           id: fe.id,
           entityType: fe.entity_type,
@@ -262,7 +262,7 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
     if (q.lines.length === 0 && pendingNewLines.length === 0) return null;
 
     let total = 0;
-    const currency = q.currency || q.lines[0]?.unit_price?.currency || pendingNewLines[0]?.unit_price_currency || 'USD';
+    const currency = q.currency || q.lines[0]?.unit_price?.currency || pendingNewLines[0]?.unit_price_currency || this.session.homeCurrency() || 'USD';
 
     for (const line of q.lines) {
       if (this.pendingRemoveLineIds().has(line.id)) continue;
@@ -606,6 +606,10 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
     const fe = this.getFieldExtraction(entityType, entityId, fieldName);
     if (!fe) return 1.0;
     return parseFloat(fe.confidence);
+  }
+
+  isCurrencyFallback(fe: FieldExtraction | undefined): boolean {
+    return !!fe && fe.field_name === 'currency' && (fe.review_reason === 'currency_fallback' || parseFloat(fe.confidence) < 0.85);
   }
 
   normalizeMoneyInput(value: string): string {
@@ -1146,7 +1150,7 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
     const text = this.newLineText().trim();
     if (!text) return;
     const q = this.quotation();
-    const currency = q?.currency || 'USD';
+    const currency = q?.currency || this.session.homeCurrency() || 'USD';
     const newLine: NewQuotationLine = {
       original_text: text,
       quantity: this.newLineQuantity() || null,

@@ -788,6 +788,7 @@
     },
     "review": {
       "title": "Quotation Review & Authorization",
+      "currencyFallbackReview": "Currency defaulted from home currency. Please confirm or correct it.",
       "subtitle": "Inspect extracted fields side by side with the source document. Verify supplier and resolve any discrepancies.",
       "backToQueue": "Back to Review Queue",
       "downloadOriginal": "Download original document",
@@ -1710,6 +1711,7 @@
   "organisation": {
     "title": "Organisation Settings",
     "subtitle": "Manage your organisation's branches, cost centres, and budgets in one place.",
+    "homeCurrency": { "title": "Home currency", "label": "Home currency", "save": "Save currency", "value": "Home currency" },
     "branchesSectionTitle": "Branches",
     "costCentresSectionTitle": "Cost Centres",
     "budgetsSectionTitle": "Budgets",
