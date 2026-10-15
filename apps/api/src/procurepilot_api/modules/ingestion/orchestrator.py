@@ -130,9 +130,9 @@ def process_inbound_email(
                 for rec in open_recipients:
                     if rec["id"] == matched_rfq_recipient_id:
                         matched_rfq_id = rec["rfq_id"]
-                        if supplier_id is None:
-                            supplier_id = rec["supplier_id"]
-                            match_method = "rfq_reply"
+                        # We know exactly which supplier the RFQ was sent to.
+                        supplier_id = rec["supplier_id"]
+                        match_method = "rfq_reply"
                         break
 
         _act_as_tenant(conn, tenant_id)

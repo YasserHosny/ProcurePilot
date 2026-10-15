@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from email.message import EmailMessage
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import psycopg
 import pytest
@@ -107,6 +107,209 @@ def _build_email(
     elif attachment is not None:
         msg.add_attachment(attachment, maintype="application", subtype="pdf", filename="q.pdf")
     return msg.as_bytes()
+
+
+def _build_rfq_reply(*, from_addr: str, message_id: str, in_reply_to: str) -> bytes:
+    msg = EmailMessage()
+    msg["From"] = from_addr
+    msg["To"] = "buyer@ingest.procurepilot.local"
+    msg["Subject"] = "Quotation"
+    msg["Message-ID"] = message_id
+    msg["In-Reply-To"] = in_reply_to
+    msg.set_content("Please find attached our latest quotation.")
+    msg.add_attachment(b"%PDF-1.4 quote", maintype="application", subtype="pdf", filename="q.pdf")
+    return msg.as_bytes()
+
+
+def _seed_rfq_recipient(tenant_id: UUID, supplier_id: UUID) -> tuple[UUID, str]:
+    recipient_id = uuid4()
+    idempotency_key = uuid4()
+    message_id = f"<{uuid4()}@procurepilot.test>"
+    with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                insert into rfq (tenant_id, created_by_membership_id, status, needed_by_date,
+                                 idempotency_key)
+                values (%s, (select id from membership where tenant_id = %s limit 1),
+                        'sent', current_date + 30, %s)
+                returning id
+                """,
+                (tenant_id, tenant_id, idempotency_key),
+            )
+            rfq_id = cur.fetchone()[0]
+            message_id = f"<{uuid4()}@procurepilot.test>"
+            cur.execute(
+                """
+                insert into rfq_recipient (id, tenant_id, rfq_id, supplier_id, status,
+                                           outbound_message_id)
+                values (%s, %s, %s, %s, 'sent', %s)
+                """,
+                (recipient_id, tenant_id, rfq_id, supplier_id, message_id),
+            )
+        conn.commit()
+    return recipient_id, message_id
+
+
+def test_shared_address_rfq_replies_use_their_recipient_supplier(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = settings_for_test_db(monkeypatch)
+    _patch_storage_and_queue(monkeypatch)
+    with committed_smart_context("ingestion-rfq-shared-address", supplier_count=2) as context:
+        supplier_a, supplier_b = context.supplier_ids
+        _seed_email_config(context.workspace.tenant_id, context.workspace.membership_id)
+        recipient_a, message_a = _seed_rfq_recipient(context.workspace.tenant_id, supplier_a)
+        recipient_b, message_b = _seed_rfq_recipient(context.workspace.tenant_id, supplier_b)
+
+        results = []
+        for suffix, supplier, recipient, rfq_message in (
+            ("a", supplier_a, recipient_a, message_a),
+            ("b", supplier_b, recipient_b, message_b),
+        ):
+            result = orchestrator_module.process_inbound_email(
+                settings,
+                tenant_id=context.workspace.tenant_id,
+                raw_email_bytes=_build_rfq_reply(
+                    from_addr="shared.sender@gmail.com",
+                    message_id=f"<shared-{suffix}@gmail.com>",
+                    in_reply_to=rfq_message,
+                ),
+                raw_email_ref=None,
+            )
+            assert result["supplier_id"] == str(supplier)
+            assert result["match_method"] == "rfq_reply"
+            results.append((result, recipient, supplier))
+
+        with psycopg.connect(TEST_DATABASE_URL or "", row_factory=dict_row) as conn:
+            with conn.cursor() as cur:
+                for result, recipient, supplier in results:
+                    cur.execute(
+                        "select supplier_id, match_method from ingestion_email_log "
+                        "where quotation_id = %s",
+                        (UUID(result["quotation_id"]),),
+                    )
+                    log_row = cur.fetchone()
+                    cur.execute(
+                        "select supplier_id from quotation where id = %s",
+                        (UUID(result["quotation_id"]),),
+                    )
+                    quotation_row = cur.fetchone()
+                    cur.execute(
+                        "select quotation_id from rfq_response where rfq_recipient_id = %s",
+                        (recipient,),
+                    )
+                    response_row = cur.fetchone()
+                    assert log_row["supplier_id"] == supplier
+                    assert log_row["match_method"] == "rfq_reply"
+                    assert quotation_row["supplier_id"] == supplier
+                    assert str(response_row["quotation_id"]) == result["quotation_id"]
+
+
+def test_rfq_reply_overrides_conflicting_address_history(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = settings_for_test_db(monkeypatch)
+    _patch_storage_and_queue(monkeypatch)
+    with committed_smart_context("ingestion-rfq-history-conflict", supplier_count=2) as context:
+        supplier_a, supplier_b = context.supplier_ids
+        _seed_email_config(context.workspace.tenant_id, context.workspace.membership_id)
+        recipient_b, message_b = _seed_rfq_recipient(context.workspace.tenant_id, supplier_b)
+        with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """insert into ingestion_email_log
+                       (tenant_id, message_id, from_address, from_domain, status,
+                        supplier_id, match_method)
+                       values (%s, %s, %s, %s, 'completed', %s, 'manual')""",
+                    (
+                        context.workspace.tenant_id,
+                        f"<{uuid4()}@gmail.com>",
+                        "shared.sender@gmail.com",
+                        "gmail.com",
+                        supplier_a,
+                    ),
+                )
+            conn.commit()
+
+        result = orchestrator_module.process_inbound_email(
+            settings,
+            tenant_id=context.workspace.tenant_id,
+            raw_email_bytes=_build_rfq_reply(
+                from_addr="shared.sender@gmail.com",
+                message_id=f"<{uuid4()}@gmail.com>",
+                in_reply_to=message_b,
+            ),
+            raw_email_ref=None,
+        )
+        assert result["supplier_id"] == str(supplier_b)
+        assert result["match_method"] == "rfq_reply"
+        with psycopg.connect(TEST_DATABASE_URL or "", row_factory=dict_row) as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "select supplier_id, match_method from ingestion_email_log "
+                    "where quotation_id = %s",
+                    (UUID(result["quotation_id"]),),
+                )
+                log_row = cur.fetchone()
+                cur.execute(
+                    "select supplier_id from quotation where id = %s",
+                    (UUID(result["quotation_id"]),),
+                )
+                quotation_row = cur.fetchone()
+                cur.execute(
+                    "select quotation_id from rfq_response where rfq_recipient_id = %s",
+                    (recipient_b,),
+                )
+                response_row = cur.fetchone()
+        assert log_row["supplier_id"] == supplier_b
+        assert log_row["match_method"] == "rfq_reply"
+        assert quotation_row["supplier_id"] == supplier_b
+        assert str(response_row["quotation_id"]) == result["quotation_id"]
+
+
+def test_non_rfq_email_keeps_single_supplier_address_history_match(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = settings_for_test_db(monkeypatch)
+    _patch_storage_and_queue(monkeypatch)
+    with committed_smart_context("ingestion-non-rfq-address", supplier_count=1) as context:
+        supplier_id = context.supplier_ids[0]
+        _seed_email_config(context.workspace.tenant_id, context.workspace.membership_id)
+        with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """insert into ingestion_email_log
+                       (tenant_id, message_id, from_address, from_domain, status,
+                        supplier_id, match_method)
+                       values (%s, %s, %s, %s, 'completed', %s, 'domain')""",
+                    (
+                        context.workspace.tenant_id,
+                        f"<{uuid4()}@gmail.com>",
+                        "known.sender@gmail.com",
+                        "gmail.com",
+                        supplier_id,
+                    ),
+                )
+            conn.commit()
+
+        result = orchestrator_module.process_inbound_email(
+            settings,
+            tenant_id=context.workspace.tenant_id,
+            raw_email_bytes=_build_email(
+                from_addr="known.sender@gmail.com", message_id=f"<{uuid4()}@gmail.com>"
+            ),
+            raw_email_ref=None,
+        )
+        assert result["supplier_id"] == str(supplier_id)
+        assert result["match_method"] == "address"
+        with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "select count(*) from rfq_response where quotation_id = %s",
+                    (UUID(result["quotation_id"]),),
+                )
+                assert cur.fetchone()[0] == 0
 
 
 def test_matched_supplier_email_creates_document_quotation_and_extraction_job(
@@ -438,4 +641,3 @@ def test_secondary_attachment_upload_failure_does_not_abort_primary_flow(
         assert str(quotation_rows[0]["document_id"]) == result["document_id"]
         assert len(job_rows) == 1
         assert job_rows[0]["status"] == "queued"
-
