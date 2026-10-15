@@ -1,6 +1,22 @@
 # Demo tenants — plan and dataset (PP-5 / G-1)
 
-Status 2026-10-15: **draft for review.** Nothing entered on hosted yet.
+Status 2026-10-15: **restaurant tenant set up on hosted** — workspace «مطاعم سند» (EGP, Egypt VAT),
+3 branches, 6 cost centres (kitchen + packaging/cleaning per branch), 3 monthly branch budgets
+(450k / 380k / 320k EGP), 5 suppliers (EGP terms, plus-address emails), 30 products with preferred
+suppliers. Next: purchasing-officer account, then the RFQ cycles — **blocked on the pooler fix below**.
+
+### Findings from the build (real product bugs)
+
+| # | Finding | Impact | Status |
+|---|---|---|---|
+| 1 | ~45 `psycopg.connect` call sites lack `prepare_threshold=None`; on Supabase's transaction pooler they fail with `DuplicatePreparedStatement` (reproduced: 3/4 connections fail, 0/4 with the setting) | CSV import cannot commit (preview OK, commit never lands, re-upload → 500); **inbound quote ingestion uses the same pattern** | fix task raised |
+| 2 | Supplier attribution: sender-address history beats the RFQ thread | quotes from a shared sender credited to the wrong supplier | fix in progress |
+| 3 | Unit list offers both "Kilogram (kg)" and "Kilogram (kilogram)" | inconsistent product units | to raise |
+| 4 | Import preview shows the pack as raw JSON (`{"pack_count":1,"unit_size":"1"}`) | cosmetic | to raise |
+| 5 | Home page still labels shipped modules "Upcoming (Chunk 4.x)" | first screen a pilot customer sees looks unfinished | to raise |
+
+Products were entered through the New Product form because of #1; the CSV import is re-tested after the fix
+(same file — every row should be reported as a duplicate and skipped).
 
 ## Principles
 
