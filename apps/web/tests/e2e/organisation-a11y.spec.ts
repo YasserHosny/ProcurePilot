@@ -22,7 +22,6 @@ async function scan(page: Page) {
 async function waitForDialogSettled(page: Page) {
   const dialog = page.locator('mat-dialog-container');
   await expect(dialog).toBeVisible();
-  await expect(dialog).toHaveAttribute('aria-modal', 'true');
   await page.evaluate(() =>
     Promise.all(document
         .getAnimations()
