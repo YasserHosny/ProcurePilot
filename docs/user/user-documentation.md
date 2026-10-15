@@ -127,7 +127,7 @@ The final step of workspace creation: a summary card showing the workspace's pla
 | 2 | **Side navigation** | Provides module switching for authenticated users. It is shown separately below so page screenshots can focus on the work area. |
 | 3 | **Welcome banner** | Displays your workspace name and confirms your workspace is provisioned with database-level tenant isolation and role-based access control. |
 | 4 | **Tenant & Security card** | Shows your Tenant ID, workspace slug, and the isolation level (PostgreSQL Row-Level Security, FORCED). This is read-only and confirms your data is fully isolated. |
-| 5 | **Regional & Financial Settings card** | Displays your region (e.g. GB), primary currency (e.g. GBP), tax model (e.g. uk_vat_standard), and default locale. The primary currency is your workspace's **home currency**: it is chosen at sign-up and pre-selected in new orders, guardrails and budgets. An Owner can change it afterwards through the API (`PATCH /tenant`, audited); there is no screen for this yet. The other values are immutable. |
+| 5 | **Regional & Financial Settings card** | Displays your region (e.g. GB), primary currency (e.g. GBP), tax model (e.g. uk_vat_standard), and default locale. The primary currency is your workspace's **home currency**: it is chosen at sign-up and pre-selected in new orders, guardrails and budgets. An Owner can change it afterwards under **Home currency** in Organisation Settings (§22); the change is audited. The other values are immutable. |
 | 6 | **Current User Authority card** | Shows your email, assigned role (Owner, Buyer, etc.), and MFA status. |
 | 7 | **Procurement Intelligence Modules** | A roadmap card describing each module. **Note:** the "Active"/"Upcoming" labels on this card describe the original chunk plan and have not been refreshed since — nearly every module described as "Upcoming" (Quotation Inbox, Smart Compare, Savings Ledger, RFQ sourcing, Order Tracking, Accounting/POS integration, forecasting, supplier risk, the analyst) is fully built and in active use. Use the side navigation, not this card, to judge what's actually available. |
 
@@ -766,10 +766,11 @@ Reached from **Record Purchase** on any Smart Compare offer, or **+ Record Purch
 | # | Element | Description |
 |---|---------|-------------|
 | 1 | **Page title — "Organisation Settings"** | Manage your organisation's branches, cost centres, and budgets in one place. |
-| 2 | **Branches section** | Define your physical locations or operational divisions. Click **+ New Branch** to add one — only a name is required; address and region are optional. |
-| 3 | **Cost Centres section** | Define cost centres for budget tracking, each with a required **Code** and an optional link to a **Branch**. |
-| 4 | **Budgets section** | Define budgets scoped to the whole organisation, a specific branch, or a specific cost centre, with an amount, currency, period (Monthly/Quarterly/Annual), and period start date. |
-| 5 | **Approval Delegations section** | Lets an approver delegate their pending decisions to a colleague for a date range (e.g. while on leave). Shows a table of the current member's own delegations: delegate, start date, end date, and a cancel action. **+ New Delegation** opens a dialog to pick the delegate (from a dropdown of workspace members), a start date, and an end date. While a delegation is active, requests that would route to the delegating approver are routed to the delegate instead, and appear in the delegate's own Approval Queue (section 20). |
+| 2 | **Home currency section** (Owners only) | A currency dropdown and a **Save currency** button, showing the current home currency. The home currency is pre-selected in new orders, guardrails and budgets; it never changes existing records. |
+| 3 | **Branches section** | Define your physical locations or operational divisions. Click **+ New Branch** to add one — only a name is required; address and region are optional. |
+| 4 | **Cost Centres section** | Define cost centres for budget tracking, each with a required **Code** and an optional link to a **Branch**. |
+| 5 | **Budgets section** | Define budgets scoped to the whole organisation, a specific branch, or a specific cost centre, with an amount, currency, period (Monthly/Quarterly/Annual), and period start date. |
+| 6 | **Approval Delegations section** | Lets an approver delegate their pending decisions to a colleague for a date range (e.g. while on leave). Shows a table of the current member's own delegations: delegate, start date, end date, and a cancel action. **+ New Delegation** opens a dialog to pick the delegate (from a dropdown of workspace members), a start date, and an end date. While a delegation is active, requests that would route to the delegating approver are routed to the delegate instead, and appear in the delegate's own Approval Queue (section 20). |
 
 **Create Cost Centre form:**
 
