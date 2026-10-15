@@ -10,9 +10,14 @@ const FPS = 30;
 
 const jobs = [
   { name: "Anim16x9", w: 1920, h: 1080, seconds: 4.5 },
-  { name: "EndCard16x9", w: 1920, h: 1080, seconds: 5.5 },
+  { name: "EndCard16x9", w: 1920, h: 1080, seconds: 157 / 30 }, // 157 frames: the outro ends at 3:00
   { name: "Anim9x16Fast", w: 1080, h: 1920, seconds: 3.0 },
   { name: "EndCard9x16", w: 1080, h: 1920, seconds: 5.5 },
+  // English versions: same timing, English text
+  { name: "AnimEn16x9", w: 1920, h: 1080, seconds: 4.5 },
+  { name: "EndCardEn16x9", w: 1920, h: 1080, seconds: 157 / 30 },
+  { name: "AnimEn9x16Fast", w: 1080, h: 1920, seconds: 3.0 },
+  { name: "EndCardEn9x16", w: 1080, h: 1920, seconds: 5.5 },
 ];
 
 function standalone(src) {
@@ -25,6 +30,7 @@ function standalone(src) {
   const browser = await chromium.launch({ channel: "chrome", headless: true });
   for (const job of jobs) {
     const dir = path.join(OUT, job.name);
+    fs.rmSync(dir, { recursive: true, force: true }); // no stale frames from a longer earlier render
     fs.mkdirSync(dir, { recursive: true });
     const html = path.join(dir, "board.html");
     fs.writeFileSync(html, standalone(fs.readFileSync(path.join(BOARDS, `${job.name}.dc.html`), "utf8")));

@@ -50,7 +50,7 @@ Music: **Antalya Beaches — DayFox** (below). Its sections line up with the sto
   them → arrowhead pops (one small overshoot) with a two-ghost speed trail → "ProcurePilot"
   revealed left-to-right, pushed by the arrow.
 - **Tagline «قارن. اختار. وفّر.»**, one word per bar (mask slide-up, right-to-left order); «وفّر.»
-  in teal. **No English line in the Arabic video** (an English variant is for LinkedIn later).
+  in teal. **No English line in the Arabic video** — the English version is a separate render (below).
 - **Beat-locked** to the track (112.35 BPM, beat = 0.5341 s), cycle 4.5 s:
 
 | Beat | Time | Visual | Sound |
@@ -70,8 +70,18 @@ Music: **Antalya Beaches — DayFox** (below). Its sections line up with the sto
 
 Navy, follows the sting seamlessly; elements fade up 0.27 s apart: logo · «جرّبه أسبوعين مجانًا» ·
 «وإحنا اللي هنجهّزه معاك.» · WhatsApp **+20 102 735 4140** (large, teal, screenshot-able) ·
-«ياسر حسني — المؤسس» · yasser.hosny@iron-sys.com · «أحد منتجات Iron Systems». The 9:16 card keeps
+«د. ياسر حسني — المؤسس» · yasser.hosny@iron-sys.com · «أحد منتجات Iron Systems». The 9:16 card keeps
 everything inside the WhatsApp/Reels safe area (top ~250 px, bottom ~350 px).
+
+## English versions (for LinkedIn / non-Arabic viewers)
+
+Same keyframes, beats, sound cues and mix as the Arabic outro — only the text changes:
+
+- **Sting tagline:** "Compare. Choose. Save." — one word per bar, revealed left-to-right; "Save." in teal.
+- **End card (LTR):** logo · **Try it free for 2 weeks** · "— we set it up with you." · WhatsApp
+  **+20 102 735 4140** · "Dr. Yasser Hosny — Founder" · yasser.hosny@iron-sys.com · "A product of Iron Systems".
+- Canvas boards 10–13 on the logo canvas (`AnimEn16x9`, `EndCardEn16x9`, `AnimEn9x16Fast`, `EndCardEn9x16`).
+- Same placement as the Arabic outros (2:50.25 in the 3-minute cut, 0:51.34 in the 60-second cut).
 
 ## Audio (decided)
 
@@ -98,8 +108,11 @@ loudness ≈ −14 LUFS for the outros (social standard), peaks ≤ −1.6 dBFS 
 | `outro-16x9.mp4` | 9.75 s | sting + end card, one continuous mix — **place at 2:50.25; ends at 3:00** |
 | `outro-9x16.mp4` | 8.5 s | fast sting + end card — **place at 0:51.34 of the 60-s cut; ends at 0:59.8** |
 | `logo-sting-16x9.mp4`, `end-card-16x9.mp4`, `logo-sting-9x16-fast.mp4`, `end-card-9x16.mp4` | — | separate pieces for flexible editing |
+| `outro-16x9-en.mp4`, `outro-9x16-en.mp4` | 9.75 s / 8.5 s | English outros — same placement and audio as the Arabic ones |
+| `logo-sting-16x9-en.mp4`, `end-card-16x9-en.mp4`, `logo-sting-9x16-fast-en.mp4`, `end-card-9x16-en.mp4` | — | English separate pieces |
 
-Approved by the user 2026-10-15; in `renders/`.
+Approved by the user 2026-10-15; in `renders/`. Re-rendered 2026-10-15 with the founder title
+«د. ياسر حسني» / "Dr. Yasser Hosny"; English versions added the same day.
 
 ## Rebuilding
 
@@ -111,5 +124,4 @@ paths from the session that made them — edit the paths at the top before reuse
 ## Open
 
 - Record the screencast (needs PP-5 demo tenant + a full live run on hosted).
-- English sting variant ("Compare. Choose. Save.") for LinkedIn.
 - Optional later: the same bars→winner→arrow motion as a Lottie loader in web/Flutter (code task).
