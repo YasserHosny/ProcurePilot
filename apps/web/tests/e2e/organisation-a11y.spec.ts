@@ -19,6 +19,18 @@ async function scan(page: Page) {
   return new AxeBuilder({ page }).withTags(WCAG_21_AA).exclude('.nav-item.disabled').analyze();
 }
 
+async function waitForDialogSettled(page: Page) {
+  const dialog = page.locator('mat-dialog-container');
+  await expect(dialog).toBeVisible();
+  await expect(dialog).toHaveAttribute('aria-modal', 'true');
+  await page.evaluate(() =>
+    Promise.all(document
+        .getAnimations()
+        .filter((animation) => animation.effect?.getComputedTiming().iterations !== Infinity)
+        .map((animation) => animation.finished.catch(() => undefined))),
+  );
+}
+
 function describeViolations(results: Awaited<ReturnType<typeof scan>>): string {
   return results.violations
     .map((v) => `${v.id} (${v.impact}): ${v.help} — ${v.nodes.length} node(s)`)
@@ -74,7 +86,7 @@ test.describe('Organisation Settings Accessibility @a11y', () => {
     await page.goto('/settings');
     await page.waitForLoadState('networkidle');
     await page.click('app-branch-list button:has-text("New Branch")');
-    await expect(page.locator('mat-dialog-container')).toBeVisible();
+    await waitForDialogSettled(page);
     const results = await scan(page);
     expect(results.violations, describeViolations(results)).toEqual([]);
   });
@@ -87,7 +99,7 @@ test.describe('Organisation Settings Accessibility @a11y', () => {
     await page.goto('/settings');
     await page.waitForLoadState('networkidle');
     await page.click('app-cost-centre-list button:has-text("New Cost Centre")');
-    await expect(page.locator('mat-dialog-container')).toBeVisible();
+    await waitForDialogSettled(page);
     const results = await scan(page);
     expect(results.violations, describeViolations(results)).toEqual([]);
   });
@@ -100,7 +112,7 @@ test.describe('Organisation Settings Accessibility @a11y', () => {
     await page.goto('/settings');
     await page.waitForLoadState('networkidle');
     await page.click('app-budget-list button:has-text("Define Budget")');
-    await expect(page.locator('mat-dialog-container')).toBeVisible();
+    await waitForDialogSettled(page);
     const results = await scan(page);
     expect(results.violations, describeViolations(results)).toEqual([]);
   });
