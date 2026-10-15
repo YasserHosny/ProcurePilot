@@ -29,7 +29,7 @@ set up, what is next, who does it, and what blocks what.
 | Space `PP` | ProcurePilot — non-code work + demo/pilot gaps |
 | Space `SP` | Sales Pipeline — one Lead per prospect company |
 | Space `MDP` | JPD sample data (MDP-1..6) — in the Jira trash; **ignore** |
-| Members | Yasser (owner); Omar Medhat (mr.omarmedhat@gmail.com) invited 2026-10-14 — JPD "User (creator)", Goals/Projects/Studio user, not admin; free plan gives every member access to PP and SP |
+| Members | Dr. Yasser Hosny (owner); Omar Medhat (mr.omarmedhat@gmail.com) invited 2026-10-14 — JPD "User (creator)", Goals/Projects/Studio user, not admin; free plan gives every member access to PP and SP |
 
 **Tool capabilities:**
 
@@ -236,4 +236,5 @@ Append one row per session. Newest at the bottom. Include Jira keys and PR numbe
 | 2026-10-14 | Claude (orchestrator) | Codex review on PR #72 verified and applied: `tenant.currency` already exists (C1/P-1 = wire it into forms, no schema); `quotation_line.vat_rate` exists (C5/B-C5 = inclusive/exclusive only); unresolved currency → human review, never a tenant default (C2/P-3); production hardening + `test:isolation` + live walkthrough before onboarding (E-1); Agy flag wording. **Spec 022 is now out of step:** US1 FR-001..FR-003 (new owner-set home currency) are unnecessary, and FR-011 (fallback to home currency) contradicts the ingestion rule — the 022 session must revise before planning further. | 022 session revises spec; merge #72 |
 | 2026-10-14 | Claude (orchestrator) | **Pilot shortened from 90 days to 2 weeks (14 days)** everywhere: GTM plan, pilot agreement, DM script, one-pager (canvas + PDF), Jira. Knock-on fixes: success-metric example now per-pilot not monthly; early exit any time in writing; two check-ins (week 1, day 14); the 14 days start after onboarding + first live RFQ. New Converge logo in PR #75. | Merge two-week-pilot PR and #75; one-pager to new logo |
 | 2026-10-15 | Claude (orchestrator) | New Converge logo merged (#75, store icons opaque after Codex review); 2-week pilot + new-logo one-pager merged (#76). Demo-video decisions recorded in `docs/gtm/video/README.md`: screencast + 2D motion graphics, text + music (no voice), music Antalya Beaches (112.35 BPM, librosa beat map), beat-locked logo sting with «قارن. اختار. وفّر.», end card, five Pixabay sound cues. Sting + end card rendered (16:9 and fast 9:16), in user review. | User reviews outros; then PP-5 demo tenant → screencast recording |
+| 2026-10-15 | Claude (orchestrator) | Founder title **Dr. Yasser Hosny / «د. ياسر حسني»** applied everywhere it is shown: one-pager (canvas AR+EN, PDF re-exported, re-attached to PP-8), DM script intro lines, video end cards + outros (re-rendered), video README. Pilot agreement unchanged (signature fields are blank). English video versions added: sting "Compare. Choose. Save." + English end cards, 16:9 and fast 9:16, same beats/audio. | PP-5 demo tenant → screencast recording |
 | | | | |
