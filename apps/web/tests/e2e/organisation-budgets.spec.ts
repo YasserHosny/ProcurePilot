@@ -64,6 +64,25 @@ test.describe('Organisation Budget Management (chunk 007 US3)', () => {
     return page.locator('app-budget-list tr[mat-row]', { hasText: formattedAmount });
   }
 
+  /**
+   * Opens a mat-select whose options arrive asynchronously (currencies from /config/options,
+   * branch and cost-centre lookups). MatSelect._canOpen() is false while it has zero options, so
+   * a click that lands before the response is silently ignored and the option lookup then waits
+   * forever -- the CI flake in the overlap test. Retry the click until a panel actually shows.
+   */
+  async function openAsyncSelect(page: Page, select: Locator): Promise<void> {
+    // Key on THIS select's own aria-expanded, not on any visible mat-option: a previously used
+    // select's panel is still in the DOM while it animates closed.
+    const trigger = select.locator('xpath=descendant-or-self::mat-select').first();
+    await expect(async () => {
+      if ((await trigger.getAttribute('aria-expanded')) !== 'true') {
+        await select.click();
+      }
+      await expect(trigger).toHaveAttribute('aria-expanded', 'true', { timeout: 2000 });
+      await expect(page.locator('mat-option').first()).toBeVisible({ timeout: 2000 });
+    }).toPass({ timeout: 15000 });
+  }
+
   interface BudgetDraft {
     /** Pattern-validated decimal string, as typed into the form. */
     amount: string;
@@ -105,7 +124,7 @@ test.describe('Organisation Budget Management (chunk 007 US3)', () => {
 
     // Chosen explicitly even though the dialog preselects the workspace currency (GBP for
     // seeded workspaces): the option label ends in the ISO code in either language.
-    await dialog.locator('mat-select[formControlName="currency"]').click();
+    await openAsyncSelect(page, dialog.locator('mat-select[formControlName="currency"]'));
     await page.locator('mat-option').filter({ hasText: '(GBP)' }).click();
 
     await dialog.locator('mat-select[formControlName="period"]').click();
@@ -123,7 +142,7 @@ test.describe('Organisation Budget Management (chunk 007 US3)', () => {
         draft.scope === 'Branch'
           ? dialog.locator('mat-select[formControlName="branch_id"]')
           : dialog.locator('mat-select[formControlName="cost_centre_id"]');
-      await picker.click();
+      await openAsyncSelect(page, picker);
       await page.locator('mat-option').filter({ hasText: draft.targetName }).click();
     }
 
