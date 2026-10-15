@@ -134,8 +134,9 @@ out of the repo):
 the RFQ thread (`ingestion/orchestrator.py`: the RFQ recipient's supplier is only used when
 `match_supplier` found nothing), so with one shared sender every quote after the first would be
 credited to the first supplier. **Fix in progress in a separate session** (RFQ reply wins) — it must
-be merged and deployed before the first supplier quote is sent. Fallback if it is not: add each
-supplier tag as a Gmail "Send mail as" alias (Gmail opens that dialog as a popup, so the user does it).
+be merged and deployed before the first supplier quote is sent. **Done 2026-10-15 as a safety net:** all 5 supplier tags are Gmail "Send mail as" aliases
+(named in Arabic), and Gmail is set to *reply from the same address the message was sent to* — so a reply
+to an RFQ sent to `+pp-nour` goes out from `+pp-nour` automatically. Owner address stays the default.
 Leave the suppliers' `email_domains` empty (all are `gmail.com`).
 
 ## Still needed
