@@ -15,8 +15,8 @@ from procurepilot_api.modules.ingestion.schemas import SupplierMatchMethod
 # successfully matched to a supplier before, for this tenant? That still delivers R3's stated
 # purpose ("higher specificity than domain for suppliers sharing a generic domain") without a
 # schema addition: once one email from `jane@acme.com` is matched (by domain, thread, or a human
-# in the review queue), every later email from that same address matches immediately even if the
-# domain is `@gmail.com`.
+# in the review queue), later emails match immediately if that address has history for only one
+# supplier. Ambiguous history for multiple suppliers falls through to domain and thread matching.
 
 
 def match_supplier_by_address_history(
@@ -25,17 +25,19 @@ def match_supplier_by_address_history(
     with conn.cursor() as cur:
         cur.execute(
             """
-            select supplier_id from ingestion_email_log
+            select (array_agg(distinct supplier_id))[1] as supplier_id,
+                   count(distinct supplier_id) as supplier_count
+            from ingestion_email_log
             where tenant_id = %(tenant_id)s
               and from_address = %(from_address)s
               and supplier_id is not null
-            order by received_at desc
-            limit 1
             """,
             {"tenant_id": tenant_id, "from_address": from_address.lower()},
         )
         row = cur.fetchone()
-    return UUID(str(row[0])) if row else None
+    if row and row[1] == 1:
+        return UUID(str(row[0]))
+    return None
 
 
 def match_supplier_by_domain(
