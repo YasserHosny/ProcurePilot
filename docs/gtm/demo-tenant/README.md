@@ -113,8 +113,29 @@ the supplier mailboxes.
 | Retail | mini-market chain, 4 branches | FMCG catalogue with pack sizes, more suppliers, POS low-stock (spec 015) |
 | Hospitality | hotel F&B + housekeeping | mixed food / linen / amenities, central store, stricter approval chain |
 
-## Decisions needed
+## Mailboxes (decided 2026-10-15)
 
-- **Supplier and staff mailboxes:** which inboxes do we control (e.g. aliases on the iron-sys.com
-  domain, or plus-addresses on one Gmail)? Needed before any RFQ is sent.
-- **Platform invitation token** for creating the new workspace on hosted (the user creates the account).
+Plus-addresses on the owner's Gmail — `<owner-gmail>+pp-<tag>@gmail.com` (the real address is kept
+out of the repo):
+
+| Tag | Used by |
+|---|---|
+| `pp-sayed` | El-Hag Sayed Produce |
+| `pp-nour` | El-Nour Foodstuffs |
+| `pp-amana` | El-Amana Trading |
+| `pp-fayrouz` | El-Fayrouz Poultry |
+| `pp-packmisr` | Pack Misr |
+| `pp-buyer` | purchasing officer account |
+| `pp-maadi` | Maadi branch manager account (optional) |
+
+**Each supplier tag must be added in Gmail as a "Send mail as" alias, and replies sent from it.**
+Gmail otherwise replies from the base address. Inbound matching checks sender-address history
+*before* the RFQ thread (`ingestion/orchestrator.py`: the RFQ recipient's supplier is only used when
+`match_supplier` found nothing), so with one shared sender every quote after the first would be
+credited to the first supplier. Product fix tracked separately (RFQ reply should win). Leave the
+suppliers' `email_domains` empty (all are `gmail.com`).
+
+## Still needed
+
+- **Platform invitation token** for creating the new workspace on hosted (the user creates the account
+  and signs in in Claude's browser pane).
