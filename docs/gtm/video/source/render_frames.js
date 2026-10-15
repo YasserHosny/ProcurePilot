@@ -30,6 +30,7 @@ function standalone(src) {
   const browser = await chromium.launch({ channel: "chrome", headless: true });
   for (const job of jobs) {
     const dir = path.join(OUT, job.name);
+    fs.rmSync(dir, { recursive: true, force: true }); // no stale frames from a longer earlier render
     fs.mkdirSync(dir, { recursive: true });
     const html = path.join(dir, "board.html");
     fs.writeFileSync(html, standalone(fs.readFileSync(path.join(BOARDS, `${job.name}.dc.html`), "utf8")));
