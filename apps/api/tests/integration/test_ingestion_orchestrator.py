@@ -109,13 +109,17 @@ def _build_email(
     return msg.as_bytes()
 
 
-def _build_rfq_reply(*, from_addr: str, message_id: str, in_reply_to: str) -> bytes:
+def _build_rfq_reply(
+    *, from_addr: str, message_id: str, in_reply_to: str, references: list[str] | None = None
+) -> bytes:
     msg = EmailMessage()
     msg["From"] = from_addr
     msg["To"] = "buyer@ingest.procurepilot.local"
     msg["Subject"] = "Quotation"
     msg["Message-ID"] = message_id
     msg["In-Reply-To"] = in_reply_to
+    if references:
+        msg["References"] = " ".join(references)
     msg.set_content("Please find attached our latest quotation.")
     msg.add_attachment(b"%PDF-1.4 quote", maintype="application", subtype="pdf", filename="q.pdf")
     return msg.as_bytes()
@@ -266,6 +270,40 @@ def test_rfq_reply_overrides_conflicting_address_history(
         assert log_row["match_method"] == "rfq_reply"
         assert quotation_row["supplier_id"] == supplier_b
         assert str(response_row["quotation_id"]) == result["quotation_id"]
+
+
+def test_ambiguous_rfq_references_fall_back_without_response(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = settings_for_test_db(monkeypatch)
+    _patch_storage_and_queue(monkeypatch)
+    with committed_smart_context("ingestion-rfq-ambiguous-references", supplier_count=2) as context:
+        supplier_a, supplier_b = context.supplier_ids
+        _seed_email_config(context.workspace.tenant_id, context.workspace.membership_id)
+        recipient_a, message_a = _seed_rfq_recipient(context.workspace.tenant_id, supplier_a)
+        recipient_b, message_b = _seed_rfq_recipient(context.workspace.tenant_id, supplier_b)
+
+        result = orchestrator_module.process_inbound_email(
+            settings,
+            tenant_id=context.workspace.tenant_id,
+            raw_email_bytes=_build_rfq_reply(
+                from_addr="ambiguous.sender@gmail.com",
+                message_id=f"<{uuid4()}@gmail.com>",
+                in_reply_to=f"<{uuid4()}@procurepilot.test>",
+                references=[message_a, message_b],
+            ),
+            raw_email_ref=None,
+        )
+
+        assert result["match_method"] != "rfq_reply"
+        with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "select count(*) from rfq_response where rfq_recipient_id in (%s, %s)",
+                    (recipient_a, recipient_b),
+                )
+                response_count = cur.fetchone()[0]
+        assert response_count == 0
 
 
 def test_non_rfq_email_keeps_single_supplier_address_history_match(
