@@ -7,6 +7,7 @@ import {
   createTestProduct,
 } from './support/api';
 
+import { openAsyncSelect } from './support/select';
 test.use({ storageState: authFile });
 
 /**
@@ -113,7 +114,7 @@ test.describe('Purchase Request Submission (chunk 008 US1)', () => {
     await expect(page.locator('.form-title')).toContainText('New Purchase Request');
 
     // Select the first branch
-    await page.click('mat-select[formControlName="branch_id"]');
+    await openAsyncSelect(page, page.locator('mat-select[formControlName="branch_id"]'));
     await page.locator('mat-option').first().click();
 
     // Fill required-by date (30 days ahead)
@@ -122,7 +123,7 @@ test.describe('Purchase Request Submission (chunk 008 US1)', () => {
 
     // Fill the first line item. .line-product is a mat-select (options list by
     // product name), not a text input — there's no real <input> inside it to fill.
-    await page.click('.line-product mat-select');
+    await openAsyncSelect(page, page.locator('.line-product mat-select'));
     await page.locator('mat-option', { hasText: product.tenant_name }).click();
     await page.fill('.line-quantity input', '5');
 

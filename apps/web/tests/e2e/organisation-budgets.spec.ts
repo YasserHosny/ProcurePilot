@@ -1,6 +1,7 @@
 import { test, expect, type Locator, type Page } from '@playwright/test';
 
 import { createIsolatedWorkspace, type Credentials } from './support/api';
+import { openAsyncSelect } from './support/select';
 
 // This spec owns a separate workspace and must authenticate its own owner.
 test.use({ storageState: { cookies: [], origins: [] } });

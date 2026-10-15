@@ -26,6 +26,7 @@ import {
   uploadQuotationAndOpenReview,
 } from './support/canonical-flow';
 
+import { openAsyncSelect } from './support/select';
 const RUN_CAPTURE = process.env['CAPTURE_USER_DOC_SCREENSHOTS'] === '1';
 const REPO_ROOT = join(__dirname, '..', '..', '..', '..');
 const SCREENSHOT_DIR = process.env['DOCS_SCREENSHOT_DIR']
@@ -43,7 +44,6 @@ interface ScreenshotFixtures {
   supplier: { id: string; name: string };
   workflowSupplier: { id: string; name: string };
   quotationId?: string;
-  matchTaskId?: string;
   matchedProductId: string;
   savingId: string;
   approvalRequest: { branchName: string; requiredByDate: string };
@@ -151,8 +151,19 @@ test.describe('User documentation screenshots', () => {
         `/quotations/${fixtures.quotationId}/review`,
         '08c-quotation-review-lines.jpg',
         async () => {
-          await expect(page.locator('.lines-card')).toBeVisible();
-          await page.locator('.lines-card').first().scrollIntoViewIfNeeded();
+          await expect(page.locator('.lines-card').first()).toBeVisible();
+          // Let the source-document panel settle (its height changes when the PDF viewer
+          // resolves or errors), then always align the lines card to the top. scrollIntoViewIfNeeded
+          // only scrolled when the card happened to be off-screen, so the capture flipped between
+          // scroll positions from run to run.
+          await page.waitForLoadState('networkidle');
+          await page
+            .locator('.lines-card')
+            .first()
+            .evaluate((el) => el.scrollIntoView({ block: 'start' }));
+          await page.evaluate(
+            () => new Promise<void>((done) => requestAnimationFrame(() => done())),
+          );
         },
       );
     }
@@ -311,7 +322,6 @@ async function buildCommercialFixtures(page: Page): Promise<ScreenshotFixtures> 
   const workflowSupplier = await createTestSupplier(ownerToken, `Docs Capture Quote Supplier ${stamp}`);
 
   let quotationId: string | undefined;
-  let matchTaskId: string | undefined;
   let matchedProductId = product.id;
 
   try {
@@ -327,13 +337,13 @@ async function buildCommercialFixtures(page: Page): Promise<ScreenshotFixtures> 
       `Docs Capture Tomatoes ${stamp}`,
     );
     matchedProductId = matchedProduct.id;
-  } catch {
-    const existingMatch = await discoverExistingMatchTask(ownerToken);
-    matchTaskId = existingMatch?.id;
-    quotationId = existingMatch?.quotationId ?? (await discoverExistingQuotationId(page));
-    if (matchTaskId) {
-      await captureExistingMatchScreenshots(page, matchTaskId);
-    }
+  } catch (error) {
+    // Deliberately no fallback to "whatever match task already exists": that silently changed
+    // which quotation line 09b/09c/10/13 show from run to run, so the drift check flaked. If the
+    // canonical flow breaks, fail here with the real cause.
+    throw new Error('Documentation screenshots: the canonical quotation flow failed', {
+      cause: error,
+    });
   }
 
   const purchase = await apiAsUser<{ saving_record: { id: string } }>(
@@ -387,7 +397,6 @@ async function buildCommercialFixtures(page: Page): Promise<ScreenshotFixtures> 
     supplier,
     workflowSupplier,
     quotationId,
-    matchTaskId,
     matchedProductId,
     savingId: purchase.saving_record.id,
     approvalRequest: { branchName: branch.name, requiredByDate: '2026-10-15' },
@@ -428,7 +437,7 @@ async function seedIngestionData(page: Page, fixtures: ScreenshotFixtures): Prom
   try {
     await page.goto('/ingestion/catalogue-import');
     await expect(page.locator('.page-title')).toContainText('Catalogue Import');
-    await page.locator('mat-select').click();
+    await openAsyncSelect(page, page.locator('mat-select'));
     await page.locator('mat-option', { hasText: supplier.name }).click();
     const csvFixturePath = join(REPO_ROOT, 'apps', 'web', 'tests', 'e2e', 'fixtures', 'test-catalogue.csv');
     await page.locator('input.file-input').setInputFiles(csvFixturePath);
@@ -549,33 +558,7 @@ async function seedIngestionData(page: Page, fixtures: ScreenshotFixtures): Prom
   );
 }
 
-async function discoverExistingMatchTask(
-  ownerToken: string,
-): Promise<{ id: string; quotationId: string | null } | null> {
-  const list = await apiAsUser<{
-    items: { id: string; quotation_id: string | null; quotation_line?: { id: string } }[];
-  }>(ownerToken, 'GET', '/match-tasks?status=all&limit=1');
-  const task = list.items[0];
-  return task ? { id: task.quotation_line?.id ?? task.id, quotationId: task.quotation_id } : null;
-}
 
-async function discoverExistingQuotationId(page: Page): Promise<string | undefined> {
-  await page.goto('/quotations?status=all');
-  await expect(page.locator('.page-title')).toContainText('Quotation Review Queue');
-  await waitForNoVisibleLoading(page);
-  await expect(page.locator('.clickable-row, .empty-state')).toBeVisible();
-
-  const reviewLink = page.locator('.tasks-table a.action-btn').first();
-  if ((await reviewLink.count()) === 0) {
-    return undefined;
-  }
-  const reviewHref = await reviewLink.getAttribute('href');
-  const match = reviewHref?.match(/\/quotations\/([^/]+)\/review/);
-  if (!match?.[1]) {
-    throw new Error('No existing quotation was available for documentation screenshots.');
-  }
-  return match[1];
-}
 
 async function captureDocumentedMatchQueue(page: Page): Promise<void> {
   await page.route('**/api/v1/match-tasks**', async (route) => {
@@ -691,19 +674,6 @@ function documentationMatchTasks(): MatchTask[] {
   ];
 }
 
-async function captureExistingMatchScreenshots(page: Page, matchTaskId: string): Promise<void> {
-  await page.goto('/matching?status=all');
-  await expect(page.locator('.page-title')).toContainText('Match Resolution Queue');
-  await expect(page.locator('.quotation-group, .empty-state')).toBeVisible();
-  await captureCurrentPage(page, '09-match-resolution-queue.jpg');
-
-  await page.goto(`/matching/${matchTaskId}`);
-  await expect(page.locator('.page-title')).toBeVisible();
-  await expect(page.locator('.line-detail-card, .task-summary-card, .decision-card')).toBeVisible();
-  await captureCurrentPage(page, '09b-match-resolution-detail.jpg');
-  await page.locator('.outcomes-section, .decision-card').first().scrollIntoViewIfNeeded();
-  await captureCurrentPage(page, '09c-match-resolution-outcomes.jpg');
-}
 
 async function captureAndResolveMatchScreenshots(
   page: Page,
@@ -722,7 +692,7 @@ async function captureAndResolveMatchScreenshots(
   await expect(page.locator('.new-product-section')).toBeVisible();
   await captureCurrentPage(page, '09c-match-resolution-outcomes.jpg');
   await page.fill('input[formControlName="tenant_name"]', productName);
-  await page.locator('mat-select[formControlName="base_unit"]').click();
+  await openAsyncSelect(page, page.locator('mat-select[formControlName="base_unit"]'));
   await page.locator('mat-option', { hasText: '(kilogram)' }).click();
   await page.locator('.confirm-resolution-btn.mat-mdc-unelevated-button').click();
   await expect(page.locator('.decision-banner')).toBeVisible({ timeout: 15_000 });

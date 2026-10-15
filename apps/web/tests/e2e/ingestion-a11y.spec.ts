@@ -11,6 +11,7 @@ import {
   type CreatedMember,
 } from './support/api';
 
+import { openAsyncSelect } from './support/select';
 /**
  * Accessibility & RTL test suite for Automated Ingestion (013-automated-ingestion, T036).
  *
@@ -274,7 +275,7 @@ test.describe('Automated Ingestion Accessibility & RTL @a11y', () => {
     await expect(page.locator('.page-title')).toContainText('Catalogue Import');
 
     // Select supplier so the browse button becomes enabled
-    await page.locator('mat-select').click();
+    await openAsyncSelect(page, page.locator('mat-select'));
     await page.locator('mat-option', { hasText: testSupplier.name }).click();
 
     const browseBtn = page.locator('button.browse-btn');

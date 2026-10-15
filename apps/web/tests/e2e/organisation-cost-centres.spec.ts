@@ -2,6 +2,7 @@ import { test, expect, type Locator, type Page } from '@playwright/test';
 
 import { createIsolatedWorkspace, createMember, signIn, type Credentials } from './support/api';
 
+import { openAsyncSelect } from './support/select';
 /**
  * End-to-End test suite for Organisation Cost Centre Management (chunk 007, User Story 2).
  *
@@ -109,11 +110,14 @@ test.describe('Organisation Cost Centre Management (chunk 007 US2)', () => {
     // mat-select panels render in the overlay outside mat-dialog-container, hence the
     // page-level option lookup.
     if (draft.budgetOwnerEmail) {
-      await dialog.locator('mat-select[formControlName="budget_owner_membership_id"]').click();
+      await openAsyncSelect(
+        page,
+        dialog.locator('mat-select[formControlName="budget_owner_membership_id"]'),
+      );
       await page.locator('mat-option').filter({ hasText: draft.budgetOwnerEmail }).click();
     }
     if (draft.branchName) {
-      await dialog.locator('mat-select[formControlName="branch_id"]').click();
+      await openAsyncSelect(page, dialog.locator('mat-select[formControlName="branch_id"]'));
       await page.locator('mat-option').filter({ hasText: draft.branchName }).click();
     }
 

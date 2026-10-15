@@ -10,6 +10,7 @@ import {
   uploadQuotationAndOpenReview,
 } from './support/canonical-flow';
 
+import { openAsyncSelect } from './support/select';
 /**
  * Phase 1 Canonical Value Path E2E (T075).
  *
@@ -51,9 +52,10 @@ test.describe('Phase 1 Complete Canonical Value Path (T075)', () => {
     await page.fill('input[formControlName="tenant_name"]', existingProductName);
     // The select trigger collapses under the floating label on this form, so click the whole
     // form field — Material opens the option panel for a click anywhere in the field.
-    await page
-      .locator('mat-form-field', { hasText: 'Base Measurement Unit' })
-      .click();
+    await openAsyncSelect(
+      page,
+      page.locator('mat-form-field', { hasText: 'Base Measurement Unit' }),
+    );
     await page.locator('mat-option', { hasText: '(each)' }).click();
     await page.fill('input[formControlName="pack_count"]', '1');
     await page.fill('input[formControlName="unit_size"]', '1');

@@ -10,6 +10,7 @@ import {
   signInOwner,
 } from './support/api';
 
+import { openAsyncSelect } from './support/select';
 /**
  * End-to-End test suite for Automated Ingestion (013-automated-ingestion, T035).
  *
@@ -153,7 +154,7 @@ test.describe('Automated Ingestion (013-automated-ingestion, T035)', () => {
     await expect(page.locator('button.browse-btn')).toBeDisabled();
 
     // Select the seeded supplier
-    await page.locator('mat-select').click();
+    await openAsyncSelect(page, page.locator('mat-select'));
     await page.locator('mat-option', { hasText: supplier.name }).click();
 
     // Confirm file picker is now enabled

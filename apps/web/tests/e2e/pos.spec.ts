@@ -7,6 +7,7 @@ import {
   signIn,
 } from './support/api';
 
+import { openAsyncSelect } from './support/select';
 const API = process.env['E2E_API_URL'] ?? 'http://localhost:8000/api/v1';
 
 async function ensureEnglish(page: Page): Promise<void> {
@@ -103,7 +104,7 @@ test.describe('POS & Inventory Integration (015-pos-inventory-integration, T036)
 
     await expect(page.locator('[data-testid="unmatched-row"]').first()).toBeVisible();
     const firstUnmatched = page.locator('[data-testid="unmatched-row"]').first();
-    await firstUnmatched.locator('[data-testid="product-picker"]').click();
+    await openAsyncSelect(page, firstUnmatched.locator('[data-testid="product-picker"]'));
     await page.locator('mat-option', { hasText: manualTarget.tenant_name }).click();
 
     const matchResponse = page.waitForResponse(
