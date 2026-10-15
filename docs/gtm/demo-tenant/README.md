@@ -125,17 +125,20 @@ out of the repo):
 | `pp-amana` | El-Amana Trading |
 | `pp-fayrouz` | El-Fayrouz Poultry |
 | `pp-packmisr` | Pack Misr |
+| `pp-owner` | owner account of the demo workspace (invitation minted 2026-10-15, valid to 2026-10-22) |
 | `pp-buyer` | purchasing officer account |
 | `pp-maadi` | Maadi branch manager account (optional) |
 
-**Each supplier tag must be added in Gmail as a "Send mail as" alias, and replies sent from it.**
-Gmail otherwise replies from the base address. Inbound matching checks sender-address history
-*before* the RFQ thread (`ingestion/orchestrator.py`: the RFQ recipient's supplier is only used when
+**Quote replies come from the base Gmail address** (Gmail replies from the base address unless a
+"Send mail as" alias is configured). Inbound matching today checks sender-address history *before*
+the RFQ thread (`ingestion/orchestrator.py`: the RFQ recipient's supplier is only used when
 `match_supplier` found nothing), so with one shared sender every quote after the first would be
-credited to the first supplier. Product fix tracked separately (RFQ reply should win). Leave the
-suppliers' `email_domains` empty (all are `gmail.com`).
+credited to the first supplier. **Fix in progress in a separate session** (RFQ reply wins) — it must
+be merged and deployed before the first supplier quote is sent. Fallback if it is not: add each
+supplier tag as a Gmail "Send mail as" alias (Gmail opens that dialog as a popup, so the user does it).
+Leave the suppliers' `email_domains` empty (all are `gmail.com`).
 
 ## Still needed
 
-- **Platform invitation token** for creating the new workspace on hosted (the user creates the account
-  and signs in in Claude's browser pane).
+- **User creates the workspace** with the minted invitation (`pp-owner`), currency EGP, and signs in in
+  Claude's browser pane — Claude does not create accounts or type passwords on hosted.
