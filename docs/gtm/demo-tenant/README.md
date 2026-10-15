@@ -13,7 +13,10 @@ suppliers. Next: purchasing-officer account, then the RFQ cycles — **blocked o
 | 2 | Supplier attribution: sender-address history beats the RFQ thread | quotes from a shared sender credited to the wrong supplier | fix in progress |
 | 3 | Unit list offers both "Kilogram (kg)" and "Kilogram (kilogram)" | inconsistent product units | to raise |
 | 4 | Import preview shows the pack as raw JSON (`{"pack_count":1,"unit_size":"1"}`) | cosmetic | to raise |
+| 6 | Team invites are not emailed ("email delivery is not configured"); the link is shown once on screen | every pilot invite must be passed on by hand | to raise |
 | 5 | Home page still labels shipped modules "Upcoming (Chunk 4.x)" | first screen a pilot customer sees looks unfinished | to raise |
+
+Lookups review (regions, currencies, tax models): [`lookups-review-2026-10-15.md`](lookups-review-2026-10-15.md).
 
 Products were entered through the New Product form because of #1; the CSV import is re-tested after the fix
 (same file — every row should be reported as a duplicate and skipped).
