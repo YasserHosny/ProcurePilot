@@ -43,6 +43,8 @@ describe('RfqCreateComponent', () => {
     translate.setTranslation('en', { rfq: { create: {
       validationError: 'Please check the following RFQ fields:',
       neededByDateLabel: 'Needed By Date',
+      saveError: 'SAVE FALLBACK',
+      errors: { notFound: 'The requested RFQ resource could not be found.' },
     } } }, true);
     translate.use('en');
     fixture.detectChanges();
@@ -84,7 +86,7 @@ describe('RfqCreateComponent', () => {
     expect(rfqApiSpy.sendRfq).toHaveBeenCalledWith('rfq-1');
   });
 
-  it('sends the picked local calendar date and shows API errors', () => {
+  it('sends the picked local calendar date and uses the fallback for an unknown error code', () => {
     rfqApiSpy.createRfq.and.returnValue(throwError(() => new HttpErrorResponse({
       status: 422, error: { code: 'invalid_date', message: 'Invalid needed-by date' }
     })));
@@ -95,7 +97,8 @@ describe('RfqCreateComponent', () => {
     component.onSave();
     expect(rfqApiSpy.createRfq).toHaveBeenCalledWith(jasmine.objectContaining({ needed_by_date: '2026-10-20' }));
     fixture.detectChanges();
-    expect(fixture.nativeElement.querySelector('[role="alert"]')?.textContent).toContain('Invalid needed-by date');
+    expect(fixture.nativeElement.querySelector('[role="alert"]')?.textContent).toContain('SAVE FALLBACK');
+    expect(fixture.nativeElement.querySelector('[role="alert"]')?.textContent).not.toContain('Invalid needed-by date');
   });
 
   it('translates validation errors and known field labels', () => {
@@ -119,5 +122,37 @@ describe('RfqCreateComponent', () => {
     expect(alert.textContent).toContain('Please check the following RFQ fields:');
     expect(alert.textContent).toContain('Needed By Date');
     expect(alert.textContent).not.toContain('Request validation failed.');
+  });
+
+  it('shows translated not-found text instead of the server message', () => {
+    rfqApiSpy.createRfq.and.returnValue(throwError(() => new HttpErrorResponse({
+      status: 404, error: { code: 'not_found', message: 'Resource was not found.' },
+    })));
+    component.form.patchValue({
+      lines: [{ workspace_product_id: 'prod-1', quantity: '10' }],
+      supplierIds: ['sup-1'], neededByDate: new Date(2026, 9, 20),
+    });
+    component.onSave();
+    fixture.detectChanges();
+
+    const alert = fixture.nativeElement.querySelector('[role="alert"]') as HTMLElement;
+    expect(alert.textContent).toContain('The requested RFQ resource could not be found.');
+    expect(alert.textContent).not.toContain('Resource was not found.');
+  });
+
+  it('uses the save fallback for an unknown server code', () => {
+    rfqApiSpy.createRfq.and.returnValue(throwError(() => new HttpErrorResponse({
+      status: 400, error: { code: 'unknown.code', message: 'Untrusted server detail' },
+    })));
+    component.form.patchValue({
+      lines: [{ workspace_product_id: 'prod-1', quantity: '10' }],
+      supplierIds: ['sup-1'], neededByDate: new Date(2026, 9, 20),
+    });
+    component.onSave();
+    fixture.detectChanges();
+
+    const alert = fixture.nativeElement.querySelector('[role="alert"]') as HTMLElement;
+    expect(alert.textContent).toContain('SAVE FALLBACK');
+    expect(alert.textContent).not.toContain('Untrusted server detail');
   });
 });

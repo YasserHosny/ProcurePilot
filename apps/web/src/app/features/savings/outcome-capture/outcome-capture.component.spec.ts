@@ -9,6 +9,7 @@ import { ApiService } from '../../../core/api/api.service';
 import type { Role } from '../../../core/api/models';
 import { SessionService } from '../../../core/auth/session.service';
 import { OutcomeCaptureComponent } from './outcome-capture.component';
+import { toLocalMidnightIso } from '../../../core/format/iso-date';
 import { SavingsApiService } from '../savings-api';
 
 describe('OutcomeCaptureComponent (T021)', () => {
@@ -180,8 +181,8 @@ describe('OutcomeCaptureComponent (T021)', () => {
       unit_price: { amount: '1.5000', currency: 'GBP' },
       total_paid: { amount: '75.0000', currency: 'GBP' },
       delivery_result: 'delivered',
-      ordered_at: '2026-10-20',
-      delivered_at: '2026-10-21',
+      ordered_at: toLocalMidnightIso(new Date(2026, 9, 20)),
+      delivered_at: toLocalMidnightIso(new Date(2026, 9, 21)),
       notes: 'Test PO #999',
     });
   });

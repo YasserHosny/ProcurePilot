@@ -18,7 +18,7 @@ import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { ApiService } from '../../../core/api/api.service';
 import type { ApiError, Product, Supplier } from '../../../core/api/models';
 import { SessionService } from '../../../core/auth/session.service';
-import { toIsoDateOrNull } from '../../../core/format/iso-date';
+import { toLocalMidnightIsoOrNull } from '../../../core/format/iso-date';
 import {
   type PurchaseDeliveryResult,
   type PurchaseOutcomeCreate,
@@ -274,8 +274,8 @@ export class OutcomeCaptureComponent implements OnInit {
         currency: String(fv.currency).trim().toUpperCase(),
       },
       delivery_result: fv.delivery_result as PurchaseDeliveryResult,
-      ordered_at: toIsoDateOrNull(fv.ordered_at),
-      delivered_at: toIsoDateOrNull(fv.delivered_at),
+      ordered_at: toLocalMidnightIsoOrNull(fv.ordered_at),
+      delivered_at: toLocalMidnightIsoOrNull(fv.delivered_at),
       notes: fv.notes?.trim() || null,
     };
 

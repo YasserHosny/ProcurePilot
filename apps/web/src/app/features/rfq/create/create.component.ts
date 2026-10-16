@@ -166,6 +166,15 @@ export class RfqCreateComponent implements OnInit {
         ? `${this.translate.instant('rfq.create.validationError')} ${labels.join(', ')}`
         : this.translate.instant('rfq.create.validationError');
     }
-    return typeof envelope?.message === 'string' ? envelope.message : fallback;
+    const errorKeys: Record<string, string> = {
+      'auth.permission_denied': 'rfq.create.errors.permissionDenied',
+      'auth.unauthenticated': 'rfq.create.errors.unauthenticated',
+      not_found: 'rfq.create.errors.notFound',
+      conflict: 'rfq.create.errors.conflict',
+      'validation.invalid_value': 'rfq.create.errors.invalidValue',
+      service_unavailable: 'rfq.create.errors.serviceUnavailable',
+    };
+    const key = typeof envelope?.code === 'string' ? errorKeys[envelope.code] : undefined;
+    return key ? this.translate.instant(key) : fallback;
   }
 }
