@@ -7,6 +7,7 @@ import { TranslatePipe } from "@ngx-translate/core";
 export interface ConfirmDialogData {
   readonly titleKey: string;
   readonly messageKey: string;
+  readonly messageParams?: Record<string, unknown>;
   readonly itemName?: string;
   readonly confirmKey: string;
   readonly cancelKey?: string;

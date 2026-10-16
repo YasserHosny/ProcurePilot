@@ -4,6 +4,7 @@ import { RouterModule, Router } from '@angular/router';
 import { MatCardModule } from '@angular/material/card';
 import { MatTableModule } from '@angular/material/table';
 import { MatButtonModule } from '@angular/material/button';
+import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatIconModule } from '@angular/material/icon';
 import { MatChipsModule } from '@angular/material/chips';
@@ -13,6 +14,7 @@ import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { RfqApi, RfqSummary } from '../rfq-api';
 import { FormatDatePipe } from '../../../core/format/date.pipe';
 import { RoleDirective } from '../../../core/auth/role.directive';
+import { CatalogueConfirmDialogComponent } from '../../catalogue/confirm-dialog/confirm-dialog.component';
 
 @Component({
   selector: 'app-rfq-history',
@@ -26,6 +28,7 @@ import { RoleDirective } from '../../../core/auth/role.directive';
     MatIconModule,
     MatChipsModule,
     MatButtonModule,
+    MatDialogModule,
     TranslateModule,
     FormatDatePipe,
     RoleDirective,
@@ -36,6 +39,7 @@ import { RoleDirective } from '../../../core/auth/role.directive';
 export class HistoryComponent implements OnInit {
   private readonly rfqApi = inject(RfqApi);
   private readonly router = inject(Router);
+  private readonly dialog = inject(MatDialog);
   private readonly snackBar = inject(MatSnackBar);
   private readonly translate = inject(TranslateService);
 
@@ -80,10 +84,59 @@ export class HistoryComponent implements OnInit {
   }
 
   onRowClick(rfq: RfqSummary): void {
-    if (rfq.status === 'converted' && rfq.converted_purchase_request_id) {
+    if (rfq.status === 'draft') {
+      this.router.navigate(['/rfq', rfq.id, 'edit']);
+    } else if (rfq.status === 'converted' && rfq.converted_purchase_request_id) {
       this.router.navigate(['/requests', rfq.converted_purchase_request_id]);
     } else {
       this.router.navigate(['/rfq/compare', rfq.id]);
     }
+  }
+
+  onEditDraft(rfq: RfqSummary, event?: Event): void {
+    event?.stopPropagation();
+    this.router.navigate(['/rfq', rfq.id, 'edit']);
+  }
+
+  onSendDraft(rfq: RfqSummary, event?: Event): void {
+    event?.stopPropagation();
+    const dialogRef = this.dialog.open(CatalogueConfirmDialogComponent, {
+      width: '440px',
+      data: {
+        titleKey: 'rfq.history.confirmSendTitle',
+        messageKey: 'rfq.history.confirmSendMessage',
+        messageParams: { count: rfq.recipient_count },
+        confirmKey: 'rfq.history.confirmSendButton',
+        cancelKey: 'rfq.history.cancelSendButton',
+        isDestructive: false,
+      },
+    });
+
+    dialogRef.afterClosed().subscribe((confirmed: boolean | undefined) => {
+      if (confirmed) {
+        this.sendRfq(rfq);
+      }
+    });
+  }
+
+  private sendRfq(rfq: RfqSummary): void {
+    this.rfqApi.sendRfq(rfq.id).subscribe({
+      next: (res) => {
+        const count = res.recipients?.length || rfq.recipient_count;
+        this.snackBar.open(
+          this.translate.instant('rfq.history.sentSuccess', { count }),
+          this.translate.instant('rfq.history.dismiss'),
+          { duration: 5000 },
+        );
+        this.loadRfqs();
+      },
+      error: () => {
+        this.snackBar.open(
+          this.translate.instant('rfq.history.sendError'),
+          this.translate.instant('rfq.history.dismiss'),
+          { duration: 5000 },
+        );
+      },
+    });
   }
 }
