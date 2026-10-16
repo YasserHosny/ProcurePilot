@@ -92,7 +92,7 @@
           <thead>
             <tr>
               @for (col of getPreviewObjectKeys(preview.preview); track col) {
-                <th>{{ col }}</th>
+                <th>{{ formatPreviewHeader(col) }}</th>
               }
             </tr>
           </thead>
@@ -100,7 +100,7 @@
             @for (row of preview.preview; track $index) {
               <tr>
                 @for (col of getPreviewObjectKeys(preview.preview); track col) {
-                  <td>{{ formatPreviewCell(row[col]) }}</td>
+                  <td>{{ formatPreviewCell(row[col], row) }}</td>
                 }
               </tr>
             }
