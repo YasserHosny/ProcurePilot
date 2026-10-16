@@ -410,10 +410,14 @@ jobs:
         working-directory: apps/web
         run: pnpm exec ng build
 
-  e2e:
-    name: End-to-end
+  e2e-shard:
+    name: End-to-end shard ${{ matrix.shard }}/3
     needs: changes
     if: needs.changes.outputs.code == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
     runs-on: ubuntu-latest
     services:
       # The quotation extraction pipeline (services/extraction-worker) is an RQ consumer over
@@ -430,7 +434,7 @@ jobs:
       - uses: astral-sh/setup-uv@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-          # The post-run cache save exits 2 here and failed the whole job AFTER all 14 specs had
+          # The post-run cache save exits 2 here and failed the whole job after the E2E suite
           # passed. A caching optimisation must never be able to fail a green test run.
           enable-cache: false
       - uses: pnpm/action-setup@v4
@@ -448,7 +452,19 @@ jobs:
         # This also applies supabase/migrations and honours supabase/config.toml, which enables the
         # custom access token hook that puts tenant_id into the JWT. Without that hook every
         # tenant-scoped query returns zero rows and the app looks empty rather than broken.
-        run: supabase start
+        # Retry transient Docker/public.ecr.aws rate limits when shards pull images in parallel.
+        run: |
+          for attempt in 1 2 3; do
+            if supabase start; then
+              exit 0
+            fi
+            if [ "$attempt" -eq 3 ]; then
+              echo "::error::supabase start failed after 3 attempts"
+              exit 1
+            fi
+            supabase stop --no-backup || true
+            sleep $((attempt*20))
+          done
 
       - name: Export Supabase credentials
         run: |
@@ -534,11 +550,14 @@ jobs:
           done
           curl -sf http://localhost:4200/ >/dev/null
 
+      # Specs are sharded by file across three runners. Each shard boots its own isolated stack
+      # (Supabase, Redis, API, worker, web), so no state is shared between shards; within a shard
+      # the suite stays serial (workers: 1) exactly as before.
       - name: Accessibility — WCAG 2.1 AA, zero violations
         # Its own step so an accessibility regression is named as one rather than buried among
         # the functional specs (FR-022, SC-006).
         working-directory: apps/web
-        run: pnpm exec playwright test a11y
+        run: pnpm exec playwright test a11y --shard=${{ matrix.shard }}/3
 
       - name: Run end-to-end specs
         # The accessibility step already ran every a11y spec; this complement is exactly the files
@@ -554,12 +573,28 @@ jobs:
             echo "::error::No non-a11y end-to-end specs found"
             exit 1
           fi
-          pnpm exec playwright test $files
+          pnpm exec playwright test $files --shard=${{ matrix.shard }}/3
 
       - name: Upload failure artefacts
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-artifacts
+          name: playwright-artifacts-${{ matrix.shard }}
           path: apps/web/test-results/
           retention-days: 7
+
+  e2e:
+    name: End-to-end
+    needs: [changes, e2e-shard]
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check E2E shard result
+        env:
+          E2E_SHARD_RESULT: ${{ needs.e2e-shard.result }}
+        run: |
+          if [ "$E2E_SHARD_RESULT" = success ] || [ "$E2E_SHARD_RESULT" = skipped ]; then
+            exit 0
+          fi
+          echo "::error::End-to-end shard matrix result: $E2E_SHARD_RESULT"
+          exit 1
