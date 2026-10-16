@@ -119,9 +119,7 @@ export class RfqCreateComponent implements OnInit {
       },
       error: (err: unknown) => {
         this.isSaving.set(false);
-        this.errorMessage.set(err instanceof HttpErrorResponse
-          ? (err.error?.message ?? this.translate.instant('rfq.create.saveError'))
-          : this.translate.instant('rfq.create.saveError'));
+        this.errorMessage.set(this.getErrorMessage(err, 'rfq.create.saveError'));
       }
     });
   }
@@ -139,10 +137,35 @@ export class RfqCreateComponent implements OnInit {
       },
       error: (err: unknown) => {
         this.isSending.set(false);
-        this.errorMessage.set(err instanceof HttpErrorResponse
-          ? (err.error?.message ?? this.translate.instant('rfq.create.sendError'))
-          : this.translate.instant('rfq.create.sendError'));
+        this.errorMessage.set(this.getErrorMessage(err, 'rfq.create.sendError'));
       }
     });
+  }
+
+  private getErrorMessage(err: unknown, fallbackKey: string): string {
+    const fallback = this.translate.instant(fallbackKey);
+    if (!(err instanceof HttpErrorResponse) || err.status >= 500) return fallback;
+
+    const envelope = err.error as {
+      code?: unknown;
+      message?: unknown;
+      details?: { loc?: unknown }[];
+    } | null;
+    if (envelope?.code === 'validation.invalid_request') {
+      const fieldKeys: Record<string, string> = {
+        lines: 'rfq.create.itemsLabel',
+        recipient_supplier_ids: 'rfq.create.suppliersLabel',
+        needed_by_date: 'rfq.create.neededByDateLabel',
+        tenant_terms: 'rfq.create.tenantTermsLabel',
+      };
+      const labels = [...new Set((Array.isArray(envelope.details) ? envelope.details : [])
+        .map(detail => Array.isArray(detail?.loc) ? detail.loc.at(-1) : undefined)
+        .filter((field): field is string => typeof field === 'string' && field in fieldKeys))]
+        .map(field => this.translate.instant(fieldKeys[field]));
+      return labels.length
+        ? `${this.translate.instant('rfq.create.validationError')} ${labels.join(', ')}`
+        : this.translate.instant('rfq.create.validationError');
+    }
+    return typeof envelope?.message === 'string' ? envelope.message : fallback;
   }
 }

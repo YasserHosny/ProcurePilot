@@ -3504,6 +3504,7 @@
       "submittingButton": "Saving...",
       "sendingButton": "Sending...",
       "saveError": "Failed to save the RFQ. Please try again.",
+      "validationError": "Please check the following RFQ fields:",
       "sendError": "Failed to send the RFQ. Please try again."
     },
     "compare": {

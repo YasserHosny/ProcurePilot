@@ -9,6 +9,7 @@ import { throwError } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { TranslateModule } from '@ngx-translate/core';
+import { TranslateService } from '@ngx-translate/core';
 import { Product, Supplier } from '../../../core/api/models';
 
 describe('RfqCreateComponent', () => {
@@ -16,6 +17,7 @@ describe('RfqCreateComponent', () => {
   let fixture: ComponentFixture<RfqCreateComponent>;
   let rfqApiSpy: jasmine.SpyObj<RfqApi>;
   let apiSpy: jasmine.SpyObj<ApiService>;
+  let translate: TranslateService;
 
   beforeEach(async () => {
     rfqApiSpy = jasmine.createSpyObj('RfqApi', ['createRfq', 'sendRfq']);
@@ -37,6 +39,12 @@ describe('RfqCreateComponent', () => {
 
     fixture = TestBed.createComponent(RfqCreateComponent);
     component = fixture.componentInstance;
+    translate = TestBed.inject(TranslateService);
+    translate.setTranslation('en', { rfq: { create: {
+      validationError: 'Please check the following RFQ fields:',
+      neededByDateLabel: 'Needed By Date',
+    } } }, true);
+    translate.use('en');
     fixture.detectChanges();
   });
 
@@ -88,5 +96,28 @@ describe('RfqCreateComponent', () => {
     expect(rfqApiSpy.createRfq).toHaveBeenCalledWith(jasmine.objectContaining({ needed_by_date: '2026-10-20' }));
     fixture.detectChanges();
     expect(fixture.nativeElement.querySelector('[role="alert"]')?.textContent).toContain('Invalid needed-by date');
+  });
+
+  it('translates validation errors and known field labels', () => {
+    rfqApiSpy.createRfq.and.returnValue(throwError(() => new HttpErrorResponse({
+      status: 422,
+      error: {
+        code: 'validation.invalid_request',
+        message: 'Request validation failed.',
+        details: [{ loc: ['body', 'needed_by_date'], msg: 'Invalid date', type: 'date_parsing' }],
+      },
+    })));
+    component.form.patchValue({
+      lines: [{ workspace_product_id: 'prod-1', quantity: '10' }],
+      supplierIds: ['sup-1'], neededByDate: new Date(2026, 9, 20),
+    });
+
+    component.onSave();
+    fixture.detectChanges();
+
+    const alert = fixture.nativeElement.querySelector('[role="alert"]') as HTMLElement;
+    expect(alert.textContent).toContain('Please check the following RFQ fields:');
+    expect(alert.textContent).toContain('Needed By Date');
+    expect(alert.textContent).not.toContain('Request validation failed.');
   });
 });

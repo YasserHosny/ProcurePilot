@@ -7,7 +7,11 @@
   </div>
 
   <mat-card class="form-card">
-    <p *ngIf="errorMessage()" role="alert">{{ errorMessage() }}</p>
+    @if (errorMessage(); as error) {
+      <mat-card class="state error" role="alert">
+        <mat-card-content>{{ error }}</mat-card-content>
+      </mat-card>
+    }
     <form [formGroup]="form" (ngSubmit)="onSave()" class="rfq-form">
       
       <div formArrayName="lines" class="lines-section">
