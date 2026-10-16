@@ -93,6 +93,7 @@ class QuotationConfirmationService:
             client.table("review_task").update(
                 {"status": "resolved", "resolved_at": datetime.now(UTC).isoformat()}
             ).eq("quotation_id", str(quotation_id)).in_("status", ["open", "in_progress"]).execute()
+            # Human confirmation is the authorisation that clears any sticky extraction reason.
         except APIError as exc:
             raise ServiceUnavailableError(details={"dependency": "database"}) from exc
         get_audit_writer().record(

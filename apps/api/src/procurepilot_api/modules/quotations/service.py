@@ -16,6 +16,7 @@ from procurepilot_api.modules.documents.schemas import Document
 from procurepilot_api.modules.documents.service import DOCUMENT_COLUMNS
 from procurepilot_api.modules.members.service import authenticated_client
 from procurepilot_api.modules.quotations.schemas import (
+    STICKY_REVIEW_REASONS,
     AuditTrailEntry,
     AuditTrailResponse,
     FieldExtraction,
@@ -950,6 +951,8 @@ def _sync_open_review_tasks(client: object, confidence_threshold: float) -> None
         .data
     )
     for task in open_tasks:
+        if task.get("reason") in STICKY_REVIEW_REASONS:
+            continue
         quotation_id = UUID(str(task["quotation_id"]))
         blocker = _current_review_task_blocker(client, quotation_id, confidence_threshold)
         if blocker is None:

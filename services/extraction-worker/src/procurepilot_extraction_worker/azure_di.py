@@ -169,6 +169,9 @@ def _parse_line_table(result: object, model_version: str) -> ExtractionResult | 
     expected = 0
     stated_total = None
     before_tax_total = None
+    previous_col_roles: dict[int, str] | None = None
+    previous_column_count: int | None = None
+    charge_amount: Decimal | None = None
     for table in tables:
         cells = _get(table, "cells", []) or []
         rows: dict[int, list[object]] = {}
@@ -187,18 +190,28 @@ def _parse_line_table(result: object, model_version: str) -> ExtractionResult | 
                 {"unit_price", "line_total"} & roles.keys()
             ):
                 roles_by_row[row] = roles
-        if not roles_by_row:
+        column_count = int(_get(table, "columnCount", 0) or 0)
+        header_row: int | None = None
+        if roles_by_row:
+            header_row = max(roles_by_row, key=lambda row: (len(roles_by_row[row]), -row))
+            roles = roles_by_row[header_row]
+            col_roles: dict[int, str] = {}
+            for role, cell in roles.items():
+                start = int(_get(cell, "columnIndex", _get(cell, "column_index", 0)))
+                span = int(_get(cell, "columnSpan", _get(cell, "column_span", 1)) or 1)
+                for column in range(start, start + span):
+                    col_roles[column] = role
+            previous_col_roles = col_roles
+            previous_column_count = column_count
+        elif (
+            previous_col_roles is not None
+            and previous_column_count == column_count
+            and previous_column_count is not None
+        ):
+            col_roles = previous_col_roles
+            header_row = min(rows, default=0) - 1
+        else:
             continue
-        header_row = max(roles_by_row, key=lambda row: (len(roles_by_row[row]), -row))
-        roles = roles_by_row[header_row]
-        col_roles: dict[int, str] = {}
-        for role, cell in roles.items():
-            start = int(_get(cell, "columnIndex", _get(cell, "column_index", 0)))
-            span = int(_get(cell, "columnSpan", _get(cell, "column_span", 1)) or 1)
-            for column in range(start, start + span):
-                col_roles[column] = role
-        expected = 0
-        charge_amount: Decimal | None = None
         for row in sorted(r for r in rows if r > header_row):
             row_cells = rows[row]
             data: dict[str, str] = {}
@@ -266,14 +279,13 @@ def _parse_line_table(result: object, model_version: str) -> ExtractionResult | 
                         "unit_price", price, currency, confidence
                     )
             lines.append(ExtractedLine(len(lines) + 1, desc, line_fields))
-        if charge_amount and lines:
-            # The existing arithmetic model adds a line's delivery fee once, so attach a
-            # document-level charge to the final item rather than creating a pseudo-item.
-            last = lines[-1]
-            last.fields["delivery_fee"] = _money_field(
-                "delivery_fee", format(charge_amount, "f"), currency, 0.9
-            )
-        break
+    if charge_amount and lines:
+        # The existing arithmetic model adds a line's delivery fee once, so attach a
+        # document-level charge to the final item rather than creating a pseudo-item.
+        last = lines[-1]
+        last.fields["delivery_fee"] = _money_field(
+            "delivery_fee", format(charge_amount, "f"), currency, 0.9
+        )
     if expected == 0:
         return None
     if before_tax_total is not None:

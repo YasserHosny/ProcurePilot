@@ -124,6 +124,80 @@ def test_alnour_lines_reconcile_and_can_auto_accept() -> None:
     assert _review_reason(result, "reconciled", 0.85, SupplierMatch("supplier", 1, True)) is None
 
 
+@pytest.mark.parametrize("repeat_header", [True, False])
+def test_alnour_split_tables_accumulate_rows_and_total(repeat_header: bool) -> None:
+    payload = split_alnour_tables(repeat_header=repeat_header)
+    result = _parse_invoice_result(payload, "layout:test")
+    assert len(result.lines) == result.expected_line_count == 5
+    assert result.stated_total.value["amount"] == "56425.00"
+    assert validate_arithmetic(result).status == "reconciled"
+
+
+def test_alnour_split_table_with_different_column_count_is_ignored() -> None:
+    payload = split_alnour_tables(repeat_header=False)
+    payload["tables"][1]["columnCount"] -= 1
+    result = _parse_invoice_result(payload, "layout:test")
+    assert len(result.lines) == 3
+    assert result.stated_total is not None
+    assert result.expected_line_count == 3
+    assert validate_arithmetic(result).status == "mismatch"
+    assert _review_reason(result, "mismatch", 0.85, SupplierMatch("supplier", 1, True)) is not None
+
+
+def test_split_table_page_subtotal_does_not_override_final_grand_total() -> None:
+    payload = split_alnour_tables(repeat_header=False, first_page_subtotal=True)
+    result = _parse_invoice_result(payload, "layout:test")
+    assert len(result.lines) == result.expected_line_count == 5
+    assert result.stated_total.value["amount"] == "56425.00"
+    assert validate_arithmetic(result).status == "reconciled"
+
+
+def split_alnour_tables(*, repeat_header: bool, first_page_subtotal: bool = False) -> dict:
+    payload = load("demo-alnour.layout.json")
+    original = payload["tables"][0]
+    first_rows = {0, 1, 2, 3}
+    second_rows = {4, 5, 6}
+    first = {**original, "rowCount": max(first_rows) + 1}
+    first["cells"] = [c.copy() for c in original["cells"] if c["rowIndex"] in first_rows]
+    second = {**original, "rowCount": max(second_rows) + 1}
+    second_cells = []
+    for cell in original["cells"]:
+        row = cell["rowIndex"]
+        include = row in {4, 5, 6}
+        if repeat_header and row == 0:
+            include = True
+        if first_page_subtotal and row == 0:
+            include = False
+        if include:
+            copied = cell.copy()
+            copied["rowIndex"] = row - 3 if row >= 4 else 0
+            second_cells.append(copied)
+    second["cells"] = second_cells
+    if first_page_subtotal:
+        subtotal = sum(Decimal(value) for value in ("16800", "18800", "9050"))
+        first["cells"].extend(
+            [
+                {
+                    "rowIndex": 4,
+                    "columnIndex": 0,
+                    "content": f"{subtotal:,.2f}",
+                    "rowSpan": 1,
+                    "columnSpan": 1,
+                },
+                {
+                    "rowIndex": 4,
+                    "columnIndex": 4,
+                    "content": "الإجمالي",
+                    "rowSpan": 1,
+                    "columnSpan": 2,
+                },
+            ]
+        )
+        first["rowCount"] = 5
+    payload["tables"] = [first, second]
+    return payload
+
+
 def test_amana_delivery_fee_is_counted_once() -> None:
     result = _parse_invoice_result(load("demo-alamana.layout.json"), "layout:test")
     assert len(result.lines) == 5
