@@ -56,7 +56,7 @@ export class RfqCreateComponent implements OnInit {
     ], Validators.required),
     supplierIds: [[] as string[], Validators.required],
     neededByDate: this.fb.control<Date | null>(null, Validators.required),
-    tenantTerms: [''],
+    tenantTerms: ['', Validators.maxLength(4000)],
   });
 
   readonly isSaving = signal(false);

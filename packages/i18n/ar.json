@@ -1712,7 +1712,12 @@
   "organisation": {
     "title": "إعدادات المنشأة",
     "subtitle": "إدارة فروع منشأتك ومراكز التكلفة والميزانيات من مكان واحد.",
-    "homeCurrency": { "title": "العملة الأساسية", "label": "العملة الأساسية", "save": "حفظ العملة", "value": "العملة الأساسية" },
+    "homeCurrency": {
+      "title": "العملة الأساسية",
+      "label": "العملة الأساسية",
+      "save": "حفظ العملة",
+      "value": "العملة الأساسية"
+    },
     "branchesSectionTitle": "الفروع",
     "costCentresSectionTitle": "مراكز التكلفة",
     "budgetsSectionTitle": "الميزانيات",
@@ -3497,6 +3502,7 @@
       "neededByDateLabel": "مطلوب بحلول تاريخ",
       "tenantTermsLabel": "الشروط والأحكام",
       "tenantTermsPlaceholder": "أدخل الشروط للموردين (اختياري)",
+      "tenantTermsTooLong": "يجب ألا تتجاوز الشروط 4000 حرف.",
       "saveDraftButton": "حفظ كمسودة",
       "sendButton": "إرسال الطلب",
       "rejectedSuppliersTitle": "الموردين المرفوضين",
@@ -3612,6 +3618,40 @@
         "ambiguous_guardrails": "سيُفعّل هذا الضابط، لكن ضابطاً آخر ينطبق أيضاً — النتيجة ملتبسة، لذلك لا يتم تفعيل أي منهما",
         "fired": "تم تفعيل الضابط وإعداد مسودة طلب."
       }
+    },
+    "email": {
+      "subject": "طلب عرض سعر — {{tenant}} — مطلوب قبل {{date}}",
+      "fromName": "{{tenant}} عبر ProcurePilot",
+      "greeting": "مرحباً،",
+      "intro": "تطلب {{tenant}} عرض سعر للعناصر التالية:",
+      "itemsHeading": "العناصر المطلوبة",
+      "neededBy": "مطلوب قبل",
+      "termsHeading": "شروط المشتري",
+      "replyInstructions": "يرجى الرد مباشرة على هذا البريد أو إرسال عرض السعر إلى:",
+      "englishSummary": "هذا طلب عرض سعر من {{tenant}}.",
+      "packHint": "(عبوة {{count}} × {{size}} {{unit}})",
+      "units": {
+        "litre": "لتر",
+        "millilitre": "مل",
+        "kilogram": "كجم",
+        "gram": "جم",
+        "each": "وحدة"
+      },
+      "months": {
+        "1": "يناير",
+        "2": "فبراير",
+        "3": "مارس",
+        "4": "أبريل",
+        "5": "مايو",
+        "6": "يونيو",
+        "7": "يوليو",
+        "8": "أغسطس",
+        "9": "سبتمبر",
+        "10": "أكتوبر",
+        "11": "نوفمبر",
+        "12": "ديسمبر"
+      },
+      "unknownProduct": "منتج غير معروف"
     }
   }
 }

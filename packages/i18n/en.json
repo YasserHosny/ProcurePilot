@@ -1712,7 +1712,12 @@
   "organisation": {
     "title": "Organisation Settings",
     "subtitle": "Manage your organisation's branches, cost centres, and budgets in one place.",
-    "homeCurrency": { "title": "Home currency", "label": "Home currency", "save": "Save currency", "value": "Home currency" },
+    "homeCurrency": {
+      "title": "Home currency",
+      "label": "Home currency",
+      "save": "Save currency",
+      "value": "Home currency"
+    },
     "branchesSectionTitle": "Branches",
     "costCentresSectionTitle": "Cost Centres",
     "budgetsSectionTitle": "Budgets",
@@ -3497,6 +3502,7 @@
       "neededByDateLabel": "Needed By Date",
       "tenantTermsLabel": "Terms and Conditions",
       "tenantTermsPlaceholder": "Enter terms for suppliers (optional)",
+      "tenantTermsTooLong": "Terms must be 4000 characters or fewer.",
       "saveDraftButton": "Save Draft",
       "sendButton": "Send RFQ",
       "rejectedSuppliersTitle": "Rejected Suppliers",
@@ -3612,6 +3618,40 @@
         "ambiguous_guardrails": "Would fire, but another guardrail also matches — ambiguous, so neither fires",
         "fired": "Guardrail fired and prepared a draft request."
       }
+    },
+    "email": {
+      "subject": "Request for quotation — {{tenant}} — needed by {{date}}",
+      "fromName": "{{tenant}} via ProcurePilot",
+      "greeting": "Hello,",
+      "intro": "{{tenant}} is requesting a quotation for these items:",
+      "itemsHeading": "Requested items",
+      "neededBy": "Needed by",
+      "termsHeading": "Buyer terms",
+      "replyInstructions": "Please reply directly to this email or send your quotation to:",
+      "englishSummary": "This is a request for quotation from {{tenant}}.",
+      "packHint": "(pack {{count}} × {{size}} {{unit}})",
+      "units": {
+        "litre": "L",
+        "millilitre": "mL",
+        "kilogram": "kg",
+        "gram": "g",
+        "each": "pcs"
+      },
+      "months": {
+        "1": "January",
+        "2": "February",
+        "3": "March",
+        "4": "April",
+        "5": "May",
+        "6": "June",
+        "7": "July",
+        "8": "August",
+        "9": "September",
+        "10": "October",
+        "11": "November",
+        "12": "December"
+      },
+      "unknownProduct": "Unknown product"
     }
   }
 }

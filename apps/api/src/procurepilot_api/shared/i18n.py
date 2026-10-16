@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
@@ -16,10 +17,23 @@ _LOCALE_DIR_CANDIDATES = [
 
 @lru_cache(maxsize=1)
 def find_i18n_dir() -> Path:
-    for candidate in _LOCALE_DIR_CANDIDATES:
-        if (candidate / "en.json").is_file():
+    configured_dir = os.environ.get("I18N_DIR")
+    candidates = ([Path(configured_dir)] if configured_dir else []) + _LOCALE_DIR_CANDIDATES
+    for candidate in candidates:
+        if (candidate / "en.json").is_file() and (candidate / "ar.json").is_file():
             return candidate
-    return _LOCALE_DIR_CANDIDATES[0]
+    return candidates[0]
+
+
+def assert_catalogues_present() -> None:
+    """Fail startup when the configured catalogue directory is incomplete."""
+    i18n_dir = find_i18n_dir()
+    missing = [name for name in ("en.json", "ar.json") if not (i18n_dir / name).is_file()]
+    if missing:
+        raise RuntimeError(
+            f"i18n catalogues missing from {i18n_dir}: {', '.join(missing)}. "
+            "Ensure packages/i18n is included in the application image or set I18N_DIR."
+        )
 
 
 @lru_cache(maxsize=4)

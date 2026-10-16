@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import re
+import unicodedata
 from collections.abc import Sequence
 from uuid import UUID, uuid4
 
@@ -177,11 +178,10 @@ class TenantSignupRepository:
         invitation_id: UUID,
     ) -> Tenant:
         for slug in _candidate_slugs(request.business_name):
-            cur.execute("select exists(select 1 from tenant where slug = %s)", (slug,))
-            row = cur.fetchone()
-            if row is not None and not row["exists"]:
-                cur.execute(
-                    """
+            try:
+                with cur.connection.transaction():
+                    cur.execute(
+                        """
                     insert into tenant (
                       name, slug, region, currency, tax_model,
                       default_locale, platform_invitation_id
@@ -189,20 +189,22 @@ class TenantSignupRepository:
                     values (%s, %s, %s, %s, %s, %s, %s)
                     returning id,name,slug,region,currency,tax_model,default_locale,created_at
                     """,
-                    (
-                        request.business_name,
-                        slug,
-                        request.region,
-                        request.currency,
-                        request.tax_model,
-                        request.default_locale,
-                        invitation_id,
-                    ),
-                )
-                inserted = cur.fetchone()
-                if inserted is None:
-                    break
-                return Tenant.model_validate(inserted)
+                        (
+                            request.business_name,
+                            slug,
+                            request.region,
+                            request.currency,
+                            request.tax_model,
+                            request.default_locale,
+                            invitation_id,
+                        ),
+                    )
+                    inserted = cur.fetchone()
+                if inserted is not None:
+                    return Tenant.model_validate(inserted)
+            except psycopg.errors.UniqueViolation as exc:
+                if exc.diag.constraint_name != "tenant_slug_key":
+                    raise
         raise ServiceUnavailableError(details={"reason": "slug_generation_failed"})
 
     def _insert_owner_membership(
@@ -293,14 +295,73 @@ class TenantSignupService:
         return self._auth_service.login(email=request.email, password=request.password)
 
 
+_ARABIC_TRANSLITERATION = str.maketrans(
+    {
+        "ا": "a",
+        "أ": "a",
+        "إ": "i",
+        "آ": "aa",
+        "ٱ": "a",
+        "ب": "b",
+        "ت": "t",
+        "ث": "th",
+        "ج": "j",
+        "ح": "h",
+        "خ": "kh",
+        "د": "d",
+        "ذ": "th",
+        "ر": "r",
+        "ز": "z",
+        "س": "s",
+        "ش": "sh",
+        "ص": "s",
+        "ض": "d",
+        "ط": "t",
+        "ظ": "z",
+        "ع": "a",
+        "غ": "gh",
+        "ف": "f",
+        "ق": "q",
+        "ك": "k",
+        "ل": "l",
+        "م": "m",
+        "ن": "n",
+        "ه": "h",
+        "ة": "a",
+        "و": "w",
+        "ؤ": "u",
+        "ي": "y",
+        "ى": "a",
+        "ئ": "i",
+        "ء": "",
+        "پ": "p",
+        "چ": "ch",
+        "ڤ": "v",
+        "گ": "g",
+    }
+)
+
+
+def slugify_business_name(name: str) -> str:
+    """Transliterate Arabic then fold Latin accents; مطاعم سند becomes mtaam-snd."""
+    stripped = "".join(
+        ch for ch in name if ch not in "ـ" and not unicodedata.category(ch).startswith("M")
+    )
+    stripped = stripped.translate(str.maketrans("٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹", "01234567890123456789"))
+    latin = stripped.translate(_ARABIC_TRANSLITERATION).casefold()
+    latin = unicodedata.normalize("NFKD", latin)
+    folded = "".join(ch for ch in latin if not unicodedata.category(ch).startswith("M"))
+    return re.sub(r"[^a-z0-9]+", "-", folded).strip("-")[:63].strip("-")
+
+
 def _candidate_slugs(name: str) -> Sequence[str]:
-    base = re.sub(r"[^a-z0-9]+", "-", name.casefold()).strip("-")
+    base = slugify_business_name(name)
     if len(base) < 3:
-        base = f"{base}-workspace".strip("-")
-    base = base[:63].strip("-")
-    if len(base) < 3:
-        base = "workspace"
-    return (base, f"{base[:54].strip('-')}-{uuid4().hex[:8]}")
+        base = f"ws-{uuid4().hex[:8]}"
+    candidates = [base]
+    for _ in range(5):
+        candidates.append(f"{base[:56].rstrip('-')}-{uuid4().hex[:6]}")
+    return tuple(candidates)
 
 
 def get_tenant_signup_service() -> TenantSignupService:
