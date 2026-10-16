@@ -3,14 +3,15 @@
 Status 2026-10-15: **restaurant tenant set up on hosted** — workspace «مطاعم سند» (EGP, Egypt VAT),
 3 branches, 6 cost centres (kitchen + packaging/cleaning per branch), 3 monthly branch budgets
 (450k / 380k / 320k EGP), 5 suppliers (EGP terms, plus-address emails), 30 products with preferred
-suppliers. Next: purchasing-officer account, then the RFQ cycles — **blocked on the pooler fix below**.
+suppliers, and a Buyer account (`pp-buyer`, active 2026-10-16). Quote-reply supplier fix merged (#84). Next: the RFQ
+cycles — **blocked on the pooler fix below** (in progress).
 
 ### Findings from the build (real product bugs)
 
 | # | Finding | Impact | Status |
 |---|---|---|---|
-| 1 | ~45 `psycopg.connect` call sites lack `prepare_threshold=None`; on Supabase's transaction pooler they fail with `DuplicatePreparedStatement` (reproduced: 3/4 connections fail, 0/4 with the setting) | CSV import cannot commit (preview OK, commit never lands, re-upload → 500); **inbound quote ingestion uses the same pattern** | fix task raised |
-| 2 | Supplier attribution: sender-address history beats the RFQ thread | quotes from a shared sender credited to the wrong supplier | fix in progress |
+| 1 | ~45 `psycopg.connect` call sites lack `prepare_threshold=None`; on Supabase's transaction pooler they fail with `DuplicatePreparedStatement` (reproduced: 3/4 connections fail, 0/4 with the setting) | CSV import cannot commit (preview OK, commit never lands, re-upload → 500); **inbound quote ingestion uses the same pattern** | fix in progress |
+| 2 | Supplier attribution: sender-address history beats the RFQ thread | quotes from a shared sender credited to the wrong supplier | fixed — #84 merged 2026-10-16 |
 | 3 | Unit list offers both "Kilogram (kg)" and "Kilogram (kilogram)" | inconsistent product units | to raise |
 | 4 | Import preview shows the pack as raw JSON (`{"pack_count":1,"unit_size":"1"}`) | cosmetic | to raise |
 | 6 | Team invites are not emailed ("email delivery is not configured"); the link is shown once on screen | every pilot invite must be passed on by hand | to raise |
