@@ -5,6 +5,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
+import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { MatTableModule } from '@angular/material/table';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatSelectModule } from '@angular/material/select';
@@ -17,12 +18,13 @@ import { MatIconModule } from '@angular/material/icon';
 import { TranslateModule, TranslatePipe, TranslateService } from '@ngx-translate/core';
 
 import { ApiService } from '../../../core/api/api.service';
-import { RfqApi, RfqGuardrail, RfqResponseComparison } from '../rfq-api';
+import { RfqApi, RfqDetail, RfqGuardrail, RfqResponseComparison } from '../rfq-api';
 import { FormatMoneyPipe } from '../../../core/format/money.pipe';
 import { FormatDatePipe } from '../../../core/format/date.pipe';
 import type { ApiError, Branch } from '../../../core/api/models';
 import { SessionService } from '../../../core/auth/session.service';
 import { toIsoDate } from '../../../core/format/iso-date';
+import { CatalogueConfirmDialogComponent } from '../../catalogue/confirm-dialog/confirm-dialog.component';
 
 @Component({
   selector: 'app-rfq-compare',
@@ -32,6 +34,7 @@ import { toIsoDate } from '../../../core/format/iso-date';
     FormsModule,
     MatCardModule,
     MatButtonModule,
+    MatDialogModule,
     MatTableModule,
     MatSnackBarModule,
     MatSelectModule,
@@ -55,10 +58,12 @@ export class CompareComponent implements OnInit {
   private readonly api = inject(ApiService);
   private readonly rfqApi = inject(RfqApi);
   private readonly session = inject(SessionService);
+  private readonly dialog = inject(MatDialog);
   private readonly snackBar = inject(MatSnackBar);
   private readonly translate = inject(TranslateService);
 
   readonly rfqId = signal<string>('');
+  readonly rfqDetail = signal<RfqDetail | null>(null);
   readonly isLoading = signal<boolean>(false);
   readonly responses = signal<RfqResponseComparison[]>([]);
   readonly branches = signal<readonly Branch[]>([]);
@@ -87,6 +92,11 @@ export class CompareComponent implements OnInit {
     this.isLoading.set(true);
     this.errorMessage.set(null);
 
+    this.rfqApi.getRfq?.(rfqId)?.subscribe({
+      next: (detail) => this.rfqDetail.set(detail),
+      error: () => this.rfqDetail.set(null),
+    });
+
     this.rfqApi.listResponses(rfqId).subscribe({
       next: (res) => {
         this.responses.set(res.items);
@@ -109,6 +119,54 @@ export class CompareComponent implements OnInit {
           this.errorMessage.set(this.translate.instant('rfq.compare.loadError'));
         }
       },
+    });
+  }
+
+  onEditDraft(): void {
+    const id = this.rfqId();
+    if (!id) return;
+    this.router.navigate(['/rfq', id, 'edit']);
+  }
+
+  onSendDraft(): void {
+    const detail = this.rfqDetail();
+    const id = this.rfqId();
+    if (!id) return;
+    const recipientCount = detail?.recipients.length ?? 0;
+
+    const dialogRef = this.dialog.open(CatalogueConfirmDialogComponent, {
+      width: '440px',
+      data: {
+        titleKey: 'rfq.history.confirmSendTitle',
+        messageKey: 'rfq.history.confirmSendMessage',
+        messageParams: { count: recipientCount },
+        confirmKey: 'rfq.history.confirmSendButton',
+        cancelKey: 'rfq.history.cancelSendButton',
+        isDestructive: false,
+      },
+    });
+
+    dialogRef.afterClosed().subscribe((confirmed: boolean | undefined) => {
+      if (confirmed) {
+        this.rfqApi.sendRfq(id).subscribe({
+          next: (res) => {
+            const count = res.recipients?.length || recipientCount;
+            this.snackBar.open(
+              this.translate.instant('rfq.history.sentSuccess', { count }),
+              this.translate.instant('rfq.history.dismiss'),
+              { duration: 5000 },
+            );
+            this.loadData(id);
+          },
+          error: () => {
+            this.snackBar.open(
+              this.translate.instant('rfq.history.sendError'),
+              this.translate.instant('rfq.history.dismiss'),
+              { duration: 5000 },
+            );
+          },
+        });
+      }
     });
   }
 
@@ -145,7 +203,7 @@ export class CompareComponent implements OnInit {
           names[s.id] = s.name;
         }
         this.supplierNames.set(names);
-      }
+      },
     });
   }
 
@@ -157,17 +215,19 @@ export class CompareComponent implements OnInit {
           names[p.id] = p.tenant_name;
         }
         this.productNames.set(names);
-      }
+      },
     });
   }
 
   isEligible(response: RfqResponseComparison): boolean {
-    return response.lines.every(l => !l.pending_match);
+    return response.lines.every((l) => !l.pending_match);
   }
 
   prepareRequest(response: RfqResponseComparison): void {
     if (!this.isEligible(response)) {
-      this.snackBar.open(this.translate.instant('rfq.compare.cannotPreparePending'), 'OK', { duration: 3000 });
+      this.snackBar.open(this.translate.instant('rfq.compare.cannotPreparePending'), 'OK', {
+        duration: 3000,
+      });
       return;
     }
 
@@ -182,7 +242,7 @@ export class CompareComponent implements OnInit {
         const snackRef = this.snackBar.open(
           this.translate.instant('rfq.compare.prepareSuccess'),
           this.translate.instant('rfq.compare.viewRequest'),
-          { duration: 5000 }
+          { duration: 5000 },
         );
         snackRef.onAction().subscribe(() => {
           this.router.navigate(['/requests', res.purchase_request_id]);
@@ -191,11 +251,17 @@ export class CompareComponent implements OnInit {
       error: (err: unknown) => {
         if (err instanceof HttpErrorResponse) {
           const apiError = err.error as ApiError | undefined;
-          this.snackBar.open(apiError?.message ?? this.translate.instant('rfq.compare.prepareError'), 'OK', { duration: 5000 });
+          this.snackBar.open(
+            apiError?.message ?? this.translate.instant('rfq.compare.prepareError'),
+            'OK',
+            { duration: 5000 },
+          );
         } else {
-          this.snackBar.open(this.translate.instant('rfq.compare.prepareError'), 'OK', { duration: 5000 });
+          this.snackBar.open(this.translate.instant('rfq.compare.prepareError'), 'OK', {
+            duration: 5000,
+          });
         }
-      }
+      },
     });
   }
 }

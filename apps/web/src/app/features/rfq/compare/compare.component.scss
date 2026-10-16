@@ -4,7 +4,7 @@
 .outcome-reason.fired { color: var(--mat-sys-primary); }
 .page-container {
   padding: 24px;
-  max-width: 1200px;
+  max-inline-size: 1200px;
   margin-inline: auto;
 }
 
@@ -14,11 +14,47 @@
   .mat-headline-4 {
     margin-block-end: 8px;
   }
-  
+
   .mat-body-1 {
     color: var(--sys-outline);
     margin: 0;
   }
+}
+
+.draft-notice-card {
+  padding: 20px;
+  margin-block-end: 24px;
+}
+
+.draft-notice-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.draft-notice-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+
+  h2 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 500;
+  }
+
+  p {
+    margin: 0;
+    color: var(--mat-sys-on-surface-variant);
+  }
+}
+
+.draft-notice-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .controls-section {
@@ -42,18 +78,18 @@
     padding-block: 16px;
     padding-inline: 16px;
   }
-  
+
   .mat-mdc-card-content {
     padding-inline: 16px;
   }
-  
+
   .mat-mdc-card-actions {
     padding: 16px;
   }
 }
 
 .lines-table {
-  width: 100%;
+  inline-size: 100%;
   margin-block-end: 16px;
 
   .mat-column-unitPrice,
@@ -69,11 +105,11 @@
   gap: 8px;
   color: var(--sys-error);
   font-weight: 500;
-  
+
   .pending-icon {
     font-size: 18px;
-    height: 18px;
-    width: 18px;
+    block-size: 18px;
+    inline-size: 18px;
   }
 }
 
@@ -93,10 +129,10 @@
   padding-block: 64px;
   gap: 16px;
   color: var(--sys-outline);
-  
+
   mat-icon {
     font-size: 48px;
-    height: 48px;
-    width: 48px;
+    block-size: 48px;
+    inline-size: 48px;
   }
 }

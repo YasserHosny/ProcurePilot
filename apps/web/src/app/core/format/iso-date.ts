@@ -33,3 +33,12 @@ export function toIsoDateOrNull(value: Date | string | null | undefined): string
   if (typeof value === 'string') return value.slice(0, 10);
   return toIsoDate(value);
 }
+
+/** Parse a YYYY-MM-DD calendar date string as a local Date (never UTC). */
+export function parseIsoDateLocal(value: string | null | undefined): Date | null {
+  if (value == null || value === '') return null;
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(value);
+  if (!match) return null;
+  return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+}
+
