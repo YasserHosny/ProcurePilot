@@ -282,10 +282,11 @@ viewer are read-only.
 | `id` | uuid | PK |
 | `tenant_id` | uuid | Required FK -> Tenant; RLS key |
 | `storage_bucket` | text | Required Supabase Storage bucket, for example `quotation-documents` |
-| `storage_path` | text | Required tenant-prefixed Supabase Storage path; unique |
+| `storage_path` | text | Required tenant-prefixed Supabase Storage path; unique. The leaf filename is an ASCII-safe name derived from the original filename: NFKD/ASCII-folded, other characters replaced with `-`, and a valid extension kept in lowercase. |
+| `original_filename` | text | Nullable original Unicode filename (1–255 characters; `document_original_filename_length_check`); shown in the UI and used for downloads. Legacy rows fall back to the storage-key basename. |
 | `mime_type` | text | Required accepted PDF, image, Excel, or CSV MIME type |
 | `content_hash` | text | Optional SHA-256 hash; nullable until upload completes |
-| `source_channel` | enum | `upload`; enum leaves room for future `email` and `api` ingestion |
+| `source_channel` | enum | `upload`, `email`, `capture`, or `catalogue_import` |
 | `status` | enum | `uploaded` or `failed_to_read` |
 | `created_at` | timestamptz | Audit field |
 | `created_by` | uuid | Required FK -> Membership |

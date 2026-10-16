@@ -27,6 +27,8 @@ class _FakeBucket:
         self._fail_on_path_pattern = fail_on_path_pattern
 
     def upload(self, path: str, content: bytes, options: dict[str, str]) -> None:
+        if not path.isascii():
+            raise RuntimeError(f"InvalidKey: {path}")
         if self._fail_on_path_pattern and self._fail_on_path_pattern in path:
             raise RuntimeError(f"Storage upload failed for {path}")
         self._uploads.append((path, content, options))
@@ -409,6 +411,40 @@ def test_matched_supplier_email_creates_document_quotation_and_extraction_job(
         assert job_row["status"] == "queued"
 
 
+def test_arabic_filename_is_stored_as_ascii_key_and_preserved_for_display(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = settings_for_test_db(monkeypatch)
+    uploads, _ = _patch_storage_and_queue(monkeypatch)
+    with committed_smart_context("ingestion-arabic-filename", supplier_count=1) as context:
+        _seed_email_config(context.workspace.tenant_id, context.workspace.membership_id)
+        raw_email = _build_email(
+            from_addr="seller@example.test",
+            message_id="<arabic-filename@example.test>",
+            attachments=[(b"%PDF-1.4 quote", "عرض-سعر-النور.pdf")],
+        )
+        result = orchestrator_module.process_inbound_email(
+            settings,
+            tenant_id=context.workspace.tenant_id,
+            raw_email_bytes=raw_email,
+            raw_email_ref="tenants/raw/arabic.eml",
+        )
+        assert result["status"] == "completed"
+        assert len(uploads) == 1 and uploads[0][0].isascii()
+        with psycopg.connect(TEST_DATABASE_URL or "", row_factory=dict_row) as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "select d.original_filename, d.storage_path, q.id as quotation_id "
+                    "from document d join quotation q on q.document_id=d.id "
+                    "where d.id=%s",
+                    (UUID(str(result["document_id"])),),
+                )
+                row = cur.fetchone()
+        assert row["original_filename"] == "عرض-سعر-النور.pdf"
+        assert row["storage_path"].rsplit("/", 1)[-1].isascii()
+        assert str(row["quotation_id"]) == result["quotation_id"]
+
+
 def test_unmatched_supplier_email_creates_a_review_task(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -509,7 +545,13 @@ def test_duplicate_message_id_is_skipped_without_creating_a_second_quotation(
                     (context.workspace.tenant_id,),
                 )
                 count = cur.fetchone()[0]
+                cur.execute(
+                    "select count(*) from quotation where tenant_id = %s",
+                    (context.workspace.tenant_id,),
+                )
+                quotation_count = cur.fetchone()[0]
         assert count == 1
+        assert quotation_count == 1
 
 
 def test_multiple_attachments_stores_all_documents_but_extracts_only_primary(
@@ -551,8 +593,8 @@ def test_multiple_attachments_stores_all_documents_but_extracts_only_primary(
         # All 3 attachments uploaded to storage with distinct paths
         assert len(uploads) == 3
         uploaded_paths = [u[0] for u in uploads]
-        assert any("primary_quote.pdf" in p for p in uploaded_paths)
-        assert any("spec_sheet.pdf" in p for p in uploaded_paths)
+        assert any("primary-quote.pdf" in p for p in uploaded_paths)
+        assert any("spec-sheet.pdf" in p for p in uploaded_paths)
         assert any("terms.pdf" in p for p in uploaded_paths)
         assert len(set(uploaded_paths)) == 3
 
@@ -608,7 +650,7 @@ def test_secondary_attachment_upload_failure_does_not_abort_primary_flow(
 ) -> None:
     settings = settings_for_test_db(monkeypatch)
     uploads, enqueued = _patch_storage_and_queue(
-        monkeypatch, fail_on_path_pattern="failing_sec.pdf"
+        monkeypatch, fail_on_path_pattern="failing-sec.pdf"
     )
 
     with committed_smart_context("ingestion-orchestrator-sec-fail", supplier_count=1) as context:
@@ -646,7 +688,7 @@ def test_secondary_attachment_upload_failure_does_not_abort_primary_flow(
         assert len(uploads) == 2
         uploaded_paths = [u[0] for u in uploads]
         assert any("primary.pdf" in p for p in uploaded_paths)
-        assert any("ok_sec.pdf" in p for p in uploaded_paths)
+        assert any("ok-sec.pdf" in p for p in uploaded_paths)
         assert not any("failing_sec.pdf" in p for p in uploaded_paths)
 
         assert len(enqueued) == 1

@@ -32,9 +32,7 @@ def conn() -> psycopg.Connection:
     yield from connection()
 
 
-def _make_member(
-    cur: psycopg.Cursor, tenant_id: UUID, label: str, role: str
-) -> Workspace:
+def _make_member(cur: psycopg.Cursor, tenant_id: UUID, label: str, role: str) -> Workspace:
     user_id, membership_id = uuid4(), uuid4()
     cur.execute(
         "insert into auth.users (id,email) values (%s,%s)",
@@ -120,9 +118,7 @@ def test_quality_issue_with_zero_photos_persists_and_lists_with_empty_photos(
             cur, owner.tenant_id, "quality-zero-photo-reporter", "branch_manager"
         )
         branch_id = _make_branch(cur, owner, "Quality Zero Photo")
-        request_id = _make_request(
-            cur, owner, branch_id, reporter, status="delivered"
-        )
+        request_id = _make_request(cur, owner, branch_id, reporter, status="delivered")
     conn.commit()
 
     service, recorded = _service(conn, monkeypatch)
@@ -141,9 +137,7 @@ def test_quality_issue_with_zero_photos_persists_and_lists_with_empty_photos(
     assert created.reported_by_membership_id == reporter.membership_id
     assert created.description == "Damaged outer cartons"
     assert created.photos == []
-    assert [row["action"] for row in recorded] == [
-        "requests.quality_issue_reported"
-    ]
+    assert [row["action"] for row in recorded] == ["requests.quality_issue_reported"]
     assert len(listed.items) == 1
     assert listed.items[0].id == created.id
     assert listed.items[0].photos == []
@@ -167,9 +161,7 @@ def test_quality_issue_against_not_delivered_request_refuses_with_conflict(
     with conn.cursor() as cur:
         owner = make_workspace(cur, "quality-not-delivered")
         branch_id = _make_branch(cur, owner, "Quality Not Delivered")
-        request_id = _make_request(
-            cur, owner, branch_id, owner, status="ordered"
-        )
+        request_id = _make_request(cur, owner, branch_id, owner, status="ordered")
     conn.commit()
 
     service, _recorded = _service(conn, monkeypatch)
@@ -185,18 +177,90 @@ def test_quality_issue_against_not_delivered_request_refuses_with_conflict(
     assert exc.value.details == {"reason": "not_delivered"}
 
 
+def test_quality_issue_photo_uploads_with_colliding_names_get_distinct_paths(
+    conn: psycopg.Connection, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    class _PhotoBucket:
+        def __init__(self) -> None:
+            self.paths: list[str] = []
+
+        def upload(
+            self, path: str, _content: bytes, *, file_options: dict[str, str]
+        ) -> dict[str, str]:
+            assert file_options["upsert"] == "false"
+            if path in self.paths:
+                raise ValueError("duplicate storage key")
+            self.paths.append(path)
+            return {"path": path}
+
+        def create_signed_url(self, path: str, *, expires_in: int) -> dict[str, str]:
+            return {"signedURL": f"https://storage.example.test/{path}?expires={expires_in}"}
+
+    class _Storage:
+        def __init__(self, bucket: _PhotoBucket) -> None:
+            self.bucket = bucket
+
+        def from_(self, _bucket_name: str) -> _PhotoBucket:
+            return self.bucket
+
+    class _Client:
+        def __init__(self, delegate: PsycopgSupabaseClient, bucket: _PhotoBucket) -> None:
+            self.delegate = delegate
+            self.storage = _Storage(bucket)
+
+        def table(self, name: str) -> object:
+            return self.delegate.table(name)
+
+    with conn.cursor() as cur:
+        owner = make_workspace(cur, "quality-photo-collisions")
+        reporter = _make_member(cur, owner.tenant_id, "quality-photo-reporter", "branch_manager")
+        branch_id = _make_branch(cur, owner, "Quality Photo Collision")
+        request_id = _make_request(cur, owner, branch_id, reporter, status="delivered")
+        act_as(cur, owner)
+    conn.commit()
+
+    bucket = _PhotoBucket()
+    client = _Client(PsycopgSupabaseClient(conn), bucket)
+    service, _recorded = _service(conn, monkeypatch)
+    monkeypatch.setattr(requests_service_module, "authenticated_client", lambda *_args: client)
+    issue = service.create_quality_issue(
+        bearer_token="token",
+        member=_current_member(owner, reporter),
+        request_id=request_id,
+        payload=QualityIssueCreate(description="Damaged packaging"),
+    )
+
+    photos = [
+        service.attach_quality_issue_photo(
+            bearer_token="token",
+            member=_current_member(owner, reporter),
+            issue_id=issue.id,
+            filename=name,
+            content_type="image/jpeg",
+            content=b"jpeg",
+        )
+        for name in ("damage_1.jpg", "damage-1.jpg", "IMG.jpg", "IMG.jpg")
+    ]
+
+    assert len(set(bucket.paths)) == 4
+    assert len(photos) == 4
+    with conn.cursor() as cur:
+        cur.execute(
+            "select count(*) from delivery_quality_issue_photo "
+            "where delivery_quality_issue_id = %s",
+            (issue.id,),
+        )
+        assert cur.fetchone() == (4,)
+
+
 def test_quality_issue_photo_storage_object_from_another_workspace_is_invisible(
     conn: psycopg.Connection,
 ) -> None:
     with conn.cursor() as cur:
         alpha = make_workspace(cur, "quality-storage-alpha")
         beta = make_workspace(cur, "quality-storage-beta")
-        alpha_path = (
-            f"tenants/{alpha.tenant_id}/quality-issues/{uuid4()}/alpha.jpg"
-        )
-        beta_path = (
-            f"tenants/{beta.tenant_id}/quality-issues/{uuid4()}/beta.jpg"
-        )
+        alpha_path = f"tenants/{alpha.tenant_id}/quality-issues/{uuid4()}/alpha.jpg"
+        beta_path = f"tenants/{beta.tenant_id}/quality-issues/{uuid4()}/beta.jpg"
         reset_role(cur)
         cur.execute(
             "insert into storage.objects (bucket_id,name,owner) "
