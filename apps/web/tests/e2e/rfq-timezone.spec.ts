@@ -27,14 +27,36 @@ test('saves an RFQ with the picked local calendar day', async ({ page }) => {
   await openAsyncSelect(page, page.locator('mat-select[formControlName="supplierIds"]'));
   await page.locator('mat-option', { hasText: supplier.name }).click();
   await page.keyboard.press('Escape');
-  await page.locator('input[formControlName="neededByDate"]').click();
-  await page.getByRole('button', { name: 'October 20, 2026' }).click();
+  const targetDate = await page.evaluate(() => {
+    const today = new Date();
+    const target = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 14);
+    const year = target.getFullYear();
+    const month = String(target.getMonth() + 1).padStart(2, '0');
+    const day = String(target.getDate()).padStart(2, '0');
+    return {
+      accessibleName: target.toLocaleDateString('en-US', {
+        month: 'long',
+        day: 'numeric',
+        year: 'numeric',
+      }),
+      expectedIsoDate: `${year}-${month}-${day}`,
+      targetMonth: target.getMonth(),
+      currentMonth: today.getMonth(),
+      targetYear: year,
+      currentYear: today.getFullYear(),
+    };
+  });
+  await page.getByRole('button', { name: 'Open calendar' }).click();
+  if (targetDate.targetYear > targetDate.currentYear || targetDate.targetMonth > targetDate.currentMonth) {
+    await page.getByRole('button', { name: 'Next month' }).click();
+  }
+  await page.getByRole('button', { name: targetDate.accessibleName }).click();
 
   const responsePromise = page.waitForResponse((response) =>
     response.url().endsWith('/rfq') && response.request().method() === 'POST');
   await page.getByRole('button', { name: /save draft/i }).click();
   const response = await responsePromise;
   expect(response.status()).toBeLessThan(300);
-  expect((response.request().postDataJSON() as { needed_by_date: string }).needed_by_date).toBe('2026-10-20');
+  expect((response.request().postDataJSON() as { needed_by_date: string }).needed_by_date).toBe(targetDate.expectedIsoDate);
   await expect(page.getByRole('alert')).toHaveCount(0);
 });
