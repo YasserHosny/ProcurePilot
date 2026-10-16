@@ -121,6 +121,10 @@ def test_extraction_parses_egyptian_date_and_routes_bad_expiry_to_review(
             "on conflict do nothing"
         )
         cur.execute(
+            "insert into supported_currency (code,label_en,label_ar) "
+            "values ('EGP','Egyptian Pound','جنيه مصري') on conflict do nothing"
+        )
+        cur.execute(
             "update tenant set region='EG', currency='EGP' where id=%s", (workspace.tenant_id,)
         )
         document_id = make_document(cur, workspace)
