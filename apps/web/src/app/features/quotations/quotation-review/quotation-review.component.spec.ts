@@ -172,6 +172,16 @@ describe('QuotationReviewComponent (T051, T057, T062)', () => {
     expect(component.flaggedFields().length).toBe(1);
   });
 
+  it('requests inline preview URLs and attachment URLs from the download button', () => {
+    expect(apiService.getDocumentDownloadUrl).toHaveBeenCalledWith('doc-1');
+
+    const downloadWindow = { opener: window, location: { href: '' }, close: jasmine.createSpy() };
+    spyOn(window, 'open').and.returnValue(downloadWindow as unknown as Window);
+    fixture.debugElement.query(By.css('.download-original-btn')).nativeElement.click();
+
+    expect(apiService.getDocumentDownloadUrl).toHaveBeenCalledWith('doc-1', 'attachment');
+  });
+
   it('uses the home currency for a quote total when the quote and its lines omit currency', () => {
     component.quotation.set({
       ...mockQuotationDetail,

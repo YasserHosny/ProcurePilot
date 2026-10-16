@@ -5,7 +5,7 @@ import json
 import logging
 from datetime import UTC, date, datetime
 from decimal import Decimal
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import psycopg
 from postgrest.exceptions import APIError
@@ -2141,7 +2141,7 @@ def _now_iso() -> str:
 
 def _quality_issue_storage_path(*, tenant_id: UUID, issue_id: UUID, filename: str) -> str:
     name = safe_object_name(filename)
-    return f"tenants/{tenant_id}/quality-issues/{issue_id}/{name}"
+    return f"tenants/{tenant_id}/quality-issues/{issue_id}/{uuid4()}/{name}"
 
 
 def _signed_url(result: object) -> str:

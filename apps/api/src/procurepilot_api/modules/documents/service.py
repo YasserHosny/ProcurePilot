@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 from pathlib import PurePosixPath
+from typing import Literal
 from urllib.parse import quote
 from uuid import UUID, uuid4
 
@@ -118,7 +119,13 @@ class DocumentService:
             raise ServiceUnavailableError(details={"dependency": "database"}) from exc
         return Document.model_validate(_one_row(response.data, resource="document"))
 
-    def create_download_url(self, *, bearer_token: str, document_id: UUID) -> DownloadUrlResponse:
+    def create_download_url(
+        self,
+        *,
+        bearer_token: str,
+        document_id: UUID,
+        disposition: Literal["inline", "attachment"] = "inline",
+    ) -> DownloadUrlResponse:
         doc = self.get_document(bearer_token=bearer_token, document_id=document_id)
         try:
             client = create_client(
@@ -132,10 +139,11 @@ class DocumentService:
         except Exception as exc:
             raise ServiceUnavailableError(details={"dependency": "supabase_storage"}) from exc
 
-        filename = doc.original_filename or PurePosixPath(doc.storage_path).name
-        return DownloadUrlResponse(
-            download_url=_signed_download_url(str(result["signedURL"]), filename)
-        )
+        signed_url = str(result["signedURL"])
+        if disposition == "attachment":
+            filename = doc.original_filename or PurePosixPath(doc.storage_path).name
+            signed_url = _signed_download_url(signed_url, filename)
+        return DownloadUrlResponse(download_url=signed_url)
 
 
 def get_document_service() -> DocumentService:

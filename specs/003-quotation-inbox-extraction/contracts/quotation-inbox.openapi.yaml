@@ -59,6 +59,11 @@ paths:
       - { name: document_id, in: path, required: true, schema: { type: string, format: uuid } }
     get:
       summary: Get a short-lived signed download URL for the original document
+      parameters:
+        - name: disposition
+          in: query
+          required: false
+          schema: { type: string, enum: [inline, attachment], default: inline }
       responses:
         '200':
           description: Signed URL valid for 5 minutes

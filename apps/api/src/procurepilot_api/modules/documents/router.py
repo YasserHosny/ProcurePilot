@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Body, Depends, Header, status
@@ -51,5 +51,8 @@ def get_document_download_url(
     token: Annotated[str, Depends(bearer_token)],
     _member: Annotated[CurrentMember, Depends(current_member)],
     service: Annotated[DocumentService, Depends(get_document_service)],
+    disposition: Literal["inline", "attachment"] = "inline",
 ) -> DownloadUrlResponse:
-    return service.create_download_url(bearer_token=token, document_id=document_id)
+    return service.create_download_url(
+        bearer_token=token, document_id=document_id, disposition=disposition
+    )

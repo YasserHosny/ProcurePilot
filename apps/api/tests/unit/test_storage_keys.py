@@ -71,6 +71,18 @@ def test_document_and_quality_photo_paths_use_ascii_safe_leaves() -> None:
     assert photo_path.isascii() and photo_path.endswith(".png")
 
 
+def test_same_named_documents_on_one_entity_get_distinct_storage_paths() -> None:
+    tenant_id = UUID("11111111-1111-1111-1111-111111111111")
+    first_document_id = UUID("22222222-2222-2222-2222-222222222222")
+    second_document_id = UUID("33333333-3333-3333-3333-333333333333")
+    first = _storage_path(tenant_id=tenant_id, document_id=first_document_id, filename="quote.pdf")
+    second = _storage_path(
+        tenant_id=tenant_id, document_id=second_document_id, filename="quote.pdf"
+    )
+
+    assert first != second
+
+
 def test_signed_download_url_encodes_download_name_without_changing_token() -> None:
     signed_url = "https://storage.example/signed?token=abc%2B123%3D%3D"
     original_token = parse_qs(urlsplit(signed_url).query)["token"]

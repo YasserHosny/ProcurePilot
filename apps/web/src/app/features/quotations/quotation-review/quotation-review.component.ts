@@ -725,7 +725,7 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
       downloadWindow.opener = null;
     }
 
-    this.api.getDocumentDownloadUrl(documentId).subscribe({
+    this.api.getDocumentDownloadUrl(documentId, 'attachment').subscribe({
       next: ({ download_url }) => {
         if (downloadWindow) {
           downloadWindow.location.href = download_url;
