@@ -23,12 +23,13 @@ Lookups review (regions, currencies, tax models): [`lookups-review-2026-10-15.md
 
 | # | Finding | Impact | Status |
 |---|---|---|---|
-| 7 | Web sends date-only fields as UTC timestamps: in Cairo (UTC+3) "Needed by 20 Oct" → `2026-10-19T21:00:00Z` → RFQ save **422**, shown to nobody; same family silently shifts savings/export/compare/reorder dates one day back | **no UTC+ customer can create an RFQ**; reports off by a day | fix task raised |
+| 7 | Web sends date-only fields as UTC timestamps: in Cairo (UTC+3) "Needed by 20 Oct" → `2026-10-19T21:00:00Z` → RFQ save **422**, shown to nobody; same family silently shifts savings/export/compare/reorder dates one day back | **no UTC+ customer can create an RFQ**; reports off by a day | fixed — #88 merged + deployed 2026-10-16 |
 | 8 | A saved RFQ draft can only be sent from the create page right after saving; History opens a compare page with no Send | stranded drafts | to raise (with #7) |
 | 9 | RFQ list shows a "Sent Date" for unsent drafts; Save gives no confirmation | cosmetic/UX | to raise |
-| 10 | Supplier RFQ email: buyer never named, buyer's terms dropped, English-only for an Arabic tenant, quantities `50.000000` with no unit | suppliers don't know who is asking | fix task raised |
-| 11 | Arabic business name → tenant slug `workspace` → inbound address `workspace@mail…` | meaningless address; next Arabic sign-up may collide | in #10 task |
-| 12 | **Arabic attachment filename → Supabase Storage `InvalidKey` → email_ingest job fails 3× → email silently lost** (no inbound-log row, no review item) | **every Arabic-named supplier PDF is lost without trace** | fix task raised; 2 demo emails to requeue after fix |
+| 10 | Supplier RFQ email: buyer never named, buyer's terms dropped, English-only for an Arabic tenant, quantities `50.000000` with no unit | suppliers don't know who is asking | fixed — #89 merged 2026-10-16 (migration applied to hosted); also fixed raw i18n keys in hosted digests/exports |
+| 11 | Arabic business name → tenant slug `workspace` → inbound address `workspace@mail…` | meaningless address; next Arabic sign-up may collide | fixed for new sign-ups — #89 (demo tenant keeps `workspace@`) |
+| 12 | **Arabic attachment filename → Supabase Storage `InvalidKey` → email_ingest job fails 3× → email silently lost** (no inbound-log row, no review item) | **every Arabic-named supplier PDF is lost without trace** | fixed — #90 merged + deployed (migration applied); 2 demo emails requeued → ingested, stored with Arabic names, matched to the right suppliers |
+| 14 | **Extraction passes the raw quote date `16/10/2026` (DD/MM/YYYY) to Postgres → `date/time field value out of range` → whole quotation `refused`**; days ≤ 12 would be silently month/day-swapped | **every Egyptian/GCC quote refused or mis-dated** | fix task raised; 2 demo quotations to re-extract after fix |
 | 13 | Ingestion dashboard "Catalogue Imports: 0" after a committed import | wrong counter | to raise |
 
 Workaround used for round 1 only: the RFQ date was corrected in the browser before sending (finding 7); the recorded demo cycle waits for the real fix.
