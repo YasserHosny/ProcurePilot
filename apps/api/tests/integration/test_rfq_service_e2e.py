@@ -30,6 +30,8 @@ def _seed_tenant(cur: psycopg.Cursor, *, email_suffix: str) -> tuple[UUID, UUID,
     tenant_id, user_id, membership_id, invitation_id = uuid4(), uuid4(), uuid4(), uuid4()
     email = f"rfq-e2e-{email_suffix}@example.test"
 
+    # See `catalogue_helpers.make_workspace`: a pooled backend may still carry a leaked role.
+    cur.execute("reset role")
     cur.execute(
         "insert into supported_region (code,label_en,label_ar) values ('GB','UK','ب') on conflict do nothing"  # noqa: E501
     )
@@ -253,7 +255,7 @@ class _ListInsertTableQuery(PsycopgTableQuery):
 
 class _FakeAuthenticatedClient(PsycopgSupabaseClient):
     def table(self, table: str) -> _ListInsertTableQuery:
-        return _ListInsertTableQuery(self._conn, table)
+        return _ListInsertTableQuery(self._conn, table, claims=self._claims)
 
 
 def _patch_requests_service_for_test(
@@ -266,25 +268,18 @@ def _patch_requests_service_for_test(
     placeholder ("not used anywhere real"), not the local stack's actual GOTRUE_JWT_SECRET, so a
     hand-signed token is rejected. Mirror `test_purchase_requests.py`'s own established fix
     instead: swap `authenticated_client` for a psycopg-backed fake bound to a real, autocommitting
-    connection with the right role/claims set at the SESSION level (not `local`, since autocommit
-    means every statement is its own implicit transaction and `local` settings would not survive
-    past the first one)."""
+    connection. Role and claims are applied per operation with `set local` inside a transaction
+    (`authenticated_scope`), never at session level: through the transaction-mode pooler a
+    session-level `set role` leaks onto the server connection and breaks later tests."""
     conn = psycopg.connect(get_settings().database_url.get_secret_value(), autocommit=True)
-    with conn.cursor() as cur:
-        cur.execute("set role authenticated")
-        cur.execute(
-            "select set_config('request.jwt.claims', %s, false)",
-            (
-                (
-                    f'{{"sub":"{user_id}","tenant_id":"{tenant_id}",'
-                    f'"role":"authenticated","member_role":"owner"}}'
-                ),
-            ),
-        )
+    claims = (
+        f'{{"sub":"{user_id}","tenant_id":"{tenant_id}",'
+        f'"role":"authenticated","member_role":"owner"}}'
+    )
     monkeypatch.setattr(
         requests_service_module,
         "authenticated_client",
-        lambda _settings, _token: _FakeAuthenticatedClient(conn),
+        lambda _settings, _token: _FakeAuthenticatedClient(conn, claims=claims),
     )
     monkeypatch.setattr(
         requests_service_module.RequestsService,
