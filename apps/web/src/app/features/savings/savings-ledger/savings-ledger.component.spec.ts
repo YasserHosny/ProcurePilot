@@ -124,10 +124,12 @@ describe('SavingsLedgerComponent (T022)', () => {
   it('should reload data when filters change', () => {
     mockSavingsApiService.getSavings.calls.reset();
     component.statusFilter.set('verified');
+    component.periodStartDate.set(new Date(2026, 9, 20));
+    component.periodEndDate.set(new Date(2026, 9, 21));
     component.onFilterChange();
 
     expect(mockSavingsApiService.getSavings).toHaveBeenCalledWith(
-      jasmine.objectContaining({ status: 'verified' }),
+      jasmine.objectContaining({ status: 'verified', period_start: '2026-10-20', period_end: '2026-10-21' }),
     );
   });
 

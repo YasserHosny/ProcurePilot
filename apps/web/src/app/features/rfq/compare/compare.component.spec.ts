@@ -156,7 +156,7 @@ describe('CompareComponent (RFQ)', () => {
   });
 
   it('should call prepareRequest API and show success snackbar for eligible response', () => {
-    const requiredDate = new Date();
+    const requiredDate = new Date(2026, 9, 20);
     component.requiredByDate.set(requiredDate);
     
     component.prepareRequest(dummyResponses.items[0]);
@@ -164,7 +164,7 @@ describe('CompareComponent (RFQ)', () => {
     expect(mockRfqApi.prepareRequest).toHaveBeenCalledWith('rfq-1', {
       rfq_response_id: 'resp-1',
       branch_id: 'branch-1',
-      required_by_date: requiredDate.toISOString().split('T')[0]
+      required_by_date: '2026-10-20'
     });
     
     expect(mockSnackBar.open).toHaveBeenCalledWith(

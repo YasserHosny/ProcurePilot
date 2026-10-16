@@ -1,6 +1,7 @@
 import { NgClass } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { toIsoDate } from '../../../core/format/iso-date';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
@@ -147,10 +148,10 @@ export class SavingsLedgerComponent implements OnInit {
     const statusParam = this.statusFilter() === 'all' ? undefined : (this.statusFilter() as SavingStatus);
     const supplierParam = this.selectedSupplierId() || undefined;
     const startParam = this.periodStartDate()
-      ? this.periodStartDate()!.toISOString().split('T')[0]
+      ? toIsoDate(this.periodStartDate()!)
       : undefined;
     const endParam = this.periodEndDate()
-      ? this.periodEndDate()!.toISOString().split('T')[0]
+      ? toIsoDate(this.periodEndDate()!)
       : undefined;
 
     this.savingsApi

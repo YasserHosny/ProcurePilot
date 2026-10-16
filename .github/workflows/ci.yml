@@ -352,6 +352,9 @@ jobs:
         # Includes the i18n catalogue completeness check (SC-005): a key present in one language
         # and missing from the other fails here rather than reaching a customer as a raw key.
         working-directory: apps/web
+        env:
+          # Exercise calendar-date serialization in a UTC+ timezone.
+          TZ: Asia/Dubai
         run: pnpm exec ng test --watch=false --browsers=ChromeHeadless
       - name: Production build
         working-directory: apps/web
@@ -490,6 +493,8 @@ jobs:
         # provide Chrome. ubuntu-latest runners ship with it; this step fails loudly if that
         # ever stops being true.
         working-directory: apps/web
+        env:
+          TZ: Asia/Dubai
         run: |
           google-chrome --version
           pnpm exec playwright test

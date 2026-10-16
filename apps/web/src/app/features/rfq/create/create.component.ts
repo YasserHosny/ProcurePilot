@@ -14,6 +14,9 @@ import { TranslateModule } from '@ngx-translate/core';
 import { RfqApi } from '../rfq-api';
 import { ApiService } from '../../../core/api/api.service';
 import { Product, Supplier } from '../../../core/api/models';
+import { HttpErrorResponse } from '@angular/common/http';
+import { TranslateService } from '@ngx-translate/core';
+import { toIsoDateOrNull } from '../../../core/format/iso-date';
 
 @Component({
   selector: 'app-rfq-create',
@@ -39,6 +42,7 @@ export class RfqCreateComponent implements OnInit {
   private readonly fb = inject(FormBuilder);
   private readonly rfqApi = inject(RfqApi);
   private readonly apiService = inject(ApiService);
+  private readonly translate = inject(TranslateService);
 
   readonly products = signal<Product[]>([]);
   readonly suppliers = signal<Supplier[]>([]);
@@ -51,7 +55,7 @@ export class RfqCreateComponent implements OnInit {
       })
     ], Validators.required),
     supplierIds: [[] as string[], Validators.required],
-    neededByDate: ['', Validators.required],
+    neededByDate: this.fb.control<Date | null>(null, Validators.required),
     tenantTerms: ['', Validators.maxLength(4000)],
   });
 
@@ -60,6 +64,7 @@ export class RfqCreateComponent implements OnInit {
   readonly rfqId = signal<string | null>(null);
   readonly rfqStatus = signal<'draft' | 'sent' | null>(null);
   readonly rejectedSuppliers = signal<{ supplier_id: string; reason: string }[]>([]);
+  readonly errorMessage = signal<string | null>(null);
 
   ngOnInit(): void {
     this.apiService.products({ limit: 100, status: 'active' }).subscribe(res => {
@@ -94,13 +99,14 @@ export class RfqCreateComponent implements OnInit {
     if (this.form.invalid) return;
 
     this.isSaving.set(true);
+    this.errorMessage.set(null);
     this.rejectedSuppliers.set([]);
     
     const val = this.form.getRawValue();
     const payload = {
       lines: val.lines,
       recipient_supplier_ids: val.supplierIds,
-      needed_by_date: val.neededByDate,
+      needed_by_date: toIsoDateOrNull(val.neededByDate)!,
       tenant_terms: val.tenantTerms || undefined,
     };
 
@@ -111,8 +117,9 @@ export class RfqCreateComponent implements OnInit {
         this.rejectedSuppliers.set(res.rejected_recipients);
         this.isSaving.set(false);
       },
-      error: () => {
+      error: (err: unknown) => {
         this.isSaving.set(false);
+        this.errorMessage.set(this.getErrorMessage(err, 'rfq.create.saveError'));
       }
     });
   }
@@ -122,14 +129,52 @@ export class RfqCreateComponent implements OnInit {
     if (!id) return;
     
     this.isSending.set(true);
+    this.errorMessage.set(null);
     this.rfqApi.sendRfq(id).subscribe({
       next: (res) => {
         this.rfqStatus.set(res.rfq.status as 'draft' | 'sent');
         this.isSending.set(false);
       },
-      error: () => {
+      error: (err: unknown) => {
         this.isSending.set(false);
+        this.errorMessage.set(this.getErrorMessage(err, 'rfq.create.sendError'));
       }
     });
+  }
+
+  private getErrorMessage(err: unknown, fallbackKey: string): string {
+    const fallback = this.translate.instant(fallbackKey);
+    if (!(err instanceof HttpErrorResponse) || err.status >= 500) return fallback;
+
+    const envelope = err.error as {
+      code?: unknown;
+      message?: unknown;
+      details?: { loc?: unknown }[];
+    } | null;
+    if (envelope?.code === 'validation.invalid_request') {
+      const fieldKeys: Record<string, string> = {
+        lines: 'rfq.create.itemsLabel',
+        recipient_supplier_ids: 'rfq.create.suppliersLabel',
+        needed_by_date: 'rfq.create.neededByDateLabel',
+        tenant_terms: 'rfq.create.tenantTermsLabel',
+      };
+      const labels = [...new Set((Array.isArray(envelope.details) ? envelope.details : [])
+        .map(detail => Array.isArray(detail?.loc) ? detail.loc.at(-1) : undefined)
+        .filter((field): field is string => typeof field === 'string' && field in fieldKeys))]
+        .map(field => this.translate.instant(fieldKeys[field]));
+      return labels.length
+        ? `${this.translate.instant('rfq.create.validationError')} ${labels.join(', ')}`
+        : this.translate.instant('rfq.create.validationError');
+    }
+    const errorKeys: Record<string, string> = {
+      'auth.permission_denied': 'rfq.create.errors.permissionDenied',
+      'auth.unauthenticated': 'rfq.create.errors.unauthenticated',
+      not_found: 'rfq.create.errors.notFound',
+      conflict: 'rfq.create.errors.conflict',
+      'validation.invalid_value': 'rfq.create.errors.invalidValue',
+      service_unavailable: 'rfq.create.errors.serviceUnavailable',
+    };
+    const key = typeof envelope?.code === 'string' ? errorKeys[envelope.code] : undefined;
+    return key ? this.translate.instant(key) : fallback;
   }
 }
