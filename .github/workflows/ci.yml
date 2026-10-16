@@ -452,7 +452,19 @@ jobs:
         # This also applies supabase/migrations and honours supabase/config.toml, which enables the
         # custom access token hook that puts tenant_id into the JWT. Without that hook every
         # tenant-scoped query returns zero rows and the app looks empty rather than broken.
-        run: supabase start
+        # Retry transient Docker/public.ecr.aws rate limits when shards pull images in parallel.
+        run: |
+          for attempt in 1 2 3; do
+            if supabase start; then
+              exit 0
+            fi
+            if [ "$attempt" -eq 3 ]; then
+              echo "::error::supabase start failed after 3 attempts"
+              exit 1
+            fi
+            supabase stop --no-backup || true
+            sleep $((attempt*20))
+          done
 
       - name: Export Supabase credentials
         run: |
