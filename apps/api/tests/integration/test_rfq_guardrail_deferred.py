@@ -449,6 +449,10 @@ def test_concurrent_evaluations_fire_once(monkeypatch: pytest.MonkeyPatch) -> No
             )
         conn.commit()
 
+    # The second evaluator blocks on the advisory lock for the whole of the first one's firing
+    # (prepare_request() included), which takes ~5s of round trips against the hosted test DB.
+    # The timeouts only guard against a deadlock hanging the suite, so size them well above that.
+    lock_wait_timeout = "30s"
     barrier = threading.Barrier(2)
     errors: list[BaseException] = []
 
@@ -456,8 +460,11 @@ def test_concurrent_evaluations_fire_once(monkeypatch: pytest.MonkeyPatch) -> No
         try:
             with psycopg.connect(settings.database_url.get_secret_value()) as conn:
                 with conn.cursor() as cur:
-                    cur.execute("set lock_timeout = '3s'")
-                    cur.execute("set statement_timeout = '3s'")
+                    cur.execute(
+                        "select set_config('lock_timeout', %s, true), "
+                        "set_config('statement_timeout', %s, true)",
+                        (lock_wait_timeout, lock_wait_timeout),
+                    )
                 barrier.wait(timeout=3)
                 _evaluate_guardrails_for_rfq(settings, conn, tenant_id=tenant_id, rfq_id=rfq_id)
                 conn.commit()
@@ -468,7 +475,7 @@ def test_concurrent_evaluations_fire_once(monkeypatch: pytest.MonkeyPatch) -> No
     for thread in threads:
         thread.start()
     for thread in threads:
-        thread.join(timeout=8)
+        thread.join(timeout=60)
     assert all(not thread.is_alive() for thread in threads), "concurrent evaluation did not finish"
     assert not errors
 
