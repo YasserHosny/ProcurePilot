@@ -58,7 +58,7 @@ describe('RfqCreateComponent', () => {
     component.form.patchValue({
       lines: [{ workspace_product_id: 'prod-1', quantity: '10' }],
       supplierIds: ['sup-1'],
-      neededByDate: '2026-12-01',
+      neededByDate: new Date(2026, 11, 1),
       tenantTerms: 'x'.repeat(4001),
     });
 
