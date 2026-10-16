@@ -1095,6 +1095,10 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
     return typeof value === 'string' && value.length > 0 && this.toDate(value) === null;
   }
 
+  rawDateEvidence(value: unknown): string | null {
+    return this.isRawDateEvidence(value) ? value : null;
+  }
+
   toIsoDate(date: Date | null): string {
     return date ? formatIsoDate(date) : '';
   }

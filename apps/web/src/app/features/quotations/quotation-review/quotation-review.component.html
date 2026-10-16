@@ -313,7 +313,7 @@
               >
                 <mat-form-field appearance="outline" class="field-control">
                   <mat-label>{{ 'quotations.review.header.issueDateLabel' | translate }}</mat-label>
-                  @if (isRawDateEvidence(getEffectiveValue('quotation', q.id, 'issue_date', q.issue_date || '')); as rawDate) {
+                  @if (rawDateEvidence(getEffectiveValue('quotation', q.id, 'issue_date', q.issue_date || '')); as rawDate) {
                     <mat-hint>{{ 'quotations.review.header.dateEvidenceHint' | translate:{ value: rawDate } }}</mat-hint>
                   }
                   <input
@@ -368,7 +368,7 @@
               >
                 <mat-form-field appearance="outline" class="field-control">
                   <mat-label>{{ 'quotations.review.header.expiryDateLabel' | translate }}</mat-label>
-                  @if (isRawDateEvidence(getEffectiveValue('quotation', q.id, 'expiry_date', q.expiry_date || '')); as rawDate) {
+                  @if (rawDateEvidence(getEffectiveValue('quotation', q.id, 'expiry_date', q.expiry_date || '')); as rawDate) {
                     <mat-hint>{{ 'quotations.review.header.dateEvidenceHint' | translate:{ value: rawDate } }}</mat-hint>
                   }
                   <input

@@ -373,6 +373,7 @@ describe('QuotationReviewComponent (T051, T057, T062)', () => {
     });
     fixture.detectChanges();
     expect(fixture.nativeElement.textContent).toContain('Text in document: 16 Octobre 2026');
+    expect(fixture.nativeElement.textContent).not.toContain('Text in document: true');
   });
 
   it('does not submit a raw non-ISO date as a reviewed correction', () => {
