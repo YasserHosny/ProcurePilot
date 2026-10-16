@@ -79,12 +79,20 @@ def requeue(
             with conn.cursor() as cur:
                 cur.execute("set local role service_role")
                 cur.execute(
+                    "update quotation set status='extracting' where id=%s and status='refused'",
+                    (quote["id"],),
+                )
+                if cur.rowcount != 1:
+                    conn.rollback()
+                    print(f"skipped id={quote['id']}: quotation is no longer refused")
+                    skipped += 1
+                    continue
+                cur.execute(
                     "insert into extraction_job (tenant_id, quotation_id, status) "
                     "values (%s,%s,'queued') returning id",
                     (quote["tenant_id"], quote["id"]),
                 )
                 new_job_id = UUID(str(cur.fetchone()[0]))
-                cur.execute("update quotation set status='extracting' where id=%s", (quote["id"],))
             conn.commit()
             try:
                 enqueue_extraction_payload(

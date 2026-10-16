@@ -359,7 +359,18 @@ describe('QuotationReviewComponent (T051, T057, T062)', () => {
     expect(parsed?.getDate()).toBe(16);
     expect(component.toDate('05/10/2026')).toBeNull();
     expect(component.isRawDateEvidence('16 Octobre 2026')).toBeTrue();
-    component.quotation.set({ ...mockQuotationDetail, issue_date: '16 Octobre 2026' });
+    const rawIssueDate = {
+      ...mockQuotationDetail.field_extractions[0],
+      id: 'fe-raw-issue-date',
+      field_name: 'issue_date',
+      extracted_value: '16 Octobre 2026',
+      confidence: '0.0000',
+    };
+    component.quotation.set({
+      ...mockQuotationDetail,
+      issue_date: null,
+      field_extractions: [rawIssueDate, ...mockQuotationDetail.field_extractions.slice(1)],
+    });
     fixture.detectChanges();
     expect(fixture.nativeElement.textContent).toContain('Text in document: 16 Octobre 2026');
   });
