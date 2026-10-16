@@ -93,7 +93,15 @@ def test_confirm_returns_409_until_required_review_work_is_resolved(
                 payload=None,
             )
 
-        assert exc_info.value.details == {"reason": "low_confidence_unresolved"}
+        assert exc_info.value.details["reason"] == "low_confidence_unresolved"
+        assert exc_info.value.details["fields"] == [
+            {
+                "id": low_confidence_field,
+                "entity_type": "quotation",
+                "entity_id": fixture.quotation_id,
+                "field_name": "issue_date",
+            }
+        ]
         cur.execute(
             "update field_extraction set corrected_value = '\"2026-08-21\"'::jsonb, "
             "corrected_by = %s, corrected_at = now() where id = %s",
@@ -106,6 +114,111 @@ def test_confirm_returns_409_until_required_review_work_is_resolved(
             payload=None,
         )
         assert reviewed.status == "reviewed"
+
+
+def test_selected_supplier_resolves_low_confidence_name_on_confirmation(
+    conn: object,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    recorded: list[AuditEventCreate] = []
+
+    class AuditWriter:
+        def record(self, event: AuditEventCreate, bearer_token: str | None = None) -> None:
+            del bearer_token
+            recorded.append(event)
+
+    with conn.cursor() as cur:
+        workspace = make_workspace(cur, "supplier-name-confirm")
+        fixture = make_extracted_quotation(cur, workspace)
+        field_id = make_field(
+            cur,
+            workspace,
+            fixture.quotation_id,
+            field_name="supplier_name",
+            extracted_value="Supplier Ltd",
+            confidence=Decimal("0.6700"),
+        )
+        act_as(cur, workspace)
+        monkeypatch.setattr(
+            confirmation_service_module,
+            "authenticated_client",
+            lambda _settings, _token: PsycopgSupabaseClient(conn),
+        )
+        monkeypatch.setattr(confirmation_service_module, "get_audit_writer", lambda: AuditWriter())
+        member = CurrentMember(
+            membership_id=workspace.membership_id,
+            tenant_id=workspace.tenant_id,
+            user_id=workspace.user_id,
+            email="buyer@example.test",
+            role=MemberRole.buyer,
+        )
+        result = QuotationConfirmationService().confirm(
+            bearer_token="test-token",
+            member=member,
+            quotation_id=fixture.quotation_id,
+            payload=None,
+        )
+        assert result.status == "reviewed"
+        cur.execute(
+            "select corrected_by, corrected_value, extracted_value "
+            "from field_extraction where id=%s",
+            (field_id,),
+        )
+        corrected_by, corrected_value, extracted_value = cur.fetchone()
+        assert corrected_by == workspace.membership_id
+        assert corrected_value == extracted_value
+        assert recorded[0].target["resolved_on_confirm"] == [
+            {
+                "field_extraction_id": str(field_id),
+                "field_name": "supplier_name",
+                "resolution": "supplier_selected",
+            }
+        ]
+
+
+def test_suggested_currency_does_not_block_confirmation(
+    conn: object, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    class AuditWriter:
+        def record(self, event: AuditEventCreate, bearer_token: str | None = None) -> None:
+            del event, bearer_token
+
+    with conn.cursor() as cur:
+        workspace = make_workspace(cur, "currency-hint-confirm")
+        fixture = make_extracted_quotation(cur, workspace)
+        make_field(
+            cur,
+            workspace,
+            fixture.quotation_id,
+            field_name="suggested_currency",
+            extracted_value="EGP",
+            confidence=Decimal("0.0000"),
+        )
+        act_as(cur, workspace)
+        monkeypatch.setattr(
+            confirmation_service_module,
+            "authenticated_client",
+            lambda _settings, _token: PsycopgSupabaseClient(conn),
+        )
+        monkeypatch.setattr(confirmation_service_module, "get_audit_writer", lambda: AuditWriter())
+        member = CurrentMember(
+            membership_id=workspace.membership_id,
+            tenant_id=workspace.tenant_id,
+            user_id=workspace.user_id,
+            email="buyer@example.test",
+            role=MemberRole.buyer,
+        )
+        assert (
+            QuotationConfirmationService()
+            .confirm(
+                bearer_token="test-token",
+                member=member,
+                quotation_id=fixture.quotation_id,
+                payload=None,
+            )
+            .status
+            == "reviewed"
+        )
 
 
 def test_parsed_raw_date_does_not_create_date_unparsed_blocker(

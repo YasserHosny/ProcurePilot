@@ -4,7 +4,7 @@ import { By } from '@angular/platform-browser';
 import { MatDatepicker } from '@angular/material/datepicker';
 import { ActivatedRoute, provideRouter } from '@angular/router';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
-import { of } from 'rxjs';
+import { of, throwError } from 'rxjs';
 
 import enCatalog from '../../../../../../../packages/i18n/en.json';
 import { ApiService } from '../../../core/api/api.service';
@@ -172,6 +172,31 @@ describe('QuotationReviewComponent (T051, T057, T062)', () => {
     expect(component.flaggedFields().length).toBe(1);
   });
 
+  it('removes low-confidence supplier_name from flagged fields after selecting a supplier', () => {
+    const supplierName = {
+      ...mockQuotationDetail.field_extractions[0],
+      id: 'fe-supplier-name',
+      field_name: 'supplier_name',
+      extracted_value: 'الأمانة للتجارة',
+      confidence: '0.6700',
+    };
+    component.quotation.set({ ...mockQuotationDetail, field_extractions: [supplierName] });
+    component.selectedSupplierId.set(null);
+    expect(component.flaggedFields().map((field) => field.id)).toContain(supplierName.id);
+    component.selectedSupplierId.set('sup-1');
+    expect(component.flaggedFields().map((field) => field.id)).not.toContain(supplierName.id);
+  });
+
+  it('stages confirm-as-is for a low-confidence unit price extraction', () => {
+    const unitPrice = {
+      ...mockQuotationDetail.field_extractions[1],
+      confidence: '0.5000',
+    };
+    component.quotation.set({ ...mockQuotationDetail, field_extractions: [unitPrice] });
+    component.confirmFieldAsIs('quotation_line', 'line-1', 'unit_price');
+    expect(component.pendingCorrections().get(unitPrice.id)).toEqual(unitPrice.extracted_value);
+  });
+
   it('requests inline preview URLs and attachment URLs from the download button', () => {
     expect(apiService.getDocumentDownloadUrl).toHaveBeenCalledWith('doc-1');
 
@@ -200,6 +225,20 @@ describe('QuotationReviewComponent (T051, T057, T062)', () => {
     component.addNewLine();
 
     expect(component.pendingNewLines()[0].unit_price_currency).toBe('EGP');
+  });
+
+  it('saves an explicitly selected currency when no currency extraction row exists', () => {
+    const missingCurrency = { ...mockQuotationDetail, currency: null, supplier_id: 'sup-1', field_extractions: [] };
+    component.quotation.set(missingCurrency as unknown as QuotationDetail);
+    component.selectedSupplierId.set('sup-1');
+    apiService.patchQuotation.and.returnValue(of({ ...missingCurrency, currency: 'EGP' } as QuotationDetail));
+    apiService.confirmQuotation.and.returnValue(of({ ...missingCurrency, currency: 'EGP', status: 'reviewed' } as QuotationDetail));
+
+    component.currencySelectionChanged('EGP');
+    component.confirmQuotation();
+
+    expect(apiService.patchQuotation).toHaveBeenCalledWith('q-review-1', jasmine.objectContaining({ currency: 'EGP' }));
+    expect(apiService.confirmQuotation).toHaveBeenCalled();
   });
 
   it('keeps a quote currency when adding a priced line', () => {
@@ -568,6 +607,21 @@ describe('QuotationReviewComponent (T051, T057, T062)', () => {
     });
   });
 
+  it('shows the localized reason for a confirm 409 instead of the envelope message', () => {
+    const alreadyMatched = { ...mockQuotationDetail, supplier_id: 'sup-1' };
+    component.quotation.set(alreadyMatched);
+    component.selectedSupplierId.set('sup-1');
+    apiService.confirmQuotation.and.returnValue(throwError(() => new HttpErrorResponse({
+      status: 409,
+      error: { message: 'Request conflicts with the current state.', details: { reason: 'currency_unresolved' } },
+    })));
+
+    component.confirmQuotation();
+
+    expect(component.confirmBlockedReason()).toBe('Set the quotation currency before confirming.');
+    expect(component.confirmBlockedReason()).not.toBe('Request conflicts with the current state.');
+  });
+
   it('should display arithmetic mismatch banner and block confirmation when totals mismatch (US3)', () => {
     const mismatchedDetail: QuotationDetail = {
       ...mockQuotationDetail,
@@ -580,3 +634,4 @@ describe('QuotationReviewComponent (T051, T057, T062)', () => {
     expect(component.hasArithmeticMismatch()).toBeTrue();
   });
 });
+import { HttpErrorResponse } from '@angular/common/http';
