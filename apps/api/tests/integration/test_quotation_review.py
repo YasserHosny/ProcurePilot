@@ -148,7 +148,7 @@ def test_review_queue_preserves_sticky_task_reasons(
     conn: object, monkeypatch: pytest.MonkeyPatch, reason: str
 ) -> None:
     with conn.cursor() as cur:
-        workspace = make_workspace(cur, f"sticky-review-{reason}")
+        workspace = make_workspace(cur, f"sticky-review-{reason.replace('_', '-')}")
         fixture = make_extracted_quotation(cur, workspace)
         cur.execute("update quotation set status='in_review' where id=%s", (fixture.quotation_id,))
         make_review_task(cur, workspace, fixture.quotation_id, reason=reason)
