@@ -580,6 +580,19 @@ _UNIT_ALIASES: dict[str, str] = {
     "millilitre": "millilitre",
     "millilitres": "millilitre",
     "milliliter": "millilitre",
+    "كجم": "kilogram",
+    "كيلو": "kilogram",
+    "جم": "gram",
+    "جرام": "gram",
+    "لتر": "litre",
+    "مل": "millilitre",
+    "صفيحة": "each",
+    "شيكارة": "each",
+    "كرتونة": "each",
+    "علبة": "each",
+    "كيس": "each",
+    "قطعة": "each",
+    "عبوة": "each",
 }
 
 

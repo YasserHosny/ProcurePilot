@@ -67,7 +67,7 @@ class AzureDocumentIntelligenceProvider:
             ).result()
             table_result = _parse_invoice_result(layout, "prebuilt-layout:2024-11-30")
             if table_result.expected_line_count is not None:
-                return _merge_headers(parsed, table_result)
+                return _merge_headers(parsed, table_result, invoice_total=parsed.stated_total)
             return parsed
         except Exception as exc:
             raise ExtractionProviderError(f"Azure DI analysis failed: {exc}") from exc
@@ -191,37 +191,57 @@ def _parse_line_table(result: object, model_version: str) -> ExtractionResult | 
             continue
         header_row = max(roles_by_row, key=lambda row: (len(roles_by_row[row]), -row))
         roles = roles_by_row[header_row]
-        col_roles = {
-            int(_get(cell, "columnIndex", _get(cell, "column_index", 0))): role
-            for role, cell in roles.items()
-        }
+        col_roles: dict[int, str] = {}
+        for role, cell in roles.items():
+            start = int(_get(cell, "columnIndex", _get(cell, "column_index", 0)))
+            span = int(_get(cell, "columnSpan", _get(cell, "column_span", 1)) or 1)
+            for column in range(start, start + span):
+                col_roles[column] = role
         expected = 0
         charge_amount: Decimal | None = None
         for row in sorted(r for r in rows if r > header_row):
-            data = {
-                col_roles.get(int(_get(c, "columnIndex", _get(c, "column_index", 0)))): str(
-                    _get(c, "content", "") or ""
-                ).strip()
-                for c in rows[row]
-            }
+            row_cells = rows[row]
+            data: dict[str, str] = {}
+            expanded: dict[int, str] = {}
+            for cell in row_cells:
+                value = str(_get(cell, "content", "") or "").strip()
+                start = int(_get(cell, "columnIndex", _get(cell, "column_index", 0)))
+                span = int(_get(cell, "columnSpan", _get(cell, "column_span", 1)) or 1)
+                for column in range(start, start + span):
+                    expanded[column] = value
+                    role = col_roles.get(column)
+                    if role and value:
+                        data.setdefault(role, value)
             desc = data.get("description", "").replace("\n", " ").strip()
             qty = _clean_number(data.get("quantity", ""))
             price = _clean_number(data.get("unit_price", ""))
             total = _clean_number(data.get("line_total", ""))
-            if _is_total_row(desc):
-                if total or price or qty is None:
-                    amount = total or price or _clean_number(desc)
+            label = " ".join(
+                value.replace("\n", " ").strip()
+                for value in dict.fromkeys(expanded.values())
+                if value and _numeric_cell_amount(value) is None
+            )
+            desc = desc or label
+            numeric_amounts = [
+                _numeric_cell_amount(value)
+                for value in expanded.values()
+                if _numeric_cell_amount(value) is not None
+            ]
+            fallback_amount = total or (numeric_amounts[-1] if numeric_amounts else None)
+            if qty is None and _is_total_row(label):
+                if fallback_amount or price:
+                    amount = fallback_amount or price
                     if amount:
                         candidate = _money_field("stated_total", amount, currency, 0.9)
-                        if _is_before_tax_row(desc):
+                        if _is_before_tax_row(label):
                             before_tax_total = candidate
                         else:
                             stated_total = candidate
                 continue
-            if _is_tax_row(desc) and qty is None:
+            if qty is None and _is_tax_row(label):
                 continue
-            if _is_charge_row(desc) and qty is None:
-                amount = total or price or _clean_number(" ".join(data.values()))
+            if qty is None and _is_charge_row(label):
+                amount = fallback_amount or price
                 if amount:
                     charge_amount = (charge_amount or Decimal("0")) + Decimal(amount)
                 continue
@@ -382,7 +402,7 @@ def _all_document_text(result: object) -> str:
         parts.extend(
             str(_get(line, "content", "") or "") for line in (_get(page, "lines", []) or [])
         )
-    return " ".join(parts)
+    return "\n".join(parts)
 
 
 def _find_grand_total(text: str, currency: str | None) -> ExtractedField | None:
@@ -555,6 +575,18 @@ def _clean_number(s: str) -> str | None:
         return format(parse_localised_decimal(cleaned), "f")
     except ValueError:
         return None
+
+
+def _numeric_cell_amount(text: str) -> str | None:
+    cleaned = re.sub(
+        r"ج\s*\.\s*م\.?|جنيه(?:\s+مصري)?|(?<![A-Z])L\.?\s*E\.?(?![A-Z])|\b(?:EGP|USD|GBP|EUR)\b|[$£€]",
+        "",
+        text,
+        flags=re.I,
+    ).strip()
+    if not re.fullmatch(r"[\d٠-٩۰-۹.,٬٫\s−﹣-]+", cleaned):
+        return None
+    return _clean_number(cleaned)
 
 
 def _infer_currency(fields: dict[str, Any]) -> str | None:

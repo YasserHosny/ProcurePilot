@@ -14,7 +14,11 @@ from procurepilot_extraction_worker.azure_di import (
 from procurepilot_extraction_worker.models import ExtractedField
 from procurepilot_extraction_worker.settings import WorkerSettings
 from procurepilot_extraction_worker.validation import validate_arithmetic
-from procurepilot_extraction_worker.worker import SupplierMatch, _review_reason
+from procurepilot_extraction_worker.worker import (
+    SupplierMatch,
+    _normalise_pack_unit,
+    _review_reason,
+)
 
 FIXTURES = Path(__file__).parent / "fixtures" / "azure_layout"
 NO_MATCH = SupplierMatch(None, None, False)
@@ -84,9 +88,12 @@ def test_demo_rtl_tables_ignore_column_order(fixture: str, clean: bool, reverse:
             for bad, good in replacements.items():
                 cell["content"] = cell["content"].replace(bad, good)
     if reverse:
-        max_col = payload["tables"][0]["columnCount"] - 1
         for cell in cells:
-            cell["columnIndex"] = max_col - cell["columnIndex"]
+            cell["columnIndex"] = (
+                payload["tables"][0]["columnCount"]
+                - cell["columnIndex"]
+                - cell.get("columnSpan", 1)
+            )
     result = _parse_invoice_result(payload, "prebuilt-layout:test")
     assert len(result.lines) == result.expected_line_count == 5
     assert all("\n" not in line.original_text for line in result.lines)
@@ -123,6 +130,14 @@ def test_amana_delivery_fee_is_counted_once() -> None:
     assert result.lines[-1].fields["delivery_fee"].value == {"amount": "250.00", "currency": "EGP"}
     assert validate_arithmetic(result).computed_total == Decimal("56925.00")
     assert validate_arithmetic(result).status == "reconciled"
+
+
+def test_merged_cell_total_is_read_from_any_column_without_paragraph_help() -> None:
+    payload = load("demo-alnour.layout.json")
+    payload["content"] = ""
+    payload["paragraphs"] = []
+    result = _parse_invoice_result(payload, "layout:test")
+    assert result.stated_total.value["amount"] == "56425.00"
 
 
 def test_printed_line_total_mismatch_lowers_line_confidence() -> None:
@@ -226,6 +241,94 @@ def test_table_beats_collapsed_invoice_items_with_fake_client() -> None:
     )
     assert len(result.lines) == 5
     assert result.model_version == "prebuilt-layout:2024-11-30"
+
+
+def test_layout_falls_back_to_invoice_total_and_keeps_header_fields() -> None:
+    class Poller:
+        def __init__(self, payload: dict) -> None:
+            self.payload = payload
+
+        def result(self) -> dict:
+            return self.payload
+
+    invoice = load("demo-alnour.invoice.json")
+    invoice["documents"][0]["fields"]["InvoiceTotal"]["content"] = "57,000.00 ج.م"
+    invoice["documents"][0]["fields"]["InvoiceDate"] = {
+        "content": "16/10/2026",
+        "confidence": 0.9,
+    }
+    layout = load("demo-alnour.layout.json")
+    table = layout["tables"][0]
+    total_row = table["rowCount"] - 1
+    table["cells"] = [c for c in table["cells"] if c["rowIndex"] != total_row]
+    layout["paragraphs"] = []
+    layout["content"] = ""
+
+    class FakeClient:
+        def begin_analyze_document(self, model: str, request: object) -> Poller:
+            return Poller(invoice if model == "prebuilt-invoice" else layout)
+
+    result = AzureDocumentIntelligenceProvider(
+        WorkerSettings("", "", ""), client=FakeClient()
+    ).extract(
+        document_id="doc",
+        mime_type="application/pdf",
+        storage_path="unused",
+        document_bytes=b"fixture",
+    )
+    assert result.stated_total.value["amount"] == "57000.00"
+    assert "supplier_name" in result.header
+    assert "issue_date" in result.header
+
+
+@pytest.mark.parametrize(
+    ("description", "qty", "price"),
+    [("Total Clean Detergent 5L", "3", "40"), ("خدمة توصيل", "2", "50")],
+)
+def test_item_labels_are_not_classified_as_totals_or_charges(
+    description: str, qty: str, price: str
+) -> None:
+    payload = load("q3-english-le-marker.layout.json")
+    table = payload["tables"][0]
+    table["cells"] = [c for c in table["cells"] if c["rowIndex"] != 1]
+    table["cells"].extend(
+        [
+            {"rowIndex": 1, "columnIndex": 0, "content": "120.00", "rowSpan": 1, "columnSpan": 1},
+            {"rowIndex": 1, "columnIndex": 1, "content": price, "rowSpan": 1, "columnSpan": 1},
+            {"rowIndex": 1, "columnIndex": 2, "content": qty, "rowSpan": 1, "columnSpan": 1},
+            {
+                "rowIndex": 1,
+                "columnIndex": 3,
+                "content": description,
+                "rowSpan": 1,
+                "columnSpan": 1,
+            },
+        ]
+    )
+    result = _parse_invoice_result(payload, "layout:test")
+    assert any(line.original_text == description for line in result.lines)
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        ("كجم", "kilogram"),
+        ("كيلو", "kilogram"),
+        ("جم", "gram"),
+        ("جرام", "gram"),
+        ("لتر", "litre"),
+        ("مل", "millilitre"),
+        ("صفيحة", "each"),
+        ("شيكارة", "each"),
+        ("كرتونة", "each"),
+        ("علبة", "each"),
+        ("كيس", "each"),
+        ("قطعة", "each"),
+        ("عبوة", "each"),
+    ],
+)
+def test_arabic_pack_unit_aliases(raw: str, expected: str) -> None:
+    assert _normalise_pack_unit(raw) == expected
 
 
 def test_structured_parse_without_total_keeps_existing_auto_accept_policy() -> None:

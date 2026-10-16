@@ -1,11 +1,38 @@
 {
   "apiVersion": "2024-11-30",
   "modelId": "prebuilt-layout",
-  "content": "",
+  "content": "                                                                                                  ‫عرض سعر‬\n                                                                             ‫مزارع الدلتا للخضروات (وهمية) — المنصورة‬\n                                                                                                        ‫التاريخ‪٢٠٢٦-١٠-١٤ :‬‬\n\n\n‫القيمة‬                          ‫السعر‬                    ‫الكمية‬                              ‫الصنف‬\n\n     ‫‪ ٩٠٠٫٠٠‬جنيه‬                    ‫‪ ٢٢٫٥٠‬جنيه‬                    ‫‪٤٠‬‬                            ‫طماطم طازجة (كجم)‬\n\n    ‫‪ ٦٣٨٫٧٥‬جنيه‬                     ‫‪ ١٨٫٢٥‬جنيه‬                    ‫‪٣٥‬‬                                 ‫بصل أحمر (كجم)‬\n\n     ‫‪ ٩٦٠٫٠٠‬جنيه‬                    ‫‪ ١٦٫٠٠‬جنيه‬                    ‫‪٦٠‬‬                                    ‫بطاطس (كجم)‬\n\n    ‫‪ ٦٨٦٫٢٥‬جنيه‬                     ‫‪ ٤٥٫٧٥‬جنيه‬                    ‫‪١٥‬‬                                ‫فلفل رومي (كجم)‬\n\n  ‫‪ ٣٬١٨٥٫٠٠‬جنيه‬                                                                                                ‫الإجمالي‬\n\n\n         ‫‪.TEST FIXTURE — fictional supplier, generated for ProcurePilot extraction testing (Jira PP-3). Not a real quotation‬‬\n\f",
   "pages": [],
   "paragraphs": [
     {
-      "content": "الإجمالي النهائي 3185.00 ج.م"
+      "content": "‫عرض سعر‬"
+    },
+    {
+      "content": "‫مزارع الدلتا للخضروات (وهمية) — المنصورة‬"
+    },
+    {
+      "content": "‫التاريخ‪٢٠٢٦-١٠-١٤ :‬‬"
+    },
+    {
+      "content": "‫القيمة‬                          ‫السعر‬                    ‫الكمية‬                              ‫الصنف‬"
+    },
+    {
+      "content": "‫‪ ٩٠٠٫٠٠‬جنيه‬                    ‫‪ ٢٢٫٥٠‬جنيه‬                    ‫‪٤٠‬‬                            ‫طماطم طازجة (كجم)‬"
+    },
+    {
+      "content": "‫‪ ٦٣٨٫٧٥‬جنيه‬                     ‫‪ ١٨٫٢٥‬جنيه‬                    ‫‪٣٥‬‬                                 ‫بصل أحمر (كجم)‬"
+    },
+    {
+      "content": "‫‪ ٩٦٠٫٠٠‬جنيه‬                    ‫‪ ١٦٫٠٠‬جنيه‬                    ‫‪٦٠‬‬                                    ‫بطاطس (كجم)‬"
+    },
+    {
+      "content": "‫‪ ٦٨٦٫٢٥‬جنيه‬                     ‫‪ ٤٥٫٧٥‬جنيه‬                    ‫‪١٥‬‬                                ‫فلفل رومي (كجم)‬"
+    },
+    {
+      "content": "‫‪ ٣٬١٨٥٫٠٠‬جنيه‬                                                                                                ‫الإجمالي‬"
+    },
+    {
+      "content": "‫‪.TEST FIXTURE — fictional supplier, generated for ProcurePilot extraction testing (Jira PP-3). Not a real quotation‬‬"
     }
   ],
   "tables": [
@@ -167,23 +194,9 @@
         {
           "rowIndex": 5,
           "columnIndex": 1,
-          "content": "",
+          "content": "الإجمالي",
           "rowSpan": 1,
-          "columnSpan": 1
-        },
-        {
-          "rowIndex": 5,
-          "columnIndex": 2,
-          "content": "",
-          "rowSpan": 1,
-          "columnSpan": 1
-        },
-        {
-          "rowIndex": 5,
-          "columnIndex": 3,
-          "content": "Total",
-          "rowSpan": 1,
-          "columnSpan": 1
+          "columnSpan": 3
         }
       ]
     }

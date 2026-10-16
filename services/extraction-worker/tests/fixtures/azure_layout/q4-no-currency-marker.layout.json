@@ -1,11 +1,35 @@
 {
   "apiVersion": "2024-11-30",
   "modelId": "prebuilt-layout",
-  "content": "",
+  "content": "                                                                                                ‫عرض أسعار‬\n                                                                                            ‫ألبان الصعيد (وهمية) — أسيوط‬\n                                                                                                      ‫التاريخ‪14-10-2026 :‬‬\n\n\n‫الإجمالي‬                       ‫السعر‬                   ‫الكمية‬                                 ‫الصنف‬\n\n     ‫‪2,700.00‬‬                       ‫‪135.00‬‬                       ‫‪20‬‬                                   ‫جبنة بيضاء (كجم)‬\n\n     ‫‪2,016.00‬‬                          ‫‪42.00‬‬                     ‫‪48‬‬                                 ‫لبن كامل الدسم ‪ ١‬لتر‬\n\n     ‫‪2,055.00‬‬                          ‫‪68.50‬‬                     ‫‪30‬‬                                          ‫زبدة ‪ ٢٠٠‬جم‬\n\n     ‫‪6,771.00‬‬                                                                                                    ‫الإجمالي‬\n\n\n           ‫‪.TEST FIXTURE — fictional supplier, generated for ProcurePilot extraction testing (Jira PP-3). Not a real quotation‬‬\n\f",
   "pages": [],
   "paragraphs": [
     {
-      "content": "الإجمالي 6,771.00"
+      "content": "‫عرض أسعار‬"
+    },
+    {
+      "content": "‫ألبان الصعيد (وهمية) — أسيوط‬"
+    },
+    {
+      "content": "‫التاريخ‪14-10-2026 :‬‬"
+    },
+    {
+      "content": "‫الإجمالي‬                       ‫السعر‬                   ‫الكمية‬                                 ‫الصنف‬"
+    },
+    {
+      "content": "‫‪2,700.00‬‬                       ‫‪135.00‬‬                       ‫‪20‬‬                                   ‫جبنة بيضاء (كجم)‬"
+    },
+    {
+      "content": "‫‪2,016.00‬‬                          ‫‪42.00‬‬                     ‫‪48‬‬                                 ‫لبن كامل الدسم ‪ ١‬لتر‬"
+    },
+    {
+      "content": "‫‪2,055.00‬‬                          ‫‪68.50‬‬                     ‫‪30‬‬                                          ‫زبدة ‪ ٢٠٠‬جم‬"
+    },
+    {
+      "content": "‫‪6,771.00‬‬                                                                                                    ‫الإجمالي‬"
+    },
+    {
+      "content": "‫‪.TEST FIXTURE — fictional supplier, generated for ProcurePilot extraction testing (Jira PP-3). Not a real quotation‬‬"
     }
   ],
   "tables": [
@@ -132,30 +156,16 @@
         {
           "rowIndex": 4,
           "columnIndex": 0,
-          "content": "6771.00",
+          "content": "6,771.00",
           "rowSpan": 1,
           "columnSpan": 1
         },
         {
           "rowIndex": 4,
           "columnIndex": 1,
-          "content": "",
+          "content": "الإجمالي",
           "rowSpan": 1,
-          "columnSpan": 1
-        },
-        {
-          "rowIndex": 4,
-          "columnIndex": 2,
-          "content": "",
-          "rowSpan": 1,
-          "columnSpan": 1
-        },
-        {
-          "rowIndex": 4,
-          "columnIndex": 3,
-          "content": "6,771.00",
-          "rowSpan": 1,
-          "columnSpan": 1
+          "columnSpan": 3
         }
       ]
     }

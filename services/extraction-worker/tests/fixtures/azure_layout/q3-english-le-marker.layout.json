@@ -1,11 +1,41 @@
 {
   "apiVersion": "2024-11-30",
   "modelId": "prebuilt-layout",
-  "content": "",
+  "content": "PRICE QUOTATION\nAlexandria Catering Supplies (fictional)\nDate: 14 Oct 2026 · Valid 10 days\n\n\n                                 Item                                       Qty          Unit price                   Amount\n\n TABLE SALT 1kg                                                            25         LE 12.50                LE 312.50\n\n LEMON JUICE CONCENTRATE 1L                                                12         LE 95.00                LE 1,140.00\n\n WATER BOTTLE 600ml (pack of 12)                                           40         LE 84.00                LE 3,360.00\n\n WHITE VINEGAR 1L                                                          18         LE 27.25                LE 490.50\n\n Total (L.E.)                                                                                                 L.E. 5,303.00\n\n\nDelivery within 2 working days to all Cairo and Giza branches.\n\n\nTEST FIXTURE — fictional supplier, generated for ProcurePilot extraction testing (Jira PP-3). Not a real quotation.\n\f",
   "pages": [],
   "paragraphs": [
     {
-      "content": "الإجمالي النهائي 5303.00 ج.م"
+      "content": "PRICE QUOTATION"
+    },
+    {
+      "content": "Alexandria Catering Supplies (fictional)"
+    },
+    {
+      "content": "Date: 14 Oct 2026 · Valid 10 days"
+    },
+    {
+      "content": "Item                                       Qty          Unit price                   Amount"
+    },
+    {
+      "content": "TABLE SALT 1kg                                                            25         LE 12.50                LE 312.50"
+    },
+    {
+      "content": "LEMON JUICE CONCENTRATE 1L                                                12         LE 95.00                LE 1,140.00"
+    },
+    {
+      "content": "WATER BOTTLE 600ml (pack of 12)                                           40         LE 84.00                LE 3,360.00"
+    },
+    {
+      "content": "WHITE VINEGAR 1L                                                          18         LE 27.25                LE 490.50"
+    },
+    {
+      "content": "Total (L.E.)                                                                                                 L.E. 5,303.00"
+    },
+    {
+      "content": "Delivery within 2 working days to all Cairo and Giza branches."
+    },
+    {
+      "content": "TEST FIXTURE — fictional supplier, generated for ProcurePilot extraction testing (Jira PP-3). Not a real quotation."
     }
   ],
   "tables": [
@@ -167,23 +197,9 @@
         {
           "rowIndex": 5,
           "columnIndex": 1,
-          "content": "",
+          "content": "Total (L.E.)",
           "rowSpan": 1,
-          "columnSpan": 1
-        },
-        {
-          "rowIndex": 5,
-          "columnIndex": 2,
-          "content": "",
-          "rowSpan": 1,
-          "columnSpan": 1
-        },
-        {
-          "rowIndex": 5,
-          "columnIndex": 3,
-          "content": "Total",
-          "rowSpan": 1,
-          "columnSpan": 1
+          "columnSpan": 3
         }
       ]
     }
