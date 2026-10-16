@@ -743,7 +743,8 @@
         "read_failure": "تعذر قراءة المستند",
         "review_required": "تتطلب مراجعة بشرية",
         "no_supplier_match": "لا يوجد تطابق مورد",
-        "currency_unresolved": "العملة غير محددة"
+        "currency_unresolved": "العملة غير محددة",
+        "date_unparsed": "تعذّر التعرّف على التاريخ"
       },
       "columns": {
         "id": "معرف عرض السعر",
@@ -836,6 +837,8 @@
         "currencyRequired": "العملة مطلوبة",
         "issueDateLabel": "تاريخ الإصدار",
         "expiryDateLabel": "تاريخ الانتهاء",
+        "dateEvidenceHint": "النص في المستند: {{value}}",
+        "pickDateToConfirm": "اختر تاريخًا لتأكيد هذه القيمة.",
         "statedTotalLabel": "إجمالي المبلغ المذكور",
         "statedTotalCurrency": "عملة المبلغ المذكور",
         "statusLabel": "الحالة"

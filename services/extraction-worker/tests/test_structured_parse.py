@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from datetime import datetime
+from io import BytesIO
+
 from procurepilot_extraction_worker.structured_parse import parse_structured_content
 
 
@@ -36,3 +39,25 @@ def test_csv_without_currency_or_fallback_does_not_invent_one() -> None:
 
     assert "currency" not in result.header
     assert result.lines[0].fields["unit_price"].value["currency"] is None
+
+
+def test_xlsx_date_cells_keep_datetime_text_parseable() -> None:
+    from openpyxl import Workbook
+
+    from procurepilot_extraction_worker.dates import parse_extracted_date
+
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.append(["quotation_date"])
+    sheet.append([datetime(2026, 10, 16)])
+    output = BytesIO()
+    workbook.save(output)
+
+    result = parse_structured_content(
+        output.getvalue(),
+        mime_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+
+    raw = result.header["issue_date"].value
+    assert raw == "2026-10-16 00:00:00"
+    assert parse_extracted_date(raw, region="EG").value.isoformat() == "2026-10-16"

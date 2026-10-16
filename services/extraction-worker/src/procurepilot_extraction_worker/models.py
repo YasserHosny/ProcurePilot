@@ -13,6 +13,7 @@ class ExtractedField:
     confidence: float
     source_page: int | None = None
     source_region: dict[str, Any] | None = None
+    typed_value: object | None = None
 
 
 @dataclass(frozen=True)
