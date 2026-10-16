@@ -1,7 +1,7 @@
 import base64
 import json
 import uuid
-from collections.abc import Iterator, Sequence
+from collections.abc import Iterator
 from contextlib import contextmanager
 from datetime import date
 
@@ -38,56 +38,8 @@ from procurepilot_api.modules.rfq.schemas import (
     RfqResponseComparisonList,
     RfqSummary,
 )
+from procurepilot_api.shared.i18n import t
 from procurepilot_api.shared.mailer import get_mailer
-
-NAMESPACE_RFQ = uuid.UUID("361f1073-a8d1-4db8-8d07-28f0907a4a2a")
-
-
-def build_rfq_message(
-    rfq: Rfq,
-    lines: Sequence[RfqLine],
-    product_names: dict[uuid.UUID, str],
-    recipient: RfqRecipient,
-    tenant_terms: str | None = None,
-    reply_to: str | None = None,
-) -> tuple[str, str, str]:
-    subject = f"Request for Quotation - {rfq.needed_by_date}"
-
-    body_lines = [
-        "Please provide a quotation for the following items:",
-        "",
-    ]
-
-    for line in lines:
-        name = product_names.get(line.workspace_product_id, "Unknown Product")
-        body_lines.append(f"- {name}: {line.quantity}")
-
-    body_lines.extend(
-        [
-            "",
-            f"Needed by: {rfq.needed_by_date.isoformat()}",
-        ]
-    )
-
-    if reply_to:
-        body_lines.extend(
-            [
-                "",
-                "To submit your quotation, please reply directly to this email or send it to:",
-                reply_to,
-            ]
-        )
-
-    if tenant_terms:
-        body_lines.extend(["", "Terms:", tenant_terms])
-
-    body = "\n".join(body_lines)
-
-    combined = f"{rfq.tenant_id}:{rfq.id}:{recipient.id}"
-    msg_hash = uuid.uuid5(NAMESPACE_RFQ, combined)
-    message_id = f"<{msg_hash}@procurepilot.internal>"
-
-    return subject, body, message_id
 
 
 @contextmanager
@@ -329,22 +281,27 @@ class RfqService:
                         continue
 
                     contact_email = supp_row["contact_email"]
+                    email_lines = []
+                    for line in lines:
+                        product = product_by_id.get(line.workspace_product_id)
+                        email_lines.append(
+                            RfqEmailLine(
+                                product_name=(
+                                    product["tenant_name"]
+                                    if product
+                                    else t("rfq.email.unknownProduct", tenant_row["default_locale"])
+                                ),
+                                quantity=line.quantity,
+                                unit_code=product["base_unit"] if product else "each",
+                                pack_count=product["pack_count"] if product else None,
+                                unit_size=product["unit_size"] if product else None,
+                            )
+                        )
                     rendered = render_rfq_email(
                         tenant_name=tenant_row["name"],
                         locale=tenant_row["default_locale"],
                         needed_by=rfq.needed_by_date,
-                        lines=[
-                            RfqEmailLine(
-                                product_name=product_by_id[line.workspace_product_id][
-                                    "tenant_name"
-                                ],
-                                quantity=line.quantity,
-                                unit_code=product_by_id[line.workspace_product_id]["base_unit"],
-                                pack_count=product_by_id[line.workspace_product_id]["pack_count"],
-                                unit_size=product_by_id[line.workspace_product_id]["unit_size"],
-                            )
-                            for line in lines
-                        ],
+                        lines=email_lines,
                         tenant_terms=rfq.tenant_terms,
                         reply_to=reply_to,
                     )

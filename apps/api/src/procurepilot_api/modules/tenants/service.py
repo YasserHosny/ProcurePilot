@@ -343,7 +343,7 @@ _ARABIC_TRANSLITERATION = str.maketrans(
 
 
 def slugify_business_name(name: str) -> str:
-    """Transliterate Arabic then fold Latin accents; مطاعم سند becomes mataam-snd."""
+    """Transliterate Arabic then fold Latin accents; مطاعم سند becomes mtaam-snd."""
     stripped = "".join(
         ch for ch in name if ch not in "ـ" and not unicodedata.category(ch).startswith("M")
     )
