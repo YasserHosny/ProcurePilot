@@ -1,0 +1,360 @@
+{
+  "apiVersion": "2024-11-30",
+  "modelId": "prebuilt-layout",
+  "content": "        ‫عرض سعر‬\n       ‫رقم‪ :‬أ‪1043/‬‬\n                                                                                            ‫األمانة للتجارة‬\n‫التاريخ‪16/10/2026 :‬‬                                                                        ‫‪El-Amana Trading‬‬\n                                                               ‫شارع الجيش‪ ،‬الزقازيق‪ ،‬الرشقية · ت‪9076 238 0111 :‬‬\n\n\n                                                                                  ‫السادة‪ /‬مطاعم سند — فرع المعادي‬\n                                                            ‫باإلشارة إىل طلبكم لعرض سعر‪ ،‬نترشف بتقديم عرضنا كالتايل‪:‬‬\n\n       ‫اإلجمايل (ج‪.‬م)‬   ‫سعر الوحدة (ج‪.‬م)‬     ‫الكمية‬      ‫الوحدة‬                                      ‫الصنف‬        ‫م‬\n\n         ‫‪17,250.00‬‬            ‫‪1,725.00‬‬          ‫‪10‬‬       ‫صفيحة‬             ‫زيت عباد الشمس (صفيحة ‪ 18‬لرت)‬          ‫‪1‬‬\n\n         ‫‪18,500.00‬‬              ‫‪925.00‬‬          ‫‪20‬‬       ‫شيكارة‬                   ‫أرز مرصي (شيكارة ‪ 25‬كجم)‬        ‫‪2‬‬\n\n           ‫‪8,900.00‬‬             ‫‪890.00‬‬          ‫‪10‬‬       ‫شيكارة‬                       ‫سكر (شيكارة ‪ 25‬كجم)‬         ‫‪3‬‬\n\n           ‫‪8,625.00‬‬             ‫‪575.00‬‬          ‫‪15‬‬        ‫كرتونة‬                     ‫مكرونة (كرتونة ‪ 20‬كجم)‬       ‫‪4‬‬\n\n           ‫‪3,400.00‬‬              ‫‪68.00‬‬          ‫‪50‬‬          ‫كجم‬                                  ‫عدس بجبة‬         ‫‪5‬‬\n\n             ‫‪250.00‬‬                                                                                   ‫مصاريف نقل‬\n\n     ‫‪ 56,925.00‬ج‪.‬م‬                                                                                 ‫اإلجمايل النهايئ‬\n\n                                   ‫الدفع‪ :‬آجل ‪ 15‬يوم · التوريد خالل ‪ 3‬أيام · العرض ساري ‪ 5‬أيام · مصاريف نقل ‪ 250‬ج‪.‬م‬\n                                                                                            ‫األسعار بالجنيه المرصي‪.‬‬\n\n                                                                                                          ‫مع تحياتنا‪،‬‬\n                                                                                      ‫إدارة المبيعات — األمانة للتجارة‬\n\f",
+  "pages": [],
+  "paragraphs": [
+    {
+      "content": "‫عرض سعر‬"
+    },
+    {
+      "content": "‫رقم‪ :‬أ‪1043/‬‬"
+    },
+    {
+      "content": "‫األمانة للتجارة‬"
+    },
+    {
+      "content": "‫التاريخ‪16/10/2026 :‬‬                                                                        ‫‪El-Amana Trading‬‬"
+    },
+    {
+      "content": "‫شارع الجيش‪ ،‬الزقازيق‪ ،‬الرشقية · ت‪9076 238 0111 :‬‬"
+    },
+    {
+      "content": "‫السادة‪ /‬مطاعم سند — فرع المعادي‬"
+    },
+    {
+      "content": "‫باإلشارة إىل طلبكم لعرض سعر‪ ،‬نترشف بتقديم عرضنا كالتايل‪:‬‬"
+    },
+    {
+      "content": "‫اإلجمايل (ج‪.‬م)‬   ‫سعر الوحدة (ج‪.‬م)‬     ‫الكمية‬      ‫الوحدة‬                                      ‫الصنف‬        ‫م‬"
+    },
+    {
+      "content": "‫‪17,250.00‬‬            ‫‪1,725.00‬‬          ‫‪10‬‬       ‫صفيحة‬             ‫زيت عباد الشمس (صفيحة ‪ 18‬لرت)‬          ‫‪1‬‬"
+    },
+    {
+      "content": "‫‪18,500.00‬‬              ‫‪925.00‬‬          ‫‪20‬‬       ‫شيكارة‬                   ‫أرز مرصي (شيكارة ‪ 25‬كجم)‬        ‫‪2‬‬"
+    },
+    {
+      "content": "‫‪8,900.00‬‬             ‫‪890.00‬‬          ‫‪10‬‬       ‫شيكارة‬                       ‫سكر (شيكارة ‪ 25‬كجم)‬         ‫‪3‬‬"
+    },
+    {
+      "content": "‫‪8,625.00‬‬             ‫‪575.00‬‬          ‫‪15‬‬        ‫كرتونة‬                     ‫مكرونة (كرتونة ‪ 20‬كجم)‬       ‫‪4‬‬"
+    },
+    {
+      "content": "‫‪3,400.00‬‬              ‫‪68.00‬‬          ‫‪50‬‬          ‫كجم‬                                  ‫عدس بجبة‬         ‫‪5‬‬"
+    },
+    {
+      "content": "‫‪250.00‬‬                                                                                   ‫مصاريف نقل‬"
+    },
+    {
+      "content": "‫‪ 56,925.00‬ج‪.‬م‬                                                                                 ‫اإلجمايل النهايئ‬"
+    },
+    {
+      "content": "‫الدفع‪ :‬آجل ‪ 15‬يوم · التوريد خالل ‪ 3‬أيام · العرض ساري ‪ 5‬أيام · مصاريف نقل ‪ 250‬ج‪.‬م‬"
+    },
+    {
+      "content": "‫األسعار بالجنيه المرصي‪.‬‬"
+    },
+    {
+      "content": "‫مع تحياتنا‪،‬‬"
+    },
+    {
+      "content": "‫إدارة المبيعات — األمانة للتجارة‬"
+    }
+  ],
+  "tables": [
+    {
+      "rowCount": 8,
+      "columnCount": 6,
+      "cells": [
+        {
+          "rowIndex": 0,
+          "columnIndex": 0,
+          "content": "اإلجمايل (ج.م)",
+          "rowSpan": 1,
+          "columnSpan": 1,
+          "kind": "columnHeader"
+        },
+        {
+          "rowIndex": 0,
+          "columnIndex": 1,
+          "content": "سعر الوحدة (ج.م)",
+          "rowSpan": 1,
+          "columnSpan": 1,
+          "kind": "columnHeader"
+        },
+        {
+          "rowIndex": 0,
+          "columnIndex": 2,
+          "content": "الكمية",
+          "rowSpan": 1,
+          "columnSpan": 1,
+          "kind": "columnHeader"
+        },
+        {
+          "rowIndex": 0,
+          "columnIndex": 3,
+          "content": "الوحدة",
+          "rowSpan": 1,
+          "columnSpan": 1,
+          "kind": "columnHeader"
+        },
+        {
+          "rowIndex": 0,
+          "columnIndex": 4,
+          "content": "الصنف",
+          "rowSpan": 1,
+          "columnSpan": 1,
+          "kind": "columnHeader"
+        },
+        {
+          "rowIndex": 0,
+          "columnIndex": 5,
+          "content": "م",
+          "rowSpan": 1,
+          "columnSpan": 1,
+          "kind": "columnHeader"
+        },
+        {
+          "rowIndex": 1,
+          "columnIndex": 0,
+          "content": "17,250.00",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 1,
+          "columnIndex": 1,
+          "content": "1,725.00",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 1,
+          "columnIndex": 2,
+          "content": "10",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 1,
+          "columnIndex": 3,
+          "content": "صفيحة",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 1,
+          "columnIndex": 4,
+          "content": "زيت عباد الشمس (صفيحة 18 لرت)",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 1,
+          "columnIndex": 5,
+          "content": "1",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 2,
+          "columnIndex": 0,
+          "content": "18,500.00",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 2,
+          "columnIndex": 1,
+          "content": "925.00",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 2,
+          "columnIndex": 2,
+          "content": "20",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 2,
+          "columnIndex": 3,
+          "content": "شيكارة",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 2,
+          "columnIndex": 4,
+          "content": "أرز مرصي (شيكارة 25 كجم)",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 2,
+          "columnIndex": 5,
+          "content": "2",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 3,
+          "columnIndex": 0,
+          "content": "8,900.00",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 3,
+          "columnIndex": 1,
+          "content": "890.00",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 3,
+          "columnIndex": 2,
+          "content": "10",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 3,
+          "columnIndex": 3,
+          "content": "شيكارة",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 3,
+          "columnIndex": 4,
+          "content": "سكر (شيكارة 25 كجم)",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 3,
+          "columnIndex": 5,
+          "content": "3",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 4,
+          "columnIndex": 0,
+          "content": "8,625.00",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 4,
+          "columnIndex": 1,
+          "content": "575.00",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 4,
+          "columnIndex": 2,
+          "content": "15",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 4,
+          "columnIndex": 3,
+          "content": "كرتونة",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 4,
+          "columnIndex": 4,
+          "content": "مكرونة (كرتونة 20 كجم)",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 4,
+          "columnIndex": 5,
+          "content": "4",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 5,
+          "columnIndex": 0,
+          "content": "3,400.00",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 5,
+          "columnIndex": 1,
+          "content": "68.00",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 5,
+          "columnIndex": 2,
+          "content": "50",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 5,
+          "columnIndex": 3,
+          "content": "كجم",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 5,
+          "columnIndex": 4,
+          "content": "عدس بجبة",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 5,
+          "columnIndex": 5,
+          "content": "5",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 6,
+          "columnIndex": 0,
+          "content": "250.00",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 6,
+          "columnIndex": 1,
+          "content": "مصاريف نقل",
+          "rowSpan": 1,
+          "columnSpan": 5
+        },
+        {
+          "rowIndex": 7,
+          "columnIndex": 0,
+          "content": "56,925.00 ج.م",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 7,
+          "columnIndex": 1,
+          "content": "اإلجمايل النهايئ",
+          "rowSpan": 1,
+          "columnSpan": 5
+        }
+      ]
+    }
+  ],
+  "documents": []
+}
