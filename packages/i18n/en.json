@@ -322,20 +322,50 @@
     "labelMfa": "Multi-Factor Auth",
     "valMfaEnabled": "Enabled",
     "valMfaDisabled": "Not configured",
-    "emptyStateTitle": "Procurement Intelligence Modules",
-    "emptyStateDescription": "Platform Foundation (Chunk 4.1) establishes secure tenancy and authentication. Core procurement modules will be unlocked in upcoming releases.",
-    "step1Title": "Platform Foundation",
-    "step1Desc": "Tenant isolation, authentication, and RBAC skeleton.",
-    "step1Status": "Active (Chunk 4.1)",
-    "step2Title": "Quotation Inbox & OCR",
-    "step2Desc": "Upload supplier PDF quotations with automated AI line-item extraction.",
-    "step2Status": "Upcoming (Chunk 4.3)",
-    "step3Title": "Smart Compare & Landed Cost",
-    "step3Desc": "Automated pack-size normalisation and best-price recommendations.",
-    "step3Status": "Upcoming (Chunk 4.5)",
-    "step4Title": "Verified Savings Ledger",
-    "step4Desc": "Auditable proof of purchasing savings vs baseline policies.",
-    "step4Status": "Upcoming (Chunk 4.6)"
+    "modulesTitle": "What you can do",
+    "modulesDescription": "Access your workspace modules to manage suppliers, compare offers, authorise requests, and track verified savings.",
+    "modules": {
+      "quotations": {
+        "title": "Quotations",
+        "description": "Upload, extract, and review supplier quotations."
+      },
+      "rfq": {
+        "title": "RFQs",
+        "description": "Create and track requests for quotation across suppliers."
+      },
+      "compare": {
+        "title": "Compare offers",
+        "description": "Compare normalised landed costs and get evidence-backed recommendations."
+      },
+      "requests": {
+        "title": "Purchase requests",
+        "description": "Create and submit internal purchase requests against branch budgets."
+      },
+      "approvals": {
+        "title": "Approvals",
+        "description": "Review and authorise pending purchase requests."
+      },
+      "orders": {
+        "title": "Orders",
+        "description": "Track purchase orders, supplier confirmations, and delivery receipts."
+      },
+      "savings": {
+        "title": "Savings",
+        "description": "Audit and export verified purchasing savings against baselines."
+      },
+      "analyst": {
+        "title": "Procurement analyst",
+        "description": "Ask grounded questions over your workspace procurement data."
+      },
+      "products": {
+        "title": "Products",
+        "description": "Manage your product catalogue, pack definitions, and base units."
+      },
+      "suppliers": {
+        "title": "Suppliers",
+        "description": "Manage supplier profiles, commercial terms, and scorecards."
+      }
+    }
   },
   "mobileHome": {
     "title": "Home",
@@ -655,7 +685,24 @@
       "viewSuppliers": "Go to Suppliers",
       "emptyFileError": "The uploaded file is empty or contains only headers.",
       "unsupportedFileError": "File format not supported. Please upload a valid CSV file.",
-      "genericError": "Unable to process import. Please try again."
+      "genericError": "Unable to process import. Please try again.",
+      "previewColumns": {
+        "line": "Row",
+        "tenant_name": "Product Name",
+        "canonical_name": "Canonical Name",
+        "brand": "Brand",
+        "variant": "Variant",
+        "gtin": "GTIN / Barcode",
+        "base_unit": "Base Unit",
+        "pack": "Pack",
+        "preferred_supplier_id": "Preferred Supplier",
+        "name": "Supplier Name",
+        "payment_terms": "Payment Terms",
+        "lead_time_days": "Lead Time (Days)",
+        "minimum_order_value": "Minimum Order Value",
+        "delivery_fee": "Delivery Fee",
+        "status": "Status"
+      }
     }
   },
   "quotations": {
@@ -3492,6 +3539,7 @@
   "rfq": {
     "create": {
       "title": "Create RFQ",
+      "editTitle": "Edit RFQ draft",
       "subtitle": "Request quotes from suppliers for your products.",
       "itemsLabel": "Items",
       "productIdLabel": "Product",
@@ -3512,6 +3560,12 @@
       "rfqStatusLabel": "RFQ Status",
       "submittingButton": "Saving...",
       "sendingButton": "Sending...",
+      "draftSaved": "Draft saved",
+      "sentSuccess": "RFQ sent to {{count}} suppliers",
+      "notDraftTitle": "RFQ cannot be edited",
+      "notDraftMessage": "Only draft RFQs can be edited. This RFQ has already been sent.",
+      "backToHistory": "Back to RFQ History",
+      "loadingRfq": "Loading RFQ...",
       "saveError": "Failed to save the RFQ. Please try again.",
       "validationError": "Please check the following RFQ fields:",
       "sendError": "Failed to send the RFQ. Please try again.",
@@ -3547,7 +3601,11 @@
       "loadError": "Failed to load RFQ responses.",
       "guardrailOutcomes": "Guardrail outcomes",
       "guardrail": "Guardrail",
-      "guardrailLabel": "Up to {{amount}} {{currency}}"
+      "guardrailLabel": "Up to {{amount}} {{currency}}",
+      "draftNoticeTitle": "This RFQ hasn't been sent yet",
+      "draftNoticeDescription": "Review or edit your draft, or send it to suppliers to start collecting responses.",
+      "editDraft": "Edit",
+      "sendDraft": "Send"
     },
     "history": {
       "title": "RFQ History",
@@ -3558,6 +3616,15 @@
       "sentAt": "Sent Date",
       "recipients": "Recipients",
       "responses": "Responses",
+      "actions": "Actions",
+      "edit": "Edit",
+      "send": "Send",
+      "confirmSendTitle": "Send RFQ",
+      "confirmSendMessage": "Are you sure you want to send this RFQ to {{count}} suppliers?",
+      "confirmSendButton": "Send RFQ",
+      "cancelSendButton": "Cancel",
+      "sentSuccess": "RFQ sent to {{count}} suppliers",
+      "sendError": "Failed to send the RFQ. Please try again.",
       "noRfqs": "No RFQs found.",
       "loading": "Loading RFQs...",
       "status_sent": "Sent",

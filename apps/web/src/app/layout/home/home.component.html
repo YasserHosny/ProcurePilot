@@ -51,7 +51,7 @@
         <div class="property-list">
           <div class="property-row">
             <span class="prop-label">{{ 'home.labelRegion' | translate }}</span>
-            <span class="prop-value">{{ tenant()?.region }}</span>
+            <span class="prop-value" data-testid="home-region-value">{{ regionLabel() }}</span>
           </div>
           <div class="property-row">
             <span class="prop-label">{{ 'home.labelCurrency' | translate }}</span>
@@ -59,7 +59,7 @@
           </div>
           <div class="property-row">
             <span class="prop-label">{{ 'home.labelTaxModel' | translate }}</span>
-            <span class="prop-value">{{ tenant()?.tax_model }}</span>
+            <span class="prop-value" data-testid="home-tax-model-value">{{ taxModelLabel() }}</span>
           </div>
           <div class="property-row">
             <span class="prop-label">{{ 'home.labelDefaultLocale' | translate }}</span>
@@ -101,45 +101,30 @@
     </mat-card>
   </div>
 
-  <!-- Roadmap / Empty State Card -->
-  <mat-card class="roadmap-card">
+  <!-- What you can do Section -->
+  <mat-card class="modules-section-card">
     <mat-card-header>
-      <mat-card-title>{{ 'home.emptyStateTitle' | translate }}</mat-card-title>
-      <mat-card-subtitle>{{ 'home.emptyStateDescription' | translate }}</mat-card-subtitle>
+      <mat-card-title>{{ 'home.modulesTitle' | translate }}</mat-card-title>
+      <mat-card-subtitle>{{ 'home.modulesDescription' | translate }}</mat-card-subtitle>
     </mat-card-header>
     <mat-card-content>
-      <div class="steps-list">
-        <div class="step-item active">
-          <div class="step-header">
-            <span class="step-title">{{ 'home.step1Title' | translate }}</span>
-          </div>
-          <p class="step-desc">{{ 'home.step1Desc' | translate }}</p>
-          <span class="step-status">{{ 'home.step1Status' | translate }}</span>
-        </div>
-
-        <div class="step-item">
-          <div class="step-header">
-            <span class="step-title">{{ 'home.step2Title' | translate }}</span>
-          </div>
-          <p class="step-desc">{{ 'home.step2Desc' | translate }}</p>
-          <span class="step-status">{{ 'home.step2Status' | translate }}</span>
-        </div>
-
-        <div class="step-item">
-          <div class="step-header">
-            <span class="step-title">{{ 'home.step3Title' | translate }}</span>
-          </div>
-          <p class="step-desc">{{ 'home.step3Desc' | translate }}</p>
-          <span class="step-status">{{ 'home.step3Status' | translate }}</span>
-        </div>
-
-        <div class="step-item">
-          <div class="step-header">
-            <span class="step-title">{{ 'home.step4Title' | translate }}</span>
-          </div>
-          <p class="step-desc">{{ 'home.step4Desc' | translate }}</p>
-          <span class="step-status">{{ 'home.step4Status' | translate }}</span>
-        </div>
+      <div class="modules-grid">
+        @for (mod of modules; track mod.key) {
+          <a
+            class="module-card"
+            [routerLink]="mod.route"
+            *appRole="mod.roles"
+            [attr.data-testid]="'home-module-' + mod.key"
+          >
+            <div class="module-icon">
+              <mat-icon aria-hidden="true">{{ mod.icon }}</mat-icon>
+            </div>
+            <div class="module-body">
+              <span class="module-title">{{ mod.titleKey | translate }}</span>
+              <p class="module-desc">{{ mod.descriptionKey | translate }}</p>
+            </div>
+          </a>
+        }
       </div>
     </mat-card-content>
   </mat-card>
