@@ -5,7 +5,7 @@ Status 2026-10-15: **logo sting + end card rendered and approved** (`renders/`);
 product work being verified on hosted.
 
 Design source for every animated element (logo sting, end cards):
-<https://claude.ai/artifact/CYVrF8484uFkpiJTqcGPdS> — boards 5–9.
+<https://claude.ai/artifact/CYVrF8484uFkpiJTqcGPdS> — boards 5–13 (10–13 are the English versions).
 
 ## Formats
 
@@ -122,6 +122,8 @@ cues and mixes music + cues with ffmpeg (`imageio-ffmpeg`). Both scripts carry a
 paths from the session that made them — edit the paths at the top before reuse.
 
 ## Open
+
+What is left before recording, with owners and status: [`production-tracker.md`](production-tracker.md).
 
 - Record the screencast (needs PP-5 demo tenant + a full live run on hosted).
 - Optional later: the same bars→winner→arrow motion as a Lottie loader in web/Flutter (code task).
