@@ -13,6 +13,7 @@ from postgrest.exceptions import APIError
 from psycopg.rows import dict_row
 from supabase import Client
 
+from procurepilot_api import db
 from procurepilot_api.config import Settings, get_settings
 from procurepilot_api.deps import CurrentMember
 from procurepilot_api.errors import (
@@ -270,10 +271,9 @@ class RequestsService:
             }
         )
         try:
-            with psycopg.connect(
+            with db.connect(
                 self._settings.database_url.get_secret_value(),
                 row_factory=dict_row,
-                prepare_threshold=None,
             ) as conn:
                 conn.execute("set local role authenticated")
                 conn.execute("select set_config('request.jwt.claims', %s, true)", (claims,))
@@ -1240,7 +1240,7 @@ class RequestsService:
 
     def _estimate_products(self, product_ids: list[UUID]) -> list[LineEstimate]:
         db_url = self._settings.database_url.get_secret_value()
-        with psycopg.connect(db_url) as conn:
+        with db.connect(db_url) as conn:
             return [estimate_line_value(conn, workspace_product_id=pid) for pid in product_ids]
 
     def _insert_lines(
@@ -1747,7 +1747,7 @@ class RequestsService:
             "role": "authenticated",
             "member_role": member.role.value,
         }
-        with psycopg.connect(self._settings.database_url.get_secret_value()) as conn:
+        with db.connect(self._settings.database_url.get_secret_value()) as conn:
             with conn.cursor(row_factory=dict_row) as cur:
                 cur.execute("set local role authenticated")
                 cur.execute(
@@ -1831,7 +1831,7 @@ class RequestsService:
                 notification_id = (
                     UUID(str(notification_row["id"])) if notification_row is not None else None
                 )
-            # Exiting the `with psycopg.connect(...)` block here commits all three writes above
+            # Exiting the `with db.connect(...)` block here commits all three writes above
             # atomically (or rolls all of them back if any exception was raised) — psycopg's own
             # connection context manager semantics, the same ones `devices/service.py` relies on.
         return dict(decided_request), dict(decided_step), notification_id

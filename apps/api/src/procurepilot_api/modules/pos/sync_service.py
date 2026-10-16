@@ -30,6 +30,7 @@ from uuid import UUID
 import psycopg
 from psycopg.rows import dict_row
 
+from procurepilot_api import db
 from procurepilot_api.config import Settings, get_settings
 from procurepilot_api.errors import ConflictError, NotFoundError
 from procurepilot_api.modules.pos.connector import (
@@ -88,7 +89,7 @@ def _service_role_db(settings: Settings) -> Generator[psycopg.Connection, None, 
     Used EXCLUSIVELY for reading and updating pos_connection.access_token
     and refresh_token (which have no SELECT/UPDATE grant for authenticated role).
     """
-    with psycopg.connect(settings.database_url.get_secret_value()) as conn:
+    with db.connect(settings.database_url.get_secret_value()) as conn:
         with conn.cursor() as cur:
             cur.execute("set local role service_role")
         yield conn
@@ -179,7 +180,7 @@ class SyncService:
             raise ValueError("Both tenant_id and connection_id are required for sync")
 
         # Concurrency guard: PostgreSQL advisory lock held on dedicated connection
-        lock_conn = psycopg.connect(cfg.database_url.get_secret_value(), autocommit=True)
+        lock_conn = db.connect(cfg.database_url.get_secret_value(), autocommit=True)
         acquired = False
         try:
             with lock_conn.cursor() as cur:
@@ -249,7 +250,7 @@ class SyncService:
         connector: PosConnector | None = None,
     ) -> dict[str, object]:
         # 1. Read the connection row first via tenant-scoped session
-        with psycopg.connect(settings.database_url.get_secret_value()) as conn:
+        with db.connect(settings.database_url.get_secret_value()) as conn:
             _act_as_tenant_sync(conn, tenant_id)
             with conn.cursor(row_factory=dict_row) as cur:
                 cur.execute(
@@ -338,7 +339,7 @@ class SyncService:
                     connection_id,
                     exc,
                 )
-                with psycopg.connect(settings.database_url.get_secret_value()) as worker_conn:
+                with db.connect(settings.database_url.get_secret_value()) as worker_conn:
                     _act_as_tenant_sync(worker_conn, tenant_id)
                     with worker_conn.cursor() as cur:
                         cur.execute(
@@ -393,7 +394,7 @@ class SyncService:
 
         # 6. Upsert into synced_product_signal via tenant-scoped session
         upserted_signals: list[dict[str, Any]] = []
-        with psycopg.connect(settings.database_url.get_secret_value()) as tenant_conn:
+        with db.connect(settings.database_url.get_secret_value()) as tenant_conn:
             _act_as_tenant_sync(tenant_conn, tenant_id)
             with tenant_conn.cursor(row_factory=dict_row) as cur:
                 for item_data in items_map.values():

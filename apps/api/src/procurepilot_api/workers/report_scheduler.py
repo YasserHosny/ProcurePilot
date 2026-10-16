@@ -12,6 +12,7 @@ import psycopg
 from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 
+from procurepilot_api import db
 from procurepilot_api.config import Settings, get_settings
 from procurepilot_api.modules.exports.storage import ExportStorage
 from procurepilot_api.modules.reports.schedules import (
@@ -31,7 +32,7 @@ def tick(settings: Settings) -> dict[str, int]:
     expired artifacts.
     """
     stats = {"claimed": 0, "enqueued": 0, "purged": 0}
-    with psycopg.connect(settings.database_url.get_secret_value()) as conn:
+    with db.connect(settings.database_url.get_secret_value()) as conn:
         claimed = _claim_due_schedules(conn)
         stats["claimed"] = len(claimed)
 
@@ -41,7 +42,7 @@ def tick(settings: Settings) -> dict[str, int]:
                 stats["enqueued"] += 1
         conn.commit()
 
-    with psycopg.connect(settings.database_url.get_secret_value()) as conn:
+    with db.connect(settings.database_url.get_secret_value()) as conn:
         purged = _purge_expired_artifacts(conn, settings)
         stats["purged"] = purged
         conn.commit()

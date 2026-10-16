@@ -27,6 +27,7 @@ from uuid import UUID
 import psycopg
 from psycopg.rows import dict_row
 
+from procurepilot_api import db
 from procurepilot_api.config import Settings, get_settings
 from procurepilot_api.deps import CurrentMember
 from procurepilot_api.errors import ConflictError, NotFoundError, UnprocessableEntityError
@@ -108,7 +109,7 @@ def _service_role_db(settings: Settings) -> Generator[psycopg.Connection, None, 
     Used for reading and updating pos_connection.access_token
     and refresh_token (which have no SELECT/UPDATE grant for authenticated role).
     """
-    with psycopg.connect(settings.database_url.get_secret_value()) as conn:
+    with db.connect(settings.database_url.get_secret_value()) as conn:
         with conn.cursor() as cur:
             cur.execute("set local role service_role")
         yield conn

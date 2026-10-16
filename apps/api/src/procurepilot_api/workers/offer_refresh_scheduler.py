@@ -10,10 +10,10 @@ import argparse
 import logging
 import time
 
-import psycopg
 from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 
+from procurepilot_api import db
 from procurepilot_api.config import Settings, get_settings
 
 logger = logging.getLogger(__name__)
@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 def tick(settings: Settings) -> dict[str, int]:
     stats = {"observed": 0, "due": 0, "enqueued": 0}
-    with psycopg.connect(settings.database_url.get_secret_value()) as conn:
+    with db.connect(settings.database_url.get_secret_value()) as conn:
         with conn.cursor(row_factory=dict_row) as cur:
             cur.execute("set local role service_role")
             cur.execute(

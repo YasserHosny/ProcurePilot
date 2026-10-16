@@ -42,7 +42,7 @@ def _wire_job(
     marked_statuses: list[str] = []
 
     monkeypatch.setattr(push_job, "get_settings", lambda: _Settings())
-    monkeypatch.setattr(push_job.psycopg, "connect", lambda _dsn: conn)
+    monkeypatch.setattr(push_job.db, "connect", lambda _dsn: conn)
     monkeypatch.setattr(
         push_job,
         "_notification_row",
@@ -174,7 +174,7 @@ def test_process_push_notification_logs_send_exceptions_and_continues_to_next_de
     marked_statuses: list[str] = []
 
     monkeypatch.setattr(push_job, "get_settings", lambda: _Settings())
-    monkeypatch.setattr(push_job.psycopg, "connect", lambda _dsn: conn)
+    monkeypatch.setattr(push_job.db, "connect", lambda _dsn: conn)
     monkeypatch.setattr(push_job, "_notification_row", lambda *_args: notification)
     monkeypatch.setattr(
         push_job,

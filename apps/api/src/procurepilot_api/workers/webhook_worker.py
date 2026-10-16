@@ -11,6 +11,7 @@ import httpx
 import psycopg
 from psycopg.rows import dict_row
 
+from procurepilot_api import db
 from procurepilot_api.config import Settings, get_settings
 from procurepilot_api.modules.webhooks.service import (
     build_webhook_body,
@@ -24,9 +25,7 @@ logger = logging.getLogger(__name__)
 
 def tick(settings: Settings, *, http_client: httpx.Client | None = None) -> dict[str, int]:
     stats = {"claimed": 0, "succeeded": 0, "retrying": 0, "failed": 0}
-    with psycopg.connect(
-        settings.database_url.get_secret_value(), prepare_threshold=None
-    ) as conn:
+    with db.connect(settings.database_url.get_secret_value()) as conn:
         claimed = _claim_deliveries(conn, settings.webhook_max_attempts)
         stats["claimed"] = len(claimed)
         conn.commit()
@@ -110,7 +109,7 @@ def _deliver_one(settings: Settings, client: httpx.Client, delivery: dict[str, A
 
 
 def _mark_succeeded(settings: Settings, delivery_id: UUID) -> None:
-    with psycopg.connect(settings.database_url.get_secret_value(), prepare_threshold=None) as conn:
+    with db.connect(settings.database_url.get_secret_value()) as conn:
         conn.execute(
             """
             update webhook_delivery
@@ -125,7 +124,7 @@ def _mark_succeeded(settings: Settings, delivery_id: UUID) -> None:
 
 def _mark_retry(settings: Settings, delivery_id: UUID, attempts: int, error: str) -> None:
     next_attempt = datetime.now(UTC) + timedelta(seconds=retry_delay_seconds(attempts))
-    with psycopg.connect(settings.database_url.get_secret_value(), prepare_threshold=None) as conn:
+    with db.connect(settings.database_url.get_secret_value()) as conn:
         conn.execute(
             """
             update webhook_delivery
@@ -139,7 +138,7 @@ def _mark_retry(settings: Settings, delivery_id: UUID, attempts: int, error: str
 
 
 def _mark_failed(settings: Settings, delivery_id: UUID, error: str) -> None:
-    with psycopg.connect(settings.database_url.get_secret_value(), prepare_threshold=None) as conn:
+    with db.connect(settings.database_url.get_secret_value()) as conn:
         conn.execute(
             """
             update webhook_delivery

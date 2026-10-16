@@ -14,6 +14,7 @@ from uuid import UUID
 import psycopg
 from psycopg.rows import dict_row
 
+from procurepilot_api import db
 from procurepilot_api.config import Settings, get_settings
 from procurepilot_api.modules.auth.jwt import MemberRole
 from procurepilot_api.modules.digests.renderer import render_digest
@@ -36,7 +37,7 @@ def tick(settings: Settings) -> dict[str, int]:
         "email_unconfigured": 0,
         "skipped": 0,
     }
-    with psycopg.connect(settings.database_url.get_secret_value()) as conn:
+    with db.connect(settings.database_url.get_secret_value()) as conn:
         claimed = _claim_due_subscriptions(conn)
         stats["claimed"] = len(claimed)
 
@@ -56,7 +57,7 @@ def process_digest_subscription(
 ) -> str:
     """Entrypoint for queue workers: re-derives tenant and delivers subscription."""
     active_settings = settings or get_settings()
-    with psycopg.connect(active_settings.database_url.get_secret_value()) as conn:
+    with db.connect(active_settings.database_url.get_secret_value()) as conn:
         with conn.cursor(row_factory=dict_row) as cur:
             cur.execute(
                 """
