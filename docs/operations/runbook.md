@@ -83,6 +83,31 @@ curl -I https://<project>.<domain>/index.html
 **Known limit:** a worker hard-killed during its final attempt can leave no email-log row. The
 failed job can still be recovered with this command when its stored raw email path is available.
 
+### 3.7 Refused quotations after an extraction failure
+
+A quotation is `refused` only when the document is unreadable or the extraction process itself
+failed. An unreadable date no longer refuses a quotation; it goes to the review queue as
+`date_unparsed` instead.
+
+1. Fix the underlying cause (provider outage, worker bug, configuration) before retrying.
+2. From an environment with the API's `DATABASE_URL` and `REDIS_URL`, such as the API or worker
+   container, preview and then requeue:
+
+   ```bash
+   python -m procurepilot_api.workers.requeue_extraction --quotation-id <uuid> --dry-run
+   python -m procurepilot_api.workers.requeue_extraction --quotation-id <uuid>
+   ```
+
+   `--quotation-id` can be repeated. For every eligible refused quotation in one tenant, use
+   `--all-refused --tenant-id <uuid>` (with `--dry-run` to preview). A quotation is eligible only
+   when it is `refused`, has a source document, and its latest extraction job is `failed` with
+   error code `extraction_failed`; anything else is skipped. Each requeued quotation moves to
+   `extracting` with a new queued extraction job and records a `quotation_extraction_requeued`
+   audit event. If the Redis enqueue fails, the new job is marked failed
+   (`redis_enqueue_failed`) and the quotation returns to `refused`. The command exits non-zero if
+   any quotation was skipped.
+3. Confirm the quotation reaches the review queue.
+
 ## 4. Scaling Actions
 
 - **Database CPU > 70% sustained:** enable Supabase read replicas or review query plans.

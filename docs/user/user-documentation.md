@@ -294,6 +294,7 @@ A supplier may quote "1 case of 12 x 500ml bottles" while another quotes "1 pack
 **Tips:**
 - Clicking anywhere on a row (not just the ID or action button) opens the review screen.
 - The "Reason for Review" shown here uses the same VAT-aware arithmetic check as the detail page, so the queue and the detail screen never disagree about whether a quotation's totals reconcile.
+- **Date Not Recognised** («تعذّر التعرّف على التاريخ») means extraction found a quote date it couldn't read. The quotation is not refused for this: it comes here with the date left empty so you can enter it on the review screen (section 9).
 
 **Business value:** the review queue protects decision quality at scale. Instead of asking buyers to inspect every field manually, it prioritises the quotations most likely to affect trust, cost, or revenue leakage: low-confidence extraction, arithmetic mismatches, and stale unresolved reviews.
 
@@ -348,6 +349,8 @@ After AI extraction finishes, each quotation lands in the review queue. Open a r
 | 12 | **Audit Trail** | An expandable panel at the bottom logging every action taken on this quotation — upload, extraction, field corrections, status changes, matching setup, automatic match acceptance, and reviewer match decisions — with actor and timestamp. |
 | 13 | **Save Corrections** | Persist manual edits without changing the quotation's status — you can return later. |
 | 14 | **Confirm & Authorize Quotation** | Marks the quotation as reviewed. Matching setup then shows loading, ready, or a retryable error; when ready, **Continue to Product Matching** opens only this quotation's matching group. A confirmation dialog states plainly that authorization **cannot be undone**. |
+
+**Quote dates:** extraction reads the supplier's issue and expiry dates itself. It accepts Arabic-Indic digits and month names in English or Arabic (Egyptian and Levantine names), and reads numeric dates in your workspace region's convention: DD/MM/YYYY for EG, SA, AE, KW, QA, BH, OM, JO, and GB workspaces, MM/DD/YYYY for US workspaces. When the day and month are both 12 or less (for example `03/04/2026`), the date is read in the region's convention and the field is flagged low-confidence so you check it. When a date can't be read at all, the field stays empty, the quotation enters the review queue as **Date Not Recognised**, and the original wording appears under the date picker as "Text in document: …". You must enter a valid date before that blocker clears; a correction that isn't a valid calendar date is rejected.
 
 **Supplier auto-match:** when the extracted vendor name resembles one of your existing suppliers closely enough, a banner appears below the supplier dropdown offering to pre-select it ("Suggested: {name} — {pct}% match", or a more tentative "Possible match" wording for a lower-confidence guess) — you still confirm it explicitly, nothing is ever auto-selected. If no reasonable match is found but a vendor name was extracted, the banner can instead offer to create the supplier directly from that name without leaving the page.
 
