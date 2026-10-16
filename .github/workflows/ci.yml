@@ -18,6 +18,24 @@ env:
   NODE_VERSION: '20'
 
 jobs:
+  api-image-i18n:
+    name: API image includes i18n catalogues
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build API image
+        run: docker build -f infra/docker/api.Dockerfile -t pp-api-ci .
+      - name: Check API image catalogues
+        run: >-
+          docker run --rm --entrypoint python pp-api-ci -c
+          "from procurepilot_api.shared.i18n import t, assert_catalogues_present; assert_catalogues_present(); s=t('rfq.email.subject','ar',tenant='X',date='D'); assert s!='rfq.email.subject' and 'X' in s, s; print('i18n ok:', s)"
+      - name: Build email ingestion worker image
+        run: docker build -f infra/docker/email-ingestion-worker.Dockerfile -t pp-email-worker-ci .
+      - name: Check email ingestion worker image catalogues
+        run: >-
+          docker run --rm --entrypoint python pp-email-worker-ci -c
+          "from procurepilot_api.shared.i18n import t, assert_catalogues_present; assert_catalogues_present(); s=t('rfq.email.subject','ar',tenant='X',date='D'); assert s!='rfq.email.subject' and 'X' in s, s; print('i18n ok:', s)"
+
   secrets:
     name: Secret scan
     runs-on: ubuntu-latest

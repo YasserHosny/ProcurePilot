@@ -115,9 +115,17 @@ async def test_create_rfq_rejects_missing_email_supplier(
         "lines": [{"workspace_product_id": str(product_id), "quantity": "100.5"}],
         "recipient_supplier_ids": [str(supplier_with_email), str(supplier_no_email)],
         "needed_by_date": "2026-12-01",
+        "tenant_terms": "x" * 4001,
     }
 
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        too_long = await client.post("/api/v1/rfq", json=payload, headers=auth_headers)
+        assert too_long.status_code == 422
+        assert any(
+            item.get("loc", [])[-1:] == ["tenant_terms"]
+            for item in too_long.json()["details"]
+        )
+        payload["tenant_terms"] = "x" * 4000
         resp = await client.post("/api/v1/rfq", json=payload, headers=auth_headers)
 
     if resp.status_code != 201:

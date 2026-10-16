@@ -28,6 +28,7 @@ ENV PATH="/workspace/apps/api/.venv/bin:$PATH" \
     PYTHONPATH=/workspace/apps/api/src
 
 COPY --chown=appuser:appgroup packages/py-logging/ /workspace/packages/py-logging/
+COPY --chown=appuser:appgroup packages/i18n/ /workspace/packages/i18n/
 COPY --chown=appuser:appgroup apps/api/ /workspace/apps/api/
 
 USER appuser

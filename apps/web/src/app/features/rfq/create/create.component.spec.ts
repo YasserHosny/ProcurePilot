@@ -42,6 +42,24 @@ describe('RfqCreateComponent', () => {
     expect(component).toBeTruthy();
   });
 
+  it('rejects tenant terms over 4000 characters and accepts exactly 4000', () => {
+    component.form.patchValue({
+      lines: [{ workspace_product_id: 'prod-1', quantity: '10' }],
+      supplierIds: ['sup-1'],
+      neededByDate: '2026-12-01',
+      tenantTerms: 'x'.repeat(4001),
+    });
+
+    fixture.detectChanges();
+    expect(component.form.controls.tenantTerms.invalid).toBeTrue();
+    expect((fixture.nativeElement as HTMLElement).querySelector<HTMLButtonElement>('button[type="submit"]')?.disabled).toBeTrue();
+
+    component.form.controls.tenantTerms.setValue('x'.repeat(4000));
+    fixture.detectChanges();
+    expect(component.form.controls.tenantTerms.valid).toBeTrue();
+    expect(component.form.valid).toBeTrue();
+  });
+
   it('should show rejection reason for suppliers without email', () => {
     rfqApiSpy.createRfq.and.returnValue(of({
       rfq: { id: 'rfq-1', status: 'draft' } as Rfq,

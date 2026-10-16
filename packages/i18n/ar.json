@@ -3502,6 +3502,7 @@
       "neededByDateLabel": "مطلوب بحلول تاريخ",
       "tenantTermsLabel": "الشروط والأحكام",
       "tenantTermsPlaceholder": "أدخل الشروط للموردين (اختياري)",
+      "tenantTermsTooLong": "يجب ألا تتجاوز الشروط 4000 حرف.",
       "saveDraftButton": "حفظ كمسودة",
       "sendButton": "إرسال الطلب",
       "rejectedSuppliersTitle": "الموردين المرفوضين",

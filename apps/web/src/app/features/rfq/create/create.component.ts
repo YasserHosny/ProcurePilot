@@ -52,7 +52,7 @@ export class RfqCreateComponent implements OnInit {
     ], Validators.required),
     supplierIds: [[] as string[], Validators.required],
     neededByDate: ['', Validators.required],
-    tenantTerms: [''],
+    tenantTerms: ['', Validators.maxLength(4000)],
   });
 
   readonly isSaving = signal(false);

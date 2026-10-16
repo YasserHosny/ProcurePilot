@@ -3502,6 +3502,7 @@
       "neededByDateLabel": "Needed By Date",
       "tenantTermsLabel": "Terms and Conditions",
       "tenantTermsPlaceholder": "Enter terms for suppliers (optional)",
+      "tenantTermsTooLong": "Terms must be 4000 characters or fewer.",
       "saveDraftButton": "Save Draft",
       "sendButton": "Send RFQ",
       "rejectedSuppliersTitle": "Rejected Suppliers",

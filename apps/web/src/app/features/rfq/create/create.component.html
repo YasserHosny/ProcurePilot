@@ -63,7 +63,9 @@
       <div class="form-section">
         <mat-form-field appearance="outline" class="full-width">
           <mat-label>{{ 'rfq.create.tenantTermsLabel' | translate }}</mat-label>
-          <textarea matInput formControlName="tenantTerms" rows="4" [placeholder]="'rfq.create.tenantTermsPlaceholder' | translate"></textarea>
+          <textarea matInput formControlName="tenantTerms" rows="4" maxlength="4000" [placeholder]="'rfq.create.tenantTermsPlaceholder' | translate"></textarea>
+          <mat-hint align="end">{{ form.controls.tenantTerms.value?.length ?? 0 }} / 4000</mat-hint>
+          <mat-error *ngIf="form.controls.tenantTerms.hasError('maxlength')">{{ 'rfq.create.tenantTermsTooLong' | translate }}</mat-error>
         </mat-form-field>
       </div>
 
