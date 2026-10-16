@@ -21,6 +21,7 @@ from procurepilot_api.modules.requests.schemas import (
     PurchaseRequestLineInput,
 )
 from procurepilot_api.modules.requests.service import RequestsService
+from procurepilot_api.modules.rfq.email import RfqEmailLine, render_rfq_email
 from procurepilot_api.modules.rfq.guardrail_evaluation import compute_guardrail_evaluation
 from procurepilot_api.modules.rfq.guardrails import explain_guardrail_evaluations
 from procurepilot_api.modules.rfq.schemas import (
@@ -196,11 +197,11 @@ class RfqService:
                     """
                     insert into rfq (
                         id, tenant_id, created_by_membership_id, status, needed_by_date,
-                        idempotency_key
+                        idempotency_key, tenant_terms
                     )
-                    values (%s, %s, %s, 'draft', %s, %s)
+                    values (%s, %s, %s, 'draft', %s, %s, %s)
                     returning id, tenant_id, created_by_membership_id, status,
-                              needed_by_date, idempotency_key, created_at
+                              needed_by_date, idempotency_key, tenant_terms, created_at
                     """,
                     (
                         rfq_id,
@@ -208,6 +209,7 @@ class RfqService:
                         member.membership_id,
                         needed_by_date,
                         idempotency_key,
+                        tenant_terms,
                     ),
                 )
                 rfq_row = cur.fetchone()
@@ -278,15 +280,25 @@ class RfqService:
                 line_rows = cur.fetchall()
                 lines = [RfqLine(**r) for r in line_rows]
 
-                product_names = {}
-                for line in lines:
-                    cur.execute(
-                        "select tenant_name from workspace_product where id = %s",
-                        (line.workspace_product_id,),
-                    )
-                    prod_row = cur.fetchone()
-                    if prod_row:
-                        product_names[line.workspace_product_id] = prod_row["tenant_name"]
+                cur.execute(
+                    "select name, default_locale from tenant where id = %s", (member.tenant_id,)
+                )
+                tenant_row = cur.fetchone()
+                cur.execute(
+                    """select l.workspace_product_id, wp.tenant_name, cp.base_unit,
+                              pd.pack_count, pd.unit_size
+                       from rfq_line l join workspace_product wp on wp.id = l.workspace_product_id
+                       left join canonical_product cp on cp.id = wp.canonical_product_id
+                       left join (
+                         select workspace_product_id, min(pack_count) as pack_count,
+                                min(unit_size) as unit_size
+                         from pack_definition group by workspace_product_id
+                         having count(*) = 1
+                       ) pd on pd.workspace_product_id = wp.id
+                       where l.rfq_id = %s""",
+                    (rfq_id,),
+                )
+                product_by_id = {r["workspace_product_id"]: r for r in cur.fetchall()}
 
                 cur.execute(
                     "select * from rfq_recipient where rfq_id = %s and status = 'draft'", (rfq_id,)
@@ -317,18 +329,32 @@ class RfqService:
                         continue
 
                     contact_email = supp_row["contact_email"]
-                    subject, body, msg_id = build_rfq_message(
-                        rfq=rfq,
-                        lines=lines,
-                        product_names=product_names,
-                        recipient=recipient,
+                    rendered = render_rfq_email(
+                        tenant_name=tenant_row["name"],
+                        locale=tenant_row["default_locale"],
+                        needed_by=rfq.needed_by_date,
+                        lines=[
+                            RfqEmailLine(
+                                product_name=product_by_id[line.workspace_product_id][
+                                    "tenant_name"
+                                ],
+                                quantity=line.quantity,
+                                unit_code=product_by_id[line.workspace_product_id]["base_unit"],
+                                pack_count=product_by_id[line.workspace_product_id]["pack_count"],
+                                unit_size=product_by_id[line.workspace_product_id]["unit_size"],
+                            )
+                            for line in lines
+                        ],
+                        tenant_terms=rfq.tenant_terms,
                         reply_to=reply_to,
                     )
 
                     send_kwargs = {
                         "to": contact_email,
-                        "subject": subject,
-                        "body": body,
+                        "subject": rendered.subject,
+                        "body": rendered.text,
+                        "html": rendered.html,
+                        "from_name": rendered.from_name,
                     }
                     if reply_to:
                         send_kwargs["headers"] = {"Reply-To": reply_to}
@@ -429,9 +455,9 @@ class RfqService:
                     )
                     fired_by_response: dict[uuid.UUID, set[uuid.UUID]] = {}
                     for event in cur.fetchall():
-                        fired_by_response.setdefault(
-                            event["rfq_response_id"], set()
-                        ).add(event["guardrail_id"])
+                        fired_by_response.setdefault(event["rfq_response_id"], set()).add(
+                            event["guardrail_id"]
+                        )
                     for response_id in response_ids:
                         explanations = explain_guardrail_evaluations(
                             guardrails=snapshot.guardrails,
@@ -441,9 +467,7 @@ class RfqService:
                             recent_average_price_by_product=snapshot.recent_average_price_by_product,
                             response_id=response_id,
                             responses_pending=snapshot.responses_pending,
-                            fired_guardrail_ids=fired_by_response.get(
-                                response_id, set()
-                            ),
+                            fired_guardrail_ids=fired_by_response.get(response_id, set()),
                         )
                         evaluation_by_response[response_id] = [
                             RfqGuardrailEvaluation(
