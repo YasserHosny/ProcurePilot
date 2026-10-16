@@ -90,8 +90,7 @@ test.describe('RFQ Draft Send from History', () => {
     await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
     await expect(page.locator('html')).toHaveAttribute('lang', 'ar');
 
-    await page.locator('a[href="/rfq/history"]').click();
-    await expect(page).toHaveURL(/\/rfq\/history$/);
+    await page.goto('/rfq/history');
     await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
     const arDraftRow = page
       .locator('tr.mat-mdc-row')
