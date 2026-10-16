@@ -154,6 +154,11 @@ JOD is also 3-decimal.
 ## 5. Recommended implementation plan (ready to hand to a coding lane)
 
 **PR 1: reference data (small, ship first)**
+> **Superseded by the owner decisions in §7:** PR 1 adds only **SA / SAR / EUR** (plus `sa_vat_standard`,
+> tax rates, region filter and the `uk_vat` clean-up). KW / QA / BH / OM / JO and every 3-decimal currency
+> (KWD, BHD, OMR, JOD) are added **only after PR 3** has made minor units correct end to end. The list below
+> is the full eventual set, not PR 1's scope.
+
 1. New forward-only migration, `supabase/migrations/20261015000001_mena_reference_data.sql`:
    - insert regions SA, KW, QA, BH, OM, JO;
    - insert currencies SAR(2), KWD(3), QAR(2), BHD(3), OMR(3), JOD(3), EUR(2);

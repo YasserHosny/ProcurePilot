@@ -1,10 +1,12 @@
 # Demo tenants — plan and dataset (PP-5 / G-1)
 
-Status 2026-10-15: **restaurant tenant set up on hosted** — workspace «مطاعم سند» (EGP, Egypt VAT),
+Status 2026-10-16: **restaurant tenant set up on hosted** — workspace «مطاعم سند» (EGP, Egypt VAT),
 3 branches, 6 cost centres (kitchen + packaging/cleaning per branch), 3 monthly branch budgets
 (450k / 380k / 320k EGP), 5 suppliers (EGP terms, plus-address emails), 30 products with preferred
-suppliers, and a Buyer account (`pp-buyer`, active 2026-10-16). Quote-reply supplier fix merged (#84). Next: the RFQ
-cycles — **blocked on the pooler fix below** (in progress).
+suppliers, owner (`pp-owner`) and Buyer (`pp-buyer`) accounts, inbound email address. Round 1 RFQ sent;
+both supplier quotes ingested and matched to the right suppliers. **Current blocker: finding 14**
+(DD/MM quote dates refuse the quotations at extraction) — fix in progress; then re-extract the two
+round-1 quotations and continue compare → approve → PO.
 
 ### Findings from the build (real product bugs)
 
@@ -174,7 +176,9 @@ be merged and deployed before the first supplier quote is sent. **Done 2026-10-1
 to an RFQ sent to `+pp-nour` goes out from `+pp-nour` automatically. Owner address stays the default.
 Leave the suppliers' `email_domains` empty (all are `gmail.com`).
 
-## Still needed
+## Remaining steps
 
-- **User creates the workspace** with the minted invitation (`pp-owner`), currency EGP, and signs in in
-  Claude's browser pane — Claude does not create accounts or type passwords on hosted.
+The workspace and both accounts already exist — do **not** create another tenant. Remaining work,
+with owners and status, is tracked in [`../video/production-tracker.md`](../video/production-tracker.md):
+finish finding 14 and re-extract round 1; run compare → basket split → guardrail → phone approval → PO →
+savings report live; switch the tenant to Arabic and walk the flow RTL; rounds 2 and 3; then the recorded round.
