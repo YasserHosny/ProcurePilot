@@ -130,6 +130,8 @@ describe('OutcomeCaptureComponent (T021)', () => {
       currency: 'GBP',
       total_paid_amount: '75.0000',
       delivery_result: 'delivered',
+      ordered_at: new Date(2026, 9, 20),
+      delivered_at: new Date(2026, 9, 21),
       notes: 'Test PO #999',
     });
 
@@ -178,8 +180,8 @@ describe('OutcomeCaptureComponent (T021)', () => {
       unit_price: { amount: '1.5000', currency: 'GBP' },
       total_paid: { amount: '75.0000', currency: 'GBP' },
       delivery_result: 'delivered',
-      ordered_at: null,
-      delivered_at: null,
+      ordered_at: '2026-10-20',
+      delivered_at: '2026-10-21',
       notes: 'Test PO #999',
     });
   });

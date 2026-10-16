@@ -132,6 +132,10 @@ describe('ReorderQueueComponent (R4.0)', () => {
   });
 
   it('loads proposals and keeps the G3-unmet release posture visible in the data', () => {
+    const expected = new Date();
+    expected.setDate(expected.getDate() + 14);
+    const expectedDate = `${expected.getFullYear()}-${String(expected.getMonth() + 1).padStart(2, '0')}-${String(expected.getDate()).padStart(2, '0')}`;
+    expect(component.requiredByDate()).toBe(expectedDate);
     fixture.detectChanges();
 
     expect(forecastingApi.listProposals).toHaveBeenCalledWith({ limit: 100 });

@@ -5,6 +5,8 @@ import { ApiService } from '../../../core/api/api.service';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { of } from 'rxjs';
+import { throwError } from 'rxjs';
+import { HttpErrorResponse } from '@angular/common/http';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { TranslateModule } from '@ngx-translate/core';
 import { Product, Supplier } from '../../../core/api/models';
@@ -53,7 +55,7 @@ describe('RfqCreateComponent', () => {
     component.form.patchValue({
       lines: [{ workspace_product_id: 'prod-1', quantity: '10' }],
       supplierIds: ['sup-1'],
-      neededByDate: '2026-12-01'
+      neededByDate: new Date(2026, 11, 1)
     });
 
     component.onSave();
@@ -72,5 +74,19 @@ describe('RfqCreateComponent', () => {
     
     component.onSend();
     expect(rfqApiSpy.sendRfq).toHaveBeenCalledWith('rfq-1');
+  });
+
+  it('sends the picked local calendar date and shows API errors', () => {
+    rfqApiSpy.createRfq.and.returnValue(throwError(() => new HttpErrorResponse({
+      status: 422, error: { code: 'invalid_date', message: 'Invalid needed-by date' }
+    })));
+    component.form.patchValue({
+      lines: [{ workspace_product_id: 'prod-1', quantity: '10' }],
+      supplierIds: ['sup-1'], neededByDate: new Date(2026, 9, 20),
+    });
+    component.onSave();
+    expect(rfqApiSpy.createRfq).toHaveBeenCalledWith(jasmine.objectContaining({ needed_by_date: '2026-10-20' }));
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('[role="alert"]')?.textContent).toContain('Invalid needed-by date');
   });
 });

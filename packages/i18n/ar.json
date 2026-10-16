@@ -3502,7 +3502,9 @@
       "rejectedSuppliersTitle": "الموردين المرفوضين",
       "rfqStatusLabel": "حالة الطلب",
       "submittingButton": "جاري الحفظ...",
-      "sendingButton": "جاري الإرسال..."
+      "sendingButton": "جاري الإرسال...",
+      "saveError": "تعذر حفظ طلب عرض الأسعار. يُرجى المحاولة مرة أخرى.",
+      "sendError": "تعذر إرسال طلب عرض الأسعار. يُرجى المحاولة مرة أخرى."
     },
     "compare": {
       "title": "ردود طلب عروض الأسعار",

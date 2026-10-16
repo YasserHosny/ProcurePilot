@@ -3502,7 +3502,9 @@
       "rejectedSuppliersTitle": "Rejected Suppliers",
       "rfqStatusLabel": "RFQ Status",
       "submittingButton": "Saving...",
-      "sendingButton": "Sending..."
+      "sendingButton": "Sending...",
+      "saveError": "Failed to save the RFQ. Please try again.",
+      "sendError": "Failed to send the RFQ. Please try again."
     },
     "compare": {
       "title": "RFQ Responses",

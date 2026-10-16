@@ -1,4 +1,5 @@
 import { DecimalPipe } from '@angular/common';
+import { toIsoDate } from '../../../core/format/iso-date';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormArray, FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
@@ -253,11 +254,7 @@ export class OrderCreateComponent implements OnInit {
     const value = this.form.getRawValue();
     const currency = value.currency;
 
-    const formatDate = (date: Date | null) => {
-      if (!date) return null;
-      const d = new Date(date);
-      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-    };
+    const formatDate = (date: Date | null) => date ? toIsoDate(date) : null;
 
     let linesTotalAmount = 0;
     const mappedLines = value.lines.map((line, i) => {

@@ -22,6 +22,7 @@ import { FormatMoneyPipe } from '../../../core/format/money.pipe';
 import { FormatDatePipe } from '../../../core/format/date.pipe';
 import type { ApiError, Branch } from '../../../core/api/models';
 import { SessionService } from '../../../core/auth/session.service';
+import { toIsoDate } from '../../../core/format/iso-date';
 
 @Component({
   selector: 'app-rfq-compare',
@@ -173,7 +174,7 @@ export class CompareComponent implements OnInit {
     const payload = {
       rfq_response_id: response.id,
       branch_id: this.selectedBranchId(),
-      required_by_date: this.requiredByDate().toISOString().split('T')[0],
+      required_by_date: toIsoDate(this.requiredByDate()),
     };
 
     this.rfqApi.prepareRequest(this.rfqId(), payload).subscribe({

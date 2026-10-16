@@ -1,6 +1,7 @@
 import { NgClass } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
+import { toIsoDate } from '../../../core/format/iso-date';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -144,8 +145,8 @@ export class ExportSavingsComponent implements OnInit {
       kind: 'savings_ledger',
       format: fv.format as ExportFormat,
       filters: {
-        period_start: startDate.toISOString().split('T')[0],
-        period_end: endDate.toISOString().split('T')[0],
+        period_start: toIsoDate(startDate),
+        period_end: toIsoDate(endDate),
         supplier_id: fv.supplier_id ? fv.supplier_id : null,
         ...(fv.branch_id ? { branch_id: fv.branch_id } : {}),
       },

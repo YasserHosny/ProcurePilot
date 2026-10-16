@@ -131,8 +131,8 @@ describe('ExportSavingsComponent (T040)', () => {
 
     component.form.patchValue({
       format: 'xlsx',
-      period_start: new Date('2026-01-01'),
-      period_end: new Date('2026-08-21'),
+      period_start: new Date(2026, 0, 1),
+      period_end: new Date(2026, 7, 21),
     });
 
     component.submitExport();
