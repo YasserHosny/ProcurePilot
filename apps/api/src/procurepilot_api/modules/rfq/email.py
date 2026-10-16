@@ -61,7 +61,7 @@ def render_rfq_email(
     terms_title = t("rfq.email.termsHeading", lang)
     reply_text = t("rfq.email.replyInstructions", lang)
     item_title = t("rfq.email.itemsHeading", lang)
-    courtesy = t("rfq.email.englishSummary", lang) if lang == "ar" else ""
+    courtesy = t("rfq.email.englishSummary", "en", tenant=tenant_name) if lang == "ar" else ""
     quantity_lines: list[str] = []
     item_html: list[str] = []
     for item in lines:

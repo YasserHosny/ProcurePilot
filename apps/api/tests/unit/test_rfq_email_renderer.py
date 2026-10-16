@@ -31,6 +31,32 @@ def test_arabic_email_localises_dates_units_and_rtl() -> None:
     assert 'lang="ar" dir="rtl"' in mail.html and "This is a request" in mail.text
 
 
+def test_arabic_courtesy_line_interpolates_tenant_and_all_fields_have_no_placeholders() -> None:
+    mail = render_rfq_email(
+        tenant_name="مطاعم سند",
+        locale="ar",
+        needed_by=date(2026, 10, 20),
+        lines=[_line()],
+        tenant_terms=None,
+        reply_to=None,
+    )
+    expected = "This is a request for quotation from مطاعم سند."
+    assert expected in mail.text
+    assert expected in mail.html
+
+    for locale in ("ar", "en"):
+        rendered = render_rfq_email(
+            tenant_name="مطاعم سند" if locale == "ar" else "Acme",
+            locale=locale,
+            needed_by=date(2026, 10, 20),
+            lines=[_line()],
+            tenant_terms=None,
+            reply_to=None,
+        )
+        for field in (rendered.subject, rendered.text, rendered.html, rendered.from_name):
+            assert "{{" not in field
+
+
 def test_english_email_and_terms_escaping() -> None:
     mail = render_rfq_email(
         tenant_name="Acme",

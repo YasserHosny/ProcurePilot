@@ -3616,7 +3616,7 @@
       "neededBy": "مطلوب قبل",
       "termsHeading": "شروط المشتري",
       "replyInstructions": "يرجى الرد مباشرة على هذا البريد أو إرسال عرض السعر إلى:",
-      "englishSummary": "This is a request for quotation from {{tenant}}.",
+      "englishSummary": "هذا طلب عرض سعر من {{tenant}}.",
       "packHint": "(عبوة {{count}} × {{size}} {{unit}})",
       "units": {
         "litre": "لتر",
