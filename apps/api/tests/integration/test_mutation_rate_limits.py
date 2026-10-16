@@ -3,7 +3,6 @@ from __future__ import annotations
 from urllib.parse import parse_qs, urlparse
 from uuid import UUID, uuid4
 
-import psycopg
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -15,6 +14,7 @@ from integration.smart_compare_helpers import (
     settings_for_test_db,
 )
 from integration.value_proof_helpers import fetch_export_jobs
+from procurepilot_api.db import connect as db_connect
 from procurepilot_api.deps import bearer_token, current_member
 from procurepilot_api.main import create_app
 from procurepilot_api.modules.auth.jwt import MemberRole
@@ -35,7 +35,7 @@ def _app(monkeypatch: pytest.MonkeyPatch, member: object) -> FastAPI:
 
 
 def _schedule_count(tenant_id: object) -> int:
-    with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+    with db_connect(TEST_DATABASE_URL or "") as conn:
         with conn.cursor() as cur:
             cur.execute(
                 "select count(*) from report_schedule where tenant_id = %s", (tenant_id,)
@@ -44,7 +44,7 @@ def _schedule_count(tenant_id: object) -> int:
 
 
 def _subscription_count(tenant_id: object) -> int:
-    with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+    with db_connect(TEST_DATABASE_URL or "") as conn:
         with conn.cursor() as cur:
             cur.execute(
                 "select count(*) from digest_subscription where tenant_id = %s", (tenant_id,)
@@ -139,7 +139,7 @@ def test_digest_subscription_rate_limit_refuses_without_creating(
         member = member_from_workspace(context.workspace)
 
         branch_a, branch_b, branch_c = uuid4(), uuid4(), uuid4()
-        with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+        with db_connect(TEST_DATABASE_URL or "") as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     """
@@ -193,7 +193,7 @@ def test_accounting_sync_rate_limit_refuses_without_syncing(
     with committed_smart_context("rl-accounting-sync") as context:
         settings_for_test_db(monkeypatch)
         member = member_from_workspace(context.workspace, role=MemberRole.owner)
-        with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+        with db_connect(TEST_DATABASE_URL or "") as conn:
             with conn.cursor() as cur:
                 cur.execute("set local role service_role")
                 cur.execute(
@@ -234,7 +234,7 @@ def test_accounting_discrepancy_resolve_rate_limit_refuses_without_resolving(
         settings_for_test_db(monkeypatch)
         member = member_from_workspace(context.workspace, role=MemberRole.owner)
         discrepancy_ids = [uuid4(), uuid4(), uuid4()]
-        with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+        with db_connect(TEST_DATABASE_URL or "") as conn:
             with conn.cursor() as cur:
                 cur.execute("set local role service_role")
                 connection_id = uuid4()
@@ -394,7 +394,7 @@ def test_pos_match_rate_limit_refuses_without_matching(
         connection_id = UUID(str(conn_data["id"]))
 
         pairs: list[tuple[UUID, UUID]] = []
-        with psycopg.connect(TEST_DATABASE_URL or "") as db_conn:
+        with db_connect(TEST_DATABASE_URL or "") as db_conn:
             with db_conn.cursor() as cur:
                 for i in range(3):
                     wp_id = make_workspace_product(
@@ -441,7 +441,7 @@ def test_pos_match_rate_limit_refuses_without_matching(
         )
         _assert_structured_429(third)
 
-        with psycopg.connect(TEST_DATABASE_URL or "") as db_conn:
+        with db_connect(TEST_DATABASE_URL or "") as db_conn:
             with db_conn.cursor() as cur:
                 cur.execute("set local role service_role")
                 cur.execute(

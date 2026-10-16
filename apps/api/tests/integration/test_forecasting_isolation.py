@@ -15,6 +15,7 @@ from integration.catalogue_helpers import (
     make_workspace,
     make_workspace_product,
 )
+from procurepilot_api.db import connect as db_connect
 
 pytestmark = pytest.mark.skipif(
     not TEST_DATABASE_URL,
@@ -97,7 +98,7 @@ def two_workspaces(
     tmp_path: object,
 ) -> tuple[psycopg.Connection, Workspace, UUID, UUID, Workspace, UUID, UUID]:
     """Two isolated tenants each with one forecast + proposal."""
-    with psycopg.connect(TEST_DATABASE_URL, autocommit=False) as conn:
+    with db_connect(TEST_DATABASE_URL, autocommit=False) as conn:
         with conn.cursor() as cur:
             ws_a = make_workspace(cur, "IsoForecastA")
             ws_b = make_workspace(cur, "IsoForecastB")

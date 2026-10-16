@@ -13,6 +13,7 @@ from integration.smart_compare_helpers import (
     settings_for_test_db,
 )
 from integration.test_idempotent_replay import _PsycopgReplayClient
+from procurepilot_api.db import connect as db_connect
 from procurepilot_api.modules.catalogue.models import PackInput, ProductCreate, SupplierCreate
 from procurepilot_api.modules.catalogue.service import CatalogueService
 from procurepilot_api.modules.devices.schemas import DeviceRegistrationCreate
@@ -69,7 +70,7 @@ def test_product_create_replay_returns_original_product(monkeypatch: pytest.Monk
     from procurepilot_api.modules.catalogue import service as module
 
     with committed_smart_context("replay-product") as context:
-        with psycopg.connect(TEST_DATABASE_URL) as conn:
+        with db_connect(TEST_DATABASE_URL) as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     "insert into billing_account (id,tenant_id,plan_code,provider_customer_id) "
@@ -113,7 +114,7 @@ def test_supplier_create_replay_returns_original_supplier(monkeypatch: pytest.Mo
     from procurepilot_api.modules.catalogue import service as module
 
     with committed_smart_context("replay-supplier") as context:
-        with psycopg.connect(TEST_DATABASE_URL) as conn:
+        with db_connect(TEST_DATABASE_URL) as conn:
             _patch_supabase(monkeypatch, conn, module)
             service = CatalogueService(settings_for_test_db(monkeypatch))
             key = uuid4()
@@ -151,7 +152,7 @@ def test_device_registration_replay_returns_original_device(
         )
         assert created is True and replayed is False
         assert second.id == first.id
-        with psycopg.connect(TEST_DATABASE_URL) as conn:
+        with db_connect(TEST_DATABASE_URL) as conn:
             assert _count(conn, "device_registration", context.workspace.tenant_id) == 1
 
 
@@ -173,7 +174,7 @@ def test_digest_subscription_replay_returns_original_subscription(
         )
         assert created is True and replayed is False
         assert second.id == first.id
-        with psycopg.connect(TEST_DATABASE_URL) as conn:
+        with db_connect(TEST_DATABASE_URL) as conn:
             assert _count(conn, "digest_subscription", context.workspace.tenant_id) == 1
 
 
@@ -229,7 +230,7 @@ def test_product_fresh_key_colliding_on_canonical_product_is_a_conflict_not_look
     from procurepilot_api.modules.catalogue import service as module
 
     with committed_smart_context("replay-product-collide") as context:
-        with psycopg.connect(TEST_DATABASE_URL) as conn:
+        with db_connect(TEST_DATABASE_URL) as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     "insert into billing_account (id,tenant_id,plan_code,provider_customer_id) "
@@ -281,7 +282,7 @@ def test_cost_centre_fresh_key_colliding_on_code_is_a_conflict_not_lookup_failed
     from procurepilot_api.modules.organisation import service as module
 
     with committed_smart_context("replay-cost-centre-collide") as context:
-        with psycopg.connect(TEST_DATABASE_URL) as conn:
+        with db_connect(TEST_DATABASE_URL) as conn:
             _patch_supabase(monkeypatch, conn, module)
             service = OrganisationService(settings_for_test_db(monkeypatch))
             service.create_cost_centre(
@@ -322,7 +323,7 @@ def test_export_create_replay_returns_original_job(monkeypatch: pytest.MonkeyPat
         )
         assert created is True and replayed is False
         assert second.id == first.id
-        with psycopg.connect(TEST_DATABASE_URL) as conn:
+        with db_connect(TEST_DATABASE_URL) as conn:
             assert _count(conn, "export_job", context.workspace.tenant_id) == 1
 
 
@@ -344,7 +345,7 @@ def test_refresh_schedule_replay_returns_original_schedule(monkeypatch: pytest.M
         )
         assert created is True and replayed is False
         assert second.id == first.id
-        with psycopg.connect(TEST_DATABASE_URL) as conn:
+        with db_connect(TEST_DATABASE_URL) as conn:
             assert _count(conn, "offer_refresh_schedule", context.workspace.tenant_id) == 1
 
 
@@ -372,7 +373,7 @@ def test_supplier_commercial_term_replay_returns_original_term(
         )
         assert created is True and replayed is False
         assert second.id == first.id
-        with psycopg.connect(TEST_DATABASE_URL) as conn:
+        with db_connect(TEST_DATABASE_URL) as conn:
             assert _count(conn, "supplier_commercial_term", context.workspace.tenant_id) == 1
 
 
@@ -380,7 +381,7 @@ def test_branch_create_replay_returns_original_branch(monkeypatch: pytest.Monkey
     from procurepilot_api.modules.organisation import service as module
 
     with committed_smart_context("replay-branch") as context:
-        with psycopg.connect(TEST_DATABASE_URL) as conn:
+        with db_connect(TEST_DATABASE_URL) as conn:
             _patch_supabase(monkeypatch, conn, module)
             service = OrganisationService(settings_for_test_db(monkeypatch))
             payload = BranchCreate(name="Replay branch", region="GB")
@@ -408,7 +409,7 @@ def test_cost_centre_create_replay_returns_original_cost_centre(
     from procurepilot_api.modules.organisation import service as module
 
     with committed_smart_context("replay-cost-centre") as context:
-        with psycopg.connect(TEST_DATABASE_URL) as conn:
+        with db_connect(TEST_DATABASE_URL) as conn:
             _patch_supabase(monkeypatch, conn, module)
             service = OrganisationService(settings_for_test_db(monkeypatch))
             payload = CostCentreCreate(name="Replay kitchen", code="REPLAY-1")
@@ -434,7 +435,7 @@ def test_budget_create_replay_returns_original_budget(monkeypatch: pytest.Monkey
     from procurepilot_api.modules.organisation import service as module
 
     with committed_smart_context("replay-budget") as context:
-        with psycopg.connect(TEST_DATABASE_URL) as conn:
+        with db_connect(TEST_DATABASE_URL) as conn:
             _patch_supabase(monkeypatch, conn, module)
             service = OrganisationService(settings_for_test_db(monkeypatch))
             payload = BudgetCreate(
@@ -468,7 +469,7 @@ def test_quotation_create_replay_returns_original_quotation(
     from procurepilot_api.modules.quotations import service as module
 
     with committed_smart_context("replay-quotation") as context:
-        with psycopg.connect(TEST_DATABASE_URL) as conn:
+        with db_connect(TEST_DATABASE_URL) as conn:
             with conn.cursor() as cur:
                 act_as(cur, context.workspace)
                 document_id = make_document(cur, context.workspace)

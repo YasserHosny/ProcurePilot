@@ -14,6 +14,7 @@ from integration.smart_compare_helpers import (
     committed_smart_context,
     settings_for_test_db,
 )
+from procurepilot_api.db import connect as db_connect
 from procurepilot_api.errors import ConflictError, UnprocessableEntityError
 from procurepilot_api.modules.offers import basket_service
 from procurepilot_api.modules.offers.basket_service import BasketService
@@ -227,7 +228,7 @@ def _insert_supplier_term(
                 "unit_price": {"amount": "9.5000", "currency": mov_currency},
             }
         )
-    with psycopg.connect(TEST_DATABASE_URL) as conn:
+    with db_connect(TEST_DATABASE_URL) as conn:
         with conn.cursor() as cur:
             act_as(cur, context.workspace)
             cur.execute(
@@ -262,7 +263,7 @@ def _insert_supplier_term(
 def _basket_jobs(tenant_id: UUID) -> list[dict[str, object]]:
     if not TEST_DATABASE_URL:
         raise RuntimeError("TEST_DATABASE_URL is required")
-    with psycopg.connect(TEST_DATABASE_URL) as conn:
+    with db_connect(TEST_DATABASE_URL) as conn:
         with conn.cursor(row_factory=dict_row) as cur:
             cur.execute(
                 """
@@ -279,7 +280,7 @@ def _basket_jobs(tenant_id: UUID) -> list[dict[str, object]]:
 def _purchase_request_count(tenant_id: UUID) -> int:
     if not TEST_DATABASE_URL:
         raise RuntimeError("TEST_DATABASE_URL is required")
-    with psycopg.connect(TEST_DATABASE_URL) as conn:
+    with db_connect(TEST_DATABASE_URL) as conn:
         with conn.cursor() as cur:
             cur.execute(
                 "select count(*) from purchase_request where tenant_id = %s",

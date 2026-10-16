@@ -7,6 +7,8 @@ from uuid import UUID, uuid4
 
 import pytest
 
+from procurepilot_api.db import connect as db_connect
+
 psycopg = pytest.importorskip("psycopg")
 sql = psycopg.sql
 
@@ -29,7 +31,7 @@ class Workspace:
 
 
 def connection() -> Iterator[psycopg.Connection]:
-    with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+    with db_connect(TEST_DATABASE_URL or "") as conn:
         yield conn
         conn.rollback()
 

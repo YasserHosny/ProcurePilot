@@ -30,6 +30,7 @@ from integration.catalogue_helpers import (
     connection,
     make_workspace,
 )
+from procurepilot_api.db import connect as db_connect
 from procurepilot_api.deps import CurrentMember
 from procurepilot_api.errors import ConflictError
 from procurepilot_api.modules.auth.jwt import MemberRole
@@ -196,7 +197,7 @@ def test_a_concurrent_withdrawal_leaves_the_step_pending(conn: psycopg.Connectio
 
     # Simulate the concurrent withdrawal directly — a separate connection/transaction, already
     # committed by the time the decision below runs.
-    with psycopg.connect(TEST_DATABASE_URL or "") as other_conn:
+    with db_connect(TEST_DATABASE_URL or "") as other_conn:
         with other_conn.cursor() as other_cur:
             other_cur.execute(
                 "update purchase_request set status = 'withdrawn' where id = %s",
@@ -250,7 +251,7 @@ def test_a_step_reassigned_after_the_precheck_refuses_the_stale_approver(
 
     # Simulate the step being reassigned (escalated to a different approver) after the caller's
     # own pre-check already read the OLD assignment — a separate, already-committed connection.
-    with psycopg.connect(TEST_DATABASE_URL or "") as other_conn:
+    with db_connect(TEST_DATABASE_URL or "") as other_conn:
         with other_conn.cursor() as other_cur:
             other_cur.execute(
                 "update approval_step set assigned_membership_id = %s where id = %s",

@@ -6,10 +6,10 @@ from decimal import Decimal
 from types import SimpleNamespace
 from uuid import uuid4
 
-import psycopg
 import pytest
 
 from procurepilot_api.config import get_settings
+from procurepilot_api.db import connect as db_connect
 from procurepilot_api.deps import CurrentMember
 from procurepilot_api.modules.auth.jwt import MemberRole
 from procurepilot_api.modules.rfq import service as rfq_service_module
@@ -35,7 +35,7 @@ def test_send_localized_rfq_with_persisted_terms(
     FakeMailer.clear()
 
     try:
-        with psycopg.connect(db_url) as conn, conn.cursor() as cur:
+        with db_connect(db_url) as conn, conn.cursor() as cur:
             cur.execute("insert into auth.users (id,email) values (%s,%s)", (user_id, email))
             cur.execute(
                 "insert into platform_invitation (id,email,token_hash,expires_at) "
@@ -92,7 +92,7 @@ def test_send_localized_rfq_with_persisted_terms(
         monkeypatch.setattr(rfq_service_module, "get_mailer", FakeMailer)
         _, sent_recipients = service.send(member=member, rfq_id=rfq.id, idempotency_key=uuid4())
 
-        with psycopg.connect(db_url) as conn, conn.cursor() as cur:
+        with db_connect(db_url) as conn, conn.cursor() as cur:
             cur.execute("select tenant_terms from rfq where id=%s", (rfq.id,))
             assert cur.fetchone()[0] == terms
         assert len(FakeMailer.sent_messages) == 1
@@ -106,7 +106,7 @@ def test_send_localized_rfq_with_persisted_terms(
             assert 'dir="rtl"' in msg.html
         assert sent_recipients[0].outbound_message_id == msg.message_id
     finally:
-        with psycopg.connect(db_url) as conn, conn.cursor() as cur:
+        with db_connect(db_url) as conn, conn.cursor() as cur:
             cur.execute("set session_replication_role = replica")
             cur.execute("delete from tenant where id=%s", (tenant_id,))
             cur.execute("delete from auth.users where id=%s", (user_id,))

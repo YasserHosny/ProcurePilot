@@ -5,6 +5,7 @@ import pytest
 
 from integration.catalogue_helpers import TEST_DATABASE_URL
 from integration.smart_compare_helpers import committed_smart_context, settings_for_test_db
+from procurepilot_api.db import connect as db_connect
 from procurepilot_api.errors import UnprocessableEntityError
 from procurepilot_api.modules.ingestion import catalogue_import_service
 from procurepilot_api.modules.matching.service import MatchingService
@@ -100,7 +101,7 @@ def test_import_creates_a_reviewed_quotation_with_one_line_per_row(
         assert len(_fake_matching) == 1
         assert _fake_matching[0]["bearer_token"] == token
 
-        with psycopg.connect(TEST_DATABASE_URL or "", row_factory=psycopg.rows.dict_row) as conn:
+        with db_connect(TEST_DATABASE_URL or "", row_factory=psycopg.rows.dict_row) as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     "select id, status, source, supplier_id, reviewed_by, reviewed_at "
@@ -216,7 +217,7 @@ def test_unmappable_required_column_raises_and_records_a_failed_import(
                 bearer_token="test-bearer-token",
             )
 
-        with psycopg.connect(TEST_DATABASE_URL or "", row_factory=psycopg.rows.dict_row) as conn:
+        with db_connect(TEST_DATABASE_URL or "", row_factory=psycopg.rows.dict_row) as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     "select status from catalogue_imports where tenant_id = %s",
@@ -306,7 +307,7 @@ def test_importing_the_same_file_twice_creates_two_independent_quotations(
         }
         assert len(matching_quotation_ids) == 2
 
-        with psycopg.connect(TEST_DATABASE_URL or "", row_factory=psycopg.rows.dict_row) as conn:
+        with db_connect(TEST_DATABASE_URL or "", row_factory=psycopg.rows.dict_row) as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     "select id, status, source, supplier_id "
@@ -386,7 +387,7 @@ def test_import_non_utf8_csv_raises_and_records_a_failed_import(
         assert excinfo.value.status_code == 422
         assert excinfo.value.details == {"reason": "file could not be decoded as UTF-8 text"}
 
-        with psycopg.connect(TEST_DATABASE_URL or "", row_factory=psycopg.rows.dict_row) as conn:
+        with db_connect(TEST_DATABASE_URL or "", row_factory=psycopg.rows.dict_row) as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     "select status, error_details from catalogue_imports where tenant_id = %s",
@@ -421,7 +422,7 @@ def test_import_corrupted_xlsx_raises_and_records_a_failed_import(
         assert excinfo.value.status_code == 422
         assert excinfo.value.details == {"reason": "file is not a valid XLSX workbook"}
 
-        with psycopg.connect(TEST_DATABASE_URL or "", row_factory=psycopg.rows.dict_row) as conn:
+        with db_connect(TEST_DATABASE_URL or "", row_factory=psycopg.rows.dict_row) as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     "select status, error_details from catalogue_imports where tenant_id = %s",

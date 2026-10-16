@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import psycopg
 import pytest
 
 from integration.catalogue_helpers import (
@@ -14,6 +13,7 @@ from integration.smart_compare_helpers import (
     member_from_workspace,
     settings_for_test_db,
 )
+from procurepilot_api.db import connect as db_connect
 from procurepilot_api.errors import ConflictError
 from procurepilot_api.modules.billing.service import (
     BillingService,
@@ -30,7 +30,7 @@ def test_starter_plan_allows_100_active_products_then_refuses_101st(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     settings = settings_for_test_db(monkeypatch)
-    with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+    with db_connect(TEST_DATABASE_URL or "") as conn:
         with conn.cursor() as cur:
             workspace = make_workspace(cur, "plan-limit")
             reset_role(cur)

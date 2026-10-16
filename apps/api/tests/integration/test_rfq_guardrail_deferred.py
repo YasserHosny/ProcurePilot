@@ -13,6 +13,8 @@ from typing import Any
 import psycopg
 import pytest
 
+from procurepilot_api.db import connect as db_connect
+
 sys.path.append(os.path.dirname(__file__))
 
 from test_rfq_service_e2e import (  # noqa: E402
@@ -127,7 +129,7 @@ def _set_response_prices(
 
 def _make_fixture() -> tuple[uuid.UUID, uuid.UUID, uuid.UUID, uuid.UUID, uuid.UUID, uuid.UUID]:
     settings = get_settings()
-    with psycopg.connect(settings.database_url.get_secret_value(), prepare_threshold=None) as conn:
+    with db_connect(settings.database_url.get_secret_value(), prepare_threshold=None) as conn:
         with conn.cursor() as cur:
             tenant_id, user_id, membership_id = _seed_tenant(cur, email_suffix=uuid.uuid4().hex)
             rfq_id, response_a, response_b, _ = _seed_rfq_and_responses(
@@ -156,7 +158,7 @@ def _thread_local_requests_client(
     def client(_settings: object, _token: str) -> _FakeAuthenticatedClient:
         conn = getattr(local, "conn", None)
         if conn is None:
-            conn = psycopg.connect(get_settings().database_url.get_secret_value(), autocommit=True)
+            conn = db_connect(get_settings().database_url.get_secret_value(), autocommit=True)
             with conn.cursor() as cur:
                 cur.execute("set role authenticated")
                 cur.execute(
@@ -195,7 +197,7 @@ def _complete_response(
     response_id: uuid.UUID,
 ) -> None:
     """Add the missing real match to the fixture's initially pending response."""
-    with psycopg.connect(settings.database_url.get_secret_value()) as conn:
+    with db_connect(settings.database_url.get_secret_value()) as conn:
         with conn.cursor() as cur:
             cur.execute("select quotation_id from rfq_response where id = %s", (response_id,))
             quotation_id = cur.fetchone()[0]
@@ -220,7 +222,7 @@ def _complete_response(
 
 
 def _quotation_id(settings: Settings, response_id: uuid.UUID) -> uuid.UUID:
-    with psycopg.connect(settings.database_url.get_secret_value()) as conn:
+    with db_connect(settings.database_url.get_secret_value()) as conn:
         with conn.cursor() as cur:
             cur.execute("select quotation_id from rfq_response where id = %s", (response_id,))
             return cur.fetchone()[0]
@@ -237,7 +239,7 @@ def _wire_quotation_lifecycle_services(
     from procurepilot_api.modules.quotations import review_service
     from procurepilot_api.modules.quotations import service as quotation_service
 
-    conn = psycopg.connect(get_settings().database_url.get_secret_value(), autocommit=True)
+    conn = db_connect(get_settings().database_url.get_secret_value(), autocommit=True)
     with conn.cursor() as cur:
         cur.execute("set role authenticated")
         cur.execute(
@@ -276,7 +278,7 @@ def _member(
 def _latest_guardrail_job(
     settings: Settings, tenant_id: uuid.UUID, quotation_id: uuid.UUID
 ) -> dict[str, object]:
-    with psycopg.connect(settings.database_url.get_secret_value()) as conn:
+    with db_connect(settings.database_url.get_secret_value()) as conn:
         with conn.cursor() as cur:
             cur.execute(
                 "select id, tenant_id, job_type, status, payload, attempts, max_attempts "
@@ -304,7 +306,7 @@ def _process_enqueued_guardrail_job(
 
 
 def _event_response_id(settings: Settings, tenant_id: uuid.UUID) -> uuid.UUID | None:
-    with psycopg.connect(settings.database_url.get_secret_value()) as conn:
+    with db_connect(settings.database_url.get_secret_value()) as conn:
         with conn.cursor() as cur:
             cur.execute(
                 "select rfq_response_id from auto_preparation_event "
@@ -363,7 +365,7 @@ def test_refusing_or_archiving_blocking_response_unblocks_guardrail(
     )
 
     response_b_quotation_id = _quotation_id(settings, response_b)
-    with psycopg.connect(settings.database_url.get_secret_value()) as conn:
+    with db_connect(settings.database_url.get_secret_value()) as conn:
         with conn.cursor() as cur:
             cur.execute(
                 "update quotation set status = 'in_review' where id = %s",
@@ -403,7 +405,7 @@ def test_archived_response_does_not_count_toward_minimum_response_count(
         monkeypatch, tenant_id=tenant_id, user_id=user_id, membership_id=membership_id
     )
 
-    with psycopg.connect(settings.database_url.get_secret_value()) as conn:
+    with db_connect(settings.database_url.get_secret_value()) as conn:
         with conn.cursor() as cur:
             cur.execute(
                 "update auto_preparation_guardrail set min_response_count = 2 "
@@ -430,7 +432,7 @@ def test_concurrent_evaluations_fire_once(monkeypatch: pytest.MonkeyPatch) -> No
     tenant_id, user_id, membership_id, rfq_id, response_a, _ = _make_fixture()
     _thread_local_requests_client(monkeypatch, tenant_id, user_id)
 
-    with psycopg.connect(settings.database_url.get_secret_value()) as conn:
+    with db_connect(settings.database_url.get_secret_value()) as conn:
         with conn.cursor() as cur:
             cur.execute(
                 "update quotation set status = 'refused' where id = "
@@ -454,7 +456,7 @@ def test_concurrent_evaluations_fire_once(monkeypatch: pytest.MonkeyPatch) -> No
 
     def evaluate() -> None:
         try:
-            with psycopg.connect(settings.database_url.get_secret_value()) as conn:
+            with db_connect(settings.database_url.get_secret_value()) as conn:
                 with conn.cursor() as cur:
                     cur.execute("set lock_timeout = '3s'")
                     cur.execute("set statement_timeout = '3s'")
@@ -472,7 +474,7 @@ def test_concurrent_evaluations_fire_once(monkeypatch: pytest.MonkeyPatch) -> No
     assert all(not thread.is_alive() for thread in threads), "concurrent evaluation did not finish"
     assert not errors
 
-    with psycopg.connect(settings.database_url.get_secret_value()) as conn:
+    with db_connect(settings.database_url.get_secret_value()) as conn:
         with conn.cursor() as cur:
             cur.execute(
                 "select count(*) from auto_preparation_event where tenant_id = %s", (tenant_id,)
@@ -495,7 +497,7 @@ def test_pending_cheaper_response_blocks_then_wins(monkeypatch: pytest.MonkeyPat
     tenant_id, user_id, membership_id, rfq_id, response_a, response_b = _make_fixture()
     _set_response_prices_on_fixture(settings, response_a, (16, 30), response_b, (14, 25))
     # No preparation should occur while response B is still pending, despite A being complete.
-    with psycopg.connect(settings.database_url.get_secret_value()) as conn:
+    with db_connect(settings.database_url.get_secret_value()) as conn:
         _evaluate_guardrails_for_rfq(settings, conn, tenant_id=tenant_id, rfq_id=rfq_id)
         conn.commit()
         with conn.cursor() as cur:
@@ -512,7 +514,7 @@ def test_pending_cheaper_response_blocks_then_wins(monkeypatch: pytest.MonkeyPat
     _patch_requests_service_for_test(
         monkeypatch, tenant_id=tenant_id, user_id=user_id, membership_id=membership_id
     )
-    with psycopg.connect(settings.database_url.get_secret_value()) as conn:
+    with db_connect(settings.database_url.get_secret_value()) as conn:
         with conn.cursor() as cur:
             cur.execute("select quotation_id from rfq_response where id = %s", (response_b,))
             quotation_id = cur.fetchone()[0]
@@ -531,7 +533,7 @@ def test_pending_cheaper_response_blocks_then_wins(monkeypatch: pytest.MonkeyPat
                 (uuid.uuid4(), tenant_id, line_id, product_id),
             )
         conn.commit()
-    with psycopg.connect(settings.database_url.get_secret_value()) as conn:
+    with db_connect(settings.database_url.get_secret_value()) as conn:
         _evaluate_guardrails_for_rfq(settings, conn, tenant_id=tenant_id, rfq_id=rfq_id)
         conn.commit()
         with conn.cursor() as cur:
@@ -549,7 +551,7 @@ def _set_response_prices_on_fixture(
     response_b: uuid.UUID,
     prices_b: tuple[int, int],
 ) -> None:
-    with psycopg.connect(settings.database_url.get_secret_value()) as conn:
+    with db_connect(settings.database_url.get_secret_value()) as conn:
         with conn.cursor() as cur:
             _set_response_prices(cur, response_a, prices_a)
             _set_response_prices(cur, response_b, prices_b)
@@ -559,7 +561,7 @@ def _set_response_prices_on_fixture(
 def test_candidate_landed_cost_is_excluded_from_baseline() -> None:
     settings = get_settings()
     tenant_id, _, membership_id, rfq_id, response_a, _ = _make_fixture()
-    with psycopg.connect(settings.database_url.get_secret_value()) as conn:
+    with db_connect(settings.database_url.get_secret_value()) as conn:
         with conn.cursor() as cur:
             cur.execute(
                 "update quotation set status = 'refused' where id = "
@@ -588,7 +590,7 @@ def test_candidate_landed_cost_is_excluded_from_baseline() -> None:
                 (uuid.uuid4(), tenant_id, line_id, decision_id),
             )
         conn.commit()
-    with psycopg.connect(settings.database_url.get_secret_value()) as conn:
+    with db_connect(settings.database_url.get_secret_value()) as conn:
         _evaluate_guardrails_for_rfq(settings, conn, tenant_id=tenant_id, rfq_id=rfq_id)
         conn.commit()
         with conn.cursor() as cur:

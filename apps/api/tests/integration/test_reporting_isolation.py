@@ -56,6 +56,7 @@ from integration.smart_compare_helpers import (
     member_from_workspace,
     settings_for_test_db,
 )
+from procurepilot_api.db import connect as db_connect
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -370,7 +371,7 @@ def make_reporting_tenant(cur: psycopg.Cursor, label: str) -> ReportingTenant:
 @pytest.fixture
 def reporting_tenants() -> Iterator[tuple[ReportingTenant, ReportingTenant]]:
     """Two unrelated businesses with marker reporting rows, committed for router reads."""
-    with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+    with db_connect(TEST_DATABASE_URL or "") as conn:
         with conn.cursor() as cur:
             alpha = make_reporting_tenant(cur, "r25-alpha")
             beta = make_reporting_tenant(cur, "r25-beta")
@@ -401,7 +402,7 @@ def test_another_workspaces_schedules_are_invisible(
     reporting_tenants: tuple[ReportingTenant, ReportingTenant],
 ) -> None:
     alpha, beta = reporting_tenants
-    with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+    with db_connect(TEST_DATABASE_URL or "") as conn:
         with conn.cursor() as cur:
             act_as(cur, alpha.workspace)
             cur.execute("select id from report_schedule")
@@ -414,7 +415,7 @@ def test_another_workspaces_subscriptions_are_invisible(
     reporting_tenants: tuple[ReportingTenant, ReportingTenant],
 ) -> None:
     alpha, beta = reporting_tenants
-    with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+    with db_connect(TEST_DATABASE_URL or "") as conn:
         with conn.cursor() as cur:
             act_as(cur, alpha.workspace)
             cur.execute("select id from digest_subscription")
@@ -427,7 +428,7 @@ def test_another_workspaces_artifacts_are_invisible(
     reporting_tenants: tuple[ReportingTenant, ReportingTenant],
 ) -> None:
     alpha, beta = reporting_tenants
-    with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+    with db_connect(TEST_DATABASE_URL or "") as conn:
         with conn.cursor() as cur:
             act_as(cur, alpha.workspace)
             cur.execute("select id from export_job")
@@ -441,7 +442,7 @@ def test_a_member_cannot_write_another_workspaces_schedule(
 ) -> None:
     """WITH CHECK, not just USING — a write-then-cannot-read row must never be creatable."""
     alpha, beta = reporting_tenants
-    with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+    with db_connect(TEST_DATABASE_URL or "") as conn:
         with conn.cursor() as cur:
             act_as(cur, alpha.workspace)
             with pytest.raises(psycopg.errors.InsufficientPrivilege):
@@ -461,7 +462,7 @@ def test_a_member_cannot_write_another_workspaces_subscription(
     reporting_tenants: tuple[ReportingTenant, ReportingTenant],
 ) -> None:
     alpha, beta = reporting_tenants
-    with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+    with db_connect(TEST_DATABASE_URL or "") as conn:
         with conn.cursor() as cur:
             act_as(cur, alpha.workspace)
             with pytest.raises(psycopg.errors.InsufficientPrivilege):
@@ -482,7 +483,7 @@ def test_duplicate_scheduled_artifact_for_the_same_period_is_refused(
     scheduler (T016) will lean on — a replayed or raced tick cannot insert a second artifact
     for the same schedule and period, whatever the worker code does."""
     alpha, _beta = reporting_tenants
-    with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+    with db_connect(TEST_DATABASE_URL or "") as conn:
         with conn.cursor() as cur:
             with pytest.raises(psycopg.errors.UniqueViolation):
                 cur.execute(
@@ -513,7 +514,7 @@ def test_savings_reader_pinned_to_tenant_a_excludes_tenant_b(
     reporting_tenants: tuple[ReportingTenant, ReportingTenant],
 ) -> None:
     alpha, beta = reporting_tenants
-    with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+    with db_connect(TEST_DATABASE_URL or "") as conn:
         with conn.cursor() as cur:
             cur.execute(
                 "select saving_id from reporting_savings_for_period(%s, %s, %s, null, null)",
@@ -528,7 +529,7 @@ def test_purchases_reader_pinned_to_tenant_a_excludes_tenant_b(
     reporting_tenants: tuple[ReportingTenant, ReportingTenant],
 ) -> None:
     alpha, beta = reporting_tenants
-    with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+    with db_connect(TEST_DATABASE_URL or "") as conn:
         with conn.cursor() as cur:
             cur.execute(
                 "select purchase_record_id from reporting_purchases_for_period"
@@ -546,7 +547,7 @@ def test_alert_snapshot_reader_pinned_to_tenant_a_excludes_tenant_b(
     """The alert snapshot returns SOURCE rows (the landed-cost lineage), so the marker is the
     landed_cost row itself — the exact input the Wave 17 Python conditions will consume."""
     alpha, beta = reporting_tenants
-    with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+    with db_connect(TEST_DATABASE_URL or "") as conn:
         with conn.cursor() as cur:
             cur.execute(
                 "select landed_cost_id from reporting_alert_snapshot(%s, %s, %s, null)",
@@ -562,7 +563,7 @@ def test_validity_expiring_reader_pinned_to_tenant_a_excludes_tenant_b(
 ) -> None:
     alpha, beta = reporting_tenants
     now = datetime.now(UTC)
-    with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+    with db_connect(TEST_DATABASE_URL or "") as conn:
         with conn.cursor() as cur:
             cur.execute(
                 "select landed_cost_id from reporting_validity_expiring(%s, %s, 7, null)",
@@ -580,7 +581,7 @@ def test_branch_guard_raises_for_another_tenants_branch(
     raises instead of being treated as "no filter" — a wrong-tenant branch id must never
     silently widen a report."""
     alpha, beta = reporting_tenants
-    with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+    with db_connect(TEST_DATABASE_URL or "") as conn:
         with conn.cursor() as cur:
             # The guard raises with errcode 22023 (invalid_parameter_value) — the code is
             # deliberate, so the test pins it rather than accepting any raise.
@@ -598,7 +599,7 @@ def test_branch_filter_excludes_other_branch_rows_in_readers(
     lineage) to branch A only, so a branch-B filter sees nothing — and an unattributed row
     would be excluded under either filter rather than guessed into a branch."""
     alpha, _beta = reporting_tenants
-    with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+    with db_connect(TEST_DATABASE_URL or "") as conn:
         with conn.cursor() as cur:
             cur.execute(
                 "select count(*) from reporting_savings_for_period(%s, %s, %s, null, %s)",
@@ -626,7 +627,7 @@ def test_digest_content_rests_on_branch_filtered_readers(
     filtered to branch B can only be rendered from branch-B reader rows. The rendered-view
     proof itself lands with T024."""
     alpha, _beta = reporting_tenants
-    with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+    with db_connect(TEST_DATABASE_URL or "") as conn:
         with conn.cursor() as cur:
             cur.execute(
                 "select count(*) from reporting_purchases_for_period(%s, %s, %s, null, %s)",
@@ -686,9 +687,7 @@ def test_export_worker_refuses_a_tenant_job_mismatch_payload(
                     {"job_id": str(job.id), "tenant_id": str(beta.workspace.tenant_id)}
                 )
 
-            with psycopg.connect(
-                TEST_DATABASE_URL or "", row_factory=psycopg.rows.dict_row
-            ) as conn:
+            with db_connect(TEST_DATABASE_URL or "", row_factory=psycopg.rows.dict_row) as conn:
                 with conn.cursor() as cur:
                     cur.execute(
                         "select status, storage_path from export_job where id = %s", (job.id,)
@@ -708,7 +707,7 @@ def test_purged_artifact_download_returns_not_found(
     from procurepilot_api.errors import NotFoundError
     from procurepilot_api.modules.exports.service import ExportService
 
-    with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+    with db_connect(TEST_DATABASE_URL or "") as conn:
         with conn.cursor() as cur:
             alpha = make_workspace(cur, "r25-purged")
             job_id = uuid4()

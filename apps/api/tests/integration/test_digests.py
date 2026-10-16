@@ -3,7 +3,6 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
-import psycopg
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -15,6 +14,7 @@ from integration.smart_compare_helpers import (
     member_from_workspace,
     settings_for_test_db,
 )
+from procurepilot_api.db import connect as db_connect
 from procurepilot_api.deps import bearer_token, current_member
 from procurepilot_api.main import create_app
 from procurepilot_api.modules.auth.jwt import MemberRole
@@ -159,7 +159,7 @@ def test_latest_digest_content_assembly(
 
 def _add_open_match_task(context: object, marker: str) -> None:
     workspace = context.workspace
-    with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+    with db_connect(TEST_DATABASE_URL or "") as conn:
         with conn.cursor() as cur:
             document_id = make_document(cur, workspace)
             quotation_id = make_quotation(cur, workspace, document_id=document_id)
@@ -239,7 +239,7 @@ def test_digest_worker_execution_and_skip_inactive(
 
         # 1. Create due subscription for in_app channel
         due_time = datetime.now(UTC) - timedelta(minutes=5)
-        with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+        with db_connect(TEST_DATABASE_URL or "") as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     """
@@ -260,7 +260,7 @@ def test_digest_worker_execution_and_skip_inactive(
 
         # 2. Test email_unconfigured path when SMTP is unset
         monkeypatch.setattr(settings, "smtp_host", None)
-        with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+        with db_connect(TEST_DATABASE_URL or "") as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     """
@@ -280,7 +280,7 @@ def test_digest_worker_execution_and_skip_inactive(
 
         # 3. Test skip inactive membership
         second_user_id = uuid4()
-        with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+        with db_connect(TEST_DATABASE_URL or "") as conn:
             with conn.cursor() as cur:
                 # Add another owner so removing member does not violate the owner guard trigger
                 cur.execute(
@@ -316,7 +316,7 @@ def test_digest_worker_execution_and_skip_inactive(
             assert stats_inactive["claimed"] >= 1
             assert stats_inactive["skipped"] >= 1
         finally:
-            with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+            with db_connect(TEST_DATABASE_URL or "") as conn:
                 with conn.cursor() as cur:
                     cur.execute(
                         "update membership set status = 'active' where id = %s",

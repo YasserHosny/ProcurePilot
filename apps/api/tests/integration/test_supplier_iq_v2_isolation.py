@@ -17,6 +17,7 @@ from integration.catalogue_helpers import (
     make_workspace_product,
 )
 from integration.quotation_helpers import make_supplier
+from procurepilot_api.db import connect as db_connect
 
 pytestmark = pytest.mark.skipif(
     not TEST_DATABASE_URL,
@@ -149,7 +150,7 @@ def _seed_r4(cur: psycopg.Cursor, workspace: Workspace, label: str) -> SeededR4:
 
 @pytest.fixture
 def seeded_r4() -> tuple[psycopg.Connection, Workspace, Workspace, SeededR4, SeededR4]:
-    with psycopg.connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
+    with db_connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
         with conn.cursor() as cur:
             alpha = make_workspace(cur, "r41-alpha")
             beta = make_workspace(cur, "r41-beta")
@@ -160,7 +161,7 @@ def seeded_r4() -> tuple[psycopg.Connection, Workspace, Workspace, SeededR4, See
 
 
 def test_r4_supplier_tables_have_forced_rls_and_policies() -> None:
-    with psycopg.connect(TEST_DATABASE_URL or "") as conn, conn.cursor() as cur:
+    with db_connect(TEST_DATABASE_URL or "") as conn, conn.cursor() as cur:
         cur.execute(
             """
             select c.relname, c.relrowsecurity, c.relforcerowsecurity,
@@ -177,7 +178,7 @@ def test_r4_supplier_tables_have_forced_rls_and_policies() -> None:
 
 
 def test_r4_supplier_tables_do_not_grant_mutation_privileges() -> None:
-    with psycopg.connect(TEST_DATABASE_URL or "") as conn, conn.cursor() as cur:
+    with db_connect(TEST_DATABASE_URL or "") as conn, conn.cursor() as cur:
         cur.execute(
             """
             select grantee, table_name, privilege_type

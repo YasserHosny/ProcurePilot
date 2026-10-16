@@ -20,6 +20,8 @@ from uuid import UUID, uuid4
 import psycopg
 import pytest
 
+from procurepilot_api.db import connect as db_connect
+
 TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL")
 
 pytestmark = pytest.mark.skipif(
@@ -211,7 +213,7 @@ def _make_rfq_workspace(cur: psycopg.Cursor, label: str) -> RfqWorkspace:
 
 @pytest.fixture
 def rfq_workspaces() -> Iterator[tuple[psycopg.Connection, RfqWorkspace, RfqWorkspace]]:
-    with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+    with db_connect(TEST_DATABASE_URL or "") as conn:
         with conn.cursor() as cur:
             alpha = _make_rfq_workspace(cur, "alpha-rfq")
             beta = _make_rfq_workspace(cur, "beta-rfq")

@@ -3,7 +3,6 @@ from __future__ import annotations
 from decimal import Decimal
 from uuid import UUID
 
-import psycopg
 import pytest
 from psycopg.rows import dict_row
 
@@ -14,6 +13,7 @@ from integration.smart_compare_helpers import (
     settings_for_test_db,
 )
 from integration.value_proof_helpers import export_request, fetch_export_jobs, record_purchase
+from procurepilot_api.db import connect as db_connect
 from procurepilot_api.errors import NotFoundError, ServiceUnavailableError
 from procurepilot_api.modules.exports import service as export_service_module
 from procurepilot_api.modules.exports.service import ExportService
@@ -130,7 +130,7 @@ def test_enqueue_failure_persists_failed_status_from_separate_connection(
         with pytest.raises(ServiceUnavailableError):
             ExportService(settings).create_job(member=context.member, payload=export_request())
 
-        with psycopg.connect(TEST_DATABASE_URL or "", row_factory=dict_row) as conn:
+        with db_connect(TEST_DATABASE_URL or "", row_factory=dict_row) as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     "select status, error from export_job where tenant_id = %s",
@@ -167,7 +167,7 @@ def test_worker_failure_persists_failed_status_from_separate_connection(
                 {"job_id": str(job.id), "tenant_id": str(context.workspace.tenant_id)}
             )
 
-        with psycopg.connect(TEST_DATABASE_URL or "", row_factory=dict_row) as conn:
+        with db_connect(TEST_DATABASE_URL or "", row_factory=dict_row) as conn:
             with conn.cursor() as cur:
                 cur.execute("select status, error from export_job where id = %s", (job.id,))
                 row = cur.fetchone()

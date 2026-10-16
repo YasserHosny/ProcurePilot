@@ -11,6 +11,7 @@ from integration.smart_compare_helpers import (
     committed_smart_context,
     settings_for_test_db,
 )
+from procurepilot_api.db import connect as db_connect
 from procurepilot_api.modules.alerts.service import AlertService
 
 pytestmark = pytest.mark.skipif(
@@ -160,12 +161,12 @@ def test_delivery_cost_anomaly_live_and_dismissal(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     settings = settings_for_test_db(monkeypatch)
-    psycopg = pytest.importorskip("psycopg")
+    pytest.importorskip("psycopg")
     now = datetime.now(UTC)
     with committed_smart_context("delivery-live", supplier_count=1) as context:
         supplier_id = context.supplier_ids[0]
         # Seed supplier commercial term with delivery fee 50.00 and MOV 100.00 (50%)
-        with psycopg.connect(TEST_DATABASE_URL) as conn:
+        with db_connect(TEST_DATABASE_URL) as conn:
             with conn.cursor() as cur:
                 act_as(cur, context.workspace)
                 cur.execute(

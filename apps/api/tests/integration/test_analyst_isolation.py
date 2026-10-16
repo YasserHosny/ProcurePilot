@@ -24,6 +24,8 @@ from uuid import UUID, uuid4
 import psycopg
 import pytest
 
+from procurepilot_api.db import connect as db_connect
+
 TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL")
 
 pytestmark = pytest.mark.skipif(
@@ -206,7 +208,7 @@ def _make_analyst_workspace(cur: psycopg.Cursor, label: str) -> AnalystWorkspace
 @pytest.fixture
 def analyst_workspaces() -> Iterator[tuple[psycopg.Connection, AnalystWorkspace, AnalystWorkspace]]:
     """Two unrelated tenants, each with one conversation/turn/citation."""
-    with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+    with db_connect(TEST_DATABASE_URL or "") as conn:
         with conn.cursor() as cur:
             alpha = _make_analyst_workspace(cur, "alpha-analyst")
             beta = _make_analyst_workspace(cur, "beta-analyst")

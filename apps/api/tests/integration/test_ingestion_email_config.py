@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import psycopg
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -11,6 +10,7 @@ from integration.smart_compare_helpers import (
     member_from_workspace,
     settings_for_test_db,
 )
+from procurepilot_api.db import connect as db_connect
 from procurepilot_api.deps import bearer_token, current_member
 from procurepilot_api.main import create_app
 from procurepilot_api.modules.auth.jwt import MemberRole
@@ -89,7 +89,7 @@ def test_forwarding_address_is_unique_per_tenant(monkeypatch: pytest.MonkeyPatch
         client = TestClient(_app(monkeypatch, owner), raise_server_exceptions=False)
         client.put("/api/v1/tenants/email-config", json={})
 
-        with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+        with db_connect(TEST_DATABASE_URL or "") as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     "select forwarding_address, "

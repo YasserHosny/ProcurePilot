@@ -5,6 +5,7 @@ import pytest
 
 from integration.catalogue_helpers import TEST_DATABASE_URL
 from integration.smart_compare_helpers import committed_smart_context, settings_for_test_db
+from procurepilot_api.db import connect as db_connect
 from procurepilot_api.modules.ingestion import capture_service as capture_service_module
 from procurepilot_api.modules.ingestion.capture_service import CaptureService
 
@@ -93,7 +94,7 @@ def test_capture_creates_pending_quotation_and_queues_extraction(
         assert len(_fake_queue) == 1
         assert _fake_queue[0]["quotation_id"] == quotation_id
 
-        with psycopg.connect(TEST_DATABASE_URL or "", row_factory=psycopg.rows.dict_row) as conn:
+        with db_connect(TEST_DATABASE_URL or "", row_factory=psycopg.rows.dict_row) as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     "select status, source, supplier_id, document_id from quotation where id = %s",
@@ -150,7 +151,7 @@ def test_capture_creates_pending_quotation_for_an_image_upload(
         assert len(_fake_queue) == 1
         assert _fake_queue[0]["quotation_id"] == quotation_id
 
-        with psycopg.connect(TEST_DATABASE_URL or "", row_factory=psycopg.rows.dict_row) as conn:
+        with db_connect(TEST_DATABASE_URL or "", row_factory=psycopg.rows.dict_row) as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     "select status, source, supplier_id, document_id from quotation where id = %s",

@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-import psycopg
 import pytest
 
 from integration.catalogue_helpers import TEST_DATABASE_URL
 from integration.smart_compare_helpers import committed_smart_context, settings_for_test_db
+from procurepilot_api.db import connect as db_connect
 from procurepilot_api.modules.ingestion.matcher import (
     match_supplier,
     match_supplier_by_address_history,
@@ -23,7 +23,7 @@ def test_matches_by_domain_when_supplier_has_that_email_domain(
     settings = settings_for_test_db(monkeypatch)
     with committed_smart_context("ingestion-domain-match", supplier_count=1) as context:
         supplier_id = context.supplier_ids[0]
-        with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+        with db_connect(TEST_DATABASE_URL or "") as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     "update supplier set email_domains = %s where id = %s",
@@ -73,7 +73,7 @@ def test_address_history_beats_domain_for_a_generic_domain_sender(
     settings = settings_for_test_db(monkeypatch)
     with committed_smart_context("ingestion-address-history", supplier_count=2) as context:
         gmail_supplier, other_supplier = context.supplier_ids
-        with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+        with db_connect(TEST_DATABASE_URL or "") as conn:
             with conn.cursor() as cur:
                 # A second supplier also claims @gmail.com, to prove address history wins over
                 # a domain match that would otherwise resolve ambiguously or to the wrong one.
@@ -113,7 +113,7 @@ def test_ambiguous_address_history_falls_through_to_domain(
     settings = settings_for_test_db(monkeypatch)
     with committed_smart_context("ingestion-ambiguous-address", supplier_count=2) as context:
         supplier_a, supplier_b = context.supplier_ids
-        with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+        with db_connect(TEST_DATABASE_URL or "") as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     "update supplier set email_domains = %s where id = %s",
@@ -158,7 +158,7 @@ def test_thread_match_inherits_supplier_from_a_prior_message_in_the_same_thread(
     settings = settings_for_test_db(monkeypatch)
     with committed_smart_context("ingestion-thread-match", supplier_count=1) as context:
         supplier_id = context.supplier_ids[0]
-        with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+        with db_connect(TEST_DATABASE_URL or "") as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     """
@@ -194,7 +194,7 @@ def test_cross_tenant_address_history_and_domain_never_leak_a_match(
     with committed_smart_context("ingestion-tenant-a", supplier_count=1) as tenant_a:
         with committed_smart_context("ingestion-tenant-b", supplier_count=1) as tenant_b:
             supplier_a = tenant_a.supplier_ids[0]
-            with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+            with db_connect(TEST_DATABASE_URL or "") as conn:
                 with conn.cursor() as cur:
                     cur.execute(
                         "update supplier set email_domains = %s where id = %s",

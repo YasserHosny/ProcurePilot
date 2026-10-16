@@ -13,7 +13,6 @@ from __future__ import annotations
 
 from urllib.parse import parse_qs, urlparse
 
-import psycopg
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -28,6 +27,7 @@ from integration.smart_compare_helpers import (
     member_from_workspace,
     settings_for_test_db,
 )
+from procurepilot_api.db import connect as db_connect
 from procurepilot_api.deps import bearer_token, current_member
 from procurepilot_api.main import create_app
 from procurepilot_api.modules.auth.jwt import MemberRole
@@ -95,7 +95,7 @@ def test_confident_single_match_creates_pos_product_match(
         client = TestClient(app, raise_server_exceptions=False)
 
         # Seed catalogue product matching stub-item-001
-        with psycopg.connect(TEST_DATABASE_URL or "") as db_conn:
+        with db_connect(TEST_DATABASE_URL or "") as db_conn:
             with db_conn.cursor() as cur:
                 product_id = make_workspace_product(
                     cur,
@@ -108,7 +108,7 @@ def test_confident_single_match_creates_pos_product_match(
         client.post("/api/v1/pos/sync")
 
         # Verify automatic match created
-        with psycopg.connect(TEST_DATABASE_URL or "", row_factory=dict_row) as db_conn:
+        with db_connect(TEST_DATABASE_URL or "", row_factory=dict_row) as db_conn:
             with db_conn.cursor() as cur:
                 cur.execute("set local role service_role")
                 cur.execute(
@@ -152,7 +152,7 @@ def test_ambiguous_candidates_left_unmatched(
         client = TestClient(app, raise_server_exceptions=False)
 
         # Seed two catalogue products sharing the exact same display name for stub-item-004
-        with psycopg.connect(TEST_DATABASE_URL or "") as db_conn:
+        with db_connect(TEST_DATABASE_URL or "") as db_conn:
             with db_conn.cursor() as cur:
                 make_workspace_product(
                     cur,
@@ -170,7 +170,7 @@ def test_ambiguous_candidates_left_unmatched(
         client.post("/api/v1/pos/sync")
 
         # Verify stub-item-004 has NO automatic match
-        with psycopg.connect(TEST_DATABASE_URL or "", row_factory=dict_row) as db_conn:
+        with db_connect(TEST_DATABASE_URL or "", row_factory=dict_row) as db_conn:
             with db_conn.cursor() as cur:
                 cur.execute("set local role service_role")
                 cur.execute(
@@ -201,7 +201,7 @@ def test_manual_match_succeeds_and_records_matched_by(
         app, _ = _app(monkeypatch, owner)
         client = TestClient(app, raise_server_exceptions=False)
 
-        with psycopg.connect(TEST_DATABASE_URL or "") as db_conn:
+        with db_connect(TEST_DATABASE_URL or "") as db_conn:
             with db_conn.cursor() as cur:
                 target_wp_id = make_workspace_product(
                     cur,
@@ -231,7 +231,7 @@ def test_manual_match_succeeds_and_records_matched_by(
         assert match_data["match_method"] == "manual"
 
         # Check in DB that matched_by is the owner's membership_id
-        with psycopg.connect(TEST_DATABASE_URL or "", row_factory=dict_row) as db_conn:
+        with db_connect(TEST_DATABASE_URL or "", row_factory=dict_row) as db_conn:
             with db_conn.cursor() as cur:
                 cur.execute("set local role service_role")
                 cur.execute(
@@ -261,7 +261,7 @@ def test_cross_tenant_workspace_products_never_candidates(
         committed_smart_context("pos-iso-tenant-b") as ctx_b,
     ):
         # In Tenant B, create a matching product
-        with psycopg.connect(TEST_DATABASE_URL or "") as db_conn:
+        with db_connect(TEST_DATABASE_URL or "") as db_conn:
             with db_conn.cursor() as cur:
                 make_workspace_product(
                     cur,
@@ -279,7 +279,7 @@ def test_cross_tenant_workspace_products_never_candidates(
         client_a.post("/api/v1/pos/sync")
 
         # Tenant A's signal must remain UNMATCHED
-        with psycopg.connect(TEST_DATABASE_URL or "", row_factory=dict_row) as db_conn:
+        with db_connect(TEST_DATABASE_URL or "", row_factory=dict_row) as db_conn:
             with db_conn.cursor() as cur:
                 cur.execute("set local role service_role")
                 cur.execute(

@@ -4,6 +4,7 @@ import psycopg
 import pytest
 
 from procurepilot_api.config import get_settings
+from procurepilot_api.db import connect as db_connect
 from procurepilot_api.modules.ingestion.orchestrator import process_inbound_email
 
 
@@ -114,7 +115,7 @@ async def test_rfq_response_capture_matches_open_rfq() -> None:
     settings = get_settings()
     test_db = settings.database_url.get_secret_value()
 
-    with psycopg.connect(test_db, prepare_threshold=None) as conn:
+    with db_connect(test_db, prepare_threshold=None) as conn:
         with conn.cursor() as cur:
             tenant_id, supplier_id = _seed_tenant_and_supplier(cur)
             rfq_id, rec_id, msg_id = _seed_rfq_with_recipient(cur, tenant_id, supplier_id, "sent")
@@ -128,7 +129,7 @@ async def test_rfq_response_capture_matches_open_rfq() -> None:
     assert result["status"] == "completed"
     assert result["match_method"] == "rfq_reply"
 
-    with psycopg.connect(test_db) as conn:
+    with db_connect(test_db) as conn:
         with conn.cursor() as cur:
             cur.execute("set local role service_role")
             # Check RFQ status
@@ -149,7 +150,7 @@ async def test_rfq_response_capture_no_match_falls_through() -> None:
     settings = get_settings()
     test_db = settings.database_url.get_secret_value()
 
-    with psycopg.connect(test_db, prepare_threshold=None) as conn:
+    with db_connect(test_db, prepare_threshold=None) as conn:
         with conn.cursor() as cur:
             tenant_id, supplier_id = _seed_tenant_and_supplier(cur)
             rfq_id, rec_id, msg_id = _seed_rfq_with_recipient(cur, tenant_id, supplier_id, "sent")
@@ -166,7 +167,7 @@ async def test_rfq_response_capture_no_match_falls_through() -> None:
     # We just want to ensure it falls through and does NOT create rfq_response
     assert result["match_method"] != "rfq_reply"
 
-    with psycopg.connect(test_db) as conn:
+    with db_connect(test_db) as conn:
         with conn.cursor() as cur:
             cur.execute("set local role service_role")
             cur.execute("select status from rfq where id = %s", (rfq_id,))
@@ -181,7 +182,7 @@ async def test_rfq_response_capture_expired_rfq() -> None:
     settings = get_settings()
     test_db = settings.database_url.get_secret_value()
 
-    with psycopg.connect(test_db, prepare_threshold=None) as conn:
+    with db_connect(test_db, prepare_threshold=None) as conn:
         with conn.cursor() as cur:
             tenant_id, supplier_id = _seed_tenant_and_supplier(cur)
             # RFQ is expired
@@ -197,7 +198,7 @@ async def test_rfq_response_capture_expired_rfq() -> None:
     
     assert result["status"] == "completed"
 
-    with psycopg.connect(test_db) as conn:
+    with db_connect(test_db) as conn:
         with conn.cursor() as cur:
             cur.execute("set local role service_role")
             cur.execute("select status from rfq where id = %s", (rfq_id,))
@@ -215,7 +216,7 @@ async def test_rfq_response_isolation() -> None:
     settings = get_settings()
     test_db = settings.database_url.get_secret_value()
 
-    with psycopg.connect(test_db, prepare_threshold=None) as conn:
+    with db_connect(test_db, prepare_threshold=None) as conn:
         with conn.cursor() as cur:
             tenant_A, supplier_A = _seed_tenant_and_supplier(cur)
             rfq_A, rec_A, msg_A = _seed_rfq_with_recipient(cur, tenant_A, supplier_A, "sent")
@@ -232,7 +233,7 @@ async def test_rfq_response_isolation() -> None:
     assert result["status"] == "completed"
     assert result["match_method"] != "rfq_reply"
 
-    with psycopg.connect(test_db) as conn:
+    with db_connect(test_db) as conn:
         with conn.cursor() as cur:
             cur.execute("set local role service_role")
             cur.execute("select status from rfq where id = %s", (rfq_A,))

@@ -17,7 +17,6 @@ from datetime import date, datetime, timedelta
 from decimal import Decimal
 from uuid import UUID, uuid4
 
-import psycopg
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -29,6 +28,7 @@ from integration.smart_compare_helpers import (
     member_from_workspace,
     settings_for_test_db,
 )
+from procurepilot_api.db import connect as db_connect
 from procurepilot_api.deps import bearer_token, current_member
 from procurepilot_api.errors import ConflictError
 from procurepilot_api.main import create_app
@@ -112,7 +112,7 @@ def _seed_connection(
     display_name: str = "ProcurePilot Demo Company",
 ) -> UUID:
     cid = connection_id or uuid4()
-    with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+    with db_connect(TEST_DATABASE_URL or "") as conn:
         with conn.cursor() as cur:
             cur.execute("set local role service_role")
             cur.execute(
@@ -164,7 +164,7 @@ def test_full_sync_creates_synced_vendors_and_bills(
         assert result["vendors_synced"] == 3
         assert result["bills_synced"] == 3
 
-        with psycopg.connect(TEST_DATABASE_URL or "", row_factory=dict_row) as conn:
+        with db_connect(TEST_DATABASE_URL or "", row_factory=dict_row) as conn:
             with conn.cursor() as cur:
                 cur.execute("set local role service_role")
                 cur.execute(
@@ -260,7 +260,7 @@ def test_resync_reflects_updated_bill(
             connector=updated_connector,
         )
 
-        with psycopg.connect(TEST_DATABASE_URL or "", row_factory=dict_row) as conn:
+        with db_connect(TEST_DATABASE_URL or "", row_factory=dict_row) as conn:
             with conn.cursor() as cur:
                 cur.execute("set local role service_role")
                 cur.execute(
@@ -320,7 +320,7 @@ def test_initial_sync_respects_90_day_window(
         )
         assert res1["bills_synced"] == 1
 
-        with psycopg.connect(TEST_DATABASE_URL or "", row_factory=dict_row) as conn:
+        with db_connect(TEST_DATABASE_URL or "", row_factory=dict_row) as conn:
             with conn.cursor() as cur:
                 cur.execute("set local role service_role")
                 cur.execute(
@@ -357,7 +357,7 @@ def test_concurrent_sync_triggers_prevented_by_advisory_lock(
         client = TestClient(app, raise_server_exceptions=False)
 
         # Hold the advisory lock in a separate dedicated connection
-        lock_conn = psycopg.connect(TEST_DATABASE_URL or "", autocommit=True)
+        lock_conn = db_connect(TEST_DATABASE_URL or "", autocommit=True)
         try:
             with lock_conn.cursor() as cur:
                 cur.execute(
@@ -425,7 +425,7 @@ def test_needs_reauth_connection_sync_fails_gracefully(
         assert res.status_code == 404, res.text
 
         # Verify no partial writes to synced_bill
-        with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+        with db_connect(TEST_DATABASE_URL or "") as conn:
             with conn.cursor() as cur:
                 cur.execute("set local role service_role")
                 cur.execute(
@@ -461,7 +461,7 @@ def test_token_refresh_failed_transitions_to_needs_reauth_and_returns_404(
             )
 
         # Connection status must now be 'needs_reauth' in database
-        with psycopg.connect(TEST_DATABASE_URL or "", row_factory=dict_row) as conn:
+        with db_connect(TEST_DATABASE_URL or "", row_factory=dict_row) as conn:
             with conn.cursor() as cur:
                 cur.execute("set local role service_role")
                 cur.execute(

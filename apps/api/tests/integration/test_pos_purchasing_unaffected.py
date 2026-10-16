@@ -57,6 +57,7 @@ from integration.smart_compare_helpers import (
     member_from_workspace,
     settings_for_test_db,
 )
+from procurepilot_api.db import connect as db_connect
 from procurepilot_api.deps import bearer_token, current_member
 from procurepilot_api.main import create_app
 from procurepilot_api.modules.auth.jwt import MemberRole
@@ -166,7 +167,7 @@ def _seed_pos_connection(
 ) -> UUID:
     """Insert a pos_connection row with the given status directly into the database."""
     conn_id = uuid4()
-    with psycopg.connect(TEST_DATABASE_URL or "") as db_conn:
+    with db_connect(TEST_DATABASE_URL or "") as db_conn:
         with db_conn.cursor() as cur:
             cur.execute("set local role service_role")
             cur.execute(
@@ -252,7 +253,7 @@ def test_purchasing_unaffected_when_no_pos_connection_exists(
 ) -> None:
     """Proves: Workspace with NO pos_connection creates requests and compares offers normally."""
     with committed_smart_context("pos-none") as context:
-        with psycopg.connect(TEST_DATABASE_URL or "") as db_conn:
+        with db_connect(TEST_DATABASE_URL or "") as db_conn:
             with db_conn.cursor() as cur:
                 act_as(cur, context.workspace)
                 branch_id = _make_branch(cur, context.workspace)
@@ -295,7 +296,7 @@ def test_purchasing_unaffected_when_pos_connection_needs_reauth(
 ) -> None:
     """Proves: Workspace with 'needs_reauth' POS creates requests/compares offers identically."""
     with committed_smart_context("pos-reauth") as context:
-        with psycopg.connect(TEST_DATABASE_URL or "") as db_conn:
+        with db_connect(TEST_DATABASE_URL or "") as db_conn:
             with db_conn.cursor() as cur:
                 act_as(cur, context.workspace)
                 branch_id = _make_branch(cur, context.workspace)
@@ -334,7 +335,7 @@ def test_purchasing_unaffected_when_pos_connection_disconnected(
 ) -> None:
     """Proves: Workspace with disconnected POS creates requests and compares offers identically."""
     with committed_smart_context("pos-disc") as context:
-        with psycopg.connect(TEST_DATABASE_URL or "") as db_conn:
+        with db_connect(TEST_DATABASE_URL or "") as db_conn:
             with db_conn.cursor() as cur:
                 act_as(cur, context.workspace)
                 branch_id = _make_branch(cur, context.workspace)
@@ -385,7 +386,7 @@ def test_disconnecting_active_connection_does_not_disrupt_purchasing(
 ) -> None:
     """Acceptance Scenario 3.2: Disconnecting POS does not disrupt subsequent purchasing."""
     with committed_smart_context("pos-lifecycle") as context:
-        with psycopg.connect(TEST_DATABASE_URL or "") as db_conn:
+        with db_connect(TEST_DATABASE_URL or "") as db_conn:
             with db_conn.cursor() as cur:
                 act_as(cur, context.workspace)
                 branch_id = _make_branch(cur, context.workspace)

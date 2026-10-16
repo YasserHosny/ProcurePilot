@@ -18,6 +18,8 @@ from uuid import UUID, uuid4
 import psycopg
 import pytest
 
+from procurepilot_api.db import connect as db_connect
+
 TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL")
 
 pytestmark = pytest.mark.skipif(
@@ -28,7 +30,7 @@ pytestmark = pytest.mark.skipif(
 
 @pytest.fixture
 def conn() -> Iterator[psycopg.Connection]:
-    with psycopg.connect(TEST_DATABASE_URL or "") as connection:
+    with db_connect(TEST_DATABASE_URL or "") as connection:
         yield connection
         connection.rollback()
 

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import psycopg
 import pytest
 from psycopg.rows import dict_row
 
@@ -10,6 +9,7 @@ from integration.smart_compare_helpers import (
     member_from_workspace,
     settings_for_test_db,
 )
+from procurepilot_api.db import connect as db_connect
 from procurepilot_api.errors import NotFoundError
 from procurepilot_api.modules.billing.service import (
     BillingService,
@@ -26,7 +26,7 @@ def test_default_plan_assignment_creates_stub_billing_account(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     settings = settings_for_test_db(monkeypatch)
-    with psycopg.connect(TEST_DATABASE_URL or "", row_factory=dict_row) as conn:
+    with db_connect(TEST_DATABASE_URL or "", row_factory=dict_row) as conn:
         with conn.cursor() as cur:
             workspace = make_workspace(cur, "billing-account")
             reset_role(cur)
@@ -49,7 +49,7 @@ def test_missing_billing_account_is_configuration_not_empty_data(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     settings = settings_for_test_db(monkeypatch)
-    with psycopg.connect(TEST_DATABASE_URL or "", row_factory=dict_row) as conn:
+    with db_connect(TEST_DATABASE_URL or "", row_factory=dict_row) as conn:
         with conn.cursor() as cur:
             workspace = make_workspace(cur, "billing-missing")
         conn.commit()

@@ -15,6 +15,7 @@ import psycopg
 import pytest
 
 from procurepilot_api.config import get_settings
+from procurepilot_api.db import connect as db_connect
 from procurepilot_api.deps import CurrentMember
 from procurepilot_api.errors import PermissionDeniedError, UnprocessableEntityError
 from procurepilot_api.modules.auth.jwt import MemberRole
@@ -84,7 +85,7 @@ def _owner(tenant_id: uuid.UUID, user_id: uuid.UUID, membership_id: uuid.UUID) -
 
 
 def test_create_guardrail_rejects_non_positive_max_order_value() -> None:
-    with psycopg.connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
+    with db_connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
         with conn.cursor() as cur:
             tenant_id, user_id, membership_id, branch_id = _seed_tenant(cur)
         conn.commit()
@@ -102,7 +103,7 @@ def test_create_guardrail_rejects_non_positive_max_order_value() -> None:
         with pytest.raises(UnprocessableEntityError):
             create_guardrail(payload=payload, member=member, service=service)
 
-    with psycopg.connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
+    with db_connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
         with conn.cursor() as cur:
             cur.execute("set local role service_role")
             cur.execute(
@@ -113,7 +114,7 @@ def test_create_guardrail_rejects_non_positive_max_order_value() -> None:
 
 
 def test_create_guardrail_rejects_non_owner() -> None:
-    with psycopg.connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
+    with db_connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
         with conn.cursor() as cur:
             tenant_id, user_id, membership_id, branch_id = _seed_tenant(cur)
         conn.commit()
@@ -137,7 +138,7 @@ def test_create_guardrail_rejects_non_owner() -> None:
 
 
 def test_create_then_update_guardrail_round_trip() -> None:
-    with psycopg.connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
+    with db_connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
         with conn.cursor() as cur:
             tenant_id, user_id, membership_id, branch_id = _seed_tenant(cur)
         conn.commit()

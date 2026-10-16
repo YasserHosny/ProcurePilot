@@ -10,6 +10,8 @@ from uuid import UUID, uuid4
 import psycopg
 import pytest
 
+from procurepilot_api.db import connect as db_connect
+
 TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL")
 
 R2_4_AUDIT_ACTIONS: tuple[str, ...] = (
@@ -23,7 +25,7 @@ R2_4_AUDIT_ACTIONS: tuple[str, ...] = (
 def conn() -> Iterator[psycopg.Connection]:
     if not TEST_DATABASE_URL:
         pytest.skip("TEST_DATABASE_URL not set; needs Postgres with the R2.4 migrations")
-    with psycopg.connect(TEST_DATABASE_URL) as connection:
+    with db_connect(TEST_DATABASE_URL) as connection:
         yield connection
         connection.rollback()
 

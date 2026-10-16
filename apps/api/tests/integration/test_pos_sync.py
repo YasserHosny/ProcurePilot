@@ -28,7 +28,6 @@ from decimal import Decimal
 from urllib.parse import parse_qs, urlparse
 from uuid import UUID
 
-import psycopg
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -43,6 +42,7 @@ from integration.smart_compare_helpers import (
     member_from_workspace,
     settings_for_test_db,
 )
+from procurepilot_api.db import connect as db_connect
 from procurepilot_api.deps import bearer_token, current_member
 from procurepilot_api.main import create_app
 from procurepilot_api.modules.auth.jwt import MemberRole
@@ -165,7 +165,7 @@ def test_full_sync_creates_signals_with_correct_fields(
         assert cold_brew["velocity_window_days_observed"] < cold_brew["velocity_window_days"]
 
         # Check DB directly for observed window
-        with psycopg.connect(TEST_DATABASE_URL or "", row_factory=dict_row) as db_conn:
+        with db_connect(TEST_DATABASE_URL or "", row_factory=dict_row) as db_conn:
             with db_conn.cursor() as cur:
                 cur.execute("set local role service_role")
                 cur.execute(
@@ -196,7 +196,7 @@ def test_stale_stock_reflects_real_staleness(
 
         # Manually backdate stock_synced_at by 2 days in database
         stale_time = datetime.now() - timedelta(days=2)
-        with psycopg.connect(TEST_DATABASE_URL or "") as db_conn:
+        with db_connect(TEST_DATABASE_URL or "") as db_conn:
             with db_conn.cursor() as cur:
                 cur.execute("set local role service_role")
                 cur.execute(
@@ -232,7 +232,7 @@ def test_concurrent_sync_triggers_conflict(
         conn_id = conn_data["id"]
 
         # Hold the advisory lock on connection_id on an independent dedicated connection
-        holder_conn = psycopg.connect(TEST_DATABASE_URL or "", autocommit=True)
+        holder_conn = db_connect(TEST_DATABASE_URL or "", autocommit=True)
         try:
             with holder_conn.cursor() as cur:
                 cur.execute("select pg_try_advisory_lock(hashtext(%s))", (str(conn_id),))
@@ -267,7 +267,7 @@ def test_needs_reauth_connection_fails_gracefully(
         conn_id = conn_data["id"]
 
         # Set status to needs_reauth
-        with psycopg.connect(TEST_DATABASE_URL or "") as db_conn:
+        with db_connect(TEST_DATABASE_URL or "") as db_conn:
             with db_conn.cursor() as cur:
                 cur.execute("set local role service_role")
                 cur.execute(
@@ -337,7 +337,7 @@ def test_reconnect_dedup_regression(
         client = TestClient(app, raise_server_exceptions=False)
 
         # Seed a matching workspace product so stub-item-001 gets matched automatically
-        with psycopg.connect(TEST_DATABASE_URL or "") as db_conn:
+        with db_connect(TEST_DATABASE_URL or "") as db_conn:
             with db_conn.cursor() as cur:
                 make_workspace_product(
                     cur,
@@ -354,7 +354,7 @@ def test_reconnect_dedup_regression(
         client.post("/api/v1/pos/sync")
 
         # Read original signal and match from DB
-        with psycopg.connect(TEST_DATABASE_URL or "", row_factory=dict_row) as db_conn:
+        with db_connect(TEST_DATABASE_URL or "", row_factory=dict_row) as db_conn:
             with db_conn.cursor() as cur:
                 cur.execute("set local role service_role")
                 cur.execute(
@@ -396,7 +396,7 @@ def test_reconnect_dedup_regression(
         assert sync2_res.status_code == 202
 
         # 6. Verify assertions (a), (b), and (c)
-        with psycopg.connect(TEST_DATABASE_URL or "", row_factory=dict_row) as db_conn:
+        with db_connect(TEST_DATABASE_URL or "", row_factory=dict_row) as db_conn:
             with db_conn.cursor() as cur:
                 cur.execute("set local role service_role")
                 # (a) No duplicate signal: exactly one row for stub-item-001, same signal ID
@@ -450,7 +450,7 @@ def test_sc002_aggregate_coverage(
         fixture_txns = []
         fixture_inv = []
 
-        with psycopg.connect(TEST_DATABASE_URL or "") as db_conn:
+        with db_connect(TEST_DATABASE_URL or "") as db_conn:
             with db_conn.cursor() as cur:
                 for i in range(1, 11):
                     item_id = f"coverage-item-{i:03d}"

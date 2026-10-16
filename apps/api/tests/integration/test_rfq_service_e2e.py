@@ -11,6 +11,7 @@ from psycopg import sql
 
 from integration.quotation_helpers import PsycopgSupabaseClient, PsycopgTableQuery, _adapt_value
 from procurepilot_api.config import get_settings
+from procurepilot_api.db import connect as db_connect
 from procurepilot_api.deps import CurrentMember
 from procurepilot_api.errors import NotFoundError, UnprocessableEntityError
 from procurepilot_api.modules.auth.jwt import MemberRole
@@ -28,7 +29,7 @@ pytestmark = pytest.mark.skipif(
 
 def _seed_tenant(cur: psycopg.Cursor, *, email_suffix: str) -> tuple[UUID, UUID, UUID]:
     tenant_id, user_id, membership_id, invitation_id = uuid4(), uuid4(), uuid4(), uuid4()
-    email = f"rfq-e2e-{email_suffix}@example.test"
+    email = f"rfq-e2e-{email_suffix}-{user_id.hex[:12]}@example.test"
 
     cur.execute(
         "insert into supported_region (code,label_en,label_ar) values ('GB','UK','ب') on conflict do nothing"  # noqa: E501
@@ -269,7 +270,7 @@ def _patch_requests_service_for_test(
     connection with the right role/claims set at the SESSION level (not `local`, since autocommit
     means every statement is its own implicit transaction and `local` settings would not survive
     past the first one)."""
-    conn = psycopg.connect(get_settings().database_url.get_secret_value(), autocommit=True)
+    conn = db_connect(get_settings().database_url.get_secret_value(), autocommit=True)
     with conn.cursor() as cur:
         cur.execute("set role authenticated")
         cur.execute(
@@ -316,7 +317,7 @@ def _member(
 
 
 def test_list_responses() -> None:
-    with psycopg.connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
+    with db_connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
         with conn.cursor() as cur:
             tenant_id, user_id, membership_id = _seed_tenant(cur, email_suffix="list")
             rfq_id, resp1_id, resp2_id, _ = _seed_rfq_and_responses(cur, tenant_id, membership_id)
@@ -338,7 +339,7 @@ def test_list_responses() -> None:
 
 
 def test_prepare_request_and_idempotency(monkeypatch: pytest.MonkeyPatch) -> None:
-    with psycopg.connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
+    with db_connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
         with conn.cursor() as cur:
             tenant_id, user_id, membership_id = _seed_tenant(cur, email_suffix="prep")
             rfq_id, resp1_id, resp2_id, branch_id = _seed_rfq_and_responses(
@@ -366,7 +367,7 @@ def test_prepare_request_and_idempotency(monkeypatch: pytest.MonkeyPatch) -> Non
         idempotency_key=idem_key,
     )
 
-    with psycopg.connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
+    with db_connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
         with conn.cursor() as cur:
             cur.execute(
                 (
@@ -414,7 +415,7 @@ def test_prepare_request_and_idempotency(monkeypatch: pytest.MonkeyPatch) -> Non
     assert res2.purchase_request_id == res.purchase_request_id
 
     # Validate that only one request was created
-    with psycopg.connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
+    with db_connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
         with conn.cursor() as cur:
             cur.execute("select count(*) from purchase_request where tenant_id = %s", (tenant_id,))
             count = cur.fetchone()[0]
@@ -422,7 +423,7 @@ def test_prepare_request_and_idempotency(monkeypatch: pytest.MonkeyPatch) -> Non
 
 
 def test_prepare_request_not_found() -> None:
-    with psycopg.connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
+    with db_connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
         with conn.cursor() as cur:
             tenant_id, user_id, membership_id = _seed_tenant(cur, email_suffix="nf")
             rfq_id, resp1_id, resp2_id, branch_id = _seed_rfq_and_responses(
@@ -448,7 +449,7 @@ def test_prepare_request_not_found() -> None:
 
 
 def test_prepare_request_pending_match() -> None:
-    with psycopg.connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
+    with db_connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
         with conn.cursor() as cur:
             tenant_id, user_id, membership_id = _seed_tenant(cur, email_suffix="pm")
             rfq_id, resp1_id, resp2_id, branch_id = _seed_rfq_and_responses(
@@ -476,7 +477,7 @@ def test_prepare_request_pending_match() -> None:
 
 
 def test_list_rfqs() -> None:
-    with psycopg.connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
+    with db_connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
         with conn.cursor() as cur:
             tenant_id, user_id, membership_id = _seed_tenant(cur, email_suffix="list-rfqs")
             rfq_id, resp1_id, resp2_id, branch_id = _seed_rfq_and_responses(

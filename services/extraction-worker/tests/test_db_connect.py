@@ -12,6 +12,7 @@ import procurepilot_extraction_worker
 from procurepilot_extraction_worker import db
 
 PACKAGE_ROOT = Path(procurepilot_extraction_worker.__file__).resolve().parent
+TESTS_ROOT = Path(__file__).resolve().parent
 
 
 def _direct_connect_calls(package_root: Path) -> list[str]:
@@ -45,9 +46,14 @@ def _direct_connect_calls(package_root: Path) -> list[str]:
 
 
 def test_no_direct_psycopg_connect_outside_db_helper() -> None:
-    offenders = _direct_connect_calls(PACKAGE_ROOT)
-    assert offenders == [], "use procurepilot_extraction_worker.db.connect:\n" + "\n".join(
-        offenders
+    package_offenders = _direct_connect_calls(PACKAGE_ROOT)
+    assert TESTS_ROOT.is_dir()
+    assert any(TESTS_ROOT.rglob("*.py")), f"no Python tests found under {TESTS_ROOT}"
+    test_offenders = _direct_connect_calls(TESTS_ROOT)
+    offenders = package_offenders + test_offenders
+    assert offenders == [], (
+        "use procurepilot_extraction_worker.db.connect (prepare_threshold=None):\n"
+        + "\n".join(offenders)
     )
 
 

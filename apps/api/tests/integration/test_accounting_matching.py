@@ -14,7 +14,6 @@ from datetime import date, datetime, timedelta
 from decimal import Decimal
 from uuid import UUID, uuid4
 
-import psycopg
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -25,6 +24,7 @@ from integration.smart_compare_helpers import (
     committed_smart_context,
     settings_for_test_db,
 )
+from procurepilot_api.db import connect as db_connect
 from procurepilot_api.deps import bearer_token, current_member
 from procurepilot_api.main import create_app
 from procurepilot_api.modules.accounting.connector import (
@@ -96,7 +96,7 @@ def _seed_connection(
     status: str = "active",
 ) -> UUID:
     cid = connection_id or uuid4()
-    with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+    with db_connect(TEST_DATABASE_URL or "") as conn:
         with conn.cursor() as cur:
             cur.execute("set local role service_role")
             cur.execute(
@@ -130,7 +130,7 @@ def _seed_purchase_record(
 ) -> UUID:
     pid = purchase_id or uuid4()
     pdate = ordered_at or date.today()
-    with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+    with db_connect(TEST_DATABASE_URL or "") as conn:
         with conn.cursor() as cur:
             cur.execute("set local role service_role")
             cur.execute(
@@ -174,7 +174,7 @@ def test_exact_match_creates_purchase_bill_match(
     with committed_smart_context("acct-match-exact", supplier_count=1) as context:
         supplier_id = context.supplier_ids[0]
         # Align supplier name with StubConnector default vendor "Global Office Supplies"
-        with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+        with db_connect(TEST_DATABASE_URL or "") as conn:
             with conn.cursor() as cur:
                 cur.execute("set local role service_role")
                 cur.execute(
@@ -209,7 +209,7 @@ def test_exact_match_creates_purchase_bill_match(
 
         assert result["matches_created"] == 1
 
-        with psycopg.connect(TEST_DATABASE_URL or "", row_factory=dict_row) as conn:
+        with db_connect(TEST_DATABASE_URL or "", row_factory=dict_row) as conn:
             with conn.cursor() as cur:
                 cur.execute("set local role service_role")
                 cur.execute(
@@ -289,7 +289,7 @@ def test_cross_tenant_purchase_records_are_never_matched(
             sup_a = ctx_a.supplier_ids[0]
             sup_b = ctx_b.supplier_ids[0]
 
-            with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+            with db_connect(TEST_DATABASE_URL or "") as conn:
                 with conn.cursor() as cur:
                     cur.execute("set local role service_role")
                     cur.execute(
@@ -331,7 +331,7 @@ def test_cross_tenant_purchase_records_are_never_matched(
             # Must not match Tenant B's purchase record!
             assert result["matches_created"] == 0
 
-            with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+            with db_connect(TEST_DATABASE_URL or "") as conn:
                 with conn.cursor() as cur:
                     cur.execute("set local role service_role")
                     cur.execute(
@@ -350,7 +350,7 @@ def test_sc_002_batch_auto_match_rate_at_least_90_percent(
         supplier_id = context.supplier_ids[0]
         vendor_name = "Bulk Batch Supplier"
 
-        with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+        with db_connect(TEST_DATABASE_URL or "") as conn:
             with conn.cursor() as cur:
                 cur.execute("set local role service_role")
                 cur.execute(
@@ -460,7 +460,7 @@ def test_sc_002_batch_auto_match_rate_at_least_90_percent(
         assert match_rate >= 0.90, f"Expected match rate >= 0.90, got {match_rate}"
 
         # Verify DB directly contains exactly 18 matches
-        with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+        with db_connect(TEST_DATABASE_URL or "") as conn:
             with conn.cursor() as cur:
                 cur.execute("set local role service_role")
                 cur.execute(

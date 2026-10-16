@@ -20,6 +20,7 @@ from integration.quotation_helpers import (
     make_supplier,
 )
 from integration.smart_compare_helpers import member_from_workspace, settings_for_test_db
+from procurepilot_api.db import connect as db_connect
 from procurepilot_api.deps import current_member
 from procurepilot_api.main import create_app
 from procurepilot_api.modules.ingestion.stats_service import (
@@ -153,7 +154,7 @@ def test_zero_activity_tenant_returns_all_zero_stats(
 ) -> None:
     """A tenant with no activity returns all zero counts and 0.0 rates with no division-by-zero."""
     settings = settings_for_test_db(monkeypatch)
-    with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+    with db_connect(TEST_DATABASE_URL or "") as conn:
         with conn.cursor() as cur:
             ensure_quotation_reference_data(cur)
             workspace = make_workspace(cur, "stats-zero")
@@ -235,7 +236,7 @@ def test_realistic_mix_computes_exact_rates_by_hand(
     settings = settings_for_test_db(monkeypatch)
     ref_now = datetime(2026, 9, 17, 12, 0, 0, tzinfo=UTC)
 
-    with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+    with db_connect(TEST_DATABASE_URL or "") as conn:
         with conn.cursor() as cur:
             ensure_quotation_reference_data(cur)
             workspace = make_workspace(cur, "stats-rates")
@@ -349,7 +350,7 @@ def test_cross_tenant_isolation(monkeypatch: pytest.MonkeyPatch) -> None:
     settings = settings_for_test_db(monkeypatch)
     ref_now = datetime(2026, 9, 17, 12, 0, 0, tzinfo=UTC)
 
-    with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+    with db_connect(TEST_DATABASE_URL or "") as conn:
         with conn.cursor() as cur:
             ensure_quotation_reference_data(cur)
             # Tenant A: zero activity
@@ -401,7 +402,7 @@ def test_tenant_timezone_window_derivation(monkeypatch: pytest.MonkeyPatch) -> N
     """Reporting timezone from tenant record correctly drives local calendar boundaries."""
     settings = settings_for_test_db(monkeypatch)
 
-    with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+    with db_connect(TEST_DATABASE_URL or "") as conn:
         with conn.cursor() as cur:
             ensure_quotation_reference_data(cur)
             workspace = make_workspace(cur, "stats-tz")
@@ -440,7 +441,7 @@ def test_tenant_timezone_window_derivation(monkeypatch: pytest.MonkeyPatch) -> N
 
 def test_get_stats_http_endpoint_returns_200(monkeypatch: pytest.MonkeyPatch) -> None:
     """GET /api/v1/ingestion/stats returns 200 and matches IngestionStats schema."""
-    with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+    with db_connect(TEST_DATABASE_URL or "") as conn:
         with conn.cursor() as cur:
             ensure_quotation_reference_data(cur)
             workspace = make_workspace(cur, "stats-http")

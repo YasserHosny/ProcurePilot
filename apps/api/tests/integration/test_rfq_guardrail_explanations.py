@@ -15,6 +15,7 @@ from integration.test_rfq_service_e2e import (
     _seed_tenant,
 )
 from procurepilot_api.config import get_settings
+from procurepilot_api.db import connect as db_connect
 from procurepilot_api.deps import CurrentMember
 from procurepilot_api.modules.auth.jwt import MemberRole
 from procurepilot_api.modules.ingestion.orchestrator import _evaluate_guardrails_for_rfq
@@ -60,7 +61,7 @@ def _complete_second_response(cur: psycopg.Cursor, response_id: UUID, product_id
 
 def _seed_explanation_fixture() -> tuple[UUID, UUID, UUID, UUID, UUID, UUID, UUID, UUID]:
     settings = get_settings()
-    with psycopg.connect(settings.database_url.get_secret_value(), prepare_threshold=None) as conn:
+    with db_connect(settings.database_url.get_secret_value(), prepare_threshold=None) as conn:
         with conn.cursor() as cur:
             tenant_id, user_id, membership_id = _seed_tenant(
                 cur, email_suffix=f"explanations-{uuid4().hex}"
@@ -119,7 +120,7 @@ def test_owner_explanations_are_real_read_only_snapshots_and_update_after_firing
     owner = _member(tenant_id, user_id, membership_id, MemberRole.owner)
     service = RfqService(get_settings())
 
-    with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+    with db_connect(TEST_DATABASE_URL or "") as conn:
         with conn.cursor() as cur:
             cur.execute(
                 "select count(*) from auto_preparation_event where tenant_id = %s",
@@ -142,7 +143,7 @@ def test_owner_explanations_are_real_read_only_snapshots_and_update_after_firing
 
     # A second owner read must not create an event, request, audit row, or status transition.
     assert _reasons(service, owner, rfq_id) == before
-    with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+    with db_connect(TEST_DATABASE_URL or "") as conn:
         with conn.cursor() as cur:
             cur.execute(
                 "select count(*) from auto_preparation_event where tenant_id = %s",
@@ -162,13 +163,13 @@ def test_owner_explanations_are_real_read_only_snapshots_and_update_after_firing
     _patch_requests_service_for_test(
         monkeypatch, tenant_id=tenant_id, user_id=user_id, membership_id=membership_id
     )
-    with psycopg.connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
+    with db_connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
         _evaluate_guardrails_for_rfq(get_settings(), conn, tenant_id=tenant_id, rfq_id=rfq_id)
 
     after = _reasons(service, owner, rfq_id)
     assert after[response_a] == "fired"
     assert after[response_b] == "rfq_not_open"
-    with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+    with db_connect(TEST_DATABASE_URL or "") as conn:
         with conn.cursor() as cur:
             cur.execute(
                 "select count(*) from auto_preparation_event "
@@ -183,7 +184,7 @@ def test_pending_response_explanation_is_owner_only_and_cross_tenant_guardrails_
     tenant_id, user_id, membership_id, rfq_id, response_a, response_b, _guardrail_id, _ = (
         _seed_explanation_fixture()
     )
-    with psycopg.connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
+    with db_connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
         with conn.cursor() as cur:
             cur.execute("select quotation_id from rfq_response where id = %s", (response_b,))
             quotation_id = cur.fetchone()[0]
@@ -218,7 +219,7 @@ def test_buyer_receives_the_same_guardrail_explanations_as_owner() -> None:
     tenant_id, owner_user_id, owner_membership, rfq_id, _a, _b, _g, _ = _seed_explanation_fixture()
     buyer_user_id, buyer_membership = uuid4(), uuid4()
     email = f"buyer-{uuid4().hex}@example.test"
-    with psycopg.connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
+    with db_connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
         with conn.cursor() as cur:
             cur.execute("insert into auth.users (id,email) values (%s,%s)", (buyer_user_id, email))
             cur.execute(

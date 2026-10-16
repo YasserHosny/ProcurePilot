@@ -18,10 +18,10 @@ import sys
 import uuid
 from decimal import Decimal
 
-import psycopg
 import pytest
 
 from procurepilot_api.config import get_settings
+from procurepilot_api.db import connect as db_connect
 from procurepilot_api.modules.ingestion.orchestrator import process_inbound_email
 
 sys.path.append(os.path.dirname(__file__))
@@ -48,7 +48,7 @@ async def _run_guardrail_pack_normalisation_test(
     settings = get_settings()
     test_db = settings.database_url.get_secret_value()
 
-    with psycopg.connect(test_db, prepare_threshold=None) as conn:
+    with db_connect(test_db, prepare_threshold=None) as conn:
         with conn.cursor() as cur:
             tenant_id, supplier_id = _seed_tenant_and_supplier(cur)
             rfq_id, rec_id, msg_id = _seed_rfq_with_recipient(cur, tenant_id, supplier_id, "sent")
@@ -174,7 +174,7 @@ async def _run_guardrail_pack_normalisation_test(
     assert result["status"] == "completed"
     quotation_id = uuid.UUID(str(result["quotation_id"]))
 
-    with psycopg.connect(test_db) as conn:
+    with db_connect(test_db) as conn:
         with conn.cursor() as cur:
             cur.execute("set local role service_role")
             cur.execute("select status from rfq where id = %s", (rfq_id,))
@@ -205,7 +205,7 @@ async def _run_guardrail_pack_normalisation_test(
             conn.commit()
 
     enqueue_guardrail_evaluation(settings, tenant_id=tenant_id, quotation_id=quotation_id)
-    with psycopg.connect(test_db) as conn:
+    with db_connect(test_db) as conn:
         with conn.cursor() as cur:
             cur.execute(
                 "select id, tenant_id, job_type, status, payload, attempts, max_attempts "
@@ -230,7 +230,7 @@ async def _run_guardrail_pack_normalisation_test(
             )
     assert _process_job(settings, job) == "completed"
 
-    with psycopg.connect(test_db) as conn:
+    with db_connect(test_db) as conn:
         with conn.cursor() as cur:
             cur.execute("set local role service_role")
 

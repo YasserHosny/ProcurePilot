@@ -6,7 +6,6 @@ from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from uuid import uuid4
 
-import psycopg
 import pytest
 
 from integration.catalogue_helpers import TEST_DATABASE_URL, act_as
@@ -15,6 +14,7 @@ from integration.smart_compare_helpers import (
     committed_smart_context,
     settings_for_test_db,
 )
+from procurepilot_api.db import connect as db_connect
 from procurepilot_api.errors import UnprocessableEntityError
 from procurepilot_api.modules.offers import supplier_iq as supplier_iq_module
 from procurepilot_api.modules.offers.supplier_iq import SupplierIqService
@@ -54,7 +54,7 @@ def test_recompute_persists_four_metrics_and_replays_by_fingerprint(
         with pytest.raises(UnprocessableEntityError):
             service.list_risks(member=context.member, cursor="invalid")
 
-        with psycopg.connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
+        with db_connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
             with conn.cursor() as cur:
                 act_as(cur, context.workspace)
                 cur.execute(
@@ -135,7 +135,7 @@ def test_recompute_rolls_back_header_and_children_on_child_failure(
                 member=context.member, idempotency_key=uuid4()
             )
 
-        with psycopg.connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
+        with db_connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
             with conn.cursor() as cur:
                 act_as(cur, context.workspace)
                 cur.execute(
@@ -167,7 +167,7 @@ def test_recompute_and_evidence_are_tenant_scoped(monkeypatch: pytest.MonkeyPatc
                 == 1
             )
 
-            with psycopg.connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
+            with db_connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
                 with conn.cursor() as cur:
                     act_as(cur, tenant_a.workspace)
                     cur.execute(
@@ -198,7 +198,7 @@ def test_recompute_and_evidence_are_tenant_scoped(monkeypatch: pytest.MonkeyPatc
 def _seed_orders(context: object) -> None:
     from datetime import date, timedelta
 
-    with psycopg.connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
+    with db_connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
         with conn.cursor() as cur:
             act_as(cur, context.workspace)
             for supplier_index, supplier_id in enumerate(context.supplier_ids):

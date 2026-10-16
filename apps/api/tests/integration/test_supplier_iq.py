@@ -15,6 +15,7 @@ from integration.smart_compare_helpers import (
     committed_smart_context,
     settings_for_test_db,
 )
+from procurepilot_api.db import connect as db_connect
 from procurepilot_api.errors import NotFoundError
 from procurepilot_api.modules.offers.supplier_iq import SupplierIqService
 
@@ -140,7 +141,7 @@ def _insert_purchase_record(
     supplier_id: UUID | None = None,
 ) -> UUID:
     purchase_id = uuid4()
-    with psycopg.connect(TEST_DATABASE_URL) as conn:
+    with db_connect(TEST_DATABASE_URL) as conn:
         with conn.cursor() as cur:
             act_as(cur, context.workspace)
             cur.execute(
@@ -191,7 +192,7 @@ def _insert_saving_record(
     supplier_id: UUID | None = None,
 ) -> UUID:
     saving_id = uuid4()
-    with psycopg.connect(TEST_DATABASE_URL) as conn:
+    with db_connect(TEST_DATABASE_URL) as conn:
         with conn.cursor() as cur:
             act_as(cur, context.workspace)
             cur.execute(
@@ -236,7 +237,7 @@ def _insert_saving_record(
 
 def _insert_quality_issue(context: SmartCompareContext, landed_cost_id: UUID) -> UUID:
     issue_id = uuid4()
-    with psycopg.connect(TEST_DATABASE_URL) as conn:
+    with db_connect(TEST_DATABASE_URL) as conn:
         with conn.cursor() as cur:
             act_as(cur, context.workspace)
             branch_id = uuid4()
@@ -315,7 +316,7 @@ def _insert_quality_issue(context: SmartCompareContext, landed_cost_id: UUID) ->
 
 
 def _snapshot_count(context: SmartCompareContext, supplier_id: UUID) -> int:
-    with psycopg.connect(TEST_DATABASE_URL) as conn:
+    with db_connect(TEST_DATABASE_URL) as conn:
         with conn.cursor(row_factory=dict_row) as cur:
             act_as(cur, context.workspace)
             cur.execute(

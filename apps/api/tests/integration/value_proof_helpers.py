@@ -4,11 +4,11 @@ from datetime import date
 from decimal import Decimal
 from uuid import UUID
 
-import psycopg
 from psycopg.rows import dict_row
 
 from integration.catalogue_helpers import TEST_DATABASE_URL
 from integration.smart_compare_helpers import SmartCompareContext
+from procurepilot_api.db import connect as db_connect
 from procurepilot_api.modules.exports.schemas import ExportCreate, ExportFilters
 from procurepilot_api.modules.savings.schemas import Money, PurchaseOutcomeCreate, SavingRecord
 from procurepilot_api.modules.savings.service import SavingsService
@@ -56,7 +56,7 @@ def export_request(*, supplier_id: UUID | None = None) -> ExportCreate:
 
 
 def fetch_savings(tenant_id: UUID) -> list[dict[str, object]]:
-    with psycopg.connect(TEST_DATABASE_URL or "", row_factory=dict_row) as conn:
+    with db_connect(TEST_DATABASE_URL or "", row_factory=dict_row) as conn:
         with conn.cursor() as cur:
             cur.execute(
                 "select * from saving_record where tenant_id = %s order by recorded_at, id",
@@ -66,7 +66,7 @@ def fetch_savings(tenant_id: UUID) -> list[dict[str, object]]:
 
 
 def fetch_export_jobs(tenant_id: UUID) -> list[dict[str, object]]:
-    with psycopg.connect(TEST_DATABASE_URL or "", row_factory=dict_row) as conn:
+    with db_connect(TEST_DATABASE_URL or "", row_factory=dict_row) as conn:
         with conn.cursor() as cur:
             cur.execute(
                 "select * from export_job where tenant_id = %s order by created_at desc, id desc",

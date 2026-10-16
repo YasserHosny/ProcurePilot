@@ -6,7 +6,6 @@ from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from uuid import uuid4
 
-import psycopg
 import pytest
 
 from integration.catalogue_helpers import TEST_DATABASE_URL, act_as, make_workspace_product
@@ -15,6 +14,7 @@ from integration.smart_compare_helpers import (
     committed_smart_context,
     settings_for_test_db,
 )
+from procurepilot_api.db import connect as db_connect
 from procurepilot_api.modules.offers.negotiation_briefs import NegotiationBriefService
 from procurepilot_api.modules.offers.supplier_iq import SupplierIqService
 
@@ -87,7 +87,7 @@ def test_prepare_is_idempotent_and_actions_are_append_only(
         # also being the winning item's displayed evidence (which additionally depends on this
         # tenant's seeded reliability data, a pre-existing, unrelated calculator this task does
         # not touch).
-        with psycopg.connect(TEST_DATABASE_URL or "", prepare_threshold=None) as verify_conn:
+        with db_connect(TEST_DATABASE_URL or "", prepare_threshold=None) as verify_conn:
             with verify_conn.cursor() as verify_cur:
                 verify_cur.execute("reset role")
                 verify_cur.execute(
@@ -126,7 +126,7 @@ def test_prepare_is_idempotent_and_actions_are_append_only(
         )
         assert dismissed.status == "dismissed"
 
-        with psycopg.connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
+        with db_connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
             with conn.cursor() as cur:
                 act_as(cur, context.workspace)
                 cur.execute(
@@ -151,7 +151,7 @@ def test_prepare_is_idempotent_and_actions_are_append_only(
 
 
 def _seed_extra_products(context: object, *, count: int) -> list:
-    with psycopg.connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
+    with db_connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
         with conn.cursor() as cur:
             product_ids = [
                 make_workspace_product(
@@ -166,7 +166,7 @@ def _seed_extra_products(context: object, *, count: int) -> list:
 def _seed_orders(context: object, product_ids: list) -> None:
     from datetime import date
 
-    with psycopg.connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
+    with db_connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
         with conn.cursor() as cur:
             act_as(cur, context.workspace)
             for supplier_index, supplier_id in enumerate(context.supplier_ids):
@@ -217,7 +217,7 @@ def _seed_orders(context: object, product_ids: list) -> None:
 
 def _seed_service_risk_rows(context: object) -> None:
     """Seed three non-matched results plus one linked quality report for supplier zero."""
-    with psycopg.connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
+    with db_connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
         with conn.cursor() as cur:
             act_as(cur, context.workspace)
             cur.execute(

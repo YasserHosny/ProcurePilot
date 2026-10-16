@@ -15,6 +15,7 @@ from integration.smart_compare_helpers import (
     member_from_workspace,
     settings_for_test_db,
 )
+from procurepilot_api.db import connect as db_connect
 from procurepilot_api.deps import bearer_token, current_member
 from procurepilot_api.main import create_app
 from procurepilot_api.modules.auth.jwt import MemberRole
@@ -106,7 +107,7 @@ def test_list_email_logs_pagination_across_pages(monkeypatch: pytest.MonkeyPatch
         base_time = datetime(2026, 9, 17, 10, 0, 0, tzinfo=UTC)
         created_ids: list[UUID] = []
 
-        with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+        with db_connect(TEST_DATABASE_URL or "") as conn:
             for i in range(5):
                 log_id = _insert_email_log(
                     conn,
@@ -167,7 +168,7 @@ def test_list_email_logs_filter_status(monkeypatch: pytest.MonkeyPatch) -> None:
         member = member_from_workspace(context.workspace)
         client = TestClient(_app(monkeypatch, member), raise_server_exceptions=False)
 
-        with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+        with db_connect(TEST_DATABASE_URL or "") as conn:
             id_completed = _insert_email_log(
                 conn, tenant_id=context.workspace.tenant_id, status="completed"
             )
@@ -224,7 +225,7 @@ def test_list_email_logs_filter_from_domain(monkeypatch: pytest.MonkeyPatch) -> 
         member = member_from_workspace(context.workspace)
         client = TestClient(_app(monkeypatch, member), raise_server_exceptions=False)
 
-        with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+        with db_connect(TEST_DATABASE_URL or "") as conn:
             id_alpha = _insert_email_log(
                 conn,
                 tenant_id=context.workspace.tenant_id,
@@ -276,7 +277,7 @@ def test_list_email_logs_filter_date_range(monkeypatch: pytest.MonkeyPatch) -> N
         t2 = datetime(2026, 9, 10, 12, 0, 0, tzinfo=UTC)
         t3 = datetime(2026, 9, 20, 14, 0, 0, tzinfo=UTC)
 
-        with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+        with db_connect(TEST_DATABASE_URL or "") as conn:
             id_1 = _insert_email_log(conn, tenant_id=context.workspace.tenant_id, received_at=t1)
             id_2 = _insert_email_log(conn, tenant_id=context.workspace.tenant_id, received_at=t2)
             id_3 = _insert_email_log(conn, tenant_id=context.workspace.tenant_id, received_at=t3)
@@ -336,7 +337,7 @@ def test_list_email_logs_cross_tenant_isolation(monkeypatch: pytest.MonkeyPatch)
         client_a = TestClient(_app(monkeypatch, member_a), raise_server_exceptions=False)
         client_b = TestClient(_app(monkeypatch, member_b), raise_server_exceptions=False)
 
-        with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+        with db_connect(TEST_DATABASE_URL or "") as conn:
             id_a1 = _insert_email_log(
                 conn, tenant_id=ctx_a.workspace.tenant_id, subject="Tenant A Log 1"
             )
@@ -377,7 +378,7 @@ def test_list_email_logs_quotation_and_supplier_fields(
         member = member_from_workspace(context.workspace)
         client = TestClient(_app(monkeypatch, member), raise_server_exceptions=False)
 
-        with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+        with db_connect(TEST_DATABASE_URL or "") as conn:
             with conn.cursor() as cur:
                 sup_id = make_supplier(cur, context.workspace, "Produce Supplier Ltd")
                 quote_id = make_quotation(cur, context.workspace, supplier_id=sup_id)
@@ -437,7 +438,7 @@ def test_list_email_logs_buyer_and_owner_rbac(monkeypatch: pytest.MonkeyPatch) -
         owner = member_from_workspace(context.workspace, role=MemberRole.owner)
         buyer = member_from_workspace(context.workspace, role=MemberRole.buyer)
 
-        with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+        with db_connect(TEST_DATABASE_URL or "") as conn:
             log_id = _insert_email_log(
                 conn, tenant_id=context.workspace.tenant_id, subject="RBAC check"
             )

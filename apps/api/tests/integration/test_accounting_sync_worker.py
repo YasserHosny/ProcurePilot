@@ -12,7 +12,6 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
-import psycopg
 import pytest
 from psycopg.rows import dict_row
 
@@ -21,6 +20,7 @@ from integration.smart_compare_helpers import (
     committed_smart_context,
     settings_for_test_db,
 )
+from procurepilot_api.db import connect as db_connect
 from procurepilot_api.modules.accounting.sync_service import SyncService
 from procurepilot_api.shared.audit import AuditEventCreate
 from procurepilot_api.workers.accounting_sync_worker import run_loop, tick
@@ -41,7 +41,7 @@ class RecordingAuditWriter:
 
 def _clean_accounting_tables() -> None:
     if TEST_DATABASE_URL:
-        with psycopg.connect(TEST_DATABASE_URL) as conn:
+        with db_connect(TEST_DATABASE_URL) as conn:
             with conn.cursor() as cur:
                 # reconciliation_discrepancy FKs into synced_bill/purchase_record — must be
                 # cleared first, or synced_bill's own delete below hits a FK violation now that
@@ -85,7 +85,7 @@ def _seed_connection(
     disconnected_at: datetime | None = None,
 ) -> UUID:
     cid = connection_id or uuid4()
-    with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+    with db_connect(TEST_DATABASE_URL or "") as conn:
         with conn.cursor() as cur:
             cur.execute("set local role service_role")
             cur.execute(
@@ -128,7 +128,7 @@ def test_concurrency_advisory_lock_prevents_duplicate_syncs(
             last_synced_at=None,
         )
 
-        holder_conn = psycopg.connect(TEST_DATABASE_URL or "", autocommit=True)
+        holder_conn = db_connect(TEST_DATABASE_URL or "", autocommit=True)
         try:
             # Hold the advisory lock on connection_id in an independent database session
             with holder_conn.cursor() as cur:
@@ -162,7 +162,7 @@ def test_concurrency_advisory_lock_prevents_duplicate_syncs(
         assert stats2["skipped_conflict"] == 0
         assert stats2["failed"] == 0
 
-        with psycopg.connect(TEST_DATABASE_URL or "", row_factory=dict_row) as conn:
+        with db_connect(TEST_DATABASE_URL or "", row_factory=dict_row) as conn:
             with conn.cursor() as cur:
                 cur.execute("set local role service_role")
                 cur.execute(
@@ -221,7 +221,7 @@ def test_tick_picks_up_due_connections_and_skips_recent(
                     assert stats["synced"] == 2
                     assert stats["failed"] == 0
 
-                    with psycopg.connect(TEST_DATABASE_URL or "", row_factory=dict_row) as conn:
+                    with db_connect(TEST_DATABASE_URL or "", row_factory=dict_row) as conn:
                         with conn.cursor() as cur:
                             cur.execute("set local role service_role")
                             cur.execute(
@@ -292,7 +292,7 @@ def test_tick_continues_past_failure_to_process_rest(
                 assert stats["failed"] == 1
                 assert stats["skipped_conflict"] == 0
 
-                with psycopg.connect(TEST_DATABASE_URL or "", row_factory=dict_row) as conn:
+                with db_connect(TEST_DATABASE_URL or "", row_factory=dict_row) as conn:
                     with conn.cursor() as cur:
                         cur.execute("set local role service_role")
                         cur.execute(

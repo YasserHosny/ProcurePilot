@@ -89,7 +89,7 @@ def test_xero_vendor_auth_failure_marks_connection_and_records_safe_audit(
         service_role_db,
     )
     monkeypatch.setattr(
-        "procurepilot_api.modules.accounting.sync_service.psycopg.connect",
+        "procurepilot_api.modules.accounting.sync_service.db.connect",
         lambda *_args, **_kwargs: worker_connection,
     )
     monkeypatch.setattr(

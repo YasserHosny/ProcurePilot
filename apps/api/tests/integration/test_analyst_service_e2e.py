@@ -23,6 +23,7 @@ import psycopg
 import pytest
 
 from procurepilot_api.config import get_settings
+from procurepilot_api.db import connect as db_connect
 from procurepilot_api.deps import CurrentMember
 from procurepilot_api.errors import NotFoundError
 from procurepilot_api.modules.analyst.intent import FakeIntentProvider
@@ -230,7 +231,7 @@ def _seed_additional_member(
 
 
 def test_ask_persists_a_real_cited_turn_and_replays_on_idempotency_key() -> None:
-    with psycopg.connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
+    with db_connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
         with conn.cursor() as cur:
             tenant_id, user_id, membership_id = _seed_workspace_with_spend(cur)
         conn.commit()
@@ -266,7 +267,7 @@ def test_ask_persists_a_real_cited_turn_and_replays_on_idempotency_key() -> None
     assert replay.turns[0].id == turn.id
 
     # And the audit event was actually written (FR-012) — not just called.
-    with psycopg.connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
+    with db_connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
         with conn.cursor() as cur:
             cur.execute(
                 "select count(*) from audit_event "
@@ -279,7 +280,7 @@ def test_ask_persists_a_real_cited_turn_and_replays_on_idempotency_key() -> None
 
 
 def test_ask_unsupported_question_returns_explicit_refusal_with_no_citations() -> None:
-    with psycopg.connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
+    with db_connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
         with conn.cursor() as cur:
             tenant_id, user_id, membership_id = _seed_workspace_with_spend(cur)
         conn.commit()
@@ -315,7 +316,7 @@ def test_citations_resolve_to_real_existing_tenant_records_across_categories() -
     retrieval loader yet (landed_cost/delivery_receipt aren't wired into any FR-002
     category at all), so there is nothing to seed or assert for them here.
     """
-    with psycopg.connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
+    with db_connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
         with conn.cursor() as cur:
             tenant_id, user_id, membership_id = _seed_workspace_with_spend(cur)
             _seed_supplier_with_snapshot(
@@ -353,7 +354,7 @@ def test_citations_resolve_to_real_existing_tenant_records_across_categories() -
         matching = [c for c in turn.citations if c.source_kind.value == expected_kind]
         assert matching, f"expected a {expected_kind} citation for: {question!r}"
 
-        with psycopg.connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
+        with db_connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
             with conn.cursor() as cur:
                 for citation in matching:
                     cur.execute(
@@ -367,7 +368,7 @@ def test_citations_resolve_to_real_existing_tenant_records_across_categories() -
 
 
 def test_next_step_link_points_to_existing_negotiation_brief_when_one_exists() -> None:
-    with psycopg.connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
+    with db_connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
         with conn.cursor() as cur:
             tenant_id, user_id, membership_id = _seed_tenant(cur, email_suffix="brief-yes")
             _seed_supplier_with_snapshot(
@@ -391,7 +392,7 @@ def test_next_step_link_points_to_existing_negotiation_brief_when_one_exists() -
     assert turn.next_step_url is not None
     assert turn.next_step_url.startswith("/negotiation-briefs/")
 
-    with psycopg.connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
+    with db_connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
         with conn.cursor() as cur:
             brief_id = turn.next_step_url.removeprefix("/negotiation-briefs/")
             cur.execute(
@@ -402,7 +403,7 @@ def test_next_step_link_points_to_existing_negotiation_brief_when_one_exists() -
 
 
 def test_next_step_link_is_absent_when_no_negotiation_brief_exists() -> None:
-    with psycopg.connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
+    with db_connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
         with conn.cursor() as cur:
             tenant_id, user_id, membership_id = _seed_tenant(cur, email_suffix="brief-no")
             _seed_supplier_with_snapshot(
@@ -429,7 +430,7 @@ def test_next_step_link_is_absent_when_no_negotiation_brief_exists() -> None:
 
 
 def test_next_step_link_points_to_reorder_queue_for_reorder_forecast_answers() -> None:
-    with psycopg.connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
+    with db_connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
         with conn.cursor() as cur:
             tenant_id, user_id, membership_id = _seed_tenant(cur, email_suffix="reorder")
             _seed_reorder_proposal(cur, tenant_id)
@@ -448,7 +449,7 @@ def test_next_step_link_points_to_reorder_queue_for_reorder_forecast_answers() -
 
 
 def test_next_step_link_points_to_reports_for_spend_savings_answers() -> None:
-    with psycopg.connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
+    with db_connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
         with conn.cursor() as cur:
             tenant_id, user_id, membership_id = _seed_workspace_with_spend(cur)
         conn.commit()
@@ -466,7 +467,7 @@ def test_next_step_link_points_to_reports_for_spend_savings_answers() -> None:
 
 
 def test_next_step_link_is_absent_for_orders_quotations_answers() -> None:
-    with psycopg.connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
+    with db_connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
         with conn.cursor() as cur:
             tenant_id, user_id, membership_id = _seed_workspace_with_spend(cur)
         conn.commit()
@@ -492,7 +493,7 @@ def test_next_step_link_is_absent_for_orders_quotations_answers() -> None:
 
 
 def test_follow_up_turn_inherits_prior_context_and_appends_to_same_conversation() -> None:
-    with psycopg.connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
+    with db_connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
         with conn.cursor() as cur:
             tenant_id, user_id, membership_id = _seed_workspace_with_spend(cur)
         conn.commit()
@@ -524,7 +525,7 @@ def test_follow_up_turn_inherits_prior_context_and_appends_to_same_conversation(
 
 
 def test_follow_up_with_new_subject_does_not_inherit_prior_category() -> None:
-    with psycopg.connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
+    with db_connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
         with conn.cursor() as cur:
             tenant_id, user_id, membership_id = _seed_workspace_with_spend(cur)
             _seed_supplier_with_snapshot(
@@ -561,7 +562,7 @@ def test_follow_up_with_new_subject_does_not_inherit_prior_category() -> None:
 
 
 def test_continuation_of_another_tenants_conversation_raises_not_found() -> None:
-    with psycopg.connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
+    with db_connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
         with conn.cursor() as cur:
             tenant_a_id, tenant_a_user, tenant_a_membership = _seed_workspace_with_spend(cur)
             tenant_b_id, tenant_b_user, tenant_b_membership = _seed_tenant(
@@ -594,7 +595,7 @@ def test_continuation_by_a_non_creator_member_raises_not_found() -> None:
     """FR-009 scopes read to creator (+ owner/buyer oversight), but continuing a
     conversation is a WRITE — only the original creator may append to their own
     conversation, even another owner in the same tenant may not."""
-    with psycopg.connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
+    with db_connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
         with conn.cursor() as cur:
             tenant_id, creator_user, creator_membership = _seed_workspace_with_spend(cur)
             other_user_id, other_membership_id = uuid4(), uuid4()
@@ -632,7 +633,7 @@ def test_continuation_by_a_non_creator_member_raises_not_found() -> None:
 
 
 def test_continuation_of_a_nonexistent_conversation_raises_not_found() -> None:
-    with psycopg.connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
+    with db_connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
         with conn.cursor() as cur:
             tenant_id, user_id, membership_id = _seed_workspace_with_spend(cur)
         conn.commit()
@@ -650,7 +651,7 @@ def test_continuation_of_a_nonexistent_conversation_raises_not_found() -> None:
         )
 
 def test_conversation_list_scoping_by_member_and_role() -> None:
-    with psycopg.connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
+    with db_connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
         with conn.cursor() as cur:
             tenant_id, user_1_id, member_1_id = _seed_workspace_with_spend(cur)
             user_2_id, member_2_id = _seed_additional_member(
@@ -700,7 +701,7 @@ def test_conversation_list_scoping_by_member_and_role() -> None:
 
 
 def test_get_conversation_replays_original_turn_unchanged() -> None:
-    with psycopg.connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
+    with db_connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
         with conn.cursor() as cur:
             tenant_id, user_id, membership_id = _seed_workspace_with_spend(cur)
         conn.commit()
@@ -730,7 +731,7 @@ def test_get_conversation_replays_original_turn_unchanged() -> None:
 
 
 def test_get_conversation_access_control() -> None:
-    with psycopg.connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
+    with db_connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
         with conn.cursor() as cur:
             t1_id, u1_id, m1_id = _seed_workspace_with_spend(cur)
             t2_id, u2_id, m2_id = _seed_tenant(cur, email_suffix="t2")

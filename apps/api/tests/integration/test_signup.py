@@ -6,6 +6,7 @@ from uuid import UUID, uuid4
 
 import pytest
 
+from procurepilot_api.db import connect as db_connect
 from procurepilot_api.errors import (
     InvitationRefusedError,
     ServiceUnavailableError,
@@ -232,7 +233,6 @@ def test_failed_signup_leaves_no_partial_tenant() -> None:
 
 @pytest.mark.skipif(not TEST_DATABASE_URL, reason="TEST_DATABASE_URL is not set")
 def test_real_db_signup_uses_unique_arabic_business_slugs() -> None:
-    import psycopg
 
     from procurepilot_api.config import get_settings
     from procurepilot_api.modules.tenants.service import TenantSignupRepository
@@ -242,7 +242,7 @@ def test_real_db_signup_uses_unique_arabic_business_slugs() -> None:
     invitation_ids: list[UUID] = []
     tenant_ids: list[UUID] = []
     try:
-        with psycopg.connect(TEST_DATABASE_URL or "") as conn, conn.cursor() as cur:
+        with db_connect(TEST_DATABASE_URL or "") as conn, conn.cursor() as cur:
             for index in range(2):
                 user_id, invitation_id = uuid4(), uuid4()
                 email = f"signup-{suffix}-{index}@example.test"
@@ -276,7 +276,7 @@ def test_real_db_signup_uses_unique_arabic_business_slugs() -> None:
         assert slugs[1].startswith("mtaam-snd-") and len(slugs[1].rsplit("-", 1)[1]) == 6
         assert slugs[0] != slugs[1] and all(slug != "workspace" for slug in slugs)
     finally:
-        with psycopg.connect(TEST_DATABASE_URL or "") as conn, conn.cursor() as cur:
+        with db_connect(TEST_DATABASE_URL or "") as conn, conn.cursor() as cur:
             cur.execute("set session_replication_role = replica")
             cur.execute("delete from tenant where id = any(%s)", (tenant_ids,))
             cur.execute("delete from auth.users where id = any(%s)", (users,))
@@ -286,7 +286,6 @@ def test_real_db_signup_uses_unique_arabic_business_slugs() -> None:
 
 @pytest.mark.skipif(not TEST_DATABASE_URL, reason="TEST_DATABASE_URL is not set")
 def test_real_db_signup_retries_when_base_slug_is_occupied() -> None:
-    import psycopg
 
     from procurepilot_api.config import get_settings
     from procurepilot_api.modules.tenants.service import TenantSignupRepository
@@ -297,7 +296,7 @@ def test_real_db_signup_retries_when_base_slug_is_occupied() -> None:
     email = f"signup-race-{suffix}@example.test"
     token = f"race{suffix}".ljust(32, "x")
     try:
-        with psycopg.connect(TEST_DATABASE_URL or "") as conn, conn.cursor() as cur:
+        with db_connect(TEST_DATABASE_URL or "") as conn, conn.cursor() as cur:
             cur.execute("insert into auth.users (id,email) values (%s,%s)", (user_id, email))
             cur.execute(
                 "insert into platform_invitation (id,email,token_hash,expires_at) "
@@ -329,7 +328,7 @@ def test_real_db_signup_retries_when_base_slug_is_occupied() -> None:
         created = TenantSignupRepository(get_settings()).create_workspace(request, user_id)
         created_tenant_id = created.tenant.id
         assert created.tenant.slug.startswith("mtaam-snd-")
-        with psycopg.connect(TEST_DATABASE_URL or "") as conn, conn.cursor() as cur:
+        with db_connect(TEST_DATABASE_URL or "") as conn, conn.cursor() as cur:
             cur.execute("select count(*) from tenant where id=%s", (created.tenant.id,))
             assert cur.fetchone()[0] == 1
             cur.execute(
@@ -338,7 +337,7 @@ def test_real_db_signup_retries_when_base_slug_is_occupied() -> None:
             )
             assert cur.fetchone()[0] == 1
     finally:
-        with psycopg.connect(TEST_DATABASE_URL or "") as conn, conn.cursor() as cur:
+        with db_connect(TEST_DATABASE_URL or "") as conn, conn.cursor() as cur:
             cur.execute("set session_replication_role = replica")
             if created_tenant_id is not None:
                 cur.execute("delete from tenant where id=%s", (created_tenant_id,))

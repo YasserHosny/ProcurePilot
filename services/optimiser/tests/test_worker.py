@@ -5,6 +5,7 @@ from uuid import uuid4
 
 import pytest
 
+from procurepilot_optimiser_worker.db import connect as db_connect
 from procurepilot_optimiser_worker.models import BasketItem
 from procurepilot_optimiser_worker.settings import WorkerSettings
 from procurepilot_optimiser_worker.solver import solve_two_supplier_split
@@ -30,7 +31,7 @@ def test_commercial_infeasibility_is_completed_result_shape_not_failed_error() -
 def test_worker_failure_durably_marks_job_failed_after_exception_unwinds(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    psycopg = pytest.importorskip("psycopg")
+    pytest.importorskip("psycopg")
     database_url = os.environ["TEST_DATABASE_URL"]
     tenant_id, user_id, membership_id, invitation_id, job_id = (
         uuid4(),
@@ -40,7 +41,7 @@ def test_worker_failure_durably_marks_job_failed_after_exception_unwinds(
         uuid4(),
     )
     email = f"optimiser-failure-{tenant_id.hex[:8]}@example.test"
-    with psycopg.connect(database_url) as conn:
+    with db_connect(database_url) as conn:
         from psycopg.types.json import Jsonb
 
         with conn.cursor() as cur:
@@ -108,7 +109,7 @@ def test_worker_failure_durably_marks_job_failed_after_exception_unwinds(
         with pytest.raises(RuntimeError, match="forced failure"):
             process_basket_split_job({"job_id": str(job_id), "tenant_id": str(tenant_id)})
 
-        with psycopg.connect(database_url) as conn:
+        with db_connect(database_url) as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     "select status, error from basket_split_job where id = %s",
@@ -119,7 +120,7 @@ def test_worker_failure_durably_marks_job_failed_after_exception_unwinds(
         assert error["code"] == "basket_split_failed"
         assert "forced failure" in error["message"]
     finally:
-        with psycopg.connect(database_url) as conn:
+        with db_connect(database_url) as conn:
             with conn.cursor() as cur:
                 # The owner-guard trigger refuses to delete the last active owner's membership
                 # row, even via cascade from a tenant delete.

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import psycopg
 import pytest
 from psycopg.rows import dict_row
 
@@ -12,6 +11,7 @@ from integration.test_email_ingestion_worker import (
     _patch_storage_and_queue,
     _seed_email_config,
 )
+from procurepilot_api.db import connect as db_connect
 from procurepilot_api.workers import email_ingestion_worker
 from procurepilot_api.workers.requeue_email_ingest import requeue
 
@@ -33,7 +33,7 @@ def test_requeue_dry_run_skip_and_worker_completion(monkeypatch: pytest.MonkeyPa
             status="failed",
             attempts=3,
         )
-        with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+        with db_connect(TEST_DATABASE_URL or "") as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     "update ingestion_jobs set job_type='guardrail_eval' where id=%s",
@@ -50,7 +50,7 @@ def test_requeue_dry_run_skip_and_worker_completion(monkeypatch: pytest.MonkeyPa
             payload={"raw_email_path": raw_path},
             status="pending",
         )
-        with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+        with db_connect(TEST_DATABASE_URL or "") as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     "update ingestion_jobs set job_type='guardrail_eval' where id=%s",
@@ -62,7 +62,7 @@ def test_requeue_dry_run_skip_and_worker_completion(monkeypatch: pytest.MonkeyPa
             conn.commit()
 
         assert requeue(job_ids=[failed_id], tenant_id=None, dry_run=True) == 0
-        with psycopg.connect(TEST_DATABASE_URL or "", row_factory=dict_row) as conn:
+        with db_connect(TEST_DATABASE_URL or "", row_factory=dict_row) as conn:
             with conn.cursor() as cur:
                 cur.execute("select status, attempts from ingestion_jobs where id=%s", (failed_id,))
                 assert cur.fetchone() == {"status": "failed", "attempts": 3}
@@ -70,11 +70,11 @@ def test_requeue_dry_run_skip_and_worker_completion(monkeypatch: pytest.MonkeyPa
             requeue(job_ids=[failed_id, wrong_type_id, pending_id], tenant_id=None, dry_run=False)
             == 1
         )
-        with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+        with db_connect(TEST_DATABASE_URL or "") as conn:
             with conn.cursor() as cur:
                 cur.execute("update ingestion_jobs set status='failed' where id=%s", (pending_id,))
             conn.commit()
-        with psycopg.connect(TEST_DATABASE_URL or "", row_factory=dict_row) as conn:
+        with db_connect(TEST_DATABASE_URL or "", row_factory=dict_row) as conn:
             with conn.cursor() as cur:
                 cur.execute("select status, attempts from ingestion_jobs where id=%s", (failed_id,))
                 assert cur.fetchone() == {"status": "pending", "attempts": 0}
@@ -82,7 +82,7 @@ def test_requeue_dry_run_skip_and_worker_completion(monkeypatch: pytest.MonkeyPa
         # The command reset the failed row; the regular worker consumes it from raw storage.
         stats = email_ingestion_worker.tick(settings)
         assert stats["completed"] == 1
-        with psycopg.connect(TEST_DATABASE_URL or "", row_factory=dict_row) as conn:
+        with db_connect(TEST_DATABASE_URL or "", row_factory=dict_row) as conn:
             with conn.cursor() as cur:
                 cur.execute("select status from ingestion_jobs where id=%s", (failed_id,))
                 assert cur.fetchone()["status"] == "completed"

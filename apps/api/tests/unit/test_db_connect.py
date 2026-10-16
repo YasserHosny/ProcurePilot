@@ -18,6 +18,7 @@ import procurepilot_api
 from procurepilot_api import db
 
 PACKAGE_ROOT = Path(procurepilot_api.__file__).resolve().parent
+TESTS_ROOT = Path(__file__).resolve().parents[1]
 
 
 def _direct_connect_calls(package_root: Path) -> list[str]:
@@ -51,7 +52,11 @@ def _direct_connect_calls(package_root: Path) -> list[str]:
 
 
 def test_no_direct_psycopg_connect_outside_db_helper() -> None:
-    offenders = _direct_connect_calls(PACKAGE_ROOT)
+    package_offenders = _direct_connect_calls(PACKAGE_ROOT)
+    assert TESTS_ROOT.is_dir()
+    assert any(TESTS_ROOT.rglob("*.py")), f"no Python tests found under {TESTS_ROOT}"
+    test_offenders = _direct_connect_calls(TESTS_ROOT)
+    offenders = package_offenders + test_offenders
     assert offenders == [], (
         "open connections with procurepilot_api.db.connect (prepare_threshold=None for the "
         "Supabase transaction pooler), not psycopg directly:\n" + "\n".join(offenders)

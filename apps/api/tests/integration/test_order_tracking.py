@@ -18,6 +18,7 @@ from integration.smart_compare_helpers import (
     member_from_workspace,
     settings_for_test_db,
 )
+from procurepilot_api.db import connect as db_connect
 from procurepilot_api.deps import bearer_token, current_member
 from procurepilot_api.main import create_app
 from procurepilot_api.modules.auth.jwt import MemberRole
@@ -110,7 +111,7 @@ def test_create_draft_from_approved_request(monkeypatch: pytest.MonkeyPatch) -> 
         app = _app(monkeypatch, member)
         client = TestClient(app, raise_server_exceptions=False)
 
-        with psycopg.connect(TEST_DATABASE_URL) as conn:
+        with db_connect(TEST_DATABASE_URL) as conn:
             req_id, line_id = _setup_approved_request(conn, context.workspace, context.product_id)
 
         payload = _base_order_payload(context.supplier_ids[0], req_id, line_id, context.product_id)
@@ -124,7 +125,7 @@ def test_create_draft_from_approved_request(monkeypatch: pytest.MonkeyPatch) -> 
         assert data["source_request_id"] == str(req_id)
         assert data["total"]["amount"] == "62.50"
 
-        with psycopg.connect(TEST_DATABASE_URL) as conn:
+        with db_connect(TEST_DATABASE_URL) as conn:
             with conn.cursor() as cur:
                 cur.execute("select status from purchase_request where id = %s", (req_id,))
                 assert cur.fetchone()[0] == "ordered"
@@ -138,7 +139,7 @@ def test_approved_request_list_item_can_create_and_edit_linked_draft_order(
         app = _app(monkeypatch, member)
         client = TestClient(app, raise_server_exceptions=False)
 
-        with psycopg.connect(TEST_DATABASE_URL) as conn:
+        with db_connect(TEST_DATABASE_URL) as conn:
             req_id, line_id = _setup_approved_request(conn, context.workspace, context.product_id)
 
             act_as(conn, context.workspace)
@@ -190,7 +191,7 @@ def test_reject_ordered_status_without_approval_proof(
         branch_id = uuid4()
         req_id = uuid4()
         line_id = uuid4()
-        with psycopg.connect(TEST_DATABASE_URL) as conn:
+        with db_connect(TEST_DATABASE_URL) as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     "insert into branch (id,tenant_id,name,region) "
@@ -235,7 +236,7 @@ def test_idempotent_draft_editing_and_allocation(
         app = _app(monkeypatch, member)
         client = TestClient(app, raise_server_exceptions=False)
 
-        with psycopg.connect(TEST_DATABASE_URL) as conn:
+        with db_connect(TEST_DATABASE_URL) as conn:
             req_id, line_id = _setup_approved_request(conn, context.workspace, context.product_id)
 
         payload = _base_order_payload(context.supplier_ids[0], req_id, line_id, context.product_id)
@@ -282,7 +283,7 @@ def test_stale_edit_idempotency_retry_does_not_overwrite_newer_edit(
         app = _app(monkeypatch, member)
         client = TestClient(app, raise_server_exceptions=False)
 
-        with psycopg.connect(TEST_DATABASE_URL) as conn:
+        with db_connect(TEST_DATABASE_URL) as conn:
             req_id, line_id = _setup_approved_request(conn, context.workspace, context.product_id)
 
         payload = _base_order_payload(context.supplier_ids[0], req_id, line_id, context.product_id)
@@ -361,7 +362,7 @@ def test_concurrent_allocation_limits(monkeypatch: pytest.MonkeyPatch) -> None:
     with committed_smart_context("order-concurrent") as context:
         member = member_from_workspace(context.workspace, role=MemberRole.owner)
 
-        with psycopg.connect(TEST_DATABASE_URL) as conn:
+        with db_connect(TEST_DATABASE_URL) as conn:
             req_id, line_id = _setup_approved_request(conn, context.workspace, context.product_id)
 
         payload1 = _base_order_payload(
@@ -398,7 +399,7 @@ def test_cancellation_releases_unreceived_quantity_but_retains_receipts(
         app = _app(monkeypatch, member)
         client = TestClient(app, raise_server_exceptions=False)
 
-        with psycopg.connect(TEST_DATABASE_URL) as conn:
+        with db_connect(TEST_DATABASE_URL) as conn:
             req_id, line_id = _setup_approved_request(conn, context.workspace, context.product_id)
 
         payload = _base_order_payload(
@@ -413,7 +414,7 @@ def test_cancellation_releases_unreceived_quantity_but_retains_receipts(
         order_line_id = order["lines"][0]["id"]
 
         # Insert a real receipt for 4 items directly into DB
-        with psycopg.connect(TEST_DATABASE_URL) as conn:
+        with db_connect(TEST_DATABASE_URL) as conn:
             with conn.cursor() as cur:
                 receipt_id = uuid4()
                 cur.execute(
@@ -462,7 +463,7 @@ def test_cancellation_releases_unreceived_quantity_but_retains_receipts(
         lines = {item["source_request_line_id"]: item for item in data.get("lines", [])}
         assert Decimal(str(lines[str(line_id)]["remaining_quantity"])) == Decimal("6.00")
 
-        with psycopg.connect(TEST_DATABASE_URL) as conn:
+        with db_connect(TEST_DATABASE_URL) as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     "select sum(received_quantity) from delivery_receipt_line "
@@ -480,7 +481,7 @@ def test_cross_tenant_and_role_rejections(
         committed_smart_context("order-tenant-a") as context_a,
         committed_smart_context("order-tenant-b") as context_b,
     ):
-        with psycopg.connect(TEST_DATABASE_URL) as conn:
+        with db_connect(TEST_DATABASE_URL) as conn:
             req_id_a, line_id_a = _setup_approved_request(
                 conn, context_a.workspace, context_a.product_id
             )
@@ -530,7 +531,7 @@ def test_cross_tenant_and_role_rejections(
 
 def test_database_rejects_line_from_different_source_request() -> None:
     with committed_smart_context("order-line-integrity") as context:
-        with psycopg.connect(TEST_DATABASE_URL) as conn:
+        with db_connect(TEST_DATABASE_URL) as conn:
             req_id_a, _line_id_a = _setup_approved_request(
                 conn, context.workspace, context.product_id
             )

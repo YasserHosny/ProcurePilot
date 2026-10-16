@@ -20,6 +20,7 @@ from integration.catalogue_helpers import (
 )
 from integration.quotation_helpers import make_supplier
 from integration.smart_compare_helpers import cleanup_workspace
+from procurepilot_api.db import connect as db_connect
 
 pytestmark = pytest.mark.skipif(
     not TEST_DATABASE_URL,
@@ -29,7 +30,7 @@ pytestmark = pytest.mark.skipif(
 
 def test_refresh_schedule_is_isolated_between_tenants() -> None:
     assert TEST_DATABASE_URL
-    with psycopg.connect(TEST_DATABASE_URL) as conn:
+    with db_connect(TEST_DATABASE_URL) as conn:
         with conn.cursor() as cur:
             tenant_a = make_workspace(cur, "r34-isolation-alpha")
             tenant_b = make_workspace(cur, "r34-isolation-beta")

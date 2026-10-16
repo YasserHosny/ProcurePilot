@@ -20,7 +20,6 @@ from __future__ import annotations
 from urllib.parse import parse_qs, urlparse
 from uuid import UUID
 
-import psycopg
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -32,6 +31,7 @@ from integration.smart_compare_helpers import (
     member_from_workspace,
     settings_for_test_db,
 )
+from procurepilot_api.db import connect as db_connect
 from procurepilot_api.deps import bearer_token, current_member
 from procurepilot_api.main import create_app
 from procurepilot_api.modules.auth.jwt import MemberRole
@@ -195,7 +195,7 @@ def test_disconnect_preserves_row_and_updates_status(
         assert get_res.json()["status"] == "disconnected"
 
         # Verify DB directly: row is preserved (not deleted)
-        with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+        with db_connect(TEST_DATABASE_URL or "") as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     """
@@ -252,7 +252,7 @@ def test_callback_with_error_or_missing_code_leaves_no_connection(
         assert "pos_connected=failed" in nocode_res.headers["location"]
 
         # Confirm DB has 0 rows for this tenant
-        with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+        with db_connect(TEST_DATABASE_URL or "") as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     "select count(*) from pos_connection where tenant_id = %s",
@@ -337,7 +337,7 @@ def test_reconnect_after_disconnect_creates_new_row(
         assert conn_1_id != conn_2_id
 
         # Verify DB directly: both rows exist and are independently queryable
-        with psycopg.connect(TEST_DATABASE_URL or "", row_factory=dict_row) as conn:
+        with db_connect(TEST_DATABASE_URL or "", row_factory=dict_row) as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     """
@@ -393,7 +393,7 @@ def test_token_refresh_failed_transitions_to_needs_reauth(
             )
 
         # Connection status in DB must now be 'needs_reauth'
-        with psycopg.connect(TEST_DATABASE_URL or "", row_factory=dict_row) as conn:
+        with db_connect(TEST_DATABASE_URL or "", row_factory=dict_row) as conn:
             with conn.cursor() as cur:
                 cur.execute("set local role service_role")
                 cur.execute(
@@ -430,7 +430,7 @@ def test_disconnected_connection_preserves_synced_product_signals(
         conn_id = conn_data["id"]
 
         # Seed a synced_product_signal row linked to this connection
-        with psycopg.connect(TEST_DATABASE_URL or "") as db_conn:
+        with db_connect(TEST_DATABASE_URL or "") as db_conn:
             with db_conn.cursor() as cur:
                 cur.execute("set local role service_role")
                 cur.execute(
@@ -458,7 +458,7 @@ def test_disconnected_connection_preserves_synced_product_signals(
         assert disc_res.json()["status"] == "disconnected"
 
         # Verify synced_product_signal is still present and queryable
-        with psycopg.connect(TEST_DATABASE_URL or "", row_factory=dict_row) as db_conn:
+        with db_connect(TEST_DATABASE_URL or "", row_factory=dict_row) as db_conn:
             with db_conn.cursor() as cur:
                 cur.execute("set local role service_role")
                 cur.execute(

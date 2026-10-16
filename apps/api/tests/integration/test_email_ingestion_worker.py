@@ -5,13 +5,13 @@ from datetime import UTC, datetime, timedelta
 from email.message import EmailMessage
 from uuid import UUID, uuid4
 
-import psycopg
 import pytest
 from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 
 from integration.catalogue_helpers import TEST_DATABASE_URL
 from integration.smart_compare_helpers import committed_smart_context, settings_for_test_db
+from procurepilot_api.db import connect as db_connect
 from procurepilot_api.modules.ingestion import orchestrator as orchestrator_module
 from procurepilot_api.workers import email_ingestion_worker
 from procurepilot_api.workers.email_ingestion_worker import (
@@ -29,7 +29,7 @@ pytestmark = pytest.mark.skipif(
 @pytest.fixture(autouse=True)
 def _park_existing_claimable_jobs(monkeypatch: pytest.MonkeyPatch) -> None:
     settings = settings_for_test_db(monkeypatch)
-    with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+    with db_connect(TEST_DATABASE_URL or "") as conn:
         with conn.cursor() as cur:
             cur.execute(
                 """
@@ -122,7 +122,7 @@ def _patch_storage_and_queue(
 
 
 def _seed_email_config(tenant_id: UUID, created_by: UUID) -> None:
-    with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+    with db_connect(TEST_DATABASE_URL or "") as conn:
         with conn.cursor() as cur:
             cur.execute(
                 """
@@ -163,7 +163,7 @@ def _insert_email_job(
     locked_at: datetime | None = None,
 ) -> UUID:
     job_id = uuid4()
-    with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+    with db_connect(TEST_DATABASE_URL or "") as conn:
         with conn.cursor() as cur:
             cur.execute(
                 """
@@ -201,7 +201,7 @@ def test_claim_pending_jobs_claims_and_updates_status(
             max_attempts=3,
         )
 
-        with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+        with db_connect(TEST_DATABASE_URL or "") as conn:
             claimed = _claim_pending_jobs(conn, limit=10)
             conn.commit()
 
@@ -217,7 +217,7 @@ def test_claim_pending_jobs_claims_and_updates_status(
         assert claimed_job["max_attempts"] == 3
 
         # Assert database status is now 'processing'
-        with psycopg.connect(TEST_DATABASE_URL or "", row_factory=dict_row) as conn:
+        with db_connect(TEST_DATABASE_URL or "", row_factory=dict_row) as conn:
             with conn.cursor() as cur:
                 cur.execute("select * from ingestion_jobs where id = %s", (job_id,))
                 db_row = cur.fetchone()
@@ -239,8 +239,8 @@ def test_concurrency_skip_locked_prevents_duplicate_claims(
             status="pending",
         )
 
-        conn_a = psycopg.connect(TEST_DATABASE_URL or "")
-        conn_b = psycopg.connect(TEST_DATABASE_URL or "")
+        conn_a = db_connect(TEST_DATABASE_URL or "")
+        conn_b = db_connect(TEST_DATABASE_URL or "")
         try:
             # Connection A starts transaction and runs claim query without committing yet
             claimed_a = _claim_pending_jobs(conn_a, limit=10)
@@ -261,7 +261,7 @@ def test_concurrency_skip_locked_prevents_duplicate_claims(
             conn_b.close()
 
         # Verify the database shows the job is claimed
-        with psycopg.connect(TEST_DATABASE_URL or "", row_factory=dict_row) as conn:
+        with db_connect(TEST_DATABASE_URL or "", row_factory=dict_row) as conn:
             with conn.cursor() as cur:
                 cur.execute("select status, locked_by from ingestion_jobs where id = %s", (job_id,))
                 row = cur.fetchone()
@@ -278,7 +278,7 @@ def test_tick_success_path_creates_document_quotation_and_extraction_job(
     with committed_smart_context("email-worker-success", supplier_count=1) as context:
         supplier_id = context.supplier_ids[0]
         _seed_email_config(context.workspace.tenant_id, context.workspace.membership_id)
-        with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+        with db_connect(TEST_DATABASE_URL or "") as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     "update supplier set email_domains = %s where id = %s",
@@ -305,7 +305,7 @@ def test_tick_success_path_creates_document_quotation_and_extraction_job(
         assert len(uploads) == 1
         assert len(enqueued) == 1
 
-        with psycopg.connect(TEST_DATABASE_URL or "", row_factory=dict_row) as conn:
+        with db_connect(TEST_DATABASE_URL or "", row_factory=dict_row) as conn:
             with conn.cursor() as cur:
                 cur.execute("select * from ingestion_jobs where id = %s", (job_id,))
                 job_row = cur.fetchone()
@@ -373,7 +373,7 @@ def test_failure_retry_and_terminal_failed_status(
         )
 
         def _get_job() -> dict[str, object]:
-            with psycopg.connect(TEST_DATABASE_URL or "", row_factory=dict_row) as conn:
+            with db_connect(TEST_DATABASE_URL or "", row_factory=dict_row) as conn:
                 with conn.cursor() as cur:
                     cur.execute("select * from ingestion_jobs where id = %s", (job_id,))
                     row = cur.fetchone()
@@ -472,7 +472,7 @@ def test_storage_failure_log_survives_retries_and_retry_resumes_same_row(
 
         for _ in range(3):
             tick(settings)
-        with psycopg.connect(TEST_DATABASE_URL or "", row_factory=dict_row) as conn:
+        with db_connect(TEST_DATABASE_URL or "", row_factory=dict_row) as conn:
             with conn.cursor() as cur:
                 cur.execute("select status from ingestion_jobs where id=%s", (job_id,))
                 assert cur.fetchone()["status"] == "failed"
@@ -491,7 +491,7 @@ def test_storage_failure_log_survives_retries_and_retry_resumes_same_row(
         assert requeue(job_ids=[job_id], tenant_id=None, dry_run=False) == 0
         should_fail = False
         tick(settings)
-        with psycopg.connect(TEST_DATABASE_URL or "", row_factory=dict_row) as conn:
+        with db_connect(TEST_DATABASE_URL or "", row_factory=dict_row) as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     "select id, status from ingestion_email_log where tenant_id=%s",
@@ -523,7 +523,7 @@ def test_tenant_id_discipline_read_from_job_row_not_untrusted_payload(
         real_tenant_id = context.workspace.tenant_id
         supplier_id = context.supplier_ids[0]
         _seed_email_config(real_tenant_id, context.workspace.membership_id)
-        with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+        with db_connect(TEST_DATABASE_URL or "") as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     "update supplier set email_domains = %s where id = %s",
@@ -598,7 +598,7 @@ def test_tenant_id_discipline_read_from_job_row_not_untrusted_payload(
 
         # Assert database records are associated with the real row tenant_id and
         # NOT the fake tenant_id
-        with psycopg.connect(TEST_DATABASE_URL or "", row_factory=dict_row) as conn:
+        with db_connect(TEST_DATABASE_URL or "", row_factory=dict_row) as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     "select status from ingestion_jobs where id in (%s, %s)",
@@ -642,7 +642,7 @@ def test_stale_processing_job_reclaimed_and_processed_on_tick(
     with committed_smart_context("email-worker-stale-reclaim", supplier_count=1) as context:
         supplier_id = context.supplier_ids[0]
         _seed_email_config(context.workspace.tenant_id, context.workspace.membership_id)
-        with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+        with db_connect(TEST_DATABASE_URL or "") as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     "update supplier set email_domains = %s where id = %s",
@@ -678,7 +678,7 @@ def test_stale_processing_job_reclaimed_and_processed_on_tick(
         assert len(enqueued) == 1
         assert "claimed: reclaimed stale lock" in caplog.text
 
-        with psycopg.connect(TEST_DATABASE_URL or "", row_factory=dict_row) as conn:
+        with db_connect(TEST_DATABASE_URL or "", row_factory=dict_row) as conn:
             with conn.cursor() as cur:
                 cur.execute("select * from ingestion_jobs where id = %s", (job_id,))
                 job_row = cur.fetchone()
@@ -708,7 +708,7 @@ def test_recent_processing_job_not_reclaimed_by_concurrent_worker(
             locked_at=recent_time,
         )
 
-        with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+        with db_connect(TEST_DATABASE_URL or "") as conn:
             claimed = _claim_pending_jobs(conn, settings=settings, limit=10)
             conn.commit()
 
@@ -718,7 +718,7 @@ def test_recent_processing_job_not_reclaimed_by_concurrent_worker(
         stats = tick(settings)
         assert stats["claimed"] == 0
 
-        with psycopg.connect(TEST_DATABASE_URL or "", row_factory=dict_row) as conn:
+        with db_connect(TEST_DATABASE_URL or "", row_factory=dict_row) as conn:
             with conn.cursor() as cur:
                 cur.execute("select * from ingestion_jobs where id = %s", (job_id,))
                 job_row = cur.fetchone()
@@ -760,7 +760,7 @@ def test_stale_job_exceeding_max_attempts_marked_failed_directly(
         assert stats["claimed"] == 0
         assert stats["failed"] == 0
 
-        with psycopg.connect(TEST_DATABASE_URL or "", row_factory=dict_row) as conn:
+        with db_connect(TEST_DATABASE_URL or "", row_factory=dict_row) as conn:
             with conn.cursor() as cur:
                 cur.execute("select * from ingestion_jobs where id = %s", (job_id,))
                 job_row = cur.fetchone()

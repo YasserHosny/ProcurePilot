@@ -55,6 +55,8 @@ import psycopg
 import pytest
 from psycopg.types.json import Jsonb
 
+from procurepilot_api.db import connect as db_connect
+
 TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL")
 
 pytestmark = pytest.mark.skipif(
@@ -727,7 +729,7 @@ def make_workspace(cur: psycopg.Cursor, label: str) -> Workspace:
 @pytest.fixture
 def workspaces() -> Iterator[tuple[psycopg.Connection, Workspace, Workspace]]:
     """Two unrelated businesses on one database — the situation isolation must survive."""
-    with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+    with db_connect(TEST_DATABASE_URL or "") as conn:
         with conn.cursor() as cur:
             alpha = make_workspace(cur, "alpha")
             beta = make_workspace(cur, "beta")

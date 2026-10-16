@@ -3,12 +3,12 @@ from __future__ import annotations
 from email.message import EmailMessage
 from uuid import UUID, uuid4
 
-import psycopg
 import pytest
 from psycopg.rows import dict_row
 
 from integration.catalogue_helpers import TEST_DATABASE_URL
 from integration.smart_compare_helpers import committed_smart_context, settings_for_test_db
+from procurepilot_api.db import connect as db_connect
 from procurepilot_api.modules.ingestion import orchestrator as orchestrator_module
 
 pytestmark = pytest.mark.skipif(
@@ -77,7 +77,7 @@ def _patch_storage_and_queue(
 
 
 def _seed_email_config(tenant_id: UUID, created_by: UUID) -> None:
-    with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+    with db_connect(TEST_DATABASE_URL or "") as conn:
         with conn.cursor() as cur:
             cur.execute(
                 """
@@ -131,7 +131,7 @@ def _seed_rfq_recipient(tenant_id: UUID, supplier_id: UUID) -> tuple[UUID, str]:
     recipient_id = uuid4()
     idempotency_key = uuid4()
     message_id = f"<{uuid4()}@procurepilot.test>"
-    with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+    with db_connect(TEST_DATABASE_URL or "") as conn:
         with conn.cursor() as cur:
             cur.execute(
                 """
@@ -187,7 +187,7 @@ def test_shared_address_rfq_replies_use_their_recipient_supplier(
             assert result["match_method"] == "rfq_reply"
             results.append((result, recipient, supplier))
 
-        with psycopg.connect(TEST_DATABASE_URL or "", row_factory=dict_row) as conn:
+        with db_connect(TEST_DATABASE_URL or "", row_factory=dict_row) as conn:
             with conn.cursor() as cur:
                 for result, recipient, supplier in results:
                     cur.execute(
@@ -221,7 +221,7 @@ def test_rfq_reply_overrides_conflicting_address_history(
         supplier_a, supplier_b = context.supplier_ids
         _seed_email_config(context.workspace.tenant_id, context.workspace.membership_id)
         recipient_b, message_b = _seed_rfq_recipient(context.workspace.tenant_id, supplier_b)
-        with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+        with db_connect(TEST_DATABASE_URL or "") as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     """insert into ingestion_email_log
@@ -250,7 +250,7 @@ def test_rfq_reply_overrides_conflicting_address_history(
         )
         assert result["supplier_id"] == str(supplier_b)
         assert result["match_method"] == "rfq_reply"
-        with psycopg.connect(TEST_DATABASE_URL or "", row_factory=dict_row) as conn:
+        with db_connect(TEST_DATABASE_URL or "", row_factory=dict_row) as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     "select supplier_id, match_method from ingestion_email_log "
@@ -298,7 +298,7 @@ def test_ambiguous_rfq_references_fall_back_without_response(
         )
 
         assert result["match_method"] != "rfq_reply"
-        with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+        with db_connect(TEST_DATABASE_URL or "") as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     "select count(*) from rfq_response where rfq_recipient_id in (%s, %s)",
@@ -316,7 +316,7 @@ def test_non_rfq_email_keeps_single_supplier_address_history_match(
     with committed_smart_context("ingestion-non-rfq-address", supplier_count=1) as context:
         supplier_id = context.supplier_ids[0]
         _seed_email_config(context.workspace.tenant_id, context.workspace.membership_id)
-        with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+        with db_connect(TEST_DATABASE_URL or "") as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     """insert into ingestion_email_log
@@ -343,7 +343,7 @@ def test_non_rfq_email_keeps_single_supplier_address_history_match(
         )
         assert result["supplier_id"] == str(supplier_id)
         assert result["match_method"] == "address"
-        with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+        with db_connect(TEST_DATABASE_URL or "") as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     "select count(*) from rfq_response where quotation_id = %s",
@@ -361,7 +361,7 @@ def test_matched_supplier_email_creates_document_quotation_and_extraction_job(
     with committed_smart_context("ingestion-orchestrator-matched", supplier_count=1) as context:
         supplier_id = context.supplier_ids[0]
         _seed_email_config(context.workspace.tenant_id, context.workspace.membership_id)
-        with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+        with db_connect(TEST_DATABASE_URL or "") as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     "update supplier set email_domains = %s where id = %s",
@@ -384,7 +384,7 @@ def test_matched_supplier_email_creates_document_quotation_and_extraction_job(
         assert len(uploads) == 1
         assert len(enqueued) == 1
 
-        with psycopg.connect(TEST_DATABASE_URL or "", row_factory=dict_row) as conn:
+        with db_connect(TEST_DATABASE_URL or "", row_factory=dict_row) as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     "select * from ingestion_email_log where tenant_id = %s",
@@ -431,7 +431,7 @@ def test_arabic_filename_is_stored_as_ascii_key_and_preserved_for_display(
         )
         assert result["status"] == "completed"
         assert len(uploads) == 1 and uploads[0][0].isascii()
-        with psycopg.connect(TEST_DATABASE_URL or "", row_factory=dict_row) as conn:
+        with db_connect(TEST_DATABASE_URL or "", row_factory=dict_row) as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     "select d.original_filename, d.storage_path, q.id as quotation_id "
@@ -466,7 +466,7 @@ def test_unmatched_supplier_email_creates_a_review_task(
         assert result["supplier_id"] is None
         assert result["match_method"] is None
 
-        with psycopg.connect(TEST_DATABASE_URL or "", row_factory=dict_row) as conn:
+        with db_connect(TEST_DATABASE_URL or "", row_factory=dict_row) as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     "select * from review_task where quotation_id = %s",
@@ -501,7 +501,7 @@ def test_no_attachment_email_stores_body_text_as_the_document(
         assert result["status"] == "completed"
         assert uploads[0][2]["content-type"] == "text/plain"
 
-        with psycopg.connect(TEST_DATABASE_URL or "", row_factory=dict_row) as conn:
+        with db_connect(TEST_DATABASE_URL or "", row_factory=dict_row) as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     "select mime_type from document where id = %s",
@@ -538,7 +538,7 @@ def test_duplicate_message_id_is_skipped_without_creating_a_second_quotation(
         assert first["status"] == "completed"
         assert second == {"status": "duplicate", "message_id": "dup-msg@x"}
 
-        with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+        with db_connect(TEST_DATABASE_URL or "") as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     "select count(*) from ingestion_email_log where tenant_id = %s",
@@ -563,7 +563,7 @@ def test_multiple_attachments_stores_all_documents_but_extracts_only_primary(
     with committed_smart_context("ingestion-orchestrator-multi-att", supplier_count=1) as context:
         supplier_id = context.supplier_ids[0]
         _seed_email_config(context.workspace.tenant_id, context.workspace.membership_id)
-        with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+        with db_connect(TEST_DATABASE_URL or "") as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     "update supplier set email_domains = %s where id = %s",
@@ -603,7 +603,7 @@ def test_multiple_attachments_stores_all_documents_but_extracts_only_primary(
         assert str(enqueued[0]["document_id"]) == result["document_id"]
         assert str(enqueued[0]["quotation_id"]) == result["quotation_id"]
 
-        with psycopg.connect(TEST_DATABASE_URL or "", row_factory=dict_row) as conn:
+        with db_connect(TEST_DATABASE_URL or "", row_factory=dict_row) as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     """
@@ -656,7 +656,7 @@ def test_secondary_attachment_upload_failure_does_not_abort_primary_flow(
     with committed_smart_context("ingestion-orchestrator-sec-fail", supplier_count=1) as context:
         supplier_id = context.supplier_ids[0]
         _seed_email_config(context.workspace.tenant_id, context.workspace.membership_id)
-        with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+        with db_connect(TEST_DATABASE_URL or "") as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     "update supplier set email_domains = %s where id = %s",
@@ -695,7 +695,7 @@ def test_secondary_attachment_upload_failure_does_not_abort_primary_flow(
         assert str(enqueued[0]["document_id"]) == result["document_id"]
         assert str(enqueued[0]["quotation_id"]) == result["quotation_id"]
 
-        with psycopg.connect(TEST_DATABASE_URL or "", row_factory=dict_row) as conn:
+        with db_connect(TEST_DATABASE_URL or "", row_factory=dict_row) as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     "select id, storage_path from document where tenant_id = %s",

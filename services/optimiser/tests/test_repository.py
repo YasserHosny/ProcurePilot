@@ -5,6 +5,7 @@ from uuid import uuid4
 
 import pytest
 
+from procurepilot_optimiser_worker.db import connect as db_connect
 from procurepilot_optimiser_worker.models import BasketItem, BasketJob
 
 pytestmark = pytest.mark.skipif(
@@ -14,7 +15,7 @@ pytestmark = pytest.mark.skipif(
 
 
 def test_read_current_offers_projects_from_normalised_base_unit_not_pack_quantity() -> None:
-    psycopg = pytest.importorskip("psycopg")
+    pytest.importorskip("psycopg")
     from psycopg.types.json import Jsonb
 
     from procurepilot_optimiser_worker.repository import read_current_offers
@@ -27,7 +28,7 @@ def test_read_current_offers_projects_from_normalised_base_unit_not_pack_quantit
     match_decision_id, match_candidate_id, landed_cost_id = uuid4(), uuid4(), uuid4()
     email = f"optimiser-repo-{tenant_id.hex[:8]}@example.test"
 
-    with psycopg.connect(database_url) as conn:
+    with db_connect(database_url) as conn:
         with conn.cursor() as cur:
             cur.execute(
                 "insert into supported_region (code,label_en,label_ar) "
@@ -140,7 +141,7 @@ def test_read_current_offers_projects_from_normalised_base_unit_not_pack_quantit
         conn.commit()
 
     try:
-        with psycopg.connect(database_url) as conn:
+        with db_connect(database_url) as conn:
             # Requesting 15 litres — half of the 30-litre case — must project half the
             # case price, not half of a per-pack-count price (the bug: quantity=1 case).
             job = BasketJob(
@@ -159,7 +160,7 @@ def test_read_current_offers_projects_from_normalised_base_unit_not_pack_quantit
         assert offer.total_landed_cost.amount == "30.0000"
         assert offer.total_landed_cost.currency == "GBP"
     finally:
-        with psycopg.connect(database_url) as conn:
+        with db_connect(database_url) as conn:
             with conn.cursor() as cur:
                 # The owner-guard trigger refuses to delete the last active owner's membership
                 # row, even via cascade from a tenant delete.

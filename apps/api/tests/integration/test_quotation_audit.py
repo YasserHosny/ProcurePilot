@@ -20,6 +20,7 @@ from integration.quotation_helpers import (
     make_field,
     make_review_task,
 )
+from procurepilot_api.db import connect as db_connect
 from procurepilot_api.deps import CurrentMember
 from procurepilot_api.errors import ServiceUnavailableError
 from procurepilot_api.modules.auth.jwt import MemberRole
@@ -279,7 +280,6 @@ def test_archive_same_key_concurrent_race_records_one_audit_event(
     conn: object,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    import psycopg
 
     from integration.catalogue_helpers import TEST_DATABASE_URL
 
@@ -310,7 +310,7 @@ def test_archive_same_key_concurrent_race_records_one_audit_event(
     )
 
     def archive() -> None:
-        thread_state.conn = psycopg.connect(TEST_DATABASE_URL, prepare_threshold=None)
+        thread_state.conn = db_connect(TEST_DATABASE_URL, prepare_threshold=None)
         try:
             with thread_state.conn.cursor() as cur:
                 act_as(cur, workspace)

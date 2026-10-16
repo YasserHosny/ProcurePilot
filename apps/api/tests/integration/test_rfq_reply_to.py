@@ -6,6 +6,7 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 
 from procurepilot_api.config import get_settings
+from procurepilot_api.db import connect as db_connect
 from procurepilot_api.deps import CurrentMember, current_member
 from procurepilot_api.main import create_app
 from procurepilot_api.modules.auth.jwt import MemberRole
@@ -133,7 +134,7 @@ async def test_rfq_send_and_webhook_capture_full_chain(monkeypatch: pytest.Monke
     app = create_app(settings)
     test_db = settings.database_url.get_secret_value()
 
-    with psycopg.connect(test_db, prepare_threshold=None) as conn:
+    with db_connect(test_db, prepare_threshold=None) as conn:
         with conn.cursor() as cur:
             tenant_id, user_id, membership_id, supplier_id = _seed_tenant_and_supplier(cur)
             product_id = _seed_product(cur, tenant_id)
@@ -192,7 +193,7 @@ async def test_rfq_send_and_webhook_capture_full_chain(monkeypatch: pytest.Monke
         assert forwarding_address in msg.body
 
         # Fetch outbound_message_id from DB
-        with psycopg.connect(test_db, prepare_threshold=None) as conn:
+        with db_connect(test_db, prepare_threshold=None) as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     "select outbound_message_id, id from rfq_recipient where rfq_id = %s", (rfq_id,)
@@ -214,7 +215,7 @@ async def test_rfq_send_and_webhook_capture_full_chain(monkeypatch: pytest.Monke
         assert webhook_res.status_code == 202, webhook_res.json()
 
         # 4. Verify webhook resolved correct tenant and queued job
-        with psycopg.connect(test_db, prepare_threshold=None) as conn:
+        with db_connect(test_db, prepare_threshold=None) as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     "select count(*) from ingestion_jobs "\
@@ -233,7 +234,7 @@ async def test_rfq_send_and_webhook_capture_full_chain(monkeypatch: pytest.Monke
         assert result["match_method"] == "rfq_reply"
 
         # Verify RFQ is responded
-        with psycopg.connect(test_db, prepare_threshold=None) as conn:
+        with db_connect(test_db, prepare_threshold=None) as conn:
             with conn.cursor() as cur:
                 cur.execute("set local role service_role")
                 cur.execute("select status from rfq where id = %s", (rfq_id,))
@@ -252,7 +253,7 @@ async def test_rfq_send_without_tenant_email_config_sends_successfully() -> None
     app = create_app(settings)
     test_db = settings.database_url.get_secret_value()
 
-    with psycopg.connect(test_db, prepare_threshold=None) as conn:
+    with db_connect(test_db, prepare_threshold=None) as conn:
         with conn.cursor() as cur:
             tenant_id, user_id, membership_id, supplier_id = _seed_tenant_and_supplier(cur)
             product_id = _seed_product(cur, tenant_id)

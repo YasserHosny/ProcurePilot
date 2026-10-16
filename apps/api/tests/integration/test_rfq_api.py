@@ -5,6 +5,7 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 
 from procurepilot_api.config import get_settings
+from procurepilot_api.db import connect as db_connect
 from procurepilot_api.main import app
 from procurepilot_api.shared.mailer import FakeMailer, SendResult
 
@@ -88,7 +89,7 @@ async def test_create_rfq_rejects_missing_email_supplier(
     settings = get_settings()
     test_db = settings.database_url.get_secret_value()
 
-    with psycopg.connect(test_db, prepare_threshold=None) as conn:
+    with db_connect(test_db, prepare_threshold=None) as conn:
         with conn.cursor() as cur:
             tenant_id, user_id, membership_id = _seed_tenant(cur)
             supplier_with_email = _seed_supplier(cur, tenant_id, "contact@example.test")
@@ -158,7 +159,7 @@ async def test_create_rfq_replays_on_idempotency_key_not_duplicates(
     settings = get_settings()
     test_db = settings.database_url.get_secret_value()
 
-    with psycopg.connect(test_db, prepare_threshold=None) as conn:
+    with db_connect(test_db, prepare_threshold=None) as conn:
         with conn.cursor() as cur:
             tenant_id, user_id, membership_id = _seed_tenant(cur)
             supplier_id = _seed_supplier(cur, tenant_id, "contact@example.test")
@@ -198,7 +199,7 @@ async def test_create_rfq_replays_on_idempotency_key_not_duplicates(
 
     assert first.json()["rfq"]["id"] == second.json()["rfq"]["id"]
 
-    with psycopg.connect(test_db, prepare_threshold=None) as conn:
+    with db_connect(test_db, prepare_threshold=None) as conn:
         with conn.cursor() as cur:
             cur.execute("select count(*) from rfq where tenant_id = %s", (tenant_id,))
             assert cur.fetchone()[0] == 1, "a replayed create must not insert a second rfq"
@@ -213,7 +214,7 @@ async def test_send_rfq_partial_failure_leaves_failed_draft(
     settings = get_settings()
     test_db = settings.database_url.get_secret_value()
 
-    with psycopg.connect(test_db, prepare_threshold=None) as conn:
+    with db_connect(test_db, prepare_threshold=None) as conn:
         with conn.cursor() as cur:
             tenant_id, user_id, membership_id = _seed_tenant(cur)
             supplier_1 = _seed_supplier(cur, tenant_id, "contact1@example.test")
@@ -287,7 +288,7 @@ async def test_send_rfq_partial_failure_leaves_failed_draft(
     assert "RFQ Tenant" in sent.body
     assert sent.html and "Deliver before noon" in sent.html
     assert sent.from_name == "RFQ Tenant via ProcurePilot"
-    with psycopg.connect(test_db, prepare_threshold=None) as conn:
+    with db_connect(test_db, prepare_threshold=None) as conn:
         with conn.cursor() as cur:
             cur.execute("select tenant_terms from rfq where id = %s", (rfq_id,))
             assert cur.fetchone()[0] == "Deliver before noon"

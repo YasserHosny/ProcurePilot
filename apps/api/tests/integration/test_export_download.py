@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from uuid import UUID, uuid4
 
-import psycopg
 import pytest
 from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
@@ -14,6 +13,7 @@ from integration.smart_compare_helpers import (
     settings_for_test_db,
 )
 from integration.value_proof_helpers import export_request
+from procurepilot_api.db import connect as db_connect
 from procurepilot_api.errors import NotFoundError
 from procurepilot_api.modules.auth.jwt import MemberRole
 from procurepilot_api.modules.exports import service as export_service_module
@@ -33,7 +33,7 @@ def _insert_completed_job(
     format: str = "xlsx",
     row_count: int = 5,
 ) -> UUID:
-    with psycopg.connect(TEST_DATABASE_URL or "", row_factory=dict_row) as conn:
+    with db_connect(TEST_DATABASE_URL or "", row_factory=dict_row) as conn:
         with conn.cursor() as cur:
             cur.execute(
                 """
@@ -199,7 +199,7 @@ def test_download_unauthorised_branch_returns_not_found(
         branch_a = uuid4()
         branch_b = uuid4()
         # Seed two branches
-        with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+        with db_connect(TEST_DATABASE_URL or "") as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     """
@@ -220,7 +220,7 @@ def test_download_unauthorised_branch_returns_not_found(
             conn.commit()
 
         # Create completed export job filtered to branch B
-        with psycopg.connect(TEST_DATABASE_URL or "", row_factory=dict_row) as conn:
+        with db_connect(TEST_DATABASE_URL or "", row_factory=dict_row) as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     """

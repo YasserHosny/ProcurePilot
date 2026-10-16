@@ -16,6 +16,7 @@ from integration.quotation_helpers import (
     make_quotation,
     make_supplier,
 )
+from procurepilot_api.db import connect as db_connect
 from procurepilot_api.deps import CurrentMember
 from procurepilot_api.errors import ConflictError, ServiceUnavailableError
 from procurepilot_api.modules.auth.jwt import MemberRole
@@ -109,9 +110,8 @@ def test_extraction_parses_egyptian_date_and_routes_bad_expiry_to_review(
 
     @contextmanager
     def mdy_connection(dsn: str) -> object:
-        import psycopg
 
-        with psycopg.connect(dsn, prepare_threshold=None) as extraction_conn:
+        with db_connect(dsn, prepare_threshold=None) as extraction_conn:
             extraction_conn.execute("set datestyle to 'ISO, MDY'")
             yield extraction_conn
 

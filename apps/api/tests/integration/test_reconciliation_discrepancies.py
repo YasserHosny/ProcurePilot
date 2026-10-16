@@ -35,6 +35,7 @@ from integration.smart_compare_helpers import (
     member_from_workspace,
     settings_for_test_db,
 )
+from procurepilot_api.db import connect as db_connect
 from procurepilot_api.deps import bearer_token, current_member
 from procurepilot_api.main import create_app
 from procurepilot_api.modules.accounting.reconciliation_service import ReconciliationService
@@ -89,7 +90,7 @@ def _seed_connection(
     status: str = "active",
 ) -> UUID:
     cid = connection_id or uuid4()
-    with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+    with db_connect(TEST_DATABASE_URL or "") as conn:
         with conn.cursor() as cur:
             cur.execute("set local role service_role")
             cur.execute(
@@ -120,7 +121,7 @@ def _seed_vendor(
     vendor_id: UUID | None = None,
 ) -> UUID:
     vid = vendor_id or uuid4()
-    with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+    with db_connect(TEST_DATABASE_URL or "") as conn:
         with conn.cursor() as cur:
             cur.execute("set local role service_role")
             cur.execute(
@@ -160,7 +161,7 @@ def _seed_bill(
     bdate = bill_date or date.today()
     p_bid = provider_bill_id or f"bill-{bid}"
     u_at = updated_at or datetime.now(UTC)
-    with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+    with db_connect(TEST_DATABASE_URL or "") as conn:
         with conn.cursor() as cur:
             cur.execute("set local role service_role")
             cur.execute(
@@ -210,7 +211,7 @@ def _seed_purchase_record(
     p_ordered = ordered_at or datetime.now(UTC)
     p_recorded = recorded_at or p_ordered
     u_at = updated_at or datetime.now(UTC)
-    with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+    with db_connect(TEST_DATABASE_URL or "") as conn:
         with conn.cursor() as cur:
             cur.execute("set local role service_role")
             cur.execute(
@@ -258,7 +259,7 @@ def _seed_match(
     matched_by: UUID | None = None,
 ) -> UUID:
     mid = uuid4()
-    with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+    with db_connect(TEST_DATABASE_URL or "") as conn:
         with conn.cursor() as cur:
             cur.execute("set local role service_role")
             cur.execute(
@@ -278,7 +279,7 @@ def _seed_match(
 
 
 def _run_recompute(tenant_id: UUID, connection_id: UUID) -> dict[str, int]:
-    with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+    with db_connect(TEST_DATABASE_URL or "") as conn:
         _act_as_tenant_sync(conn, tenant_id)
         service = ReconciliationService()
         result = service.recompute_discrepancies(
@@ -300,7 +301,7 @@ def test_amount_mismatch_detected_and_shows_both_figures(
         supplier_id = context.supplier_ids[0]
         product_id = context.product_id
 
-        with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+        with db_connect(TEST_DATABASE_URL or "") as conn:
             with conn.cursor() as cur:
                 cur.execute("set local role service_role")
                 cur.execute(
@@ -517,7 +518,7 @@ def test_resolve_records_resolver_timestamp_and_note(
         assert resolved_data["resolution_note"] == "Approved discrepancy after manual check"
 
         # Check DB state directly
-        with psycopg.connect(TEST_DATABASE_URL or "", row_factory=dict_row) as conn:
+        with db_connect(TEST_DATABASE_URL or "", row_factory=dict_row) as conn:
             with conn.cursor() as cur:
                 cur.execute("set local role service_role")
                 cur.execute(
@@ -584,7 +585,7 @@ def test_resolved_discrepancy_reopens_when_underlying_record_changes(
         assert counts_second["reopened"] == 0
         assert counts_second["inserted"] == 0
 
-        with psycopg.connect(TEST_DATABASE_URL or "", row_factory=dict_row) as conn:
+        with db_connect(TEST_DATABASE_URL or "", row_factory=dict_row) as conn:
             with conn.cursor() as cur:
                 cur.execute("set local role service_role")
                 cur.execute(
@@ -609,7 +610,7 @@ def test_resolved_discrepancy_reopens_when_underlying_record_changes(
         assert counts_third["reopened"] == 1
         assert counts_third["inserted"] == 0
 
-        with psycopg.connect(TEST_DATABASE_URL or "", row_factory=dict_row) as conn:
+        with db_connect(TEST_DATABASE_URL or "", row_factory=dict_row) as conn:
             with conn.cursor() as cur:
                 cur.execute("set local role service_role")
                 cur.execute(
@@ -739,7 +740,7 @@ def test_open_discrepancy_auto_resolves_when_condition_clears(
         assert counts1["unmatched_bills"] == 1
         assert counts1["inserted"] == 1
 
-        with psycopg.connect(TEST_DATABASE_URL or "", row_factory=dict_row) as conn:
+        with db_connect(TEST_DATABASE_URL or "", row_factory=dict_row) as conn:
             with conn.cursor() as cur:
                 cur.execute("set local role service_role")
                 cur.execute(
@@ -766,7 +767,7 @@ def test_open_discrepancy_auto_resolves_when_condition_clears(
         assert counts2["unmatched_bills"] == 0
         assert counts2["auto_resolved"] == 1
 
-        with psycopg.connect(TEST_DATABASE_URL or "", row_factory=dict_row) as conn:
+        with db_connect(TEST_DATABASE_URL or "", row_factory=dict_row) as conn:
             with conn.cursor() as cur:
                 cur.execute("set local role service_role")
                 cur.execute(
@@ -842,7 +843,7 @@ def test_unmatched_purchase_excludes_supplier_without_synced_vendor(
         counts = _run_recompute(tenant_id, conn_id)
         assert counts["unmatched_purchases"] == 1
 
-        with psycopg.connect(TEST_DATABASE_URL or "", row_factory=dict_row) as conn:
+        with db_connect(TEST_DATABASE_URL or "", row_factory=dict_row) as conn:
             with conn.cursor() as cur:
                 cur.execute("set local role service_role")
                 cur.execute(

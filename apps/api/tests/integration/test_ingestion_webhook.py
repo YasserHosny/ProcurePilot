@@ -3,13 +3,13 @@ from __future__ import annotations
 import base64
 from email.message import EmailMessage
 
-import psycopg
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from integration.catalogue_helpers import TEST_DATABASE_URL
 from integration.smart_compare_helpers import committed_smart_context, settings_for_test_db
+from procurepilot_api.db import connect as db_connect
 from procurepilot_api.main import create_app
 from procurepilot_api.modules.ingestion import router as ingestion_router_module
 
@@ -40,7 +40,7 @@ def _raw_email(recipient: str) -> bytes:
 def _seed_config(
     tenant_id: object, membership_id: object, address: str, **overrides: object
 ) -> None:
-    with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+    with db_connect(TEST_DATABASE_URL or "") as conn:
         with conn.cursor() as cur:
             cur.execute(
                 """
@@ -91,7 +91,7 @@ def test_valid_secret_queues_a_job(monkeypatch: pytest.MonkeyPatch) -> None:
         )
 
         assert res.status_code == 202, res.text
-        with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+        with db_connect(TEST_DATABASE_URL or "") as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     "select count(*) from ingestion_jobs where tenant_id = %s "
@@ -154,7 +154,7 @@ def test_disabled_tenant_does_not_queue_a_job(monkeypatch: pytest.MonkeyPatch) -
         )
 
         assert res.status_code == 202
-        with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+        with db_connect(TEST_DATABASE_URL or "") as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     "select count(*) from ingestion_jobs where tenant_id = %s",
@@ -184,7 +184,7 @@ def test_daily_limit_reached_refuses_without_queueing(monkeypatch: pytest.Monkey
         )
 
         assert res.status_code == 202
-        with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+        with db_connect(TEST_DATABASE_URL or "") as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     "select count(*) from ingestion_jobs where tenant_id = %s",
