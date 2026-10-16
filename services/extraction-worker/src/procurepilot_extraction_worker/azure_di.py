@@ -56,14 +56,10 @@ class AzureDocumentIntelligenceProvider:
         except Exception as exc:
             raise ExtractionProviderError(f"Azure DI analysis failed: {exc}") from exc
 
-        return _parse_invoice_result(
-            result, self.model_version
-        )
+        return _parse_invoice_result(result, self.model_version)
 
 
-def _parse_invoice_result(
-    result: Any, model_version: str
-) -> ExtractionResult:
+def _parse_invoice_result(result: object, model_version: str) -> ExtractionResult:
     header: dict[str, ExtractedField] = {}
     lines: list[ExtractedLine] = []
     stated_total: ExtractedField | None = None
@@ -83,17 +79,13 @@ def _parse_invoice_result(
     if currency is not None:
         header["currency"] = ExtractedField("currency", currency, 0.90, 1, None)
 
-    invoice_date = _content(fields, "InvoiceDate")
+    invoice_date = _date_value(fields, "InvoiceDate")
     if invoice_date:
-        header["issue_date"] = _make_field(
-            "issue_date", _normalise_date(invoice_date), fields, "InvoiceDate"
-        )
+        header["issue_date"] = _make_field("issue_date", invoice_date, fields, "InvoiceDate")
 
-    due_date = _content(fields, "DueDate")
+    due_date = _date_value(fields, "DueDate")
     if due_date:
-        header["expiry_date"] = _make_field(
-            "expiry_date", _normalise_date(due_date), fields, "DueDate"
-        )
+        header["expiry_date"] = _make_field("expiry_date", due_date, fields, "DueDate")
 
     total_content = _content(fields, "InvoiceTotal")
     if total_content is not None:
@@ -125,9 +117,7 @@ def _parse_invoice_result(
     )
 
 
-def _fallback_from_tables(
-    result: Any, model_version: str
-) -> ExtractionResult:
+def _fallback_from_tables(result: object, model_version: str) -> ExtractionResult:
     tables = getattr(result, "tables", None) or []
     lines: list[ExtractedLine] = []
     marker_text = " ".join(
@@ -142,8 +132,7 @@ def _fallback_from_tables(
         cells = table.cells or []
         headers_row = [c for c in cells if c.row_index == 0]
         header_names = [
-            c.content.strip().lower()
-            for c in sorted(headers_row, key=lambda c: c.column_index)
+            c.content.strip().lower() for c in sorted(headers_row, key=lambda c: c.column_index)
         ]
         for row_idx in range(1, table.row_count):
             row_cells = sorted(
@@ -161,9 +150,7 @@ def _fallback_from_tables(
                     cleaned_qty = _clean_number(qty)
                     if cleaned_qty:
                         ef["quantity"] = ExtractedField("quantity", cleaned_qty, 0.80, 1, None)
-                price = (
-                    row_data.get("unit price") or row_data.get("price") or row_data.get("rate")
-                )
+                price = row_data.get("unit price") or row_data.get("price") or row_data.get("rate")
                 if price:
                     amount = _clean_number(price)
                     if amount:
@@ -194,9 +181,7 @@ def _fallback_from_tables(
     )
 
 
-def _parse_line_item(
-    idx: int, item_fields: dict[str, Any], currency: str
-) -> ExtractedLine:
+def _parse_line_item(idx: int, item_fields: dict[str, Any], currency: str) -> ExtractedLine:
     fields: dict[str, ExtractedField] = {}
 
     desc = _content_from(item_fields, "Description") or ""
@@ -238,6 +223,13 @@ def _content(fields: dict[str, Any], name: str) -> str | None:
     return getattr(field, "content", None)
 
 
+def _date_value(fields: dict[str, Any], name: str) -> object | None:
+    field = fields.get(name)
+    if field is None:
+        return None
+    return getattr(field, "value_date", None) or getattr(field, "content", None)
+
+
 def _confidence(fields: dict[str, Any], name: str) -> float | None:
     field = fields.get(name)
     if field is None:
@@ -260,7 +252,7 @@ def _conf_from(item_fields: dict[str, Any], name: str) -> float | None:
 
 
 def _make_field(
-    name: str, value: Any, fields: dict[str, Any], azure_field_name: str
+    name: str, value: object, fields: dict[str, Any], azure_field_name: str
 ) -> ExtractedField:
     conf = _confidence(fields, azure_field_name)
     return ExtractedField(
@@ -291,12 +283,6 @@ def _clean_number(s: str) -> str | None:
         return format(parse_localised_decimal(cleaned), "f")
     except ValueError:
         return None
-
-
-def _normalise_date(value: str) -> str:
-    if re.match(r"\d{4}-\d{2}-\d{2}", value):
-        return value[:10]
-    return value
 
 
 def _infer_currency(fields: dict[str, Any]) -> str | None:

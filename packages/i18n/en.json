@@ -743,7 +743,8 @@
         "read_failure": "Read Failure",
         "review_required": "Review Required",
         "no_supplier_match": "No Supplier Match",
-        "currency_unresolved": "Currency Not Found"
+        "currency_unresolved": "Currency Not Found",
+        "date_unparsed": "Date Not Recognised"
       },
       "columns": {
         "id": "Quotation ID",

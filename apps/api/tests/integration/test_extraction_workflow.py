@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import sys
+from contextlib import contextmanager
+from datetime import date
 from pathlib import Path
 from uuid import uuid4
 
@@ -82,6 +84,129 @@ def test_structured_extraction_writes_lines_fields_and_review_task(conn: object)
             (quotation_id,),
         )
         assert cur.fetchone() == ("open", "high", "arithmetic_mismatch")
+
+
+def test_extraction_parses_egyptian_date_and_routes_bad_expiry_to_review(
+    conn: object, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import procurepilot_extraction_worker.worker as extraction_worker
+    from procurepilot_extraction_worker.models import ExtractedField, ExtractionResult
+    from procurepilot_extraction_worker.settings import WorkerSettings
+    from procurepilot_extraction_worker.worker import process_extraction_job
+
+    @contextmanager
+    def mdy_connection(dsn: str) -> object:
+        import psycopg
+
+        with psycopg.connect(dsn, prepare_threshold=None) as extraction_conn:
+            extraction_conn.execute("set datestyle to 'ISO, MDY'")
+            yield extraction_conn
+
+    monkeypatch.setattr(extraction_worker.db, "connect", mdy_connection)
+
+    with conn.cursor() as cur:
+        workspace = make_workspace(cur, f"extraction-date-eg-{uuid4().hex[:8]}")
+        cur.execute(
+            "insert into supported_region (code,label_en,label_ar) values ('EG','Egypt','مصر') "
+            "on conflict do nothing"
+        )
+        cur.execute(
+            "update tenant set region='EG', currency='EGP' where id=%s", (workspace.tenant_id,)
+        )
+        document_id = make_document(cur, workspace)
+        quotation_id = make_quotation(cur, workspace, document_id=document_id, status="extracting")
+        job_id = uuid4()
+        cur.execute(
+            "insert into extraction_job (id,tenant_id,quotation_id,status) "
+            "values (%s,%s,%s,'queued')",
+            (job_id, workspace.tenant_id, quotation_id),
+        )
+        conn.commit()
+
+    result = ExtractionResult(
+        method="bedrock",
+        model_version="date-test",
+        header={
+            "currency": ExtractedField("currency", "EGP", 0.99),
+            "issue_date": ExtractedField("issue_date", "16/10/2026", 0.99),
+            "expiry_date": ExtractedField("expiry_date", "soon", 0.99),
+        },
+        lines=[],
+    )
+    monkeypatch.setattr(
+        "procurepilot_extraction_worker.worker.get_settings",
+        lambda: WorkerSettings(
+            database_url=TEST_DATABASE_URL or "", supabase_url="", supabase_service_role_key=""
+        ),
+    )
+    monkeypatch.setattr(
+        "procurepilot_extraction_worker.worker._extract", lambda *_args, **_kwargs: result
+    )
+    process_extraction_job(
+        {
+            "job_id": str(job_id),
+            "tenant_id": str(workspace.tenant_id),
+            "quotation_id": str(quotation_id),
+            "document_id": str(document_id),
+        }
+    )
+    with conn.cursor() as cur:
+        act_as(cur, workspace)
+        cur.execute(
+            "select status, issue_date, expiry_date from quotation where id=%s", (quotation_id,)
+        )
+        assert cur.fetchone() == ("in_review", date(2026, 10, 16), None)
+        cur.execute("select status from extraction_job where id=%s", (job_id,))
+        assert cur.fetchone() == ("succeeded",)
+        cur.execute("select reason from review_task where quotation_id=%s", (quotation_id,))
+        assert cur.fetchone() == ("date_unparsed",)
+
+        ambiguous_document_id = make_document(cur, workspace)
+        ambiguous_quotation_id = make_quotation(
+            cur, workspace, document_id=ambiguous_document_id, status="extracting"
+        )
+        ambiguous_job_id = uuid4()
+        cur.execute(
+            "insert into extraction_job (id,tenant_id,quotation_id,status) "
+            "values (%s,%s,%s,'queued')",
+            (ambiguous_job_id, workspace.tenant_id, ambiguous_quotation_id),
+        )
+        conn.commit()
+
+    ambiguous_result = ExtractionResult(
+        method="bedrock",
+        model_version="date-test",
+        header={
+            "currency": ExtractedField("currency", "EGP", 0.99),
+            "issue_date": ExtractedField("issue_date", "05/10/2026", 0.99),
+        },
+        lines=[],
+    )
+    monkeypatch.setattr(
+        "procurepilot_extraction_worker.worker._extract",
+        lambda *_args, **_kwargs: ambiguous_result,
+    )
+    process_extraction_job(
+        {
+            "job_id": str(ambiguous_job_id),
+            "tenant_id": str(workspace.tenant_id),
+            "quotation_id": str(ambiguous_quotation_id),
+            "document_id": str(ambiguous_document_id),
+        }
+    )
+    with conn.cursor() as cur:
+        act_as(cur, workspace)
+        cur.execute(
+            "select status, issue_date from quotation where id=%s", (ambiguous_quotation_id,)
+        )
+        assert cur.fetchone() == ("in_review", date(2026, 10, 5))
+        cur.execute(
+            "select reason from review_task where quotation_id=%s", (ambiguous_quotation_id,)
+        )
+        assert cur.fetchone() == ("low_confidence",)
+    from integration.smart_compare_helpers import cleanup_workspace
+
+    cleanup_workspace(workspace)
 
 
 def test_redis_enqueue_failure_does_not_leave_quotation_stuck(

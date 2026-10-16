@@ -425,7 +425,8 @@ export type ReviewTaskReason =
   | 'read_failure'
   | 'review_required'
   | 'no_supplier_match'
-  | 'currency_unresolved';
+  | 'currency_unresolved'
+  | 'date_unparsed';
 
 export interface ReviewTask {
   readonly id: string;
