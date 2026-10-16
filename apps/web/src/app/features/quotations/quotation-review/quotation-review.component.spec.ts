@@ -389,6 +389,47 @@ describe('QuotationReviewComponent (T051, T057, T062)', () => {
     expect(component.pendingCorrections().has('fe-raw-date')).toBeFalse();
   });
 
+  it('confirms a date using the canonical quotation value while preserving raw evidence', () => {
+    const rawDate = {
+      ...mockQuotationDetail.field_extractions[0],
+      id: 'fe-raw-confirm-date',
+      field_name: 'issue_date',
+      extracted_value: '05/10/2026',
+      confidence: '0.5000',
+    };
+    component.quotation.set({
+      ...mockQuotationDetail,
+      issue_date: '2026-10-05',
+      field_extractions: [rawDate],
+    });
+
+    component.confirmFieldAsIs('quotation', 'q-review-1', 'issue_date');
+
+    expect(component.pendingCorrections().get(rawDate.id)).toBe('2026-10-05');
+    expect(component.dateEvidence('q-review-1', 'issue_date', '2026-10-05')).toBe('05/10/2026');
+  });
+
+  it('does not stage confirm-as-is when the canonical date is missing', () => {
+    const rawDate = {
+      ...mockQuotationDetail.field_extractions[0],
+      id: 'fe-unparsed-confirm-date',
+      field_name: 'issue_date',
+      extracted_value: 'soon',
+      confidence: '0.0000',
+    };
+    component.quotation.set({
+      ...mockQuotationDetail,
+      issue_date: null,
+      field_extractions: [rawDate],
+    });
+    fixture.detectChanges();
+
+    component.confirmFieldAsIs('quotation', 'q-review-1', 'issue_date');
+
+    expect(component.pendingCorrections().has(rawDate.id)).toBeFalse();
+    expect(fixture.nativeElement.textContent).toContain('Choose a date to confirm this value.');
+  });
+
   it('should stage an unchanged low-confidence expiry date when the datepicker closes', () => {
     const lowConfidenceExpiry = {
       ...mockQuotationDetail.field_extractions[0],

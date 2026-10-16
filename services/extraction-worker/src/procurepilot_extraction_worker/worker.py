@@ -51,7 +51,7 @@ def process_extraction_job(payload: dict[str, str]) -> None:
                 document=document,
             )
             tenant_currency, region = _tenant_currency(conn, tenant_id)
-            result, has_unparsed_date = _with_normalised_dates(result, region)
+            result, parsed_dates, has_unparsed_date = _with_normalised_dates(result, region)
             result = _with_currency_suggestion(result, tenant_currency)
             arithmetic = validate_arithmetic(result)
             _persist_result(conn, tenant_id, quotation_id, result, arithmetic.status)
@@ -75,6 +75,7 @@ def process_extraction_job(payload: dict[str, str]) -> None:
                 arithmetic.status,
                 result,
                 supplier_match,
+                parsed_dates,
             )
             _mark_succeeded(conn, job_id, result.method)
             logger.info(
@@ -284,6 +285,7 @@ def _update_quotation_status(
     arithmetic_status: str,
     result: ExtractionResult,
     supplier_match: SupplierMatch,
+    parsed_dates: dict[str, str | None] | None = None,
 ) -> None:
     stated = result.stated_total.value if result.stated_total is not None else None
     currency = stated.get("currency") if isinstance(stated, dict) else None
@@ -303,8 +305,8 @@ def _update_quotation_status(
             (
                 status,
                 _header_value(header, "currency"),
-                _header_date_value(header, "issue_date"),
-                _header_date_value(header, "expiry_date"),
+                (parsed_dates or {}).get("issue_date"),
+                (parsed_dates or {}).get("expiry_date"),
                 amount,
                 currency,
                 arithmetic_status,
@@ -402,8 +404,9 @@ def _tenant_currency(conn: psycopg.Connection, tenant_id: UUID) -> tuple[str | N
 
 def _with_normalised_dates(
     result: ExtractionResult, region: str | None
-) -> tuple[ExtractionResult, bool]:
+) -> tuple[ExtractionResult, dict[str, str | None], bool]:
     unparsed = False
+    parsed_dates: dict[str, str | None] = {"issue_date": None, "expiry_date": None}
 
     def normalise(fields: dict[str, ExtractedField]) -> dict[str, ExtractedField]:
         nonlocal unparsed
@@ -412,25 +415,23 @@ def _with_normalised_dates(
             if not name.endswith("_date"):
                 continue
             parsed = parse_extracted_date(field.value, region=region)
+            if fields is result.header and name in parsed_dates:
+                parsed_dates[name] = parsed.value.isoformat() if parsed.value else None
             if parsed.unparsed:
                 unparsed = True
                 updated[name] = replace(field, confidence=0.0)
                 continue  # Keep raw evidence in field_extraction; canonical columns stay NULL.
             confidence = min(field.confidence, 0.5) if parsed.ambiguous else field.confidence
-            updated[name] = replace(field, value=parsed.value.isoformat(), confidence=confidence)
+            updated[name] = replace(field, confidence=confidence)
         return updated
 
     header = normalise(result.header)
     lines = [replace(line, fields=normalise(line.fields)) for line in result.lines]
-    return replace(result, header=header, lines=lines), unparsed
-
-
-def _header_date_value(header: dict[str, ExtractedField], name: str) -> str | None:
-    field = header.get(name)
-    if field is None:
-        return None
-    parsed = parse_extracted_date(field.value, region=None)
-    return parsed.value.isoformat() if parsed.value is not None else None
+    logger.info(
+        "date normalization preserves extracted values as evidence",
+        extra={"rule": "raw_evidence_with_region_parsed_columns"},
+    )
+    return replace(result, header=header, lines=lines), parsed_dates, unparsed
 
 
 def _upsert_review_task(

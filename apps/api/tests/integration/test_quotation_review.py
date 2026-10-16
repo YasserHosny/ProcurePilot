@@ -17,6 +17,7 @@ from procurepilot_api.modules.quotations import (
     confirmation_service as confirmation_service_module,
 )
 from procurepilot_api.modules.quotations.confirmation_service import QuotationConfirmationService
+from procurepilot_api.modules.quotations.review_service import _current_review_blocker
 from procurepilot_api.shared.audit import AuditEventCreate
 
 pytestmark = pytest.mark.skipif(
@@ -93,3 +94,31 @@ def test_confirm_returns_409_until_required_review_work_is_resolved(
             payload=None,
         )
         assert reviewed.status == "reviewed"
+
+
+def test_parsed_raw_date_does_not_create_date_unparsed_blocker(
+    conn: object,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    with conn.cursor() as cur:
+        workspace = make_workspace(cur, "parsed-date-blocker")
+        fixture = make_extracted_quotation(cur, workspace)
+        make_field(
+            cur,
+            workspace,
+            fixture.quotation_id,
+            field_name="issue_date",
+            extracted_value="16/10/2026",
+            confidence=Decimal("0.9900"),
+        )
+        cur.execute(
+            "update quotation set issue_date='2026-10-16' where id=%s",
+            (fixture.quotation_id,),
+        )
+        act_as(cur, workspace)
+        assert (
+            _current_review_blocker(
+                PsycopgSupabaseClient(conn), fixture.quotation_id, 0.85
+            )
+            is None
+        )

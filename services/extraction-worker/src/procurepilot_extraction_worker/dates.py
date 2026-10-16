@@ -10,7 +10,10 @@ from procurepilot_extraction_worker.currency import _ARABIC_DIGITS
 _RTL_MARKS = str.maketrans("", "", "\u200e\u200f\u061c")
 _SEPARATORS = r"\s*[/.-]\s*"
 _NUMERIC = re.compile(rf"^(\d{{1,4}}){_SEPARATORS}(\d{{1,2}}){_SEPARATORS}(\d{{2,4}})$")
-_ISO = re.compile(r"^(\d{4})-(\d{2})-(\d{2})(?:T.*)?$")
+_ISO = re.compile(
+    r"^(\d{4})-(\d{2})-(\d{2})"
+    r"(?:[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?)?$"
+)
 _MONTHS = {
     "january": 1,
     "jan": 1,

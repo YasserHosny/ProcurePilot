@@ -35,11 +35,11 @@ def test_conflicting_currency_markers_store_no_currency() -> None:
     assert result.stated_total.value["currency"] is None
 
 
-def test_invoice_dates_prefer_azure_typed_value_date() -> None:
+def test_invoice_dates_preserve_azure_content_as_evidence() -> None:
     fields = {
         "InvoiceDate": NS(value_date=date(2026, 10, 16), content="16/10/2026", confidence=0.9),
         "DueDate": NS(value_date=None, content="20/10/2026", confidence=0.8),
     }
     result = _parse_invoice_result(NS(documents=[NS(fields=fields)]), "test")
-    assert result.header["issue_date"].value == date(2026, 10, 16)
+    assert result.header["issue_date"].value == "16/10/2026"
     assert result.header["expiry_date"].value == "20/10/2026"

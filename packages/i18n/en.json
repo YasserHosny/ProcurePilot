@@ -838,6 +838,7 @@
         "issueDateLabel": "Issue Date",
         "expiryDateLabel": "Expiry Date",
         "dateEvidenceHint": "Text in document: {{value}}",
+        "pickDateToConfirm": "Choose a date to confirm this value.",
         "statedTotalLabel": "Stated Total Amount",
         "statedTotalCurrency": "Stated Total Currency",
         "statusLabel": "Status"

@@ -580,7 +580,7 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
   }
 
   expiryBadge(q: QuotationDetail): ExpiryBadge | null {
-    const expiryValue = this.getEffectiveValue('quotation', q.id, 'expiry_date', q.expiry_date || '');
+    const expiryValue = this.canonicalDateValue(q, 'expiry_date');
     if (!expiryValue || typeof expiryValue !== 'string') return null;
 
     const expiryDate = new Date(`${expiryValue}T00:00:00`);
@@ -654,10 +654,31 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
   confirmFieldAsIs(entityType: 'quotation' | 'quotation_line', entityId: string, fieldName: string): void {
     const fe = this.getFieldExtraction(entityType, entityId, fieldName);
     if (!fe) return;
+    if (entityType === 'quotation' && (fieldName === 'issue_date' || fieldName === 'expiry_date')) {
+      const quotation = this.quotation();
+      const canonical = quotation ? this.canonicalDateValue(quotation, fieldName) : null;
+      if (canonical) this.updateCorrection(fe.id, canonical);
+      return;
+    }
     const current = this.pendingCorrections().has(fe.id)
       ? this.pendingCorrections().get(fe.id)
       : fe.extracted_value;
     this.updateCorrection(fe.id, current);
+  }
+
+  canonicalDateValue(q: QuotationDetail, fieldName: 'issue_date' | 'expiry_date'): string | null {
+    const fe = this.getFieldExtraction('quotation', q.id, fieldName);
+    if (fe && this.pendingCorrections().has(fe.id)) {
+      const pending = this.pendingCorrections().get(fe.id);
+      if (typeof pending === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(pending)) return pending;
+    }
+    if (fe?.corrected_value && typeof fe.corrected_value === 'string') return fe.corrected_value;
+    return q[fieldName] || null;
+  }
+
+  dateEvidence(entityId: string, fieldName: 'issue_date' | 'expiry_date', canonical: string | null): string | null {
+    const raw = this.getFieldExtraction('quotation', entityId, fieldName)?.extracted_value;
+    return typeof raw === 'string' && raw && raw !== canonical ? raw : null;
   }
 
   // FR-014: Keyboard Navigation through flagged fields

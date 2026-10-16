@@ -19,8 +19,9 @@ def _result(issue_date: object) -> ExtractionResult:
 
 
 def test_normalises_date_to_iso_and_ambiguous_confidence_routes_low_confidence() -> None:
-    normalized, unparsed = _with_normalised_dates(_result("05/10/2026"), "EG")
-    assert normalized.header["issue_date"].value == "2026-10-05"
+    normalized, parsed_dates, unparsed = _with_normalised_dates(_result("05/10/2026"), "EG")
+    assert normalized.header["issue_date"].value == "05/10/2026"
+    assert parsed_dates["issue_date"] == "2026-10-05"
     assert normalized.header["issue_date"].confidence == 0.5
     assert not unparsed
     assert (
@@ -30,8 +31,9 @@ def test_normalises_date_to_iso_and_ambiguous_confidence_routes_low_confidence()
 
 
 def test_unparsed_date_stays_as_evidence_and_routes_to_date_review() -> None:
-    normalized, unparsed = _with_normalised_dates(_result("soon"), "EG")
+    normalized, parsed_dates, unparsed = _with_normalised_dates(_result("soon"), "EG")
     assert normalized.header["issue_date"].value == "soon"
+    assert parsed_dates["issue_date"] is None
     assert unparsed
     assert (
         _review_reason(

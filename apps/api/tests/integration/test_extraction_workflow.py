@@ -170,6 +170,12 @@ def test_extraction_parses_egyptian_date_and_routes_bad_expiry_to_review(
             "select status, issue_date, expiry_date from quotation where id=%s", (quotation_id,)
         )
         assert cur.fetchone() == ("in_review", date(2026, 10, 16), None)
+        cur.execute(
+            "select extracted_value from field_extraction "
+            "where quotation_id=%s and field_name='issue_date'",
+            (quotation_id,),
+        )
+        assert cur.fetchone() == ("16/10/2026",)
         cur.execute("select status from extraction_job where id=%s", (job_id,))
         assert cur.fetchone() == ("succeeded",)
         cur.execute("select reason from review_task where quotation_id=%s", (quotation_id,))
@@ -292,6 +298,12 @@ def test_extraction_parses_egyptian_date_and_routes_bad_expiry_to_review(
             "select status, issue_date from quotation where id=%s", (ambiguous_quotation_id,)
         )
         assert cur.fetchone() == ("in_review", date(2026, 10, 5))
+        cur.execute(
+            "select extracted_value from field_extraction "
+            "where quotation_id=%s and field_name='issue_date'",
+            (ambiguous_quotation_id,),
+        )
+        assert cur.fetchone() == ("05/10/2026",)
         cur.execute(
             "select reason from review_task where quotation_id=%s", (ambiguous_quotation_id,)
         )

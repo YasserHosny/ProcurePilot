@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from datetime import date, datetime
 from typing import Any
 
 from azure.ai.documentintelligence import DocumentIntelligenceClient
@@ -83,13 +84,13 @@ def _parse_invoice_result(
     if currency is not None:
         header["currency"] = ExtractedField("currency", currency, 0.90, 1, None)
 
-    invoice_date = _date_value(fields, "InvoiceDate")
+    invoice_date = _date_evidence(fields, "InvoiceDate")
     if invoice_date:
         header["issue_date"] = _make_field(
             "issue_date", invoice_date, fields, "InvoiceDate"
         )
 
-    due_date = _date_value(fields, "DueDate")
+    due_date = _date_evidence(fields, "DueDate")
     if due_date:
         header["expiry_date"] = _make_field(
             "expiry_date", due_date, fields, "DueDate"
@@ -238,11 +239,15 @@ def _content(fields: dict[str, Any], name: str) -> str | None:
     return getattr(field, "content", None)
 
 
-def _date_value(fields: dict[str, Any], name: str) -> object | None:
+def _date_evidence(fields: dict[str, Any], name: str) -> object | None:
     field = fields.get(name)
     if field is None:
         return None
-    return getattr(field, "value_date", None) or getattr(field, "content", None)
+    content = getattr(field, "content", None)
+    if content:
+        return content
+    typed_date = getattr(field, "value_date", None)
+    return typed_date.isoformat() if isinstance(typed_date, (date, datetime)) else typed_date
 
 
 def _confidence(fields: dict[str, Any], name: str) -> float | None:

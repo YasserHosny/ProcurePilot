@@ -42,7 +42,7 @@ class QuotationReviewService:
         client = authenticated_client(self._settings, bearer_token)
         quotation = _one_row(
             client.table("quotation")
-            .select("id,status,supplier_id,reviewer_notes")
+            .select("id,status,supplier_id,reviewer_notes,tenant_id")
             .eq("id", str(quotation_id))
             .limit(2)
             .execute()
@@ -68,26 +68,38 @@ class QuotationReviewService:
 
         if "reviewer_notes" in patch.model_fields_set:
             updates["reviewer_notes"] = patch.reviewer_notes
+        quotation_tenant_id = quotation.get("tenant_id")
+        if patch.add_lines and quotation_tenant_id is None:
+            raise ServiceUnavailableError(details={"reason": "quotation_not_found"})
+
+        # Resolve and validate every correction before the first mutation. PostgREST does
+        # not provide a transaction spanning these requests, so validation belongs here.
+        correction_fields: list[tuple[object, object]] = []
+        for correction in patch.corrections:
+            field = _one_row(
+                client.table("field_extraction")
+                .select(FIELD_COLUMNS)
+                .eq("id", str(correction.field_extraction_id))
+                .eq("quotation_id", str(quotation_id))
+                .limit(2)
+                .execute()
+                .data,
+                resource="field_extraction",
+            )
+            is_date_field = field.get("field_name") in {"issue_date", "expiry_date"}
+            if (
+                field.get("corrected_by") is None
+                and is_date_field
+                and not _is_iso_date(correction.corrected_value)
+            ):
+                raise ConflictError(details={"reason": "invalid_date_correction"})
+            correction_fields.append((correction, field))
 
         try:
             client.table("quotation").update(updates).eq("id", str(quotation_id)).execute()
-            for correction in patch.corrections:
-                field = _one_row(
-                    client.table("field_extraction")
-                    .select(FIELD_COLUMNS)
-                    .eq("id", str(correction.field_extraction_id))
-                    .eq("quotation_id", str(quotation_id))
-                    .limit(2)
-                    .execute()
-                    .data,
-                    resource="field_extraction",
-                )
+            for correction, field in correction_fields:
                 if field.get("corrected_by") is not None:
                     continue
-                if field.get("field_name") in {"issue_date", "expiry_date"} and not _is_iso_date(
-                    correction.corrected_value
-                ):
-                    raise ConflictError(details={"reason": "invalid_date_correction"})
                 client.table("field_extraction").update(
                     {
                         "corrected_value": correction.corrected_value,
@@ -117,21 +129,9 @@ class QuotationReviewService:
                 )
                 next_number = (existing_lines[0]["line_number"] + 1) if existing_lines else 1
 
-                q_row = (
-                    client.table("quotation")
-                    .select("tenant_id")
-                    .eq("id", str(quotation_id))
-                    .limit(1)
-                    .execute()
-                    .data
-                )
-                q_tenant_id = q_row[0]["tenant_id"] if q_row else None
-                if q_tenant_id is None:
-                    raise ServiceUnavailableError(details={"reason": "quotation_not_found"})
-
                 for new_line in patch.add_lines:
                     row_data: dict[str, object] = {
-                        "tenant_id": q_tenant_id,
+                        "tenant_id": quotation_tenant_id,
                         "quotation_id": str(quotation_id),
                         "line_number": next_number,
                         "original_text": new_line.original_text,
@@ -423,7 +423,7 @@ def _current_review_blocker(
 ) -> tuple[str, str] | None:
     quote = _one_row(
         client.table("quotation")
-        .select("id,supplier_id,arithmetic_status")
+        .select("id,supplier_id,arithmetic_status,issue_date,expiry_date")
         .eq("id", str(quotation_id))
         .limit(2)
         .execute()
@@ -435,7 +435,7 @@ def _current_review_blocker(
 
     date_evidence = (
         client.table("field_extraction")
-        .select("extracted_value")
+        .select("field_name,extracted_value")
         .eq("quotation_id", str(quotation_id))
         .eq("entity_type", "quotation")
         .in_("field_name", ["issue_date", "expiry_date"])
@@ -443,7 +443,10 @@ def _current_review_blocker(
         .execute()
         .data
     )
-    if any(not _is_iso_date(row.get("extracted_value")) for row in _rows(date_evidence)):
+    if any(
+        row.get("extracted_value") is not None and quote.get(row.get("field_name")) is None
+        for row in _rows(date_evidence)
+    ):
         return ("date_unparsed", "normal")
 
     low_confidence = (

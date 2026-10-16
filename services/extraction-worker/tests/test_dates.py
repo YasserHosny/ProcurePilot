@@ -30,6 +30,8 @@ from procurepilot_extraction_worker.dates import parse_extracted_date
         ("16-Oct-2026", "EG", date(2026, 10, 16), False),
         ("2026-10-16", "EG", date(2026, 10, 16), False),
         ("2026-10-16T00:00:00Z", "EG", date(2026, 10, 16), False),
+        ("2026-10-16 00:00:00", "EG", date(2026, 10, 16), False),
+        ("2026-10-16 00:00:00.123456+02:00", "EG", date(2026, 10, 16), False),
         ("التاريخ: 16/10/2026", "EG", date(2026, 10, 16), False),
     ],
 )

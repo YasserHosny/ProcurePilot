@@ -313,26 +313,26 @@
               >
                 <mat-form-field appearance="outline" class="field-control">
                   <mat-label>{{ 'quotations.review.header.issueDateLabel' | translate }}</mat-label>
-                  @if (rawDateEvidence(getEffectiveValue('quotation', q.id, 'issue_date', q.issue_date || '')); as rawDate) {
+                  @if (dateEvidence(q.id, 'issue_date', canonicalDateValue(q, 'issue_date')); as rawDate) {
                     <mat-hint>{{ 'quotations.review.header.dateEvidenceHint' | translate:{ value: rawDate } }}</mat-hint>
                   }
                   <input
                     matInput
                     [matDatepicker]="issueDatePicker"
-                    [value]="toDate(getEffectiveValue('quotation', q.id, 'issue_date', q.issue_date || ''))"
+                    [value]="toDate(canonicalDateValue(q, 'issue_date'))"
                     (dateChange)="getFieldExtraction('quotation', q.id, 'issue_date') && updateCorrection(getFieldExtraction('quotation', q.id, 'issue_date')!.id, toIsoDate($event.value))"
-                    (blur)="reviewFieldValue('quotation', q.id, 'issue_date', getEffectiveValue('quotation', q.id, 'issue_date', q.issue_date || ''))"
+                    (blur)="reviewFieldValue('quotation', q.id, 'issue_date', canonicalDateValue(q, 'issue_date'))"
                     [readonly]="!isWriter() || q.status === 'reviewed'"
                   />
                   <mat-datepicker-toggle
                     matIconSuffix
                     [for]="issueDatePicker"
-                    (click)="reviewFieldValue('quotation', q.id, 'issue_date', getEffectiveValue('quotation', q.id, 'issue_date', q.issue_date || ''))"
+                    (click)="reviewFieldValue('quotation', q.id, 'issue_date', canonicalDateValue(q, 'issue_date'))"
                   ></mat-datepicker-toggle>
                   <mat-datepicker
                     #issueDatePicker
                     [disabled]="!isWriter() || q.status === 'reviewed'"
-                    (closed)="reviewFieldValue('quotation', q.id, 'issue_date', getEffectiveValue('quotation', q.id, 'issue_date', q.issue_date || ''))"
+                    (closed)="reviewFieldValue('quotation', q.id, 'issue_date', canonicalDateValue(q, 'issue_date'))"
                   ></mat-datepicker>
                 </mat-form-field>
                 @if (isFieldCorrected('quotation', q.id, 'issue_date')) {
@@ -343,7 +343,7 @@
                     {{ formatConfidence(fe.confidence) }}%
                   </span>
                 }
-                @if (getFieldConfidence('quotation', q.id, 'issue_date') < 0.85 && !isFieldCorrected('quotation', q.id, 'issue_date')) {
+                @if (getFieldConfidence('quotation', q.id, 'issue_date') < 0.85 && !isFieldCorrected('quotation', q.id, 'issue_date') && canonicalDateValue(q, 'issue_date')) {
                   <button
                     mat-icon-button
                     type="button"
@@ -353,6 +353,9 @@
                   >
                     <mat-icon aria-hidden="true">check_circle</mat-icon>
                   </button>
+                }
+                @if (getFieldConfidence('quotation', q.id, 'issue_date') < 0.85 && !canonicalDateValue(q, 'issue_date')) {
+                  <span class="date-pick-hint">{{ 'quotations.review.header.pickDateToConfirm' | translate }}</span>
                 }
               </div>
 
@@ -368,26 +371,26 @@
               >
                 <mat-form-field appearance="outline" class="field-control">
                   <mat-label>{{ 'quotations.review.header.expiryDateLabel' | translate }}</mat-label>
-                  @if (rawDateEvidence(getEffectiveValue('quotation', q.id, 'expiry_date', q.expiry_date || '')); as rawDate) {
+                  @if (dateEvidence(q.id, 'expiry_date', canonicalDateValue(q, 'expiry_date')); as rawDate) {
                     <mat-hint>{{ 'quotations.review.header.dateEvidenceHint' | translate:{ value: rawDate } }}</mat-hint>
                   }
                   <input
                     matInput
                     [matDatepicker]="expiryDatePicker"
-                    [value]="toDate(getEffectiveValue('quotation', q.id, 'expiry_date', q.expiry_date || ''))"
+                    [value]="toDate(canonicalDateValue(q, 'expiry_date'))"
                     (dateChange)="getFieldExtraction('quotation', q.id, 'expiry_date') && updateCorrection(getFieldExtraction('quotation', q.id, 'expiry_date')!.id, toIsoDate($event.value))"
-                    (blur)="reviewFieldValue('quotation', q.id, 'expiry_date', getEffectiveValue('quotation', q.id, 'expiry_date', q.expiry_date || ''))"
+                    (blur)="reviewFieldValue('quotation', q.id, 'expiry_date', canonicalDateValue(q, 'expiry_date'))"
                     [readonly]="!isWriter() || q.status === 'reviewed'"
                   />
                   <mat-datepicker-toggle
                     matIconSuffix
                     [for]="expiryDatePicker"
-                    (click)="reviewFieldValue('quotation', q.id, 'expiry_date', getEffectiveValue('quotation', q.id, 'expiry_date', q.expiry_date || ''))"
+                    (click)="reviewFieldValue('quotation', q.id, 'expiry_date', canonicalDateValue(q, 'expiry_date'))"
                   ></mat-datepicker-toggle>
                   <mat-datepicker
                     #expiryDatePicker
                     [disabled]="!isWriter() || q.status === 'reviewed'"
-                    (closed)="reviewFieldValue('quotation', q.id, 'expiry_date', getEffectiveValue('quotation', q.id, 'expiry_date', q.expiry_date || ''))"
+                    (closed)="reviewFieldValue('quotation', q.id, 'expiry_date', canonicalDateValue(q, 'expiry_date'))"
                   ></mat-datepicker>
                 </mat-form-field>
                 @if (expiryBadge(q); as badge) {
@@ -403,7 +406,7 @@
                     {{ formatConfidence(fe.confidence) }}%
                   </span>
                 }
-                @if (getFieldConfidence('quotation', q.id, 'expiry_date') < 0.85 && !isFieldCorrected('quotation', q.id, 'expiry_date')) {
+                @if (getFieldConfidence('quotation', q.id, 'expiry_date') < 0.85 && !isFieldCorrected('quotation', q.id, 'expiry_date') && canonicalDateValue(q, 'expiry_date')) {
                   <button
                     mat-icon-button
                     type="button"
@@ -413,6 +416,9 @@
                   >
                     <mat-icon aria-hidden="true">check_circle</mat-icon>
                   </button>
+                }
+                @if (getFieldConfidence('quotation', q.id, 'expiry_date') < 0.85 && !canonicalDateValue(q, 'expiry_date')) {
+                  <span class="date-pick-hint">{{ 'quotations.review.header.pickDateToConfirm' | translate }}</span>
                 }
               </div>
 

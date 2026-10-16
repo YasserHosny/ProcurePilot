@@ -838,6 +838,7 @@
         "issueDateLabel": "تاريخ الإصدار",
         "expiryDateLabel": "تاريخ الانتهاء",
         "dateEvidenceHint": "النص في المستند: {{value}}",
+        "pickDateToConfirm": "اختر تاريخًا لتأكيد هذه القيمة.",
         "statedTotalLabel": "إجمالي المبلغ المذكور",
         "statedTotalCurrency": "عملة المبلغ المذكور",
         "statusLabel": "الحالة"
