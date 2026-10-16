@@ -33,7 +33,7 @@ def ensure_quotation_reference_data(cur: psycopg.Cursor) -> None:
     try:
         cur.execute(
             "insert into supported_base_unit (code,label_en,label_ar,dimension,is_enabled) "
-            "values ('kg','Kilogram','كيلوغرام','mass',true) on conflict do nothing"
+            "values ('kilogram','Kilogram','كيلوغرام','mass',true) on conflict do nothing"
         )
         cur.execute(
             "insert into supported_base_unit (code,label_en,label_ar,dimension,is_enabled) "
@@ -108,7 +108,7 @@ def make_line(cur: psycopg.Cursor, workspace: Workspace, quotation_id: UUID) -> 
         "insert into quotation_line "
         "(id,tenant_id,quotation_id,line_number,original_text,quantity,pack_count,unit_size,"
         "pack_unit,unit_price_amount,unit_price_currency) "
-        "values (%s,%s,%s,1,'Tomatoes case 10 kg',2,1,10,'kg',12,'GBP')",
+        "values (%s,%s,%s,1,'Tomatoes case 10 kg',2,1,10,'kilogram',12,'GBP')",
         (line_id, workspace.tenant_id, quotation_id),
     )
     return line_id

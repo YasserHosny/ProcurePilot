@@ -27,7 +27,7 @@ def _offer(
         landed_cost=Money(amount=amount, currency="GBP"),
         normalised_unit_price=Money(amount=amount, currency="GBP"),
         requested_quantity="1.000000",
-        base_unit="kg",
+        base_unit="kilogram",
         lead_time_days=lead_time,
         reliability_score=reliability,
         stock_signal=None,

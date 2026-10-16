@@ -36,6 +36,7 @@ def connection() -> Iterator[psycopg.Connection]:
 
 def make_workspace(cur: psycopg.Cursor, label: str, *, role: str = "owner") -> Workspace:
     tenant_id, user_id, membership_id, invitation_id = uuid4(), uuid4(), uuid4(), uuid4()
+    email = f"{label}-{role}-{user_id.hex[:10]}@example.test"
     # Through the transaction-mode pooler this connection may land on a server backend that an
     # earlier session-level `set role` left as `authenticated`; fixtures must run as the owner.
     cur.execute("reset role")
@@ -57,12 +58,12 @@ def make_workspace(cur: psycopg.Cursor, label: str, *, role: str = "owner") -> W
     )
     cur.execute(
         "insert into auth.users (id,email) values (%s,%s)",
-        (user_id, f"{label}-{role}@example.test"),
+        (user_id, email),
     )
     cur.execute(
         "insert into platform_invitation (id,email,token_hash,expires_at) "
         "values (%s,%s,%s, now() + interval '7 days')",
-        (invitation_id, f"{label}-{role}@example.test", f"hash-{invitation_id}"),
+        (invitation_id, email, f"hash-{invitation_id}"),
     )
     cur.execute(
         "insert into tenant (id,name,slug,region,currency,tax_model,platform_invitation_id) "

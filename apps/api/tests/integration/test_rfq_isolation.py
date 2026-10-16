@@ -19,6 +19,7 @@ from uuid import UUID, uuid4
 
 import psycopg
 import pytest
+from httpx import ASGITransport, AsyncClient
 
 TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL")
 
@@ -69,6 +70,7 @@ class RfqWorkspace:
 def _make_rfq_workspace(cur: psycopg.Cursor, label: str) -> RfqWorkspace:
     tenant_id, user_id, membership_id, invitation_id = uuid4(), uuid4(), uuid4(), uuid4()
     supplier_id = uuid4()
+    email = f"rfq-{label}-{user_id.hex[:10]}@example.test"
 
     # Reference data
     cur.execute(
@@ -91,14 +93,14 @@ def _make_rfq_workspace(cur: psycopg.Cursor, label: str) -> RfqWorkspace:
     # Auth user
     cur.execute(
         "insert into auth.users (id,email) values (%s,%s)",
-        (user_id, f"rfq-{label}@example.test"),
+        (user_id, email),
     )
 
     # Tenant + invitation
     cur.execute(
         "insert into platform_invitation (id,email,token_hash,expires_at) "
         "values (%s,%s,%s, now() + interval '7 days')",
-        (invitation_id, f"rfq-{label}@example.test", f"hash-rfq-{label}"),
+        (invitation_id, email, f"hash-rfq-{invitation_id}"),
     )
     cur.execute(
         "insert into tenant (id,name,slug,region,currency,tax_model,platform_invitation_id) "
@@ -108,7 +110,7 @@ def _make_rfq_workspace(cur: psycopg.Cursor, label: str) -> RfqWorkspace:
     cur.execute(
         "insert into membership (id,tenant_id,user_id,email,role,is_active_workspace) "
         "values (%s,%s,%s,%s,'owner',true)",
-        (membership_id, tenant_id, user_id, f"rfq-{label}@example.test"),
+        (membership_id, tenant_id, user_id, email),
     )
 
     # Supplier
@@ -282,14 +284,10 @@ def test_another_tenants_guardrails_are_invisible(
     with conn.cursor() as cur:
         _act_as(cur, alpha)
         cur.execute(
-            "select id from auto_preparation_guardrail where tenant_id = %s",
-            (beta.tenant_id,)
+            "select id from auto_preparation_guardrail where tenant_id = %s", (beta.tenant_id,)
         )
         assert cur.fetchall() == []
-        cur.execute(
-            "select id from auto_preparation_guardrail where id = %s",
-            (beta.guardrail_id,)
-        )
+        cur.execute("select id from auto_preparation_guardrail where id = %s", (beta.guardrail_id,))
         assert cur.fetchone() is None
 
 
@@ -351,3 +349,49 @@ def test_authenticated_cannot_delete_auto_preparation_event(
             )
         cur.execute("rollback to savepoint no_delete")
 
+
+@pytest.mark.asyncio
+async def test_other_tenant_rfq_detail_and_draft_update_are_not_found(
+    rfq_workspaces: tuple[psycopg.Connection, RfqWorkspace, RfqWorkspace],
+) -> None:
+    conn, alpha, beta = rfq_workspaces
+    with conn.cursor() as cur:
+        cur.execute("reset role")
+        cur.execute("update rfq set status = 'draft' where id = %s", (beta.rfq_id,))
+    conn.commit()
+
+    from procurepilot_api.deps import CurrentMember, current_member
+    from procurepilot_api.main import app
+    from procurepilot_api.modules.auth.jwt import MemberRole
+
+    app.dependency_overrides[current_member] = lambda: CurrentMember(
+        user_id=alpha.user_id,
+        email=f"rfq-{alpha.user_id}@example.test",
+        membership_id=alpha.membership_id,
+        tenant_id=alpha.tenant_id,
+        role=MemberRole.owner,
+    )
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            detail = await client.get(f"/api/v1/rfq/{beta.rfq_id}")
+            assert detail.status_code == 404
+            update = await client.put(
+                f"/api/v1/rfq/{beta.rfq_id}",
+                json={
+                    "lines": [],
+                    "recipient_supplier_ids": [],
+                    "needed_by_date": "2030-01-01",
+                    "tenant_terms": "must not leak",
+                },
+                headers={"Idempotency-Key": str(uuid4())},
+            )
+            assert update.status_code == 404
+    finally:
+        app.dependency_overrides.clear()
+
+    with conn.cursor() as cur:
+        cur.execute("reset role")
+        cur.execute("select needed_by_date, tenant_terms from rfq where id = %s", (beta.rfq_id,))
+        row = cur.fetchone()
+        assert row[0].isoformat() != "2030-01-01"
+        assert row[1] is None

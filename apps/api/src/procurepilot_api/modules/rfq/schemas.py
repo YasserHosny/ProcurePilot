@@ -170,6 +170,7 @@ class RfqSummary(BaseModel):
     status: RfqStatus
     needed_by_date: date
     created_at: datetime
+    sent_at: datetime | None = None
     recipient_count: int
     response_count: int
     converted_purchase_request_id: UUID | None
@@ -178,3 +179,9 @@ class RfqSummary(BaseModel):
 class RfqList(BaseModel):
     items: list[RfqSummary]
     next_cursor: str | None = None
+
+
+class RfqDetail(BaseModel):
+    rfq: Rfq
+    lines: list[RfqLine]
+    recipients: list[RfqRecipient]

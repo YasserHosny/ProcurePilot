@@ -122,8 +122,7 @@ async def test_create_rfq_rejects_missing_email_supplier(
         too_long = await client.post("/api/v1/rfq", json=payload, headers=auth_headers)
         assert too_long.status_code == 422
         assert any(
-            item.get("loc", [])[-1:] == ["tenant_terms"]
-            for item in too_long.json()["details"]
+            item.get("loc", [])[-1:] == ["tenant_terms"] for item in too_long.json()["details"]
         )
         payload["tenant_terms"] = "x" * 4000
         resp = await client.post("/api/v1/rfq", json=payload, headers=auth_headers)
@@ -297,4 +296,79 @@ async def test_send_rfq_partial_failure_leaves_failed_draft(
     assert r2["status"] == "draft"
     assert r2["outbound_message_id"] is None
 
+    app.dependency_overrides.clear()
+
+
+@pytest.mark.asyncio
+async def test_get_and_update_rfq_draft(monkeypatch: pytest.MonkeyPatch) -> None:
+    settings = get_settings()
+    with psycopg.connect(settings.database_url.get_secret_value(), prepare_threshold=None) as conn:
+        with conn.cursor() as cur:
+            tenant_id, user_id, membership_id = _seed_tenant(cur)
+            supplier_id = _seed_supplier(cur, tenant_id, "draft-edit@example.test")
+            product_id = _seed_product(cur, tenant_id)
+        conn.commit()
+
+    from procurepilot_api.deps import CurrentMember, current_member
+    from procurepilot_api.modules.auth.jwt import MemberRole
+
+    app.dependency_overrides[current_member] = lambda: CurrentMember(
+        user_id=user_id,
+        email=f"rfq-e2e-{user_id}@example.test",
+        membership_id=membership_id,
+        tenant_id=tenant_id,
+        role=MemberRole.owner,
+    )
+    payload = {
+        "lines": [{"workspace_product_id": str(product_id), "quantity": "2"}],
+        "recipient_supplier_ids": [str(supplier_id)],
+        "needed_by_date": "2026-12-01",
+        "tenant_terms": "First terms",
+    }
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        created = await client.post(
+            "/api/v1/rfq", json=payload, headers={"Idempotency-Key": str(uuid.uuid4())}
+        )
+        assert created.status_code == 201, created.text
+        rfq_id = created.json()["rfq"]["id"]
+        detail = await client.get(f"/api/v1/rfq/{rfq_id}")
+        assert detail.status_code == 200
+        assert detail.json()["rfq"]["tenant_terms"] == "First terms"
+        assert len(detail.json()["lines"]) == len(detail.json()["recipients"]) == 1
+
+        replacement = {**payload, "needed_by_date": "2026-12-15", "tenant_terms": "Updated"}
+        replacement["lines"] = [{"workspace_product_id": str(product_id), "quantity": "5"}]
+        replacement["recipient_supplier_ids"] = [str(supplier_id), str(uuid.uuid4())]
+        updated = await client.put(
+            f"/api/v1/rfq/{rfq_id}",
+            json=replacement,
+            headers={"Idempotency-Key": str(uuid.uuid4())},
+        )
+        assert updated.status_code == 200, updated.text
+        result = updated.json()
+        assert result["rfq"]["needed_by_date"] == "2026-12-15"
+        assert result["rfq"]["tenant_terms"] == "Updated"
+        assert result["lines"][0]["quantity"] == "5.000000"
+        assert len(result["recipients"]) == 1
+        assert result["rejected_recipients"][0]["reason"] == "not_found"
+        listing = await client.get("/api/v1/rfq")
+        item = next(row for row in listing.json()["items"] if row["id"] == rfq_id)
+        assert item["sent_at"] is None
+
+        sent = await client.post(
+            f"/api/v1/rfq/{rfq_id}/send", headers={"Idempotency-Key": str(uuid.uuid4())}
+        )
+        assert sent.status_code == 200, sent.text
+        listing = await client.get("/api/v1/rfq")
+        item = next(row for row in listing.json()["items"] if row["id"] == rfq_id)
+        assert item["sent_at"] is not None
+        rejected_update = await client.put(
+            f"/api/v1/rfq/{rfq_id}",
+            json=replacement,
+            headers={"Idempotency-Key": str(uuid.uuid4())},
+        )
+        assert rejected_update.status_code == 409
+
+        missing_key = await client.put(f"/api/v1/rfq/{rfq_id}", json=replacement)
+        assert missing_key.status_code == 422
     app.dependency_overrides.clear()

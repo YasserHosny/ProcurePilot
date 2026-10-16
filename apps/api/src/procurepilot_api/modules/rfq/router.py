@@ -16,6 +16,7 @@ from procurepilot_api.modules.rfq.schemas import (
     GuardrailCreateInput,
     GuardrailUpdateInput,
     Rfq,
+    RfqDetail,
     RfqLine,
     RfqList,
     RfqPrepareRequestInput,
@@ -79,6 +80,62 @@ def list_rfqs(
         status=status,
         cursor=cursor,
         limit=limit,
+    )
+
+
+@router.get(
+    "/guardrails",
+    status_code=status.HTTP_200_OK,
+    response_model=list[AutoPreparationGuardrail],
+    operation_id="listGuardrails",
+)
+def list_guardrails(
+    member: Annotated[CurrentMember, Depends(current_member)],
+    service: Annotated[RfqService, Depends(get_rfq_service)],
+) -> list[AutoPreparationGuardrail]:
+    if member.role != "owner":
+        raise PermissionDeniedError(details={"role": "owner_required"})
+    return service.list_guardrails(member=member)
+
+
+@router.get(
+    "/{rfq_id}", status_code=status.HTTP_200_OK, response_model=RfqDetail, operation_id="getRfq"
+)
+def get_rfq(
+    rfq_id: uuid.UUID,
+    member: Annotated[CurrentMember, Depends(current_member)],
+    service: Annotated[RfqService, Depends(get_rfq_service)],
+) -> RfqDetail:
+    return service.get_detail(member=member, rfq_id=rfq_id)
+
+
+@router.put(
+    "/{rfq_id}",
+    status_code=status.HTTP_200_OK,
+    response_model=RfqCreateResponse,
+    operation_id="updateRfqDraft",
+)
+@mutation_limiter.limit(_rfq_create_limit)
+def update_rfq_draft(
+    request: Request,
+    rfq_id: uuid.UUID,
+    payload: Annotated[RfqCreatePayload, Body()],
+    member: Annotated[CurrentMember, Depends(current_member)],
+    service: Annotated[RfqService, Depends(get_rfq_service)],
+    idempotency_key: Annotated[uuid.UUID | None, Header(alias="Idempotency-Key")] = None,
+) -> RfqCreateResponse:
+    if idempotency_key is None:
+        raise UnprocessableEntityError(details={"header": "Idempotency-Key is required"})
+    rfq, lines, recipients, rejected = service.update_draft(
+        member=member,
+        rfq_id=rfq_id,
+        lines_data=payload.lines,
+        recipient_supplier_ids=payload.recipient_supplier_ids,
+        needed_by_date=payload.needed_by_date,
+        tenant_terms=payload.tenant_terms,
+    )
+    return RfqCreateResponse(
+        rfq=rfq, lines=lines, recipients=recipients, rejected_recipients=rejected
     )
 
 
@@ -207,22 +264,6 @@ def create_guardrail(
         raise UnprocessableEntityError(details={"max_order_value_amount": "Must be greater than 0"})
 
     return service.create_guardrail(member=member, payload=payload)
-
-
-@router.get(
-    "/guardrails",
-    status_code=status.HTTP_200_OK,
-    response_model=list[AutoPreparationGuardrail],
-    operation_id="listGuardrails",
-)
-def list_guardrails(
-    member: Annotated[CurrentMember, Depends(current_member)],
-    service: Annotated[RfqService, Depends(get_rfq_service)],
-) -> list[AutoPreparationGuardrail]:
-    if member.role != "owner":
-        raise PermissionDeniedError(details={"role": "owner_required"})
-
-    return service.list_guardrails(member=member)
 
 
 @router.patch(

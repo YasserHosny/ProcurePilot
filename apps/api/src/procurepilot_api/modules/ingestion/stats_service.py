@@ -50,7 +50,7 @@ def get_ingestion_stats(
     - emails_received_today / _week / _month: ingestion_email_log rows within tenant-local
       calendar boundaries in the tenant's reporting_timezone.
     - capture_uploads_total: all-time quotations with source = 'capture'.
-    - catalogue_imports_total: all-time catalogue imports for the tenant.
+    - catalogue_imports_total: supplier catalogue imports plus committed import wizard jobs.
     - supplier_match_rate: fraction of completed ingestion_email_log rows that have a matched
       supplier (supplier_id is not null).
     - extraction_success_rate: fraction of completed extraction jobs for ingestion quotations
@@ -60,9 +60,7 @@ def get_ingestion_stats(
 
     with _authenticated_db(resolved_settings, member) as conn:
         with conn.cursor() as cur:
-            cur.execute(
-                "select reporting_timezone from tenant where id = %s", (member.tenant_id,)
-            )
+            cur.execute("select reporting_timezone from tenant where id = %s", (member.tenant_id,))
             tz_row = cur.fetchone()
         tz_name = str(tz_row[0]) if tz_row and tz_row[0] else "UTC"
         today_start, week_start, month_start = derive_calendar_windows(tz_name, now=now)
@@ -106,12 +104,14 @@ def get_ingestion_stats(
             )
             capture_row = cur.fetchone() or {}
 
-            # 3. Catalogue imports total (all-time catalogue_imports rows for the tenant)
+            # 3. Supplier catalogue imports plus committed import wizard jobs.
             cur.execute(
                 """
-                select count(*) as catalogue_imports_total
-                from catalogue_imports
-                where tenant_id = %(tenant_id)s
+                select
+                    (select count(*) from catalogue_imports where tenant_id = %(tenant_id)s)
+                    + (select count(*) from import_job
+                       where tenant_id = %(tenant_id)s and status = 'committed')
+                    as catalogue_imports_total
                 """,
                 {"tenant_id": member.tenant_id},
             )
@@ -219,12 +219,8 @@ def get_ingestion_stats(
         else 0.0
     )
     purchase_history_days = int(history_row.get("purchase_history_days") or 0)
-    active_refresh_schedule_count = int(
-        refresh_row.get("active_refresh_schedule_count") or 0
-    )
-    linked_refresh_schedule_count = int(
-        refresh_row.get("linked_refresh_schedule_count") or 0
-    )
+    active_refresh_schedule_count = int(refresh_row.get("active_refresh_schedule_count") or 0)
+    linked_refresh_schedule_count = int(refresh_row.get("linked_refresh_schedule_count") or 0)
 
     return IngestionStats(
         emails_received_today=emails_received_today,

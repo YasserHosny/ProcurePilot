@@ -144,7 +144,7 @@ def make_reporting_tenant(cur: psycopg.Cursor, label: str) -> ReportingTenant:
            vat_amount, vat_currency, delivery_fee_amount, delivery_fee_currency,
            discount_amount, discount_currency, other_charges_amount, other_charges_currency,
            total_amount, total_currency, raw_inputs, rule_version, valid_from, valid_to)
-        values (%s, %s, %s, %s, 10, 30, 'kg', 10, 'GBP',
+        values (%s, %s, %s, %s, 10, 30, 'kilogram', 10, 'GBP',
                 2, 'GBP', 0, 'GBP', 0, 'GBP', 0, 'GBP',
                 12, 'GBP', '{}'::jsonb, 'landed-cost-v1',
                 now() - interval '2 days', now() + interval '3 days')
@@ -211,7 +211,7 @@ def make_reporting_tenant(cur: psycopg.Cursor, label: str) -> ReportingTenant:
           (id, tenant_id, workspace_product_id, supplier_id, landed_cost_id, recorded_by,
            quantity, base_unit, unit_price_amount, unit_price_currency,
            total_paid_amount, total_paid_currency, delivery_result, recorded_at)
-        values (%s, %s, %s, %s, %s, %s, 10, 'kg', 10, 'GBP', 100, 'GBP', 'delivered', %s)
+        values (%s, %s, %s, %s, %s, %s, 10, 'kilogram', 10, 'GBP', 100, 'GBP', 'delivered', %s)
         """,
         (
             purchase_id,

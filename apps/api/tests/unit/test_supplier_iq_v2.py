@@ -34,7 +34,7 @@ def fixture(n: int = 3, price: str = "110") -> SupplierRiskInput:
         product = UUID(int=100 + i)
         for period, day in enumerate((START, SPLIT)):
             ident = 1000 + i * 10 + period
-            line = OrderLine(UUID(int=ident), product, "kg", D(10))
+            line = OrderLine(UUID(int=ident), product, "kilogram", D(10))
             orders.append(
                 PurchaseOrder(UUID(int=ident), S, day, day, "received", D(100), "USD", (line,))
             )
@@ -46,7 +46,7 @@ def fixture(n: int = 3, price: str = "110") -> SupplierRiskInput:
                     UUID(int=ident + 20000),
                     S,
                     product,
-                    "kg",
+                    "kilogram",
                     "USD",
                     D("100" if period == 0 else price),
                     stamp(day),
@@ -202,11 +202,11 @@ def test_reliability_decay(failed: int, risk: str) -> None:
 @pytest.mark.parametrize(
     ("active", "currency", "unit", "valid", "risk"),
     [
-        (True, "USD", "kg", True, "0"),
-        (False, "USD", "kg", True, "1"),
-        (True, "EUR", "kg", True, "1"),
+        (True, "USD", "kilogram", True, "0"),
+        (False, "USD", "kilogram", True, "1"),
+        (True, "EUR", "kilogram", True, "1"),
         (True, "USD", "g", True, "1"),
-        (True, "USD", "kg", False, "1"),
+        (True, "USD", "kilogram", False, "1"),
     ],
 )
 def test_alternatives(active: bool, currency: str, unit: str, valid: bool, risk: str) -> None:
@@ -237,7 +237,7 @@ def test_single_source_uses_product_level_alternative_coverage() -> None:
             UUID(int=50000 + i),
             OTHER,
             UUID(int=100 + i),
-            "kg",
+            "kilogram",
             "USD",
             D(90),
             stamp(SPLIT),
@@ -478,8 +478,8 @@ def test_invalid_windows_and_duplicate_ids() -> None:
 
 def test_source_projection_rejects_non_decimal_and_duplicate_lines() -> None:
     with pytest.raises(ValueError, match="quantity"):
-        OrderLine(UUID(int=900), UUID(int=901), "kg", 1.0)
-    line = OrderLine(UUID(int=900), UUID(int=901), "kg", D(1))
+        OrderLine(UUID(int=900), UUID(int=901), "kilogram", 1.0)
+    line = OrderLine(UUID(int=900), UUID(int=901), "kilogram", D(1))
     with pytest.raises(ValueError, match="amount"):
         PurchaseOrder(UUID(int=902), S, START, START, "received", 1.0, "USD", (line,))
     with pytest.raises(ValueError, match="Duplicate order line IDs"):
@@ -524,7 +524,14 @@ def test_plan_public_score_example() -> None:
     )
     alternatives = tuple(
         Alternative(
-            UUID(int=40000 + i), OTHER, UUID(int=100 + i), "kg", "USD", D(90), stamp(START), START
+            UUID(int=40000 + i),
+            OTHER,
+            UUID(int=100 + i),
+            "kilogram",
+            "USD",
+            D(90),
+            stamp(START),
+            START,
         )
         for i in range(2)
     )
@@ -574,7 +581,7 @@ def test_failure_rate_without_positive_decay(baseline: bool) -> None:
 def test_alternative_exclusions(kind: str, reason: str) -> None:
     p = fixture()
     row = Alternative(
-        UUID(int=40000), OTHER, UUID(int=100), "kg", "USD", D(10), stamp(START), START
+        UUID(int=40000), OTHER, UUID(int=100), "kilogram", "USD", D(10), stamp(START), START
     )
     changes = {
         "same": {"supplier_id": S},
@@ -596,7 +603,7 @@ def test_fingerprint_timezone_line_order_and_versions() -> None:
 
     p = fixture()
     first = p.purchase_orders[0]
-    second_line = OrderLine(UUID(int=999997), first.lines[0].product_id, "kg", D(1))
+    second_line = OrderLine(UUID(int=999997), first.lines[0].product_id, "kilogram", D(1))
     nested = replace(first, lines=(first.lines[0], second_line))
     nested_reversed = replace(first, lines=(second_line, first.lines[0]))
     assert source_fingerprint(

@@ -29,6 +29,7 @@ from procurepilot_api.modules.rfq.schemas import (
     GuardrailCreateInput,
     GuardrailUpdateInput,
     Rfq,
+    RfqDetail,
     RfqGuardrailEvaluation,
     RfqLine,
     RfqList,
@@ -118,31 +119,9 @@ class RfqService:
                         details={"idempotency_key": "concurrent request"}
                     )
 
-                # First, verify suppliers exist and check contact emails
-                rejected_recipients = []
-                valid_supplier_ids = []
-
-                for supplier_id in recipient_supplier_ids:
-                    cur.execute(
-                        "select id, contact_email from supplier where id = %s", (supplier_id,)
-                    )
-                    row = cur.fetchone()
-                    if row is None:
-                        rejected_recipients.append(
-                            {
-                                "supplier_id": str(supplier_id),
-                                "reason": "not_found",
-                            }
-                        )
-                    elif not row.get("contact_email"):
-                        rejected_recipients.append(
-                            {
-                                "supplier_id": str(supplier_id),
-                                "reason": "missing_contact_email",
-                            }
-                        )
-                    else:
-                        valid_supplier_ids.append(supplier_id)
+                rejected_recipients, valid_supplier_ids = _validate_recipients(
+                    cur, recipient_supplier_ids
+                )
 
                 rfq_id = uuid.uuid4()
                 cur.execute(
@@ -203,6 +182,91 @@ class RfqService:
                 conn.commit()
                 return rfq, created_lines, created_recipients, rejected_recipients
 
+    def get_detail(self, *, member: CurrentMember, rfq_id: uuid.UUID) -> RfqDetail:
+        with _authenticated_db(self.settings, member) as conn:
+            with conn.cursor(row_factory=dict_row) as cur:
+                cur.execute("select * from rfq where id = %s", (rfq_id,))
+                row = cur.fetchone()
+                if row is None:
+                    raise NotFoundError(details={"resource": "rfq"})
+                cur.execute(
+                    "select * from rfq_line where rfq_id = %s order by created_at", (rfq_id,)
+                )
+                lines = [RfqLine(**item) for item in cur.fetchall()]
+                cur.execute(
+                    "select * from rfq_recipient where rfq_id = %s order by created_at", (rfq_id,)
+                )
+                recipients = [RfqRecipient(**item) for item in cur.fetchall()]
+                return RfqDetail(rfq=Rfq(**row), lines=lines, recipients=recipients)
+
+    def update_draft(
+        self,
+        *,
+        member: CurrentMember,
+        rfq_id: uuid.UUID,
+        lines_data: list,
+        recipient_supplier_ids: list[uuid.UUID],
+        needed_by_date: date,
+        tenant_terms: str | None,
+    ) -> tuple[Rfq, list[RfqLine], list[RfqRecipient], list[dict]]:
+        with _authenticated_db(self.settings, member) as conn:
+            with conn.cursor(row_factory=dict_row) as cur:
+                cur.execute("select * from rfq where id = %s for update", (rfq_id,))
+                row = cur.fetchone()
+                if row is None:
+                    raise NotFoundError(details={"resource": "rfq"})
+                if row["status"] != "draft":
+                    from procurepilot_api.errors import ConflictError
+
+                    raise ConflictError(details={"resource": "rfq", "reason": "not_draft"})
+                rejected, valid_supplier_ids = _validate_recipients(cur, recipient_supplier_ids)
+                try:
+                    cur.execute("delete from rfq_line where rfq_id = %s", (rfq_id,))
+                    cur.execute("delete from rfq_recipient where rfq_id = %s", (rfq_id,))
+                except psycopg.errors.ForeignKeyViolation as exc:
+                    from procurepilot_api.errors import ConflictError
+
+                    raise ConflictError(
+                        details={"resource": "rfq", "reason": "has_responses"}
+                    ) from exc
+                cur.execute(
+                    "update rfq set needed_by_date = %s, tenant_terms = %s "
+                    "where id = %s returning *",
+                    (needed_by_date, tenant_terms, rfq_id),
+                )
+                rfq = Rfq(**cur.fetchone())
+                lines = []
+                for item in lines_data:
+                    cur.execute(
+                        "insert into rfq_line "
+                        "(tenant_id,rfq_id,workspace_product_id,quantity) "
+                        "values (%s,%s,%s,%s) returning *",
+                        (member.tenant_id, rfq_id, item.workspace_product_id, item.quantity),
+                    )
+                    lines.append(RfqLine(**cur.fetchone()))
+                recipients = []
+                for supplier_id in valid_supplier_ids:
+                    cur.execute(
+                        "insert into rfq_recipient "
+                        "(tenant_id,rfq_id,supplier_id,status) "
+                        "values (%s,%s,%s,'draft') returning *",
+                        (member.tenant_id, rfq_id, supplier_id),
+                    )
+                    recipients.append(RfqRecipient(**cur.fetchone()))
+                cur.execute(
+                    "select record_audit_event(%s, 'success'::audit_outcome, "
+                    "%s, %s, %s, %s::jsonb, null)",
+                    (
+                        "rfq.draft_updated",
+                        member.tenant_id,
+                        member.membership_id,
+                        member.email,
+                        json.dumps({"rfq_id": str(rfq_id)}),
+                    ),
+                )
+                conn.commit()
+                return rfq, lines, recipients, rejected
+
     def send(
         self,
         *,
@@ -222,7 +286,7 @@ class RfqService:
                         details={"idempotency_key": "concurrent request"}
                     )
 
-                cur.execute("select * from rfq where id = %s", (rfq_id,))
+                cur.execute("select * from rfq where id = %s for update", (rfq_id,))
                 rfq_row = cur.fetchone()
                 if not rfq_row:
                     raise NotFoundError(details={"resource": "rfq"})
@@ -772,6 +836,8 @@ class RfqService:
                 r.status,
                 r.needed_by_date,
                 r.created_at,
+                (SELECT max(rr_sent.sent_at) FROM rfq_recipient rr_sent
+                 WHERE rr_sent.rfq_id = r.id) as sent_at,
                 (SELECT count(*) FROM rfq_recipient rr WHERE rr.rfq_id = r.id) as recipient_count,
                 (
                     SELECT count(*)
@@ -811,6 +877,23 @@ class RfqService:
 
 def _cap_limit(limit: int) -> int:
     return max(1, min(limit, 100))
+
+
+def _validate_recipients(
+    cur: psycopg.Cursor, supplier_ids: list[uuid.UUID]
+) -> tuple[list[dict], list[uuid.UUID]]:
+    rejected: list[dict] = []
+    valid: list[uuid.UUID] = []
+    for supplier_id in supplier_ids:
+        cur.execute("select id, contact_email from supplier where id = %s", (supplier_id,))
+        row = cur.fetchone()
+        if row is None:
+            rejected.append({"supplier_id": str(supplier_id), "reason": "not_found"})
+        elif not row.get("contact_email"):
+            rejected.append({"supplier_id": str(supplier_id), "reason": "missing_contact_email"})
+        else:
+            valid.append(supplier_id)
+    return rejected, valid
 
 
 def _encode_cursor(offset: int) -> str:

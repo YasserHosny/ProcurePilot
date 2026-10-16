@@ -475,3 +475,25 @@ def test_derive_calendar_windows_iso_week_and_month_boundaries() -> None:
     assert today_start == datetime(2026, 9, 17, 0, 0, 0, tzinfo=UTC)
     assert week_start == datetime(2026, 9, 14, 0, 0, 0, tzinfo=UTC)  # Monday
     assert month_start == datetime(2026, 9, 1, 0, 0, 0, tzinfo=UTC)
+
+
+def test_catalogue_import_total_includes_only_committed_import_jobs(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = settings_for_test_db(monkeypatch)
+    with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+        with conn.cursor() as cur:
+            ensure_quotation_reference_data(cur)
+            workspace = make_workspace(cur, "stats-import-jobs")
+            for status in ("committed", "previewed", "refused"):
+                cur.execute(
+                    """insert into import_job
+                       (tenant_id,kind,filename,status,row_count,created_by,committed_at)
+                       values (%s,'products','products.csv',%s::import_status,1,%s,
+                         case when %s = 'committed' then now() else null end)""",
+                    (workspace.tenant_id, status, workspace.membership_id, status),
+                )
+        conn.commit()
+
+    stats = get_ingestion_stats(member=member_from_workspace(workspace), settings=settings)
+    assert stats.catalogue_imports_total == 1

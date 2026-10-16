@@ -87,7 +87,7 @@ def test_product_create_replay_returns_original_product(monkeypatch: pytest.Monk
             payload = ProductCreate(
                 tenant_name="Replay product",
                 canonical_name="Replay product",
-                base_unit="kg",
+                base_unit="kilogram",
                 pack=PackInput(pack_count=1, unit_size="1"),
             )
             key = uuid4()
@@ -211,9 +211,7 @@ def test_digest_subscription_fresh_key_colliding_on_filters_is_a_conflict_not_a_
     service = DigestsService(settings_for_test_db(monkeypatch))
     with committed_smart_context("replay-digest-collide") as context:
         payload = DigestSubscriptionCreate(channel="in_app", locale="en")
-        service.create_subscription(
-            member=context.member, payload=payload, idempotency_key=uuid4()
-        )
+        service.create_subscription(member=context.member, payload=payload, idempotency_key=uuid4())
         # Same member, same (default) filters -> hits digest_subscription_owner_unique, not the
         # idempotency index. A FRESH key must not be mistaken for a replay of this row.
         with pytest.raises(ConflictError):
@@ -247,7 +245,7 @@ def test_product_fresh_key_colliding_on_canonical_product_is_a_conflict_not_look
             payload = ProductCreate(
                 tenant_name="Collide product one",
                 canonical_name="Collide canonical",
-                base_unit="kg",
+                base_unit="kilogram",
                 pack=PackInput(pack_count=1, unit_size="1"),
             )
             service.create_product(
@@ -262,7 +260,7 @@ def test_product_fresh_key_colliding_on_canonical_product_is_a_conflict_not_look
             second_payload = ProductCreate(
                 tenant_name="Collide product two",
                 canonical_name="Collide canonical",
-                base_unit="kg",
+                base_unit="kilogram",
                 pack=PackInput(pack_count=1, unit_size="1"),
             )
             with pytest.raises(ConflictError):
