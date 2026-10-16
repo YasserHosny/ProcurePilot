@@ -5,7 +5,10 @@ import pytest
 
 from integration.catalogue_helpers import TEST_DATABASE_URL
 from integration.smart_compare_helpers import committed_smart_context, settings_for_test_db
-from procurepilot_api.modules.ingestion.matcher import match_supplier
+from procurepilot_api.modules.ingestion.matcher import (
+    match_supplier,
+    match_supplier_by_address_history,
+)
 from procurepilot_api.modules.offers.service import _authenticated_db
 
 pytestmark = pytest.mark.skipif(
@@ -102,6 +105,51 @@ def test_address_history_beats_domain_for_a_generic_domain_sender(
 
         assert matched_id == gmail_supplier
         assert method == "address"
+
+
+def test_ambiguous_address_history_falls_through_to_domain(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = settings_for_test_db(monkeypatch)
+    with committed_smart_context("ingestion-ambiguous-address", supplier_count=2) as context:
+        supplier_a, supplier_b = context.supplier_ids
+        with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "update supplier set email_domains = %s where id = %s",
+                    (["gmail.com"], supplier_b),
+                )
+                for index, supplier_id in enumerate((supplier_a, supplier_b)):
+                    cur.execute(
+                        """insert into ingestion_email_log
+                           (tenant_id, message_id, from_address, from_domain, status,
+                            supplier_id, match_method)
+                           values (%s, %s, 'shared@gmail.com', 'gmail.com', 'completed', %s,
+                                   'manual')""",
+                        (
+                            context.workspace.tenant_id,
+                            f"<ambiguous-{index}@gmail.com>",
+                            supplier_id,
+                        ),
+                    )
+            conn.commit()
+
+        with _authenticated_db(settings, context.member) as conn:
+            history_match = match_supplier_by_address_history(
+                conn, tenant_id=context.workspace.tenant_id, from_address="shared@gmail.com"
+            )
+            matched_id, method = match_supplier(
+                conn,
+                tenant_id=context.workspace.tenant_id,
+                from_address="shared@gmail.com",
+                from_domain="gmail.com",
+                in_reply_to=None,
+                references=[],
+            )
+
+        assert history_match is None
+        assert matched_id == supplier_b
+        assert method == "domain"
 
 
 def test_thread_match_inherits_supplier_from_a_prior_message_in_the_same_thread(
