@@ -1,0 +1,192 @@
+{
+  "apiVersion": "2024-11-30",
+  "modelId": "prebuilt-layout",
+  "content": "",
+  "pages": [],
+  "paragraphs": [
+    {
+      "content": "الإجمالي النهائي 3185.00 ج.م"
+    }
+  ],
+  "tables": [
+    {
+      "rowCount": 6,
+      "columnCount": 4,
+      "cells": [
+        {
+          "rowIndex": 0,
+          "columnIndex": 0,
+          "content": "اإلجمايل",
+          "rowSpan": 1,
+          "columnSpan": 1,
+          "kind": "columnHeader"
+        },
+        {
+          "rowIndex": 0,
+          "columnIndex": 1,
+          "content": "السعر",
+          "rowSpan": 1,
+          "columnSpan": 1,
+          "kind": "columnHeader"
+        },
+        {
+          "rowIndex": 0,
+          "columnIndex": 2,
+          "content": "الكمية",
+          "rowSpan": 1,
+          "columnSpan": 1,
+          "kind": "columnHeader"
+        },
+        {
+          "rowIndex": 0,
+          "columnIndex": 3,
+          "content": "الصنف",
+          "rowSpan": 1,
+          "columnSpan": 1,
+          "kind": "columnHeader"
+        },
+        {
+          "rowIndex": 1,
+          "columnIndex": 0,
+          "content": "900.00",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 1,
+          "columnIndex": 1,
+          "content": "22.50",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 1,
+          "columnIndex": 2,
+          "content": "40",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 1,
+          "columnIndex": 3,
+          "content": "طماطم طازجة",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 2,
+          "columnIndex": 0,
+          "content": "638.75",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 2,
+          "columnIndex": 1,
+          "content": "18.25",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 2,
+          "columnIndex": 2,
+          "content": "35",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 2,
+          "columnIndex": 3,
+          "content": "بصل أحمر",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 3,
+          "columnIndex": 0,
+          "content": "960.00",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 3,
+          "columnIndex": 1,
+          "content": "16.00",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 3,
+          "columnIndex": 2,
+          "content": "60",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 3,
+          "columnIndex": 3,
+          "content": "بطاطس",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 4,
+          "columnIndex": 0,
+          "content": "686.25",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 4,
+          "columnIndex": 1,
+          "content": "45.75",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 4,
+          "columnIndex": 2,
+          "content": "15",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 4,
+          "columnIndex": 3,
+          "content": "فلفل رومي",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 5,
+          "columnIndex": 0,
+          "content": "3185.00 ج.م",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 5,
+          "columnIndex": 1,
+          "content": "",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 5,
+          "columnIndex": 2,
+          "content": "",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 5,
+          "columnIndex": 3,
+          "content": "Total",
+          "rowSpan": 1,
+          "columnSpan": 1
+        }
+      ]
+    }
+  ],
+  "documents": []
+}

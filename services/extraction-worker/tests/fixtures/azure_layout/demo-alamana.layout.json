@@ -1,0 +1,362 @@
+{
+  "apiVersion": "2024-11-30",
+  "modelId": "prebuilt-layout",
+  "content": "",
+  "pages": [],
+  "paragraphs": [
+    {
+      "content": "اإلجمايل النهايئ 56925.00 ج.م"
+    }
+  ],
+  "tables": [
+    {
+      "rowCount": 8,
+      "columnCount": 6,
+      "cells": [
+        {
+          "rowIndex": 0,
+          "columnIndex": 0,
+          "content": "اإلجمايل (ج.م)",
+          "rowSpan": 1,
+          "columnSpan": 1,
+          "kind": "columnHeader"
+        },
+        {
+          "rowIndex": 0,
+          "columnIndex": 1,
+          "content": "سعر الوحدة (ج.م)",
+          "rowSpan": 1,
+          "columnSpan": 1,
+          "kind": "columnHeader"
+        },
+        {
+          "rowIndex": 0,
+          "columnIndex": 2,
+          "content": "الكمية",
+          "rowSpan": 1,
+          "columnSpan": 1,
+          "kind": "columnHeader"
+        },
+        {
+          "rowIndex": 0,
+          "columnIndex": 3,
+          "content": "الوحدة",
+          "rowSpan": 1,
+          "columnSpan": 1,
+          "kind": "columnHeader"
+        },
+        {
+          "rowIndex": 0,
+          "columnIndex": 4,
+          "content": "الصنف",
+          "rowSpan": 1,
+          "columnSpan": 1,
+          "kind": "columnHeader"
+        },
+        {
+          "rowIndex": 0,
+          "columnIndex": 5,
+          "content": "م",
+          "rowSpan": 1,
+          "columnSpan": 1,
+          "kind": "columnHeader"
+        },
+        {
+          "rowIndex": 1,
+          "columnIndex": 0,
+          "content": "17,250.00",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 1,
+          "columnIndex": 1,
+          "content": "1,725.00",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 1,
+          "columnIndex": 2,
+          "content": "10",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 1,
+          "columnIndex": 3,
+          "content": "وحدة",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 1,
+          "columnIndex": 4,
+          "content": "زيت عباد الشمس",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 1,
+          "columnIndex": 5,
+          "content": "1",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 2,
+          "columnIndex": 0,
+          "content": "18,500.00",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 2,
+          "columnIndex": 1,
+          "content": "925.00",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 2,
+          "columnIndex": 2,
+          "content": "20",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 2,
+          "columnIndex": 3,
+          "content": "وحدة",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 2,
+          "columnIndex": 4,
+          "content": "أرز مرصي",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 2,
+          "columnIndex": 5,
+          "content": "2",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 3,
+          "columnIndex": 0,
+          "content": "8,900.00",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 3,
+          "columnIndex": 1,
+          "content": "890.00",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 3,
+          "columnIndex": 2,
+          "content": "10",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 3,
+          "columnIndex": 3,
+          "content": "وحدة",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 3,
+          "columnIndex": 4,
+          "content": "سكر",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 3,
+          "columnIndex": 5,
+          "content": "3",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 4,
+          "columnIndex": 0,
+          "content": "8,625.00",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 4,
+          "columnIndex": 1,
+          "content": "575.00",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 4,
+          "columnIndex": 2,
+          "content": "15",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 4,
+          "columnIndex": 3,
+          "content": "وحدة",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 4,
+          "columnIndex": 4,
+          "content": "مكرونة",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 4,
+          "columnIndex": 5,
+          "content": "4",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 5,
+          "columnIndex": 0,
+          "content": "3,400.00",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 5,
+          "columnIndex": 1,
+          "content": "68.00",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 5,
+          "columnIndex": 2,
+          "content": "50",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 5,
+          "columnIndex": 3,
+          "content": "وحدة",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 5,
+          "columnIndex": 4,
+          "content": "عدس بجبة",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 5,
+          "columnIndex": 5,
+          "content": "5",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 6,
+          "columnIndex": 0,
+          "content": "250.00",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 6,
+          "columnIndex": 1,
+          "content": "",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 6,
+          "columnIndex": 2,
+          "content": "",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 6,
+          "columnIndex": 3,
+          "content": "",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 6,
+          "columnIndex": 4,
+          "content": "مصاريف نقل",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 6,
+          "columnIndex": 5,
+          "content": "",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 7,
+          "columnIndex": 0,
+          "content": "56925.00 ج.م",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 7,
+          "columnIndex": 1,
+          "content": "",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 7,
+          "columnIndex": 2,
+          "content": "",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 7,
+          "columnIndex": 3,
+          "content": "",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 7,
+          "columnIndex": 4,
+          "content": "اإلجمايل النهايئ",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 7,
+          "columnIndex": 5,
+          "content": "Total",
+          "rowSpan": 1,
+          "columnSpan": 1
+        }
+      ]
+    }
+  ],
+  "documents": []
+}

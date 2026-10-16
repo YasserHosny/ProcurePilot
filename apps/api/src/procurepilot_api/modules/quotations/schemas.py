@@ -23,6 +23,9 @@ ReviewTaskReason = Literal[
     "no_supplier_match",
     "currency_unresolved",
     "date_unparsed",
+    "merged_line_items",
+    "line_count_mismatch",
+    "total_unverified",
 ]
 
 

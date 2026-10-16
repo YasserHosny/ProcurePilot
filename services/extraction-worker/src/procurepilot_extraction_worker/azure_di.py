@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import re
+import unicodedata
 from datetime import date, datetime
+from decimal import Decimal
 from typing import Any
 
 from azure.ai.documentintelligence import DocumentIntelligenceClient
@@ -24,8 +26,11 @@ class AzureDocumentIntelligenceProvider:
     method = "azure_di"
     model_version = f"{MODEL_ID}:2024-11-30"
 
-    def __init__(self, settings: WorkerSettings | None = None) -> None:
+    def __init__(
+        self, settings: WorkerSettings | None = None, client: object | None = None
+    ) -> None:
         self._settings = settings or get_settings()
+        self._client = client
 
     def extract(
         self,
@@ -40,10 +45,10 @@ class AzureDocumentIntelligenceProvider:
 
         endpoint = self._settings.azure_di_endpoint
         key = self._settings.azure_di_key
-        if not endpoint or not key:
+        if self._client is None and (not endpoint or not key):
             raise ExtractionProviderError("AZURE_DI_ENDPOINT and AZURE_DI_KEY are required")
 
-        client = DocumentIntelligenceClient(
+        client = self._client or DocumentIntelligenceClient(
             endpoint=endpoint,
             credential=AzureKeyCredential(key),
         )
@@ -54,47 +59,59 @@ class AzureDocumentIntelligenceProvider:
                 AnalyzeDocumentRequest(bytes_source=document_bytes),
             )
             result = poller.result()
+            parsed = _parse_invoice_result(result, self.model_version)
+            if parsed.expected_line_count is not None:
+                return parsed
+            layout = client.begin_analyze_document(
+                "prebuilt-layout", AnalyzeDocumentRequest(bytes_source=document_bytes)
+            ).result()
+            table_result = _parse_invoice_result(layout, "prebuilt-layout:2024-11-30")
+            if table_result.expected_line_count is not None:
+                return _merge_headers(parsed, table_result)
+            return parsed
         except Exception as exc:
             raise ExtractionProviderError(f"Azure DI analysis failed: {exc}") from exc
 
-        return _parse_invoice_result(
-            result, self.model_version
-        )
 
-
-def _parse_invoice_result(
-    result: object, model_version: str
-) -> ExtractionResult:
+def _parse_invoice_result(result: object, model_version: str) -> ExtractionResult:
     header: dict[str, ExtractedField] = {}
     lines: list[ExtractedLine] = []
     stated_total: ExtractedField | None = None
 
-    documents = getattr(result, "documents", None) or []
+    table_result = _parse_line_table(result, model_version)
+    documents = _get(result, "documents", []) or []
     if not documents:
-        return _fallback_from_tables(result, model_version)
+        return table_result or ExtractionResult("azure_di", model_version, {}, [], cost_usd=0.0)
 
     doc = documents[0]
-    fields = doc.fields or {}
+    fields = _get(doc, "fields", {}) or {}
 
     vendor = _content(fields, "VendorName")
     if vendor:
         header["supplier_name"] = _make_field("supplier_name", vendor, fields, "VendorName")
 
-    currency = _infer_currency_state(fields)[0]
+    currency_text = _all_document_text(result)
+    currency = _infer_currency_state(fields)[0] or detect_currency(currency_text)
     if currency is not None:
         header["currency"] = ExtractedField("currency", currency, 0.90, 1, None)
 
     invoice_date = _date_evidence(fields, "InvoiceDate")
     if invoice_date:
         header["issue_date"] = _make_field(
-            "issue_date", invoice_date, fields, "InvoiceDate",
+            "issue_date",
+            invoice_date,
+            fields,
+            "InvoiceDate",
             typed_value=_typed_date(fields, "InvoiceDate"),
         )
 
     due_date = _date_evidence(fields, "DueDate")
     if due_date:
         header["expiry_date"] = _make_field(
-            "expiry_date", due_date, fields, "DueDate",
+            "expiry_date",
+            due_date,
+            fields,
+            "DueDate",
             typed_value=_typed_date(fields, "DueDate"),
         )
 
@@ -111,10 +128,16 @@ def _parse_invoice_result(
             )
 
     items_field = fields.get("Items")
+    if table_result is not None:
+        return _merge_headers(
+            ExtractionResult("azure_di", model_version, header, [], stated_total, 0.0),
+            table_result,
+            invoice_total=stated_total,
+        )
     if items_field:
-        item_list = getattr(items_field, "value_array", None) or []
+        item_list = _get(items_field, "value_array", []) or []
         for idx, item in enumerate(item_list, start=1):
-            item_fields = getattr(item, "value_object", None) or {}
+            item_fields = _get(item, "value_object", {}) or {}
             line = _parse_line_item(idx, item_fields, currency)
             lines.append(line)
 
@@ -128,78 +151,286 @@ def _parse_invoice_result(
     )
 
 
-def _fallback_from_tables(
-    result: object, model_version: str
-) -> ExtractionResult:
-    tables = getattr(result, "tables", None) or []
+def _parse_line_table(result: object, model_version: str) -> ExtractionResult | None:
+    """Prefer semantic-header table rows; invoice fields remain the source for header data.
+
+    Provider policy: analyze prebuilt-invoice first; if it has a line table, ignore Items.
+    Otherwise analyze prebuilt-layout and use its table when found, falling back to Items only
+    when neither model exposes a usable table. A table/paragraph total overrides InvoiceTotal.
+    """
+    tables = _get(result, "tables", []) or []
+    document_text = _all_document_text(result)
+    all_cell_text = " ".join(
+        str(_get(c, "content", "") or "") for t in tables for c in (_get(t, "cells", []) or [])
+    )
+    currency = detect_currency(all_cell_text + " " + document_text)
+    currency_conflict = _has_currency_conflict(all_cell_text + " " + document_text)
     lines: list[ExtractedLine] = []
-    marker_text = " ".join(
-        str(getattr(cell, "content", "") or "")
-        for table in tables
-        for cell in (getattr(table, "cells", None) or [])
-    )
-    detected_currency = detect_currency(marker_text)
-    currency = detected_currency
-    header = {"currency": ExtractedField("currency", currency, 0.90, 1, None)} if currency else {}
+    expected = 0
+    stated_total = None
+    before_tax_total = None
     for table in tables:
-        cells = table.cells or []
-        headers_row = [c for c in cells if c.row_index == 0]
-        header_names = [
-            c.content.strip().lower()
-            for c in sorted(headers_row, key=lambda c: c.column_index)
-        ]
-        for row_idx in range(1, table.row_count):
-            row_cells = sorted(
-                [c for c in cells if c.row_index == row_idx],
-                key=lambda c: c.column_index,
+        cells = _get(table, "cells", []) or []
+        rows: dict[int, list[object]] = {}
+        for cell in cells:
+            rows.setdefault(int(_get(cell, "rowIndex", _get(cell, "row_index", 0))), []).append(
+                cell
             )
-            row_data: dict[str, str] = {}
+        roles_by_row: dict[int, dict[str, object]] = {}
+        for row, row_cells in rows.items():
+            roles: dict[str, object] = {}
             for cell in row_cells:
-                if cell.column_index < len(header_names):
-                    row_data[header_names[cell.column_index]] = cell.content
-            if row_data:
-                ef: dict[str, ExtractedField] = {}
-                qty = row_data.get("quantity") or row_data.get("qty")
-                if qty:
-                    cleaned_qty = _clean_number(qty)
-                    if cleaned_qty:
-                        ef["quantity"] = ExtractedField("quantity", cleaned_qty, 0.80, 1, None)
-                price = (
-                    row_data.get("unit price") or row_data.get("price") or row_data.get("rate")
-                )
-                if price:
-                    amount = _clean_number(price)
+                role = _header_role(str(_get(cell, "content", "") or ""))
+                if role and role not in roles:
+                    roles[role] = cell
+            if {"description", "quantity"} <= roles.keys() and (
+                {"unit_price", "line_total"} & roles.keys()
+            ):
+                roles_by_row[row] = roles
+        if not roles_by_row:
+            continue
+        header_row = max(roles_by_row, key=lambda row: (len(roles_by_row[row]), -row))
+        roles = roles_by_row[header_row]
+        col_roles = {
+            int(_get(cell, "columnIndex", _get(cell, "column_index", 0))): role
+            for role, cell in roles.items()
+        }
+        expected = 0
+        charge_amount: Decimal | None = None
+        for row in sorted(r for r in rows if r > header_row):
+            data = {
+                col_roles.get(int(_get(c, "columnIndex", _get(c, "column_index", 0)))): str(
+                    _get(c, "content", "") or ""
+                ).strip()
+                for c in rows[row]
+            }
+            desc = data.get("description", "").replace("\n", " ").strip()
+            qty = _clean_number(data.get("quantity", ""))
+            price = _clean_number(data.get("unit_price", ""))
+            total = _clean_number(data.get("line_total", ""))
+            if _is_total_row(desc):
+                if total or price or qty is None:
+                    amount = total or price or _clean_number(desc)
                     if amount:
-                        ef["unit_price"] = ExtractedField(
-                            "unit_price", {"amount": amount, "currency": currency}, 0.80, 1, None
-                        )
-                desc = (
-                    row_data.get("description")
-                    or row_data.get("item")
-                    or row_data.get("product")
-                    or " ".join(row_data.values())
-                )
-                lines.append(
-                    ExtractedLine(
-                        line_number=row_idx,
-                        original_text=desc or f"Table row {row_idx}",
-                        fields=ef,
+                        candidate = _money_field("stated_total", amount, currency, 0.9)
+                        if _is_before_tax_row(desc):
+                            before_tax_total = candidate
+                        else:
+                            stated_total = candidate
+                continue
+            if _is_tax_row(desc) and qty is None:
+                continue
+            if _is_charge_row(desc) and qty is None:
+                amount = total or price or _clean_number(" ".join(data.values()))
+                if amount:
+                    charge_amount = (charge_amount or Decimal("0")) + Decimal(amount)
+                continue
+            if not desc:
+                continue
+            expected += 1
+            if qty is None or price is None:
+                continue
+            confidence = 0.90
+            line_fields = {
+                "quantity": ExtractedField("quantity", qty, confidence),
+                "unit_price": _money_field("unit_price", price, currency, confidence),
+            }
+            if data.get("unit"):
+                line_fields["pack_unit"] = ExtractedField("pack_unit", data["unit"], confidence)
+            if total:
+                line_fields["line_total"] = _money_field("line_total", total, currency, confidence)
+                if abs(Decimal(qty) * Decimal(price) - Decimal(total)) > Decimal("0.01"):
+                    confidence = 0.50
+                    line_fields["quantity"] = ExtractedField("quantity", qty, confidence)
+                    line_fields["unit_price"] = _money_field(
+                        "unit_price", price, currency, confidence
                     )
-                )
+            lines.append(ExtractedLine(len(lines) + 1, desc, line_fields))
+        if charge_amount and lines:
+            # The existing arithmetic model adds a line's delivery fee once, so attach a
+            # document-level charge to the final item rather than creating a pseudo-item.
+            last = lines[-1]
+            last.fields["delivery_fee"] = _money_field(
+                "delivery_fee", format(charge_amount, "f"), currency, 0.9
+            )
+        break
+    if expected == 0:
+        return None
+    if before_tax_total is not None:
+        stated_total = before_tax_total
+    paragraph_total = _find_grand_total(document_text, currency)
+    if paragraph_total is not None and (
+        stated_total is None or _has_before_tax_total(document_text)
+    ):
+        stated_total = paragraph_total
+    header = (
+        {"currency": ExtractedField("currency", currency, 0.9)}
+        if currency and not currency_conflict
+        else {}
+    )
+    if currency_conflict:
+        for line in lines:
+            for key in ("unit_price", "line_total", "delivery_fee"):
+                if key in line.fields:
+                    value = dict(line.fields[key].value)
+                    value["currency"] = None
+                    line.fields[key] = ExtractedField(key, value, line.fields[key].confidence)
+        if stated_total:
+            stated_total = ExtractedField(
+                "stated_total",
+                {"amount": stated_total.value["amount"], "currency": None},
+                stated_total.confidence,
+            )
     return ExtractionResult(
-        method="azure_di",
-        model_version=model_version,
-        header=header,
-        lines=lines,
-        stated_total=None,
-        cost_usd=0.0,
-        warnings=("no structured invoice detected; extracted from tables",),
+        "azure_di", model_version, header, lines, stated_total, 0.0, expected_line_count=expected
     )
 
 
-def _parse_line_item(
-    idx: int, item_fields: dict[str, Any], currency: str
-) -> ExtractedLine:
+def _get(obj: object, name: str, default: Any = None) -> Any:  # noqa: ANN401
+    if isinstance(obj, dict):
+        if name in obj:
+            return obj[name]
+        camel = re.sub(r"_([a-z])", lambda m: m.group(1).upper(), name)
+        return obj.get(camel, default)
+    snake = re.sub(r"[A-Z]", lambda m: "_" + m.group().lower(), name)
+    camel = re.sub(r"_([a-z])", lambda m: m.group(1).upper(), name)
+    return getattr(obj, name, getattr(obj, snake, getattr(obj, camel, default)))
+
+
+def _header_role(text: str) -> str | None:
+    n = _normalise_header(text)
+    compact = re.sub(r"\s+", "", n)
+    candidates = [
+        ("unit_price", ("سعر الوحدة", "سعر", "الفئة", "unit price", "unitprice", "price", "rate")),
+        ("line_total", ("الإجمالي", "القيمة", "المبلغ", "total", "amount")),
+        (
+            "description",
+            ("الصنف والمواصفات", "الصنف", "البيان", "الوصف", "item", "description", "product"),
+        ),
+        ("quantity", ("الكمية", "العدد", "quantity", "qty")),
+        ("unit", ("الوحدة", "unit", "uom")),
+    ]
+    matches: list[tuple[int, str]] = []
+    for role, words in candidates:
+        for word in words:
+            wn = _normalise_header(word)
+            if wn in n or re.sub(r"\s+", "", wn) in compact:
+                matches.append((len(wn), role))
+            elif _skeleton(wn) and _skeleton(wn) in _skeleton(n):
+                matches.append((len(wn), role))
+    return max(matches, default=(0, None), key=lambda item: item[0])[1]
+
+
+def _normalise_header(text: str) -> str:
+    text = unicodedata.normalize("NFKC", text)
+    text = re.sub(
+        r"[\u0610-\u061a\u064b-\u065f\u0670\u0640\u06d6-\u06ed\u200e\u200f\u202a-\u202e\u2066-\u2069]",
+        "",
+        text,
+    )
+    return text.translate(str.maketrans("أإآٱىئة", "اااايي ه".replace(" ", ""))).lower()
+
+
+def _skeleton(text: str) -> str:
+    return re.sub(r"[ال\s]", "", _normalise_header(text))
+
+
+def _is_total_row(desc: str) -> bool:
+    n = _normalise_header(desc)
+    skeleton = _skeleton(desc)
+    return any(
+        _normalise_header(x) in n or _skeleton(x) in skeleton
+        for x in ("الإجمالي النهائي", "الإجمالي قبل الضريبة", "الإجمالي", "total", "grand total")
+    )
+
+
+def _is_before_tax_row(desc: str) -> bool:
+    n = _normalise_header(desc)
+    return "قبل الضريبه" in n or "before tax" in n
+
+
+def _is_tax_row(desc: str) -> bool:
+    n = _normalise_header(desc)
+    return "ضريبه" in n or re.search(r"\bvat\b|\btax\b", n, re.I) is not None
+
+
+def _is_charge_row(desc: str) -> bool:
+    n = _normalise_header(desc)
+    return any(
+        _normalise_header(x) in n
+        for x in (
+            "مصاريف نقل",
+            "مصاريف توصيل",
+            "نقل",
+            "توصيل",
+            "شحن",
+            "delivery",
+            "shipping",
+            "freight",
+        )
+    )
+
+
+def _money_field(name: str, amount: str, currency: str | None, confidence: float) -> ExtractedField:
+    return ExtractedField(name, {"amount": amount, "currency": currency}, confidence)
+
+
+def _all_document_text(result: object) -> str:
+    parts = [str(_get(result, "content", "") or "")]
+    parts.extend(str(_get(p, "content", "") or "") for p in (_get(result, "paragraphs", []) or []))
+    for page in _get(result, "pages", []) or []:
+        parts.extend(
+            str(_get(line, "content", "") or "") for line in (_get(page, "lines", []) or [])
+        )
+    return " ".join(parts)
+
+
+def _find_grand_total(text: str, currency: str | None) -> ExtractedField | None:
+    before_tax: ExtractedField | None = None
+    grand_total: ExtractedField | None = None
+    for line in text.splitlines():
+        if _is_total_row(line):
+            amounts = re.findall(r"[\d٠-٩۰-۹][\d٠-٩۰-۹.,٬٫]*", line)
+            if amounts:
+                amount = _clean_number(amounts[-1])
+                if amount:
+                    candidate = _money_field("stated_total", amount, currency, 0.9)
+                    if _is_before_tax_row(line):
+                        before_tax = candidate
+                    else:
+                        grand_total = candidate
+    return before_tax or grand_total
+
+
+def _has_before_tax_total(text: str) -> bool:
+    return any(_is_total_row(line) and _is_before_tax_row(line) for line in text.splitlines())
+
+
+def _has_currency_conflict(text: str) -> bool:
+    egp = bool(re.search(r"ج\s*\.\s*م|جنيه|\bEGP\b|\bL\.?E\.?\b|\bLE\b", text, re.I))
+    other = bool(re.search(r"\$|\bUSD\b|£|\bGBP\b|€|\bEUR\b", text, re.I))
+    return egp and other
+
+
+def _merge_headers(
+    base: ExtractionResult, table: ExtractionResult, invoice_total: ExtractedField | None = None
+) -> ExtractionResult:
+    header = dict(base.header)
+    if table.expected_line_count is not None and "currency" not in table.header:
+        header.pop("currency", None)
+    header.update(table.header)
+    return ExtractionResult(
+        "azure_di",
+        table.model_version,
+        header,
+        table.lines,
+        table.stated_total or invoice_total,
+        table.cost_usd,
+        expected_line_count=table.expected_line_count,
+    )
+
+
+def _parse_line_item(idx: int, item_fields: dict[str, Any], currency: str) -> ExtractedLine:
     fields: dict[str, ExtractedField] = {}
 
     desc = _content_from(item_fields, "Description") or ""
@@ -238,23 +469,23 @@ def _content(fields: dict[str, Any], name: str) -> str | None:
     field = fields.get(name)
     if field is None:
         return None
-    return getattr(field, "content", None)
+    return _get(field, "content")
 
 
 def _date_evidence(fields: dict[str, Any], name: str) -> object | None:
     field = fields.get(name)
     if field is None:
         return None
-    content = getattr(field, "content", None)
+    content = _get(field, "content")
     if content:
         return content
-    typed_date = getattr(field, "value_date", None)
+    typed_date = _get(field, "value_date")
     return typed_date.isoformat() if isinstance(typed_date, (date, datetime)) else typed_date
 
 
 def _typed_date(fields: dict[str, Any], name: str) -> date | datetime | None:
     field = fields.get(name)
-    value = getattr(field, "value_date", None) if field is not None else None
+    value = _get(field, "value_date") if field is not None else None
     return value if isinstance(value, (date, datetime)) else None
 
 
@@ -262,26 +493,30 @@ def _confidence(fields: dict[str, Any], name: str) -> float | None:
     field = fields.get(name)
     if field is None:
         return None
-    return getattr(field, "confidence", None)
+    return _get(field, "confidence")
 
 
 def _content_from(item_fields: dict[str, Any], name: str) -> str | None:
     field = item_fields.get(name)
     if field is None:
         return None
-    return getattr(field, "content", None)
+    return _get(field, "content")
 
 
 def _conf_from(item_fields: dict[str, Any], name: str) -> float | None:
     field = item_fields.get(name)
     if field is None:
         return None
-    return getattr(field, "confidence", None)
+    return _get(field, "confidence")
 
 
 def _make_field(
-    name: str, value: object, fields: dict[str, Any], azure_field_name: str,
-    *, typed_value: object | None = None,
+    name: str,
+    value: object,
+    fields: dict[str, Any],
+    azure_field_name: str,
+    *,
+    typed_value: object | None = None,
 ) -> ExtractedField:
     conf = _confidence(fields, azure_field_name)
     return ExtractedField(
@@ -295,6 +530,13 @@ def _make_field(
 
 
 def _clean_number(s: str) -> str | None:
+    s = re.sub(
+        r"ج\s*\.\s*م\.?|جنيه(?:\s+مصري)?|(?<![A-Z])L\.?\s*E\.?(?![A-Z])|\b(?:EGP|USD|GBP|EUR)\b",
+        "",
+        s,
+        flags=re.I,
+    )
+    s = re.sub(r"[$£€]", "", s)
     cleaned = re.sub(r"[^\d.,\-٠-٩۰-۹٫٬−﹣]", "", s)
     if not cleaned or cleaned in (".", ",", "٫", "-"):
         return None
@@ -320,21 +562,21 @@ def _infer_currency(fields: dict[str, Any]) -> str | None:
 
 
 def _infer_currency_state(fields: dict[str, Any]) -> tuple[str | None, bool]:
-    all_content = " ".join(str(getattr(field, "content", "") or "") for field in fields.values())
+    all_content = " ".join(str(_get(field, "content", "") or "") for field in fields.values())
     marker_currency = detect_currency(all_content)
     codes: set[str] = set()
     for field in fields.values():
-        marker = detect_currency(str(getattr(field, "content", "") or ""))
+        marker = detect_currency(str(_get(field, "content", "") or ""))
         if marker:
             codes.add(marker)
     for name in ("InvoiceTotal", "SubTotal", "AmountDue"):
         field = fields.get(name)
         if field is None:
             continue
-        cur = getattr(field, "currency_code", None)
+        cur = _get(field, "currency_code")
         if cur:
             codes.add(str(cur).upper())
-        content = getattr(field, "content", "") or ""
+        content = _get(field, "content", "") or ""
         for code, marker in (("GBP", "£"), ("USD", "$"), ("EUR", "€")):
             if marker in content or code in content.upper():
                 codes.add(code)

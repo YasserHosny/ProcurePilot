@@ -1,0 +1,192 @@
+{
+  "apiVersion": "2024-11-30",
+  "modelId": "prebuilt-layout",
+  "content": "",
+  "pages": [],
+  "paragraphs": [
+    {
+      "content": "الإجمالي قبل الضريبة 16,012.50 ج.م"
+    }
+  ],
+  "tables": [
+    {
+      "rowCount": 6,
+      "columnCount": 4,
+      "cells": [
+        {
+          "rowIndex": 0,
+          "columnIndex": 0,
+          "content": "اإلجمايل",
+          "rowSpan": 1,
+          "columnSpan": 1,
+          "kind": "columnHeader"
+        },
+        {
+          "rowIndex": 0,
+          "columnIndex": 1,
+          "content": "سعر الوحدة",
+          "rowSpan": 1,
+          "columnSpan": 1,
+          "kind": "columnHeader"
+        },
+        {
+          "rowIndex": 0,
+          "columnIndex": 2,
+          "content": "الكمية",
+          "rowSpan": 1,
+          "columnSpan": 1,
+          "kind": "columnHeader"
+        },
+        {
+          "rowIndex": 0,
+          "columnIndex": 3,
+          "content": "الصنف",
+          "rowSpan": 1,
+          "columnSpan": 1,
+          "kind": "columnHeader"
+        },
+        {
+          "rowIndex": 1,
+          "columnIndex": 0,
+          "content": "3,700.00",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 1,
+          "columnIndex": 1,
+          "content": "185.00",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 1,
+          "columnIndex": 2,
+          "content": "20",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 1,
+          "columnIndex": 3,
+          "content": "أرز مصري",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 2,
+          "columnIndex": 0,
+          "content": "4,275.00",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 2,
+          "columnIndex": 1,
+          "content": "142.50",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 2,
+          "columnIndex": 2,
+          "content": "30",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 2,
+          "columnIndex": 3,
+          "content": "زيت عباد الشمس",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 3,
+          "columnIndex": 0,
+          "content": "1,937.50",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 3,
+          "columnIndex": 1,
+          "content": "38.75",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 3,
+          "columnIndex": 2,
+          "content": "50",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 3,
+          "columnIndex": 3,
+          "content": "سكر أبيض",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 4,
+          "columnIndex": 0,
+          "content": "6,100.00",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 4,
+          "columnIndex": 1,
+          "content": "610.00",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 4,
+          "columnIndex": 2,
+          "content": "10",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 4,
+          "columnIndex": 3,
+          "content": "دقيق فاخر",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 5,
+          "columnIndex": 0,
+          "content": "16012.50 ج.م",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 5,
+          "columnIndex": 1,
+          "content": "",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 5,
+          "columnIndex": 2,
+          "content": "",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 5,
+          "columnIndex": 3,
+          "content": "Total",
+          "rowSpan": 1,
+          "columnSpan": 1
+        }
+      ]
+    }
+  ],
+  "documents": []
+}

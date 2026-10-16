@@ -1,0 +1,192 @@
+{
+  "apiVersion": "2024-11-30",
+  "modelId": "prebuilt-layout",
+  "content": "",
+  "pages": [],
+  "paragraphs": [
+    {
+      "content": "الإجمالي النهائي 5303.00 ج.م"
+    }
+  ],
+  "tables": [
+    {
+      "rowCount": 6,
+      "columnCount": 4,
+      "cells": [
+        {
+          "rowIndex": 0,
+          "columnIndex": 0,
+          "content": "Amount",
+          "rowSpan": 1,
+          "columnSpan": 1,
+          "kind": "columnHeader"
+        },
+        {
+          "rowIndex": 0,
+          "columnIndex": 1,
+          "content": "Unit price",
+          "rowSpan": 1,
+          "columnSpan": 1,
+          "kind": "columnHeader"
+        },
+        {
+          "rowIndex": 0,
+          "columnIndex": 2,
+          "content": "Qty",
+          "rowSpan": 1,
+          "columnSpan": 1,
+          "kind": "columnHeader"
+        },
+        {
+          "rowIndex": 0,
+          "columnIndex": 3,
+          "content": "Item",
+          "rowSpan": 1,
+          "columnSpan": 1,
+          "kind": "columnHeader"
+        },
+        {
+          "rowIndex": 1,
+          "columnIndex": 0,
+          "content": "LE 312.50",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 1,
+          "columnIndex": 1,
+          "content": "LE 12.50",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 1,
+          "columnIndex": 2,
+          "content": "25",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 1,
+          "columnIndex": 3,
+          "content": "TABLE SALT 1kg",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 2,
+          "columnIndex": 0,
+          "content": "LE 1,140.00",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 2,
+          "columnIndex": 1,
+          "content": "LE 95.00",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 2,
+          "columnIndex": 2,
+          "content": "12",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 2,
+          "columnIndex": 3,
+          "content": "LEMON JUICE CONCENTRATE 1L",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 3,
+          "columnIndex": 0,
+          "content": "LE 3,360.00",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 3,
+          "columnIndex": 1,
+          "content": "LE 84.00",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 3,
+          "columnIndex": 2,
+          "content": "40",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 3,
+          "columnIndex": 3,
+          "content": "WATER BOTTLE 600ml",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 4,
+          "columnIndex": 0,
+          "content": "LE 490.50",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 4,
+          "columnIndex": 1,
+          "content": "LE 27.25",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 4,
+          "columnIndex": 2,
+          "content": "18",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 4,
+          "columnIndex": 3,
+          "content": "WHITE VINEGAR 1L",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 5,
+          "columnIndex": 0,
+          "content": "L.E. 5303.00",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 5,
+          "columnIndex": 1,
+          "content": "",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 5,
+          "columnIndex": 2,
+          "content": "",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 5,
+          "columnIndex": 3,
+          "content": "Total",
+          "rowSpan": 1,
+          "columnSpan": 1
+        }
+      ]
+    }
+  ],
+  "documents": []
+}

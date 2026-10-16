@@ -426,7 +426,10 @@ export type ReviewTaskReason =
   | 'review_required'
   | 'no_supplier_match'
   | 'currency_unresolved'
-  | 'date_unparsed';
+  | 'date_unparsed'
+  | 'merged_line_items'
+  | 'line_count_mismatch'
+  | 'total_unverified';
 
 export interface ReviewTask {
   readonly id: string;

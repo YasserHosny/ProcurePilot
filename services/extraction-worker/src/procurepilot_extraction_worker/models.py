@@ -35,3 +35,4 @@ class ExtractionResult:
     # only when the document itself did not evidence one (spec 022 FR-011).
     suggested_currency: str | None = None
     warnings: tuple[str, ...] = field(default_factory=tuple)
+    expected_line_count: int | None = None

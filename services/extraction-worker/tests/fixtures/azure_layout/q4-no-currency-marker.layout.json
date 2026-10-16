@@ -1,0 +1,164 @@
+{
+  "apiVersion": "2024-11-30",
+  "modelId": "prebuilt-layout",
+  "content": "",
+  "pages": [],
+  "paragraphs": [
+    {
+      "content": "الإجمالي 6,771.00"
+    }
+  ],
+  "tables": [
+    {
+      "rowCount": 5,
+      "columnCount": 4,
+      "cells": [
+        {
+          "rowIndex": 0,
+          "columnIndex": 0,
+          "content": "اإلجمايل",
+          "rowSpan": 1,
+          "columnSpan": 1,
+          "kind": "columnHeader"
+        },
+        {
+          "rowIndex": 0,
+          "columnIndex": 1,
+          "content": "السعر",
+          "rowSpan": 1,
+          "columnSpan": 1,
+          "kind": "columnHeader"
+        },
+        {
+          "rowIndex": 0,
+          "columnIndex": 2,
+          "content": "الكمية",
+          "rowSpan": 1,
+          "columnSpan": 1,
+          "kind": "columnHeader"
+        },
+        {
+          "rowIndex": 0,
+          "columnIndex": 3,
+          "content": "الصنف",
+          "rowSpan": 1,
+          "columnSpan": 1,
+          "kind": "columnHeader"
+        },
+        {
+          "rowIndex": 1,
+          "columnIndex": 0,
+          "content": "2,700.00",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 1,
+          "columnIndex": 1,
+          "content": "135.00",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 1,
+          "columnIndex": 2,
+          "content": "20",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 1,
+          "columnIndex": 3,
+          "content": "جبنة بيضاء",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 2,
+          "columnIndex": 0,
+          "content": "2,016.00",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 2,
+          "columnIndex": 1,
+          "content": "42.00",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 2,
+          "columnIndex": 2,
+          "content": "48",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 2,
+          "columnIndex": 3,
+          "content": "لبن كامل الدسم",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 3,
+          "columnIndex": 0,
+          "content": "2,055.00",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 3,
+          "columnIndex": 1,
+          "content": "68.50",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 3,
+          "columnIndex": 2,
+          "content": "30",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 3,
+          "columnIndex": 3,
+          "content": "زبدة",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 4,
+          "columnIndex": 0,
+          "content": "6771.00",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 4,
+          "columnIndex": 1,
+          "content": "",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 4,
+          "columnIndex": 2,
+          "content": "",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 4,
+          "columnIndex": 3,
+          "content": "6,771.00",
+          "rowSpan": 1,
+          "columnSpan": 1
+        }
+      ]
+    }
+  ],
+  "documents": []
+}
