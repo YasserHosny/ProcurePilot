@@ -3,6 +3,11 @@ name: CI
 # Every check here is required to merge. A gate nobody has watched fail is not a gate, so each job
 # below has been run locally against the real stack before being wired in — see the commit that
 # introduced this file.
+#
+# Docs-only pull requests (docs/, specs/, .specify/, *.md) skip every job except the secret scan:
+# the `changes` job gates them with `if:` rather than a workflow-level `paths:` filter, because a
+# workflow that never triggers leaves required checks pending, whereas a job skipped by `if:`
+# counts as passing. Pushes to main always run everything.
 
 on:
   pull_request:
@@ -18,8 +23,43 @@ env:
   NODE_VERSION: '20'
 
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      code: ${{ steps.code.outputs.code }}
+    steps:
+      - name: Filter changed paths
+        id: paths
+        if: github.event_name != 'push'
+        uses: dorny/paths-filter@v3
+        with:
+          predicate-quantifier: 'every'
+          filters: |
+            code:
+              - '**'
+              - '!docs/**'
+              - '!specs/**'
+              - '!.specify/**'
+              - '!**/*.md'
+      - name: Set code-change output
+        id: code
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          CODE_PATHS: ${{ steps.paths.outputs.code }}
+        run: |
+          if [ "$EVENT_NAME" = push ]; then
+            echo 'code=true' >> "$GITHUB_OUTPUT"
+          else
+            echo "code=$CODE_PATHS" >> "$GITHUB_OUTPUT"
+          fi
+
   api-image-i18n:
     name: API image includes i18n catalogues
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -58,6 +98,8 @@ jobs:
 
   lint:
     name: Lint
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -81,6 +123,8 @@ jobs:
 
   backend-tests:
     name: Backend tests
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -197,6 +241,8 @@ jobs:
 
   dependency-audit:
     name: Dependency audit
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -245,6 +291,8 @@ jobs:
 
   tenant-isolation:
     name: Tenant isolation
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     # Deliberately its own job with its own name (FR-030). Constitution Principle V's failure mode
     # is silent, and a cross-tenant leak buried among two hundred other test results is a leak
     # nobody notices. When this check goes red, the reason is unambiguous.
@@ -326,6 +374,8 @@ jobs:
 
   web-unit-tests:
     name: Web unit tests
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -362,6 +412,8 @@ jobs:
 
   e2e:
     name: End-to-end
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     services:
       # The quotation extraction pipeline (services/extraction-worker) is an RQ consumer over
@@ -489,15 +541,20 @@ jobs:
         run: pnpm exec playwright test a11y
 
       - name: Run end-to-end specs
-        # playwright.config.ts uses channel:'chrome' rather than a bundled browser, so CI must
-        # provide Chrome. ubuntu-latest runners ship with it; this step fails loudly if that
-        # ever stops being true.
+        # The accessibility step already ran every a11y spec; this complement is exactly the files
+        # whose path lacks "a11y". playwright.config.ts uses channel:'chrome' rather than a bundled
+        # browser, so CI must provide Chrome. ubuntu-latest runners ship with it; fail loudly if not.
         working-directory: apps/web
         env:
           TZ: Asia/Dubai
         run: |
           google-chrome --version
-          pnpm exec playwright test
+          files=$(cd tests/e2e && ls *.spec.ts | grep -v a11y | sed 's#^#tests/e2e/#')
+          if [ -z "$files" ]; then
+            echo "::error::No non-a11y end-to-end specs found"
+            exit 1
+          fi
+          pnpm exec playwright test $files
 
       - name: Upload failure artefacts
         if: failure()
