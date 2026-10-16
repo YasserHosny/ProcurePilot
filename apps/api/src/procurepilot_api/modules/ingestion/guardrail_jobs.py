@@ -4,8 +4,7 @@ import json
 import logging
 from uuid import UUID
 
-import psycopg
-
+from procurepilot_api import db
 from procurepilot_api.config import Settings
 
 logger = logging.getLogger(__name__)
@@ -16,7 +15,7 @@ def enqueue_guardrail_evaluation(
 ) -> None:
     """Best-effort enqueue after a match decision is durably created."""
     try:
-        with psycopg.connect(settings.database_url.get_secret_value()) as conn:
+        with db.connect(settings.database_url.get_secret_value()) as conn:
             with conn.cursor() as cur:
                 cur.execute("set local role service_role")
                 cur.execute(

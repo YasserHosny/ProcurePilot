@@ -10,6 +10,7 @@ import psycopg
 from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 
+from procurepilot_api import db
 from procurepilot_api.config import Settings, get_settings
 from procurepilot_api.modules.exports.renderers import render_csv, render_pdf, render_xlsx
 from procurepilot_api.modules.exports.storage import ExportStorage
@@ -26,7 +27,7 @@ def process_export_job(payload: dict[str, str]) -> dict[str, Any]:
     settings = get_settings()
 
     # Step 1: Re-derive tenant_id and verify queue payload
-    with psycopg.connect(settings.database_url.get_secret_value()) as conn:
+    with db.connect(settings.database_url.get_secret_value()) as conn:
         with conn.cursor(row_factory=dict_row) as cur:
             cur.execute("select * from export_job where id = %s", (job_id,))
             initial_row = cur.fetchone()
@@ -46,7 +47,7 @@ def process_export_job(payload: dict[str, str]) -> dict[str, Any]:
         raise RuntimeError("tenant_payload_mismatch")
 
     try:
-        with psycopg.connect(settings.database_url.get_secret_value()) as conn:
+        with db.connect(settings.database_url.get_secret_value()) as conn:
             _act_as_tenant(conn, real_tenant_id)
             row = _mark_running(conn, job_id)
             conn.commit()
@@ -321,7 +322,7 @@ def _mark_completed(
 
 
 def _persist_failure(settings: Settings, *, tenant_id: UUID, job_id: UUID, exc: Exception) -> None:
-    with psycopg.connect(settings.database_url.get_secret_value()) as conn:
+    with db.connect(settings.database_url.get_secret_value()) as conn:
         _act_as_tenant(conn, tenant_id)
         with conn.cursor() as cur:
             cur.execute(

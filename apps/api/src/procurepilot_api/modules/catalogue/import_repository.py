@@ -12,6 +12,7 @@ from uuid import UUID
 import psycopg
 from psycopg.rows import dict_row
 
+from procurepilot_api import db
 from procurepilot_api.config import Settings
 from procurepilot_api.deps import CurrentMember
 from procurepilot_api.errors import ConflictError, NotFoundError, ServiceUnavailableError
@@ -276,7 +277,7 @@ class PostgresImportRepository(ImportRepository):
         return UUID(str(inserted["id"]))
 
     def _connection(self) -> psycopg.Connection[dict[str, Any]]:
-        return psycopg.connect(self._database_url, row_factory=dict_row)
+        return db.connect(self._database_url, row_factory=dict_row)
 
     def _active_conn(self) -> psycopg.Connection[dict[str, Any]]:
         if self._conn is None:

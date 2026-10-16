@@ -8,6 +8,7 @@ from uuid import UUID, uuid4
 import psycopg
 from psycopg.rows import dict_row
 
+from procurepilot_api import db
 from procurepilot_api.config import Settings, get_settings
 from procurepilot_api.errors import ServiceUnavailableError, UnprocessableEntityError
 from procurepilot_api.modules.auth.jwt import MemberRole
@@ -75,7 +76,7 @@ class TenantSignupRepository:
 
     def prevalidate(self, request: SignupRequest) -> None:
         try:
-            with psycopg.connect(
+            with db.connect(
                 self._settings.database_url.get_secret_value(),
                 row_factory=dict_row,
             ) as conn:
@@ -96,7 +97,7 @@ class TenantSignupRepository:
 
     def create_workspace(self, request: SignupRequest, user_id: UUID) -> WorkspaceCreated:
         try:
-            with psycopg.connect(
+            with db.connect(
                 self._settings.database_url.get_secret_value(),
                 row_factory=dict_row,
             ) as conn:
@@ -137,7 +138,7 @@ class TenantSignupRepository:
 
     def config_options(self) -> ConfigOptions:
         try:
-            with psycopg.connect(
+            with db.connect(
                 self._settings.database_url.get_secret_value(),
                 row_factory=dict_row,
             ) as conn:

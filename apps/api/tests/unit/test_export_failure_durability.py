@@ -120,7 +120,7 @@ def test_worker_failure_mark_is_committed_before_exception_continues(
     job_id = uuid4()
     conn = _Conn()
 
-    class _Psycopg:
+    class _Db:
         @staticmethod
         def connect(*_args: object, **_kwargs: object) -> _Conn:
             return conn
@@ -128,7 +128,7 @@ def test_worker_failure_mark_is_committed_before_exception_continues(
     class _Settings:
         database_url = type("Secret", (), {"get_secret_value": lambda self: "postgres://test"})()
 
-    monkeypatch.setattr(export_worker, "psycopg", _Psycopg)
+    monkeypatch.setattr(export_worker, "db", _Db)
 
     export_worker._persist_failure(
         _Settings(),

@@ -7,13 +7,13 @@ from email.utils import make_msgid
 from typing import Annotated
 from uuid import UUID, uuid4
 
-import psycopg
 from fastapi import APIRouter, Body, Depends, Header, Query, Request, Response, status
 from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 from starlette.datastructures import UploadFile as StarletteUploadFile
 from supabase import create_client
 
+from procurepilot_api import db
 from procurepilot_api.config import Settings, get_settings
 from procurepilot_api.deps import CurrentMember, bearer_token, current_member
 from procurepilot_api.errors import NotFoundError, UnprocessableEntityError
@@ -264,7 +264,7 @@ async def inbound_email_webhook(
         logger.warning("Inbound email exceeded max size for recipient %s", recipient)
         return Response(status_code=status.HTTP_202_ACCEPTED)
 
-    with psycopg.connect(settings.database_url.get_secret_value()) as conn:
+    with db.connect(settings.database_url.get_secret_value()) as conn:
         tenant_config = _lookup_tenant_by_address(conn, recipient)
         if tenant_config is None:
             # Unknown address: a standard bounce, no existence leak (research R10) — same 202,

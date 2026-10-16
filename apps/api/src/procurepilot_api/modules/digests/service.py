@@ -10,6 +10,7 @@ import psycopg.errors
 from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 
+from procurepilot_api import db
 from procurepilot_api.config import Settings, get_settings
 from procurepilot_api.deps import CurrentMember
 from procurepilot_api.errors import (
@@ -345,7 +346,7 @@ class DigestsService:
         db_cm = (
             _authenticated_db(self._settings, member)
             if member is not None
-            else psycopg.connect(self._settings.database_url.get_secret_value())
+            else db.connect(self._settings.database_url.get_secret_value())
         )
         with db_cm as conn:
             if member is None:

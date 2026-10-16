@@ -9,6 +9,7 @@ import psycopg
 from psycopg.rows import dict_row
 from supabase import Client, create_client
 
+from procurepilot_api import db
 from procurepilot_api.config import Settings
 from procurepilot_api.modules.ingestion.email_parser import (
     EmailParseError,
@@ -66,7 +67,7 @@ def process_inbound_email(
         logger.error("Failed to parse inbound email for tenant %s: %s", tenant_id, exc)
         return {"status": "rejected", "reason": str(exc)}
 
-    with psycopg.connect(settings.database_url.get_secret_value()) as conn:
+    with db.connect(settings.database_url.get_secret_value()) as conn:
         _act_as_tenant(conn, tenant_id)
 
         log_id = _insert_email_log_row(
@@ -229,7 +230,7 @@ def process_inbound_email(
     )
 
     if supplier_id is None:
-        with psycopg.connect(settings.database_url.get_secret_value()) as conn:
+        with db.connect(settings.database_url.get_secret_value()) as conn:
             _act_as_tenant(conn, tenant_id)
             _insert_unmatched_review_task(conn, tenant_id=tenant_id, quotation_id=quotation_id)
             conn.commit()

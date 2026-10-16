@@ -12,6 +12,7 @@ from uuid import UUID
 import psycopg
 from procurepilot_logging import new_trace_id, set_trace_id
 
+from procurepilot_extraction_worker import db
 from procurepilot_extraction_worker.azure_di import AzureDocumentIntelligenceProvider
 from procurepilot_extraction_worker.bedrock import BedrockExtractionProvider
 from procurepilot_extraction_worker.models import ExtractedField, ExtractedLine, ExtractionResult
@@ -40,11 +41,8 @@ def process_extraction_job(payload: dict[str, str]) -> None:
         "extraction job started",
         extra={"job_id": str(job_id), "document_id": str(document_id)},
     )
-    # prepare_threshold=None: DATABASE_URL runs through Supabase's transaction-mode pooler,
-    # which hands out reused backend sessions. psycopg3's default server-side prepared
-    # statements collide across connections on that shared session (DuplicatePreparedStatement:
-    # "_pg3_0" already exists) the moment a second job runs.
-    with psycopg.connect(settings.database_url, prepare_threshold=None) as conn:
+    # db.connect disables prepared statements (transaction-mode pooler; see db.py).
+    with db.connect(settings.database_url) as conn:
         document = _document(conn, tenant_id, document_id)
         _mark_running(conn, job_id)
         try:

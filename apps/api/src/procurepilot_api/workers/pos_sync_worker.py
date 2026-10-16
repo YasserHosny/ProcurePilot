@@ -13,9 +13,9 @@ import logging
 import time
 from uuid import UUID
 
-import psycopg
 from psycopg.rows import dict_row
 
+from procurepilot_api import db
 from procurepilot_api.config import Settings, get_settings
 from procurepilot_api.errors import ConflictError
 from procurepilot_api.modules.pos.sync_service import SyncService
@@ -73,7 +73,7 @@ def _find_due_connections(settings: Settings) -> list[dict[str, object]]:
     Uses service_role to query across tenants. Tenant ID is read directly from
     each returned row, never derived from any external payload.
     """
-    with psycopg.connect(settings.database_url.get_secret_value()) as conn:
+    with db.connect(settings.database_url.get_secret_value()) as conn:
         with conn.cursor(row_factory=dict_row) as cur:
             cur.execute("set local role service_role")
             cur.execute(
