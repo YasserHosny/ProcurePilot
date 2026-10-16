@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import replace
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from typing import NamedTuple
 from urllib.error import URLError
 from urllib.parse import quote
@@ -285,7 +285,7 @@ def _update_quotation_status(
     arithmetic_status: str,
     result: ExtractionResult,
     supplier_match: SupplierMatch,
-    parsed_dates: dict[str, str | None] | None = None,
+    parsed_dates: dict[str, str | None],
 ) -> None:
     stated = result.stated_total.value if result.stated_total is not None else None
     currency = stated.get("currency") if isinstance(stated, dict) else None
@@ -305,8 +305,8 @@ def _update_quotation_status(
             (
                 status,
                 _header_value(header, "currency"),
-                (parsed_dates or {}).get("issue_date"),
-                (parsed_dates or {}).get("expiry_date"),
+                parsed_dates.get("issue_date"),
+                parsed_dates.get("expiry_date"),
                 amount,
                 currency,
                 arithmetic_status,
@@ -414,7 +414,22 @@ def _with_normalised_dates(
         for name, field in fields.items():
             if not name.endswith("_date"):
                 continue
-            parsed = parse_extracted_date(field.value, region=region)
+            typed_value = field.typed_value
+            raw_value = (
+                typed_value
+                if isinstance(typed_value, (date, datetime))
+                else field.value
+            )
+            parsed = parse_extracted_date(raw_value, region=region)
+            logger.info(
+                "date field normalized",
+                extra={
+                    "field": name,
+                    "rule": parsed.rule,
+                    "ambiguous": parsed.ambiguous,
+                    "region": region,
+                },
+            )
             if fields is result.header and name in parsed_dates:
                 parsed_dates[name] = parsed.value.isoformat() if parsed.value else None
             if parsed.unparsed:
@@ -427,10 +442,6 @@ def _with_normalised_dates(
 
     header = normalise(result.header)
     lines = [replace(line, fields=normalise(line.fields)) for line in result.lines]
-    logger.info(
-        "date normalization preserves extracted values as evidence",
-        extra={"rule": "raw_evidence_with_region_parsed_columns"},
-    )
     return replace(result, header=header, lines=lines), parsed_dates, unparsed
 
 

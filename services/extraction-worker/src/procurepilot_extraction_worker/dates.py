@@ -83,6 +83,7 @@ class ParsedDate:
     value: date | None
     ambiguous: bool
     unparsed: bool
+    rule: str
 
 
 def parse_extracted_date(raw: object, *, region: str | None) -> ParsedDate:
@@ -92,11 +93,11 @@ def parse_extracted_date(raw: object, *, region: str | None) -> ParsedDate:
     use day-first dates. Ambiguity remains explicit so humans review these values.
     """
     if isinstance(raw, datetime):
-        return ParsedDate(raw.date(), False, False)
+        return ParsedDate(raw.date(), False, False, "typed")
     if isinstance(raw, date):
-        return ParsedDate(raw, False, False)
+        return ParsedDate(raw, False, False, "typed")
     if not isinstance(raw, str):
-        return ParsedDate(None, False, True)
+        return ParsedDate(None, False, True, "unparsed")
     text = raw.translate(_ARABIC_DIGITS).translate(_RTL_MARKS).strip().strip("«»\"'“”")
     text = text.translate(str.maketrans({"⁄": "/", "∕": "/", "／": "/", "٫": "/", "ـ": ""}))
     text = _LABEL.sub("", text).strip()
@@ -105,7 +106,7 @@ def parse_extracted_date(raw: object, *, region: str | None) -> ParsedDate:
     text = _normalise_arabic(text)
     iso = _ISO.fullmatch(text)
     if iso:
-        return _make_date(int(iso[1]), int(iso[2]), int(iso[3]), False)
+        return _make_date(int(iso[1]), int(iso[2]), int(iso[3]), False, "iso")
     month_match = _MONTH_DATE.fullmatch(text)
     if month_match:
         groups = month_match.groups()
@@ -115,34 +116,41 @@ def parse_extracted_date(raw: object, *, region: str | None) -> ParsedDate:
             month, day, year = _month(groups[3]), int(groups[4]), int(groups[5])
         else:
             day, month, year = int(groups[6]), _month(groups[7]), int(groups[8])
-        return _make_date(year, month, day, False)
+        return _make_date(year, month, day, False, "month_name")
     numeric = _NUMERIC.fullmatch(text)
     if not numeric:
-        return ParsedDate(None, False, True)
+        return ParsedDate(None, False, True, "unparsed")
     a, b, year = (int(value) for value in numeric.groups())
     if a >= 1000:
-        return _make_date(a, b, year, False)
+        return _make_date(a, b, year, False, "yyyy_mm_dd")
     if len(numeric[3]) == 2:
         year += 2000
     ambiguous = a <= 12 and b <= 12 and a != b
     if a > 12:
         day, month = a, b
+        rule = "numeric_day_first"
     elif b > 12:
         month, day = a, b
+        rule = "numeric_month_first"
     elif a == b:
         day, month = a, b
+        rule = "numeric_day_first"
     elif (region or "").upper() == "US":
         month, day = a, b
+        rule = "numeric_month_first"
     else:
         day, month = a, b
-    return _make_date(year, month, day, ambiguous)
+        rule = "numeric_day_first"
+    if ambiguous:
+        rule += f":region={(region or 'default').upper() if region else 'default'}"
+    return _make_date(year, month, day, ambiguous, rule)
 
 
-def _make_date(year: int, month: int, day: int, ambiguous: bool) -> ParsedDate:
+def _make_date(year: int, month: int, day: int, ambiguous: bool, rule: str) -> ParsedDate:
     try:
-        return ParsedDate(date(year, month, day), ambiguous, False)
+        return ParsedDate(date(year, month, day), ambiguous, False, rule)
     except ValueError:
-        return ParsedDate(None, False, True)
+        return ParsedDate(None, False, True, "unparsed")
 
 
 def _normalise_arabic(text: str) -> str:

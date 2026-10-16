@@ -87,13 +87,15 @@ def _parse_invoice_result(
     invoice_date = _date_evidence(fields, "InvoiceDate")
     if invoice_date:
         header["issue_date"] = _make_field(
-            "issue_date", invoice_date, fields, "InvoiceDate"
+            "issue_date", invoice_date, fields, "InvoiceDate",
+            typed_value=_typed_date(fields, "InvoiceDate"),
         )
 
     due_date = _date_evidence(fields, "DueDate")
     if due_date:
         header["expiry_date"] = _make_field(
-            "expiry_date", due_date, fields, "DueDate"
+            "expiry_date", due_date, fields, "DueDate",
+            typed_value=_typed_date(fields, "DueDate"),
         )
 
     total_content = _content(fields, "InvoiceTotal")
@@ -250,6 +252,12 @@ def _date_evidence(fields: dict[str, Any], name: str) -> object | None:
     return typed_date.isoformat() if isinstance(typed_date, (date, datetime)) else typed_date
 
 
+def _typed_date(fields: dict[str, Any], name: str) -> date | datetime | None:
+    field = fields.get(name)
+    value = getattr(field, "value_date", None) if field is not None else None
+    return value if isinstance(value, (date, datetime)) else None
+
+
 def _confidence(fields: dict[str, Any], name: str) -> float | None:
     field = fields.get(name)
     if field is None:
@@ -272,7 +280,8 @@ def _conf_from(item_fields: dict[str, Any], name: str) -> float | None:
 
 
 def _make_field(
-    name: str, value: object, fields: dict[str, Any], azure_field_name: str
+    name: str, value: object, fields: dict[str, Any], azure_field_name: str,
+    *, typed_value: object | None = None,
 ) -> ExtractedField:
     conf = _confidence(fields, azure_field_name)
     return ExtractedField(
@@ -281,6 +290,7 @@ def _make_field(
         confidence=conf if conf is not None else 0.85,
         source_page=1,
         source_region=None,
+        typed_value=typed_value,
     )
 
 

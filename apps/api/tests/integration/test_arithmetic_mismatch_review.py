@@ -37,6 +37,7 @@ def test_mismatched_quotations_always_create_mandatory_review_task(conn: object)
         SupplierMatch,
         _persist_result,
         _update_quotation_status,
+        _with_normalised_dates,
     )
 
     with conn.cursor() as cur:
@@ -69,6 +70,7 @@ def test_mismatched_quotations_always_create_mandatory_review_task(conn: object)
             ),
         )
         arithmetic = validate_arithmetic(result)
+        result, parsed_dates, _ = _with_normalised_dates(result, None)
 
         _persist_result(conn, workspace.tenant_id, quotation_id, result, arithmetic.status)
         _update_quotation_status(
@@ -78,6 +80,7 @@ def test_mismatched_quotations_always_create_mandatory_review_task(conn: object)
             arithmetic.status,
             result,
             SupplierMatch(None, None, had_candidates=False),
+            parsed_dates,
         )
 
         act_as(cur, workspace)

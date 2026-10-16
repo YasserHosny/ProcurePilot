@@ -53,3 +53,21 @@ def test_equal_components_are_not_ambiguous() -> None:
     parsed = parse_extracted_date("10/10/2026", region="US")
     assert parsed.value == date(2026, 10, 10)
     assert not parsed.ambiguous
+
+
+@pytest.mark.parametrize(
+    ("raw", "region", "rule"),
+    [
+        (date(2026, 5, 10), "EG", "typed"),
+        ("2026-05-10", "EG", "iso"),
+        ("10 May 2026", "EG", "month_name"),
+        ("05/10/2026", "EG", "numeric_day_first:region=EG"),
+        ("05/10/2026", "US", "numeric_month_first:region=US"),
+        ("05/10/2026", "SA", "numeric_day_first:region=SA"),
+        ("05/10/2026", None, "numeric_day_first:region=default"),
+        ("2026/05/10", "EG", "yyyy_mm_dd"),
+        ("soon", "EG", "unparsed"),
+    ],
+)
+def test_parse_rule_is_recorded(raw: object, region: str, rule: str) -> None:
+    assert parse_extracted_date(raw, region=region).rule == rule
