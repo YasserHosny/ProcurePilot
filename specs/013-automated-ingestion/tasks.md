@@ -83,8 +83,11 @@
   - Same `FOR UPDATE SKIP LOCKED` shape as report_scheduler/export_worker/digest_worker;
     tenant_id read from the claimed job row, never the payload (same untrusted-payload
     discipline). Retry up to `max_attempts` (3), then terminal `failed`.
-  - No dedicated worker-level test file; covered indirectly via the orchestrator tests
-    (`process_inbound_email` is exactly what the worker calls per claimed job).
+  - Worker-level behavior is covered by `tests/integration/test_email_ingestion_worker.py`;
+    orchestrator behavior is also covered by the ingestion orchestrator integration tests.
+  - 2026-10-16 follow-up (PR #90): persisted failed email-log rows after post-parse failures,
+    resume only failed rows on retry, and added the operator requeue CLI. Coverage includes
+    `tests/integration/test_requeue_email_ingest.py` and `tests/unit/test_storage_keys.py`.
 
 - [x] **T013** — API: tenant email config endpoints (`modules/ingestion/service.py` + `router.py`)
   - `GET`/`PUT /tenants/email-config`, `POST /tenants/email-config/{enable,disable}`. `PUT`
