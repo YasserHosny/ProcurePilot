@@ -149,6 +149,12 @@ def _thread_local_requests_client(
     from procurepilot_api.modules.requests import service as requests_service_module
     from procurepilot_api.modules.requests.valuation import LineEstimate
 
+    # Role/claims are applied per operation via `set local` (see `authenticated_scope`); a
+    # session-level `set role` leaks through the transaction-mode pooler into later tests.
+    claims = (
+        f'{{"sub":"{user_id}","tenant_id":"{tenant_id}",'
+        f'"role":"authenticated","member_role":"owner"}}'
+    )
     local = threading.local()
     connections: list[psycopg.Connection[Any]] = []
     lock = threading.Lock()
@@ -157,18 +163,10 @@ def _thread_local_requests_client(
         conn = getattr(local, "conn", None)
         if conn is None:
             conn = psycopg.connect(get_settings().database_url.get_secret_value(), autocommit=True)
-            with conn.cursor() as cur:
-                cur.execute("set role authenticated")
-                cur.execute(
-                    "select set_config('request.jwt.claims', %s, false)",
-                    (
-                        f'{{"sub":"{user_id}","tenant_id":"{tenant_id}","role":"authenticated","member_role":"owner"}}',
-                    ),
-                )
             local.conn = conn
             with lock:
                 connections.append(conn)
-        return _FakeAuthenticatedClient(conn)
+        return _FakeAuthenticatedClient(conn, claims=claims)
 
     monkeypatch.setattr(requests_service_module, "authenticated_client", client)
     monkeypatch.setattr(
@@ -238,17 +236,13 @@ def _wire_quotation_lifecycle_services(
     from procurepilot_api.modules.quotations import service as quotation_service
 
     conn = psycopg.connect(get_settings().database_url.get_secret_value(), autocommit=True)
-    with conn.cursor() as cur:
-        cur.execute("set role authenticated")
-        cur.execute(
-            "select set_config('request.jwt.claims', %s, false)",
-            (
-                f'{{"sub":"{user_id}","tenant_id":"{tenant_id}",'
-                f'"role":"authenticated","member_role":"owner"}}',
-            ),
-        )
+    claims = (
+        f'{{"sub":"{user_id}","tenant_id":"{tenant_id}",'
+        f'"role":"authenticated","member_role":"owner"}}'
+    )
+
     def client(_settings: object, _token: str) -> _FakeAuthenticatedClient:
-        return _FakeAuthenticatedClient(conn)
+        return _FakeAuthenticatedClient(conn, claims=claims)
 
     monkeypatch.setattr(quotation_service, "authenticated_client", client)
     monkeypatch.setattr(review_service, "authenticated_client", client)
@@ -456,8 +450,8 @@ def test_concurrent_evaluations_fire_once(monkeypatch: pytest.MonkeyPatch) -> No
         try:
             with psycopg.connect(settings.database_url.get_secret_value()) as conn:
                 with conn.cursor() as cur:
-                    cur.execute("set lock_timeout = '3s'")
-                    cur.execute("set statement_timeout = '3s'")
+                    cur.execute("set local lock_timeout = '3s'")
+                    cur.execute("set local statement_timeout = '3s'")
                 barrier.wait(timeout=3)
                 _evaluate_guardrails_for_rfq(settings, conn, tenant_id=tenant_id, rfq_id=rfq_id)
                 conn.commit()
