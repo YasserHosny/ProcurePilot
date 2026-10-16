@@ -22,6 +22,7 @@ from procurepilot_api.modules.ingestion.matcher import match_supplier
 from procurepilot_api.modules.rfq.guardrail_evaluation import compute_guardrail_evaluation
 from procurepilot_api.shared.audit import AuditEventCreate, AuditOutcome, get_audit_writer
 from procurepilot_api.shared.logging import get_trace_id
+from procurepilot_api.shared.storage_keys import display_filename, safe_object_name
 
 logger = logging.getLogger(__name__)
 
@@ -83,120 +84,160 @@ def process_inbound_email(
             )
             return {"status": "duplicate", "message_id": email_data.message_id}
 
-        rejection = _validate_content(settings, email_data)
-        if rejection is not None:
-            _mark_log_terminal(conn, log_id, status="rejected", error_message=rejection)
-            conn.commit()
-            _record_audit(
+        try:
+            rejection = _validate_content(settings, email_data)
+            if rejection is not None:
+                _mark_log_terminal(conn, log_id, status="rejected", error_message=rejection)
+                conn.commit()
+                _record_audit(
+                    tenant_id=tenant_id,
+                    action="email_rejected",
+                    target={"message_id": email_data.message_id, "reason": rejection},
+                    outcome="refused",
+                )
+                return {"status": "rejected", "reason": rejection}
+
+            supplier_id, match_method = match_supplier(
+                conn,
                 tenant_id=tenant_id,
-                action="email_rejected",
-                target={"message_id": email_data.message_id, "reason": rejection},
-                outcome="refused",
-            )
-            return {"status": "rejected", "reason": rejection}
-
-        supplier_id, match_method = match_supplier(
-            conn,
-            tenant_id=tenant_id,
-            from_address=email_data.from_address,
-            from_domain=email_data.from_domain,
-            in_reply_to=email_data.in_reply_to,
-            references=email_data.references,
-        )
-
-        from procurepilot_api.modules.rfq.response_matching import match_rfq_response
-
-        matched_rfq_recipient_id = None
-        matched_rfq_id = None
-
-        with conn.cursor(row_factory=dict_row) as service_cur:
-            service_cur.execute("set local role service_role")
-            service_cur.execute(
-                """
-                select id, outbound_message_id, rfq_id, supplier_id
-                from rfq_recipient
-                where tenant_id = %s and outbound_message_id is not null
-                """,
-                (tenant_id,),
-            )
-            open_recipients = service_cur.fetchall()
-
-            matched_rfq_recipient_id = match_rfq_response(
+                from_address=email_data.from_address,
+                from_domain=email_data.from_domain,
                 in_reply_to=email_data.in_reply_to,
                 references=email_data.references,
-                open_recipients=open_recipients,
             )
 
-            if matched_rfq_recipient_id:
-                for rec in open_recipients:
-                    if rec["id"] == matched_rfq_recipient_id:
-                        matched_rfq_id = rec["rfq_id"]
-                        # We know exactly which supplier the RFQ was sent to.
-                        supplier_id = rec["supplier_id"]
-                        match_method = "rfq_reply"
-                        break
+            from procurepilot_api.modules.rfq.response_matching import match_rfq_response
 
-        _act_as_tenant(conn, tenant_id)
+            matched_rfq_recipient_id = None
+            matched_rfq_id = None
 
-        document_id, mime_type, filename = _store_primary_document(
-            settings, conn, tenant_id=tenant_id, email_data=email_data
-        )
-
-        quotation_id = _insert_quotation(
-            conn,
-            tenant_id=tenant_id,
-            document_id=document_id,
-            supplier_id=supplier_id,
-            ingestion_email_id=log_id,
-        )
-
-        job_id = _insert_extraction_job(conn, tenant_id=tenant_id, quotation_id=quotation_id)
-
-        if matched_rfq_recipient_id and matched_rfq_id:
-            with conn.cursor() as service_cur:
+            with conn.cursor(row_factory=dict_row) as service_cur:
                 service_cur.execute("set local role service_role")
                 service_cur.execute(
                     """
-                    insert into rfq_response (tenant_id, rfq_recipient_id, quotation_id)
-                    values (%s, %s, %s)
+                    select id, outbound_message_id, rfq_id, supplier_id
+                    from rfq_recipient
+                    where tenant_id = %s and outbound_message_id is not null
                     """,
-                    (tenant_id, matched_rfq_recipient_id, quotation_id),
+                    (tenant_id,),
                 )
-                service_cur.execute(
-                    """
-                    update rfq
-                    set status = 'responded'
-                    where tenant_id = %s and id = %s and status = 'sent'
-                    """,
-                    (tenant_id, matched_rfq_id),
+                open_recipients = service_cur.fetchall()
+
+                matched_rfq_recipient_id = match_rfq_response(
+                    in_reply_to=email_data.in_reply_to,
+                    references=email_data.references,
+                    open_recipients=open_recipients,
                 )
-                service_cur.execute(
-                    "select record_audit_event(%s, 'success'::audit_outcome, "
-                    "%s, null, %s, %s::jsonb, null)",
-                    (
-                        "rfq.response_received",
-                        tenant_id,
-                        "ingestion-worker@procurepilot.local",
-                        json.dumps(
-                            {
-                                "rfq_id": str(matched_rfq_id),
-                                "rfq_recipient_id": str(matched_rfq_recipient_id),
-                                "quotation_id": str(quotation_id),
-                            }
-                        ),
-                    ),
-                )
+
+                if matched_rfq_recipient_id:
+                    for rec in open_recipients:
+                        if rec["id"] == matched_rfq_recipient_id:
+                            matched_rfq_id = rec["rfq_id"]
+                            # We know exactly which supplier the RFQ was sent to.
+                            supplier_id = rec["supplier_id"]
+                            match_method = "rfq_reply"
+                            break
+
             _act_as_tenant(conn, tenant_id)
 
-        _mark_log_completed(
-            conn,
-            log_id,
-            quotation_id=quotation_id,
-            supplier_id=supplier_id,
-            match_method=match_method,
-            attachment_count=len(email_data.attachments),
-        )
-        conn.commit()
+            document_id, mime_type, filename = _store_primary_document(
+                settings, conn, tenant_id=tenant_id, email_data=email_data
+            )
+
+            quotation_id = _insert_quotation(
+                conn,
+                tenant_id=tenant_id,
+                document_id=document_id,
+                supplier_id=supplier_id,
+                ingestion_email_id=log_id,
+            )
+
+            job_id = _insert_extraction_job(conn, tenant_id=tenant_id, quotation_id=quotation_id)
+
+            if matched_rfq_recipient_id and matched_rfq_id:
+                with conn.cursor() as service_cur:
+                    service_cur.execute("set local role service_role")
+                    service_cur.execute(
+                        """
+                        insert into rfq_response (tenant_id, rfq_recipient_id, quotation_id)
+                        values (%s, %s, %s)
+                        """,
+                        (tenant_id, matched_rfq_recipient_id, quotation_id),
+                    )
+                    service_cur.execute(
+                        """
+                        update rfq
+                        set status = 'responded'
+                        where tenant_id = %s and id = %s and status = 'sent'
+                        """,
+                        (tenant_id, matched_rfq_id),
+                    )
+                    service_cur.execute(
+                        "select record_audit_event(%s, 'success'::audit_outcome, "
+                        "%s, null, %s, %s::jsonb, null)",
+                        (
+                            "rfq.response_received",
+                            tenant_id,
+                            "ingestion-worker@procurepilot.local",
+                            json.dumps(
+                                {
+                                    "rfq_id": str(matched_rfq_id),
+                                    "rfq_recipient_id": str(matched_rfq_recipient_id),
+                                    "quotation_id": str(quotation_id),
+                                }
+                            ),
+                        ),
+                    )
+                _act_as_tenant(conn, tenant_id)
+
+            _mark_log_completed(
+                conn,
+                log_id,
+                quotation_id=quotation_id,
+                supplier_id=supplier_id,
+                match_method=match_method,
+                attachment_count=len(email_data.attachments),
+            )
+            conn.commit()
+        except Exception as exc:
+            conn.rollback()
+            safe_reason = " ".join(str(exc).split())[:500] or "Inbound email processing failed"
+            try:
+                _act_as_tenant(conn, tenant_id)
+                with conn.cursor() as cur:
+                    cur.execute(
+                        """
+                        insert into ingestion_email_log
+                          (tenant_id, message_id, from_address, from_domain, subject,
+                           in_reply_to, references_list, raw_email_ref, attachment_count,
+                           status, error_message, processed_at)
+                        values (%s, %s, %s, %s, %s, %s, %s, %s, %s, 'failed', %s, now())
+                        on conflict (tenant_id, message_id) do update
+                        set status = 'failed', error_message = excluded.error_message,
+                            processed_at = now()
+                        where ingestion_email_log.status = 'failed'
+                        """,
+                        (
+                            tenant_id,
+                            email_data.message_id,
+                            email_data.from_address,
+                            email_data.from_domain,
+                            email_data.subject,
+                            email_data.in_reply_to,
+                            email_data.references,
+                            raw_email_ref,
+                            len(email_data.attachments),
+                            safe_reason,
+                        ),
+                    )
+                conn.commit()
+            except Exception:
+                logger.exception(
+                    "Could not persist failed inbound email log for tenant %s message %s",
+                    tenant_id,
+                    email_data.message_id,
+                )
+            raise
 
     try:
         _enqueue_extraction(
@@ -430,6 +471,23 @@ def _insert_email_log_row(
         return UUID(str(row["id"]))
     except psycopg.errors.UniqueViolation:
         conn.rollback()
+        _act_as_tenant(conn, tenant_id)
+        with conn.cursor(row_factory=dict_row) as cur:
+            cur.execute(
+                "select id, status from ingestion_email_log "
+                "where tenant_id = %s and message_id = %s for update",
+                (tenant_id, email_data.message_id),
+            )
+            existing = cur.fetchone()
+            if existing is None:
+                return None
+            if existing["status"] == "failed":
+                cur.execute(
+                    "update ingestion_email_log set status = 'processing', error_message = null, "
+                    "processed_at = null where id = %s returning id",
+                    (existing["id"],),
+                )
+                return UUID(str(cur.fetchone()["id"]))
         return None
 
 
@@ -491,7 +549,7 @@ def _store_primary_document(
 ) -> tuple[UUID, str, str]:
     content, mime_type, filename = _primary_content(email_data)
     document_id = uuid4()
-    storage_path = f"tenants/{tenant_id}/quotations/{document_id}/{filename}"
+    storage_path = f"tenants/{tenant_id}/quotations/{document_id}/{safe_object_name(filename)}"
     bucket = settings.quotation_documents_bucket
 
     client = create_client(
@@ -510,11 +568,20 @@ def _store_primary_document(
             """
             insert into document
               (id, tenant_id, storage_bucket, storage_path, mime_type, content_hash,
-               source_channel, status, created_by)
+               source_channel, status, created_by, original_filename)
             values (%s, %s, %s, %s, %s, %s, 'email', 'uploaded',
-                    (select created_by from tenant_email_config where tenant_id = %s))
+                    (select created_by from tenant_email_config where tenant_id = %s), %s)
             """,
-            (document_id, tenant_id, bucket, storage_path, mime_type, content_hash, tenant_id),
+            (
+                document_id,
+                tenant_id,
+                bucket,
+                storage_path,
+                mime_type,
+                content_hash,
+                tenant_id,
+                display_filename(filename, fallback="email-attachment"),
+            ),
         )
 
     _store_secondary_documents(
@@ -540,7 +607,8 @@ def _store_secondary_documents(
     for attachment in attachments:
         try:
             document_id = uuid4()
-            storage_path = f"tenants/{tenant_id}/quotations/{document_id}/{attachment.filename}"
+            storage_name = safe_object_name(attachment.filename)
+            storage_path = f"tenants/{tenant_id}/quotations/{document_id}/{storage_name}"
             client.storage.from_(bucket).upload(
                 storage_path,
                 attachment.content,
@@ -553,9 +621,10 @@ def _store_secondary_documents(
                         """
                         insert into document
                           (id, tenant_id, storage_bucket, storage_path, mime_type, content_hash,
-                           source_channel, status, created_by)
+                           source_channel, status, created_by, original_filename)
                         values (%s, %s, %s, %s, %s, %s, 'email', 'uploaded',
-                                (select created_by from tenant_email_config where tenant_id = %s))
+                                (select created_by from tenant_email_config
+                                 where tenant_id = %s), %s)
                         """,
                         (
                             document_id,
@@ -565,6 +634,7 @@ def _store_secondary_documents(
                             attachment.declared_content_type,
                             content_hash,
                             tenant_id,
+                            display_filename(attachment.filename, fallback="email-attachment"),
                         ),
                     )
         except Exception:

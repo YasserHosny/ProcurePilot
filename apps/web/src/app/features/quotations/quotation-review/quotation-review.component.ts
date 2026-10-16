@@ -531,7 +531,9 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
   }
 
   documentFileName(): string {
-    const path = this.quotation()?.document.storage_path || '';
+    const document = this.quotation()?.document;
+    if (document?.original_filename) return document.original_filename;
+    const path = document?.storage_path || '';
     const parts = path.split('/');
     return parts[parts.length - 1] || path;
   }

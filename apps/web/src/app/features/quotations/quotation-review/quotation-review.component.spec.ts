@@ -156,6 +156,14 @@ describe('QuotationReviewComponent (T051, T057, T062)', () => {
     fixture.detectChanges();
   });
 
+  it('prefers the original Unicode filename over the ASCII storage key', () => {
+    component.quotation.set({
+      ...mockQuotationDetail,
+      document: { ...mockQuotationDetail.document, original_filename: 'عرض-سعر-النور.pdf' },
+    });
+    expect(component.documentFileName()).toBe('عرض-سعر-النور.pdf');
+  });
+
   it('should load quotation details and suppliers on init', () => {
     expect(apiService.getQuotation).toHaveBeenCalledWith('q-review-1');
     expect(apiService.suppliers).toHaveBeenCalled();

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 from pathlib import PurePosixPath
+from urllib.parse import quote
 from uuid import UUID, uuid4
 
 from postgrest.exceptions import APIError
@@ -22,6 +23,7 @@ from procurepilot_api.modules.documents.schemas import (
     PresignResponse,
 )
 from procurepilot_api.modules.members.service import authenticated_client
+from procurepilot_api.shared.storage_keys import display_filename, safe_object_name
 
 ACCEPTED_MIME_TYPES = {
     "application/pdf",
@@ -35,7 +37,7 @@ ACCEPTED_MIME_TYPES = {
 
 DOCUMENT_COLUMNS = (
     "id,storage_bucket,storage_path,mime_type,content_hash,source_channel,status,created_at,"
-    "created_by"
+    "created_by,original_filename"
 )
 
 
@@ -62,19 +64,26 @@ class DocumentService:
             filename=payload.filename,
         )
         try:
-            response = client.table("document").insert(
-                {
-                    "id": str(document_id),
-                    "tenant_id": str(member.tenant_id),
-                    "storage_bucket": bucket,
-                    "storage_path": storage_path,
-                    "mime_type": payload.mime_type,
-                    "content_hash": payload.content_hash,
-                    "source_channel": "upload",
-                    "status": "uploaded",
-                    "created_by": str(member.membership_id),
-                }
-            ).execute()
+            response = (
+                client.table("document")
+                .insert(
+                    {
+                        "id": str(document_id),
+                        "tenant_id": str(member.tenant_id),
+                        "storage_bucket": bucket,
+                        "storage_path": storage_path,
+                        "mime_type": payload.mime_type,
+                        "content_hash": payload.content_hash,
+                        "source_channel": "upload",
+                        "status": "uploaded",
+                        "created_by": str(member.membership_id),
+                        "original_filename": display_filename(
+                            payload.filename, fallback="document"
+                        ),
+                    }
+                )
+                .execute()
+            )
             row = _one_row(response.data, resource="document")
         except APIError as exc:
             raise ServiceUnavailableError(details={"dependency": "database"}) from exc
@@ -123,7 +132,10 @@ class DocumentService:
         except Exception as exc:
             raise ServiceUnavailableError(details={"dependency": "supabase_storage"}) from exc
 
-        return DownloadUrlResponse(download_url=str(result["signedURL"]))
+        filename = doc.original_filename or PurePosixPath(doc.storage_path).name
+        return DownloadUrlResponse(
+            download_url=_signed_download_url(str(result["signedURL"]), filename)
+        )
 
 
 def get_document_service() -> DocumentService:
@@ -131,8 +143,13 @@ def get_document_service() -> DocumentService:
 
 
 def _storage_path(*, tenant_id: UUID, document_id: UUID, filename: str) -> str:
-    name = PurePosixPath(filename).name.replace("/", "_")
+    name = safe_object_name(filename)
     return f"tenants/{tenant_id}/quotations/{document_id}/{name}"
+
+
+def _signed_download_url(url: str, filename: str) -> str:
+    separator = "&" if "?" in url else "?"
+    return f"{url}{separator}download={quote(filename, safe='')}"
 
 
 def _signed_upload_url(settings: Settings, bucket: str, path: str) -> str:

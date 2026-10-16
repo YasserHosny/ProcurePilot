@@ -322,7 +322,7 @@ class MatchingService:
                     q.reviewed_at,
                     q.reviewed_by,
                     reviewer.email as reviewed_by_email,
-                    d.storage_path,
+                    d.storage_path, d.original_filename,
                     q.supplier_id,
                     supplier.name as supplier_name,
                     ql.id as quotation_line_id,
@@ -380,7 +380,7 @@ class MatchingService:
                     q.reviewed_at,
                     q.reviewed_by,
                     reviewer.email as reviewed_by_email,
-                    d.storage_path,
+                    d.storage_path, d.original_filename,
                     q.supplier_id,
                     supplier.name as supplier_name,
                     ql.id as quotation_line_id,
@@ -994,7 +994,7 @@ def _source_filename(client: object, document_id: UUID) -> str | None:
     try:
         response = (
             client.table("document")
-            .select("id,storage_path")
+            .select("id,storage_path,original_filename")
             .eq("id", str(document_id))
             .limit(1)
             .execute()
@@ -1004,7 +1004,7 @@ def _source_filename(client: object, document_id: UUID) -> str | None:
     rows = _rows(response.data)
     if not rows or not rows[0].get("storage_path"):
         return None
-    return PurePosixPath(str(rows[0]["storage_path"])).name
+    return str(rows[0].get("original_filename") or PurePosixPath(str(rows[0]["storage_path"])).name)
 
 
 def _membership_email(client: object, membership_id: UUID) -> str | None:
@@ -1605,7 +1605,9 @@ def _queue_item(row: dict[str, object]) -> MatchQueueItem:
         status=str(row["quotation_status"]),
         document_id=UUID(str(row["document_id"])) if row.get("document_id") else None,
         source_filename=(
-            PurePosixPath(str(row["storage_path"])).name if row.get("storage_path") else None
+            str(row.get("original_filename") or PurePosixPath(str(row["storage_path"])).name)
+            if row.get("storage_path")
+            else None
         ),
         supplier_id=UUID(str(row["supplier_id"])) if row.get("supplier_id") else None,
         issue_date=row.get("issue_date"),

@@ -46,7 +46,7 @@ def test_presigned_upload_metadata_creation_for_accepted_mime(
             bearer_token="test-token",
             member=member,
             payload=PresignRequest(
-                filename="supplier-quote.pdf",
+                filename="عرض-سعر-الأمانة.pdf",
                 mime_type="application/pdf",
                 size_bytes=128,
                 content_hash="abc123",
@@ -55,11 +55,22 @@ def test_presigned_upload_metadata_creation_for_accepted_mime(
 
         assert response.storage_bucket == "quotation-documents"
         assert response.storage_path.startswith(f"tenants/{workspace.tenant_id}/quotations/")
+        assert response.storage_path.isascii()
         cur.execute(
-            "select mime_type, content_hash, created_by from document where id = %s",
+            "select mime_type, content_hash, created_by, original_filename "
+            "from document where id = %s",
             (response.document_id,),
         )
-        assert cur.fetchone() == ("application/pdf", "abc123", workspace.membership_id)
+        assert cur.fetchone() == (
+            "application/pdf",
+            "abc123",
+            workspace.membership_id,
+            "عرض-سعر-الأمانة.pdf",
+        )
+        document = DocumentService().get_document(
+            bearer_token="test-token", document_id=response.document_id
+        )
+        assert document.original_filename == "عرض-سعر-الأمانة.pdf"
 
 
 def test_presigned_upload_refuses_unsupported_mime_before_writing(
