@@ -10,7 +10,7 @@ cycles — **blocked on the pooler fix below** (in progress).
 
 | # | Finding | Impact | Status |
 |---|---|---|---|
-| 1 | ~45 `psycopg.connect` call sites lack `prepare_threshold=None`; on Supabase's transaction pooler they fail with `DuplicatePreparedStatement` (reproduced: 3/4 connections fail, 0/4 with the setting) | CSV import cannot commit (preview OK, commit never lands, re-upload → 500); **inbound quote ingestion uses the same pattern** | fix in progress |
+| 1 | ~45 `psycopg.connect` call sites lack `prepare_threshold=None`; on Supabase's transaction pooler they fail with `DuplicatePreparedStatement` (reproduced: 3/4 connections fail, 0/4 with the setting) | CSV import cannot commit (preview OK, commit never lands, re-upload → 500); **inbound quote ingestion uses the same pattern** | fixed — #87 merged + deployed 2026-10-16; CSV import re-tested on hosted (committed, 30 duplicates skipped) |
 | 2 | Supplier attribution: sender-address history beats the RFQ thread | quotes from a shared sender credited to the wrong supplier | fixed — #84 merged 2026-10-16 |
 | 3 | Unit list offers both "Kilogram (kg)" and "Kilogram (kilogram)" | inconsistent product units | to raise |
 | 4 | Import preview shows the pack as raw JSON (`{"pack_count":1,"unit_size":"1"}`) | cosmetic | to raise |
@@ -18,6 +18,20 @@ cycles — **blocked on the pooler fix below** (in progress).
 | 5 | Home page still labels shipped modules "Upcoming (Chunk 4.x)" | first screen a pilot customer sees looks unfinished | to raise |
 
 Lookups review (regions, currencies, tax models): [`lookups-review-2026-10-15.md`](lookups-review-2026-10-15.md).
+
+**Round 1 (2026-10-16) — dry-goods RFQ to النور + الأمانة, first live run on hosted:**
+
+| # | Finding | Impact | Status |
+|---|---|---|---|
+| 7 | Web sends date-only fields as UTC timestamps: in Cairo (UTC+3) "Needed by 20 Oct" → `2026-10-19T21:00:00Z` → RFQ save **422**, shown to nobody; same family silently shifts savings/export/compare/reorder dates one day back | **no UTC+ customer can create an RFQ**; reports off by a day | fix task raised |
+| 8 | A saved RFQ draft can only be sent from the create page right after saving; History opens a compare page with no Send | stranded drafts | to raise (with #7) |
+| 9 | RFQ list shows a "Sent Date" for unsent drafts; Save gives no confirmation | cosmetic/UX | to raise |
+| 10 | Supplier RFQ email: buyer never named, buyer's terms dropped, English-only for an Arabic tenant, quantities `50.000000` with no unit | suppliers don't know who is asking | fix task raised |
+| 11 | Arabic business name → tenant slug `workspace` → inbound address `workspace@mail…` | meaningless address; next Arabic sign-up may collide | in #10 task |
+| 12 | **Arabic attachment filename → Supabase Storage `InvalidKey` → email_ingest job fails 3× → email silently lost** (no inbound-log row, no review item) | **every Arabic-named supplier PDF is lost without trace** | fix task raised; 2 demo emails to requeue after fix |
+| 13 | Ingestion dashboard "Catalogue Imports: 0" after a committed import | wrong counter | to raise |
+
+Workaround used for round 1 only: the RFQ date was corrected in the browser before sending (finding 7); the recorded demo cycle waits for the real fix.
 
 Products were entered through the New Product form because of #1; the CSV import is re-tested after the fix
 (same file — every row should be reported as a duplicate and skipped).
