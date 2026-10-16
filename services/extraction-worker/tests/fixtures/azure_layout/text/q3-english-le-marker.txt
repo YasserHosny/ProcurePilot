@@ -1,0 +1,23 @@
+PRICE QUOTATION
+Alexandria Catering Supplies (fictional)
+Date: 14 Oct 2026 · Valid 10 days
+
+
+                                 Item                                       Qty          Unit price                   Amount
+
+ TABLE SALT 1kg                                                            25         LE 12.50                LE 312.50
+
+ LEMON JUICE CONCENTRATE 1L                                                12         LE 95.00                LE 1,140.00
+
+ WATER BOTTLE 600ml (pack of 12)                                           40         LE 84.00                LE 3,360.00
+
+ WHITE VINEGAR 1L                                                          18         LE 27.25                LE 490.50
+
+ Total (L.E.)                                                                                                 L.E. 5,303.00
+
+
+Delivery within 2 working days to all Cairo and Giza branches.
+
+
+TEST FIXTURE — fictional supplier, generated for ProcurePilot extraction testing (Jira PP-3). Not a real quotation.
+
