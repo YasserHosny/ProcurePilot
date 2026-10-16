@@ -3502,7 +3502,18 @@
       "rejectedSuppliersTitle": "Rejected Suppliers",
       "rfqStatusLabel": "RFQ Status",
       "submittingButton": "Saving...",
-      "sendingButton": "Sending..."
+      "sendingButton": "Sending...",
+      "saveError": "Failed to save the RFQ. Please try again.",
+      "validationError": "Please check the following RFQ fields:",
+      "sendError": "Failed to send the RFQ. Please try again.",
+      "errors": {
+        "permissionDenied": "You do not have permission to perform this action.",
+        "unauthenticated": "Your session has expired. Please sign in again.",
+        "notFound": "The requested RFQ resource could not be found.",
+        "conflict": "The RFQ has changed. Refresh and try again.",
+        "invalidValue": "Some RFQ values are invalid. Please review them and try again.",
+        "serviceUnavailable": "The RFQ service is temporarily unavailable. Please try again."
+      }
     },
     "compare": {
       "title": "RFQ Responses",

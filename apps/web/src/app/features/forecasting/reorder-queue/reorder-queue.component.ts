@@ -1,4 +1,5 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { toIsoDate } from '../../../core/format/iso-date';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
@@ -155,5 +156,5 @@ export class ReorderQueueComponent implements OnInit {
 function defaultRequiredByDate(): string {
   const date = new Date();
   date.setDate(date.getDate() + 14);
-  return date.toISOString().slice(0, 10);
+  return toIsoDate(date);
 }
