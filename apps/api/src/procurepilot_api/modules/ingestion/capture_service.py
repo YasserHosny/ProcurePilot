@@ -17,6 +17,7 @@ from procurepilot_api.modules.ingestion.extraction import enqueue_extraction
 from procurepilot_api.modules.offers.service import _authenticated_db
 from procurepilot_api.shared.audit import AuditEventCreate, AuditOutcome, get_audit_writer
 from procurepilot_api.shared.logging import get_trace_id
+from procurepilot_api.shared.storage_keys import display_filename, safe_object_name
 
 # T015 (research R5): a dedicated capture endpoint, synchronous within the request — there is no
 # external step to decouple from (the server already has the file bytes from the multipart
@@ -70,7 +71,9 @@ class CaptureService:
                         raise NotFoundError(details={"resource": "supplier"})
 
             document_id = uuid4()
-            storage_path = f"tenants/{member.tenant_id}/quotations/{document_id}/{filename}"
+            storage_path = (
+                f"tenants/{member.tenant_id}/quotations/{document_id}/{safe_object_name(filename)}"
+            )
             client = create_client(
                 self._settings.supabase_url,
                 self._settings.supabase_service_role_key.get_secret_value(),
@@ -84,8 +87,8 @@ class CaptureService:
                     """
                     insert into document
                       (id, tenant_id, storage_bucket, storage_path, mime_type, source_channel,
-                       status, created_by)
-                    values (%s, %s, %s, %s, %s, 'capture', 'uploaded', %s)
+                       status, created_by, original_filename)
+                    values (%s, %s, %s, %s, %s, 'capture', 'uploaded', %s, %s)
                     """,
                     (
                         document_id,
@@ -94,6 +97,7 @@ class CaptureService:
                         storage_path,
                         detected_mime,
                         member.membership_id,
+                        display_filename(filename, fallback="capture"),
                     ),
                 )
 

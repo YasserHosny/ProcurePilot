@@ -14,6 +14,7 @@ from psycopg.rows import dict_row
 from pydantic import BaseModel, ValidationError
 from supabase import Client
 
+from procurepilot_api import db
 from procurepilot_api.config import Settings, get_settings
 from procurepilot_api.deps import CurrentMember
 from procurepilot_api.errors import (
@@ -800,11 +801,9 @@ class OrdersService:
             }
         )
         try:
-            with psycopg.connect(
+            with db.connect(
                 self._settings.database_url.get_secret_value(),
                 row_factory=dict_row,
-                # Supabase's transaction pooler does not preserve prepared statements.
-                prepare_threshold=None,
             ) as conn:
                 with conn.transaction():
                     conn.execute("set local role authenticated")

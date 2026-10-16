@@ -18,6 +18,7 @@ from procurepilot_api.workers.email_ingestion_worker import (
     _claim_pending_jobs,
     tick,
 )
+from procurepilot_api.workers.requeue_email_ingest import requeue
 
 pytestmark = pytest.mark.skipif(
     not TEST_DATABASE_URL,
@@ -60,6 +61,8 @@ class _FakeBucket:
         self._downloads = downloads or {}
 
     def upload(self, path: str, content: bytes, options: dict[str, str]) -> None:
+        if not path.isascii():
+            raise RuntimeError(f"InvalidKey: {path}")
         self._uploads.append((path, content, options))
 
     def download(self, path: str) -> bytes:
@@ -420,6 +423,95 @@ def test_failure_retry_and_terminal_failed_status(
         job4 = _get_job()
         assert job4["status"] == "failed"
         assert job4["attempts"] == 3
+
+
+def test_storage_failure_log_survives_retries_and_retry_resumes_same_row(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = settings_for_test_db(monkeypatch)
+    with committed_smart_context("email-worker-storage-failure", supplier_count=1) as context:
+        _seed_email_config(context.workspace.tenant_id, context.workspace.membership_id)
+        raw_email_path = f"tenants/{context.workspace.tenant_id}/raw/storage-fail.eml"
+        raw_email = _build_email(
+            from_addr="seller@unknown.test", message_id="<storage-fail@example.test>"
+        )
+        _patch_storage_and_queue(monkeypatch, downloads={raw_email_path: raw_email})
+        job_id = _insert_email_job(
+            context.workspace.tenant_id,
+            payload={"raw_email_path": raw_email_path},
+            max_attempts=3,
+        )
+        should_fail = True
+
+        class _FailingBucket(_FakeBucket):
+            def upload(self, path: str, content: bytes, options: dict[str, str]) -> None:
+                if should_fail:
+                    raise RuntimeError("InvalidKey: simulated storage failure")
+                super().upload(path, content, options)
+
+        class _FailingStorage(_FakeStorage):
+            def from_(self, _bucket: str) -> _FailingBucket:
+                return _FailingBucket(self._uploads, downloads=self._downloads)
+
+        class _FailingClient(_FakeSupabaseClient):
+            def __init__(
+                self,
+                uploads: list[tuple[str, bytes, dict[str, str]]],
+                downloads: dict[str, bytes] | None = None,
+            ) -> None:
+                self.storage = _FailingStorage(uploads, downloads)
+
+        uploads: list[tuple[str, bytes, dict[str, str]]] = []
+
+        def _client(*_args: object, **_kwargs: object) -> _FailingClient:
+            return _FailingClient(uploads, {raw_email_path: raw_email})
+
+        monkeypatch.setattr(email_ingestion_worker, "create_client", _client)
+        monkeypatch.setattr(orchestrator_module, "create_client", _client)
+        monkeypatch.setattr(orchestrator_module, "_enqueue_extraction", lambda *_a, **_k: None)
+
+        for _ in range(3):
+            tick(settings)
+        with psycopg.connect(TEST_DATABASE_URL or "", row_factory=dict_row) as conn:
+            with conn.cursor() as cur:
+                cur.execute("select status from ingestion_jobs where id=%s", (job_id,))
+                assert cur.fetchone()["status"] == "failed"
+                cur.execute(
+                    "select id, status, error_message from ingestion_email_log where tenant_id=%s",
+                    (context.workspace.tenant_id,),
+                )
+                failed_log = cur.fetchone()
+                cur.execute(
+                    "select count(*) from ingestion_email_log where tenant_id=%s",
+                    (context.workspace.tenant_id,),
+                )
+                assert cur.fetchone()["count"] == 1
+        assert failed_log["status"] == "failed" and failed_log["error_message"]
+
+        assert requeue(job_ids=[job_id], tenant_id=None, dry_run=False) == 0
+        should_fail = False
+        tick(settings)
+        with psycopg.connect(TEST_DATABASE_URL or "", row_factory=dict_row) as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "select id, status from ingestion_email_log where tenant_id=%s",
+                    (context.workspace.tenant_id,),
+                )
+                resumed = cur.fetchone()
+                cur.execute(
+                    "select count(*) from ingestion_email_log where tenant_id=%s",
+                    (context.workspace.tenant_id,),
+                )
+                assert cur.fetchone()["count"] == 1
+                cur.execute("select status from ingestion_jobs where id=%s", (job_id,))
+                assert cur.fetchone()["status"] == "completed"
+                cur.execute(
+                    "select count(*) from quotation where tenant_id=%s",
+                    (context.workspace.tenant_id,),
+                )
+                assert cur.fetchone()["count"] == 1
+        assert resumed["id"] == failed_log["id"]
+        assert resumed["status"] == "completed"
 
 
 def test_tenant_id_discipline_read_from_job_row_not_untrusted_payload(

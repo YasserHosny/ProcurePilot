@@ -35,6 +35,7 @@ from procurepilot_api.modules.rfq.router import router as rfq_router
 from procurepilot_api.modules.savings.router import router as savings_router
 from procurepilot_api.modules.tenants.router import router as tenants_router
 from procurepilot_api.modules.webhooks.router import router as webhooks_router
+from procurepilot_api.shared.i18n import assert_catalogues_present
 from procurepilot_api.shared.logging import TraceIdMiddleware, configure_logging
 from procurepilot_api.shared.observability import init_error_reporting
 from procurepilot_api.shared.rate_limit import configure_rate_limiting
@@ -43,6 +44,7 @@ API_PREFIX = "/api/v1"
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
+    assert_catalogues_present()
     active_settings = settings or get_settings()
     # Before anything else can fail, so that startup errors are reported too.
     init_error_reporting(active_settings)

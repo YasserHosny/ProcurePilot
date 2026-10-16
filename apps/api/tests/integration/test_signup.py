@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
@@ -23,6 +24,8 @@ from procurepilot_api.modules.tenants.models import (
     WorkspaceCreated,
 )
 from procurepilot_api.modules.tenants.service import TenantSignupService
+
+TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL")
 
 TOKEN = "a" * 32
 EMAIL = "owner@example.test"
@@ -225,3 +228,127 @@ def test_failed_signup_leaves_no_partial_tenant() -> None:
         TenantSignupService(repository=repo, auth_service=_Auth()).signup(_request())
 
     assert repo.tenants == []
+
+
+@pytest.mark.skipif(not TEST_DATABASE_URL, reason="TEST_DATABASE_URL is not set")
+def test_real_db_signup_uses_unique_arabic_business_slugs() -> None:
+    import psycopg
+
+    from procurepilot_api.config import get_settings
+    from procurepilot_api.modules.tenants.service import TenantSignupRepository
+
+    suffix = uuid4().hex
+    users: list[UUID] = []
+    invitation_ids: list[UUID] = []
+    tenant_ids: list[UUID] = []
+    try:
+        with psycopg.connect(TEST_DATABASE_URL or "") as conn, conn.cursor() as cur:
+            for index in range(2):
+                user_id, invitation_id = uuid4(), uuid4()
+                email = f"signup-{suffix}-{index}@example.test"
+                token = f"{suffix}{index:02d}".ljust(32, "x")
+                users.append(user_id)
+                invitation_ids.append(invitation_id)
+                cur.execute("insert into auth.users (id,email) values (%s,%s)", (user_id, email))
+                cur.execute(
+                    "insert into platform_invitation (id,email,token_hash,expires_at) "
+                    "values (%s,%s,%s,now()+interval '7 days')",
+                    (invitation_id, email, hash_platform_invitation_token(token)),
+                )
+        repo = TenantSignupRepository(get_settings())
+        slugs = []
+        for index in range(2):
+            email = f"signup-{suffix}-{index}@example.test"
+            request = SignupRequest(
+                invitation_token=f"{suffix}{index:02d}".ljust(32, "x"),
+                email=email,
+                password="correct-horse-password",
+                business_name="مطاعم سند",
+                region="GB",
+                currency="GBP",
+                tax_model="uk_vat",
+                default_locale="ar",
+            )
+            created = repo.create_workspace(request, users[index])
+            tenant_ids.append(created.tenant.id)
+            slugs.append(created.tenant.slug)
+        assert slugs[0] == "mtaam-snd"
+        assert slugs[1].startswith("mtaam-snd-") and len(slugs[1].rsplit("-", 1)[1]) == 6
+        assert slugs[0] != slugs[1] and all(slug != "workspace" for slug in slugs)
+    finally:
+        with psycopg.connect(TEST_DATABASE_URL or "") as conn, conn.cursor() as cur:
+            cur.execute("set session_replication_role = replica")
+            cur.execute("delete from tenant where id = any(%s)", (tenant_ids,))
+            cur.execute("delete from auth.users where id = any(%s)", (users,))
+            cur.execute("delete from platform_invitation where id = any(%s)", (invitation_ids,))
+            cur.execute("set session_replication_role = default")
+
+
+@pytest.mark.skipif(not TEST_DATABASE_URL, reason="TEST_DATABASE_URL is not set")
+def test_real_db_signup_retries_when_base_slug_is_occupied() -> None:
+    import psycopg
+
+    from procurepilot_api.config import get_settings
+    from procurepilot_api.modules.tenants.service import TenantSignupRepository
+
+    suffix = uuid4().hex
+    user_id, invitation_id, blocker_invitation = uuid4(), uuid4(), uuid4()
+    created_tenant_id: UUID | None = None
+    email = f"signup-race-{suffix}@example.test"
+    token = f"race{suffix}".ljust(32, "x")
+    try:
+        with psycopg.connect(TEST_DATABASE_URL or "") as conn, conn.cursor() as cur:
+            cur.execute("insert into auth.users (id,email) values (%s,%s)", (user_id, email))
+            cur.execute(
+                "insert into platform_invitation (id,email,token_hash,expires_at) "
+                "values (%s,%s,%s,now()+interval '7 days'),(%s,%s,%s,now()+interval '7 days')",
+                (
+                    invitation_id,
+                    email,
+                    hash_platform_invitation_token(token),
+                    blocker_invitation,
+                    f"block-{suffix}@example.test",
+                    f"block-{suffix}",
+                ),
+            )
+            cur.execute(
+                "insert into tenant (name,slug,region,currency,tax_model,platform_invitation_id) "
+                "values ('Blocker','mtaam-snd','GB','GBP','uk_vat',%s)",
+                (blocker_invitation,),
+            )
+        request = SignupRequest(
+            invitation_token=token,
+            email=email,
+            password="correct-horse-password",
+            business_name="مطاعم سند",
+            region="GB",
+            currency="GBP",
+            tax_model="uk_vat",
+            default_locale="ar",
+        )
+        created = TenantSignupRepository(get_settings()).create_workspace(request, user_id)
+        created_tenant_id = created.tenant.id
+        assert created.tenant.slug.startswith("mtaam-snd-")
+        with psycopg.connect(TEST_DATABASE_URL or "") as conn, conn.cursor() as cur:
+            cur.execute("select count(*) from tenant where id=%s", (created.tenant.id,))
+            assert cur.fetchone()[0] == 1
+            cur.execute(
+                "select count(*) from membership where tenant_id=%s and user_id=%s",
+                (created.tenant.id, user_id),
+            )
+            assert cur.fetchone()[0] == 1
+    finally:
+        with psycopg.connect(TEST_DATABASE_URL or "") as conn, conn.cursor() as cur:
+            cur.execute("set session_replication_role = replica")
+            if created_tenant_id is not None:
+                cur.execute("delete from tenant where id=%s", (created_tenant_id,))
+            cur.execute("delete from auth.users where id=%s", (user_id,))
+            cur.execute(
+                "delete from tenant where slug='mtaam-snd' and platform_invitation_id=%s",
+                (blocker_invitation,),
+            )
+            cur.execute(
+                "delete from platform_invitation where id in (%s,%s)",
+                (invitation_id, blocker_invitation),
+            )
+            cur.execute("set session_replication_role = default")

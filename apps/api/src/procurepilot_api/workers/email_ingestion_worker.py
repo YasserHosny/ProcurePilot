@@ -9,6 +9,7 @@ import psycopg
 from psycopg.rows import dict_row
 from supabase import create_client
 
+from procurepilot_api import db
 from procurepilot_api.config import Settings, get_settings
 from procurepilot_api.modules.ingestion.orchestrator import (
     _evaluate_guardrails_for_rfq,
@@ -27,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 def tick(settings: Settings) -> dict[str, int]:
     stats = {"claimed": 0, "completed": 0, "duplicate": 0, "rejected": 0, "failed": 0}
-    with psycopg.connect(settings.database_url.get_secret_value()) as conn:
+    with db.connect(settings.database_url.get_secret_value()) as conn:
         claimed = _claim_pending_jobs(conn, settings=settings)
         stats["claimed"] = len(claimed)
         conn.commit()
@@ -150,7 +151,7 @@ def _process_job(settings: Settings, job: dict[str, object]) -> str:
             quotation_id = UUID(str(payload["quotation_id"])) if isinstance(payload, dict) else None
             if quotation_id is None:
                 raise ValueError("guardrail_eval payload missing quotation_id")
-            with psycopg.connect(settings.database_url.get_secret_value()) as conn:
+            with db.connect(settings.database_url.get_secret_value()) as conn:
                 with conn.cursor(row_factory=dict_row) as cur:
                     cur.execute(
                         """
@@ -208,7 +209,7 @@ def _fetch_raw_email(settings: Settings, raw_email_path: str | None) -> bytes:
 
 
 def _mark_job_completed(settings: Settings, job_id: UUID) -> None:
-    with psycopg.connect(settings.database_url.get_secret_value()) as conn:
+    with db.connect(settings.database_url.get_secret_value()) as conn:
         with conn.cursor() as cur:
             cur.execute(
                 """
@@ -226,7 +227,7 @@ def _mark_job_failed(
 ) -> None:
     new_attempts = attempts + 1
     next_status = "pending" if new_attempts < max_attempts else "failed"
-    with psycopg.connect(settings.database_url.get_secret_value()) as conn:
+    with db.connect(settings.database_url.get_secret_value()) as conn:
         with conn.cursor() as cur:
             cur.execute(
                 """

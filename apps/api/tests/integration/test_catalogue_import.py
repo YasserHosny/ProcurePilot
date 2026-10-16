@@ -55,9 +55,7 @@ def _fake_matching(monkeypatch: pytest.MonkeyPatch) -> list[dict[str, object]]:
     def _fake(
         self: MatchingService, *, bearer_token: str, member: object, quotation_id: object
     ) -> None:
-        calls.append(
-            {"bearer_token": bearer_token, "member": member, "quotation_id": quotation_id}
-        )
+        calls.append({"bearer_token": bearer_token, "member": member, "quotation_id": quotation_id})
 
     monkeypatch.setattr(MatchingService, "quotation_matches", _fake)
     return calls
@@ -87,7 +85,7 @@ def test_import_creates_a_reviewed_quotation_with_one_line_per_row(
             member=context.member,
             supplier_id=supplier_id,
             file_content=content,
-            filename="prices.csv",
+            filename="عرض-أسعار.csv",
             file_format="csv",
             bearer_token=token,
         )
@@ -131,12 +129,14 @@ def test_import_creates_a_reviewed_quotation_with_one_line_per_row(
                 assert lines[0]["unit_price_currency"] == "USD"
 
                 cur.execute(
-                    "select storage_path, source_channel from document where id = "
-                    "(select document_id from quotation where id = %s)",
+                    "select storage_path, source_channel, original_filename from document "
+                    "where id = (select document_id from quotation where id = %s)",
                     (quotation["id"],),
                 )
                 document = cur.fetchone()
                 assert document["source_channel"] == "catalogue_import"
+                assert document["storage_path"].isascii()
+                assert document["original_filename"] == "عرض-أسعار.csv"
                 assert document["storage_path"].startswith(
                     f"tenants/{context.workspace.tenant_id}/quotations/"
                 )

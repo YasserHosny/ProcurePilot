@@ -11,6 +11,7 @@ from uuid import UUID
 import psycopg
 from psycopg.rows import dict_row
 
+from procurepilot_api import db
 from procurepilot_api.config import Settings, get_settings
 from procurepilot_api.deps import CurrentMember
 from procurepilot_api.errors import NotFoundError, ServiceUnavailableError, UnprocessableEntityError
@@ -246,9 +247,7 @@ def get_offer_service() -> OfferService:
 @contextmanager
 def _authenticated_db(settings: Settings, member: CurrentMember) -> Iterator[psycopg.Connection]:
     try:
-        with psycopg.connect(
-            settings.database_url.get_secret_value(), prepare_threshold=None
-        ) as conn:
+        with db.connect(settings.database_url.get_secret_value()) as conn:
             with conn.cursor() as cur:
                 claims = {
                     "sub": str(member.user_id),

@@ -1,5 +1,6 @@
 import os
 import uuid
+from email.utils import formataddr
 from typing import Protocol
 
 import httpx
@@ -14,7 +15,14 @@ class SendResult(BaseModel):
 
 class Mailer(Protocol):
     def send(
-        self, *, to: str, subject: str, body: str, headers: dict[str, str] | None = None
+        self,
+        *,
+        to: str,
+        subject: str,
+        body: str,
+        headers: dict[str, str] | None = None,
+        html: str | None = None,
+        from_name: str | None = None,
     ) -> SendResult: ...
 
 
@@ -24,18 +32,35 @@ class FakeMessage(BaseModel):
     body: str
     headers: dict[str, str] | None
     message_id: str
+    html: str | None = None
+    from_name: str | None = None
 
 
 class FakeMailer:
     sent_messages: list[FakeMessage] = []
 
     def send(
-        self, *, to: str, subject: str, body: str, headers: dict[str, str] | None = None
+        self,
+        *,
+        to: str,
+        subject: str,
+        body: str,
+        headers: dict[str, str] | None = None,
+        html: str | None = None,
+        from_name: str | None = None,
     ) -> SendResult:
         # Deterministic-enough fake Message-ID
         msg_id = f"fake-{uuid.uuid4().hex}@stub.mail"
         self.sent_messages.append(
-            FakeMessage(to=to, subject=subject, body=body, headers=headers, message_id=msg_id)
+            FakeMessage(
+                to=to,
+                subject=subject,
+                body=body,
+                headers=headers,
+                message_id=msg_id,
+                html=html,
+                from_name=from_name,
+            )
         )
         return SendResult(message_id=msg_id)
 
@@ -55,17 +80,28 @@ class MailgunMailer:
         self.api_url = f"https://api.mailgun.net/v3/{self.domain}/messages"
 
     def send(
-        self, *, to: str, subject: str, body: str, headers: dict[str, str] | None = None
+        self,
+        *,
+        to: str,
+        subject: str,
+        body: str,
+        headers: dict[str, str] | None = None,
+        html: str | None = None,
+        from_name: str | None = None,
     ) -> SendResult:
         if not self.api_key or not self.domain:
             raise RuntimeError("Mailgun credentials not configured")
 
         data = {
-            "from": f"ProcurePilot <noreply@{self.domain}>",
+            "from": formataddr(
+                (from_name or "ProcurePilot", f"noreply@{self.domain}"), charset="utf-8"
+            ),
             "to": [to],
             "subject": subject,
             "text": body,
         }
+        if html is not None:
+            data["html"] = html
 
         if headers:
             for k, v in headers.items():

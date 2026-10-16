@@ -5,14 +5,14 @@ import json
 import logging
 from datetime import UTC, date, datetime
 from decimal import Decimal
-from pathlib import PurePosixPath
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import psycopg
 from postgrest.exceptions import APIError
 from psycopg.rows import dict_row
 from supabase import Client
 
+from procurepilot_api import db
 from procurepilot_api.config import Settings, get_settings
 from procurepilot_api.deps import CurrentMember
 from procurepilot_api.errors import (
@@ -67,6 +67,7 @@ from procurepilot_api.modules.requests.valuation import (
     estimate_line_value,
 )
 from procurepilot_api.shared.audit import AuditEventCreate, get_audit_writer
+from procurepilot_api.shared.storage_keys import safe_object_name
 
 REQUEST_COLUMNS = (
     "id,tenant_id,branch_id,cost_centre_id,requested_by_membership_id,"
@@ -270,10 +271,9 @@ class RequestsService:
             }
         )
         try:
-            with psycopg.connect(
+            with db.connect(
                 self._settings.database_url.get_secret_value(),
                 row_factory=dict_row,
-                prepare_threshold=None,
             ) as conn:
                 conn.execute("set local role authenticated")
                 conn.execute("select set_config('request.jwt.claims', %s, true)", (claims,))
@@ -1240,7 +1240,7 @@ class RequestsService:
 
     def _estimate_products(self, product_ids: list[UUID]) -> list[LineEstimate]:
         db_url = self._settings.database_url.get_secret_value()
-        with psycopg.connect(db_url) as conn:
+        with db.connect(db_url) as conn:
             return [estimate_line_value(conn, workspace_product_id=pid) for pid in product_ids]
 
     def _insert_lines(
@@ -1747,7 +1747,7 @@ class RequestsService:
             "role": "authenticated",
             "member_role": member.role.value,
         }
-        with psycopg.connect(self._settings.database_url.get_secret_value()) as conn:
+        with db.connect(self._settings.database_url.get_secret_value()) as conn:
             with conn.cursor(row_factory=dict_row) as cur:
                 cur.execute("set local role authenticated")
                 cur.execute(
@@ -1831,7 +1831,7 @@ class RequestsService:
                 notification_id = (
                     UUID(str(notification_row["id"])) if notification_row is not None else None
                 )
-            # Exiting the `with psycopg.connect(...)` block here commits all three writes above
+            # Exiting the `with db.connect(...)` block here commits all three writes above
             # atomically (or rolls all of them back if any exception was raised) — psycopg's own
             # connection context manager semantics, the same ones `devices/service.py` relies on.
         return dict(decided_request), dict(decided_step), notification_id
@@ -2140,10 +2140,8 @@ def _now_iso() -> str:
 
 
 def _quality_issue_storage_path(*, tenant_id: UUID, issue_id: UUID, filename: str) -> str:
-    name = PurePosixPath(filename).name.replace("/", "_")
-    if not name:
-        name = "photo"
-    return f"tenants/{tenant_id}/quality-issues/{issue_id}/{name}"
+    name = safe_object_name(filename)
+    return f"tenants/{tenant_id}/quality-issues/{issue_id}/{uuid4()}/{name}"
 
 
 def _signed_url(result: object) -> str:

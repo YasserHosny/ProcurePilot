@@ -117,6 +117,9 @@ same file does not create duplicate offers.
 
 ### Edge Cases
 
+- A failure after an inbound email has been parsed is visible in the Email Inbound Log as
+  `failed` with a short error message, and support can recover the failed job with the operator
+  requeue CLI. Failures before the raw email can be fetched or parsed do not create a log row.
 - If an email attachment is corrupted or an unsupported MIME type, the document is stored as-is
   with `extraction_status = 'unsupported'` and the quotation remains with no extracted data,
   available for manual entry.

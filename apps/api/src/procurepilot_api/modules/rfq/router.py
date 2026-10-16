@@ -6,7 +6,7 @@ from decimal import Decimal
 from typing import Annotated
 
 from fastapi import APIRouter, Body, Depends, Header, Request, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from procurepilot_api.config import get_settings
 from procurepilot_api.deps import CurrentMember, bearer_token, current_member
@@ -46,7 +46,7 @@ class RfqCreatePayload(BaseModel):
     lines: list[RfqLineCreate]
     recipient_supplier_ids: list[uuid.UUID]
     needed_by_date: date
-    tenant_terms: str | None = None
+    tenant_terms: str | None = Field(default=None, max_length=4000)
 
 
 class RfqCreateResponse(BaseModel):

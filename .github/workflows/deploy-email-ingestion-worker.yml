@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - 'apps/api/**'
+      - 'packages/i18n/**'
       - 'infra/docker/email-ingestion-worker.Dockerfile'
       - '.github/workflows/deploy-email-ingestion-worker.yml'
   workflow_dispatch:

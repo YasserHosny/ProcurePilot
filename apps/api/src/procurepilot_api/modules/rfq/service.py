@@ -1,13 +1,14 @@
 import base64
 import json
 import uuid
-from collections.abc import Iterator, Sequence
+from collections.abc import Iterator
 from contextlib import contextmanager
 from datetime import date
 
 import psycopg
 from psycopg.rows import dict_row
 
+from procurepilot_api import db
 from procurepilot_api.config import Settings
 from procurepilot_api.deps import CurrentMember
 from procurepilot_api.errors import (  # noqa: E501
@@ -20,6 +21,7 @@ from procurepilot_api.modules.requests.schemas import (
     PurchaseRequestLineInput,
 )
 from procurepilot_api.modules.requests.service import RequestsService
+from procurepilot_api.modules.rfq.email import RfqEmailLine, render_rfq_email
 from procurepilot_api.modules.rfq.guardrail_evaluation import compute_guardrail_evaluation
 from procurepilot_api.modules.rfq.guardrails import explain_guardrail_evaluations
 from procurepilot_api.modules.rfq.schemas import (
@@ -36,64 +38,14 @@ from procurepilot_api.modules.rfq.schemas import (
     RfqResponseComparisonList,
     RfqSummary,
 )
+from procurepilot_api.shared.i18n import t
 from procurepilot_api.shared.mailer import get_mailer
-
-NAMESPACE_RFQ = uuid.UUID("361f1073-a8d1-4db8-8d07-28f0907a4a2a")
-
-
-def build_rfq_message(
-    rfq: Rfq,
-    lines: Sequence[RfqLine],
-    product_names: dict[uuid.UUID, str],
-    recipient: RfqRecipient,
-    tenant_terms: str | None = None,
-    reply_to: str | None = None,
-) -> tuple[str, str, str]:
-    subject = f"Request for Quotation - {rfq.needed_by_date}"
-
-    body_lines = [
-        "Please provide a quotation for the following items:",
-        "",
-    ]
-
-    for line in lines:
-        name = product_names.get(line.workspace_product_id, "Unknown Product")
-        body_lines.append(f"- {name}: {line.quantity}")
-
-    body_lines.extend(
-        [
-            "",
-            f"Needed by: {rfq.needed_by_date.isoformat()}",
-        ]
-    )
-
-    if reply_to:
-        body_lines.extend(
-            [
-                "",
-                "To submit your quotation, please reply directly to this email or send it to:",
-                reply_to,
-            ]
-        )
-
-    if tenant_terms:
-        body_lines.extend(["", "Terms:", tenant_terms])
-
-    body = "\n".join(body_lines)
-
-    combined = f"{rfq.tenant_id}:{rfq.id}:{recipient.id}"
-    msg_hash = uuid.uuid5(NAMESPACE_RFQ, combined)
-    message_id = f"<{msg_hash}@procurepilot.internal>"
-
-    return subject, body, message_id
 
 
 @contextmanager
 def _authenticated_db(settings: Settings, member: CurrentMember) -> Iterator[psycopg.Connection]:
     try:
-        with psycopg.connect(
-            settings.database_url.get_secret_value(), prepare_threshold=None
-        ) as conn:
+        with db.connect(settings.database_url.get_secret_value()) as conn:
             with conn.cursor() as cur:
                 claims = {
                     "sub": str(member.user_id),
@@ -197,11 +149,11 @@ class RfqService:
                     """
                     insert into rfq (
                         id, tenant_id, created_by_membership_id, status, needed_by_date,
-                        idempotency_key
+                        idempotency_key, tenant_terms
                     )
-                    values (%s, %s, %s, 'draft', %s, %s)
+                    values (%s, %s, %s, 'draft', %s, %s, %s)
                     returning id, tenant_id, created_by_membership_id, status,
-                              needed_by_date, idempotency_key, created_at
+                              needed_by_date, idempotency_key, tenant_terms, created_at
                     """,
                     (
                         rfq_id,
@@ -209,6 +161,7 @@ class RfqService:
                         member.membership_id,
                         needed_by_date,
                         idempotency_key,
+                        tenant_terms,
                     ),
                 )
                 rfq_row = cur.fetchone()
@@ -279,15 +232,25 @@ class RfqService:
                 line_rows = cur.fetchall()
                 lines = [RfqLine(**r) for r in line_rows]
 
-                product_names = {}
-                for line in lines:
-                    cur.execute(
-                        "select tenant_name from workspace_product where id = %s",
-                        (line.workspace_product_id,),
-                    )
-                    prod_row = cur.fetchone()
-                    if prod_row:
-                        product_names[line.workspace_product_id] = prod_row["tenant_name"]
+                cur.execute(
+                    "select name, default_locale from tenant where id = %s", (member.tenant_id,)
+                )
+                tenant_row = cur.fetchone()
+                cur.execute(
+                    """select l.workspace_product_id, wp.tenant_name, cp.base_unit,
+                              pd.pack_count, pd.unit_size
+                       from rfq_line l join workspace_product wp on wp.id = l.workspace_product_id
+                       left join canonical_product cp on cp.id = wp.canonical_product_id
+                       left join (
+                         select workspace_product_id, min(pack_count) as pack_count,
+                                min(unit_size) as unit_size
+                         from pack_definition group by workspace_product_id
+                         having count(*) = 1
+                       ) pd on pd.workspace_product_id = wp.id
+                       where l.rfq_id = %s""",
+                    (rfq_id,),
+                )
+                product_by_id = {r["workspace_product_id"]: r for r in cur.fetchall()}
 
                 cur.execute(
                     "select * from rfq_recipient where rfq_id = %s and status = 'draft'", (rfq_id,)
@@ -318,18 +281,37 @@ class RfqService:
                         continue
 
                     contact_email = supp_row["contact_email"]
-                    subject, body, msg_id = build_rfq_message(
-                        rfq=rfq,
-                        lines=lines,
-                        product_names=product_names,
-                        recipient=recipient,
+                    email_lines = []
+                    for line in lines:
+                        product = product_by_id.get(line.workspace_product_id)
+                        email_lines.append(
+                            RfqEmailLine(
+                                product_name=(
+                                    product["tenant_name"]
+                                    if product
+                                    else t("rfq.email.unknownProduct", tenant_row["default_locale"])
+                                ),
+                                quantity=line.quantity,
+                                unit_code=product["base_unit"] if product else "each",
+                                pack_count=product["pack_count"] if product else None,
+                                unit_size=product["unit_size"] if product else None,
+                            )
+                        )
+                    rendered = render_rfq_email(
+                        tenant_name=tenant_row["name"],
+                        locale=tenant_row["default_locale"],
+                        needed_by=rfq.needed_by_date,
+                        lines=email_lines,
+                        tenant_terms=rfq.tenant_terms,
                         reply_to=reply_to,
                     )
 
                     send_kwargs = {
                         "to": contact_email,
-                        "subject": subject,
-                        "body": body,
+                        "subject": rendered.subject,
+                        "body": rendered.text,
+                        "html": rendered.html,
+                        "from_name": rendered.from_name,
                     }
                     if reply_to:
                         send_kwargs["headers"] = {"Reply-To": reply_to}
@@ -430,9 +412,9 @@ class RfqService:
                     )
                     fired_by_response: dict[uuid.UUID, set[uuid.UUID]] = {}
                     for event in cur.fetchall():
-                        fired_by_response.setdefault(
-                            event["rfq_response_id"], set()
-                        ).add(event["guardrail_id"])
+                        fired_by_response.setdefault(event["rfq_response_id"], set()).add(
+                            event["guardrail_id"]
+                        )
                     for response_id in response_ids:
                         explanations = explain_guardrail_evaluations(
                             guardrails=snapshot.guardrails,
@@ -442,9 +424,7 @@ class RfqService:
                             recent_average_price_by_product=snapshot.recent_average_price_by_product,
                             response_id=response_id,
                             responses_pending=snapshot.responses_pending,
-                            fired_guardrail_ids=fired_by_response.get(
-                                response_id, set()
-                            ),
+                            fired_guardrail_ids=fired_by_response.get(response_id, set()),
                         )
                         evaluation_by_response[response_id] = [
                             RfqGuardrailEvaluation(

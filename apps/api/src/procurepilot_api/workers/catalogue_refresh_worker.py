@@ -14,6 +14,7 @@ from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 from supabase import create_client
 
+from procurepilot_api import db
 from procurepilot_api.config import Settings, get_settings
 from procurepilot_api.modules.catalogue.connector import CsvCatalogueConnector
 
@@ -22,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 def tick(settings: Settings) -> dict[str, int]:
     stats = {"claimed": 0, "completed": 0, "failed": 0}
-    with psycopg.connect(settings.database_url.get_secret_value()) as conn:
+    with db.connect(settings.database_url.get_secret_value()) as conn:
         jobs = _claim_jobs(conn)
         stats["claimed"] = len(jobs)
         conn.commit()
@@ -81,7 +82,7 @@ def _create_review(settings: Settings, job: dict[str, Any]) -> UUID:
     schedule_id = _payload_uuid(payload, "refresh_schedule_id")
     source_import_id = _payload_uuid(payload, "source_import_id")
 
-    with psycopg.connect(settings.database_url.get_secret_value()) as conn:
+    with db.connect(settings.database_url.get_secret_value()) as conn:
         with conn.cursor(row_factory=dict_row) as cur:
             cur.execute("set local role service_role")
             cur.execute(
@@ -166,7 +167,7 @@ def _download(settings: Settings, path: str) -> bytes:
 
 
 def _mark_completed(settings: Settings, job_id: UUID, review_id: UUID) -> None:
-    with psycopg.connect(settings.database_url.get_secret_value()) as conn:
+    with db.connect(settings.database_url.get_secret_value()) as conn:
         with conn.cursor() as cur:
             cur.execute("set local role service_role")
             cur.execute(
@@ -191,7 +192,7 @@ def _mark_failed(
     error: str,
 ) -> None:
     next_status = "failed" if attempts + 1 >= max_attempts else "pending"
-    with psycopg.connect(settings.database_url.get_secret_value()) as conn:
+    with db.connect(settings.database_url.get_secret_value()) as conn:
         with conn.cursor() as cur:
             cur.execute("set local role service_role")
             cur.execute(

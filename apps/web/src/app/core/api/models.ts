@@ -277,6 +277,7 @@ export interface Document {
   readonly status: 'uploaded' | 'failed_to_read';
   readonly created_at: string;
   readonly created_by?: string;
+  readonly original_filename?: string | null;
 }
 
 export interface DocumentDownloadResponse {

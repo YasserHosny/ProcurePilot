@@ -26,6 +26,7 @@ from procurepilot_api.modules.matching.service import MatchingService
 from procurepilot_api.modules.offers.service import _authenticated_db
 from procurepilot_api.shared.audit import AuditEventCreate, AuditOutcome, get_audit_writer
 from procurepilot_api.shared.logging import get_trace_id
+from procurepilot_api.shared.storage_keys import display_filename, safe_object_name
 
 # T017 (research R6). Real finding that reshapes this task versus tasks.md's summary:
 # MatchingService.quotation_matches() (the actual spec-004 matching entry point) refuses any
@@ -124,7 +125,7 @@ def import_catalogue(
                     member.tenant_id,
                     supplier_id,
                     filename,
-                    f"tenants/{member.tenant_id}/quotations/{document_id}/{filename}",
+                    f"tenants/{member.tenant_id}/quotations/{document_id}/{safe_object_name(filename)}",
                     len(file_content),
                     file_format,
                     status,
@@ -231,7 +232,9 @@ def _store_catalogue_document(
     settings: Settings, conn: object, member: CurrentMember, filename: str, content: bytes
 ) -> UUID:
     document_id = uuid4()
-    storage_path = f"tenants/{member.tenant_id}/quotations/{document_id}/{filename}"
+    storage_path = (
+        f"tenants/{member.tenant_id}/quotations/{document_id}/{safe_object_name(filename)}"
+    )
     mime_type = (
         "text/csv"
         if filename.lower().endswith(".csv")
@@ -248,8 +251,8 @@ def _store_catalogue_document(
             """
             insert into document
               (id, tenant_id, storage_bucket, storage_path, mime_type, source_channel, status,
-               created_by)
-            values (%s, %s, %s, %s, %s, 'catalogue_import', 'uploaded', %s)
+               created_by, original_filename)
+            values (%s, %s, %s, %s, %s, 'catalogue_import', 'uploaded', %s, %s)
             """,
             (
                 document_id,
@@ -258,6 +261,7 @@ def _store_catalogue_document(
                 storage_path,
                 mime_type,
                 member.membership_id,
+                display_filename(filename, fallback="catalogue-import"),
             ),
         )
     return document_id

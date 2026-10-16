@@ -7,6 +7,7 @@ from uuid import UUID
 import psycopg
 from psycopg.rows import dict_row
 
+from procurepilot_api import db
 from procurepilot_api.config import Settings, get_settings
 
 logger = logging.getLogger(__name__)
@@ -19,7 +20,7 @@ MAX_PUSH_ATTEMPTS = 5
 def process_push_notification(notification_id: UUID | str) -> None:
     settings = get_settings()
     try:
-        with psycopg.connect(settings.database_url.get_secret_value()) as conn:
+        with db.connect(settings.database_url.get_secret_value()) as conn:
             notification = _notification_row(conn, UUID(str(notification_id)))
             if notification is None:
                 logger.warning(
@@ -57,7 +58,7 @@ def sweep_stale_push_notifications() -> int:
     settings = get_settings()
     cutoff = datetime.now(UTC) - RETRY_SWEEP_AGE
     try:
-        with psycopg.connect(settings.database_url.get_secret_value()) as conn:
+        with db.connect(settings.database_url.get_secret_value()) as conn:
             rows = _stale_notifications(conn, cutoff=cutoff)
         enqueued = 0
         for row in rows:

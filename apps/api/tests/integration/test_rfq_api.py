@@ -115,9 +115,17 @@ async def test_create_rfq_rejects_missing_email_supplier(
         "lines": [{"workspace_product_id": str(product_id), "quantity": "100.5"}],
         "recipient_supplier_ids": [str(supplier_with_email), str(supplier_no_email)],
         "needed_by_date": "2026-12-01",
+        "tenant_terms": "x" * 4001,
     }
 
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        too_long = await client.post("/api/v1/rfq", json=payload, headers=auth_headers)
+        assert too_long.status_code == 422
+        assert any(
+            item.get("loc", [])[-1:] == ["tenant_terms"]
+            for item in too_long.json()["details"]
+        )
+        payload["tenant_terms"] = "x" * 4000
         resp = await client.post("/api/v1/rfq", json=payload, headers=auth_headers)
 
     if resp.status_code != 201:
@@ -232,6 +240,7 @@ async def test_send_rfq_partial_failure_leaves_failed_draft(
         "lines": [{"workspace_product_id": str(product_id), "quantity": "100"}],
         "recipient_supplier_ids": [str(supplier_1), str(supplier_2)],
         "needed_by_date": "2026-12-01",
+        "tenant_terms": "Deliver before noon",
     }
 
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
@@ -243,12 +252,11 @@ async def test_send_rfq_partial_failure_leaves_failed_draft(
 
     # Now mock mailer to fail on supplier_2
     class FailingMailer(FakeMailer):
-        def send(
-            self, *, to: str, subject: str, body: str, headers: dict[str, str] | None = None
-        ) -> SendResult:
+        def send(self, **kwargs: object) -> SendResult:
+            to = str(kwargs["to"])
             if to == "contact2@example.test":
                 raise RuntimeError("Simulated mailer failure")
-            return super().send(to=to, subject=subject, body=body, headers=headers)
+            return super().send(**kwargs)  # type: ignore[arg-type]
 
     # We monkeypatch the import where it's used in service
     import procurepilot_api.modules.rfq.service
@@ -273,6 +281,18 @@ async def test_send_rfq_partial_failure_leaves_failed_draft(
 
     assert r1["status"] == "sent"
     assert r1["outbound_message_id"] is not None
+    assert FakeMailer.sent_messages
+    sent = FakeMailer.sent_messages[-1]
+    assert "Deliver before noon" in sent.body
+    assert "RFQ Tenant" in sent.body
+    assert sent.html and "Deliver before noon" in sent.html
+    assert sent.from_name == "RFQ Tenant via ProcurePilot"
+    with psycopg.connect(test_db, prepare_threshold=None) as conn:
+        with conn.cursor() as cur:
+            cur.execute("select tenant_terms from rfq where id = %s", (rfq_id,))
+            assert cur.fetchone()[0] == "Deliver before noon"
+            cur.execute("select outbound_message_id from rfq_recipient where id = %s", (r1["id"],))
+            assert cur.fetchone()[0] == r1["outbound_message_id"]
 
     assert r2["status"] == "draft"
     assert r2["outbound_message_id"] is None

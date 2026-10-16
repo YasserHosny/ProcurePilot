@@ -156,12 +156,30 @@ describe('QuotationReviewComponent (T051, T057, T062)', () => {
     fixture.detectChanges();
   });
 
+  it('prefers the original Unicode filename over the ASCII storage key', () => {
+    component.quotation.set({
+      ...mockQuotationDetail,
+      document: { ...mockQuotationDetail.document, original_filename: 'عرض-سعر-النور.pdf' },
+    });
+    expect(component.documentFileName()).toBe('عرض-سعر-النور.pdf');
+  });
+
   it('should load quotation details and suppliers on init', () => {
     expect(apiService.getQuotation).toHaveBeenCalledWith('q-review-1');
     expect(apiService.suppliers).toHaveBeenCalled();
     expect(component.quotation()?.id).toBe('q-review-1');
     expect(component.suppliers().length).toBe(1);
     expect(component.flaggedFields().length).toBe(1);
+  });
+
+  it('requests inline preview URLs and attachment URLs from the download button', () => {
+    expect(apiService.getDocumentDownloadUrl).toHaveBeenCalledWith('doc-1');
+
+    const downloadWindow = { opener: window, location: { href: '' }, close: jasmine.createSpy() };
+    spyOn(window, 'open').and.returnValue(downloadWindow as unknown as Window);
+    fixture.debugElement.query(By.css('.download-original-btn')).nativeElement.click();
+
+    expect(apiService.getDocumentDownloadUrl).toHaveBeenCalledWith('doc-1', 'attachment');
   });
 
   it('uses the home currency for a quote total when the quote and its lines omit currency', () => {

@@ -39,7 +39,7 @@ const REPO_ROOT = join(__dirname, '..', '..', '..', '..', '..');
  * signs in as risks leaving that shared owner in a state later files cannot recover from. One
  * extra sign-up per FILE (not per test) keeps this well within the auth rate limit.
  */
-export async function createIsolatedWorkspace(): Promise<Credentials> {
+export async function createIsolatedWorkspace(currency?: string): Promise<Credentials> {
   const stamp = `${Date.now()}.${Math.floor(Math.random() * 10000)}`;
   const creds: Credentials = {
     ownerEmail: `e2e.isolated.owner.${stamp}@example.test`,
@@ -77,7 +77,7 @@ export async function createIsolatedWorkspace(): Promise<Credentials> {
       password: creds.ownerPassword,
       business_name: creds.businessName,
       region: invitation.region,
-      currency: invitation.currency,
+      currency: currency ?? invitation.currency,
       tax_model: invitation.tax_model,
       default_locale: 'en',
     }),

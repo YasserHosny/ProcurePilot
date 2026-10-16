@@ -31,7 +31,7 @@ def _wire_sweep(
 ) -> list[tuple[_Settings, UUID]]:
     enqueued: list[tuple[_Settings, UUID]] = []
     monkeypatch.setattr(push_job, "get_settings", lambda: _Settings())
-    monkeypatch.setattr(push_job.psycopg, "connect", lambda _dsn: _Connection())
+    monkeypatch.setattr(push_job.db, "connect", lambda _dsn: _Connection())
     monkeypatch.setattr(push_job, "_stale_notifications", lambda _conn, *, cutoff: rows)
     monkeypatch.setattr(
         push_job,
@@ -74,7 +74,7 @@ def test_sweep_enqueue_failure_for_one_row_does_not_stop_the_rest(
     enqueued: list[UUID] = []
 
     monkeypatch.setattr(push_job, "get_settings", lambda: _Settings())
-    monkeypatch.setattr(push_job.psycopg, "connect", lambda _dsn: _Connection())
+    monkeypatch.setattr(push_job.db, "connect", lambda _dsn: _Connection())
     monkeypatch.setattr(
         push_job,
         "_stale_notifications",

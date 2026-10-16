@@ -204,12 +204,14 @@ Stores raw inbound emails for replay capability.
 
 ### Existing `documents` bucket — Extended paths
 
-Ingested attachments and capture uploads use the existing documents bucket with new path
-prefixes:
+Ingested files use the existing documents bucket and the tenant-prefixed quotation path required
+by the `document.storage_path` constraint. Each document ID scopes its object key, and the final
+leaf is an ASCII-safe name derived from the source filename (NFKD/ASCII-folded, other characters
+replaced with `-`, valid extension lowercased and kept; `file` is used when the slug is empty).
+The original Unicode name is stored in `document.original_filename` for display and download;
+legacy rows fall back to the key basename.
 
-- **Email attachments**: `{tenant_id}/ingestion/email/{quotation_id}/{filename}`
-- **Capture uploads**: `{tenant_id}/ingestion/capture/{quotation_id}/{filename}`
-- **Catalogue files**: `{tenant_id}/ingestion/catalogue/{import_id}/{filename}`
+- **Email attachments, capture uploads, and catalogue files**: `tenants/{tenant_id}/quotations/{document_id}/{ascii_safe_leaf}`
 
 ---
 
@@ -236,10 +238,14 @@ prefixes:
 
 ```
 received → processing → completed
-                     → failed (retryable)
+                     → failed (durable after a post-parse processing failure)
                      → duplicate (terminal)
                      → rejected (terminal)
 ```
+
+On a later job retry, only an existing `failed` email-log row is resumed (`failed` →
+`processing`). Existing `processing`, `received`, `completed`, `rejected`, or `duplicate` rows
+remain duplicates. Failures before raw-email parsing do not create an email-log row.
 
 ### Ingestion Job Status
 
@@ -248,6 +254,10 @@ pending → processing → completed
                     → failed → pending (retry, if attempts < max_attempts)
                              → failed (terminal, if attempts >= max_attempts)
 ```
+
+An operator can requeue a terminal failed email-ingest job after fixing its cause. The recovery
+CLI selects only failed `email_ingest` jobs with a `raw_email_path`, resets them to `pending` with
+zero attempts, and records `email_ingest_requeued`.
 
 ### Catalogue Import Status
 

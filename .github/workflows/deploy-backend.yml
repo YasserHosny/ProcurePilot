@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - 'apps/api/**'
+      - 'packages/i18n/**'
       - 'infra/docker/api.Dockerfile'
       - '.github/workflows/deploy-backend.yml'
   workflow_dispatch:

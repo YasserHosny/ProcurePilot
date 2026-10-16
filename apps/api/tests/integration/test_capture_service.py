@@ -13,6 +13,7 @@ pytestmark = pytest.mark.skipif(
     reason="TEST_DATABASE_URL is not set; needs a migrated local Postgres",
 )
 
+
 class _FakeAuditWriter:
     def record(self, *args: object, **kwargs: object) -> None:
         pass
@@ -22,6 +23,7 @@ class _FakeAuditWriter:
 def _mock_audit(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(capture_service_module, "get_audit_writer", lambda: _FakeAuditWriter())
 
+
 # A minimal real PDF header — enough for libmagic to detect application/pdf, one of
 # CaptureService's accepted mime types.
 _PDF_BYTES = b"%PDF-1.4\n%\xe2\xe3\xcf\xd3\n1 0 obj\n<< /Type /Catalog >>\nendobj\n"
@@ -29,13 +31,20 @@ _JPEG_BYTES = b"\xff\xd8\xff\xe0\x00\x10JFIF\x00\x01\x01\x00\x00\x01\x00\x01\x00
 
 
 class _FakeBucket:
-    def upload(self, *_args: object, **_kwargs: object) -> None:
-        return None
+    def __init__(self, paths: list[str]) -> None:
+        self.paths = paths
+
+    def upload(self, path: str, *_args: object, **_kwargs: object) -> None:
+        if not path.isascii():
+            raise RuntimeError(f"InvalidKey: {path}")
+        self.paths.append(path)
 
 
 class _FakeStorage:
+    paths: list[str] = []
+
     def from_(self, _bucket: str) -> _FakeBucket:
-        return _FakeBucket()
+        return _FakeBucket(self.paths)
 
 
 class _FakeSupabaseClient:
@@ -44,6 +53,7 @@ class _FakeSupabaseClient:
 
 @pytest.fixture(autouse=True)
 def _fake_storage(monkeypatch: pytest.MonkeyPatch) -> None:
+    _FakeStorage.paths.clear()
     monkeypatch.setattr(
         capture_service_module, "create_client", lambda *_a, **_k: _FakeSupabaseClient()
     )
@@ -71,7 +81,7 @@ def test_capture_creates_pending_quotation_and_queues_extraction(
         result = service.create_capture(
             member=context.member,
             file_content=_PDF_BYTES,
-            filename="delivery-note.pdf",
+            filename="عرض-سعر-النور.pdf",
             supplier_id=supplier_id,
             notes="left at reception",
             bearer_token="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.signature",
@@ -96,13 +106,17 @@ def test_capture_creates_pending_quotation_and_queues_extraction(
                 assert quotation["supplier_id"] == supplier_id
 
                 cur.execute(
-                    "select mime_type, source_channel, status from document where id = %s",
+                    "select mime_type, source_channel, status, storage_path, original_filename "
+                    "from document where id = %s",
                     (quotation["document_id"],),
                 )
                 document = cur.fetchone()
                 assert document is not None
                 assert document["mime_type"] == "application/pdf"
                 assert document["source_channel"] == "capture"
+                assert document["original_filename"] == "عرض-سعر-النور.pdf"
+                assert document["storage_path"].isascii()
+                assert _FakeStorage.paths[0].isascii()
 
                 cur.execute(
                     "select status from extraction_job where quotation_id = %s",

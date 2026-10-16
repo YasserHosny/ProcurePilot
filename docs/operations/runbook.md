@@ -52,6 +52,37 @@ curl -I https://<project>.<domain>/index.html
 2. Verify push tokens are current in tenant profile.
 3. Test deep link routing.
 
+### 3.6 Failed inbound email ingestion
+
+1. Find terminal failed email-ingest jobs:
+
+   ```sql
+   select id, tenant_id, last_error
+   from ingestion_jobs
+   where job_type='email_ingest' and status='failed';
+   ```
+
+2. Check the job error and worker logs, then fix the underlying cause before retrying. The
+   requeue command requires a failed `email_ingest` job with a stored `raw_email_path`.
+3. Run the command from an environment with the worker's `DATABASE_URL` and API settings, such
+   as the API or worker container. Preview the selected job first, then requeue it:
+
+   ```bash
+   python -m procurepilot_api.workers.requeue_email_ingest --job-id <id> --dry-run
+   python -m procurepilot_api.workers.requeue_email_ingest --job-id <id>
+   ```
+
+   For all eligible failed email-ingest jobs for one tenant, use
+   `--all-failed --tenant-id <id>` (and include `--dry-run` to preview). The command resets
+   selected jobs to `pending` with zero attempts and records an `email_ingest_requeued` audit
+   event. It exits non-zero if any explicitly requested job ID was skipped.
+4. Confirm the worker completes the job and the corresponding `ingestion_email_log` row is
+   `completed`. A post-parse processing failure is recorded as a failed log row with a short
+   error. A failure before the raw email is fetched or parsed creates no log row.
+
+**Known limit:** a worker hard-killed during its final attempt can leave no email-log row. The
+failed job can still be recovered with this command when its stored raw email path is available.
+
 ## 4. Scaling Actions
 
 - **Database CPU > 70% sustained:** enable Supabase read replicas or review query plans.

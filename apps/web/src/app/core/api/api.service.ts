@@ -418,8 +418,14 @@ export class ApiService {
     return this.http.get<Document>(`${this.base}/documents/${documentId}`);
   }
 
-  getDocumentDownloadUrl(documentId: string): Observable<DocumentDownloadResponse> {
-    return this.http.get<DocumentDownloadResponse>(`${this.base}/documents/${documentId}/download`);
+  getDocumentDownloadUrl(
+    documentId: string,
+    disposition: 'inline' | 'attachment' = 'inline',
+  ): Observable<DocumentDownloadResponse> {
+    const query = disposition === 'attachment' ? '?disposition=attachment' : '';
+    return this.http.get<DocumentDownloadResponse>(
+      `${this.base}/documents/${documentId}/download${query}`,
+    );
   }
 
   createQuotation(body: QuotationCreate, idempotencyKey?: string): Observable<Quotation> {

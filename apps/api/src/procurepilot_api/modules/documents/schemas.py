@@ -62,3 +62,4 @@ class Document(BaseModel):
     status: DocumentStatus
     created_at: datetime
     created_by: UUID
+    original_filename: str | None = None

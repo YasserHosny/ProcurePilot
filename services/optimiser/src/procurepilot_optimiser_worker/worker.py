@@ -2,8 +2,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
-import psycopg
-
+from procurepilot_optimiser_worker import db
 from procurepilot_optimiser_worker.repository import (
     load_advanced_optimisation_input,
     load_job,
@@ -20,7 +19,7 @@ def process_basket_split_job(payload: dict[str, str]) -> None:
     settings = get_settings()
     job_id = UUID(payload["job_id"])
     tenant_id = UUID(payload["tenant_id"])
-    with psycopg.connect(settings.database_url) as conn:
+    with db.connect(settings.database_url) as conn:
         try:
             mark_running(conn, job_id=job_id)
             conn.commit()
