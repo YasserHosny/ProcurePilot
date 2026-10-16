@@ -13,16 +13,14 @@ test.use({ storageState: authFile });
 
 const API = process.env['E2E_API_URL'] ?? 'http://localhost:8000/api/v1';
 
-// storageState restores cookies/localStorage but never navigates — a brand new page starts on
-// about:blank, so checking `dir` here before landing on any real page would always see nothing
-// and skip the reset. Go to a known authenticated page first so this reflects the real state.
 async function ensureEnglish(page: Page) {
   await page.goto('/home');
-  if ((await page.locator('html').getAttribute('dir')) === 'rtl') {
-    await page.click('.account-btn');
-    await page.locator('button[mat-menu-item]', { hasText: 'English' }).click();
-    await expect(page.locator('html')).toHaveAttribute('dir', 'ltr');
-  }
+  const accountButton = page.locator('.account-btn');
+  await expect(accountButton).toBeVisible();
+  await accountButton.click();
+  await page.locator('button[mat-menu-item]', { hasText: 'English' }).click();
+  await expect(page.locator('html')).toHaveAttribute('dir', 'ltr');
+  await expect(page.locator('html')).toHaveAttribute('lang', 'en');
 }
 
 async function apiStatus(
