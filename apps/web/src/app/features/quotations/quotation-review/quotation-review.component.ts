@@ -639,6 +639,12 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
     fieldName: string,
     reviewedValue: unknown,
   ): void {
+    if (
+      entityType === 'quotation' &&
+      (fieldName === 'issue_date' || fieldName === 'expiry_date') &&
+      typeof reviewedValue === 'string' &&
+      !/^\d{4}-\d{2}-\d{2}$/.test(reviewedValue)
+    ) return;
     const fe = this.getFieldExtraction(entityType, entityId, fieldName);
     if (!fe || fe.corrected_by || parseFloat(fe.confidence) >= 0.85) return;
     if (this.pendingCorrections().has(fe.id)) return;
@@ -1075,9 +1081,18 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
   }
 
   toDate(value: unknown): Date | null {
-    if (!value || typeof value !== 'string') return null;
-    const d = new Date(value);
-    return isNaN(d.getTime()) ? null : d;
+    if (typeof value !== 'string') return null;
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+    if (!match) return null;
+    const [, year, month, day] = match;
+    const date = new Date(Number(year), Number(month) - 1, Number(day));
+    return date.getFullYear() === Number(year) && date.getMonth() === Number(month) - 1 && date.getDate() === Number(day)
+      ? date
+      : null;
+  }
+
+  isRawDateEvidence(value: unknown): value is string {
+    return typeof value === 'string' && value.length > 0 && this.toDate(value) === null;
   }
 
   toIsoDate(date: Date | null): string {

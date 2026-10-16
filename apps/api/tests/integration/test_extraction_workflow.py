@@ -14,14 +14,19 @@ from integration.quotation_helpers import (
     ensure_quotation_reference_data,
     make_document,
     make_quotation,
+    make_supplier,
 )
 from procurepilot_api.deps import CurrentMember
-from procurepilot_api.errors import ServiceUnavailableError
+from procurepilot_api.errors import ConflictError, ServiceUnavailableError
 from procurepilot_api.modules.auth.jwt import MemberRole
 from procurepilot_api.modules.extraction import service as extraction_service_module
 from procurepilot_api.modules.extraction.service import ExtractionService
+from procurepilot_api.modules.quotations import review_service as review_service_module
 from procurepilot_api.modules.quotations import service as quotation_service_module
+from procurepilot_api.modules.quotations.review_service import QuotationReviewService
+from procurepilot_api.modules.quotations.schemas import FieldCorrection, QuotationReviewPatch
 from procurepilot_api.modules.quotations.service import QuotationService
+from procurepilot_api.shared.audit import AuditEventCreate
 
 WORKER_SRC = Path(__file__).resolve().parents[4] / "services" / "extraction-worker" / "src"
 sys.path.insert(0, str(WORKER_SRC))
@@ -35,6 +40,11 @@ pytestmark = pytest.mark.skipif(
 @pytest.fixture
 def conn() -> object:
     yield from connection()
+
+
+class _NoopAuditWriter:
+    def record(self, event: AuditEventCreate, bearer_token: str | None = None) -> None:
+        del event, bearer_token
 
 
 def test_structured_extraction_writes_lines_fields_and_review_task(conn: object) -> None:
@@ -160,6 +170,84 @@ def test_extraction_parses_egyptian_date_and_routes_bad_expiry_to_review(
         assert cur.fetchone() == ("succeeded",)
         cur.execute("select reason from review_task where quotation_id=%s", (quotation_id,))
         assert cur.fetchone() == ("date_unparsed",)
+        cur.execute(
+            "select id from field_extraction where quotation_id=%s and field_name='expiry_date'",
+            (quotation_id,),
+        )
+        expiry_field_id = cur.fetchone()[0]
+        cur.execute(
+            "select confidence,extracted_value from field_extraction where id=%s",
+            (expiry_field_id,),
+        )
+        assert cur.fetchone() == (0, "soon")
+        supplier_id = make_supplier(cur, workspace, "Review Date Supplier")
+        conn.commit()
+        monkeypatch.setattr(
+            review_service_module,
+            "authenticated_client",
+            lambda _settings, _token: PsycopgSupabaseClient(conn),
+        )
+        monkeypatch.setattr(
+            quotation_service_module,
+            "authenticated_client",
+            lambda _settings, _token: PsycopgSupabaseClient(conn),
+        )
+        monkeypatch.setattr(
+            review_service_module, "get_audit_writer", lambda: _NoopAuditWriter()
+        )
+        member = CurrentMember(
+            membership_id=workspace.membership_id,
+            tenant_id=workspace.tenant_id,
+            user_id=workspace.user_id,
+            email="buyer@example.test",
+            role=MemberRole.buyer,
+        )
+        review_service = QuotationReviewService()
+        review_service.apply_review_patch(
+            bearer_token="test-token",
+            member=member,
+            quotation_id=quotation_id,
+            patch=QuotationReviewPatch(supplier_id=supplier_id),
+        )
+        with conn.cursor() as verify_cur:
+            act_as(verify_cur, workspace)
+            verify_cur.execute(
+                "select reason,status from review_task where quotation_id=%s", (quotation_id,)
+            )
+            assert verify_cur.fetchone() == ("date_unparsed", "open")
+        with pytest.raises(ConflictError):
+            review_service.apply_review_patch(
+                bearer_token="test-token",
+                member=member,
+                quotation_id=quotation_id,
+                patch=QuotationReviewPatch(
+                    corrections=[
+                        FieldCorrection(
+                            field_extraction_id=expiry_field_id, corrected_value="soon"
+                        )
+                    ]
+                ),
+            )
+        review_service.apply_review_patch(
+            bearer_token="test-token",
+            member=member,
+            quotation_id=quotation_id,
+            patch=QuotationReviewPatch(
+                corrections=[
+                    FieldCorrection(
+                        field_extraction_id=expiry_field_id, corrected_value="2026-10-20"
+                    )
+                ]
+            ),
+        )
+        with conn.cursor() as verify_cur:
+            act_as(verify_cur, workspace)
+            verify_cur.execute("select expiry_date from quotation where id=%s", (quotation_id,))
+            assert verify_cur.fetchone() == (date(2026, 10, 20),)
+            verify_cur.execute(
+                "select reason,status from review_task where quotation_id=%s", (quotation_id,)
+            )
+            assert verify_cur.fetchone() == ("date_unparsed", "resolved")
 
         ambiguous_document_id = make_document(cur, workspace)
         ambiguous_quotation_id = make_quotation(

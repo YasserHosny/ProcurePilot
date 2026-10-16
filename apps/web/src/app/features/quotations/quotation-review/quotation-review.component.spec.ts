@@ -352,6 +352,31 @@ describe('QuotationReviewComponent (T051, T057, T062)', () => {
     expect(component.hasPendingReviewChanges()).toBeTrue();
   });
 
+  it('parses only ISO dates as local calendar dates and keeps non-ISO evidence visible', () => {
+    const parsed = component.toDate('2026-10-16');
+    expect(parsed?.getFullYear()).toBe(2026);
+    expect(parsed?.getMonth()).toBe(9);
+    expect(parsed?.getDate()).toBe(16);
+    expect(component.toDate('05/10/2026')).toBeNull();
+    expect(component.isRawDateEvidence('16 Octobre 2026')).toBeTrue();
+    component.quotation.set({ ...mockQuotationDetail, issue_date: '16 Octobre 2026' });
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Text in document: 16 Octobre 2026');
+  });
+
+  it('does not submit a raw non-ISO date as a reviewed correction', () => {
+    const rawDate = {
+      ...mockQuotationDetail.field_extractions[0],
+      id: 'fe-raw-date',
+      field_name: 'issue_date',
+      extracted_value: '16 Octobre 2026',
+      confidence: '0.0000',
+    };
+    component.quotation.set({ ...mockQuotationDetail, field_extractions: [rawDate] });
+    component.reviewFieldValue('quotation', 'q-review-1', 'issue_date', '16 Octobre 2026');
+    expect(component.pendingCorrections().has('fe-raw-date')).toBeFalse();
+  });
+
   it('should stage an unchanged low-confidence expiry date when the datepicker closes', () => {
     const lowConfidenceExpiry = {
       ...mockQuotationDetail.field_extractions[0],

@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import re
+import unicodedata
 from dataclasses import dataclass
 from datetime import date, datetime
 
 from procurepilot_extraction_worker.currency import _ARABIC_DIGITS
 
 _RTL_MARKS = str.maketrans("", "", "\u200e\u200f\u061c")
-_SEPARATORS = "[/.-]"
+_SEPARATORS = r"\s*[/.-]\s*"
 _NUMERIC = re.compile(rf"^(\d{{1,4}}){_SEPARATORS}(\d{{1,2}}){_SEPARATORS}(\d{{2,4}})$")
 _ISO = re.compile(r"^(\d{4})-(\d{2})-(\d{2})(?:T.*)?$")
 _MONTHS = {
@@ -40,27 +41,22 @@ _MONTHS = {
     "فبراير": 2,
     "شباط": 2,
     "مارس": 3,
-    "آذار": 3,
+    "اذار": 3,
     "ابريل": 4,
-    "أبريل": 4,
     "نيسان": 4,
     "مايو": 5,
-    "أيار": 5,
+    "ايار": 5,
     "حزيران": 6,
     "يونيو": 6,
     "تموز": 7,
     "يوليو": 7,
-    "آب": 8,
+    "اب": 8,
     "اغسطس": 8,
-    "أغسطس": 8,
-    "أيلول": 9,
+    "ايلول": 9,
     "سبتمبر": 9,
-    "أكتوبر": 10,
     "اكتوبر": 10,
-    "تشرين الأول": 10,
+    "تشرين الاول": 10,
     "تشرين الثاني": 11,
-    "تشرين اﻷول": 10,
-    "كانون الأول": 12,
     "كانون الاول": 12,
 }
 _MONTH_PATTERN = "|".join(re.escape(name) for name in sorted(_MONTHS, key=len, reverse=True))
@@ -73,7 +69,10 @@ _MONTH_DATE = re.compile(
     rf"(\d{{1,2}})-({_MONTH_PATTERN})-(\d{{4}}))\s*(?:م)?$",
     re.IGNORECASE,
 )
-_LABEL = re.compile(r"^(?:التاريخ|date)\s*[:：-]\s*", re.IGNORECASE)
+_LABEL = re.compile(
+    r"^(?:التاريخ|تاريخ(?:\s+العرض)?|date|quotation\s+date)\s*[:：-]\s*",
+    re.IGNORECASE,
+)
 
 
 @dataclass(frozen=True)
@@ -98,7 +97,9 @@ def parse_extracted_date(raw: object, *, region: str | None) -> ParsedDate:
     text = raw.translate(_ARABIC_DIGITS).translate(_RTL_MARKS).strip().strip("«»\"'“”")
     text = text.translate(str.maketrans({"⁄": "/", "∕": "/", "／": "/", "٫": "/", "ـ": ""}))
     text = _LABEL.sub("", text).strip()
-    text = re.sub(r"^[\w\u0600-\u06ff]+\s+", "", text) if not _MONTH_DATE.match(text) else text
+    text = re.sub(rf"^(?:{_WEEKDAYS})[,،]?\s+", "", text, flags=re.IGNORECASE)
+    text = re.sub(r"(?<=\d)[،,](?=\s*\d{4}\b)", " ", text)
+    text = _normalise_arabic(text)
     iso = _ISO.fullmatch(text)
     if iso:
         return _make_date(int(iso[1]), int(iso[2]), int(iso[3]), False)
@@ -106,11 +107,11 @@ def parse_extracted_date(raw: object, *, region: str | None) -> ParsedDate:
     if month_match:
         groups = month_match.groups()
         if groups[0]:
-            day, month, year = int(groups[0]), _MONTHS[groups[1].lower()], int(groups[2])
+            day, month, year = int(groups[0]), _month(groups[1]), int(groups[2])
         elif groups[3]:
-            month, day, year = _MONTHS[groups[3].lower()], int(groups[4]), int(groups[5])
+            month, day, year = _month(groups[3]), int(groups[4]), int(groups[5])
         else:
-            day, month, year = int(groups[6]), _MONTHS[groups[7].lower()], int(groups[8])
+            day, month, year = int(groups[6]), _month(groups[7]), int(groups[8])
         return _make_date(year, month, day, False)
     numeric = _NUMERIC.fullmatch(text)
     if not numeric:
@@ -139,3 +140,12 @@ def _make_date(year: int, month: int, day: int, ambiguous: bool) -> ParsedDate:
         return ParsedDate(date(year, month, day), ambiguous, False)
     except ValueError:
         return ParsedDate(None, False, True)
+
+
+def _normalise_arabic(text: str) -> str:
+    text = text.translate(str.maketrans({"أ": "ا", "إ": "ا", "آ": "ا", "ة": "ه", "ـ": ""}))
+    return "".join(char for char in text if unicodedata.category(char) != "Mn")
+
+
+def _month(value: str) -> int:
+    return _MONTHS[_normalise_arabic(value).lower()]

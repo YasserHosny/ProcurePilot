@@ -414,6 +414,7 @@ def _with_normalised_dates(
             parsed = parse_extracted_date(field.value, region=region)
             if parsed.unparsed:
                 unparsed = True
+                updated[name] = replace(field, confidence=0.0)
                 continue  # Keep raw evidence in field_extraction; canonical columns stay NULL.
             confidence = min(field.confidence, 0.5) if parsed.ambiguous else field.confidence
             updated[name] = replace(field, value=parsed.value.isoformat(), confidence=confidence)
@@ -604,7 +605,9 @@ def _has_uncurried_money(result: ExtractionResult) -> bool:
                 return True
     stated = result.stated_total.value if result.stated_total is not None else None
     return (
-        isinstance(stated, dict) and stated.get("amount") is not None and not stated.get("currency")
+        isinstance(stated, dict)
+        and stated.get("amount") is not None
+        and not stated.get("currency")
     )
 
 

@@ -837,6 +837,7 @@
         "currencyRequired": "Currency is required",
         "issueDateLabel": "Issue Date",
         "expiryDateLabel": "Expiry Date",
+        "dateEvidenceHint": "Text in document: {{value}}",
         "statedTotalLabel": "Stated Total Amount",
         "statedTotalCurrency": "Stated Total Currency",
         "statusLabel": "Status"

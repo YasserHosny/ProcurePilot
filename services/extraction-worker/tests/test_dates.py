@@ -17,7 +17,16 @@ from procurepilot_extraction_worker.dates import parse_extracted_date
         ("«16 أكتوبر 2026»", "EG", date(2026, 10, 16), False),
         ("١٦ أكتوبر ٢٠٢٦م", "EG", date(2026, 10, 16), False),
         ("16 تشرين الأول 2026", "EG", date(2026, 10, 16), False),
+        ("16 تشرين الاول 2026", "EG", date(2026, 10, 16), False),
+        ("16 اكتوبر 2026", "EG", date(2026, 10, 16), False),
+        ("16 إبريل 2026", "EG", date(2026, 4, 16), False),
+        ("16 إِبْرِيل 2026", "EG", date(2026, 4, 16), False),
+        ("16 ابريل 2026", "EG", date(2026, 4, 16), False),
         ("October 16, 2026", "EG", date(2026, 10, 16), False),
+        ("Oct 16، 2026", "EG", date(2026, 10, 16), False),
+        ("16 / 10 / 2026", "EG", date(2026, 10, 16), False),
+        ("تاريخ العرض: 16/10/2026", "EG", date(2026, 10, 16), False),
+        ("Quotation date: 16/10/2026", "EG", date(2026, 10, 16), False),
         ("16-Oct-2026", "EG", date(2026, 10, 16), False),
         ("2026-10-16", "EG", date(2026, 10, 16), False),
         ("2026-10-16T00:00:00Z", "EG", date(2026, 10, 16), False),
@@ -31,7 +40,7 @@ def test_parse_supported_dates(raw: str, region: str, expected: date, ambiguous:
     assert not parsed.unparsed
 
 
-@pytest.mark.parametrize("raw", ["soon", "", None, "31/02/2026", "99/99/2026"])
+@pytest.mark.parametrize("raw", ["soon", "", None, "31/02/2026", "99/99/2026", "Ref 16/10/2026"])
 def test_parse_invalid_dates_without_raising(raw: object) -> None:
     parsed = parse_extracted_date(raw, region="EG")
     assert parsed.value is None
