@@ -74,7 +74,7 @@ describe('RfqCreateComponent', () => {
             title: 'Create RFQ',
             editTitle: 'Edit RFQ draft',
             draftSaved: 'Draft saved',
-            sentSuccess: 'RFQ sent to {{count}} suppliers',
+            sentSuccess: 'RFQ sent. Suppliers emailed: {{count}}',
             notDraftTitle: 'RFQ cannot be edited',
             notDraftMessage: 'Only draft RFQs can be edited. This RFQ has already been sent.',
             backToHistory: 'Back to RFQ History',
@@ -175,7 +175,7 @@ describe('RfqCreateComponent', () => {
 
     component.onSend();
     expect(rfqApiSpy.sendRfq).toHaveBeenCalledWith('rfq-1');
-    expect(snackBarSpy.open).toHaveBeenCalledWith('RFQ sent to 2 suppliers', 'Close', {
+    expect(snackBarSpy.open).toHaveBeenCalledWith('RFQ sent. Suppliers emailed: 2', 'Close', {
       duration: 5000,
     });
     expect(router.navigate).toHaveBeenCalledWith(['/rfq/history']);

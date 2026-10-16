@@ -73,7 +73,7 @@ test.describe('RFQ Draft Send from History', () => {
     await dialog.getByRole('button', { name: /send rfq/i }).click();
 
     await expect(page.locator('mat-snack-bar-container')).toContainText(
-      /RFQ sent to 1 suppliers/i,
+      /RFQ sent\. Suppliers emailed: 1/i,
     );
     await expect(enRow.locator('.status-badge')).toHaveText('Sent');
     await expect(enRow.locator('[data-testid="rfq-sent-at-cell"]')).not.toHaveText('—');
@@ -81,11 +81,18 @@ test.describe('RFQ Draft Send from History', () => {
     // --- Arabic (RTL) flow ---
     await createDraftRfq(token, product.id, supplier.id);
     await page.click('.account-btn');
+    const localeSave = page.waitForResponse((response) => {
+      const request = response.request();
+      return request.method() === 'PATCH' && new URL(response.url()).pathname.endsWith('/me') && response.ok();
+    });
     await page.click('button:has-text("العربية")');
+    await localeSave;
     await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
     await expect(page.locator('html')).toHaveAttribute('lang', 'ar');
 
-    await page.goto('/rfq/history');
+    await page.locator('a[href="/rfq/history"]').click();
+    await expect(page).toHaveURL(/\/rfq\/history$/);
+    await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
     const arDraftRow = page
       .locator('tr.mat-mdc-row')
       .filter({ has: page.locator('[data-testid="rfq-send-button"]') })
@@ -101,7 +108,7 @@ test.describe('RFQ Draft Send from History', () => {
     await arDialog.getByRole('button', { name: /إرسال الطلب/ }).click();
 
     await expect(page.locator('mat-snack-bar-container')).toContainText(
-      /تم إرسال طلب عرض الأسعار إلى 1 موردين/,
+      /تم إرسال طلب عرض الأسعار\. عدد الموردين: 1/,
     );
     await expect(page.locator('tr.mat-mdc-row').first().locator('.status-badge')).toHaveText(
       'مرسل',

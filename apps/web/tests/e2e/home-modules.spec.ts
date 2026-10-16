@@ -1,7 +1,7 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
 
-import { createIsolatedWorkspace } from './support/api';
+import { apiAsUser, createIsolatedWorkspace, signIn } from './support/api';
 
 const WCAG_21_AA = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'];
 
@@ -37,6 +37,13 @@ test.describe('Home Modules & Localized Config Labels', () => {
     page,
   }) => {
     const credentials = await createIsolatedWorkspace();
+    const token = await signIn(credentials.ownerEmail, credentials.ownerPassword);
+    const tenant = await apiAsUser<{ tax_model: string }>(token, 'GET', '/tenant');
+    const config = await apiAsUser<{
+      tax_models: readonly { code: string; label_en: string; label_ar: string }[];
+    }>(token, 'GET', '/reference/config-options');
+    const taxModel = config.tax_models.find((option) => option.code === tenant.tax_model);
+    expect(taxModel).toBeDefined();
     await signInUi(page, credentials.ownerEmail, credentials.ownerPassword);
     await page.goto('/home');
 
@@ -44,12 +51,10 @@ test.describe('Home Modules & Localized Config Labels', () => {
     await expect(page.locator('html')).toHaveAttribute('dir', 'ltr');
     await expect(page.locator('.module-card')).toHaveCount(EXPECTED_MODULE_PATHS.length);
 
-    const enBodyText = await page.locator('main, .home-container').first().innerText();
-    expect(enBodyText).not.toMatch(/chunk|المرحلة\s*4/i);
-
-    const enTaxLabel = (await page.locator('[data-testid="home-tax-model-value"]').innerText()).trim();
-    expect(enTaxLabel.length).toBeGreaterThan(0);
-    expect(enTaxLabel).not.toMatch(/^[a-z0-9]+(_[a-z0-9]+)+$/);
+    await expect(page.locator('main, .home-container').first()).not.toContainText(
+      /chunk|المرحلة\s*4/i,
+    );
+    await expect(page.getByTestId('home-tax-model-value')).toHaveText(taxModel!.label_en);
 
     for (const expectedPath of EXPECTED_MODULE_PATHS) {
       await expect(page.locator(`a.module-card[href="${expectedPath}"]`)).toBeVisible();
@@ -70,12 +75,10 @@ test.describe('Home Modules & Localized Config Labels', () => {
     await expect(page.locator('html')).toHaveAttribute('lang', 'ar');
 
     await expect(page.locator('.module-card')).toHaveCount(EXPECTED_MODULE_PATHS.length);
-    const arBodyText = await page.locator('main, .home-container').first().innerText();
-    expect(arBodyText).not.toMatch(/chunk|المرحلة\s*4/i);
-
-    const arTaxLabel = (await page.locator('[data-testid="home-tax-model-value"]').innerText()).trim();
-    expect(arTaxLabel.length).toBeGreaterThan(0);
-    expect(arTaxLabel).not.toMatch(/^[a-z0-9]+(_[a-z0-9]+)+$/);
+    await expect(page.locator('main, .home-container').first()).not.toContainText(
+      /chunk|المرحلة\s*4/i,
+    );
+    await expect(page.getByTestId('home-tax-model-value')).toHaveText(taxModel!.label_ar);
 
     const arA11y = await runAxe(page);
     expect(arA11y.violations).toEqual([]);
