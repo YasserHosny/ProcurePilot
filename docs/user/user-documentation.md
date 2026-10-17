@@ -397,6 +397,8 @@ After AI extraction finishes, each quotation lands in the review queue. Open a r
 
 **Fuzzy matches no longer auto-accept by default:** a candidate that only scored well on text similarity — no GTIN match, no supplier product code, and no previously learned alias — is never auto-accepted by default, even if its score clears the auto-accept threshold. It is routed here instead with the reason **Close Match — Needs Confirmation**, so a human confirms the product identity before it reaches comparison. This is a deliberate precision guard, not a bug: a workspace can restore the old behaviour (auto-accepting a high-scoring similarity-only match) by enabling a settings flag, but that is off by default until the fuzzy score is calibrated against real outcomes.
 
+**Confirm all exact matches:** when some open lines use exactly the same wording as a catalogue product's name (ignoring case, spacing and Unicode width differences), Owners and Buyers see a banner at the top of the queue — "N exact name matches ready to confirm" — with a **Confirm all exact matches (N)** button. Nothing is accepted automatically: the button records your decision for each line, exactly as if you had confirmed them one by one, and saves an alias so the same wording matches automatically next time. Lines that cannot be confirmed this way (an alias conflict, or already resolved) are counted in a follow-up message; open them individually.
+
 ### Match Resolution detail
 
 ![Match Resolution Detail](screenshots/09b-match-resolution-detail.jpg)
@@ -405,7 +407,7 @@ After AI extraction finishes, each quotation lands in the review queue. Open a r
 |---|---------|-------------|
 | 1 | **Keyboard Controls bar** | 1–9 selects a candidate by rank, arrow keys navigate, O cycles through outcomes, Enter confirms the decision — the whole screen is operable without a mouse. |
 | 2 | **Line detail** | The extracted line text, quantity, unit price, quoted line exposure, and any mixed-currency warning for context. This lets you compare the matching decision against the value that will later appear in Smart Compare. |
-| 3 | **Ranked Product Candidates** | Each candidate card shows the product's brand, variant, GTIN, and base unit, plus a **Match Score** and a reason breakdown (GTIN match, supplier-code match, alias hit, lexical similarity, brand/variant/pack-unit/pack-size/price agreement, and semantic signal where available). An explainer states plainly that this score ranks candidates — **it is not yet a calibrated probability** — so treat it as a ranking signal, not a statistical confidence level. |
+| 3 | **Ranked Product Candidates** | Each candidate card shows the product's brand, variant, GTIN, and base unit, plus a **Match Score** and a reason breakdown (GTIN match, supplier-code match, alias hit, lexical similarity, brand/variant/pack-unit/pack-size/price agreement, and semantic signal where available — shown as "Not available" when the workspace has no semantic-matching provider configured). An explainer states plainly that this score ranks candidates — **it is not yet a calibrated probability** — so treat it as a ranking signal, not a statistical confidence level. |
 
 ![Match Resolution Outcomes](screenshots/09c-match-resolution-outcomes.jpg)
 
@@ -490,10 +492,10 @@ Reached from **Create Order** on the order list, or from the same-named action o
 |---|---------|-------------|
 | 1 | **Page title — "Smart Compare"** | Compare supplier offers side-by-side with true landed cost and evidence-backed recommendations. |
 | 2 | **Product selector** | Select a product from your catalogue to see all available supplier offers. |
-| 3 | **Required Quantity field** | Enter the quantity you need. Prices recalculate live — tiers, minimum order values, and delivery thresholds update instantly. |
+| 3 | **Required Quantity field** | Enter the quantity you need, in packs (the unit you buy in, for example tins or sacks). A hint underneath converts it, for example "10 pack(s) × 18 litre = 180 litre". Prices recalculate live — tiers, minimum order values, and delivery thresholds update instantly. |
 | 4 | **Include expired offers toggle** | Check to include expired quotation offers in the comparison. |
 | 5 | **Recommended Offer banner** | Shown when a matched and costed offer exists: a confidence badge (High/Medium/Low), a recommendation score, risk considerations (e.g. "Product match score is below 85%. Verify product specifications."), validity window, and scoring evidence breakdown. When Supplier IQ risk evaluation influenced the recommendation, a **Supplier IQ / Risk** evidence chip and risk panel appear with a direct **View Supplier Scorecard** link. |
-| 6 | **Comparison table** | Each row is one supplier offer: unit price, total landed cost, lead time, reliability, stock availability, **Match Score**, validity, and status. Next to each supplier's name, a scorecard icon button allows navigating directly to that supplier's detailed Supplier IQ scorecard (`/suppliers/:id/scorecard`). |
+| 6 | **Comparison table** | Each row is one supplier offer: unit price, total landed cost, lead time, reliability, stock availability, **Match Score**, validity, and status. A product match that a person confirmed shows as 100% with a **Verified by buyer** badge, and is not flagged as a low-confidence match. Next to each supplier's name, a scorecard icon button allows navigating directly to that supplier's detailed Supplier IQ scorecard (`/suppliers/:id/scorecard`). |
 | 7 | **Record Purchase action** | From the banner or any table row, click "Record Purchase" to open the outcome-capture form (section 16) and have the savings automatically calculated. |
 
 **Mixed-currency offers:** ProcurePilot has no foreign-exchange rate data, so it never converts or silently mixes currencies when scoring a recommendation. If the offers for the selected product span more than one currency — for example, one supplier quoted in USD and the rest in GBP — the comparison table (item 6 above) still lists every offer regardless of currency, but the Recommended Offer banner only scores and ranks offers in a single reference currency: whichever currency the most suppliers quoted in, tied-broken first by the lowest supplier ID and then by the currency code itself. Offer(s) in any other currency are excluded from the recommendation and its ranking entirely. When this happens, the banner's Risk Considerations list includes a note: "One or more offers in a different currency were excluded from this comparison rather than converted." See [§40 Known Issues](#40-known-issues) for a current display defect affecting this specific note.
@@ -536,7 +538,7 @@ Reached from **Create Order** on the order list, or from the same-named action o
 | 3 | **Commercial Constraints panel** | Toggle to configure supplier commercial terms: Minimum Order Values (MOV), Free Delivery Thresholds, Delivery Fees, and Quantity Tiers. |
 | 4 | **Risk & Urgency controls** | Set Risk Tolerance (`low`, `medium`, `high`), Delivery Urgency (`normal`, `urgent`), and explicit supplier exclusions. |
 | 5 | **Optimisation Weights** | Customise relative weighting sliders for price, preferred suppliers, risk, lead time, and quality. |
-| 6 | **Basket Items section** | Add catalogue products and required quantities. Click **+ Add Item** to add more lines. |
+| 6 | **Basket Items section** | Add catalogue products and required quantities, in packs; a hint under each quantity shows the total in the product's base unit. Click **+ Add Item** to add more lines. |
 | 7 | **Optimise Basket button** | Submits the constrained basket to the solver. Execution runs asynchronously with live polling. |
 
 **Results and Analysis:**
