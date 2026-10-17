@@ -149,3 +149,55 @@ def test_cross_tenant_product_reference_returns_not_found(
                     product_id=beta.product_id,
                     quantity=Decimal("1.000000"),
                 )
+
+
+def test_human_confirmed_match_counts_as_verified_in_compare(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A buyer-confirmed match is verified: confidence 1.0, no low-match risk note, while the
+    stored machine score on match_decision stays untouched."""
+    settings = settings_for_test_db(monkeypatch)
+    with committed_smart_context("offers-verified") as context:
+        verified = add_costed_offer(
+            context,
+            supplier_id=context.supplier_ids[0],
+            amount=Decimal("5.0000"),
+            confidence=Decimal("0.5500"),
+            human_outcome="same_product",
+        )
+        service = OfferService(settings)
+        compare = service.compare_offers(
+            member=context.member,
+            product_id=context.product_id,
+            quantity=Decimal("1.000000"),
+        )
+        (offer,) = compare.offers
+        assert offer.id == verified.landed_cost_id
+        assert offer.match_verified is True
+        assert offer.match_confidence == "1.0000"
+        assert compare.recommendation is not None
+        assert compare.recommendation.evidence.components["match_confidence"] == "1.0000"
+        assert "low_match_confidence" not in compare.recommendation.risk_notes
+
+
+def test_machine_only_low_confidence_match_stays_unverified_with_risk_note(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = settings_for_test_db(monkeypatch)
+    with committed_smart_context("offers-unverified") as context:
+        add_costed_offer(
+            context,
+            supplier_id=context.supplier_ids[0],
+            amount=Decimal("5.0000"),
+            confidence=Decimal("0.5500"),
+        )
+        compare = OfferService(settings).compare_offers(
+            member=context.member,
+            product_id=context.product_id,
+            quantity=Decimal("1.000000"),
+        )
+        (offer,) = compare.offers
+        assert offer.match_verified is False
+        assert offer.match_confidence == "0.5500"
+        assert compare.recommendation is not None
+        assert "low_match_confidence" in compare.recommendation.risk_notes

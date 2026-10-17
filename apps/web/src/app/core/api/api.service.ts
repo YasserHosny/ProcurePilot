@@ -603,6 +603,17 @@ export class ApiService {
     );
   }
 
+  getExactMatchCount(): Observable<{ count: number }> {
+    return this.http.get<{ count: number }>(`${this.base}/match-tasks/exact-matches`);
+  }
+
+  confirmExactMatches(): Observable<{ confirmed: number; skipped: number }> {
+    return this.http.post<{ confirmed: number; skipped: number }>(
+      `${this.base}/match-tasks/confirm-exact`,
+      {},
+    );
+  }
+
   listCatalogueRefreshReviews(params?: {
     status?: 'pending_review' | 'processing' | 'approved' | 'rejected' | 'all';
     cursor?: string;

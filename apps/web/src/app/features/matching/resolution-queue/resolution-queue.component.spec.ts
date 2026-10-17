@@ -128,12 +128,16 @@ describe('ResolutionQueueComponent', () => {
   beforeEach(async () => {
     apiService = jasmine.createSpyObj('ApiService', [
       'getMatchTasks',
+      'getExactMatchCount',
+      'confirmExactMatches',
       'listCatalogueRefreshReviews',
       'approveCatalogueRefreshReview',
       'rejectCatalogueRefreshReview',
     ]);
     apiService.getMatchTasks.and.returnValue(of({ items: mockTasks, next_cursor: 'cursor-123' }));
     apiService.listCatalogueRefreshReviews.and.returnValue(of({ items: [], next_cursor: null }));
+    apiService.getExactMatchCount.and.returnValue(of({ count: 3 }));
+    apiService.confirmExactMatches.and.returnValue(of({ confirmed: 3, skipped: 0 }));
 
     const mockSession = {
       hasRole: jasmine.createSpy('hasRole').and.returnValue(true),
@@ -190,6 +194,35 @@ describe('ResolutionQueueComponent', () => {
 
     expect(apiService.approveCatalogueRefreshReview).toHaveBeenCalledWith(mockRefreshReview.id);
     expect(component.refreshReviews()).toEqual([]);
+  });
+
+  it('offers a one-click bulk confirm for exact name matches and reloads afterwards', () => {
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.querySelector('[data-testid="exact-match-banner"]')?.textContent).toContain(
+      '3 exact name matches',
+    );
+    apiService.getExactMatchCount.and.returnValue(of({ count: 0 }));
+    (el.querySelector('[data-testid="confirm-exact-btn"]') as HTMLButtonElement).click();
+    fixture.detectChanges();
+
+    expect(apiService.confirmExactMatches).toHaveBeenCalledTimes(1);
+    expect(apiService.getMatchTasks).toHaveBeenCalledTimes(2);
+    expect(el.querySelector('[data-testid="exact-match-banner"]')).toBeNull();
+    expect(el.querySelector('[data-testid="exact-match-result"]')?.textContent).toContain(
+      '3 matches confirmed',
+    );
+  });
+
+  it('tells the buyer when exact matches were skipped instead of hiding it', () => {
+    apiService.confirmExactMatches.and.returnValue(of({ confirmed: 1, skipped: 2 }));
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    (el.querySelector('[data-testid="confirm-exact-btn"]') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    expect(el.querySelector('[data-testid="exact-match-skipped"]')?.textContent).toContain(
+      '2 could not be confirmed',
+    );
   });
 
   it('should send all status explicitly so auto-matched rows stay in quotation groups', () => {

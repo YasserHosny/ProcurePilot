@@ -1215,6 +1215,13 @@
         "reject": "Reject refresh",
         "readOnly": "View-only access",
         "empty": "No catalogue refreshes are awaiting review."
+      },
+      "exact": {
+        "title": "{{count}} exact name matches ready to confirm",
+        "description": "The line text equals a catalogue product name exactly. Nothing is accepted automatically; confirming records your decision and saves an alias so the same wording auto-matches next time.",
+        "action": "Confirm all exact matches ({{count}})",
+        "confirmed": "{{count}} matches confirmed.",
+        "skipped": "{{count}} could not be confirmed (alias conflict or already resolved). Open them individually to resolve."
       }
     },
     "resolution": {
@@ -1262,7 +1269,7 @@
           "supplierCodeMatchDesc": "Matches supplier catalog code",
           "lexicalSimilarity": "Lexical Similarity",
           "semanticSimilarity": "Semantic Similarity",
-          "unavailableForStub": "Unavailable for stub model",
+          "unavailableForStub": "Not available",
           "featureScores": "Feature Plausibility Breakdown",
           "brandMatch": "Brand Match",
           "variantMatch": "Variant Match",
@@ -1412,7 +1419,7 @@
       },
       "validityWindow": "Price valid from {{from}} to {{to}}",
       "validityOpenEnded": "Price valid from {{from}} (no expiry date)",
-      "winningMargin": "Winning margin: {{margin}}%",
+      "winningMargin": "Winning margin: {{margin}}",
       "evidenceTitle": "Scoring Evidence Breakdown",
       "weightsTitle": "Criteria Weights",
       "weights": {
@@ -1435,7 +1442,8 @@
       "supplierIqInfluenced": "Supplier IQ risk evaluation factored into this recommendation for {{supplier}}.",
       "viewSupplierScorecard": "View Supplier Scorecard",
       "tieBreakTitle": "Deterministic Tie-Break Applied",
-      "tieBreakNote": "Offers scored equally; tie-break applied in order: {{rule}}"
+      "tieBreakNote": "Offers scored equally; tie-break applied in order: {{rule}}",
+      "reliabilityNotEnoughData": "Not enough data (neutral)"
     },
     "table": {
       "supplier": "Supplier",
@@ -1454,7 +1462,9 @@
       "status": "Status",
       "statusActive": "Active",
       "statusExpired": "Expired",
-      "recommendedBadge": "Recommended"
+      "recommendedBadge": "Recommended",
+      "notEnoughData": "Not enough data",
+      "verifiedByBuyer": "Verified by buyer"
     },
     "empty": {
       "title": "No supplier offers on file",

@@ -14,7 +14,13 @@ from procurepilot_api.modules.catalogue.service import CatalogueService
 from procurepilot_api.modules.ingestion.guardrail_jobs import enqueue_guardrail_evaluation
 from procurepilot_api.modules.landed_cost.service import LandedCostService
 from procurepilot_api.modules.matching.alias_service import AliasLearningService
-from procurepilot_api.modules.matching.schemas import MatchDecision, MatchResolutionRequest
+from procurepilot_api.modules.matching.exact import is_exact_name_match
+from procurepilot_api.modules.matching.schemas import (
+    BulkConfirmResult,
+    ExactMatchSummary,
+    MatchDecision,
+    MatchResolutionRequest,
+)
 from procurepilot_api.modules.matching.scoring import decimal_string
 from procurepilot_api.modules.matching.service import (
     _candidate,
@@ -25,6 +31,9 @@ from procurepilot_api.modules.matching.service import (
 from procurepilot_api.modules.members.service import authenticated_client
 from procurepilot_api.shared.audit import AuditEventCreate, get_audit_writer
 from procurepilot_api.shared.logging import get_trace_id
+
+EXACT_CONFIRM_BATCH = 100  # exact pairs returned per call
+EXACT_SCAN_LIMIT = 1000  # open tasks examined while collecting them
 
 
 class MatchResolutionService:
@@ -142,6 +151,78 @@ class MatchResolutionService:
             repair_existing_decision=False,
         )
         return decision
+
+    def count_exact_matches(self, *, bearer_token: str) -> ExactMatchSummary:
+        client = authenticated_client(self._settings, bearer_token)
+        return ExactMatchSummary(count=len(self._exact_match_pairs(client)))
+
+    def confirm_exact_matches(
+        self, *, bearer_token: str, member: CurrentMember
+    ) -> BulkConfirmResult:
+        """Human-triggered bulk confirm of open tasks whose top candidate is an exact
+        normalised-name match. Each line gets an ordinary human decision + alias."""
+        client = authenticated_client(self._settings, bearer_token)
+        confirmed = 0
+        skipped = 0
+        for line_id, candidate_id in self._exact_match_pairs(client):
+            try:
+                self.resolve(
+                    bearer_token=bearer_token,
+                    member=member,
+                    line_id=line_id,
+                    payload=MatchResolutionRequest(
+                        outcome="same_product", selected_match_candidate_id=candidate_id
+                    ),
+                )
+            except ConflictError:
+                skipped += 1
+                continue
+            confirmed += 1
+        return BulkConfirmResult(confirmed=confirmed, skipped=skipped)
+
+    def _exact_match_pairs(self, client: object) -> list[tuple[UUID, UUID]]:
+        try:
+            tasks = _rows(
+                client.table("match_task")
+                .select("quotation_line_id")
+                .in_("status", ["open", "in_progress"])
+                .order("created_at")
+                .limit(EXACT_SCAN_LIMIT)
+                .execute()
+                .data
+            )
+            pairs: list[tuple[UUID, UUID]] = []
+            for task in tasks:
+                if len(pairs) >= EXACT_CONFIRM_BATCH:
+                    break
+                line_id = UUID(str(task["quotation_line_id"]))
+                top = _rows(
+                    client.table("match_candidate")
+                    .select("id,candidate_workspace_product_id")
+                    .eq("quotation_line_id", str(line_id))
+                    .order("rank")
+                    .limit(1)
+                    .execute()
+                    .data
+                )
+                if not top:
+                    continue
+                product = _rows(
+                    client.table("workspace_product")
+                    .select("tenant_name")
+                    .eq("id", str(top[0]["candidate_workspace_product_id"]))
+                    .limit(1)
+                    .execute()
+                    .data
+                )
+                line = _line_row(client, line_id)
+                if product and is_exact_name_match(
+                    line.get("original_text"), product[0]["tenant_name"]
+                ):
+                    pairs.append((line_id, UUID(str(top[0]["id"]))))
+        except APIError as exc:
+            raise ServiceUnavailableError(details={"dependency": "database"}) from exc
+        return pairs
 
     def _complete_resolution_side_effects(
         self,

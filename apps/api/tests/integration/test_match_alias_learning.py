@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from decimal import Decimal
 from typing import cast
 from uuid import UUID, uuid4
@@ -32,6 +33,7 @@ from procurepilot_api.modules.matching import service as matching_module
 from procurepilot_api.modules.matching.resolution_service import MatchResolutionService
 from procurepilot_api.modules.matching.schemas import MatchResolutionRequest
 from procurepilot_api.modules.matching.service import MatchingService
+from procurepilot_api.shared.audit import AuditEventCreate
 
 pytestmark = pytest.mark.skipif(
     not TEST_DATABASE_URL,
@@ -55,9 +57,41 @@ class _MatchingSettings:
     matching_fuzzy_auto_accept_enabled = False
 
 
+class _PsycopgAuditWriter:
+    def __init__(self, conn: object) -> None:
+        self._conn = conn
+
+    def record(self, event: AuditEventCreate, bearer_token: str | None = None) -> None:
+        del bearer_token
+        with self._conn.cursor() as cur:
+            cur.execute(
+                "select record_audit_event(%s, %s, %s::uuid, %s::uuid, %s, %s::jsonb, %s)",
+                (
+                    event.action,
+                    event.outcome,
+                    event.tenant_id,
+                    event.actor_membership_id,
+                    event.actor_email,
+                    json.dumps(event.target),
+                    event.trace_id,
+                ),
+            )
+
+
 @pytest.fixture
 def conn() -> object:
     yield from connection()
+
+
+@pytest.fixture(autouse=True)
+def _local_side_effects(conn: object, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Audit through the test connection (no PostgREST) and skip the guardrail job queue."""
+    writer = _PsycopgAuditWriter(conn)
+    monkeypatch.setattr(matching_module, "get_audit_writer", lambda: writer)
+    monkeypatch.setattr(resolution_module, "get_audit_writer", lambda: writer)
+    monkeypatch.setattr(
+        resolution_module, "enqueue_guardrail_evaluation", lambda *_a, **_k: None
+    )
 
 
 def test_human_resolution_learns_exact_alias_and_next_identical_wording_auto_matches(
@@ -132,6 +166,121 @@ def test_human_resolution_learns_exact_alias_and_next_identical_wording_auto_mat
         assert state.lines[0].candidates[0].reasons.alias_hit is True
         assert _count(cur, "match_task", second_line_id) == 0
         assert _count(cur, "match_decision", second_line_id) == 1
+
+
+def test_bulk_confirm_exact_matches_confirms_only_exact_names_and_learns_aliases(
+    conn: object, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    with conn.cursor() as cur:
+        ensure_quotation_reference_data(cur)
+        workspace = make_workspace(cur, "bulk-exact")
+        supplier_id = make_supplier(cur, workspace, name="Bulk Exact Supplier")
+        exact_product = make_workspace_product(cur, workspace, name="Bulk Sugar 25kg")
+        near_product = make_workspace_product(cur, workspace, name="Bulk Rice 10kg")
+        exact_line = _reviewed_line(
+            cur, workspace, supplier_id, original_text="  bulk SUGAR  25kg", line_number=1
+        )
+        near_line = _reviewed_line(
+            cur, workspace, supplier_id, original_text="Bulk Rice 5kg", line_number=2
+        )
+        _candidate(cur, workspace, exact_line, exact_product)
+        _candidate(cur, workspace, near_line, near_product)
+        for line_id in (exact_line, near_line):
+            _open_task(cur, workspace, line_id)
+        db_client = PsycopgSupabaseClient(conn)
+        monkeypatch.setattr(
+            resolution_module, "authenticated_client", lambda _s, _t: db_client
+        )
+        resolution = MatchResolutionService(cast(Settings, _MatchingSettings()))
+        resolution._landed_cost = _NoopLandedCost()  # noqa: SLF001
+        member = _member(workspace)
+
+        act_as(cur, workspace)
+        assert resolution.count_exact_matches(bearer_token="t").count == 1
+        result = resolution.confirm_exact_matches(bearer_token="t", member=member)
+
+        assert (result.confirmed, result.skipped) == (1, 0)
+        assert _count(cur, "match_decision", exact_line) == 1
+        assert _count(cur, "match_decision", near_line) == 0
+        cur.execute(
+            "select is_automatic, outcome from match_decision where quotation_line_id = %s",
+            (exact_line,),
+        )
+        assert cur.fetchone() == (False, "same_product")
+        assert _alias_for_text(cur, "  bulk SUGAR  25kg")["workspace_product_id"] == exact_product
+        cur.execute(
+            "select status from match_task where quotation_line_id = %s", (near_line,)
+        )
+        assert cur.fetchone()[0] == "open"
+        assert resolution.count_exact_matches(bearer_token="t").count == 0
+
+
+def test_exact_matches_are_found_behind_a_backlog_of_older_non_exact_tasks(
+    conn: object, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    with conn.cursor() as cur:
+        ensure_quotation_reference_data(cur)
+        workspace = make_workspace(cur, "bulk-exact-backlog")
+        supplier_id = make_supplier(cur, workspace, name="Backlog Supplier")
+        product = make_workspace_product(cur, workspace, name="Backlog Beans 1kg")
+        # Older non-exact tasks first (created_at order), exact one last.
+        for n in range(3):
+            line = _reviewed_line(
+                cur,
+                workspace,
+                supplier_id,
+                original_text=f"Unrelated wording {n}",
+                line_number=n + 1,
+            )
+            _candidate(cur, workspace, line, product)
+            _open_task(cur, workspace, line)
+        exact_line = _reviewed_line(
+            cur, workspace, supplier_id, original_text="Backlog Beans 1kg", line_number=9
+        )
+        _candidate(cur, workspace, exact_line, product)
+        _open_task(cur, workspace, exact_line)
+        db_client = PsycopgSupabaseClient(conn)
+        monkeypatch.setattr(resolution_module, "authenticated_client", lambda _s, _t: db_client)
+        monkeypatch.setattr(resolution_module, "EXACT_SCAN_LIMIT", 10)
+        monkeypatch.setattr(resolution_module, "EXACT_CONFIRM_BATCH", 1)
+        resolution = MatchResolutionService(cast(Settings, _MatchingSettings()))
+        act_as(cur, workspace)
+        assert resolution.count_exact_matches(bearer_token="t").count == 1
+
+
+def test_bulk_confirm_reports_alias_conflict_as_skipped(
+    conn: object, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    with conn.cursor() as cur:
+        ensure_quotation_reference_data(cur)
+        workspace = make_workspace(cur, "bulk-exact-skip")
+        supplier_id = make_supplier(cur, workspace, name="Skip Supplier")
+        product = make_workspace_product(cur, workspace, name="Skip Flour 5kg")
+        other = make_workspace_product(cur, workspace, name="Skip Other 5kg")
+        line = _reviewed_line(
+            cur, workspace, supplier_id, original_text="Skip Flour 5kg", line_number=1
+        )
+        _candidate(cur, workspace, line, product)
+        _open_task(cur, workspace, line)
+        _alias(cur, workspace, other, supplier_id, alias_text="Skip Flour 5kg")  # conflicting alias
+        db_client = PsycopgSupabaseClient(conn)
+        monkeypatch.setattr(resolution_module, "authenticated_client", lambda _s, _t: db_client)
+        resolution = MatchResolutionService(cast(Settings, _MatchingSettings()))
+        resolution._landed_cost = _NoopLandedCost()  # noqa: SLF001
+        act_as(cur, workspace)
+        result = resolution.confirm_exact_matches(bearer_token="t", member=_member(workspace))
+        assert (result.confirmed, result.skipped) == (0, 1)
+
+
+def _open_task(cur: psycopg.Cursor, workspace: object, line_id: UUID) -> None:
+    act_as(cur, workspace)
+    cur.execute(
+        """
+        insert into match_task (id, tenant_id, quotation_line_id, status, priority, reason)
+        values (%s, %s, %s, 'open', 'normal', 'low_confidence')
+        """,
+        (uuid4(), workspace.tenant_id, line_id),
+    )
 
 
 def test_supplier_product_code_extraction_auto_matches_known_supplier_alias(

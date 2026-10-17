@@ -48,7 +48,11 @@ select distinct on (lc.id)
   lc.valid_to,
   lc.recorded_at,
   lc.base_unit,
-  md.confidence as match_confidence,
+  case when md.is_automatic = false
+    and md.outcome in ('same_product', 'different_pack', 'different_variant')
+    then 1.0 else md.confidence end as match_confidence,
+  (md.is_automatic = false
+    and md.outcome in ('same_product', 'different_pack', 'different_variant')) as match_verified,
   s.lead_time_days,
   s.reliability_score,
   pd.base_quantity as pack_base_quantity
