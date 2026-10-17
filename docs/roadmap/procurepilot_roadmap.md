@@ -54,7 +54,7 @@ release's spec was built and merged; it does not mean the phase's business gate 
 | 2 | R2.1 Requests + Approvals | `008-requests-approvals` | Shipped | Policy engine deferred (see below) |
 | 2 | R2.2 Mobile MVP | `009-mobile-app-mvp` | Shipped | |
 | 2 | R2.3 Mobile approvals + receipt | `010-mobile-approvals-receipt` | Shipped | |
-| 2 | R2.4 Optimisation + Supplier IQ | `011-optimisation-supplier-iq` | Shipped | Optimiser worker not running on hosted yet (bunny.net container to create, PR #108) |
+| 2 | R2.4 Optimisation + Supplier IQ | `011-optimisation-supplier-iq` | Shipped | Optimiser worker deployed on hosted 2026-10-17 (PR #108 + bunny.net container) |
 | 2 | R2.5 Reporting + Hardening | `012-reporting-hardening` | Shipped | |
 | 3 | R3.0 Email ingestion + catalogue refresh | `013-automated-ingestion` | Shipped | WhatsApp is manual capture only |
 | 3 | R3.1 Accounting #1 | `014-accounting-integration` | Shipped | QuickBooks Online and Xero both supported |
