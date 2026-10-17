@@ -1,12 +1,13 @@
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
-import { provideTranslateService } from '@ngx-translate/core';
+import { TranslateService, provideTranslateService } from '@ngx-translate/core';
 
-import { FormatService } from './format.service';
+import { FormatService, formatCurrencyAmount, formatLocaleNumber } from './format.service';
 
 describe('FormatService (T069)', () => {
   let service: FormatService;
+  let translate: TranslateService;
 
   beforeEach(() => {
     TestBed.configureTestingModule({
@@ -18,6 +19,7 @@ describe('FormatService (T069)', () => {
       ],
     });
     service = TestBed.inject(FormatService);
+    translate = TestBed.inject(TranslateService);
   });
 
   describe('formatMoney', () => {
@@ -42,6 +44,63 @@ describe('FormatService (T069)', () => {
     it('should always include currency even if amount is NaN', () => {
       const result = service.formatMoney({ amount: 'invalid', currency: 'USD' });
       expect(result).toContain('USD');
+    });
+  });
+
+  describe('formatCurrencyAmount (0–2 fraction digits, locale-aware)', () => {
+    it('formats money with thousands separators and 0–2 fraction digits in en', () => {
+      translate.use('en');
+      expect(service.formatCurrencyAmount({ amount: '56425.0000', currency: 'EGP' })).toBe(
+        'EGP 56,425',
+      );
+      expect(service.formatCurrencyAmount({ amount: '56425.5000', currency: 'EGP' })).toBe(
+        'EGP 56,425.5',
+      );
+      expect(service.formatCurrencyAmount({ amount: '56425.5500', currency: 'EGP' })).toBe(
+        'EGP 56,425.55',
+      );
+      expect(formatCurrencyAmount({ amount: '500.0000', currency: 'GBP' }, 'en')).toBe('GBP 500');
+    });
+
+    it('formats money with Arabic-Indic digits when active ngx-translate language is ar', () => {
+      translate.use('ar');
+      const intFormatted = service.formatCurrencyAmount({ amount: '56425.0000', currency: 'EGP' });
+      expect(intFormatted).toContain('EGP');
+      expect(intFormatted).toContain('٥٦');
+      expect(intFormatted).toContain('٤٢٥');
+      expect(intFormatted).not.toContain('56425');
+
+      const decFormatted = service.formatCurrencyAmount({ amount: '56425.5000', currency: 'EGP' });
+      expect(decFormatted).toContain('EGP');
+      expect(decFormatted).toContain('٥');
+      expect(decFormatted).not.toContain('000');
+    });
+
+    it('returns placeholder for null or missing money values', () => {
+      expect(service.formatCurrencyAmount(null)).toBe('—');
+      expect(service.formatCurrencyAmount(undefined)).toBe('—');
+    });
+  });
+
+  describe('formatQuantity / formatNumber (trimmed up to 2 decimals, locale-aware)', () => {
+    it('trims trailing zeros up to 2 decimals with thousands separators in en', () => {
+      translate.use('en');
+      expect(service.formatQuantity('15.000000')).toBe('15');
+      expect(service.formatQuantity('15.500000')).toBe('15.5');
+      expect(service.formatQuantity('15.250000')).toBe('15.25');
+      expect(service.formatQuantity('1500.000000')).toBe('1,500');
+      expect(formatLocaleNumber('15.000000', 'en')).toBe('15');
+    });
+
+    it('renders Arabic-Indic digits with trimmed decimals when locale is ar', () => {
+      translate.use('ar');
+      const qty15 = service.formatQuantity('15.000000');
+      expect(qty15).toBe('١٥');
+
+      const qtyDec = service.formatQuantity('15.500000');
+      expect(qtyDec).toContain('١٥');
+      expect(qtyDec).toContain('٥');
+      expect(qtyDec).not.toContain('0');
     });
   });
 

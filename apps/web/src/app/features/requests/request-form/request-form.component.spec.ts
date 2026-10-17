@@ -231,6 +231,7 @@ describe('RequestFormComponent — edit mode (T017)', () => {
       }),
     );
     requestsApi.getRequest.and.returnValue(of(mockRequest));
+    requestsApi.updateRequest.and.returnValue(of(mockRequest));
 
     await TestBed.configureTestingModule({
       imports: [RequestFormComponent, TranslateModule.forRoot()],
@@ -320,6 +321,7 @@ describe('RequestFormComponent — edit mode (T017)', () => {
 
     component.submitRequest();
 
+    expect(requestsApi.updateRequest).toHaveBeenCalledTimes(1);
     expect(requestsApi.submitRequest).toHaveBeenCalledWith('r1');
     expect(routerSpy.navigate).toHaveBeenCalledWith(['/requests']);
     expect(snackBarSpy.open).toHaveBeenCalledWith(
@@ -329,8 +331,67 @@ describe('RequestFormComponent — edit mode (T017)', () => {
     );
   });
 
+  it('should save dirty valid form before submitting, in order', () => {
+    const callOrder: string[] = [];
+    requestsApi.updateRequest.and.callFake((id, body) => {
+      callOrder.push('save');
+      return of({ ...mockRequest, id, cost_centre_id: body.cost_centre_id });
+    });
+    requestsApi.submitRequest.and.callFake(() => {
+      callOrder.push('submit');
+      return of({ ...mockRequest, status: 'submitted' } as PurchaseRequest);
+    });
+
+    component.form.controls.cost_centre_id.setValue('cc-new');
+    component.form.markAsDirty();
+
+    component.submitRequest();
+
+    expect(callOrder).toEqual(['save', 'submit']);
+    expect(requestsApi.updateRequest).toHaveBeenCalledWith(
+      'r1',
+      jasmine.objectContaining({ cost_centre_id: 'cc-new' }),
+    );
+    expect(requestsApi.submitRequest).toHaveBeenCalledWith('r1');
+  });
+
+  it('should call neither save nor submit when form is dirty and invalid', () => {
+    requestsApi.updateRequest.calls.reset();
+    requestsApi.submitRequest.calls.reset();
+
+    component.form.controls.branch_id.setValue('');
+    component.form.controls.branch_id.markAsDirty();
+    component.form.markAsDirty();
+
+    component.submitRequest();
+    fixture.detectChanges();
+
+    expect(requestsApi.updateRequest).not.toHaveBeenCalled();
+    expect(requestsApi.submitRequest).not.toHaveBeenCalled();
+    expect(component.form.controls.branch_id.touched).toBeTrue();
+  });
+
+  it('should not call submit when save fails before submit', () => {
+    const error500 = new HttpErrorResponse({
+      status: 500,
+      error: { code: 'internal', message: 'Failed to save draft', trace_id: 'tr_save_err' },
+    });
+    requestsApi.updateRequest.and.returnValue(throwError(() => error500));
+    requestsApi.submitRequest.calls.reset();
+
+    component.form.controls.cost_centre_id.setValue('cc-fail');
+    component.form.markAsDirty();
+
+    component.submitRequest();
+
+    expect(requestsApi.updateRequest).toHaveBeenCalledTimes(1);
+    expect(requestsApi.submitRequest).not.toHaveBeenCalled();
+    expect(component.errorMessage()).toBe('Failed to save draft');
+    expect(component.isSubmitting()).toBeFalse();
+  });
+
   it('should display the estimate for a line with price history', () => {
-    expect(component.formatEstimate(mockRequest.lines[0])).toBe('GBP 25.5000');
+    expect(component.formatEstimate(mockRequest.lines[0])).toBe('GBP 25.5');
   });
 
   it('should display a fallback for a line without price history', () => {
@@ -340,7 +401,13 @@ describe('RequestFormComponent — edit mode (T017)', () => {
     );
   });
 
-  it('should disable the form when viewing a non-draft request', async () => {
+  it('should disable the form and show read-only title + status chip when viewing a non-draft request', async () => {
+    const compiledDraft = fixture.nativeElement as HTMLElement;
+    expect(compiledDraft.querySelector('.form-title')?.textContent?.trim()).toBe(
+      'Edit Purchase Request',
+    );
+    expect(compiledDraft.querySelector('[data-testid="request-status-chip"]')).toBeNull();
+
     requestsApi.getRequest.and.returnValue(
       of({ ...mockRequest, status: 'submitted' } as PurchaseRequest),
     );
@@ -349,6 +416,40 @@ describe('RequestFormComponent — edit mode (T017)', () => {
     submittedRoute.detectChanges();
 
     expect(submittedRoute.componentInstance.form.disabled).toBeTrue();
+    const compiledSubmitted = submittedRoute.nativeElement as HTMLElement;
+    expect(compiledSubmitted.querySelector('.form-title')?.textContent?.trim()).toBe(
+      'Purchase Request',
+    );
+    const chip = compiledSubmitted.querySelector('[data-testid="request-status-chip"]');
+    expect(chip).toBeTruthy();
+    expect(chip?.textContent?.trim()).toBe('Submitted');
+
+    const qtyInput = compiledSubmitted.querySelector<HTMLInputElement>('.line-quantity input');
+    expect(qtyInput?.value).toBe('10');
+  });
+
+  it('should show Create purchase order button only when status is approved and navigate on click', () => {
+    const compiledDraft = fixture.nativeElement as HTMLElement;
+    expect(compiledDraft.querySelector('[data-testid="request-create-order-btn"]')).toBeNull();
+
+    requestsApi.getRequest.and.returnValue(
+      of({ ...mockRequest, status: 'approved' } as PurchaseRequest),
+    );
+
+    const approvedFixture = TestBed.createComponent(RequestFormComponent);
+    approvedFixture.detectChanges();
+
+    const compiledApproved = approvedFixture.nativeElement as HTMLElement;
+    const createOrderBtn = compiledApproved.querySelector<HTMLButtonElement>(
+      '[data-testid="request-create-order-btn"]',
+    );
+    expect(createOrderBtn).toBeTruthy();
+    expect(createOrderBtn?.textContent).toContain('Create purchase order');
+
+    createOrderBtn?.click();
+    expect(routerSpy.navigate).toHaveBeenCalledWith(['/orders/new'], {
+      queryParams: { source_request_id: 'r1' },
+    });
   });
 
   it('should not display budget status block when budget_status is absent', () => {
@@ -377,7 +478,7 @@ describe('RequestFormComponent — edit mode (T017)', () => {
       'This request would exceed the remaining budget for its scope.',
     );
     expect(warningBanner?.textContent).toContain('Remaining budget');
-    expect(warningBanner?.textContent).toContain('GBP 75.0000');
+    expect(warningBanner?.textContent).toContain('GBP 75');
 
     const submitBtn = compiled.querySelector<HTMLButtonElement>('.submit-request-btn');
     expect(submitBtn).toBeTruthy();
@@ -403,7 +504,7 @@ describe('RequestFormComponent — edit mode (T017)', () => {
     const budgetRow = compiled.querySelector('.budget-status-row');
     expect(budgetRow).toBeTruthy();
     expect(budgetRow?.textContent).toContain('Remaining budget');
-    expect(budgetRow?.textContent).toContain('GBP 500.0000');
+    expect(budgetRow?.textContent).toContain('GBP 500');
 
     const submitBtn = compiled.querySelector<HTMLButtonElement>('.submit-request-btn');
     expect(submitBtn).toBeTruthy();

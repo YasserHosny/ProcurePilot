@@ -83,6 +83,59 @@ class OrdersService:
     def __init__(self, settings: Settings | None = None) -> None:
         self._settings = settings or get_settings()
 
+    def next_order_number(self, *, member: CurrentMember) -> str:
+        try:
+            with db.connect(self._settings.database_url.get_secret_value()) as conn:
+                with conn.cursor() as cur:
+                    claims = {
+                        "sub": str(member.user_id),
+                        "tenant_id": str(member.tenant_id),
+                        "role": "authenticated",
+                        "member_role": member.role.value,
+                    }
+                    cur.execute("set local role authenticated")
+                    cur.execute(
+                        "select set_config('request.jwt.claims', %s, true)", (json.dumps(claims),)
+                    )
+                    cur.execute(
+                        "select coalesce(max(substring(order_number "
+                        "from '^PO-([0-9]+)$')::bigint), 0) + 1 "
+                        "from purchase_order where tenant_id = %s",
+                        (member.tenant_id,),
+                    )
+                    number = cur.fetchone()[0]
+                    return f"PO-{number:06d}"
+        except psycopg.Error as exc:
+            raise ServiceUnavailableError(details={"dependency": "database"}) from exc
+
+    def request_supplier_prefill(
+        self, *, member: CurrentMember, source_request_id: UUID
+    ) -> dict[str, object]:
+        with self._transaction(member) as cur:
+            cur.execute(
+                "select pr.status, s.id as supplier_id, s.name as supplier_name "
+                "from purchase_request pr "
+                "left join rfq_response rr on rr.id = pr.source_rfq_response_id "
+                "left join rfq_recipient recipient on recipient.id = rr.rfq_recipient_id "
+                "left join supplier s on s.id = recipient.supplier_id "
+                "and s.tenant_id = pr.tenant_id "
+                "where pr.id = %s and pr.tenant_id = %s",
+                (source_request_id, member.tenant_id),
+            )
+            row = cur.fetchone()
+            if row is None:
+                raise NotFoundError(details={"resource": "purchase_request"})
+            if row["status"] != "approved":
+                raise UnprocessableEntityError(details={"reason": "request_not_approved"})
+            return {
+                "source_request_id": source_request_id,
+                "supplier": (
+                    {"id": row["supplier_id"], "name": row["supplier_name"]}
+                    if row["supplier_id"] is not None
+                    else None
+                ),
+            }
+
     def create_order(
         self,
         *,
@@ -171,7 +224,13 @@ class OrdersService:
                 if row is not None:
                     order = self._load_order_cursor(cur, UUID(str(row["id"])))
                     return order, False
-                raise ConflictError(details={"reason": "order_number_or_idempotency_exists"})
+                cur.execute(
+                    "select 1 from purchase_order where tenant_id = %s and order_number = %s",
+                    (member.tenant_id, payload.order_number),
+                )
+                if cur.fetchone() is not None:
+                    raise ConflictError(details={"reason": "order_number_exists"})
+                raise ConflictError(details={"reason": "idempotency_key_exists"})
             order_id = UUID(str(row["id"]))
             cur.executemany(
                 "insert into purchase_order_line (tenant_id,purchase_order_id,line_number,"

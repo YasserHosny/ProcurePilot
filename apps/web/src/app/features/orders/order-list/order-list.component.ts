@@ -2,13 +2,16 @@ import { Component, OnInit, inject, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatIconModule } from '@angular/material/icon';
+import { MatMenuModule } from '@angular/material/menu';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
 import { RoleDirective } from '../../../core/auth/role.directive';
 import { FormatDatePipe } from '../../../core/format/date.pipe';
+import { FormatService } from '../../../core/format/format.service';
 import { FormatMoneyPipe } from '../../../core/format/money.pipe';
+import { RequestsApiService, type PurchaseRequest } from '../../requests/requests-api';
 import { OrdersApiService, type OrderStatus, type PurchaseOrder } from '../orders-api';
 
 @Component({
@@ -18,6 +21,7 @@ import { OrdersApiService, type OrderStatus, type PurchaseOrder } from '../order
     MatButtonModule,
     MatCardModule,
     MatIconModule,
+    MatMenuModule,
     MatProgressSpinnerModule,
     RouterLink,
     TranslatePipe,
@@ -30,6 +34,9 @@ import { OrdersApiService, type OrderStatus, type PurchaseOrder } from '../order
 })
 export class OrderListComponent implements OnInit {
   private readonly ordersApi = inject(OrdersApiService);
+  private readonly requestsApi = inject(RequestsApiService);
+  private readonly formatService = inject(FormatService);
+  private readonly router = inject(Router);
   private readonly translate = inject(TranslateService);
 
   readonly orders = signal<PurchaseOrder[]>([]);
@@ -37,6 +44,8 @@ export class OrderListComponent implements OnInit {
   readonly isLoading = signal(true);
   readonly isLoadingMore = signal(false);
   readonly errorMessage = signal<string | null>(null);
+  readonly approvedRequests = signal<PurchaseRequest[]>([]);
+  readonly isLoadingApprovedRequests = signal(false);
 
   ngOnInit(): void {
     this.loadOrders();
@@ -73,6 +82,28 @@ export class OrderListComponent implements OnInit {
         this.errorMessage.set(this.translate.instant('orders.loadError'));
       },
     });
+  }
+
+  loadApprovedRequests(): void {
+    this.isLoadingApprovedRequests.set(true);
+    this.requestsApi.listRequests({ status: 'approved' }).subscribe({
+      next: (response) => {
+        this.approvedRequests.set([...response.items]);
+        this.isLoadingApprovedRequests.set(false);
+      },
+      error: () => {
+        this.approvedRequests.set([]);
+        this.isLoadingApprovedRequests.set(false);
+      },
+    });
+  }
+
+  createFromApprovedRequest(request: PurchaseRequest): void {
+    this.router.navigate(['/orders/new'], { queryParams: { source_request_id: request.id } });
+  }
+
+  formatApprovedRequestMoney(request: PurchaseRequest): string {
+    return this.formatService.formatCurrencyAmount(request.estimated_total);
   }
 
   getStatusLabel(status: OrderStatus): string {

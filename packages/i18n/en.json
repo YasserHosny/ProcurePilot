@@ -1382,6 +1382,7 @@
         "confirmAndNext": "Resolve and Next",
         "confirming": "Confirming...",
         "saveSuccess": "Match decision confirmed and alias saved successfully.",
+        "queueCleared": "All match tasks resolved — queue cleared.",
         "candidateRequired": "Please select a candidate before confirming.",
         "formInvalid": "Please correct the product creation errors before confirming."
       },
@@ -2012,6 +2013,7 @@
     "form": {
       "createTitle": "New Purchase Request",
       "editTitle": "Edit Purchase Request",
+      "viewTitle": "Purchase Request",
       "branchLabel": "Branch",
       "branchRequired": "Branch is required.",
       "costCentreLabel": "Cost Centre (optional)",
@@ -2032,6 +2034,7 @@
       "saveDraftButton": "Save Draft",
       "submitButton": "Submit Request",
       "submittingButton": "Submitting...",
+      "createOrderButton": "Create purchase order",
       "atLeastOneLineRequired": "At least one line item is required."
     },
     "empty": "No purchase requests yet. Create your first request to get started.",
@@ -2123,6 +2126,7 @@
     "alreadyDecided": "This request has already been decided by someone else.",
     "empty": "No requests are currently awaiting your decision.",
     "notAvailable": "Not available",
+    "costCentreNone": "None (branch-level)",
     "line": "line",
     "lines": "lines",
     "viewLines": "View lines",
@@ -2130,6 +2134,16 @@
     "noLines": "No line items.",
     "budgetExceeded": "Exceeds budget",
     "budgetRemaining": "Remaining",
+    "budgetStatus": {
+      "within": "Within budget",
+      "near": "Near budget limit",
+      "over": "Exceeds budget",
+      "no_budget": "No budget configured",
+      "reasons": {
+        "no_budget_for_branch": "No budget set for this branch",
+        "no_budget_at_cost_centre_level": "No budget at cost-centre level"
+      }
+    },
     "thresholdRules": {
       "sectionTitle": "Approval Threshold Rules",
       "createButton": "New Threshold Rule",
@@ -3228,6 +3242,8 @@
     "lineCount": "{{count}} line(s)",
     "notProvided": "Not provided",
     "createButton": "Create Order",
+    "fromApprovedRequest": "From approved request",
+    "fromApprovedRequestEmpty": "No approved requests available.",
     "create": {
       "title": "Create Purchase Order",
       "subtitle": "Manually record an internal purchase order.",
@@ -3261,7 +3277,9 @@
         "currencyFormat": "3-letter code",
         "positiveQuantity": "Must be > 0",
         "nonNegativePrice": "Must be >= 0",
-        "maxQuantity": "Cannot exceed remaining quantity"
+        "maxQuantity": "Cannot exceed remaining quantity",
+        "orderNumberExists": "Order number already exists. Please use a different order number.",
+        "idempotencyKeyExists": "This order submission is already being processed or was already submitted."
       },
       "creatingFromRequest": "Creating from Request",
       "estimateReference": "Estimate",
@@ -3663,8 +3681,11 @@
       "cannotPreparePending": "Cannot prepare request while lines are unmatched",
       "prepareSuccess": "Draft purchase request prepared successfully.",
       "prepareError": "Failed to prepare request. Lines may have become unmatched.",
+      "openDraft": "Open draft",
       "viewRequest": "View Request",
       "branchLabel": "Deliver to Branch",
+      "branchPlaceholder": "Select branch...",
+      "branchRequired": "Select a branch before preparing a request.",
       "requiredByLabel": "Required By",
       "noResponses": "No responses found for this RFQ yet.",
       "loading": "Loading responses...",

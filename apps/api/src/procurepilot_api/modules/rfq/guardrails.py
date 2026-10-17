@@ -191,9 +191,7 @@ def explain_guardrail_evaluations(
         if guardrail.enabled
     }
     ambiguous_guardrail_ids = {
-        guardrail_id
-        for guardrail_id, decision in independent_decisions.items()
-        if decision.fired
+        guardrail_id for guardrail_id, decision in independent_decisions.items() if decision.fired
     }
     if len(ambiguous_guardrail_ids) <= 1:
         ambiguous_guardrail_ids = set()
@@ -230,8 +228,7 @@ def explain_guardrail_evaluations(
                 eligible = [
                     item
                     for item in eligible_for_guardrail(guardrail)
-                    if _evaluate_candidate(item, guardrail, recent_average_price_by_product)
-                    is None
+                    if _evaluate_candidate(item, guardrail, recent_average_price_by_product) is None
                 ]
                 lowest = min((item.total_amount for item in eligible), default=None)
                 tied = [item for item in eligible if item.total_amount == lowest]

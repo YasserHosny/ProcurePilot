@@ -1866,12 +1866,28 @@ class RequestsService:
         line_rows: list[dict[str, object]],
         step_row: dict[str, object] | None,
     ) -> PurchaseRequest:
+        requester = self._fetch_requester(client, str(request_row["requested_by_membership_id"]))
         return _purchase_request(
             request_row,
             line_rows,
             step_row,
             budget_status=self._budget_status_for(client, request_row),
+            requester_email=requester.get("email"),
         )
+
+    def _fetch_requester(self, client: Client, membership_id: str) -> dict[str, object]:
+        try:
+            response = (
+                client.table("membership")
+                .select("email")
+                .eq("id", membership_id)
+                .limit(1)
+                .execute()
+            )
+        except APIError as exc:
+            raise ServiceUnavailableError(details={"dependency": "database"}) from exc
+        rows = _rows(response.data)
+        return rows[0] if rows else {}
 
     def _budget_status_for(
         self,
@@ -1942,12 +1958,16 @@ def _purchase_request(
     step_row: dict[str, object] | None,
     *,
     budget_status: BudgetStatus | None = None,
+    requester_name: str | None = None,
+    requester_email: str | None = None,
 ) -> PurchaseRequest:
     return PurchaseRequest(
         id=UUID(str(row["id"])),
         branch_id=UUID(str(row["branch_id"])),
         cost_centre_id=(UUID(str(row["cost_centre_id"])) if row.get("cost_centre_id") else None),
         requested_by_membership_id=UUID(str(row["requested_by_membership_id"])),
+        requester_name=requester_name,
+        requester_email=requester_email,
         required_by_date=_parse_date(row["required_by_date"]),
         status=str(row["status"]),
         lines=[_purchase_request_line(lr) for lr in line_rows],

@@ -4,6 +4,7 @@ from typing import Annotated, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Body, Depends, Header, Query
+from pydantic import BaseModel
 
 from procurepilot_api.deps import CurrentMember, bearer_token, current_member
 from procurepilot_api.modules.auth.jwt import MemberRole
@@ -27,6 +28,32 @@ from procurepilot_api.modules.matching.schemas import (
 from procurepilot_api.modules.matching.service import MatchingService, get_matching_service
 
 router = APIRouter(tags=["matching"])
+
+
+class NextMatchTask(BaseModel):
+    next_task_id: UUID | None
+
+
+@router.get("/match-tasks/next", response_model=NextMatchTask)
+def next_match_task(
+    token: Annotated[str, Depends(bearer_token)],
+    member: Annotated[CurrentMember, Depends(current_member)],
+    service: Annotated[MatchingService, Depends(get_matching_service)],
+    exclude_task_id: UUID | None = None,
+) -> NextMatchTask:
+    queue = service.list_match_tasks(
+        bearer_token=token,
+        member=member,
+        limit=100,
+        status="open",
+        sort_by="created_at",
+        sort_order="desc",
+    )
+    items = getattr(queue, "items", [])
+    next_id = next((item.id for item in items if item.id != exclude_task_id), None)
+    return NextMatchTask(next_task_id=next_id)
+
+
 WRITE_ROLES = (MemberRole.owner, MemberRole.buyer)
 
 
@@ -64,9 +91,7 @@ def list_match_tasks(
     search: Annotated[str | None, Query(max_length=200)] = None,
     date_from: Annotated[str | None, Query()] = None,
     date_to: Annotated[str | None, Query()] = None,
-    sort_by: Annotated[
-        Literal["created_at", "priority", "status"], Query()
-    ] = "created_at",
+    sort_by: Annotated[Literal["created_at", "priority", "status"], Query()] = "created_at",
     sort_order: Annotated[Literal["asc", "desc"], Query()] = "desc",
 ) -> MatchQueueList:
     return service.list_match_tasks(

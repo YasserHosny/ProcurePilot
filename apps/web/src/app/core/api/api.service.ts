@@ -647,6 +647,13 @@ export class ApiService {
     return this.http.get<MatchTask>(`${this.base}/quotation-lines/${lineId}/match-task`);
   }
 
+  getNextMatchTask(excludeTaskId?: string): Observable<{ next_task_id: string | null }> {
+    const query = new URLSearchParams();
+    if (excludeTaskId) query.set('exclude_task_id', excludeTaskId);
+    const qs = query.toString() ? `?${query.toString()}` : '';
+    return this.http.get<{ next_task_id: string | null }>(`${this.base}/match-tasks/next${qs}`);
+  }
+
   resolveMatch(
     lineId: string,
     body: MatchResolutionRequest,

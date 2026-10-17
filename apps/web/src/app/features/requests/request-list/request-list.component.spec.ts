@@ -179,7 +179,13 @@ describe('RequestListComponent (T017)', () => {
 
   it('should format money from estimated_total', () => {
     expect(component.formatMoney(mockRequests[0])).toBe('—');
-    expect(component.formatMoney(mockRequests[1])).toBe('GBP 500.0000');
+    expect(component.formatMoney(mockRequests[1])).toBe('GBP 500');
+    expect(
+      component.formatMoney({
+        ...mockRequests[1],
+        estimated_total: { amount: '56425.0000', currency: 'EGP' },
+      }),
+    ).toBe('EGP 56,425');
   });
 
   it('should show the incomplete estimate badge for flagged requests', () => {

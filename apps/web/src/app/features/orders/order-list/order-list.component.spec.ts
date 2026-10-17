@@ -2,7 +2,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting, HttpTestingController } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
-import { provideRouter } from '@angular/router';
+import { Router, provideRouter } from '@angular/router';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 
 import { OrderListComponent } from './order-list.component';
@@ -38,6 +38,8 @@ describe('OrderListComponent', () => {
       orders: {
         title: 'Order Tracking', subtitle: 'Orders', refresh: 'Refresh', retry: 'Retry', loadMore: 'Load more',
         loadError: 'Load failed', open: 'Open', orderDate: 'Ordered {{date}}', lineCount: '{{count}} line(s)',
+        createButton: 'Create Order', fromApprovedRequest: 'From approved request',
+        fromApprovedRequestEmpty: 'No approved requests available.',
         status: { submitted: 'Submitted' }, empty: { title: 'Empty', description: 'No orders' },
       },
     });
@@ -78,5 +80,71 @@ describe('OrderListComponent', () => {
     fixture.detectChanges();
     btn = fixture.nativeElement.querySelector('[data-testid="order-create-btn"]');
     expect(btn).toBeNull();
+  });
+
+  it('loads approved requests into the picker and navigates to /orders/new?source_request_id=<id>', () => {
+    const router = TestBed.inject(Router);
+    spyOn(router, 'navigate');
+
+    fixture.detectChanges();
+    http.expectOne('/api/v1/orders?limit=50').flush({ items: [], next_cursor: null });
+
+    const fromApprovedBtn = fixture.nativeElement.querySelector(
+      '[data-testid="order-from-approved-request-btn"]',
+    ) as HTMLButtonElement;
+    expect(fromApprovedBtn).toBeTruthy();
+    expect(fromApprovedBtn.textContent).toContain('From approved request');
+
+    fromApprovedBtn.click();
+    fixture.detectChanges();
+
+    const approvedReqCall = http.expectOne('/api/v1/requests?status=approved');
+    approvedReqCall.flush({
+      next_cursor: null,
+      items: [
+        {
+          id: 'req-approved-1',
+          branch_id: 'b1',
+          requested_by_membership_id: 'm1',
+          required_by_date: '2026-10-25',
+          status: 'approved',
+          lines: [],
+          estimated_total: { amount: '56425.0000', currency: 'EGP' },
+          has_incomplete_estimate: false,
+          created_at: '2026-10-01T00:00:00Z',
+        },
+      ],
+    });
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.approvedRequests().length).toBe(1);
+    const option = document.querySelector(
+      '[data-testid="approved-request-option-req-approved-1"]',
+    ) as HTMLButtonElement | null;
+    expect(option).toBeTruthy();
+    expect(option?.textContent).toContain('EGP 56,425');
+
+    option?.click();
+    expect(router.navigate).toHaveBeenCalledWith(['/orders/new'], {
+      queryParams: { source_request_id: 'req-approved-1' },
+    });
+  });
+
+  it('shows empty state in From approved request picker when no approved requests exist', () => {
+    fixture.detectChanges();
+    http.expectOne('/api/v1/orders?limit=50').flush({ items: [], next_cursor: null });
+
+    const fromApprovedBtn = fixture.nativeElement.querySelector(
+      '[data-testid="order-from-approved-request-btn"]',
+    ) as HTMLButtonElement;
+    fromApprovedBtn.click();
+    fixture.detectChanges();
+
+    http.expectOne('/api/v1/requests?status=approved').flush({ items: [], next_cursor: null });
+    fixture.detectChanges();
+
+    const emptyEl = document.querySelector('[data-testid="approved-requests-empty"]');
+    expect(emptyEl).toBeTruthy();
+    expect(emptyEl?.textContent).toContain('No approved requests available.');
   });
 });

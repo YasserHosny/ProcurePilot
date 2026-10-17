@@ -26,10 +26,14 @@ import type {
   ApprovalDecisionInput,
   Branch,
   BranchList,
+  BudgetStatusValue,
+  CostCentre,
+  CostCentreList,
   Product,
   PurchaseRequest,
   PurchaseRequestLine,
 } from '../../../core/api/models';
+import { FormatService } from '../../../core/format/format.service';
 import { RequestsApiService } from '../../requests/requests-api';
 import { OrganisationApiService } from '../../settings/organisation-api';
 import { ApprovalsApiService } from '../approvals-api';
@@ -149,6 +153,7 @@ export class ApprovalQueueComponent implements OnInit {
   private readonly requestsApi = inject(RequestsApiService);
   private readonly organisationApi = inject(OrganisationApiService);
   private readonly api = inject(ApiService);
+  private readonly formatService = inject(FormatService);
   private readonly dialog = inject(MatDialog);
   private readonly snackBar = inject(MatSnackBar);
   private readonly translate = inject(TranslateService);
@@ -156,6 +161,7 @@ export class ApprovalQueueComponent implements OnInit {
   readonly isLoading = signal<boolean>(true);
   readonly pendingRequests = signal<PurchaseRequest[]>([]);
   readonly branches = signal<Branch[]>([]);
+  readonly costCentres = signal<CostCentre[]>([]);
   readonly products = signal<Product[]>([]);
   readonly errorMessage = signal<string | null>(null);
   readonly errorTraceId = signal<string | null>(null);
@@ -181,6 +187,14 @@ export class ApprovalQueueComponent implements OnInit {
     return byId;
   });
 
+  readonly costCentreNameById = computed<Map<string, string>>(() => {
+    const byId = new Map<string, string>();
+    for (const cc of this.costCentres()) {
+      byId.set(cc.id, cc.name);
+    }
+    return byId;
+  });
+
   readonly productNameById = computed<Map<string, string>>(() => {
     const byId = new Map<string, string>();
     for (const product of this.products()) {
@@ -201,11 +215,13 @@ export class ApprovalQueueComponent implements OnInit {
     forkJoin({
       approvals: this.approvalsApi.listPendingApprovals({ limit: 50 }),
       branches: this.loadBranches(),
+      costCentres: this.loadCostCentres(),
       products: this.loadProducts(),
     }).subscribe({
-      next: ({ approvals, branches, products }) => {
+      next: ({ approvals, branches, costCentres, products }) => {
         this.pendingRequests.set([...approvals.items]);
         this.branches.set([...branches.items]);
+        this.costCentres.set([...costCentres.items]);
         this.products.set([...products.items]);
         this.isLoading.set(false);
       },
@@ -283,18 +299,82 @@ export class ApprovalQueueComponent implements OnInit {
     });
   }
 
+  getRequesterDisplay(request: PurchaseRequest): string {
+    const name = request.requester_name?.trim();
+    if (name) {
+      return name;
+    }
+    const email = request.requester_email?.trim();
+    if (email) {
+      return email;
+    }
+    if (request.requested_by_membership_id) {
+      return request.requested_by_membership_id.slice(0, 8);
+    }
+    return this.translate.instant(`${I18N}.notAvailable`);
+  }
+
+  getCostCentreDisplay(request: PurchaseRequest): string {
+    if (request.cost_centre_id) {
+      return this.costCentreNameById().get(request.cost_centre_id) ?? request.cost_centre_id;
+    }
+    if (request.branch_id) {
+      return this.translate.instant(`${I18N}.costCentreNone`);
+    }
+    return this.translate.instant(`${I18N}.notAvailable`);
+  }
+
+  getBudgetStatusValue(request: PurchaseRequest): BudgetStatusValue | null {
+    const bs = request.budget_status;
+    if (!bs) {
+      return null;
+    }
+    if (bs.status) {
+      return bs.status;
+    }
+    if (bs.exceeds) {
+      return 'over';
+    }
+    if (!bs.remaining_amount) {
+      return 'no_budget';
+    }
+    return 'within';
+  }
+
+  getBudgetStatusLabel(request: PurchaseRequest): string {
+    const status = this.getBudgetStatusValue(request);
+    if (!status) {
+      return this.translate.instant(`${I18N}.notAvailable`);
+    }
+    return this.translate.instant(`${I18N}.budgetStatus.${status}`);
+  }
+
+  getBudgetReasonText(request: PurchaseRequest): string | null {
+    const reasonCode = request.budget_status?.reason_code;
+    if (!reasonCode) {
+      return null;
+    }
+    const key = `${I18N}.budgetStatus.reasons.${reasonCode}`;
+    const translated = this.translate.instant(key);
+    return translated !== key ? translated : reasonCode;
+  }
+
+  formatBudgetRemaining(request: PurchaseRequest): string {
+    return this.formatService.formatCurrencyAmount(request.budget_status?.remaining_amount);
+  }
+
   formatMoney(request: PurchaseRequest): string {
     if (!request.estimated_total) {
       return this.translate.instant(`${I18N}.notAvailable`);
     }
-    return `${request.estimated_total.currency} ${request.estimated_total.amount}`;
+    return this.formatService.formatCurrencyAmount(request.estimated_total);
   }
 
   formatLinePrice(line: PurchaseRequestLine): string {
     if (!line.estimated_unit_price) {
       return this.translate.instant(`${I18N}.notAvailable`);
     }
-    return `${line.estimated_unit_price.currency} ${line.estimated_unit_price.amount}`;
+    return this.formatService.formatCurrencyAmount(line.estimated_unit_price);
   }
 
   getBranchName(branchId: string): string {
@@ -309,6 +389,21 @@ export class ApprovalQueueComponent implements OnInit {
     return this.organisationApi.listBranches({ limit: 100 }).pipe(
       catchError(() =>
         of<BranchList>({
+          items: [],
+          next_cursor: null,
+        }),
+      ),
+    );
+  }
+
+  private loadCostCentres() {
+    const listFn = this.organisationApi.listCostCentres;
+    if (typeof listFn !== 'function') {
+      return of<CostCentreList>({ items: [], next_cursor: null });
+    }
+    return (listFn.call(this.organisationApi, { limit: 100 }) ?? of<CostCentreList>({ items: [], next_cursor: null })).pipe(
+      catchError(() =>
+        of<CostCentreList>({
           items: [],
           next_cursor: null,
         }),

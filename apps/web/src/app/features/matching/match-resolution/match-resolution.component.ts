@@ -138,6 +138,18 @@ export class MatchResolutionComponent implements OnInit {
     return this.candidates().find((c) => c.id === id) ?? null;
   });
 
+  readonly matchedProductName = computed<string>(() => {
+    const taskProduct = this.task()?.matched_product;
+    const decisionProduct = this.decision()?.matched_product;
+    return (
+      taskProduct?.tenant_name ||
+      taskProduct?.canonical_name ||
+      decisionProduct?.tenant_name ||
+      decisionProduct?.canonical_name ||
+      ''
+    );
+  });
+
   readonly outcomeOptions: readonly { value: MatchOutcome; labelKey: string; descKey: string }[] = [
     {
       value: 'same_product',
@@ -167,12 +179,23 @@ export class MatchResolutionComponent implements OnInit {
   ];
 
   ngOnInit(): void {
-    const id = this.route.snapshot.paramMap.get('id');
-    this.quotationId.set(this.route.snapshot.queryParamMap.get('quotation_id'));
-    if (id) {
-      this.routeId.set(id);
-      this.loadReferenceData();
-      this.loadTask(id);
+    this.loadReferenceData();
+    if (this.route.paramMap) {
+      this.route.paramMap.subscribe((params) => {
+        const id = params.get('id');
+        this.quotationId.set(this.route.snapshot?.queryParamMap?.get('quotation_id') ?? null);
+        if (id && id !== this.routeId()) {
+          this.routeId.set(id);
+          this.loadTask(id);
+        }
+      });
+    } else {
+      const id = this.route.snapshot.paramMap.get('id');
+      this.quotationId.set(this.route.snapshot.queryParamMap.get('quotation_id'));
+      if (id) {
+        this.routeId.set(id);
+        this.loadTask(id);
+      }
     }
 
     this.productForm.valueChanges.subscribe((vals) => {
@@ -215,6 +238,24 @@ export class MatchResolutionComponent implements OnInit {
         this.applyTask(task);
       },
       error: (err: unknown) => {
+        if (err instanceof HttpErrorResponse && err.status === 404 && this.api.getMatchTasks) {
+          this.api.getMatchTasks({ status: 'all', limit: 100 }).subscribe({
+            next: (res) => {
+              const matched = res.items.find((item) => item.id === id || item.quotation_line.id === id);
+              if (matched && matched.quotation_line.id !== id) {
+                this.loadTask(matched.quotation_line.id);
+                return;
+              }
+              this.isLoading.set(false);
+              this.handleError(err);
+            },
+            error: () => {
+              this.isLoading.set(false);
+              this.handleError(err);
+            },
+          });
+          return;
+        }
         this.isLoading.set(false);
         this.handleError(err);
       },
@@ -235,6 +276,8 @@ export class MatchResolutionComponent implements OnInit {
       }
       this.loadLandedCost(t.quotation_line.id);
     } else {
+      this.decision.set(null);
+      this.landedCost.set(null);
       if (sortedCandidates.length > 0 && t.reason !== 'close_candidates') {
         this.selectedCandidateId.set(sortedCandidates[0].id);
         this.selectedOutcome.set('same_product');
@@ -430,6 +473,10 @@ export class MatchResolutionComponent implements OnInit {
       next: (decision) => {
         this.isSubmitting.set(false);
         this.decision.set(decision);
+        if (resolveNext) {
+          this.navigateToNextTask(l.id);
+          return;
+        }
         this.snackBar.open(
           this.translate.instant('matching.resolution.actions.saveSuccess'),
           undefined,
@@ -437,9 +484,6 @@ export class MatchResolutionComponent implements OnInit {
         );
         // Refresh landed cost for the resolved line
         this.loadLandedCost(l.id);
-        if (resolveNext) {
-          this.navigateToNextTask(l.id);
-        }
       },
       error: (err: unknown) => {
         this.isSubmitting.set(false);
@@ -449,33 +493,29 @@ export class MatchResolutionComponent implements OnInit {
   }
 
   private navigateToNextTask(resolvedLineId: string): void {
-    const quotationId = this.quotationId() ?? this.task()?.quotation.id;
-    if (!quotationId) return;
-    this.api
-      .getMatchTasks({
-        status: 'open',
-        quotation_id: quotationId,
-        limit: 100,
-        sort_by: 'created_at',
-        sort_order: 'asc',
-      })
-      .subscribe({
-        next: (response) => {
-          const next = response.items.find(
-            (task) => task.quotation_line.id !== resolvedLineId,
-          );
-          if (next) {
-            void this.router.navigate(['/matching', next.quotation_line.id], {
-              queryParams: { quotation_id: quotationId },
-            });
+    const excludeTaskId = this.task()?.id ?? resolvedLineId;
+    if (this.api.getNextMatchTask) {
+      this.api.getNextMatchTask(excludeTaskId).subscribe({
+        next: (res) => {
+          if (res.next_task_id) {
+            this.snackBar.open(
+              this.translate.instant('matching.resolution.actions.saveSuccess'),
+              undefined,
+              { duration: 3500 },
+            );
+            void this.router.navigate(['/matching', res.next_task_id]);
             return;
           }
-          void this.router.navigate(['/matching'], {
-            queryParams: { quotation_id: quotationId },
-          });
+          this.snackBar.open(
+            this.translate.instant('matching.resolution.actions.queueCleared'),
+            undefined,
+            { duration: 3500 },
+          );
+          void this.router.navigate(['/matching']);
         },
         error: (err: unknown) => this.handleError(err),
       });
+    }
   }
 
   formatScore(score: string | number | undefined | null): number {

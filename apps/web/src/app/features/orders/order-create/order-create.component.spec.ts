@@ -1,10 +1,10 @@
-import { provideHttpClient } from '@angular/common/http';
+import { HttpErrorResponse, provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { provideRouter } from '@angular/router';
 import { TranslateModule } from '@ngx-translate/core';
-import { of } from 'rxjs';
+import { of, throwError } from 'rxjs';
 import { signal } from '@angular/core';
 
 import { ApiService } from '../../../core/api/api.service';
@@ -33,6 +33,8 @@ describe('OrderCreateComponent', () => {
       'editDraftOrder',
       'getAllocations',
       'getOrder',
+      'getNextOrderNumber',
+      'getRequestPrefill',
     ]);
     requestsApiService = jasmine.createSpyObj('RequestsApiService', ['getRequest']);
     routeSnapshot = {
@@ -46,6 +48,8 @@ describe('OrderCreateComponent', () => {
     apiService.suppliers.and.returnValue(of({ items: [mockSupplier], next_cursor: null }));
     apiService.products.and.returnValue(of({ items: [mockProduct], next_cursor: null }));
     ordersApiService.getAllocations.and.returnValue(of({ source_request_id: 'req-1', lines: [] }));
+    ordersApiService.getNextOrderNumber.and.returnValue(of({ order_number: 'PO-000101' }));
+    ordersApiService.getRequestPrefill.and.returnValue(of({ source_request_id: 'req-1', supplier: null }));
 
     await TestBed.configureTestingModule({
       imports: [OrderCreateComponent, TranslateModule.forRoot()],
@@ -70,13 +74,123 @@ describe('OrderCreateComponent', () => {
     fixture.detectChanges();
   });
 
-  it('should create and load initial data', () => {
+  it('should create and load initial data with suggested order number', () => {
     expect(component).toBeTruthy();
     expect(apiService.suppliers).toHaveBeenCalled();
     expect(apiService.products).toHaveBeenCalled();
+    expect(ordersApiService.getNextOrderNumber).toHaveBeenCalled();
+    expect(component.form.controls.order_number.value).toBe('PO-000101');
     expect(component.suppliers().length).toBe(1);
     expect(component.products().length).toBe(1);
     expect(component.lines.length).toBe(1); // One empty line added by default
+  });
+
+  it('pre-fills supplier (id + name) and next order number when source_request_id is present', () => {
+    fixture.destroy();
+    routeSnapshot.queryParamMap = convertToParamMap({ source_request_id: 'req-42' });
+    requestsApiService.getRequest.and.returnValue(of({
+      id: 'req-42',
+      branch_id: 'b1',
+      requested_by_membership_id: 'm1',
+      required_by_date: '2026-10-01',
+      status: 'approved',
+      lines: [
+        {
+          id: 'rl-1',
+          workspace_product_id: 'p1',
+          quantity: '3.000000',
+          estimated_unit_price: { amount: '12.0000', currency: 'USD' },
+        },
+      ],
+      has_incomplete_estimate: false,
+      created_at: '2026-09-29T00:00:00Z',
+    } as unknown as import('../../../core/api/models').PurchaseRequest));
+    ordersApiService.getAllocations.and.returnValue(of({
+      source_request_id: 'req-42',
+      lines: [
+        {
+          source_request_line_id: 'rl-1',
+          requested_quantity: '3.000000',
+          allocated_quantity: '0.000000',
+          remaining_quantity: '3.000000',
+        },
+      ],
+    }));
+    ordersApiService.getNextOrderNumber.and.returnValue(of({ order_number: 'PO-000777' }));
+    ordersApiService.getRequestPrefill.and.returnValue(of({
+      source_request_id: 'req-42',
+      supplier: { id: 's-cairo', name: 'Cairo Foods' },
+    }));
+
+    fixture = TestBed.createComponent(OrderCreateComponent);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+
+    expect(ordersApiService.getRequestPrefill).toHaveBeenCalledWith('req-42');
+    expect(ordersApiService.getNextOrderNumber).toHaveBeenCalled();
+    expect(component.form.controls.order_number.value).toBe('PO-000777');
+    expect(component.form.controls.supplier_id.value).toBe('s-cairo');
+    expect(component.suppliers().some(s => s.id === 's-cairo' && s.name === 'Cairo Foods')).toBeTrue();
+  });
+
+  it('handles prefill and next-number failures gracefully by leaving fields blank', () => {
+    fixture.destroy();
+    routeSnapshot.queryParamMap = convertToParamMap({ source_request_id: 'req-99' });
+    requestsApiService.getRequest.and.returnValue(throwError(() => new Error('Failed')));
+    ordersApiService.getAllocations.and.returnValue(throwError(() => new Error('Failed')));
+    ordersApiService.getRequestPrefill.and.returnValue(throwError(() => new Error('Prefill error')));
+    ordersApiService.getNextOrderNumber.and.returnValue(throwError(() => new Error('Next number error')));
+
+    fixture = TestBed.createComponent(OrderCreateComponent);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+
+    expect(component.form.controls.order_number.value).toBe('');
+    expect(component.form.controls.supplier_id.value).toBe('');
+  });
+
+  it('shows specific i18n error messages on 409 for order_number_exists and idempotency_key_exists', () => {
+    component.form.patchValue({
+      order_number: 'PO-DUP-1',
+      supplier_id: 's1',
+      order_date: new Date('2026-09-29T12:00:00Z'),
+      currency: 'USD',
+    });
+    component.lines.at(0).patchValue({
+      description: 'Test Item',
+      quantity: 1,
+      base_unit: 'EA',
+      unit_price: 10,
+      line_tax: 0,
+    });
+
+    ordersApiService.createOrder.and.returnValue(
+      throwError(() => new HttpErrorResponse({
+        status: 409,
+        error: {
+          code: 'CONFLICT',
+          message: 'Order number already exists',
+          details: { reason: 'order_number_exists' },
+        },
+      })),
+    );
+
+    component.submit();
+    expect(component.errorMessage()).toBe('orders.create.errors.orderNumberExists');
+
+    ordersApiService.createOrder.and.returnValue(
+      throwError(() => new HttpErrorResponse({
+        status: 409,
+        error: {
+          code: 'CONFLICT',
+          message: 'Idempotency key already used',
+          details: { reason: 'idempotency_key_exists' },
+        },
+      })),
+    );
+
+    component.submit();
+    expect(component.errorMessage()).toBe('orders.create.errors.idempotencyKeyExists');
   });
 
   it('defaults the currency to the home currency and submits the selected currency', () => {

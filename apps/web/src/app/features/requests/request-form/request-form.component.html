@@ -1,7 +1,23 @@
 <div class="form-container">
-  <h1 class="form-title">
-    {{ (isEditMode() ? 'requests.form.editTitle' : 'requests.form.createTitle') | translate }}
-  </h1>
+  <div class="form-title-row">
+    <h1 class="form-title">
+      {{
+        (isReadOnly()
+          ? 'requests.form.viewTitle'
+          : isEditMode()
+            ? 'requests.form.editTitle'
+            : 'requests.form.createTitle'
+        ) | translate
+      }}
+    </h1>
+    @if (existingRequest(); as req) {
+      @if (req.status !== 'draft') {
+        <span class="status-chip" [attr.data-status]="req.status" data-testid="request-status-chip">
+          {{ 'requests.status.' + req.status | translate }}
+        </span>
+      }
+    }
+  </div>
 
   @if (errorMessage()) {
     <div class="error-banner" role="alert">
@@ -82,7 +98,13 @@
 
               <mat-form-field appearance="outline" class="line-quantity">
                 <mat-label>{{ 'requests.form.quantityLabel' | translate }}</mat-label>
-                <input matInput [formControl]="lineGroup.controls.quantity" type="number" min="0" step="any" />
+                <input
+                  matInput
+                  [formControl]="lineGroup.controls.quantity"
+                  [type]="form.disabled ? 'text' : 'number'"
+                  min="0"
+                  step="any"
+                />
               </mat-form-field>
 
               <mat-form-field appearance="outline" class="line-note">
@@ -118,7 +140,7 @@
             <div class="total-row">
               <span class="total-label">{{ 'requests.columns.estimatedTotal' | translate }}</span>
               <span class="total-value">
-                {{ req.estimated_total.currency }} {{ req.estimated_total.amount }}
+                {{ formatMoney(req.estimated_total) }}
               </span>
             </div>
           }
@@ -139,7 +161,7 @@
                   </span>
                   <span class="budget-remaining-amount">
                     {{ 'requests.budgetStatus.remainingLabel' | translate }}:
-                    {{ budget.remaining_amount.currency }} {{ budget.remaining_amount.amount }}
+                    {{ formatMoney(budget.remaining_amount) }}
                   </span>
                 </div>
               </div>
@@ -147,7 +169,7 @@
               <div class="budget-status-row">
                 <span class="budget-status-label">{{ 'requests.budgetStatus.remainingLabel' | translate }}</span>
                 <span class="budget-status-value">
-                  {{ budget.remaining_amount.currency }} {{ budget.remaining_amount.amount }}
+                  {{ formatMoney(budget.remaining_amount) }}
                 </span>
               </div>
             }
@@ -193,6 +215,20 @@
           <button mat-stroked-button type="button" (click)="cancel()">
             {{ 'requests.form.cancelButton' | translate }}
           </button>
+
+          @if (canCreateOrder()) {
+            <button
+              mat-flat-button
+              color="primary"
+              type="button"
+              class="create-order-btn"
+              data-testid="request-create-order-btn"
+              (click)="navigateToCreateOrder()"
+            >
+              <mat-icon aria-hidden="true">shopping_cart</mat-icon>
+              {{ 'requests.form.createOrderButton' | translate }}
+            </button>
+          }
 
           @if (!form.disabled) {
             <button

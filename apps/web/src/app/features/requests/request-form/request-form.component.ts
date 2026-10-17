@@ -14,10 +14,11 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { ActivatedRoute, Router } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { forkJoin, of, type Observable } from 'rxjs';
-import { catchError, finalize, tap } from 'rxjs/operators';
+import { catchError, finalize, switchMap, tap } from 'rxjs/operators';
 
 import { ApiService } from '../../../core/api/api.service';
 import { FormatDatePipe } from '../../../core/format/date.pipe';
+import { FormatService } from '../../../core/format/format.service';
 import type {
   ApiError,
   Branch,
@@ -25,6 +26,7 @@ import type {
   CostCentre,
   CostCentreList,
   Member,
+  Money,
   Product,
   PurchaseRequest,
   PurchaseRequestLine,
@@ -65,6 +67,7 @@ export class RequestFormComponent implements OnInit {
   private readonly requestsApi = inject(RequestsApiService);
   private readonly organisationApi = inject(OrganisationApiService);
   private readonly api = inject(ApiService);
+  private readonly formatService = inject(FormatService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly snackBar = inject(MatSnackBar);
@@ -80,6 +83,16 @@ export class RequestFormComponent implements OnInit {
   readonly products = signal<Product[]>([]);
   readonly existingRequest = signal<PurchaseRequest | null>(null);
   readonly isEditMode = signal<boolean>(false);
+
+  readonly isReadOnly = computed<boolean>(() => {
+    const req = this.existingRequest();
+    return req !== null && req.status !== 'draft';
+  });
+
+  readonly canCreateOrder = computed<boolean>(() => {
+    const req = this.existingRequest();
+    return req !== null && req.status === 'approved';
+  });
 
   readonly memberEmailById = computed<Map<string, string>>(() => {
     const byId = new Map<string, string>();
@@ -162,25 +175,14 @@ export class RequestFormComponent implements OnInit {
 
   saveDraft(): void {
     if (this.form.invalid || this.lines.length === 0) {
+      this.form.markAllAsTouched();
       return;
     }
 
     this.isSaving.set(true);
     this.errorMessage.set(null);
 
-    const value = this.form.getRawValue();
-    const body = {
-      branch_id: value.branch_id,
-      cost_centre_id: value.cost_centre_id || null,
-      required_by_date: value.required_by_date,
-      lines: value.lines.map((l) => ({
-        workspace_product_id: l.workspace_product_id,
-        // The API contract carries quantity as a decimal string (monetary-rule style), while
-        // the number input's value accessor stores a JS number — serialise at the boundary.
-        quantity: String(l.quantity),
-        note: l.note || null,
-      })),
-    };
+    const body = this.buildRequestPayload();
 
     const existing = this.existingRequest();
     const obs = existing
@@ -192,6 +194,7 @@ export class RequestFormComponent implements OnInit {
         this.isSaving.set(false);
         this.existingRequest.set(saved);
         this.isEditMode.set(true);
+        this.form.markAsPristine();
         this.snackBar.open(this.translate.instant(`${I18N}.createSuccess`), undefined, {
           duration: 3500,
         });
@@ -210,37 +213,107 @@ export class RequestFormComponent implements OnInit {
       return;
     }
 
+    if (this.form.invalid || this.lines.length === 0) {
+      this.form.markAllAsTouched();
+      this.errorMessage.set(this.getValidationErrorMessage());
+      return;
+    }
+
     this.isSubmitting.set(true);
     this.errorMessage.set(null);
 
-    this.requestsApi.submitRequest(existing.id).subscribe({
-      next: () => {
-        this.isSubmitting.set(false);
-        this.snackBar.open(this.translate.instant(`${I18N}.submitSuccess`), undefined, {
-          duration: 3500,
-        });
-        this.router.navigate(['/requests']);
-      },
-      error: (err: unknown) => {
-        this.isSubmitting.set(false);
-        this.handleError(err);
-      },
-    });
+    const body = this.buildRequestPayload();
+
+    this.requestsApi
+      .updateRequest(existing.id, body)
+      .pipe(
+        tap((saved) => {
+          this.existingRequest.set(saved);
+          this.form.markAsPristine();
+        }),
+        switchMap((saved) => this.requestsApi.submitRequest(saved.id)),
+      )
+      .subscribe({
+        next: () => {
+          this.isSubmitting.set(false);
+          this.snackBar.open(this.translate.instant(`${I18N}.submitSuccess`), undefined, {
+            duration: 3500,
+          });
+          this.router.navigate(['/requests']);
+        },
+        error: (err: unknown) => {
+          this.isSubmitting.set(false);
+          this.handleError(err);
+        },
+      });
+  }
+
+  navigateToCreateOrder(): void {
+    const req = this.existingRequest();
+    if (!req || req.status !== 'approved') {
+      return;
+    }
+    this.router.navigate(['/orders/new'], { queryParams: { source_request_id: req.id } });
   }
 
   cancel(): void {
     this.router.navigate(['/requests']);
   }
 
+  formatMoney(value: Money | null | undefined): string {
+    return this.formatService.formatCurrencyAmount(value);
+  }
+
+  formatQuantity(value: number | string | null | undefined): string {
+    return this.formatService.formatQuantity(value);
+  }
+
   formatEstimate(line: PurchaseRequestLine): string {
     if (!line.estimated_unit_price) {
       return this.translate.instant(`${I18N}.form.noEstimateAvailable`);
     }
-    return `${line.estimated_unit_price.currency} ${line.estimated_unit_price.amount}`;
+    return this.formatService.formatCurrencyAmount(line.estimated_unit_price);
   }
 
   hasProductName(productId: string): boolean {
     return this.productNameById().has(productId);
+  }
+
+  private getValidationErrorMessage(): string {
+    if (this.form.controls.branch_id.invalid) {
+      return this.translate.instant(`${I18N}.form.branchRequired`);
+    }
+    if (this.form.controls.required_by_date.invalid) {
+      return this.translate.instant(`${I18N}.form.requiredByDateRequired`);
+    }
+    if (this.lines.length === 0) {
+      return this.translate.instant(`${I18N}.form.atLeastOneLineRequired`);
+    }
+    for (const group of this.lines.controls) {
+      if (group.controls.workspace_product_id.invalid) {
+        return this.translate.instant(`${I18N}.form.productRequired`);
+      }
+      if (group.controls.quantity.invalid) {
+        return this.translate.instant(`${I18N}.form.quantityRequired`);
+      }
+    }
+    return this.translate.instant(`${I18N}.genericError`);
+  }
+
+  private buildRequestPayload() {
+    const value = this.form.getRawValue();
+    return {
+      branch_id: value.branch_id,
+      cost_centre_id: value.cost_centre_id || null,
+      required_by_date: value.required_by_date,
+      lines: value.lines.map((l) => ({
+        workspace_product_id: l.workspace_product_id,
+        // The API contract carries quantity as a decimal string (monetary-rule style), while
+        // the number input's value accessor stores a JS number — serialise at the boundary.
+        quantity: String(l.quantity),
+        note: l.note || null,
+      })),
+    };
   }
 
   private loadBranches(): Observable<BranchList> {
@@ -293,14 +366,16 @@ export class RequestFormComponent implements OnInit {
           required_by_date: req.required_by_date,
         });
 
+        const isReadOnly = req.status !== 'draft';
         this.lines.clear();
         for (const line of req.lines) {
+          const displayQty = isReadOnly ? this.formatQuantity(line.quantity) : line.quantity;
           const group = new FormGroup<LineFormGroup>({
             workspace_product_id: new FormControl<string>(line.workspace_product_id, {
               nonNullable: true,
               validators: [Validators.required],
             }),
-            quantity: new FormControl<string>(line.quantity, {
+            quantity: new FormControl<string>(displayQty, {
               nonNullable: true,
               validators: [Validators.required, Validators.pattern(/^\d+(\.\d+)?$/)],
             }),
@@ -309,7 +384,7 @@ export class RequestFormComponent implements OnInit {
           this.lines.push(group);
         }
 
-        if (req.status !== 'draft') {
+        if (isReadOnly) {
           this.form.disable();
         }
       }),
