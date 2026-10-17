@@ -214,6 +214,17 @@ describe('ResolutionQueueComponent', () => {
     );
   });
 
+  it('tells the buyer when exact matches were skipped instead of hiding it', () => {
+    apiService.confirmExactMatches.and.returnValue(of({ confirmed: 1, skipped: 2 }));
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    (el.querySelector('[data-testid="confirm-exact-btn"]') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    expect(el.querySelector('[data-testid="exact-match-skipped"]')?.textContent).toContain(
+      '2 could not be confirmed',
+    );
+  });
+
   it('should send all status explicitly so auto-matched rows stay in quotation groups', () => {
     component.onStatusChange('all');
 

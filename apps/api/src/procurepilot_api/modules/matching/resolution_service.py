@@ -32,7 +32,8 @@ from procurepilot_api.modules.members.service import authenticated_client
 from procurepilot_api.shared.audit import AuditEventCreate, get_audit_writer
 from procurepilot_api.shared.logging import get_trace_id
 
-EXACT_CONFIRM_BATCH = 100
+EXACT_CONFIRM_BATCH = 100  # exact pairs returned per call
+EXACT_SCAN_LIMIT = 1000  # open tasks examined while collecting them
 
 
 class MatchResolutionService:
@@ -186,12 +187,14 @@ class MatchResolutionService:
                 .select("quotation_line_id")
                 .in_("status", ["open", "in_progress"])
                 .order("created_at")
-                .limit(EXACT_CONFIRM_BATCH)
+                .limit(EXACT_SCAN_LIMIT)
                 .execute()
                 .data
             )
             pairs: list[tuple[UUID, UUID]] = []
             for task in tasks:
+                if len(pairs) >= EXACT_CONFIRM_BATCH:
+                    break
                 line_id = UUID(str(task["quotation_line_id"]))
                 top = _rows(
                     client.table("match_candidate")

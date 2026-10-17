@@ -83,6 +83,7 @@ export class ResolutionQueueComponent implements OnInit {
   readonly exactMatchCount = signal<number>(0);
   readonly isConfirmingExact = signal<boolean>(false);
   readonly exactConfirmedCount = signal<number | null>(null);
+  readonly exactSkippedCount = signal<number>(0);
   readonly refreshReviews = signal<CatalogueRefreshReview[]>([]);
   readonly isLoadingRefreshReviews = signal<boolean>(true);
   readonly refreshReviewDecisionId = signal<string | null>(null);
@@ -163,6 +164,7 @@ export class ResolutionQueueComponent implements OnInit {
       next: (res) => {
         this.isConfirmingExact.set(false);
         this.exactConfirmedCount.set(res.confirmed);
+        this.exactSkippedCount.set(res.skipped);
         this.loadExactMatchCount();
         this.loadTasks();
       },

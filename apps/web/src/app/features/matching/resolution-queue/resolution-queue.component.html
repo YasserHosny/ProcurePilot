@@ -46,6 +46,11 @@
     <p class="exact-match-result" data-testid="exact-match-result" role="status">
       {{ 'matching.queue.exact.confirmed' | translate: { count: exactConfirmedCount() } }}
     </p>
+    @if (exactSkippedCount() > 0) {
+      <p class="exact-match-result" data-testid="exact-match-skipped" role="alert">
+        {{ 'matching.queue.exact.skipped' | translate: { count: exactSkippedCount() } }}
+      </p>
+    }
   }
 
   <mat-card class="filter-card">

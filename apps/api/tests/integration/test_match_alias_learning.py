@@ -215,6 +215,63 @@ def test_bulk_confirm_exact_matches_confirms_only_exact_names_and_learns_aliases
         assert resolution.count_exact_matches(bearer_token="t").count == 0
 
 
+def test_exact_matches_are_found_behind_a_backlog_of_older_non_exact_tasks(
+    conn: object, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    with conn.cursor() as cur:
+        ensure_quotation_reference_data(cur)
+        workspace = make_workspace(cur, "bulk-exact-backlog")
+        supplier_id = make_supplier(cur, workspace, name="Backlog Supplier")
+        product = make_workspace_product(cur, workspace, name="Backlog Beans 1kg")
+        # Older non-exact tasks first (created_at order), exact one last.
+        for n in range(3):
+            line = _reviewed_line(
+                cur,
+                workspace,
+                supplier_id,
+                original_text=f"Unrelated wording {n}",
+                line_number=n + 1,
+            )
+            _candidate(cur, workspace, line, product)
+            _open_task(cur, workspace, line)
+        exact_line = _reviewed_line(
+            cur, workspace, supplier_id, original_text="Backlog Beans 1kg", line_number=9
+        )
+        _candidate(cur, workspace, exact_line, product)
+        _open_task(cur, workspace, exact_line)
+        db_client = PsycopgSupabaseClient(conn)
+        monkeypatch.setattr(resolution_module, "authenticated_client", lambda _s, _t: db_client)
+        monkeypatch.setattr(resolution_module, "EXACT_SCAN_LIMIT", 10)
+        monkeypatch.setattr(resolution_module, "EXACT_CONFIRM_BATCH", 1)
+        resolution = MatchResolutionService(cast(Settings, _MatchingSettings()))
+        act_as(cur, workspace)
+        assert resolution.count_exact_matches(bearer_token="t").count == 1
+
+
+def test_bulk_confirm_reports_alias_conflict_as_skipped(
+    conn: object, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    with conn.cursor() as cur:
+        ensure_quotation_reference_data(cur)
+        workspace = make_workspace(cur, "bulk-exact-skip")
+        supplier_id = make_supplier(cur, workspace, name="Skip Supplier")
+        product = make_workspace_product(cur, workspace, name="Skip Flour 5kg")
+        other = make_workspace_product(cur, workspace, name="Skip Other 5kg")
+        line = _reviewed_line(
+            cur, workspace, supplier_id, original_text="Skip Flour 5kg", line_number=1
+        )
+        _candidate(cur, workspace, line, product)
+        _open_task(cur, workspace, line)
+        _alias(cur, workspace, other, supplier_id, alias_text="Skip Flour 5kg")  # conflicting alias
+        db_client = PsycopgSupabaseClient(conn)
+        monkeypatch.setattr(resolution_module, "authenticated_client", lambda _s, _t: db_client)
+        resolution = MatchResolutionService(cast(Settings, _MatchingSettings()))
+        resolution._landed_cost = _NoopLandedCost()  # noqa: SLF001
+        act_as(cur, workspace)
+        result = resolution.confirm_exact_matches(bearer_token="t", member=_member(workspace))
+        assert (result.confirmed, result.skipped) == (0, 1)
+
+
 def _open_task(cur: psycopg.Cursor, workspace: object, line_id: UUID) -> None:
     act_as(cur, workspace)
     cur.execute(

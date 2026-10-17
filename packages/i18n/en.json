@@ -1220,7 +1220,8 @@
         "title": "{{count}} exact name matches ready to confirm",
         "description": "The line text equals a catalogue product name exactly. Nothing is accepted automatically; confirming records your decision and saves an alias so the same wording auto-matches next time.",
         "action": "Confirm all exact matches ({{count}})",
-        "confirmed": "{{count}} matches confirmed."
+        "confirmed": "{{count}} matches confirmed.",
+        "skipped": "{{count}} could not be confirmed (alias conflict or already resolved). Open them individually to resolve."
       }
     },
     "resolution": {
