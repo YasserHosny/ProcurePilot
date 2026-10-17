@@ -113,12 +113,12 @@ class QuotationReviewService:
                 _apply_correction_to_canonical_row(client, field, correction.corrected_value)
 
             for line_id in patch.remove_line_ids:
-                client.table("field_extraction").delete().eq("entity_id", str(line_id)).eq(
-                    "entity_type", "quotation_line"
-                ).execute()
-                client.table("quotation_line").delete().eq("id", str(line_id)).eq(
-                    "quotation_id", str(quotation_id)
-                ).execute()
+                client.table("field_extraction").delete().eq(
+                    "entity_id", str(line_id)
+                ).eq("entity_type", "quotation_line").execute()
+                client.table("quotation_line").delete().eq(
+                    "id", str(line_id)
+                ).eq("quotation_id", str(quotation_id)).execute()
 
             if patch.add_lines:
                 existing_lines = (
@@ -210,13 +210,11 @@ class QuotationReviewService:
         try:
             row = _one_row(
                 client.table("quotation")
-                .update(
-                    {
-                        "status": "refused",
-                        "reviewed_by": str(member.membership_id),
-                        "reviewed_at": datetime.now(UTC).isoformat(),
-                    }
-                )
+                .update({
+                    "status": "refused",
+                    "reviewed_by": str(member.membership_id),
+                    "reviewed_at": datetime.now(UTC).isoformat(),
+                })
                 .eq("id", str(quotation_id))
                 .execute()
                 .data,
@@ -224,7 +222,9 @@ class QuotationReviewService:
             )
             client.table("review_task").update(
                 {"status": "resolved", "resolved_at": datetime.now(UTC).isoformat()}
-            ).eq("quotation_id", str(quotation_id)).in_("status", ["open", "in_progress"]).execute()
+            ).eq("quotation_id", str(quotation_id)).in_(
+                "status", ["open", "in_progress"]
+            ).execute()
         except APIError as exc:
             raise ServiceUnavailableError(details={"dependency": "database"}) from exc
         get_audit_writer().record(
@@ -360,9 +360,13 @@ def _recompute_arithmetic_status(client: object, quotation_id: UUID) -> None:
     if abs(subtotal - stated) <= ARITHMETIC_TOLERANCE:
         status = "reconciled"
     elif not has_any_vat and subtotal > 0 and stated > subtotal:
-        inferred_pct = round(float((stated - subtotal) / subtotal) * 100)
+        inferred_pct = round(
+            float((stated - subtotal) / subtotal) * 100
+        )
         if 0 < inferred_pct <= 30:
-            recomputed = subtotal * (1 + Decimal(str(inferred_pct)) / 100)
+            recomputed = subtotal * (
+                1 + Decimal(str(inferred_pct)) / 100
+            )
             if abs(recomputed - stated) <= ARITHMETIC_TOLERANCE:
                 status = "reconciled"
             else:
@@ -384,18 +388,17 @@ def _sync_review_task_after_patch(
     confidence_threshold: float,
 ) -> None:
     blocker = _current_review_blocker(client, quotation_id, confidence_threshold)
-    open_task_query = (
-        client.table("review_task")
-        .select("id")
-        .eq("quotation_id", str(quotation_id))
-        .in_("status", ["open", "in_progress"])
-    )
+    open_task_query = client.table("review_task").select("id").eq(
+        "quotation_id", str(quotation_id)
+    ).in_("status", ["open", "in_progress"])
     open_tasks = _rows(open_task_query.execute().data)
 
     if blocker is None:
         client.table("review_task").update(
             {"status": "resolved", "resolved_at": datetime.now(UTC).isoformat()}
-        ).eq("quotation_id", str(quotation_id)).in_("status", ["open", "in_progress"]).execute()
+        ).eq("quotation_id", str(quotation_id)).in_(
+            "status", ["open", "in_progress"]
+        ).execute()
         return
 
     reason, priority = blocker
@@ -406,9 +409,9 @@ def _sync_review_task_after_patch(
         "resolved_at": None,
     }
     if open_tasks:
-        client.table("review_task").update(payload).eq("quotation_id", str(quotation_id)).in_(
-            "status", ["open", "in_progress"]
-        ).execute()
+        client.table("review_task").update(payload).eq(
+            "quotation_id", str(quotation_id)
+        ).in_("status", ["open", "in_progress"]).execute()
         return
 
     client.table("review_task").insert(
