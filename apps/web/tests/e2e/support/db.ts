@@ -47,15 +47,17 @@ export function seedRfqQuotationResponse(
     `select gen_random_uuid(),line.tenant_id,line.id,rfql.workspace_product_id,'no_match_new_product',false,owner.membership_id,1 from line join owner using (tenant_id) join rfq_line rfql on rfql.tenant_id=line.tenant_id and rfql.rfq_id=${sqlLiteral(rfqId)}::uuid returning id),`,
     'response as (insert into rfq_response (tenant_id,rfq_recipient_id,quotation_id)',
     `select owner.tenant_id,rr.id,quote.id from owner join rfq r on r.id=${sqlLiteral(rfqId)}::uuid and r.tenant_id=owner.tenant_id join rfq_recipient rr on rr.rfq_id=r.id and rr.supplier_id=${sqlLiteral(supplierId)}::uuid and rr.tenant_id=owner.tenant_id join quote on quote.tenant_id=owner.tenant_id cross join decision returning id)`,
-    'select (select count(*) from doc)+(select count(*) from quote)+(select count(*) from line)+(select count(*) from decision)+(select count(*) from response)',
+    "select (select count(*) from doc)||','||(select count(*) from quote)||','||(select count(*) from line)||','||(select count(*) from decision)||','||(select count(*) from response)",
   ].join(' ');
   const url = process.env['E2E_DATABASE_URL'];
   const psqlArgs = url ? [url, '-t', '-A', '-c', sql] : ['-U', 'postgres', '-t', '-A', '-c', sql];
   const stdout = execFileSync('docker', ['exec', DB_CONTAINER, 'psql', ...psqlArgs], {
     encoding: 'utf-8',
   }).trim();
-  if (stdout !== '5') {
-    throw new Error(`seedRfqQuotationResponse expected five inserted rows, got ${stdout || 'none'}`);
+  if (stdout !== '1,1,1,1,1') {
+    throw new Error(
+      `seedRfqQuotationResponse expected doc,quote,line,decision,response counts 1,1,1,1,1; got ${stdout || 'none'}`,
+    );
   }
 }
 

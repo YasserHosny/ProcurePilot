@@ -115,7 +115,11 @@ test.describe('Request → Approval → PO Flow & Matching Next (PP7 W2)', () =>
     productId = product.id;
 
     supplierName = `PP7 Flow Supplier ${Date.now()}`;
-    const supplier = await createTestSupplier(ownerToken, supplierName);
+    const supplier = await createTestSupplier(
+      ownerToken,
+      supplierName,
+      `e2e-supplier-${Date.now()}@example.test`,
+    );
     supplierId = supplier.id;
   });
 
@@ -206,12 +210,16 @@ test.describe('Request → Approval → PO Flow & Matching Next (PP7 W2)', () =>
       .split('T')[0]!;
 
     // Create an RFQ, send it, record a supplier response, and prepare a request from it
-    const rfq = await apiAsUser<{ rfq: { id: string } }>(ownerToken, 'POST', '/rfq', {
+    const rfq = await apiAsUser<{
+      rfq: { id: string };
+      rejected_recipients: Array<{ supplier_id: string; reason: string }>;
+    }>(ownerToken, 'POST', '/rfq', {
       needed_by_date: neededByDate,
       tenant_terms: 'Net 30',
       lines: [{ workspace_product_id: productId, quantity: '6' }],
       recipient_supplier_ids: [supplierId],
     }, { 'Idempotency-Key': crypto.randomUUID() });
+    expect(rfq.rejected_recipients, 'RFQ supplier recipients must all be accepted').toEqual([]);
     await apiAsUser(ownerToken, 'POST', `/rfq/${rfq.rfq.id}/send`, {}, {
       'Idempotency-Key': crypto.randomUUID(),
     });
