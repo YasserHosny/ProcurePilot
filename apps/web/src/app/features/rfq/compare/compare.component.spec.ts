@@ -15,7 +15,7 @@ import { of } from 'rxjs';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatDialog, MatDialogRef } from '@angular/material/dialog';
-import { Branch, Supplier, Product } from '../../../core/api/models';
+import { Branch, Member, Supplier, Product } from '../../../core/api/models';
 import { SessionService } from '../../../core/auth/session.service';
 import { CatalogueConfirmDialogComponent } from '../../catalogue/confirm-dialog/confirm-dialog.component';
 
@@ -133,14 +133,15 @@ describe('CompareComponent (RFQ)', () => {
     mockSession = jasmine.createSpyObj('SessionService', ['hasRole'], {
       isAuthenticated: signal(true),
       activeLocale: signal('en'),
-      currentMember: signal(null),
+      currentMember: signal<{ email: string } | null>({ email: 'owner@test.com' }),
       tenant: signal(null),
     });
     mockSession.hasRole.and.returnValue(true);
 
     mockApiService = jasmine.createSpyObj('ApiService', ['listBranches', 'suppliers', 'products', 'members']);
-    mockApiService.members.and.returnValue(of({ items: [{ id: 'member-1', email: 'owner@test.com' }], next_cursor: null }));
-    mockSession.currentMember.set({ email: 'owner@test.com' } as never);
+    mockApiService.members.and.returnValue(
+      of({ items: [{ id: 'member-1', email: 'owner@test.com' }], next_cursor: null } as unknown as { items: Member[]; next_cursor: string | null }),
+    );
     mockApiService.listBranches.and.returnValue(
       of({ items: [{ id: 'branch-1', name: 'Main Branch' }], next_cursor: null } as unknown as {
         items: Branch[];
