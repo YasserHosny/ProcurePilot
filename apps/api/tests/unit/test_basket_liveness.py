@@ -117,3 +117,15 @@ def test_get_job_reports_unreachable_optimiser_as_failed_with_code(
     assert job.status == "failed"
     assert job.error is not None and job.error["code"] == "optimiser_unavailable"
     assert any("update basket_split_job" in s for s in conn.statements)
+
+
+def test_requeueing_a_failed_job_restarts_the_expiry_clock() -> None:
+    job_id = uuid4()
+    conn = _Conn({"id": job_id, "status": "queued"})
+
+    row = basket_service._requeue_failed_job(conn, job_id)  # type: ignore[arg-type]
+
+    sql = " ".join(conn.statements)
+    assert "created_at = now()" in sql
+    assert "started_at = null" in sql
+    assert row["status"] == "queued"

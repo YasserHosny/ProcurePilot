@@ -66,14 +66,7 @@ class BasketService:
                         _compensate_failed_enqueue(conn, UUID(str(existing["id"])))
                         conn.commit()
                         raise
-                    with conn.cursor(row_factory=dict_row) as cur:
-                        cur.execute(
-                            "update basket_split_job "
-                            "set status = 'queued', error = null, completed_at = null "
-                            "where id = %s returning *",
-                            (existing["id"],),
-                        )
-                        job = _job(dict(cur.fetchone()))
+                    job = _job(_requeue_failed_job(conn, UUID(str(existing["id"]))))
                     if isinstance(payload, AdvancedBasketOptimiseRequest):
                         _record_audit(
                             bearer_token=bearer_token,
@@ -520,6 +513,23 @@ def _enqueue_redis_job(settings: Settings, row: dict[str, object], member: Curre
         )
     except Exception as exc:
         raise ServiceUnavailableError(details={"dependency": "redis"}) from exc
+
+
+def _requeue_failed_job(conn: object, job_id: UUID) -> dict[str, object]:
+    """Reset a failed job to a fresh queued attempt.
+
+    ``created_at``/``started_at`` restart so the stuck-job expiry measures this attempt, not
+    the original one (otherwise a retry of an expired job is failed again on its first poll).
+    """
+    with conn.cursor(row_factory=dict_row) as cur:
+        cur.execute(
+            "update basket_split_job "
+            "set status = 'queued', error = null, completed_at = null, "
+            "started_at = null, created_at = now() "
+            "where id = %s returning *",
+            (job_id,),
+        )
+        return dict(cur.fetchone())
 
 
 def _compensate_failed_enqueue(conn: object, job_id: UUID) -> None:
