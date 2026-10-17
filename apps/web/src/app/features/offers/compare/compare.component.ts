@@ -64,6 +64,10 @@ export class CompareComponent implements OnInit {
   readonly isLoading = signal<boolean>(false);
   readonly products = signal<Product[]>([]);
   readonly selectedProductId = signal<string>('');
+  // The comparison request is in base units, which needs the selected product's pack size, so it
+  // must not be sent before the product list has loaded (otherwise 10 tins go out as 10 litres).
+  private productsLoaded = false;
+  private pendingProductId: string | null = null;
   readonly productSignal = signal<SyncedProductSignal | null>(null);
   readonly quantityInput = signal<string>('10');
   readonly includeExpired = signal<boolean>(false);
@@ -156,16 +160,29 @@ export class CompareComponent implements OnInit {
     this.api.products({ limit: 100, status: 'active' }).subscribe({
       next: (res) => {
         this.products.set(res.items);
+        this.productsLoaded = true;
         if (!this.selectedProductId() && res.items.length > 0) {
           const firstId = res.items[0].id;
           this.selectedProductId.set(firstId);
           this.fetchComparison(firstId);
+        } else {
+          this.flushPendingFetch();
         }
       },
       error: () => {
-        // Soft fail on product list load
+        // Soft fail on product list load: compare with the unconverted quantity.
+        this.productsLoaded = true;
+        this.flushPendingFetch();
       },
     });
+  }
+
+  private flushPendingFetch(): void {
+    const pending = this.pendingProductId;
+    this.pendingProductId = null;
+    if (pending) {
+      this.fetchComparison(pending);
+    }
   }
 
   onProductChange(productId: string): void {
@@ -181,6 +198,11 @@ export class CompareComponent implements OnInit {
   fetchComparison(productId: string): void {
     if (!productId) {
       this.productSignal.set(null);
+      return;
+    }
+    if (!this.productsLoaded) {
+      this.pendingProductId = productId;
+      this.isLoading.set(true);
       return;
     }
     this.isLoading.set(true);

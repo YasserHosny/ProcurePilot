@@ -234,3 +234,30 @@ def test_estimate_without_source_response_is_still_per_pack() -> None:
     ]
     total, _currency, _ = _total(products, estimates)
     assert total == Decimal("56925")  # 56,675 quote lines + 250 delivery: not ~6,135
+
+
+def test_source_estimate_includes_landed_charges() -> None:
+    """الأمانة's 250 EGP delivery is part of its landed cost: a request prepared from it must be
+    valued at 56,925 (what the purchase really costs), not the bare 56,675 of line prices."""
+    with psycopg.connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
+        with conn.cursor() as cur:
+            tenant_id, _user, membership_id = _seed_tenant(
+                cur, email_suffix=f"packs-landed-{uuid4().hex[:8]}"
+            )
+            products, responses = _seed(cur, tenant_id, membership_id)
+            rid = _request_row(cur, tenant_id, membership_id, responses["amana"])
+        conn.commit()
+
+    estimates = RequestsService(settings=get_settings())._estimate_products(
+        products, request_id=rid
+    )
+    assert [e.unit_price_amount for e in estimates] == [
+        Decimal(1725),
+        Decimal(925),
+        Decimal(890),
+        Decimal(575),
+        Decimal(73),
+    ]
+    assert all(e.source_landed_cost_id is not None for e in estimates)
+    total, currency, _ = _total(products, estimates)
+    assert (total, currency) == (Decimal("56925"), "EGP")

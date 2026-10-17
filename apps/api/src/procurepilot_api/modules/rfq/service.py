@@ -22,6 +22,7 @@ from procurepilot_api.modules.requests.schemas import (
     PurchaseRequestLineInput,
 )
 from procurepilot_api.modules.requests.service import RequestsService
+from procurepilot_api.modules.requests.valuation import estimate_from_source_response
 from procurepilot_api.modules.rfq.email import RfqEmailLine, render_rfq_email
 from procurepilot_api.modules.rfq.guardrail_evaluation import compute_guardrail_evaluation
 from procurepilot_api.modules.rfq.guardrails import explain_guardrail_evaluations
@@ -642,11 +643,26 @@ class RfqService:
                     )
                     pr_line_rows = cur.fetchall()
 
+                    # Same valuation submit uses (per pack, landed charges included), so the
+                    # estimate cannot change between prepare and submit.
+                    source_estimates = estimate_from_source_response(
+                        conn,
+                        rfq_response_id=rfq_response_id,
+                        product_ids=list(matched_lines),
+                    )
+
                     for prl in pr_line_rows:
                         pid = prl["workspace_product_id"]
                         if pid in matched_lines:
-                            q_amt = matched_lines[pid]["unit_price_amount"]
-                            q_curr = matched_lines[pid]["unit_price_currency"]
+                            estimate = source_estimates.get(pid)
+                            if estimate is not None:
+                                q_amt = estimate.unit_price_amount
+                                q_curr = estimate.unit_price_currency
+                                landed_id = estimate.source_landed_cost_id
+                            else:
+                                q_amt = matched_lines[pid]["unit_price_amount"]
+                                q_curr = matched_lines[pid]["unit_price_currency"]
+                                landed_id = None
                             qty = prl["quantity"]
 
                             cur.execute(
@@ -654,10 +670,10 @@ class RfqService:
                                 update purchase_request_line
                                 set estimated_unit_price_amount = %s,
                                     estimated_unit_price_currency = %s,
-                                    estimated_unit_price_source_landed_cost_id = null
+                                    estimated_unit_price_source_landed_cost_id = %s
                                 where id = %s and tenant_id = %s
                                 """,
-                                (q_amt, q_curr, prl["id"], member.tenant_id),
+                                (q_amt, q_curr, landed_id, prl["id"], member.tenant_id),
                             )
                             total_amount += q_amt * qty
                             # A single RFQ response's quoted lines share one currency in
