@@ -8,6 +8,13 @@
   gap: 1.25rem;
 }
 
+.form-title-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
 .form-title {
   margin: 0;
   font-size: 1.5rem;
@@ -279,18 +286,26 @@
   font-size: 0.75rem;
   font-weight: 600;
 
-  &[data-status='pending'] {
+  &[data-status='pending'],
+  &[data-status='submitted'] {
     background: #eff6ff;
     color: #1d4ed8;
   }
 
-  &[data-status='approved'] {
+  &[data-status='approved'],
+  &[data-status='ordered'] {
     background: #ecfdf5;
-    color: #059669;
+    color: #047857;
   }
 
   &[data-status='rejected'] {
     background: #fef2f2;
     color: #dc2626;
+  }
+
+  &[data-status='withdrawn'],
+  &[data-status='draft'] {
+    background: #f5f5f4;
+    color: #57534e;
   }
 }

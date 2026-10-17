@@ -23,17 +23,17 @@ class Money(StrictApiModel):
 
 
 class BudgetStatus(BaseModel):
-    remaining_amount: Money
-    exceeds: bool
+    remaining_amount: Money | None = None
+    exceeds: bool = False
+    status: Literal["within", "near", "over", "no_budget"] = "within"
+    reason_code: str | None = None
 
 
 class PurchaseRequestLine(BaseModel):
     id: UUID
     workspace_product_id: UUID
     quantity: StrictStr = Field(pattern=r"^\d+(\.\d{1,6})?$")
-    quantity_received: StrictStr | None = Field(
-        default=None, pattern=r"^\d+(\.\d{1,6})?$"
-    )
+    quantity_received: StrictStr | None = Field(default=None, pattern=r"^\d+(\.\d{1,6})?$")
     note: str | None = None
     estimated_unit_price: Money | None = None
     estimated_unit_price_source_landed_cost_id: UUID | None = None
@@ -60,6 +60,8 @@ class PurchaseRequest(BaseModel):
     branch_id: UUID
     cost_centre_id: UUID | None = None
     requested_by_membership_id: UUID
+    requester_name: str | None = None
+    requester_email: str | None = None
     required_by_date: date
     status: PurchaseRequestStatus
     lines: list[PurchaseRequestLine]
@@ -190,18 +192,14 @@ class LowStockReport(BaseModel):
     branch_id: UUID
     member_id: UUID
     workspace_product_id: UUID
-    count_remaining: StrictStr | None = Field(
-        default=None, pattern=r"^\d+(\.\d{1,6})?$"
-    )
+    count_remaining: StrictStr | None = Field(default=None, pattern=r"^\d+(\.\d{1,6})?$")
     created_at: datetime
 
 
 class LowStockReportCreate(StrictApiModel):
     branch_id: UUID
     workspace_product_id: UUID
-    count_remaining: StrictStr | None = Field(
-        default=None, pattern=r"^\d+(\.\d{1,6})?$"
-    )
+    count_remaining: StrictStr | None = Field(default=None, pattern=r"^\d+(\.\d{1,6})?$")
 
 
 class LowStockReportList(BaseModel):

@@ -125,6 +125,7 @@ class RfqPrepareRequestInput(BaseModel):
 
 class RfqPrepareRequestResponse(BaseModel):
     purchase_request_id: UUID
+    status: str = "draft"
 
 
 class GuardrailCreateInput(BaseModel):

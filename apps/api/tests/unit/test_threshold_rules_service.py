@@ -33,12 +33,31 @@ class InsertQuery:
         return SimpleNamespace(data=[{**self.row, **(self.payload or {})}])
 
 
+class MembershipQuery:
+    def select(self, _columns: str) -> MembershipQuery:
+        return self
+
+    def eq(self, _column: str, _value: str) -> MembershipQuery:
+        return self
+
+    def in_(self, _column: str, _values: list[str]) -> MembershipQuery:
+        return self
+
+    def limit(self, _limit: int) -> MembershipQuery:
+        return self
+
+    def execute(self) -> SimpleNamespace:
+        return SimpleNamespace(data=[])
+
+
 class FakeClient:
     def __init__(self, rows: dict[str, dict[str, object]]) -> None:
         self.rows = rows
         self.queries: dict[str, InsertQuery] = {}
 
-    def table(self, name: str) -> InsertQuery:
+    def table(self, name: str) -> InsertQuery | MembershipQuery:
+        if name == "membership":
+            return MembershipQuery()
         query = InsertQuery(self.rows[name])
         self.queries[name] = query
         return query
@@ -163,11 +182,8 @@ def test_create_delegation_defaults_to_current_member(
     )
 
     assert client.queries["approval_delegation"].payload is not None
-    assert (
-        client.queries["approval_delegation"].payload[
-            "delegator_membership_id"
-        ]
-        == str(current.membership_id)
+    assert client.queries["approval_delegation"].payload["delegator_membership_id"] == str(
+        current.membership_id
     )
 
 

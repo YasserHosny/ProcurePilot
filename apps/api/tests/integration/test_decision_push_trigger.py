@@ -40,14 +40,15 @@ class _Settings:
 
 def _make_member(cur: psycopg.Cursor, tenant_id: UUID, label: str, role: str) -> Workspace:
     user_id, membership_id = uuid4(), uuid4()
+    email = f"{label}-{uuid4().hex}@example.test"
     cur.execute(
         "insert into auth.users (id,email) values (%s,%s)",
-        (user_id, f"{label}@example.test"),
+        (user_id, email),
     )
     cur.execute(
         "insert into membership (id,tenant_id,user_id,email,role,is_active_workspace) "
         "values (%s,%s,%s,%s,%s,true)",
-        (membership_id, tenant_id, user_id, f"{label}@example.test", role),
+        (membership_id, tenant_id, user_id, email, role),
     )
     return Workspace(tenant_id, user_id, membership_id, role, label)
 
@@ -157,8 +158,26 @@ def _prepare_service(
     request_row: dict[str, object],
     step_row: dict[str, object],
 ) -> RequestsService:
+    class MembershipQuery:
+        def select(self, _columns: str) -> MembershipQuery:
+            return self
+
+        def eq(self, _column: str, _value: str) -> MembershipQuery:
+            return self
+
+        def limit(self, _limit: int) -> MembershipQuery:
+            return self
+
+        def execute(self) -> object:
+            return type("Response", (), {"data": []})()
+
+    class FakeClient:
+        def table(self, name: str) -> MembershipQuery:
+            assert name == "membership"
+            return MembershipQuery()
+
     service = RequestsService(settings=_Settings())  # type: ignore[arg-type]
-    monkeypatch.setattr(requests_module, "authenticated_client", lambda *_args: object())
+    monkeypatch.setattr(requests_module, "authenticated_client", lambda *_args: FakeClient())
     monkeypatch.setattr(service, "_fetch_request", lambda *_args: request_row)
     monkeypatch.setattr(service, "_fetch_step", lambda *_args: step_row)
     monkeypatch.setattr(service, "_fetch_lines_for", lambda *_args: [])
@@ -167,9 +186,7 @@ def _prepare_service(
     return service
 
 
-def _push_rows(
-    conn: psycopg.Connection, request_id: UUID
-) -> list[tuple[UUID, str, UUID, UUID]]:
+def _push_rows(conn: psycopg.Connection, request_id: UUID) -> list[tuple[UUID, str, UUID, UUID]]:
     with conn.cursor() as cur:
         cur.execute(
             """

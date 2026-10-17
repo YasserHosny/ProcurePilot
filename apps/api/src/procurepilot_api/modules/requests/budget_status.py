@@ -67,7 +67,17 @@ def compute_budget_status(
     )
     chosen = _current_period_budget(selected)
     if chosen is None:
-        return None
+        return BudgetStatus(
+            status="no_budget",
+            reason_code=(
+                "no_budget_at_cost_centre_level"
+                if cost_centre_id is not None
+                and any(
+                    b.scope == "cost_centre" and b.cost_centre_id == cost_centre_id for b in budgets
+                )
+                else "no_budget_for_branch"
+            ),
+        )
 
     period_start = chosen.period_start
     period_end = _budget_period_end(chosen)
@@ -90,13 +100,20 @@ def compute_budget_status(
     )
     remaining = budget_amount - spent_amount
     if request_amount <= remaining:
-        return None
+        status = (
+            "near" if spent_amount + request_amount >= budget_amount * Decimal("0.8") else "within"
+        )
+        return BudgetStatus(
+            remaining_amount=Money(amount=_format_decimal(remaining), currency=request_currency),
+            status=status,
+        )
     return BudgetStatus(
         remaining_amount=Money(
             amount=_format_decimal(remaining),
             currency=request_currency,
         ),
         exceeds=True,
+        status="over",
     )
 
 
@@ -138,9 +155,7 @@ def _most_specific_budgets(
     cost_centre_id: UUID | None,
 ) -> list[BudgetRow]:
     if cost_centre_id is not None:
-        cost_centre_budgets = [
-            budget for budget in budgets if budget.scope == "cost_centre"
-        ]
+        cost_centre_budgets = [budget for budget in budgets if budget.scope == "cost_centre"]
         if cost_centre_budgets:
             return cost_centre_budgets
     branch_budgets = [budget for budget in budgets if budget.scope == "branch"]
@@ -159,10 +174,7 @@ def _budget_targets_request(
         return True
     if budget.scope == "branch":
         return budget.branch_id == branch_id
-    return (
-        cost_centre_id is not None
-        and budget.cost_centre_id == cost_centre_id
-    )
+    return cost_centre_id is not None and budget.cost_centre_id == cost_centre_id
 
 
 def _spend_matches_budget_scope(
@@ -176,10 +188,7 @@ def _spend_matches_budget_scope(
         return True
     if scope == "branch":
         return spend.branch_id == branch_id
-    return (
-        cost_centre_id is not None
-        and spend.cost_centre_id == cost_centre_id
-    )
+    return cost_centre_id is not None and spend.cost_centre_id == cost_centre_id
 
 
 def _date_in_budget_period(value: date, budget: BudgetRow) -> bool:

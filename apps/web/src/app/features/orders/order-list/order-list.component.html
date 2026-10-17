@@ -9,6 +9,45 @@
         <mat-icon aria-hidden="true">refresh</mat-icon>
         {{ 'orders.refresh' | translate }}
       </button>
+      <button
+        *appRole="['owner', 'buyer']"
+        mat-stroked-button
+        type="button"
+        [matMenuTriggerFor]="approvedRequestsMenu"
+        (menuOpened)="loadApprovedRequests()"
+        data-testid="order-from-approved-request-btn"
+      >
+        <mat-icon aria-hidden="true">playlist_add_check</mat-icon>
+        {{ 'orders.fromApprovedRequest' | translate }}
+      </button>
+      <mat-menu #approvedRequestsMenu="matMenu">
+        @if (isLoadingApprovedRequests()) {
+          <div class="approved-requests-state" data-testid="approved-requests-loading">
+            <mat-spinner diameter="18" [attr.aria-label]="'common.loading' | translate" />
+            <span>{{ 'common.loading' | translate }}</span>
+          </div>
+        } @else if (approvedRequests().length === 0) {
+          <div class="approved-requests-empty" data-testid="approved-requests-empty">
+            {{ 'orders.fromApprovedRequestEmpty' | translate }}
+          </div>
+        } @else {
+          @for (req of approvedRequests(); track req.id) {
+            <button
+              mat-menu-item
+              type="button"
+              (click)="createFromApprovedRequest(req)"
+              [attr.data-testid]="'approved-request-option-' + req.id"
+            >
+              <span>
+                {{ req.required_by_date }}
+                @if (req.estimated_total) {
+                  · {{ formatApprovedRequestMoney(req) }}
+                }
+              </span>
+            </button>
+          }
+        }
+      </mat-menu>
       <a *appRole="['owner', 'buyer']" mat-flat-button color="primary" routerLink="/orders/new" data-testid="order-create-btn">
         <mat-icon aria-hidden="true">add</mat-icon>
         {{ 'orders.createButton' | translate }}

@@ -114,34 +114,38 @@
     }
 
     <!-- Already Resolved Decision Banner -->
-    @if (decision(); as dec) {
+    @if (decision() || task()?.matched_product) {
       <div class="decision-banner" role="region">
         <div class="decision-header">
           <mat-icon class="decision-icon" aria-hidden="true">check_circle</mat-icon>
           <div class="decision-title-group">
             <h2 class="decision-title">{{ 'matching.resolution.decision.title' | translate }}</h2>
-            <span class="decision-tag" [class.auto-tag]="dec.is_automatic" [class.human-tag]="!dec.is_automatic">
-              {{ (dec.is_automatic ? 'matching.resolution.decision.automatic' : 'matching.resolution.decision.human') | translate }}
-            </span>
+            @if (decision(); as dec) {
+              <span class="decision-tag" [class.auto-tag]="dec.is_automatic" [class.human-tag]="!dec.is_automatic">
+                {{ (dec.is_automatic ? 'matching.resolution.decision.automatic' : 'matching.resolution.decision.human') | translate }}
+              </span>
+            }
           </div>
         </div>
         <div class="decision-details-grid">
           <div>
             <strong>{{ 'matching.resolution.decision.matchedProduct' | translate }}</strong>
-            <span>{{ dec.matched_product.tenant_name }}</span>
+            <span>{{ matchedProductName() }}</span>
           </div>
-          <div>
-            <strong>{{ 'matching.resolution.decision.outcome' | translate }}</strong>
-            <span>{{ 'matching.resolution.outcomes.' + dec.outcome + '.label' | translate }}</span>
-          </div>
-          <div>
-            <strong>{{ 'matching.resolution.decision.confidence' | translate }}</strong>
-            <span>{{ formatScore(dec.confidence) }}%</span>
-          </div>
-          <div>
-            <strong>{{ 'matching.resolution.decision.decidedAt' | translate }}</strong>
-            <span>{{ dec.decided_at | formatDate }}</span>
-          </div>
+          @if (decision(); as dec) {
+            <div>
+              <strong>{{ 'matching.resolution.decision.outcome' | translate }}</strong>
+              <span>{{ 'matching.resolution.outcomes.' + dec.outcome + '.label' | translate }}</span>
+            </div>
+            <div>
+              <strong>{{ 'matching.resolution.decision.confidence' | translate }}</strong>
+              <span>{{ formatScore(dec.confidence) }}%</span>
+            </div>
+            <div>
+              <strong>{{ 'matching.resolution.decision.decidedAt' | translate }}</strong>
+              <span>{{ dec.decided_at | formatDate }}</span>
+            </div>
+          }
         </div>
       </div>
     }
@@ -208,12 +212,12 @@
       [selectedCandidateId]="selectedCandidateId()"
       [selectedOutcome]="selectedOutcome()"
       [isWriter]="isWriter()"
-      [hasDecision]="decision() !== null"
+      [hasDecision]="decision() !== null || !!task()?.matched_product"
       (candidateSelected)="selectCandidate($event)"
     ></app-match-resolution-candidates>
 
     <!-- Outcomes Selection Section -->
-    @if (isWriter() && !decision()) {
+    @if (isWriter() && !decision() && !task()?.matched_product) {
       <section class="outcomes-section" aria-labelledby="outcomes-section-title">
         <div class="section-header">
           <h2 id="outcomes-section-title" class="section-title">{{ 'matching.resolution.outcomes.title' | translate }}</h2>

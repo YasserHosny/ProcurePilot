@@ -18,6 +18,7 @@ import { forkJoin, of } from 'rxjs';
 import { catchError } from 'rxjs/operators';
 
 import type { ApiError, Branch, BranchList, PurchaseRequest, PurchaseRequestStatus } from '../../../core/api/models';
+import { FormatService } from '../../../core/format/format.service';
 import { OrganisationApiService } from '../../settings/organisation-api';
 import { RequestsApiService } from '../requests-api';
 
@@ -46,6 +47,7 @@ const I18N = 'requests';
 export class RequestListComponent implements OnInit {
   private readonly requestsApi = inject(RequestsApiService);
   private readonly organisationApi = inject(OrganisationApiService);
+  private readonly formatService = inject(FormatService);
   private readonly router = inject(Router);
   private readonly dialog = inject(MatDialog);
   private readonly snackBar = inject(MatSnackBar);
@@ -136,10 +138,7 @@ export class RequestListComponent implements OnInit {
   }
 
   formatMoney(request: PurchaseRequest): string {
-    if (!request.estimated_total) {
-      return '—';
-    }
-    return `${request.estimated_total.currency} ${request.estimated_total.amount}`;
+    return this.formatService.formatCurrencyAmount(request.estimated_total);
   }
 
   getBranchName(branchId: string): string {

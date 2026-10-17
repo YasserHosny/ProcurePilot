@@ -87,6 +87,16 @@ STEP_COLUMNS = (
     "id,purchase_request_id,assigned_membership_id,source,status,"
     "comment,decided_by_membership_id,decided_at"
 )
+
+
+def approved_step_predicate(alias: str = "") -> str:
+    prefix = f"{alias}." if alias else ""
+    return (
+        f"{prefix}status = 'approved' and {prefix}decided_by_membership_id is not null "
+        f"and {prefix}decided_at is not null"
+    )
+
+
 THRESHOLD_RULE_COLUMNS = (
     "id,branch_id,min_amount,max_amount,currency,approver_membership_id,"
     "created_by,created_at,updated_at"
@@ -286,13 +296,7 @@ class RequestsService:
                 if request_row is None:
                     raise NotFoundError(details={"resource": "purchase_request"})
 
-                step_filter = (
-                    " and status = 'approved'"
-                    " and decided_by_membership_id is not null"
-                    " and decided_at is not null"
-                    if require_approval
-                    else ""
-                )
+                step_filter = f" and {approved_step_predicate()}" if require_approval else ""
                 step_row = conn.execute(
                     f"select {STEP_COLUMNS} from approval_step "
                     "where tenant_id = %s and purchase_request_id = %s"
@@ -319,11 +323,17 @@ class RequestsService:
         self,
         *,
         bearer_token: str,
+        member: CurrentMember | None = None,
         status: PurchaseRequestStatus | None = None,
         branch_id: UUID | None = None,
         cursor: str | None = None,
         limit: int = 50,
+        eligible_for_order: bool = False,
     ) -> PurchaseRequestList:
+        if eligible_for_order:
+            if member is None:
+                raise UnprocessableEntityError(details={"reason": "member_required"})
+            return self.list_requests_eligible_for_order(member=member, cursor=cursor, limit=limit)
         client = authenticated_client(self._settings, bearer_token)
         capped = _cap_limit(limit)
         offset = _decode_cursor(cursor)
@@ -353,6 +363,7 @@ class RequestsService:
         request_ids = [str(r["id"]) for r in visible]
         lines_by_request = self._fetch_lines_batch(client, request_ids)
         steps_by_request = self._fetch_steps_batch(client, request_ids)
+        requester_emails = self._fetch_requester_emails_batch(client, visible)
 
         items = [
             self._purchase_request_with_budget_status(
@@ -360,9 +371,50 @@ class RequestsService:
                 row,
                 lines_by_request.get(str(row["id"]), []),
                 steps_by_request.get(str(row["id"])),
+                requester_email=requester_emails.get(str(row["requested_by_membership_id"])),
+                requester_lookup=False,
             )
             for row in visible
         ]
+        return PurchaseRequestList(items=items, next_cursor=next_cursor)
+
+    def list_requests_eligible_for_order(
+        self, *, member: CurrentMember, cursor: str | None = None, limit: int = 50
+    ) -> PurchaseRequestList:
+        capped = _cap_limit(limit)
+        offset = _decode_cursor(cursor)
+        claims = json.dumps(
+            {
+                "sub": str(member.user_id),
+                "tenant_id": str(member.tenant_id),
+                "role": "authenticated",
+                "member_role": member.role.value,
+            }
+        )
+        try:
+            with db.connect(
+                self._settings.database_url.get_secret_value(), row_factory=dict_row
+            ) as conn:
+                conn.execute("set local role authenticated")
+                conn.execute("select set_config('request.jwt.claims', %s, true)", (claims,))
+                rows = conn.execute(
+                    "select pr.id from purchase_request pr join approval_step ast "
+                    "on ast.tenant_id = pr.tenant_id and ast.purchase_request_id = pr.id "
+                    f"where pr.tenant_id = %s and {approved_step_predicate('ast')} "
+                    "and not exists (select 1 from purchase_order po "
+                    "where po.tenant_id = pr.tenant_id "
+                    "and po.source_request_id = pr.id) order by pr.created_at desc, pr.id "
+                    "limit %s offset %s",
+                    (member.tenant_id, capped + 1, offset),
+                ).fetchall()
+        except psycopg.Error as exc:
+            raise ServiceUnavailableError(details={"dependency": "database"}) from exc
+        visible = rows[:capped]
+        items = [
+            self._get_request_for_member(member=member, request_id=UUID(str(row["id"])))
+            for row in visible
+        ]
+        next_cursor = _encode_cursor(offset + capped) if len(rows) > capped else None
         return PurchaseRequestList(items=items, next_cursor=next_cursor)
 
     def list_pending_approvals(
@@ -400,6 +452,7 @@ class RequestsService:
         request_rows = self._fetch_requests_batch(client, request_ids)
         lines_by_request = self._fetch_lines_batch(client, request_ids)
         steps_by_request = {str(step["purchase_request_id"]): step for step in visible_steps}
+        requester_emails = self._fetch_requester_emails_batch(client, request_rows)
 
         items = [
             self._purchase_request_with_budget_status(
@@ -407,6 +460,8 @@ class RequestsService:
                 row,
                 lines_by_request.get(str(row["id"]), []),
                 steps_by_request.get(str(row["id"])),
+                requester_email=requester_emails.get(str(row["requested_by_membership_id"])),
+                requester_lookup=False,
             )
             for row in request_rows
         ]
@@ -1865,13 +1920,63 @@ class RequestsService:
         request_row: dict[str, object],
         line_rows: list[dict[str, object]],
         step_row: dict[str, object] | None,
+        *,
+        requester_email: str | None = None,
+        requester_lookup: bool = True,
     ) -> PurchaseRequest:
+        if requester_lookup:
+            requester = self._fetch_requester(
+                client, str(request_row["requested_by_membership_id"])
+            )
+            requester_email = str(requester["email"]) if requester.get("email") else None
         return _purchase_request(
             request_row,
             line_rows,
             step_row,
             budget_status=self._budget_status_for(client, request_row),
+            requester_email=requester_email,
         )
+
+    def _fetch_requester_emails_batch(
+        self, client: Client, request_rows: list[dict[str, object]]
+    ) -> dict[str, str]:
+        membership_ids = {str(row["requested_by_membership_id"]) for row in request_rows}
+        if not membership_ids:
+            return {}
+        try:
+            response = (
+                client.table("membership")
+                .select("id,email")
+                .in_("id", list(membership_ids))
+                .execute()
+            )
+            return {
+                str(row["id"]): str(row["email"])
+                for row in _rows(response.data)
+                if row.get("email")
+            }
+        except Exception:
+            logger.warning("Requester email lookup failed for request list", exc_info=True)
+            return {}
+
+    def _fetch_requester(self, client: Client, membership_id: str) -> dict[str, object]:
+        try:
+            response = (
+                client.table("membership")
+                .select("email")
+                .eq("id", membership_id)
+                .limit(1)
+                .execute()
+            )
+        except Exception:
+            logger.warning(
+                "Requester email lookup failed",
+                extra={"membership_id": membership_id},
+                exc_info=True,
+            )
+            return {}
+        rows = _rows(response.data)
+        return rows[0] if rows else {}
 
     def _budget_status_for(
         self,
@@ -1942,12 +2047,16 @@ def _purchase_request(
     step_row: dict[str, object] | None,
     *,
     budget_status: BudgetStatus | None = None,
+    requester_name: str | None = None,
+    requester_email: str | None = None,
 ) -> PurchaseRequest:
     return PurchaseRequest(
         id=UUID(str(row["id"])),
         branch_id=UUID(str(row["branch_id"])),
         cost_centre_id=(UUID(str(row["cost_centre_id"])) if row.get("cost_centre_id") else None),
         requested_by_membership_id=UUID(str(row["requested_by_membership_id"])),
+        requester_name=requester_name,
+        requester_email=requester_email,
         required_by_date=_parse_date(row["required_by_date"]),
         status=str(row["status"]),
         lines=[_purchase_request_line(lr) for lr in line_rows],

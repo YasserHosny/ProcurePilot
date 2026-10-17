@@ -35,9 +35,7 @@ def quoted_exposure(
         + Decimal(delivery_fee.amount if delivery_fee else "0")
         - Decimal(discount.amount if discount else "0")
     )
-    total = (line_net * (Decimal("1") + Decimal(vat_rate or "0"))).quantize(
-        FOUR_PLACES
-    )
+    total = (line_net * (Decimal("1") + Decimal(vat_rate or "0"))).quantize(FOUR_PLACES)
     return QuotedExposureResult(
         total=Money(amount=format(total, "f"), currency=unit_price.currency)
     )

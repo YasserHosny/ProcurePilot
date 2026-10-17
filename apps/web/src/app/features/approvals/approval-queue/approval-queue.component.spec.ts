@@ -82,7 +82,10 @@ describe('ApprovalQueueComponent', () => {
       'approveRequest',
       'rejectRequest',
     ]);
-    organisationApi = jasmine.createSpyObj('OrganisationApiService', ['listBranches']);
+    organisationApi = jasmine.createSpyObj('OrganisationApiService', [
+      'listBranches',
+      'listCostCentres',
+    ]);
     api = jasmine.createSpyObj('ApiService', ['products']);
     dialogSpy = jasmine.createSpyObj('MatDialog', ['open']);
     snackBarSpy = jasmine.createSpyObj('MatSnackBar', ['open']);
@@ -95,6 +98,22 @@ describe('ApprovalQueueComponent', () => {
         items: [
           { id: 'branch-north', name: 'North Branch', is_active: true, created_at: '2026-01-01T00:00:00Z' },
           { id: 'branch-south', name: 'South Branch', is_active: true, created_at: '2026-01-01T00:00:00Z' },
+        ],
+        next_cursor: null,
+      }),
+    );
+    organisationApi.listCostCentres.and.returnValue(
+      of({
+        items: [
+          {
+            id: 'cc-ops',
+            name: 'Operations CC',
+            code: 'OPS-01',
+            branch_id: 'branch-north',
+            is_orphaned: false,
+            is_archived: false,
+            created_at: '2026-01-01T00:00:00Z',
+          },
         ],
         next_cursor: null,
       }),
@@ -156,24 +175,59 @@ describe('ApprovalQueueComponent', () => {
   it('should load pending approvals with limit 50 on init', () => {
     expect(approvalsApi.listPendingApprovals).toHaveBeenCalledWith({ limit: 50 });
     expect(organisationApi.listBranches).toHaveBeenCalledWith({ limit: 100 });
+    expect(organisationApi.listCostCentres).toHaveBeenCalledWith({ limit: 100 });
     expect(api.products).toHaveBeenCalledWith({ status: 'all', limit: 100 });
     expect(component.pendingRequests().length).toBe(2);
     expect(component.isLoading()).toBeFalse();
   });
 
-  it('should display rows with requester, branch, cost centre, required-by date, and total', () => {
+  it('should display rows with requester short id fallback, branch, cost centre name/none, required-by date, and formatted total', () => {
     const compiled = fixture.nativeElement as HTMLElement;
     const rows = compiled.querySelectorAll('.request-row');
     expect(rows.length).toBe(2);
 
-    expect(compiled.textContent).toContain('mem-requester-1');
+    expect(compiled.textContent).toContain('mem-requ');
     expect(compiled.textContent).toContain('North Branch');
-    expect(compiled.textContent).toContain('cc-ops');
+    expect(compiled.textContent).toContain('Operations CC');
     expect(compiled.textContent).toContain('2026-09-20');
-    expect(compiled.textContent).toContain('SAR 1250.00');
+    expect(compiled.textContent).toContain('SAR 1,250');
 
-    expect(compiled.textContent).toContain('mem-requester-2');
     expect(compiled.textContent).toContain('South Branch');
+    expect(compiled.textContent).toContain('None (branch-level)');
+  });
+
+  it('should prefer requester_name over requester_email and fall back to short id only when both are null', () => {
+    const requestsWithRequesterInfo: PurchaseRequest[] = [
+      {
+        ...mockPendingRequests[0],
+        id: 'req-name',
+        requester_name: 'Nadia Mansour',
+        requester_email: 'nadia@example.com',
+      },
+      {
+        ...mockPendingRequests[0],
+        id: 'req-email',
+        requester_name: null,
+        requester_email: 'buyer@example.com',
+      },
+      {
+        ...mockPendingRequests[0],
+        id: 'req-fallback',
+        requester_name: null,
+        requester_email: null,
+        requested_by_membership_id: 'abcdef12-3456-7890-abcd-ef1234567890',
+      },
+    ];
+    approvalsApi.listPendingApprovals.and.returnValue(
+      of({ items: requestsWithRequesterInfo, next_cursor: null }),
+    );
+    component.loadPendingApprovals();
+    fixture.detectChanges();
+
+    const cells = Array.from(
+      (fixture.nativeElement as HTMLElement).querySelectorAll('.requester-cell'),
+    ).map((el) => el.textContent?.trim());
+    expect(cells).toEqual(['Nadia Mansour', 'buyer@example.com', 'abcdef12']);
   });
 
   it('should render incomplete estimate badge and budget warning when applicable', () => {
@@ -188,14 +242,73 @@ describe('ApprovalQueueComponent', () => {
 
     const warningRemaining = compiled.querySelector('.budget-remaining-subtext');
     expect(warningRemaining).toBeTruthy();
-    expect(warningRemaining?.textContent?.trim()).toBe('Remaining: SAR 100.00');
+    expect(warningRemaining?.textContent?.trim()).toBe('Remaining: SAR 100');
   });
 
-  it('should render quiet remaining budget when within budget', () => {
+  it('should render within budget badge and formatted remaining budget when within budget', () => {
     const compiled = fixture.nativeElement as HTMLElement;
+    const withinBadge = compiled.querySelector('.budget-within-badge');
+    expect(withinBadge?.textContent?.trim()).toBe('Within budget');
     const budgetRemaining = compiled.querySelector('.budget-remaining');
     expect(budgetRemaining).toBeTruthy();
-    expect(budgetRemaining?.textContent?.trim()).toBe('Remaining: SAR 5000.00');
+    expect(budgetRemaining?.textContent?.trim()).toBe('Remaining: SAR 5,000');
+  });
+
+  it('should render near, over, and no_budget statuses with i18n reason_code messages', () => {
+    const requestsWithStatuses: PurchaseRequest[] = [
+      {
+        ...mockPendingRequests[0],
+        id: 'req-near',
+        budget_status: {
+          status: 'near',
+          remaining_amount: { amount: '1250.5', currency: 'EGP' },
+          exceeds: false,
+          reason_code: null,
+        },
+      },
+      {
+        ...mockPendingRequests[0],
+        id: 'req-nobudget-branch',
+        cost_centre_id: null,
+        budget_status: {
+          status: 'no_budget',
+          remaining_amount: null,
+          exceeds: false,
+          reason_code: 'no_budget_for_branch',
+        },
+      },
+      {
+        ...mockPendingRequests[0],
+        id: 'req-nobudget-cc',
+        budget_status: {
+          status: 'no_budget',
+          remaining_amount: null,
+          exceeds: false,
+          reason_code: 'no_budget_at_cost_centre_level',
+        },
+      },
+    ];
+    approvalsApi.listPendingApprovals.and.returnValue(
+      of({ items: requestsWithStatuses, next_cursor: null }),
+    );
+    component.loadPendingApprovals();
+    fixture.detectChanges();
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    expect(compiled.querySelector('.budget-near-badge')?.textContent?.trim()).toBe(
+      'Near budget limit',
+    );
+    expect(compiled.textContent).toContain('Remaining: EGP 1,250.5');
+    expect(compiled.querySelector('.budget-no-budget-badge')?.textContent?.trim()).toBe(
+      'No budget configured',
+    );
+    const reasons = Array.from(compiled.querySelectorAll('.budget-reason-subtext')).map((el) =>
+      el.textContent?.trim(),
+    );
+    expect(reasons).toEqual([
+      'No budget set for this branch',
+      'No budget at cost-centre level',
+    ]);
   });
 
   it('should display not available when budget_status is absent or null', () => {
@@ -261,6 +374,7 @@ describe('ApprovalQueueComponent', () => {
 
   it('should fall back to raw IDs when lookup data is missing', () => {
     organisationApi.listBranches.and.returnValue(of({ items: [], next_cursor: null }));
+    organisationApi.listCostCentres.and.returnValue(of({ items: [], next_cursor: null }));
     api.products.and.returnValue(of({ items: [], next_cursor: null }));
 
     component.loadPendingApprovals();
@@ -269,6 +383,7 @@ describe('ApprovalQueueComponent', () => {
 
     const compiled = fixture.nativeElement as HTMLElement;
     expect(compiled.textContent).toContain('branch-north');
+    expect(compiled.textContent).toContain('cc-ops');
     expect(compiled.textContent).toContain('prod-gloves');
   });
 
@@ -340,10 +455,10 @@ describe('ApprovalQueueComponent', () => {
     expect(component.errorTraceId()).toBe('tr_appr_123');
   });
 
-  it('should correctly format money and line prices', () => {
-    expect(component.formatMoney(mockPendingRequests[0])).toBe('SAR 1250.00');
+  it('should correctly format money and line prices via FormatService', () => {
+    expect(component.formatMoney(mockPendingRequests[0])).toBe('SAR 1,250');
     expect(component.formatMoney(mockPendingRequests[1])).toBe('Not available');
-    expect(component.formatLinePrice(mockPendingRequests[0].lines[0])).toBe('SAR 15.00');
+    expect(component.formatLinePrice(mockPendingRequests[0].lines[0])).toBe('SAR 15');
     expect(
       component.formatLinePrice({
         id: 'l3',

@@ -2,6 +2,7 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Body, Depends, Header, Query, Request, Response, status
+from pydantic import BaseModel
 
 from procurepilot_api.config import get_settings
 from procurepilot_api.deps import CurrentMember, bearer_token, current_member
@@ -26,6 +27,39 @@ WRITE_ROLES = (MemberRole.owner, MemberRole.buyer)
 
 def _order_limit() -> str:
     return get_settings().rate_limit_order_mutation
+
+
+class NextOrderNumber(BaseModel):
+    order_number: str
+
+
+class SupplierPrefill(BaseModel):
+    id: UUID
+    name: str
+
+
+class RequestOrderPrefill(BaseModel):
+    source_request_id: UUID
+    supplier: SupplierPrefill | None
+
+
+@router.get("/orders/next-number", response_model=NextOrderNumber)
+def next_order_number(
+    member: Annotated[CurrentMember, Depends(current_member)],
+    service: Annotated[OrdersService, Depends(get_orders_service)],
+) -> NextOrderNumber:
+    return NextOrderNumber(order_number=service.next_order_number(member=member))
+
+
+@router.get("/orders/request-prefill", response_model=RequestOrderPrefill)
+def request_order_prefill(
+    source_request_id: UUID,
+    member: Annotated[CurrentMember, Depends(current_member)],
+    service: Annotated[OrdersService, Depends(get_orders_service)],
+) -> RequestOrderPrefill:
+    return RequestOrderPrefill.model_validate(
+        service.request_supplier_prefill(member=member, source_request_id=source_request_id)
+    )
 
 
 @router.post("/orders", status_code=status.HTTP_201_CREATED, response_model=PurchaseOrder)
