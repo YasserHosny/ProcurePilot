@@ -167,7 +167,7 @@ describe('MatchResolutionComponent (T039)', () => {
     ]);
     apiService.getMatchTasks.and.returnValue(of({ items: [mockTask], next_cursor: null }));
     apiService.getMatchTaskForLine.and.returnValue(of(mockTask));
-    apiService.getNextMatchTask.and.returnValue(of({ next_task_id: null }));
+    apiService.getNextMatchTask.and.returnValue(of({ next_task_id: null, next_quotation_line_id: null }));
     apiService.baseUnits.and.returnValue(
       of({
         items: [{ code: 'litre', label_en: 'Litre (L)', label_ar: 'لتر', dimension: 'volume' }],
@@ -402,13 +402,13 @@ describe('MatchResolutionComponent (T039)', () => {
   it('navigates to the next open task on Resolve and Next when next_task_id is returned', () => {
     const router = (component as unknown as { router: { navigate: (...args: unknown[]) => Promise<boolean> } }).router;
     const navSpy = spyOn(router, 'navigate').and.returnValue(Promise.resolve(true));
-    apiService.getNextMatchTask.and.returnValue(of({ next_task_id: 'task-resolve-2' }));
+    apiService.getNextMatchTask.and.returnValue(of({ next_task_id: 'task-resolve-2', next_quotation_line_id: 'line-next' }));
 
     component.confirmResolution(true);
 
     expect(apiService.resolveMatch).toHaveBeenCalled();
     expect(apiService.getNextMatchTask).toHaveBeenCalledWith('task-resolve-1');
-    expect(navSpy).toHaveBeenCalledWith(['/matching', 'task-resolve-2']);
+    expect(navSpy).toHaveBeenCalledWith(['/matching', 'line-next']);
   });
 
   it('navigates to /matching and shows queue cleared toast on Resolve and Next when no tasks remain', () => {
@@ -416,7 +416,7 @@ describe('MatchResolutionComponent (T039)', () => {
     const navSpy = spyOn(router, 'navigate').and.returnValue(Promise.resolve(true));
     const snackBar = (component as unknown as { snackBar: { open: (...args: unknown[]) => unknown } }).snackBar;
     const snackSpy = spyOn(snackBar, 'open');
-    apiService.getNextMatchTask.and.returnValue(of({ next_task_id: null }));
+    apiService.getNextMatchTask.and.returnValue(of({ next_task_id: null, next_quotation_line_id: null }));
 
     component.confirmResolution(true);
 

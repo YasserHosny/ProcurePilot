@@ -428,12 +428,15 @@ describe('RequestFormComponent — edit mode (T017)', () => {
     expect(qtyInput?.value).toBe('10');
   });
 
-  it('should show Create purchase order button only when status is approved and navigate on click', () => {
+  it('shows Create purchase order for an approved step on an ordered request', () => {
     const compiledDraft = fixture.nativeElement as HTMLElement;
     expect(compiledDraft.querySelector('[data-testid="request-create-order-btn"]')).toBeNull();
 
     requestsApi.getRequest.and.returnValue(
-      of({ ...mockRequest, status: 'approved' } as PurchaseRequest),
+      of({ ...mockRequest, status: 'ordered', approval_step: {
+        id: 'step1', assigned_membership_id: 'm1', source: 'owner_fallback', status: 'approved',
+        decided_by_membership_id: 'm1', decided_at: '2026-10-01T00:00:00Z',
+      } } as PurchaseRequest),
     );
 
     const approvedFixture = TestBed.createComponent(RequestFormComponent);
@@ -445,11 +448,23 @@ describe('RequestFormComponent — edit mode (T017)', () => {
     );
     expect(createOrderBtn).toBeTruthy();
     expect(createOrderBtn?.textContent).toContain('Create purchase order');
+    expect(compiledApproved.querySelector('.form-title')?.textContent?.trim()).toBe('Purchase Request');
+    expect(compiledApproved.querySelector('[data-testid="request-status-chip"]')?.textContent?.trim()).toBe('Ordered');
 
     createOrderBtn?.click();
     expect(routerSpy.navigate).toHaveBeenCalledWith(['/orders/new'], {
       queryParams: { source_request_id: 'r1' },
     });
+  });
+
+  it('hides Create purchase order while approval is pending', () => {
+    requestsApi.getRequest.and.returnValue(of({ ...mockRequest, status: 'submitted', approval_step: {
+      id: 'step1', assigned_membership_id: 'm1', source: 'owner_fallback', status: 'pending',
+      decided_by_membership_id: null, decided_at: null,
+    } } as PurchaseRequest));
+    const pendingFixture = TestBed.createComponent(RequestFormComponent);
+    pendingFixture.detectChanges();
+    expect(pendingFixture.nativeElement.querySelector('[data-testid="request-create-order-btn"]')).toBeNull();
   });
 
   it('should not display budget status block when budget_status is absent', () => {

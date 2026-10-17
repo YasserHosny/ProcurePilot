@@ -216,6 +216,7 @@ def test_orders_next_number_supplier_prefill_and_duplicate_number_conflict(
         app = _app(monkeypatch, member)
         client = TestClient(app, raise_server_exceptions=False)
         branch_id, request_id, rfq_id, recipient_id, response_id = (uuid4() for _ in range(5))
+        pending_request_id = uuid4()
         with pytest.importorskip("psycopg").connect(TEST_DATABASE_URL) as conn:
             with conn.cursor() as cur:
                 act_as(cur, context.workspace)
@@ -242,13 +243,36 @@ def test_orders_next_number_supplier_prefill_and_duplicate_number_conflict(
                     (response_id, context.workspace.tenant_id, recipient_id, quote_id),
                 )
                 cur.execute(
-                    "insert into purchase_request (id,tenant_id,branch_id,requested_by_membership_id,required_by_date,status,source_rfq_response_id) values (%s,%s,%s,%s,'2026-12-01','approved',%s)",  # noqa: E501
+                    "insert into purchase_request (id,tenant_id,branch_id,requested_by_membership_id,required_by_date,status,source_rfq_response_id) values (%s,%s,%s,%s,'2026-12-01','ordered',%s)",  # noqa: E501
                     (
                         request_id,
                         context.workspace.tenant_id,
                         branch_id,
                         context.workspace.membership_id,
                         response_id,
+                    ),
+                )
+                cur.execute(
+                    "insert into approval_step (tenant_id,purchase_request_id,"
+                    "assigned_membership_id,"
+                    "source,status,decided_by_membership_id,decided_at) "
+                    "values (%s,%s,%s,'owner_fallback','approved',%s,now())",
+                    (
+                        context.workspace.tenant_id,
+                        request_id,
+                        context.workspace.membership_id,
+                        context.workspace.membership_id,
+                    ),
+                )
+                cur.execute(
+                    "insert into purchase_request (id,tenant_id,branch_id,"
+                    "requested_by_membership_id,"
+                    "required_by_date,status) values (%s,%s,%s,%s,'2026-12-01','submitted')",
+                    (
+                        pending_request_id,
+                        context.workspace.tenant_id,
+                        branch_id,
+                        context.workspace.membership_id,
                     ),
                 )
                 cur.execute(
@@ -272,6 +296,16 @@ def test_orders_next_number_supplier_prefill_and_duplicate_number_conflict(
                 "id": str(context.supplier_ids[0]),
                 "name": "web-orders-prefill Supplier 1",
             }
+            eligible = client.get("/api/v1/requests", params={"eligible_for_order": "true"})
+            assert eligible.status_code == 200, eligible.text
+            assert str(request_id) in {item["id"] for item in eligible.json()["items"]}
+            assert str(pending_request_id) not in {item["id"] for item in eligible.json()["items"]}
+            pending_prefill = client.get(
+                "/api/v1/orders/request-prefill",
+                params={"source_request_id": str(pending_request_id)},
+            )
+            assert pending_prefill.status_code == 422
+            assert pending_prefill.json()["details"]["reason"] == "request_not_approved"
             product_id = context.product_id
             payload = {
                 "order_number": "PO-000009",
@@ -367,3 +401,4 @@ def test_resolved_match_task_has_product_and_next_open_task(
                 "test-token", member, service, exclude_task_id=resolved_task
             )
             assert next_item.next_task_id == open_task
+            assert next_item.next_quotation_line_id == line_ids[1]

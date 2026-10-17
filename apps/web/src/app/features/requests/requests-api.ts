@@ -29,6 +29,7 @@ export class RequestsApiService {
     branch_id?: string;
     cursor?: string;
     limit?: number;
+    eligible_for_order?: boolean;
   }): Observable<PurchaseRequestList> {
     return this.api.listRequests(params);
   }

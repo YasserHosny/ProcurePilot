@@ -87,6 +87,16 @@ STEP_COLUMNS = (
     "id,purchase_request_id,assigned_membership_id,source,status,"
     "comment,decided_by_membership_id,decided_at"
 )
+
+
+def approved_step_predicate(alias: str = "") -> str:
+    prefix = f"{alias}." if alias else ""
+    return (
+        f"{prefix}status = 'approved' and {prefix}decided_by_membership_id is not null "
+        f"and {prefix}decided_at is not null"
+    )
+
+
 THRESHOLD_RULE_COLUMNS = (
     "id,branch_id,min_amount,max_amount,currency,approver_membership_id,"
     "created_by,created_at,updated_at"
@@ -286,13 +296,7 @@ class RequestsService:
                 if request_row is None:
                     raise NotFoundError(details={"resource": "purchase_request"})
 
-                step_filter = (
-                    " and status = 'approved'"
-                    " and decided_by_membership_id is not null"
-                    " and decided_at is not null"
-                    if require_approval
-                    else ""
-                )
+                step_filter = f" and {approved_step_predicate()}" if require_approval else ""
                 step_row = conn.execute(
                     f"select {STEP_COLUMNS} from approval_step "
                     "where tenant_id = %s and purchase_request_id = %s"
@@ -319,11 +323,17 @@ class RequestsService:
         self,
         *,
         bearer_token: str,
+        member: CurrentMember | None = None,
         status: PurchaseRequestStatus | None = None,
         branch_id: UUID | None = None,
         cursor: str | None = None,
         limit: int = 50,
+        eligible_for_order: bool = False,
     ) -> PurchaseRequestList:
+        if eligible_for_order:
+            if member is None:
+                raise UnprocessableEntityError(details={"reason": "member_required"})
+            return self.list_requests_eligible_for_order(member=member, cursor=cursor, limit=limit)
         client = authenticated_client(self._settings, bearer_token)
         capped = _cap_limit(limit)
         offset = _decode_cursor(cursor)
@@ -366,6 +376,45 @@ class RequestsService:
             )
             for row in visible
         ]
+        return PurchaseRequestList(items=items, next_cursor=next_cursor)
+
+    def list_requests_eligible_for_order(
+        self, *, member: CurrentMember, cursor: str | None = None, limit: int = 50
+    ) -> PurchaseRequestList:
+        capped = _cap_limit(limit)
+        offset = _decode_cursor(cursor)
+        claims = json.dumps(
+            {
+                "sub": str(member.user_id),
+                "tenant_id": str(member.tenant_id),
+                "role": "authenticated",
+                "member_role": member.role.value,
+            }
+        )
+        try:
+            with db.connect(
+                self._settings.database_url.get_secret_value(), row_factory=dict_row
+            ) as conn:
+                conn.execute("set local role authenticated")
+                conn.execute("select set_config('request.jwt.claims', %s, true)", (claims,))
+                rows = conn.execute(
+                    "select pr.id from purchase_request pr join approval_step ast "
+                    "on ast.tenant_id = pr.tenant_id and ast.purchase_request_id = pr.id "
+                    f"where pr.tenant_id = %s and {approved_step_predicate('ast')} "
+                    "and not exists (select 1 from purchase_order po "
+                    "where po.tenant_id = pr.tenant_id "
+                    "and po.source_request_id = pr.id) order by pr.created_at desc, pr.id "
+                    "limit %s offset %s",
+                    (member.tenant_id, capped + 1, offset),
+                ).fetchall()
+        except psycopg.Error as exc:
+            raise ServiceUnavailableError(details={"dependency": "database"}) from exc
+        visible = rows[:capped]
+        items = [
+            self._get_request_for_member(member=member, request_id=UUID(str(row["id"])))
+            for row in visible
+        ]
+        next_cursor = _encode_cursor(offset + capped) if len(rows) > capped else None
         return PurchaseRequestList(items=items, next_cursor=next_cursor)
 
     def list_pending_approvals(

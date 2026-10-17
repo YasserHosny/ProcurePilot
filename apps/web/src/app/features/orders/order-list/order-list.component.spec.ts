@@ -98,7 +98,7 @@ describe('OrderListComponent', () => {
     fromApprovedBtn.click();
     fixture.detectChanges();
 
-    const approvedReqCall = http.expectOne('/api/v1/requests?status=approved');
+    const approvedReqCall = http.expectOne('/api/v1/requests?limit=100&eligible_for_order=true');
     approvedReqCall.flush({
       next_cursor: null,
       items: [
@@ -107,17 +107,31 @@ describe('OrderListComponent', () => {
           branch_id: 'b1',
           requested_by_membership_id: 'm1',
           required_by_date: '2026-10-25',
-          status: 'approved',
+          status: 'ordered',
+          approval_step: { id: 'step1', assigned_membership_id: 'm1', source: 'owner_fallback', status: 'approved', decided_by_membership_id: 'm1', decided_at: '2026-10-01T00:00:00Z' },
           lines: [],
           estimated_total: { amount: '56425.0000', currency: 'EGP' },
           has_incomplete_estimate: false,
           created_at: '2026-10-01T00:00:00Z',
+        },
+        {
+          id: 'req-pending-1',
+          branch_id: 'b1',
+          requested_by_membership_id: 'm1',
+          required_by_date: '2026-10-25',
+          status: 'submitted',
+          approval_step: { id: 'step2', assigned_membership_id: 'm1', source: 'owner_fallback', status: 'pending', decided_by_membership_id: null, decided_at: null },
+          lines: [],
+          estimated_total: null,
+          has_incomplete_estimate: false,
+          created_at: '2026-10-02T00:00:00Z',
         },
       ],
     });
     fixture.detectChanges();
 
     expect(fixture.componentInstance.approvedRequests().length).toBe(1);
+    expect(document.querySelector('[data-testid="approved-request-option-req-pending-1"]')).toBeNull();
     const option = document.querySelector(
       '[data-testid="approved-request-option-req-approved-1"]',
     ) as HTMLButtonElement | null;
@@ -140,7 +154,7 @@ describe('OrderListComponent', () => {
     fromApprovedBtn.click();
     fixture.detectChanges();
 
-    http.expectOne('/api/v1/requests?status=approved').flush({ items: [], next_cursor: null });
+    http.expectOne('/api/v1/requests?limit=100&eligible_for_order=true').flush({ items: [], next_cursor: null });
     fixture.detectChanges();
 
     const emptyEl = document.querySelector('[data-testid="approved-requests-empty"]');

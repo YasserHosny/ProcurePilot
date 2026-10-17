@@ -647,11 +647,17 @@ export class ApiService {
     return this.http.get<MatchTask>(`${this.base}/quotation-lines/${lineId}/match-task`);
   }
 
-  getNextMatchTask(excludeTaskId?: string): Observable<{ next_task_id: string | null }> {
+  getNextMatchTask(excludeTaskId?: string): Observable<{
+    next_task_id: string | null;
+    next_quotation_line_id: string | null;
+  }> {
     const query = new URLSearchParams();
     if (excludeTaskId) query.set('exclude_task_id', excludeTaskId);
     const qs = query.toString() ? `?${query.toString()}` : '';
-    return this.http.get<{ next_task_id: string | null }>(`${this.base}/match-tasks/next${qs}`);
+    return this.http.get<{
+      next_task_id: string | null;
+      next_quotation_line_id: string | null;
+    }>(`${this.base}/match-tasks/next${qs}`);
   }
 
   resolveMatch(
@@ -944,12 +950,14 @@ export class ApiService {
     branch_id?: string;
     cursor?: string;
     limit?: number;
+    eligible_for_order?: boolean;
   }): Observable<PurchaseRequestList> {
     const query = new URLSearchParams();
     if (params?.status) query.set('status', params.status);
     if (params?.branch_id) query.set('branch_id', params.branch_id);
     if (params?.cursor) query.set('cursor', params.cursor);
     if (params?.limit !== undefined) query.set('limit', String(params.limit));
+    if (params?.eligible_for_order) query.set('eligible_for_order', 'true');
     const qs = query.toString() ? `?${query.toString()}` : '';
     return this.http.get<PurchaseRequestList>(`${this.base}/requests${qs}`);
   }

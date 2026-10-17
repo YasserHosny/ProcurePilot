@@ -66,19 +66,22 @@ def create_request(
 @router.get("/requests", response_model=PurchaseRequestList)
 def list_requests(
     token: Annotated[str, Depends(bearer_token)],
-    _member: Annotated[CurrentMember, Depends(current_member)],
+    member: Annotated[CurrentMember, Depends(current_member)],
     service: Annotated[RequestsService, Depends(get_requests_service)],
     status_filter: Annotated[PurchaseRequestStatus | None, Query(alias="status")] = None,
     branch_id: Annotated[UUID | None, Query()] = None,
     cursor: Annotated[str | None, Query()] = None,
     limit: Annotated[int, Query(le=100)] = 50,
+    eligible_for_order: Annotated[bool, Query()] = False,
 ) -> PurchaseRequestList:
     return service.list_requests(
         bearer_token=token,
+        member=member,
         status=status_filter,
         branch_id=branch_id,
         cursor=cursor,
         limit=limit,
+        eligible_for_order=eligible_for_order,
     )
 
 

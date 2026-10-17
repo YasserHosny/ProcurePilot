@@ -91,7 +91,7 @@ export class RequestFormComponent implements OnInit {
 
   readonly canCreateOrder = computed<boolean>(() => {
     const req = this.existingRequest();
-    return req !== null && req.status === 'approved';
+    return req !== null && req.approval_step?.status === 'approved';
   });
 
   readonly memberEmailById = computed<Map<string, string>>(() => {
@@ -250,7 +250,7 @@ export class RequestFormComponent implements OnInit {
 
   navigateToCreateOrder(): void {
     const req = this.existingRequest();
-    if (!req || req.status !== 'approved') {
+    if (!req || req.approval_step?.status !== 'approved') {
       return;
     }
     this.router.navigate(['/orders/new'], { queryParams: { source_request_id: req.id } });

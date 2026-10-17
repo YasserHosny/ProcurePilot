@@ -32,6 +32,7 @@ router = APIRouter(tags=["matching"])
 
 class NextMatchTask(BaseModel):
     next_task_id: UUID | None
+    next_quotation_line_id: UUID | None
 
 
 @router.get("/match-tasks/next", response_model=NextMatchTask)
@@ -50,8 +51,11 @@ def next_match_task(
         sort_order="desc",
     )
     items = getattr(queue, "items", [])
-    next_id = next((item.id for item in items if item.id != exclude_task_id), None)
-    return NextMatchTask(next_task_id=next_id)
+    next_item = next((item for item in items if item.id != exclude_task_id), None)
+    return NextMatchTask(
+        next_task_id=next_item.id if next_item else None,
+        next_quotation_line_id=next_item.quotation_line.id if next_item else None,
+    )
 
 
 WRITE_ROLES = (MemberRole.owner, MemberRole.buyer)

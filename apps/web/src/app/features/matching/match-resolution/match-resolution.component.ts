@@ -497,13 +497,13 @@ export class MatchResolutionComponent implements OnInit {
     if (this.api.getNextMatchTask) {
       this.api.getNextMatchTask(excludeTaskId).subscribe({
         next: (res) => {
-          if (res.next_task_id) {
+          if (res.next_quotation_line_id) {
             this.snackBar.open(
               this.translate.instant('matching.resolution.actions.saveSuccess'),
               undefined,
               { duration: 3500 },
             );
-            void this.router.navigate(['/matching', res.next_task_id]);
+            void this.router.navigate(['/matching', res.next_quotation_line_id]);
             return;
           }
           this.snackBar.open(

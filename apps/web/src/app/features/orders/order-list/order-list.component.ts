@@ -86,9 +86,16 @@ export class OrderListComponent implements OnInit {
 
   loadApprovedRequests(): void {
     this.isLoadingApprovedRequests.set(true);
-    this.requestsApi.listRequests({ status: 'approved' }).subscribe({
+    this.requestsApi.listRequests({ eligible_for_order: true, limit: 100 }).subscribe({
       next: (response) => {
-        this.approvedRequests.set([...response.items]);
+        this.approvedRequests.set(
+          response.items.filter(
+            (request) =>
+              request.approval_step?.status === 'approved' &&
+              Boolean(request.approval_step.decided_by_membership_id) &&
+              Boolean(request.approval_step.decided_at),
+          ),
+        );
         this.isLoadingApprovedRequests.set(false);
       },
       error: () => {
