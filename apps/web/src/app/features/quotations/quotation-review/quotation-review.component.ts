@@ -155,8 +155,8 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
   readonly pendingQuotationCurrency = signal<string | undefined>(undefined);
   readonly effectiveQuotationCurrency = computed(() => {
     const q = this.quotation();
-    return this.pendingQuotationCurrency() ?? q?.currency ?? q?.lines[0]?.unit_price?.currency ??
-      this.pendingNewLines()[0]?.unit_price_currency ?? this.session.homeCurrency() ?? 'USD';
+    return this.pendingQuotationCurrency() ?? (q?.currency || q?.lines[0]?.unit_price?.currency ||
+      this.pendingNewLines()[0]?.unit_price_currency || this.session.homeCurrency() || 'USD');
   });
   readonly reviewerNotes = signal<string>('');
   readonly isRequote = signal<boolean>(false);
@@ -1249,7 +1249,6 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
   addNewLine(): void {
     const text = this.newLineText().trim();
     if (!text) return;
-    const q = this.quotation();
     const currency = this.effectiveQuotationCurrency();
     const newLine: NewQuotationLine = {
       original_text: text,
