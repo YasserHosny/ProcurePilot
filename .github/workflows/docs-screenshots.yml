@@ -63,10 +63,27 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
       - uses: supabase/setup-cli@v1
         with:
-          version: latest
+          # Pin so CI avoids the rate-limited GitHub API lookup for "latest" and a CLI release
+          # cannot change the stack under us; bump deliberately.
+          version: 2.121.0
 
       - name: Start Supabase
-        run: supabase start
+        # Skip studio/postgres-meta (dashboard), vector/logflare (analytics), edge-runtime (no
+        # functions), mailpit (auth email confirmations are off in supabase/config.toml), and
+        # realtime (the app does not use it). This limits startup to the five services the app uses.
+        # Retry transient Docker/public.ecr.aws rate limits while pulling the required images.
+        run: |
+          for attempt in 1 2 3 4 5; do
+            if supabase start -x studio,vector,logflare,edge-runtime,postgres-meta,mailpit,realtime; then
+              exit 0
+            fi
+            if [ "$attempt" -eq 5 ]; then
+              echo "::error::supabase start failed after 5 attempts"
+              exit 1
+            fi
+            supabase stop --no-backup || true
+            sleep $((attempt*30))
+          done
 
       - name: Export Supabase credentials
         run: |
