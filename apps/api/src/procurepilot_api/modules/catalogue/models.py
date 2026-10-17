@@ -12,6 +12,7 @@ from procurepilot_api.modules.catalogue.normalisation import (
     normalised_base_quantity_from_string,
     parse_decimal_string,
 )
+from procurepilot_api.modules.catalogue.units import canonical_base_unit
 
 type ProductStatus = Literal["active", "archived"]
 type ProductListStatus = Literal["active", "archived", "all"]
@@ -98,6 +99,11 @@ class ProductCreate(StrictApiModel):
     base_unit: str
     pack: PackInput
     preferred_supplier_id: UUID | None = None
+
+    @field_validator("base_unit", mode="before")
+    @classmethod
+    def _canonical_base_unit(cls, value: object) -> object:
+        return canonical_base_unit(value) if isinstance(value, str) else value
 
     @field_validator("gtin")
     @classmethod

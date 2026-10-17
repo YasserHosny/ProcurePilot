@@ -13,6 +13,7 @@ from procurepilot_api.config import Settings
 from procurepilot_api.deps import CurrentMember
 from procurepilot_api.errors import (  # noqa: E501
     NotFoundError,
+    PermissionDeniedError,
     ServiceUnavailableError,
     UnprocessableEntityError,
 )
@@ -29,6 +30,7 @@ from procurepilot_api.modules.rfq.schemas import (
     GuardrailCreateInput,
     GuardrailUpdateInput,
     Rfq,
+    RfqDetail,
     RfqGuardrailEvaluation,
     RfqLine,
     RfqList,
@@ -118,31 +120,9 @@ class RfqService:
                         details={"idempotency_key": "concurrent request"}
                     )
 
-                # First, verify suppliers exist and check contact emails
-                rejected_recipients = []
-                valid_supplier_ids = []
-
-                for supplier_id in recipient_supplier_ids:
-                    cur.execute(
-                        "select id, contact_email from supplier where id = %s", (supplier_id,)
-                    )
-                    row = cur.fetchone()
-                    if row is None:
-                        rejected_recipients.append(
-                            {
-                                "supplier_id": str(supplier_id),
-                                "reason": "not_found",
-                            }
-                        )
-                    elif not row.get("contact_email"):
-                        rejected_recipients.append(
-                            {
-                                "supplier_id": str(supplier_id),
-                                "reason": "missing_contact_email",
-                            }
-                        )
-                    else:
-                        valid_supplier_ids.append(supplier_id)
+                rejected_recipients, valid_supplier_ids = _validate_recipients(
+                    cur, recipient_supplier_ids
+                )
 
                 rfq_id = uuid.uuid4()
                 cur.execute(
@@ -203,6 +183,94 @@ class RfqService:
                 conn.commit()
                 return rfq, created_lines, created_recipients, rejected_recipients
 
+    def get_detail(self, *, member: CurrentMember, rfq_id: uuid.UUID) -> RfqDetail:
+        with _authenticated_db(self.settings, member) as conn:
+            with conn.cursor(row_factory=dict_row) as cur:
+                cur.execute("select * from rfq where id = %s", (rfq_id,))
+                row = cur.fetchone()
+                if row is None:
+                    raise NotFoundError(details={"resource": "rfq"})
+                cur.execute(
+                    "select * from rfq_line where rfq_id = %s order by created_at", (rfq_id,)
+                )
+                lines = [RfqLine(**item) for item in cur.fetchall()]
+                cur.execute(
+                    "select * from rfq_recipient where rfq_id = %s order by created_at", (rfq_id,)
+                )
+                recipients = [RfqRecipient(**item) for item in cur.fetchall()]
+                return RfqDetail(rfq=Rfq(**row), lines=lines, recipients=recipients)
+
+    def update_draft(
+        self,
+        *,
+        member: CurrentMember,
+        rfq_id: uuid.UUID,
+        lines_data: list,
+        recipient_supplier_ids: list[uuid.UUID],
+        needed_by_date: date,
+        tenant_terms: str | None,
+        idempotency_key: uuid.UUID,
+    ) -> tuple[Rfq, list[RfqLine], list[RfqRecipient], list[dict]]:
+        with _authenticated_db(self.settings, member) as conn:
+            with conn.cursor(row_factory=dict_row) as cur:
+                row = _lock_rfq_for_creator(cur, member, rfq_id)
+                if row["last_update_idempotency_key"] == idempotency_key:
+                    # Replay of an already-applied PUT (lost response): return the stored
+                    # result without re-creating lines/recipients or auditing again.
+                    rfq, lines, recipients, _ = self._fetch_created(cur, rfq_id)
+                    return rfq, lines, recipients, []
+                if row["status"] != "draft":
+                    from procurepilot_api.errors import ConflictError
+
+                    raise ConflictError(details={"resource": "rfq", "reason": "not_draft"})
+                rejected, valid_supplier_ids = _validate_recipients(cur, recipient_supplier_ids)
+                try:
+                    cur.execute("delete from rfq_line where rfq_id = %s", (rfq_id,))
+                    cur.execute("delete from rfq_recipient where rfq_id = %s", (rfq_id,))
+                except psycopg.errors.ForeignKeyViolation as exc:
+                    from procurepilot_api.errors import ConflictError
+
+                    raise ConflictError(
+                        details={"resource": "rfq", "reason": "has_responses"}
+                    ) from exc
+                cur.execute(
+                    "update rfq set needed_by_date = %s, tenant_terms = %s, "
+                    "last_update_idempotency_key = %s where id = %s returning *",
+                    (needed_by_date, tenant_terms, idempotency_key, rfq_id),
+                )
+                rfq = Rfq(**cur.fetchone())
+                lines = []
+                for item in lines_data:
+                    cur.execute(
+                        "insert into rfq_line "
+                        "(tenant_id,rfq_id,workspace_product_id,quantity) "
+                        "values (%s,%s,%s,%s) returning *",
+                        (member.tenant_id, rfq_id, item.workspace_product_id, item.quantity),
+                    )
+                    lines.append(RfqLine(**cur.fetchone()))
+                recipients = []
+                for supplier_id in valid_supplier_ids:
+                    cur.execute(
+                        "insert into rfq_recipient "
+                        "(tenant_id,rfq_id,supplier_id,status) "
+                        "values (%s,%s,%s,'draft') returning *",
+                        (member.tenant_id, rfq_id, supplier_id),
+                    )
+                    recipients.append(RfqRecipient(**cur.fetchone()))
+                cur.execute(
+                    "select record_audit_event(%s, 'success'::audit_outcome, "
+                    "%s, %s, %s, %s::jsonb, null)",
+                    (
+                        "rfq.draft_updated",
+                        member.tenant_id,
+                        member.membership_id,
+                        member.email,
+                        json.dumps({"rfq_id": str(rfq_id)}),
+                    ),
+                )
+                conn.commit()
+                return rfq, lines, recipients, rejected
+
     def send(
         self,
         *,
@@ -222,10 +290,7 @@ class RfqService:
                         details={"idempotency_key": "concurrent request"}
                     )
 
-                cur.execute("select * from rfq where id = %s", (rfq_id,))
-                rfq_row = cur.fetchone()
-                if not rfq_row:
-                    raise NotFoundError(details={"resource": "rfq"})
+                rfq_row = _lock_rfq_for_creator(cur, member, rfq_id)
                 rfq = Rfq(**rfq_row)
 
                 cur.execute("select * from rfq_line where rfq_id = %s", (rfq_id,))
@@ -772,6 +837,9 @@ class RfqService:
                 r.status,
                 r.needed_by_date,
                 r.created_at,
+                r.created_by_membership_id,
+                (SELECT max(rr_sent.sent_at) FROM rfq_recipient rr_sent
+                 WHERE rr_sent.rfq_id = r.id) as sent_at,
                 (SELECT count(*) FROM rfq_recipient rr WHERE rr.rfq_id = r.id) as recipient_count,
                 (
                     SELECT count(*)
@@ -809,8 +877,46 @@ class RfqService:
         return RfqList(items=items, next_cursor=next_cursor)
 
 
+def _lock_rfq_for_creator(cur: psycopg.Cursor, member: CurrentMember, rfq_id: uuid.UUID) -> dict:
+    """Load and row-lock an RFQ the caller may mutate, BEFORE any side effect (email, delete).
+
+    RLS makes another tenant's RFQ invisible (404). Within a tenant, `rfq_update` is
+    creator-only while `rfq_select` also admits owners/buyers, so a non-creator can read a
+    draft but would only fail at the final UPDATE — after suppliers were already emailed.
+    Refuse up front instead (403).
+    """
+    cur.execute("select * from rfq where id = %s", (rfq_id,))
+    row = cur.fetchone()
+    if row is None:
+        raise NotFoundError(details={"resource": "rfq"})
+    if row["created_by_membership_id"] != member.membership_id:
+        raise PermissionDeniedError(details={"resource": "rfq", "reason": "not_creator"})
+    cur.execute("select * from rfq where id = %s for update", (rfq_id,))
+    locked = cur.fetchone()
+    if locked is None:
+        raise NotFoundError(details={"resource": "rfq"})
+    return locked
+
+
 def _cap_limit(limit: int) -> int:
     return max(1, min(limit, 100))
+
+
+def _validate_recipients(
+    cur: psycopg.Cursor, supplier_ids: list[uuid.UUID]
+) -> tuple[list[dict], list[uuid.UUID]]:
+    rejected: list[dict] = []
+    valid: list[uuid.UUID] = []
+    for supplier_id in supplier_ids:
+        cur.execute("select id, contact_email from supplier where id = %s", (supplier_id,))
+        row = cur.fetchone()
+        if row is None:
+            rejected.append({"supplier_id": str(supplier_id), "reason": "not_found"})
+        elif not row.get("contact_email"):
+            rejected.append({"supplier_id": str(supplier_id), "reason": "missing_contact_email"})
+        else:
+            valid.append(supplier_id)
+    return rejected, valid
 
 
 def _encode_cursor(offset: int) -> str:

@@ -9,7 +9,7 @@
         {{ 'rfq.history.guardrails' | translate }}
       </a>
       <a mat-flat-button color="primary" routerLink="/rfq/create">
-        <mat-icon>add</mat-icon>
+        <mat-icon aria-hidden="true">add</mat-icon>
         {{ 'rfq.history.createRfq' | translate }}
       </a>
     </div>
@@ -24,7 +24,7 @@
     } @else {
       @if (rfqs().length === 0) {
         <div class="empty-state">
-          <mat-icon>history</mat-icon>
+          <mat-icon aria-hidden="true">history</mat-icon>
           <p>{{ 'rfq.history.noRfqs' | translate }}</p>
         </div>
       } @else {
@@ -52,8 +52,12 @@
             <!-- Sent At Column -->
             <ng-container matColumnDef="sentAt">
               <th mat-header-cell *matHeaderCellDef>{{ 'rfq.history.sentAt' | translate }}</th>
-              <td mat-cell *matCellDef="let rfq">
-                {{ rfq.created_at | formatDate }}
+              <td mat-cell *matCellDef="let rfq" data-testid="rfq-sent-at-cell">
+                @if (rfq.sent_at) {
+                  {{ rfq.sent_at | formatDate }}
+                } @else {
+                  —
+                }
               </td>
             </ng-container>
 
@@ -75,9 +79,33 @@
 
             <!-- Actions Column -->
             <ng-container matColumnDef="actions">
-              <th mat-header-cell *matHeaderCellDef></th>
-              <td mat-cell *matCellDef="let rfq">
-                <mat-icon>chevron_right</mat-icon>
+              <th mat-header-cell *matHeaderCellDef class="actions-header">{{ 'rfq.history.actions' | translate }}</th>
+              <td mat-cell *matCellDef="let rfq" class="actions-cell">
+                @if (rfq.status === 'draft' && isCreator(rfq)) {
+                  <div class="draft-actions">
+                    <button
+                      mat-stroked-button
+                      type="button"
+                      (click)="onEditDraft(rfq, $event)"
+                      [attr.aria-label]="'rfq.history.edit' | translate"
+                      data-testid="rfq-edit-button"
+                    >
+                      {{ 'rfq.history.edit' | translate }}
+                    </button>
+                    <button
+                      mat-flat-button
+                      color="primary"
+                      type="button"
+                      (click)="onSendDraft(rfq, $event)"
+                      [attr.aria-label]="'rfq.history.send' | translate"
+                      data-testid="rfq-send-button"
+                    >
+                      {{ 'rfq.history.send' | translate }}
+                    </button>
+                  </div>
+                } @else {
+                  <mat-icon aria-hidden="true">chevron_right</mat-icon>
+                }
               </td>
             </ng-container>
 

@@ -18,7 +18,7 @@ def point(amount: str, recorded_at: datetime) -> PriceHistoryPoint:
         normalised_unit_price=Money(amount=amount, currency="GBP"),
         landed_cost_total=Money(amount=amount, currency="GBP"),
         quantity="1.000000",
-        base_unit="kg",
+        base_unit="kilogram",
     )
 
 

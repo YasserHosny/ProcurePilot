@@ -10,6 +10,7 @@ export interface Rfq {
   created_by_membership_id: string;
   status: 'draft' | 'sent' | 'responded' | 'expired' | 'converted';
   needed_by_date: string;
+  tenant_terms: string | null;
   idempotency_key: string;
   created_at: string;
 }
@@ -32,6 +33,12 @@ export interface RfqRecipient {
   outbound_message_id: string | null;
   sent_at: string | null;
   created_at: string;
+}
+
+export interface RfqDetail {
+  rfq: Rfq;
+  lines: RfqLine[];
+  recipients: RfqRecipient[];
 }
 
 export interface RfqCreatePayload {
@@ -107,9 +114,11 @@ export interface RfqResponseComparisonList {
 
 export interface RfqSummary {
   id: string;
+  created_by_membership_id: string;
   status: 'draft' | 'sent' | 'responded' | 'expired' | 'converted';
   needed_by_date: string;
   created_at: string;
+  sent_at: string | null;
   recipient_count: number;
   response_count: number;
   converted_purchase_request_id: string | null;
@@ -143,6 +152,17 @@ export class RfqApi {
       'Idempotency-Key': crypto.randomUUID(),
     });
     return this.http.post<RfqCreateResponse>(this.baseUrl, payload, { headers });
+  }
+
+  getRfq(rfqId: string): Observable<RfqDetail> {
+    return this.http.get<RfqDetail>(`${this.baseUrl}/${rfqId}`);
+  }
+
+  updateRfq(rfqId: string, payload: RfqCreatePayload): Observable<RfqCreateResponse> {
+    const headers = new HttpHeaders({
+      'Idempotency-Key': crypto.randomUUID(),
+    });
+    return this.http.put<RfqCreateResponse>(`${this.baseUrl}/${rfqId}`, payload, { headers });
   }
 
   sendRfq(rfqId: string): Observable<RfqSendResponse> {

@@ -27,7 +27,7 @@ def test_offer_and_compare_contract_requires_money_and_recommendation_evidence()
         landed_cost=Money(amount="10.0000", currency="GBP"),
         normalised_unit_price=Money(amount="1.0000", currency="GBP"),
         requested_quantity="10.000000",
-        base_unit="kg",
+        base_unit="kilogram",
         stock_signal=None,
         match_confidence="0.9200",
         valid_from=datetime.now(UTC),

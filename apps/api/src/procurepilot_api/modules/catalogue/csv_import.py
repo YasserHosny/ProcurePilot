@@ -9,6 +9,8 @@ from decimal import Decimal, InvalidOperation
 from typing import Any, Literal, Protocol
 from uuid import UUID
 
+from procurepilot_api.modules.catalogue.units import canonical_base_unit
+
 ImportKind = Literal["products", "suppliers"]
 DuplicateAction = Literal["skip", "update"]
 
@@ -71,7 +73,10 @@ class ProductImportRow:
 
     @property
     def duplicate_key(self) -> str:
-        return self.gtin or f"{self.canonical_name or self.tenant_name}|{self.base_unit}"
+        return (
+            self.gtin
+            or f"{self.canonical_name or self.tenant_name}|{canonical_base_unit(self.base_unit)}"
+        )
 
 
 @dataclass(frozen=True)
@@ -338,6 +343,8 @@ def _parse_product_row(
     before = len(errors)
     tenant_name = _required_text(line, row, "tenant_name", errors)
     base_unit = _required_text(line, row, "base_unit", errors)
+    if base_unit:
+        base_unit = canonical_base_unit(base_unit)
     pack_count = _positive_int(line, row.get("pack_count"), "pack_count", errors)
     unit_size = _positive_decimal(line, row.get("unit_size"), "unit_size", errors)
     preferred_supplier_id = _optional_uuid(

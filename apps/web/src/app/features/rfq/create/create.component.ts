@@ -1,5 +1,6 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { ReactiveFormsModule, FormBuilder, Validators, FormArray } from '@angular/forms';
 import { MatCardModule } from '@angular/material/card';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -10,19 +11,22 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatNativeDateModule } from '@angular/material/core';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { TranslateModule } from '@ngx-translate/core';
-import { RfqApi } from '../rfq-api';
+import { MatSnackBar } from '@angular/material/snack-bar';
+import { TranslateModule, TranslateService } from '@ngx-translate/core';
+import { forkJoin } from 'rxjs';
+import { HttpErrorResponse } from '@angular/common/http';
+
+import { Rfq, RfqApi, RfqDetail } from '../rfq-api';
 import { ApiService } from '../../../core/api/api.service';
 import { Product, Supplier } from '../../../core/api/models';
-import { HttpErrorResponse } from '@angular/common/http';
-import { TranslateService } from '@ngx-translate/core';
-import { toIsoDateOrNull } from '../../../core/format/iso-date';
+import { parseIsoDateLocal, toIsoDateOrNull } from '../../../core/format/iso-date';
 
 @Component({
   selector: 'app-rfq-create',
   standalone: true,
   imports: [
-    CommonModule, 
+    CommonModule,
+    RouterModule,
     ReactiveFormsModule,
     MatCardModule,
     MatFormFieldModule,
@@ -33,112 +37,218 @@ import { toIsoDateOrNull } from '../../../core/format/iso-date';
     MatDatepickerModule,
     MatNativeDateModule,
     MatProgressSpinnerModule,
-    TranslateModule
+    TranslateModule,
   ],
   templateUrl: './create.component.html',
-  styleUrl: './create.component.scss'
+  styleUrl: './create.component.scss',
 })
 export class RfqCreateComponent implements OnInit {
   private readonly fb = inject(FormBuilder);
   private readonly rfqApi = inject(RfqApi);
   private readonly apiService = inject(ApiService);
   private readonly translate = inject(TranslateService);
+  private readonly snackBar = inject(MatSnackBar);
+  private readonly route = inject(ActivatedRoute, { optional: true });
+  private readonly router = inject(Router, { optional: true });
 
   readonly products = signal<Product[]>([]);
   readonly suppliers = signal<Supplier[]>([]);
 
   readonly form = this.fb.nonNullable.group({
-    lines: this.fb.array([
-      this.fb.nonNullable.group({
-        workspace_product_id: ['', Validators.required],
-        quantity: ['', [Validators.required, Validators.min(0.01)]],
-      })
-    ], Validators.required),
+    lines: this.fb.array(
+      [
+        this.fb.nonNullable.group({
+          workspace_product_id: ['', Validators.required],
+          quantity: ['', [Validators.required, Validators.min(0.01)]],
+        }),
+      ],
+      Validators.required,
+    ),
     supplierIds: [[] as string[], Validators.required],
     neededByDate: this.fb.control<Date | null>(null, Validators.required),
     tenantTerms: ['', Validators.maxLength(4000)],
   });
 
+  readonly isEditMode = signal(false);
+  readonly isLoadingRfq = signal(false);
+  readonly isNotDraft = signal(false);
   readonly isSaving = signal(false);
   readonly isSending = signal(false);
   readonly rfqId = signal<string | null>(null);
-  readonly rfqStatus = signal<'draft' | 'sent' | null>(null);
+  readonly rfqStatus = signal<Rfq['status'] | null>(null);
   readonly rejectedSuppliers = signal<{ supplier_id: string; reason: string }[]>([]);
   readonly errorMessage = signal<string | null>(null);
 
   ngOnInit(): void {
-    this.apiService.products({ limit: 100, status: 'active' }).subscribe(res => {
+    const routeId = this.route?.snapshot?.paramMap?.get('id') ?? null;
+    if (routeId) {
+      this.isEditMode.set(true);
+      this.rfqId.set(routeId);
+      this.loadEditModeData(routeId);
+      return;
+    }
+
+    this.apiService.products({ limit: 100, status: 'active' }).subscribe((res) => {
       this.products.set(res.items);
     });
-    this.apiService.suppliers({ limit: 100, status: 'active' }).subscribe(res => {
-      // Filter out suppliers with no contact_email as requested in the prompt
-      this.suppliers.set(res.items.filter(s => !!s.contact_email));
+    this.apiService.suppliers({ limit: 100, status: 'active' }).subscribe((res) => {
+      this.suppliers.set(res.items.filter((s) => !!s.contact_email));
     });
   }
 
-  get linesFormArray() {
+  private loadEditModeData(rfqId: string): void {
+    this.isLoadingRfq.set(true);
+    this.errorMessage.set(null);
+
+    forkJoin({
+      products: this.apiService.products({ limit: 100, status: 'active' }),
+      suppliers: this.apiService.suppliers({ limit: 100, status: 'active' }),
+      detail: this.rfqApi.getRfq(rfqId),
+    }).subscribe({
+      next: ({ products, suppliers, detail }) => {
+        this.products.set(products.items);
+        this.suppliers.set(suppliers.items.filter((s) => !!s.contact_email));
+        this.applyRfqDetail(detail);
+        this.isLoadingRfq.set(false);
+      },
+      error: (err: unknown) => {
+        this.isLoadingRfq.set(false);
+        this.errorMessage.set(err instanceof HttpErrorResponse && err.status === 403
+          ? this.translate.instant('rfq.creatorOnly') : this.getErrorMessage(err, 'rfq.create.saveError'));
+      },
+    });
+  }
+
+  private applyRfqDetail(detail: RfqDetail): void {
+    this.rfqId.set(detail.rfq.id);
+    this.rfqStatus.set(detail.rfq.status);
+
+    if (detail.rfq.status !== 'draft') {
+      this.isNotDraft.set(true);
+      return;
+    }
+
+    this.isNotDraft.set(false);
+    this.linesFormArray.clear();
+    const linesToLoad =
+      detail.lines.length > 0
+        ? detail.lines
+        : [{ workspace_product_id: '', quantity: '' }];
+    for (const line of linesToLoad) {
+      this.linesFormArray.push(
+        this.fb.nonNullable.group({
+          workspace_product_id: [line.workspace_product_id, Validators.required],
+          quantity: [String(line.quantity), [Validators.required, Validators.min(0.01)]],
+        }),
+      );
+    }
+
+    this.form.patchValue({
+      supplierIds: detail.recipients.map((r) => r.supplier_id),
+      neededByDate: parseIsoDateLocal(detail.rfq.needed_by_date),
+      tenantTerms: detail.rfq.tenant_terms ?? '',
+    });
+  }
+
+  get linesFormArray(): FormArray {
     return this.form.get('lines') as FormArray;
   }
 
-  addLine() {
+  addLine(): void {
     this.linesFormArray.push(
       this.fb.nonNullable.group({
         workspace_product_id: ['', Validators.required],
         quantity: ['', [Validators.required, Validators.min(0.01)]],
-      })
+      }),
     );
   }
 
-  removeLine(index: number) {
+  removeLine(index: number): void {
     if (this.linesFormArray.length > 1) {
       this.linesFormArray.removeAt(index);
     }
   }
 
-  onSave() {
+  onSave(): void {
     if (this.form.invalid) return;
 
     this.isSaving.set(true);
     this.errorMessage.set(null);
     this.rejectedSuppliers.set([]);
-    
+
     const val = this.form.getRawValue();
     const payload = {
-      lines: val.lines,
+      lines: val.lines.map((line) => ({
+        workspace_product_id: line.workspace_product_id,
+        quantity: String(line.quantity),
+      })),
       recipient_supplier_ids: val.supplierIds,
       needed_by_date: toIsoDateOrNull(val.neededByDate)!,
       tenant_terms: val.tenantTerms || undefined,
     };
 
-    this.rfqApi.createRfq(payload).subscribe({
+    const existingId = this.rfqId();
+    const request$ = existingId
+      ? this.rfqApi.updateRfq(existingId, payload)
+      : this.rfqApi.createRfq(payload);
+
+    request$.subscribe({
       next: (res) => {
+        const wasCreate = existingId === null;
         this.rfqId.set(res.rfq.id);
-        this.rfqStatus.set(res.rfq.status as 'draft' | 'sent');
-        this.rejectedSuppliers.set(res.rejected_recipients);
+        this.rfqStatus.set(res.rfq.status);
+        this.rejectedSuppliers.set(res.rejected_recipients ?? []);
         this.isSaving.set(false);
+        this.isEditMode.set(true);
+        this.snackBar.open(
+          this.translate.instant('rfq.create.draftSaved'),
+          this.translate.instant('rfq.history.dismiss'),
+          { duration: 4000 },
+        );
+        if (wasCreate && this.router) {
+          void this.router
+            .navigate(['/rfq', res.rfq.id, 'edit'], { replaceUrl: true })
+            ?.catch(() => undefined);
+        }
       },
       error: (err: unknown) => {
         this.isSaving.set(false);
+        if (err instanceof HttpErrorResponse && err.status === 403) {
+          this.errorMessage.set(this.translate.instant('rfq.creatorOnly'));
+          return;
+        }
         this.errorMessage.set(this.getErrorMessage(err, 'rfq.create.saveError'));
-      }
+      },
     });
   }
 
-  onSend() {
+  onSend(): void {
     const id = this.rfqId();
     if (!id) return;
-    
+
     this.isSending.set(true);
     this.errorMessage.set(null);
     this.rfqApi.sendRfq(id).subscribe({
       next: (res) => {
-        this.rfqStatus.set(res.rfq.status as 'draft' | 'sent');
+        this.rfqStatus.set(res.rfq.status);
         this.isSending.set(false);
+        const total = res.recipients.length;
+        const sent = res.recipients.filter((recipient) => recipient.status === 'sent').length;
+        const key = sent === total && total > 0 ? 'rfq.create.sentSuccess' : sent > 0 ? 'rfq.create.sentPartial' : 'rfq.create.sentNone';
+        const params = sent === total && total > 0 ? { count: sent } : { sent, total, failed: total - sent };
+        this.snackBar.open(this.translate.instant(key, params), this.translate.instant('rfq.history.dismiss'), { duration: 5000 });
+        if (sent === total && total > 0 && this.router) {
+          void this.router.navigate(['/rfq/history'])?.catch(() => undefined);
+        }
       },
       error: (err: unknown) => {
         this.isSending.set(false);
+        if (err instanceof HttpErrorResponse && err.status === 403) {
+          this.errorMessage.set(this.translate.instant('rfq.creatorOnly'));
+          return;
+        }
         this.errorMessage.set(this.getErrorMessage(err, 'rfq.create.sendError'));
-      }
+      },
     });
   }
 
@@ -158,10 +268,13 @@ export class RfqCreateComponent implements OnInit {
         needed_by_date: 'rfq.create.neededByDateLabel',
         tenant_terms: 'rfq.create.tenantTermsLabel',
       };
-      const labels = [...new Set((Array.isArray(envelope.details) ? envelope.details : [])
-        .map(detail => Array.isArray(detail?.loc) ? detail.loc.at(-1) : undefined)
-        .filter((field): field is string => typeof field === 'string' && field in fieldKeys))]
-        .map(field => this.translate.instant(fieldKeys[field]));
+      const labels = [
+        ...new Set(
+          (Array.isArray(envelope.details) ? envelope.details : [])
+            .map((detail) => (Array.isArray(detail?.loc) ? detail.loc.at(-1) : undefined))
+            .filter((field): field is string => typeof field === 'string' && field in fieldKeys),
+        ),
+      ].map((field) => this.translate.instant(fieldKeys[field]));
       return labels.length
         ? `${this.translate.instant('rfq.create.validationError')} ${labels.join(', ')}`
         : this.translate.instant('rfq.create.validationError');

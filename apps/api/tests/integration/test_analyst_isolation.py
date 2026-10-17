@@ -158,8 +158,7 @@ def _make_analyst_workspace(cur: psycopg.Cursor, label: str) -> AnalystWorkspace
     # analyst_conversation (inserted as superuser, no RLS yet)
     conversation_id = uuid4()
     cur.execute(
-        "insert into analyst_conversation (id,tenant_id,creating_member_id) "
-        "values (%s,%s,%s)",
+        "insert into analyst_conversation (id,tenant_id,creating_member_id) values (%s,%s,%s)",
         (conversation_id, tenant_id, membership_id),
     )
 
@@ -244,14 +243,10 @@ def test_another_tenants_conversations_are_invisible(
     with conn.cursor() as cur:
         _act_as(cur, alpha)
 
-        cur.execute(
-            "select id from analyst_conversation where tenant_id = %s", (beta.tenant_id,)
-        )
+        cur.execute("select id from analyst_conversation where tenant_id = %s", (beta.tenant_id,))
         assert cur.fetchall() == [], "cross-tenant list must be empty"
 
-        cur.execute(
-            "select id from analyst_conversation where id = %s", (beta.conversation_id,)
-        )
+        cur.execute("select id from analyst_conversation where id = %s", (beta.conversation_id,))
         assert cur.fetchone() is None, (
             "direct cross-tenant read must be None (not-found, not forbidden)"
         )
@@ -269,14 +264,10 @@ def test_another_tenants_turns_are_invisible(
     with conn.cursor() as cur:
         _act_as(cur, alpha)
 
-        cur.execute(
-            "select id from analyst_turn where tenant_id = %s", (beta.tenant_id,)
-        )
+        cur.execute("select id from analyst_turn where tenant_id = %s", (beta.tenant_id,))
         assert cur.fetchall() == []
 
-        cur.execute(
-            "select id from analyst_turn where id = %s", (beta.turn_id,)
-        )
+        cur.execute("select id from analyst_turn where id = %s", (beta.turn_id,))
         assert cur.fetchone() is None
 
 
@@ -292,14 +283,10 @@ def test_another_tenants_citations_are_invisible(
     with conn.cursor() as cur:
         _act_as(cur, alpha)
 
-        cur.execute(
-            "select id from analyst_turn_citation where tenant_id = %s", (beta.tenant_id,)
-        )
+        cur.execute("select id from analyst_turn_citation where tenant_id = %s", (beta.tenant_id,))
         assert cur.fetchall() == []
 
-        cur.execute(
-            "select id from analyst_turn_citation where id = %s", (beta.citation_id,)
-        )
+        cur.execute("select id from analyst_turn_citation where id = %s", (beta.citation_id,))
         assert cur.fetchone() is None
 
 
@@ -316,8 +303,7 @@ def test_member_cannot_insert_conversation_into_another_tenant(
         _act_as(cur, alpha)
         with pytest.raises(psycopg.errors.InsufficientPrivilege):
             cur.execute(
-                "insert into analyst_conversation (tenant_id,creating_member_id) "
-                "values (%s,%s)",
+                "insert into analyst_conversation (tenant_id,creating_member_id) values (%s,%s)",
                 (beta.tenant_id, alpha.membership_id),
             )
 

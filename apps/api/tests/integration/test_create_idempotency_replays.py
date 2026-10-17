@@ -5,6 +5,7 @@ from uuid import UUID, uuid4
 
 import psycopg
 import pytest
+from fastapi.testclient import TestClient
 
 from integration.catalogue_helpers import TEST_DATABASE_URL, act_as
 from integration.quotation_helpers import make_document
@@ -65,8 +66,14 @@ def _count(conn: psycopg.Connection, table: str, tenant_id: UUID) -> int:
         return int(cur.fetchone()[0])
 
 
-def test_product_create_replay_returns_original_product(monkeypatch: pytest.MonkeyPatch) -> None:
+@pytest.mark.parametrize("base_unit_alias", ["kg", "KG ", "Kg"])
+def test_product_create_replay_returns_original_product(
+    monkeypatch: pytest.MonkeyPatch, base_unit_alias: str
+) -> None:
+    from procurepilot_api.deps import current_member
+    from procurepilot_api.main import app
     from procurepilot_api.modules.catalogue import service as module
+    from procurepilot_api.modules.catalogue.service import get_catalogue_service
 
     with committed_smart_context("replay-product") as context:
         with psycopg.connect(TEST_DATABASE_URL) as conn:
@@ -84,29 +91,54 @@ def test_product_create_replay_returns_original_product(monkeypatch: pytest.Monk
             _patch_supabase(monkeypatch, conn, module)
             service = CatalogueService(settings_for_test_db(monkeypatch))
             service._service_role_client = lambda: _PsycopgReplayClient(conn)  # type: ignore[method-assign]
-            payload = ProductCreate(
-                tenant_name="Replay product",
-                canonical_name="Replay product",
-                base_unit="kg",
-                pack=PackInput(pack_count=1, unit_size="1"),
-            )
             key = uuid4()
-            first, first_created = service.create_product(
-                bearer_token="test-token",
-                member=context.member,
-                payload=payload,
-                idempotency_key=key,
-            )
-            second, second_created = service.create_product(
-                bearer_token="test-token",
-                member=context.member,
-                payload=payload,
-                idempotency_key=key,
-            )
-            assert first_created is True
-            assert second_created is False
-            assert second.id == first.id
+            app.dependency_overrides[current_member] = lambda: context.member
+            app.dependency_overrides[get_catalogue_service] = lambda: service
+            try:
+                with TestClient(app) as client:
+                    first_response = client.post(
+                        "/api/v1/products",
+                        json={
+                            "tenant_name": "Replay product",
+                            "canonical_name": "Replay product",
+                            "base_unit": base_unit_alias,
+                            "pack": {"pack_count": 1, "unit_size": "1"},
+                        },
+                        headers={
+                            "Authorization": "Bearer test-token",
+                            "Idempotency-Key": str(key),
+                        },
+                    )
+                    replay_response = client.post(
+                        "/api/v1/products",
+                        json={
+                            "tenant_name": "Replay product",
+                            "canonical_name": "Replay product",
+                            "base_unit": base_unit_alias,
+                            "pack": {"pack_count": 1, "unit_size": "1"},
+                        },
+                        headers={
+                            "Authorization": "Bearer test-token",
+                            "Idempotency-Key": str(key),
+                        },
+                    )
+                assert first_response.status_code == 201, first_response.text
+                assert replay_response.status_code == 200, replay_response.text
+                first = first_response.json()
+                assert replay_response.json()["id"] == first["id"]
+            finally:
+                app.dependency_overrides.clear()
             assert _count(conn, "workspace_product", context.workspace.tenant_id) == 2
+            with conn.cursor() as cur:
+                cur.execute(
+                    "select cp.base_unit from workspace_product wp "
+                    "join canonical_product cp on cp.id = wp.canonical_product_id "
+                    "where wp.id = %s",
+                    (first["id"],),
+                )
+                assert cur.fetchone()[0] == "kilogram"
+                cur.execute("select 1 from supported_base_unit where code = 'kg'")
+                assert cur.fetchone() is None
 
 
 def test_supplier_create_replay_returns_original_supplier(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -211,9 +243,7 @@ def test_digest_subscription_fresh_key_colliding_on_filters_is_a_conflict_not_a_
     service = DigestsService(settings_for_test_db(monkeypatch))
     with committed_smart_context("replay-digest-collide") as context:
         payload = DigestSubscriptionCreate(channel="in_app", locale="en")
-        service.create_subscription(
-            member=context.member, payload=payload, idempotency_key=uuid4()
-        )
+        service.create_subscription(member=context.member, payload=payload, idempotency_key=uuid4())
         # Same member, same (default) filters -> hits digest_subscription_owner_unique, not the
         # idempotency index. A FRESH key must not be mistaken for a replay of this row.
         with pytest.raises(ConflictError):
@@ -247,7 +277,7 @@ def test_product_fresh_key_colliding_on_canonical_product_is_a_conflict_not_look
             payload = ProductCreate(
                 tenant_name="Collide product one",
                 canonical_name="Collide canonical",
-                base_unit="kg",
+                base_unit="kilogram",
                 pack=PackInput(pack_count=1, unit_size="1"),
             )
             service.create_product(
@@ -262,7 +292,7 @@ def test_product_fresh_key_colliding_on_canonical_product_is_a_conflict_not_look
             second_payload = ProductCreate(
                 tenant_name="Collide product two",
                 canonical_name="Collide canonical",
-                base_unit="kg",
+                base_unit="kilogram",
                 pack=PackInput(pack_count=1, unit_size="1"),
             )
             with pytest.raises(ConflictError):

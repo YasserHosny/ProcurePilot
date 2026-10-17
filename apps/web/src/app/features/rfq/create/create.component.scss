@@ -1,6 +1,6 @@
 .rfq-create-container {
   padding: 24px;
-  max-width: 800px;
+  max-inline-size: 800px;
   margin-inline: auto;
 }
 
@@ -14,7 +14,8 @@
   }
 
   .subtitle {
-    margin: 4px 0 0;
+    margin-block: 4px 0;
+    margin-inline: 0;
     color: var(--mat-sys-on-surface-variant);
   }
 }
@@ -22,6 +23,23 @@
 .form-card, .rejections-card, .send-card {
   margin-block-end: 24px;
   padding: 24px;
+}
+
+.loading-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.not-draft-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+
+  h3, p {
+    margin: 0;
+  }
 }
 
 .rfq-form {
@@ -52,13 +70,13 @@
   }
 
   .item-qty-field {
-    width: 120px;
+    inline-size: 120px;
   }
 }
 
 .form-section {
   .full-width {
-    width: 100%;
+    inline-size: 100%;
   }
 }
 

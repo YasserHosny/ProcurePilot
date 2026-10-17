@@ -7,6 +7,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from procurepilot_api.modules.catalogue.units import canonical_base_unit
+
 MoneyAmount = Decimal
 
 
@@ -36,6 +38,11 @@ class PurchaseOutcomeCreate(BaseModel):
     ordered_at: datetime | None = None
     delivered_at: datetime | None = None
     notes: str | None = Field(default=None, max_length=2000)
+
+    @field_validator("base_unit", mode="before")
+    @classmethod
+    def _canonical_base_unit(cls, value: object) -> object:
+        return canonical_base_unit(value) if isinstance(value, str) else value
 
 
 class PurchaseRecord(BaseModel):

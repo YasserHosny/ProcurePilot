@@ -20,8 +20,12 @@ from procurepilot_api.modules.catalogue.csv_import import (
     ImportValidationReport,
     ProductImportRow,
     commit_import,
+    validate_import_file,
 )
-from procurepilot_api.modules.catalogue.import_repository import PostgresImportRepository
+from procurepilot_api.modules.catalogue.import_repository import (
+    PostgresImportRepository,
+    with_database_duplicates,
+)
 
 pytestmark = pytest.mark.skipif(
     not TEST_DATABASE_URL,
@@ -122,4 +126,60 @@ def test_failed_import_commit_leaves_catalogue_unchanged(conn: object) -> None:
                 "delete from canonical_product where name in (%s,%s)",
                 ("Atomic first product", "Atomic failing product"),
             )
+            conn.commit()
+
+
+def test_kg_csv_preview_commit_and_repeat_skip(conn: object) -> None:
+    with conn.cursor() as cur:
+        workspace = make_workspace(cur, "import-kg-alias")
+        conn.commit()
+        act_as(cur, workspace)
+        cur.execute("select 1 from supported_base_unit where code = 'kg'")
+        assert cur.fetchone() is None
+        member = CurrentMember(
+            membership_id=workspace.membership_id,
+            tenant_id=workspace.tenant_id,
+            user_id=workspace.user_id,
+            email="import-kg-alias-owner@example.test",
+            role=MemberRole.owner,
+        )
+        content = (
+            b"tenant_name,canonical_name,base_unit,pack_count,unit_size\n"
+            b"Olive Oil,Olive Oil,kg,1,1\n"
+        )
+        repository = PostgresImportRepository(get_settings(), member)
+        report = validate_import_file(
+            kind="products",
+            filename="demo.csv",
+            content=content,
+            content_type="text/csv",
+        )
+        assert report.valid
+        assert report.preview[0]["base_unit"] == "kilogram"
+        try:
+            import_id = repository.create_import_job(report)
+            assert import_id
+            first = commit_import(report, repository)
+            assert first.created == 1 and first.skipped == 0
+
+            with conn.cursor() as verify:
+                act_as(verify, workspace)
+                verify.execute(
+                    "select cp.base_unit from workspace_product wp "
+                    "join canonical_product cp on cp.id = wp.canonical_product_id "
+                    "where wp.tenant_id = %s and wp.tenant_name = 'Olive Oil'",
+                    (workspace.tenant_id,),
+                )
+                assert verify.fetchone()[0] == "kilogram"
+            repeated = with_database_duplicates(report, repository)
+            assert any(item.reason == "duplicate existing record" for item in repeated.duplicates)
+            second = commit_import(repeated, repository)
+            assert second.created == 0 and second.skipped == 1
+        finally:
+            cur.execute("reset role")
+            cur.execute("set local session_replication_role = replica")
+            delete_tenant_scoped_rows(cur, workspace.tenant_id)
+            cur.execute("delete from tenant where id = %s", (workspace.tenant_id,))
+            cur.execute("delete from auth.users where id = %s", (workspace.user_id,))
+            cur.execute("delete from canonical_product where name = 'Olive Oil'")
             conn.commit()

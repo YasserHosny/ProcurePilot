@@ -26,7 +26,7 @@ def test_price_history_contract_traces_metrics_to_landed_cost_rows() -> None:
         normalised_unit_price=Money(amount="1.2500", currency="GBP"),
         landed_cost_total=Money(amount="12.5000", currency="GBP"),
         quantity="10.000000",
-        base_unit="kg",
+        base_unit="kilogram",
     )
     response = PriceHistoryResponse(
         product=ProductRef(id=product_id, tenant_name="Tomatoes"),
@@ -41,6 +41,6 @@ def test_price_history_contract_traces_metrics_to_landed_cost_rows() -> None:
             best_price=None,
         ),
     )
-    assert response.model_dump(mode="json")["summary"]["last_paid"][
-        "source_landed_cost_ids"
-    ] == [str(landed_cost_id)]
+    assert response.model_dump(mode="json")["summary"]["last_paid"]["source_landed_cost_ids"] == [
+        str(landed_cost_id)
+    ]

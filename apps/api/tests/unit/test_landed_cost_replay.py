@@ -14,7 +14,7 @@ def test_landed_cost_replay_from_raw_inputs_is_bit_identical() -> None:
         LandedCostInputs(
             quantity=Decimal("2"),
             normalised_base_quantity=Decimal("20"),
-            base_unit="kg",
+            base_unit="kilogram",
             unit_price=MoneyValue(Decimal("12.0000"), "GBP"),
             vat_rate=None,
             delivery_fee=MoneyValue(Decimal("1.0000"), "GBP"),

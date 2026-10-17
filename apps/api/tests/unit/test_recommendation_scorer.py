@@ -30,7 +30,7 @@ def offer(
         landed_cost=Money(amount=amount, currency=currency),
         normalised_unit_price=Money(amount=amount, currency=currency),
         requested_quantity="1.000000",
-        base_unit="kg",
+        base_unit="kilogram",
         lead_time_days=lead_time,
         reliability_score=reliability,
         stock_signal=None,
@@ -102,9 +102,7 @@ def test_recommendation_excludes_non_reference_currency_before_comparing_costs()
         supplier_name="Other currency",
         currency="EUR",
     )
-    recommendation = recommend_offer(
-        [reference_offer, other_offer]
-    )
+    recommendation = recommend_offer([reference_offer, other_offer])
 
     assert recommendation is not None
     assert recommendation.recommended_offer_id == reference_offer.id
