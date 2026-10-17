@@ -28,7 +28,7 @@ to bunny.net Magic Containers using the following secrets.
 | `BUNNY_API_KEY` | Account-level API key for bunny.net; grants authorization to update container images via `BunnyWay/actions/container-update-image`. | GitHub Repository Secrets (or GitHub Organization Secrets). |
 | `BUNNY_BACKEND_APP_ID` | The Magic Containers Application ID corresponding to the backend API (`procurepilot-backend`). | GitHub Environment / Repository Secrets. |
 | `BUNNY_FRONTEND_APP_ID` | The Magic Containers Application ID corresponding to the frontend SPA (`procurepilot-frontend`). | GitHub Environment / Repository Secrets. |
-| `BUNNY_WORKERS_APP_ID` | The Magic Containers Application ID for the workers app (`procurepilot-extraction-worker`, `shared-redis`). | GitHub Environment / Repository Secrets. |
+| `BUNNY_WORKERS_APP_ID` | The Magic Containers Application ID for the workers app (`procurepilot-extraction-worker`, `procurepilot-email-ingestion-worker`, `procurepilot-optimiser-worker`, `shared-redis`). | GitHub Environment / Repository Secrets. |
 | `GITHUB_TOKEN` *(built-in)* | Automatically supplied by GitHub Actions runtime. Used to authenticate to `ghcr.io` for pushing Docker images (`packages: write`). | Handled automatically by GitHub Actions. |
 
 ---
@@ -82,6 +82,7 @@ terraform validate
 ## 5. Deployment Workflows
 
 - `.github/workflows/deploy-backend.yml` — Builds `infra/docker/api.Dockerfile`, tags with `latest` and `${{ github.sha }}`, pushes to GHCR, and updates the backend container on bunny.net.
+- `.github/workflows/deploy-extraction-worker.yml`, `deploy-email-ingestion-worker.yml`, `deploy-optimiser-worker.yml` — Build the three worker images (`infra/docker/*-worker.Dockerfile`, `optimiser.Dockerfile`), push to GHCR, and update the matching container in the workers app. They do not create containers; each is created once by hand (`docs/operations/runbook.md`).
 - `.github/workflows/deploy-frontend.yml` — Builds the Angular SPA and Nginx image from `infra/docker/web.Dockerfile`, tags with `latest` and `${{ github.sha }}`, pushes to GHCR, and updates the frontend container on bunny.net.
 
 ---
