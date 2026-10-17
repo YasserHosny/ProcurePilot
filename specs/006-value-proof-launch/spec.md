@@ -2,7 +2,7 @@
 
 **Feature Branch**: `006-value-proof-launch`
 **Created**: 2026-08-21
-**Status**: Draft
+**Status**: Shipped — partial: plans and limits enforced, billing provider is a stub (see `docs/roadmap/procurepilot_roadmap.md`, Delivery Status)
 **Input**: User description: "Chunk 4.6 Value Proof and Launch Readiness: savings ledger with outcome capture, Excel/PDF export service, onboarding flow with Stripe-gated plans (stub billing provider for now), Arabic/RTL pass and accessibility audit, performance and security review"
 
 ## User Scenarios & Testing *(mandatory)*

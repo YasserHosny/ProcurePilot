@@ -2,7 +2,7 @@
 
 **Feature Branch**: `021-rfq-sourcing-autonomy`
 **Created**: 2026-09-24
-**Status**: Draft for approval
+**Status**: Shipped — merged to `main` (see `docs/roadmap/procurepilot_roadmap.md`, Delivery Status)
 **Roadmap Release**: R4.3, Phase 4 Predictive Procurement (final release of Phase 4)
 **Input**: Automated RFQ sourcing and guarded autonomous workflows — structured RFQ dispatch to
 suppliers with automated response ingestion, and rules-based auto-approval workflows within
@@ -219,9 +219,19 @@ accurate statuses.
   channel, and MUST explain why for that specific recipient without blocking the rest of the RFQ.
 - **FR-003**: An RFQ MUST NOT be dispatched until a human (owner or buyer) explicitly sends it;
   drafting and editing an RFQ before send has no external effect.
+- **FR-003A** *(added 2026-10-18, records PR #103)*: A saved draft MUST be reopenable for editing and
+  sendable from RFQ history, not only from the page that created it. Only the RFQ's creator may edit
+  or send it (another member of the workspace gets a refusal before any email is sent; another
+  workspace gets "not found"). Edits apply only to drafts and are refused once the RFQ is sent or has
+  responses. A repeated edit request with the same idempotency key is applied once.
 - **FR-004**: Each dispatched RFQ MUST include, at minimum, the product identity, the requested
   quantity, the needed-by date, and any tenant-specified terms — the concrete fields a supplier
   needs to respond without contacting the buyer first for clarification.
+- **FR-004A** *(added 2026-10-18, records PR #89)*: The buyer's terms MUST be stored with the RFQ
+  (they were accepted but not saved before #89). The dispatched email MUST name the buyer's workspace
+  in the subject, sender name and body, and MUST be written in the workspace's default language
+  (English or Arabic, right-to-left for Arabic), with quantities shown without trailing zeros and
+  with their unit, dates written out with month names, and Arabic-Indic digits in Arabic.
 - **FR-005**: A supplier's reply to a dispatched RFQ MUST be captured and extracted into a
   structured quotation using the same extraction, confidence-scoring, and mandatory-review-on-
   arithmetic-mismatch pipeline the existing quotation inbox already applies to any other

@@ -2,7 +2,7 @@
 
 **Feature Branch**: `007-organisation-model`
 **Created**: 2026-08-22
-**Status**: Draft
+**Status**: Shipped — merged to `main` (see `docs/roadmap/procurepilot_roadmap.md`, Delivery Status)
 **Input**: User description: "Chunk R2.0 Organisation Model, start of Phase 2: branches, cost centres, an expanded roles and permissions model beyond Phase 1 owner/buyer/branch-manager/approver/viewer, budget definitions, and an organisation settings screen. This is the foundational layer that later Phase 2 releases depend on: purchase requests (R2.1) need branches and cost centres to assign to and budgets to check against; approval routing (R2.1) needs the expanded roles and permissions; mobile (R2.2/R2.3) needs branch membership to scope what a branch manager sees. Scope for this chunk specifically: branch CRUD (name, address, region, active or inactive), cost-centre CRUD (name, code, budget owner), budget definitions (period, amount, currency, scope of org-wide, branch, or cost-centre), an org settings screen, and a role and permission model extended to support branch-scoped and cost-centre-scoped access so a branch manager sees only their own branch data. Explicitly out of scope for this chunk: purchase requests themselves, approval routing and workflow, the mobile app, the advanced basket optimiser, supplier scorecards, anomaly detection, and scheduled reports, all of which are later Phase 2 releases starting at R2.1 per the roadmap."
 
 ## User Scenarios & Testing *(mandatory)*

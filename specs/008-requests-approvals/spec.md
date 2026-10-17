@@ -2,7 +2,7 @@
 
 **Feature Branch**: `008-requests-approvals`
 **Created**: 2026-08-23
-**Status**: Draft
+**Status**: Shipped — merged to `main` (see `docs/roadmap/procurepilot_roadmap.md`, Delivery Status)
 **Input**: User description: "Release R2.1 Requests + Approvals (Phase 2, web only): purchase
 request creation with branch and cost-centre assignment, approval routing with threshold rules
 (amount-based, branch-scoped approver resolution) and delegation, budget check at request
@@ -228,6 +228,12 @@ either way.
   estimated value used for routing (FR-008) and budget comparison (FR-011); a line whose product
   has no known price contributes zero and the request MUST be marked as having an incomplete
   estimate wherever its value is shown, without blocking submission, routing, or approval.
+- **FR-015A** *(added 2026-10-18, records PR #110 and ADR-020)*: Request quantities are in the
+  purchasing unit (pack), so the estimate MUST be a price per pack (a landed cost's total divided by
+  its quantity in packs), never a price per base unit (kg, litre) multiplied by a pack quantity. When
+  a request was prepared from an RFQ response, its estimate MUST come from that response's quoted
+  lines, not from another supplier's latest price, and submitting the request MUST NOT re-price it
+  from a different source.
 
 ### Key Entities
 
