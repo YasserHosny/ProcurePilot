@@ -227,7 +227,7 @@ tasks (see the top of this file). The next feature has not been scoped.
   email with buyer terms (#89), draft edit/send via `GET/PUT /rfq/{id}` (#103). Matching: human
   decisions show as verified, bulk confirm of exact-name matches (#109). Requests: per-pack estimates
   from the source RFQ response (#110, ADR-020). Basket split: optimiser worker image + deploy, stuck
-  jobs fail instead of spinning (#108; the bunny.net container still has to be created). Platform:
+  jobs fail instead of spinning (#108; the bunny.net container was created and the worker deployed on 2026-10-17). Platform:
   `prepare_threshold=None` on every connection (#87), local calendar dates (#88). CI: docs-only PRs
   skip heavy jobs, E2E sharded across 3 runners (`docs/operations/ci-pipeline.md`).
 - 2026-10-14: 022-home-currency-readiness (PR #73) -- the existing `tenant.currency` is now the home

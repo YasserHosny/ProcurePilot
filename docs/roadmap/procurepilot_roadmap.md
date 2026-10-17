@@ -1364,7 +1364,7 @@ customer-configurable. Decisions 3 and 4 have not been revisited in this documen
 | # | Action | Where tracked |
 |---:|---|---|
 | 1 | Finish the hosted demo tenant and record the demo video | `docs/gtm/video/production-tracker.md` (PP-5, PP-6) |
-| 2 | Create the optimiser container on bunny.net so basket split runs on hosted | PR #108, `docs/gtm/demo-tenant/README.md` finding 17 |
+| 2 | Re-run a basket split on hosted now that the optimiser worker is deployed | PR #108, `docs/gtm/demo-tenant/README.md` finding 17 |
 | 3 | Run real Egyptian supplier quotes through extraction | `specs/022-home-currency-readiness/tasks.md` T015 (Jira PP-3) |
 | 4 | Reach 20 prospect conversations and sign the first pilot | `docs/gtm/gtm-execution-plan.md` (PP-11, PP-13, PP-10) |
 | 5 | Choose what to build from the partial and deferred scope above, driven by the pilot | This document, Delivery Status |
