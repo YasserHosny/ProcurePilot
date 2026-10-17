@@ -76,12 +76,28 @@ export class CompareComponent implements OnInit {
 
   // Pure client-side instantaneous projection (SC-002: <150ms budget, no network request per keystroke)
   readonly projected = computed(() => {
-    return projectComparison(this.rawComparison(), this.quantityInput());
+    return projectComparison(this.rawComparison(), this.baseQuantityInput());
   });
 
   readonly selectedProduct = computed<Product | null>(() => {
     const id = this.selectedProductId();
     return this.products().find((p) => p.id === id) ?? null;
+  });
+
+  // The quantity field is in PACKS (the purchasing unit: tins, sacks, cartons). The offers API,
+  // the projection and the offer prices are per base unit (litre/kg), so the typed pack quantity
+  // is converted once here: "10" tins of 18 L -> "180" litre.
+  readonly packBaseQuantity = computed<number>(() => {
+    const pack = this.selectedProduct()?.pack;
+    if (!pack) return 1;
+    const base = parseFloat(pack.base_quantity ?? String(pack.pack_count * parseFloat(pack.unit_size)));
+    return base > 0 ? base : 1;
+  });
+
+  readonly baseQuantityInput = computed<string>(() => {
+    const packs = parseFloat(this.quantityInput());
+    if (isNaN(packs) || packs <= 0) return this.quantityInput();
+    return String(Math.round(packs * this.packBaseQuantity() * 1e6) / 1e6);
   });
 
   readonly displayedColumns = [
@@ -174,7 +190,7 @@ export class CompareComponent implements OnInit {
 
     this.fetchProductSignal(productId);
 
-    const qty = this.quantityInput() || '10';
+    const qty = this.baseQuantityInput() || '10';
     this.api.compareOffers({ product_id: productId, quantity: qty }).subscribe({
       next: (comp) => {
         this.rawComparison.set(comp);
@@ -290,7 +306,7 @@ export class CompareComponent implements OnInit {
     const params: Record<string, string> = {
       product_id: this.selectedProductId(),
       supplier_id: offer.supplier_id,
-      quantity: this.quantityInput() || '10',
+      quantity: this.baseQuantityInput() || '10',
       unit_price: offer.projected_unit_price.amount,
       currency: offer.projected_unit_price.currency,
       total_paid: offer.projected_landed_cost.amount,

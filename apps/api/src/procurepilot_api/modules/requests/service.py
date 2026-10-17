@@ -64,6 +64,7 @@ from procurepilot_api.modules.requests.schemas import (
 )
 from procurepilot_api.modules.requests.valuation import (
     LineEstimate,
+    estimate_from_source_response,
     estimate_line_value,
 )
 from procurepilot_api.shared.audit import AuditEventCreate, get_audit_writer
@@ -580,7 +581,7 @@ class RequestsService:
         new_line_rows: list[dict[str, object]] | None = None
         if patch.lines is not None:
             product_ids = [ln.workspace_product_id for ln in patch.lines]
-            estimates = self._estimate_products(product_ids)
+            estimates = self._estimate_products(product_ids, request_id=request_id)
             quantities = [ln.quantity for ln in patch.lines]
             total_amount, total_currency, has_incomplete = _compute_totals(quantities, estimates)
             updates["estimated_total_amount"] = (
@@ -655,7 +656,7 @@ class RequestsService:
             raise UnprocessableEntityError(details={"reason": "no_lines"})
 
         product_ids = [UUID(str(lr["workspace_product_id"])) for lr in line_rows]
-        estimates = self._estimate_products(product_ids)
+        estimates = self._estimate_products(product_ids, request_id=request_id)
 
         now = _now_iso()
         for lr, est in zip(line_rows, estimates, strict=True):
@@ -1238,10 +1239,32 @@ class RequestsService:
 
     # ── internal helpers ──────────────────────────────────────────────
 
-    def _estimate_products(self, product_ids: list[UUID]) -> list[LineEstimate]:
+    def _estimate_products(
+        self, product_ids: list[UUID], *, request_id: UUID | None = None
+    ) -> list[LineEstimate]:
+        """Per-pack estimates. A request prepared from an RFQ response is valued at that
+        response's quoted prices; any product not on it (or any other request) falls back to
+        the latest landed cost per pack."""
         db_url = self._settings.database_url.get_secret_value()
         with db.connect(db_url) as conn:
-            return [estimate_line_value(conn, workspace_product_id=pid) for pid in product_ids]
+            sourced: dict[UUID, LineEstimate] = {}
+            if request_id is not None:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        "select source_rfq_response_id from purchase_request where id = %s",
+                        (request_id,),
+                    )
+                    row = cur.fetchone()
+                if row is not None and row[0] is not None:
+                    sourced = estimate_from_source_response(
+                        conn, rfq_response_id=row[0], product_ids=product_ids
+                    )
+            return [
+                sourced[pid]
+                if pid in sourced
+                else estimate_line_value(conn, workspace_product_id=pid)
+                for pid in product_ids
+            ]
 
     def _insert_lines(
         self,

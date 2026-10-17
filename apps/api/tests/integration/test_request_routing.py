@@ -226,7 +226,7 @@ def build_service(
     monkeypatch.setattr(
         service,
         "_estimate_products",
-        lambda _ids: [LineEstimate(Decimal("60.0000"), "GBP", None)],
+        lambda _ids, **_kw: [LineEstimate(Decimal("60.0000"), "GBP", None)],
     )
     monkeypatch.setattr(service, "_fetch_threshold_rules", lambda _client: rules)
     monkeypatch.setattr(

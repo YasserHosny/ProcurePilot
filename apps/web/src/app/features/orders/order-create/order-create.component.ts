@@ -73,6 +73,20 @@ export class OrderCreateComponent implements OnInit {
   readonly isSubmitting = signal(false);
   readonly errorMessage = signal<string | null>(null);
   readonly sourceRequest = signal<PurchaseRequest | null>(null);
+
+  /** The unit a request/PO quantity is expressed in: "pack of 18 litre", or the bare base unit
+   *  when the pack is a single base unit (loose goods sold per kg). */
+  private purchasingUnitLabel(product: Product | undefined): string {
+    if (!product) return 'EA';
+    const baseQuantity = parseFloat(
+      product.pack.base_quantity ?? String(product.pack.pack_count * parseFloat(product.pack.unit_size)),
+    );
+    if (!(baseQuantity > 0) || baseQuantity === 1) return product.base_unit;
+    return this.translate.instant('orders.create.packUnit', {
+      size: String(baseQuantity),
+      unit: product.base_unit,
+    });
+  }
   readonly requestAllocations = signal<RequestAllocation | null>(null);
   readonly editOrderId = signal<string | null>(null);
 
@@ -193,8 +207,11 @@ export class OrderCreateComponent implements OnInit {
                 workspace_product_id: new FormControl<string | null>(reqLine.workspace_product_id || null),
                 description: new FormControl<string>(products.items.find(p => p.id === reqLine.workspace_product_id)?.tenant_name || '', { nonNullable: true, validators: [Validators.required] }),
                 quantity: new FormControl<number | null>(remaining, { validators: [Validators.required, Validators.min(0.0001), Validators.max(remaining)] }),
-                base_unit: new FormControl<string>(products.items.find(p => p.id === reqLine.workspace_product_id)?.base_unit || 'EA', { nonNullable: true, validators: [Validators.required] }),
-                unit_price: new FormControl<number | null>(null, { validators: [Validators.required, Validators.min(0)] }),
+                // Request quantities are in PACKS (the purchasing unit) and the request's
+                // estimate is a per-pack price, so the PO line carries the pack label and
+                // the per-pack price - never the bare base unit ("10 litre" for 10 tins).
+                base_unit: new FormControl<string>(this.purchasingUnitLabel(products.items.find(p => p.id === reqLine.workspace_product_id)), { nonNullable: true, validators: [Validators.required] }),
+                unit_price: new FormControl<number | null>(reqLine.estimated_unit_price ? parseFloat(reqLine.estimated_unit_price.amount) : null, { validators: [Validators.required, Validators.min(0)] }),
                 line_tax: new FormControl<number | null>(0, { validators: [Validators.min(0)] }),
                 source_request_line_id: new FormControl<string | null>(reqLine.id),
                 remaining_quantity: new FormControl<number | null>(remaining),

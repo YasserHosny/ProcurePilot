@@ -63,7 +63,7 @@
         />
         <mat-icon matSuffix aria-hidden="true">calculate</mat-icon>
         @if (selectedProduct()?.base_unit) {
-          <mat-hint>{{ 'compare.unitLabel' | translate:{ unit: selectedProduct()?.base_unit } }}</mat-hint>
+          <mat-hint>{{ 'compare.packHint' | translate:{ count: quantityInput(), size: packBaseQuantity(), total: baseQuantityInput(), unit: selectedProduct()?.base_unit } }}</mat-hint>
         }
       </mat-form-field>
 
@@ -136,7 +136,7 @@
         <app-compare-recommendation
           [recommendation]="rec"
           [bestOffer]="recommendedOffer()"
-          [requestedQuantity]="quantityInput()"
+          [requestedQuantity]="baseQuantityInput()"
           [baseUnit]="selectedProduct()?.base_unit || 'unit'"
         ></app-compare-recommendation>
       }
@@ -146,7 +146,7 @@
         [offers]="visibleOffers()"
         [displayedColumns]="displayedColumns"
         [recommendedOfferId]="proj.recommendation?.recommended_offer_id"
-        [requestedQuantity]="quantityInput()"
+        [requestedQuantity]="baseQuantityInput()"
         [baseUnit]="selectedProduct()?.base_unit || 'unit'"
       ></app-compare-table>
     } @else {

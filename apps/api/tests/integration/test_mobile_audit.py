@@ -209,7 +209,7 @@ def _client_for(
     # database_url, matching test_decision_atomicity.py's own precedent for exercising that exact
     # method against real Postgres.
     service._settings = _test_settings()
-    service._estimate_products = lambda product_ids: [
+    service._estimate_products = lambda product_ids, **_kw: [
         LineEstimate(None, None, None) for _product_id in product_ids
     ]
     service._insert_lines = lambda client, **kwargs: _insert_lines(conn, **kwargs)
