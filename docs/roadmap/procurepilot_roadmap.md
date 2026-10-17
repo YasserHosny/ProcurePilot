@@ -8,8 +8,9 @@
 | Field | Value |
 |---|---|
 | Document | ProcurePilot Master Roadmap |
-| Version | 1.0 |
-| Status | Draft for review |
+| Version | 1.1 |
+| Status | Active — delivery status maintained in the section "Delivery Status" below |
+| Last updated | 2026-10-18 |
 | Source of truth | `procurepilot_ai_context.md` (product context package) |
 | Scope | Business vision, strategy, phased delivery, technical architecture, web and mobile implementation |
 | Planning horizon | 24 months (M0 – M24) |
@@ -23,6 +24,79 @@
 - **Sections 10–14** define *how* it gets built — architecture, web app, mobile app, AI.
 - **Sections 15–20** define *execution reality* — team, cost, metrics, risk, critical path.
 - **All numeric values are illustrative planning assumptions** unless explicitly marked as validated. This preserves the discipline set in the source context document.
+- **Delivery Status** (next section) records what has actually shipped, what is partial, and what was deferred. Sections 1–22 are the original plan; where reality differs, the status section and the dated notes say so.
+
+### Change Log
+
+| Version | Date | Change |
+|---|---|---|
+| 1.0 | 2026-09-10 | Original plan |
+| 1.1 | 2026-10-18 | Added Delivery Status (release ledger, gates, partial and deferred scope); first pilot market (Egypt); new risks 16–21 from the hosted demo build; walkthrough rule in the Definitions of Done; decision status in §20.2; current next actions in §21 |
+
+---
+
+## Delivery Status (as of 2026-10-18)
+
+### Release ledger
+
+Every release R1.0–R4.3 has a Speckit spec under `specs/` and is merged to `main`. "Shipped" means the
+release's spec was built and merged; it does not mean the phase's business gate was met (see Gates).
+
+| Phase | Release | Spec | Status | Notes |
+|---|---|---|---|---|
+| 1 | R1.0 Foundation | `001-platform-foundation` | Shipped | |
+| 1 | R1.1 Catalogue + Suppliers | `002-catalogue-suppliers` | Shipped | |
+| 1 | R1.2 Ingestion + Extraction | `003-quotation-inbox-extraction` | Shipped | Amended 2026-10-17 (FR-013A, a quotation can always be authorised) |
+| 1 | R1.3 Matching + Normalisation | `004-matching-normalisation` | Shipped | Fuzzy matches no longer auto-accept (PR #59); score calibration waits for 500+ labelled decisions |
+| 1 | R1.4 Compare + Intelligence | `005-smart-compare-intelligence` | Shipped | |
+| 1 | R1.5 Value Proof + Launch | `006-value-proof-launch` | Partial | Plans and limits enforced; billing provider is a stub, no payment collection |
+| 2 | R2.0 Organisation model | `007-organisation-model` | Shipped | |
+| 2 | R2.1 Requests + Approvals | `008-requests-approvals` | Shipped | Policy engine deferred (see below) |
+| 2 | R2.2 Mobile MVP | `009-mobile-app-mvp` | Shipped | |
+| 2 | R2.3 Mobile approvals + receipt | `010-mobile-approvals-receipt` | Shipped | |
+| 2 | R2.4 Optimisation + Supplier IQ | `011-optimisation-supplier-iq` | Shipped | Optimiser worker deployed on hosted 2026-10-17 (PR #108 + bunny.net container) |
+| 2 | R2.5 Reporting + Hardening | `012-reporting-hardening` | Shipped | |
+| 3 | R3.0 Email ingestion + catalogue refresh | `013-automated-ingestion` | Shipped | WhatsApp is manual capture only |
+| 3 | R3.1 Accounting #1 | `014-accounting-integration` | Shipped | QuickBooks Online and Xero both supported |
+| 3 | R3.2 POS / inventory | `015-pos-inventory-integration` | Shipped | Square, including stock on hand |
+| 3 | R3.3 Order tracking + three-way match | `016-order-tracking-three-way-match` | Shipped | Draft POs from approved requests (PR #61) |
+| 3 | R3.4 Partner API + connectors | `017-partner-api-beta` | Partial | Read endpoints and webhook subscriptions; no partner credentials, generic connector framework or data-freshness engine |
+| 4 | R4.0 Forecasting + reorder | `018-forecasting-reorder` | Shipped | Some tests still unwritten (tasks T011, T016, T019, T020, T024) |
+| 4 | R4.1 Supplier risk + negotiation | `019-supplier-risk-negotiation` | Shipped | Evidence: `docs/quality/r4.1-release-evidence.md` |
+| 4 | R4.2 Grounded analyst | `020-grounded-procurement-analyst` | Shipped | Evidence: `docs/quality/r4.2-release-evidence.md` |
+| 4 | R4.3 RFQ sourcing + guardrails | `021-rfq-sourcing-autonomy` | Shipped | Evidence: `docs/quality/r4.3-release-evidence.md` |
+| Pilot | Home currency (Egypt) | `022-home-currency-readiness` | Merged, 3 tasks open | Real-quote extraction run, mobile screenshots, full test pass |
+
+Since 2026-10-15 the hosted demo tenant build has produced 20 findings, most fixed in PRs #84–#110;
+see `docs/gtm/demo-tenant/README.md`.
+
+### Gates
+
+| Gate | Recorded outcome |
+|---|---|
+| G1 → Phase 2 | Not passed; engineering proceeded by recorded exception (ADR-010) |
+| G2 → Phase 3 | Software scope complete; business criteria (workflow origination, mobile adoption, retention) not measured — no pilot cohort (ADR-016, `docs/quality/g2-stage-gate-evaluation.md`) |
+| G3 → Phase 4 | Unmet (`docs/quality/r3.4-release-evidence.md` … `r4.3-release-evidence.md`) |
+
+No metric in §15.2 has been measured against real customer data yet. The first pilot (Egypt, see
+§18) is what makes them measurable.
+
+### Partial and deferred scope
+
+| Item | Roadmap ref | State | Where recorded |
+|---|---|---|---|
+| Policy engine: blocked suppliers, spend limits beyond the budget check, exception justification | §7.1 | Not built; only preferred suppliers exist | Deferred in `specs/008-requests-approvals/spec.md` |
+| Alerts inbox actions: assign, snooze, approve, purchase | §7.1 | Dismiss only; alert actions link to the relevant screen | — |
+| Customer-configurable savings baseline | §6.4, risk 2 | Each saving stores its baseline policy; no workspace setting | — |
+| Generic ERP connector framework | §8.1 | Accounting and POS each have their own connector interface | Deferred in `specs/013-automated-ingestion/spec.md` |
+| Anomaly detection v2 (contract variance, false discounts) | §8.1 | Not built; v1 alerts exist | — |
+| Data-freshness engine (source-quality scoring) | §8.1 | Partial: fresh/stale on offers, refresh schedules | — |
+| Partner credentials (separate from user sign-in) | §8.1 | Partner endpoints use a user's sign-in token | `specs/017-partner-api-beta/spec.md` (later increments) |
+| WhatsApp Business API | §8.1, decision 8 | Manual capture only | Deferred in `specs/013-automated-ingestion/spec.md` |
+| Separate inventory-system connector | §8.1 | Stock on hand comes from the POS (Square) only | — |
+| Payment collection for plans | §6.2 R1.5 | Stub billing provider | — |
+| Exchange rates (pilot gap C4) | — | Cross-currency comparison refused by design | `docs/gtm/first-customer-gtm-plan.md` |
+| VAT-inclusive prices (C5) and GCC items G1–G5 | — | Open | `docs/gtm/first-customer-gtm-plan.md` |
 
 ---
 
@@ -385,6 +459,7 @@ Everything else in Phase 1 is optional polish.
 - Every saving in the ledger is traceable to the source quotation and purchase record.
 - A new customer can self-onboard, upload a real quotation, and see a trusted comparison without founder intervention.
 - Review-queue throughput allows one operator to clear a typical customer's weekly documents in under 30 minutes.
+- *(Added v1.1)* Each user-facing release is walked through end to end on the hosted environment, in both English and Arabic, before it is called done. The 2026-10 demo-tenant build found 20 defects that unit, integration and E2E suites had passed (`docs/gtm/demo-tenant/README.md`).
 
 ### 6.4 Explicit Phase 1 Risks
 
@@ -439,6 +514,7 @@ Everything else in Phase 1 is optional polish.
 - Branch managers use mobile without training beyond a one-screen guide.
 - Approval cycle time is measurably shorter than the customer's documented baseline.
 - Supplier scorecards are populated from actual recorded outcomes, not manual entry.
+- *(Added v1.1)* Same hosted walkthrough rule as §6.3, including the mobile app.
 
 ---
 
@@ -1108,6 +1184,12 @@ Severity and likelihood are illustrative planning assessments (1–5 scale).
 | 13 | **Data security incident** | 5 | 2 | Tenant isolation with RLS, encryption, least privilege, audit logs, penetration test, incident runbook | Engineering lead | P1+ |
 | 14 | **Key-person dependency** on founder for domain knowledge | 3 | 4 | Document decisions as ADRs; train analyst; record customer-review methodology | Founder | All |
 | 15 | **Supplier resistance** to being compared | 2 | 3 | Position as buyer-side tool; no public price publication; no supplier shaming | Founder | P2+ |
+| 16 | **Silent data loss in ingestion** — a document fails and leaves no trace (seen: Arabic attachment names lost emails, PR #90) | 5 | 3 | Every failure leaves a visible log or review item; alert on repeated job failures | Engineering lead | All |
+| 17 | **Locale drift** — dates, digits, number formats and RTL tables from Arabic-language suppliers misread (seen: DD/MM dates refused whole quotes, #96; RTL tables merged lines, #100; UTC date shift, #88) | 5 | 4 | Fixtures from real regional documents; unreadable values go to review, never guessed | Engineering lead | All |
+| 18 | **Unit-of-measure errors** — pack vs base unit mixed in estimates (seen: request estimate ~9× too low, #110) | 5 | 3 | One rule: quantities and prices per pack (ADR-020); tests on pack sizes > 1 | Engineering lead | All |
+| 19 | **Service built but not deployed** (seen: optimiser worker had no deploy, #108) | 4 | 3 | Every service has a deploy workflow and a liveness check; hosted walkthrough per release | Engineering lead | All |
+| 20 | **Hosted AI configuration differs from tests** (seen: stub embedding on hosted, exact names scored 55%) | 4 | 3 | Record provider settings per environment; decide the hosted embedding provider | AI lead | P1+ |
+| 21 | **Database pooler incompatibility** (seen: prepared statements failed through Supabase's transaction pooler, #87) | 4 | 3 | All connections through `db.connect` with prepared statements off; integration tests against the pooler | Engineering lead | All |
 
 ---
 
@@ -1202,6 +1284,14 @@ These margins are the basis of the >75% subscription gross-margin objective in s
 
 **Illustrative revenue mix at maturity:** subscriptions 72% · API and integrations 13% · partner revenue 9% · premium services 6%.
 
+**First pilot market (added v1.1, 2026-10):** the first pilot is a multi-branch food-service or retail
+business in **Egypt**, quoting and budgeting in **EGP**, with Arabic-first users and suppliers. The
+GBP figures in this section and in §15.2 are the original illustrative baseline and have not been
+re-priced for Egypt; pilot terms and pricing are in `docs/gtm/first-customer-gtm-plan.md` and
+`docs/gtm/gtm-execution-plan.md`. Requirements this market added to the product: a home currency per
+workspace (spec 022), no guessed currency on extraction, DD/MM dates, Arabic-Indic digits, Arabic
+right-to-left quote tables, Arabic file names, and Arabic supplier emails.
+
 **Other revenue opportunities (post-P2):** API fees, integration fees, partner revenue, premium services, white-label licensing, supplier analytics, referral commission. Sponsored placement is permissible only if clearly labelled and never allowed to influence ranking — otherwise it contradicts the buyer-side positioning and the non-goals in section 1.9.
 
 ---
@@ -1252,6 +1342,12 @@ These margins are the basis of the >75% subscription gross-margin objective in s
 | 7 | **Build platform** — Supabase for Phase 1 (decided) | Infrastructure work in R1.0 | End M2 |
 | 8 | **WhatsApp ingestion** — direct integration or file-based export? | Ingestion layer scope | End M4 |
 
+**Status of these decisions (2026-10-18):** (2) first region Egypt, currency EGP as the workspace home
+currency (spec 022); (5) fuzzy matches do not auto-accept until scores are calibrated (PR #59);
+(6) English and Arabic, both shipped with RTL; (7) Supabase, in use; (8) manual capture now, direct
+WhatsApp integration deferred (spec 013). (1) A baseline policy is stored on each saving, but it is not
+customer-configurable. Decisions 3 and 4 have not been revisited in this document.
+
 ### 20.3 Deliberately Unresolved (Revisit at Gates)
 
 - Whether pricing should shift from count-based to spend-based tiers (**revisit at G1**)
@@ -1262,6 +1358,18 @@ These margins are the basis of the >75% subscription gross-margin objective in s
 ---
 
 ## 21. Immediate Next Actions
+
+### 21.1 Current next actions (2026-10-18)
+
+| # | Action | Where tracked |
+|---:|---|---|
+| 1 | Finish the hosted demo tenant and record the demo video | `docs/gtm/video/production-tracker.md` (PP-5, PP-6) |
+| 2 | Create the optimiser container on bunny.net so basket split runs on hosted | PR #108, `docs/gtm/demo-tenant/README.md` finding 17 |
+| 3 | Run real Egyptian supplier quotes through extraction | `specs/022-home-currency-readiness/tasks.md` T015 (Jira PP-3) |
+| 4 | Reach 20 prospect conversations and sign the first pilot | `docs/gtm/gtm-execution-plan.md` (PP-11, PP-13, PP-10) |
+| 5 | Choose what to build from the partial and deferred scope above, driven by the pilot | This document, Delivery Status |
+
+### 21.2 Original Phase 0 actions (2026-09-10, kept for history)
 
 | # | Action | Output | Owner |
 |---:|---|---|---|
