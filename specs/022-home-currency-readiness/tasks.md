@@ -37,7 +37,7 @@
 
 ## Phase 5: Polish
 
-- [x] T019 Docs: user docs (web settings + review flag + mobile), `docs/product/first-customer-gtm-plan.md` C1–C3 marked fixed, CLAUDE.md recent-changes line — PR #81 (verify merged before relying on this)
+- [x] T019 Docs: user docs (web settings + review flag + mobile), `docs/gtm/first-customer-gtm-plan.md` C1–C3 marked fixed, CLAUDE.md recent-changes line — PR #81 (verify merged before relying on this)
 - [ ] T020 `pnpm lint`, `pnpm test:api`, `pnpm test:web`, worker pytest, `flutter test`, `pnpm test:isolation` all green; run twice consecutively
 - [x] T021 Update Jira PP-1/PP-2/PP-3 with PR links (orchestrator, Atlassian connector) — comments on PP-1/2/3 posted 2026-10-15; statuses unchanged
 

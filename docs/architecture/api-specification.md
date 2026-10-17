@@ -90,8 +90,13 @@ The following endpoints are delivered for chunk 4.1 and mirror
 
 - Requires bearer auth and owner role.
 - Updates workspace settings.
-- Request fields: optional `name`, optional `default_locale`.
-- `region`, `currency`, and `tax_model` are immutable after creation.
+- Request fields: optional `name`, optional `default_locale`, optional `reporting_timezone`, optional
+  `currency` (the workspace home currency; ISO 4217 code).
+- `currency` must be an enabled `supported_currency`, otherwise `422` with
+  `details.currency = "unsupported"`. The change and its `tenant.currency_changed` audit event are
+  written in one transaction (`set_tenant_currency`), and are skipped when the value is unchanged.
+  The home currency is only a default for new forms; it never rewrites existing records.
+- `region` and `tax_model` are immutable after creation.
 
 ### `GET /members`
 
@@ -1896,8 +1901,8 @@ not per-subscription — it explains why a `channel: email` subscription's deliv
 
 ### `PATCH /tenant` — `reporting_timezone` extension
 
-- Owner only (existing `PATCH /tenant` surface from the foundation contract; region, currency,
-  and tax model remain immutable). New field: `reporting_timezone`, an IANA timezone name
+- Owner only (existing `PATCH /tenant` surface from the foundation contract; region and tax model
+  remain immutable, currency is editable — see `PATCH /tenant` above). New field: `reporting_timezone`, an IANA timezone name
   (default `UTC`) — every scheduled-report window, digest window, and next-run computation for
   the workspace derives from it. The change takes effect for future scheduled runs; windows
   already derived are not recomputed retroactively.
@@ -2825,6 +2830,23 @@ Constitution Principle III (see `test_rfq_guardrail_boundary.py`'s executable pr
   and reported back in `rejected_recipients`, rather than failing the whole request.
 - Returns `201` with the created `Rfq`, its `RfqLine`s, its `RfqRecipient`s, and
   `rejected_recipients`.
+
+### `GET /rfq/{rfq_id}`
+
+- Any owner or buyer may read an RFQ in their workspace; another workspace's RFQ returns `404`.
+- Returns the `Rfq` with its lines and recipients (`RfqDetail`), so a saved draft can be reopened
+  for editing.
+
+### `PUT /rfq/{rfq_id}`
+
+- Replaces a **draft** RFQ's lines, recipients, `needed_by_date`, and `tenant_terms`. Same request
+  body as `POST /rfq`.
+- `Idempotency-Key` is required; a repeat of the last applied key returns the stored result without
+  re-applying or re-auditing.
+- Only the RFQ's creator may edit it (`403`, `reason: not_creator`). A non-draft RFQ returns `409`
+  (`reason: not_draft`); a draft that already has supplier responses returns `409`
+  (`reason: has_responses`).
+- Returns `200` with the same shape as `POST /rfq`, including `rejected_recipients`.
 
 ### `POST /rfq/{rfq_id}/send`
 
