@@ -353,6 +353,7 @@ class RequestsService:
         request_ids = [str(r["id"]) for r in visible]
         lines_by_request = self._fetch_lines_batch(client, request_ids)
         steps_by_request = self._fetch_steps_batch(client, request_ids)
+        requester_emails = self._fetch_requester_emails_batch(client, visible)
 
         items = [
             self._purchase_request_with_budget_status(
@@ -360,6 +361,8 @@ class RequestsService:
                 row,
                 lines_by_request.get(str(row["id"]), []),
                 steps_by_request.get(str(row["id"])),
+                requester_email=requester_emails.get(str(row["requested_by_membership_id"])),
+                requester_lookup=False,
             )
             for row in visible
         ]
@@ -400,6 +403,7 @@ class RequestsService:
         request_rows = self._fetch_requests_batch(client, request_ids)
         lines_by_request = self._fetch_lines_batch(client, request_ids)
         steps_by_request = {str(step["purchase_request_id"]): step for step in visible_steps}
+        requester_emails = self._fetch_requester_emails_batch(client, request_rows)
 
         items = [
             self._purchase_request_with_budget_status(
@@ -407,6 +411,8 @@ class RequestsService:
                 row,
                 lines_by_request.get(str(row["id"]), []),
                 steps_by_request.get(str(row["id"])),
+                requester_email=requester_emails.get(str(row["requested_by_membership_id"])),
+                requester_lookup=False,
             )
             for row in request_rows
         ]
@@ -1865,15 +1871,44 @@ class RequestsService:
         request_row: dict[str, object],
         line_rows: list[dict[str, object]],
         step_row: dict[str, object] | None,
+        *,
+        requester_email: str | None = None,
+        requester_lookup: bool = True,
     ) -> PurchaseRequest:
-        requester = self._fetch_requester(client, str(request_row["requested_by_membership_id"]))
+        if requester_lookup:
+            requester = self._fetch_requester(
+                client, str(request_row["requested_by_membership_id"])
+            )
+            requester_email = str(requester["email"]) if requester.get("email") else None
         return _purchase_request(
             request_row,
             line_rows,
             step_row,
             budget_status=self._budget_status_for(client, request_row),
-            requester_email=requester.get("email"),
+            requester_email=requester_email,
         )
+
+    def _fetch_requester_emails_batch(
+        self, client: Client, request_rows: list[dict[str, object]]
+    ) -> dict[str, str]:
+        membership_ids = {str(row["requested_by_membership_id"]) for row in request_rows}
+        if not membership_ids:
+            return {}
+        try:
+            response = (
+                client.table("membership")
+                .select("id,email")
+                .in_("id", list(membership_ids))
+                .execute()
+            )
+            return {
+                str(row["id"]): str(row["email"])
+                for row in _rows(response.data)
+                if row.get("email")
+            }
+        except Exception:
+            logger.warning("Requester email lookup failed for request list", exc_info=True)
+            return {}
 
     def _fetch_requester(self, client: Client, membership_id: str) -> dict[str, object]:
         try:
@@ -1884,8 +1919,13 @@ class RequestsService:
                 .limit(1)
                 .execute()
             )
-        except APIError as exc:
-            raise ServiceUnavailableError(details={"dependency": "database"}) from exc
+        except Exception:
+            logger.warning(
+                "Requester email lookup failed",
+                extra={"membership_id": membership_id},
+                exc_info=True,
+            )
+            return {}
         rows = _rows(response.data)
         return rows[0] if rows else {}
 
