@@ -300,5 +300,5 @@ and Phase 6, was independently re-verified on 2026-10-03 against the real migrat
 source files, and the real test files named above — not re-derived from the commit messages or
 the release-evidence document alone, though both corroborate the same facts. Phase 5's T019
 (FR-011A's three-signal service-risk formula) was the one requirement from `spec.md` that the
-merged code did not deliver at verification time (fixed the same day in PR #68); it is left `[ ]` deliberately rather than checked off on the
-strength of the internal plan document's claim that it was done.
+merged code did not deliver at verification time (fixed the same day in PR #68). It was checked off only after that fix, not on the strength of the
+internal plan document's claim that it was done.
