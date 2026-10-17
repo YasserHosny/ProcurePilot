@@ -1394,9 +1394,11 @@
     "productLabel": "Product",
     "quantityLabel": "Required Quantity",
     "quantityPlaceholder": "e.g. 10",
+    "packHint": "{{count}} pack(s) × {{size}} {{unit}} = {{total}} {{unit}}",
     "quantityRequired": "Quantity must be greater than 0",
     "includeExpired": "Include expired offers",
     "recomputing": "Recalculating...",
+    "packHint": "{{count}} pack(s) × {{size}} {{unit}} = {{total}} {{unit}}",
     "unitLabel": "Unit: {{unit}}",
     "recommendation": {
       "title": "Recommended Offer",
@@ -3253,6 +3255,7 @@
       },
       "creatingFromRequest": "Creating from Request",
       "estimateReference": "Estimate",
+      "packUnit": "pack of {{size}} {{unit}}",
       "remainingQuantity": "Remaining Allocatable"
     },
     "status": {

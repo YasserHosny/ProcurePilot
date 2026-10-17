@@ -630,7 +630,7 @@ def _service(
     monkeypatch.setattr(
         service,
         "_estimate_products",
-        lambda product_ids: [
+        lambda product_ids, **_kw: [
             LineEstimate(
                 unit_price_amount=None,
                 unit_price_currency=None,

@@ -73,6 +73,28 @@ export class OrderCreateComponent implements OnInit {
   readonly isSubmitting = signal(false);
   readonly errorMessage = signal<string | null>(null);
   readonly sourceRequest = signal<PurchaseRequest | null>(null);
+
+  /** Pack description for a request/PO line ("pack of 18 litre"), or null when the pack is a
+   *  single base unit. Request quantities are in packs; this goes in the line description only -
+   *  `base_unit` stays the canonical unit because downstream code compares it exactly. */
+  private packDescription(product: Product | undefined): string | null {
+    if (!product?.pack) return null;
+    const baseQuantity = parseFloat(
+      product.pack.base_quantity ?? String(product.pack.pack_count * parseFloat(product.pack.unit_size)),
+    );
+    if (!(baseQuantity > 0) || baseQuantity === 1) return null;
+    return this.translate.instant('orders.create.packUnit', {
+      size: String(baseQuantity),
+      unit: product.base_unit,
+    });
+  }
+
+  private requestLineDescription(product: Product | undefined): string {
+    const name = product?.tenant_name || '';
+    const pack = this.packDescription(product);
+    return pack ? `${name} (${pack})` : name;
+  }
+
   readonly requestAllocations = signal<RequestAllocation | null>(null);
   readonly editOrderId = signal<string | null>(null);
 
@@ -191,10 +213,12 @@ export class OrderCreateComponent implements OnInit {
             this.lines.push(
               new FormGroup<OrderLineForm>({
                 workspace_product_id: new FormControl<string | null>(reqLine.workspace_product_id || null),
-                description: new FormControl<string>(products.items.find(p => p.id === reqLine.workspace_product_id)?.tenant_name || '', { nonNullable: true, validators: [Validators.required] }),
+                description: new FormControl<string>(this.requestLineDescription(products.items.find(p => p.id === reqLine.workspace_product_id)), { nonNullable: true, validators: [Validators.required] }),
                 quantity: new FormControl<number | null>(remaining, { validators: [Validators.required, Validators.min(0.0001), Validators.max(remaining)] }),
+                // Request quantities are in PACKS and the request's estimate is a per-pack
+                // price: prefill that price, and say "pack of 18 litre" in the description.
                 base_unit: new FormControl<string>(products.items.find(p => p.id === reqLine.workspace_product_id)?.base_unit || 'EA', { nonNullable: true, validators: [Validators.required] }),
-                unit_price: new FormControl<number | null>(null, { validators: [Validators.required, Validators.min(0)] }),
+                unit_price: new FormControl<number | null>(reqLine.estimated_unit_price ? parseFloat(reqLine.estimated_unit_price.amount) : null, { validators: [Validators.required, Validators.min(0)] }),
                 line_tax: new FormControl<number | null>(0, { validators: [Validators.min(0)] }),
                 source_request_line_id: new FormControl<string | null>(reqLine.id),
                 remaining_quantity: new FormControl<number | null>(remaining),

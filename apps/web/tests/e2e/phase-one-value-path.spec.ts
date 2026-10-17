@@ -104,12 +104,15 @@ test.describe('Phase 1 Complete Canonical Value Path (T075)', () => {
 
     await expect(page.locator('.page-title')).toContainText('Smart Compare');
     await expect(page.locator('.recommendation-card')).toBeVisible({ timeout: 15000 });
-    // Bug #4 guard: Required Quantity is in the product's normalised base unit.
-    await expect(page.locator('.quantity-field mat-hint')).toHaveText('Unit: kilogram');
-
-    const quantityValue = parseFloat(
-      await page.inputValue('.quantity-input'),
+    // Required Quantity is in PACKS (ADR-020); the hint shows the base-unit equivalent, which is
+    // what the offers API, the projection and the recorded purchase use. One 10 kg pack = 10 kg.
+    await page.fill('.quantity-input', '1');
+    await expect(page.locator('.quantity-field mat-hint')).toHaveText(
+      '1 pack(s) × 10 kilogram = 10 kilogram',
     );
+
+    const packQuantity = parseFloat(await page.inputValue('.quantity-input'));
+    const quantityValue = packQuantity * 10; // base units (kg)
     const recommendedUnitPrice = parseMoney(
       await page.locator('.unit-price-sub strong').innerText(),
     );

@@ -4,7 +4,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { provideRouter } from '@angular/router';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
-import { of, throwError } from 'rxjs';
+import { Subject, of, throwError } from 'rxjs';
 
 import enCatalog from '../../../../../../../packages/i18n/en.json';
 import { ApiService } from '../../../core/api/api.service';
@@ -134,7 +134,7 @@ describe('CompareComponent (US1, SC-002, T020, T029)', () => {
             tenant_name: 'Semi-Skimmed Milk 2L',
             canonical_name: 'Semi-Skimmed Milk',
             base_unit: 'L',
-            pack: { pack_count: 1, unit_size: '2.0' },
+            pack: { pack_count: 1, unit_size: '1.0' },
             status: 'active',
             created_at: '2026-08-01T00:00:00Z',
           },
@@ -219,6 +219,52 @@ describe('CompareComponent (US1, SC-002, T020, T029)', () => {
 
     // Recommendation re-evaluated client-side
     expect(proj?.recommendation?.recommended_offer_id).toBe('offer-1');
+  });
+
+  it('quantity is typed in packs and converted to base units: 10 tins of 18 L = 180 L', () => {
+    component.products.set([
+      {
+        id: '00000000-0000-4000-8000-000000000001',
+        tenant_name: 'Sunflower oil tin 18L',
+        canonical_name: 'Sunflower oil',
+        base_unit: 'litre',
+        pack: { pack_count: 1, unit_size: '18' },
+        status: 'active',
+        created_at: '2026-08-01T00:00:00Z',
+      },
+    ]);
+    component.onQuantityChange('10');
+    expect(component.packBaseQuantity()).toBe(18);
+    expect(component.baseQuantityInput()).toBe('180');
+    expect(component.projected()?.requested_quantity).toBe('180');
+    // 1,680 EGP per tin == 93.33 per litre: 10 tins cost 16,800 either way.
+    const offer = component.visibleOffers()[0];
+    expect(component.getRecordPurchaseParams(offer)['quantity']).toBe('180');
+  });
+
+  it('does not send the comparison until the product list (pack size) has loaded', () => {
+    const tin = {
+      id: '00000000-0000-4000-8000-000000000001',
+      tenant_name: 'Sunflower oil tin 18L',
+      canonical_name: 'Sunflower oil',
+      base_unit: 'litre',
+      pack: { pack_count: 1, unit_size: '18' },
+      status: 'active' as const,
+      created_at: '2026-08-01T00:00:00Z',
+    };
+    const productList = new Subject<{ items: (typeof tin)[]; next_cursor: null }>();
+    apiService.products.and.returnValue(productList.asObservable() as never);
+    apiService.compareOffers.calls.reset();
+
+    const late = TestBed.createComponent(CompareComponent).componentInstance;
+    late.quantityInput.set('10');
+    late.fetchComparison(tin.id);
+    expect(apiService.compareOffers).not.toHaveBeenCalled();
+
+    late.loadProductList();
+    productList.next({ items: [tin], next_cursor: null });
+    expect(apiService.compareOffers).toHaveBeenCalledTimes(1);
+    expect(apiService.compareOffers.calls.mostRecent().args[0].quantity).toBe('180');
   });
 
   it('should render unknown stock signal correctly', () => {

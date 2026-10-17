@@ -172,7 +172,7 @@ def _thread_local_requests_client(
     monkeypatch.setattr(
         requests_service_module.RequestsService,
         "_estimate_products",
-        lambda self, product_ids: [
+        lambda self, product_ids, **_kw: [
             LineEstimate(
                 unit_price_amount=None, unit_price_currency=None, source_landed_cost_id=None
             )

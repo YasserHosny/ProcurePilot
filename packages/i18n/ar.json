@@ -1394,9 +1394,11 @@
     "productLabel": "المنتج",
     "quantityLabel": "الكمية المطلوبة",
     "quantityPlaceholder": "مثال: 10",
+    "packHint": "{{count}} عبوة × {{size}} {{unit}} = {{total}} {{unit}}",
     "quantityRequired": "يجب أن تكون الكمية أكبر من 0",
     "includeExpired": "تضمين العروض منتهية الصلاحية",
     "recomputing": "جاري إعادة الحساب...",
+    "packHint": "{{count}} عبوة × {{size}} {{unit}} = {{total}} {{unit}}",
     "unitLabel": "الوحدة: {{unit}}",
     "recommendation": {
       "title": "العرض الموصى به",
@@ -3253,6 +3255,7 @@
       },
       "creatingFromRequest": "الإنشاء من الطلب",
       "estimateReference": "التقدير",
+      "packUnit": "عبوة {{size}} {{unit}}",
       "remainingQuantity": "الكمية المتبقية للتخصيص"
     },
     "status": {
