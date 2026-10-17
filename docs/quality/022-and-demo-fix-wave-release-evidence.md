@@ -33,7 +33,7 @@ Merge dates are UTC.
 | #100 | `7972d2a` | 2026-10-16 | RTL table lines, structural review reasons | 15 | Both demo quotes re-extracted with 5 lines each |
 | #103 | `d09bc07` | 2026-10-17 | Home modules, RFQ draft edit/send, kg unit merge, import pack | 3, 4, 5, 8, 9, 13 | Deployed, migrations applied |
 | #104 | `92977b8` | 2026-10-17 | A quotation can always be authorised | 16 | Both demo quotes authorised |
-| #108 | `3fda432` | 2026-10-17 | Optimiser image and deploy, stuck jobs fail | 17 | **Not live:** deploy fails until the bunny.net container exists |
+| #108 | `3fda432` | 2026-10-17 | Optimiser image and deploy, stuck jobs fail | 17 | Container created by the owner; deploy passed 2026-10-17 (UTC). No basket split re-run on hosted yet |
 | #109 | `8304739` | 2026-10-17 | Verified matches, exact-name bulk confirm | 20 (partly) | Deployed; hosted still on the stub embedding |
 | #110 | `4ebef39` | 2026-10-17 | Per-pack estimates (ADR-020) | 18 | Deployed; PO step not yet re-run on hosted |
 
