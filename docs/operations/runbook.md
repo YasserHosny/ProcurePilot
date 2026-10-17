@@ -89,6 +89,16 @@ A quotation is `refused` only when the document is unreadable or the extraction 
 failed. An unreadable date no longer refuses a quotation; it goes to the review queue as
 `date_unparsed` instead.
 
+Line-structure problems also go to review rather than refusal: `merged_line_items` (one
+extracted line holds several items), `line_count_mismatch` (the quote's table has more item rows
+than lines produced), and `total_unverified` (a PDF/image quote with no stated total or no
+computable line totals; CSV/XLSX uploads are exempt). A reviewer's save clears all three.
+
+> **Deploy ordering:** these three values are added to the `review_task_reason` enum by
+> `supabase/migrations/20261017000001_review_reason_line_structure.sql`. Apply that migration to
+> the hosted database **before** deploying the extraction worker. Deploys do not run migrations,
+> and a worker that writes an unknown enum value fails the job and refuses the quotation.
+
 1. Fix the underlying cause (provider outage, worker bug, configuration) before retrying.
 2. From an environment with the API's `DATABASE_URL` and `REDIS_URL`, such as the API or worker
    container, preview and then requeue:

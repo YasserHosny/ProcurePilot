@@ -373,10 +373,23 @@ def _review_reason(
         return "currency_unresolved"
     if has_unparsed_date:
         return "date_unparsed"
-    if currency.confidence < threshold:
-        return "low_confidence"
+    if any(
+        len([part for part in line.original_text.splitlines() if part.strip()]) >= 2
+        for line in result.lines
+    ):
+        return "merged_line_items"
+    if result.expected_line_count is not None and len(result.lines) < result.expected_line_count:
+        return "line_count_mismatch"
     if arithmetic_status == "mismatch":
         return "arithmetic_mismatch"
+    if (
+        result.method in ("azure_di", "bedrock")
+        and result.lines
+        and arithmetic_status != "reconciled"
+    ):
+        return "total_unverified"
+    if currency.confidence < threshold:
+        return "low_confidence"
     if low_confidence_fields(result, threshold):
         return "low_confidence"
     if supplier_match.had_candidates and supplier_match.supplier_id is None:
@@ -415,11 +428,7 @@ def _with_normalised_dates(
             if not name.endswith("_date"):
                 continue
             typed_value = field.typed_value
-            raw_value = (
-                typed_value
-                if isinstance(typed_value, (date, datetime))
-                else field.value
-            )
+            raw_value = typed_value if isinstance(typed_value, (date, datetime)) else field.value
             parsed = parse_extracted_date(raw_value, region=region)
             logger.info(
                 "date field normalized",
@@ -571,6 +580,19 @@ _UNIT_ALIASES: dict[str, str] = {
     "millilitre": "millilitre",
     "millilitres": "millilitre",
     "milliliter": "millilitre",
+    "كجم": "kilogram",
+    "كيلو": "kilogram",
+    "جم": "gram",
+    "جرام": "gram",
+    "لتر": "litre",
+    "مل": "millilitre",
+    "صفيحة": "each",
+    "شيكارة": "each",
+    "كرتونة": "each",
+    "علبة": "each",
+    "كيس": "each",
+    "قطعة": "each",
+    "عبوة": "each",
 }
 
 
@@ -617,9 +639,7 @@ def _has_uncurried_money(result: ExtractionResult) -> bool:
                 return True
     stated = result.stated_total.value if result.stated_total is not None else None
     return (
-        isinstance(stated, dict)
-        and stated.get("amount") is not None
-        and not stated.get("currency")
+        isinstance(stated, dict) and stated.get("amount") is not None and not stated.get("currency")
     )
 
 

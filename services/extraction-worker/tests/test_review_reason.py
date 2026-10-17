@@ -86,9 +86,7 @@ def test_uncurried_money_is_routed_to_review_and_not_persisted_as_amount() -> No
         line_number=1,
         original_text="Tomatoes 10.00",
         fields={
-            "unit_price": ExtractedField(
-                "unit_price", {"amount": "10.00", "currency": None}, 1.0
-            )
+            "unit_price": ExtractedField("unit_price", {"amount": "10.00", "currency": None}, 1.0)
         },
     )
     result = ExtractionResult(
@@ -100,3 +98,46 @@ def test_uncurried_money_is_routed_to_review_and_not_persisted_as_amount() -> No
 
     assert _money_amount(line, "unit_price") is None
     assert _review_reason(result, "not_applicable", 0.85, _NO_MATCH) == "currency_unresolved"
+
+
+def _confident_document_result(
+    *, text: str = "item", expected: int | None = None, total: str | None = "2.00"
+) -> ExtractionResult:
+    line = ExtractedLine(
+        1,
+        text,
+        {
+            "quantity": ExtractedField("quantity", "1", 0.99),
+            "unit_price": ExtractedField("unit_price", {"amount": "2.00", "currency": "EGP"}, 0.99),
+        },
+    )
+    return ExtractionResult(
+        "azure_di",
+        "test",
+        {"currency": ExtractedField("currency", "EGP", 0.99)},
+        [line],
+        ExtractedField("stated_total", {"amount": total, "currency": "EGP"}, 0.99)
+        if total
+        else None,
+        expected_line_count=expected,
+    )
+
+
+def test_merged_line_items_routes_to_review() -> None:
+    result = _confident_document_result(text="item one\nitem two")
+    assert _review_reason(result, "reconciled", 0.85, _NO_MATCH) == "merged_line_items"
+
+
+def test_expected_line_count_routes_missing_rows_to_review() -> None:
+    result = _confident_document_result(expected=5)
+    assert _review_reason(result, "reconciled", 0.85, _NO_MATCH) == "line_count_mismatch"
+
+
+def test_document_provider_without_reconciled_total_routes_to_review() -> None:
+    result = _confident_document_result(total=None)
+    assert _review_reason(result, "not_applicable", 0.85, _NO_MATCH) == "total_unverified"
+
+
+def test_arithmetic_disagreement_keeps_existing_reason() -> None:
+    result = _confident_document_result(total="3.00")
+    assert _review_reason(result, "mismatch", 0.85, _NO_MATCH) == "arithmetic_mismatch"
