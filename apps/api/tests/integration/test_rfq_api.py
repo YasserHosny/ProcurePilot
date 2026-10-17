@@ -372,3 +372,124 @@ async def test_get_and_update_rfq_draft(monkeypatch: pytest.MonkeyPatch) -> None
         missing_key = await client.put(f"/api/v1/rfq/{rfq_id}", json=replacement)
         assert missing_key.status_code == 422
     app.dependency_overrides.clear()
+
+
+@pytest.mark.asyncio
+async def test_rfq_creator_permissions_update_replay_and_summary() -> None:
+    settings = get_settings()
+    test_db = settings.database_url.get_secret_value()
+    with psycopg.connect(test_db, prepare_threshold=None) as conn:
+        with conn.cursor() as cur:
+            tenant_id, user_id, membership_id = _seed_tenant(cur)
+            supplier_id = _seed_supplier(cur, tenant_id, "creator-rfq@example.test")
+            product_id = _seed_product(cur, tenant_id)
+            second_user_id, second_membership_id = uuid.uuid4(), uuid.uuid4()
+            cur.execute(
+                "insert into auth.users (id,email) values (%s,%s)",
+                (second_user_id, f"second-{second_user_id}@example.test"),
+            )
+            cur.execute(
+                "insert into membership (id,tenant_id,user_id,email,role,is_active_workspace) "
+                "values (%s,%s,%s,%s,'buyer',true)",
+                (
+                    second_membership_id,
+                    tenant_id,
+                    second_user_id,
+                    f"buyer-{second_user_id}@example.test",
+                ),
+            )
+        conn.commit()
+
+    from procurepilot_api.deps import CurrentMember, current_member
+    from procurepilot_api.modules.auth.jwt import MemberRole
+
+    active_member = {"membership_id": membership_id, "user_id": user_id, "role": MemberRole.owner}
+
+    def override_current_member() -> CurrentMember:
+        return CurrentMember(
+            user_id=active_member["user_id"],
+            email=f"rfq-e2e-{active_member['user_id']}@example.test",
+            membership_id=active_member["membership_id"],
+            tenant_id=tenant_id,
+            role=active_member["role"],
+        )
+
+    app.dependency_overrides[current_member] = override_current_member
+    FakeMailer.clear()
+    original = {
+        "lines": [{"workspace_product_id": str(product_id), "quantity": "2"}],
+        "recipient_supplier_ids": [str(supplier_id)],
+        "needed_by_date": "2026-12-01",
+        "tenant_terms": "Original",
+    }
+    edit = {
+        **original,
+        "lines": [{"workspace_product_id": str(product_id), "quantity": "7"}],
+        "tenant_terms": "Updated",
+    }
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        created = await client.post(
+            "/api/v1/rfq", json=original, headers={"Idempotency-Key": str(uuid.uuid4())}
+        )
+        assert created.status_code == 201, created.text
+        rfq_id = created.json()["rfq"]["id"]
+        original_line_id = created.json()["lines"][0]["id"]
+        original_recipient_id = created.json()["recipients"][0]["id"]
+
+        active_member.update(
+            membership_id=second_membership_id,
+            user_id=second_user_id,
+            role=MemberRole.buyer,
+        )
+        noncreator_put = await client.put(
+            f"/api/v1/rfq/{rfq_id}",
+            json=edit,
+            headers={"Idempotency-Key": str(uuid.uuid4())},
+        )
+        assert noncreator_put.status_code == 403
+        noncreator_send = await client.post(
+            f"/api/v1/rfq/{rfq_id}/send",
+            headers={"Idempotency-Key": str(uuid.uuid4())},
+        )
+        assert noncreator_send.status_code == 403
+        assert FakeMailer.sent_messages == []
+        detail = await client.get(f"/api/v1/rfq/{rfq_id}")
+        assert detail.status_code == 200
+        assert detail.json()["rfq"]["status"] == "draft"
+        assert detail.json()["lines"][0]["id"] == original_line_id
+        assert detail.json()["lines"][0]["quantity"] == "2.000000"
+        assert detail.json()["recipients"][0]["id"] == original_recipient_id
+        assert detail.json()["recipients"][0]["status"] == "draft"
+
+        active_member.update(membership_id=membership_id, user_id=user_id, role=MemberRole.owner)
+        first_key = str(uuid.uuid4())
+        first = await client.put(
+            f"/api/v1/rfq/{rfq_id}", json=edit, headers={"Idempotency-Key": first_key}
+        )
+        replay = await client.put(
+            f"/api/v1/rfq/{rfq_id}", json=edit, headers={"Idempotency-Key": first_key}
+        )
+        assert first.status_code == replay.status_code == 200
+        assert [r["id"] for r in first.json()["lines"]] == [r["id"] for r in replay.json()["lines"]]
+        assert [r["id"] for r in first.json()["recipients"]] == [
+            r["id"] for r in replay.json()["recipients"]
+        ]
+        second = await client.put(
+            f"/api/v1/rfq/{rfq_id}",
+            json=original,
+            headers={"Idempotency-Key": str(uuid.uuid4())},
+        )
+        assert second.status_code == 200
+        listing = await client.get("/api/v1/rfq")
+        summary = next(row for row in listing.json()["items"] if row["id"] == rfq_id)
+        assert summary["created_by_membership_id"] == str(membership_id)
+
+    with psycopg.connect(test_db, prepare_threshold=None) as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "select count(*) from audit_event where tenant_id = %s "
+                "and action = 'rfq.draft_updated' and target->>'rfq_id' = %s",
+                (tenant_id, rfq_id),
+            )
+            assert cur.fetchone()[0] == 2
+    app.dependency_overrides.clear()

@@ -73,3 +73,15 @@ def test_csv_catalogue_connector_reuses_parser_and_normalizes_rows() -> None:
     assert [row.provider_record_id for row in page.rows] == ["prices.csv:2"]
     assert page.rows[0].base_unit == "box"
     assert page.errors == ("row 3: unparseable_unit_price",)
+
+
+def test_catalogue_connector_canonicalizes_base_unit_aliases() -> None:
+    now = datetime(2026, 9, 20, tzinfo=UTC)
+    connector = CsvCatalogueConnector(
+        b"product_name,unit_price,currency,unit\nRice,4.00,GBP,KG \n",
+        filename="prices.csv",
+        observed_at=now,
+        default_base_unit="kg",
+    )
+
+    assert connector.list_catalogue().rows[0].base_unit == "kilogram"

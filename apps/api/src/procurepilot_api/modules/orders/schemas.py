@@ -7,6 +7,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from procurepilot_api.modules.catalogue.units import canonical_base_unit
+
 OrderStatus = Literal[
     "draft",
     "submitted",
@@ -252,6 +254,11 @@ class PurchaseOrderLineInput(StrictModel):
     tax: Money
     line_total: Money
     source_request_line_id: UUID | None = None
+
+    @field_validator("base_unit", mode="before")
+    @classmethod
+    def _canonical_base_unit(cls, value: object) -> object:
+        return canonical_base_unit(value) if isinstance(value, str) else value
 
     _validate_quantity_scale = field_validator("ordered_quantity")(
         lambda value: _require_scale(value, 6, "ordered quantity")

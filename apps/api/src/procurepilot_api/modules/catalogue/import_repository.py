@@ -24,6 +24,7 @@ from procurepilot_api.modules.catalogue.csv_import import (
     ProductImportRow,
     SupplierImportRow,
 )
+from procurepilot_api.modules.catalogue.units import canonical_base_unit
 
 IMPORT_JOB_COLUMNS = (
     "id,tenant_id,kind,filename,status,row_count,error_report,created_by,created_at,committed_at"
@@ -183,11 +184,15 @@ class PostgresImportRepository(ImportRepository):
             )
 
     def find_supplier_duplicate(self, row: SupplierImportRow) -> dict[str, Any] | None:
-        return self._active_conn().execute(
-            "select id from supplier where tenant_id = %s and lower(name) = lower(%s) "
-            "order by created_at, id limit 1",
-            (self._member.tenant_id, row.name),
-        ).fetchone()
+        return (
+            self._active_conn()
+            .execute(
+                "select id from supplier where tenant_id = %s and lower(name) = lower(%s) "
+                "order by created_at, id limit 1",
+                (self._member.tenant_id, row.name),
+            )
+            .fetchone()
+        )
 
     def create_supplier(self, row: SupplierImportRow) -> None:
         self._active_conn().execute(
@@ -322,10 +327,7 @@ def _act_as(conn: psycopg.Connection[dict[str, Any]], member: CurrentMember) -> 
 
 
 def _error_report(report: ImportValidationReport) -> list[dict[str, object]]:
-    details = [
-        _error_detail(error)
-        for error in (*report.errors, *report.duplicates)
-    ]
+    details = [_error_detail(error) for error in (*report.errors, *report.duplicates)]
     if report.file_error is not None:
         details.append({"line": 0, "column": None, "reason": report.file_error})
     return details
@@ -417,7 +419,7 @@ def _row_from_payload(payload: object) -> ProductImportRow | SupplierImportRow:
         return ProductImportRow(
             line=int(payload["line"]),
             tenant_name=str(payload["tenant_name"]),
-            base_unit=str(payload["base_unit"]),
+            base_unit=canonical_base_unit(str(payload["base_unit"])),
             pack_count=int(payload["pack_count"]),
             unit_size=Decimal(str(payload["unit_size"])),
             canonical_name=_optional_payload_str(payload.get("canonical_name")),

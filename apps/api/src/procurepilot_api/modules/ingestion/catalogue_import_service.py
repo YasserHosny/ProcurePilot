@@ -13,6 +13,7 @@ from supabase import create_client
 from procurepilot_api.config import Settings, get_settings
 from procurepilot_api.deps import CurrentMember
 from procurepilot_api.errors import NotFoundError, UnprocessableEntityError
+from procurepilot_api.modules.catalogue.units import canonical_base_unit
 from procurepilot_api.modules.ingestion.catalogue_parser import (
     CatalogueParseError,
     CatalogueRow,
@@ -308,7 +309,7 @@ def _insert_quotation_lines(
                             line_number,
                             row.product_name,
                             row.minimum_order_quantity or 1,
-                            None,
+                            canonical_base_unit(row.unit) if row.unit else None,
                             row.unit_price_amount,
                             row.unit_price_currency,
                         ),

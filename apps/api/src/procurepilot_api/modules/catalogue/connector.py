@@ -9,6 +9,7 @@ from decimal import Decimal
 from typing import Protocol, runtime_checkable
 
 from procurepilot_api.config import Settings, get_settings
+from procurepilot_api.modules.catalogue.units import canonical_base_unit
 from procurepilot_api.modules.ingestion.catalogue_parser import parse_catalogue_file
 
 
@@ -45,6 +46,7 @@ class NormalizedCatalogueRow:
             raise ValueError("product_name must not be empty")
         if not self.base_unit.strip():
             raise ValueError("base_unit must not be empty")
+        object.__setattr__(self, "base_unit", canonical_base_unit(self.base_unit))
         _amount(self.unit_price_amount)
         object.__setattr__(self, "unit_price_currency", _currency(self.unit_price_currency))
         if self.valid_to is not None and self.valid_to < self.valid_from:
@@ -78,8 +80,7 @@ class CatalogueConnector(Protocol):
         since: datetime | None = None,
         cursor: str | None = None,
         limit: int = 100,
-    ) -> CataloguePage:
-        ...
+    ) -> CataloguePage: ...
 
 
 class StubCatalogueConnector:
@@ -126,7 +127,7 @@ class CsvCatalogueConnector:
                 product_name=row.product_name,
                 unit_price_amount=row.unit_price_amount,
                 unit_price_currency=row.unit_price_currency,
-                base_unit=row.unit or default_base_unit,
+                base_unit=canonical_base_unit(row.unit or default_base_unit),
                 observed_at=self._observed_at,
                 valid_from=self._observed_at,
                 valid_to=valid_to,
