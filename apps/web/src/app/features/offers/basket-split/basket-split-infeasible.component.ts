@@ -37,6 +37,14 @@ export class BasketSplitInfeasibleComponent {
   @Output() readonly rerun = new EventEmitter<void>();
   @Output() readonly resetBasket = new EventEmitter<void>();
 
+  /** Specific copy when the solver service never ran the job; null falls back to the generic text. */
+  failureMessageKey(): string | null {
+    const code = this.currentJob?.error?.['code'];
+    if (code === 'optimiser_unavailable') return 'basketSplit.status.unavailableMessage';
+    if (code === 'optimiser_timeout') return 'basketSplit.status.timeoutMessage';
+    return null;
+  }
+
   getSupplierName(supplierId: string): string {
     const s = this.suppliers.find((supp) => supp.id === supplierId);
     return s ? s.name : supplierId;

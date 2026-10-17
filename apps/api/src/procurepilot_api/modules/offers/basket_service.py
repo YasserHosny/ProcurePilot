@@ -16,6 +16,11 @@ from procurepilot_api.errors import (
     ServiceUnavailableError,
     UnprocessableEntityError,
 )
+from procurepilot_api.modules.offers.basket_liveness import (
+    STALE_MESSAGES,
+    optimiser_worker_alive,
+    stale_code,
+)
 from procurepilot_api.modules.offers.schemas import (
     AdvancedBasketOptimiseRequest,
     BasketOptimiseRequest,
@@ -61,14 +66,7 @@ class BasketService:
                         _compensate_failed_enqueue(conn, UUID(str(existing["id"])))
                         conn.commit()
                         raise
-                    with conn.cursor(row_factory=dict_row) as cur:
-                        cur.execute(
-                            "update basket_split_job "
-                            "set status = 'queued', error = null, completed_at = null "
-                            "where id = %s returning *",
-                            (existing["id"],),
-                        )
-                        job = _job(dict(cur.fetchone()))
+                    job = _job(_requeue_failed_job(conn, UUID(str(existing["id"]))))
                     if isinstance(payload, AdvancedBasketOptimiseRequest):
                         _record_audit(
                             bearer_token=bearer_token,
@@ -84,6 +82,7 @@ class BasketService:
                             },
                         )
                     return job, True
+            self._expire_stuck_jobs(conn)
             _visible_suppliers(conn, payload.supplier_ids)
             _visible_products(conn, [item.workspace_product_id for item in payload.items])
             request_snapshot = _request_snapshot(conn, member, payload)
@@ -152,9 +151,57 @@ class BasketService:
             with conn.cursor(row_factory=dict_row) as cur:
                 cur.execute("select * from basket_split_job where id = %s", (job_id,))
                 row = cur.fetchone()
-        if row is None:
-            raise NotFoundError(details={"resource": "basket_split_job"})
-        return _job(dict(row))
+            if row is None:
+                raise NotFoundError(details={"resource": "basket_split_job"})
+            row = dict(row)
+            code = self._stale_code(row, worker_alive=None)
+            if code is not None:
+                row = self._fail_stuck(conn, row, code)
+        return _job(row)
+
+    def _stale_code(self, row: dict[str, object], *, worker_alive: bool | None) -> str | None:
+        if row["status"] == "queued" and worker_alive is None:
+            worker_alive = optimiser_worker_alive(self._settings)
+        return stale_code(
+            status=str(row["status"]),
+            created_at=row["created_at"],
+            started_at=row.get("started_at"),
+            now=datetime.now(UTC),
+            stall_seconds=self._settings.basket_split_stall_seconds,
+            expiry_seconds=self._settings.basket_split_expiry_seconds,
+            worker_alive=worker_alive,
+        )
+
+    def _fail_stuck(self, conn: object, row: dict[str, object], code: str) -> dict[str, object]:
+        """Mark a job nobody is working on as failed so the UI can offer a retry.
+
+        The update is best-effort under RLS; the returned row reflects the failure either way
+        so a read-only member also sees it.
+        """
+        error = {"code": code, "message": STALE_MESSAGES[code]}
+        completed_at = datetime.now(UTC)
+        with conn.cursor() as cur:
+            cur.execute(
+                "update basket_split_job set status = 'failed', error = %s, completed_at = %s "
+                "where id = %s and status in ('queued', 'running')",
+                (Jsonb(error), completed_at, row["id"]),
+            )
+        return {**row, "status": "failed", "error": error, "completed_at": completed_at}
+
+    def _expire_stuck_jobs(self, conn: object) -> None:
+        """Fail stuck jobs in this tenant so a retry is not blocked as 'already running'."""
+        with conn.cursor(row_factory=dict_row) as cur:
+            cur.execute("select * from basket_split_job where status in ('queued', 'running')")
+            active = [dict(r) for r in cur.fetchall()]
+        alive = (
+            optimiser_worker_alive(self._settings)
+            if any(r["status"] == "queued" for r in active)
+            else None
+        )
+        for row in active:
+            code = self._stale_code(row, worker_alive=alive)
+            if code is not None:
+                self._fail_stuck(conn, row, code)
 
 
 def get_basket_service() -> BasketService:
@@ -389,9 +436,7 @@ def _ensure_single_currency(supplier_terms: list[dict[str, object]]) -> None:
         for tier in term["quantity_tiers"]:
             currencies.add(_money_currency(tier.get("unit_price")))
     if len(currencies) > 1:
-        raise UnprocessableEntityError(
-            details={"currency": "mixed_advanced_basket_currency"}
-        )
+        raise UnprocessableEntityError(details={"currency": "mixed_advanced_basket_currency"})
 
 
 def _money_currency(value: object) -> str:
@@ -468,6 +513,23 @@ def _enqueue_redis_job(settings: Settings, row: dict[str, object], member: Curre
         )
     except Exception as exc:
         raise ServiceUnavailableError(details={"dependency": "redis"}) from exc
+
+
+def _requeue_failed_job(conn: object, job_id: UUID) -> dict[str, object]:
+    """Reset a failed job to a fresh queued attempt.
+
+    ``created_at``/``started_at`` restart so the stuck-job expiry measures this attempt, not
+    the original one (otherwise a retry of an expired job is failed again on its first poll).
+    """
+    with conn.cursor(row_factory=dict_row) as cur:
+        cur.execute(
+            "update basket_split_job "
+            "set status = 'queued', error = null, completed_at = null, "
+            "started_at = null, created_at = now() "
+            "where id = %s returning *",
+            (job_id,),
+        )
+        return dict(cur.fetchone())
 
 
 def _compensate_failed_enqueue(conn: object, job_id: UUID) -> None:

@@ -66,9 +66,21 @@
       <mat-icon class="failed-icon" aria-hidden="true">error</mat-icon>
       <h2 class="failed-title">{{ 'basketSplit.status.failed' | translate }}</h2>
       <p class="failed-message">
-        {{ errorMessage || ('basketSplit.status.failedMessage' | translate) }}
+        {{
+          errorMessage ||
+            ((failureMessageKey() ?? 'basketSplit.status.failedMessage') | translate)
+        }}
       </p>
       <div class="failed-actions">
+        <button
+          mat-stroked-button
+          (click)="rerun.emit()"
+          class="rerun-btn"
+          [disabled]="!isWriter || isSubmitting"
+        >
+          <mat-icon aria-hidden="true">replay</mat-icon>
+          <span>{{ 'advancedBasket.actions.rerun' | translate }}</span>
+        </button>
         <button mat-flat-button color="primary" (click)="resetBasket.emit()">
           <mat-icon aria-hidden="true">refresh</mat-icon>
           <span>{{ 'basketSplit.actions.newSplit' | translate }}</span>
