@@ -1216,7 +1216,7 @@ A grounded, cited question-and-answer assistant over your own tenant data — sp
 
 ## 38. RFQ Sourcing & Response Comparison
 
-**Route:** `/rfq/create` (Owner or Buyer) — reached via the **Create RFQ** button on RFQ History (below), or by navigating directly.
+**Route:** `/rfq/create` (Owner or Buyer) — reached via the **Create RFQ** button on RFQ History (below), or by navigating directly. A saved draft reopens for editing at `/rfq/:id/edit` (its creator only), from its RFQ History row.
 
 ![Create RFQ](screenshots/34-rfq-create.jpg)
 
@@ -1228,7 +1228,7 @@ Sends a structured request for quotation to one or more suppliers by email. Repl
 | 2 | **Suppliers dropdown** | A multi-select populated with your active suppliers, showing supplier name. Only suppliers that have a contact email on file (§5) appear in the list — a supplier without one simply isn't selectable here. |
 | 3 | **Needed By Date field** | A date picker for the date the buyer needs the goods by. |
 | 4 | **Terms and Conditions field** | Optional free text included with the RFQ (e.g. delivery or payment terms suppliers should quote against). |
-| 5 | **Save Draft button** | Creates the RFQ in `draft` status. Once created, the button disables — the draft is saved once per visit to this form. |
+| 5 | **Save Draft button** | The first save creates the RFQ in `draft` status; later saves update the same draft, and a confirmation appears after each save. The button stays enabled until the RFQ is sent. |
 | 6 | **Rejected Suppliers list** | Appears only if the backend still excluded a selected supplier from the RFQ (for example, its contact email was removed between when the page loaded and when you saved). Since the dropdown already limits selection to suppliers with a contact email on file, this list is expected to stay empty in normal use. |
 | 7 | **Send RFQ button** | Appears once the draft is saved. Dispatches the RFQ by email to every recipient still pending, and shows the current RFQ status ("draft" or "sent"). |
 
@@ -1244,7 +1244,8 @@ Sends a structured request for quotation to one or more suppliers by email. Repl
 | 2 | **Create RFQ button** | Top-right of the header. Navigates to `/rfq/create` (above) — this is the app's navigation entry point into Create RFQ. |
 | 3 | **Guardrails button** | Owner only. Navigates to the guardrail settings screen (below). |
 | 4 | **RFQ table** | One row per RFQ: status (Draft/Sent/Responded/Expired/Converted), needed-by date, sent date, recipient count, and response count. |
-| 5 | **Row click** | Opens the RFQ. A `Converted` row opens the purchase request it produced (§19); any other status opens the Compare RFQ Responses screen (below). |
+| 5 | **Row click** | A `Draft` row you created reopens the draft for editing (`/rfq/:id/edit`); anyone else's draft, and any `Sent`/`Responded`/`Expired` row, opens the Compare RFQ Responses screen (below). A `Converted` row opens the purchase request it produced (§19). |
+| 6 | **Edit / Send (draft rows)** | Shown only on drafts you created. **Edit** reopens the draft; **Send** asks for confirmation, then emails the RFQ to every recipient — the same as **Send RFQ** on the form. |
 
 ### Guardrail settings
 
