@@ -44,6 +44,12 @@ class Settings(BaseSettings):
     basket_split_queue_name: str = Field(
         default="basket-split", validation_alias="BASKET_SPLIT_QUEUE_NAME"
     )
+    basket_split_stall_seconds: int = Field(
+        default=60, validation_alias="BASKET_SPLIT_STALL_SECONDS", gt=0
+    )
+    basket_split_expiry_seconds: int = Field(
+        default=900, validation_alias="BASKET_SPLIT_EXPIRY_SECONDS", gt=0
+    )
     export_queue_name: str = Field(default="exports", validation_alias="EXPORT_QUEUE_NAME")
     digest_queue_name: str = Field(default="digests", validation_alias="DIGEST_QUEUE_NAME")
     extraction_provider_mode: Literal["stub", "bedrock", "azure_di"] = Field(

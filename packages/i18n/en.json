@@ -1539,7 +1539,9 @@
       "polling": "Checking job status...",
       "completed": "Optimisation Completed",
       "failed": "Optimisation Job Failed",
-      "failedMessage": "An error occurred during solver execution. Please try again."
+      "failedMessage": "An error occurred during solver execution. Please try again.",
+      "unavailableMessage": "The optimisation service is not responding. Please try again shortly, or contact support if this keeps happening.",
+      "timeoutMessage": "The optimisation did not finish in time. Please try again."
     },
     "result": {
       "feasibleTitle": "Recommended Basket Allocation",

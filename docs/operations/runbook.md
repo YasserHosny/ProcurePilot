@@ -148,7 +148,7 @@ Production uses **two separate bunny.net Magic Container apps**, not one:
 | App | Containers | Purpose |
 |---|---|---|
 | `procurepilot-production` | `procurepilot-backend` (port 8000), `procurepilot-frontend` (port 80) | API + SPA; shared network namespace |
-| `procurepilot-workers` | `procurepilot-extraction-worker`, `shared-redis` (port 6379) | Background extraction jobs |
+| `procurepilot-workers` | `procurepilot-extraction-worker`, `procurepilot-optimiser-worker`, `shared-redis` (port 6379) | Background extraction and basket-split jobs |
 
 Containers within the same app share a network namespace (communicate via `localhost`).
 Containers in **different** apps do not share a namespace — the backend API connects to the
@@ -234,6 +234,38 @@ container:
 1. Click **Update Container** in the container settings.
 2. Click **Save Changes** at the app level — this triggers a full redeployment.
 3. Wait for the container status to return to "Running" before testing.
+
+### 7.7 Optimiser (Basket Split) Worker
+
+The Two-Supplier Basket Split and advanced basket optimisation run in `services/optimiser`, an
+RQ consumer on the `basket-split` queue. If it is not running, `basket_split_job` rows stay
+`queued` and nothing computes them. Image: `ghcr.io/<owner>/procurepilot-optimiser-worker`
+(built from `infra/docker/optimiser.Dockerfile`, rolled by
+`.github/workflows/deploy-optimiser-worker.yml`, which only **updates** an existing container).
+
+**One-time owner step:** in the `procurepilot-workers` app, create a container named exactly
+`procurepilot-optimiser-worker` from that image (no public port, no endpoint needed) with:
+
+| Variable | Required | Value |
+|---|---|---|
+| `DATABASE_URL` | yes | Supabase pooler connection string (the worker disables prepared statements itself) |
+| `REDIS_URL` | yes | `redis://localhost:6379/0` (same workers app as `shared-redis`); must be the **same** Redis the backend's `REDIS_URL` points at |
+| `BASKET_SPLIT_QUEUE_NAME` | yes | `basket-split` (must equal the backend's value) |
+
+No other variables are read (`services/optimiser/.../settings.py`). Then **Save Changes** at the
+app level (see 7.6). On start the log shows
+`optimiser worker starting: queue=basket-split redis=<host>:<port>`; it exits immediately if
+Redis is unreachable.
+
+**Backend settings (optional):** `BASKET_SPLIT_STALL_SECONDS` (default 60) fails a queued job
+when no worker is registered on the queue for that long; `BASKET_SPLIT_EXPIRY_SECONDS`
+(default 900) fails any job still queued, or running, that long. The UI then shows
+"the optimisation service is not responding" with a retry button (error codes
+`optimiser_unavailable` / `optimiser_timeout`) instead of polling forever.
+
+**Diagnose a stuck basket split:** is a `procurepilot-optimiser-worker` container Running? Do
+its logs show the startup line? Does `rq info` against the shared Redis list a worker on
+`basket-split`?
 
 ## 8. Logging & Diagnostics
 
