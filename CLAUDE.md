@@ -1,17 +1,10 @@
 # ProcurePilot — Development Guidelines
 
-Last updated: 2026-10-14 · Active feature: none mid-build. Every numbered spec, `001` through
-`021`, has shipped to `main` — including `018-forecasting-reorder` and
-`019-supplier-risk-negotiation`, both already fully built and merged (as "R4.0" and "R4.1" in
-commit history) despite their `specs/` folders lagging behind: `018` had no `tasks.md` and `019`
-had neither a `plan.md` nor a `tasks.md` until 2026-10-03, when both were reconstructed
-retroactively against the real shipped code (see the dated verification notes inside each). That
-reconstruction surfaced two real bugs — T012 (forecasting's proposal-list pagination) and T019
-(FR-011A's three-signal service-risk formula) — both fixed and merged the same day (PRs #67, #68).
-`012-reporting-hardening`'s weekly digest also gained a 6th section the same day
-(`pending_match_resolutions`, T043, PR #69), closing a real notification gap found during the
-018/019 investigation. There is currently no visible not-yet-started spec in `specs/`; the next
-feature has not been scoped.
+Last updated: 2026-10-18 · Active work: Egypt pilot readiness. Specs `001`–`021` have shipped to
+`main`; `022-home-currency-readiness` is merged with three tasks open (T015 real-quote extraction run,
+T018 mobile screenshots, T020 full test pass). Since 2026-10-15 most changes have come from building
+the hosted demo tenant «مطاعم سند» (`docs/gtm/demo-tenant/README.md`, findings 1–20) rather than from
+a new spec. No new spec has been scoped; `docs/gtm/gtm-execution-plan.md` tracks pilot work.
 
 ProcurePilot turns fragmented supplier information into trusted, comparable purchasing
 decisions and proves the money saved. Read `.specify/memory/constitution.md` before writing
@@ -56,15 +49,20 @@ photos, push notifications. 31 Dart source files, 22 test files (`apps/mobile/li
 
 ```text
 apps/api/          FastAPI modular monolith — the only backend deployable
-  src/procurepilot_api/modules/{auth,tenants,members,health}/
-  migrations/      versioned SQL, applied via Supabase CLI
+  src/procurepilot_api/modules/   30 modules (auth, tenants, catalogue, quotations, matching,
+                   offers, requests, orders, rfq, analyst, ...) — `ls` for the current list
+  src/procurepilot_api/workers/   background workers run from the API image (email ingestion, exports,
+                   digests, report scheduling, accounting/POS sync, webhooks, catalogue and offer
+                   refresh) and operator CLIs (`requeue_extraction`, `requeue_email_ingest`)
   tests/{unit,integration,contract}/
+supabase/migrations/  versioned SQL, applied via Supabase CLI (apps/api/migrations/ is a pointer)
 apps/web/          Angular 19 SPA
   src/app/{core,layout,features}/
 apps/mobile/       Flutter app — shipped (auth, requests, approvals, low-stock, delivery, push)
 packages/          domain-types · ui · validation · i18n
 services/          extraction-worker (quotation extraction) · optimiser (basket-split solver) —
-                   both real, independently deployed workers, not placeholders
+                   both real, independently deployed workers; matching-worker/ is an empty
+                   placeholder (matching runs inside apps/api)
 ml/                evals/product_matching (precision/recall/ECE against a held-out benchmark) ·
                    benchmarks/product_matching (benchmark format) — real, not placeholders
 infra/             docker · nginx · terraform
@@ -104,6 +102,15 @@ interfaces, not shared internal state.
 **TypeScript** — strict mode, standalone components, signals for local state, RxJS for streams.
 No `any`. Shared validation schemas come from `packages/validation`.
 
+**Database connections** — open every Postgres connection through `procurepilot_api.db.connect`
+(or the worker's own `db.connect`): it sets `prepare_threshold=None`, which Supabase's
+transaction-mode pooler needs (PR #87). A bare `psycopg.connect` fails there with
+`DuplicatePreparedStatement`. Deploys never run migrations — apply them to hosted with
+`pnpm db:migrate` and check with `supabase migration list`.
+
+**Quantities** — request, RFQ and PO quantities are in the purchasing unit (pack) and prices are
+per pack; base-unit conversion is only for cross-supplier comparison (ADR-020).
+
 **SQL** — one versioned file per migration, forward-only, never edited after merge. Every new
 tenant-scoped table ships with its RLS policy in the same migration.
 
@@ -116,7 +123,7 @@ directions.
 |---|---|
 | Why does this exist, what ships when | `docs/roadmap/procurepilot_roadmap.md` |
 | What are the binding rules | `.specify/memory/constitution.md` |
-| What am I building now | `specs/001-platform-foundation/spec.md` |
+| What am I building now | `specs/022-home-currency-readiness/tasks.md` · `docs/gtm/gtm-execution-plan.md` |
 | How was it decided | `specs/001-platform-foundation/research.md` |
 | Tables, RLS, state transitions | `specs/001-platform-foundation/data-model.md` |
 | How do I run it | `specs/001-platform-foundation/quickstart.md` |
@@ -129,7 +136,11 @@ directions.
 Every spec through `021-rfq-sourcing-autonomy` is complete and merged (`specs/*/tasks.md` fully
 checked, or verified against actual code where the checkboxes themselves were stale — see the
 dated notes inside `specs/004-matching-normalisation/tasks.md` and
-`specs/008-requests-approvals/tasks.md` for examples of that verification). That includes:
+`specs/008-requests-approvals/tasks.md` for examples of that verification). Some boxes are left
+open on purpose, as their notes explain: `specs/018-forecasting-reorder/tasks.md` T011, T016, T019,
+T020 and T024 call for tests that were never written, and `specs/004-matching-normalisation/tasks.md`
+T049 cannot be tested until the landed-cost rule version can change. Do not tick them without that
+evidence. That includes:
 Phase 4 (Predictive Procurement, R4.0–R4.3 — RFQ sourcing with guarded auto-preparation, passed its
 T047 live hosted walkthrough including a guardrail firing autonomously on hosted, evidence
 `docs/quality/r4.3-release-evidence.md`); `016-order-tracking-three-way-match`, including its final
@@ -172,8 +183,8 @@ precedent for one anywhere in this app, and closer to the "no passive dashboard"
 `specs/004`'s own `plan.md` explicitly designed against). Shipped as `012-reporting-hardening`'s
 6th digest section (`pending_match_resolutions`, FR-009 amended, T043, PR #69).
 
-With `018`/`019` closed out and both real bugs fixed, there is no visible not-yet-started spec
-anywhere in `specs/` right now — the next feature has not been scoped.
+With `018`/`019` closed out and both real bugs fixed, the only open spec work is `022`'s three
+tasks (see the top of this file). The next feature has not been scoped.
 
 <!-- MANUAL ADDITIONS START -->
 <!-- MANUAL ADDITIONS END -->
@@ -208,6 +219,17 @@ anywhere in `specs/` right now — the next feature has not been scoped.
 - Supabase Postgres 17, unchanged. Reuses `tenant.currency`; audit via existing `record_audit_event`. (022-home-currency-readiness)
 
 ## Recent Changes
+- 2026-10-15 to 10-18: hosted demo-tenant fix wave (findings in `docs/gtm/demo-tenant/README.md`).
+  Ingestion: RFQ-reply supplier wins attribution (#84), Arabic filenames no longer lose emails (#90).
+  Extraction: DD/MM quote dates parsed in Python, unparsed dates go to review (#96); Arabic RTL tables
+  read row by row, merged lines and unverified totals never auto-accept (#100). Review: a quotation
+  can always be authorised, specific 409 reasons (#104, spec 003 FR-013A). RFQ: localised supplier
+  email with buyer terms (#89), draft edit/send via `GET/PUT /rfq/{id}` (#103). Matching: human
+  decisions show as verified, bulk confirm of exact-name matches (#109). Requests: per-pack estimates
+  from the source RFQ response (#110, ADR-020). Basket split: optimiser worker image + deploy, stuck
+  jobs fail instead of spinning (#108; the bunny.net container still has to be created). Platform:
+  `prepare_threshold=None` on every connection (#87), local calendar dates (#88). CI: docs-only PRs
+  skip heavy jobs, E2E sharded across 3 runners (`docs/operations/ci-pipeline.md`).
 - 2026-10-14: 022-home-currency-readiness (PR #73) -- the existing `tenant.currency` is now the home
   currency: web forms default to it instead of USD, `PATCH /tenant` accepts and audits it, extraction
   recognises EGP markers/Arabic-Indic digits and stores no currency when none is evidenced and routes to review as `currency_unresolved` with the home currency only as a suggestion (no more

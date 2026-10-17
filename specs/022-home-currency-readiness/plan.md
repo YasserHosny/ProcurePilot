@@ -1,7 +1,7 @@
 # Implementation Plan: Home Currency Readiness for the Egypt Pilot
 
 **Branch**: `022-home-currency-readiness` | **Date**: 2026-10-14 | **Spec**: [spec.md](spec.md)
-**Tracking**: Jira PP-1 (C1), PP-2 (C3), PP-3 fix part (C2) · `docs/product/gtm-execution-plan.md` P-1..P-3
+**Tracking**: Jira PP-1 (C1), PP-2 (C3), PP-3 fix part (C2) · `docs/gtm/gtm-execution-plan.md` P-1..P-3
 
 ## Summary
 

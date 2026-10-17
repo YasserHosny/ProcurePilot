@@ -4,8 +4,8 @@
 **Created**: 2026-10-14
 **Status**: Draft (amended 2026-10-14 after planning research: the home currency is the existing `tenant.currency`; see plan.md)
 **Tracking**: Jira PP-1 (gap C1), PP-2 (gap C3), PP-3 fix part (gap C2) — see
-`docs/product/first-customer-gtm-plan.md` § "Currency gaps — Egypt" and
-`docs/product/gtm-execution-plan.md` (P-1..P-3)
+`docs/gtm/first-customer-gtm-plan.md` § "Currency gaps — Egypt" and
+`docs/gtm/gtm-execution-plan.md` (P-1..P-3)
 **Input**: Each tenant has a home currency; web money forms default to it instead of USD;
 quotation extraction falls back to it instead of GBP and recognises Egyptian currency markers and
 Arabic-Indic digits, flagging any fallback for review; landed cost stops defaulting to GBP; the
