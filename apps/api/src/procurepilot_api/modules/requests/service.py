@@ -72,7 +72,7 @@ from procurepilot_api.shared.storage_keys import safe_object_name
 
 REQUEST_COLUMNS = (
     "id,tenant_id,branch_id,cost_centre_id,requested_by_membership_id,"
-    "required_by_date,status,estimated_total_amount,estimated_total_currency,"
+    "required_by_date,status,source_rfq_response_id,estimated_total_amount,estimated_total_currency,"
     "has_incomplete_estimate,submitted_at,withdrawn_at,delivered_at,"
     "delivery_confirmed_by_membership_id,has_delivery_discrepancy,"
     "created_at,updated_at"
@@ -1945,6 +1945,11 @@ def _purchase_request(
 ) -> PurchaseRequest:
     return PurchaseRequest(
         id=UUID(str(row["id"])),
+        source_rfq_response_id=(
+            UUID(str(row["source_rfq_response_id"]))
+            if row.get("source_rfq_response_id")
+            else None
+        ),
         branch_id=UUID(str(row["branch_id"])),
         cost_centre_id=(UUID(str(row["cost_centre_id"])) if row.get("cost_centre_id") else None),
         requested_by_membership_id=UUID(str(row["requested_by_membership_id"])),

@@ -1365,6 +1365,7 @@ export interface ApprovalStep {
 
 export interface PurchaseRequest {
   readonly id: string;
+  readonly source_rfq_response_id?: string | null;
   readonly branch_id: string;
   readonly cost_centre_id?: string | null;
   readonly requested_by_membership_id: string;

@@ -103,6 +103,31 @@ describe('OrderCreateComponent', () => {
     expect(component.form.controls.currency.value).toBe('USD');
   });
 
+  it('prefills request line unit price only for an RFQ-sourced request', () => {
+    const loadRequest = (sourceRfqResponseId: string | null) => {
+      fixture.destroy();
+      routeSnapshot.queryParamMap = convertToParamMap({ source_request_id: 'req-1' });
+      requestsApiService.getRequest.and.returnValue(of({
+        id: 'req-1', branch_id: 'b1', requested_by_membership_id: 'm1',
+        required_by_date: '2026-10-01', status: 'approved',
+        source_rfq_response_id: sourceRfqResponseId,
+        lines: [{ id: 'rl-1', workspace_product_id: 'p1', quantity: '5.000000', estimated_unit_price: { amount: '9.0000', currency: 'USD' } }],
+        has_incomplete_estimate: false, created_at: '2026-09-29T00:00:00Z',
+      } as unknown as import('../../../core/api/models').PurchaseRequest));
+      ordersApiService.getAllocations.and.returnValue(of({ source_request_id: 'req-1', lines: [{ source_request_line_id: 'rl-1', requested_quantity: '5.000000', allocated_quantity: '0', remaining_quantity: '5.000000' }] }));
+      fixture = TestBed.createComponent(OrderCreateComponent);
+      component = fixture.componentInstance;
+      fixture.detectChanges();
+    };
+
+    loadRequest('rfq-response-1');
+    expect(component.lines.at(0).controls.unit_price.value).toBe(9);
+    fixture.destroy();
+    loadRequest(null);
+    expect(component.lines.at(0).controls.unit_price.value).toBeNull();
+    expect(component.lines.at(0).controls.estimated_price.value).toBe(9);
+  });
+
   it('loads a source request when editing a request-derived draft and preserves links on submit', () => {
     routeSnapshot.paramMap = convertToParamMap({ id: 'order-1' });
     const order = {

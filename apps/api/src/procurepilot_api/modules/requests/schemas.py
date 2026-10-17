@@ -57,6 +57,7 @@ class ApprovalStep(BaseModel):
 
 class PurchaseRequest(BaseModel):
     id: UUID
+    source_rfq_response_id: UUID | None = None
     branch_id: UUID
     cost_centre_id: UUID | None = None
     requested_by_membership_id: UUID

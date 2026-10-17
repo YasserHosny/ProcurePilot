@@ -72,6 +72,15 @@ def test_purchase_request_minimal_shape() -> None:
     assert pr.withdrawn_at is None
     assert pr.budget_status is None
     assert pr.updated_at is None
+    assert pr.source_rfq_response_id is None
+
+
+def test_purchase_request_exposes_rfq_response_source() -> None:
+    response_id = uuid4()
+    pr = PurchaseRequest.model_validate(
+        _request(source_rfq_response_id=response_id)
+    )
+    assert pr.model_dump(mode="json")["source_rfq_response_id"] == str(response_id)
 
 
 def test_purchase_request_list_with_cursor() -> None:
