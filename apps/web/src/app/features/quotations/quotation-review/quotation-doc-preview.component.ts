@@ -40,6 +40,7 @@ export class QuotationDocPreviewComponent {
 
   fieldLabel(fieldName: string): string {
     const labels: Record<string, string> = {
+      supplier_name: 'Supplier Name',
       currency: 'Currency',
       issue_date: 'Issue Date',
       expiry_date: 'Expiry Date',

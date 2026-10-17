@@ -102,9 +102,12 @@
           <article class="flagged-field-row" [id]="'flagged-' + field.id" [class.flagged-highlight]="activeExtraction()?.id === field.id">
             <strong>{{ ('quotations.review.fieldLabels.' + field.fieldName) | translate }}</strong>
             <span class="flagged-value" dir="auto">{{ displayExtractionValue(field.extraction.extracted_value) }}</span>
-            @if (field.fieldName === 'supplier_name' && !selectedSupplierId()) {
-              <span>{{ 'quotations.review.flagged.chooseSupplier' | translate }}</span>
-            } @else if (['supplier_name', 'currency', 'issue_date', 'expiry_date', 'stated_total', 'quantity', 'unit_price'].includes(field.fieldName)) {
+            @if (field.fieldName === 'supplier_name') {
+              @if (!selectedSupplierId()) {
+                <span>{{ 'quotations.review.flagged.chooseSupplier' | translate }}</span>
+              }
+              <button mat-button type="button" (click)="goToFlaggedField(field)">{{ 'quotations.review.flagged.goToField' | translate }}</button>
+            } @else if (['currency', 'issue_date', 'expiry_date', 'stated_total', 'quantity', 'unit_price'].includes(field.fieldName)) {
               <button mat-button type="button" (click)="goToFlaggedField(field)">{{ 'quotations.review.flagged.goToField' | translate }}</button>
             }
             <button mat-stroked-button type="button" (click)="confirmFieldAsIs(field.entityType, field.entityId, field.fieldName)">{{ 'quotations.review.flagged.confirmAsIs' | translate }}</button>
@@ -198,6 +201,7 @@
               <mat-form-field appearance="outline" class="form-col-full">
                 <mat-label>{{ 'quotations.review.header.supplierLabel' | translate }}</mat-label>
                 <mat-select
+                  id="supplier-select"
                   [value]="selectedSupplierId()"
                   (selectionChange)="selectedSupplierId.set($event.value)"
                   [disabled]="!isWriter() || q.status === 'reviewed'"

@@ -188,6 +188,28 @@ describe('QuotationReviewComponent (T051, T057, T062)', () => {
     expect(component.flaggedFields().map((field) => field.id)).not.toContain(supplierName.id);
   });
 
+  it('opens low-confidence supplier name evidence and renders its Go to field action without a supplier selected', () => {
+    const supplierName = {
+      ...mockQuotationDetail.field_extractions[0],
+      id: 'fe-supplier-name',
+      field_name: 'supplier_name',
+      extracted_value: 'الأمانة للتجارة',
+      confidence: '0.6700',
+    };
+    component.quotation.set({ ...mockQuotationDetail, field_extractions: [supplierName] });
+    component.selectedSupplierId.set(null);
+    const flaggedSupplierName = component.flaggedFields().find((field) => field.id === supplierName.id);
+    expect(flaggedSupplierName).toBeDefined();
+    component.goToFlaggedField(flaggedSupplierName!);
+    expect(component.activeExtraction()?.id).toBe(supplierName.id);
+
+    fixture.detectChanges();
+    const supplierRow = fixture.nativeElement.querySelector('#flagged-fe-supplier-name') as HTMLElement;
+    expect(supplierRow.querySelector('button')?.textContent).toContain(
+      enCatalog.quotations.review.flagged.goToField,
+    );
+  });
+
   it('stages confirm-as-is for a low-confidence unit price extraction', () => {
     const unitPrice = {
       ...mockQuotationDetail.field_extractions[1],

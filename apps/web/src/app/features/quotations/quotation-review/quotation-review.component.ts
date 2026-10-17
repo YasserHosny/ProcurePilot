@@ -413,8 +413,9 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
         const flagged = this.flaggedFields();
         if (flagged.length > 0) {
           this.activeExtraction.set(flagged[0].extraction);
-        } else if (q.field_extractions.length > 0) {
-          this.activeExtraction.set(q.field_extractions[0]);
+        } else {
+          const defaultExtraction = this.defaultExtraction(q);
+          if (defaultExtraction) this.activeExtraction.set(defaultExtraction);
         }
 
         this.isLoading.set(false);
@@ -659,6 +660,11 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
     }
   }
 
+  private defaultExtraction(q: QuotationDetail): FieldExtraction | undefined {
+    return q.field_extractions.find((extraction) => extraction.field_name === 'supplier_name')
+      ?? q.field_extractions[0];
+  }
+
   updateCorrection(feId: string, newValue: unknown): void {
     const current = new Map(this.pendingCorrections());
     current.set(feId, newValue);
@@ -708,7 +714,10 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
 
   goToFlaggedField(field: FlaggedField): void {
     this.selectField(field.entityType, field.entityId, field.fieldName);
-    document.getElementById(`field-${field.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    const targetId = field.fieldName === 'supplier_name' ? 'supplier-select' : `field-${field.id}`;
+    const target = document.getElementById(targetId);
+    target?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    if (field.fieldName === 'supplier_name') target?.focus();
   }
 
   canonicalDateValue(q: QuotationDetail, fieldName: 'issue_date' | 'expiry_date'): string | null {
