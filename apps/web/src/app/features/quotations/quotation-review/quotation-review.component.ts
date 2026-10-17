@@ -114,6 +114,18 @@ type QuotationTimestampFields = QuotationDetail & {
   styleUrl: './quotation-review.component.scss',
 })
 export class QuotationReviewComponent implements OnInit, OnDestroy {
+  private readonly conflictReasonKeys: Record<string, string> = {
+    quotation_not_confirmable: 'quotation_not_confirmable', supplier_not_confirmed: 'supplier_not_confirmed',
+    arithmetic_mismatch_unresolved: 'arithmetic_mismatch_unresolved', low_confidence_unresolved: 'low_confidence_unresolved',
+    currency_unresolved: 'currency_unresolved', previous_quotation_self_reference: 'previous_quotation_self_reference',
+    quotation_not_editable: 'quotation_not_editable', invalid_date_correction: 'invalid_date_correction',
+    quotation_not_refusable: 'quotation_not_refusable', quotation_already_archived: 'quotation_already_archived',
+    quotation_extraction_already_active: 'quotation_extraction_already_active', extraction_already_running: 'extraction_already_running',
+  };
+  private conflictKey(reason: unknown, namespace: 'confirmBlocked' | 'conflict' = 'confirmBlocked'): string {
+    const key = typeof reason === 'string' && this.conflictReasonKeys[reason] ? reason : 'unknown';
+    return `quotations.review.${namespace}.${key}`;
+  }
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly api = inject(ApiService);
@@ -1186,7 +1198,7 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
           if (err instanceof HttpErrorResponse && err.status === 409) {
             const apiError = err.error as ApiError | undefined;
             const reason = String(apiError?.details?.['reason'] ?? 'unknown');
-            this.confirmBlockedReason.set(this.translate.instant(`quotations.review.confirmBlocked.${reason}`));
+            this.confirmBlockedReason.set(this.translate.instant(this.conflictKey(reason)));
             if (reason === 'low_confidence_unresolved') {
               const fields = apiError?.details?.['fields'];
               const first = Array.isArray(fields) ? fields[0] as { id?: string } | undefined : undefined;
@@ -1278,7 +1290,7 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
       this.errorTraceId.set(apiError?.trace_id ?? null);
       if (err.status === 409) {
         const reason = String(apiError?.details?.['reason'] ?? 'unknown');
-        this.errorMessage.set(this.translate.instant(`quotations.review.confirmBlocked.${reason}`));
+        this.errorMessage.set(this.translate.instant(this.conflictKey(apiError?.details?.['reason'], 'conflict')));
         return;
       }
       this.errorMessage.set(
