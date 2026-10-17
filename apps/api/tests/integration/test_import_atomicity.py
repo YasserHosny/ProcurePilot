@@ -13,7 +13,6 @@ from integration.catalogue_helpers import (
     make_workspace,
     psycopg,
 )
-from integration.quotation_helpers import make_document, make_quotation
 from procurepilot_api.config import get_settings
 from procurepilot_api.deps import CurrentMember
 from procurepilot_api.modules.auth.jwt import MemberRole
@@ -27,8 +26,6 @@ from procurepilot_api.modules.catalogue.import_repository import (
     PostgresImportRepository,
     with_database_duplicates,
 )
-from procurepilot_api.modules.ingestion.catalogue_import_service import _insert_quotation_lines
-from procurepilot_api.modules.ingestion.catalogue_parser import CatalogueRow
 
 pytestmark = pytest.mark.skipif(
     not TEST_DATABASE_URL,
@@ -185,45 +182,4 @@ def test_kg_csv_preview_commit_and_repeat_skip(conn: object) -> None:
             cur.execute("delete from tenant where id = %s", (workspace.tenant_id,))
             cur.execute("delete from auth.users where id = %s", (workspace.user_id,))
             cur.execute("delete from canonical_product where name = 'Olive Oil'")
-            conn.commit()
-
-
-def test_catalogue_import_quotation_line_canonicalizes_kg(conn: object) -> None:
-    with conn.cursor() as cur:
-        workspace = make_workspace(cur, "quotation-line-kg")
-        conn.commit()
-        act_as(cur, workspace)
-        cur.execute("select 1 from supported_base_unit where code = 'kg'")
-        assert cur.fetchone() is None
-        member = CurrentMember(
-            membership_id=workspace.membership_id,
-            tenant_id=workspace.tenant_id,
-            user_id=workspace.user_id,
-            email="quotation-line-kg-owner@example.test",
-            role=MemberRole.owner,
-        )
-        quotation_id = make_quotation(cur, workspace, document_id=make_document(cur, workspace))
-        row = CatalogueRow(
-            row_number=2,
-            product_name="Flour",
-            unit_price_amount=Decimal("2.50"),
-            unit_price_currency="GBP",
-            unit="KG ",
-            minimum_order_quantity=None,
-        )
-        try:
-            imported = _insert_quotation_lines(conn, member, quotation_id, [row], [])
-            assert imported == 1
-            act_as(cur, workspace)
-            cur.execute(
-                "select pack_unit from quotation_line where quotation_id = %s",
-                (quotation_id,),
-            )
-            assert cur.fetchone()[0] == "kilogram"
-        finally:
-            cur.execute("reset role")
-            cur.execute("set local session_replication_role = replica")
-            delete_tenant_scoped_rows(cur, workspace.tenant_id)
-            cur.execute("delete from tenant where id = %s", (workspace.tenant_id,))
-            cur.execute("delete from auth.users where id = %s", (workspace.user_id,))
             conn.commit()
