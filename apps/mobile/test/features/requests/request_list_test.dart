@@ -52,6 +52,26 @@ void main() {
       expect(find.byKey(const Key('requestStatus_approved')), findsOneWidget);
     });
 
+    testWidgets('formats estimated total in English', (tester) async {
+      fakeClient.listResults = [
+        PurchaseRequest(
+          id: 'req-money',
+          branchId: 'branch-1',
+          requestedByMembershipId: 'member-1',
+          requiredByDate: '2026-10-01',
+          status: 'submitted',
+          lines: [],
+          estimatedTotal: const Money(amount: '12500', currency: 'EGP'),
+          hasIncompleteEstimate: false,
+          createdAt: DateTime.now(),
+        ),
+      ];
+
+      await pumpList(tester);
+
+      expect(find.text('EGP 12,500.00'), findsOneWidget);
+    });
+
     testWidgets('filters requests by status', (tester) async {
       await pumpList(tester);
       await tester.tap(find.byKey(const Key('requestListStatusFilter')));

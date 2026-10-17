@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/api/models.dart';
 import '../../core/api/requests_api_client.dart';
+import '../../core/format/money_format.dart';
 import '../../core/i18n/i18n_loader.dart';
 import '../service_provider.dart';
 
@@ -165,6 +166,6 @@ class _RequestListScreenState extends State<RequestListScreen> {
 
   Widget? _moneyText(Money? money) {
     if (money == null) return null;
-    return Text('${money.currency} ${money.amount}');
+    return Text(formatMoney(money.amount, money.currency, locale: _i18n.locale));
   }
 }
