@@ -351,6 +351,7 @@ footer{
   <nav id="nav">
     <span class="nav-label">Strategy</span>
     <a href="#overview" class="on"><span class="dot"></span>Overview</a>
+    <a href="#status"><span class="dot"></span>Delivery Status</a>
     <a href="#vision"><span class="dot"></span>Vision &amp; Thesis</a>
     <a href="#problem"><span class="dot"></span>Problem &amp; Leakage</a>
     <a href="#market"><span class="dot"></span>Market &amp; Personas</a>
@@ -479,6 +480,87 @@ footer{
 </section>
 
 <!-- ══════════════════ 02 VISION ══════════════════ -->
+<section id="status" class="reveal">
+  <div class="sec-head">
+    <div>
+      <span class="sec-num">00 — DELIVERY STATUS · 2026-10-18</span>
+      <h3>What has actually shipped</h3>
+      <p>Every release R1.0–R4.3 has a spec under <span class="mono">specs/</span> and is merged. "Shipped" means the spec was built and merged, not that the phase's business gate was met. Source: <span class="mono">docs/roadmap/procurepilot_roadmap.md</span>, section "Delivery Status".</p>
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:16px">
+    <div class="card-h"><h4>Release ledger</h4><span class="tag">v1.1</span></div>
+    <div class="tbl-wrap" style="border:none">
+      <table>
+        <thead><tr><th>Phase</th><th>Release</th><th>Status</th><th>Notes</th></tr></thead>
+        <tbody>
+            <tr><td class="mono">1</td><td><strong>R1.0 Foundation</strong><div class="mono">specs/001</div></td><td><span class="tag">Shipped</span></td><td></td></tr>
+            <tr><td class="mono">1</td><td><strong>R1.1 Catalogue + Suppliers</strong><div class="mono">specs/002</div></td><td><span class="tag">Shipped</span></td><td></td></tr>
+            <tr><td class="mono">1</td><td><strong>R1.2 Ingestion + Extraction</strong><div class="mono">specs/003</div></td><td><span class="tag">Shipped</span></td><td>Amended 2026-10-17: a quotation can always be authorised</td></tr>
+            <tr><td class="mono">1</td><td><strong>R1.3 Matching + Normalisation</strong><div class="mono">specs/004</div></td><td><span class="tag">Shipped</span></td><td>Fuzzy matches no longer auto-accept; calibration waits for 500+ labelled decisions</td></tr>
+            <tr><td class="mono">1</td><td><strong>R1.4 Compare + Intelligence</strong><div class="mono">specs/005</div></td><td><span class="tag">Shipped</span></td><td></td></tr>
+            <tr><td class="mono">1</td><td><strong>R1.5 Value Proof + Launch</strong><div class="mono">specs/006</div></td><td><span class="tag y">Partial</span></td><td>Plans and limits enforced; billing provider is a stub, no payment collection</td></tr>
+            <tr><td class="mono">2</td><td><strong>R2.0 Organisation model</strong><div class="mono">specs/007</div></td><td><span class="tag">Shipped</span></td><td></td></tr>
+            <tr><td class="mono">2</td><td><strong>R2.1 Requests + Approvals</strong><div class="mono">specs/008</div></td><td><span class="tag">Shipped</span></td><td>Policy engine deferred</td></tr>
+            <tr><td class="mono">2</td><td><strong>R2.2 Mobile MVP</strong><div class="mono">specs/009</div></td><td><span class="tag">Shipped</span></td><td></td></tr>
+            <tr><td class="mono">2</td><td><strong>R2.3 Mobile approvals + receipt</strong><div class="mono">specs/010</div></td><td><span class="tag">Shipped</span></td><td></td></tr>
+            <tr><td class="mono">2</td><td><strong>R2.4 Optimisation + Supplier IQ</strong><div class="mono">specs/011</div></td><td><span class="tag">Shipped</span></td><td>Optimiser not running on hosted yet (container to create)</td></tr>
+            <tr><td class="mono">2</td><td><strong>R2.5 Reporting + Hardening</strong><div class="mono">specs/012</div></td><td><span class="tag">Shipped</span></td><td></td></tr>
+            <tr><td class="mono">3</td><td><strong>R3.0 Email ingestion + catalogue refresh</strong><div class="mono">specs/013</div></td><td><span class="tag">Shipped</span></td><td>WhatsApp is manual capture only</td></tr>
+            <tr><td class="mono">3</td><td><strong>R3.1 Accounting #1</strong><div class="mono">specs/014</div></td><td><span class="tag">Shipped</span></td><td>QuickBooks Online and Xero</td></tr>
+            <tr><td class="mono">3</td><td><strong>R3.2 POS / inventory</strong><div class="mono">specs/015</div></td><td><span class="tag">Shipped</span></td><td>Square, including stock on hand</td></tr>
+            <tr><td class="mono">3</td><td><strong>R3.3 Order tracking + three-way match</strong><div class="mono">specs/016</div></td><td><span class="tag">Shipped</span></td><td>Draft POs from approved requests</td></tr>
+            <tr><td class="mono">3</td><td><strong>R3.4 Partner API + connectors</strong><div class="mono">specs/017</div></td><td><span class="tag y">Partial</span></td><td>Read endpoints + webhooks; no partner credentials, connector framework or freshness engine</td></tr>
+            <tr><td class="mono">4</td><td><strong>R4.0 Forecasting + reorder</strong><div class="mono">specs/018</div></td><td><span class="tag">Shipped</span></td><td>Some tests still unwritten</td></tr>
+            <tr><td class="mono">4</td><td><strong>R4.1 Supplier risk + negotiation</strong><div class="mono">specs/019</div></td><td><span class="tag">Shipped</span></td><td></td></tr>
+            <tr><td class="mono">4</td><td><strong>R4.2 Grounded analyst</strong><div class="mono">specs/020</div></td><td><span class="tag">Shipped</span></td><td></td></tr>
+            <tr><td class="mono">4</td><td><strong>R4.3 RFQ sourcing + guardrails</strong><div class="mono">specs/021</div></td><td><span class="tag">Shipped</span></td><td></td></tr>
+            <tr><td class="mono">Pilot</td><td><strong>Home currency (Egypt)</strong><div class="mono">specs/022</div></td><td><span class="tag n">Open</span></td><td>Merged; real-quote run, mobile screenshots and full test pass open</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="grid g2">
+    <div class="card">
+      <div class="card-h"><h4>Gate outcomes</h4><span class="tag y">Business gates not met</span></div>
+      <div class="tbl-wrap" style="border:none">
+        <table>
+          <thead><tr><th>Gate</th><th>Recorded outcome</th></tr></thead>
+          <tbody>
+            <tr><td><strong>G1</strong></td><td>Not passed; engineering proceeded by recorded exception (ADR-010)</td></tr>
+            <tr><td><strong>G2</strong></td><td>Software complete; business criteria not measured, no pilot cohort (ADR-016)</td></tr>
+            <tr><td><strong>G3</strong></td><td>Unmet (release evidence R3.4–R4.3)</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="card-sub" style="margin-top:10px">No metric has been measured against real customer data yet. The first pilot is in Egypt (EGP, Arabic-first).</p>
+    </div>
+    <div class="card">
+      <div class="card-h"><h4>Partial and deferred scope</h4><span class="tag r">Not built</span></div>
+      <div class="tbl-wrap" style="border:none">
+        <table>
+          <thead><tr><th>Item</th><th>State</th></tr></thead>
+          <tbody>
+            <tr><td>Policy engine (blocked suppliers, spend limits, exception justification)</td><td>Deferred in spec 008</td></tr>
+            <tr><td>Alerts inbox: assign, snooze, approve, purchase</td><td>Dismiss only</td></tr>
+            <tr><td>Customer-configurable savings baseline</td><td>Stored per saving, no workspace setting</td></tr>
+            <tr><td>Generic ERP connector framework</td><td>Deferred in spec 013</td></tr>
+            <tr><td>Anomaly detection v2 (contract variance, false discounts)</td><td>Not built</td></tr>
+            <tr><td>Data-freshness engine</td><td>Partial: fresh/stale and refresh schedules</td></tr>
+            <tr><td>Partner credentials separate from user sign-in</td><td>Not built</td></tr>
+            <tr><td>WhatsApp Business API</td><td>Deferred in spec 013</td></tr>
+            <tr><td>Separate inventory-system connector</td><td>POS stock on hand only</td></tr>
+            <tr><td>Payment collection for plans</td><td>Stub provider</td></tr>
+            <tr><td>Exchange rates, VAT-inclusive prices, GCC currency items</td><td>Open pilot gaps C4, C5, G1–G5</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+
 <section id="vision" class="reveal">
   <div class="divider"></div>
   <div class="sec-head">
