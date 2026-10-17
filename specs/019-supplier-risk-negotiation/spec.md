@@ -2,7 +2,7 @@
 
 **Feature Branch**: `019-supplier-risk-negotiation`
 **Created**: 2026-09-20
-**Status**: Draft for approval
+**Status**: Shipped — merged to `main` (see `docs/roadmap/procurepilot_roadmap.md`, Delivery Status)
 **Roadmap Release**: R4.1, Phase 4 Predictive Procurement
 **Input**: Product-owner direction to proceed with R4.1 while keeping G3 unmet.
 

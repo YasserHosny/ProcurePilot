@@ -2,7 +2,7 @@
 
 **Feature Branch**: `001-platform-foundation`
 **Created**: 2026-08-20
-**Status**: Draft
+**Status**: Shipped — merged to `main` (see `docs/roadmap/procurepilot_roadmap.md`, Delivery Status)
 **Input**: User description: "Chunk 4.1 Foundation (R1.0): monorepo, CI/CD, environments, authentication, multi-tenancy, RBAC skeleton, design system v1, and app shell."
 
 ## Overview

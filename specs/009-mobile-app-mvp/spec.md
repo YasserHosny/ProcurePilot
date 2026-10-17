@@ -2,7 +2,7 @@
 
 **Feature Branch**: `009-mobile-app-mvp`
 **Created**: 2026-09-11
-**Status**: Draft
+**Status**: Shipped — merged to `main` (see `docs/roadmap/procurepilot_roadmap.md`, Delivery Status)
 **Input**: User description: "Release R2.2 Mobile MVP (Phase 2): the first mobile app release,
 covering the three mobile-native jobs the roadmap scopes for it — Request and, read-only,
 awareness of Approve — mobile shell (navigation, theming from shared design tokens), sign-in with

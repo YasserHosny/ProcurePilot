@@ -2,7 +2,7 @@
 
 **Feature Branch**: `020-grounded-procurement-analyst`
 **Created**: 2026-09-23
-**Status**: Draft for approval
+**Status**: Shipped — merged to `main` (see `docs/roadmap/procurepilot_roadmap.md`, Delivery Status)
 **Roadmap Release**: R4.2, Phase 4 Predictive Procurement
 **Input**: Natural-language question answering over the tenant's own data. Every answer must cite
 a source record and show a visible calculation; never ungrounded generation. No autonomous

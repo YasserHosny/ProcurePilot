@@ -2,7 +2,7 @@
 
 **Feature Branch**: `015-pos-inventory-integration`
 **Created**: 2026-09-18
-**Status**: Draft
+**Status**: Shipped — merged to `main` (see `docs/roadmap/procurepilot_roadmap.md`, Delivery Status)
 **Input**: User description: "R3.2 — POS and inventory integration plus usage signals. Per docs/roadmap/procurepilot_roadmap.md section 8 (Phase 3, Connected Operations): one POS provider integration feeding sales-velocity usage signals into purchasing recommendations, plus inventory integration (stock-on-hand sync) where a system exists. Builds on the connector and sync architecture established in R3.0 (email ingestion) and R3.1 (accounting integration) rather than inventing a new integration pattern. Per the roadmap integration principles: CSV and email before APIs where a spreadsheet can satisfy early customers, one connector framework across many providers with no provider schema leaking into the domain, integrations must be revocable and degrade gracefully to manual input rather than blocking purchasing, and provider choice should be driven by actual pilot demand rather than market size."
 
 ## User Scenarios & Testing *(mandatory)*

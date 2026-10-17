@@ -2,7 +2,7 @@
 
 **Feature Branch**: `011-optimisation-supplier-iq`
 **Created**: 2026-09-13
-**Status**: Draft
+**Status**: Shipped — merged to `main` (see `docs/roadmap/procurepilot_roadmap.md`, Delivery Status)
 **Input**: User description: "R2.4 Optimisation + Supplier IQ: advance the existing Smart Compare, basket split, alerts, and delivery outcome data into a richer optimisation and supplier intelligence release with minimum order values, free-delivery thresholds, quantity tiers, urgency constraints, supplier-preference weighting, supplier scorecards, risk scoring, and anomaly detection v1. Keep this advisory: no autonomous purchasing."
 
 ## User Scenarios & Testing *(mandatory)*

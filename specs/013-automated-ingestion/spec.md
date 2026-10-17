@@ -2,7 +2,7 @@
 
 **Feature Branch**: `013-automated-ingestion`
 **Created**: 2026-09-17
-**Status**: Draft
+**Status**: Shipped — merged to `main` (see `docs/roadmap/procurepilot_roadmap.md`, Delivery Status)
 **Input**: Roadmap R3.0 (M15 – M16): "Email ingestion + supplier catalogue refresh". Roadmap §8.1
 Phase 3 scope: "Email ingestion: dedicated per-tenant forwarding address; automatic supplier
 identification; attachment extraction; thread-to-quotation linking". Roadmap §8.3 Integration
@@ -142,14 +142,25 @@ same file does not create duplicate offers.
 
 - **FR-001**: System MUST provide per-tenant forwarding email addresses in the format
   `{tenant_slug}@ingest.procurepilot.com`, configurable by an owner.
+- **FR-001A** *(added 2026-10-18, records PR #89)*: A workspace slug MUST be meaningful for
+  non-Latin business names: Arabic names are transliterated to Latin (for example «مطاعم سند» →
+  `mtaam-snd`) rather than falling back to a generic `workspace`, and colliding slugs get a unique
+  suffix. Existing slugs and forwarding addresses are not changed automatically.
 - **FR-002**: System MUST process inbound emails: extract sender, subject, Message-ID,
   In-Reply-To, body text, and all attachments.
 - **FR-003**: System MUST identify the supplier from the sender's email domain by matching
   against registered supplier contact emails and domains.
+- **FR-003A** *(added 2026-10-18, records PR #84)*: When an inbound email is a reply to a dispatched
+  RFQ, the RFQ recipient's supplier MUST take precedence over sender-address history, domain and
+  thread matching. Sender-address history that points to more than one supplier is treated as
+  ambiguous and falls through to domain and thread matching instead of picking the most recent.
 - **FR-004**: System MUST create a quotation record for each processed inbound email, linked to
   the identified supplier (or `unmatched`), with `source = 'email'`.
 - **FR-005**: System MUST store each attachment in Supabase Storage under the tenant's document
   bucket, scoped by `tenant_id/ingestion/{quotation_id}/`.
+- **FR-005A** *(added 2026-10-18, records PR #90)*: Storage object keys MUST be ASCII-safe for every
+  upload path; the original file name (including Arabic) is kept on the document record and used for
+  display and downloads.
 - **FR-006**: System MUST queue each stored attachment for the existing extraction pipeline
   (spec 003).
 - **FR-007**: System MUST deduplicate inbound emails by Message-ID per tenant.

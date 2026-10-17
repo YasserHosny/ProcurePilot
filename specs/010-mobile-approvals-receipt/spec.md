@@ -2,7 +2,7 @@
 
 **Feature Branch**: `010-mobile-approvals-receipt`
 **Created**: 2026-09-13
-**Status**: Draft
+**Status**: Shipped — merged to `main` (see `docs/roadmap/procurepilot_roadmap.md`, Delivery Status)
 **Input**: User description: "Mobile approvals and delivery receipt (R2.3, roadmap §7.2, M12-M13).
 Extend the Flutter mobile app (specs/009-mobile-app-mvp) so an approver can review and decide on a
 pending purchase request from their phone with full context (lines, estimated total, budget

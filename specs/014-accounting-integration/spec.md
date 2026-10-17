@@ -2,7 +2,7 @@
 
 **Feature Branch**: `014-accounting-integration`
 **Created**: 2026-09-17
-**Status**: Draft
+**Status**: Shipped — merged to `main` (see `docs/roadmap/procurepilot_roadmap.md`, Delivery Status)
 **Input**: User description: "R3.1 — Accounting integration #1 + reconciliation foundation. Per
 docs/roadmap/procurepilot_roadmap.md §8 (Phase 3, Connected Operations): the first of two planned
 accounting-provider integrations (invoice and supplier sync, spend reconciliation), laying the
