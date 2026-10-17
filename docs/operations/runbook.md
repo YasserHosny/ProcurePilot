@@ -148,7 +148,7 @@ Production uses **two separate bunny.net Magic Container apps**, not one:
 | App | Containers | Purpose |
 |---|---|---|
 | `procurepilot-production` | `procurepilot-backend` (port 8000), `procurepilot-frontend` (port 80) | API + SPA; shared network namespace |
-| `procurepilot-workers` | `procurepilot-extraction-worker`, `procurepilot-optimiser-worker`, `shared-redis` (port 6379) | Background extraction and basket-split jobs |
+| `procurepilot-workers` | `procurepilot-extraction-worker`, `procurepilot-email-ingestion-worker`, `procurepilot-optimiser-worker`, `shared-redis` (port 6379) | Background extraction, inbound-email ingestion and basket-split jobs |
 
 Containers within the same app share a network namespace (communicate via `localhost`).
 Containers in **different** apps do not share a namespace — the backend API connects to the
@@ -266,6 +266,42 @@ when no worker is registered on the queue for that long; `BASKET_SPLIT_EXPIRY_SE
 **Diagnose a stuck basket split:** is a `procurepilot-optimiser-worker` container Running? Do
 its logs show the startup line? Does `rq info` against the shared Redis list a worker on
 `basket-split`?
+
+### 7.8 Email-Ingestion Worker
+
+Inbound supplier emails (Mailgun → `POST /api/v1/webhooks/inbound-email`) are stored and queued as
+`ingestion_job` rows with `job_type='email_ingest'`. The email-ingestion worker claims them from
+the **database** every 15 s (no Redis queue for this step), stores the attachments, matches the
+reply to its RFQ and supplier, and then enqueues extraction on Redis. If it is not running, inbound
+quotes pile up as queued jobs and never reach the Quotation Inbox. Image:
+`ghcr.io/<owner>/procurepilot-email-ingestion-worker`, built from
+`infra/docker/email-ingestion-worker.Dockerfile` and rolled by
+`.github/workflows/deploy-email-ingestion-worker.yml`, which only **updates** an existing container.
+
+**One-time owner step:** in the `procurepilot-workers` app, create a container named exactly
+`procurepilot-email-ingestion-worker` from that image (no public port, no endpoint). It runs the
+API package and loads the API's full `Settings`, so it exits at start-up unless every required
+API setting is present. Copy them from the backend container:
+
+| Variable | Required | Value |
+|---|---|---|
+| `DATABASE_URL` | yes | Supabase pooler connection string (same as the backend) |
+| `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` | yes | Used to read the raw email and write attachments to Storage |
+| `SUPABASE_ANON_KEY`, `SUPABASE_JWT_AUDIENCE`, `SUPABASE_JWT_ISSUER` | yes | Not used by the worker, but required by `Settings` |
+| `API_HOST`, `API_PORT`, `API_ENV`, `API_LOG_LEVEL`, `API_CORS_ORIGINS` | yes | Same values as the backend; required by `Settings` |
+| `WEB_API_BASE_URL`, `WEB_DEFAULT_LOCALE` | yes | Same as the backend |
+| `PLATFORM_INVITATION_TTL_DAYS`, `MEMBER_INVITATION_TTL_DAYS`, `RATE_LIMIT_AUTH` | yes | Same as the backend; required by `Settings` |
+| `REDIS_URL` | yes in practice | `redis://localhost:6379/0` (same workers app as `shared-redis`). Defaults to that value; extraction is enqueued here, so it must be the Redis the extraction worker consumes |
+| `EXTRACTION_QUEUE_NAME` | if changed | Must equal the extraction worker's queue name |
+| `INGESTION_RAW_BUCKET` | if changed | Storage bucket for raw emails (default in `config.py`) |
+
+The authoritative list of required settings is the set of `Settings` fields in
+`apps/api/src/procurepilot_api/config.py` with no default. Then **Save Changes** at the app level
+(see 7.6).
+
+**Diagnose lost inbound quotes:** is the container Running? Do its logs show jobs being claimed?
+Are there `ingestion_job` rows with `job_type='email_ingest'` stuck in `queued`? The operator CLI
+`python -m procurepilot_api.workers.requeue_email_ingest` re-queues jobs by `--job-id` or `--all-failed` (try `--dry-run` first).
 
 ## 8. Logging & Diagnostics
 
