@@ -377,6 +377,7 @@ export interface NewQuotationLine {
 
 export interface QuotationReviewPatch {
   readonly supplier_id?: string | null;
+  readonly currency?: string | null;
   readonly reviewer_notes?: string | null;
   readonly corrections?: readonly FieldCorrection[];
   readonly add_lines?: readonly NewQuotationLine[];

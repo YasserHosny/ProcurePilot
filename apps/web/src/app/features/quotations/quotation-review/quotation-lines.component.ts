@@ -38,6 +38,7 @@ import type {
 })
 export class QuotationLinesComponent {
   @Input({ required: true }) quotation!: QuotationDetail;
+  @Input({ required: true }) effectiveCurrency = 'USD';
   @Input({ required: true }) activeExtraction: FieldExtraction | null = null;
   @Input({ required: true }) isWriter = false;
   @Input({ required: true }) pendingRemoveLineIds = new Set<string>();

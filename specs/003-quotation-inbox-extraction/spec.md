@@ -195,6 +195,22 @@ the new one is linked to the prior version and both remain visible and distingui
 - **FR-013**: Reviewers MUST be able to correct any extracted field, and a correction MUST be
   recorded as a distinct, attributable human decision rather than overwriting the original
   extracted value in place.
+- **FR-013A** *(added 2026-10-17, confirm dead-end fix)*: Every extracted field that blocks
+  confirmation MUST be resolvable in the review UI by an existing human action — an inline edit or
+  an explicit "Confirm as-is" — so that no quotation can become impossible to authorise. Rules:
+  (a) the extracted `supplier_name` is not a blocker once the quotation has a `supplier_id`
+  (however it was set: RFQ-reply match, address match, or a reviewer's choice); the supplier
+  selection is the human resolution of who the supplier is, and the reviewer's confirm click is the
+  authorisation. At confirm time any still-uncorrected low-confidence `supplier_name` row is
+  stamped as corrected by the confirming member (value unchanged) and the `quotation.confirmed`
+  audit event lists it under `resolved_on_confirm` with resolution `supplier_selected`;
+  (b) `suggested_currency` is a system hint, never extracted evidence, and never blocks;
+  (c) a quotation with no currency cannot be confirmed (`currency_unresolved`) — money always
+  carries a currency; (d) the confirm 409 carries a machine-readable `reason` (and, for
+  `low_confidence_unresolved`, the blocking `fields`) and the UI MUST show a specific localized
+  message and highlight the blocking field, never a generic conflict message. The confirm endpoint
+  and the review-task blocker share one gate (`modules/quotations/review_gate.py`) so they cannot
+  disagree.
 - **FR-014**: Reviewers MUST be able to move between fields needing attention using the keyboard
   alone, without requiring the mouse.
 - **FR-015**: As part of reviewing a quotation, the reviewer MUST confirm which existing supplier it

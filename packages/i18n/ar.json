@@ -1038,6 +1038,55 @@
         "in_review": "قيد المراجعة",
         "reviewed": "تمت المراجعة والاعتماد",
         "refused": "مرفوض"
+      },
+      "confirmBlocked": {
+        "quotation_not_confirmable": "حالة عرض السعر لا تسمح بتأكيده حالياً.",
+        "supplier_not_confirmed": "يرجى اختيار مورد قبل اعتماد عرض السعر.",
+        "arithmetic_mismatch_unresolved": "يرجى معالجة عدم التطابق الحسابي أو الإقرار به قبل التأكيد.",
+        "low_confidence_unresolved": "يرجى مراجعة الحقول المستخرجة المعلّمة أو تأكيدها قبل المتابعة.",
+        "currency_unresolved": "يرجى تحديد عملة عرض السعر قبل تأكيده.",
+        "previous_quotation_self_reference": "لا يمكن لعرض السعر أن يحل محل نفسه.",
+        "unknown": "تعذر تأكيد عرض السعر لوجود متطلب مراجعة غير مكتمل."
+      },
+      "conflict": {
+        "unknown": "تعذر تحديث عرض السعر لأن حالته الحالية قد تغيرت.",
+        "quotation_not_editable": "لم يعد بالإمكان تعديل عرض السعر في حالته الحالية.",
+        "invalid_date_correction": "يرجى إدخال تاريخ صالح لعرض السعر.",
+        "quotation_not_refusable": "لم يعد بالإمكان رفض عرض السعر في حالته الحالية.",
+        "quotation_already_archived": "تمت أرشفة عرض السعر بالفعل.",
+        "quotation_extraction_already_active": "عملية استخراج البيانات نشطة بالفعل لهذا العرض.",
+        "extraction_already_running": "عملية استخراج البيانات جارية بالفعل لهذا العرض.",
+        "quotation_not_confirmable": "حالة عرض السعر لا تسمح بتأكيده حالياً.",
+        "supplier_not_confirmed": "يرجى اختيار مورد قبل اعتماد عرض السعر.",
+        "arithmetic_mismatch_unresolved": "يرجى معالجة عدم التطابق الحسابي أو الإقرار به قبل التأكيد.",
+        "low_confidence_unresolved": "يرجى مراجعة الحقول المستخرجة المعلّمة أو تأكيدها قبل المتابعة.",
+        "currency_unresolved": "يرجى تحديد عملة عرض السعر قبل تأكيده.",
+        "previous_quotation_self_reference": "لا يمكن لعرض السعر أن يحل محل نفسه."
+      },
+      "flagged": {
+        "title": "الحقول المعلّمة للمراجعة",
+        "chooseSupplier": "اختر مورداً لحل هذا الحقل.",
+        "goToField": "انتقل إلى الحقل",
+        "confirmAsIs": "تأكيد القيمة كما هي"
+      },
+      "fieldLabels": {
+        "supplier_name": "اسم المورد",
+        "issue_date": "تاريخ الإصدار",
+        "expiry_date": "تاريخ الانتهاء",
+        "currency": "العملة",
+        "stated_total": "الإجمالي المذكور",
+        "original_text": "وصف البند",
+        "quantity": "الكمية",
+        "unit_price": "سعر الوحدة",
+        "line_total": "إجمالي البند",
+        "pack_unit": "وحدة العبوة",
+        "pack_count": "عدد العبوات",
+        "unit_size": "حجم العبوة",
+        "vat_rate": "نسبة ضريبة القيمة المضافة",
+        "discount": "الخصم",
+        "delivery_fee": "رسوم التوصيل",
+        "suggested_currency": "العملة المقترحة",
+        "pack_details": "تفاصيل العبوة"
       }
     },
     "audit": {

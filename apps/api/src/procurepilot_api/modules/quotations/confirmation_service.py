@@ -9,6 +9,7 @@ from procurepilot_api.config import Settings, get_settings
 from procurepilot_api.deps import CurrentMember
 from procurepilot_api.errors import ConflictError, ServiceUnavailableError
 from procurepilot_api.modules.members.service import authenticated_client
+from procurepilot_api.modules.quotations.review_gate import blocking_low_confidence_fields
 from procurepilot_api.modules.quotations.schemas import ConfirmRequest, Quotation
 from procurepilot_api.modules.quotations.service import _one_row, _quotation
 from procurepilot_api.shared.audit import AuditEventCreate, get_audit_writer
@@ -48,16 +49,19 @@ class QuotationConfirmationService:
         if quote.get("arithmetic_status") == "mismatch":
             if not (payload and payload.acknowledge_mismatch):
                 raise ConflictError(details={"reason": "arithmetic_mismatch_unresolved"})
+        if quote.get("currency") is None:
+            raise ConflictError(details={"reason": "currency_unresolved"})
 
-        threshold = self._settings.extraction_confidence_threshold
-        try:
-            low_confidence = client.table("field_extraction").select("id,confidence").eq(
-                "quotation_id", str(quotation_id)
-            ).lt("confidence", threshold).is_("corrected_by", "null").limit(1).execute()
-        except APIError as exc:
-            raise ServiceUnavailableError(details={"dependency": "database"}) from exc
-        if low_confidence.data:
-            raise ConflictError(details={"reason": "low_confidence_unresolved"})
+        low_confidence = blocking_low_confidence_fields(
+            client,
+            quotation_id,
+            self._settings.extraction_confidence_threshold,
+            supplier_id=quote.get("supplier_id"),
+        )
+        if low_confidence:
+            raise ConflictError(
+                details={"reason": "low_confidence_unresolved", "fields": low_confidence[:100]}
+            )
 
         previous_id = payload.previous_quotation_id if payload else None
         if previous_id is not None:
@@ -75,6 +79,26 @@ class QuotationConfirmationService:
             )
 
         try:
+            supplier_name_rows = []
+            if quote.get("supplier_id") is not None:
+                supplier_name_rows = (
+                    client.table("field_extraction")
+                    .select("id,extracted_value")
+                    .eq("quotation_id", str(quotation_id))
+                    .eq("field_name", "supplier_name")
+                    .is_("corrected_by", "null")
+                    .lt("confidence", self._settings.extraction_confidence_threshold)
+                    .execute()
+                    .data
+                )
+                for evidence in supplier_name_rows:
+                    client.table("field_extraction").update(
+                        {
+                            "corrected_by": str(member.membership_id),
+                            "corrected_at": datetime.now(UTC).isoformat(),
+                            "corrected_value": evidence.get("extracted_value"),
+                        }
+                    ).eq("id", str(evidence["id"])).execute()
             rows = _one_row(
                 client.table("quotation")
                 .update(
@@ -102,13 +126,29 @@ class QuotationConfirmationService:
                 actor_membership_id=member.membership_id,
                 actor_email=member.email,
                 action="quotation.confirmed",
-                target={"quotation_id": str(quotation_id)},
+                target=_confirmation_audit_target(quotation_id, supplier_name_rows),
                 outcome="success",
                 trace_id=get_trace_id(),
             ),
             bearer_token=bearer_token,
         )
         return _quotation(rows)
+
+
+def _confirmation_audit_target(
+    quotation_id: UUID, supplier_name_rows: list[dict[str, object]]
+) -> dict[str, object]:
+    target: dict[str, object] = {"quotation_id": str(quotation_id)}
+    if supplier_name_rows:
+        target["resolved_on_confirm"] = [
+            {
+                "field_extraction_id": str(row["id"]),
+                "field_name": "supplier_name",
+                "resolution": "supplier_selected",
+            }
+            for row in supplier_name_rows
+        ]
+    return target
 
 
 def get_quotation_confirmation_service() -> QuotationConfirmationService:

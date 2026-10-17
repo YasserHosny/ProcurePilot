@@ -166,6 +166,8 @@
 .prov-val {
   font-weight: 500;
   color: #1e293b;
+  unicode-bidi: plaintext;
+  white-space: pre-line;
 
   &.mono {
     font-family: monospace;

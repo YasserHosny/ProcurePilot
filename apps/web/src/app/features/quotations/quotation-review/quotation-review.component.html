@@ -95,6 +95,27 @@
       (nextFlagged)="nextFlaggedField()"
     ></app-quotation-review-banners>
 
+    @if (flaggedFields().length) {
+      <section class="flagged-fields-panel" [attr.aria-label]="'quotations.review.flagged.title' | translate">
+        <h2>{{ 'quotations.review.flagged.title' | translate }}</h2>
+        @for (field of flaggedFields(); track field.id) {
+          <article class="flagged-field-row" [id]="'flagged-' + field.id" [class.flagged-highlight]="activeExtraction()?.id === field.id">
+            <strong>{{ ('quotations.review.fieldLabels.' + field.fieldName) | translate }}</strong>
+            <span class="flagged-value" dir="auto">{{ displayExtractionValue(field.extraction.extracted_value) }}</span>
+            @if (field.fieldName === 'supplier_name') {
+              @if (!selectedSupplierId()) {
+                <span>{{ 'quotations.review.flagged.chooseSupplier' | translate }}</span>
+              }
+              <button mat-button type="button" (click)="goToFlaggedField(field)">{{ 'quotations.review.flagged.goToField' | translate }}</button>
+            } @else if (['currency', 'issue_date', 'expiry_date', 'stated_total', 'quantity', 'unit_price'].includes(field.fieldName)) {
+              <button mat-button type="button" (click)="goToFlaggedField(field)">{{ 'quotations.review.flagged.goToField' | translate }}</button>
+            }
+            <button mat-stroked-button type="button" (click)="confirmFieldAsIs(field.entityType, field.entityId, field.fieldName)">{{ 'quotations.review.flagged.confirmAsIs' | translate }}</button>
+          </article>
+        }
+      </section>
+    }
+
     <!-- Side-by-Side Main Panels -->
     <div class="side-by-side-layout">
       <!-- Left Panel: Source Document Evidence -->
@@ -180,6 +201,7 @@
               <mat-form-field appearance="outline" class="form-col-full">
                 <mat-label>{{ 'quotations.review.header.supplierLabel' | translate }}</mat-label>
                 <mat-select
+                  id="supplier-select"
                   [value]="selectedSupplierId()"
                   (selectionChange)="selectedSupplierId.set($event.value)"
                   [disabled]="!isWriter() || q.status === 'reviewed'"
@@ -267,9 +289,9 @@
                 <mat-form-field appearance="outline" class="field-control">
                   <mat-label>{{ 'quotations.review.header.currencyLabel' | translate }}</mat-label>
                   <mat-select
-                    [value]="getEffectiveValue('quotation', q.id, 'currency', q.currency || '')"
-                    (selectionChange)="getFieldExtraction('quotation', q.id, 'currency') && updateCorrection(getFieldExtraction('quotation', q.id, 'currency')!.id, $event.value)"
-                    (closed)="reviewFieldValue('quotation', q.id, 'currency', getEffectiveValue('quotation', q.id, 'currency', q.currency || ''))"
+                    [value]="getEffectiveValue('quotation', q.id, 'currency', effectiveQuotationCurrency())"
+                    (selectionChange)="currencySelectionChanged($event.value)"
+                    (closed)="reviewFieldValue('quotation', q.id, 'currency', getEffectiveValue('quotation', q.id, 'currency', effectiveQuotationCurrency()))"
                     [disabled]="!isWriter() || q.status === 'reviewed'"
                   >
                     @for (c of currencyOptions; track c) {
@@ -437,12 +459,12 @@
                   <input
                     matInput
                     [value]="q.stated_total | formatMoney"
-                    (input)="getFieldExtraction('quotation', q.id, 'stated_total') && updateCorrection(getFieldExtraction('quotation', q.id, 'stated_total')!.id, { amount: normalizeMoneyInput($any($event.target).value), currency: q.stated_total?.currency || q.currency || 'USD' })"
-                    (change)="getFieldExtraction('quotation', q.id, 'stated_total') && updateCorrection(getFieldExtraction('quotation', q.id, 'stated_total')!.id, { amount: normalizeMoneyInput($any($event.target).value), currency: q.stated_total?.currency || q.currency || 'USD' })"
-                    (blur)="reviewFieldValue('quotation', q.id, 'stated_total', { amount: normalizeMoneyInput($any($event.target).value), currency: q.stated_total?.currency || q.currency || 'USD' })"
+                    (input)="getFieldExtraction('quotation', q.id, 'stated_total') && updateCorrection(getFieldExtraction('quotation', q.id, 'stated_total')!.id, { amount: normalizeMoneyInput($any($event.target).value), currency: q.stated_total?.currency || effectiveQuotationCurrency() })"
+                    (change)="getFieldExtraction('quotation', q.id, 'stated_total') && updateCorrection(getFieldExtraction('quotation', q.id, 'stated_total')!.id, { amount: normalizeMoneyInput($any($event.target).value), currency: q.stated_total?.currency || effectiveQuotationCurrency() })"
+                    (blur)="reviewFieldValue('quotation', q.id, 'stated_total', { amount: normalizeMoneyInput($any($event.target).value), currency: q.stated_total?.currency || effectiveQuotationCurrency() })"
                     [readonly]="!isWriter() || q.status === 'reviewed'"
                   />
-                  <span matTextSuffix class="currency-suffix">{{ q.stated_total?.currency || q.currency }}</span>
+                  <span matTextSuffix class="currency-suffix">{{ q.stated_total?.currency || effectiveQuotationCurrency() }}</span>
                 </mat-form-field>
                 @if (isFieldCorrected('quotation', q.id, 'stated_total')) {
                   <span class="corrected-tag">{{ 'quotations.review.corrections.correctedBadge' | translate }}</span>
@@ -512,6 +534,7 @@
         <!-- Line Items Card -->
         <app-quotation-lines
           [quotation]="q"
+          [effectiveCurrency]="effectiveQuotationCurrency()"
           [activeExtraction]="activeExtraction()"
           [isWriter]="isWriter()"
           [pendingRemoveLineIds]="pendingRemoveLineIds()"

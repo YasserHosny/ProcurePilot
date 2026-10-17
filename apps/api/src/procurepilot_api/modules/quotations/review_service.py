@@ -11,6 +11,7 @@ from procurepilot_api.config import Settings, get_settings
 from procurepilot_api.deps import CurrentMember
 from procurepilot_api.errors import ConflictError, ServiceUnavailableError
 from procurepilot_api.modules.members.service import authenticated_client
+from procurepilot_api.modules.quotations.review_gate import blocking_low_confidence_fields
 from procurepilot_api.modules.quotations.schemas import (
     QuotationDetail,
     QuotationReviewPatch,
@@ -42,7 +43,7 @@ class QuotationReviewService:
         client = authenticated_client(self._settings, bearer_token)
         quotation = _one_row(
             client.table("quotation")
-            .select("id,status,supplier_id,reviewer_notes,tenant_id")
+            .select("id,status,supplier_id,currency,reviewer_notes,tenant_id")
             .eq("id", str(quotation_id))
             .limit(2)
             .execute()
@@ -65,6 +66,8 @@ class QuotationReviewService:
                     resource="supplier",
                 )
             updates["supplier_id"] = str(patch.supplier_id) if patch.supplier_id else None
+        if "currency" in patch.model_fields_set:
+            updates["currency"] = patch.currency
 
         if "reviewer_notes" in patch.model_fields_set:
             updates["reviewer_notes"] = patch.reviewer_notes
@@ -168,6 +171,10 @@ class QuotationReviewService:
                 "supplier_changed": (
                     "supplier_id" in patch.model_fields_set
                     and str(quotation.get("supplier_id") or "") != str(patch.supplier_id or "")
+                ),
+                "currency_changed": (
+                    "currency" in patch.model_fields_set
+                    and quotation.get("currency") != patch.currency
                 ),
                 "notes_changed": (
                     "reviewer_notes" in patch.model_fields_set
@@ -423,7 +430,7 @@ def _current_review_blocker(
 ) -> tuple[str, str] | None:
     quote = _one_row(
         client.table("quotation")
-        .select("id,supplier_id,arithmetic_status,issue_date,expiry_date")
+        .select("id,supplier_id,currency,arithmetic_status,issue_date,expiry_date")
         .eq("id", str(quotation_id))
         .limit(2)
         .execute()
@@ -432,6 +439,8 @@ def _current_review_blocker(
     )
     if quote.get("arithmetic_status") == "mismatch":
         return ("arithmetic_mismatch", "high")
+    if quote.get("currency") is None:
+        return ("currency_unresolved", "normal")
 
     date_evidence = (
         client.table("field_extraction")
@@ -449,15 +458,8 @@ def _current_review_blocker(
     ):
         return ("date_unparsed", "normal")
 
-    low_confidence = (
-        client.table("field_extraction")
-        .select("id")
-        .eq("quotation_id", str(quotation_id))
-        .lt("confidence", confidence_threshold)
-        .is_("corrected_by", "null")
-        .limit(1)
-        .execute()
-        .data
+    low_confidence = blocking_low_confidence_fields(
+        client, quotation_id, confidence_threshold, supplier_id=quote.get("supplier_id")
     )
     if low_confidence:
         return ("low_confidence", "normal")

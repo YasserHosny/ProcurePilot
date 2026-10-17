@@ -116,6 +116,7 @@ class NewQuotationLine(StrictApiModel):
 
 class QuotationReviewPatch(StrictApiModel):
     supplier_id: UUID | None = None
+    currency: StrictStr | None = Field(default=None, pattern=r"^[A-Z]{3}$")
     reviewer_notes: str | None = None
     corrections: list[FieldCorrection] = Field(default_factory=list)
     add_lines: list[NewQuotationLine] = Field(default_factory=list)

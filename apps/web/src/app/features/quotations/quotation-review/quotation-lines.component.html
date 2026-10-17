@@ -78,7 +78,7 @@
               </mat-panel-title>
               <mat-panel-description class="line-panel-desc">
                 @if (computeLineTotal(line); as total) {
-                  <span class="line-summary-total">{{ total }} {{ line.unit_price?.currency || quotation.currency }}</span>
+                  <span class="line-summary-total">{{ total }} {{ line.unit_price?.currency || effectiveCurrency }}</span>
                 }
                 @if (isWriter && quotation.status !== 'reviewed' && !pendingRemoveLineIds.has(line.id)) {
                   <button
@@ -174,11 +174,11 @@
                   <input
                     matInput
                     [value]="line.unit_price?.amount || '0.00'"
-                    (change)="getFieldExtraction('quotation_line', line.id, 'unit_price') && correctionUpdated.emit({ feId: getFieldExtraction('quotation_line', line.id, 'unit_price')!.id, newValue: { amount: $any($event.target).value, currency: line.unit_price?.currency || quotation.currency || 'USD' } })"
-                    (blur)="fieldReviewed.emit({ entityType: 'quotation_line', entityId: line.id, fieldName: 'unit_price', reviewedValue: { amount: $any($event.target).value, currency: line.unit_price?.currency || quotation.currency || 'USD' } })"
+                    (change)="getFieldExtraction('quotation_line', line.id, 'unit_price') && correctionUpdated.emit({ feId: getFieldExtraction('quotation_line', line.id, 'unit_price')!.id, newValue: { amount: $any($event.target).value, currency: line.unit_price?.currency || effectiveCurrency } })"
+                    (blur)="fieldReviewed.emit({ entityType: 'quotation_line', entityId: line.id, fieldName: 'unit_price', reviewedValue: { amount: $any($event.target).value, currency: line.unit_price?.currency || effectiveCurrency } })"
                     [readonly]="!isWriter || quotation.status === 'reviewed'"
                   />
-                  <span matTextSuffix class="currency-suffix">{{ line.unit_price?.currency || quotation.currency }}</span>
+                  <span matTextSuffix class="currency-suffix">{{ line.unit_price?.currency || effectiveCurrency }}</span>
                 </mat-form-field>
                 @if (isFieldCorrected('quotation_line', line.id, 'unit_price')) {
                   <span class="corrected-tag">{{ 'quotations.review.corrections.correctedBadge' | translate }}</span>

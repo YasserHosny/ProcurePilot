@@ -309,3 +309,7 @@
   margin-block-start: 1rem;
   flex-wrap: wrap;
 }
+.flagged-fields-panel { margin-block: 1rem; padding: 1rem; border: 1px solid #f59e0b; border-radius: 8px; }
+.flagged-field-row { display: flex; align-items: center; gap: .75rem; padding-block: .5rem; border-block-start: 1px solid #e2e8f0; }
+.flagged-value { unicode-bidi: plaintext; white-space: pre-line; overflow-wrap: anywhere; flex: 1; }
+.flagged-highlight { outline: 2px solid #f59e0b; background: #fffbeb; }

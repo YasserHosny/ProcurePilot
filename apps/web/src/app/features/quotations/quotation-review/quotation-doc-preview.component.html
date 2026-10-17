@@ -98,12 +98,12 @@
             </div>
             <div class="prov-item">
               <span class="prov-label">{{ 'quotations.review.provenance.originalValue' | translate }}</span>
-              <span class="prov-val mono">{{ fe.extracted_value | json }}</span>
+              <span class="prov-val" [class.mono]="typeof fe.extracted_value !== 'string'" [attr.dir]="typeof fe.extracted_value === 'string' ? 'auto' : null">{{ typeof fe.extracted_value === 'string' ? fe.extracted_value : (fe.extracted_value | json) }}</span>
             </div>
             @if (fe.corrected_value !== null && fe.corrected_value !== undefined) {
               <div class="prov-item corrected">
                 <span class="prov-label">{{ 'quotations.review.provenance.correctedValue' | translate }}</span>
-                <span class="prov-val mono">{{ fe.corrected_value | json }}</span>
+                <span class="prov-val" [class.mono]="typeof fe.corrected_value !== 'string'" [attr.dir]="typeof fe.corrected_value === 'string' ? 'auto' : null">{{ typeof fe.corrected_value === 'string' ? fe.corrected_value : (fe.corrected_value | json) }}</span>
               </div>
               <div class="prov-item">
                 <span class="prov-label">{{ 'quotations.review.provenance.correctedAt' | translate }}</span>

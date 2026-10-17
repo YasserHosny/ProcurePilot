@@ -1,10 +1,11 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { HttpErrorResponse } from '@angular/common/http';
 import { signal } from '@angular/core';
 import { By } from '@angular/platform-browser';
 import { MatDatepicker } from '@angular/material/datepicker';
 import { ActivatedRoute, provideRouter } from '@angular/router';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
-import { of } from 'rxjs';
+import { of, throwError } from 'rxjs';
 
 import enCatalog from '../../../../../../../packages/i18n/en.json';
 import { ApiService } from '../../../core/api/api.service';
@@ -172,6 +173,53 @@ describe('QuotationReviewComponent (T051, T057, T062)', () => {
     expect(component.flaggedFields().length).toBe(1);
   });
 
+  it('removes low-confidence supplier_name from flagged fields after selecting a supplier', () => {
+    const supplierName = {
+      ...mockQuotationDetail.field_extractions[0],
+      id: 'fe-supplier-name',
+      field_name: 'supplier_name',
+      extracted_value: 'الأمانة للتجارة',
+      confidence: '0.6700',
+    };
+    component.quotation.set({ ...mockQuotationDetail, field_extractions: [supplierName] });
+    component.selectedSupplierId.set(null);
+    expect(component.flaggedFields().map((field) => field.id)).toContain(supplierName.id);
+    component.selectedSupplierId.set('sup-1');
+    expect(component.flaggedFields().map((field) => field.id)).not.toContain(supplierName.id);
+  });
+
+  it('opens low-confidence supplier name evidence and renders its Go to field action without a supplier selected', () => {
+    const supplierName = {
+      ...mockQuotationDetail.field_extractions[0],
+      id: 'fe-supplier-name',
+      field_name: 'supplier_name',
+      extracted_value: 'الأمانة للتجارة',
+      confidence: '0.6700',
+    };
+    component.quotation.set({ ...mockQuotationDetail, field_extractions: [supplierName] });
+    component.selectedSupplierId.set(null);
+    const flaggedSupplierName = component.flaggedFields().find((field) => field.id === supplierName.id);
+    expect(flaggedSupplierName).toBeDefined();
+    component.goToFlaggedField(flaggedSupplierName!);
+    expect(component.activeExtraction()?.id).toBe(supplierName.id);
+
+    fixture.detectChanges();
+    const supplierRow = fixture.nativeElement.querySelector('#flagged-fe-supplier-name') as HTMLElement;
+    expect(supplierRow.querySelector('button')?.textContent).toContain(
+      enCatalog.quotations.review.flagged.goToField,
+    );
+  });
+
+  it('stages confirm-as-is for a low-confidence unit price extraction', () => {
+    const unitPrice = {
+      ...mockQuotationDetail.field_extractions[1],
+      confidence: '0.5000',
+    };
+    component.quotation.set({ ...mockQuotationDetail, field_extractions: [unitPrice] });
+    component.confirmFieldAsIs('quotation_line', 'line-1', 'unit_price');
+    expect(component.pendingCorrections().get(unitPrice.id)).toEqual(unitPrice.extracted_value);
+  });
+
   it('requests inline preview URLs and attachment URLs from the download button', () => {
     expect(apiService.getDocumentDownloadUrl).toHaveBeenCalledWith('doc-1');
 
@@ -192,6 +240,23 @@ describe('QuotationReviewComponent (T051, T057, T062)', () => {
     expect(component.computedLinesTotal()?.currency).toBe('EGP');
   });
 
+  it('uses a staged currency for totals and newly added priced lines when the quote has no currency', () => {
+    component.quotation.set({
+      ...mockQuotationDetail,
+      currency: null,
+      stated_total: null,
+      lines: [],
+    } as unknown as QuotationDetail);
+    component.currencySelectionChanged('EUR');
+    component.newLineText.set('New item');
+    component.newLinePriceAmount.set('12.50');
+
+    component.addNewLine();
+
+    expect(component.pendingNewLines()[0].unit_price_currency).toBe('EUR');
+    expect(component.computedLinesTotal()?.currency).toBe('EUR');
+  });
+
   it('uses the home currency when adding a priced line to a quote without currency', () => {
     component.quotation.set({ ...mockQuotationDetail, currency: null, lines: [] } as unknown as QuotationDetail);
     component.newLineText.set('New item');
@@ -200,6 +265,20 @@ describe('QuotationReviewComponent (T051, T057, T062)', () => {
     component.addNewLine();
 
     expect(component.pendingNewLines()[0].unit_price_currency).toBe('EGP');
+  });
+
+  it('saves an explicitly selected currency when no currency extraction row exists', () => {
+    const missingCurrency = { ...mockQuotationDetail, currency: null, supplier_id: 'sup-1', field_extractions: [] };
+    component.quotation.set(missingCurrency as unknown as QuotationDetail);
+    component.selectedSupplierId.set('sup-1');
+    apiService.patchQuotation.and.returnValue(of({ ...missingCurrency, currency: 'EGP' } as QuotationDetail));
+    apiService.confirmQuotation.and.returnValue(of({ ...missingCurrency, currency: 'EGP', status: 'reviewed' } as QuotationDetail));
+
+    component.currencySelectionChanged('EGP');
+    component.confirmQuotation();
+
+    expect(apiService.patchQuotation).toHaveBeenCalledWith('q-review-1', jasmine.objectContaining({ currency: 'EGP' }));
+    expect(apiService.confirmQuotation).toHaveBeenCalled();
   });
 
   it('keeps a quote currency when adding a priced line', () => {
@@ -566,6 +645,68 @@ describe('QuotationReviewComponent (T051, T057, T062)', () => {
       previous_quotation_id: null,
       acknowledge_mismatch: undefined,
     });
+  });
+
+  it('shows the localized reason for a confirm 409 instead of the envelope message', () => {
+    const alreadyMatched = { ...mockQuotationDetail, supplier_id: 'sup-1' };
+    component.quotation.set(alreadyMatched);
+    component.selectedSupplierId.set('sup-1');
+    apiService.confirmQuotation.and.returnValue(throwError(() => new HttpErrorResponse({
+      status: 409,
+      error: { message: 'Request conflicts with the current state.', details: { reason: 'currency_unresolved' } },
+    })));
+
+    component.confirmQuotation();
+
+    expect(component.confirmBlockedReason()).toBe('Set the quotation currency before confirming.');
+    expect(component.confirmBlockedReason()).not.toBe('Request conflicts with the current state.');
+  });
+
+  it('falls back to the unknown confirm conflict translation for unrecognized reasons', () => {
+    const alreadyMatched = { ...mockQuotationDetail, supplier_id: 'sup-1' };
+    component.quotation.set(alreadyMatched);
+    component.selectedSupplierId.set('sup-1');
+    apiService.confirmQuotation.and.returnValue(throwError(() => new HttpErrorResponse({
+      status: 409,
+      error: { message: 'Request conflicts with the current state.', details: { reason: 'something_new' } },
+    })));
+
+    component.confirmQuotation();
+    fixture.detectChanges();
+
+    const shown = component.confirmBlockedReason() ?? '';
+    expect(shown).toBe(enCatalog.quotations.review.confirmBlocked.unknown);
+    expect(shown.startsWith('quotations.')).toBeFalse();
+    expect(fixture.nativeElement.textContent).toContain(enCatalog.quotations.review.confirmBlocked.unknown);
+  });
+
+  it('falls back to the unknown PATCH conflict translation for unrecognized reasons', () => {
+    component.quotation.set(mockQuotationDetail);
+    apiService.patchQuotation.and.returnValue(throwError(() => new HttpErrorResponse({
+      status: 409,
+      error: { message: 'Request conflicts with the current state.', details: { reason: 'something_new' } },
+    })));
+    component.saveCorrections();
+
+    fixture.detectChanges();
+    const shown = component.errorMessage();
+    expect(shown).toBe(enCatalog.quotations.review.conflict.unknown);
+    expect(shown?.startsWith('quotations.')).toBeFalse();
+    expect(fixture.nativeElement.textContent).toContain(enCatalog.quotations.review.conflict.unknown);
+  });
+
+  it('treats prototype property names as unknown conflict reasons', () => {
+    const alreadyMatched = { ...mockQuotationDetail, supplier_id: 'sup-1' };
+    component.quotation.set(alreadyMatched);
+    component.selectedSupplierId.set('sup-1');
+    apiService.confirmQuotation.and.returnValue(throwError(() => new HttpErrorResponse({
+      status: 409,
+      error: { message: 'Request conflicts with the current state.', details: { reason: 'toString' } },
+    })));
+
+    component.confirmQuotation();
+
+    expect(component.confirmBlockedReason()).toBe(enCatalog.quotations.review.confirmBlocked.unknown);
   });
 
   it('should display arithmetic mismatch banner and block confirmation when totals mismatch (US3)', () => {

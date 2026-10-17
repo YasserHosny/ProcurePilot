@@ -1,5 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { createMember, type CreatedMember } from './support/api';
+import { seedQuotationReviewCase } from './support/db';
+import { openAsyncSelect } from './support/select';
 import {
   confirmQuotation,
   resolveIssueDateFlag,
@@ -108,5 +110,59 @@ test.describe('Quotation Review & Confirmation (T053, US2)', () => {
 
     // FR-016: human authorization via POST /confirm flips the quotation to reviewed.
     await confirmQuotation(page);
+  });
+
+  test('ignores low-confidence supplier name after supplier selection and confirms', async ({ page }) => {
+    const quotationId = await uploadQuotationAndOpenReview(page, 'quote_supplier_name_gate.pdf');
+    seedQuotationReviewCase(buyer.email, quotationId, 'supplier_name');
+    await page.reload();
+    await expect(page.locator('.status-pill')).toBeVisible();
+    await expect(page.locator('.flagged-field-row')).toHaveCount(0);
+    await confirmQuotation(page);
+  });
+
+  test('blocks low-confidence line price until confirmed as extracted', async ({ page }) => {
+    const quotationId = await uploadQuotationAndOpenReview(page, 'quote_line_price_gate.pdf');
+    seedQuotationReviewCase(buyer.email, quotationId, 'unit_price');
+    await page.reload();
+    await page.locator('button.confirm-btn').click();
+    await page.locator('.confirm-dialog .confirm-dialog-actions .mat-mdc-unelevated-button').click();
+    await expect(page.locator('.error-text')).toContainText(
+      /Review or confirm the flagged extraction fields before confirming\./,
+    );
+    await expect(page.locator('.error-text')).not.toHaveText(
+      'Request conflicts with the current state.',
+    );
+    const priceFlag = page.locator('.flagged-field-row').filter({ has: page.getByText('Unit price', { exact: true }) });
+    await expect(priceFlag).toHaveClass(/flagged-highlight/);
+    await priceFlag.locator('button').last().click();
+    await page.locator('button.save-btn').click();
+    await expect(page.locator('.corrected-tag').first()).toBeVisible();
+    await page.locator('button.confirm-btn').click();
+    const dialog = page.locator('.confirm-dialog');
+    await expect(dialog).toBeVisible();
+    await dialog.locator('.confirm-dialog-actions .mat-mdc-unelevated-button').click();
+    await expect(page.locator('.status-pill.status-reviewed')).toBeVisible();
+  });
+
+  test('renders Arabic supplier provenance as auto-direction plain text', async ({ page }) => {
+    const quotationId = await uploadQuotationAndOpenReview(page, 'quote_supplier_provenance.pdf');
+    seedQuotationReviewCase(buyer.email, quotationId, 'supplier_name');
+    await page.reload();
+    // With a supplier selected the supplier_name row is (correctly) not a blocker; clear the
+    // selection so the row reappears and its provenance can be opened.
+    await openAsyncSelect(page, page.locator('mat-select[required]'));
+    await page.locator('mat-option').first().click();
+    // Focus a different field first: the provenance box must then switch to the supplier name
+    // because of the Go-to-field click, not because it happened to be the page's default.
+    await page.locator('.field-box', { hasText: 'Issue Date' }).first().click();
+    await expect(page.locator('.extraction-field-label')).not.toHaveText('Supplier Name');
+    const supplierFlag = page.locator('.flagged-field-row').filter({ has: page.getByText('Supplier name', { exact: true }) });
+    await supplierFlag.getByRole('button', { name: 'Go to field', exact: true }).click();
+    await expect(page.locator('.extraction-field-label')).toHaveText('Supplier Name');
+    const originalValue = page.locator('.prov-item').filter({ hasText: 'Original AI Value' }).locator('.prov-val');
+    await expect(originalValue).toHaveAttribute('dir', 'auto');
+    await expect(originalValue).toContainText('الأمانة للتجارة');
+    await expect(originalValue).not.toHaveText(/^"/);
   });
 });

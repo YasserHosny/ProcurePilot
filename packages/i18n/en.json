@@ -1038,6 +1038,55 @@
         "in_review": "In Review",
         "reviewed": "Reviewed & Authorized",
         "refused": "Refused"
+      },
+      "confirmBlocked": {
+        "quotation_not_confirmable": "This quotation is not in a state that can be confirmed.",
+        "supplier_not_confirmed": "Select a supplier before authorizing this quotation.",
+        "arithmetic_mismatch_unresolved": "Resolve or acknowledge the arithmetic mismatch before confirming.",
+        "low_confidence_unresolved": "Review or confirm the flagged extraction fields before confirming.",
+        "currency_unresolved": "Set the quotation currency before confirming.",
+        "previous_quotation_self_reference": "A quotation cannot supersede itself.",
+        "unknown": "The quotation cannot be confirmed because a review requirement is unresolved."
+      },
+      "conflict": {
+        "unknown": "This quotation could not be updated because its current state changed.",
+        "quotation_not_editable": "This quotation can no longer be edited in its current state.",
+        "invalid_date_correction": "Enter a valid date for this quotation.",
+        "quotation_not_refusable": "This quotation can no longer be refused in its current state.",
+        "quotation_already_archived": "This quotation has already been archived.",
+        "quotation_extraction_already_active": "Extraction is already active for this quotation.",
+        "extraction_already_running": "Extraction is already running for this quotation.",
+        "quotation_not_confirmable": "This quotation is not in a state that can be confirmed.",
+        "supplier_not_confirmed": "Select a supplier before authorizing this quotation.",
+        "arithmetic_mismatch_unresolved": "Resolve or acknowledge the arithmetic mismatch before confirming.",
+        "low_confidence_unresolved": "Review or confirm the flagged extraction fields before confirming.",
+        "currency_unresolved": "Set the quotation currency before confirming.",
+        "previous_quotation_self_reference": "A quotation cannot supersede itself."
+      },
+      "flagged": {
+        "title": "Flagged fields",
+        "chooseSupplier": "Choose a supplier to resolve this field.",
+        "goToField": "Go to field",
+        "confirmAsIs": "Confirm as-is"
+      },
+      "fieldLabels": {
+        "supplier_name": "Supplier name",
+        "issue_date": "Issue date",
+        "expiry_date": "Expiry date",
+        "currency": "Currency",
+        "stated_total": "Stated total",
+        "original_text": "Line description",
+        "quantity": "Quantity",
+        "unit_price": "Unit price",
+        "line_total": "Line total",
+        "pack_unit": "Pack unit",
+        "pack_count": "Pack count",
+        "unit_size": "Unit size",
+        "vat_rate": "VAT rate",
+        "discount": "Discount",
+        "delivery_fee": "Delivery fee",
+        "suggested_currency": "Suggested currency",
+        "pack_details": "Pack details"
       }
     },
     "audit": {
