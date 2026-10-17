@@ -17,7 +17,7 @@ pytestmark = pytest.mark.skipif(
 def test_merge_kg_migration_remaps_product_and_quotation_line_then_rolls_back() -> None:
     migration = (
         Path(__file__).parents[4]
-        / "supabase/migrations/20261017000001_merge_duplicate_kg_base_unit.sql"
+        / "supabase/migrations/20261017000002_merge_duplicate_kg_base_unit.sql"
     )
     with psycopg.connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
         try:
