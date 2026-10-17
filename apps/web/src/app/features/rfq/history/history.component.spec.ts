@@ -12,6 +12,7 @@ import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { signal } from '@angular/core';
 import { SessionService } from '../../../core/auth/session.service';
 import { CatalogueConfirmDialogComponent } from '../../catalogue/confirm-dialog/confirm-dialog.component';
+import { ApiService } from '../../../core/api/api.service';
 
 describe('HistoryComponent', () => {
   let component: HistoryComponent;
@@ -24,6 +25,7 @@ describe('HistoryComponent', () => {
   const mockRfqs: RfqSummary[] = [
     {
       id: 'rfq-draft-1',
+      created_by_membership_id: 'm1',
       status: 'draft',
       needed_by_date: '2026-10-10',
       created_at: '2026-09-20T10:00:00Z',
@@ -34,6 +36,7 @@ describe('HistoryComponent', () => {
     },
     {
       id: 'rfq-1',
+      created_by_membership_id: 'm1',
       status: 'sent',
       needed_by_date: '2026-10-01',
       created_at: '2026-09-25T10:00:00Z',
@@ -44,6 +47,7 @@ describe('HistoryComponent', () => {
     },
     {
       id: 'rfq-2',
+      created_by_membership_id: 'm1',
       status: 'converted',
       needed_by_date: '2026-10-05',
       created_at: '2026-09-24T10:00:00Z',
@@ -62,6 +66,8 @@ describe('HistoryComponent', () => {
   beforeEach(async () => {
     rfqApiSpy = jasmine.createSpyObj('RfqApi', ['listRfqs', 'sendRfq']);
     snackBarSpy = jasmine.createSpyObj('MatSnackBar', ['open']);
+    const apiSpy = jasmine.createSpyObj('ApiService', ['members']);
+    apiSpy.members.and.returnValue(of({ items: [{ id: 'm1', email: 'user@test.com' }], next_cursor: null }));
     dialogSpy = jasmine.createSpyObj('MatDialog', ['open']);
 
     rfqApiSpy.listRfqs.and.returnValue(of(mockRfqList));
@@ -73,6 +79,7 @@ describe('HistoryComponent', () => {
         provideHttpClientTesting(),
         provideRouter([]),
         { provide: RfqApi, useValue: rfqApiSpy },
+        { provide: ApiService, useValue: apiSpy },
         { provide: MatSnackBar, useValue: snackBarSpy },
         { provide: MatDialog, useValue: dialogSpy },
         {
@@ -82,6 +89,7 @@ describe('HistoryComponent', () => {
             hasRole: () => true,
             isAuthenticated: () => true,
             activeLocale: () => 'en',
+            currentMember: () => ({ email: 'user@test.com' }),
           },
         },
       ],
@@ -107,6 +115,18 @@ describe('HistoryComponent', () => {
   it('should navigate to edit view when clicking a draft row', () => {
     component.onRowClick(mockRfqs[0]);
     expect(router.navigate).toHaveBeenCalledWith(['/rfq', 'rfq-draft-1', 'edit']);
+  });
+
+  it('routes another member’s draft to compare and hides draft actions', async () => {
+    component.currentMembershipId.set('different-member');
+    component.onRowClick(mockRfqs[0]);
+    expect(router.navigate).toHaveBeenCalledWith(['/rfq/compare', 'rfq-draft-1']);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    const compiled = fixture.nativeElement as HTMLElement;
+    expect(compiled.querySelector('[data-testid="rfq-edit-button"]')).toBeNull();
+    expect(compiled.querySelector('[data-testid="rfq-send-button"]')).toBeNull();
   });
 
   it('should navigate to compare view for non-converted sent RFQ', () => {

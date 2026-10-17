@@ -114,6 +114,7 @@ export interface RfqResponseComparisonList {
 
 export interface RfqSummary {
   id: string;
+  created_by_membership_id: string;
   status: 'draft' | 'sent' | 'responded' | 'expired' | 'converted';
   needed_by_date: string;
   created_at: string;

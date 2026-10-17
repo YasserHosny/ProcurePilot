@@ -138,7 +138,9 @@ describe('CompareComponent (RFQ)', () => {
     });
     mockSession.hasRole.and.returnValue(true);
 
-    mockApiService = jasmine.createSpyObj('ApiService', ['listBranches', 'suppliers', 'products']);
+    mockApiService = jasmine.createSpyObj('ApiService', ['listBranches', 'suppliers', 'products', 'members']);
+    mockApiService.members.and.returnValue(of({ items: [{ id: 'member-1', email: 'owner@test.com' }], next_cursor: null }));
+    mockSession.currentMember.set({ email: 'owner@test.com' } as never);
     mockApiService.listBranches.and.returnValue(
       of({ items: [{ id: 'branch-1', name: 'Main Branch' }], next_cursor: null } as unknown as {
         items: Branch[];
@@ -236,6 +238,18 @@ describe('CompareComponent (RFQ)', () => {
     sendBtn?.click();
     expect(mockRfqApi.sendRfq).toHaveBeenCalledWith('rfq-1');
     expect(mockSnackBar.open).toHaveBeenCalled();
+  });
+
+  it('shows draft actions only to the RFQ creator', async () => {
+    mockRfqApi.getRfq.and.returnValue(of(draftDetail));
+    component.loadData('rfq-1');
+    await fixture.whenStable();
+    fixture.detectChanges();
+    expect((fixture.nativeElement as HTMLElement).querySelector('[data-testid="rfq-compare-send-button"]')).not.toBeNull();
+    component.currentMembershipId.set('another-member');
+    fixture.detectChanges();
+    expect((fixture.nativeElement as HTMLElement).querySelector('[data-testid="rfq-compare-send-button"]')).toBeNull();
+    expect((fixture.nativeElement as HTMLElement).querySelector('[data-testid="rfq-compare-edit-button"]')).toBeNull();
   });
 
   it('should disable prepare action for responses with pending match lines', () => {

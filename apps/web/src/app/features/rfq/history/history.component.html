@@ -81,7 +81,7 @@
             <ng-container matColumnDef="actions">
               <th mat-header-cell *matHeaderCellDef class="actions-header">{{ 'rfq.history.actions' | translate }}</th>
               <td mat-cell *matCellDef="let rfq" class="actions-cell">
-                @if (rfq.status === 'draft') {
+                @if (rfq.status === 'draft' && isCreator(rfq)) {
                   <div class="draft-actions">
                     <button
                       mat-stroked-button

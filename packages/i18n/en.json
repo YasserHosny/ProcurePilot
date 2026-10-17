@@ -3540,6 +3540,7 @@
     }
   },
   "rfq": {
+    "creatorOnly": "Only the person who created this RFQ can send or edit it.",
     "create": {
       "title": "Create RFQ",
       "editTitle": "Edit RFQ draft",
@@ -3565,6 +3566,8 @@
       "sendingButton": "Sending...",
       "draftSaved": "Draft saved",
       "sentSuccess": "RFQ sent. Suppliers emailed: {{count}}",
+      "sentPartial": "Sent to {{sent}} of {{total}} suppliers. {{failed}} could not be reached — check their contact emails.",
+      "sentNone": "No suppliers could be reached. Check their contact emails and try again.",
       "notDraftTitle": "RFQ cannot be edited",
       "notDraftMessage": "Only draft RFQs can be edited. This RFQ has already been sent.",
       "backToHistory": "Back to RFQ History",

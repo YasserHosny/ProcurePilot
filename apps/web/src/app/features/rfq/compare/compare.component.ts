@@ -73,10 +73,15 @@ export class CompareComponent implements OnInit {
   readonly productNames = signal<Record<string, string>>({});
   readonly errorMessage = signal<string | null>(null);
   readonly guardrails = signal<readonly RfqGuardrail[]>([]);
+  readonly currentMembershipId = signal<string | null>(null);
 
   readonly displayedColumns = ['product', 'quantity', 'unitPrice', 'totalValue'];
 
   ngOnInit(): void {
+    this.api.members().subscribe(({ items }) => {
+      const email = this.session.currentMember()?.email;
+      this.currentMembershipId.set(items.find((member) => member.email === email)?.id ?? null);
+    });
     this.route.paramMap.subscribe((params) => {
       const id = params.get('id');
       if (id) {
@@ -125,10 +130,16 @@ export class CompareComponent implements OnInit {
   onEditDraft(): void {
     const id = this.rfqId();
     if (!id) return;
+    if (!this.isCreator()) return;
     this.router.navigate(['/rfq', id, 'edit']);
   }
 
+  isCreator(): boolean {
+    return this.rfqDetail()?.rfq.created_by_membership_id === this.currentMembershipId();
+  }
+
   onSendDraft(): void {
+    if (!this.isCreator()) return;
     const detail = this.rfqDetail();
     const id = this.rfqId();
     if (!id) return;
@@ -150,17 +161,18 @@ export class CompareComponent implements OnInit {
       if (confirmed) {
         this.rfqApi.sendRfq(id).subscribe({
           next: (res) => {
-            const count = res.recipients?.length || recipientCount;
-            this.snackBar.open(
-              this.translate.instant('rfq.history.sentSuccess', { count }),
-              this.translate.instant('rfq.history.dismiss'),
-              { duration: 5000 },
-            );
-            this.loadData(id);
+            const total = res.recipients.length;
+            const sent = res.recipients.filter((recipient) => recipient.status === 'sent').length;
+            const key = sent === total && total > 0 ? 'rfq.history.sentSuccess' : sent > 0 ? 'rfq.create.sentPartial' : 'rfq.create.sentNone';
+            const params = sent === total && total > 0 ? { count: sent } : { sent, total, failed: total - sent };
+            this.snackBar.open(this.translate.instant(key, params), this.translate.instant('rfq.history.dismiss'), { duration: 5000 });
+            if (sent === total && total > 0) this.router.navigate(['/rfq/history']);
+            else this.loadData(id);
           },
-          error: () => {
+          error: (err: unknown) => {
+            const key = err instanceof HttpErrorResponse && err.status === 403 ? 'rfq.creatorOnly' : 'rfq.history.sendError';
             this.snackBar.open(
-              this.translate.instant('rfq.history.sendError'),
+              this.translate.instant(key),
               this.translate.instant('rfq.history.dismiss'),
               { duration: 5000 },
             );

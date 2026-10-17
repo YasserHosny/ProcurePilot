@@ -13,6 +13,7 @@
           <h2>{{ 'rfq.compare.draftNoticeTitle' | translate }}</h2>
           <p>{{ 'rfq.compare.draftNoticeDescription' | translate }}</p>
         </div>
+        @if (isCreator()) {
         <div class="draft-notice-actions">
           <button
             mat-stroked-button
@@ -32,6 +33,7 @@
             {{ 'rfq.compare.sendDraft' | translate }}
           </button>
         </div>
+        }
       </div>
     </mat-card>
   }

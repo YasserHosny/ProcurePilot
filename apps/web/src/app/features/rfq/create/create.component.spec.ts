@@ -169,7 +169,7 @@ describe('RfqCreateComponent', () => {
     rfqApiSpy.sendRfq.and.returnValue(
       of({
         rfq: { id: 'rfq-1', status: 'sent' } as Rfq,
-        recipients: [{ id: 'rec-1' }, { id: 'rec-2' }] as never[],
+        recipients: [{ id: 'rec-1', status: 'sent' }, { id: 'rec-2', status: 'sent' }] as never[],
       }),
     );
 
@@ -179,6 +179,28 @@ describe('RfqCreateComponent', () => {
       duration: 5000,
     });
     expect(router.navigate).toHaveBeenCalledWith(['/rfq/history']);
+  });
+
+  it('stays on the page and reports partial delivery', () => {
+    component.rfqId.set('rfq-1');
+    rfqApiSpy.sendRfq.and.returnValue(of({
+      rfq: { id: 'rfq-1', status: 'sent' } as Rfq,
+      recipients: [{ status: 'sent' }, { status: 'failed' }] as never[],
+    }));
+    component.onSend();
+    expect(snackBarSpy.open).toHaveBeenCalledWith(jasmine.stringMatching('rfq.create.sentPartial|Sent to'), jasmine.any(String), jasmine.any(Object));
+    expect(router.navigate).not.toHaveBeenCalled();
+  });
+
+  it('stays on the page and reports no delivery', () => {
+    component.rfqId.set('rfq-1');
+    rfqApiSpy.sendRfq.and.returnValue(of({
+      rfq: { id: 'rfq-1', status: 'draft' } as Rfq,
+      recipients: [{ status: 'failed' }] as never[],
+    }));
+    component.onSend();
+    expect(snackBarSpy.open).toHaveBeenCalledWith(jasmine.stringMatching('rfq.create.sentNone|No suppliers'), jasmine.any(String), jasmine.any(Object));
+    expect(router.navigate).not.toHaveBeenCalled();
   });
 
   it('prefills form in edit mode with local date and calls updateRfq (PUT) on save', () => {
