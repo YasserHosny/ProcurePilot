@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import replace
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from typing import NamedTuple
 from urllib.error import URLError
 from urllib.parse import quote
@@ -13,8 +13,7 @@ import psycopg
 from procurepilot_logging import new_trace_id, set_trace_id
 
 from procurepilot_extraction_worker import db
-from procurepilot_extraction_worker.azure_di import AzureDocumentIntelligenceProvider
-from procurepilot_extraction_worker.bedrock import BedrockExtractionProvider
+from procurepilot_extraction_worker.dates import parse_extracted_date
 from procurepilot_extraction_worker.models import ExtractedField, ExtractedLine, ExtractionResult
 from procurepilot_extraction_worker.providers import FakeExtractionProvider
 from procurepilot_extraction_worker.settings import WorkerSettings, get_settings
@@ -51,7 +50,9 @@ def process_extraction_job(payload: dict[str, str]) -> None:
                 document_id=document_id,
                 document=document,
             )
-            result = _with_currency_suggestion(result, _tenant_currency(conn, tenant_id))
+            tenant_currency, region = _tenant_currency(conn, tenant_id)
+            result, parsed_dates, has_unparsed_date = _with_normalised_dates(result, region)
+            result = _with_currency_suggestion(result, tenant_currency)
             arithmetic = validate_arithmetic(result)
             _persist_result(conn, tenant_id, quotation_id, result, arithmetic.status)
             supplier_match = _match_supplier(conn, tenant_id, result.header)
@@ -60,6 +61,7 @@ def process_extraction_job(payload: dict[str, str]) -> None:
                 arithmetic.status,
                 settings.confidence_threshold,
                 supplier_match,
+                has_unparsed_date=has_unparsed_date,
             )
             if review_reason is not None:
                 _upsert_review_task(conn, tenant_id, quotation_id, review_reason)
@@ -73,6 +75,7 @@ def process_extraction_job(payload: dict[str, str]) -> None:
                 arithmetic.status,
                 result,
                 supplier_match,
+                parsed_dates,
             )
             _mark_succeeded(conn, job_id, result.method)
             logger.info(
@@ -88,6 +91,7 @@ def process_extraction_job(payload: dict[str, str]) -> None:
         except Exception as exc:
             conn.rollback()
             _mark_failed(conn, job_id, {"code": "extraction_failed", "message": str(exc)})
+            # Refusal is reserved for unreadable documents or an extraction process failure.
             _refuse_quotation(conn, quotation_id)
             # The `with` block below commits on a clean exit but rolls back on one exiting
             # via an exception — which the `raise` below does. Without this commit, the
@@ -130,12 +134,18 @@ def _extract(
     )
     if settings.provider_mode == "azure_di":
         logger.info("using azure_di provider")
+        from procurepilot_extraction_worker.azure_di import AzureDocumentIntelligenceProvider
+
         return AzureDocumentIntelligenceProvider(settings).extract(**common)
     logger.info("using bedrock provider")
     try:
+        from procurepilot_extraction_worker.bedrock import BedrockExtractionProvider
+
         return BedrockExtractionProvider(settings).extract(**common)
     except Exception:
         logger.warning("bedrock failed, falling back to azure_di", exc_info=True)
+        from procurepilot_extraction_worker.azure_di import AzureDocumentIntelligenceProvider
+
         return AzureDocumentIntelligenceProvider(settings).extract(**common)
 
 
@@ -275,6 +285,7 @@ def _update_quotation_status(
     arithmetic_status: str,
     result: ExtractionResult,
     supplier_match: SupplierMatch,
+    parsed_dates: dict[str, str | None],
 ) -> None:
     stated = result.stated_total.value if result.stated_total is not None else None
     currency = stated.get("currency") if isinstance(stated, dict) else None
@@ -294,8 +305,8 @@ def _update_quotation_status(
             (
                 status,
                 _header_value(header, "currency"),
-                _header_value(header, "issue_date"),
-                _header_value(header, "expiry_date"),
+                parsed_dates.get("issue_date"),
+                parsed_dates.get("expiry_date"),
                 amount,
                 currency,
                 arithmetic_status,
@@ -344,6 +355,8 @@ def _review_reason(
     arithmetic_status: str,
     threshold: float,
     supplier_match: SupplierMatch,
+    *,
+    has_unparsed_date: bool = False,
 ) -> str | None:
     # A provider can report a clean "succeeded" job while genuinely extracting nothing -- e.g.
     # Azure DI's prebuilt-invoice model not recognising the document as an invoice and its
@@ -358,10 +371,25 @@ def _review_reason(
     if currency is None or _has_uncurried_money(result):
         # No evidenced currency: nothing is guessed, a human supplies it (FR-011).
         return "currency_unresolved"
-    if currency.confidence < threshold:
-        return "low_confidence"
+    if has_unparsed_date:
+        return "date_unparsed"
+    if any(
+        len([part for part in line.original_text.splitlines() if part.strip()]) >= 2
+        for line in result.lines
+    ):
+        return "merged_line_items"
+    if result.expected_line_count is not None and len(result.lines) < result.expected_line_count:
+        return "line_count_mismatch"
     if arithmetic_status == "mismatch":
         return "arithmetic_mismatch"
+    if (
+        result.method in ("azure_di", "bedrock")
+        and result.lines
+        and arithmetic_status != "reconciled"
+    ):
+        return "total_unverified"
+    if currency.confidence < threshold:
+        return "low_confidence"
     if low_confidence_fields(result, threshold):
         return "low_confidence"
     if supplier_match.had_candidates and supplier_match.supplier_id is None:
@@ -369,17 +397,61 @@ def _review_reason(
     return None
 
 
-def _with_currency_suggestion(result: ExtractionResult, tenant_currency: str | None) -> ExtractionResult:
+def _with_currency_suggestion(
+    result: ExtractionResult, tenant_currency: str | None
+) -> ExtractionResult:
     if "currency" in result.header and not _has_uncurried_money(result):
         return result
     return replace(result, suggested_currency=tenant_currency)
 
 
-def _tenant_currency(conn: psycopg.Connection, tenant_id: UUID) -> str | None:
+def _tenant_currency(conn: psycopg.Connection, tenant_id: UUID) -> tuple[str | None, str | None]:
     with conn.cursor() as cur:
-        cur.execute("select currency from tenant where id = %s", (tenant_id,))
+        cur.execute("select currency, region from tenant where id = %s", (tenant_id,))
         row = cur.fetchone()
-    return str(row[0]).upper() if row and row[0] else None
+    return (
+        (str(row[0]).upper() if row and row[0] else None),
+        (str(row[1]).upper() if row and row[1] else None),
+    )
+
+
+def _with_normalised_dates(
+    result: ExtractionResult, region: str | None
+) -> tuple[ExtractionResult, dict[str, str | None], bool]:
+    unparsed = False
+    parsed_dates: dict[str, str | None] = {"issue_date": None, "expiry_date": None}
+
+    def normalise(fields: dict[str, ExtractedField]) -> dict[str, ExtractedField]:
+        nonlocal unparsed
+        updated = dict(fields)
+        for name, field in fields.items():
+            if not name.endswith("_date"):
+                continue
+            typed_value = field.typed_value
+            raw_value = typed_value if isinstance(typed_value, (date, datetime)) else field.value
+            parsed = parse_extracted_date(raw_value, region=region)
+            logger.info(
+                "date field normalized",
+                extra={
+                    "field": name,
+                    "rule": parsed.rule,
+                    "ambiguous": parsed.ambiguous,
+                    "region": region,
+                },
+            )
+            if fields is result.header and name in parsed_dates:
+                parsed_dates[name] = parsed.value.isoformat() if parsed.value else None
+            if parsed.unparsed:
+                unparsed = True
+                updated[name] = replace(field, confidence=0.0)
+                continue  # Keep raw evidence in field_extraction; canonical columns stay NULL.
+            confidence = min(field.confidence, 0.5) if parsed.ambiguous else field.confidence
+            updated[name] = replace(field, confidence=confidence)
+        return updated
+
+    header = normalise(result.header)
+    lines = [replace(line, fields=normalise(line.fields)) for line in result.lines]
+    return replace(result, header=header, lines=lines), parsed_dates, unparsed
 
 
 def _upsert_review_task(
@@ -508,6 +580,19 @@ _UNIT_ALIASES: dict[str, str] = {
     "millilitre": "millilitre",
     "millilitres": "millilitre",
     "milliliter": "millilitre",
+    "كجم": "kilogram",
+    "كيلو": "kilogram",
+    "جم": "gram",
+    "جرام": "gram",
+    "لتر": "litre",
+    "مل": "millilitre",
+    "صفيحة": "each",
+    "شيكارة": "each",
+    "كرتونة": "each",
+    "علبة": "each",
+    "كيس": "each",
+    "قطعة": "each",
+    "عبوة": "each",
 }
 
 
@@ -553,7 +638,9 @@ def _has_uncurried_money(result: ExtractionResult) -> bool:
             ):
                 return True
     stated = result.stated_total.value if result.stated_total is not None else None
-    return isinstance(stated, dict) and stated.get("amount") is not None and not stated.get("currency")
+    return (
+        isinstance(stated, dict) and stated.get("amount") is not None and not stated.get("currency")
+    )
 
 
 def _header_value(header: dict[str, ExtractedField], name: str) -> object | None:

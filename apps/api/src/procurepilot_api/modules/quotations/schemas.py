@@ -22,7 +22,22 @@ ReviewTaskReason = Literal[
     "review_required",
     "no_supplier_match",
     "currency_unresolved",
+    "date_unparsed",
+    "merged_line_items",
+    "line_count_mismatch",
+    "total_unverified",
 ]
+
+STICKY_REVIEW_REASONS = frozenset(
+    {
+        "merged_line_items",
+        "line_count_mismatch",
+        "total_unverified",
+        "currency_unresolved",
+        "date_unparsed",
+        "read_failure",
+    }
+)
 
 
 class StrictApiModel(BaseModel):

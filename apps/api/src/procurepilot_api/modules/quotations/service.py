@@ -16,6 +16,7 @@ from procurepilot_api.modules.documents.schemas import Document
 from procurepilot_api.modules.documents.service import DOCUMENT_COLUMNS
 from procurepilot_api.modules.members.service import authenticated_client
 from procurepilot_api.modules.quotations.schemas import (
+    STICKY_REVIEW_REASONS,
     AuditTrailEntry,
     AuditTrailResponse,
     FieldExtraction,
@@ -950,6 +951,8 @@ def _sync_open_review_tasks(client: object, confidence_threshold: float) -> None
         .data
     )
     for task in open_tasks:
+        if task.get("reason") in STICKY_REVIEW_REASONS:
+            continue
         quotation_id = UUID(str(task["quotation_id"]))
         blocker = _current_review_task_blocker(client, quotation_id, confidence_threshold)
         if blocker is None:
@@ -1169,25 +1172,15 @@ def _enqueue_extraction(
     quote: dict[str, object],
     member: CurrentMember,
 ) -> None:
-    try:
-        from redis import Redis
-        from rq import Queue
-    except ImportError as exc:
-        raise ServiceUnavailableError(details={"dependency": "rq"}) from exc
-    try:
-        queue = Queue(settings.extraction_queue_name, connection=Redis.from_url(settings.redis_url))
-        queue.enqueue(
-            "procurepilot_extraction_worker.worker.process_extraction_job",
-            {
-                "job_id": str(job_row["id"]),
-                "tenant_id": str(member.tenant_id),
-                "quotation_id": str(quote["id"]),
-                "document_id": str(quote["document_id"]),
-            },
-            job_id=str(job_row["id"]),
-        )
-    except Exception as exc:
-        raise ServiceUnavailableError(details={"dependency": "redis"}) from exc
+    from procurepilot_api.modules.extraction.queue import enqueue_extraction_payload
+
+    enqueue_extraction_payload(
+        settings,
+        job_id=str(job_row["id"]),
+        tenant_id=str(member.tenant_id),
+        quotation_id=str(quote["id"]),
+        document_id=str(quote["document_id"]),
+    )
 
 
 def _mark_extraction_enqueue_failed(

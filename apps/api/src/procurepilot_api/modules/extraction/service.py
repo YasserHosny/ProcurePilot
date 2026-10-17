@@ -8,6 +8,7 @@ from postgrest.exceptions import APIError
 from procurepilot_api.config import Settings, get_settings
 from procurepilot_api.deps import CurrentMember
 from procurepilot_api.errors import ConflictError, ServiceUnavailableError
+from procurepilot_api.modules.extraction.queue import enqueue_extraction_payload
 from procurepilot_api.modules.jobs.router import JOB_COLUMNS
 from procurepilot_api.modules.jobs.schemas import Job
 from procurepilot_api.modules.members.service import authenticated_client
@@ -113,25 +114,13 @@ def _enqueue_redis_job(
     quote: dict[str, object],
     member: CurrentMember,
 ) -> None:
-    try:
-        from redis import Redis
-        from rq import Queue
-    except ImportError as exc:
-        raise ServiceUnavailableError(details={"dependency": "rq"}) from exc
-    try:
-        queue = Queue(settings.extraction_queue_name, connection=Redis.from_url(settings.redis_url))
-        queue.enqueue(
-            "procurepilot_extraction_worker.worker.process_extraction_job",
-            {
-                "job_id": str(job_row["id"]),
-                "tenant_id": str(member.tenant_id),
-                "quotation_id": str(quote["id"]),
-                "document_id": str(quote["document_id"]),
-            },
-            job_id=str(job_row["id"]),
-        )
-    except Exception as exc:
-        raise ServiceUnavailableError(details={"dependency": "redis"}) from exc
+    enqueue_extraction_payload(
+        settings,
+        job_id=str(job_row["id"]),
+        tenant_id=str(member.tenant_id),
+        quotation_id=str(quote["id"]),
+        document_id=str(quote["document_id"]),
+    )
 
 
 def _compensate_failed_enqueue(

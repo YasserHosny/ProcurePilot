@@ -108,6 +108,15 @@ def mock_supabase_client(monkeypatch: pytest.MonkeyPatch) -> None:
         "create_client",
         _fake_create_client
     )
+    # Never push a real RQ job: TEST_DATABASE_URL is the shared hosted DB, and any extraction
+    # worker listening on the configured Redis (e.g. the local docker stack, which also points at
+    # the hosted DB) would consume it, fail to download this fixture's fake document, and flip the
+    # quotation to 'refused' mid-test -- which the guardrail then correctly ignores.
+    monkeypatch.setattr(
+        procurepilot_api.modules.ingestion.orchestrator,
+        "_enqueue_extraction",
+        lambda *_args, **_kwargs: None,
+    )
 
 @pytest.mark.asyncio
 async def test_rfq_response_capture_matches_open_rfq() -> None:

@@ -743,7 +743,11 @@
         "read_failure": "Read Failure",
         "review_required": "Review Required",
         "no_supplier_match": "No Supplier Match",
-        "currency_unresolved": "Currency Not Found"
+        "currency_unresolved": "Currency Not Found",
+        "date_unparsed": "Date Not Recognised",
+        "merged_line_items": "Multiple items were merged into one line",
+        "line_count_mismatch": "Some quotation lines could not be extracted",
+        "total_unverified": "Quotation total could not be verified"
       },
       "columns": {
         "id": "Quotation ID",
@@ -836,6 +840,8 @@
         "currencyRequired": "Currency is required",
         "issueDateLabel": "Issue Date",
         "expiryDateLabel": "Expiry Date",
+        "dateEvidenceHint": "Text in document: {{value}}",
+        "pickDateToConfirm": "Choose a date to confirm this value.",
         "statedTotalLabel": "Stated Total Amount",
         "statedTotalCurrency": "Stated Total Currency",
         "statusLabel": "Status"

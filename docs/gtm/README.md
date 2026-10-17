@@ -11,6 +11,8 @@ Jira keys, and the handoff log.
 | [`first-customer-gtm-plan.md`](first-customer-gtm-plan.md) | The plan: ICP, fit and currency gaps (C1–C5, G1–G5), demo walkthrough, pilot prerequisites, sales-pipeline stages |
 | [`gtm-execution-plan.md`](gtm-execution-plan.md) | Execution tracker and cold-start handoff for any model: Jira setup, tasks, dependencies, handoff log |
 | [`one-pager/ProcurePilot-one-pager.pdf`](one-pager/ProcurePilot-one-pager.pdf) | Approved one-pager, 2 × A4 (Arabic, English) — PP-8 |
+| [`demo-tenant/`](demo-tenant/) | Demo tenants (PP-5 / G-1): plan, restaurant dataset «مطاعم سند» on hosted, findings from building it live, lookups review |
+| [`video/production-tracker.md`](video/production-tracker.md) | Demo video production tracker: what is left before recording (product flow, demo data, production), owners, status, user inputs |
 | [`video/`](video/) | Demo video spec and decisions (PP-6): style, storyboard with music map, beat-locked logo sting, end card, audio sources and licences, beat data, render scripts |
 | [`test-fixtures/egypt-quotes/`](test-fixtures/egypt-quotes/) | 5 synthetic Egyptian supplier quotes + `expected.json` for extraction testing (spec 022 US2, PP-3). Fictional suppliers, each marked TEST FIXTURE |
 

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import date, datetime
 from decimal import Decimal
@@ -190,23 +192,59 @@ def make_extracted_quotation(cur: psycopg.Cursor, workspace: Workspace) -> Quota
     return QuotationFixture(document_id, quotation_id, supplier_id, line_id, field_id, storage_path)
 
 
+@contextmanager
+def authenticated_scope(conn: psycopg.Connection, claims: str | None) -> Iterator[None]:
+    """Run the enclosed statements as `authenticated` with `claims`, scoped to one transaction.
+
+    Tests run through a Supabase transaction-mode pooler, where a session-level `set role` /
+    `set_config(..., false)` sticks to whichever server connection ran it and leaks into later,
+    unrelated tests that get handed the same backend. `set local` inside an explicit transaction
+    is the only form that cannot leak; on an autocommit connection this still commits each
+    operation on its own, as PostgREST would. `claims=None` leaves the connection untouched."""
+    if claims is None:
+        yield
+        return
+    with conn.transaction():
+        with conn.cursor() as cur:
+            cur.execute("set local role authenticated")
+            cur.execute("select set_config('request.jwt.claims', %s, true)", (claims,))
+        yield
+
+
 class PsycopgSupabaseClient:
-    def __init__(self, conn: psycopg.Connection, *, service_role: bool = False) -> None:
+    def __init__(
+        self,
+        conn: psycopg.Connection,
+        *,
+        service_role: bool = False,
+        claims: str | None = None,
+    ) -> None:
         self._conn = conn
         self._service_role = service_role
+        self._claims = claims
 
     def table(self, name: str) -> PsycopgTableQuery:
-        return PsycopgTableQuery(self._conn, name, service_role=self._service_role)
+        return PsycopgTableQuery(
+            self._conn, name, service_role=self._service_role, claims=self._claims
+        )
 
     def rpc(self, name: str, params: dict[str, object]) -> PsycopgRpcQuery:
-        return PsycopgRpcQuery(self._conn, name, params)
+        return PsycopgRpcQuery(self._conn, name, params, claims=self._claims)
 
 
 class PsycopgRpcQuery:
-    def __init__(self, conn: psycopg.Connection, function: str, params: dict[str, object]) -> None:
+    def __init__(
+        self,
+        conn: psycopg.Connection,
+        function: str,
+        params: dict[str, object],
+        *,
+        claims: str | None = None,
+    ) -> None:
         self._conn = conn
         self._function = function
         self._params = params
+        self._claims = claims
 
     def execute(self) -> _Response:
         unknown_params = set(self._params) - _RPC_PARAM_TYPES.keys()
@@ -224,7 +262,10 @@ class PsycopgRpcQuery:
             key: Jsonb(value) if isinstance(value, dict | list) else value
             for key, value in self._params.items()
         }
-        with self._conn.cursor(row_factory=psycopg.rows.dict_row) as cur:
+        with (
+            authenticated_scope(self._conn, self._claims),
+            self._conn.cursor(row_factory=psycopg.rows.dict_row) as cur,
+        ):
             cur.execute(query, adapted)
             rows = cur.fetchall()
         return _Response(
@@ -246,10 +287,18 @@ _RPC_PARAM_TYPES = {
 
 
 class PsycopgTableQuery:
-    def __init__(self, conn: psycopg.Connection, table: str, *, service_role: bool = False) -> None:
+    def __init__(
+        self,
+        conn: psycopg.Connection,
+        table: str,
+        *,
+        service_role: bool = False,
+        claims: str | None = None,
+    ) -> None:
         self._conn = conn
         self._table = table
         self._service_role = service_role
+        self._claims = claims
         self._operation = "select"
         self._payload: dict[str, object] | None = None
         self._where: list[tuple[str, str, object]] = []
@@ -414,7 +463,10 @@ class PsycopgTableQuery:
         return sql.SQL(" and ").join(clauses), params
 
     def _fetch(self, query: sql.SQL, params: list[object]) -> list[dict[str, object]]:
-        with self._conn.cursor(row_factory=psycopg.rows.dict_row) as cur:
+        with (
+            authenticated_scope(self._conn, self._claims),
+            self._conn.cursor(row_factory=psycopg.rows.dict_row) as cur,
+        ):
             cur.execute(query, params)
             rows = cur.fetchall()
         return [

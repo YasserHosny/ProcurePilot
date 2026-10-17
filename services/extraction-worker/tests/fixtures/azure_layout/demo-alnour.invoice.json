@@ -1,0 +1,43 @@
+{
+  "apiVersion": "2024-11-30",
+  "modelId": "prebuilt-invoice",
+  "content": "",
+  "pages": [],
+  "paragraphs": [],
+  "tables": [],
+  "documents": [
+    {
+      "docType": "invoice",
+      "fields": {
+        "VendorName": {
+          "content": "النور للمواد الغذائية",
+          "confidence": 0.98
+        },
+        "InvoiceTotal": {
+          "content": "56425.00 ج.م",
+          "confidence": 0.9
+        },
+        "Items": {
+          "valueArray": [
+            {
+              "valueObject": {
+                "Description": {
+                  "content": "زيت عباد الشمس\nأرز مصري\nسكر\nمكرونة\nعدس بجبة",
+                  "confidence": 0.94
+                },
+                "Quantity": {
+                  "content": "50",
+                  "confidence": 0.94
+                },
+                "UnitPrice": {
+                  "content": "1680",
+                  "confidence": 0.9
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

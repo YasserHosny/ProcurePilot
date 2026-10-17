@@ -83,6 +83,41 @@ curl -I https://<project>.<domain>/index.html
 **Known limit:** a worker hard-killed during its final attempt can leave no email-log row. The
 failed job can still be recovered with this command when its stored raw email path is available.
 
+### 3.7 Refused quotations after an extraction failure
+
+A quotation is `refused` only when the document is unreadable or the extraction process itself
+failed. An unreadable date no longer refuses a quotation; it goes to the review queue as
+`date_unparsed` instead.
+
+Line-structure problems also go to review rather than refusal: `merged_line_items` (one
+extracted line holds several items), `line_count_mismatch` (the quote's table has more item rows
+than lines produced), and `total_unverified` (a PDF/image quote with no stated total or no
+computable line totals; CSV/XLSX uploads are exempt). A reviewer's save clears all three.
+
+> **Deploy ordering:** these three values are added to the `review_task_reason` enum by
+> `supabase/migrations/20261017000001_review_reason_line_structure.sql`. Apply that migration to
+> the hosted database **before** deploying the extraction worker. Deploys do not run migrations,
+> and a worker that writes an unknown enum value fails the job and refuses the quotation.
+
+1. Fix the underlying cause (provider outage, worker bug, configuration) before retrying.
+2. From an environment with the API's `DATABASE_URL` and `REDIS_URL`, such as the API or worker
+   container, preview and then requeue:
+
+   ```bash
+   python -m procurepilot_api.workers.requeue_extraction --quotation-id <uuid> --dry-run
+   python -m procurepilot_api.workers.requeue_extraction --quotation-id <uuid>
+   ```
+
+   `--quotation-id` can be repeated. For every eligible refused quotation in one tenant, use
+   `--all-refused --tenant-id <uuid>` (with `--dry-run` to preview). A quotation is eligible only
+   when it is `refused`, has a source document, and its latest extraction job is `failed` with
+   error code `extraction_failed`; anything else is skipped. Each requeued quotation moves to
+   `extracting` with a new queued extraction job and records a `quotation_extraction_requeued`
+   audit event. If the Redis enqueue fails, the new job is marked failed
+   (`redis_enqueue_failed`) and the quotation returns to `refused`. The command exits non-zero if
+   any quotation was skipped.
+3. Confirm the quotation reaches the review queue.
+
 ## 4. Scaling Actions
 
 - **Database CPU > 70% sustained:** enable Supabase read replicas or review query plans.
