@@ -477,8 +477,10 @@ describe('RequestFormComponent — edit mode (T017)', () => {
     const exceedingRequest: PurchaseRequest = {
       ...mockRequest,
       budget_status: {
+        status: 'over',
         remaining_amount: { amount: '75.0000', currency: 'GBP' },
         exceeds: true,
+        reason_code: 'budget_exceeded',
       },
     };
     requestsApi.getRequest.and.returnValue(of(exceedingRequest));
@@ -504,8 +506,10 @@ describe('RequestFormComponent — edit mode (T017)', () => {
     const withinBudgetRequest: PurchaseRequest = {
       ...mockRequest,
       budget_status: {
+        status: 'within',
         remaining_amount: { amount: '500.0000', currency: 'GBP' },
         exceeds: false,
+        reason_code: null,
       },
     };
     requestsApi.getRequest.and.returnValue(of(withinBudgetRequest));
@@ -524,6 +528,25 @@ describe('RequestFormComponent — edit mode (T017)', () => {
     const submitBtn = compiled.querySelector<HTMLButtonElement>('.submit-request-btn');
     expect(submitBtn).toBeTruthy();
     expect(submitBtn?.disabled).toBeFalse();
+  });
+
+  it('does not render a budget row or warning when there is no budget', () => {
+    requestsApi.getRequest.and.returnValue(of({
+      ...mockRequest,
+      budget_status: {
+        status: 'no_budget',
+        remaining_amount: null,
+        exceeds: false,
+        reason_code: 'no_budget',
+      },
+    } as PurchaseRequest));
+
+    const hostFixture = TestBed.createComponent(RequestFormComponent);
+    hostFixture.detectChanges();
+
+    const compiled = hostFixture.nativeElement as HTMLElement;
+    expect(compiled.querySelector('.budget-warning-banner')).toBeNull();
+    expect(compiled.querySelector('.budget-status-row')).toBeNull();
   });
 
   it('should not render an approval section when the request has no approval_step', () => {

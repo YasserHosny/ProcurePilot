@@ -165,7 +165,7 @@
                   </span>
                 </div>
               </div>
-            } @else {
+            } @else if (budget.remaining_amount) {
               <div class="budget-status-row">
                 <span class="budget-status-label">{{ 'requests.budgetStatus.remainingLabel' | translate }}</span>
                 <span class="budget-status-value">

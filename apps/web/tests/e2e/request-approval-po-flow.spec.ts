@@ -90,6 +90,7 @@ test.describe('Request → Approval → PO Flow & Matching Next (PP7 W2)', () =>
         address: '10 Flow Street',
         region: 'GB',
       },
+      { 'Idempotency-Key': crypto.randomUUID() },
     );
     branchId = branch.id;
 
@@ -103,6 +104,7 @@ test.describe('Request → Approval → PO Flow & Matching Next (PP7 W2)', () =>
         code: `CC-${Date.now().toString().slice(-4)}`,
         branch_id: branchId,
       },
+      { 'Idempotency-Key': crypto.randomUUID() },
     );
     costCentreId = costCentre.id;
 
@@ -133,7 +135,7 @@ test.describe('Request → Approval → PO Flow & Matching Next (PP7 W2)', () =>
       cost_centre_id: null,
       required_by_date: requiredByDate,
       lines: [{ workspace_product_id: productId, quantity: '4' }],
-    });
+    }, { 'Idempotency-Key': crypto.randomUUID() });
 
     await signInUi(page, workspace.ownerEmail, workspace.ownerPassword);
     await ensureEnglish(page);
@@ -210,7 +212,9 @@ test.describe('Request → Approval → PO Flow & Matching Next (PP7 W2)', () =>
       lines: [{ workspace_product_id: productId, quantity: '6' }],
       recipient_supplier_ids: [supplierId],
     }, { 'Idempotency-Key': crypto.randomUUID() });
-    await apiAsUser(ownerToken, 'POST', `/rfq/${rfq.rfq.id}/send`, {});
+    await apiAsUser(ownerToken, 'POST', `/rfq/${rfq.rfq.id}/send`, {}, {
+      'Idempotency-Key': crypto.randomUUID(),
+    });
 
     const quotation = await apiAsUser<{ id: string; lines: Array<{ id: string }> }>(
       ownerToken,
@@ -229,6 +233,7 @@ test.describe('Request → Approval → PO Flow & Matching Next (PP7 W2)', () =>
           },
         ],
       },
+      { 'Idempotency-Key': crypto.randomUUID() },
     ).catch(() => null);
 
     expect(quotation, 'manual quotation seed must succeed').toBeTruthy();
@@ -256,10 +261,12 @@ test.describe('Request → Approval → PO Flow & Matching Next (PP7 W2)', () =>
       ownerToken, 'GET', `/requests/${prepared.purchase_request_id}`,
     );
     if (request.status === 'draft') {
-      await apiAsUser(ownerToken, 'POST', `/requests/${request.id}/submit`);
+      await apiAsUser(ownerToken, 'POST', `/requests/${request.id}/submit`, {}, {
+        'Idempotency-Key': crypto.randomUUID(),
+      });
       await apiAsUser(ownerToken, 'POST', `/requests/${request.id}/approve`, {
         comment: 'Approved in RFQ PO E2E flow',
-      });
+      }, { 'Idempotency-Key': crypto.randomUUID() });
     }
 
     await page.goto(`/orders/new?source_request_id=${request.id}`);
@@ -295,12 +302,19 @@ test.describe('Request → Approval → PO Flow & Matching Next (PP7 W2)', () =>
       .first();
     await expect(firstLine).toBeVisible({ timeout: 30_000 });
     await firstLine.locator('.action-btn').click();
-    await page.waitForURL(/\/matching\/[0-9a-f-]+$/);
+    await page.waitForURL(/\/matching\/([0-9a-f-]+)(?:\?.*)?$/);
 
     const resolveNextBtn = page.locator('button.confirm-resolution-btn', {
       hasText: 'Resolve and Next',
     });
     await expect(resolveNextBtn).toBeVisible();
+    const nextTaskResponse = page.waitForResponse((response) =>
+      response.url().includes('/match-tasks/next') && response.request().method() === 'GET',
+    );
+    await resolveNextBtn.click();
+    const expectedNextLineId = (await (await nextTaskResponse).json()).next_quotation_line_id as string;
+    await page.waitForURL(/\/matching\/([0-9a-f-]+)(?:\?.*)?$/);
+    expect(new URL(page.url()).pathname.split('/').at(-1)).toBe(expectedNextLineId);
   });
 
   // --- Arabic (RTL) test placed last ---

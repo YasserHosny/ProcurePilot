@@ -40,6 +40,7 @@ test.describe('Request budget status', () => {
         address: '9 Ledger Lane',
         region: 'GB',
       },
+      { 'Idempotency-Key': crypto.randomUUID() },
     );
     branchId = branch.id;
   });
@@ -67,7 +68,12 @@ test.describe('Request budget status', () => {
   ): Promise<{
     requestId: string;
     buyer: CreatedMember;
-    budgetStatus: { exceeds: boolean; remaining_amount: { amount: string; currency: string } } | null;
+    budgetStatus: {
+      status: 'within' | 'near' | 'over' | 'no_budget';
+      exceeds: boolean;
+      remaining_amount: { amount: string; currency: string } | null;
+      reason_code: string | null;
+    };
   }> {
     const buyer = await createMember('buyer', ownerToken);
     const buyerToken = await signIn(buyer.email, buyer.password);
@@ -76,15 +82,17 @@ test.describe('Request budget status', () => {
       branch_id: branchId,
       required_by_date: requiredByDate,
       lines: [{ workspace_product_id: productId, quantity }],
-    });
+    }, { 'Idempotency-Key': crypto.randomUUID() });
 
     const submitted = await apiAsUser<{
       id: string;
       budget_status: {
+        status: 'within' | 'near' | 'over' | 'no_budget';
         exceeds: boolean;
-        remaining_amount: { amount: string; currency: string };
-      } | null;
-    }>(buyerToken, 'POST', `/requests/${draft.id}/submit`);
+        remaining_amount: { amount: string; currency: string } | null;
+        reason_code: string | null;
+      };
+    }>(buyerToken, 'POST', `/requests/${draft.id}/submit`, {}, { 'Idempotency-Key': crypto.randomUUID() });
 
     return {
       requestId: submitted.id,
@@ -103,7 +111,7 @@ test.describe('Request budget status', () => {
       period: 'monthly',
       period_start: periodStart,
       scope: 'organisation',
-    });
+    }, { 'Idempotency-Key': crypto.randomUUID() });
 
     const product = await seedProduct('500.00');
     const { requestId, buyer, budgetStatus } = await submitRequestAsBuyer(
@@ -138,7 +146,7 @@ test.describe('Request budget status', () => {
       period: 'monthly',
       period_start: periodStart,
       scope: 'organisation',
-    });
+    }, { 'Idempotency-Key': crypto.randomUUID() });
 
     const product = await seedProduct('100.00');
     const { requestId, buyer, budgetStatus } = await submitRequestAsBuyer(
@@ -147,14 +155,18 @@ test.describe('Request budget status', () => {
       requiredBy,
     );
 
-    expect(budgetStatus).toBeNull();
+    expect(budgetStatus.status).toBe('within');
+    expect(budgetStatus.exceeds).toBe(false);
+    expect(Number(budgetStatus.remaining_amount?.amount)).toBe(2000);
+    expect(budgetStatus.remaining_amount?.currency).toBe('GBP');
 
     await signInUi(page, buyer.email, buyer.password);
     await page.goto(`/requests/${requestId}`);
 
-    // Within budget the backend returns no budget_status, so the UI renders no banner/row.
+    // Within budget the UI shows the remaining amount without a warning.
     await expect(page.locator('.budget-warning-banner')).toHaveCount(0);
-    await expect(page.locator('.budget-status-row')).toHaveCount(0);
+    await expect(page.locator('.budget-status-row')).toHaveCount(1);
+    await expect(page.locator('.budget-status-row')).toContainText('GBP 2,000');
     await expect(page.locator('.total-value')).toContainText('GBP 500');
   });
 
@@ -168,7 +180,7 @@ test.describe('Request budget status', () => {
       period: 'monthly',
       period_start: periodStart,
       scope: 'organisation',
-    });
+    }, { 'Idempotency-Key': crypto.randomUUID() });
 
     const product = await seedProduct('500.00');
     const { budgetStatus } = await submitRequestAsBuyer(product.id, '3', requiredBy);
