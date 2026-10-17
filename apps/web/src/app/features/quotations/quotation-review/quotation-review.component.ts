@@ -1289,7 +1289,6 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
       const apiError = err.error as ApiError | undefined;
       this.errorTraceId.set(apiError?.trace_id ?? null);
       if (err.status === 409) {
-        const reason = String(apiError?.details?.['reason'] ?? 'unknown');
         this.errorMessage.set(this.translate.instant(this.conflictKey(apiError?.details?.['reason'], 'conflict')));
         return;
       }

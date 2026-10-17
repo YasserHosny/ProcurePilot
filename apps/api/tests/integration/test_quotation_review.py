@@ -197,21 +197,41 @@ def test_suggested_currency_does_not_block_confirmation(
         )
 
 
-def test_unconfirmed_supplier_name_blocks_confirmation(conn: object, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_unconfirmed_supplier_name_blocks_confirmation(
+    conn: object, monkeypatch: pytest.MonkeyPatch
+) -> None:
     with conn.cursor() as cur:
         workspace = make_workspace(cur, "supplier-required")
         fixture = make_extracted_quotation(cur, workspace)
         cur.execute("update quotation set supplier_id=null where id=%s", (fixture.quotation_id,))
-        make_field(cur, workspace, fixture.quotation_id, field_name="supplier_name",
-                   extracted_value="Possible Supplier", confidence=Decimal("0.6700"))
+        make_field(
+            cur,
+            workspace,
+            fixture.quotation_id,
+            field_name="supplier_name",
+            extracted_value="Possible Supplier",
+            confidence=Decimal("0.6700"),
+        )
         act_as(cur, workspace)
-        monkeypatch.setattr(confirmation_service_module, "authenticated_client",
-                            lambda _settings, _token: PsycopgSupabaseClient(conn))
-        member = CurrentMember(membership_id=workspace.membership_id, tenant_id=workspace.tenant_id,
-                               user_id=workspace.user_id, email="buyer@example.test", role=MemberRole.buyer)
+        monkeypatch.setattr(
+            confirmation_service_module,
+            "authenticated_client",
+            lambda _settings, _token: PsycopgSupabaseClient(conn),
+        )
+        member = CurrentMember(
+            membership_id=workspace.membership_id,
+            tenant_id=workspace.tenant_id,
+            user_id=workspace.user_id,
+            email="buyer@example.test",
+            role=MemberRole.buyer,
+        )
         with pytest.raises(ConflictError) as exc_info:
-            QuotationConfirmationService().confirm(bearer_token="test-token", member=member,
-                                                   quotation_id=fixture.quotation_id, payload=None)
+            QuotationConfirmationService().confirm(
+                bearer_token="test-token",
+                member=member,
+                quotation_id=fixture.quotation_id,
+                payload=None,
+            )
         assert exc_info.value.details["reason"] == "supplier_not_confirmed"
 
 
@@ -222,41 +242,88 @@ def test_selected_supplier_filters_supplier_name_from_line_price_blockers(
         workspace = make_workspace(cur, "line-price-blocker")
         fixture = make_extracted_quotation(cur, workspace)
         line_id = fixture.line_id
-        price_field_id = make_field(cur, workspace, fixture.quotation_id, entity_type="quotation_line",
-                                    entity_id=line_id, field_name="unit_price", extracted_value={"amount": "12"},
-                                    confidence=Decimal("0.6000"))
-        make_field(cur, workspace, fixture.quotation_id, field_name="supplier_name",
-                   extracted_value="Possible Supplier", confidence=Decimal("0.6700"))
+        price_field_id = make_field(
+            cur,
+            workspace,
+            fixture.quotation_id,
+            entity_type="quotation_line",
+            entity_id=line_id,
+            field_name="unit_price",
+            extracted_value={"amount": "12"},
+            confidence=Decimal("0.6000"),
+        )
+        make_field(
+            cur,
+            workspace,
+            fixture.quotation_id,
+            field_name="supplier_name",
+            extracted_value="Possible Supplier",
+            confidence=Decimal("0.6700"),
+        )
         act_as(cur, workspace)
-        monkeypatch.setattr(confirmation_service_module, "authenticated_client",
-                            lambda _settings, _token: PsycopgSupabaseClient(conn))
-        member = CurrentMember(membership_id=workspace.membership_id, tenant_id=workspace.tenant_id,
-                               user_id=workspace.user_id, email="buyer@example.test", role=MemberRole.buyer)
+        monkeypatch.setattr(
+            confirmation_service_module,
+            "authenticated_client",
+            lambda _settings, _token: PsycopgSupabaseClient(conn),
+        )
+        member = CurrentMember(
+            membership_id=workspace.membership_id,
+            tenant_id=workspace.tenant_id,
+            user_id=workspace.user_id,
+            email="buyer@example.test",
+            role=MemberRole.buyer,
+        )
         with pytest.raises(ConflictError) as exc_info:
-            QuotationConfirmationService().confirm(bearer_token="test-token", member=member,
-                                                   quotation_id=fixture.quotation_id, payload=None)
+            QuotationConfirmationService().confirm(
+                bearer_token="test-token",
+                member=member,
+                quotation_id=fixture.quotation_id,
+                payload=None,
+            )
         assert exc_info.value.details["reason"] == "low_confidence_unresolved"
-        assert exc_info.value.details["fields"] == [{"id": price_field_id, "entity_type": "quotation_line",
-                                                       "entity_id": line_id, "field_name": "unit_price"}]
+        assert exc_info.value.details["fields"] == [
+            {
+                "id": price_field_id,
+                "entity_type": "quotation_line",
+                "entity_id": line_id,
+                "field_name": "unit_price",
+            }
+        ]
 
 
-def test_missing_currency_blocks_confirmation(conn: object, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_missing_currency_blocks_confirmation(
+    conn: object, monkeypatch: pytest.MonkeyPatch
+) -> None:
     with conn.cursor() as cur:
         workspace = make_workspace(cur, "currency-required")
         fixture = make_extracted_quotation(cur, workspace)
         cur.execute("update quotation set currency=null where id=%s", (fixture.quotation_id,))
         act_as(cur, workspace)
-        monkeypatch.setattr(confirmation_service_module, "authenticated_client",
-                            lambda _settings, _token: PsycopgSupabaseClient(conn))
-        member = CurrentMember(membership_id=workspace.membership_id, tenant_id=workspace.tenant_id,
-                               user_id=workspace.user_id, email="buyer@example.test", role=MemberRole.buyer)
+        monkeypatch.setattr(
+            confirmation_service_module,
+            "authenticated_client",
+            lambda _settings, _token: PsycopgSupabaseClient(conn),
+        )
+        member = CurrentMember(
+            membership_id=workspace.membership_id,
+            tenant_id=workspace.tenant_id,
+            user_id=workspace.user_id,
+            email="buyer@example.test",
+            role=MemberRole.buyer,
+        )
         with pytest.raises(ConflictError) as exc_info:
-            QuotationConfirmationService().confirm(bearer_token="test-token", member=member,
-                                                   quotation_id=fixture.quotation_id, payload=None)
+            QuotationConfirmationService().confirm(
+                bearer_token="test-token",
+                member=member,
+                quotation_id=fixture.quotation_id,
+                payload=None,
+            )
         assert exc_info.value.details["reason"] == "currency_unresolved"
 
 
-def test_supplier_patch_resolves_low_confidence_review_task(conn: object, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_supplier_patch_resolves_low_confidence_review_task(
+    conn: object, monkeypatch: pytest.MonkeyPatch
+) -> None:
     class AuditWriter:
         def record(self, event: AuditEventCreate, bearer_token: str | None = None) -> None:
             del event, bearer_token
@@ -266,19 +333,38 @@ def test_supplier_patch_resolves_low_confidence_review_task(conn: object, monkey
         fixture = make_extracted_quotation(cur, workspace)
         supplier_id = make_supplier(cur, workspace)
         cur.execute("update quotation set supplier_id=null where id=%s", (fixture.quotation_id,))
-        make_field(cur, workspace, fixture.quotation_id, field_name="supplier_name",
-                   extracted_value="Possible Supplier", confidence=Decimal("0.6700"))
+        make_field(
+            cur,
+            workspace,
+            fixture.quotation_id,
+            field_name="supplier_name",
+            extracted_value="Possible Supplier",
+            confidence=Decimal("0.6700"),
+        )
         make_review_task(cur, workspace, fixture.quotation_id, reason="low_confidence")
         act_as(cur, workspace)
-        monkeypatch.setattr(review_service_module, "authenticated_client",
-                            lambda _settings, _token: PsycopgSupabaseClient(conn))
-        monkeypatch.setattr(quotation_service_module, "authenticated_client",
-                            lambda _settings, _token: PsycopgSupabaseClient(conn))
+        monkeypatch.setattr(
+            review_service_module,
+            "authenticated_client",
+            lambda _settings, _token: PsycopgSupabaseClient(conn),
+        )
+        monkeypatch.setattr(
+            quotation_service_module,
+            "authenticated_client",
+            lambda _settings, _token: PsycopgSupabaseClient(conn),
+        )
         monkeypatch.setattr(review_service_module, "get_audit_writer", lambda: AuditWriter())
-        member = CurrentMember(membership_id=workspace.membership_id, tenant_id=workspace.tenant_id,
-                               user_id=workspace.user_id, email="buyer@example.test", role=MemberRole.buyer)
+        member = CurrentMember(
+            membership_id=workspace.membership_id,
+            tenant_id=workspace.tenant_id,
+            user_id=workspace.user_id,
+            email="buyer@example.test",
+            role=MemberRole.buyer,
+        )
         QuotationReviewService().apply_review_patch(
-            bearer_token="test-token", member=member, quotation_id=fixture.quotation_id,
+            bearer_token="test-token",
+            member=member,
+            quotation_id=fixture.quotation_id,
             patch=QuotationReviewPatch(supplier_id=supplier_id),
         )
         cur.execute("select status from review_task where quotation_id=%s", (fixture.quotation_id,))

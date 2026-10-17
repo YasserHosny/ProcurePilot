@@ -319,10 +319,7 @@ class QuotationService:
             )
             if not response.data:
                 quote = _quotation_row(client, quotation_id)
-                if (
-                    idempotency_key is not None
-                    and _archive_key_matches(quote, idempotency_key)
-                ):
+                if idempotency_key is not None and _archive_key_matches(quote, idempotency_key):
                     if not _archive_key_was_recorded(client, quotation_id, idempotency_key):
                         self._record(
                             bearer_token=bearer_token,
@@ -348,9 +345,7 @@ class QuotationService:
             target={
                 "quotation_id": str(quotation_id),
                 **(
-                    {"idempotency_key": str(idempotency_key)}
-                    if idempotency_key is not None
-                    else {}
+                    {"idempotency_key": str(idempotency_key)} if idempotency_key is not None else {}
                 ),
             },
         )

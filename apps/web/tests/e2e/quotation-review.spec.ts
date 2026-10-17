@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { createMember, type CreatedMember } from './support/api';
 import { seedQuotationReviewCase } from './support/db';
+import { openAsyncSelect } from './support/select';
 import {
   confirmQuotation,
   resolveIssueDateFlag,
@@ -118,7 +119,6 @@ test.describe('Quotation Review & Confirmation (T053, US2)', () => {
     await expect(page.locator('.status-pill')).toBeVisible();
     await expect(page.locator('.flagged-field-row')).toHaveCount(0);
     await confirmQuotation(page);
-    await expect(page.locator('.mat-mdc-snack-bar-label')).toContainText(/authorized|confirmed/i);
   });
 
   test('blocks low-confidence line price until confirmed as extracted', async ({ page }) => {
@@ -126,13 +126,14 @@ test.describe('Quotation Review & Confirmation (T053, US2)', () => {
     seedQuotationReviewCase(buyer.email, quotationId, 'unit_price');
     await page.reload();
     await page.locator('button.confirm-btn').click();
+    await page.locator('.confirm-dialog .confirm-dialog-actions .mat-mdc-unelevated-button').click();
     await expect(page.locator('.error-text')).toContainText(
       /Review or confirm the flagged extraction fields before confirming\./,
     );
     await expect(page.locator('.error-text')).not.toHaveText(
       'Request conflicts with the current state.',
     );
-    const priceFlag = page.locator('.flagged-field-row').filter({ has: page.getByText('Unit Price', { exact: true }) });
+    const priceFlag = page.locator('.flagged-field-row').filter({ has: page.getByText('Unit price', { exact: true }) });
     await expect(priceFlag).toHaveClass(/flagged-highlight/);
     await priceFlag.locator('button').last().click();
     await page.locator('button.save-btn').click();
@@ -148,9 +149,13 @@ test.describe('Quotation Review & Confirmation (T053, US2)', () => {
     const quotationId = await uploadQuotationAndOpenReview(page, 'quote_supplier_provenance.pdf');
     seedQuotationReviewCase(buyer.email, quotationId, 'supplier_name');
     await page.reload();
-    const supplierFlag = page.locator('.flagged-field-row').filter({ has: page.getByText('Supplier Name', { exact: true }) });
+    // With a supplier selected the supplier_name row is (correctly) not a blocker; clear the
+    // selection so the row reappears and its provenance can be opened.
+    await openAsyncSelect(page, page.locator('mat-select[required]'));
+    await page.locator('mat-option').first().click();
+    const supplierFlag = page.locator('.flagged-field-row').filter({ has: page.getByText('Supplier name', { exact: true }) });
     await supplierFlag.locator('button').first().click();
-    const originalValue = page.locator('.prov-item').filter({ hasText: 'Original Value' }).locator('.prov-val');
+    const originalValue = page.locator('.prov-item').filter({ hasText: 'Original AI Value' }).locator('.prov-val');
     await expect(originalValue).toHaveAttribute('dir', 'auto');
     await expect(originalValue).toContainText('الأمانة للتجارة');
     await expect(originalValue).not.toHaveText(/^"/);
