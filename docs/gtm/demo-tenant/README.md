@@ -1,12 +1,12 @@
 # Demo tenants — plan and dataset (PP-5 / G-1)
 
-Status 2026-10-16: **restaurant tenant set up on hosted** — workspace «مطاعم سند» (EGP, Egypt VAT),
+Status 2026-10-17: **restaurant tenant set up on hosted** — workspace «مطاعم سند» (EGP, Egypt VAT),
 3 branches, 6 cost centres (kitchen + packaging/cleaning per branch), 3 monthly branch budgets
 (450k / 380k / 320k EGP), 5 suppliers (EGP terms, plus-address emails), 30 products with preferred
-suppliers, owner (`pp-owner`) and Buyer (`pp-buyer`) accounts, inbound email address. Round 1 RFQ sent;
-both supplier quotes ingested and matched to the right suppliers. **Current blocker: finding 14**
-(DD/MM quote dates refuse the quotations at extraction) — fix in progress; then re-extract the two
-round-1 quotations and continue compare → approve → PO.
+suppliers, owner (`pp-owner`) and Buyer (`pp-buyer`) accounts, inbound email address. Round 1: both
+supplier quotes extracted, authorized and matched; compare, request and approval ran live. **Current
+blocker: finding 18** (pack vs base unit — understated request estimate and wrong PO units); the PO
+step waits for it. Basket split also waits for finding 17 (optimiser not deployed).
 
 ### Findings from the build (real product bugs)
 
@@ -31,8 +31,22 @@ Lookups review (regions, currencies, tax models): [`lookups-review-2026-10-15.md
 | 10 | Supplier RFQ email: buyer never named, buyer's terms dropped, English-only for an Arabic tenant, quantities `50.000000` with no unit | suppliers don't know who is asking | fixed — #89 merged 2026-10-16 (migration applied to hosted); also fixed raw i18n keys in hosted digests/exports |
 | 11 | Arabic business name → tenant slug `workspace` → inbound address `workspace@mail…` | meaningless address; next Arabic sign-up may collide | fixed for new sign-ups — #89 (demo tenant keeps `workspace@`) |
 | 12 | **Arabic attachment filename → Supabase Storage `InvalidKey` → email_ingest job fails 3× → email silently lost** (no inbound-log row, no review item) | **every Arabic-named supplier PDF is lost without trace** | fixed — #90 merged + deployed (migration applied); 2 demo emails requeued → ingested, stored with Arabic names, matched to the right suppliers |
-| 14 | **Extraction passes the raw quote date `16/10/2026` (DD/MM/YYYY) to Postgres → `date/time field value out of range` → whole quotation `refused`**; days ≤ 12 would be silently month/day-swapped | **every Egyptian/GCC quote refused or mis-dated** | fix task raised; 2 demo quotations to re-extract after fix |
+| 14 | **Extraction passes the raw quote date `16/10/2026` (DD/MM/YYYY) to Postgres → `date/time field value out of range` → whole quotation `refused`**; days ≤ 12 would be silently month/day-swapped | **every Egyptian/GCC quote refused or mis-dated** | fixed — #96; both demo quotations re-extracted |
 | 13 | Ingestion dashboard "Catalogue Imports: 0" after a committed import | wrong counter | fixed in PP-6 PR (counter now includes committed product imports from `import_job`) |
+
+
+**Round 1, steps 2–4 (2026-10-17) — authorize, match, compare, request, approval, PO (first live run of everything after extraction):**
+
+| # | Finding | Impact | Status |
+|---|---|---|---|
+| 15 | Arabic RTL quote tables collapsed into one line; one quote auto-accepted with a wrong 84,000 EGP line | silent wrong prices | fixed — #100 |
+| 16 | A low-confidence supplier name on an already-linked quote could never be confirmed (dead end, generic 409) | quote cannot be authorized | fixed — #104; authorized live |
+| 17 | **Basket-split optimiser worker has no Dockerfile or deploy workflow; jobs stay `queued` forever, UI spins on "Checking job status…"** | headline feature does not work on hosted | fix task raised; needs a bunny.net container (owner) |
+| 18 | **Pack vs base unit: request estimate re-computed on Submit as per-base-unit prices × pack quantities (56,425 → 6,135.58) using the wrong supplier's prices; PO pre-fill says "10 litre" for 10 tins; Smart Compare asks in litres** | **understated totals feed approval thresholds and budgets; wrong PO units** | fix task raised (critical) |
+| 19 | Request flow: Submit drops unsaved edits (cost centre); "Prepare Request" gives no feedback and ignores the RFQ date; approval queue shows a raw requester UUID; branch budgets show "Not available"; approved request has no "Create PO" button (hidden `?source_request_id=` URL); PO needs manual order number + supplier; raw `EGP 56425.0000` formatting; "Resolve and Next" doesn't advance | friction + silent data loss | fix task raised |
+| 20 | Hosted uses the stub embedding: exact-name matches score 55% (all 10 lines needed manual confirm); human-confirmed matches still show 55% / "Medium Confidence" / "match score below 85%"; "Winning margin: 2%%" | trust signals wrong | fix task raised |
+
+Round 1 got as far as: both quotes authorized, 10 matches confirmed (aliases saved), Smart Compare per product (النور 16,800 vs الأمانة 17,250 for 10 tins of oil), a draft request prepared for Maadi, submitted and **approved**. Stopped before creating the PO (it would record wrong units/amounts). The submitted+approved request `6f460785-…` (wrong estimate 6,135.58) is demo test data and is to be withdrawn and re-prepared after fix 18.
 
 Workaround used for round 1 only: the RFQ date was corrected in the browser before sending (finding 7); the recorded demo cycle waits for the real fix.
 
@@ -180,5 +194,5 @@ Leave the suppliers' `email_domains` empty (all are `gmail.com`).
 
 The workspace and both accounts already exist — do **not** create another tenant. Remaining work,
 with owners and status, is tracked in [`../video/production-tracker.md`](../video/production-tracker.md):
-finish finding 14 and re-extract round 1; run compare → basket split → guardrail → phone approval → PO →
-savings report live; switch the tenant to Arabic and walk the flow RTL; rounds 2 and 3; then the recorded round.
+fix findings 17–20, then withdraw and re-prepare the round-1 request and run basket split → guardrail →
+phone approval → PO → savings report live; switch the tenant to Arabic and walk the flow RTL; rounds 2 and 3; then the recorded round.
