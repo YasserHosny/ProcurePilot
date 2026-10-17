@@ -218,6 +218,23 @@ describe('QuotationReviewComponent (T051, T057, T062)', () => {
     expect(component.computedLinesTotal()?.currency).toBe('EGP');
   });
 
+  it('uses a staged currency for totals and newly added priced lines when the quote has no currency', () => {
+    component.quotation.set({
+      ...mockQuotationDetail,
+      currency: null,
+      stated_total: null,
+      lines: [],
+    } as unknown as QuotationDetail);
+    component.currencySelectionChanged('EUR');
+    component.newLineText.set('New item');
+    component.newLinePriceAmount.set('12.50');
+
+    component.addNewLine();
+
+    expect(component.pendingNewLines()[0].unit_price_currency).toBe('EUR');
+    expect(component.computedLinesTotal()?.currency).toBe('EUR');
+  });
+
   it('uses the home currency when adding a priced line to a quote without currency', () => {
     component.quotation.set({ ...mockQuotationDetail, currency: null, lines: [] } as unknown as QuotationDetail);
     component.newLineText.set('New item');

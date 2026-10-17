@@ -502,3 +502,52 @@ def test_reviewer_patch_resolves_structural_task_and_list_resolves_stale_dynamic
         make_review_task(cur, workspace, stale.quotation_id, reason="low_confidence")
         tasks = QuotationService().list_review_tasks(bearer_token="test-token").items
         assert all(task.quotation_id != stale.quotation_id for task in tasks)
+
+
+@pytest.mark.parametrize(
+    ("field_name", "entity_type", "is_blocking"),
+    [
+        ("supplier_name", "quotation", False),
+        ("suggested_currency", "quotation", False),
+        ("unit_price", "quotation_line", True),
+    ],
+)
+def test_review_queue_sync_uses_confirmation_blockers_for_low_confidence_fields(
+    conn: object,
+    monkeypatch: pytest.MonkeyPatch,
+    field_name: str,
+    entity_type: str,
+    is_blocking: bool,
+) -> None:
+    with conn.cursor() as cur:
+        workspace = make_workspace(cur, f"qlc-{field_name.replace('_', '-')}")
+        quotation = make_extracted_quotation(cur, workspace)
+        extraction_entity_id = (
+            quotation.line_id if entity_type == "quotation_line" else quotation.quotation_id
+        )
+        make_field(
+            cur,
+            workspace,
+            quotation.quotation_id,
+            entity_id=extraction_entity_id,
+            entity_type=entity_type,
+            field_name=field_name,
+            confidence=Decimal("0.5000"),
+        )
+        task_id = make_review_task(cur, workspace, quotation.quotation_id, reason="low_confidence")
+        act_as(cur, workspace)
+        monkeypatch.setattr(
+            quotation_service_module,
+            "authenticated_client",
+            lambda _settings, _token: PsycopgSupabaseClient(conn),
+        )
+
+        tasks = QuotationService().list_review_tasks(bearer_token="test-token").items
+        matching = [task for task in tasks if task.quotation_id == quotation.quotation_id]
+        assert bool(matching) is is_blocking
+        if is_blocking:
+            assert matching[0].reason == "low_confidence"
+            assert matching[0].status == "open"
+        else:
+            cur.execute("select status from review_task where id=%s", (task_id,))
+            assert cur.fetchone() == ("resolved",)

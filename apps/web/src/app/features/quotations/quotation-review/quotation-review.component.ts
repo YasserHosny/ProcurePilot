@@ -153,6 +153,11 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
 
   readonly selectedSupplierId = signal<string | null>(null);
   readonly pendingQuotationCurrency = signal<string | undefined>(undefined);
+  readonly effectiveQuotationCurrency = computed(() => {
+    const q = this.quotation();
+    return this.pendingQuotationCurrency() ?? q?.currency ?? q?.lines[0]?.unit_price?.currency ??
+      this.pendingNewLines()[0]?.unit_price_currency ?? this.session.homeCurrency() ?? 'USD';
+  });
   readonly reviewerNotes = signal<string>('');
   readonly isRequote = signal<boolean>(false);
   readonly selectedPreviousQuotationId = signal<string | null>(null);
@@ -278,7 +283,7 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
     if (q.lines.length === 0 && pendingNewLines.length === 0) return null;
 
     let total = 0;
-    const currency = q.currency || q.lines[0]?.unit_price?.currency || pendingNewLines[0]?.unit_price_currency || this.session.homeCurrency() || 'USD';
+    const currency = this.effectiveQuotationCurrency();
 
     for (const line of q.lines) {
       if (this.pendingRemoveLineIds().has(line.id)) continue;
@@ -1245,7 +1250,7 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
     const text = this.newLineText().trim();
     if (!text) return;
     const q = this.quotation();
-    const currency = q?.currency || this.session.homeCurrency() || 'USD';
+    const currency = this.effectiveQuotationCurrency();
     const newLine: NewQuotationLine = {
       original_text: text,
       quantity: this.newLineQuantity() || null,

@@ -15,6 +15,7 @@ from procurepilot_api.errors import ConflictError, NotFoundError, ServiceUnavail
 from procurepilot_api.modules.documents.schemas import Document
 from procurepilot_api.modules.documents.service import DOCUMENT_COLUMNS
 from procurepilot_api.modules.members.service import authenticated_client
+from procurepilot_api.modules.quotations.review_gate import blocking_low_confidence_fields
 from procurepilot_api.modules.quotations.schemas import (
     STICKY_REVIEW_REASONS,
     AuditTrailEntry,
@@ -990,15 +991,11 @@ def _current_review_task_blocker(
     if quote.get("arithmetic_status") == "mismatch":
         return ("arithmetic_mismatch", "high")
 
-    low_confidence = (
-        client.table("field_extraction")
-        .select("id")
-        .eq("quotation_id", str(quotation_id))
-        .lt("confidence", confidence_threshold)
-        .is_("corrected_by", "null")
-        .limit(1)
-        .execute()
-        .data
+    low_confidence = blocking_low_confidence_fields(
+        client,
+        quotation_id,
+        confidence_threshold,
+        supplier_id=quote.get("supplier_id"),
     )
     if low_confidence:
         return ("low_confidence", "normal")
