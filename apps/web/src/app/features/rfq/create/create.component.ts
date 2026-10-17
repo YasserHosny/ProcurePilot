@@ -113,7 +113,8 @@ export class RfqCreateComponent implements OnInit {
       },
       error: (err: unknown) => {
         this.isLoadingRfq.set(false);
-        this.errorMessage.set(this.getErrorMessage(err, 'rfq.create.saveError'));
+        this.errorMessage.set(err instanceof HttpErrorResponse && err.status === 403
+          ? this.translate.instant('rfq.creatorOnly') : this.getErrorMessage(err, 'rfq.create.saveError'));
       },
     });
   }
@@ -212,6 +213,10 @@ export class RfqCreateComponent implements OnInit {
       },
       error: (err: unknown) => {
         this.isSaving.set(false);
+        if (err instanceof HttpErrorResponse && err.status === 403) {
+          this.errorMessage.set(this.translate.instant('rfq.creatorOnly'));
+          return;
+        }
         this.errorMessage.set(this.getErrorMessage(err, 'rfq.create.saveError'));
       },
     });
@@ -227,18 +232,21 @@ export class RfqCreateComponent implements OnInit {
       next: (res) => {
         this.rfqStatus.set(res.rfq.status);
         this.isSending.set(false);
-        const count = res.recipients?.length || this.form.controls.supplierIds.value.length;
-        this.snackBar.open(
-          this.translate.instant('rfq.create.sentSuccess', { count }),
-          this.translate.instant('rfq.history.dismiss'),
-          { duration: 5000 },
-        );
-        if (this.router) {
+        const total = res.recipients.length;
+        const sent = res.recipients.filter((recipient) => recipient.status === 'sent').length;
+        const key = sent === total && total > 0 ? 'rfq.create.sentSuccess' : sent > 0 ? 'rfq.create.sentPartial' : 'rfq.create.sentNone';
+        const params = sent === total && total > 0 ? { count: sent } : { sent, total, failed: total - sent };
+        this.snackBar.open(this.translate.instant(key, params), this.translate.instant('rfq.history.dismiss'), { duration: 5000 });
+        if (sent === total && total > 0 && this.router) {
           void this.router.navigate(['/rfq/history'])?.catch(() => undefined);
         }
       },
       error: (err: unknown) => {
         this.isSending.set(false);
+        if (err instanceof HttpErrorResponse && err.status === 403) {
+          this.errorMessage.set(this.translate.instant('rfq.creatorOnly'));
+          return;
+        }
         this.errorMessage.set(this.getErrorMessage(err, 'rfq.create.sendError'));
       },
     });
