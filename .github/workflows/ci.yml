@@ -443,7 +443,9 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
       - uses: supabase/setup-cli@v1
         with:
-          version: latest
+          # Pin so CI avoids the rate-limited GitHub API lookup for "latest" and a CLI release
+          # cannot change the stack under us; bump deliberately.
+          version: 2.121.0
 
       - name: Start Supabase
         # `supabase start` — NOT docker compose. Three GoTrue versions could not migrate against a
@@ -452,18 +454,22 @@ jobs:
         # This also applies supabase/migrations and honours supabase/config.toml, which enables the
         # custom access token hook that puts tenant_id into the JWT. Without that hook every
         # tenant-scoped query returns zero rows and the app looks empty rather than broken.
-        # Retry transient Docker/public.ecr.aws rate limits when shards pull images in parallel.
+        # Skip studio/postgres-meta (dashboard), vector/logflare (analytics), edge-runtime (no
+        # functions), mailpit (auth email confirmations are off in supabase/config.toml), and
+        # realtime (the app does not use it). This limits startup to the five services the app uses.
+        # Stagger shard pulls to reduce public.ecr.aws contention, then retry transient failures.
         run: |
-          for attempt in 1 2 3; do
-            if supabase start; then
+          sleep $(( (${{ matrix.shard }} - 1) * 25 ))
+          for attempt in 1 2 3 4 5; do
+            if supabase start -x studio,vector,logflare,edge-runtime,postgres-meta,mailpit,realtime; then
               exit 0
             fi
-            if [ "$attempt" -eq 3 ]; then
-              echo "::error::supabase start failed after 3 attempts"
+            if [ "$attempt" -eq 5 ]; then
+              echo "::error::supabase start failed after 5 attempts"
               exit 1
             fi
             supabase stop --no-backup || true
-            sleep $((attempt*20))
+            sleep $((attempt*30))
           done
 
       - name: Export Supabase credentials
