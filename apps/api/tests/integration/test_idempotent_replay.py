@@ -190,7 +190,7 @@ def _client_for(
 
     service = RequestsService.__new__(RequestsService)
     service._settings = object()
-    service._estimate_products = lambda product_ids: [
+    service._estimate_products = lambda product_ids, **_kw: [
         LineEstimate(None, None, None) for _product_id in product_ids
     ]
     service._insert_lines = lambda client, **kwargs: _insert_lines(conn, **kwargs)

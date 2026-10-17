@@ -288,3 +288,27 @@
     a response-window cutoff (e.g. the RFQ's needed-by date) is the likely follow-on.
   - Fuller autonomy — auto-matching quotations whose extraction was fully high-confidence and
     reconciled, without human review — remains a separate, explicit product decision.
+
+## ADR-020 — Quantities and Estimates Are in the Purchasing Unit (Pack), Not the Base Unit
+
+- **Status:** Accepted (2026-10-17)
+- **Context:** A demo walkthrough on the hosted tenant showed a 56,425 EGP request re-estimated to
+  6,135.58 at submit. Request quantities are in packs (10 tins of 18 L), but the submit-time
+  estimate came from `landed_cost.total_amount / normalised_base_quantity`, a price per litre or kg.
+  Pack quantity × per-base price understated the total ~9×, so approval thresholds and budget
+  checks saw the wrong amount. The estimate also ignored the RFQ response the request was prepared
+  from and used another supplier's latest landed cost.
+- **Decision:**
+  - Quantities on requests, RFQs and purchase orders are in the product's **purchasing unit** (a
+    pack: tin, sack, carton, or one kg for loose goods). Prices on those documents are **per pack**.
+  - Base-unit conversion (`pack_count × unit_size`) is used only to normalise across suppliers
+    (Smart Compare, Basket Split, price history). Those screens take quantity in packs and show the
+    base-unit equivalent ("10 × 18 litre = 180 litre") before calling the base-unit APIs.
+  - A request's line estimates are the per-pack prices of its source RFQ response
+    (`purchase_request.source_rfq_response_id`) when it has one, else the latest landed cost per
+    pack (`landed_cost.total_amount / landed_cost.quantity`). Submit and draft edits use the same
+    rule, so submit never swaps the estimate the user saw for another supplier's.
+  - Purchase-order prefill from a request carries the pack label and the per-pack estimate.
+- **Consequences:** `estimated_unit_price` on request lines now means "per pack". Existing draft
+  requests prepared before this change should be withdrawn and re-prepared. Pre-filling the PO
+  supplier from the source response is not done yet (the request API does not expose it).

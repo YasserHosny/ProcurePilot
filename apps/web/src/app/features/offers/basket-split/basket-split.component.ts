@@ -215,6 +215,21 @@ export class BasketSplitComponent implements OnInit {
     return this.products().find((product) => product.id === workspaceProductId)?.base_unit;
   }
 
+  /** Base units (litre/kg) in one purchasing pack of the product; 1 when it has no pack info. */
+  packBaseQuantityFor(workspaceProductId: string): number {
+    const pack = this.products().find((product) => product.id === workspaceProductId)?.pack;
+    if (!pack) return 1;
+    const base = parseFloat(pack.base_quantity ?? String(pack.pack_count * parseFloat(pack.unit_size)));
+    return base > 0 ? base : 1;
+  }
+
+  /** Quantities are typed in PACKS; the optimiser works in base units, so convert on send. */
+  baseQuantityFor(item: { workspace_product_id: string; quantity: string }): string {
+    const packs = parseFloat(item.quantity);
+    if (isNaN(packs)) return item.quantity;
+    return String(Math.round(packs * this.packBaseQuantityFor(item.workspace_product_id) * 1e6) / 1e6);
+  }
+
   isFormValid(): boolean {
     const s1 = this.supplierId1();
     const s2 = this.supplierId2();
@@ -243,7 +258,7 @@ export class BasketSplitComponent implements OnInit {
     const supplierIds = this.allSelectedSupplierIds();
     const reqItems: BasketItemRequest[] = this.items().map((it) => ({
       workspace_product_id: it.workspace_product_id,
-      quantity: it.quantity,
+      quantity: this.baseQuantityFor(it),
     }));
 
     const reqBody: BasketOptimiseRequest = {
