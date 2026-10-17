@@ -5,9 +5,9 @@ Status 2026-10-17: **restaurant tenant set up on hosted** — workspace «مطا
 (450k / 380k / 320k EGP), 5 suppliers (EGP terms, plus-address emails), 30 products with preferred
 suppliers, owner (`pp-owner`) and Buyer (`pp-buyer`) accounts, inbound email address. Round 1: both
 supplier quotes extracted, authorized and matched; compare, request and approval ran live. Finding 18
-(pack vs base unit) is fixed by #110 (deployed 2026-10-17), so the PO step can be retried. **Current
-blocker: finding 17** — basket split needs the owner to create the `procurepilot-optimiser-worker`
-container on bunny.net (#108 merged; its deploy fails until the container exists).
+(pack vs base unit) is fixed by #110 (deployed 2026-10-17), so the PO step can be retried. Finding 17
+(optimiser) is deployed: the owner created the bunny.net container and the deploy passed on 2026-10-18; a
+basket split has not been re-run on hosted since.
 
 ### Findings from the build (real product bugs)
 
@@ -42,7 +42,7 @@ Lookups review (regions, currencies, tax models): [`lookups-review-2026-10-15.md
 |---|---|---|---|
 | 15 | Arabic RTL quote tables collapsed into one line; one quote auto-accepted with a wrong 84,000 EGP line | silent wrong prices | fixed — #100 |
 | 16 | A low-confidence supplier name on an already-linked quote could never be confirmed (dead end, generic 409) | quote cannot be authorized | fixed — #104; authorized live |
-| 17 | **Basket-split optimiser worker has no Dockerfile or deploy workflow; jobs stay `queued` forever, UI spins on "Checking job status…"** | headline feature does not work on hosted | code fixed — #108 merged 2026-10-17 (Dockerfile, deploy workflow, stuck jobs now fail with `optimiser_unavailable` instead of spinning); **owner action**: create the bunny.net container `procurepilot-optimiser-worker` — the deploy fails until it exists |
+| 17 | **Basket-split optimiser worker has no Dockerfile or deploy workflow; jobs stay `queued` forever, UI spins on "Checking job status…"** | headline feature does not work on hosted | fixed — #108 merged 2026-10-17 (Dockerfile, deploy workflow, stuck jobs fail with `optimiser_unavailable` instead of spinning); container created by the owner and worker deployed 2026-10-18; basket split not yet re-run on hosted |
 | 18 | **Pack vs base unit: request estimate re-computed on Submit as per-base-unit prices × pack quantities (56,425 → 6,135.58) using the wrong supplier's prices; PO pre-fill says "10 litre" for 10 tins; Smart Compare asks in litres** | **understated totals feed approval thresholds and budgets; wrong PO units** | fixed — #110 merged + deployed 2026-10-17 (ADR-020: quantities and prices are per pack); PO step to be re-run on hosted |
 | 19 | Request flow: Submit drops unsaved edits (cost centre); "Prepare Request" gives no feedback and ignores the RFQ date; approval queue shows a raw requester UUID; branch budgets show "Not available"; approved request has no "Create PO" button (hidden `?source_request_id=` URL); PO needs manual order number + supplier; raw `EGP 56425.0000` formatting; "Resolve and Next" doesn't advance | friction + silent data loss | fix in progress — PR #112 open |
 | 20 | Hosted uses the stub embedding: exact-name matches score 55% (all 10 lines needed manual confirm); human-confirmed matches still show 55% / "Medium Confidence" / "match score below 85%"; "Winning margin: 2%%" | trust signals wrong | partly fixed — #109 merged + deployed (human-confirmed matches show as verified; bulk-confirm exact-name matches); hosted still uses the stub embedding |
