@@ -20,6 +20,13 @@ It can be used for:
 
 This document represents the **latest clarified version** of the ProcurePilot concept.
 
+> **Status note (2026-10-18).** The concept below is unchanged, but it was written before the product
+> was built. Releases R1.0–R4.3 have since shipped; what is built, partial or deferred is recorded in
+> `docs/roadmap/procurepilot_roadmap.md` (section "Delivery Status"), and the current engineering state
+> is in `CLAUDE.md`. The first pilot market is **Egypt** (EGP, Arabic-first users and suppliers) — see
+> `docs/gtm/first-customer-gtm-plan.md`. GBP figures in this document are the original illustrative
+> baseline. Decisions taken since are added to section 21; answered questions are marked in section 22.
+
 For a function-by-function view of user value, business/revenue impact, and proof metrics, see
 [Function Business Value](function-business-value.md).
 
@@ -1517,6 +1524,17 @@ Another AI model should treat the following as current strategic decisions unles
 11. AI recommendations must show evidence, confidence, risk, and validity.
 12. Pricing should be justified through measurable customer ROI.
 
+Added after the build (2026-10):
+
+13. Each workspace has a home currency; it is a default for new forms, and extraction never guesses
+    a currency — an unresolved currency goes to human review (spec 022).
+14. Quantities and prices in requests, RFQs and purchase orders are per purchasing unit (pack);
+    base-unit conversion is only for comparing suppliers (ADR-020).
+15. Similarity-only product matches are not auto-accepted until match scores are calibrated on
+    enough human decisions.
+16. English and Arabic (right-to-left) are both supported from the start.
+17. Automation may prepare and route purchases; a human always authorises them.
+
 ---
 
 ## 22. Open Questions for Further Validation
@@ -1527,11 +1545,11 @@ Another AI model should treat the following as current strategic decisions unles
 4. Which accounting or POS integrations are most requested?
 5. How much historical data is available?
 6. Which approval workflows are common among small businesses?
-7. Which region should launch first?
-8. Should WhatsApp ingestion be direct or file-based?
+7. Which region should launch first? *(Answered 2026-10: Egypt.)*
+8. Should WhatsApp ingestion be direct or file-based? *(For now: manual capture; direct integration deferred.)*
 9. What product-matching accuracy is acceptable for launch?
 10. How should realised savings be verified?
-11. Which currencies, tax models, and languages are required first?
+11. Which currencies, tax models, and languages are required first? *(Partly answered: EGP and English + Arabic; VAT-inclusive pricing and exchange rates are still open.)*
 12. Should ordering remain external or be completed inside ProcurePilot?
 
 ---
