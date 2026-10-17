@@ -17,7 +17,7 @@ import {
   selectReviewSupplier,
   uploadQuotationAndOpenReview,
 } from './support/canonical-flow';
-import { seedRfqResponse } from './support/db';
+import { seedRfqQuotationResponse } from './support/db';
 import { openAsyncSelect } from './support/select';
 
 const WCAG_21_AA = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'];
@@ -216,28 +216,11 @@ test.describe('Request → Approval → PO Flow & Matching Next (PP7 W2)', () =>
       'Idempotency-Key': crypto.randomUUID(),
     });
 
-    const quotation = await apiAsUser<{ id: string; lines: Array<{ id: string }> }>(
-      ownerToken,
-      'POST',
-      '/quotations/manual',
-      {
-        supplier_id: supplierId,
-        issue_date: new Date().toISOString().split('T')[0],
-        lines: [
-          {
-            line_number: 1,
-            original_text: 'PP7 Flow Tomatoes',
-            quantity: '6',
-            pack: { pack_count: 1, unit_size: '1', unit: 'kilogram' },
-            unit_price: { amount: '4.50', currency: 'GBP' },
-          },
-        ],
-      },
-      { 'Idempotency-Key': crypto.randomUUID() },
-    ).catch(() => null);
-
-    expect(quotation, 'manual quotation seed must succeed').toBeTruthy();
-    seedRfqResponse(workspace.ownerEmail, rfq.rfq.id, supplierId, quotation!.id);
+    seedRfqQuotationResponse(workspace.ownerEmail, rfq.rfq.id, supplierId, {
+      description: 'PP7 Flow Tomatoes',
+      quantity: '6',
+      unitPrice: '4.50',
+    });
 
     await signInUi(page, workspace.ownerEmail, workspace.ownerPassword);
     await ensureEnglish(page);

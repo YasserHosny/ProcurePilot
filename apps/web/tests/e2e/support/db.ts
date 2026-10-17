@@ -21,28 +21,41 @@ function sqlLiteral(value: string): string {
   return `'${value.replace(/'/g, "''")}'`;
 }
 
-/** Associates a seeded quotation with the matching sent RFQ recipient for prepare-request E2E. */
-export function seedRfqResponse(
+/** Seeds a usable supplier quotation and associates it with the matching sent RFQ recipient. */
+export function seedRfqQuotationResponse(
   ownerEmail: string,
   rfqId: string,
   supplierId: string,
-  quotationId: string,
+  line: { description: string; quantity: string; unitPrice: string },
 ): void {
+  if (!/^\d+(\.\d{1,6})?$/.test(line.quantity) || Number(line.quantity) <= 0) {
+    throw new Error(`seedRfqQuotationResponse: invalid quantity "${line.quantity}"`);
+  }
+  if (!/^\d+(\.\d{1,4})?$/.test(line.unitPrice) || Number(line.unitPrice) <= 0) {
+    throw new Error(`seedRfqQuotationResponse: invalid unitPrice "${line.unitPrice}"`);
+  }
   const sql = [
-    'insert into rfq_response (tenant_id, rfq_recipient_id, quotation_id)',
-    'select m.tenant_id, rr.id, q.id from membership m',
-    'join rfq r on r.id=' + `${sqlLiteral(rfqId)}::uuid` + ' and r.tenant_id=m.tenant_id',
-    'join rfq_recipient rr on rr.rfq_id=r.id and rr.supplier_id=' + `${sqlLiteral(supplierId)}::uuid`,
-    'join quotation q on q.id=' + `${sqlLiteral(quotationId)}::uuid` + ' and q.tenant_id=m.tenant_id',
-    `where lower(m.email)=lower(${sqlLiteral(ownerEmail)}) and m.status='active'`,
+    'with owner as (select m.tenant_id, m.id as membership_id from membership m',
+    `where lower(m.email)=lower(${sqlLiteral(ownerEmail)}) and m.status='active' limit 1),`,
+    'doc as (insert into document (id,tenant_id,storage_bucket,storage_path,mime_type,source_channel,status,created_by)',
+    `select gen_random_uuid(),owner.tenant_id,'quotations','tenants/'||owner.tenant_id||'/quotations/'||gen_random_uuid(),'text/csv','upload','uploaded',owner.membership_id from owner returning id,tenant_id),`,
+    'quote as (insert into quotation (id,tenant_id,document_id,supplier_id,currency,issue_date,status,reviewed_by,reviewed_at)',
+    `select gen_random_uuid(),doc.tenant_id,doc.id,${sqlLiteral(supplierId)}::uuid,'GBP',current_date,'reviewed',owner.membership_id,now() from doc join owner using (tenant_id) returning id,tenant_id),`,
+    'line as (insert into quotation_line (id,tenant_id,quotation_id,line_number,original_text,quantity,pack_count,unit_size,pack_unit,unit_price_amount,unit_price_currency)',
+    `select gen_random_uuid(),quote.tenant_id,quote.id,1,${sqlLiteral(line.description)},${sqlLiteral(line.quantity)},1,1,'kilogram',${sqlLiteral(line.unitPrice)},'GBP' from quote returning id,tenant_id),`,
+    'decision as (insert into match_decision (id,tenant_id,quotation_line_id,matched_workspace_product_id,outcome,is_automatic,decided_by,confidence)',
+    `select gen_random_uuid(),line.tenant_id,line.id,rfql.workspace_product_id,'no_match_new_product',false,owner.membership_id,1 from line join owner using (tenant_id) join rfq_line rfql on rfql.tenant_id=line.tenant_id and rfql.rfq_id=${sqlLiteral(rfqId)}::uuid returning id),`,
+    'response as (insert into rfq_response (tenant_id,rfq_recipient_id,quotation_id)',
+    `select owner.tenant_id,rr.id,quote.id from owner join rfq r on r.id=${sqlLiteral(rfqId)}::uuid and r.tenant_id=owner.tenant_id join rfq_recipient rr on rr.rfq_id=r.id and rr.supplier_id=${sqlLiteral(supplierId)}::uuid and rr.tenant_id=owner.tenant_id join quote on quote.tenant_id=owner.tenant_id cross join decision returning id)`,
+    'select (select count(*) from doc)+(select count(*) from quote)+(select count(*) from line)+(select count(*) from decision)+(select count(*) from response)',
   ].join(' ');
   const url = process.env['E2E_DATABASE_URL'];
   const psqlArgs = url ? [url, '-t', '-A', '-c', sql] : ['-U', 'postgres', '-t', '-A', '-c', sql];
   const stdout = execFileSync('docker', ['exec', DB_CONTAINER, 'psql', ...psqlArgs], {
     encoding: 'utf-8',
   }).trim();
-  if (stdout !== 'INSERT 0 1') {
-    throw new Error(`seedRfqResponse expected one association, got ${stdout || 'none'}`);
+  if (stdout !== '5') {
+    throw new Error(`seedRfqQuotationResponse expected five inserted rows, got ${stdout || 'none'}`);
   }
 }
 
