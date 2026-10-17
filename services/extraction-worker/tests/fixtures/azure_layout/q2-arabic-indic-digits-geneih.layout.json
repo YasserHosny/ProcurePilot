@@ -1,0 +1,205 @@
+{
+  "apiVersion": "2024-11-30",
+  "modelId": "prebuilt-layout",
+  "content": "                                                                                                  ‫عرض سعر‬\n                                                                             ‫مزارع الدلتا للخضروات (وهمية) — المنصورة‬\n                                                                                                        ‫التاريخ‪٢٠٢٦-١٠-١٤ :‬‬\n\n\n‫القيمة‬                          ‫السعر‬                    ‫الكمية‬                              ‫الصنف‬\n\n     ‫‪ ٩٠٠٫٠٠‬جنيه‬                    ‫‪ ٢٢٫٥٠‬جنيه‬                    ‫‪٤٠‬‬                            ‫طماطم طازجة (كجم)‬\n\n    ‫‪ ٦٣٨٫٧٥‬جنيه‬                     ‫‪ ١٨٫٢٥‬جنيه‬                    ‫‪٣٥‬‬                                 ‫بصل أحمر (كجم)‬\n\n     ‫‪ ٩٦٠٫٠٠‬جنيه‬                    ‫‪ ١٦٫٠٠‬جنيه‬                    ‫‪٦٠‬‬                                    ‫بطاطس (كجم)‬\n\n    ‫‪ ٦٨٦٫٢٥‬جنيه‬                     ‫‪ ٤٥٫٧٥‬جنيه‬                    ‫‪١٥‬‬                                ‫فلفل رومي (كجم)‬\n\n  ‫‪ ٣٬١٨٥٫٠٠‬جنيه‬                                                                                                ‫الإجمالي‬\n\n\n         ‫‪.TEST FIXTURE — fictional supplier, generated for ProcurePilot extraction testing (Jira PP-3). Not a real quotation‬‬\n\f",
+  "pages": [],
+  "paragraphs": [
+    {
+      "content": "‫عرض سعر‬"
+    },
+    {
+      "content": "‫مزارع الدلتا للخضروات (وهمية) — المنصورة‬"
+    },
+    {
+      "content": "‫التاريخ‪٢٠٢٦-١٠-١٤ :‬‬"
+    },
+    {
+      "content": "‫القيمة‬                          ‫السعر‬                    ‫الكمية‬                              ‫الصنف‬"
+    },
+    {
+      "content": "‫‪ ٩٠٠٫٠٠‬جنيه‬                    ‫‪ ٢٢٫٥٠‬جنيه‬                    ‫‪٤٠‬‬                            ‫طماطم طازجة (كجم)‬"
+    },
+    {
+      "content": "‫‪ ٦٣٨٫٧٥‬جنيه‬                     ‫‪ ١٨٫٢٥‬جنيه‬                    ‫‪٣٥‬‬                                 ‫بصل أحمر (كجم)‬"
+    },
+    {
+      "content": "‫‪ ٩٦٠٫٠٠‬جنيه‬                    ‫‪ ١٦٫٠٠‬جنيه‬                    ‫‪٦٠‬‬                                    ‫بطاطس (كجم)‬"
+    },
+    {
+      "content": "‫‪ ٦٨٦٫٢٥‬جنيه‬                     ‫‪ ٤٥٫٧٥‬جنيه‬                    ‫‪١٥‬‬                                ‫فلفل رومي (كجم)‬"
+    },
+    {
+      "content": "‫‪ ٣٬١٨٥٫٠٠‬جنيه‬                                                                                                ‫الإجمالي‬"
+    },
+    {
+      "content": "‫‪.TEST FIXTURE — fictional supplier, generated for ProcurePilot extraction testing (Jira PP-3). Not a real quotation‬‬"
+    }
+  ],
+  "tables": [
+    {
+      "rowCount": 6,
+      "columnCount": 4,
+      "cells": [
+        {
+          "rowIndex": 0,
+          "columnIndex": 0,
+          "content": "اإلجمايل",
+          "rowSpan": 1,
+          "columnSpan": 1,
+          "kind": "columnHeader"
+        },
+        {
+          "rowIndex": 0,
+          "columnIndex": 1,
+          "content": "السعر",
+          "rowSpan": 1,
+          "columnSpan": 1,
+          "kind": "columnHeader"
+        },
+        {
+          "rowIndex": 0,
+          "columnIndex": 2,
+          "content": "الكمية",
+          "rowSpan": 1,
+          "columnSpan": 1,
+          "kind": "columnHeader"
+        },
+        {
+          "rowIndex": 0,
+          "columnIndex": 3,
+          "content": "الصنف",
+          "rowSpan": 1,
+          "columnSpan": 1,
+          "kind": "columnHeader"
+        },
+        {
+          "rowIndex": 1,
+          "columnIndex": 0,
+          "content": "900.00",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 1,
+          "columnIndex": 1,
+          "content": "22.50",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 1,
+          "columnIndex": 2,
+          "content": "40",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 1,
+          "columnIndex": 3,
+          "content": "طماطم طازجة",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 2,
+          "columnIndex": 0,
+          "content": "638.75",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 2,
+          "columnIndex": 1,
+          "content": "18.25",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 2,
+          "columnIndex": 2,
+          "content": "35",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 2,
+          "columnIndex": 3,
+          "content": "بصل أحمر",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 3,
+          "columnIndex": 0,
+          "content": "960.00",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 3,
+          "columnIndex": 1,
+          "content": "16.00",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 3,
+          "columnIndex": 2,
+          "content": "60",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 3,
+          "columnIndex": 3,
+          "content": "بطاطس",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 4,
+          "columnIndex": 0,
+          "content": "686.25",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 4,
+          "columnIndex": 1,
+          "content": "45.75",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 4,
+          "columnIndex": 2,
+          "content": "15",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 4,
+          "columnIndex": 3,
+          "content": "فلفل رومي",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 5,
+          "columnIndex": 0,
+          "content": "3185.00 ج.م",
+          "rowSpan": 1,
+          "columnSpan": 1
+        },
+        {
+          "rowIndex": 5,
+          "columnIndex": 1,
+          "content": "الإجمالي",
+          "rowSpan": 1,
+          "columnSpan": 3
+        }
+      ]
+    }
+  ],
+  "documents": []
+}

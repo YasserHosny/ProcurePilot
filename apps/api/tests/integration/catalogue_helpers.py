@@ -36,6 +36,9 @@ def connection() -> Iterator[psycopg.Connection]:
 
 def make_workspace(cur: psycopg.Cursor, label: str, *, role: str = "owner") -> Workspace:
     tenant_id, user_id, membership_id, invitation_id = uuid4(), uuid4(), uuid4(), uuid4()
+    # Through the transaction-mode pooler this connection may land on a server backend that an
+    # earlier session-level `set role` left as `authenticated`; fixtures must run as the owner.
+    cur.execute("reset role")
     cur.execute(
         "insert into supported_region (code,label_en,label_ar) values ('GB','UK','ب') "
         "on conflict do nothing"

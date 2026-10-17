@@ -744,7 +744,10 @@
         "review_required": "Review Required",
         "no_supplier_match": "No Supplier Match",
         "currency_unresolved": "Currency Not Found",
-        "date_unparsed": "Date Not Recognised"
+        "date_unparsed": "Date Not Recognised",
+        "merged_line_items": "Multiple items were merged into one line",
+        "line_count_mismatch": "Some quotation lines could not be extracted",
+        "total_unverified": "Quotation total could not be verified"
       },
       "columns": {
         "id": "Quotation ID",
