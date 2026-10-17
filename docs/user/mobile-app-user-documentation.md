@@ -301,11 +301,10 @@ The app follows the same shared English/Arabic translation catalogue as the web 
 switcher yet on mobile — language currently follows the device/system locale. (The target
 Settings screen previewed in section 18 adds one.)
 
-**Money amounts:** the Approval Queue and Request Detail show each amount as its currency code and
+**Money amounts:** the My Requests list, Approval Queue and Request Detail show each amount as its currency code and
 a grouped number with that currency's own number of decimal places — three for KWD, BHD and OMR,
 none for JPY, two for most others — for example `EGP 12,500.00`. In Arabic the digits and separators
-are Arabic, for example `EGP ١٢٬٥٠٠٫٠٠`. The **My Requests** list does not use this formatting yet
-(section 17).
+are Arabic, for example `EGP ١٢٬٥٠٠٫٠٠`.
 
 **Tips:**
 - Change the phone's system language to Arabic to review the current mobile RTL experience.
@@ -606,7 +605,6 @@ A: No. It is optional and can always fall back to password sign-in.
 | 6 | Sessions | If a session is revoked server-side, the mobile client's own refresh-token exchange happens directly against Supabase Auth rather than through ProcurePilot's API — this path has a documented gap in test coverage, not a confirmed bug (see the engineering notes in `apps/api/tests/integration/test_session_revocation.py`). |
 | 7 | Documentation images | Mobile screenshots are design mockups, not simulator captures, and three shipped screens (Approvals, Delivery Confirmation, Quality Issue Reporting) never had a mockup produced at all. The shipped-vs-mockup notes and the text-only sections are the source of truth for current behaviour. |
 | 8 | Commercial modules | Catalogue, suppliers, import, quotations, matching, compare, basket split, alerts, savings, team management, and organisation settings are web-only today. |
-| 9 | Money formatting | The **My Requests** list (section 9) shows estimated totals unformatted, for example `EGP 12500.000000`. Approval Queue and Request Detail are formatted (section 8). |
 
 If you hit anything beyond this list, flag it to the product team.
 
