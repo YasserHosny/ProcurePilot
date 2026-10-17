@@ -101,6 +101,7 @@ describe('RequestListComponent (T017)', () => {
 
   it('should display branch names instead of raw branch IDs when lookup data is available', () => {
     const compiled = fixture.nativeElement as HTMLElement;
+    expect(compiled.textContent).toContain('New request');
     expect(compiled.textContent).toContain('North Branch');
     expect(compiled.textContent).toContain('South Branch');
     expect(compiled.textContent).not.toContain('b1');

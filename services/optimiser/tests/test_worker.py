@@ -133,3 +133,54 @@ def test_worker_failure_durably_marks_job_failed_after_exception_unwinds(
                 finally:
                     cur.execute("set session_replication_role = default")
             conn.commit()
+
+
+def test_worker_marks_missing_current_offers_with_specific_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from collections.abc import Iterator
+    from contextlib import contextmanager
+
+    from procurepilot_optimiser_worker import worker
+    from procurepilot_optimiser_worker.models import BasketJob
+    from procurepilot_optimiser_worker.repository import NoCurrentOffersError
+
+    job_id, tenant_id = uuid4(), uuid4()
+    job = BasketJob.model_validate(
+        {
+            "id": str(job_id),
+            "tenant_id": str(tenant_id),
+            "supplier_ids": [str(uuid4()), str(uuid4())],
+            "items": [{"workspace_product_id": str(uuid4()), "quantity": "1"}],
+        }
+    )
+    captured: list[dict[str, object]] = []
+
+    class FakeConnection:
+        def commit(self) -> None:
+            return None
+
+    @contextmanager
+    def fake_connect(_url: str) -> Iterator[FakeConnection]:
+        yield FakeConnection()
+
+    monkeypatch.setattr(worker, "get_settings", lambda: WorkerSettings(database_url="unused"))
+    monkeypatch.setattr(worker.db, "connect", fake_connect)
+    monkeypatch.setattr(worker, "mark_running", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(worker, "load_job", lambda *_args, **_kwargs: job)
+    monkeypatch.setattr(worker, "read_current_offers", lambda *_args, **_kwargs: [])
+
+    def capture_failure(_conn: object, *, error: dict[str, object], **_kwargs: object) -> None:
+        captured.append(error)
+
+    monkeypatch.setattr(worker, "mark_failed", capture_failure)
+
+    with pytest.raises(NoCurrentOffersError):
+        process_basket_split_job({"job_id": str(job_id), "tenant_id": str(tenant_id)})
+
+    assert captured == [
+        {
+            "code": "no_offers_for_products",
+            "product_ids": [str(job.items[0].workspace_product_id)],
+        }
+    ]

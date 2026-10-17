@@ -129,3 +129,115 @@ def test_requeueing_a_failed_job_restarts_the_expiry_clock() -> None:
     assert "created_at = now()" in sql
     assert "started_at = null" in sql
     assert row["status"] == "queued"
+
+
+def test_current_offer_validation_rejects_products_without_supplier_offers() -> None:
+    from procurepilot_api.errors import UnprocessableEntityError
+
+    product_id = uuid4()
+
+    class OfferCursor(_Cursor):
+        def fetchall(self) -> list[tuple[object, ...]]:
+            return []
+
+    class OfferConn(_Conn):
+        def cursor(self, **_: object) -> OfferCursor:
+            return OfferCursor(self)
+
+    conn = OfferConn({})
+    payload = type(
+        "Payload",
+        (),
+        {
+            "items": [type("Item", (), {"workspace_product_id": product_id})()],
+            "supplier_ids": [uuid4(), uuid4()],
+        },
+    )()
+
+    with pytest.raises(UnprocessableEntityError) as exc_info:
+        basket_service._ensure_current_offers(conn, payload)  # type: ignore[arg-type]
+
+    assert exc_info.value.details == {
+        "reason": "no_offers_for_products",
+        "product_ids": [str(product_id)],
+    }
+    assert "valid_to" in conn.statements[0]
+
+
+def test_create_job_does_not_enqueue_when_offer_check_rejects(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from contextlib import contextmanager
+    from unittest.mock import Mock
+
+    from procurepilot_api.errors import UnprocessableEntityError
+
+    @contextmanager
+    def fake_db(*_: object) -> Iterator[object]:
+        yield object()
+
+    monkeypatch.setattr(basket_service, "_authenticated_db", fake_db)
+    monkeypatch.setattr(basket_service, "_visible_suppliers", lambda *_args: None)
+    monkeypatch.setattr(basket_service, "_visible_products", lambda *_args: None)
+    monkeypatch.setattr(
+        basket_service,
+        "_ensure_current_offers",
+        lambda *_args: (_ for _ in ()).throw(
+            UnprocessableEntityError(
+                details={"reason": "no_offers_for_products", "product_ids": []}
+            )
+        ),
+    )
+    enqueue_job = Mock()
+    monkeypatch.setattr(basket_service, "_enqueue_redis_job", enqueue_job)
+    service = basket_service.BasketService.__new__(basket_service.BasketService)
+    service._settings = object()
+    monkeypatch.setattr(service, "_expire_stuck_jobs", lambda _conn: None)
+
+    payload = type(
+        "Payload",
+        (),
+        {"supplier_ids": [], "items": []},
+    )()
+    with pytest.raises(UnprocessableEntityError):
+        service.create_job(member=object(), payload=payload)  # type: ignore[arg-type]
+
+    enqueue_job.assert_not_called()
+
+
+def test_idempotent_replay_skips_current_offer_validation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from types import SimpleNamespace
+    from unittest.mock import Mock
+
+    job_id = uuid4()
+    conn = _Conn(
+        {
+            "id": job_id,
+            "supplier_ids": [uuid4(), uuid4()],
+            "items": [],
+            "status": "completed",
+            "created_at": datetime.now(UTC),
+        }
+    )
+
+    @contextmanager
+    def fake_db(*_: object) -> Iterator[_Conn]:
+        yield conn
+
+    check_offers = Mock(side_effect=AssertionError("Replay must not validate current offers"))
+    monkeypatch.setattr(basket_service, "_authenticated_db", fake_db)
+    monkeypatch.setattr(basket_service, "_ensure_current_offers", check_offers)
+    service = basket_service.BasketService.__new__(basket_service.BasketService)
+    service._settings = object()
+
+    job, created = service.create_job(
+        member=SimpleNamespace(tenant_id=uuid4()),  # type: ignore[arg-type]
+        payload=object(),  # type: ignore[arg-type]
+        idempotency_key=uuid4(),
+    )
+
+    assert job.id == job_id
+    assert created is False
+    check_offers.assert_not_called()

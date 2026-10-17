@@ -8,7 +8,12 @@ import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
+import { catchError, forkJoin, of } from 'rxjs';
+import { packLabel } from '../pack-label';
 
+import { ApiService } from '../../../core/api/api.service';
+import { FormatService } from '../../../core/format/format.service';
+import type { Product } from '../../../core/api/models';
 import { FormatDatePipe } from '../../../core/format/date.pipe';
 import { FormatMoneyPipe } from '../../../core/format/money.pipe';
 import {
@@ -42,8 +47,11 @@ export class OrderDetailComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly ordersApi = inject(OrdersApiService);
   private readonly translate = inject(TranslateService);
+  private readonly api = inject(ApiService);
+  private readonly formatService = inject(FormatService);
 
   readonly evidence = signal<OrderEvidenceProjection | null>(null);
+  readonly products = signal<Map<string, Product>>(new Map());
   readonly isLoading = signal(true);
   readonly isSaving = signal(false);
   readonly errorMessage = signal<string | null>(null);
@@ -69,9 +77,43 @@ export class OrderDetailComponent implements OnInit {
     this.isLoading.set(true);
     this.errorMessage.set(null);
     this.ordersApi.getOrder(this.orderId).subscribe({
-      next: (value) => { this.evidence.set(value); this.isLoading.set(false); },
+      next: (value) => {
+        this.evidence.set(value);
+        this.products.set(new Map());
+        const ids = [...new Set(value.order.lines.flatMap(line =>
+          line.workspace_product_id ? [line.workspace_product_id] : [],
+        ))];
+        if (ids.length === 0) {
+          this.isLoading.set(false);
+          return;
+        }
+        forkJoin(ids.map(id => this.api.product(id).pipe(catchError(() => of(null)))))
+          .subscribe(products => {
+            this.products.set(new Map(
+              products.flatMap(product => product ? [[product.id, product] as const] : []),
+            ));
+            this.isLoading.set(false);
+          });
+      },
       error: () => { this.errorMessage.set(this.translate.instant('orders.loadError')); this.isLoading.set(false); },
     });
+  }
+
+  linePriceLabel(line: PurchaseOrderLine): string {
+    const product = line.workspace_product_id ? this.products().get(line.workspace_product_id) : undefined;
+    const { size, unit, label } = packLabel(product, line.base_unit, this.translate, this.formatService);
+    const amount = this.formatService.formatMoney(line.unit_price);
+    if (size > 1) {
+      const base = this.formatService.formatMoney({ amount: String(parseFloat(line.unit_price.amount) / size), currency: line.unit_price.currency });
+      return `${amount} / ${label} · ${base} / ${unit}`;
+    }
+    return `${amount} / ${unit}`;
+  }
+
+  formatQuantity(value: string | null): string {
+    return value === null
+      ? this.translate.instant('orders.notProvided')
+      : this.formatService.formatQuantity(value);
   }
 
   getStatusLabel(status: string): string { return this.translate.instant(`orders.status.${status}`); }

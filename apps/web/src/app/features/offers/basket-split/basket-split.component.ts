@@ -434,6 +434,12 @@ export class BasketSplitComponent implements OnInit {
   private handleError(err: unknown): void {
     if (err instanceof HttpErrorResponse) {
       const apiError = err.error as ApiError | undefined;
+      const details = apiError?.details as { reason?: string; product_ids?: string[] } | undefined;
+      if (details?.reason === 'no_offers_for_products') {
+        const names = (details.product_ids ?? []).map((id) => this.products().find((product) => product.id === id)?.tenant_name ?? id).join(', ');
+        this.errorMessage.set(this.translate.instant('basketSplit.status.noCurrentOffers', { products: names }));
+        return;
+      }
       this.errorMessage.set(
         apiError?.message ??
           err.message ??

@@ -93,6 +93,20 @@ describe('RequestFormComponent — create mode (T017)', () => {
     fixture.detectChanges();
   });
 
+  it('filters cost centres to the selected branch and keeps tenant-wide centres', () => {
+    component.allCostCentres.set([
+      { id: 'global', name: 'Global', code: 'G', branch_id: null, is_orphaned: false, is_archived: false, created_at: '' },
+      { id: 'b1cc', name: 'Branch 1', code: '1', branch_id: 'b1', is_orphaned: false, is_archived: false, created_at: '' },
+      { id: 'b2cc', name: 'Branch 2', code: '2', branch_id: 'b2', is_orphaned: false, is_archived: false, created_at: '' },
+    ]);
+    component.form.controls.branch_id.setValue('b1');
+    expect(component.costCentres().map((centre) => centre.id)).toEqual(['global', 'b1cc']);
+    component.form.controls.cost_centre_id.setValue('b1cc');
+    component.form.controls.branch_id.setValue('b2');
+    expect(component.costCentres().map((centre) => centre.id)).toEqual(['global', 'b2cc']);
+    expect(component.form.controls.cost_centre_id.value).toBe('');
+  });
+
   it('should start with one empty line in create mode', () => {
     expect(component.isEditMode()).toBeFalse();
     expect(component.lines.length).toBe(1);

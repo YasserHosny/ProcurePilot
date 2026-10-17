@@ -1,6 +1,7 @@
 import { signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { CompareComponent } from './compare.component';
+import { formatLocaleNumber } from '../../../core/format/format.service';
 import {
   RfqApi,
   RfqDetail,
@@ -213,6 +214,21 @@ describe('CompareComponent (RFQ)', () => {
     expect(component.productNames()['prod-1']).toBe('Product One');
   });
 
+  it('renders quoted quantities without trailing decimal zeroes in the comparison table', () => {
+    const response = dummyResponses.items[0];
+    mockRfqApi.listResponses.and.returnValue(of({
+      items: [{ ...response, lines: [{ ...response.lines[0], quoted_quantity: '50.000000' }] }],
+    }));
+
+    component.loadData('rfq-1');
+    fixture.detectChanges();
+
+    const quantityCell = (fixture.nativeElement as HTMLElement).querySelector('td.mat-column-quantity');
+    const text = quantityCell?.textContent?.trim();
+    expect(text).toBe('50');
+    expect(text).not.toContain('50.000000');
+  });
+
   it('should not preselect branch when multiple branches exist and none saved in localStorage, and should remember choice per tenant', () => {
     try {
       localStorage.removeItem('pp.rfq.lastBranchId.tenant-1');
@@ -340,5 +356,12 @@ describe('CompareComponent (RFQ)', () => {
       { duration: 5000 },
     );
     expect(mockRouter.navigate).toHaveBeenCalledWith(['/requests', 'pr-1']);
+  });
+});
+
+describe('RFQ quantity display', () => {
+  it('formats decimal quantities without trailing zeroes', () => {
+    expect(formatLocaleNumber('50.000000', 'en')).toBe('50');
+    expect(formatLocaleNumber('12.500000', 'en')).toBe('12.5');
   });
 });

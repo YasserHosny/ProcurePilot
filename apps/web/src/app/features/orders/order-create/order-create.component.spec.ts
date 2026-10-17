@@ -3,7 +3,9 @@ import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { provideRouter } from '@angular/router';
-import { TranslateModule } from '@ngx-translate/core';
+import { TranslateModule, TranslateService } from '@ngx-translate/core';
+import enCatalog from '../../../../../../../packages/i18n/en.json';
+import arCatalog from '../../../../../../../packages/i18n/ar.json';
 import { of, throwError } from 'rxjs';
 import { signal } from '@angular/core';
 
@@ -301,6 +303,24 @@ describe('OrderCreateComponent', () => {
     const payload = ordersApiService.editDraftOrder.calls.mostRecent().args[1];
     expect(payload.source_request_id).toBe('req-1');
     expect(payload.lines[0].source_request_line_id).toBe('rl-1');
+  });
+
+  it('keeps pack wording out of the stored description and exposes a separate localized pack hint', () => {
+    const product = {
+      id: 'p2', tenant_name: 'Rice', canonical_name: 'Rice', base_unit: 'kilogram',
+      pack: { pack_count: 1, unit_size: '25', base_quantity: '25' }, status: 'active', created_at: '',
+    } as import('../../../core/api/models').Product;
+    const translate = TestBed.inject(TranslateService);
+    translate.setTranslation('en', enCatalog);
+    translate.setTranslation('ar', arCatalog);
+    translate.use('en');
+    component.products.set([product]);
+    component.lines.at(0).controls.workspace_product_id.setValue('p2');
+    component.onProductSelected(0, 'p2');
+    expect(component.lines.at(0).controls.description.value).toBe('Rice');
+    expect(component.packHint(component.lines.at(0))).toBe('pack of 25 kg');
+    translate.use('ar');
+    expect(component.packHint(component.lines.at(0))).toBe('عبوة ٢٥ كجم');
   });
 
   it('should auto-fill product details when selected', () => {
