@@ -18,7 +18,7 @@
 - [x] T006 [P] [US1] Quotation review: `|| 'USD'` fallbacks (`quotation-review.component.ts:265,1149`) → quote currency ?? `homeCurrency()`, spec
 - [x] T007 [P] [US1] Supplier form: minimum-order and delivery-fee currency default → `homeCurrency()` (`supplier-form.component.ts`), spec
 - [x] T008 [US1] Owner-only "Home currency" control in organisation settings (read-only for non-owners), strings in `packages/i18n` en + ar, RTL checked
-- [ ] T009 [US1] Playwright: tenant EGP → PO create/guardrails/supplier form open EGP; switch one PO to USD stays USD. Run via `pnpm --filter web exec playwright test <spec>` (not `-- <spec>`)
+- [x] T009 [US1] Playwright: tenant EGP → PO create/guardrails/supplier form open EGP; switch one PO to USD stays USD. Run via `pnpm --filter web exec playwright test <spec>` (not `-- <spec>`) — PR #83 merged 2026-10-16, CI End-to-end green; "fails when expected currency is wrong" check not yet done
 
 ## Phase 3: User Story 2 — extraction and landed cost (P1)
 
@@ -37,9 +37,9 @@
 
 ## Phase 5: Polish
 
-- [ ] T019 Docs: user docs (web settings + review flag + mobile), `docs/product/first-customer-gtm-plan.md` C1–C3 marked fixed, CLAUDE.md recent-changes line
+- [x] T019 Docs: user docs (web settings + review flag + mobile), `docs/product/first-customer-gtm-plan.md` C1–C3 marked fixed, CLAUDE.md recent-changes line — PR #81 (verify merged before relying on this)
 - [ ] T020 `pnpm lint`, `pnpm test:api`, `pnpm test:web`, worker pytest, `flutter test`, `pnpm test:isolation` all green; run twice consecutively
-- [ ] T021 Update Jira PP-1/PP-2/PP-3 with PR links (orchestrator, Atlassian connector)
+- [x] T021 Update Jira PP-1/PP-2/PP-3 with PR links (orchestrator, Atlassian connector) — comments on PP-1/2/3 posted 2026-10-15; statuses unchanged
 
 ## Dependencies
 
