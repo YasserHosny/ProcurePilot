@@ -445,7 +445,7 @@ Tracks a purchase order's lifecycle — submitted, confirmed by the supplier, de
 
 **Route:** `/orders/new` (Owner/Buyer), or `/orders/:id/edit` to edit an existing draft
 
-Reached from **Create Order** on the order list (blank), **From approved request** on the order list (pick an approved request from the menu), the **Create Order** icon on an `approved` row in Purchase Requests (§18), or **Create purchase order** on an approved request's own page (§19). All of them open this form; none places an order without it.
+Reached from **Create Order** on the order list (blank), **From approved request** on the order list (pick an approved request from the menu), the **Create Order** icon on a request whose approval decision is Approved — such a request is listed with status `ordered` in Purchase Requests (§18), not `approved`, or **Create purchase order** on an approved request's own page (§19). All of them open this form; none places an order without it.
 
 | # | Element | Description |
 |---|---------|-------------|
@@ -731,7 +731,7 @@ Reached from **Record Purchase** on any Smart Compare offer, or **+ Record Purch
 | # | Element | Description |
 |---|---------|-------------|
 | 1 | **Page title — "Approval Queue"** | Requests awaiting your decision. Only requests routed to you — directly, or via an active delegation (section 22) — based on threshold approval rules appear here. |
-| 2 | **Approvals table** | One row per pending request: required-by date, requester (name or email), branch, cost centre, estimated total (with an "incomplete estimate" badge when some lines lack pricing), budget status, and line count. Budget status uses the cost centre's budget when there is one, otherwise the branch's; with neither it shows **No budget configured** and says why. |
+| 2 | **Approvals table** | One row per pending request: required-by date, requester (name or email), branch, cost centre, estimated total (with an "incomplete estimate" badge when some lines lack pricing), budget status, and line count. Budget status uses the most specific budget that applies: the cost centre's, otherwise the branch's, otherwise an organisation-wide budget; only when none of the three exists does it show **No budget configured** and say why. |
 | 3 | **Budget Status column** | Shows the remaining budget after this request, or an amber "Budget Exceeded" badge with a tooltip and the remaining-budget figure when the request would exceed the applicable budget. Blank when no budget applies. |
 | 4 | **Lines column + expand toggle** | Shows the line count; the expand icon reveals a nested table underneath the row with each line's product, quantity, unit price, and note — so you can review the full request without leaving the queue. |
 | 5 | **Approve / Reject buttons** | Each row has both actions. Either opens a confirmation dialog with an optional comment field before committing the decision. |
