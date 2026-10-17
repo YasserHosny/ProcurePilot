@@ -193,6 +193,8 @@ Leave the suppliers' `email_domains` empty (all are `gmail.com`).
 
 ## Remaining steps
 
+Round 1 step by step, with screenshots: [`round-1/README.md`](round-1/README.md).
+
 The workspace and both accounts already exist — do **not** create another tenant. Remaining work,
 with owners and status, is tracked in [`../video/production-tracker.md`](../video/production-tracker.md):
 fix findings 17–20, then withdraw and re-prepare the round-1 request and run basket split → guardrail →
