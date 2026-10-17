@@ -207,9 +207,12 @@ talking points; insufficient/expired snapshots are rejected; replays are idempot
       `apps/web/src/app/features/supplier-risk/brief-detail/brief-detail.component.ts` + `.html`
       exist; route `/negotiation-briefs/:id` confirmed ahead of generic routes per the Task 9 file
       map
-- [ ] T019 [US3] FR-011A: compute the `service_performance` item's risk as
+- [x] T019 [US3] FR-011A: compute the `service_performance` item's risk as
       `max(reliability_risk, non_matched_qualifying_three_way_rate, quality_incidents_per_qualifying_completed_order)`
-      — **left unchecked, 2026-10-03**: this was *not* found built. The shipped
+      — **Done 2026-10-03 (PR #68)**: `load_service_risk_evidence()` in `supplier_iq_repository.py`
+      and `_service_performance_item()` in `negotiation_briefs.py` take the maximum of the three
+      signals. The note below is the original finding that led to the fix.
+      — **left unchecked, 2026-10-03 (superseded)**: this was *not* found built. The shipped
       `_risk_component_item(snapshot, "reliability", "service_performance", ...)` in
       `negotiation_briefs.py` forwards only the `reliability` component's risk value; no query
       against `three_way_match` or `delivery_quality_issue` exists anywhere in
@@ -292,10 +295,10 @@ including the negative RBAC case.
 
 ## Summary
 
-26 tasks (T001–T025, with T019 unchecked). Everything in Phases 1–2 and 4–7, and all of Phase 3
+26 tasks (T001–T025, all checked; T019 was fixed in PR #68 after this verification). Everything in Phases 1–2 and 4–7, and all of Phase 3
 and Phase 6, was independently re-verified on 2026-10-03 against the real migration, the real
 source files, and the real test files named above — not re-derived from the commit messages or
 the release-evidence document alone, though both corroborate the same facts. Phase 5's T019
-(FR-011A's three-signal service-risk formula) is the one requirement from `spec.md` that the
-merged code does not deliver; it is left `[ ]` deliberately rather than checked off on the
+(FR-011A's three-signal service-risk formula) was the one requirement from `spec.md` that the
+merged code did not deliver at verification time (fixed the same day in PR #68); it is left `[ ]` deliberately rather than checked off on the
 strength of the internal plan document's claim that it was done.
