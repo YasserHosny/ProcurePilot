@@ -128,6 +128,7 @@ def add_costed_offer(
     confidence: Decimal = Decimal("0.9500"),
     quantity: Decimal = Decimal("1.000000"),
     product_id: UUID | None = None,
+    human_outcome: str | None = None,
 ) -> CostedOffer:
     if not TEST_DATABASE_URL:
         raise RuntimeError("TEST_DATABASE_URL is required")
@@ -148,18 +149,40 @@ def add_costed_offer(
             line_id = make_line(cur, context.workspace, quotation_id)
             act_as(cur, context.workspace)
             decision_id = uuid4()
+            candidate_id = None
+            if human_outcome:
+                candidate_id = uuid4()
+                cur.execute(
+                    """
+                    insert into match_candidate
+                      (id, tenant_id, quotation_line_id, candidate_workspace_product_id,
+                       confidence, reasons, rank, scoring_version, embedding_model)
+                    values (%s, %s, %s, %s, %s, '{}'::jsonb, 1, 'matching-score-v2', 'stub-hash-v1')
+                    """,
+                    (
+                        candidate_id,
+                        context.workspace.tenant_id,
+                        line_id,
+                        product_id or context.product_id,
+                        confidence,
+                    ),
+                )
             cur.execute(
                 """
                 insert into match_decision
                   (id, tenant_id, quotation_line_id, matched_workspace_product_id,
-                   outcome, is_automatic, confidence)
-                values (%s, %s, %s, %s, 'no_match_new_product', true, %s)
+                   selected_match_candidate_id, outcome, is_automatic, decided_by, confidence)
+                values (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """,
                 (
                     decision_id,
                     context.workspace.tenant_id,
                     line_id,
                     product_id or context.product_id,
+                    candidate_id,
+                    human_outcome or "no_match_new_product",
+                    human_outcome is None,
+                    context.workspace.membership_id if human_outcome else None,
                     confidence,
                 ),
             )

@@ -111,7 +111,11 @@
       </span>
       <span class="evidence-chip">
         {{ 'compare.recommendation.weights.reliability' | translate: { weight: '15' } }}:
-        {{ formatScore(recommendation.evidence.components['reliability']) }}
+        @if (bestOffer && !bestOffer.reliability_score) {
+          {{ 'compare.recommendation.reliabilityNotEnoughData' | translate }}
+        } @else {
+          {{ formatScore(recommendation.evidence.components['reliability']) }}
+        }
       </span>
       <span class="evidence-chip">
         {{ 'compare.recommendation.weights.leadTime' | translate: { weight: '10' } }}:

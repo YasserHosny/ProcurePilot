@@ -54,7 +54,11 @@ ranked as (
     lc.valid_to,
     lc.recorded_at,
     lc.base_unit,
-    md.confidence as match_confidence,
+    case when md.is_automatic = false
+      and md.outcome in ('same_product', 'different_pack', 'different_variant')
+      then 1.0 else md.confidence end as match_confidence,
+    (md.is_automatic = false
+      and md.outcome in ('same_product', 'different_pack', 'different_variant')) as match_verified,
     s.lead_time_days,
     s.reliability_score,
     pd.base_quantity as pack_base_quantity,
@@ -335,6 +339,7 @@ def _offer(
         reliability_score=None if reliability is None else _decimal_string(reliability, "0.001"),
         stock_signal=None,
         match_confidence=_decimal_string(row["match_confidence"], "0.0001"),
+        match_verified=bool(row.get("match_verified", False)),
         valid_from=row["valid_from"],
         valid_to=valid_to,
         is_expired=is_expired,

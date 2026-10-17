@@ -226,6 +226,35 @@ describe('CompareComponent (US1, SC-002, T020, T029)', () => {
     expect(proj?.offers[0].stock_signal).toBeNull();
   });
 
+  it('renders "—" with a not-enough-data hint for missing stock, and no double percent sign', () => {
+    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+    expect(text).not.toContain('%%');
+    expect(text).not.toContain('No rating');
+    expect(text).not.toContain('Unknown');
+    const hints = (fixture.nativeElement as HTMLElement).querySelectorAll(
+      '[aria-label="Not enough data"]',
+    );
+    expect(hints.length).toBeGreaterThan(0);
+  });
+
+  it('shows a "Verified by buyer" badge only for human-verified matches', () => {
+    expect(
+      (fixture.nativeElement as HTMLElement).querySelector('[data-testid="match-verified-badge"]'),
+    ).toBeNull();
+    const base = mockComparison.offers[0];
+    component.rawComparison.set({
+      ...mockComparison,
+      offers: [{ ...base, match_confidence: '1.0000', match_verified: true }],
+    });
+    fixture.detectChanges();
+    const badge = (fixture.nativeElement as HTMLElement).querySelector(
+      '[data-testid="match-verified-badge"]',
+    );
+    expect(badge?.textContent).toContain('Verified by buyer');
+    const proj = component.projected();
+    expect(proj?.recommendation?.risk_notes).not.toContain('low_match_confidence');
+  });
+
   it('should handle empty offers state gracefully', () => {
     const emptyComp: OfferComparison = {
       product: { id: 'prod-empty', tenant_name: 'Empty Product' },

@@ -365,3 +365,33 @@ thresholds, embedding model identifier and calibration version so runs are compa
 | R10 | Evaluation | 500+ labelled pairs, hard negatives, precision/recall/review/ECE metrics |
 
 **No NEEDS CLARIFICATION items remain.**
+
+## Addendum 2026-10-17 - Exact-name rule, verified matches, stub embeddings
+
+Found live on the hosted demo tenant: 10 quotation lines whose text equalled catalogue names
+exactly all scored 0.55 (< 0.92) because the deterministic stub embedding contributes no signal
+and every feature score is neutral 0.5. Decisions (no auto-accept relaxation; R5/R10 stand):
+
+1. **Exact normalised-name rule.** A line whose text equals a catalogue product's `tenant_name`
+   after NFKC + case-fold + whitespace collapse is an *exact name match* (`matching/exact.py`).
+   It is still **human-confirmed**: the queue shows "Confirm all exact matches (N)"
+   (`GET /match-tasks/exact-matches`, `POST /match-tasks/confirm-exact`, owner/buyer only, 100 per
+   call). Each line gets an ordinary human `match_decision` (`same_product`) plus a learned alias,
+   audited as `matching.resolved`. Similarity-only matches (trigram/semantic, no exact name) are
+   never included.
+2. **Alias hit auto-matches next time** (existing behaviour, covered by
+   `test_human_resolution_learns_exact_alias_and_next_identical_wording_auto_matches`).
+3. **Verified matches.** A human `match_decision` with outcome `same_product`/`different_pack`/
+   `different_variant` is read by compare, landed-cost alerts and the recommendation as
+   `match_confidence = 1.0`, `match_verified = true` (no `low_match_confidence` note, UI
+   "Verified by buyer"). The machine score stays on `match_decision.confidence` and in the
+   match-resolution evidence.
+4. **Stub embeddings** show "Not available" instead of a semantic number (the stub already
+   carries weight 0 in `WEIGHTS_STUB_EMBEDDING`).
+
+Open owner decision - real embeddings on hosted: set `MATCHING_EMBEDDING_PROVIDER_MODE=bedrock`
+and `MATCHING_EMBEDDING_MODEL=<bedrock embedding model id>` on the API, plus AWS credentials the
+API container can use (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` or `AWS_PROFILE`,
+`AWS_DEFAULT_REGION`, with `bedrock:InvokeModel` on that model) and `boto3` in the image. Even
+then, per R5/R10, semantic similarity alone must not auto-accept until calibrated on 500+ labelled
+pairs. Not enabled by this change.

@@ -136,3 +136,18 @@
     font-style: italic;
   }
 }
+
+.verified-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-inline-start: 6px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.verified-icon {
+  font-size: 16px;
+  width: 16px;
+  height: 16px;
+}

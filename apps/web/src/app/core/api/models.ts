@@ -687,6 +687,8 @@ export interface Offer {
   readonly reliability_score?: string | null;
   readonly stock_signal?: StockSignal | null;
   readonly match_confidence: string;
+  /** True when a buyer confirmed the match; match_confidence is then 1.0 (verified). */
+  readonly match_verified?: boolean;
   readonly valid_from: string;
   readonly valid_to?: string | null;
   readonly is_expired: boolean;

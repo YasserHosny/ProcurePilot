@@ -13,6 +13,8 @@ from procurepilot_api.modules.matching.resolution_service import (
     get_match_resolution_service,
 )
 from procurepilot_api.modules.matching.schemas import (
+    BulkConfirmResult,
+    ExactMatchSummary,
     MatchDecision,
     MatchQueueList,
     MatchResolutionRequest,
@@ -100,3 +102,21 @@ def resolve_match(
         payload=payload,
         idempotency_key=_idempotency_key,
     )
+
+
+@router.get("/match-tasks/exact-matches", response_model=ExactMatchSummary)
+def count_exact_matches(
+    token: Annotated[str, Depends(bearer_token)],
+    _member: Annotated[CurrentMember, Depends(require_role(*WRITE_ROLES))],
+    service: Annotated[MatchResolutionService, Depends(get_match_resolution_service)],
+) -> ExactMatchSummary:
+    return service.count_exact_matches(bearer_token=token)
+
+
+@router.post("/match-tasks/confirm-exact", response_model=BulkConfirmResult)
+def confirm_exact_matches(
+    token: Annotated[str, Depends(bearer_token)],
+    member: Annotated[CurrentMember, Depends(require_role(*WRITE_ROLES))],
+    service: Annotated[MatchResolutionService, Depends(get_match_resolution_service)],
+) -> BulkConfirmResult:
+    return service.confirm_exact_matches(bearer_token=token, member=member)

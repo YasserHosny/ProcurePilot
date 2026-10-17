@@ -106,6 +106,7 @@ class Offer(BaseModel):
     reliability_score: str | None = None
     stock_signal: StockSignal | None = None
     match_confidence: str
+    match_verified: bool = False
     valid_from: datetime
     valid_to: datetime | None = None
     is_expired: bool

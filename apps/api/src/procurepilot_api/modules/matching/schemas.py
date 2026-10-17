@@ -162,6 +162,15 @@ class MatchResolutionRequest(StrictApiModel):
         return self
 
 
+class ExactMatchSummary(BaseModel):
+    count: int = Field(ge=0)
+
+
+class BulkConfirmResult(BaseModel):
+    confirmed: int = Field(ge=0)
+    skipped: int = Field(ge=0)
+
+
 class MatchTaskList(BaseModel):
     items: list[MatchTask]
     next_cursor: str | None = None
