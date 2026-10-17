@@ -40,6 +40,39 @@ export interface SeededLandedCost {
   id: string;
 }
 
+/** Sets deterministic review gate data on a quotation owned by this E2E buyer. */
+export function seedQuotationReviewCase(
+  ownerEmail: string,
+  quotationId: string,
+  lowConfidenceField: 'supplier_name' | 'unit_price',
+): void {
+  const sql = [
+    'with owner as (select m.tenant_id from membership m',
+    `where lower(m.email)=lower(${sqlLiteral(ownerEmail)}) and m.status='active' limit 1),`,
+    'supplier as (insert into supplier (id,tenant_id,name)',
+    `select gen_random_uuid(),tenant_id,${sqlLiteral(`E2E Review Supplier ${Date.now()}`)} from owner returning id,tenant_id),`,
+    'quote as (update quotation q set supplier_id=supplier.id,currency=\'EGP\',arithmetic_status=\'reconciled\'',
+    `from supplier where q.id=${sqlLiteral(quotationId)}::uuid and q.tenant_id=supplier.tenant_id returning q.id,q.tenant_id),`,
+    'raised as (update field_extraction f set confidence=0.9900 from quote',
+    'where f.quotation_id=quote.id and f.tenant_id=quote.tenant_id returning f.id),',
+    'target as (update field_extraction f set confidence=0.6000,extracted_value=',
+    lowConfidenceField === 'supplier_name'
+      ? `${sqlLiteral('الأمانة للتجارة\nEl-Amana Trading')}::jsonb`
+      : `coalesce(f.extracted_value,'{"amount":"12.00","currency":"EGP"}'::jsonb)`,
+    'from quote where f.id=(select candidate.id from field_extraction candidate',
+    'where candidate.quotation_id=quote.id and candidate.tenant_id=quote.tenant_id',
+    `and candidate.field_name=${sqlLiteral(lowConfidenceField)}`,
+    lowConfidenceField === 'unit_price'
+      ? "and candidate.entity_type='quotation_line' order by candidate.created_at limit 1)"
+      : "and candidate.entity_type='quotation' order by candidate.created_at limit 1)",
+    'returning f.id) select count(*) from target',
+  ].join(' ');
+  const stdout = execFileSync('docker', ['exec', DB_CONTAINER, 'psql', '-U', 'postgres', '-t', '-A', '-c', sql], {
+    encoding: 'utf-8',
+  }).trim();
+  if (stdout !== '1') throw new Error(`seedQuotationReviewCase expected one target field, got ${stdout || 'none'}`);
+}
+
 /**
  * Seeds a landed_cost row for a product so purchase-request valuation produces a real estimate.
  *

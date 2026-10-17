@@ -123,7 +123,7 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
     quotation_extraction_already_active: 'quotation_extraction_already_active', extraction_already_running: 'extraction_already_running',
   };
   private conflictKey(reason: unknown, namespace: 'confirmBlocked' | 'conflict' = 'confirmBlocked'): string {
-    const key = typeof reason === 'string' && this.conflictReasonKeys[reason] ? reason : 'unknown';
+    const key = typeof reason === 'string' && Object.hasOwn(this.conflictReasonKeys, reason) ? reason : 'unknown';
     return `quotations.review.${namespace}.${key}`;
   }
   private readonly route = inject(ActivatedRoute);

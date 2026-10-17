@@ -1,4 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { HttpErrorResponse } from '@angular/common/http';
 import { signal } from '@angular/core';
 import { By } from '@angular/platform-browser';
 import { MatDatepicker } from '@angular/material/datepicker';
@@ -622,6 +623,53 @@ describe('QuotationReviewComponent (T051, T057, T062)', () => {
     expect(component.confirmBlockedReason()).not.toBe('Request conflicts with the current state.');
   });
 
+  it('falls back to the unknown confirm conflict translation for unrecognized reasons', () => {
+    const alreadyMatched = { ...mockQuotationDetail, supplier_id: 'sup-1' };
+    component.quotation.set(alreadyMatched);
+    component.selectedSupplierId.set('sup-1');
+    apiService.confirmQuotation.and.returnValue(throwError(() => new HttpErrorResponse({
+      status: 409,
+      error: { message: 'Request conflicts with the current state.', details: { reason: 'something_new' } },
+    })));
+
+    component.confirmQuotation();
+    fixture.detectChanges();
+
+    const shown = component.confirmBlockedReason() ?? '';
+    expect(shown).toBe(enCatalog.quotations.review.confirmBlocked.unknown);
+    expect(shown.startsWith('quotations.')).toBeFalse();
+    expect(fixture.nativeElement.textContent).toContain(enCatalog.quotations.review.confirmBlocked.unknown);
+  });
+
+  it('falls back to the unknown PATCH conflict translation for unrecognized reasons', () => {
+    component.quotation.set(mockQuotationDetail);
+    apiService.patchQuotation.and.returnValue(throwError(() => new HttpErrorResponse({
+      status: 409,
+      error: { message: 'Request conflicts with the current state.', details: { reason: 'something_new' } },
+    })));
+    component.saveCorrections();
+
+    fixture.detectChanges();
+    const shown = component.errorMessage();
+    expect(shown).toBe(enCatalog.quotations.review.conflict.unknown);
+    expect(shown?.startsWith('quotations.')).toBeFalse();
+    expect(fixture.nativeElement.textContent).toContain(enCatalog.quotations.review.conflict.unknown);
+  });
+
+  it('treats prototype property names as unknown conflict reasons', () => {
+    const alreadyMatched = { ...mockQuotationDetail, supplier_id: 'sup-1' };
+    component.quotation.set(alreadyMatched);
+    component.selectedSupplierId.set('sup-1');
+    apiService.confirmQuotation.and.returnValue(throwError(() => new HttpErrorResponse({
+      status: 409,
+      error: { message: 'Request conflicts with the current state.', details: { reason: 'toString' } },
+    })));
+
+    component.confirmQuotation();
+
+    expect(component.confirmBlockedReason()).toBe(enCatalog.quotations.review.confirmBlocked.unknown);
+  });
+
   it('should display arithmetic mismatch banner and block confirmation when totals mismatch (US3)', () => {
     const mismatchedDetail: QuotationDetail = {
       ...mockQuotationDetail,
@@ -634,4 +682,3 @@ describe('QuotationReviewComponent (T051, T057, T062)', () => {
     expect(component.hasArithmeticMismatch()).toBeTrue();
   });
 });
-import { HttpErrorResponse } from '@angular/common/http';
