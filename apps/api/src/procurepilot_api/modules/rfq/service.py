@@ -13,6 +13,7 @@ from procurepilot_api.config import Settings
 from procurepilot_api.deps import CurrentMember
 from procurepilot_api.errors import (  # noqa: E501
     NotFoundError,
+    PermissionDeniedError,
     ServiceUnavailableError,
     UnprocessableEntityError,
 )
@@ -208,13 +209,16 @@ class RfqService:
         recipient_supplier_ids: list[uuid.UUID],
         needed_by_date: date,
         tenant_terms: str | None,
+        idempotency_key: uuid.UUID,
     ) -> tuple[Rfq, list[RfqLine], list[RfqRecipient], list[dict]]:
         with _authenticated_db(self.settings, member) as conn:
             with conn.cursor(row_factory=dict_row) as cur:
-                cur.execute("select * from rfq where id = %s for update", (rfq_id,))
-                row = cur.fetchone()
-                if row is None:
-                    raise NotFoundError(details={"resource": "rfq"})
+                row = _lock_rfq_for_creator(cur, member, rfq_id)
+                if row["last_update_idempotency_key"] == idempotency_key:
+                    # Replay of an already-applied PUT (lost response): return the stored
+                    # result without re-creating lines/recipients or auditing again.
+                    rfq, lines, recipients, _ = self._fetch_created(cur, rfq_id)
+                    return rfq, lines, recipients, []
                 if row["status"] != "draft":
                     from procurepilot_api.errors import ConflictError
 
@@ -230,9 +234,9 @@ class RfqService:
                         details={"resource": "rfq", "reason": "has_responses"}
                     ) from exc
                 cur.execute(
-                    "update rfq set needed_by_date = %s, tenant_terms = %s "
-                    "where id = %s returning *",
-                    (needed_by_date, tenant_terms, rfq_id),
+                    "update rfq set needed_by_date = %s, tenant_terms = %s, "
+                    "last_update_idempotency_key = %s where id = %s returning *",
+                    (needed_by_date, tenant_terms, idempotency_key, rfq_id),
                 )
                 rfq = Rfq(**cur.fetchone())
                 lines = []
@@ -286,10 +290,7 @@ class RfqService:
                         details={"idempotency_key": "concurrent request"}
                     )
 
-                cur.execute("select * from rfq where id = %s for update", (rfq_id,))
-                rfq_row = cur.fetchone()
-                if not rfq_row:
-                    raise NotFoundError(details={"resource": "rfq"})
+                rfq_row = _lock_rfq_for_creator(cur, member, rfq_id)
                 rfq = Rfq(**rfq_row)
 
                 cur.execute("select * from rfq_line where rfq_id = %s", (rfq_id,))
@@ -836,6 +837,7 @@ class RfqService:
                 r.status,
                 r.needed_by_date,
                 r.created_at,
+                r.created_by_membership_id,
                 (SELECT max(rr_sent.sent_at) FROM rfq_recipient rr_sent
                  WHERE rr_sent.rfq_id = r.id) as sent_at,
                 (SELECT count(*) FROM rfq_recipient rr WHERE rr.rfq_id = r.id) as recipient_count,
@@ -873,6 +875,27 @@ class RfqService:
 
         items = [RfqSummary.model_validate(row) for row in rows]
         return RfqList(items=items, next_cursor=next_cursor)
+
+
+def _lock_rfq_for_creator(cur: psycopg.Cursor, member: CurrentMember, rfq_id: uuid.UUID) -> dict:
+    """Load and row-lock an RFQ the caller may mutate, BEFORE any side effect (email, delete).
+
+    RLS makes another tenant's RFQ invisible (404). Within a tenant, `rfq_update` is
+    creator-only while `rfq_select` also admits owners/buyers, so a non-creator can read a
+    draft but would only fail at the final UPDATE — after suppliers were already emailed.
+    Refuse up front instead (403).
+    """
+    cur.execute("select * from rfq where id = %s", (rfq_id,))
+    row = cur.fetchone()
+    if row is None:
+        raise NotFoundError(details={"resource": "rfq"})
+    if row["created_by_membership_id"] != member.membership_id:
+        raise PermissionDeniedError(details={"resource": "rfq", "reason": "not_creator"})
+    cur.execute("select * from rfq where id = %s for update", (rfq_id,))
+    locked = cur.fetchone()
+    if locked is None:
+        raise NotFoundError(details={"resource": "rfq"})
+    return locked
 
 
 def _cap_limit(limit: int) -> int:

@@ -133,6 +133,7 @@ def update_rfq_draft(
         recipient_supplier_ids=payload.recipient_supplier_ids,
         needed_by_date=payload.needed_by_date,
         tenant_terms=payload.tenant_terms,
+        idempotency_key=idempotency_key,
     )
     return RfqCreateResponse(
         rfq=rfq, lines=lines, recipients=recipients, rejected_recipients=rejected

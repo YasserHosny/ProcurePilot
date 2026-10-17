@@ -171,6 +171,7 @@ class RfqSummary(BaseModel):
     needed_by_date: date
     created_at: datetime
     sent_at: datetime | None = None
+    created_by_membership_id: UUID
     recipient_count: int
     response_count: int
     converted_purchase_request_id: UUID | None
