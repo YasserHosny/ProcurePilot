@@ -14,6 +14,11 @@ Jira keys, and the handoff log.
 | [`demo-tenant/`](demo-tenant/) | Demo tenants (PP-5 / G-1): plan, restaurant dataset «مطاعم سند» on hosted, findings from building it live, lookups review |
 | [`video/production-tracker.md`](video/production-tracker.md) | Demo video production tracker: what is left before recording (product flow, demo data, production), owners, status, user inputs |
 | [`video/`](video/) | Demo video spec and decisions (PP-6): style, storyboard with music map, beat-locked logo sting, end card, audio sources and licences, beat data, render scripts |
+| [`company-formation/us-company-fb-research.md`](company-formation/us-company-fb-research.md) | Research (Arabic): 13 posts + all comments from the Lean Startup Circle Egypt Facebook group on forming a US company from Egypt — per-post analysis, option comparison, consensus vs. disputed claims, providers |
+| [`company-formation/recommendations.md`](company-formation/recommendations.md) | Conclusion & recommendations (Arabic): where to incorporate ProcurePilot now (Egyptian company, simplified tax regime) vs. later (Delaware C-Corp flip), questions for an Egyptian accountant, action plan, verified sources |
+| [`company-formation/egypt-company-setup-guide.md`](company-formation/egypt-company-setup-guide.md) | Step-by-step guide (Arabic): one-person company at GAFI, Law 6/2025 simplified tax (verified rates + consulting exclusion), VAT, e-invoicing, banking, costs, checklist |
+| [`company-formation/cost-comparison.md`](company-formation/cost-comparison.md) | 3-year cost comparison (Arabic): Egypt simplified vs. standard vs. adding US LLC / Delaware C-Corp / UAE free zone, at three revenue scenarios |
+| [`company-formation/flip-readiness.md`](company-formation/flip-readiness.md) | Flip readiness (Arabic): what to set up now (IP assignment, assets, cap table) so a later Delaware/holding flip is cheap; Delaware facts verified; group experiences |
 | [`test-fixtures/egypt-quotes/`](test-fixtures/egypt-quotes/) | 5 synthetic Egyptian supplier quotes + `expected.json` for extraction testing (spec 022 US2, PP-3). Fictional suppliers, each marked TEST FIXTURE |
 
 ## Live documents (source of truth — edit there, not here)
