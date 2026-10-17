@@ -394,6 +394,7 @@ journey
 - `/home` -> **Procurement Analyst** -> `/analyst` -> ask a question -> follow a next-step link, or **Question History** -> `/analyst/history` -> reopen a conversation -> `/analyst/:conversationId`
 - `/home` -> **RFQ History** -> `/rfq/history` -> **Create RFQ** -> `/rfq/create` -> add lines + pick suppliers -> **Save Draft** -> **Send RFQ** -> supplier replies captured automatically
 - `/home` -> **RFQ History** -> `/rfq/history` -> open a row -> `/rfq/compare/:id` -> review each response's guardrail-outcome panel -> **Prepare Request** -> draft appears in `/requests`; a `Converted` row instead opens `/requests/:id` directly
+- `/rfq/history` -> a `Draft` row -> **Edit** -> `/rfq/:id/edit` -> change lines, suppliers, needed-by date or terms -> **Save Draft** (stays on the page, "Draft saved") -> **Send RFQ** -> `/rfq/history`; a draft can also be sent straight from its History row (**Send** -> confirm). Saving a new RFQ on `/rfq/create` moves it to `/rfq/:id/edit`. Only the RFQ's creator can edit or send it.
 - `/rfq/history` -> **Guardrails** (Owner only) -> `/rfq/guardrails` -> create or edit a guardrail -> save -> guardrail can now auto-prepare a matching RFQ response
 
 ```mermaid
