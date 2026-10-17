@@ -2833,7 +2833,8 @@ Constitution Principle III (see `test_rfq_guardrail_boundary.py`'s executable pr
 
 ### `GET /rfq/{rfq_id}`
 
-- Any owner or buyer may read an RFQ in their workspace; another workspace's RFQ returns `404`.
+- The RFQ's creator (whatever their current role) or any owner or buyer may read an RFQ in their
+  workspace (`rfq_select` RLS policy); another workspace's RFQ returns `404`.
 - Returns the `Rfq` with its lines and recipients (`RfqDetail`), so a saved draft can be reopened
   for editing.
 
