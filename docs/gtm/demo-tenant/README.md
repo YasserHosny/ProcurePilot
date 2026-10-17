@@ -34,6 +34,20 @@ Lookups review (regions, currencies, tax models): [`lookups-review-2026-10-15.md
 | 14 | **Extraction passes the raw quote date `16/10/2026` (DD/MM/YYYY) to Postgres → `date/time field value out of range` → whole quotation `refused`**; days ≤ 12 would be silently month/day-swapped | **every Egyptian/GCC quote refused or mis-dated** | fix task raised; 2 demo quotations to re-extract after fix |
 | 13 | Ingestion dashboard "Catalogue Imports: 0" after a committed import | wrong counter | fixed in PP-6 PR (counter now includes committed product imports from `import_job`) |
 
+
+**Round 1, steps 2–4 (2026-10-17) — authorize, match, compare, request, approval, PO (first live run of everything after extraction):**
+
+| # | Finding | Impact | Status |
+|---|---|---|---|
+| 15 | Arabic RTL quote tables collapsed into one line; one quote auto-accepted with a wrong 84,000 EGP line | silent wrong prices | fixed — #100 |
+| 16 | A low-confidence supplier name on an already-linked quote could never be confirmed (dead end, generic 409) | quote cannot be authorized | fixed — #104; authorized live |
+| 17 | **Basket-split optimiser worker has no Dockerfile or deploy workflow; jobs stay `queued` forever, UI spins on "Checking job status…"** | headline feature does not work on hosted | fix task raised; needs a bunny.net container (owner) |
+| 18 | **Pack vs base unit: request estimate re-computed on Submit as per-base-unit prices × pack quantities (56,425 → 6,135.58) using the wrong supplier's prices; PO pre-fill says "10 litre" for 10 tins; Smart Compare asks in litres** | **understated totals feed approval thresholds and budgets; wrong PO units** | fix task raised (critical) |
+| 19 | Request flow: Submit drops unsaved edits (cost centre); "Prepare Request" gives no feedback and ignores the RFQ date; approval queue shows a raw requester UUID; branch budgets show "Not available"; approved request has no "Create PO" button (hidden `?source_request_id=` URL); PO needs manual order number + supplier; raw `EGP 56425.0000` formatting; "Resolve and Next" doesn't advance | friction + silent data loss | fix task raised |
+| 20 | Hosted uses the stub embedding: exact-name matches score 55% (all 10 lines needed manual confirm); human-confirmed matches still show 55% / "Medium Confidence" / "match score below 85%"; "Winning margin: 2%%" | trust signals wrong | fix task raised |
+
+Round 1 got as far as: both quotes authorized, 10 matches confirmed (aliases saved), Smart Compare per product (النور 16,800 vs الأمانة 17,250 for 10 tins of oil), a draft request prepared for Maadi, submitted and **approved**. Stopped before creating the PO (it would record wrong units/amounts). The submitted+approved request `6f460785-…` (wrong estimate 6,135.58) is demo test data and is to be withdrawn and re-prepared after fix 18.
+
 Workaround used for round 1 only: the RFQ date was corrected in the browser before sending (finding 7); the recorded demo cycle waits for the real fix.
 
 Products were entered through the New Product form because of #1; the CSV import is re-tested after the fix
