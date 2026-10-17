@@ -82,7 +82,7 @@ terraform validate
 ## 5. Deployment Workflows
 
 - `.github/workflows/deploy-backend.yml` — Builds `infra/docker/api.Dockerfile`, tags with `latest` and `${{ github.sha }}`, pushes to GHCR, and updates the backend container on bunny.net.
-- `.github/workflows/deploy-extraction-worker.yml`, `deploy-email-ingestion-worker.yml`, `deploy-optimiser-worker.yml` — Build the three worker images (`infra/docker/*-worker.Dockerfile`, `optimiser.Dockerfile`), push to GHCR, and update the matching container in the workers app. They do not create containers; each is created once by hand (`docs/operations/runbook.md`).
+- `.github/workflows/deploy-extraction-worker.yml`, `deploy-email-ingestion-worker.yml`, `deploy-optimiser-worker.yml` — Build the three worker images (`infra/docker/*-worker.Dockerfile`, `optimiser.Dockerfile`), push to GHCR, and update the matching container in the workers app. They do not create containers; each is created once by hand with its environment — see `docs/operations/runbook.md` §7.3 (extraction), §7.7 (optimiser) and §7.8 (email ingestion).
 - `.github/workflows/deploy-frontend.yml` — Builds the Angular SPA and Nginx image from `infra/docker/web.Dockerfile`, tags with `latest` and `${{ github.sha }}`, pushes to GHCR, and updates the frontend container on bunny.net.
 
 ---
