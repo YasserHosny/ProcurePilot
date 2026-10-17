@@ -9,7 +9,15 @@ import {
   signIn,
   type Credentials,
 } from './support/api';
-import { reconcileAndConfirmQuotation } from './support/canonical-flow';
+import {
+  confirmQuotation,
+  correctStatedTotal,
+  resolveIssueDateFlag,
+  saveCorrections,
+  selectReviewSupplier,
+  uploadQuotationAndOpenReview,
+} from './support/canonical-flow';
+import { seedRfqResponse } from './support/db';
 import { openAsyncSelect } from './support/select';
 
 const WCAG_21_AA = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'];
@@ -196,14 +204,13 @@ test.describe('Request → Approval → PO Flow & Matching Next (PP7 W2)', () =>
       .split('T')[0]!;
 
     // Create an RFQ, send it, record a supplier response, and prepare a request from it
-    const rfq = await apiAsUser<{ id: string }>(ownerToken, 'POST', '/rfq', {
+    const rfq = await apiAsUser<{ rfq: { id: string } }>(ownerToken, 'POST', '/rfq', {
       needed_by_date: neededByDate,
       tenant_terms: 'Net 30',
-      lines: [{ workspace_product_id: productId, requested_quantity: '6' }],
-      supplier_ids: [supplierId],
-      idempotency_key: crypto.randomUUID(),
-    });
-    await apiAsUser(ownerToken, 'POST', `/rfq/${rfq.id}/send`, {});
+      lines: [{ workspace_product_id: productId, quantity: '6' }],
+      recipient_supplier_ids: [supplierId],
+    }, { 'Idempotency-Key': crypto.randomUUID() });
+    await apiAsUser(ownerToken, 'POST', `/rfq/${rfq.rfq.id}/send`, {});
 
     const quotation = await apiAsUser<{ id: string; lines: Array<{ id: string }> }>(
       ownerToken,
@@ -224,20 +231,43 @@ test.describe('Request → Approval → PO Flow & Matching Next (PP7 W2)', () =>
       },
     ).catch(() => null);
 
-    if (quotation) {
-      await apiAsUser(ownerToken, 'POST', `/rfq/${rfq.id}/responses`, {
-        supplier_id: supplierId,
-        quotation_id: quotation.id,
-      }).catch(() => null);
-    }
+    expect(quotation, 'manual quotation seed must succeed').toBeTruthy();
+    seedRfqResponse(workspace.ownerEmail, rfq.rfq.id, supplierId, quotation!.id);
 
     await signInUi(page, workspace.ownerEmail, workspace.ownerPassword);
     await ensureEnglish(page);
-    await page.goto('/orders/new');
+    const responses = await apiAsUser<{ items: Array<{ id: string }> }>(
+      ownerToken, 'GET', `/rfq/${rfq.rfq.id}/responses`,
+    );
+    expect(responses.items.length, 'RFQ ingestion must associate a supplier response').toBeGreaterThan(0);
+    const prepared = await apiAsUser<{ purchase_request_id: string }>(
+      ownerToken,
+      'POST',
+      `/rfq/${rfq.rfq.id}/prepare-request`,
+      {
+        rfq_response_id: responses.items[0]!.id,
+        branch_id: branchId,
+        cost_centre_id: costCentreId,
+        required_by_date: neededByDate,
+      },
+      { 'Idempotency-Key': crypto.randomUUID() },
+    );
+    const request = await apiAsUser<{ id: string; status: string }>(
+      ownerToken, 'GET', `/requests/${prepared.purchase_request_id}`,
+    );
+    if (request.status === 'draft') {
+      await apiAsUser(ownerToken, 'POST', `/requests/${request.id}/submit`);
+      await apiAsUser(ownerToken, 'POST', `/requests/${request.id}/approve`, {
+        comment: 'Approved in RFQ PO E2E flow',
+      });
+    }
+
+    await page.goto(`/orders/new?source_request_id=${request.id}`);
 
     const orderNumberInput = page.locator('input[formControlName="order_number"]');
     await expect(orderNumberInput).toBeVisible();
     await expect(orderNumberInput).toHaveValue(/^PO-\d+/);
+    await expect(page.locator('mat-select[formControlName="supplier_id"]')).toContainText(supplierName);
   });
 
   test('matching Resolve and Next navigates to the next open task and clears queue', async ({
@@ -251,7 +281,12 @@ test.describe('Request → Approval → PO Flow & Matching Next (PP7 W2)', () =>
       base_unit: 'litre',
     });
 
-    const { quotationId } = await reconcileAndConfirmQuotation(page, 'pp7_resolve_next.pdf');
+    const quotationId = await uploadQuotationAndOpenReview(page, 'pp7_resolve_next.pdf');
+    await selectReviewSupplier(page, supplierName);
+    await correctStatedTotal(page);
+    await resolveIssueDateFlag(page);
+    await saveCorrections(page);
+    await confirmQuotation(page);
 
     await page.goto(`/matching?quotation_id=${quotationId}`);
     const firstLine = page
@@ -260,7 +295,7 @@ test.describe('Request → Approval → PO Flow & Matching Next (PP7 W2)', () =>
       .first();
     await expect(firstLine).toBeVisible({ timeout: 30_000 });
     await firstLine.locator('.action-btn').click();
-    await page.waitForURL('**/matching/**');
+    await page.waitForURL(/\/matching\/[0-9a-f-]+$/);
 
     const resolveNextBtn = page.locator('button.confirm-resolution-btn', {
       hasText: 'Resolve and Next',

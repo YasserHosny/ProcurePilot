@@ -21,6 +21,31 @@ function sqlLiteral(value: string): string {
   return `'${value.replace(/'/g, "''")}'`;
 }
 
+/** Associates a seeded quotation with the matching sent RFQ recipient for prepare-request E2E. */
+export function seedRfqResponse(
+  ownerEmail: string,
+  rfqId: string,
+  supplierId: string,
+  quotationId: string,
+): void {
+  const sql = [
+    'insert into rfq_response (tenant_id, rfq_recipient_id, quotation_id)',
+    'select m.tenant_id, rr.id, q.id from membership m',
+    'join rfq r on r.id=' + `${sqlLiteral(rfqId)}::uuid` + ' and r.tenant_id=m.tenant_id',
+    'join rfq_recipient rr on rr.rfq_id=r.id and rr.supplier_id=' + `${sqlLiteral(supplierId)}::uuid`,
+    'join quotation q on q.id=' + `${sqlLiteral(quotationId)}::uuid` + ' and q.tenant_id=m.tenant_id',
+    `where lower(m.email)=lower(${sqlLiteral(ownerEmail)}) and m.status='active'`,
+  ].join(' ');
+  const url = process.env['E2E_DATABASE_URL'];
+  const psqlArgs = url ? [url, '-t', '-A', '-c', sql] : ['-U', 'postgres', '-t', '-A', '-c', sql];
+  const stdout = execFileSync('docker', ['exec', DB_CONTAINER, 'psql', ...psqlArgs], {
+    encoding: 'utf-8',
+  }).trim();
+  if (stdout !== 'INSERT 0 1') {
+    throw new Error(`seedRfqResponse expected one association, got ${stdout || 'none'}`);
+  }
+}
+
 export interface CreatedCostCentre {
   id: string;
 }

@@ -122,10 +122,10 @@ test.describe('Request budget status', () => {
     await expect(warning.locator('.budget-warning-message')).toContainText(
       'would exceed the remaining budget',
     );
-    await expect(warning.locator('.budget-remaining-amount')).toContainText('GBP 1000.0000');
+    await expect(warning.locator('.budget-remaining-amount')).toContainText('GBP 1,000');
 
     // The page must show the request detail, not an error, for the requester.
-    await expect(page.locator('.total-value')).toContainText('GBP 1500.0000');
+    await expect(page.locator('.total-value')).toContainText('GBP 1,500');
   });
 
   test('requester sees remaining budget when the request is within budget', async ({ page }) => {
@@ -155,7 +155,7 @@ test.describe('Request budget status', () => {
     // Within budget the backend returns no budget_status, so the UI renders no banner/row.
     await expect(page.locator('.budget-warning-banner')).toHaveCount(0);
     await expect(page.locator('.budget-status-row')).toHaveCount(0);
-    await expect(page.locator('.total-value')).toContainText('GBP 500.0000');
+    await expect(page.locator('.total-value')).toContainText('GBP 500');
   });
 
   test('approver sees a budget-exceeded warning in the approval queue', async ({ page }) => {
@@ -184,7 +184,7 @@ test.describe('Request budget status', () => {
     // drill-through the real UI never built.
     const row = page
       .locator('tr.request-row', { hasText: requiredBy })
-      .filter({ hasText: 'GBP 1500.0000' });
+      .filter({ hasText: 'GBP 1,500' });
     await expect(row).toBeVisible();
     await expect(row.locator('.budget-warning-badge')).toBeVisible();
     await expect(row.locator('.budget-warning-badge')).toContainText('Exceeds budget');
