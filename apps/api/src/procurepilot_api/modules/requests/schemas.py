@@ -37,6 +37,10 @@ class PurchaseRequestLine(BaseModel):
     note: str | None = None
     estimated_unit_price: Money | None = None
     estimated_unit_price_source_landed_cost_id: UUID | None = None
+    # The supplier's own quoted per-pack price (before VAT/delivery/discounts) from the RFQ
+    # response the request was prepared from; null for any line without that provenance. This,
+    # not `estimated_unit_price` (a landed estimate), is what a purchase order may pre-fill.
+    quoted_unit_price: Money | None = None
 
 
 class PurchaseRequestLineInput(StrictApiModel):

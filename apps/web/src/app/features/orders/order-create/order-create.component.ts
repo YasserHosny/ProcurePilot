@@ -215,10 +215,10 @@ export class OrderCreateComponent implements OnInit {
                 workspace_product_id: new FormControl<string | null>(reqLine.workspace_product_id || null),
                 description: new FormControl<string>(this.requestLineDescription(products.items.find(p => p.id === reqLine.workspace_product_id)), { nonNullable: true, validators: [Validators.required] }),
                 quantity: new FormControl<number | null>(remaining, { validators: [Validators.required, Validators.min(0.0001), Validators.max(remaining)] }),
-                // Request quantities are in PACKS; quoted RFQ estimates are per-pack prices.
-                // Keep other estimates as references only, and say "pack of 18 litre" in the description.
+                // Request quantities are in PACKS. Only the supplier's quoted per-pack price pre-fills
+                // the PO; the (landed) estimate stays a reference, and say "pack of 18 litre" in the description.
                 base_unit: new FormControl<string>(products.items.find(p => p.id === reqLine.workspace_product_id)?.base_unit || 'EA', { nonNullable: true, validators: [Validators.required] }),
-                unit_price: new FormControl<number | null>(request.source_rfq_response_id && reqLine.estimated_unit_price ? parseFloat(reqLine.estimated_unit_price.amount) : null, { validators: [Validators.required, Validators.min(0)] }),
+                unit_price: new FormControl<number | null>(reqLine.quoted_unit_price ? parseFloat(reqLine.quoted_unit_price.amount) : null, { validators: [Validators.required, Validators.min(0)] }),
                 line_tax: new FormControl<number | null>(0, { validators: [Validators.min(0)] }),
                 source_request_line_id: new FormControl<string | null>(reqLine.id),
                 remaining_quantity: new FormControl<number | null>(remaining),

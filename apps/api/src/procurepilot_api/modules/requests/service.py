@@ -66,6 +66,7 @@ from procurepilot_api.modules.requests.valuation import (
     LineEstimate,
     estimate_from_source_response,
     estimate_line_value,
+    quoted_prices_from_source_response,
 )
 from procurepilot_api.shared.audit import AuditEventCreate, get_audit_writer
 from procurepilot_api.shared.storage_keys import safe_object_name
@@ -1871,7 +1872,24 @@ class RequestsService:
             line_rows,
             step_row,
             budget_status=self._budget_status_for(client, request_row),
+            quoted_prices=self._quoted_prices_for(request_row, line_rows),
         )
+
+    def _quoted_prices_for(
+        self, request_row: dict[str, object], line_rows: list[dict[str, object]]
+    ) -> dict[UUID, tuple[Decimal, str]]:
+        """Quoted per-pack prices of an RFQ-sourced request's source response, by product."""
+        source = request_row.get("source_rfq_response_id")
+        if not source or not line_rows:
+            return {}
+        product_ids = [UUID(str(lr["workspace_product_id"])) for lr in line_rows]
+        try:
+            with db.connect(self._settings.database_url.get_secret_value()) as conn:
+                return quoted_prices_from_source_response(
+                    conn, rfq_response_id=UUID(str(source)), product_ids=product_ids
+                )
+        except psycopg.Error as exc:
+            raise ServiceUnavailableError(details={"dependency": "database"}) from exc
 
     def _budget_status_for(
         self,
@@ -1942,6 +1960,7 @@ def _purchase_request(
     step_row: dict[str, object] | None,
     *,
     budget_status: BudgetStatus | None = None,
+    quoted_prices: dict[UUID, tuple[Decimal, str]] | None = None,
 ) -> PurchaseRequest:
     return PurchaseRequest(
         id=UUID(str(row["id"])),
@@ -1955,7 +1974,7 @@ def _purchase_request(
         requested_by_membership_id=UUID(str(row["requested_by_membership_id"])),
         required_by_date=_parse_date(row["required_by_date"]),
         status=str(row["status"]),
-        lines=[_purchase_request_line(lr) for lr in line_rows],
+        lines=[_purchase_request_line(lr, quoted_prices or {}) for lr in line_rows],
         estimated_total=_money(
             row.get("estimated_total_amount"),
             row.get("estimated_total_currency"),
@@ -1977,7 +1996,11 @@ def _purchase_request(
     )
 
 
-def _purchase_request_line(row: dict[str, object]) -> PurchaseRequestLine:
+def _purchase_request_line(
+    row: dict[str, object],
+    quoted_prices: dict[UUID, tuple[Decimal, str]] | None = None,
+) -> PurchaseRequestLine:
+    quoted = (quoted_prices or {}).get(UUID(str(row["workspace_product_id"])))
     return PurchaseRequestLine(
         id=UUID(str(row["id"])),
         workspace_product_id=UUID(str(row["workspace_product_id"])),
@@ -1997,6 +2020,7 @@ def _purchase_request_line(row: dict[str, object]) -> PurchaseRequestLine:
             if row.get("estimated_unit_price_source_landed_cost_id")
             else None
         ),
+        quoted_unit_price=_money(quoted[0], quoted[1]) if quoted else None,
     )
 
 
