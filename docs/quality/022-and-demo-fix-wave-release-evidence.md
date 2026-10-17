@@ -37,7 +37,7 @@ Merge dates are UTC.
 | #109 | `8304739` | 2026-10-17 | Verified matches, exact-name bulk confirm | 20 (partly) | Deployed; hosted still on the stub embedding |
 | #110 | `4ebef39` | 2026-10-17 | Per-pack estimates (ADR-020) | 18 | Deployed; PO step not yet re-run on hosted |
 
-Still open: finding 19 (request-flow gaps, PR #112), finding 6 (team invites not emailed; PR #111 adds an
+Since this record: finding 19 (request-flow gaps) fixed by PR #112, merged 2026-10-17, not yet re-run on hosted. Still open: finding 6 (team invites not emailed; PR #111 adds an
 operator workaround).
 
 All migrations in the repository up to `20261017000003` are applied to hosted (checked 2026-10-18).

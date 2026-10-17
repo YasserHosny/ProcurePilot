@@ -305,6 +305,7 @@ const DATA = [
     { name:"Order Tracking & Three-Way Match", route:"/orders", features:[
       {t:"Lifecycle", d:"Draft → Submitted → Confirmed → Partially Received/Received → Closed."},
       {t:"Create / Edit / Cancel draft", d:"Quantity capped to what remains unallocated on the source request."},
+      {t:"From approved request", d:"Start a PO from any approved request; suggested order number, supplier pre-filled from its RFQ response."},
       {t:"Record confirmation / delivery", d:"Cumulative receipts; remaining quantity recomputed each time."},
       {t:"Reconciliation Discrepancies", d:"Three-way comparison against synced accounting bills (§33)."},
     ]},

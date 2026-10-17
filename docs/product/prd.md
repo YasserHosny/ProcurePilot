@@ -3,6 +3,9 @@
 > Source of truth for product functionality from Phase 1 through Phase 2.  
 > Companion to the [Master Roadmap](../roadmap/procurepilot_roadmap.md).
 > For detailed business/revenue value by function, see [Function Business Value](function-business-value.md).
+>
+> **Status (2026-10-18):** Phases 1–4 are built (`specs/001`–`021`); what is partial or deferred is in the
+> roadmap's "Delivery Status" section. The first pilot market is Egypt, which added the requirements in §3.9.
 
 ---
 
@@ -95,6 +98,18 @@
 | F31 | Delivery confirmation | Confirm quantity received, flag shortage/quality issue, attach photo | P2 |
 | F32 | Offline tolerance | Drafts persist locally and sync when connectivity returns; idempotency prevents duplicates | P2 |
 
+### 3.9 Regional Requirements — Egypt pilot (added 2026-10-18)
+
+| ID | Requirement | Acceptance Criteria | Source |
+|---|---|---|---|
+| R1 | Home currency per workspace | New orders, guardrails and budgets default to it; owners can change it (audited) | spec 022 |
+| R2 | No guessed currency | A quote with no currency evidence is stored without one and goes to review; the home currency is only a suggestion | spec 022, 003 |
+| R3 | Regional dates and digits | DD/MM dates by region, Arabic-Indic digits and Arabic month names; an unreadable date goes to review, never refuses the quote | spec 003 FR-005A |
+| R4 | Arabic right-to-left quote tables | Lines read by column meaning; merged or missing lines and unverified totals go to review | spec 003 FR-011A |
+| R5 | Arabic file names and business names | Arabic attachments are kept and shown by name; workspace addresses are transliterated | spec 013 FR-001A, FR-005A |
+| R6 | Supplier emails in the buyer's language | RFQ email names the buyer, includes their terms, in Arabic or English with localised numbers and dates | spec 021 FR-004A |
+| R7 | Quantities per pack | Requests, RFQs and orders count packs and price per pack | ADR-020, spec 008 FR-015A |
+
 ## 4. Non-Functional Requirements
 
 - **Performance** — dashboard FCP < 1.5 s; comparison grid recalculation < 150 ms; extraction p95 < 45 s.
@@ -113,8 +128,8 @@
 
 ## 6. Open Questions
 
-1. Should savings baseline be customer-configurable or a single conservative default?
-2. Does WhatsApp ingestion require a direct integration or manual file export?
+1. Should savings baseline be customer-configurable or a single conservative default? *(2026-10: each saving stores its baseline policy; there is no workspace setting yet.)*
+2. Does WhatsApp ingestion require a direct integration or manual file export? *(2026-10: manual capture today; direct integration deferred, spec 013.)*
 3. ~~Which accounting/POS providers are pilot priorities for Phase 3?~~ Resolved: QuickBooks
    Online and Xero for accounting (014-accounting-integration, 016-order-tracking-three-way-match)
    and Square for POS/inventory (015-pos-inventory-integration) shipped in Phase 3 and are live

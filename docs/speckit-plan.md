@@ -5,6 +5,25 @@
 
 ---
 
+## Status (2026-10-18)
+
+This plan was written before any code. Every chunk below, and every phase sketched in section 5, has
+since been specified and built:
+
+| Plan section | Specs |
+|---|---|
+| Chunks 4.1–4.6 (Phase 1) | `001`–`006` |
+| Phase 2 sketches | `007`–`012` |
+| Phase 3 sketches | `013`–`017` |
+| Phase 4 sketches | `018`–`021` |
+| Egypt pilot readiness (not in this plan) | `022-home-currency-readiness` |
+
+The stage gates were not passed first: Phase 2 started by recorded exception (ADR-010), and G2 was
+recorded as software-only (ADR-016). Current status per release is in the roadmap's "Delivery Status"
+section. New work starts a new spec (`023-…`) with `/speckit.specify`; this file is kept for history.
+
+---
+
 ## 1. How to Use This Plan
 
 1. Feed the relevant section below to Speckit's `/constitution`, `/plan`, or `/specify` command as instructed.
@@ -212,7 +231,7 @@ Run these chunks sequentially. Each chunk should produce code, tests, and docs t
 
 ---
 
-## 5. Future Phase Sketches (Do Not Code Yet)
+## 5. Future Phase Sketches (as written 2026-09-10; all since built — see Status above)
 
 ### Phase 2 chunks
 - 5.1 Organisation model (branches, cost centres, budgets, roles).
