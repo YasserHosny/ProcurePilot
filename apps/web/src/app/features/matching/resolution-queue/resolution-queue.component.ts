@@ -80,6 +80,9 @@ export class ResolutionQueueComponent implements OnInit {
   readonly sortOrder = signal<MatchTaskSortOrder>('desc');
   readonly errorMessage = signal<string | null>(null);
   readonly errorTraceId = signal<string | null>(null);
+  readonly exactMatchCount = signal<number>(0);
+  readonly isConfirmingExact = signal<boolean>(false);
+  readonly exactConfirmedCount = signal<number | null>(null);
   readonly refreshReviews = signal<CatalogueRefreshReview[]>([]);
   readonly isLoadingRefreshReviews = signal<boolean>(true);
   readonly refreshReviewDecisionId = signal<string | null>(null);
@@ -140,6 +143,34 @@ export class ResolutionQueueComponent implements OnInit {
     }
     this.loadTasks();
     this.loadRefreshReviews();
+    this.loadExactMatchCount();
+  }
+
+  loadExactMatchCount(): void {
+    if (!this.isWriter()) return;
+    this.api.getExactMatchCount().subscribe({
+      next: (res) => this.exactMatchCount.set(res.count),
+      error: () => this.exactMatchCount.set(0),
+    });
+  }
+
+  /** Human-triggered: each exact-name match gets an ordinary buyer decision and learns an alias. */
+  confirmAllExact(): void {
+    if (!this.isWriter() || this.isConfirmingExact()) return;
+    this.isConfirmingExact.set(true);
+    this.exactConfirmedCount.set(null);
+    this.api.confirmExactMatches().subscribe({
+      next: (res) => {
+        this.isConfirmingExact.set(false);
+        this.exactConfirmedCount.set(res.confirmed);
+        this.loadExactMatchCount();
+        this.loadTasks();
+      },
+      error: (err: unknown) => {
+        this.isConfirmingExact.set(false);
+        this.handleError(err);
+      },
+    });
   }
 
   loadRefreshReviews(): void {

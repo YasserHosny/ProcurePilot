@@ -28,6 +28,26 @@
     </div>
   }
 
+  @if (isWriter() && exactMatchCount() > 0) {
+    <section class="exact-match-banner" data-testid="exact-match-banner" role="status">
+      <mat-icon aria-hidden="true">task_alt</mat-icon>
+      <div class="banner-content">
+        <span class="banner-title">{{ 'matching.queue.exact.title' | translate: { count: exactMatchCount() } }}</span>
+        <span class="banner-text">{{ 'matching.queue.exact.description' | translate }}</span>
+      </div>
+      <button mat-flat-button color="primary" type="button" data-testid="confirm-exact-btn"
+              (click)="confirmAllExact()" [disabled]="isConfirmingExact()">
+        @if (isConfirmingExact()) { <mat-spinner diameter="18"></mat-spinner> }
+        <span>{{ 'matching.queue.exact.action' | translate: { count: exactMatchCount() } }}</span>
+      </button>
+    </section>
+  }
+  @if (exactConfirmedCount() !== null) {
+    <p class="exact-match-result" data-testid="exact-match-result" role="status">
+      {{ 'matching.queue.exact.confirmed' | translate: { count: exactConfirmedCount() } }}
+    </p>
+  }
+
   <mat-card class="filter-card">
     <mat-card-content class="filter-row">
       <mat-form-field appearance="outline" class="filter-field search-field">

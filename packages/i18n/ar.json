@@ -1215,6 +1215,12 @@
         "reject": "رفض التحديث",
         "readOnly": "صلاحية للعرض فقط",
         "empty": "لا توجد تحديثات لدليل المنتجات بانتظار المراجعة."
+      },
+      "exact": {
+        "title": "{{count}} تطابق تام في الاسم جاهز للتأكيد",
+        "description": "نص البند يطابق اسم منتج في الكتالوج تمامًا. لا يتم قبول أي شيء تلقائيًا؛ التأكيد يسجل قرارك ويحفظ اسمًا بديلًا ليُطابق النص نفسه تلقائيًا في المرة القادمة.",
+        "action": "تأكيد كل التطابقات التامة ({{count}})",
+        "confirmed": "تم تأكيد {{count}} تطابق."
       }
     },
     "resolution": {
@@ -1262,7 +1268,7 @@
           "supplierCodeMatchDesc": "يطابق كود المنتج الخاص بالمورد",
           "lexicalSimilarity": "التشابه اللفظي",
           "semanticSimilarity": "التشابه الدلالي",
-          "unavailableForStub": "غير متاح لنموذج الاختبار",
+          "unavailableForStub": "غير متاح",
           "featureScores": "تفاصيل معقولية السمات",
           "brandMatch": "تطابق العلامة التجارية",
           "variantMatch": "تطابق الصنف",
@@ -1410,7 +1416,7 @@
       },
       "validityWindow": "السعر صالح من {{from}} إلى {{to}}",
       "validityOpenEnded": "السعر صالح من {{from}} (بدون تاريخ انتهاء)",
-      "winningMargin": "هامش التوفير: {{margin}}%",
+      "winningMargin": "هامش التوفير: {{margin}}",
       "evidenceTitle": "تفاصيل أدلة التقييم",
       "weightsTitle": "أوزان المعايير",
       "weights": {
@@ -1433,7 +1439,8 @@
       "supplierIqInfluenced": "تم أخذ تقييم مخاطر ذكاء المورّد في الاعتبار لهذه التوصية لـ {{supplier}}.",
       "viewSupplierScorecard": "عرض بطاقة أداء المورّد",
       "tieBreakTitle": "تم تطبيق معيار كسر التعادل الحتمي",
-      "tieBreakNote": "تساوت درجات العروض؛ تم كسر التعادل بالترتيب: {{rule}}"
+      "tieBreakNote": "تساوت درجات العروض؛ تم كسر التعادل بالترتيب: {{rule}}",
+      "reliabilityNotEnoughData": "لا توجد بيانات كافية (محايد)"
     },
     "table": {
       "supplier": "المورد",
@@ -1452,7 +1459,9 @@
       "status": "الحالة",
       "statusActive": "نشط",
       "statusExpired": "منتهي الصلاحية",
-      "recommendedBadge": "موصى به"
+      "recommendedBadge": "موصى به",
+      "notEnoughData": "لا توجد بيانات كافية",
+      "verifiedByBuyer": "تم التحقق من المشتري"
     },
     "empty": {
       "title": "لا توجد عروض موردين مسجلة",
