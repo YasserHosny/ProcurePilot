@@ -2,7 +2,7 @@
 
 **Feature Branch**: `003-quotation-inbox-extraction`
 **Created**: 2026-08-21
-**Status**: Draft
+**Status**: Shipped — merged to `main` (see `docs/roadmap/procurepilot_roadmap.md`, Delivery Status)
 **Input**: User description: "Chunk 4.3: Quotation Inbox + Extraction Review — a workspace uploads supplier quotation documents (PDF, and likely image/email-derived text); an AI extraction step reads them into structured line items (product references, quantities, pack sizes, unit prices, currency); a human reviewer confirms or corrects each extracted line, with a confidence score and provenance back to the source document, before anything becomes trusted commercial data feeding the catalogue's suppliers/products and the eventual Smart Compare engine. First chunk to introduce Redis for the extraction worker's job queue."
 
 ## User Scenarios & Testing *(mandatory)*
@@ -173,6 +173,14 @@ the new one is linked to the prior version and both remain visible and distingui
 - **FR-005**: System MUST extract, for every quotation, a header (at minimum: supplier, currency,
   issue date, and expiry date where present) and one or more line items (at minimum: the original
   wording as it appeared in the document, quantity, pack information, and unit price).
+- **FR-005A** *(added 2026-10-18, records PR #96)*: Extracted dates MUST be parsed by the system,
+  never passed to the database as raw text. Accepted forms include ISO dates, `d/m/yyyy`-style dates
+  with `/`, `-` or `.` separators, Arabic-Indic digits, and English or Arabic month names. When the
+  day and month cannot be told apart (both ≤ 12), the workspace region decides the order (day-first
+  for Egypt, the Gulf, Jordan, the UK and unknown regions; month-first for the US) and the field's confidence is
+  capped so the quotation goes to review. A date that cannot be parsed MUST NOT refuse the
+  quotation: the date stays empty, the original text is kept as evidence, and the quotation goes to
+  review with reason `date_unparsed`.
 - **FR-006**: System MUST bypass AI-based extraction for inputs that are already structured data
   (Excel, CSV) and read their values directly, reserving AI extraction for documents that require
   reading unstructured text or images (PDF, scanned image).
@@ -189,6 +197,14 @@ the new one is linked to the prior version and both remain visible and distingui
   regardless of the confidence reported on individual fields.
 - **FR-011**: System MUST force a quotation into mandatory review whenever any of its fields falls
   below a configured confidence threshold, rather than accepting it silently.
+- **FR-011A** *(added 2026-10-18, records PR #100)*: Line items MUST be read from the document's
+  line-item table by column meaning (Arabic or English headers), not by column position, so
+  right-to-left tables are read correctly; totals, tax and delivery-charge rows are not items. A
+  quotation MUST go to review instead of being auto-accepted when one line contains several items
+  (`merged_line_items`), when fewer lines were produced than the table has item rows
+  (`line_count_mismatch`), or when a PDF or image quotation's line totals cannot be reconciled with a
+  stated total (`total_unverified`). Model confidence alone never auto-accepts a document quotation;
+  spreadsheet uploads (FR-006) are exempt. These reasons are cleared only by a reviewer's save.
 - **FR-012**: System MUST provide a review interface that shows the source document and the
   extracted fields side by side, and highlights a field's source region in the document when it is
   selected.

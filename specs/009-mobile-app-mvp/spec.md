@@ -2,7 +2,9 @@
 
 **Feature Branch**: `009-mobile-app-mvp`
 **Created**: 2026-09-11
-**Status**: Draft
+**Status**: Partial — merged to `main`, except push delivery: `_send_to_device()` is a stub with
+no FCM/APNs provider, so push notifications are queued but never delivered (T011 open; see
+`tasks.md`). Delivery Status: `docs/roadmap/procurepilot_roadmap.md`
 **Input**: User description: "Release R2.2 Mobile MVP (Phase 2): the first mobile app release,
 covering the three mobile-native jobs the roadmap scopes for it — Request and, read-only,
 awareness of Approve — mobile shell (navigation, theming from shared design tokens), sign-in with

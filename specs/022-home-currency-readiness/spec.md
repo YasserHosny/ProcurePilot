@@ -2,7 +2,7 @@
 
 **Feature Branch**: `022-home-currency-readiness`
 **Created**: 2026-10-14
-**Status**: Draft (amended 2026-10-14 after planning research: the home currency is the existing `tenant.currency`; see plan.md)
+**Status**: Merged to `main` 2026-10-14, three tasks open (T015, T018, T020). (amended 2026-10-14 after planning research: the home currency is the existing `tenant.currency`; see plan.md)
 **Tracking**: Jira PP-1 (gap C1), PP-2 (gap C3), PP-3 fix part (gap C2) — see
 `docs/gtm/first-customer-gtm-plan.md` § "Currency gaps — Egypt" and
 `docs/gtm/gtm-execution-plan.md` (P-1..P-3)

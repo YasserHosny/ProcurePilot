@@ -289,6 +289,7 @@ export async function createTestProduct(
 export async function createTestSupplier(
   token: string,
   name?: string,
+  contactEmail?: string,
 ): Promise<{ id: string; name: string }> {
   const uniqueName = name ?? `Supplier ${Date.now()}_${Math.floor(Math.random() * 1000)}`;
   // No status field: SupplierCreate is a strict model and rejects it, and the supplier table
@@ -298,6 +299,7 @@ export async function createTestSupplier(
     headers: { Authorization: `Bearer ${token}` },
     body: JSON.stringify({
       name: uniqueName,
+      ...(contactEmail ? { contact_email: contactEmail } : {}),
     }),
   });
 }

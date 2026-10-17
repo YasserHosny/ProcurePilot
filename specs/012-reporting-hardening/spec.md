@@ -2,7 +2,7 @@
 
 **Feature Branch**: `012-reporting-hardening`
 **Created**: 2026-09-14
-**Status**: Draft
+**Status**: Shipped — merged to `main` (see `docs/roadmap/procurepilot_roadmap.md`, Delivery Status)
 **Input**: Roadmap R2.5 (M14 – M15): "Scheduled reports, digests, exports, performance tuning,
 accessibility pass, security review". Roadmap §7.1 Phase 2 workflow scope: "Scheduled reports and
 email digests". Roadmap §10.8: third-party penetration test before general availability (end of

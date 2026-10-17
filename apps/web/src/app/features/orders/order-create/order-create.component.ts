@@ -142,10 +142,37 @@ export class OrderCreateComponent implements OnInit {
       products: this.api.products({ status: 'all', limit: 100 }).pipe(catchError(() => of({ items: [], next_cursor: null }))),
       request: sourceRequestId ? this.requestsApi.getRequest(sourceRequestId).pipe(catchError(() => of(null))) : of(null),
       allocations: sourceRequestId ? this.ordersApi.getAllocations(sourceRequestId).pipe(catchError(() => of(null))) : of(null),
+      prefill: !editId && sourceRequestId && this.ordersApi.getRequestPrefill
+        ? this.ordersApi.getRequestPrefill(sourceRequestId).pipe(catchError(() => of(null)))
+        : of(null),
+      nextNumber: !editId && this.ordersApi.getNextOrderNumber
+        ? this.ordersApi.getNextOrderNumber().pipe(catchError(() => of(null)))
+        : of(null),
       orderToEdit: editId ? this.ordersApi.getOrder(editId).pipe(catchError(() => of(null))) : of(null),
-    }).subscribe(({ suppliers, products, request, allocations, orderToEdit }) => {
-      this.suppliers.set(suppliers.items);
+    }).subscribe(({ suppliers, products, request, allocations, prefill, nextNumber, orderToEdit }) => {
+      const supplierItems = [...suppliers.items];
+      if (!orderToEdit && prefill?.supplier) {
+        const prefillSupplier = prefill.supplier;
+        if (!supplierItems.some(s => s.id === prefillSupplier.id)) {
+          supplierItems.push({
+            id: prefillSupplier.id,
+            name: prefillSupplier.name,
+            status: 'active',
+            created_at: '',
+          });
+        }
+      }
+      this.suppliers.set(supplierItems);
       this.products.set(products.items);
+
+      if (!orderToEdit) {
+        if (nextNumber?.order_number && !this.form.controls.order_number.value) {
+          this.form.controls.order_number.setValue(nextNumber.order_number);
+        }
+        if (prefill?.supplier?.id) {
+          this.form.controls.supplier_id.setValue(prefill.supplier.id);
+        }
+      }
       
       if (orderToEdit) {
         const order = orderToEdit.order;
@@ -328,6 +355,18 @@ export class OrderCreateComponent implements OnInit {
       },
       error: (err: unknown) => {
         this.isSubmitting.set(false);
+        if (err instanceof HttpErrorResponse && err.status === 409) {
+          const details = err.error?.details as Record<string, unknown> | undefined;
+          const reason = details?.['reason'];
+          if (reason === 'order_number_exists') {
+            this.errorMessage.set(this.translate.instant('orders.create.errors.orderNumberExists'));
+            return;
+          }
+          if (reason === 'idempotency_key_exists') {
+            this.errorMessage.set(this.translate.instant('orders.create.errors.idempotencyKeyExists'));
+            return;
+          }
+        }
         if (err instanceof HttpErrorResponse && err.error?.message) {
           this.errorMessage.set(err.error.message);
         } else {

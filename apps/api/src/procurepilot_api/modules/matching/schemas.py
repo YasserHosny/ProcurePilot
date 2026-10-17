@@ -136,6 +136,7 @@ class MatchTask(BaseModel):
     reason: MatchTaskReason
     candidates: list[MatchCandidate]
     decision: MatchDecision | None = None
+    matched_product: ProductSummary | None = None
     created_at: datetime
     resolved_at: datetime | None = None
     supplier_name: str | None = None

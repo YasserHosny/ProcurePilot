@@ -1382,6 +1382,7 @@
         "confirmAndNext": "تسوية والانتقال للتالي",
         "confirming": "جاري التأكيد...",
         "saveSuccess": "تم تأكيد قرار المطابقة وحفظ الاسم المرادف بنجاح.",
+        "queueCleared": "تمت تسوية جميع مهام المطابقة — القائمة خالية.",
         "candidateRequired": "يُرجى اختيار منتج مرشح قبل التأكيد.",
         "formInvalid": "يُرجى تصحيح أخطاء إنشاء المنتج قبل التأكيد."
       },
@@ -2012,6 +2013,7 @@
     "form": {
       "createTitle": "طلب شراء جديد",
       "editTitle": "تعديل طلب الشراء",
+      "viewTitle": "طلب شراء",
       "branchLabel": "الفرع",
       "branchRequired": "الفرع مطلوب.",
       "costCentreLabel": "مركز التكلفة (اختياري)",
@@ -2032,6 +2034,7 @@
       "saveDraftButton": "حفظ كمسودة",
       "submitButton": "إرسال الطلب",
       "submittingButton": "جاري الإرسال...",
+      "createOrderButton": "إنشاء أمر شراء",
       "atLeastOneLineRequired": "مطلوب بند واحد على الأقل."
     },
     "empty": "لا توجد طلبات شراء بعد. أنشئ أول طلب للبدء.",
@@ -2123,6 +2126,7 @@
     "alreadyDecided": "تم اتخاذ قرار بشأن هذا الطلب بالفعل من قبل شخص آخر.",
     "empty": "لا توجد طلبات تنتظر قرارك حاليًا.",
     "notAvailable": "غير متاح",
+    "costCentreNone": "لا يوجد (على مستوى الفرع)",
     "line": "بند",
     "lines": "بنود",
     "viewLines": "عرض البنود",
@@ -2130,6 +2134,16 @@
     "noLines": "لا توجد بنود.",
     "budgetExceeded": "يتجاوز الميزانية",
     "budgetRemaining": "المتبقي",
+    "budgetStatus": {
+      "within": "ضمن الميزانية",
+      "near": "قريب من حد الميزانية",
+      "over": "يتجاوز الميزانية",
+      "no_budget": "لا توجد ميزانية محددة",
+      "reasons": {
+        "no_budget_for_branch": "لم يتم تحديد ميزانية لهذا الفرع",
+        "no_budget_at_cost_centre_level": "لا توجد ميزانية على مستوى مركز التكلفة"
+      }
+    },
     "thresholdRules": {
       "sectionTitle": "قواعد عتبات الاعتماد",
       "createButton": "قاعدة عتبة جديدة",
@@ -3228,6 +3242,8 @@
     "lineCount": "{{count}} بند",
     "notProvided": "غير متوفر",
     "createButton": "إنشاء طلب",
+    "fromApprovedRequest": "من طلب شراء معتمد",
+    "fromApprovedRequestEmpty": "لا توجد طلبات شراء معتمدة متاحة.",
     "create": {
       "title": "إنشاء أمر شراء",
       "subtitle": "تسجيل أمر شراء داخلي يدويًا.",
@@ -3261,7 +3277,9 @@
         "currencyFormat": "رمز من 3 أحرف",
         "positiveQuantity": "يجب أن يكون > 0",
         "nonNegativePrice": "يجب أن يكون >= 0",
-        "maxQuantity": "لا يمكن تجاوز الكمية المتبقية"
+        "maxQuantity": "لا يمكن تجاوز الكمية المتبقية",
+        "orderNumberExists": "رقم الطلب موجود بالفعل. يُرجى استخدام رقم طلب مختلف.",
+        "idempotencyKeyExists": "تم إرسال هذا الطلب بالفعل أو لا يزال قيد المعالجة."
       },
       "creatingFromRequest": "الإنشاء من الطلب",
       "estimateReference": "التقدير",
@@ -3663,8 +3681,11 @@
       "cannotPreparePending": "لا يمكن إعداد الطلب بينما توجد بنود غير مطابقة",
       "prepareSuccess": "تم إعداد مسودة طلب الشراء بنجاح.",
       "prepareError": "فشل إعداد الطلب. قد تكون البنود أصبحت غير مطابقة.",
+      "openDraft": "فتح المسودة",
       "viewRequest": "عرض الطلب",
       "branchLabel": "التوصيل إلى الفرع",
+      "branchPlaceholder": "اختر الفرع...",
+      "branchRequired": "اختر فرعاً قبل إعداد الطلب.",
       "requiredByLabel": "مطلوب بحلول",
       "noResponses": "لم يتم العثور على ردود لطلب عروض الأسعار هذا بعد.",
       "loading": "جاري تحميل الردود...",

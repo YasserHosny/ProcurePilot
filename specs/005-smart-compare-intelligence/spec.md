@@ -2,7 +2,7 @@
 
 **Feature Branch**: `005-smart-compare-intelligence`
 **Created**: 2026-08-21
-**Status**: Draft
+**Status**: Shipped — merged to `main` (see `docs/roadmap/procurepilot_roadmap.md`, Delivery Status)
 **Input**: User description: "Chunk 4.5 Smart Compare and Intelligence: offers compare endpoint with recommendation scorer, product price-history intelligence view, Smart Compare grid, basic two-supplier basket optimisation via a new services/optimiser using OR-Tools, and an actionable alerts inbox v1"
 
 ## User Scenarios & Testing *(mandatory)*

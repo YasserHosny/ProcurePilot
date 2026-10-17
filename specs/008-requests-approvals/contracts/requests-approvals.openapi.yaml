@@ -403,11 +403,13 @@ components:
     BudgetStatus:
       type: object
       description: >
-        Present only when an R2.0 budget applies to the request's scope (FR-012); absent
-        entirely otherwise — never a misleading zero.
-      required: [remaining_amount, exceeds]
+        Informational evaluation of the most specific applicable budget. Cost-centre takes
+        precedence over branch; missing budgets carry a machine-readable reason.
+      required: [exceeds, status]
       properties:
-        remaining_amount: { $ref: '#/components/schemas/Money' }
+        remaining_amount: { allOf: [{ $ref: '#/components/schemas/Money' }], nullable: true }
+        status: { type: string, enum: [within, near, over, no_budget] }
+        reason_code: { type: string, nullable: true, enum: [no_budget_at_cost_centre_level, no_budget_for_branch] }
         exceeds:
           type: boolean
           description: true when the request's estimated total would exceed remaining_amount (FR-011) — informational only, never a block
@@ -465,6 +467,8 @@ components:
         branch_id: { type: string, format: uuid }
         cost_centre_id: { type: string, format: uuid, nullable: true }
         requested_by_membership_id: { type: string, format: uuid }
+        requester_name: { type: string, nullable: true }
+        requester_email: { type: string, format: email, nullable: true }
         required_by_date: { type: string, format: date }
         status: { $ref: '#/components/schemas/PurchaseRequestStatus' }
         lines:

@@ -42,9 +42,7 @@ def active_weights(embedding_model: str) -> dict[str, Decimal]:
     return WEIGHTS
 
 
-def score_candidate(
-    inputs: ScoreInputs, *, embedding_model: str = STUB_EMBEDDING_MODEL
-) -> Decimal:
+def score_candidate(inputs: ScoreInputs, *, embedding_model: str = STUB_EMBEDDING_MODEL) -> Decimal:
     weights = active_weights(embedding_model)
     raw = (
         weights["deterministic"] * _clamp(inputs.deterministic_signal)

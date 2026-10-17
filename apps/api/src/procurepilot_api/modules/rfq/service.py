@@ -545,9 +545,10 @@ class RfqService:
             with conn.cursor(row_factory=dict_row) as cur:
                 cur.execute(
                     """
-                    select r.id, r.quotation_id
+                    select r.id, r.quotation_id, rfq.needed_by_date
                     from rfq_response r
                     join rfq_recipient rec on r.rfq_recipient_id = rec.id
+                    join rfq on rfq.id = rec.rfq_id and rfq.tenant_id = r.tenant_id
                     where r.id = %s and rec.rfq_id = %s and r.tenant_id = %s
                     """,
                     (rfq_response_id, rfq_id, member.tenant_id),
@@ -619,7 +620,7 @@ class RfqService:
                 request_payload = PurchaseRequestCreate(
                     branch_id=branch_id,
                     cost_centre_id=cost_centre_id,
-                    required_by_date=required_by_date,
+                    required_by_date=resp_row["needed_by_date"],
                     lines=pr_lines,
                 )
 
@@ -709,7 +710,9 @@ class RfqService:
 
                     conn.commit()
 
-        return RfqPrepareRequestResponse(purchase_request_id=purchase_request.id)
+        return RfqPrepareRequestResponse(
+            purchase_request_id=purchase_request.id, status=purchase_request.status
+        )
 
     def create_guardrail(
         self,

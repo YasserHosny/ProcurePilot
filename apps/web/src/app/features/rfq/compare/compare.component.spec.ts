@@ -194,7 +194,7 @@ describe('CompareComponent (RFQ)', () => {
     fixture.detectChanges();
   });
 
-  it('should load responses and resolve names on init', () => {
+  it('should load responses, prefill requiredByDate from needed_by_date, and preselect sole branch on init', () => {
     expect(mockRfqApi.getRfq).toHaveBeenCalledWith('rfq-1');
     expect(mockRfqApi.listResponses).toHaveBeenCalledWith('rfq-1');
     expect(mockRfqApi.listGuardrails).toHaveBeenCalled();
@@ -204,8 +204,48 @@ describe('CompareComponent (RFQ)', () => {
 
     expect(component.responses().length).toBe(2);
     expect(component.selectedBranchId()).toBe('branch-1');
+    const reqDate = component.requiredByDate();
+    expect(reqDate).toBeTruthy();
+    expect(reqDate?.getFullYear()).toBe(2026);
+    expect(reqDate?.getMonth()).toBe(9);
+    expect(reqDate?.getDate()).toBe(20);
     expect(component.supplierNames()['supp-1']).toBe('Supplier One');
     expect(component.productNames()['prod-1']).toBe('Product One');
+  });
+
+  it('should not preselect branch when multiple branches exist and none saved in localStorage, and should remember choice per tenant', () => {
+    try {
+      localStorage.removeItem('pp.rfq.lastBranchId.tenant-1');
+    } catch {
+      // ignore
+    }
+    mockApiService.listBranches.and.returnValue(
+      of({
+        items: [
+          { id: 'branch-1', name: 'Main Branch' },
+          { id: 'branch-2', name: 'Second Branch' },
+        ],
+        next_cursor: null,
+      } as unknown as { items: Branch[]; next_cursor: string | null }),
+    );
+
+    component.loadBranches();
+    expect(component.selectedBranchId()).toBe('');
+    expect(component.canPrepare(dummyResponses.items[0])).toBeFalse();
+
+    component.onBranchChange('branch-2');
+    expect(component.selectedBranchId()).toBe('branch-2');
+
+    // Reloading branches for same tenant restores saved branch-2
+    component.selectedBranchId.set('');
+    component.loadBranches();
+    expect(component.selectedBranchId()).toBe('branch-2');
+
+    try {
+      localStorage.removeItem('pp.rfq.lastBranchId.tenant-1');
+    } catch {
+      // ignore
+    }
   });
 
   it('shows draft notice card only when RFQ status is draft', () => {
@@ -277,14 +317,15 @@ describe('CompareComponent (RFQ)', () => {
 
   it('should show error snackbar when preparing an ineligible response', () => {
     component.prepareRequest(dummyResponses.items[1]);
-    expect(mockSnackBar.open).toHaveBeenCalledWith(jasmine.any(String), 'OK', { duration: 3000 });
+    expect(mockSnackBar.open).toHaveBeenCalledWith(
+      'rfq.compare.cannotPreparePending',
+      'rfq.history.dismiss',
+      { duration: 3000 },
+    );
     expect(mockRfqApi.prepareRequest).not.toHaveBeenCalled();
   });
 
-  it('should call prepareRequest API and show success snackbar for eligible response', () => {
-    const requiredDate = new Date(2026, 9, 20);
-    component.requiredByDate.set(requiredDate);
-
+  it('should call prepareRequest API, show Open draft snackbar, and navigate to /requests/<id>', () => {
     component.prepareRequest(dummyResponses.items[0]);
 
     expect(mockRfqApi.prepareRequest).toHaveBeenCalledWith('rfq-1', {
@@ -294,9 +335,10 @@ describe('CompareComponent (RFQ)', () => {
     });
 
     expect(mockSnackBar.open).toHaveBeenCalledWith(
-      jasmine.any(String),
-      jasmine.any(String),
+      'rfq.compare.prepareSuccess',
+      'rfq.compare.openDraft',
       { duration: 5000 },
     );
+    expect(mockRouter.navigate).toHaveBeenCalledWith(['/requests', 'pr-1']);
   });
 });

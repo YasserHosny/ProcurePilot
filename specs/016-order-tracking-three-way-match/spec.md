@@ -2,7 +2,7 @@
 
 **Feature Branch**: `016-order-tracking-three-way-match`  
 **Created**: 2026-09-19  
-**Status**: Planned  
+**Status**: Shipped — merged to `main` (see `docs/roadmap/procurepilot_roadmap.md`, Delivery Status)
 **Roadmap Release**: R3.3, Phase 3 Connected Operations  
 **Provider**: Xero as the second accounting provider after QuickBooks Online
 

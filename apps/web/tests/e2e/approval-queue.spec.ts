@@ -5,6 +5,7 @@ import {
   apiAsUser,
   createMember,
   createTestProduct,
+  credentials,
   signIn,
   signInOwner,
 } from './support/api';
@@ -39,9 +40,11 @@ async function apiStatus(
 
 test.describe('Approval Queue (chunk 008 US2)', () => {
   let ownerToken: string;
+  let ownerEmail: string;
 
   test.beforeAll(async () => {
     ownerToken = await signInOwner();
+    ownerEmail = credentials().ownerEmail;
   });
 
   async function seedSubmittedRequest(label: string): Promise<{
@@ -100,7 +103,8 @@ test.describe('Approval Queue (chunk 008 US2)', () => {
     // The branch column renders the branch's name (getBranchName), never its raw id.
     const row = page.locator('tr.request-row', { hasText: request.branchName });
     await expect(row).toBeVisible();
-    await expect(row).toContainText(request.requesterId);
+    await expect(row.locator('.requester-cell')).toContainText(ownerEmail);
+    await expect(row.locator('.requester-cell')).not.toContainText(request.requesterId);
     await expect(row).toContainText(request.requiredByDate);
     await expect(row).toContainText('1 line');
 

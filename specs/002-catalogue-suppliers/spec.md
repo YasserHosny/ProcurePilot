@@ -2,7 +2,7 @@
 
 **Feature Branch**: `002-catalogue-suppliers`
 **Created**: 2026-08-20
-**Status**: Draft
+**Status**: Shipped — merged to `main` (see `docs/roadmap/procurepilot_roadmap.md`, Delivery Status)
 **Input**: User description: "Chunk 4.2 Catalogue + Suppliers (R1.1): product master, supplier profiles, units and pack definitions, CSV import with validation, and product aliases."
 
 ## Overview

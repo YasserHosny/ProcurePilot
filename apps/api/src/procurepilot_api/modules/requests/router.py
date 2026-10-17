@@ -50,9 +50,7 @@ def create_request(
     member: Annotated[CurrentMember, Depends(current_member)],
     service: Annotated[RequestsService, Depends(get_requests_service)],
     response: Response,
-    idempotency_key: Annotated[
-        UUID | None, Header(alias="Idempotency-Key")
-    ] = None,
+    idempotency_key: Annotated[UUID | None, Header(alias="Idempotency-Key")] = None,
 ) -> PurchaseRequest:
     request, created = service.create_request(
         bearer_token=token,
@@ -68,21 +66,22 @@ def create_request(
 @router.get("/requests", response_model=PurchaseRequestList)
 def list_requests(
     token: Annotated[str, Depends(bearer_token)],
-    _member: Annotated[CurrentMember, Depends(current_member)],
+    member: Annotated[CurrentMember, Depends(current_member)],
     service: Annotated[RequestsService, Depends(get_requests_service)],
-    status_filter: Annotated[
-        PurchaseRequestStatus | None, Query(alias="status")
-    ] = None,
+    status_filter: Annotated[PurchaseRequestStatus | None, Query(alias="status")] = None,
     branch_id: Annotated[UUID | None, Query()] = None,
     cursor: Annotated[str | None, Query()] = None,
     limit: Annotated[int, Query(le=100)] = 50,
+    eligible_for_order: Annotated[bool, Query()] = False,
 ) -> PurchaseRequestList:
     return service.list_requests(
         bearer_token=token,
+        member=member,
         status=status_filter,
         branch_id=branch_id,
         cursor=cursor,
         limit=limit,
+        eligible_for_order=eligible_for_order,
     )
 
 
@@ -113,9 +112,7 @@ def create_low_stock_report(
     member: Annotated[CurrentMember, Depends(current_member)],
     service: Annotated[RequestsService, Depends(get_requests_service)],
     response: Response,
-    idempotency_key: Annotated[
-        UUID | None, Header(alias="Idempotency-Key")
-    ] = None,
+    idempotency_key: Annotated[UUID | None, Header(alias="Idempotency-Key")] = None,
 ) -> LowStockReport:
     report, created = service.create_low_stock_report(
         bearer_token=token,
@@ -154,9 +151,7 @@ def get_request(
     _member: Annotated[CurrentMember, Depends(current_member)],
     service: Annotated[RequestsService, Depends(get_requests_service)],
 ) -> PurchaseRequest:
-    return service.get_request(
-        bearer_token=token, request_id=request_id
-    )
+    return service.get_request(bearer_token=token, request_id=request_id)
 
 
 @router.patch("/requests/{request_id}", response_model=PurchaseRequest)
@@ -184,13 +179,9 @@ def submit_request(
     token: Annotated[str, Depends(bearer_token)],
     member: Annotated[CurrentMember, Depends(current_member)],
     service: Annotated[RequestsService, Depends(get_requests_service)],
-    _idempotency_key: Annotated[
-        UUID | None, Header(alias="Idempotency-Key")
-    ] = None,
+    _idempotency_key: Annotated[UUID | None, Header(alias="Idempotency-Key")] = None,
 ) -> PurchaseRequest:
-    return service.submit_request(
-        bearer_token=token, member=member, request_id=request_id
-    )
+    return service.submit_request(bearer_token=token, member=member, request_id=request_id)
 
 
 @router.post(
@@ -203,9 +194,7 @@ def withdraw_request(
     member: Annotated[CurrentMember, Depends(current_member)],
     service: Annotated[RequestsService, Depends(get_requests_service)],
 ) -> PurchaseRequest:
-    return service.withdraw_request(
-        bearer_token=token, member=member, request_id=request_id
-    )
+    return service.withdraw_request(bearer_token=token, member=member, request_id=request_id)
 
 
 @router.post(
@@ -218,9 +207,7 @@ def confirm_delivery(
     token: Annotated[str, Depends(bearer_token)],
     member: Annotated[CurrentMember, Depends(current_member)],
     service: Annotated[RequestsService, Depends(get_requests_service)],
-    _idempotency_key: Annotated[
-        UUID | None, Header(alias="Idempotency-Key")
-    ] = None,
+    _idempotency_key: Annotated[UUID | None, Header(alias="Idempotency-Key")] = None,
 ) -> PurchaseRequest:
     return service.confirm_delivery(
         bearer_token=token,
@@ -360,9 +347,7 @@ def create_threshold_rule(
     token: Annotated[str, Depends(bearer_token)],
     member: Annotated[CurrentMember, Depends(current_member)],
     service: Annotated[RequestsService, Depends(get_requests_service)],
-    _idempotency_key: Annotated[
-        UUID | None, Header(alias="Idempotency-Key")
-    ] = None,
+    _idempotency_key: Annotated[UUID | None, Header(alias="Idempotency-Key")] = None,
 ) -> ThresholdRule:
     return service.create_threshold_rule(
         bearer_token=token,
@@ -432,9 +417,7 @@ def create_approval_delegation(
     token: Annotated[str, Depends(bearer_token)],
     member: Annotated[CurrentMember, Depends(current_member)],
     service: Annotated[RequestsService, Depends(get_requests_service)],
-    _idempotency_key: Annotated[
-        UUID | None, Header(alias="Idempotency-Key")
-    ] = None,
+    _idempotency_key: Annotated[UUID | None, Header(alias="Idempotency-Key")] = None,
 ) -> ApprovalDelegation:
     return service.create_approval_delegation(
         bearer_token=token,

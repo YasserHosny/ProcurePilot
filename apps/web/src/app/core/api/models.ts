@@ -555,6 +555,7 @@ export interface MatchTask {
   readonly reason: MatchTaskReason;
   readonly candidates: readonly MatchCandidate[];
   readonly decision?: MatchDecision | null;
+  readonly matched_product?: ProductSummary | null;
   readonly created_at: string;
   readonly resolved_at?: string | null;
   readonly supplier_name?: string | null;
@@ -1333,9 +1334,13 @@ export type PurchaseRequestStatus =
 export type ApprovalStepStatus = 'pending' | 'approved' | 'rejected';
 export type ApprovalStepSource = 'threshold_match' | 'delegate' | 'owner_fallback';
 
+export type BudgetStatusValue = 'within' | 'near' | 'over' | 'no_budget';
+
 export interface BudgetStatus {
-  readonly remaining_amount: Money;
+  readonly status?: BudgetStatusValue;
+  readonly remaining_amount?: Money | null;
   readonly exceeds: boolean;
+  readonly reason_code?: string | null;
 }
 
 export interface PurchaseRequestLine {
@@ -1371,6 +1376,8 @@ export interface PurchaseRequest {
   readonly branch_id: string;
   readonly cost_centre_id?: string | null;
   readonly requested_by_membership_id: string;
+  readonly requester_name?: string | null;
+  readonly requester_email?: string | null;
   readonly required_by_date: string;
   readonly status: PurchaseRequestStatus;
   readonly lines: readonly PurchaseRequestLine[];

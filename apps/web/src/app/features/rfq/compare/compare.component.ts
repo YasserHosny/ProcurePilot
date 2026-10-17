@@ -23,8 +23,10 @@ import { FormatMoneyPipe } from '../../../core/format/money.pipe';
 import { FormatDatePipe } from '../../../core/format/date.pipe';
 import type { ApiError, Branch } from '../../../core/api/models';
 import { SessionService } from '../../../core/auth/session.service';
-import { toIsoDate } from '../../../core/format/iso-date';
+import { parseIsoDateLocal, toIsoDate } from '../../../core/format/iso-date';
 import { CatalogueConfirmDialogComponent } from '../../catalogue/confirm-dialog/confirm-dialog.component';
+
+const LAST_BRANCH_STORAGE_PREFIX = 'pp.rfq.lastBranchId.';
 
 @Component({
   selector: 'app-rfq-compare',
@@ -68,7 +70,7 @@ export class CompareComponent implements OnInit {
   readonly responses = signal<RfqResponseComparison[]>([]);
   readonly branches = signal<readonly Branch[]>([]);
   readonly selectedBranchId = signal<string>('');
-  readonly requiredByDate = signal<Date>(new Date());
+  readonly requiredByDate = signal<Date | null>(null);
   readonly supplierNames = signal<Record<string, string>>({});
   readonly productNames = signal<Record<string, string>>({});
   readonly errorMessage = signal<string | null>(null);
@@ -98,7 +100,14 @@ export class CompareComponent implements OnInit {
     this.errorMessage.set(null);
 
     this.rfqApi.getRfq?.(rfqId)?.subscribe({
-      next: (detail) => this.rfqDetail.set(detail),
+      next: (detail) => {
+        this.rfqDetail.set(detail);
+        const parsedNeededBy = parseIsoDateLocal(detail.rfq.needed_by_date);
+        if (parsedNeededBy) {
+          this.requiredByDate.set(parsedNeededBy);
+        }
+        this.applyBranchPreselection();
+      },
       error: () => this.rfqDetail.set(null),
     });
 
@@ -197,14 +206,17 @@ export class CompareComponent implements OnInit {
     this.api.listBranches({ is_active: true, limit: 100 }).subscribe({
       next: (res) => {
         this.branches.set(res.items);
-        if (res.items.length > 0) {
-          this.selectedBranchId.set(res.items[0].id);
-        }
+        this.applyBranchPreselection();
       },
       error: () => {
         // Soft fail
       },
     });
+  }
+
+  onBranchChange(branchId: string): void {
+    this.selectedBranchId.set(branchId);
+    this.saveBranchId(branchId);
   }
 
   resolveSuppliers(): void {
@@ -235,45 +247,120 @@ export class CompareComponent implements OnInit {
     return response.lines.every((l) => !l.pending_match);
   }
 
+  canPrepare(response: RfqResponseComparison): boolean {
+    return this.isEligible(response) && Boolean(this.selectedBranchId()) && Boolean(this.requiredByDate());
+  }
+
   prepareRequest(response: RfqResponseComparison): void {
     if (!this.isEligible(response)) {
-      this.snackBar.open(this.translate.instant('rfq.compare.cannotPreparePending'), 'OK', {
-        duration: 3000,
-      });
+      this.snackBar.open(
+        this.translate.instant('rfq.compare.cannotPreparePending'),
+        this.translate.instant('rfq.history.dismiss'),
+        { duration: 3000 },
+      );
       return;
     }
 
+    const branchId = this.selectedBranchId();
+    if (!branchId) {
+      this.snackBar.open(
+        this.translate.instant('rfq.compare.branchRequired'),
+        this.translate.instant('rfq.history.dismiss'),
+        { duration: 3000 },
+      );
+      return;
+    }
+
+    this.saveBranchId(branchId);
+
+    const reqDate = this.requiredByDate();
+    const requiredBy =
+      (reqDate ? toIsoDate(reqDate) : '') ||
+      this.rfqDetail()?.rfq.needed_by_date ||
+      toIsoDate(new Date());
+
     const payload = {
       rfq_response_id: response.id,
-      branch_id: this.selectedBranchId(),
-      required_by_date: toIsoDate(this.requiredByDate()),
+      branch_id: branchId,
+      required_by_date: requiredBy,
     };
 
     this.rfqApi.prepareRequest(this.rfqId(), payload).subscribe({
       next: (res) => {
         const snackRef = this.snackBar.open(
           this.translate.instant('rfq.compare.prepareSuccess'),
-          this.translate.instant('rfq.compare.viewRequest'),
+          this.translate.instant('rfq.compare.openDraft'),
           { duration: 5000 },
         );
-        snackRef.onAction().subscribe(() => {
+        let navigated = false;
+        const navigateToDraft = () => {
+          if (!navigated && res?.purchase_request_id) {
+            navigated = true;
+            this.router.navigate(['/requests', res.purchase_request_id]);
+          }
+        };
+        snackRef?.onAction?.().subscribe(() => {
           this.router.navigate(['/requests', res.purchase_request_id]);
         });
+        navigateToDraft();
       },
       error: (err: unknown) => {
-        if (err instanceof HttpErrorResponse) {
-          const apiError = err.error as ApiError | undefined;
-          this.snackBar.open(
-            apiError?.message ?? this.translate.instant('rfq.compare.prepareError'),
-            'OK',
-            { duration: 5000 },
-          );
-        } else {
-          this.snackBar.open(this.translate.instant('rfq.compare.prepareError'), 'OK', {
-            duration: 5000,
-          });
-        }
+        const message =
+          err instanceof HttpErrorResponse
+            ? ((err.error as ApiError | undefined)?.message ??
+              this.translate.instant('rfq.compare.prepareError'))
+            : this.translate.instant('rfq.compare.prepareError');
+        this.snackBar.open(
+          message,
+          this.translate.instant('rfq.history.dismiss'),
+          { duration: 5000 },
+        );
       },
     });
+  }
+
+  private getTenantStorageKey(): string {
+    const tenantId =
+      this.session.tenant?.()?.id ??
+      this.rfqDetail()?.rfq.tenant_id ??
+      'default';
+    return `${LAST_BRANCH_STORAGE_PREFIX}${tenantId}`;
+  }
+
+  private readSavedBranchId(): string | null {
+    try {
+      return localStorage.getItem(this.getTenantStorageKey());
+    } catch {
+      return null;
+    }
+  }
+
+  private saveBranchId(branchId: string): void {
+    if (!branchId) {
+      return;
+    }
+    try {
+      localStorage.setItem(this.getTenantStorageKey(), branchId);
+    } catch {
+      // Ignore storage access errors
+    }
+  }
+
+  private applyBranchPreselection(): void {
+    const items = this.branches();
+    if (items.length === 0) {
+      this.selectedBranchId.set('');
+      return;
+    }
+    if (items.length === 1) {
+      this.selectedBranchId.set(items[0].id);
+      return;
+    }
+    const saved = this.readSavedBranchId();
+    if (saved && items.some((b) => b.id === saved)) {
+      this.selectedBranchId.set(saved);
+      return;
+    }
+    this.selectedBranchId.set('');
   }
 }

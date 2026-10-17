@@ -192,6 +192,20 @@ export interface PurchaseOrderCreate {
   lines: PurchaseOrderLineInput[];
 }
 
+export interface NextOrderNumber {
+  order_number: string;
+}
+
+export interface SupplierPrefill {
+  id: string;
+  name: string;
+}
+
+export interface RequestOrderPrefill {
+  source_request_id: string;
+  supplier: SupplierPrefill | null;
+}
+
 @Injectable({ providedIn: 'root' })
 export class OrdersApiService {
   private readonly http = inject(HttpClient);
@@ -243,7 +257,15 @@ export class OrdersApiService {
     return this.http.post<PurchaseOrder>(`${this.base}/orders`, payload, { headers });
   }
 
-  
+  getNextOrderNumber(): Observable<NextOrderNumber> {
+    return this.http.get<NextOrderNumber>(`${this.base}/orders/next-number`);
+  }
+
+  getRequestPrefill(sourceRequestId: string): Observable<RequestOrderPrefill> {
+    const query = new URLSearchParams({ source_request_id: sourceRequestId });
+    return this.http.get<RequestOrderPrefill>(`${this.base}/orders/request-prefill?${query.toString()}`);
+  }
+
   getAllocations(sourceRequestId: string): Observable<RequestAllocation> {
     const query = new URLSearchParams({ source_request_id: sourceRequestId });
     return this.http.get<RequestAllocation>(`${this.base}/orders/allocations?${query.toString()}`);

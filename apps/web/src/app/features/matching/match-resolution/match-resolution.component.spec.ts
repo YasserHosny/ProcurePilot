@@ -159,6 +159,7 @@ describe('MatchResolutionComponent (T039)', () => {
     apiService = jasmine.createSpyObj('ApiService', [
       'getMatchTasks',
       'getMatchTaskForLine',
+      'getNextMatchTask',
       'baseUnits',
       'suppliers',
       'resolveMatch',
@@ -166,6 +167,7 @@ describe('MatchResolutionComponent (T039)', () => {
     ]);
     apiService.getMatchTasks.and.returnValue(of({ items: [mockTask], next_cursor: null }));
     apiService.getMatchTaskForLine.and.returnValue(of(mockTask));
+    apiService.getNextMatchTask.and.returnValue(of({ next_task_id: null, next_quotation_line_id: null }));
     apiService.baseUnits.and.returnValue(
       of({
         items: [{ code: 'litre', label_en: 'Litre (L)', label_ar: 'لتر', dimension: 'volume' }],
@@ -395,5 +397,68 @@ describe('MatchResolutionComponent (T039)', () => {
     expect(component.isSubmitting()).toBeFalse();
     expect(component.errorMessage()).toContain('already assigned');
     expect(component.errorTraceId()).toBe('tr-conflict-1');
+  });
+
+  it('navigates to the next open task on Resolve and Next when next_task_id is returned', () => {
+    const router = (component as unknown as { router: { navigate: (...args: unknown[]) => Promise<boolean> } }).router;
+    const navSpy = spyOn(router, 'navigate').and.returnValue(Promise.resolve(true));
+    apiService.getNextMatchTask.and.returnValue(of({ next_task_id: 'task-resolve-2', next_quotation_line_id: 'line-next' }));
+
+    component.confirmResolution(true);
+
+    expect(apiService.resolveMatch).toHaveBeenCalled();
+    expect(apiService.getNextMatchTask).toHaveBeenCalledWith('task-resolve-1');
+    expect(navSpy).toHaveBeenCalledWith(['/matching', 'line-next']);
+  });
+
+  it('navigates to /matching and shows queue cleared toast on Resolve and Next when no tasks remain', () => {
+    const router = (component as unknown as { router: { navigate: (...args: unknown[]) => Promise<boolean> } }).router;
+    const navSpy = spyOn(router, 'navigate').and.returnValue(Promise.resolve(true));
+    const snackBar = (component as unknown as { snackBar: { open: (...args: unknown[]) => unknown } }).snackBar;
+    const snackSpy = spyOn(snackBar, 'open');
+    apiService.getNextMatchTask.and.returnValue(of({ next_task_id: null, next_quotation_line_id: null }));
+
+    component.confirmResolution(true);
+
+    expect(apiService.getNextMatchTask).toHaveBeenCalledWith('task-resolve-1');
+    expect(snackSpy).toHaveBeenCalledWith(
+      enCatalog.matching.resolution.actions.queueCleared,
+      undefined,
+      { duration: 3500 },
+    );
+    expect(navSpy).toHaveBeenCalledWith(['/matching']);
+  });
+
+  it('displays task.matched_product name in the Matched Product box on a resolved task page', () => {
+    apiService.getMatchTaskForLine.and.returnValue(
+      of({
+        ...mockTask,
+        status: 'resolved',
+        matched_product: {
+          id: 'prod-resolved-1',
+          tenant_name: '',
+          canonical_name: 'Canonical Whole Milk 2L',
+          base_unit: 'litre',
+          status: 'active',
+        },
+        decision: {
+          ...mockDecision,
+          matched_product: {
+            id: 'prod-resolved-1',
+            tenant_name: '',
+            canonical_name: 'Canonical Whole Milk 2L',
+            base_unit: 'litre',
+            status: 'active',
+          },
+        },
+      }),
+    );
+
+    component.loadTask('line-99');
+    fixture.detectChanges();
+
+    const banner = fixture.nativeElement.querySelector('.decision-banner') as HTMLElement | null;
+    expect(banner).toBeTruthy();
+    expect(banner?.textContent).toContain('Canonical Whole Milk 2L');
   });
 });

@@ -216,6 +216,19 @@ consume extraction jobs from Redis. Its CI workflow is
 `.github/workflows/deploy-extraction-worker.yml`, which deploys to the **workers** Bunny app
 (`BUNNY_WORKERS_APP_ID`), not the production app.
 
+Two more worker images are built the same way and deployed to the same workers app *(added
+2026-10-18)*:
+
+- `procurepilot-email-ingestion-worker` from `infra/docker/email-ingestion-worker.Dockerfile`, by
+  `.github/workflows/deploy-email-ingestion-worker.yml` — polls `email_ingest` jobs.
+- `procurepilot-optimiser-worker` from `infra/docker/optimiser.Dockerfile`, by
+  `.github/workflows/deploy-optimiser-worker.yml` — consumes the `basket-split` queue
+  (`docs/operations/runbook.md` §7.7).
+
+Like the extraction worker's, these workflows only **update** an existing container; each container
+is created once by hand in the workers app. Until the optimiser container exists, its deploy fails
+on purpose and basket splits fail with `optimiser_unavailable`.
+
 ### 2.6 Mobile Build Workflow Placeholder
 
 `build-mobile.yml` is a Phase 2 placeholder for `apps/mobile/**`. When Phase 2 opens, the
@@ -324,6 +337,8 @@ Create the workers app in bunny.net and add two containers:
 | Container | Image | Port | Purpose |
 |---|---|---|---|
 | `procurepilot-extraction-worker` | `ghcr.io/<org>/procurepilot-extraction-worker:latest` | — | RQ worker consuming extraction jobs |
+| `procurepilot-email-ingestion-worker` | `ghcr.io/<org>/procurepilot-email-ingestion-worker:latest` | — | Processes inbound supplier emails *(added 2026-10-18)* |
+| `procurepilot-optimiser-worker` | `ghcr.io/<org>/procurepilot-optimiser-worker:latest` | — | RQ worker for basket splits (runbook §7.7) *(added 2026-10-18)* |
 | `shared-redis` | `redis:7.4-alpine` | 6379 | Job queue for RQ |
 
 Because these two containers are in the same app, the worker reaches Redis at
@@ -369,6 +384,7 @@ Push to `main` (or run `workflow_dispatch`) and confirm:
 2. **`deploy-backend.yml`** — builds, pushes to GHCR, updates the Bunny backend container
 3. **`deploy-frontend.yml`** — builds, pushes to GHCR, updates the Bunny frontend container
 4. **`deploy-extraction-worker.yml`** — builds, pushes to GHCR, updates the worker container on the workers Bunny app
+5. **`deploy-email-ingestion-worker.yml`** and **`deploy-optimiser-worker.yml`** — the same, for the other two workers
 
 ### 4.3 Deployment Workflow Expectations
 
@@ -415,6 +431,7 @@ staging gate once the first production deployment is stable.
 - [ ] `deploy-backend.yml` green
 - [ ] `deploy-frontend.yml` green
 - [ ] `deploy-extraction-worker.yml` green
+- [ ] `deploy-email-ingestion-worker.yml` and `deploy-optimiser-worker.yml` green
 - [ ] Image tags include both `latest` and commit SHA
 - [ ] GHCR package visibility allows bunny.net to pull images
 - [ ] Staging deployment completed or initial direct-production exception recorded

@@ -892,6 +892,7 @@ class MatchingService:
             ),
             supplier_name=supplier_name,
         )
+        decision = _decision(client, decision_row) if decision_row else None
         return MatchTask(
             id=UUID(str(row["id"])),
             quotation_id=quotation_id,
@@ -904,7 +905,8 @@ class MatchingService:
                 _candidate(client, candidate)
                 for candidate in _candidate_rows(client, UUID(str(line_row["id"])))
             ],
-            decision=_decision(client, decision_row) if decision_row else None,
+            decision=decision,
+            matched_product=decision.matched_product if decision else None,
             created_at=row["created_at"],
             resolved_at=row.get("resolved_at"),
             supplier_name=supplier_name,

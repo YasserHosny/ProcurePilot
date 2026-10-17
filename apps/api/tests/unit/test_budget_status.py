@@ -70,7 +70,52 @@ def test_within_budget_returns_no_status() -> None:
         ],
     )
 
-    assert result is None
+    assert result is not None
+    assert result.status == "within"
+
+
+def test_branch_budget_applies_without_cost_centre_and_reports_near_threshold() -> None:
+    branch_id = uuid4()
+    result = compute_budget_status(
+        request_id=uuid4(),
+        request_amount=Decimal("100"),
+        request_currency="EGP",
+        branch_id=branch_id,
+        cost_centre_id=None,
+        required_by=date(2026, 10, 10),
+        budgets=[
+            budget(
+                amount="380000", currency="EGP", period_start=date(2026, 10, 1), branch_id=branch_id
+            )
+        ],
+        committed_spend=[
+            spend(
+                amount="304000",
+                currency="EGP",
+                branch_id=branch_id,
+                required_by_date=date(2026, 10, 2),
+            )
+        ],
+    )
+    assert result is not None
+    assert result.status == "near"
+    assert result.remaining_amount.amount == "76000.0000"
+
+
+def test_branch_budget_reports_no_budget_machine_reason() -> None:
+    result = compute_budget_status(
+        request_id=uuid4(),
+        request_amount=Decimal("90"),
+        request_currency="EGP",
+        branch_id=uuid4(),
+        cost_centre_id=None,
+        required_by=date(2026, 10, 10),
+        budgets=[],
+        committed_spend=[],
+    )
+    assert result is not None
+    assert result.status == "no_budget"
+    assert result.reason_code == "no_budget_for_branch"
 
 
 def test_exceeding_budget_returns_remaining_amount() -> None:
@@ -118,7 +163,9 @@ def test_no_applicable_budget_returns_no_status() -> None:
         committed_spend=[],
     )
 
-    assert result is None
+    assert result is not None
+    assert result.status == "no_budget"
+    assert result.reason_code == "no_budget_for_branch"
 
 
 def test_overlapping_budgets_check_against_the_tightest_period_not_their_sum() -> None:
@@ -192,7 +239,8 @@ def test_overlapping_budgets_count_spend_only_within_the_chosen_period() -> None
         ],
     )
 
-    assert result is None
+    assert result is not None
+    assert result.status == "near"
 
 
 def test_same_length_overlapping_budgets_tie_break_to_the_latest_start() -> None:
