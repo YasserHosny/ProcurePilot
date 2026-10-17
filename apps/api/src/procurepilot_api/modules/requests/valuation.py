@@ -113,3 +113,39 @@ def estimate_from_source_response(
                 source_landed_cost_id=None,
             )
     return estimates
+
+
+QUOTED_PRICES_SQL = """
+select md.matched_workspace_product_id, ql.unit_price_amount, ql.unit_price_currency
+from rfq_response resp
+join quotation_line ql on ql.quotation_id = resp.quotation_id
+join match_decision md on md.quotation_line_id = ql.id
+where resp.id = %(rfq_response_id)s
+  and md.matched_workspace_product_id = any(%(product_ids)s)
+  and ql.unit_price_amount is not null
+  and ql.unit_price_currency is not null
+order by ql.line_number
+"""
+
+
+def quoted_prices_from_source_response(
+    conn: psycopg.Connection,
+    *,
+    rfq_response_id: UUID,
+    product_ids: list[UUID],
+) -> dict[UUID, tuple[Decimal, str]]:
+    """The supplier's own quoted per-pack price per product on an RFQ response (no landed
+    charges): the only figure that may pre-fill a purchase order's unit price."""
+    with conn.cursor(row_factory=dict_row) as cur:
+        cur.execute(
+            QUOTED_PRICES_SQL,
+            {"rfq_response_id": rfq_response_id, "product_ids": product_ids},
+        )
+        rows = cur.fetchall()
+    return {
+        row["matched_workspace_product_id"]: (
+            Decimal(str(row["unit_price_amount"])),
+            str(row["unit_price_currency"]),
+        )
+        for row in rows
+    }

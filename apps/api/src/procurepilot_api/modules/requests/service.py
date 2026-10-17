@@ -66,13 +66,14 @@ from procurepilot_api.modules.requests.valuation import (
     LineEstimate,
     estimate_from_source_response,
     estimate_line_value,
+    quoted_prices_from_source_response,
 )
 from procurepilot_api.shared.audit import AuditEventCreate, get_audit_writer
 from procurepilot_api.shared.storage_keys import safe_object_name
 
 REQUEST_COLUMNS = (
     "id,tenant_id,branch_id,cost_centre_id,requested_by_membership_id,"
-    "required_by_date,status,estimated_total_amount,estimated_total_currency,"
+    "required_by_date,status,source_rfq_response_id,estimated_total_amount,estimated_total_currency,"
     "has_incomplete_estimate,submitted_at,withdrawn_at,delivered_at,"
     "delivery_confirmed_by_membership_id,has_delivery_discrepancy,"
     "created_at,updated_at"
@@ -1934,6 +1935,7 @@ class RequestsService:
             line_rows,
             step_row,
             budget_status=self._budget_status_for(client, request_row),
+            quoted_prices=self._quoted_prices_for(request_row, line_rows),
             requester_email=requester_email,
         )
 
@@ -1977,6 +1979,22 @@ class RequestsService:
             return {}
         rows = _rows(response.data)
         return rows[0] if rows else {}
+
+    def _quoted_prices_for(
+        self, request_row: dict[str, object], line_rows: list[dict[str, object]]
+    ) -> dict[UUID, tuple[Decimal, str]]:
+        """Quoted per-pack prices of an RFQ-sourced request's source response, by product."""
+        source = request_row.get("source_rfq_response_id")
+        if not source or not line_rows:
+            return {}
+        product_ids = [UUID(str(lr["workspace_product_id"])) for lr in line_rows]
+        try:
+            with db.connect(self._settings.database_url.get_secret_value()) as conn:
+                return quoted_prices_from_source_response(
+                    conn, rfq_response_id=UUID(str(source)), product_ids=product_ids
+                )
+        except psycopg.Error as exc:
+            raise ServiceUnavailableError(details={"dependency": "database"}) from exc
 
     def _budget_status_for(
         self,
@@ -2047,11 +2065,17 @@ def _purchase_request(
     step_row: dict[str, object] | None,
     *,
     budget_status: BudgetStatus | None = None,
+    quoted_prices: dict[UUID, tuple[Decimal, str]] | None = None,
     requester_name: str | None = None,
     requester_email: str | None = None,
 ) -> PurchaseRequest:
     return PurchaseRequest(
         id=UUID(str(row["id"])),
+        source_rfq_response_id=(
+            UUID(str(row["source_rfq_response_id"]))
+            if row.get("source_rfq_response_id")
+            else None
+        ),
         branch_id=UUID(str(row["branch_id"])),
         cost_centre_id=(UUID(str(row["cost_centre_id"])) if row.get("cost_centre_id") else None),
         requested_by_membership_id=UUID(str(row["requested_by_membership_id"])),
@@ -2059,7 +2083,7 @@ def _purchase_request(
         requester_email=requester_email,
         required_by_date=_parse_date(row["required_by_date"]),
         status=str(row["status"]),
-        lines=[_purchase_request_line(lr) for lr in line_rows],
+        lines=[_purchase_request_line(lr, quoted_prices or {}) for lr in line_rows],
         estimated_total=_money(
             row.get("estimated_total_amount"),
             row.get("estimated_total_currency"),
@@ -2081,7 +2105,11 @@ def _purchase_request(
     )
 
 
-def _purchase_request_line(row: dict[str, object]) -> PurchaseRequestLine:
+def _purchase_request_line(
+    row: dict[str, object],
+    quoted_prices: dict[UUID, tuple[Decimal, str]] | None = None,
+) -> PurchaseRequestLine:
+    quoted = (quoted_prices or {}).get(UUID(str(row["workspace_product_id"])))
     return PurchaseRequestLine(
         id=UUID(str(row["id"])),
         workspace_product_id=UUID(str(row["workspace_product_id"])),
@@ -2101,6 +2129,7 @@ def _purchase_request_line(row: dict[str, object]) -> PurchaseRequestLine:
             if row.get("estimated_unit_price_source_landed_cost_id")
             else None
         ),
+        quoted_unit_price=_money(quoted[0], quoted[1]) if quoted else None,
     )
 
 

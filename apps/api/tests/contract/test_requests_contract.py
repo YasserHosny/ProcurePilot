@@ -72,6 +72,13 @@ def test_purchase_request_minimal_shape() -> None:
     assert pr.withdrawn_at is None
     assert pr.budget_status is None
     assert pr.updated_at is None
+    assert pr.source_rfq_response_id is None
+
+
+def test_purchase_request_exposes_rfq_response_source() -> None:
+    response_id = uuid4()
+    pr = PurchaseRequest.model_validate(_request(source_rfq_response_id=response_id))
+    assert pr.model_dump(mode="json")["source_rfq_response_id"] == str(response_id)
 
 
 def test_purchase_request_list_with_cursor() -> None:
@@ -208,3 +215,17 @@ def test_all_status_values_are_valid() -> None:
     for s in ("draft", "submitted", "approved", "rejected", "withdrawn"):
         pr = PurchaseRequest.model_validate(_request(status=s))
         assert pr.status == s
+
+
+def test_purchase_request_line_exposes_quoted_unit_price() -> None:
+    line = PurchaseRequestLine(
+        id=uuid4(),
+        workspace_product_id=uuid4(),
+        quantity="10",
+        estimated_unit_price=Money(amount="73.0000", currency="EGP"),
+        quoted_unit_price=Money(amount="68.0000", currency="EGP"),
+    )
+    dumped = line.model_dump(mode="json")
+    assert dumped["quoted_unit_price"] == {"amount": "68.0000", "currency": "EGP"}
+    bare = PurchaseRequestLine(id=uuid4(), workspace_product_id=uuid4(), quantity="1")
+    assert bare.quoted_unit_price is None

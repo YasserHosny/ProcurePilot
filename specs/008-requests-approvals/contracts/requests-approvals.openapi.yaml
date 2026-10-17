@@ -424,6 +424,14 @@ components:
         note: { type: string, nullable: true }
         estimated_unit_price: { $ref: '#/components/schemas/Money' }
         estimated_unit_price_source_landed_cost_id: { type: string, format: uuid, nullable: true }
+        quoted_unit_price:
+          allOf: [{ $ref: '#/components/schemas/Money' }]
+          nullable: true
+          description: >
+            The supplier's own quoted per-pack price (no VAT/delivery/discounts) from the RFQ
+            response the request was prepared from. Null for lines without that provenance.
+            Only this value may pre-fill a purchase order's unit price; estimated_unit_price is a
+            landed estimate used for approval routing and budgets.
 
     PurchaseRequestLineInput:
       type: object
@@ -451,6 +459,11 @@ components:
       required: [id, branch_id, requested_by_membership_id, required_by_date, status, lines, has_incomplete_estimate, created_at]
       properties:
         id: { type: string, format: uuid }
+        source_rfq_response_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: The RFQ response this request was prepared from, if any.
         branch_id: { type: string, format: uuid }
         cost_centre_id: { type: string, format: uuid, nullable: true }
         requested_by_membership_id: { type: string, format: uuid }

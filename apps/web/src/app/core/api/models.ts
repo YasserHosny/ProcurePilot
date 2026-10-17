@@ -1350,6 +1350,8 @@ export interface PurchaseRequestLine {
   readonly note?: string | null;
   readonly estimated_unit_price?: Money | null;
   readonly estimated_unit_price_source_landed_cost_id?: string | null;
+  /** Supplier's quoted per-pack price from the source RFQ response; the only PO-prefillable price. */
+  readonly quoted_unit_price?: Money | null;
 }
 
 export interface PurchaseRequestLineInput {
@@ -1370,6 +1372,7 @@ export interface ApprovalStep {
 
 export interface PurchaseRequest {
   readonly id: string;
+  readonly source_rfq_response_id?: string | null;
   readonly branch_id: string;
   readonly cost_centre_id?: string | null;
   readonly requested_by_membership_id: string;

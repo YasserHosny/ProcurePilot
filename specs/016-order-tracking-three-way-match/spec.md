@@ -107,6 +107,10 @@ and the request's approval status remains unchanged.
 2. Given a purchase request with estimated prices, when creating a draft order, then the estimates
    MUST NEVER silently become the purchase order actual prices. Request estimates can be shown as
    reference only; actual unit price, currency, and tax remain buyer-entered and confirmed.
+   *(Amended 2026-10-18.)* Exception: when the request was prepared from a supplier's RFQ response
+   (`source_rfq_response_id` is set), its line prices are that supplier's quoted per-pack prices, not
+   estimates, so the order form pre-fills them as editable unit prices. Every other request leaves
+   unit price empty, with the estimate shown only as a reference.
 3. Given a created draft purchase order, then the action does NOT submit, send, authorize, or
    execute a purchase, and the underlying request's approval decision/status remains unchanged.
    The request's recorded approval step is the evidence of human approval; its legacy `ordered`

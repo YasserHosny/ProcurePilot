@@ -261,3 +261,40 @@ def test_source_estimate_includes_landed_charges() -> None:
     assert all(e.source_landed_cost_id is not None for e in estimates)
     total, currency, _ = _total(products, estimates)
     assert (total, currency) == (Decimal("56925"), "EGP")
+
+
+def test_quoted_prices_are_the_supplier_line_price_without_landed_charges() -> None:
+    """A PO may pre-fill only the supplier's quoted per-pack price. الأمانة's lentils estimate is
+    73 (68 + 250 delivery / 50 kg) but the quoted price is 68; a product not on the source
+    response (or a request with no source) gets no quoted price at all."""
+    with psycopg.connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
+        with conn.cursor() as cur:
+            tenant_id, _user, membership_id = _seed_tenant(
+                cur, email_suffix=f"packs-quoted-{uuid4().hex[:8]}"
+            )
+            products, responses = _seed(cur, tenant_id, membership_id)
+            stray, stray_canonical = uuid4(), uuid4()
+            cur.execute(
+                "insert into canonical_product (id,name,base_unit) values (%s,'stray','kilogram')",
+                (stray_canonical,),
+            )
+            cur.execute(
+                "insert into workspace_product (id,tenant_id,canonical_product_id,tenant_name) "
+                "values (%s,%s,%s,'not on the quote')",
+                (stray, tenant_id, stray_canonical),
+            )
+        conn.commit()
+
+    service = RequestsService(settings=get_settings())
+    lines = [{"workspace_product_id": pid} for pid in [*products, stray]]
+    sourced = service._quoted_prices_for({"source_rfq_response_id": responses["amana"]}, lines)
+    assert [sourced[pid][0] for pid in products] == [
+        Decimal(1725),
+        Decimal(925),
+        Decimal(890),
+        Decimal(575),
+        Decimal(68),
+    ]
+    assert {currency for _, currency in sourced.values()} == {"EGP"}
+    assert stray not in sourced
+    assert service._quoted_prices_for({"source_rfq_response_id": None}, lines) == {}
