@@ -51,7 +51,9 @@ photos, push notifications. 31 Dart source files, 22 test files (`apps/mobile/li
 apps/api/          FastAPI modular monolith — the only backend deployable
   src/procurepilot_api/modules/   30 modules (auth, tenants, catalogue, quotations, matching,
                    offers, requests, orders, rfq, analyst, ...) — `ls` for the current list
-  src/procurepilot_api/workers/   email-ingestion worker (runs from the API image)
+  src/procurepilot_api/workers/   background workers run from the API image (email ingestion, exports,
+                   digests, report scheduling, accounting/POS sync, webhooks, catalogue and offer
+                   refresh) and operator CLIs (`requeue_extraction`, `requeue_email_ingest`)
   tests/{unit,integration,contract}/
 supabase/migrations/  versioned SQL, applied via Supabase CLI (apps/api/migrations/ is a pointer)
 apps/web/          Angular 19 SPA
