@@ -44,7 +44,7 @@
 ## Quality records
 
 - Stage gate: [`quality/g2-stage-gate-evaluation.md`](quality/g2-stage-gate-evaluation.md).
-- Release evidence: [R3.4](quality/r3.4-release-evidence.md) · [R4.1](quality/r4.1-release-evidence.md) · [R4.2](quality/r4.2-release-evidence.md) · [R4.3](quality/r4.3-release-evidence.md) (G3 status is recorded in these).
+- Release evidence: [022 + Oct 2026 demo fixes](quality/022-and-demo-fix-wave-release-evidence.md) · [R3.4](quality/r3.4-release-evidence.md) · [R4.1](quality/r4.1-release-evidence.md) · [R4.2](quality/r4.2-release-evidence.md) · [R4.3](quality/r4.3-release-evidence.md) (G3 status is recorded in these).
 - Security reviews: [R2.5](quality/r2.5-security-review-record.md) · [R3.0](quality/r3.0-security-review-record.md) · [R3.1 accounting](quality/r3.1-accounting-security-review-record.md); critique: [R2.5 hardening](quality/r2.5-security-hardening-critique.md).
 - R2.5 baselines and audits: [performance and accessibility](quality/r2.5-performance-accessibility-baseline.md) · [docs gap audit](quality/r2.5-docs-gap-audit.md) · [reporting product critique](quality/r2.5-reporting-hardening-product-critique-agy.md).
 - Matching reviews: [functionality critique](quality/matching-functionality-critique.md) · [normalisation audit](quality/matching-normalisation-audit.md) · [resolution-queue critique](quality/match-resolution-queue-critique.md).

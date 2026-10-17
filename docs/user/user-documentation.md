@@ -445,12 +445,12 @@ Tracks a purchase order's lifecycle — submitted, confirmed by the supplier, de
 
 **Route:** `/orders/new` (Owner/Buyer), or `/orders/:id/edit` to edit an existing draft
 
-Reached from **Create Order** on the order list, or from the same-named action on an `approved` purchase request (§18) — the only two entry points, there is still no separate "convert this request" button that skips the form.
+Reached from **Create Order** on the order list (blank), **From approved request** on the order list (pick an approved request from the menu), the **Create Order** icon on a request whose approval decision is Approved — such a request is listed with status `ordered` in Purchase Requests (§18), not `approved`, or **Create purchase order** on an approved request's own page (§19). All of them open this form; none places an order without it.
 
 | # | Element | Description |
 |---|---------|-------------|
 | 1 | **Source request banner** | Shown only when arriving from a purchase request. Names the request you're creating from, for context. |
-| 2 | **Order Number, Supplier, Order Date, Expected Delivery Date, Currency** | Standard header fields. Currency starts as your workspace's home currency and can be changed per order. Arriving from a request does not pre-fill the supplier — a request isn't tied to one supplier, so you still choose it here. |
+| 2 | **Order Number, Supplier, Order Date, Expected Delivery Date, Currency** | Standard header fields. Order Number is pre-filled with a suggested next number, which you can change. Currency starts as your workspace's home currency and can be changed per order. When the request was prepared from a supplier's RFQ response, **Supplier** is pre-filled with that supplier; otherwise you choose it here. |
 | 3 | **Order Lines** | When creating from a request: one line per request line that still has quantity left to allocate (lines fully covered by an earlier draft are left out entirely). Each line's **Product**, **Description**, and **Base Unit** are pre-filled from the request line; **Unit Price** is left for you to enter — the request's estimated price is never used as the real price silently. The one exception: if the request was prepared from a supplier's RFQ response, **Unit Price** starts filled with that supplier's quoted price per pack, which you can still change. Quantities are in packs, and the description says the pack size (for example "pack of 18 litre"). |
 | 4 | **Estimate badge** | Shown only when creating a new order from a request (not when re-opening an existing draft via **Edit Draft**). Shows the purchase request's own estimated unit price next to the matching line, as a reference-only figure — it has no effect on the order total unless it is in **Unit Price**, either because you typed it or because the request came from an RFQ response (row 3). |
 | 5 | **Remaining Allocatable badge / quantity cap** | Also shown only when creating from a request. Shows how much of that request line's quantity is still unallocated across all non-cancelled draft/submitted orders, and **Quantity** on that line is capped at this figure so you cannot over-allocate a request across multiple orders. |
@@ -706,13 +706,13 @@ Reached from **Record Purchase** on any Smart Compare offer, or **+ Record Purch
 
 | # | Element | Description |
 |---|---------|-------------|
-| 1 | **Page title** | Reads "New Purchase Request" when creating a draft and "Edit Purchase Request" when opening an existing draft/submitted request. |
+| 1 | **Page title** | Reads "New Purchase Request" when creating a draft, "Edit Purchase Request" when editing a draft, and "Purchase Request" (with its status) when the request can no longer be edited. An approved request also shows a **Create purchase order** button (§11). |
 | 2 | **Branch selector** (required) | Select the branch this request is for. Branches are defined in Organisation Settings (section 22) — a request cannot be created until at least one branch exists. Existing requests show the saved branch. |
 | 3 | **Cost Centre selector** (optional) | Optionally assign the request to a cost centre for budget tracking. |
 | 4 | **Required By date** (required) | The date by which the goods are needed. |
 | 5 | **Line Items section** | Each line needs a **Product**, a **Quantity**, and an optional **Note**. |
 | 6 | **+ Add Line button** | Adds another line item row. At least one line is required to submit. |
-| 7 | **Save Draft / Submit controls** | Saves the request as a draft first; submitted requests become read-only except for status-specific actions such as withdrawal. |
+| 7 | **Save Draft / Submit controls** | **Submit** saves your latest edits first, then submits; if the form is invalid or the save fails, nothing is submitted. Submitted requests become read-only except for status-specific actions such as withdrawal. |
 
 **Current display limitation:** existing submitted requests can show the saved product UUID in the line-item field instead of the product name. The underlying relationship is stored correctly, but the detail display still needs the same friendly-name resolution used elsewhere in the app.
 
@@ -731,7 +731,7 @@ Reached from **Record Purchase** on any Smart Compare offer, or **+ Record Purch
 | # | Element | Description |
 |---|---------|-------------|
 | 1 | **Page title — "Approval Queue"** | Requests awaiting your decision. Only requests routed to you — directly, or via an active delegation (section 22) — based on threshold approval rules appear here. |
-| 2 | **Approvals table** | One row per pending request: required-by date, requester, branch, cost centre, estimated total (with an "incomplete estimate" badge when some lines lack pricing), budget status, and line count. |
+| 2 | **Approvals table** | One row per pending request: required-by date, requester (name or email), branch, cost centre, estimated total (with an "incomplete estimate" badge when some lines lack pricing), budget status, and line count. Budget status uses the most specific budget that applies: the cost centre's, otherwise the branch's, otherwise an organisation-wide budget; only when none of the three exists does it show **No budget configured** and say why. |
 | 3 | **Budget Status column** | Shows the remaining budget after this request, or an amber "Budget Exceeded" badge with a tooltip and the remaining-budget figure when the request would exceed the applicable budget. Blank when no budget applies. |
 | 4 | **Lines column + expand toggle** | Shows the line count; the expand icon reveals a nested table underneath the row with each line's product, quantity, unit price, and note — so you can review the full request without leaving the queue. |
 | 5 | **Approve / Reject buttons** | Each row has both actions. Either opens a confirmation dialog with an optional comment field before committing the decision. |
@@ -1275,7 +1275,7 @@ A screen for owners to configure auto-preparation guardrails without needing API
 | 2 | **Deliver to Branch / Required By controls** | Set once and used for whichever response you prepare into a request. |
 | 3 | **Response cards** | One card per supplier response: supplier name, submitted date, and a line table (product, quantity, unit price, total value). A line whose product hasn't been matched yet to a catalogue product shows a **Pending Match** badge instead of a price line. |
 | 4 | **Guardrail outcomes panel** | Shown on each response card, for both Owners and Buyers, whenever at least one guardrail is configured: one row per guardrail, labelled by its limit ("Up to 500.00 GBP"), with a plain-language reason for why it did or didn't fire for *this* response. A fired guardrail's row is visually distinguished from the rest. |
-| 5 | **Prepare Request button** | Creates a draft purchase request priced from this response's actual quoted prices (not a landed-cost estimate) and marks the RFQ `Converted`. Disabled while any line on the response is still a pending match — a request is only ever prepared from a fully-priced response. The confirmation includes a **View Request** action that jumps straight to the new draft. |
+| 5 | **Deliver to Branch + Prepare Request** | Choose the branch first (pre-selected when you have only one, or your last choice); **Prepare Request** is refused until a branch is set. It creates a draft purchase request priced from this response's quoted prices, with its Required By date taken from the RFQ's needed-by date, and marks the RFQ `Converted`. Disabled while any line on the response is still a pending match. The confirmation has an **Open draft** action and then opens the new draft. |
 | 6 | **No responses state** | Shown until at least one supplier reply has been captured and matched. |
 
 **Guardrail outcome reasons (what each one means):**
@@ -1343,7 +1343,7 @@ A: If you have configured a domain allowlist, any incoming email sent from an un
 A: ProcurePilot uses partial import resilience. All valid rows are imported into the supplier catalogue immediately, while rows with errors (such as missing product names or invalid currency codes) are reported in the expandable Error Details table with their row number and reason so you can fix and re-import them.
 
 **Q: Who can create a purchase order, and where?**
-A: An Owner or Buyer, from Order Tracking (§11). Click **Create Order** on the order list for a blank draft, or **Create Order** on an `approved` purchase request to open the same screen pre-filled from that request. There is still no bulk import tool or accounting/POS provider writer for orders — those remain API-only. Once an order exists, use Order Tracking to edit or cancel it while it's a draft, submit it, record supplier confirmations, and record deliveries.
+A: An Owner or Buyer, from Order Tracking (§11). Click **Create Order** on the order list for a blank draft, **From approved request** on the order list, or **Create Order** / **Create purchase order** on an `approved` purchase request to open the same screen pre-filled from that request. There is still no bulk import tool or accounting/POS provider writer for orders — those remain API-only. Once an order exists, use Order Tracking to edit or cancel it while it's a draft, submit it, record supplier confirmations, and record deliveries.
 
 **Q: Why didn't my RFQ auto-prepare a request through the guardrail?**
 A: Every condition has to hold at once: the RFQ still open, at least the configured minimum number of responses received, every line on that response matched to a catalogue product, its currency matching the guardrail's currency exactly, its supplier allowed (if a supplier allowlist is configured), its total under the configured maximum, its price within the configured variance of your recent purchase history for that product, and it must be the single lowest-priced eligible response — a tie never fires, and if more than one guardrail would independently fire the result is treated as ambiguous rather than picked arbitrarily. If even one condition fails, the response is simply left for you to prepare manually from RFQ Responses (§38) — which now also tells you exactly which condition failed for each response, per guardrail.

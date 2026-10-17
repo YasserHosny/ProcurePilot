@@ -61,6 +61,14 @@
 
 ---
 
+## Egypt pilot (added 2026-10-18)
+
+- As **Sara**, I want new orders and budgets to open in EGP, so that I never record a purchase in the wrong currency.
+- As **Sara**, I want a quote with no visible currency to be flagged, not assumed, so that a wrong currency never reaches comparison.
+- As **Youssef**, I want Arabic quotes with DD/MM dates and right-to-left tables read correctly — or sent to me for review when they can't be — so that no quote is lost or silently wrong.
+- As **Sara**, I want my RFQ email to reach suppliers in Arabic, naming my business and my terms, so that they reply without calling me.
+- As **Khaled**, I want to request items in the packs I actually buy (tins, sacks), so that the estimate my approver sees is right.
+
 ## Use Cases
 
 ### UC-001 New quotation → trusted recommendation
@@ -88,3 +96,13 @@
 3. He corrects fields and confirms matches.
 4. Every correction writes a `ProductAlias` and labelled example.
 5. The next similar document routes with higher confidence.
+
+### UC-004 Arabic supplier quote → order in EGP *(added 2026-10-18)*
+
+1. Sara sends an RFQ in Arabic to three suppliers from RFQ History.
+2. Suppliers reply by email with Arabic PDFs (dates like `16/10/2026`, prices marked «ج.م»).
+3. The replies are credited to the right suppliers, read row by row, and land in review with their dates and EGP prices.
+4. Sara confirms the matches (exact names in one click) and compares offers per pack.
+5. She prepares a request from the best response for a branch; Omar approves it on his phone.
+6. Sara creates the purchase order from the approved request, with the supplier filled in.
+
