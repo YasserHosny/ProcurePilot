@@ -1,6 +1,6 @@
 # CI pipeline notes
 
-Last updated: 2026-10-16. Source of truth is `.github/workflows/ci.yml`; this page records *why* it is shaped the way it is.
+Last updated: 2026-10-18. Source of truth is `.github/workflows/ci.yml`; this page records *why* it is shaped the way it is.
 
 ## Docs-only pull requests skip the heavy jobs
 
@@ -21,15 +21,32 @@ check name other tooling may rely on is unchanged.
 
 - The accessibility step runs the `*a11y*` specs; the following step runs the complement (files whose name lacks
   `a11y`). They used to overlap, which ran ~117 tests twice.
-- `supabase start` is retried up to three times: parallel shards pull images at the same moment and the registry
-  occasionally answers `toomanyrequests`. If a run ever fails on an image pull despite the retry, cache or mirror the
-  images rather than raising the retry count.
+- Supabase CLI is pinned to `2.121.0` so CI does not hit the rate-limited GitHub API while resolving `latest`; bump
+  it deliberately. `supabase start -x studio,vector,logflare,edge-runtime,postgres-meta,mailpit,realtime` skips the
+  seven unused services, reducing image pulls from 12 to five (`postgres`, `gotrue`, `postgrest`, `kong`, and
+  `storage-api`). Shards stagger startup by 25 seconds each, then retry up to five times with a 30-second-per-attempt
+  backoff. `docs-screenshots.yml` uses the same CLI pin, exclusions and retry, without the shard stagger. To bring a
+  service back, remove it from the `-x` list in **both** workflows.
 
-## Measured effect (2026-10-16)
+## Pushes to main finish
 
-| | Before | After |
-|---|---|---|
-| End-to-end wall time | 22–26 min | ~10 min |
-| Docs-only PR | ~26 min | seconds (secret scan only) |
+`cancel-in-progress` is `github.event_name == 'pull_request'`, so superseded PR runs are cancelled while pushes to
+`main` complete. A concurrency group keeps only one pending run, though, so several merges landing during one run
+still collapse to the last pending run.
+
+## Measured effect (2026-10-18)
+
+| Change | Measurement |
+|---|---|
+| End-to-end wall time (sharding) | 22–26 min → ~9–10 min |
+| Docs-only PR | ~26 min → seconds (secret scan only) |
+| Supabase startup hardening | Reliability, not speed: shard times remain ~485–550 s. Registry retry/rate-limit log lines per shard went from 31–48 to 0–13 over three trial runs, with one 30-line outlier in the first run. Recent red CI runs had included whole-run `supabase start` failures and a `setup-cli@latest` rate-limit failure. |
 
 Sharding costs roughly three times the ~170 s stack start-up in runner minutes, in exchange for about half the wait.
+
+## Not done / ideas
+
+- Impact-based E2E spec selection is the biggest remaining lever and the riskiest; keep the full suite on `main`.
+- Serve a prebuilt web app instead of using `ng serve`.
+- Add a fourth shard.
+- Use `pytest-xdist` for backend tests.
