@@ -1399,6 +1399,7 @@
     "title": "Smart Compare",
     "subtitle": "Compare supplier offers side-by-side with true landed cost and evidence-backed recommendations.",
     "selectProductPrompt": "Select a product from the list to compare supplier offers.",
+    "packUnknown": "Could not load this product's pack size, so the comparison was not run. Reload and try again.",
     "productLabel": "Product",
     "quantityLabel": "Required Quantity",
     "quantityPlaceholder": "e.g. 10",
@@ -3285,6 +3286,8 @@
       },
       "creatingFromRequest": "Creating from Request",
       "estimateReference": "Estimate",
+      "quotedMixedCurrencies": "This request's supplier quote lines are in more than one currency, so unit prices were not pre-filled. Enter the prices manually.",
+      "quotedCurrencyMismatch": "The order currency ({{order}}) differs from the supplier's quoted currency ({{quoted}}). Use {{quoted}} or edit the prices.",
       "packUnit": "pack of {{size}} {{unit}}",
       "baseUnitPrice": "per {{unit}}",
       "remainingQuantity": "Remaining Allocatable"

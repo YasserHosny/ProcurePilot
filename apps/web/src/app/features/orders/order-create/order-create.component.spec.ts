@@ -250,6 +250,52 @@ describe('OrderCreateComponent', () => {
     expect(component.lines.at(0).controls.estimated_price.value).toBe(9.5);
   });
 
+  describe('quoted currency', () => {
+    type Quote = { amount: string; currency: string } | null;
+    const loadLines = (quotes: Quote[]) => {
+      const translate = TestBed.inject(TranslateService);
+      translate.setTranslation('en', enCatalog);
+      translate.use('en');
+      fixture.destroy();
+      routeSnapshot.queryParamMap = convertToParamMap({ source_request_id: 'req-1' });
+      requestsApiService.getRequest.and.returnValue(of({
+        id: 'req-1', branch_id: 'b1', requested_by_membership_id: 'm1',
+        required_by_date: '2026-10-01', status: 'approved',
+        source_rfq_response_id: 'rfq-response-1',
+        lines: quotes.map((quoted, i) => ({
+          id: `rl-${i}`, workspace_product_id: 'p1', quantity: '5.000000', quoted_unit_price: quoted,
+        })),
+        has_incomplete_estimate: false, created_at: '2026-09-29T00:00:00Z',
+      } as unknown as import('../../../core/api/models').PurchaseRequest));
+      ordersApiService.getAllocations.and.returnValue(of({
+        source_request_id: 'req-1',
+        lines: quotes.map((_, i) => ({ source_request_line_id: `rl-${i}`, requested_quantity: '5.000000', allocated_quantity: '0', remaining_quantity: '5.000000' })),
+      }));
+      fixture = TestBed.createComponent(OrderCreateComponent);
+      component = fixture.componentInstance;
+      fixture.detectChanges();
+    };
+
+    it('takes the order currency from the supplier quote and blocks a different one on submit', () => {
+      loadLines([{ amount: '9.0000', currency: 'EUR' }]);
+      expect(component.form.controls.currency.value).toBe('EUR');
+      expect(component.lines.at(0).controls.unit_price.value).toBe(9);
+
+      component.form.patchValue({ order_number: 'PO-1', supplier_id: 's1', currency: 'EGP' });
+      ordersApiService.createOrder.calls.reset();
+      component.submit();
+      expect(ordersApiService.createOrder).not.toHaveBeenCalled();
+      expect(component.errorMessage()).toContain('EUR');
+    });
+
+    it('does not pre-fill prices when the quote lines mix currencies', () => {
+      loadLines([{ amount: '9.0000', currency: 'EUR' }, { amount: '10.0000', currency: 'USD' }]);
+      expect(component.lines.at(0).controls.unit_price.value).toBeNull();
+      expect(component.lines.at(1).controls.unit_price.value).toBeNull();
+      expect(component.errorMessage()).toBe(enCatalog.orders.create.quotedMixedCurrencies);
+    });
+  });
+
   it('loads a source request when editing a request-derived draft and preserves links on submit', () => {
     routeSnapshot.paramMap = convertToParamMap({ id: 'order-1' });
     const order = {
