@@ -127,7 +127,7 @@
               <div class="refresh-preview-row" role="row">
                 <span role="cell">{{ row.product_name }}</span>
                 <span role="cell">{{ row.unit_price_amount }} {{ row.unit_price_currency }}</span>
-                <span role="cell">{{ row.base_unit }}</span>
+                <span role="cell">{{ row.base_unit | unitLabel }}</span>
               </div>
             }
           </div>

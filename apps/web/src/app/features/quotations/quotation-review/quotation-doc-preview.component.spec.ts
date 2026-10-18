@@ -1,7 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
-import { TranslateModule } from '@ngx-translate/core';
+import { TranslateModule, TranslateService } from '@ngx-translate/core';
 
 import type { FieldExtraction, QuotationDetail } from '../../../core/api/models';
 import { QuotationDocPreviewComponent } from './quotation-doc-preview.component';
@@ -39,5 +39,20 @@ describe('QuotationDocPreviewComponent provenance', () => {
     expect(values[0].textContent?.trim()).toBe('الأمانة للتجارة');
     expect(values[0].textContent).not.toContain('"');
     expect(values[1].textContent?.trim()).toBe('الأمانة للتجارة');
+  });
+
+  it('keeps extraction internals off the screen and labels fields from the catalogue', () => {
+    const translate = TestBed.inject(TranslateService);
+    translate.setTranslation('ar', { quotations: { review: { fieldLabels: { supplier_name: 'اسم المورد' } } } });
+    translate.use('ar');
+    fixture.detectChanges();
+    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+    expect(text).not.toContain('application/pdf');
+    expect(text).not.toContain('bedrock');
+    expect(text).not.toContain('test-model');
+    expect(text).not.toContain('Supplier Name');
+    expect(fixture.nativeElement.querySelector('.extraction-field-label').textContent.trim()).toBe('اسم المورد');
+    const icon = fixture.nativeElement.querySelector('.prov-details-icon') as HTMLElement;
+    expect(icon.getAttribute('aria-label')).toContain('bedrock · test-model');
   });
 });

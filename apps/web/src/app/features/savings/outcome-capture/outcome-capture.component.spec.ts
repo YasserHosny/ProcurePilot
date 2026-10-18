@@ -54,6 +54,7 @@ describe('OutcomeCaptureComponent (T021)', () => {
       currentMember: signal(null),
       isAuthenticated: signal(true),
       tenant: signal(null),
+      homeCurrency: signal<string | undefined>('EGP'),
       activeLocale: signal('en'),
     };
 
@@ -87,6 +88,11 @@ describe('OutcomeCaptureComponent (T021)', () => {
     fixture = TestBed.createComponent(OutcomeCaptureComponent);
     component = fixture.componentInstance;
     fixture.detectChanges();
+  });
+
+  it('defaults the currency to the workspace home currency and offers localised units', () => {
+    expect(component.homeCurrency).toBe('EGP');
+    expect(component.baseUnits).toContain('kilogram');
   });
 
   it('should create and load reference products and suppliers', () => {

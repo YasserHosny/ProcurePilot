@@ -54,6 +54,7 @@ export interface IngestionEmailLog {
   attachment_count: number;
   quotation_id: string | null;
   supplier_id: string | null;
+  supplier_name?: string | null;
   match_method: SupplierMatchMethod | null;
   created_at: string;
 }

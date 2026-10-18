@@ -47,6 +47,8 @@ class IngestionEmailLog(BaseModel):
     attachment_count: int
     quotation_id: UUID | None
     supplier_id: UUID | None
+    # Display name of the matched supplier; null when unmatched.
+    supplier_name: str | None = None
     match_method: SupplierMatchMethod | None
     created_at: datetime
 

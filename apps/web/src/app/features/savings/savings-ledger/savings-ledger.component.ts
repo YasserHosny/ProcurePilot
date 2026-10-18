@@ -11,7 +11,6 @@ import { MatDividerModule } from '@angular/material/divider';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
-import { MatNativeDateModule } from '@angular/material/core';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
@@ -38,8 +37,10 @@ import {
   isNegativeSaving,
   isPositiveSaving,
 } from '../savings-formatting';
+import { provideAppDateAdapter } from '../../../core/i18n/date-adapter';
 
 @Component({
+  providers: [provideAppDateAdapter()],
   selector: 'app-savings-ledger',
   standalone: true,
   imports: [
@@ -55,7 +56,6 @@ import {
     MatInputModule,
     MatSelectModule,
     MatDatepickerModule,
-    MatNativeDateModule,
     MatDividerModule,
     MatProgressSpinnerModule,
     MatSnackBarModule,

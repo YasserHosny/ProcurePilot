@@ -542,9 +542,14 @@ components:
           type: string
           format: uuid
           nullable: true
+        supplier_name:
+          type: string
+          nullable: true
+          readOnly: true
+          description: Display name of the matched supplier; null when unmatched.
         match_method:
           type: string
-          enum: [address, domain, thread, manual]
+          enum: [address, domain, thread, manual, rfq_reply]
           nullable: true
         created_at:
           type: string

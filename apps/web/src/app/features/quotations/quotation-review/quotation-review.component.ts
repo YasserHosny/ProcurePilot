@@ -6,7 +6,6 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatChipsModule } from '@angular/material/chips';
-import { MatNativeDateModule } from '@angular/material/core';
 import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatDialogModule } from '@angular/material/dialog';
 import { MatDividerModule } from '@angular/material/divider';
@@ -41,6 +40,7 @@ import { QuotationReviewBannersComponent } from './quotation-review-banners.comp
 import { QuotationDocPreviewComponent } from './quotation-doc-preview.component';
 import { QuotationLinesComponent } from './quotation-lines.component';
 import { QuotationAuditTrailComponent } from './quotation-audit-trail.component';
+import { provideAppDateAdapter } from '../../../core/i18n/date-adapter';
 
 interface FlaggedField {
   readonly id: string;
@@ -79,6 +79,7 @@ type QuotationTimestampFields = QuotationDetail & {
 };
 
 @Component({
+  providers: [provideAppDateAdapter()],
   selector: 'app-quotation-review',
   standalone: true,
   imports: [
@@ -95,7 +96,6 @@ type QuotationTimestampFields = QuotationDetail & {
     MatSelectModule,
     MatCheckboxModule,
     MatDatepickerModule,
-    MatNativeDateModule,
     MatExpansionModule,
     MatTableModule,
     MatProgressSpinnerModule,

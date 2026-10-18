@@ -63,7 +63,7 @@
         />
         <mat-icon matSuffix aria-hidden="true">calculate</mat-icon>
         @if (selectedProduct()?.base_unit) {
-          <mat-hint>{{ 'compare.packHint' | translate:{ count: quantityInput(), size: packBaseQuantity(), total: baseQuantityInput(), unit: selectedProduct()?.base_unit } }}</mat-hint>
+          <mat-hint>{{ 'compare.packHint' | translate: packHintParams() }}</mat-hint>
         }
       </mat-form-field>
 
@@ -88,7 +88,7 @@
               <span class="signal-label">{{ 'pos.inline.stockOnHand' | translate }}:</span>
               <strong class="signal-value">{{ signal.stock_on_hand }}</strong>
               @if (selectedProduct()?.base_unit; as unit) {
-                <span class="signal-unit">{{ unit }}</span>
+                <span class="signal-unit">{{ unit | unitLabel }}</span>
               }
               <span class="signal-meta">
                 @if (signal.stock_synced_at) {

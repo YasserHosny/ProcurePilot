@@ -11,7 +11,6 @@ import { MatDividerModule } from '@angular/material/divider';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
-import { MatNativeDateModule } from '@angular/material/core';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatRadioModule } from '@angular/material/radio';
@@ -34,8 +33,10 @@ import {
   type ExportJobUIState,
   determineExportJobUIState,
 } from '../export-job-state';
+import { provideAppDateAdapter } from '../../../core/i18n/date-adapter';
 
 @Component({
+  providers: [provideAppDateAdapter()],
   selector: 'app-export-savings',
   standalone: true,
   imports: [
@@ -47,7 +48,6 @@ import {
     MatInputModule,
     MatSelectModule,
     MatDatepickerModule,
-    MatNativeDateModule,
     MatRadioModule,
     MatButtonModule,
     MatIconModule,

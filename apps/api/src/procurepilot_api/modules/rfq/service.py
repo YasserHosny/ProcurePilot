@@ -298,8 +298,15 @@ class RfqService:
                 line_rows = cur.fetchall()
                 lines = [RfqLine(**r) for r in line_rows]
 
+                # The supplier email follows the sender's interface language, then the
+                # workspace default -- the same order the digest uses.
                 cur.execute(
-                    "select name, default_locale from tenant where id = %s", (member.tenant_id,)
+                    """select t.name,
+                              coalesce(m.preferred_locale, t.default_locale) as default_locale
+                       from tenant t
+                       left join membership m on m.tenant_id = t.id and m.id = %s
+                       where t.id = %s""",
+                    (member.membership_id, member.tenant_id),
                 )
                 tenant_row = cur.fetchone()
                 cur.execute(

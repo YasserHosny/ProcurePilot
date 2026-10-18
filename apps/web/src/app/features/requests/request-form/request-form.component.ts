@@ -8,7 +8,6 @@ import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
-import { MatNativeDateModule } from '@angular/material/core';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
@@ -35,6 +34,7 @@ import type {
 } from '../../../core/api/models';
 import { OrganisationApiService } from '../../settings/organisation-api';
 import { RequestsApiService } from '../requests-api';
+import { provideAppDateAdapter } from '../../../core/i18n/date-adapter';
 
 const I18N = 'requests';
 
@@ -45,6 +45,7 @@ interface LineFormGroup {
 }
 
 @Component({
+  providers: [provideAppDateAdapter()],
   selector: 'app-request-form',
   standalone: true,
   imports: [
@@ -54,7 +55,6 @@ interface LineFormGroup {
     MatInputModule,
     MatSelectModule,
     MatDatepickerModule,
-    MatNativeDateModule,
     MatButtonModule,
     MatIconModule,
     MatProgressSpinnerModule,

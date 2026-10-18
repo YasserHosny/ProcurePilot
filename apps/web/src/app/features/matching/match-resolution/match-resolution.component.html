@@ -195,7 +195,7 @@
           <div class="cost-normalisation-row">
             <div class="norm-info">
               <span class="norm-label">{{ 'matching.resolution.landedCost.normalisedQuantity' | translate }}:</span>
-              <strong class="norm-val">{{ lc.normalised_base_quantity }} {{ lc.base_unit }}</strong>
+              <strong class="norm-val">{{ lc.normalised_base_quantity | formatQuantity }} {{ lc.base_unit | unitLabel }}</strong>
             </div>
             <div class="replay-notice">
               <mat-icon aria-hidden="true">lock</mat-icon>

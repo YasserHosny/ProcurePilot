@@ -19,6 +19,8 @@ import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { ApiService } from '../../../core/api/api.service';
 import type { ApiError, Product } from '../../../core/api/models';
 import { FormatDatePipe } from '../../../core/format/date.pipe';
+import { FormatService } from '../../../core/format/format.service';
+import { UnitLabelPipe, unitLabel } from '../../../core/format/unit-label';
 import { PosApiService, type SyncedProductSignal } from '../../pos/pos-api';
 import { formatConfidenceClass, formatScorePercent } from '../offer-formatting';
 import type { OfferComparison, Recommendation, RecommendationConfidence } from '../offers-api';
@@ -47,6 +49,7 @@ import { CompareTableComponent } from './compare-table.component';
     MatSnackBarModule,
     TranslatePipe,
     FormatDatePipe,
+    UnitLabelPipe,
     CompareRecommendationComponent,
     CompareTableComponent,
   ],
@@ -60,6 +63,7 @@ export class CompareComponent implements OnInit {
   private readonly posApi = inject(PosApiService);
   private readonly snackBar = inject(MatSnackBar);
   private readonly translate = inject(TranslateService);
+  private readonly format = inject(FormatService);
 
   readonly isLoading = signal<boolean>(false);
   readonly products = signal<Product[]>([]);
@@ -97,6 +101,16 @@ export class CompareComponent implements OnInit {
     const base = parseFloat(pack.base_quantity ?? String(pack.pack_count * parseFloat(pack.unit_size)));
     return base > 0 ? base : 1;
   });
+
+  /** "10 packs × 1 kg = 10 kg" in the UI language, with localised digits and unit. */
+  packHintParams(): Record<string, string> {
+    return {
+      count: this.format.formatExactQuantity(this.quantityInput()),
+      size: this.format.formatExactQuantity(String(this.packBaseQuantity())),
+      total: this.format.formatExactQuantity(this.baseQuantityInput()),
+      unit: unitLabel(this.translate, this.selectedProduct()?.base_unit),
+    };
+  }
 
   readonly baseQuantityInput = computed<string>(() => {
     const packs = parseFloat(this.quantityInput());

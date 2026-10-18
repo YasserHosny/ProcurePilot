@@ -9,6 +9,7 @@ import type { Product, Supplier } from '../../../core/api/models';
 import { FormatService } from '../../../core/format/format.service';
 import { FormatDatePipe } from '../../../core/format/date.pipe';
 import { FormatMoneyPipe } from '../../../core/format/money.pipe';
+import { unitLabel } from '../../../core/format/unit-label';
 import type {
   BasketSplitJob,
   OptimisationConstraint,
@@ -83,9 +84,7 @@ export class BasketSplitResultsComponent {
       this.currentJob?.pack_snapshot?.[line.workspace_product_id]?.base_unit ??
       product?.base_unit ??
       '';
-    const unitKey = `rfq.email.units.${rawUnit}`;
-    const translatedUnit: string = this.translate.instant(unitKey);
-    const unit = translatedUnit === unitKey ? rawUnit : translatedUnit;
+    const unit = unitLabel(this.translate, rawUnit);
     const fmt = (n: number): string =>
       this.format.formatNumber(n, { maximumFractionDigits: 6 });
     // Prefer the pack definition captured at submission: the catalogue may have changed since.

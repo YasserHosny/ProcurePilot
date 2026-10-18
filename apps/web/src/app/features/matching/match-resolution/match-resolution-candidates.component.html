@@ -59,7 +59,7 @@
               @if (cand.candidate_product.gtin) {
                 <span class="attr-item"><strong>{{ 'matching.resolution.candidates.product.gtin' | translate }}:</strong> {{ cand.candidate_product.gtin }}</span>
               }
-              <span class="attr-item"><strong>{{ 'matching.resolution.candidates.product.baseUnit' | translate }}:</strong> {{ cand.candidate_product.base_unit }}</span>
+              <span class="attr-item"><strong>{{ 'matching.resolution.candidates.product.baseUnit' | translate }}:</strong> {{ cand.candidate_product.base_unit | unitLabel }}</span>
             </div>
 
             @if (cand.candidate_product.status === 'archived') {

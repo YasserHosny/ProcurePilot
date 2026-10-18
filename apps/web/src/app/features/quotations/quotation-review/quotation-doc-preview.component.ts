@@ -1,12 +1,12 @@
 import { CommonModule } from '@angular/common';
-import { Component, EventEmitter, Input, Output } from '@angular/core';
+import { Component, EventEmitter, Input, Output, inject } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import type { SafeResourceUrl } from '@angular/platform-browser';
-import { TranslatePipe } from '@ngx-translate/core';
+import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
 import type { FieldExtraction, QuotationDetail } from '../../../core/api/models';
 import { FormatDatePipe } from '../../../core/format/date.pipe';
@@ -38,22 +38,17 @@ export class QuotationDocPreviewComponent {
   @Output() readonly replaceDocumentSelected = new EventEmitter<Event>();
   @Output() readonly download = new EventEmitter<void>();
 
+  private readonly translate = inject(TranslateService);
+
   fieldLabel(fieldName: string): string {
-    const labels: Record<string, string> = {
-      supplier_name: 'Supplier Name',
-      currency: 'Currency',
-      issue_date: 'Issue Date',
-      expiry_date: 'Expiry Date',
-      stated_total: 'Stated Total',
-      quantity: 'Quantity',
-      unit_price: 'Unit Price',
-      discount: 'Discount',
-      delivery_fee: 'Delivery Fee',
-      vat_rate: 'VAT Rate',
-      original_text: 'Description',
-      pack_details: 'Pack Details',
-    };
-    return labels[fieldName] || fieldName.replace(/_/g, ' ');
+    const key = `quotations.review.fieldLabels.${fieldName}`;
+    const label: string = this.translate.instant(key);
+    return label === key ? fieldName.replace(/_/g, ' ') : label;
+  }
+
+  /** Extraction provider and model, for the details tooltip only — not shown on the screen. */
+  technicalDetails(fe: FieldExtraction): string {
+    return [fe.extraction_method, fe.model_version].filter(Boolean).join(' · ');
   }
 
   formatConfidence(score: string | number): number {

@@ -176,7 +176,7 @@
 
           <div class="detail-row">
             <span class="detail-label">{{ 'savings.outcomeCapture.quantityLabel' | translate }}</span>
-            <span class="detail-val">{{ evidence.purchase_record.quantity }} {{ evidence.purchase_record.base_unit }}</span>
+            <span class="detail-val">{{ evidence.purchase_record.quantity | formatQuantity }} {{ evidence.purchase_record.base_unit | unitLabel }}</span>
           </div>
 
           <div class="detail-row">
