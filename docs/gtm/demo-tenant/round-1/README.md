@@ -95,10 +95,14 @@ pasta 15). The optimiser on hosted completed the job (2511bb47) in about 2 secon
 | النور | lentils, oil, pasta | 28,575 |
 | **Split total** | | **55,975** — EGP 450 less than all from النور (56,425) |
 
-**Bug (finding 21):** the result page cannot load it. `GET /api/v1/baskets/{id}` returns 500 because the
-optimiser stores a result shape the API's `AdvancedBasketResult` rejects (lines lack `supplier_id`,
-`confidence` is an object not high/medium/low, extra `rule_version`/`advisory_only`). Hidden until now
-because hosted had no optimiser. Handed to the optimiser session 2026-10-18.
+The result page first failed with a 500 (finding 21: the optimiser's stored result shape did not match the
+API contract). Fixed by #131 (a read-side adapter plus a worker-to-API contract test), deployed 2026-10-18;
+the page now shows the split and "Splitting saves 450.00 EGP versus buying exclusively from النور":
+
+![Basket split result: EGP 55,975, saves 450 EGP](10-basket-split-result.jpg)
+
+Open on this screen (sent to the optimiser session): allocated quantities show in kg/litres (500, 250, 180)
+instead of packs, and "Applied Constraints" shows the solver's internal English tie-break text.
 
 ## Savings ledger (checked 2026-10-18)
 
