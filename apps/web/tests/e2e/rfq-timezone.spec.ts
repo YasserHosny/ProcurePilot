@@ -34,7 +34,9 @@ test('saves an RFQ with the picked local calendar day', async ({ page }) => {
     const month = String(target.getMonth() + 1).padStart(2, '0');
     const day = String(target.getDate()).padStart(2, '0');
     return {
-      accessibleName: target.toLocaleDateString('en-US', {
+      // The date picker is day-first outside the US region (AppDateAdapter), so its cells are
+      // labelled en-GB style: "1 November 2026".
+      accessibleName: target.toLocaleDateString('en-GB', {
         month: 'long',
         day: 'numeric',
         year: 'numeric',
