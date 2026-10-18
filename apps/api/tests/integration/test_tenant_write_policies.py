@@ -107,7 +107,13 @@ def _name_of(cur: psycopg.Cursor, tenant_id: UUID) -> str:
 
 @pytest.mark.parametrize("role", ["buyer", "viewer"])
 @pytest.mark.parametrize(
-    "assignment", ["name = 'X'", "default_locale = 'ar'", "reporting_timezone = 'Africa/Cairo'"]
+    "assignment",
+    [
+        "name = 'X'",
+        "default_locale = 'ar'",
+        "reporting_timezone = 'Africa/Cairo'",
+        "currency = 'USD'",
+    ],
 )
 def test_a_non_owner_cannot_change_the_workspace_even_with_an_owner_claim(
     workspace: Workspace, role: str, assignment: str
@@ -138,7 +144,14 @@ def test_nobody_inserts_or_deletes_a_tenant_as_authenticated(
 
 @pytest.mark.parametrize(
     "assignment",
-    ["slug = 'taken'", "region = 'GB'", "tax_model = 'uk_vat'", "platform_invitation_id = null"],
+    [
+        "slug = 'taken'",
+        "region = 'GB'",
+        "tax_model = 'uk_vat'",
+        "platform_invitation_id = null",
+        "id = gen_random_uuid()",
+        "created_at = now()",
+    ],
 )
 def test_an_owner_cannot_change_identity_columns(workspace: Workspace, assignment: str) -> None:
     cur, tenant_id, users = workspace
@@ -187,3 +200,71 @@ def test_every_member_still_reads_their_workspace(workspace: Workspace, role: st
     act_as(cur, tenant_id, users[role], role)
     cur.execute("select id from tenant")
     assert [row[0] for row in cur.fetchall()] == [tenant_id]
+
+
+def test_a_removed_owner_cannot_change_the_workspace(workspace: Workspace) -> None:
+    """Their role is still owner, but the membership is no longer active."""
+    cur, tenant_id, users = workspace
+    add_member(cur, tenant_id, "owner")  # the workspace must keep an active owner
+    cur.execute(
+        "update membership set status = 'removed', is_active_workspace = false "
+        "where tenant_id = %s and user_id = %s",
+        (tenant_id, users["owner"]),
+    )
+    act_as(cur, tenant_id, users["owner"], "owner")
+    cur.execute("update tenant set name = 'X' where id = %s", (tenant_id,))
+    assert cur.rowcount == 0
+
+
+# --- set_tenant_currency (security invoker) runs under these policies ---------------------------
+
+
+def _membership_id(cur: psycopg.Cursor, tenant_id: UUID, user_id: UUID) -> UUID:
+    cur.execute(
+        "select id from membership where tenant_id = %s and user_id = %s", (tenant_id, user_id)
+    )
+    return cur.fetchone()[0]
+
+
+def _currency_of(cur: psycopg.Cursor, tenant_id: UUID) -> str:
+    cur.execute("reset role")
+    cur.execute("select currency from tenant where id = %s", (tenant_id,))
+    return str(cur.fetchone()[0])
+
+
+def _enable_usd(cur: psycopg.Cursor) -> None:
+    cur.execute(
+        "insert into supported_currency (code,label_en,label_ar) values ('USD','D','د') "
+        "on conflict (code) do update set is_enabled = true"
+    )
+
+
+def test_an_owner_can_set_the_currency_through_the_audited_function(workspace: Workspace) -> None:
+    cur, tenant_id, users = workspace
+    _enable_usd(cur)
+    owner_membership = _membership_id(cur, tenant_id, users["owner"])
+    act_as(cur, tenant_id, users["owner"], "owner")
+    cur.execute("select set_tenant_currency('USD', %s, 'o@t')", (owner_membership,))
+    assert cur.fetchone()[0] == "GBP"
+    assert _currency_of(cur, tenant_id) == "USD"
+    cur.execute(
+        "select count(*) from audit_event where tenant_id = %s "
+        "and action = 'tenant.currency_changed'",
+        (tenant_id,),
+    )
+    assert cur.fetchone()[0] == 1
+
+
+@pytest.mark.parametrize("role", ["buyer", "viewer"])
+def test_a_non_owner_cannot_set_the_currency_through_the_function(
+    workspace: Workspace, role: str
+) -> None:
+    cur, tenant_id, users = workspace
+    _enable_usd(cur)
+    membership = _membership_id(cur, tenant_id, users[role])
+    act_as(cur, tenant_id, users[role], "owner")
+    cur.execute("savepoint before_set")
+    with pytest.raises(psycopg.errors.NoDataFound):
+        cur.execute("select set_tenant_currency('USD', %s, 'x@t')", (membership,))
+    cur.execute("rollback to savepoint before_set")
+    assert _currency_of(cur, tenant_id) == "GBP"
