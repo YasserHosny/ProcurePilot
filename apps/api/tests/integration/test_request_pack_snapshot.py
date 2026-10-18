@@ -1,6 +1,9 @@
 """ADR-020: catalogue edits must not rewrite a request's purchasing-pack history."""
 
+from __future__ import annotations
+
 from collections.abc import Iterator
+from contextlib import contextmanager
 from datetime import date, timedelta
 from decimal import Decimal
 
@@ -13,8 +16,10 @@ from integration.catalogue_helpers import (
     connection,
     make_workspace,
     make_workspace_product,
+    reset_role,
 )
 from integration.test_purchase_requests import _current_member, _make_branch, _service
+from procurepilot_api.modules.requests import service as requests_service_module
 from procurepilot_api.modules.requests.schemas import (
     PurchaseRequestCreate,
     PurchaseRequestLineInput,
@@ -31,9 +36,64 @@ def conn() -> Iterator[psycopg.Connection]:
     yield from connection()
 
 
+class _TestConnectionWrapper:
+    """Wraps an existing test connection so nested ``with db.connect(...)`` calls reuse it."""
+
+    def __init__(
+        self,
+        conn: psycopg.Connection,
+        *,
+        row_factory: object = None,
+    ) -> None:
+        self._conn = conn
+        self._row_factory = row_factory
+
+    def execute(self, query: object, params: object = None, **kwargs: object) -> object:
+        cur = self._conn.cursor(row_factory=self._row_factory)  # type: ignore[arg-type]
+        return cur.execute(query, params, **kwargs)  # type: ignore[arg-type]
+
+    def cursor(self, *args: object, **kwargs: object) -> object:
+        if self._row_factory is not None and "row_factory" not in kwargs:
+            kwargs["row_factory"] = self._row_factory
+        return self._conn.cursor(*args, **kwargs)  # type: ignore[arg-type]
+
+    def commit(self) -> None:
+        pass
+
+    def rollback(self) -> None:
+        pass
+
+    def close(self) -> None:
+        pass
+
+    def __enter__(self) -> _TestConnectionWrapper:
+        return self
+
+    def __exit__(self, *args: object) -> None:
+        pass
+
+    def __getattr__(self, name: str) -> object:
+        return getattr(self._conn, name)
+
+
 def test_request_keeps_pack_snapshot_after_catalogue_edit(
     conn: psycopg.Connection, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    @contextmanager
+    def fake_connect(*args: object, **kwargs: object) -> Iterator[_TestConnectionWrapper]:
+        row_factory = kwargs.get("row_factory")
+        wrapper = _TestConnectionWrapper(conn, row_factory=row_factory)
+        with conn.cursor() as cur:
+            cur.execute("savepoint test_request_pack_snapshot_get_request")
+        try:
+            yield wrapper
+        finally:
+            with conn.cursor() as cur:
+                cur.execute("rollback to savepoint test_request_pack_snapshot_get_request")
+                reset_role(cur)
+
+    monkeypatch.setattr(requests_service_module.db, "connect", fake_connect)
+
     with conn.cursor() as cur:
         owner = make_workspace(cur, "request-pack-snapshot")
         act_as(cur, owner)
