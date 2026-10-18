@@ -147,5 +147,8 @@ def confirm_exact_matches(
     token: Annotated[str, Depends(bearer_token)],
     member: Annotated[CurrentMember, Depends(require_role(*WRITE_ROLES))],
     service: Annotated[MatchResolutionService, Depends(get_match_resolution_service)],
+    idempotency_key: Annotated[UUID | None, Header(alias="Idempotency-Key")] = None,
 ) -> BulkConfirmResult:
-    return service.confirm_exact_matches(bearer_token=token, member=member)
+    return service.confirm_exact_matches(
+        bearer_token=token, member=member, idempotency_key=idempotency_key
+    )

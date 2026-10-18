@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 from datetime import UTC, datetime
-from uuid import UUID
+from uuid import UUID, uuid5
 
 from postgrest.exceptions import APIError
 
@@ -34,6 +34,7 @@ from procurepilot_api.shared.logging import get_trace_id
 
 EXACT_CONFIRM_BATCH = 100  # exact pairs returned per call
 EXACT_SCAN_LIMIT = 1000  # open tasks examined while collecting them
+EXACT_LOOKUP_CHUNK = 100  # lines per batched read (keeps PostgREST URLs short)
 
 
 class MatchResolutionService:
@@ -157,14 +158,32 @@ class MatchResolutionService:
         return ExactMatchSummary(count=len(self._exact_match_pairs(client)))
 
     def confirm_exact_matches(
-        self, *, bearer_token: str, member: CurrentMember
+        self,
+        *,
+        bearer_token: str,
+        member: CurrentMember,
+        idempotency_key: UUID | None = None,
     ) -> BulkConfirmResult:
         """Human-triggered bulk confirm of open tasks whose top candidate is an exact
-        normalised-name match. Each line gets an ordinary human decision + alias."""
+        normalised-name match. Each line gets an ordinary human decision + alias.
+
+        With an Idempotency-Key the first call freezes its batch (`match_bulk_confirmation`) and
+        derives a per-line key from it, so a retry replays the same plan: lines already decided
+        replay as confirmed, the rest are completed, and the queue is never re-selected."""
         client = authenticated_client(self._settings, bearer_token)
+        plan: list[tuple[UUID, UUID]] | None = None
+        if idempotency_key is not None:
+            plan = _stored_bulk_plan(client, member.tenant_id, idempotency_key)
+        if plan is None:
+            plan = self._exact_match_pairs(client)
+            if idempotency_key is not None and plan:
+                _store_bulk_plan(client, member.tenant_id, idempotency_key, plan)
         confirmed = 0
         skipped = 0
-        for line_id, candidate_id in self._exact_match_pairs(client):
+        for line_id, candidate_id in plan:
+            line_key = (
+                uuid5(idempotency_key, str(line_id)) if idempotency_key is not None else None
+            )
             try:
                 self.resolve(
                     bearer_token=bearer_token,
@@ -173,6 +192,7 @@ class MatchResolutionService:
                     payload=MatchResolutionRequest(
                         outcome="same_product", selected_match_candidate_id=candidate_id
                     ),
+                    idempotency_key=line_key,
                 )
             except ConflictError:
                 skipped += 1
@@ -181,6 +201,10 @@ class MatchResolutionService:
         return BulkConfirmResult(confirmed=confirmed, skipped=skipped)
 
     def _exact_match_pairs(self, client: object) -> list[tuple[UUID, UUID]]:
+        """Up to EXACT_CONFIRM_BATCH (line, candidate) pairs, oldest task first.
+
+        Bounded batched reads: one task query, then per chunk of EXACT_LOOKUP_CHUNK lines one
+        query each for rank-1 candidates, product names and line text."""
         try:
             tasks = _rows(
                 client.table("match_task")
@@ -191,35 +215,55 @@ class MatchResolutionService:
                 .execute()
                 .data
             )
+            line_ids = [str(task["quotation_line_id"]) for task in tasks]
             pairs: list[tuple[UUID, UUID]] = []
-            for task in tasks:
+            for offset in range(0, len(line_ids), EXACT_LOOKUP_CHUNK):
                 if len(pairs) >= EXACT_CONFIRM_BATCH:
                     break
-                line_id = UUID(str(task["quotation_line_id"]))
-                top = _rows(
-                    client.table("match_candidate")
-                    .select("id,candidate_workspace_product_id")
-                    .eq("quotation_line_id", str(line_id))
-                    .order("rank")
-                    .limit(1)
-                    .execute()
-                    .data
-                )
-                if not top:
+                chunk = line_ids[offset : offset + EXACT_LOOKUP_CHUNK]
+                candidates = {
+                    str(row["quotation_line_id"]): row
+                    for row in _rows(
+                        client.table("match_candidate")
+                        .select("id,quotation_line_id,candidate_workspace_product_id")
+                        .in_("quotation_line_id", chunk)
+                        .eq("rank", 1)
+                        .execute()
+                        .data
+                    )
+                }
+                if not candidates:
                     continue
-                product = _rows(
-                    client.table("workspace_product")
-                    .select("tenant_name")
-                    .eq("id", str(top[0]["candidate_workspace_product_id"]))
-                    .limit(1)
-                    .execute()
-                    .data
+                product_ids = sorted(
+                    {str(row["candidate_workspace_product_id"]) for row in candidates.values()}
                 )
-                line = _line_row(client, line_id)
-                if product and is_exact_name_match(
-                    line.get("original_text"), product[0]["tenant_name"]
-                ):
-                    pairs.append((line_id, UUID(str(top[0]["id"]))))
+                names = {
+                    str(row["id"]): row["tenant_name"]
+                    for row in _rows(
+                        client.table("workspace_product")
+                        .select("id,tenant_name")
+                        .in_("id", product_ids)
+                        .execute()
+                        .data
+                    )
+                }
+                texts = {
+                    str(row["id"]): row.get("original_text")
+                    for row in _rows(
+                        client.table("quotation_line")
+                        .select("id,original_text")
+                        .in_("id", list(candidates))
+                        .execute()
+                        .data
+                    )
+                }
+                for line_id in chunk:
+                    candidate = candidates.get(line_id)
+                    if candidate is None or len(pairs) >= EXACT_CONFIRM_BATCH:
+                        continue
+                    name = names.get(str(candidate["candidate_workspace_product_id"]))
+                    if name is not None and is_exact_name_match(texts.get(line_id), name):
+                        pairs.append((UUID(line_id), UUID(str(candidate["id"]))))
         except APIError as exc:
             raise ServiceUnavailableError(details={"dependency": "database"}) from exc
         return pairs
@@ -390,6 +434,46 @@ def _idempotency_record_for_key(
     if len(rows) > 1:
         raise ServiceUnavailableError(details={"reason": "multiple_idempotency_records"})
     return rows[0] if rows else None
+
+
+def _stored_bulk_plan(
+    client: object, tenant_id: UUID, idempotency_key: UUID
+) -> list[tuple[UUID, UUID]] | None:
+    try:
+        rows = _rows(
+            client.table("match_bulk_confirmation")
+            .select("plan")
+            .eq("tenant_id", str(tenant_id))
+            .eq("idempotency_key", str(idempotency_key))
+            .limit(2)
+            .execute()
+            .data
+        )
+    except APIError as exc:
+        raise ServiceUnavailableError(details={"dependency": "database"}) from exc
+    if not rows:
+        return None
+    return [
+        (UUID(str(item["line_id"])), UUID(str(item["candidate_id"]))) for item in rows[0]["plan"]
+    ]
+
+
+def _store_bulk_plan(
+    client: object, tenant_id: UUID, idempotency_key: UUID, plan: list[tuple[UUID, UUID]]
+) -> None:
+    try:
+        client.table("match_bulk_confirmation").insert(
+            {
+                "tenant_id": str(tenant_id),
+                "idempotency_key": str(idempotency_key),
+                "plan": [
+                    {"line_id": str(line_id), "candidate_id": str(candidate_id)}
+                    for line_id, candidate_id in plan
+                ],
+            }
+        ).execute()
+    except APIError as exc:
+        raise ServiceUnavailableError(details={"dependency": "database"}) from exc
 
 
 def _decision_by_id(client: object, decision_id: UUID) -> dict[str, object]:

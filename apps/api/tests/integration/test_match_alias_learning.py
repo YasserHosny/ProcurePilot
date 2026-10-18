@@ -272,6 +272,89 @@ def test_bulk_confirm_reports_alias_conflict_as_skipped(
         assert (result.confirmed, result.skipped) == (0, 1)
 
 
+def test_exact_scan_uses_a_bounded_number_of_queries(
+    conn: object, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    with conn.cursor() as cur:
+        ensure_quotation_reference_data(cur)
+        workspace = make_workspace(cur, "bulk-exact-queries")
+        supplier_id = make_supplier(cur, workspace, name="Query Count Supplier")
+        product = make_workspace_product(cur, workspace, name="Query Count Tea 1kg")
+        for n in range(6):
+            line = _reviewed_line(
+                cur,
+                workspace,
+                supplier_id,
+                original_text="Query Count Tea 1kg" if n % 2 == 0 else f"Other wording {n}",
+                line_number=n + 1,
+            )
+            _candidate(cur, workspace, line, product)
+            _open_task(cur, workspace, line)
+        db_client = PsycopgSupabaseClient(conn)
+        monkeypatch.setattr(resolution_module, "authenticated_client", lambda _s, _t: db_client)
+        resolution = MatchResolutionService(cast(Settings, _MatchingSettings()))
+        calls: list[str] = []
+        original = PsycopgSupabaseClient.table
+
+        def counting_table(self: object, name: str) -> object:
+            calls.append(name)
+            return original(self, name)
+
+        monkeypatch.setattr(PsycopgSupabaseClient, "table", counting_table)
+        act_as(cur, workspace)
+        assert resolution.count_exact_matches(bearer_token="t").count == 3
+        # 1 task query + 3 batched reads for the single chunk - independent of the task count.
+        assert len(calls) == 4, calls
+
+
+def test_bulk_confirm_retry_with_same_key_replays_the_frozen_batch(
+    conn: object, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    with conn.cursor() as cur:
+        ensure_quotation_reference_data(cur)
+        workspace = make_workspace(cur, "bulk-exact-idem")
+        supplier_id = make_supplier(cur, workspace, name="Idem Supplier")
+        product = make_workspace_product(cur, workspace, name="Idem Rice 2kg")
+        first = _reviewed_line(
+            cur, workspace, supplier_id, original_text="Idem Rice 2kg", line_number=1
+        )
+        _candidate(cur, workspace, first, product)
+        _open_task(cur, workspace, first)
+        db_client = PsycopgSupabaseClient(conn)
+        monkeypatch.setattr(resolution_module, "authenticated_client", lambda _s, _t: db_client)
+        resolution = MatchResolutionService(cast(Settings, _MatchingSettings()))
+        resolution._landed_cost = _NoopLandedCost()  # noqa: SLF001
+        member = _member(workspace)
+        key = uuid4()
+
+        act_as(cur, workspace)
+        one = resolution.confirm_exact_matches(
+            bearer_token="t", member=member, idempotency_key=key
+        )
+        assert (one.confirmed, one.skipped) == (1, 0)
+
+        # The queue changes between the attempt and its retry: a new exact line appears.
+        second = _reviewed_line(
+            cur, workspace, supplier_id, original_text="Idem Rice 2kg ", line_number=2
+        )
+        _candidate(cur, workspace, second, product)
+        _open_task(cur, workspace, second)
+        act_as(cur, workspace)
+
+        retry = resolution.confirm_exact_matches(
+            bearer_token="t", member=member, idempotency_key=key
+        )
+        assert (retry.confirmed, retry.skipped) == (1, 0)  # same frozen batch, replayed
+        assert _count(cur, "match_decision", first) == 1  # no duplicate decision
+        assert _count(cur, "match_decision", second) == 0  # the new line was NOT swept in
+
+        fresh = resolution.confirm_exact_matches(
+            bearer_token="t", member=member, idempotency_key=uuid4()
+        )
+        assert fresh.confirmed == 1
+        assert _count(cur, "match_decision", second) == 1
+
+
 def _open_task(cur: psycopg.Cursor, workspace: object, line_id: UUID) -> None:
     act_as(cur, workspace)
     cur.execute(

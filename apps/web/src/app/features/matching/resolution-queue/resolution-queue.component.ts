@@ -91,6 +91,7 @@ export class ResolutionQueueComponent implements OnInit {
   readonly collapsedGroupIds = signal<ReadonlySet<string>>(new Set<string>());
   private searchDebounce: ReturnType<typeof setTimeout> | null = null;
   private latestLoadRequestId = 0;
+  private exactConfirmKey: string | null = null;
 
   readonly isWriter = computed<boolean>(() => this.session.hasRole('owner', 'buyer'));
   readonly hasActiveFilters = computed<boolean>(
@@ -151,7 +152,10 @@ export class ResolutionQueueComponent implements OnInit {
     if (!this.isWriter()) return;
     this.api.getExactMatchCount().subscribe({
       next: (res) => this.exactMatchCount.set(res.count),
-      error: () => this.exactMatchCount.set(0),
+      error: (err: unknown) => {
+        this.exactMatchCount.set(0);
+        this.handleError(err);
+      },
     });
   }
 
@@ -160,9 +164,12 @@ export class ResolutionQueueComponent implements OnInit {
     if (!this.isWriter() || this.isConfirmingExact()) return;
     this.isConfirmingExact.set(true);
     this.exactConfirmedCount.set(null);
-    this.api.confirmExactMatches().subscribe({
+    // One key per logical attempt: a retry after a lost response replays the same frozen batch.
+    this.exactConfirmKey ??= crypto.randomUUID();
+    this.api.confirmExactMatches(this.exactConfirmKey).subscribe({
       next: (res) => {
         this.isConfirmingExact.set(false);
+        this.exactConfirmKey = null;
         this.exactConfirmedCount.set(res.confirmed);
         this.exactSkippedCount.set(res.skipped);
         this.loadExactMatchCount();
