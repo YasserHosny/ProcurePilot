@@ -101,8 +101,8 @@ the page now shows the split and "Splitting saves 450.00 EGP versus buying exclu
 
 ![Basket split result: EGP 55,975, saves 450 EGP](10-basket-split-result.jpg)
 
-Open on this screen (sent to the optimiser session): allocated quantities show in kg/litres (500, 250, 180)
-instead of packs, and "Applied Constraints" shows the solver's internal English tie-break text.
+Since #141 (2026-10-18) the cards show packs first ("20 × 25 kg", "500 kg in total") and constraint text
+comes from en/ar copy; the solver's internal tie-break line is no longer shown. Screenshot retaken after #141.
 
 ## Savings ledger (checked 2026-10-18)
 
