@@ -106,6 +106,10 @@ DELEGATION_COLUMNS = (
     "id,delegator_membership_id,delegate_membership_id,starts_on,ends_on,created_at"
 )
 BUDGET_COLUMNS = "id,amount,currency,period,period_start,scope,branch_id,cost_centre_id"
+# Statuses whose estimate counts against a budget. An approved request moves straight to
+# "ordered" (spec 010) and later "delivered", so both stay committed spend; draft, rejected
+# and withdrawn requests never count.
+COMMITTED_SPEND_STATUSES = ("submitted", "approved", "ordered", "delivered")
 QUALITY_ISSUE_COLUMNS = (
     "id,tenant_id,purchase_request_id,reported_by_membership_id,description,created_at"
 )
@@ -1599,7 +1603,7 @@ class RequestsService:
                     "id,branch_id,cost_centre_id,required_by_date,"
                     "estimated_total_amount,estimated_total_currency,status"
                 )
-                .in_("status", ["submitted", "approved"])
+                .in_("status", list(COMMITTED_SPEND_STATUSES))
                 .execute()
             )
         except APIError as exc:

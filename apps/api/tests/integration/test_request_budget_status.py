@@ -307,3 +307,78 @@ def test_exceeding_budget_does_not_block_approval(
     assert decided.budget_status is not None
     assert decided.budget_status.exceeds is True
     assert audit.actions == ["requests.approval_step_approved"]
+
+
+class SpendQuery:
+    def __init__(self, rows: list[dict[str, object]]) -> None:
+        self.rows = rows
+        self.statuses: list[str] | None = None
+
+    def select(self, _columns: str) -> SpendQuery:
+        return self
+
+    def in_(self, column: str, value: list[str]) -> SpendQuery:
+        assert column == "status"
+        self.statuses = value
+        return self
+
+    def execute(self) -> Response:
+        assert self.statuses is not None
+        return Response([row for row in self.rows if row["status"] in self.statuses])
+
+
+class SpendClient:
+    def __init__(self, rows: list[dict[str, object]]) -> None:
+        self.rows = rows
+
+    def table(self, name: str) -> SpendQuery:
+        assert name == "purchase_request"
+        return SpendQuery(self.rows)
+
+
+def test_ordered_and_delivered_requests_reduce_remaining_budget_for_another_request(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Regression: an approved request moves straight to "ordered" (spec 010), so committed
+    # spend filtered on submitted/approved only silently dropped every approved request.
+    tenant_id = uuid4()
+    branch_id = uuid4()
+    requester_id = uuid4()
+
+    def other(status: str, amount: str) -> dict[str, object]:
+        return request_row(
+            request_id=uuid4(),
+            tenant_id=tenant_id,
+            branch_id=branch_id,
+            requester_id=requester_id,
+            status=status,
+            amount=amount,
+        )
+
+    current = request_row(
+        request_id=uuid4(),
+        tenant_id=tenant_id,
+        branch_id=branch_id,
+        requester_id=requester_id,
+        amount="5.0000",
+    )
+    rows = [
+        current,
+        other("ordered", "20.0000"),
+        other("delivered", "15.0000"),
+        other("submitted", "10.0000"),
+        other("approved", "5.0000"),
+        other("draft", "1000.0000"),
+        other("rejected", "1000.0000"),
+        other("withdrawn", "1000.0000"),
+    ]
+    service = RequestsService()
+    monkeypatch.setattr(service, "_fetch_budget_rows", lambda _client: [budget(branch_id)])
+
+    status = service._budget_status_for(SpendClient(rows), current)  # type: ignore[arg-type]
+
+    assert status is not None
+    # Budget 100 minus committed 20 + 15 + 10 + 5; the current request and the
+    # draft/rejected/withdrawn rows are excluded.
+    assert status.remaining_amount.amount == "50.0000"
+    assert status.exceeds is False
