@@ -57,4 +57,16 @@ describe('AppDateAdapter', () => {
     expect(adapter.getMonthNames('long')[9]).toBe('October');
     expect(adapter.getFirstDayOfWeek()).toBe(1);
   });
+
+  it('announces a locale change as soon as the interface language switches', () => {
+    translate.use('en');
+    region.set('GB');
+    adapter.getMonthNames('long');
+    const seen: number[] = [];
+    const sub = adapter.localeChanges.subscribe(() => seen.push(1));
+    translate.use('ar');
+    expect(seen.length).toBe(1);
+    expect(adapter.getMonthNames('long')[9]).toBe('أكتوبر');
+    sub.unsubscribe();
+  });
 });

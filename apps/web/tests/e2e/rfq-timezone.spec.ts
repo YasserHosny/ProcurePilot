@@ -52,7 +52,7 @@ test('saves an RFQ with the picked local calendar day', async ({ page }) => {
   if (targetDate.targetYear > targetDate.currentYear || targetDate.targetMonth > targetDate.currentMonth) {
     await page.getByRole('button', { name: 'Next month' }).click();
   }
-  await page.getByRole('button', { name: targetDate.accessibleName }).click();
+  await page.getByRole('button', { name: targetDate.accessibleName, exact: true }).click();
 
   const responsePromise = page.waitForResponse((response) =>
     response.url().endsWith('/rfq') && response.request().method() === 'POST');

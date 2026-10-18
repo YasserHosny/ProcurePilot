@@ -1,4 +1,5 @@
-import { Injectable, Injector, Provider, inject } from '@angular/core';
+import { DestroyRef, Injectable, Injector, Provider, inject } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import {
   DateAdapter,
   MAT_DATE_FORMATS,
@@ -34,6 +35,15 @@ const pad = (n: number): string => String(n).padStart(2, '0');
 export class AppDateAdapter extends NativeDateAdapter {
   private readonly translate = inject(TranslateService, { optional: true });
   private readonly injector = inject(Injector);
+
+  constructor() {
+    super();
+    // Re-emit localeChanges on a language switch so date inputs already on screen reformat
+    // and an open calendar relabels, instead of waiting for the next adapter call.
+    this.translate?.onLangChange
+      .pipe(takeUntilDestroyed(inject(DestroyRef)))
+      .subscribe(() => this.syncLocale());
+  }
 
   private language(): string {
     return this.translate?.currentLang || this.translate?.getDefaultLang() || 'en';

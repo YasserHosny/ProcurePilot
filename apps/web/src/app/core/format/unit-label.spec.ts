@@ -23,9 +23,20 @@ describe('unitLabel', () => {
 });
 
 describe('lineDescription', () => {
-  it('drops the English pack suffix older purchase orders stored in the description', () => {
-    expect(lineDescription('أرز مصري (شيكارة 25 كجم) (pack of 25 kilogram)')).toBe('أرز مصري (شيكارة 25 كجم)');
-    expect(lineDescription('زيت (صفيحة 18 لتر) (pack of 18 litre)')).toBe('زيت (صفيحة 18 لتر)');
-    expect(lineDescription('Paper (pack of 6)')).toBe('Paper (pack of 6)');
+  const pack25kg = { pack_base_quantity: '25.000000', base_unit: 'kilogram' };
+
+  it('hides the English pack suffix older purchase orders generated from the line pack', () => {
+    expect(lineDescription({ ...pack25kg, description: 'أرز مصري (شيكارة 25 كجم) (pack of 25 kilogram)' }))
+      .toBe('أرز مصري (شيكارة 25 كجم)');
+    expect(lineDescription({ pack_base_quantity: '18.000000', base_unit: 'litre', description: 'زيت (pack of 18 litre)' }))
+      .toBe('زيت');
+  });
+
+  it('keeps text that does not match the line pack, or a line without a pack', () => {
+    expect(lineDescription({ ...pack25kg, description: 'Paper (pack of 10 kilogram)' })).toBe('Paper (pack of 10 kilogram)');
+    expect(lineDescription({ ...pack25kg, description: 'Paper (pack of 25 litre)' })).toBe('Paper (pack of 25 litre)');
+    expect(lineDescription({ pack_base_quantity: null, base_unit: 'kilogram', description: 'Rice (pack of 25 kilogram)' }))
+      .toBe('Rice (pack of 25 kilogram)');
+    expect(lineDescription({ ...pack25kg, description: 'Paper (pack of 6)' })).toBe('Paper (pack of 6)');
   });
 });
