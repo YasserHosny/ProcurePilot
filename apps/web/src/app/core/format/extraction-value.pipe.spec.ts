@@ -126,6 +126,20 @@ describe('FormatExtractionPipe and extraction formatting helpers', () => {
       expect(formatted).not.toContain('19');
     });
 
+    it('formats datetime strings with offset on issue_date from literal YYYY-MM-DD components', () => {
+      const formatted = pipe.transform('2026-08-20T00:30:00+02:00', 'issue_date');
+      expect(formatted).toBe(service.formatDate(new Date(2026, 7, 20)));
+      expect(formatted).toContain('20');
+    });
+
+    it('returns invalid calendar date 2026-02-31 on issue_date as raw string', () => {
+      expect(pipe.transform('2026-02-31', 'issue_date')).toBe('2026-02-31');
+    });
+
+    it('returns invalid calendar date 2026-13-01 on expiry_date as raw string', () => {
+      expect(pipe.transform('2026-13-01', 'expiry_date')).toBe('2026-13-01');
+    });
+
     it('leaves ISO date strings unformatted when fieldName is not a date field', () => {
       const formatted = pipe.transform('2026-08-20', 'supplier_name');
       expect(formatted).toBe('2026-08-20');

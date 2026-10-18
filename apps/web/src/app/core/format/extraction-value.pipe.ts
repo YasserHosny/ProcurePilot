@@ -21,8 +21,7 @@ export function isMoneyLike(
   return hasAmount && hasCurrency;
 }
 
-const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}(?:[T\s]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?)?$/;
-const PURE_DATE_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/;
+const ISO_DATE_PATTERN = /^(\d{4})-(\d{2})-(\d{2})(?:[T\s]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?)?$/;
 
 /**
  * Returns true if the field name represents a known date extraction field.
@@ -81,18 +80,25 @@ export function formatExtractionValue(
   }
 
   if (typeof value === 'string') {
-    if ((isDateField(fieldName) || !fieldName) && isIsoDateString(value)) {
-      if (!formatService) return value;
+    if (isDateField(fieldName) || !fieldName) {
       const trimmed = value.trim();
-      const pureDateMatch = PURE_DATE_PATTERN.exec(trimmed);
-      const dateToFormat: Date | string = pureDateMatch
-        ? new Date(
-            Number(pureDateMatch[1]),
-            Number(pureDateMatch[2]) - 1,
-            Number(pureDateMatch[3]),
-          )
-        : trimmed;
-      return formatService.formatDate(dateToFormat, { dateStyle: 'medium' }, localeOverride);
+      const match = ISO_DATE_PATTERN.exec(trimmed);
+      if (match) {
+        const year = Number(match[1]);
+        const month = Number(match[2]);
+        const day = Number(match[3]);
+        const date = new Date(year, month - 1, day);
+        if (
+          date.getFullYear() !== year ||
+          date.getMonth() + 1 !== month ||
+          date.getDate() !== day
+        ) {
+          return value;
+        }
+        return formatService
+          ? formatService.formatDate(date, { dateStyle: 'medium' }, localeOverride)
+          : value;
+      }
     }
     return value;
   }
