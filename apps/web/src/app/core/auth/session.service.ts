@@ -1,5 +1,6 @@
+import { HttpContext, HttpContextToken, HttpErrorResponse, HttpRequest } from '@angular/common/http';
 import { Injectable, NgZone, computed, inject, signal } from '@angular/core';
-import { Observable, finalize, shareReplay, tap, throwError } from 'rxjs';
+import { Observable, defer, finalize, of, shareReplay, switchMap, tap, throwError } from 'rxjs';
 
 import { ApiService } from '../api/api.service';
 import type { Me, Role, Session, WorkspaceSummary } from '../api/models';
@@ -9,6 +10,23 @@ const REFRESH_TOKEN_KEY = 'pp.refresh_token';
 
 /** Renew this long before `exp`, so a request in flight never carries a token about to lapse. */
 export const REFRESH_LEAD_MS = 60_000;
+
+/**
+ * Lets a request rebuild itself before the interceptor replays it after a refresh. A request
+ * whose BODY carries the refresh token (the workspace switch) must not be replayed verbatim:
+ * the refresh just rotated that token, so the replay would spend a dead one.
+ */
+export const REBUILD_ON_REPLAY = new HttpContextToken<
+  ((req: HttpRequest<unknown>) => HttpRequest<unknown>) | null
+>(() => null);
+
+/**
+ * True only when the server has definitively refused the refresh token. A 429, a 5xx or a
+ * network failure says nothing about the session, so it must not cost the person their sign-in.
+ */
+export function refreshWasRejected(error: unknown): boolean {
+  return error instanceof HttpErrorResponse && [400, 401, 403, 422].includes(error.status);
+}
 
 /** The token's `exp` in epoch milliseconds, or null if it is not a readable JWT. */
 export function tokenExpiry(token: string | null): number | null {
@@ -36,6 +54,7 @@ export class SessionService {
   private readonly zone = inject(NgZone);
   private inFlightRefresh: Observable<Session> | null = null;
   private refreshTimer: ReturnType<typeof setTimeout> | null = null;
+  private switching = false;
 
   private readonly member = signal<Me | null>(null);
 
@@ -108,12 +127,34 @@ export class SessionService {
     return localStorage.getItem(REFRESH_TOKEN_KEY);
   }
 
+  /**
+   * Switches workspace. The server re-issues the session from the refresh token in the body,
+   * which rotates it — so this must never race a refresh for the same token:
+   * - a refresh already in flight is awaited, and an expiring access token is renewed first,
+   *   so the switch sends the CURRENT refresh token;
+   * - the proactive timer stands down while the switch is out (the switch's own adopt re-arms it);
+   * - if the PUT still gets a 401 and the interceptor refreshes, the replay re-reads the refresh
+   *   token instead of resending the one that refresh just spent.
+   */
   switchWorkspace(tenantId: string): Observable<Session> {
-    const refresh = this.refreshToken;
-    if (!refresh) {
+    if (!this.refreshToken) {
       return throwError(() => new Error('cannot switch workspace without a refresh token'));
     }
-    return this.api.setActiveWorkspace(tenantId, refresh).pipe(tap((s) => this.adopt(s)));
+    const context = new HttpContext().set(REBUILD_ON_REPLAY, (req) =>
+      req.clone({
+        body: { ...(req.body as Record<string, unknown>), refresh_token: this.refreshToken },
+      }),
+    );
+    return defer(() => {
+      this.switching = true;
+      const ready: Observable<unknown> =
+        this.inFlightRefresh ?? (this.accessTokenNeedsRefresh() ? this.refresh() : of(null));
+      return ready.pipe(
+        switchMap(() => this.api.setActiveWorkspace(tenantId, this.refreshToken ?? '', context)),
+        tap((s) => this.adopt(s)),
+        finalize(() => (this.switching = false)),
+      );
+    });
   }
 
   workspaces(): Observable<{ items: WorkspaceSummary[] }> {
@@ -155,6 +196,8 @@ export class SessionService {
     this.zone.runOutsideAngular(() => {
       this.refreshTimer = setTimeout(() => {
         this.refreshTimer = null;
+        // A workspace switch is spending the refresh token; its adopt() re-arms this timer.
+        if (this.switching) return;
         // Another tab may already have renewed the shared token; just re-arm for it.
         if (!this.accessTokenNeedsRefresh()) {
           this.scheduleRefresh();

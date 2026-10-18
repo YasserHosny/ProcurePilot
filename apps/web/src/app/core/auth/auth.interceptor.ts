@@ -10,7 +10,7 @@ import { Router } from '@angular/router';
 import { Observable, catchError, switchMap, throwError } from 'rxjs';
 
 import { environment } from '../../../environments/environment';
-import { SessionService } from './session.service';
+import { REBUILD_ON_REPLAY, SessionService, refreshWasRejected } from './session.service';
 
 /** Set on a request replayed after a refresh, so a second 401 signs out instead of looping. */
 const REPLAYED_AFTER_REFRESH = new HttpContextToken<boolean>(() => false);
@@ -19,7 +19,7 @@ const REPLAYED_AFTER_REFRESH = new HttpContextToken<boolean>(() => false);
 const NO_REFRESH_PATHS = ['/auth/login', '/auth/refresh', '/auth/logout'];
 
 /**
- * Attaches the bearer token and reacts to a rejected one.
+ * Attaches the bearer token to OUR API's requests only, and reacts to a rejected one.
  *
  * A 401 from our API usually means the hour-long access token expired (demo finding 29), so the
  * first response is to renew it once from the refresh token and replay the request. Parallel
@@ -40,6 +40,11 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
   };
 
   const attempt = (request: HttpRequest<unknown>): Observable<HttpEvent<unknown>> => {
+    // Only our API gets the bearer token. Anything else — a presigned storage upload, a
+    // translation file — must never see it, and its 401 says nothing about our session.
+    if (!isOwnApi(request.url)) {
+      return next(request);
+    }
     const sentToken = session.accessToken;
     const authorised = sentToken
       ? request.clone({ setHeaders: { Authorization: `Bearer ${sentToken}` } })
@@ -54,20 +59,25 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
           signOut();
           return throwError(() => error);
         }
-        const replay = request.clone({
+        const rebuild = request.context.get(REBUILD_ON_REPLAY);
+        const marked = request.clone({
           context: request.context.set(REPLAYED_AFTER_REFRESH, true),
         });
+        // Rebuilt lazily, after the refresh, so it sees the rotated refresh token.
+        const replay = (): HttpRequest<unknown> => (rebuild ? rebuild(marked) : marked);
         // A refresh already landed while this request was out: replay with the new token.
         const current = session.accessToken;
         if (current && current !== sentToken) {
-          return attempt(replay);
+          return attempt(replay());
         }
         return session.refresh().pipe(
-          catchError(() => {
-            signOut();
+          catchError((refreshError: unknown) => {
+            // A rate-limited or unreachable refresh leaves the session intact; only a refused
+            // refresh token ends it.
+            if (refreshWasRejected(refreshError)) signOut();
             return throwError(() => error);
           }),
-          switchMap(() => attempt(replay)),
+          switchMap(() => attempt(replay())),
         );
       }),
     );
@@ -76,10 +86,13 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
   return attempt(req);
 };
 
+function isOwnApi(url: string): boolean {
+  const base = environment.apiBaseUrl;
+  return url === base || url.startsWith(`${base}/`) || url.startsWith(`${base}?`);
+}
+
 function mayRefresh(req: HttpRequest<unknown>): boolean {
   if (req.context.get(REPLAYED_AFTER_REFRESH)) return false;
-  const base = environment.apiBaseUrl;
-  if (!req.url.startsWith(base)) return false;
-  const path = req.url.slice(base.length).split('?')[0];
+  const path = req.url.slice(environment.apiBaseUrl.length).split('?')[0];
   return !NO_REFRESH_PATHS.includes(path);
 }

@@ -180,12 +180,127 @@ describe('authInterceptor token refresh (demo finding 29)', () => {
     backend.expectNone('/api/v1/auth/refresh');
   });
 
-  it('does not refresh for a 401 from outside our API', async () => {
+  it('a 401 from outside our API neither refreshes nor signs out', async () => {
     const result = firstValueFrom(http.get('/i18n/en.json'));
-    backend.expectOne('/i18n/en.json').flush(null, { status: 401, statusText: 'Unauthorized' });
+    const req = backend.expectOne('/i18n/en.json');
+    expect(req.request.headers.has('Authorization')).toBeFalse();
+    req.flush(null, { status: 401, statusText: 'Unauthorized' });
 
     await expectAsync(result).toBeRejected();
     backend.expectNone('/api/v1/auth/refresh');
+    expect(navigate).not.toHaveBeenCalled();
+    expect(localStorage.getItem('pp.access_token')).toBe(expired);
+    expect(localStorage.getItem('pp.refresh_token')).toBe('refresh-1');
+  });
+
+  it('never sends the bearer token to a presigned storage URL', async () => {
+    const url = 'https://storage.example.test/bucket/quote.pdf?X-Amz-Signature=abc';
+    const result = firstValueFrom(http.put(url, new Blob(['x'])));
+    const req = backend.expectOne(url);
+    expect(req.request.headers.has('Authorization')).toBeFalse();
+    req.flush(null, { status: 401, statusText: 'Unauthorized' }); // e.g. the URL expired
+
+    await expectAsync(result).toBeRejected();
+    expect(navigate).not.toHaveBeenCalled();
+    expect(localStorage.getItem('pp.refresh_token')).toBe('refresh-1');
+  });
+
+  it('does not treat a lookalike path as our API', async () => {
+    const result = firstValueFrom(http.get('/api/v1-other/thing'));
+    const req = backend.expectOne('/api/v1-other/thing');
+    expect(req.request.headers.has('Authorization')).toBeFalse();
+    req.flush(null);
+    await result;
+  });
+
+  it('a rate-limited refresh fails the request but keeps the session', async () => {
+    const result = firstValueFrom(http.get('/api/v1/requests'));
+
+    backend.expectOne('/api/v1/requests').flush(null, { status: 401, statusText: 'Unauthorized' });
+    backend
+      .expectOne('/api/v1/auth/refresh')
+      .flush({ code: 'rate_limited' }, { status: 429, statusText: 'Too Many Requests' });
+
+    await expectAsync(result).toBeRejected();
+    expect(navigate).not.toHaveBeenCalled();
+    expect(localStorage.getItem('pp.refresh_token')).toBe('refresh-1');
+  });
+
+  describe('workspace switch', () => {
+    const switchUrl = '/api/v1/me/active-workspace';
+
+    it('with an expired access token, refreshes first and sends the rotated refresh token', async () => {
+      const switched = firstValueFrom(sessionService.switchWorkspace('tenant-b'));
+
+      // No doomed PUT with the expired token and the about-to-be-spent refresh token.
+      backend.expectNone(switchUrl);
+      const refresh = backend.expectOne('/api/v1/auth/refresh');
+      expect(refresh.request.body).toEqual({ refresh_token: 'refresh-1' });
+      refresh.flush(session(renewed, 'refresh-2'));
+
+      const put = backend.expectOne(switchUrl);
+      expect(put.request.headers.get('Authorization')).toBe(`Bearer ${renewed}`);
+      expect(put.request.body).toEqual({ tenant_id: 'tenant-b', refresh_token: 'refresh-2' });
+      put.flush(session(jwt(3600, 'b'), 'refresh-3'));
+
+      await switched;
+      expect(localStorage.getItem('pp.refresh_token')).toBe('refresh-3');
+      expect(navigate).not.toHaveBeenCalled();
+    });
+
+    it('during an in-flight refresh, waits for it instead of spending the same token', async () => {
+      const pending = firstValueFrom(http.get('/api/v1/requests'));
+      backend.expectOne('/api/v1/requests').flush(null, { status: 401, statusText: 'Unauthorized' });
+      const refresh = backend.expectOne('/api/v1/auth/refresh');
+
+      const switched = firstValueFrom(sessionService.switchWorkspace('tenant-b'));
+      backend.expectNone(switchUrl);
+      refresh.flush(session(renewed, 'refresh-2'));
+
+      backend.expectOne('/api/v1/requests').flush('ok');
+      const put = backend.expectOne(switchUrl);
+      expect(put.request.body).toEqual({ tenant_id: 'tenant-b', refresh_token: 'refresh-2' });
+      put.flush(session(jwt(3600, 'b'), 'refresh-3'));
+      backend.expectNone('/api/v1/auth/refresh');
+
+      expect(await pending).toBe('ok');
+      await switched;
+      expect(navigate).not.toHaveBeenCalled();
+    });
+
+    it('when the PUT itself gets a 401, the replay carries the refresh token the refresh just issued', async () => {
+      localStorage.setItem('pp.access_token', jwt(1800, 'revoked-server-side'));
+      const switched = firstValueFrom(sessionService.switchWorkspace('tenant-b'));
+
+      const first = backend.expectOne(switchUrl);
+      expect(first.request.body).toEqual({ tenant_id: 'tenant-b', refresh_token: 'refresh-1' });
+      first.flush(null, { status: 401, statusText: 'Unauthorized' });
+
+      backend.expectOne('/api/v1/auth/refresh').flush(session(renewed, 'refresh-2'));
+
+      const replay = backend.expectOne(switchUrl);
+      expect(replay.request.headers.get('Authorization')).toBe(`Bearer ${renewed}`);
+      expect(replay.request.body).toEqual({ tenant_id: 'tenant-b', refresh_token: 'refresh-2' });
+      replay.flush(session(jwt(3600, 'b'), 'refresh-3'));
+
+      await switched;
+      expect(localStorage.getItem('pp.refresh_token')).toBe('refresh-3');
+      expect(navigate).not.toHaveBeenCalled();
+    });
+
+    it('the proactive refresh stands down while a switch is out', fakeAsync(() => {
+      sessionService.adopt(session(jwt(300, 'a'), 'refresh-1'));
+      tick(1_000);
+      sessionService.switchWorkspace('tenant-b').subscribe();
+      const put = backend.expectOne(switchUrl);
+
+      tick(300_000); // the timer for the old token fires mid-switch
+      backend.expectNone('/api/v1/auth/refresh');
+
+      put.flush(session(jwt(3600, 'b'), 'refresh-2'));
+      expect(localStorage.getItem('pp.refresh_token')).toBe('refresh-2');
+      sessionService.logout();
+    }));
   });
 
   it('passes other errors through untouched', async () => {
@@ -218,6 +333,18 @@ describe('authInterceptor token refresh (demo finding 29)', () => {
     expect(await restored).toBeNull();
     expect(sessionService.isAuthenticated()).toBeFalse();
     expect(localStorage.getItem('pp.refresh_token')).toBeNull();
+  });
+
+  it('on start, a rate-limited renewal keeps the tokens for the next load', async () => {
+    const restored = firstValueFrom(TestBed.runInInjectionContext(() => restoreSessionOnStartup()));
+
+    backend
+      .expectOne('/api/v1/auth/refresh')
+      .flush(null, { status: 429, statusText: 'Too Many Requests' });
+
+    expect(await restored).toBeNull();
+    expect(sessionService.isAuthenticated()).toBeFalse();
+    expect(localStorage.getItem('pp.refresh_token')).toBe('refresh-1');
   });
 
   it('on start, a still-valid token restores through /me without refreshing', async () => {

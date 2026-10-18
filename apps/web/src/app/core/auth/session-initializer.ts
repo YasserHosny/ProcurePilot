@@ -1,7 +1,7 @@
 import { inject } from '@angular/core';
 import { Observable, catchError, map, of } from 'rxjs';
 
-import { SessionService } from './session.service';
+import { SessionService, refreshWasRejected } from './session.service';
 
 /**
  * Restores the session BEFORE the router runs its first navigation.
@@ -27,15 +27,16 @@ export function restoreSessionOnStartup(): Observable<null> {
     return of(null);
   }
 
-  const start: Observable<unknown> =
-    session.refreshToken && session.accessTokenNeedsRefresh()
-      ? session.refresh()
-      : session.restore();
+  const usedRefresh = !!session.refreshToken && session.accessTokenNeedsRefresh();
+  const start: Observable<unknown> = usedRefresh ? session.refresh() : session.restore();
 
   return start.pipe(
     map(() => null),
-    catchError(() => {
-      session.logout();
+    catchError((error: unknown) => {
+      // A refused token ends the session. A refresh that was merely rate-limited or could not
+      // reach the server keeps the tokens for the next load; the guard still sends the person
+      // to sign-in for now, since no member was restored.
+      if (!usedRefresh || refreshWasRejected(error)) session.logout();
       return of(null);
     }),
   );

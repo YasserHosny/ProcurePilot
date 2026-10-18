@@ -12,6 +12,7 @@ from procurepilot_api.modules.auth.jwt import MemberRole
 from procurepilot_api.modules.auth.service import get_auth_service
 from procurepilot_api.modules.members.models import Me, SessionResponse
 from procurepilot_api.modules.tenants.models import Tenant
+from procurepilot_api.shared.rate_limit import limiter
 
 TENANT_ID = uuid4()
 
@@ -48,6 +49,7 @@ class FakeAuthService:
 @pytest.fixture
 def client() -> TestClient:
     FakeAuthService.calls = []
+    limiter.reset()
     app: FastAPI = create_app()
     app.dependency_overrides[get_auth_service] = FakeAuthService
     return TestClient(app)
@@ -90,3 +92,16 @@ def test_tenant_cannot_be_chosen_by_the_caller(client: TestClient) -> None:
 
     assert response.status_code == 200
     assert response.json()["user"]["tenant"]["id"] == str(TENANT_ID)
+
+
+def test_refresh_shares_the_auth_rate_limit(client: TestClient) -> None:
+    # conftest sets RATE_LIMIT_AUTH=10/minute; the 11th call inside the window is refused.
+    statuses = [
+        client.post("/api/v1/auth/refresh", json={"refresh_token": "good-refresh"}).status_code
+        for _ in range(11)
+    ]
+    limiter.reset()
+
+    assert statuses[:10] == [200] * 10
+    assert statuses[10] == 429
+    assert len(FakeAuthService.calls) == 10

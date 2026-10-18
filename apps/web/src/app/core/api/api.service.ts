@@ -1,4 +1,4 @@
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpContext } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 
@@ -163,11 +163,16 @@ export class ApiService {
    * token has to be minted, and that is only done in exchange for a refresh token. Omitting it
    * returns 422.
    */
-  setActiveWorkspace(tenantId: string, refreshToken: string): Observable<Session> {
-    return this.http.put<Session>(`${this.base}/me/active-workspace`, {
-      tenant_id: tenantId,
-      refresh_token: refreshToken,
-    });
+  setActiveWorkspace(
+    tenantId: string,
+    refreshToken: string,
+    context?: HttpContext,
+  ): Observable<Session> {
+    return this.http.put<Session>(
+      `${this.base}/me/active-workspace`,
+      { tenant_id: tenantId, refresh_token: refreshToken },
+      { context },
+    );
   }
 
   // --- workspace ----------------------------------------------------------
