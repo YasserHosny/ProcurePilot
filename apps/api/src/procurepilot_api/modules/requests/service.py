@@ -91,6 +91,17 @@ STEP_COLUMNS = (
 )
 
 
+# A request can become a purchase order only while its own status still says it is approved;
+# an approved step alone is not enough once the request is withdrawn or rejected afterwards.
+ORDERABLE_REQUEST_STATUSES = ("approved", "ordered")
+
+
+def orderable_request_predicate(alias: str = "") -> str:
+    prefix = f"{alias}." if alias else ""
+    statuses = ", ".join(f"'{status}'" for status in ORDERABLE_REQUEST_STATUSES)
+    return f"{prefix}status in ({statuses})"
+
+
 def approved_step_predicate(alias: str = "") -> str:
     prefix = f"{alias}." if alias else ""
     return (
@@ -267,7 +278,7 @@ class RequestsService:
             raise ServiceUnavailableError(details={"dependency": "database"}) from exc
 
         rows = _rows(response.data)
-        if not rows:
+        if not rows or request_row["status"] not in ORDERABLE_REQUEST_STATUSES:
             raise ConflictError(details={"reason": "request_not_approved"})
 
         step_row = rows[0]
@@ -311,7 +322,9 @@ class RequestsService:
                     f"{step_filter} limit 1",
                     (member.tenant_id, request_id),
                 ).fetchone()
-                if require_approval and step_row is None:
+                if require_approval and (
+                    step_row is None or request_row["status"] not in ORDERABLE_REQUEST_STATUSES
+                ):
                     raise UnprocessableEntityError(details={"reason": "request_not_approved"})
 
                 line_rows = conn.execute(
@@ -409,6 +422,7 @@ class RequestsService:
                     "select pr.id from purchase_request pr join approval_step ast "
                     "on ast.tenant_id = pr.tenant_id and ast.purchase_request_id = pr.id "
                     f"where pr.tenant_id = %s and {approved_step_predicate('ast')} "
+                    f"and {orderable_request_predicate('pr')} "
                     "and not exists (select 1 from purchase_order po "
                     "where po.tenant_id = pr.tenant_id "
                     "and po.source_request_id = pr.id) order by pr.created_at desc, pr.id "
