@@ -23,6 +23,12 @@ from procurepilot_optimiser_worker.models import (
 )
 
 
+class NoCurrentOffersError(Exception):
+    def __init__(self, product_ids: list[str]) -> None:
+        self.product_ids = product_ids
+        super().__init__("No current offers for requested products")
+
+
 def load_job(conn: psycopg.Connection, *, job_id: UUID, tenant_id: UUID) -> BasketJob:
     with conn.cursor(row_factory=dict_row) as cur:
         cur.execute(
@@ -48,9 +54,12 @@ def load_advanced_optimisation_input(
     row, snapshot = _load_advanced_job_snapshot(conn, job_id=job_id, tenant_id=tenant_id)
     request = _advanced_request_from_snapshot(row=row, snapshot=snapshot)
     supplier_terms = _supplier_terms_from_snapshot(snapshot)
+    offers = read_current_advanced_offers(conn, request=request)
+    if not offers:
+        raise NoCurrentOffersError([str(item.workspace_product_id) for item in request.items])
     return AdvancedOptimisationInput(
         request=request,
-        offers=read_current_advanced_offers(conn, request=request),
+        offers=offers,
         supplier_terms=supplier_terms or read_supplier_terms(conn, request=request),
         supplier_risks=read_supplier_risks(conn, request=request),
     )

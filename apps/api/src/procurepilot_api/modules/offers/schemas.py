@@ -58,6 +58,8 @@ ConstraintKind = Literal[
     "supplier_exclusion",
     "urgency",
     "currency_consistency",
+    "risk_tolerance",
+    "no_eligible_supplier",
 ]
 AnomalyAlertKind = Literal[
     "price_spike",
@@ -252,7 +254,7 @@ class SingleSupplierBaseline(BaseModel):
 class InfeasibleBasketItem(BaseModel):
     workspace_product_id: UUID
     requested_quantity: str
-    reason: Literal["no_offer_from_named_suppliers"]
+    reason: Literal["no_offer_from_named_suppliers", "mixed_currency_offers"]
     missing_supplier_ids: list[UUID]
 
 

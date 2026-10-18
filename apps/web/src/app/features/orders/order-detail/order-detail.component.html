@@ -30,8 +30,8 @@
         @for (line of data.order.lines; track line.id) {
           @if (lineSummary(line.id); as summary) {
             <div class="line-row">
-              <div class="line-description"><span class="line-number">#{{ line.line_number }}</span><strong>{{ line.description }}</strong><span>{{ line.unit_price | formatMoney }} / {{ line.base_unit }}</span></div>
-              <div class="line-evidence"><span>{{ 'orders.detail.ordered' | translate }} <strong>{{ summary.ordered_quantity }}</strong></span><span class="evidence-value" [attr.data-state]="summary.confirmed.state">{{ 'orders.detail.confirmed' | translate }} <strong>{{ summary.confirmed.quantity ?? ('orders.notProvided' | translate) }}</strong></span><span class="evidence-value" [attr.data-state]="summary.received.state">{{ 'orders.detail.received' | translate }} <strong>{{ summary.received.quantity ?? ('orders.notProvided' | translate) }}</strong></span><span>{{ 'orders.detail.remaining' | translate }} <strong>{{ summary.remaining_quantity ?? ('orders.notProvided' | translate) }}</strong></span></div>
+              <div class="line-description"><span class="line-number">#{{ line.line_number }}</span><strong>{{ line.description }}</strong><span>{{ linePriceLabel(line) }}</span></div>
+              <div class="line-evidence"><span>{{ 'orders.detail.ordered' | translate }} <strong>{{ formatQuantity(summary.ordered_quantity) }}</strong></span><span class="evidence-value" [attr.data-state]="summary.confirmed.state">{{ 'orders.detail.confirmed' | translate }} <strong>{{ formatQuantity(summary.confirmed.quantity) }}</strong></span><span class="evidence-value" [attr.data-state]="summary.received.state">{{ 'orders.detail.received' | translate }} <strong>{{ formatQuantity(summary.received.quantity) }}</strong></span><span>{{ 'orders.detail.remaining' | translate }} <strong>{{ formatQuantity(summary.remaining_quantity) }}</strong></span></div>
             </div>
           }
         }

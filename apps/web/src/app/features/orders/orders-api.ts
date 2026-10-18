@@ -20,6 +20,7 @@ export interface Money {
 }
 
 export interface PurchaseOrderLine {
+  pack_base_quantity?: string | null;
   id: string;
   line_number: number;
   workspace_product_id: string | null;

@@ -4,6 +4,7 @@ from uuid import UUID
 
 from procurepilot_optimiser_worker import db
 from procurepilot_optimiser_worker.repository import (
+    NoCurrentOffersError,
     load_advanced_optimisation_input,
     load_job,
     mark_completed,
@@ -40,6 +41,14 @@ def process_basket_split_job(payload: dict[str, str]) -> None:
                 )
             mark_completed(conn, job_id=job_id, result=result.model_dump(mode="json"))
             conn.commit()
+        except NoCurrentOffersError as exc:
+            mark_failed(
+                conn,
+                job_id=job_id,
+                error={"code": "no_offers_for_products", "product_ids": exc.product_ids},
+            )
+            conn.commit()
+            raise
         except Exception as exc:
             mark_failed(
                 conn,

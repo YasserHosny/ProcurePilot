@@ -4,7 +4,9 @@ import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testin
 import { signal } from '@angular/core';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { provideRouter } from '@angular/router';
-import { TranslateModule } from '@ngx-translate/core';
+import { TranslateModule, TranslateService } from '@ngx-translate/core';
+import en from '../../../../../../../packages/i18n/en.json';
+import ar from '../../../../../../../packages/i18n/ar.json';
 import { of } from 'rxjs';
 
 import { ApiService } from '../../../core/api/api.service';
@@ -230,6 +232,21 @@ describe('BasketSplitComponent (US3, T045)', () => {
     expect(savings.type).toBe('split_saves');
     expect(savings.savingsAmount).toBe('20.00'); // 280 - 260 = 20
     expect(savings.cheaperSupplierName).toBe('Supplier Beta');
+  });
+
+  it('renders the basket pack hint in English and Arabic', () => {
+    const translate = TestBed.inject(TranslateService);
+    translate.setTranslation('en', en);
+    translate.setTranslation('ar', ar);
+    for (const [language, expected] of [
+      ['en', '10 pack(s) × 1 EA = 10 EA'],
+      ['ar', '10 عبوة × 1 EA = 10 EA'],
+    ]) {
+      translate.use(language);
+      fixture.detectChanges();
+      const hint = (fixture.nativeElement as HTMLElement).querySelector('.item-qty-field mat-hint');
+      expect(hint?.textContent?.trim()).toBe(expected);
+    }
   });
 
   it('should distinguish and render an infeasible completed result distinctly from failed job', () => {

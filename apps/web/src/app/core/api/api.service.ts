@@ -611,10 +611,11 @@ export class ApiService {
     return this.http.get<{ count: number }>(`${this.base}/match-tasks/exact-matches`);
   }
 
-  confirmExactMatches(): Observable<{ confirmed: number; skipped: number }> {
+  confirmExactMatches(idempotencyKey: string): Observable<{ confirmed: number; skipped: number }> {
     return this.http.post<{ confirmed: number; skipped: number }>(
       `${this.base}/match-tasks/confirm-exact`,
       {},
+      { headers: { 'Idempotency-Key': idempotencyKey } },
     );
   }
 

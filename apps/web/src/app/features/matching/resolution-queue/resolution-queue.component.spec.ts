@@ -207,6 +207,7 @@ describe('ResolutionQueueComponent', () => {
     fixture.detectChanges();
 
     expect(apiService.confirmExactMatches).toHaveBeenCalledTimes(1);
+    expect(apiService.confirmExactMatches).toHaveBeenCalledWith(jasmine.stringMatching(/^[0-9a-f-]{36}$/));
     expect(apiService.getMatchTasks).toHaveBeenCalledTimes(2);
     expect(el.querySelector('[data-testid="exact-match-banner"]')).toBeNull();
     expect(el.querySelector('[data-testid="exact-match-result"]')?.textContent).toContain(

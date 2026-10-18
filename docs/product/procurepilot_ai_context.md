@@ -21,7 +21,9 @@ It can be used for:
 This document represents the **latest clarified version** of the ProcurePilot concept.
 
 > **Status note (2026-10-18).** The concept below is unchanged, but it was written before the product
-> was built. Releases R1.0–R4.3 have since shipped; what is built, partial or deferred is recorded in
+> was built. Releases R1.0–R4.3 have since been built and merged, but several are only partial (for example R1.5:
+> no payment collection; R3.4: no partner credentials or connector framework; push notifications are
+> never delivered). What is built, partial or deferred is recorded in
 > `docs/roadmap/procurepilot_roadmap.md` (section "Delivery Status"), and the current engineering state
 > is in `CLAUDE.md`. The first pilot market is **Egypt** (EGP, Arabic-first users and suppliers) — see
 > `docs/gtm/first-customer-gtm-plan.md`. GBP figures in this document are the original illustrative

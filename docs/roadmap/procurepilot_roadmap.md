@@ -46,14 +46,14 @@ release's spec was built and merged; it does not mean the phase's business gate 
 |---|---|---|---|---|
 | 1 | R1.0 Foundation | `001-platform-foundation` | Shipped | |
 | 1 | R1.1 Catalogue + Suppliers | `002-catalogue-suppliers` | Shipped | |
-| 1 | R1.2 Ingestion + Extraction | `003-quotation-inbox-extraction` | Shipped | Amended 2026-10-17 (FR-013A, a quotation can always be authorised) |
-| 1 | R1.3 Matching + Normalisation | `004-matching-normalisation` | Shipped | Fuzzy matches no longer auto-accept (PR #59); score calibration waits for 500+ labelled decisions |
+| 1 | R1.2 Ingestion + Extraction | `003-quotation-inbox-extraction` | Unvalidated | Built and merged; ≥90% extraction gate not measured (no held-out benchmark). Amended 2026-10-17 (FR-013A, a quotation can always be authorised) |
+| 1 | R1.3 Matching + Normalisation | `004-matching-normalisation` | Partial | Built and merged; precision gates not proven (no held-out benchmark), T049 not exercisable. Fuzzy matches no longer auto-accept (PR #59); calibration waits for 500+ labelled decisions |
 | 1 | R1.4 Compare + Intelligence | `005-smart-compare-intelligence` | Shipped | |
 | 1 | R1.5 Value Proof + Launch | `006-value-proof-launch` | Partial | Plans and limits enforced; billing provider is a stub, no payment collection |
 | 2 | R2.0 Organisation model | `007-organisation-model` | Shipped | |
 | 2 | R2.1 Requests + Approvals | `008-requests-approvals` | Shipped | Policy engine deferred (see below) |
-| 2 | R2.2 Mobile MVP | `009-mobile-app-mvp` | Shipped | |
-| 2 | R2.3 Mobile approvals + receipt | `010-mobile-approvals-receipt` | Shipped | |
+| 2 | R2.2 Mobile MVP | `009-mobile-app-mvp` | Partial | Push notifications are never delivered (no FCM/APNs provider) |
+| 2 | R2.3 Mobile approvals + receipt | `010-mobile-approvals-receipt` | Partial | Approval and decision pushes never arrive (same stub) |
 | 2 | R2.4 Optimisation + Supplier IQ | `011-optimisation-supplier-iq` | Shipped | Optimiser worker deployed on hosted 2026-10-17 (PR #108 + bunny.net container) |
 | 2 | R2.5 Reporting + Hardening | `012-reporting-hardening` | Shipped | |
 | 3 | R3.0 Email ingestion + catalogue refresh | `013-automated-ingestion` | Shipped | WhatsApp is manual capture only |
@@ -1364,7 +1364,7 @@ customer-configurable. Decisions 3 and 4 have not been revisited in this documen
 | # | Action | Where tracked |
 |---:|---|---|
 | 1 | Finish the hosted demo tenant and record the demo video | `docs/gtm/video/production-tracker.md` (PP-5, PP-6) |
-| 2 | Re-run a basket split on hosted now that the optimiser worker is deployed | PR #108, `docs/gtm/demo-tenant/README.md` finding 17 |
+| 2 | Fix the basket-split result read (`GET /baskets/{id}` → 500 on a completed advanced job), then re-open the round-1 split on hosted | `docs/gtm/demo-tenant/README.md` finding 21 |
 | 3 | Run real Egyptian supplier quotes through extraction | `specs/022-home-currency-readiness/tasks.md` T015 (Jira PP-3) |
 | 4 | Reach 20 prospect conversations and sign the first pilot | `docs/gtm/gtm-execution-plan.md` (PP-11, PP-13, PP-10) |
 | 5 | Choose what to build from the partial and deferred scope above, driven by the pilot | This document, Delivery Status |

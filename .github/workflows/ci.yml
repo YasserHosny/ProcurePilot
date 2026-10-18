@@ -229,7 +229,7 @@ jobs:
 
           audit_module.create_client = _fake_create_client
           PY
-          uv run --project apps/api --with-editable services/extraction-worker pytest apps/api -q
+          uv run --project apps/api --with-editable services/extraction-worker --with-editable services/optimiser pytest apps/api -q
       - name: Run product matching eval smoke gate
         # Update this to enforce precision, review-band, and ECE thresholds as soon as ml/benchmarks/product_matching/heldout.jsonl reaches 500+ records.
         run: |

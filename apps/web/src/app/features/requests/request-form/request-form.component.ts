@@ -1,5 +1,6 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormArray, FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
@@ -14,11 +15,12 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { ActivatedRoute, Router } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { forkJoin, of, type Observable } from 'rxjs';
-import { catchError, finalize, switchMap, tap } from 'rxjs/operators';
+import { catchError, distinctUntilChanged, finalize, switchMap, tap } from 'rxjs/operators';
 
 import { ApiService } from '../../../core/api/api.service';
 import { FormatDatePipe } from '../../../core/format/date.pipe';
 import { FormatService } from '../../../core/format/format.service';
+import { trimDecimal } from '../../../core/format/trim-decimal';
 import type {
   ApiError,
   Branch,
@@ -64,6 +66,8 @@ interface LineFormGroup {
   styleUrl: './request-form.component.scss',
 })
 export class RequestFormComponent implements OnInit {
+  private readonly destroyRef = inject(DestroyRef);
+  private readonly branchId = signal('');
   private readonly requestsApi = inject(RequestsApiService);
   private readonly organisationApi = inject(OrganisationApiService);
   private readonly api = inject(ApiService);
@@ -78,7 +82,10 @@ export class RequestFormComponent implements OnInit {
   readonly isSubmitting = signal<boolean>(false);
   readonly errorMessage = signal<string | null>(null);
   readonly branches = signal<Branch[]>([]);
-  readonly costCentres = signal<CostCentre[]>([]);
+  readonly allCostCentres = signal<CostCentre[]>([]);
+  readonly costCentres = computed(() =>
+    this.allCostCentres().filter(cc => !cc.branch_id || cc.branch_id === this.branchId()),
+  );
   readonly members = signal<Member[]>([]);
   readonly products = signal<Product[]>([]);
   readonly existingRequest = signal<PurchaseRequest | null>(null);
@@ -126,6 +133,16 @@ export class RequestFormComponent implements OnInit {
 
   ngOnInit(): void {
     this.isLoading.set(true);
+    this.branchId.set(this.form.controls.branch_id.value);
+    this.form.controls.branch_id.valueChanges
+      .pipe(distinctUntilChanged(), takeUntilDestroyed(this.destroyRef))
+      .subscribe((branchId) => {
+        this.branchId.set(branchId);
+        const selected = this.form.controls.cost_centre_id.value;
+        if (selected && !this.costCentres().some(cc => cc.id === selected)) {
+          this.form.controls.cost_centre_id.setValue('');
+        }
+      });
 
     const requestId = this.route.snapshot.paramMap.get('id');
     const isEditMode = requestId !== null;
@@ -325,7 +342,7 @@ export class RequestFormComponent implements OnInit {
   private loadCostCentres(): Observable<CostCentreList> {
     return this.organisationApi
       .listCostCentres({ is_archived: false })
-      .pipe(tap((res) => this.costCentres.set([...res.items])));
+      .pipe(tap((res) => this.allCostCentres.set([...res.items])));
   }
 
   private loadMembers(): void {
@@ -369,7 +386,7 @@ export class RequestFormComponent implements OnInit {
         const isReadOnly = req.status !== 'draft';
         this.lines.clear();
         for (const line of req.lines) {
-          const displayQty = isReadOnly ? this.formatQuantity(line.quantity) : line.quantity;
+          const displayQty = isReadOnly ? this.formatQuantity(line.quantity) : trimDecimal(line.quantity);
           const group = new FormGroup<LineFormGroup>({
             workspace_product_id: new FormControl<string>(line.workspace_product_id, {
               nonNullable: true,

@@ -42,7 +42,14 @@ export class BasketSplitInfeasibleComponent {
     const code = this.currentJob?.error?.['code'];
     if (code === 'optimiser_unavailable') return 'basketSplit.status.unavailableMessage';
     if (code === 'optimiser_timeout') return 'basketSplit.status.timeoutMessage';
+    if (code === 'no_offers_for_products') return 'basketSplit.status.noCurrentOffers';
     return null;
+  }
+
+  failureMessageParams(): Record<string, string> {
+    const ids = this.currentJob?.error?.['product_ids'];
+    const names = Array.isArray(ids) ? ids.map((id) => this.getProductName(String(id))).join(', ') : '';
+    return { products: names };
   }
 
   getSupplierName(supplierId: string): string {

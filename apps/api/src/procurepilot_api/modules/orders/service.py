@@ -62,7 +62,7 @@ ORDER_HEADER_COLUMNS = (
 ORDER_LINE_COLUMNS = (
     "id,line_number,workspace_product_id,description,ordered_quantity,base_unit,"
     "unit_price_amount,unit_price_currency,tax_amount,tax_currency,line_total_amount,"
-    "line_total_currency,source_request_line_id"
+    "line_total_currency,source_request_line_id,pack_base_quantity"
 )
 CONFIRMATION_COLUMNS = (
     "id,tenant_id,purchase_order_id,supplier_reference,confirmed_at,expected_delivery_date,"
@@ -240,8 +240,11 @@ class OrdersService:
                 "insert into purchase_order_line (tenant_id,purchase_order_id,line_number,"
                 "workspace_product_id,description,ordered_quantity,base_unit,unit_price_amount,"
                 "unit_price_currency,tax_amount,tax_currency,line_total_amount,"
-                "line_total_currency,source_request_id,source_request_line_id) "
-                "values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+                "line_total_currency,source_request_id,source_request_line_id,pack_base_quantity) "
+                "values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,"
+                "(select pd.base_quantity from pack_definition pd "
+                "where pd.tenant_id = %s and pd.workspace_product_id = %s "
+                "order by pd.created_at desc, pd.id desc limit 1))",
                 [
                     (
                         member.tenant_id,
@@ -259,6 +262,8 @@ class OrdersService:
                         line.line_total.currency,
                         payload.source_request_id,
                         line.source_request_line_id,
+                        member.tenant_id,
+                        line.workspace_product_id,
                     )
                     for line in payload.lines
                 ],
@@ -378,8 +383,11 @@ class OrdersService:
                 "insert into purchase_order_line (tenant_id,purchase_order_id,line_number,"
                 "workspace_product_id,description,ordered_quantity,base_unit,unit_price_amount,"
                 "unit_price_currency,tax_amount,tax_currency,line_total_amount,"
-                "line_total_currency,source_request_id,source_request_line_id) "
-                "values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+                "line_total_currency,source_request_id,source_request_line_id,pack_base_quantity) "
+                "values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,"
+                "(select pd.base_quantity from pack_definition pd "
+                "where pd.tenant_id = %s and pd.workspace_product_id = %s "
+                "order by pd.created_at desc, pd.id desc limit 1))",
                 [
                     (
                         member.tenant_id,
@@ -397,6 +405,8 @@ class OrdersService:
                         line.line_total.currency,
                         payload.source_request_id,
                         line.source_request_line_id,
+                        member.tenant_id,
+                        line.workspace_product_id,
                     )
                     for line in payload.lines
                 ],
@@ -1117,6 +1127,7 @@ def _order_line_model(row: dict[str, object]) -> PurchaseOrderLine:
             "id": row["id"],
             "line_number": row["line_number"],
             "workspace_product_id": row["workspace_product_id"],
+            "pack_base_quantity": row.get("pack_base_quantity"),
             "description": row["description"],
             "ordered_quantity": row["ordered_quantity"],
             "base_unit": row["base_unit"],

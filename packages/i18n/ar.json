@@ -1552,6 +1552,7 @@
       "itemsSectionTitle": "منتجات السلة",
       "product": "المنتج",
       "quantity": "الكمية",
+      "packHint": "{{count}} عبوة × {{size}} {{unit}} = {{total}} {{unit}}",
       "unitLabel": "الوحدة: {{unit}}",
       "addItem": "إضافة منتج",
       "addSupplier": "إضافة مورّد (٢-١٠)",
@@ -1567,6 +1568,7 @@
       "completed": "اكتمل التحسين",
       "failed": "فشل طلب التحسين",
       "failedMessage": "حدث خطأ أثناء تنفيذ عملية التحسين. يُرجى المحاولة مرة أخرى.",
+      "noCurrentOffers": "لا توجد عروض حالية من الموردين المختارين للأصناف: {{products}}",
       "unavailableMessage": "خدمة التحسين لا تستجيب حالياً. يُرجى المحاولة مرة أخرى بعد قليل، أو التواصل مع الدعم إذا استمرت المشكلة.",
       "timeoutMessage": "لم يكتمل التحسين في الوقت المحدد. يُرجى المحاولة مرة أخرى."
     },
@@ -1998,6 +2000,7 @@
     }
   },
   "requests": {
+    "list": { "newRequestButton": "طلب جديد" },
     "title": "طلبات الشراء",
     "subtitle": "أنشئ وتابع طلبات الشراء لفروعك ومراكز التكلفة.",
     "status": {
@@ -3275,7 +3278,7 @@
       "description": "الوصف",
       "quantity": "الكمية",
       "baseUnit": "الوحدة الأساسية",
-      "unitPrice": "سعر الوحدة",
+      "unitPrice": "سعر الوحدة (للعبوة)",
       "lineTax": "ضريبة البند",
       "lineTotal": "إجمالي البند",
       "orderTotal": "إجمالي الطلب",
@@ -3298,6 +3301,7 @@
       "creatingFromRequest": "الإنشاء من الطلب",
       "estimateReference": "التقدير",
       "packUnit": "عبوة {{size}} {{unit}}",
+      "baseUnitPrice": "لكل {{unit}}",
       "remainingQuantity": "الكمية المتبقية للتخصيص"
     },
     "status": {

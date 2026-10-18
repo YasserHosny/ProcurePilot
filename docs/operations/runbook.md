@@ -270,10 +270,10 @@ its logs show the startup line? Does `rq info` against the shared Redis list a w
 ### 7.8 Email-Ingestion Worker
 
 Inbound supplier emails (Mailgun → `POST /api/v1/webhooks/inbound-email`) are stored and queued as
-`ingestion_job` rows with `job_type='email_ingest'`. The email-ingestion worker claims them from
+`ingestion_jobs` rows with `job_type='email_ingest'` and status `pending`. The email-ingestion worker claims them from
 the **database** every 15 s (no Redis queue for this step), stores the attachments, matches the
 reply to its RFQ and supplier, and then enqueues extraction on Redis. If it is not running, inbound
-quotes pile up as queued jobs and never reach the Quotation Inbox. Image:
+quotes pile up as `pending` jobs and never reach the Quotation Inbox. Image:
 `ghcr.io/<owner>/procurepilot-email-ingestion-worker`, built from
 `infra/docker/email-ingestion-worker.Dockerfile` and rolled by
 `.github/workflows/deploy-email-ingestion-worker.yml`, which only **updates** an existing container.
@@ -300,7 +300,7 @@ The authoritative list of required settings is the set of `Settings` fields in
 (see 7.6).
 
 **Diagnose lost inbound quotes:** is the container Running? Do its logs show jobs being claimed?
-Are there `ingestion_job` rows with `job_type='email_ingest'` stuck in `queued`? The operator CLI
+Are there `ingestion_jobs` rows with `job_type='email_ingest'` stuck in `pending` (statuses: `pending`, `processing`, `completed`, `failed`)? The operator CLI
 `python -m procurepilot_api.workers.requeue_email_ingest` re-queues jobs by `--job-id` or `--all-failed` (try `--dry-run` first).
 
 ## 8. Logging & Diagnostics
