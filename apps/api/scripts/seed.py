@@ -147,6 +147,19 @@ def seed_reporting_demo(cur: psycopg.Cursor) -> dict[str, object] | None:
     )
     product_id = cur.fetchone()["id"]
 
+    # --- its pack (guarded by product) --------------------------------------------
+    # Every workspace product needs exactly one pack: without it GET /products fails the whole
+    # catalogue with 503 pack_definition_not_readable. Also repairs workspaces seeded before
+    # this insert existed.
+    cur.execute(
+        """
+        insert into pack_definition (tenant_id, workspace_product_id, pack_count, unit_size)
+        select %(t)s, %(p)s, 1, 5
+        where not exists (select 1 from pack_definition where workspace_product_id = %(p)s)
+        """,
+        {"t": tenant_id, "p": product_id},
+    )
+
     # --- one verified saving inside the last week (guarded by the notes marker) --
     cur.execute(
         "select 1 from purchase_record where tenant_id = %(t)s and notes = %(n)s",

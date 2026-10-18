@@ -7,9 +7,11 @@ import { ActivatedRoute, provideRouter } from '@angular/router';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { of, throwError } from 'rxjs';
 
+import arCatalog from '../../../../../../../packages/i18n/ar.json';
 import enCatalog from '../../../../../../../packages/i18n/en.json';
 import { ApiService } from '../../../core/api/api.service';
 import type { QuotationDetail, Role, Supplier } from '../../../core/api/models';
+import { FormatService } from '../../../core/format/format.service';
 import { SessionService } from '../../../core/auth/session.service';
 import { QuotationReviewComponent } from './quotation-review.component';
 
@@ -150,6 +152,7 @@ describe('QuotationReviewComponent (T051, T057, T062)', () => {
 
     const translate = TestBed.inject(TranslateService);
     translate.setTranslation('en', enCatalog);
+    translate.setTranslation('ar', arCatalog);
     translate.use('en');
 
     fixture = TestBed.createComponent(QuotationReviewComponent);
@@ -719,5 +722,70 @@ describe('QuotationReviewComponent (T051, T057, T062)', () => {
     fixture.detectChanges();
 
     expect(component.hasArithmeticMismatch()).toBeTrue();
+  });
+
+  it('renders a flagged stated_total through FormatService.formatMoney in English and Arabic without raw JSON', () => {
+    const formatService = TestBed.inject(FormatService);
+    const translate = TestBed.inject(TranslateService);
+    const statedTotal = {
+      ...mockQuotationDetail.field_extractions[0],
+      id: 'fe-stated-total',
+      field_name: 'stated_total',
+      extracted_value: { amount: '24220.00', currency: 'EGP' },
+      confidence: '0.5000',
+    };
+    component.quotation.set({ ...mockQuotationDetail, field_extractions: [statedTotal] });
+    fixture.detectChanges();
+
+    const valueElEn = fixture.nativeElement.querySelector('#flagged-fe-stated-total .flagged-value') as HTMLElement;
+    expect(valueElEn).toBeTruthy();
+    expect(valueElEn.textContent).not.toContain('"amount"');
+    expect(valueElEn.textContent).not.toContain('{');
+    expect(valueElEn.textContent?.trim()).toBe(formatService.formatMoney({ amount: '24220.00', currency: 'EGP' }));
+
+    translate.use('ar');
+    fixture.detectChanges();
+
+    const valueElAr = fixture.nativeElement.querySelector('#flagged-fe-stated-total .flagged-value') as HTMLElement;
+    expect(valueElAr).toBeTruthy();
+    expect(valueElAr.textContent).not.toContain('"amount"');
+    expect(valueElAr.textContent).not.toContain('{');
+    expect(valueElAr.textContent?.trim()).toBe(formatService.formatMoney({ amount: '24220.00', currency: 'EGP' }));
+    expect(valueElAr.textContent).toContain('٢٤');
+  });
+
+  it('renders a flagged plain string field as raw text without reformatting', () => {
+    const plainStringField = {
+      ...mockQuotationDetail.field_extractions[0],
+      id: 'fe-supplier-name',
+      field_name: 'supplier_name',
+      extracted_value: 'الأمانة للتجارة',
+      confidence: '0.6700',
+    };
+    component.quotation.set({ ...mockQuotationDetail, field_extractions: [plainStringField] });
+    component.selectedSupplierId.set(null);
+    fixture.detectChanges();
+
+    const valueEl = fixture.nativeElement.querySelector('#flagged-fe-supplier-name .flagged-value') as HTMLElement;
+    expect(valueEl).toBeTruthy();
+    expect(valueEl.textContent?.trim()).toBe('الأمانة للتجارة');
+  });
+
+  it('renders a flagged issue_date ISO date through date formatting instead of raw string', () => {
+    const formatService = TestBed.inject(FormatService);
+    const dateField = {
+      ...mockQuotationDetail.field_extractions[0],
+      id: 'fe-issue-date',
+      field_name: 'issue_date',
+      extracted_value: '2026-08-20',
+      confidence: '0.5000',
+    };
+    component.quotation.set({ ...mockQuotationDetail, field_extractions: [dateField] });
+    fixture.detectChanges();
+
+    const valueEl = fixture.nativeElement.querySelector('#flagged-fe-issue-date .flagged-value') as HTMLElement;
+    expect(valueEl).toBeTruthy();
+    expect(valueEl.textContent?.trim()).not.toBe('2026-08-20');
+    expect(valueEl.textContent?.trim()).toBe(formatService.formatDate(new Date(2026, 7, 20)));
   });
 });

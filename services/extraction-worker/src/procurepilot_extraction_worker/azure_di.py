@@ -114,6 +114,14 @@ def _parse_invoice_result(result: object, model_version: str) -> ExtractionResul
             "DueDate",
             typed_value=_typed_date(fields, "DueDate"),
         )
+    else:
+        validity = _find_validity_date(currency_text)
+        if validity:
+            # prebuilt-invoice has no "valid until" field and maps it to DueDate only
+            # sometimes (finding 42: never on a photo); text evidence goes to review.
+            header["expiry_date"] = ExtractedField(
+                "expiry_date", validity, _TEXT_VALIDITY_CONFIDENCE, 1, None
+            )
 
     total_content = _content(fields, "InvoiceTotal")
     if total_content is not None:
@@ -415,6 +423,47 @@ def _all_document_text(result: object) -> str:
             str(_get(line, "content", "") or "") for line in (_get(page, "lines", []) or [])
         )
     return "\n".join(parts)
+
+
+_TEXT_VALIDITY_CONFIDENCE = 0.6
+_VALIDITY_LABEL = (
+    r"(?:(?:العرض\s+)?(?:صالح|ساري)[ةه]?\s+حت[ىي]|(?:ال)?صلاحي[ةه](?:\s+العرض)?(?:\s+حت[ىي])?|"
+    r"تاريخ\s+(?:الانتهاء|انتهاء\s+العرض)|valid\s+(?:until|till|thru|through)|"
+    r"validity(?:\s+date)?|expiry\s+date|expires(?:\s+on)?)"
+)
+_TEXT_DATE = r"\d{1,4}\s*[/.\-]\s*\d{1,2}\s*[/.\-]\s*\d{2,4}"
+_VALIDITY_AFTER = re.compile(rf"{_VALIDITY_LABEL}\s*[:：]\s*({_TEXT_DATE})", re.I)
+_VALIDITY_AFTER_LOOSE = re.compile(
+    rf"{_VALIDITY_LABEL}\s*[\-–]?\s*({_TEXT_DATE})(?!\d)(?!\s*[:：])", re.I
+)
+# OCR of a photo can emit an RTL line in visual order ("29/10/2026 :صالح حتى 19/10/2026 ..."),
+# putting the value before its label. Only the label's own colon, right next to the date, makes
+# it the label's value; "Date: 19/10/2026 Validity: 30 days" must not yield the issue date.
+_VALIDITY_BEFORE = re.compile(rf"({_TEXT_DATE})\s*[:：]\s*{_VALIDITY_LABEL}", re.I)
+_VALIDITY_ALONE = re.compile(rf"{_VALIDITY_LABEL}\s*[:：\-–]?\s*$", re.I)
+_DATE_ALONE = re.compile(rf"^\s*({_TEXT_DATE})")
+
+
+def _find_validity_date(text: str) -> str | None:
+    lines = [line.strip() for line in text.splitlines()]
+    for idx, line in enumerate(lines):
+        match = _VALIDITY_AFTER.search(line)
+        if match:
+            return match[1]
+        match = _VALIDITY_BEFORE.search(line)
+        # A date that follows another label's colon ("Date: 19/10/2026 :...") is that label's.
+        if match and not line[: match.start()].rstrip().endswith((":", "：")):
+            return match[1]
+        # Without a colon, a date followed by one is the next label's value in visual order.
+        match = _VALIDITY_AFTER_LOOSE.search(line)
+        if match:
+            return match[1]
+        if _VALIDITY_ALONE.search(line):
+            following = next((nxt for nxt in lines[idx + 1 :] if nxt), "")
+            date_match = _DATE_ALONE.match(following)
+            if date_match:
+                return date_match[1]
+    return None
 
 
 def _find_grand_total(text: str, currency: str | None) -> ExtractedField | None:
