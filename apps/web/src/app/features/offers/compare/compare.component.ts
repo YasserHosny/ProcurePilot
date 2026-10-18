@@ -170,7 +170,7 @@ export class CompareComponent implements OnInit {
         }
       },
       error: () => {
-        // Soft fail on product list load: compare with the unconverted quantity.
+        // The list failed: fetchComparison loads the selected product on its own.
         this.productsLoaded = true;
         this.flushPendingFetch();
       },
@@ -205,6 +205,32 @@ export class CompareComponent implements OnInit {
       this.isLoading.set(true);
       return;
     }
+    if (this.products().some((p) => p.id === productId)) {
+      this.runComparison(productId);
+      return;
+    }
+    // The product is outside the first page of the catalogue (or the list failed to load): its
+    // pack size is unknown, and guessing "one base unit per pack" would compare 10 tins of 18 L
+    // as 10 litres. Fetch the product itself, and stop the comparison if that fails too.
+    this.isLoading.set(true);
+    this.errorMessage.set(null);
+    this.errorTraceId.set(null);
+    this.api.product(productId).subscribe({
+      next: (product) => {
+        if (this.selectedProductId() !== productId) return;
+        this.products.update((list) => [...list, product]);
+        this.runComparison(productId);
+      },
+      error: () => {
+        if (this.selectedProductId() !== productId) return;
+        this.isLoading.set(false);
+        this.rawComparison.set(null);
+        this.errorMessage.set(this.translate.instant('compare.packUnknown'));
+      },
+    });
+  }
+
+  private runComparison(productId: string): void {
     this.isLoading.set(true);
     this.errorMessage.set(null);
     this.errorTraceId.set(null);

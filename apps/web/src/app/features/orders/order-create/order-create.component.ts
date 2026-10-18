@@ -76,6 +76,8 @@ export class OrderCreateComponent implements OnInit {
   readonly isSubmitting = signal(false);
   readonly errorMessage = signal<string | null>(null);
   readonly sourceRequest = signal<PurchaseRequest | null>(null);
+  // Currency of the supplier quote the unit prices were pre-filled from; the order must use it.
+  private readonly quotedCurrency = signal<string | null>(null);
 
   packDescription(product: Product | undefined): string | null {
     return packLabel(product?.pack, product?.base_unit ?? '', this.translate, this.formatService).label;
@@ -225,7 +227,21 @@ export class OrderCreateComponent implements OnInit {
         this.sourceRequest.set(request);
         this.requestAllocations.set(allocations);
         this.lines.clear();
-        
+
+        // Pre-filled prices are in the quote's currency, so the order currency follows it. A
+        // request whose quote lines mix currencies cannot be pre-filled into one order.
+        const quotedCurrencies = new Set(
+          request.lines.map(l => l.quoted_unit_price?.currency).filter((c): c is string => !!c),
+        );
+        const prefillQuotes = quotedCurrencies.size === 1;
+        if (prefillQuotes) {
+          const [currency] = quotedCurrencies;
+          this.quotedCurrency.set(currency);
+          this.form.controls.currency.setValue(currency);
+        } else if (quotedCurrencies.size > 1) {
+          this.errorMessage.set(this.translate.instant('orders.create.quotedMixedCurrencies'));
+        }
+
         request.lines.forEach(reqLine => {
           const allocation = allocations.lines.find(a => a.source_request_line_id === reqLine.id);
           const remainingStr = allocation?.remaining_quantity || '0';
@@ -240,7 +256,7 @@ export class OrderCreateComponent implements OnInit {
                 // Request quantities are in PACKS. Only the supplier's quoted per-pack price pre-fills
                 // the PO; the (landed) estimate stays a reference, and say "pack of 18 litre" in the description.
                 base_unit: new FormControl<string>(products.items.find(p => p.id === reqLine.workspace_product_id)?.base_unit || 'EA', { nonNullable: true, validators: [Validators.required] }),
-                unit_price: new FormControl<number | null>(reqLine.quoted_unit_price ? parseFloat(reqLine.quoted_unit_price.amount) : null, { validators: [Validators.required, Validators.min(0)] }),
+                unit_price: new FormControl<number | null>(prefillQuotes && reqLine.quoted_unit_price ? parseFloat(reqLine.quoted_unit_price.amount) : null, { validators: [Validators.required, Validators.min(0)] }),
                 line_tax: new FormControl<number | null>(0, { validators: [Validators.min(0)] }),
                 source_request_line_id: new FormControl<string | null>(reqLine.id),
                 remaining_quantity: new FormControl<number | null>(remaining),
@@ -299,6 +315,15 @@ export class OrderCreateComponent implements OnInit {
 
     const value = this.form.getRawValue();
     const currency = value.currency;
+
+    const quoted = this.quotedCurrency();
+    if (quoted && currency !== quoted) {
+      this.errorMessage.set(
+        this.translate.instant('orders.create.quotedCurrencyMismatch', { order: currency, quoted }),
+      );
+      this.isSubmitting.set(false);
+      return;
+    }
 
     const formatDate = (date: Date | null) => date ? toIsoDate(date) : null;
 
