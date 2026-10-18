@@ -423,6 +423,7 @@ export interface Job {
 export type ReviewTaskStatus = 'open' | 'in_progress' | 'resolved';
 export type ReviewTaskPriority = 'low' | 'normal' | 'high';
 export type ReviewTaskReason =
+  | 'ready_to_authorise'
   | 'low_confidence'
   | 'arithmetic_mismatch'
   | 'read_failure'

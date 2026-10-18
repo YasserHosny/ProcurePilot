@@ -812,7 +812,8 @@
         "date_unparsed": "Date Not Recognised",
         "merged_line_items": "Multiple items were merged into one line",
         "line_count_mismatch": "Some quotation lines could not be extracted",
-        "total_unverified": "Quotation total could not be verified"
+        "total_unverified": "Quotation total could not be verified",
+        "ready_to_authorise": "Ready to authorise"
       },
       "columns": {
         "id": "Quotation ID",

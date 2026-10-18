@@ -812,7 +812,8 @@
         "date_unparsed": "تعذّر التعرّف على التاريخ",
         "merged_line_items": "دُمجت عدة أصناف في بند واحد",
         "line_count_mismatch": "تعذّر استخراج بعض بنود عرض السعر",
-        "total_unverified": "تعذّر التحقق من إجمالي عرض السعر"
+        "total_unverified": "تعذّر التحقق من إجمالي عرض السعر",
+        "ready_to_authorise": "جاهز للاعتماد"
       },
       "columns": {
         "id": "معرف عرض السعر",

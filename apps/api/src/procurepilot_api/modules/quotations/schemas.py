@@ -16,6 +16,7 @@ EntityType = Literal["quotation", "quotation_line"]
 ReviewTaskStatus = Literal["open", "in_progress", "resolved"]
 ReviewTaskPriority = Literal["low", "normal", "high"]
 ReviewTaskReason = Literal[
+    "ready_to_authorise",
     "low_confidence",
     "arithmetic_mismatch",
     "read_failure",
