@@ -752,3 +752,155 @@ def test_guardrail_updates_follow_the_live_owner_role(
             (alpha.guardrail_id,),
         )
         assert cur.rowcount == updated
+
+
+# --- mark_rfq_converted (20261019000001) ---------------------------------------------------------
+#
+# rfq_update only matches the RFQ's creator, so preparing a request from someone else's RFQ used to
+# leave it 'sent'. mark_rfq_converted lets any active owner or buyer close the RFQ a request was
+# prepared from, and nothing else.
+
+
+def _add_member(cur: psycopg.Cursor, workspace: RfqWorkspace, role: str) -> tuple[UUID, UUID]:
+    user_id, membership_id = uuid4(), uuid4()
+    email = f"rfq-{role}-{user_id.hex[:10]}@example.test"
+    cur.execute("reset role")
+    cur.execute("insert into auth.users (id,email) values (%s,%s)", (user_id, email))
+    cur.execute(
+        "insert into membership (id,tenant_id,user_id,email,role,is_active_workspace) "
+        "values (%s,%s,%s,%s,%s,true)",
+        (membership_id, workspace.tenant_id, user_id, email, role),
+    )
+    return user_id, membership_id
+
+
+def _prepared_request(
+    cur: psycopg.Cursor, workspace: RfqWorkspace, membership_id: UUID, response_id: UUID | None
+) -> UUID:
+    request_id = uuid4()
+    cur.execute("reset role")
+    cur.execute(
+        "insert into purchase_request (id,tenant_id,branch_id,requested_by_membership_id,"
+        "required_by_date,status,source_rfq_response_id) "
+        "select %s, %s, id, %s, current_date + 7, 'draft', %s from branch where tenant_id = %s "
+        "limit 1",
+        (request_id, workspace.tenant_id, membership_id, response_id, workspace.tenant_id),
+    )
+    return request_id
+
+
+def _act_as_user(
+    cur: psycopg.Cursor, workspace: RfqWorkspace, user_id: UUID, claim_role: str
+) -> None:
+    cur.execute("set local role authenticated")
+    cur.execute(
+        "select set_config('request.jwt.claims', %s, true)",
+        (
+            json.dumps(
+                {
+                    "sub": str(user_id),
+                    "tenant_id": str(workspace.tenant_id),
+                    "role": "authenticated",
+                    "member_role": claim_role,
+                }
+            ),
+        ),
+    )
+
+
+def _rfq_status(cur: psycopg.Cursor, rfq_id: UUID) -> str:
+    cur.execute("reset role")
+    cur.execute("select status from rfq where id = %s", (rfq_id,))
+    return str(cur.fetchone()[0])
+
+
+@pytest.mark.parametrize("role", ["buyer", "owner"])
+def test_an_owner_or_buyer_who_did_not_create_the_rfq_can_mark_it_converted(
+    rfq_workspaces: tuple[psycopg.Connection, RfqWorkspace, RfqWorkspace], role: str
+) -> None:
+    conn, alpha, _beta = rfq_workspaces
+    with conn.cursor() as cur:
+        user_id, membership_id = _add_member(cur, alpha, role)
+        request_id = _prepared_request(cur, alpha, membership_id, alpha.rfq_response_id)
+        _act_as_user(cur, alpha, user_id, role)
+        # The plain update is still creator-only.
+        cur.execute("update rfq set status = 'converted' where id = %s", (alpha.rfq_id,))
+        assert cur.rowcount == 0
+        cur.execute("select mark_rfq_converted(%s, %s)", (alpha.rfq_id, request_id))
+        assert cur.fetchone()[0] is True
+        assert _rfq_status(cur, alpha.rfq_id) == "converted"
+
+
+@pytest.mark.parametrize("claim_role", ["viewer", "buyer"])
+def test_a_viewer_cannot_mark_an_rfq_converted_even_with_a_buyer_claim(
+    rfq_workspaces: tuple[psycopg.Connection, RfqWorkspace, RfqWorkspace], claim_role: str
+) -> None:
+    conn, alpha, _beta = rfq_workspaces
+    with conn.cursor() as cur:
+        user_id, membership_id = _add_member(cur, alpha, "viewer")
+        request_id = _prepared_request(cur, alpha, membership_id, alpha.rfq_response_id)
+        _act_as_user(cur, alpha, user_id, claim_role)
+        cur.execute("savepoint before_mark")
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            cur.execute("select mark_rfq_converted(%s, %s)", (alpha.rfq_id, request_id))
+        cur.execute("rollback to savepoint before_mark")
+        assert _rfq_status(cur, alpha.rfq_id) == "sent"
+
+
+def test_a_request_not_prepared_from_the_rfq_cannot_convert_it(
+    rfq_workspaces: tuple[psycopg.Connection, RfqWorkspace, RfqWorkspace],
+) -> None:
+    conn, alpha, _beta = rfq_workspaces
+    with conn.cursor() as cur:
+        user_id, membership_id = _add_member(cur, alpha, "buyer")
+        unrelated_request = _prepared_request(cur, alpha, membership_id, None)
+        _act_as_user(cur, alpha, user_id, "buyer")
+        cur.execute("select mark_rfq_converted(%s, %s)", (alpha.rfq_id, unrelated_request))
+        assert cur.fetchone()[0] is False
+        assert _rfq_status(cur, alpha.rfq_id) == "sent"
+
+
+def test_another_workspaces_rfq_cannot_be_converted(
+    rfq_workspaces: tuple[psycopg.Connection, RfqWorkspace, RfqWorkspace],
+) -> None:
+    conn, alpha, beta = rfq_workspaces
+    with conn.cursor() as cur:
+        user_id, membership_id = _add_member(cur, alpha, "buyer")
+        request_id = _prepared_request(cur, alpha, membership_id, alpha.rfq_response_id)
+        beta_request = _prepared_request(cur, beta, beta.membership_id, beta.rfq_response_id)
+        _act_as_user(cur, alpha, user_id, "buyer")
+        for rfq_id, req_id in ((beta.rfq_id, request_id), (beta.rfq_id, beta_request)):
+            cur.execute("select mark_rfq_converted(%s, %s)", (rfq_id, req_id))
+            assert cur.fetchone()[0] is False
+            cur.execute("set local role authenticated")
+        assert _rfq_status(cur, beta.rfq_id) == "sent"
+
+
+def test_a_draft_rfq_is_never_converted(
+    rfq_workspaces: tuple[psycopg.Connection, RfqWorkspace, RfqWorkspace],
+) -> None:
+    conn, alpha, _beta = rfq_workspaces
+    with conn.cursor() as cur:
+        cur.execute("update rfq set status = 'draft' where id = %s", (alpha.rfq_id,))
+        user_id, membership_id = _add_member(cur, alpha, "buyer")
+        request_id = _prepared_request(cur, alpha, membership_id, alpha.rfq_response_id)
+        _act_as_user(cur, alpha, user_id, "buyer")
+        cur.execute("select mark_rfq_converted(%s, %s)", (alpha.rfq_id, request_id))
+        assert cur.fetchone()[0] is False
+        assert _rfq_status(cur, alpha.rfq_id) == "draft"
+
+
+def test_an_already_converted_rfq_is_not_converted_again(
+    rfq_workspaces: tuple[psycopg.Connection, RfqWorkspace, RfqWorkspace],
+) -> None:
+    """One purchase request per RFQ: a second request from it does not report a conversion."""
+    conn, alpha, _beta = rfq_workspaces
+    with conn.cursor() as cur:
+        user_id, membership_id = _add_member(cur, alpha, "buyer")
+        first = _prepared_request(cur, alpha, membership_id, alpha.rfq_response_id)
+        second = _prepared_request(cur, alpha, membership_id, alpha.rfq_response_id)
+        _act_as_user(cur, alpha, user_id, "buyer")
+        cur.execute("select mark_rfq_converted(%s, %s)", (alpha.rfq_id, first))
+        assert cur.fetchone()[0] is True
+        cur.execute("select mark_rfq_converted(%s, %s)", (alpha.rfq_id, second))
+        assert cur.fetchone()[0] is False
