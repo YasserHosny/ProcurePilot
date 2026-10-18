@@ -1,7 +1,7 @@
 import { signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { CompareComponent } from './compare.component';
-import { formatLocaleNumber } from '../../../core/format/format.service';
+import { formatExactQuantity, formatLocaleNumber } from '../../../core/format/format.service';
 import {
   RfqApi,
   RfqDetail,
@@ -357,11 +357,23 @@ describe('CompareComponent (RFQ)', () => {
     );
     expect(mockRouter.navigate).toHaveBeenCalledWith(['/requests', 'pr-1']);
   });
+
+  it('formats 6-decimal precision quantities in compare cells', () => {
+    expect(component.formatQuantity('0.000001')).toBe('0.000001');
+    expect(component.formatQuantity('1.234567')).toBe('1.234567');
+    expect(component.formatQuantity('50.000000')).toBe('50');
+  });
 });
 
 describe('RFQ quantity display', () => {
   it('formats decimal quantities without trailing zeroes', () => {
     expect(formatLocaleNumber('50.000000', 'en')).toBe('50');
     expect(formatLocaleNumber('12.500000', 'en')).toBe('12.5');
+  });
+
+  it('formats 6-decimal precision quantities without truncation', () => {
+    expect(formatExactQuantity('0.000001', 'en')).toBe('0.000001');
+    expect(formatExactQuantity('1.234567', 'en')).toBe('1.234567');
+    expect(formatExactQuantity('50.000000', 'en')).toBe('50');
   });
 });

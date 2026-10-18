@@ -113,6 +113,8 @@ describe('OrderDetailComponent', () => {
     fixture.detectChanges();
     const component = fixture.componentInstance;
     expect(component.formatQuantity('12.500000')).toBe('12.5');
+    expect(component.formatQuantity('0.000001')).toBe('0.000001');
+    expect(component.formatQuantity('1.234567')).toBe('1.234567');
     expect(component.formatQuantity(null)).toBe('Not provided');
     const text = (fixture.nativeElement as HTMLElement).querySelector('.line-evidence')?.textContent;
     expect(text).toContain('Ordered 10');

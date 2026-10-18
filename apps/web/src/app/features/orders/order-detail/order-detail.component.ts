@@ -95,7 +95,7 @@ export class OrderDetailComponent implements OnInit {
   formatQuantity(value: string | null): string {
     return value === null
       ? this.translate.instant('orders.notProvided')
-      : this.formatService.formatQuantity(value);
+      : this.formatService.formatExactQuantity(value);
   }
 
   getStatusLabel(status: string): string { return this.translate.instant(`orders.status.${status}`); }

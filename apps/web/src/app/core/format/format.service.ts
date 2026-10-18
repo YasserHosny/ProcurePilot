@@ -39,6 +39,20 @@ export function formatLocaleNumber(
 }
 
 /**
+ * Pure locale-aware quantity formatter preserving up to 6 fraction digits
+ * (for numeric(18,6) values), trimming trailing zeroes, and Arabic-Indic digits when locale is 'ar'.
+ */
+export function formatExactQuantity(
+  value: number | string | null | undefined,
+  locale = 'en',
+): string {
+  return formatLocaleNumber(value, locale, {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 6,
+  });
+}
+
+/**
  * Pure locale-aware money formatter with explicit currency code, thousands separators,
  * 0-2 fraction digits (e.g. `EGP 56,425`, `EGP 56,425.5`), and Arabic-Indic digits for 'ar'.
  */
@@ -143,6 +157,17 @@ export class FormatService {
       minimumFractionDigits: 0,
       maximumFractionDigits: 2,
     });
+  }
+
+  /**
+   * Formats a quantity with exact precision up to 6 fraction digits trimmed (`0.000001` -> `0.000001`, `50.000000` -> `50`),
+   * preserving precision for numeric(18,6) database values, with Arabic-Indic digits for `ar`.
+   */
+  formatExactQuantity(
+    value: number | string | null | undefined,
+    localeOverride?: string,
+  ): string {
+    return formatExactQuantity(value, this.resolveLocale(localeOverride));
   }
 
   /**

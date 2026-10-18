@@ -3,7 +3,12 @@ import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { TranslateService, provideTranslateService } from '@ngx-translate/core';
 
-import { FormatService, formatCurrencyAmount, formatLocaleNumber } from './format.service';
+import {
+  FormatService,
+  formatCurrencyAmount,
+  formatExactQuantity,
+  formatLocaleNumber,
+} from './format.service';
 
 describe('FormatService (T069)', () => {
   let service: FormatService;
@@ -101,6 +106,35 @@ describe('FormatService (T069)', () => {
       expect(qtyDec).toContain('١٥');
       expect(qtyDec).toContain('٥');
       expect(qtyDec).not.toContain('0');
+    });
+  });
+
+  describe('formatExactQuantity (up to 6 decimals, numeric(18,6) precision)', () => {
+    it('formats 6-decimal quantities trimming trailing zeroes in en', () => {
+      translate.use('en');
+      expect(service.formatExactQuantity('0.000001')).toBe('0.000001');
+      expect(service.formatExactQuantity('1.234567')).toBe('1.234567');
+      expect(service.formatExactQuantity('50.000000')).toBe('50');
+      expect(formatExactQuantity('0.000001', 'en')).toBe('0.000001');
+      expect(formatExactQuantity('1.234567', 'en')).toBe('1.234567');
+      expect(formatExactQuantity('50.000000', 'en')).toBe('50');
+    });
+
+    it('renders Arabic-Indic digits for exact 6-decimal quantities when locale is ar', () => {
+      translate.use('ar');
+      expect(service.formatExactQuantity('0.000001')).toBe('٠٫٠٠٠٠٠١');
+      expect(service.formatExactQuantity('1.234567')).toBe('١٫٢٣٤٥٦٧');
+      expect(service.formatExactQuantity('50.000000')).toBe('٥٠');
+      expect(formatExactQuantity('0.000001', 'ar')).toBe('٠٫٠٠٠٠٠١');
+      expect(formatExactQuantity('1.234567', 'ar')).toBe('١٫٢٣٤٥٦٧');
+      expect(formatExactQuantity('50.000000', 'ar')).toBe('٥٠');
+    });
+
+    it('retains default 2-decimal truncation for formatQuantity', () => {
+      translate.use('en');
+      expect(service.formatQuantity('0.000001')).toBe('0');
+      expect(service.formatQuantity('1.234567')).toBe('1.23');
+      expect(service.formatQuantity('50.000000')).toBe('50');
     });
   });
 

@@ -79,7 +79,7 @@ export class CompareComponent implements OnInit {
   readonly guardrails = signal<readonly RfqGuardrail[]>([]);
   readonly currentMembershipId = signal<string | null>(null);
 
-  formatQuantity(value: string | number): string { return this.formatService.formatQuantity(value); }
+  formatQuantity(value: string | number): string { return this.formatService.formatExactQuantity(value); }
 
   readonly displayedColumns = ['product', 'quantity', 'unitPrice', 'totalValue'];
 
