@@ -10,6 +10,7 @@ import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
 import type { FieldExtraction, QuotationDetail } from '../../../core/api/models';
 import { FormatDatePipe } from '../../../core/format/date.pipe';
+import { FormatExtractionPipe, isExtractionJsonFallback } from '../../../core/format/extraction-value.pipe';
 
 @Component({
   selector: 'app-quotation-doc-preview',
@@ -23,11 +24,13 @@ import { FormatDatePipe } from '../../../core/format/date.pipe';
     MatTooltipModule,
     TranslatePipe,
     FormatDatePipe,
+    FormatExtractionPipe,
   ],
   templateUrl: './quotation-doc-preview.component.html',
   styleUrl: './quotation-doc-preview.component.scss',
 })
 export class QuotationDocPreviewComponent {
+  readonly isExtractionJson = isExtractionJsonFallback;
   @Input({ required: true }) quotation!: QuotationDetail;
   @Input({ required: true }) safePreviewUrl: SafeResourceUrl | null = null;
   @Input({ required: true }) documentFileName = '';
