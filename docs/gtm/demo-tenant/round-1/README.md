@@ -76,7 +76,7 @@ Approval Queue (web). The phone approval is tested separately.
 quantities and prices and canonical base units (#110, #112). Set the expected delivery date and
 create. The PO is a draft until submitted; ProcurePilot never writes back to suppliers or accounting.
 
-![PO-000001: lines, total EGP 56,425](07-po-lines.jpg)
+![PO-000001: lines priced per pack and per base unit, total EGP 56,425](07-po-lines.jpg)
 
 ![PO-000001: evidence actions and timeline](08-po-actions.jpg)
 
@@ -88,15 +88,15 @@ create. The PO is a draft until submitted; ProcurePilot never writes back to sup
 
 ## Open issues seen on these screens
 
-Being fixed in the "Fix on-camera label gaps from the round-1 PO run" session:
+Fixed by #128 (deployed 2026-10-18; screenshot 7 retaken after the fix):
 
-- PO lines show the per-pack price as per base unit ("EGP 940.00 / kilogram" is the price of a
-  25 kg sack).
-- English "(pack of 25 kilogram)" is appended to Arabic line descriptions.
-- Quantities shown as "50.000000" on RFQ Responses.
-- The new-request button on Purchase Requests is labelled "Save Draft".
-- Basket split with no matching offers shows a raw validation error.
-- The cost-centre list is not filtered by branch.
+- PO lines now show the price per pack and per base unit ("EGP 940.00 / pack of 25 kg · EGP 37.60 / kg").
+- Quantities show without trailing zeros ("20", not "20.000000").
+- The new-request button on Purchase Requests is labelled "New request".
+- Basket split with no offers at all shows a plain message instead of a validation error.
+- The cost-centre list is filtered to the selected branch.
+- New POs no longer append an English "(pack of …)" to Arabic descriptions. PO-000001 was created
+  before the fix, so its stored descriptions still carry it.
 
 Not yet raised:
 
