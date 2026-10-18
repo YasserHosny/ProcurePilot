@@ -856,12 +856,18 @@ def test_a_cross_workspace_update_changes_nothing(
 def test_a_cross_workspace_delete_removes_nothing(
     workspaces: tuple[psycopg.Connection, Workspace, Workspace],
 ) -> None:
-    """beta carries two membership rows (owner + delegate, T008) — both must survive."""
+    """beta carries two membership rows (owner + delegate, T008) — both must survive.
+
+    Since 20261018000010 `authenticated` holds no DELETE on membership at all, so the attempt is
+    refused outright rather than matching no rows.
+    """
     conn, alpha, beta = workspaces
     with conn.cursor() as cur:
         act_as(cur, alpha)
-        cur.execute("delete from membership where tenant_id = %s", (beta.tenant_id,))
-        assert cur.rowcount == 0
+        cur.execute("savepoint cross_workspace_delete")
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            cur.execute("delete from membership where tenant_id = %s", (beta.tenant_id,))
+        cur.execute("rollback to savepoint cross_workspace_delete")
         cur.execute("reset role")
         cur.execute("select count(*) from membership where tenant_id = %s", (beta.tenant_id,))
         row = cur.fetchone()
