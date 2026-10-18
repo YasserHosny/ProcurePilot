@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
@@ -45,8 +46,10 @@ def compute_budget_status(
     cost_centre_id: UUID | None,
     required_by: date,
     budgets: list[BudgetRow],
-    committed_spend: list[SpendRow],
+    committed_spend: list[SpendRow] | Callable[[BudgetRow], list[SpendRow]],
 ) -> BudgetStatus | None:
+    """``committed_spend`` may be a loader called with the chosen budget, so the caller can
+    fetch only that budget's period, currency and scope rather than every committed request."""
     if request_amount is None or request_currency is None:
         return None
 
@@ -80,8 +83,10 @@ def compute_budget_status(
         )
 
     period_start = chosen.period_start
-    period_end = _budget_period_end(chosen)
+    period_end = budget_period_end(chosen)
     budget_amount = chosen.amount
+    if callable(committed_spend):
+        committed_spend = committed_spend(chosen)
     spent_amount = sum(
         (
             spend.amount
@@ -192,10 +197,10 @@ def _spend_matches_budget_scope(
 
 
 def _date_in_budget_period(value: date, budget: BudgetRow) -> bool:
-    return budget.period_start <= value < _budget_period_end(budget)
+    return budget.period_start <= value < budget_period_end(budget)
 
 
-def _budget_period_end(budget: BudgetRow) -> date:
+def budget_period_end(budget: BudgetRow) -> date:
     months = {"monthly": 1, "quarterly": 3, "annual": 12}[budget.period]
     return budget.period_start + relativedelta(months=months)
 

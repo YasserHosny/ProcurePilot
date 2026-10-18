@@ -47,7 +47,10 @@ from procurepilot_api.modules.orders.validation import (
     validate_confirmation_against_order,
     validate_receipt_against_order,
 )
-from procurepilot_api.modules.requests.service import approved_step_predicate
+from procurepilot_api.modules.requests.service import (
+    approved_step_predicate,
+    orderable_request_predicate,
+)
 from procurepilot_api.shared.audit import AuditEventCreate, get_audit_writer
 
 LOGGER = logging.getLogger(__name__)
@@ -117,7 +120,7 @@ class OrdersService:
                 "select pr.id, s.id as supplier_id, s.name as supplier_name, "
                 "exists (select 1 from approval_step ast where ast.purchase_request_id = pr.id "
                 f"and ast.tenant_id = pr.tenant_id and {approved_step_predicate('ast')}) "
-                "as approved "
+                f"and {orderable_request_predicate('pr')} as approved "
                 "from purchase_request pr "
                 "left join rfq_response rr on rr.id = pr.source_rfq_response_id "
                 "left join rfq_recipient recipient on recipient.id = rr.rfq_recipient_id "

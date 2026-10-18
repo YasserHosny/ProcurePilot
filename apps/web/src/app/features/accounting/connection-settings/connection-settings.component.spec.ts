@@ -481,6 +481,24 @@ describe('ConnectionSettingsComponent (T016)', () => {
   });
 
   describe('OAuth callback query parameters', () => {
+    it('keeps Connect disabled and skips the status load until the completion POST settles', fakeAsync(() => {
+      mockQueryParamMap.set('accounting_code', 'race-code');
+      mockQueryParamMap.set('accounting_state', 'race-state');
+
+      component.ngOnInit();
+      tick();
+
+      const completeReq = httpTestingController.expectOne('/api/v1/accounting/connect/complete');
+      expect(component.isMutating()).toBeTrue();
+      httpTestingController.expectNone('/api/v1/accounting/connection');
+
+      completeReq.flush(mockActiveConnection);
+      tick();
+
+      expect(component.isMutating()).toBeFalse();
+      httpTestingController.expectOne('/api/v1/accounting/connection').flush(mockActiveConnection);
+    }));
+
     it('should complete connection and display success snackbar when accounting_code, accounting_state, and realm_id are present', fakeAsync(() => {
       mockQueryParamMap.set('accounting_code', 'acct-code-123');
       mockQueryParamMap.set('accounting_state', 'acct-state-456');

@@ -130,6 +130,34 @@ def test_create_draft_from_approved_request(monkeypatch: pytest.MonkeyPatch) -> 
                 assert cur.fetchone()[0] == "ordered"
 
 
+def test_request_withdrawn_after_approval_cannot_become_an_order(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    with committed_smart_context("order-withdrawn") as context:
+        member = member_from_workspace(context.workspace, role=MemberRole.owner)
+        app = _app(monkeypatch, member)
+        client = TestClient(app, raise_server_exceptions=False)
+
+        with psycopg.connect(TEST_DATABASE_URL) as conn:
+            req_id, line_id = _setup_approved_request(conn, context.workspace, context.product_id)
+            with conn.cursor() as cur:
+                cur.execute(
+                    "update purchase_request set status = 'withdrawn', withdrawn_at = now() "
+                    "where id = %s",
+                    (req_id,),
+                )
+            conn.commit()
+
+        eligible = client.get("/api/v1/requests", params={"eligible_for_order": "true"})
+        assert eligible.status_code == 200, eligible.text
+        assert str(req_id) not in {item["id"] for item in eligible.json()["items"]}
+
+        payload = _base_order_payload(context.supplier_ids[0], req_id, line_id, context.product_id)
+        res = client.post("/api/v1/orders", json=payload, headers={"Idempotency-Key": str(uuid4())})
+        assert res.status_code == 422, res.text
+        assert res.json()["details"]["reason"] == "request_not_approved"
+
+
 def test_approved_request_list_item_can_create_and_edit_linked_draft_order(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

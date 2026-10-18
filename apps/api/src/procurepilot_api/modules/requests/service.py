@@ -28,6 +28,7 @@ from procurepilot_api.modules.members.service import authenticated_client
 from procurepilot_api.modules.requests.budget_status import (
     BudgetRow,
     SpendRow,
+    budget_period_end,
     compute_budget_status,
 )
 from procurepilot_api.modules.requests.routing import (
@@ -90,6 +91,17 @@ STEP_COLUMNS = (
 )
 
 
+# A request can become a purchase order only while its own status still says it is approved;
+# an approved step alone is not enough once the request is withdrawn or rejected afterwards.
+ORDERABLE_REQUEST_STATUSES = ("approved", "ordered")
+
+
+def orderable_request_predicate(alias: str = "") -> str:
+    prefix = f"{alias}." if alias else ""
+    statuses = ", ".join(f"'{status}'" for status in ORDERABLE_REQUEST_STATUSES)
+    return f"{prefix}status in ({statuses})"
+
+
 def approved_step_predicate(alias: str = "") -> str:
     prefix = f"{alias}." if alias else ""
     return (
@@ -110,6 +122,8 @@ BUDGET_COLUMNS = "id,amount,currency,period,period_start,scope,branch_id,cost_ce
 # "ordered" (spec 010) and later "delivered", so both stay committed spend; draft, rejected
 # and withdrawn requests never count.
 COMMITTED_SPEND_STATUSES = ("submitted", "approved", "ordered", "delivered")
+# Matches the Data API max_rows (supabase/config.toml); a full page means "fetch the next".
+COMMITTED_SPEND_PAGE_SIZE = 1000
 QUALITY_ISSUE_COLUMNS = (
     "id,tenant_id,purchase_request_id,reported_by_membership_id,description,created_at"
 )
@@ -264,7 +278,7 @@ class RequestsService:
             raise ServiceUnavailableError(details={"dependency": "database"}) from exc
 
         rows = _rows(response.data)
-        if not rows:
+        if not rows or request_row["status"] not in ORDERABLE_REQUEST_STATUSES:
             raise ConflictError(details={"reason": "request_not_approved"})
 
         step_row = rows[0]
@@ -308,7 +322,9 @@ class RequestsService:
                     f"{step_filter} limit 1",
                     (member.tenant_id, request_id),
                 ).fetchone()
-                if require_approval and step_row is None:
+                if require_approval and (
+                    step_row is None or request_row["status"] not in ORDERABLE_REQUEST_STATUSES
+                ):
                     raise UnprocessableEntityError(details={"reason": "request_not_approved"})
 
                 line_rows = conn.execute(
@@ -406,6 +422,7 @@ class RequestsService:
                     "select pr.id from purchase_request pr join approval_step ast "
                     "on ast.tenant_id = pr.tenant_id and ast.purchase_request_id = pr.id "
                     f"where pr.tenant_id = %s and {approved_step_predicate('ast')} "
+                    f"and {orderable_request_predicate('pr')} "
                     "and not exists (select 1 from purchase_order po "
                     "where po.tenant_id = pr.tenant_id "
                     "and po.source_request_id = pr.id) order by pr.created_at desc, pr.id "
@@ -1595,28 +1612,49 @@ class RequestsService:
             raise ServiceUnavailableError(details={"dependency": "database"}) from exc
         return [_budget_row(row) for row in _rows(response.data)]
 
-    def _fetch_committed_spend_rows(self, client: Client) -> list[SpendRow]:
-        try:
-            response = (
+    def _fetch_committed_spend_rows(self, client: Client, budget: BudgetRow) -> list[SpendRow]:
+        """Committed requests that draw on ``budget``: its currency, period and scope.
+
+        Ordered and delivered requests accumulate forever, and PostgREST caps a response at
+        the Data API row limit, so filter in the query and page through the result.
+        """
+        spend_rows = []
+        offset = 0
+        while True:
+            query = (
                 client.table("purchase_request")
                 .select(
                     "id,branch_id,cost_centre_id,required_by_date,"
                     "estimated_total_amount,estimated_total_currency,status"
                 )
                 .in_("status", list(COMMITTED_SPEND_STATUSES))
-                .execute()
+                .eq("estimated_total_currency", budget.currency)
+                .gte("required_by_date", budget.period_start.isoformat())
+                .lt("required_by_date", budget_period_end(budget).isoformat())
             )
-        except APIError as exc:
-            raise ServiceUnavailableError(details={"dependency": "database"}) from exc
-        spend_rows = []
-        for row in _rows(response.data):
-            if (
-                row.get("estimated_total_amount") is None
-                or row.get("estimated_total_currency") is None
-            ):
-                continue
-            spend_rows.append(_spend_row(row))
-        return spend_rows
+            if budget.scope == "branch" and budget.branch_id is not None:
+                query = query.eq("branch_id", str(budget.branch_id))
+            elif budget.scope == "cost_centre" and budget.cost_centre_id is not None:
+                query = query.eq("cost_centre_id", str(budget.cost_centre_id))
+            try:
+                response = (
+                    query.order("id")
+                    .range(offset, offset + COMMITTED_SPEND_PAGE_SIZE - 1)
+                    .execute()
+                )
+            except APIError as exc:
+                raise ServiceUnavailableError(details={"dependency": "database"}) from exc
+            page = _rows(response.data)
+            for row in page:
+                if (
+                    row.get("estimated_total_amount") is None
+                    or row.get("estimated_total_currency") is None
+                ):
+                    continue
+                spend_rows.append(_spend_row(row))
+            if len(page) < COMMITTED_SPEND_PAGE_SIZE:
+                return spend_rows
+            offset += COMMITTED_SPEND_PAGE_SIZE
 
     def _fetch_delegation(self, client: Client, delegation_id: UUID) -> dict[str, object]:
         try:
@@ -2085,7 +2123,7 @@ class RequestsService:
             ),
             required_by=_parse_date(request_row["required_by_date"]),
             budgets=self._fetch_budget_rows(client),
-            committed_spend=self._fetch_committed_spend_rows(client),
+            committed_spend=lambda budget: self._fetch_committed_spend_rows(client, budget),
         )
 
     def _create_quality_issue_photo_url(self, client: Client, storage_path: str) -> str:

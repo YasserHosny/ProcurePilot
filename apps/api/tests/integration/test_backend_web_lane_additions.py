@@ -220,6 +220,7 @@ def test_orders_next_number_supplier_prefill_and_duplicate_number_conflict(
         client = TestClient(app, raise_server_exceptions=False)
         branch_id, request_id, rfq_id, recipient_id, response_id = (uuid4() for _ in range(5))
         pending_request_id = uuid4()
+        withdrawn_request_id = uuid4()
         with pytest.importorskip("psycopg").connect(TEST_DATABASE_URL) as conn:
             with conn.cursor() as cur:
                 act_as(cur, context.workspace)
@@ -281,6 +282,30 @@ def test_orders_next_number_supplier_prefill_and_duplicate_number_conflict(
                         context.workspace.membership_id,
                     ),
                 )
+                # Approved, then withdrawn: the approved step stays, but it must not be orderable.
+                cur.execute(
+                    "insert into purchase_request (id,tenant_id,branch_id,"
+                    "requested_by_membership_id,required_by_date,status,withdrawn_at) "
+                    "values (%s,%s,%s,%s,'2026-12-01','withdrawn',now())",
+                    (
+                        withdrawn_request_id,
+                        context.workspace.tenant_id,
+                        branch_id,
+                        context.workspace.membership_id,
+                    ),
+                )
+                cur.execute(
+                    "insert into approval_step (tenant_id,purchase_request_id,"
+                    "assigned_membership_id,"
+                    "source,status,decided_by_membership_id,decided_at) "
+                    "values (%s,%s,%s,'owner_fallback','approved',%s,now())",
+                    (
+                        context.workspace.tenant_id,
+                        withdrawn_request_id,
+                        context.workspace.membership_id,
+                        context.workspace.membership_id,
+                    ),
+                )
                 cur.execute(
                     "insert into purchase_order (tenant_id,order_number,supplier_id,status,order_date,total_amount,total_currency,tax_amount,tax_currency,source_kind,source_reference,created_by,create_idempotency_key) values (%s,'PO-000009',%s,'draft',current_date,1,'GBP',0,'GBP','manual','fixture',%s,%s)",  # noqa: E501
                     (
@@ -312,6 +337,14 @@ def test_orders_next_number_supplier_prefill_and_duplicate_number_conflict(
             )
             assert pending_prefill.status_code == 422
             assert pending_prefill.json()["details"]["reason"] == "request_not_approved"
+            eligible_ids = {item["id"] for item in eligible.json()["items"]}
+            assert str(withdrawn_request_id) not in eligible_ids
+            withdrawn_prefill = client.get(
+                "/api/v1/orders/request-prefill",
+                params={"source_request_id": str(withdrawn_request_id)},
+            )
+            assert withdrawn_prefill.status_code == 422
+            assert withdrawn_prefill.json()["details"]["reason"] == "request_not_approved"
             product_id = context.product_id
             payload = {
                 "order_number": "PO-000009",

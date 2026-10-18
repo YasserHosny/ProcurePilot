@@ -48,8 +48,11 @@ export class ConnectionSettingsComponent implements OnInit {
   readonly error = signal<string | null>(null);
 
   ngOnInit(): void {
-    this.handleOAuthCallbackParams();
-    this.loadConnection();
+    // While an OAuth completion is in flight it loads the connection itself once it settles;
+    // an earlier load would show a stale "not connected" state with Connect enabled.
+    if (!this.handleOAuthCallbackParams()) {
+      this.loadConnection();
+    }
   }
 
   loadConnection(): void {
@@ -129,15 +132,18 @@ export class ConnectionSettingsComponent implements OnInit {
     return this.translate.instant(`accounting.connection.providers.${provider}`);
   }
 
-  private handleOAuthCallbackParams(): void {
+  /** Returns true when an OAuth completion was started. */
+  private handleOAuthCallbackParams(): boolean {
     const code = this.route.snapshot?.queryParamMap?.get('accounting_code');
     const state = this.route.snapshot?.queryParamMap?.get('accounting_state');
     const realmId = this.route.snapshot?.queryParamMap?.get('realm_id');
     const status = this.route.snapshot?.queryParamMap?.get('accounting_connected');
 
     if (code && state) {
+      this.isMutating.set(true);
       this.accountingApi.completeConnection({ code, state, realm_id: realmId }).subscribe({
         next: (conn) => {
+          this.isMutating.set(false);
           this.connection.set(conn);
           this.snackBar.open(
             this.translate.instant('accounting.connection.connectedSuccess'),
@@ -148,15 +154,17 @@ export class ConnectionSettingsComponent implements OnInit {
           this.loadConnection();
         },
         error: () => {
+          this.isMutating.set(false);
           this.snackBar.open(
             this.translate.instant('accounting.connection.connectFailed'),
             undefined,
             { duration: 4000 },
           );
           this.clearCallbackQueryParams();
+          this.loadConnection();
         },
       });
-      return;
+      return true;
     }
 
     if (status === 'success') {
@@ -174,6 +182,7 @@ export class ConnectionSettingsComponent implements OnInit {
       );
       this.clearCallbackQueryParams();
     }
+    return false;
   }
 
   private clearCallbackQueryParams(): void {

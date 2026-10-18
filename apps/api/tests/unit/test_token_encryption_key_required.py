@@ -210,3 +210,25 @@ def test_webhook_create_subscription_with_key_encrypts_stored_secret(
     assert inserted_row["secret_encrypted"] != created.secret
     # Decrypting stored secret with key recovers the generated secret
     assert decrypt_token(inserted_row["secret_encrypted"], raw_key) == created.secret
+
+
+def test_validation_error_from_environment_does_not_retain_secrets(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    service_role_secret = "service-role-secret-value-123"
+    malformed_key = "malformed-key-material-456"
+    monkeypatch.setenv("SUPABASE_SERVICE_ROLE_KEY", service_role_secret)
+    monkeypatch.setenv("POS_TOKEN_ENCRYPTION_KEY", malformed_key)
+
+    with pytest.raises(ValidationError) as exc_info:
+        Settings()
+
+    error = exc_info.value
+    assert "POS_TOKEN_ENCRYPTION_KEY" in str(error)
+    rendered = " ".join(
+        [str(error), repr(error), error.json(), repr(error.errors()), repr(error.__cause__)]
+    )
+    for secret in (service_role_secret, malformed_key):
+        assert secret not in rendered
+    assert all(err["input"] is None for err in error.errors())
+    assert error.__context__ is None or error.__suppress_context__

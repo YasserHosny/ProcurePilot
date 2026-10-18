@@ -7,6 +7,7 @@ that an over-budget warning remains informational: it must not block a human app
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
@@ -212,9 +213,7 @@ def service_with_budget_fixture(
     monkeypatch.setattr(
         service,
         "_fetch_lines_for",
-        lambda _client, _id: [
-            line_row(request_id=request_id, product_id=product_id)
-        ],
+        lambda _client, _id: [line_row(request_id=request_id, product_id=product_id)],
     )
     monkeypatch.setattr(service, "_fetch_step", lambda _client, _id: step)
     monkeypatch.setattr(service, "_fetch_requests_batch", lambda _client, _ids: [req])
@@ -222,16 +221,14 @@ def service_with_budget_fixture(
         service,
         "_fetch_lines_batch",
         lambda _client, _ids: {
-            str(request_id): [
-                line_row(request_id=request_id, product_id=product_id)
-            ]
+            str(request_id): [line_row(request_id=request_id, product_id=product_id)]
         },
     )
     monkeypatch.setattr(service, "_fetch_budget_rows", lambda _client: [budget(branch_id)])
     monkeypatch.setattr(
         service,
         "_fetch_committed_spend_rows",
-        lambda _client: [spend(request_id=uuid4(), branch_id=branch_id, amount="30.0000")],
+        lambda _client, _budget: [spend(request_id=uuid4(), branch_id=branch_id, amount="30.0000")],
     )
 
     return service, client, member, request_id
@@ -310,9 +307,17 @@ def test_exceeding_budget_does_not_block_approval(
 
 
 class SpendQuery:
+    """Applies the filters the service sends and caps each response at 1,000 rows, like
+    PostgREST's Data API max_rows."""
+
+    MAX_ROWS = 1000
+
     def __init__(self, rows: list[dict[str, object]]) -> None:
         self.rows = rows
         self.statuses: list[str] | None = None
+        self.predicates: list[Callable[[dict[str, object]], bool]] = []
+        self.order_column: str | None = None
+        self.window: tuple[int, int] | None = None
 
     def select(self, _columns: str) -> SpendQuery:
         return self
@@ -322,9 +327,37 @@ class SpendQuery:
         self.statuses = value
         return self
 
+    def eq(self, column: str, value: object) -> SpendQuery:
+        self.predicates.append(lambda row: row[column] == value)
+        return self
+
+    def gte(self, column: str, value: str) -> SpendQuery:
+        self.predicates.append(lambda row: str(row[column]) >= value)
+        return self
+
+    def lt(self, column: str, value: str) -> SpendQuery:
+        self.predicates.append(lambda row: str(row[column]) < value)
+        return self
+
+    def order(self, column: str) -> SpendQuery:
+        self.order_column = column
+        return self
+
+    def range(self, start: int, end: int) -> SpendQuery:
+        self.window = (start, end)
+        return self
+
     def execute(self) -> Response:
         assert self.statuses is not None
-        return Response([row for row in self.rows if row["status"] in self.statuses])
+        matched = [
+            row
+            for row in self.rows
+            if row["status"] in self.statuses and all(p(row) for p in self.predicates)
+        ]
+        if self.order_column is not None:
+            matched.sort(key=lambda row: str(row[self.order_column]))
+        start, end = self.window or (0, len(matched) - 1)
+        return Response(matched[start : end + 1][: self.MAX_ROWS])
 
 
 class SpendClient:
@@ -382,3 +415,74 @@ def test_ordered_and_delivered_requests_reduce_remaining_budget_for_another_requ
     # draft/rejected/withdrawn rows are excluded.
     assert status.remaining_amount.amount == "50.0000"
     assert status.exceeds is False
+
+
+def test_committed_spend_counts_every_row_past_the_data_api_row_limit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Regression: committed spend was one unpaginated query, silently truncated at 1,000 rows.
+    tenant_id = uuid4()
+    branch_id = uuid4()
+    other_branch_id = uuid4()
+    requester_id = uuid4()
+    current = request_row(
+        request_id=uuid4(),
+        tenant_id=tenant_id,
+        branch_id=branch_id,
+        requester_id=requester_id,
+        amount="5.0000",
+    )
+    committed = [
+        request_row(
+            request_id=uuid4(),
+            tenant_id=tenant_id,
+            branch_id=branch_id,
+            requester_id=requester_id,
+            status="delivered",
+            amount="0.1000",
+        )
+        for _ in range(2500)
+    ]
+    out_of_scope = [
+        request_row(
+            request_id=uuid4(),
+            tenant_id=tenant_id,
+            branch_id=other_branch_id,
+            requester_id=requester_id,
+            status="ordered",
+            amount="1000.0000",
+        ),
+        {
+            **request_row(
+                request_id=uuid4(),
+                tenant_id=tenant_id,
+                branch_id=branch_id,
+                requester_id=requester_id,
+                status="ordered",
+                amount="1000.0000",
+            ),
+            "required_by_date": "2026-10-01",
+        },
+        {
+            **request_row(
+                request_id=uuid4(),
+                tenant_id=tenant_id,
+                branch_id=branch_id,
+                requester_id=requester_id,
+                status="ordered",
+                amount="1000.0000",
+            ),
+            "estimated_total_currency": "EGP",
+        },
+    ]
+    service = RequestsService()
+    monkeypatch.setattr(service, "_fetch_budget_rows", lambda _client: [budget(branch_id)])
+
+    status = service._budget_status_for(  # type: ignore[arg-type]
+        SpendClient([current, *committed, *out_of_scope]), current
+    )
+
+    assert status is not None
+    # 100 - 2,500 x 0.10 = -150: every page counted, other branch/period/currency excluded.
+    assert status.remaining_amount.amount == "-150.0000"
+    assert status.exceeds is True

@@ -1598,6 +1598,10 @@
       "infeasibleSubtitle": "The solver completed successfully, but a feasible allocation cannot be made with the selected suppliers.",
       "infeasibleReason": "The following item(s) have no eligible offers from the selected suppliers:",
       "missingSuppliers": "Missing offers from: {{suppliers}}",
+      "itemReasons": {
+        "no_offer_from_named_suppliers": "No eligible offer from the selected suppliers once exclusions and risk limits are applied.",
+        "mixed_currency_offers": "The selected suppliers quote this item in different currencies, so the offers cannot be compared."
+      },
       "solverVersion": "Solver Version: {{version}}",
       "computedAt": "Computed at {{time}}",
       "packQuantity": "{{count}} × {{size}} {{unit}}",

@@ -62,7 +62,9 @@ class BasketService:
                 _enqueue_redis_job(self._settings, pending, member)
             except ServiceUnavailableError:
                 with _authenticated_db(self._settings, member) as conn:
-                    _compensate_failed_enqueue(conn, UUID(str(pending["id"])))
+                    _compensate_failed_enqueue(
+                        conn, UUID(str(pending["id"])), attempt=pending["created_at"]
+                    )
                 raise
         if created and isinstance(payload, AdvancedBasketOptimiseRequest):
             _record_audit(
@@ -329,7 +331,8 @@ def _request_snapshot(
 
 
 def _pack_snapshot(conn: object, product_ids: list[UUID]) -> dict[str, dict[str, str]]:
-    """Pack size and base unit per product at submission (first pack, as the catalogue shows)."""
+    """Pack size and base unit per product at submission: the newest pack, as the catalogue
+    shows it (same tie-break as the purchase_request_line pack-snapshot migration)."""
     with conn.cursor(row_factory=dict_row) as cur:
         cur.execute(
             """
@@ -339,7 +342,7 @@ def _pack_snapshot(conn: object, product_ids: list[UUID]) -> dict[str, dict[str,
             join canonical_product cp on cp.id = wp.canonical_product_id
             join pack_definition pd on pd.workspace_product_id = wp.id
             where wp.id = any(%s::uuid[])
-            order by wp.id, pd.created_at
+            order by wp.id, pd.created_at desc, pd.id desc
             """,
             ([str(product_id) for product_id in product_ids],),
         )
@@ -563,7 +566,13 @@ def _requeue_failed_job(conn: object, job_id: UUID) -> dict[str, object]:
         return dict(cur.fetchone())
 
 
-def _compensate_failed_enqueue(conn: object, job_id: UUID) -> None:
+def _compensate_failed_enqueue(conn: object, job_id: UUID, *, attempt: object) -> None:
+    """Fail the attempt whose enqueue raised, only if it is still queued as that attempt.
+
+    Redis may have accepted the job before the client lost the reply, so a worker can already
+    have claimed or finished it; ``created_at`` is the attempt's fence token (see
+    ``attempt_token``).
+    """
     with conn.cursor() as cur:
         cur.execute(
             """
@@ -571,7 +580,7 @@ def _compensate_failed_enqueue(conn: object, job_id: UUID) -> None:
             set status = 'failed',
                 error = %s,
                 completed_at = %s
-            where id = %s
+            where id = %s and status = 'queued' and created_at = %s
             """,
             (
                 Jsonb(
@@ -582,6 +591,7 @@ def _compensate_failed_enqueue(conn: object, job_id: UUID) -> None:
                 ),
                 datetime.now(UTC),
                 job_id,
+                attempt,
             ),
         )
 
@@ -593,7 +603,7 @@ def _job(row: dict[str, object]) -> BasketSplitJob:
             "supplier_ids": row["supplier_ids"],
             "items": row["items"],
             "status": row["status"],
-            "result": normalise_stored_result(row.get("result"), row["supplier_ids"]),
+            "result": normalise_stored_result(row.get("result")),
             "error": row.get("error"),
             "result_url": f"/api/v1/baskets/{row['id']}",
             "created_at": row["created_at"],
