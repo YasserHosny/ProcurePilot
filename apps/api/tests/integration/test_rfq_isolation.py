@@ -395,3 +395,34 @@ async def test_other_tenant_rfq_detail_and_draft_update_are_not_found(
         row = cur.fetchone()
         assert row[0].isoformat() != "2030-01-01"
         assert row[1] is None
+
+
+@pytest.mark.parametrize("role", ["viewer", "approver", "branch_manager"])
+def test_only_owner_or_buyer_can_insert_an_rfq(
+    rfq_workspaces: tuple[psycopg.Connection, RfqWorkspace, RfqWorkspace], role: str
+) -> None:
+    """Spec 021 FR-001 in the database, not just the router (security review 2026-10-18)."""
+    conn, alpha, _beta = rfq_workspaces
+    with conn.cursor() as cur:
+        _act_as(cur, alpha, role=role)
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            cur.execute(
+                "insert into rfq (tenant_id,created_by_membership_id,status,needed_by_date,"
+                "idempotency_key) "
+                "values (%s,%s,'draft',current_date,%s)",
+                (alpha.tenant_id, alpha.membership_id, uuid4()),
+            )
+
+
+@pytest.mark.parametrize(("role", "updated"), [("viewer", 0), ("buyer", 1), ("owner", 1)])
+def test_only_owner_or_buyer_can_update_their_rfq(
+    rfq_workspaces: tuple[psycopg.Connection, RfqWorkspace, RfqWorkspace],
+    role: str,
+    updated: int,
+) -> None:
+    """Sending is an update of the rfq row; a creator who is not an owner or buyer cannot."""
+    conn, alpha, _beta = rfq_workspaces
+    with conn.cursor() as cur:
+        _act_as(cur, alpha, role=role)
+        cur.execute("update rfq set needed_by_date = needed_by_date where id = %s", (alpha.rfq_id,))
+        assert cur.rowcount == updated
