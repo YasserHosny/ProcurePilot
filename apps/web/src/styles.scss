@@ -28,6 +28,15 @@ mat-icon {
   overflow: hidden;
 }
 
+// A selected slide toggle's handle sits at the inline end of its track, which in RTL is next to
+// the label, and its 40px focus/hover ripple then covers the label's first letters (seen as
+// «مفعّل» shown as «ل» on guardrail settings). Keep the label clear of the ripple in both
+// directions.
+.mat-mdc-slide-toggle .mat-internal-form-field > label.mdc-label {
+  padding-inline-start: 12px;
+  white-space: nowrap;
+}
+
 [dir="rtl"] {
   font-family: Roboto, "Segoe UI", "Cairo", Tahoma, sans-serif;
 

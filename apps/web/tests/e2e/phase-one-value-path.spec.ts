@@ -108,7 +108,7 @@ test.describe('Phase 1 Complete Canonical Value Path (T075)', () => {
     // what the offers API, the projection and the recorded purchase use. One 10 kg pack = 10 kg.
     await page.fill('.quantity-input', '1');
     await expect(page.locator('.quantity-field mat-hint')).toHaveText(
-      '1 pack(s) × 10 kilogram = 10 kilogram',
+      '1 pack(s) × 10 kg = 10 kg',
     );
 
     const packQuantity = parseFloat(await page.inputValue('.quantity-input'));

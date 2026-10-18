@@ -85,4 +85,45 @@ describe('BasketSplitInfeasibleComponent — optimiser unavailable', () => {
     );
     expect(translate.instant('basketSplit.status.timeoutMessage')).not.toContain('basketSplit.');
   });
+
+  function infeasibleJob(reason: string, missing: string[]): BasketSplitJob {
+    return {
+      ...failedJob(),
+      status: 'completed',
+      result: {
+        feasible: false,
+        infeasible_items: [
+          { workspace_product_id: 'p1', requested_quantity: '2', reason, missing_supplier_ids: missing },
+        ],
+      },
+    } as unknown as BasketSplitJob;
+  }
+
+  function renderInfeasible(job: BasketSplitJob): HTMLElement {
+    fixture.componentRef.setInput('uiState', 'completed_infeasible');
+    fixture.componentRef.setInput('currentJob', job);
+    fixture.componentRef.setInput('isWriter', true);
+    fixture.componentRef.setInput('isSubmitting', false);
+    fixture.componentRef.setInput('errorMessage', null);
+    fixture.componentRef.setInput('suppliers', [{ id: 's1', name: 'Alpha' }]);
+    fixture.componentRef.setInput('products', [{ id: 'p1', tenant_name: 'Rice' }]);
+    fixture.componentRef.setInput('violatedConstraints', []);
+    fixture.detectChanges();
+    return fixture.nativeElement as HTMLElement;
+  }
+
+  it('names the suppliers an item is actually missing offers from', () => {
+    const el = renderInfeasible(infeasibleJob('no_offer_from_named_suppliers', ['s1']));
+    expect(el.querySelector('.missing-suppliers')?.textContent).toContain('Missing offers from: Alpha');
+  });
+
+  it('shows the reason instead of a supplier list when no supplier is known to be missing', () => {
+    const el = renderInfeasible(infeasibleJob('mixed_currency_offers', []));
+    const text = el.querySelector('.missing-suppliers')?.textContent ?? '';
+    expect(text).not.toContain('Missing offers from');
+    expect(text).toContain('different currencies');
+    translate.use('ar');
+    fixture.detectChanges();
+    expect(el.querySelector('.missing-suppliers')?.textContent).toContain('بعملات مختلفة');
+  });
 });

@@ -17,7 +17,9 @@
       "ar": "العربية (ar)"
     },
     "all": "All",
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "retry": "Retry",
+    "notAvailable": "Not available"
   },
   "auth": {
     "signin": {
@@ -899,7 +901,7 @@
         "supplierEmptyState": "No suppliers in this workspace yet.",
         "supplierEmptyAction": "Add a supplier",
         "currencyLabel": "Currency",
-        "currencyPlaceholder": "e.g. USD, EUR, GBP",
+        "currencyPlaceholder": "e.g. {{currency}}",
         "currencyRequired": "Currency is required",
         "issueDateLabel": "Issue Date",
         "expiryDateLabel": "Expiry Date",
@@ -966,7 +968,8 @@
         "correctedValue": "Corrected Value:",
         "correctedBy": "Corrected By:",
         "correctedAt": "Corrected At:",
-        "showSource": "Show in Document"
+        "showSource": "Show in Document",
+        "technicalDetails": "Technical details"
       },
       "corrections": {
         "title": "Correct Field",
@@ -977,7 +980,7 @@
         "confirmAsIsTooltip": "Confirm this value is correct as extracted"
       },
       "arithmetic": {
-        "mismatchTitle": "Arithmetic Discrepancy Detected (US3)",
+        "mismatchTitle": "Arithmetic discrepancy detected",
         "mismatchDescription": "The sum of the extracted line totals does not match the stated document total. This quotation cannot be confirmed until this discrepancy is reconciled or corrected.",
         "statedTotal": "Stated Document Total:",
         "computedTotal": "Computed Line Total:",
@@ -1595,6 +1598,10 @@
       "infeasibleSubtitle": "The solver completed successfully, but a feasible allocation cannot be made with the selected suppliers.",
       "infeasibleReason": "The following item(s) have no eligible offers from the selected suppliers:",
       "missingSuppliers": "Missing offers from: {{suppliers}}",
+      "itemReasons": {
+        "no_offer_from_named_suppliers": "No eligible offer from the selected suppliers once exclusions and risk limits are applied.",
+        "mixed_currency_offers": "The selected suppliers quote this item in different currencies, so the offers cannot be compared."
+      },
       "solverVersion": "Solver Version: {{version}}",
       "computedAt": "Computed at {{time}}",
       "packQuantity": "{{count}} × {{size}} {{unit}}",
@@ -2025,6 +2032,17 @@
     "roleScoping": {
       "branchScopedBadge": "Branch-scoped",
       "notFoundMessage": "This branch does not exist or is not available."
+    },
+    "workspaceLanguage": {
+      "title": "Workspace language",
+      "hint": "RFQ emails to suppliers, invitations and scheduled reports use this language. Members who haven't chosen their own language also see the app in it.",
+      "label": "Workspace language",
+      "save": "Save language",
+      "error": "The workspace language could not be saved. Try again.",
+      "options": {
+        "en": "English",
+        "ar": "Arabic"
+      }
     }
   },
   "requests": {
@@ -2106,6 +2124,14 @@
       "comment": "Decision comment",
       "decidedAt": "Decided on",
       "pending": "Pending approval"
+    },
+    "autoPrepared": {
+      "badge": "Auto-prepared",
+      "badgeTooltip": "Prepared automatically by a guardrail from {{supplier}}'s quote",
+      "title": "Prepared automatically by a guardrail",
+      "draftMessage": "This draft was prepared automatically by a guardrail from {{supplier}}'s quote. Review it and submit it if it is right; nothing is ordered until it is approved.",
+      "message": "This request was prepared automatically by a guardrail from {{supplier}}'s quote.",
+      "unknownSupplier": "the winning supplier"
     }
   },
   "delivery": {
@@ -3018,7 +3044,8 @@
         "configureAction": "Configure",
         "viewLogAction": "View Log",
         "captureAction": "Capture",
-        "importAction": "Import"
+        "importAction": "Import",
+        "manageAction": "Manage"
       },
       "loading": "Loading ingestion dashboard...",
       "error": {
@@ -3161,7 +3188,8 @@
         "address": "Sender Address Match",
         "domain": "Domain Match",
         "thread": "Thread Match",
-        "manual": "Manual Match"
+        "manual": "Manual Match",
+        "rfq_reply": "RFQ Reply Match"
       },
       "viewQuotation": "View Quotation",
       "quotationLink": "View Quotation",
@@ -3191,7 +3219,8 @@
         "title": "Unable to load email logs",
         "generic": "An unexpected error occurred while loading email logs.",
         "retry": "Retry"
-      }
+      },
+      "matchedSupplier": "Matched supplier"
     },
     "capture": {
       "title": "Quotation Capture",
@@ -3344,7 +3373,7 @@
       "linesTotalLabel": "Lines Total",
       "linePrefix": "Line",
       "noProduct": "-- None --",
-      "currencyPlaceholder": "e.g. USD, GBP",
+      "currencyPlaceholder": "e.g. {{currency}}",
       "errors": {
         "required": "Required",
         "currencyFormat": "3-letter code",
@@ -3830,7 +3859,8 @@
         "maxOrderValue": "Maximum order value must be greater than zero.",
         "minResponses": "Minimum responses must be at least one.",
         "priceVariance": "Price variance must be between 0% and 100%.",
-        "branch": "Select a default branch."
+        "branch": "Select a default branch.",
+        "costCentre": "Choose an active cost centre on the default branch."
       },
       "errors": {
         "save": "Unable to save guardrail settings."
@@ -3855,7 +3885,10 @@
         "would_fire": "This response would fire the guardrail.",
         "ambiguous_guardrails": "Would fire, but another guardrail also matches — ambiguous, so neither fires",
         "fired": "Guardrail fired and prepared a draft request."
-      }
+      },
+      "costCentre": "Default cost centre",
+      "noCostCentre": "None",
+      "costCentreHint": "Optional. Must be an active cost centre on the default branch."
     },
     "email": {
       "subject": "Request for quotation — {{tenant}} — needed by {{date}}",
@@ -3890,6 +3923,22 @@
         "12": "December"
       },
       "unknownProduct": "Unknown product"
+    },
+    "autoPreparedEmail": {
+      "subject": "Draft request ready to review — {{supplier}}",
+      "fromName": "{{workspace}} · ProcurePilot",
+      "greeting": "Hello,",
+      "intro": "A guardrail prepared a draft purchase request in {{workspace}} from {{supplier}}'s quote.",
+      "review": "Nothing has been ordered. Review the draft and submit it for approval if it is right.",
+      "open": "Open the draft request",
+      "why": "You receive this email because you created the guardrail."
     }
+  },
+  "units": {
+    "litre": "L",
+    "millilitre": "mL",
+    "kilogram": "kg",
+    "gram": "g",
+    "each": "pcs"
   }
 }

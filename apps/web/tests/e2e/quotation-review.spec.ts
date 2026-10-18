@@ -90,10 +90,10 @@ test.describe('Quotation Review & Confirmation (T053, US2)', () => {
     await page.keyboard.press('Alt+KeyN');
     const labelLocator = page.locator('.extraction-info-bar .extraction-field-label');
     try {
-      await expect(labelLocator).toHaveText('Issue Date', { timeout: 4000 });
+      await expect(labelLocator).toHaveText('Issue date', { timeout: 4000 });
     } catch {
       await keyboardNavBar.locator('.nav-btn').last().click();
-      await expect(labelLocator).toHaveText('Issue Date');
+      await expect(labelLocator).toHaveText('Issue date');
     }
   });
 
@@ -156,10 +156,10 @@ test.describe('Quotation Review & Confirmation (T053, US2)', () => {
     // Focus a different field first: the provenance box must then switch to the supplier name
     // because of the Go-to-field click, not because it happened to be the page's default.
     await page.locator('.field-box', { hasText: 'Issue Date' }).first().click();
-    await expect(page.locator('.extraction-field-label')).not.toHaveText('Supplier Name');
+    await expect(page.locator('.extraction-field-label')).not.toHaveText('Supplier name');
     const supplierFlag = page.locator('.flagged-field-row').filter({ has: page.getByText('Supplier name', { exact: true }) });
     await supplierFlag.getByRole('button', { name: 'Go to field', exact: true }).click();
-    await expect(page.locator('.extraction-field-label')).toHaveText('Supplier Name');
+    await expect(page.locator('.extraction-field-label')).toHaveText('Supplier name');
     const originalValue = page.locator('.prov-item').filter({ hasText: 'Original AI Value' }).locator('.prov-val');
     await expect(originalValue).toHaveAttribute('dir', 'auto');
     await expect(originalValue).toContainText('الأمانة للتجارة');

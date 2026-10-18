@@ -82,6 +82,12 @@
               <span class="status-chip" [attr.data-status]="req.status">
                 {{ 'requests.status.' + req.status | translate }}
               </span>
+              @if (req.auto_prepared) {
+                <span class="auto-prepared-badge" data-testid="auto-prepared-badge"
+                  [attr.title]="'requests.autoPrepared.badgeTooltip' | translate: { supplier: req.auto_prepared.supplier_name || ('requests.autoPrepared.unknownSupplier' | translate) }">
+                  {{ 'requests.autoPrepared.badge' | translate }}
+                </span>
+              }
               @if (req.has_incomplete_estimate) {
                 <span class="incomplete-badge">
                   {{ 'requests.incompleteEstimateBadge' | translate }}

@@ -204,6 +204,33 @@ def test_digest_pending_match_resolutions_owner_buyer_and_tenant_scope(
         assert item["deep_link"] == "/matching"
 
 
+def test_latest_digest_follows_reader_interface_language(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The in-app digest renders in the reader's language, not the subscription's."""
+    with committed_smart_context("digest-reader-locale") as context:
+        _add_open_match_task(context, "طماطم")
+        member = member_from_workspace(context.workspace, role=MemberRole.buyer)
+        client = TestClient(_app(monkeypatch, member), raise_server_exceptions=False)
+        res = client.post(
+            "/api/v1/digests/subscriptions",
+            json={"filters": {}, "locale": "en", "channel": "in_app"},
+        )
+        assert res.status_code == 201, res.text
+        with psycopg.connect(TEST_DATABASE_URL or "") as conn, conn.cursor() as cur:
+            cur.execute(
+                "update membership set preferred_locale = 'ar' where id = %s",
+                (context.workspace.membership_id,),
+            )
+
+        res = client.get("/api/v1/digests/latest")
+        assert res.status_code == 200, res.text
+        section = next(
+            s for s in res.json()["sections"] if s["kind"] == "pending_match_resolutions"
+        )
+        assert [item["label"] for item in section["items"]] == ["مطلوب مراجعة مطابقة: طماطم"]
+
+
 def test_digest_pending_match_resolutions_non_writer_gets_empty_section(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

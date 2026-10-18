@@ -91,7 +91,7 @@
           <h2 class="reconciled-title">{{ 'quotations.review.arithmetic.reconciledTitle' | translate }}</h2>
           <p class="reconciled-desc">
             @if (inferredVatPct) {
-              {{ 'quotations.review.arithmetic.reconciledVatDescription' | translate:{ vatPct: inferredVatPct } }}
+              {{ 'quotations.review.arithmetic.reconciledVatNote' | translate:{ pct: inferredVatPct } }}
             } @else {
               {{ 'quotations.review.arithmetic.reconciledDescription' | translate }}
             }

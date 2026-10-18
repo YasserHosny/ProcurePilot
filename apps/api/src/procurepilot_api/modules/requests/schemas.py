@@ -62,9 +62,21 @@ class ApprovalStep(BaseModel):
     decided_at: datetime | None = None
 
 
+class AutoPreparedProvenance(BaseModel):
+    """Set when an RFQ auto-preparation guardrail, not a person, drafted the request (finding
+    38a). The supplier is the one whose RFQ response won the guardrail."""
+
+    guardrail_id: UUID
+    rfq_id: UUID | None = None
+    supplier_id: UUID | None = None
+    supplier_name: str | None = None
+    created_at: datetime
+
+
 class PurchaseRequest(BaseModel):
     id: UUID
     source_rfq_response_id: UUID | None = None
+    auto_prepared: AutoPreparedProvenance | None = None
     branch_id: UUID
     cost_centre_id: UUID | None = None
     requested_by_membership_id: UUID

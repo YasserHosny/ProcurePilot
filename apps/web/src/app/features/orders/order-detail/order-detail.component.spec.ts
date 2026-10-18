@@ -53,7 +53,7 @@ describe('OrderDetailComponent', () => {
       ],
     }).compileComponents();
     TestBed.inject(TranslateService).setTranslation('en', {
-      rfq: { email: { units: { kilogram: 'kg', litre: 'L' } } },
+      units: { kilogram: 'kg', litre: 'L' },
       orders: {
         create: { packUnit: 'pack of {{size}} {{unit}}' },
         backToOrders: 'Back', retry: 'Retry', loadError: 'Load failed', saveError: 'Save failed', notProvided: 'Not provided',

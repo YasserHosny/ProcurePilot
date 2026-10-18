@@ -1,6 +1,9 @@
 from __future__ import annotations
 
-from procurepilot_api.modules.quotations.service import _enrich_audit_target
+from procurepilot_api.modules.quotations.service import (
+    _enrich_audit_target,
+    _product_display_label,
+)
 
 
 def test_enrich_audit_target_adds_line_and_product_labels() -> None:
@@ -30,3 +33,12 @@ def test_enrich_audit_target_adds_line_and_product_labels() -> None:
 
 def test_enrich_audit_target_returns_none_for_missing_target() -> None:
     assert _enrich_audit_target(None, lines_by_id={}, products_by_id={}) is None
+
+
+def test_product_label_prefers_workspace_name_over_catalogue_name() -> None:
+    canonical = {"brand": None, "name": "Eggs tray of 30", "variant": None}
+    assert _product_display_label({"tenant_name": "بيض (كرتونة 30)"}, canonical) == (
+        "بيض (كرتونة 30)"
+    )
+    assert _product_display_label({"tenant_name": None}, canonical) == "Eggs tray of 30"
+    assert _product_display_label({"tenant_name": ""}, None) is None

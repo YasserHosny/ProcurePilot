@@ -240,7 +240,8 @@ describe('BasketSplitComponent (US3, T045)', () => {
     translate.setTranslation('ar', ar);
     for (const [language, expected] of [
       ['en', '10 pack(s) × 1 EA = 10 EA'],
-      ['ar', '10 عبوة × 1 EA = 10 EA'],
+      // Arabic-Indic digits in Arabic; an unknown unit code is shown as-is.
+      ['ar', '١٠ عبوة × ١ EA = ١٠ EA'],
     ]) {
       translate.use(language);
       fixture.detectChanges();

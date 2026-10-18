@@ -1,8 +1,8 @@
 from functools import lru_cache
-from typing import Annotated, Literal, Self
+from typing import Annotated, Any, Literal, Self
 
 from cryptography.fernet import Fernet
-from pydantic import Field, SecretStr, field_validator, model_validator
+from pydantic import Field, SecretStr, ValidationError, field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 type ApiEnvironment = Literal["local", "staging", "production"]
@@ -11,7 +11,17 @@ type LogLevel = Literal["debug", "info", "warning", "error", "critical"]
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(case_sensitive=False, extra="ignore")
+    # The validation input is the whole raw environment mapping, so it carries every
+    # secret. Keep it out of error strings, and strip it from the error data itself.
+    model_config = SettingsConfigDict(
+        case_sensitive=False, extra="ignore", hide_input_in_errors=True
+    )
+
+    def __init__(self, **values: object) -> None:
+        try:
+            super().__init__(**values)
+        except ValidationError as exc:
+            raise _without_inputs(exc) from None
 
     api_host: str = Field(validation_alias="API_HOST")
     api_port: int = Field(validation_alias="API_PORT")
@@ -386,6 +396,16 @@ class Settings(BaseSettings):
                         f"{env_var} must be a valid 32-byte url-safe base64-encoded Fernet key"
                     ) from None
         return self
+
+
+def _without_inputs(exc: ValidationError) -> ValidationError:
+    line_errors: list[Any] = []
+    for error in exc.errors(include_url=False, include_input=False):
+        line_error: dict[str, Any] = {"type": error["type"], "loc": error["loc"], "input": None}
+        if "ctx" in error:
+            line_error["ctx"] = error["ctx"]
+        line_errors.append(line_error)
+    return ValidationError.from_exception_data(exc.title, line_errors, hide_input=True)
 
 
 @lru_cache(maxsize=1)

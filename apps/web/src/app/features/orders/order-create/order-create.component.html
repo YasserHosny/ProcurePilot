@@ -70,7 +70,7 @@
       <div class="form-row">
         <mat-form-field appearance="outline">
           <mat-label>{{ 'orders.create.currency' | translate }}</mat-label>
-          <input matInput formControlName="currency" [placeholder]="'orders.create.currencyPlaceholder' | translate" />
+          <input matInput formControlName="currency" [placeholder]="'orders.create.currencyPlaceholder' | translate: { currency: homeCurrency }" />
           @if (form.controls.currency.hasError('required')) {
             <mat-error>{{ 'orders.create.errors.required' | translate }}</mat-error>
           }

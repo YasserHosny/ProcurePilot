@@ -1081,18 +1081,24 @@ def _audit_display_lookups(
         for product in product_rows:
             product_id = str(product["id"])
             canonical = canonical_by_id.get(str(product.get("canonical_product_id") or ""))
-            label_parts: list[str] = []
-            if canonical is not None:
-                for key in ("brand", "name", "variant"):
-                    value = canonical.get(key)
-                    if value:
-                        label_parts.append(str(value))
-            if not label_parts and product.get("tenant_name"):
-                label_parts.append(str(product["tenant_name"]))
-            if label_parts:
-                products_by_id[product_id] = " / ".join(label_parts)
+            label = _product_display_label(product, canonical)
+            if label:
+                products_by_id[product_id] = label
 
     return lines_by_id, products_by_id
+
+
+def _product_display_label(
+    product: dict[str, object], canonical: dict[str, object] | None
+) -> str | None:
+    """The workspace's own product name (what its users call it, often Arabic), falling back
+    to the shared catalogue's brand / name / variant."""
+    if product.get("tenant_name"):
+        return str(product["tenant_name"])
+    if canonical is None:
+        return None
+    parts = [str(canonical[key]) for key in ("brand", "name", "variant") if canonical.get(key)]
+    return " / ".join(parts) or None
 
 
 def _enrich_audit_target(

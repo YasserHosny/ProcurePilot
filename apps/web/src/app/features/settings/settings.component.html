@@ -19,6 +19,27 @@
     }
   </section>
 
+  <section class="workspace-language" aria-labelledby="workspace-language-title">
+    <h2 id="workspace-language-title">{{ 'organisation.workspaceLanguage.title' | translate }}</h2>
+    <p class="section-hint">{{ 'organisation.workspaceLanguage.hint' | translate }}</p>
+    @if (session.hasRole('owner')) {
+      <mat-form-field appearance="outline">
+        <mat-label>{{ 'organisation.workspaceLanguage.label' | translate }}</mat-label>
+        <mat-select [value]="selectedLocale()" (selectionChange)="selectedLocale.set($event.value)" data-testid="workspace-language-select">
+          @for (locale of locales; track locale) {
+            <mat-option [value]="locale">{{ 'organisation.workspaceLanguage.options.' + locale | translate }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+      <button mat-flat-button type="button" data-testid="workspace-language-save" [disabled]="savingLocale() || selectedLocale() === workspaceLocale()" (click)="saveLocale()">{{ 'organisation.workspaceLanguage.save' | translate }}</button>
+      @if (localeError()) {
+        <p class="section-error" role="alert">{{ 'organisation.workspaceLanguage.error' | translate }}</p>
+      }
+    } @else {
+      <p>{{ 'organisation.workspaceLanguage.label' | translate }}: {{ 'organisation.workspaceLanguage.options.' + workspaceLocale() | translate }}</p>
+    }
+  </section>
+
   <app-branch-list></app-branch-list>
 
   <app-cost-centre-list></app-cost-centre-list>

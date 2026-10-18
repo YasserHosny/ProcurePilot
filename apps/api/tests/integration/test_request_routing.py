@@ -247,7 +247,7 @@ def build_service(
         lambda _client, _ids: {str(request_id): [line]},
     )
     monkeypatch.setattr(service, "_fetch_budget_rows", lambda _client: [])
-    monkeypatch.setattr(service, "_fetch_committed_spend_rows", lambda _client: [])
+    monkeypatch.setattr(service, "_fetch_committed_spend_rows", lambda _client, _budget: [])
     monkeypatch.setattr(
         "procurepilot_api.modules.requests.service.get_audit_writer",
         lambda: FakeAuditWriter(),

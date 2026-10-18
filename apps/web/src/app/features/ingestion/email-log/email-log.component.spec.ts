@@ -27,6 +27,7 @@ describe('EmailLogComponent', () => {
       attachment_count: 2,
       quotation_id: 'quot-101',
       supplier_id: 'supp-201',
+      supplier_name: 'مزارع النيل',
       match_method: 'domain',
       created_at: '2026-09-17T08:30:00Z',
     },
@@ -443,7 +444,9 @@ describe('EmailLogComponent', () => {
 
       // First row has supplier_id: 'supp-201' and match_method: 'domain'
       const firstRowSupplier = rows[0].querySelector('.supplier-cell');
-      expect(firstRowSupplier?.querySelector('.supplier-id')).toBeTruthy();
+      // The supplier's name, never its id.
+      expect(firstRowSupplier?.querySelector('.supplier-name')?.textContent?.trim()).toBe('مزارع النيل');
+      expect(firstRowSupplier?.textContent).not.toContain('supp-201');
       expect(firstRowSupplier?.querySelector('.match-method-chip')).toBeTruthy();
 
       // Second row has supplier_id: null

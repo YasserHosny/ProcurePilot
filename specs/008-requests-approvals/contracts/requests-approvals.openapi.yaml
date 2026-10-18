@@ -482,6 +482,20 @@ components:
           format: uuid
           nullable: true
           description: The RFQ response this request was prepared from, if any.
+        auto_prepared:
+          type: object
+          nullable: true
+          description: >-
+            Set when an RFQ auto-preparation guardrail (spec 021), not a person, drafted the
+            request; null for every request a person created or prepared. Visible to anyone who
+            can read the request.
+          required: [guardrail_id, created_at]
+          properties:
+            guardrail_id: { type: string, format: uuid }
+            rfq_id: { type: string, format: uuid, nullable: true }
+            supplier_id: { type: string, format: uuid, nullable: true, description: The supplier whose response won. }
+            supplier_name: { type: string, nullable: true }
+            created_at: { type: string, format: date-time }
         branch_id: { type: string, format: uuid }
         cost_centre_id: { type: string, format: uuid, nullable: true }
         requested_by_membership_id: { type: string, format: uuid }

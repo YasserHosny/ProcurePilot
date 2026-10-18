@@ -41,7 +41,7 @@ class IngestionEmailLogService:
         parsed_date_from = _parse_date_bound(date_from, is_end=False)
         parsed_date_to = _parse_date_bound(date_to, is_end=True)
 
-        clauses = ["tenant_id = %(tenant_id)s"]
+        clauses = ["l.tenant_id = %(tenant_id)s"]
         params: dict[str, Any] = {
             "tenant_id": member.tenant_id,
             "offset": offset,
@@ -49,39 +49,41 @@ class IngestionEmailLogService:
         }
 
         if status is not None:
-            clauses.append("status = %(status)s")
+            clauses.append("l.status = %(status)s")
             params["status"] = status
         if from_domain is not None:
-            clauses.append("from_domain = %(from_domain)s")
+            clauses.append("l.from_domain = %(from_domain)s")
             params["from_domain"] = from_domain
         if parsed_date_from is not None:
-            clauses.append("received_at >= %(date_from)s")
+            clauses.append("l.received_at >= %(date_from)s")
             params["date_from"] = parsed_date_from
         if parsed_date_to is not None:
-            clauses.append("received_at <= %(date_to)s")
+            clauses.append("l.received_at <= %(date_to)s")
             params["date_to"] = parsed_date_to
 
         where_sql = " where " + " and ".join(clauses)
 
         query = f"""
             select
-                id,
-                message_id,
-                from_address,
-                from_domain,
-                subject,
-                received_at,
-                processed_at,
-                status,
-                error_message,
-                attachment_count,
-                quotation_id,
-                supplier_id,
-                match_method,
-                created_at
-            from ingestion_email_log
+                l.id,
+                l.message_id,
+                l.from_address,
+                l.from_domain,
+                l.subject,
+                l.received_at,
+                l.processed_at,
+                l.status,
+                l.error_message,
+                l.attachment_count,
+                l.quotation_id,
+                l.supplier_id,
+                s.name as supplier_name,
+                l.match_method,
+                l.created_at
+            from ingestion_email_log l
+            left join supplier s on s.id = l.supplier_id and s.tenant_id = l.tenant_id
             {where_sql}
-            order by received_at desc, id desc
+            order by l.received_at desc, l.id desc
             offset %(offset)s limit %(limit)s
         """
 
@@ -159,6 +161,7 @@ def _map_log_entry(row: dict[str, Any]) -> IngestionEmailLog:
         attachment_count=int(row["attachment_count"]),
         quotation_id=row.get("quotation_id"),
         supplier_id=row.get("supplier_id"),
+        supplier_name=str(row["supplier_name"]) if row.get("supplier_name") is not None else None,
         match_method=row.get("match_method"),
         created_at=row["created_at"],
     )

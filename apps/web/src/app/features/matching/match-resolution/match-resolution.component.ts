@@ -36,6 +36,8 @@ import { FormatMoneyPipe } from '../../../core/format/money.pipe';
 import { computeBaseQuantity } from '../../catalogue/normalisation';
 
 import { MatchResolutionCandidatesComponent } from './match-resolution-candidates.component';
+import { FormatQuantityPipe } from '../../../core/format/quantity.pipe';
+import { UnitLabelPipe } from '../../../core/format/unit-label';
 
 @Component({
   selector: 'app-match-resolution',
@@ -57,6 +59,8 @@ import { MatchResolutionCandidatesComponent } from './match-resolution-candidate
     MatSnackBarModule,
     MatTooltipModule,
     TranslatePipe,
+    FormatQuantityPipe,
+    UnitLabelPipe,
     FormatDatePipe,
     FormatMoneyPipe,
     MatchResolutionCandidatesComponent,

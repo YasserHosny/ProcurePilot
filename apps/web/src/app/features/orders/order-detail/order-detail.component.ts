@@ -8,7 +8,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
-import { packLabel } from '../pack-label';
+import { lineDescription, packLabel } from '../pack-label';
 
 import { FormatService } from '../../../core/format/format.service';
 import { FormatDatePipe } from '../../../core/format/date.pipe';
@@ -79,6 +79,8 @@ export class OrderDetailComponent implements OnInit {
       error: () => { this.errorMessage.set(this.translate.instant('orders.loadError')); this.isLoading.set(false); },
     });
   }
+
+  readonly lineDescription = lineDescription;
 
   linePriceLabel(line: PurchaseOrderLine): string {
     const { size, unit, label } = packLabel(

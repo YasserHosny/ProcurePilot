@@ -491,6 +491,35 @@ describe('RequestFormComponent — edit mode (T017)', () => {
     expect(pendingFixture.nativeElement.querySelector('[data-testid="request-create-order-btn"]')).toBeNull();
   });
 
+  it('does not show the auto-prepared banner on a manually created request', () => {
+    const compiled = fixture.nativeElement as HTMLElement;
+    expect(compiled.querySelector('[data-testid="auto-prepared-banner"]')).toBeNull();
+  });
+
+  it('tells the owner a guardrail drafted the request from the winning quote', () => {
+    requestsApi.getRequest.and.returnValue(
+      of({
+        ...mockRequest,
+        auto_prepared: {
+          guardrail_id: 'g1',
+          rfq_id: 'rfq1',
+          supplier_id: 's1',
+          supplier_name: 'Nile Bakery',
+          created_at: '2026-10-18T09:00:00Z',
+        },
+      }),
+    );
+    const autoFixture = TestBed.createComponent(RequestFormComponent);
+    autoFixture.detectChanges();
+
+    const banner = (autoFixture.nativeElement as HTMLElement).querySelector(
+      '[data-testid="auto-prepared-banner"]',
+    );
+    expect(banner).toBeTruthy();
+    expect(banner?.textContent).toContain('Prepared automatically by a guardrail');
+    expect(banner?.textContent).toContain("from Nile Bakery's quote. Review it and submit it");
+  });
+
   it('should not display budget status block when budget_status is absent', () => {
     const compiled = fixture.nativeElement as HTMLElement;
     expect(compiled.querySelector('.budget-warning-banner')).toBeNull();

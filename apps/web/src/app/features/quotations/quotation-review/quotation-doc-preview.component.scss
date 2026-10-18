@@ -130,6 +130,9 @@
 }
 
 .prov-title {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
   font-size: 0.85rem;
   font-weight: 700;
   color: #475569;
@@ -172,4 +175,12 @@
   &.mono {
     font-family: monospace;
   }
+}
+
+.prov-details-icon {
+  font-size: 1rem;
+  inline-size: 1rem;
+  block-size: 1rem;
+  color: #64748b;
+  cursor: help;
 }

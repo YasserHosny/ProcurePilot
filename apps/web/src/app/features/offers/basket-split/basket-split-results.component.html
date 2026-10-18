@@ -39,7 +39,7 @@
               @if (baselineInfo.type === 'split_saves') {
                 <span>
                   {{ 'basketSplit.result.splitSavings' | translate: {
-                    amount: (baselineInfo.savingsAmount + ' ' + baselineInfo.currency),
+                    amount: ($any({ amount: baselineInfo.savingsAmount, currency: baselineInfo.currency }) | formatMoney),
                     cheaperSupplier: baselineInfo.cheaperSupplierName
                   } }}
                 </span>

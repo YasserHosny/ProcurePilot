@@ -1,7 +1,7 @@
 import { inject } from '@angular/core';
-import { catchError, of } from 'rxjs';
+import { Observable, catchError, map, of } from 'rxjs';
 
-import { SessionService } from './session.service';
+import { SessionService, refreshWasRejected } from './session.service';
 
 /**
  * Restores the session BEFORE the router runs its first navigation.
@@ -14,19 +14,29 @@ import { SessionService } from './session.service';
  * Found by the implementer reviewing the core code it was told not to modify, and correctly
  * reported rather than worked around in the screens.
  *
- * A failed restore resolves rather than rejects: an expired or revoked token means "not signed
- * in", which the guard handles, not a broken application.
+ * A stored access token that has expired (the tab sat closed for over an hour) is renewed from
+ * the refresh token first, rather than spending a doomed /me call (demo finding 29).
+ *
+ * A failed restore resolves rather than rejects: an expired or revoked session means "not
+ * signed in", which the guard handles, not a broken application.
  */
-export function restoreSessionOnStartup() {
+export function restoreSessionOnStartup(): Observable<null> {
   const session = inject(SessionService);
 
-  if (!session.accessToken) {
+  if (!session.accessToken && !session.refreshToken) {
     return of(null);
   }
 
-  return session.restore().pipe(
-    catchError(() => {
-      session.logout();
+  const usedRefresh = !!session.refreshToken && session.accessTokenNeedsRefresh();
+  const start: Observable<unknown> = usedRefresh ? session.refresh() : session.restore();
+
+  return start.pipe(
+    map(() => null),
+    catchError((error: unknown) => {
+      // A refused token ends the session. A refresh that was merely rate-limited or could not
+      // reach the server keeps the tokens for the next load; the guard still sends the person
+      // to sign-in for now, since no member was restored.
+      if (!usedRefresh || refreshWasRejected(error)) session.logout();
       return of(null);
     }),
   );

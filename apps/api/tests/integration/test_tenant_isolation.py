@@ -728,7 +728,8 @@ def make_workspace(cur: psycopg.Cursor, label: str) -> Workspace:
 def workspaces() -> Iterator[tuple[psycopg.Connection, Workspace, Workspace]]:
     """Two unrelated businesses on one database — the situation isolation must survive."""
     with psycopg.connect(TEST_DATABASE_URL or "") as conn:
-        with conn.cursor() as cur:
+        # make_workspace reads nothing back, so its ~120 inserts can share one round trip.
+        with conn.pipeline(), conn.cursor() as cur:
             alpha = make_workspace(cur, "alpha")
             beta = make_workspace(cur, "beta")
         yield conn, alpha, beta
@@ -856,12 +857,18 @@ def test_a_cross_workspace_update_changes_nothing(
 def test_a_cross_workspace_delete_removes_nothing(
     workspaces: tuple[psycopg.Connection, Workspace, Workspace],
 ) -> None:
-    """beta carries two membership rows (owner + delegate, T008) — both must survive."""
+    """beta carries two membership rows (owner + delegate, T008) — both must survive.
+
+    Since 20261018000010 `authenticated` holds no DELETE on membership at all, so the attempt is
+    refused outright rather than matching no rows.
+    """
     conn, alpha, beta = workspaces
     with conn.cursor() as cur:
         act_as(cur, alpha)
-        cur.execute("delete from membership where tenant_id = %s", (beta.tenant_id,))
-        assert cur.rowcount == 0
+        cur.execute("savepoint cross_workspace_delete")
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            cur.execute("delete from membership where tenant_id = %s", (beta.tenant_id,))
+        cur.execute("rollback to savepoint cross_workspace_delete")
         cur.execute("reset role")
         cur.execute("select count(*) from membership where tenant_id = %s", (beta.tenant_id,))
         row = cur.fetchone()

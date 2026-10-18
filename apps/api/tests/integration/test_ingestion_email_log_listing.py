@@ -417,6 +417,7 @@ def test_list_email_logs_quotation_and_supplier_fields(
         matched = items_by_id[str(log_id_matched)]
         assert matched["quotation_id"] == str(quote_id)
         assert matched["supplier_id"] == str(sup_id)
+        assert matched["supplier_name"] == "Produce Supplier Ltd"
         assert matched["match_method"] == "domain"
         assert matched["status"] == "completed"
         assert matched["error_message"] is None
@@ -426,6 +427,7 @@ def test_list_email_logs_quotation_and_supplier_fields(
         rejected = items_by_id[str(log_id_rejected)]
         assert rejected["quotation_id"] is None
         assert rejected["supplier_id"] is None
+        assert rejected["supplier_name"] is None
         assert rejected["match_method"] is None
         assert rejected["status"] == "rejected"
         assert rejected["error_message"] == "Sender domain not in allowlist"

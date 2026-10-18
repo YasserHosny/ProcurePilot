@@ -9,7 +9,6 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatDatepickerModule } from '@angular/material/datepicker';
-import { MatNativeDateModule } from '@angular/material/core';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
@@ -20,8 +19,11 @@ import { Rfq, RfqApi, RfqDetail } from '../rfq-api';
 import { ApiService } from '../../../core/api/api.service';
 import { Product, Supplier } from '../../../core/api/models';
 import { parseIsoDateLocal, toIsoDateOrNull } from '../../../core/format/iso-date';
+import { provideAppDateAdapter } from '../../../core/i18n/date-adapter';
+import { trimDecimal } from '../../../core/format/trim-decimal';
 
 @Component({
+  providers: [provideAppDateAdapter()],
   selector: 'app-rfq-create',
   standalone: true,
   imports: [
@@ -35,7 +37,6 @@ import { parseIsoDateLocal, toIsoDateOrNull } from '../../../core/format/iso-dat
     MatButtonModule,
     MatIconModule,
     MatDatepickerModule,
-    MatNativeDateModule,
     MatProgressSpinnerModule,
     TranslateModule,
   ],
@@ -138,7 +139,8 @@ export class RfqCreateComponent implements OnInit {
       this.linesFormArray.push(
         this.fb.nonNullable.group({
           workspace_product_id: [line.workspace_product_id, Validators.required],
-          quantity: [String(line.quantity), [Validators.required, Validators.min(0.01)]],
+          // numeric(18,6) comes back as '120.000000'; the narrow field would show only its tail.
+          quantity: [trimDecimal(String(line.quantity)), [Validators.required, Validators.min(0.01)]],
         }),
       );
     }

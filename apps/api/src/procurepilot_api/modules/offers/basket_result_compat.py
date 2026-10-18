@@ -18,7 +18,7 @@ _KIND_ALIASES = {"mixed_currency": "currency_consistency"}
 _RISK_NOTE_KEYS = {"high": "high_supplier_risk", "medium": "elevated_supplier_risk"}
 
 
-def normalise_stored_result(result: object, supplier_ids: list[Any] | None = None) -> object:
+def normalise_stored_result(result: object) -> object:
     if not isinstance(result, dict):
         return result
     if not _is_worker_advanced_result(result):
@@ -28,7 +28,7 @@ def normalise_stored_result(result: object, supplier_ids: list[Any] | None = Non
     out["confidence"] = _confidence(result.get("confidence"))
     out["risk_notes"] = _risk_notes(result.get("risk_notes", []))
     out["infeasible_items"] = result.get("infeasible_items") or _infeasible_items(
-        result.get("violated_constraints", []), supplier_ids or []
+        result.get("violated_constraints", [])
     )
     out["applied_constraints"] = [
         _constraint(c, violated=False)
@@ -55,9 +55,7 @@ def _is_worker_advanced_result(result: dict[str, Any]) -> bool:
     ) and "applied_constraints" in result
 
 
-def _infeasible_items(
-    violations: list[dict[str, Any]], supplier_ids: list[Any]
-) -> list[dict[str, Any]]:
+def _infeasible_items(violations: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Per-item violations (no offer / mixed currency) as the infeasible card's item list."""
     reasons = {
         "no_eligible_supplier": "no_offer_from_named_suppliers",
@@ -74,7 +72,11 @@ def _infeasible_items(
                 "workspace_product_id": product_id,
                 "requested_quantity": violation.get("requested_quantity") or "0",
                 "reason": reason,
-                "missing_supplier_ids": [str(sid) for sid in supplier_ids],
+                # A violation does not say which suppliers lack an offer: mixed currency means
+                # offers exist, and no eligible supplier can come from exclusions or risk
+                # limits. Naming every requested supplier would misdiagnose both, so leave the
+                # list empty and let the card show the reason instead.
+                "missing_supplier_ids": [],
             }
         )
     return items

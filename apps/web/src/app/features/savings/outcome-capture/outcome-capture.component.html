@@ -100,12 +100,11 @@
           <!-- Base Unit -->
           <mat-form-field appearance="outline" class="col-half">
             <mat-label>{{ 'savings.outcomeCapture.baseUnitLabel' | translate }}</mat-label>
-            <input
-              matInput
-              type="text"
-              formControlName="base_unit"
-              placeholder="each"
-            />
+            <mat-select formControlName="base_unit">
+              @for (unit of baseUnits; track unit) {
+                <mat-option [value]="unit">{{ unit | unitLabel }}</mat-option>
+              }
+            </mat-select>
             @if (form.get('base_unit')?.hasError('required') && form.get('base_unit')?.touched) {
               <mat-error>{{ 'savings.outcomeCapture.validation.baseUnitRequired' | translate }}</mat-error>
             }
@@ -132,7 +131,7 @@
               matInput
               type="text"
               formControlName="currency"
-              placeholder="GBP"
+              [placeholder]="homeCurrency"
               maxlength="3"
             />
             @if (form.get('currency')?.hasError('required') && form.get('currency')?.touched) {

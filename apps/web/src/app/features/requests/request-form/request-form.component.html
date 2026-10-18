@@ -19,6 +19,23 @@
     }
   </div>
 
+  @if (existingRequest()?.auto_prepared; as auto) {
+    <div class="auto-prepared-banner" role="status" data-testid="auto-prepared-banner">
+      <mat-icon class="auto-prepared-icon" aria-hidden="true">smart_toy</mat-icon>
+      <div>
+        <strong>{{ 'requests.autoPrepared.title' | translate }}</strong>
+        <p>
+          {{
+            (existingRequest()?.status === 'draft'
+              ? 'requests.autoPrepared.draftMessage'
+              : 'requests.autoPrepared.message'
+            ) | translate: { supplier: auto.supplier_name || ('requests.autoPrepared.unknownSupplier' | translate) }
+          }}
+        </p>
+      </div>
+    </div>
+  }
+
   @if (errorMessage()) {
     <div class="error-banner" role="alert">
       <mat-icon class="error-icon" aria-hidden="true">error_outline</mat-icon>

@@ -298,8 +298,15 @@ class RfqService:
                 line_rows = cur.fetchall()
                 lines = [RfqLine(**r) for r in line_rows]
 
+                # The supplier email follows the sender's interface language, then the
+                # workspace default -- the same order the digest uses.
                 cur.execute(
-                    "select name, default_locale from tenant where id = %s", (member.tenant_id,)
+                    """select t.name,
+                              coalesce(m.preferred_locale, t.default_locale) as default_locale
+                       from tenant t
+                       left join membership m on m.tenant_id = t.id and m.id = %s
+                       where t.id = %s""",
+                    (member.membership_id, member.tenant_id),
                 )
                 tenant_row = cur.fetchone()
                 cur.execute(
@@ -722,13 +729,20 @@ class RfqService:
     ) -> AutoPreparationGuardrail:
         with _authenticated_db(self.settings, member) as conn:
             with conn.cursor(row_factory=dict_row) as cur:
+                _validate_guardrail_destination(
+                    cur,
+                    tenant_id=member.tenant_id,
+                    branch_id=payload.default_branch_id,
+                    cost_centre_id=payload.default_cost_centre_id,
+                )
                 cur.execute(
                     """
                     insert into auto_preparation_guardrail
                     (tenant_id, created_by_membership_id, max_order_value_amount,
                      max_order_value_currency, supplier_allowlist, category_allowlist,
-                     min_response_count, max_price_variance_pct, enabled, default_branch_id)
-                    values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                     min_response_count, max_price_variance_pct, enabled, default_branch_id,
+                     default_cost_centre_id)
+                    values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     returning *
                     """,
                     (
@@ -742,6 +756,7 @@ class RfqService:
                         payload.max_price_variance_pct,
                         payload.enabled,
                         payload.default_branch_id,
+                        payload.default_cost_centre_id,
                     ),
                 )
                 row = cur.fetchone()
@@ -796,6 +811,24 @@ class RfqService:
                     if not row:
                         raise NotFoundError(details={"resource": "auto_preparation_guardrail"})
                     return AutoPreparationGuardrail.model_validate(row)
+
+                if "default_branch_id" in updates or "default_cost_centre_id" in updates:
+                    cur.execute(
+                        "select default_branch_id, default_cost_centre_id "
+                        "from auto_preparation_guardrail where tenant_id = %s and id = %s",
+                        (member.tenant_id, guardrail_id),
+                    )
+                    current = cur.fetchone()
+                    if not current:
+                        raise NotFoundError(details={"resource": "auto_preparation_guardrail"})
+                    _validate_guardrail_destination(
+                        cur,
+                        tenant_id=member.tenant_id,
+                        branch_id=updates.get("default_branch_id", current["default_branch_id"]),
+                        cost_centre_id=updates.get(
+                            "default_cost_centre_id", current["default_cost_centre_id"]
+                        ),
+                    )
 
                 set_clauses = [f"{key} = %s" for key in updates]
                 values: list[object] = list(updates.values())
@@ -894,6 +927,39 @@ class RfqService:
 
         items = [RfqSummary.model_validate(row) for row in rows]
         return RfqList(items=items, next_cursor=next_cursor)
+
+
+def _validate_guardrail_destination(
+    cur: psycopg.Cursor,
+    *,
+    tenant_id: uuid.UUID,
+    branch_id: uuid.UUID | None,
+    cost_centre_id: uuid.UUID | None,
+) -> None:
+    """A guardrail's default branch and optional cost centre must be visible to the caller in
+    their own workspace (RLS: another tenant's id reads as not found), and the cost centre must
+    be an active one assigned to that branch (finding 38b)."""
+    if branch_id is None:
+        raise UnprocessableEntityError(details={"default_branch_id": "required"})
+    cur.execute(
+        "select 1 from branch where tenant_id = %s and id = %s",
+        (tenant_id, branch_id),
+    )
+    if cur.fetchone() is None:
+        raise NotFoundError(details={"resource": "branch"})
+    if cost_centre_id is None:
+        return
+    cur.execute(
+        "select branch_id, is_archived from cost_centre where tenant_id = %s and id = %s",
+        (tenant_id, cost_centre_id),
+    )
+    cost_centre = cur.fetchone()
+    if cost_centre is None:
+        raise NotFoundError(details={"resource": "cost_centre"})
+    if cost_centre["is_archived"]:
+        raise UnprocessableEntityError(details={"default_cost_centre_id": "archived"})
+    if cost_centre["branch_id"] != branch_id:
+        raise UnprocessableEntityError(details={"default_cost_centre_id": "not_in_branch"})
 
 
 def _lock_rfq_for_creator(cur: psycopg.Cursor, member: CurrentMember, rfq_id: uuid.UUID) -> dict:

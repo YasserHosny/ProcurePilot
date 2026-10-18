@@ -182,8 +182,8 @@
               <td mat-cell *matCellDef="let log" class="supplier-cell">
                 @if (log.supplier_id) {
                   <div class="supplier-info">
-                    <span class="supplier-id">
-                      {{ 'ingestion.emailLog.supplierId' | translate: { id: log.supplier_id } }}
+                    <span class="supplier-name">
+                      {{ log.supplier_name || ('ingestion.emailLog.matchedSupplier' | translate) }}
                     </span>
                     @if (log.match_method) {
                       <span class="match-method-chip">

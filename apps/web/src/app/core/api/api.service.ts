@@ -1,8 +1,9 @@
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpContext } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 
 import { environment } from '../../../environments/environment';
+import { SEND_SESSION_TOKEN } from '../auth/http-context';
 import type {
   Alert,
   AlertDismissal,
@@ -130,6 +131,11 @@ export class ApiService {
     return this.http.post<Session>(`${this.base}/auth/login`, { email, password });
   }
 
+  /** Renews an expired session. Needs no bearer token; the tenant claim comes from the server. */
+  refreshSession(refreshToken: string): Observable<Session> {
+    return this.http.post<Session>(`${this.base}/auth/refresh`, { refresh_token: refreshToken });
+  }
+
   logout(): Observable<void> {
     return this.http.post<void>(`${this.base}/auth/logout`, {});
   }
@@ -159,11 +165,16 @@ export class ApiService {
    * token has to be minted, and that is only done in exchange for a refresh token. Omitting it
    * returns 422.
    */
-  setActiveWorkspace(tenantId: string, refreshToken: string): Observable<Session> {
-    return this.http.put<Session>(`${this.base}/me/active-workspace`, {
-      tenant_id: tenantId,
-      refresh_token: refreshToken,
-    });
+  setActiveWorkspace(
+    tenantId: string,
+    refreshToken: string,
+    context?: HttpContext,
+  ): Observable<Session> {
+    return this.http.put<Session>(
+      `${this.base}/me/active-workspace`,
+      { tenant_id: tenantId, refresh_token: refreshToken },
+      { context },
+    );
   }
 
   // --- workspace ----------------------------------------------------------
@@ -410,9 +421,10 @@ export class ApiService {
         formData.append(k, v);
       }
       formData.append('file', file);
-      return this.http.post<void>(uploadUrl, formData);
+      return this.http.post<void>(uploadUrl, formData, { context: storageContext() });
     }
     return this.http.put<void>(uploadUrl, file, {
+      context: storageContext(),
       headers: {
         'Content-Type': file.type || 'application/octet-stream',
       },
@@ -1079,4 +1091,9 @@ export class ApiService {
   cancelApprovalDelegation(delegationId: string): Observable<void> {
     return this.http.delete<void>(`${this.base}/approvals/delegations/${delegationId}`);
   }
+}
+
+/** The upload URL is a Storage object URL our API issued; Storage authorises it with the JWT. */
+function storageContext(): HttpContext {
+  return new HttpContext().set(SEND_SESSION_TOKEN, true);
 }

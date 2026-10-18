@@ -34,6 +34,38 @@ void main() {
         expect(req.requesterDisplayName(i18nEn), 'Sarah Connor');
       });
 
+      test('parses auto_prepared guardrail provenance and round-trips it', () {
+        final json = {
+          'id': 'req-1',
+          'branch_id': 'branch-1',
+          'requested_by_membership_id': '00000000-0000-0000-0000-000000000001',
+          'required_by_date': '2026-10-01',
+          'status': 'draft',
+          'lines': <Map<String, dynamic>>[],
+          'has_incomplete_estimate': false,
+          'created_at': '2026-09-13T10:00:00Z',
+          'auto_prepared': {
+            'guardrail_id': 'g-1',
+            'rfq_id': 'rfq-1',
+            'supplier_id': 's-1',
+            'supplier_name': 'Nile Bakery',
+            'created_at': '2026-10-18T09:00:00Z',
+          },
+        };
+
+        final req = PurchaseRequest.fromJson(json);
+        expect(req.autoPrepared?.guardrailId, 'g-1');
+        expect(req.autoPrepared?.supplierName, 'Nile Bakery');
+        expect(req.autoPrepared?.createdAt, DateTime.utc(2026, 10, 18, 9));
+        expect(
+          PurchaseRequest.fromJson(req.toJson()).autoPrepared?.supplierId,
+          's-1',
+        );
+
+        json.remove('auto_prepared');
+        expect(PurchaseRequest.fromJson(json).autoPrepared, isNull);
+      });
+
       test('falls back to email when name is null or whitespace', () {
         final req = PurchaseRequest(
           id: 'req-1',

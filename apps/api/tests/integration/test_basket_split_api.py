@@ -3,6 +3,7 @@ from __future__ import annotations
 from decimal import Decimal
 from uuid import UUID
 
+import psycopg
 import pytest
 
 from integration.catalogue_helpers import TEST_DATABASE_URL
@@ -95,6 +96,47 @@ def test_redis_enqueue_failure_durably_marks_job_failed_after_exception_unwinds(
         assert len(persisted) == 1
         assert persisted[0]["status"] == "failed"
         assert persisted[0]["error"]["code"] == "redis_enqueue_failed"
+
+
+def test_failed_enqueue_compensation_never_overwrites_an_attempt_a_worker_claimed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Redis can accept the job and still raise (lost reply); a worker may already be running
+    it by the time the API compensates, and that attempt must be left alone."""
+    settings = settings_for_test_db(monkeypatch)
+    with committed_smart_context("basket-fenced") as context:
+        for supplier_id in context.supplier_ids:
+            add_costed_offer(context, supplier_id=supplier_id, amount=Decimal("3.0000"))
+
+        def claimed_then_fail(_settings: object, row: dict[str, object], _member: object) -> None:
+            with psycopg.connect(TEST_DATABASE_URL, prepare_threshold=None) as worker:
+                worker.execute(
+                    "update basket_split_job set status = 'running', started_at = now() "
+                    "where id = %s and created_at = %s",
+                    (row["id"], row["created_at"]),
+                )
+                worker.commit()
+            raise ServiceUnavailableError(details={"dependency": "redis"})
+
+        monkeypatch.setattr(basket_service, "_enqueue_redis_job", claimed_then_fail)
+        with pytest.raises(ServiceUnavailableError):
+            BasketService(settings).create_job(
+                member=context.member,
+                payload=BasketOptimiseRequest(
+                    supplier_ids=context.supplier_ids,
+                    items=[
+                        BasketItemRequest(
+                            workspace_product_id=context.product_id,
+                            quantity="2.000000",
+                        )
+                    ],
+                ),
+            )
+
+        persisted = fetch_basket_jobs(context.workspace.tenant_id)
+        assert len(persisted) == 1
+        assert persisted[0]["status"] == "running"
+        assert persisted[0]["error"] is None
 
 
 def test_create_job_replays_on_idempotency_key_without_reenqueuing(

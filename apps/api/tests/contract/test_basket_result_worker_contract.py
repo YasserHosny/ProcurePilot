@@ -164,7 +164,9 @@ def test_infeasible_items_are_synthesised_from_per_item_violations() -> None:
     assert [str(i.workspace_product_id) for i in job.result.infeasible_items] == [missing_product]
     item = job.result.infeasible_items[0]
     assert item.reason == "no_offer_from_named_suppliers"
-    assert item.missing_supplier_ids == row["supplier_ids"]
+    # The violation does not say which suppliers lack an offer (exclusions or risk limits can
+    # cause it too), so no supplier is named; the card shows the reason instead.
+    assert item.missing_supplier_ids == []
 
 
 def test_job_exposes_the_pack_snapshot_stored_at_submission() -> None:
@@ -178,3 +180,26 @@ def test_job_exposes_the_pack_snapshot_stored_at_submission() -> None:
 
     assert job.pack_snapshot is not None
     assert job.pack_snapshot[product_id].base_quantity == "0.5"
+
+
+def test_mixed_currency_item_names_no_supplier_as_missing_offers() -> None:
+    # Mixed currency means offers exist; listing every supplier as "missing" misdiagnoses it.
+    row, _ = _solve()
+    product_id = str(uuid4())
+    row["result"]["feasible"] = False  # type: ignore[index]
+    row["result"]["violated_constraints"].append(  # type: ignore[index]
+        {
+            "kind": "mixed_currency",
+            "workspace_product_id": product_id,
+            "requested_quantity": "1.000000",
+            "message": "offers are in different currencies",
+            "source_ids": [],
+        }
+    )
+
+    job = _job(row)
+
+    assert isinstance(job.result, AdvancedBasketResult)
+    [item] = [i for i in job.result.infeasible_items if str(i.workspace_product_id) == product_id]
+    assert item.reason == "mixed_currency_offers"
+    assert item.missing_supplier_ids == []

@@ -22,6 +22,8 @@ import { Subscription, interval, switchMap } from 'rxjs';
 import { ApiService } from '../../../core/api/api.service';
 import type { ApiError, Product, Supplier } from '../../../core/api/models';
 import { SessionService } from '../../../core/auth/session.service';
+import { FormatService } from '../../../core/format/format.service';
+import { unitLabel } from '../../../core/format/unit-label';
 import type {
   BasketItemRequest,
   BasketOptimiseRequest,
@@ -73,6 +75,7 @@ export class BasketSplitComponent implements OnInit {
   private readonly session = inject(SessionService);
   private readonly snackBar = inject(MatSnackBar);
   private readonly translate = inject(TranslateService);
+  private readonly format = inject(FormatService);
   private readonly destroyRef = inject(DestroyRef);
 
   readonly suppliers = signal<Supplier[]>([]);
@@ -221,6 +224,16 @@ export class BasketSplitComponent implements OnInit {
     if (!pack) return 1;
     const base = parseFloat(pack.base_quantity ?? String(pack.pack_count * parseFloat(pack.unit_size)));
     return base > 0 ? base : 1;
+  }
+
+  /** "10 packs × 1 kg = 10 kg" in the UI language, with localised digits and unit. */
+  packHintParams(item: { workspace_product_id: string; quantity: string }): Record<string, string> {
+    return {
+      count: this.format.formatExactQuantity(item.quantity),
+      size: this.format.formatExactQuantity(String(this.packBaseQuantityFor(item.workspace_product_id))),
+      total: this.format.formatExactQuantity(this.baseQuantityFor(item)),
+      unit: unitLabel(this.translate, this.baseUnitFor(item.workspace_product_id)),
+    };
   }
 
   /** Quantities are typed in PACKS; the optimiser works in base units, so convert on send. */

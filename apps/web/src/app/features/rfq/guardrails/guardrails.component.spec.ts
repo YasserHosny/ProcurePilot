@@ -29,7 +29,14 @@ describe('GuardrailsComponent', () => {
     rfqApi.listGuardrails.and.returnValue(of([guardrail]));
     rfqApi.createGuardrail.and.returnValue(of(guardrail));
     rfqApi.updateGuardrail.and.returnValue(of({ ...guardrail, enabled: false }));
-    api = jasmine.createSpyObj('ApiService', ['suppliers', 'listBranches', 'configOptions']);
+    api = jasmine.createSpyObj('ApiService', ['suppliers', 'listBranches', 'configOptions', 'listCostCentres']);
+    api.listCostCentres.and.returnValue(of({
+      items: [{
+        id: 'cc-1', name: 'Kitchen', code: 'K1', branch_id: 'b-1', is_orphaned: false,
+        is_archived: false, created_at: '2026-09-25T10:00:00Z',
+      }],
+      next_cursor: null,
+    }));
     api.suppliers.and.returnValue(of({ items: [], next_cursor: null }));
     api.listBranches.and.returnValue(of({
       items: [{ id: 'b-1', name: 'Main', is_active: true, created_at: '2026-09-25T10:00:00Z' }],
@@ -98,8 +105,49 @@ describe('GuardrailsComponent', () => {
     expect(rfqApi.createGuardrail).toHaveBeenCalledWith(jasmine.objectContaining({
       max_order_value_amount: '2500', max_order_value_currency: 'GBP',
       min_response_count: 3, max_price_variance_pct: '0.125',
-      supplier_allowlist: ['s-1'], default_branch_id: 'b-1', enabled: true,
+      supplier_allowlist: ['s-1'], default_branch_id: 'b-1', default_cost_centre_id: null,
+      enabled: true,
     }));
+  });
+
+  it('offers only the selected branch\'s active cost centres and sends the choice', () => {
+    component.onBranchChange('b-1');
+    expect(api.listCostCentres).toHaveBeenCalledWith({ branch_id: 'b-1', is_archived: false, limit: 100 });
+    expect(component.costCentres().map((item) => item.id)).toEqual(['cc-1']);
+
+    component.defaultCostCentreId = 'cc-1';
+    component.maxOrderValue = '500';
+    component.maxPriceVariancePercent = '10';
+    component.save();
+    expect(rfqApi.createGuardrail).toHaveBeenCalledWith(jasmine.objectContaining({
+      default_branch_id: 'b-1', default_cost_centre_id: 'cc-1',
+    }));
+  });
+
+  it('clears the cost centre when the branch changes', () => {
+    component.onBranchChange('b-1');
+    component.defaultCostCentreId = 'cc-1';
+    component.onBranchChange('b-2');
+    expect(component.defaultCostCentreId).toBeNull();
+    expect(api.listCostCentres).toHaveBeenCalledWith({ branch_id: 'b-2', is_archived: false, limit: 100 });
+  });
+
+  it('restores the cost centre when editing a guardrail', () => {
+    component.edit({ ...guardrail, default_cost_centre_id: 'cc-1' });
+    expect(component.defaultCostCentreId).toBe('cc-1');
+    expect(component.costCentres().map((item) => item.id)).toEqual(['cc-1']);
+  });
+
+  it('explains a cost centre that is not on the default branch', () => {
+    rfqApi.createGuardrail.and.returnValue(
+      throwError(() => new HttpErrorResponse({ status: 422, error: { details: { default_cost_centre_id: 'not_in_branch' } } })),
+    );
+    component.onBranchChange('b-1');
+    component.defaultCostCentreId = 'cc-1';
+    component.maxOrderValue = '100';
+    component.maxPriceVariancePercent = '10';
+    component.save();
+    expect(component.errorMessage()).toBe('rfq.guardrails.validation.costCentre');
   });
 
   it('patches the enabled flag', () => {

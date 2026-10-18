@@ -24,9 +24,13 @@
                 <span>{{ 'basketSplit.result.requestedQuantity' | translate:{ quantity: item.requested_quantity } }}</span>
               </div>
               <div class="missing-suppliers">
-                {{ 'basketSplit.result.missingSuppliers' | translate: {
-                  suppliers: item.missing_supplier_ids.map(getSupplierName.bind(this)).join(', ')
-                } }}
+                @if (item.missing_supplier_ids.length > 0) {
+                  {{ 'basketSplit.result.missingSuppliers' | translate: {
+                    suppliers: item.missing_supplier_ids.map(getSupplierName.bind(this)).join(', ')
+                  } }}
+                } @else {
+                  {{ 'basketSplit.result.itemReasons.' + item.reason | translate }}
+                }
               </div>
             </div>
           }
