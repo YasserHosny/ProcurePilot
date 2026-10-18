@@ -311,6 +311,9 @@ class Settings(BaseSettings):
     webhook_request_timeout_seconds: float = Field(
         default=10.0, validation_alias="WEBHOOK_REQUEST_TIMEOUT_SECONDS", gt=0
     )
+    webhook_allow_private_endpoints: bool = Field(
+        default=False, validation_alias="WEBHOOK_ALLOW_PRIVATE_ENDPOINTS"
+    )
     rate_limit_pos_sync: str = Field(default="10/minute", validation_alias="RATE_LIMIT_POS_SYNC")
     rate_limit_pos_match: str = Field(default="30/minute", validation_alias="RATE_LIMIT_POS_MATCH")
     # A bare POS item name carries none of the deterministic (GTIN), brand, variant, or pack

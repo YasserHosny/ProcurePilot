@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+import socket
 import time
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -18,6 +19,10 @@ from procurepilot_api.modules.webhooks.service import (
     retry_delay_seconds,
     sign_webhook_payload,
 )
+from procurepilot_api.modules.webhooks.url_safety import (
+    categorize_delivery_error,
+    check_endpoint_url_safety,
+)
 from procurepilot_api.shared.token_crypto import decrypt_token
 
 logger = logging.getLogger(__name__)
@@ -30,7 +35,10 @@ def tick(settings: Settings, *, http_client: httpx.Client | None = None) -> dict
         stats["claimed"] = len(claimed)
         conn.commit()
 
-    client = http_client or httpx.Client(timeout=settings.webhook_request_timeout_seconds)
+    client = http_client or httpx.Client(
+        timeout=settings.webhook_request_timeout_seconds,
+        follow_redirects=False,
+    )
     close_client = http_client is None
     try:
         for delivery in claimed:
@@ -84,25 +92,44 @@ def _claim_deliveries(
 
 def _deliver_one(settings: Settings, client: httpx.Client, delivery: dict[str, Any]) -> str:
     delivery_id = UUID(str(delivery["id"]))
+    allow_private = settings.webhook_allow_private_endpoints
+
+    try:
+        check_endpoint_url_safety(str(delivery["endpoint_url"]), allow_private=allow_private)
+    except (socket.gaierror, OSError):
+        attempts = int(delivery["attempts"])
+        if attempts >= settings.webhook_max_attempts:
+            _mark_failed(settings, delivery_id, "connect_error")
+            return "failed"
+        _mark_retry(settings, delivery_id, attempts, "connect_error")
+        return "retrying"
+    except ValueError:
+        _mark_failed(settings, delivery_id, "endpoint_not_allowed")
+        return "failed"
+
     body = build_webhook_body(delivery["payload"])
-    secret = decrypt_token(
-        str(delivery["secret_encrypted"]), settings.webhook_token_encryption_key
-    )
+    secret = decrypt_token(str(delivery["secret_encrypted"]), settings.webhook_token_encryption_key)
     headers = {
         "Content-Type": "application/json",
-        "X-ProcurePilot-Event-Id": str(delivery["event_id"]),
+        "X-ProcurePilot-Event-Id": str(delivery["audit_event_id"]),
         "X-ProcurePilot-Event-Type": str(delivery["event_type"]),
         "X-ProcurePilot-Signature": sign_webhook_payload(body, secret),
     }
     try:
-        response = client.post(str(delivery["endpoint_url"]), content=body, headers=headers)
+        response = client.post(
+            str(delivery["endpoint_url"]),
+            content=body,
+            headers=headers,
+            follow_redirects=False,
+        )
         response.raise_for_status()
     except Exception as exc:
+        error_cat = categorize_delivery_error(exc)
         attempts = int(delivery["attempts"])
         if attempts >= settings.webhook_max_attempts:
-            _mark_failed(settings, delivery_id, str(exc))
+            _mark_failed(settings, delivery_id, error_cat)
             return "failed"
-        _mark_retry(settings, delivery_id, attempts, str(exc))
+        _mark_retry(settings, delivery_id, attempts, error_cat)
         return "retrying"
     _mark_succeeded(settings, delivery_id)
     return "succeeded"

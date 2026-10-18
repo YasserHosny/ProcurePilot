@@ -11,7 +11,11 @@ from postgrest.exceptions import APIError
 
 from procurepilot_api.config import Settings, get_settings
 from procurepilot_api.deps import CurrentMember
-from procurepilot_api.errors import NotFoundError, ServiceUnavailableError
+from procurepilot_api.errors import (
+    NotFoundError,
+    ServiceUnavailableError,
+    UnprocessableEntityError,
+)
 from procurepilot_api.modules.members.service import authenticated_client
 from procurepilot_api.modules.webhooks.schemas import (
     WebhookDelivery,
@@ -21,6 +25,7 @@ from procurepilot_api.modules.webhooks.schemas import (
     WebhookSubscriptionCreated,
     WebhookSubscriptionList,
 )
+from procurepilot_api.modules.webhooks.url_safety import validate_webhook_url
 from procurepilot_api.shared.audit import AuditEventCreate, get_audit_writer
 from procurepilot_api.shared.token_crypto import encrypt_token
 
@@ -70,14 +75,19 @@ class WebhookService:
         member: CurrentMember,
         payload: WebhookSubscriptionCreate,
     ) -> WebhookSubscriptionCreated:
+        try:
+            validate_webhook_url(
+                str(payload.endpoint_url),
+                allow_private=self._settings.webhook_allow_private_endpoints,
+            )
+        except ValueError as exc:
+            raise UnprocessableEntityError(details={"endpoint_url": str(exc)}) from exc
         secret = secrets.token_urlsafe(32)
         row = {
             "tenant_id": str(member.tenant_id),
             "endpoint_url": str(payload.endpoint_url),
             "events": payload.events,
-            "secret_encrypted": encrypt_token(
-                secret, self._settings.webhook_token_encryption_key
-            ),
+            "secret_encrypted": encrypt_token(secret, self._settings.webhook_token_encryption_key),
             "created_by": str(member.membership_id),
         }
         try:
