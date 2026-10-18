@@ -8,7 +8,7 @@
 | Field | Value |
 |---|---|
 | Document | ProcurePilot Master Roadmap |
-| Version | 1.1 |
+| Version | 1.2 |
 | Status | Active — delivery status maintained in the section "Delivery Status" below |
 | Last updated | 2026-10-18 |
 | Source of truth | `procurepilot_ai_context.md` (product context package) |
@@ -32,6 +32,7 @@
 |---|---|---|
 | 1.0 | 2026-09-10 | Original plan |
 | 1.1 | 2026-10-18 | Added Delivery Status (release ledger, gates, partial and deferred scope); first pilot market (Egypt); new risks 16–21 from the hosted demo build; walkthrough rule in the Definitions of Done; decision status in §20.2; current next actions in §21 |
+| 1.2 | 2026-10-18 | Delivery Status: demo findings count, security review (R3.2–R4.3), background workers not deployed on hosted; §10.8 internal review row; risk 19 widened; §21.1 refreshed |
 
 ---
 
@@ -57,18 +58,25 @@ release's spec was built and merged; it does not mean the phase's business gate 
 | 2 | R2.4 Optimisation + Supplier IQ | `011-optimisation-supplier-iq` | Shipped | Optimiser worker deployed on hosted 2026-10-17 (PR #108 + bunny.net container) |
 | 2 | R2.5 Reporting + Hardening | `012-reporting-hardening` | Shipped | |
 | 3 | R3.0 Email ingestion + catalogue refresh | `013-automated-ingestion` | Shipped | WhatsApp is manual capture only |
-| 3 | R3.1 Accounting #1 | `014-accounting-integration` | Shipped | QuickBooks Online and Xero both supported |
-| 3 | R3.2 POS / inventory | `015-pos-inventory-integration` | Shipped | Square, including stock on hand |
+| 3 | R3.1 Accounting #1 | `014-accounting-integration` | Shipped | QuickBooks Online and Xero both supported. Connect is completed by the signed-in owner (#156); live mode needs a token encryption key (#160) |
+| 3 | R3.2 POS / inventory | `015-pos-inventory-integration` | Shipped | Square, including stock on hand. Same connect and key hardening as R3.1 (#156, #160) |
 | 3 | R3.3 Order tracking + three-way match | `016-order-tracking-three-way-match` | Shipped | Draft POs from approved requests (PR #61) |
-| 3 | R3.4 Partner API + connectors | `017-partner-api-beta` | Partial | Read endpoints and webhook subscriptions; no partner credentials, generic connector framework or data-freshness engine |
+| 3 | R3.4 Partner API + connectors | `017-partner-api-beta` | Partial | Read endpoints and webhook subscriptions; no partner credentials, generic connector framework or data-freshness engine. Outbound webhooks never delivered until #142 (2026-10-18), and the webhook worker is not deployed on hosted |
 | 4 | R4.0 Forecasting + reorder | `018-forecasting-reorder` | Shipped | Some tests still unwritten (tasks T011, T016, T019, T020, T024) |
 | 4 | R4.1 Supplier risk + negotiation | `019-supplier-risk-negotiation` | Shipped | Evidence: `docs/quality/r4.1-release-evidence.md` |
 | 4 | R4.2 Grounded analyst | `020-grounded-procurement-analyst` | Shipped | Evidence: `docs/quality/r4.2-release-evidence.md` |
 | 4 | R4.3 RFQ sourcing + guardrails | `021-rfq-sourcing-autonomy` | Shipped | Evidence: `docs/quality/r4.3-release-evidence.md` |
 | Pilot | Home currency (Egypt) | `022-home-currency-readiness` | Merged, 3 tasks open | Real-quote extraction run, mobile screenshots, full test pass |
 
-Since 2026-10-15 the hosted demo tenant build has produced 20 findings, most fixed in PRs #84–#110;
-see `docs/gtm/demo-tenant/README.md`.
+Since 2026-10-15 the hosted demo tenant build has produced 30 findings. As of 2026-10-18, 21 are fixed,
+1 is partly fixed (20) and 8 are open (22, 23, 25–30); see `docs/gtm/demo-tenant/README.md`.
+
+An internal security review of R3.2–R4.3 and the October fixes was completed on 2026-10-18
+(`docs/quality/r3.2-r4.x-security-review-record.md`). Its 7 Critical, High and Medium findings are fixed
+and merged (#137, #138, #142, #156, #160). #137 and #138 are deployed with their migrations applied to hosted;
+#142, #156 and #160 need no migration, but the webhook-worker part of #142 is not active on hosted because
+that worker is not deployed (see "Background workers on hosted" below). 8 Low and Info findings are tracked
+there.
 
 ### Gates
 
@@ -97,6 +105,7 @@ No metric in §15.2 has been measured against real customer data yet. The first 
 | Payment collection for plans | §6.2 R1.5 | Stub billing provider | — |
 | Exchange rates (pilot gap C4) | — | Cross-currency comparison refused by design | `docs/gtm/first-customer-gtm-plan.md` |
 | VAT-inclusive prices (C5) and GCC items G1–G5 | — | Open | `docs/gtm/first-customer-gtm-plan.md` |
+| Background workers on hosted | Risk 19 | Only the extraction, email-ingestion and optimiser workers are deployed. Report schedules, offer refresh, exports, digests, outbound webhooks and accounting/POS sync have no deploy workflow. Checked on hosted 2026-10-18: the only report schedule has been due since 2026-09-15 and never ran; 4 offer-refresh schedules are overdue; the only completed exports came from local E2E runs | `docker-compose.yml` lists them; `.github/workflows/deploy-*.yml` does not |
 
 ---
 
@@ -800,6 +809,7 @@ Extends the conceptual model in the context document with the entities implement
 | **Backups** | Daily automated backups, tested restore, documented RPO/RTO | P1 |
 | **Penetration test** | Third-party test before general availability | End P2 |
 | **SOC 2 readiness** | Policy set and evidence collection begun when enterprise-adjacent demand appears | P3 |
+| **Internal security review** | Manual review per release group before the pen test. R3.2–R4.3 done 2026-10-18 (`docs/quality/r3.2-r4.x-security-review-record.md`) | Each phase |
 
 ---
 
@@ -1187,7 +1197,7 @@ Severity and likelihood are illustrative planning assessments (1–5 scale).
 | 16 | **Silent data loss in ingestion** — a document fails and leaves no trace (seen: Arabic attachment names lost emails, PR #90) | 5 | 3 | Every failure leaves a visible log or review item; alert on repeated job failures | Engineering lead | All |
 | 17 | **Locale drift** — dates, digits, number formats and RTL tables from Arabic-language suppliers misread (seen: DD/MM dates refused whole quotes, #96; RTL tables merged lines, #100; UTC date shift, #88) | 5 | 4 | Fixtures from real regional documents; unreadable values go to review, never guessed | Engineering lead | All |
 | 18 | **Unit-of-measure errors** — pack vs base unit mixed in estimates (seen: request estimate ~9× too low, #110) | 5 | 3 | One rule: quantities and prices per pack (ADR-020); tests on pack sizes > 1 | Engineering lead | All |
-| 19 | **Service built but not deployed** (seen: optimiser worker had no deploy, #108) | 4 | 3 | Every service has a deploy workflow and a liveness check; hosted walkthrough per release | Engineering lead | All |
+| 19 | **Service built but not deployed** (seen: optimiser worker had no deploy, #108; on 2026-10-18 the report-schedule, offer-refresh, export, digest, webhook and sync workers still had none, see Delivery Status) | 4 | 3 | Every service has a deploy workflow and a liveness check; hosted walkthrough per release | Engineering lead | All |
 | 20 | **Hosted AI configuration differs from tests** (seen: stub embedding on hosted, exact names scored 55%) | 4 | 3 | Record provider settings per environment; decide the hosted embedding provider | AI lead | P1+ |
 | 21 | **Database pooler incompatibility** (seen: prepared statements failed through Supabase's transaction pooler, #87) | 4 | 3 | All connections through `db.connect` with prepared statements off; integration tests against the pooler | Engineering lead | All |
 
@@ -1364,7 +1374,7 @@ customer-configurable. Decisions 3 and 4 have not been revisited in this documen
 | # | Action | Where tracked |
 |---:|---|---|
 | 1 | Finish the hosted demo tenant and record the demo video | `docs/gtm/video/production-tracker.md` (PP-5, PP-6) |
-| 2 | Fix the basket-split result read (`GET /baskets/{id}` → 500 on a completed advanced job), then re-open the round-1 split on hosted | `docs/gtm/demo-tenant/README.md` finding 21 |
+| 2 | After the demo video is recorded (its flow needs none of them), deploy the background workers hosted lacks (report schedules, offer refresh, exports, digests, webhooks, sync) as **one** combined jobs container — one image/entrypoint serving all these low-volume queues, one deploy workflow modelled on #108, its env documented in `docs/operations/runbook.md` — then fix the open demo findings (22, 23, 25–30; 23 needs the owner's savings-baseline decision). The basket-split read (finding 21) was fixed in #131 | Delivery Status; `docs/gtm/demo-tenant/README.md` |
 | 3 | Run real Egyptian supplier quotes through extraction | `specs/022-home-currency-readiness/tasks.md` T015 (Jira PP-3) |
 | 4 | Reach 20 prospect conversations and sign the first pilot | `docs/gtm/gtm-execution-plan.md` (PP-11, PP-13, PP-10) |
 | 5 | Choose what to build from the partial and deferred scope above, driven by the pilot | This document, Delivery Status |

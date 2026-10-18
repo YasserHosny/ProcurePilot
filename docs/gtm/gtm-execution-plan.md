@@ -71,6 +71,8 @@ set up, what is next, who does it, and what blocks what.
 
 ## 2. Current state (snapshot 2026-10-14)
 
+> Snapshot of the Jira and plan setup on 2026-10-14. Product status since then lives in §3 (P rows), `docs/roadmap/procurepilot_roadmap.md` Delivery Status and `docs/gtm/demo-tenant/README.md`.
+
 ### GTM plan file
 
 | Item | State |
@@ -173,9 +175,9 @@ PR → CI → merge → link PR on the PP task. Refs are in the GTM plan's curre
 
 | ID | Gap | Task | Owner | Depends on | Done when |
 |---|---|---|---|---|---|
-| [ ] P-1 | **C1** | Wire the **existing** `tenant.currency` (required at sign-up, returned by `/me`, already used by budget/threshold forms) into the forms that still default to USD: PO create, guardrails, quotation review fallbacks. No new setting, no schema/RLS change | Orch (spec + tenancy part), Lane (forms) | — | Merged; demo tenant set to EGP and every form opens in EGP |
-| [ ] P-2 | **C3** | Locale-aware money formatting on mobile (grouping, currency minor units, ar/en) for approval queue + request detail | Lane | — | Merged; `flutter test` green; screenshots show `EGP 12,500.00` (and Arabic locale equivalent) |
-| [ ] P-3 | **C2** | Test extraction with 5 real Egyptian quotes (incl. Arabic-Indic digits, ج.م / جنيه / LE); recognise Egyptian markers; replace the GBP fallback with **human review** for unresolved currency — never a tenant-currency default (also Azure DI £/$/€-only + hard-coded USD path; landed-cost GBP default) | Orch (test), Lane (fix) | — | Test results recorded on PP task; fix merged; q1–q3 extract as EGP; q4–q5 land flagged for review with no guessed currency |
+| [x] P-1 | **C1** | Wire the **existing** `tenant.currency` (required at sign-up, returned by `/me`, already used by budget/threshold forms) into the forms that still default to USD: PO create, guardrails, quotation review fallbacks. No new setting, no schema/RLS change | Orch (spec + tenancy part), Lane (forms) | — | Merged; demo tenant set to EGP and every form opens in EGP — **done: 022 (#73), PP-1 Done** |
+| [ ] P-2 | **C3** | Locale-aware money formatting on mobile (grouping, currency minor units, ar/en) for approval queue + request detail | Lane | — | Merged; `flutter test` green; screenshots show `EGP 12,500.00` (and Arabic locale equivalent) — **code merged in 022 (#73, #124); stays open until the screenshots (022 T018) exist** |
+| [ ] P-3 | **C2** | Test extraction with 5 real Egyptian quotes (incl. Arabic-Indic digits, ج.م / جنيه / LE); recognise Egyptian markers; replace the GBP fallback with **human review** for unresolved currency — never a tenant-currency default (also Azure DI £/$/€-only + hard-coded USD path; landed-cost GBP default) | Orch (test), Lane (fix) | — | Test results recorded on PP task; fix merged; q1–q3 extract as EGP; q4–q5 land flagged for review with no guessed currency — **fix merged in 022 (#73); the real-quote run is 022 T015, still open** |
 
 ### E — Pilot environment
 
@@ -238,4 +240,5 @@ Append one row per session. Newest at the bottom. Include Jira keys and PR numbe
 | 2026-10-15 | Claude (orchestrator) | New Converge logo merged (#75, store icons opaque after Codex review); 2-week pilot + new-logo one-pager merged (#76). Demo-video decisions recorded in `docs/gtm/video/README.md`: screencast + 2D motion graphics, text + music (no voice), music Antalya Beaches (112.35 BPM, librosa beat map), beat-locked logo sting with «قارن. اختار. وفّر.», end card, five Pixabay sound cues. Sting + end card rendered (16:9 and fast 9:16), in user review. | User reviews outros; then PP-5 demo tenant → screencast recording |
 | 2026-10-15 | Claude (orchestrator) | Founder title **Dr. Yasser Hosny / «د. ياسر حسني»** applied everywhere it is shown: one-pager (canvas AR+EN, PDF re-exported, re-attached to PP-8), DM script intro lines, video end cards + outros (re-rendered), video README. Pilot agreement unchanged (signature fields are blank). English video versions added: sting "Compare. Choose. Save." + English end cards, 16:9 and fast 9:16, same beats/audio. | PP-5 demo tenant → screencast recording |
 | 2026-10-17 | Claude (orchestrator) | Company-formation research in `docs/gtm/company-formation/` (Arabic): 22 Lean Startup Circle Egypt posts + all comments read via Claude in Chrome, key facts verified against official/professional sources (Law 6/2025 rates + consulting exclusion, VAT, e-invoicing, OPC capital EGP 1,000, Delaware $400 LLC tax, Form 5472, BOI). Recommendation: Egyptian one-person company on the simplified regime now; Delaware C-Corp flip only at a funding round. Setup guide, 3-year cost comparison, flip-readiness checklist added. | User books an Egyptian accountant (questions in `recommendations.md` §6), then incorporates; pilot agreement (G-6) moves to the company name |
+| 2026-10-18 | Claude (orchestrator) | P-1 ticked (shipped in 022, #73). P-2 code merged (#73/#124) but left open until its screenshots (022 T018). P-3 fix merged, real-quote run still 022 T015. Roadmap v1.2 records the security review and the background workers missing on hosted | Demo video first; then one combined jobs container for the missing workers; demo findings 22–30 |
 | | | | |
