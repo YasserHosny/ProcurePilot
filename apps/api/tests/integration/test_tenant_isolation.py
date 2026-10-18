@@ -2796,3 +2796,105 @@ def test_no_single_column_foreign_key_links_two_tenant_scoped_tables(
             """
         )
         assert cur.fetchall() == []
+
+
+# --- table privileges (20261018000005) ---------------------------------------------------------
+#
+# RLS decides which rows a role sees; these grants decide which operations it may attempt at all.
+# A project whose default privileges grant ALL to anon/authenticated (hosted did, before
+# 20261018000005) silently widens every narrow GRANT the migrations make. These are schema
+# invariants over every table in public, not samples, so a future migration that relies on a
+# default grant or adds `grant all` fails here.
+
+_ANON_READABLE_REFERENCE_TABLES = {
+    "supported_base_unit",
+    "supported_currency",
+    "supported_region",
+    "supported_tax_model",
+}
+
+
+def test_anon_can_only_read_the_shared_reference_tables(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, _alpha, _beta = workspaces
+    with conn.cursor() as cur:
+        cur.execute("reset role")
+        cur.execute(
+            """
+            select c.relname, a.privilege_type
+            from pg_class c
+            cross join lateral aclexplode(c.relacl) a
+            where c.relnamespace = 'public'::regnamespace
+              and c.relkind in ('r', 'p', 'v', 'm', 'S', 'f')
+              and a.grantee = 'anon'::regrole
+            order by 1, 2
+            """
+        )
+        granted = cur.fetchall()
+    assert granted == [(name, "SELECT") for name in sorted(_ANON_READABLE_REFERENCE_TABLES)]
+
+
+def test_no_table_grants_truncate_references_trigger_or_maintain_to_client_roles(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    conn, _alpha, _beta = workspaces
+    with conn.cursor() as cur:
+        cur.execute("reset role")
+        cur.execute(
+            """
+            select c.relname, a.grantee::regrole::text, a.privilege_type
+            from pg_class c
+            cross join lateral aclexplode(c.relacl) a
+            where c.relnamespace = 'public'::regnamespace
+              and c.relkind in ('r', 'p', 'v', 'm', 'f')
+              and a.grantee in ('anon'::regrole, 'authenticated'::regrole)
+              and a.privilege_type in ('TRUNCATE', 'REFERENCES', 'TRIGGER', 'MAINTAIN')
+            order by 1, 2, 3
+            """
+        )
+        assert cur.fetchall() == []
+
+
+def test_members_cannot_read_or_overwrite_integration_tokens(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    """The column-level split in 20260918000002/20260919000001 only holds while authenticated
+    has no table-level SELECT or UPDATE on these tables."""
+    conn, _alpha, _beta = workspaces
+    with conn.cursor() as cur:
+        cur.execute("reset role")
+        cur.execute(
+            """
+            select t, col, priv, has_column_privilege(r, t, col, priv)
+            from unnest(array['accounting_connection', 'pos_connection']) t
+            cross join unnest(array['access_token', 'refresh_token']) col
+            cross join unnest(array['SELECT', 'UPDATE']) priv
+            cross join unnest(array['anon', 'authenticated']) r
+            """
+        )
+        leaks = [row[:3] for row in cur.fetchall() if row[3]]
+    assert leaks == []
+
+
+def test_new_public_tables_grant_nothing_to_client_roles_by_default(
+    workspaces: tuple[psycopg.Connection, Workspace, Workspace],
+) -> None:
+    """Default privileges of the migrating role: a table a future migration creates gets only the
+    rights that migration grants explicitly."""
+    conn, _alpha, _beta = workspaces
+    with conn.cursor() as cur:
+        cur.execute("reset role")
+        cur.execute(
+            """
+            select d.defaclobjtype, a.grantee::regrole::text, a.privilege_type
+            from pg_default_acl d
+            cross join lateral aclexplode(d.defaclacl) a
+            where d.defaclrole = 'postgres'::regrole
+              and d.defaclnamespace = 'public'::regnamespace
+              and d.defaclobjtype in ('r', 'S')
+              and a.grantee in ('anon'::regrole, 'authenticated'::regrole)
+            order by 1, 2, 3
+            """
+        )
+        assert cur.fetchall() == []
