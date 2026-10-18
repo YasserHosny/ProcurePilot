@@ -11,6 +11,8 @@ from pydantic import BaseModel, Field
 from procurepilot_api.config import get_settings
 from procurepilot_api.deps import CurrentMember, bearer_token, current_member
 from procurepilot_api.errors import PermissionDeniedError, UnprocessableEntityError
+from procurepilot_api.modules.auth.jwt import MemberRole
+from procurepilot_api.modules.auth.rbac import require_role
 from procurepilot_api.modules.rfq.schemas import (
     AutoPreparationGuardrail,
     GuardrailCreateInput,
@@ -26,6 +28,9 @@ from procurepilot_api.modules.rfq.schemas import (
 )
 from procurepilot_api.modules.rfq.service import RfqService, get_rfq_service
 from procurepilot_api.shared.rate_limit import mutation_limiter
+
+# Spec 021 FR-001/FR-003: only an owner or buyer creates, edits, sends, or prepares from an RFQ.
+RFQ_WRITE_ROLES = (MemberRole.owner, MemberRole.buyer)
 
 router = APIRouter(prefix="/rfq", tags=["rfq"])
 
@@ -120,7 +125,7 @@ def update_rfq_draft(
     request: Request,
     rfq_id: uuid.UUID,
     payload: Annotated[RfqCreatePayload, Body()],
-    member: Annotated[CurrentMember, Depends(current_member)],
+    member: Annotated[CurrentMember, Depends(require_role(*RFQ_WRITE_ROLES))],
     service: Annotated[RfqService, Depends(get_rfq_service)],
     idempotency_key: Annotated[uuid.UUID | None, Header(alias="Idempotency-Key")] = None,
 ) -> RfqCreateResponse:
@@ -150,7 +155,7 @@ def update_rfq_draft(
 def create_rfq(
     request: Request,
     payload: Annotated[RfqCreatePayload, Body()],
-    member: Annotated[CurrentMember, Depends(current_member)],
+    member: Annotated[CurrentMember, Depends(require_role(*RFQ_WRITE_ROLES))],
     service: Annotated[RfqService, Depends(get_rfq_service)],
     idempotency_key: Annotated[uuid.UUID | None, Header(alias="Idempotency-Key")] = None,
 ) -> RfqCreateResponse:
@@ -184,7 +189,7 @@ def create_rfq(
 def send_rfq(
     request: Request,
     rfq_id: uuid.UUID,
-    member: Annotated[CurrentMember, Depends(current_member)],
+    member: Annotated[CurrentMember, Depends(require_role(*RFQ_WRITE_ROLES))],
     service: Annotated[RfqService, Depends(get_rfq_service)],
     idempotency_key: Annotated[uuid.UUID | None, Header(alias="Idempotency-Key")] = None,
 ) -> RfqSendResponse:
@@ -228,7 +233,7 @@ def prepare_request(
     rfq_id: uuid.UUID,
     payload: Annotated[RfqPrepareRequestInput, Body()],
     token: Annotated[str, Depends(bearer_token)],
-    member: Annotated[CurrentMember, Depends(current_member)],
+    member: Annotated[CurrentMember, Depends(require_role(*RFQ_WRITE_ROLES))],
     service: Annotated[RfqService, Depends(get_rfq_service)],
     idempotency_key: Annotated[uuid.UUID | None, Header(alias="Idempotency-Key")] = None,
 ) -> RfqPrepareRequestResponse:
