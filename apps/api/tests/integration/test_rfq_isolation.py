@@ -221,11 +221,52 @@ def rfq_workspaces() -> Iterator[tuple[psycopg.Connection, RfqWorkspace, RfqWork
         conn.rollback()
 
 
-def _act_as(cur: psycopg.Cursor, workspace: RfqWorkspace, *, role: str = "owner") -> None:
+def _ensure_spare_owner(cur: psycopg.Cursor, workspace: RfqWorkspace) -> None:
+    """A second active owner, so the workspace member can be demoted (owner-guard trigger)."""
+    cur.execute(
+        "select 1 from membership where tenant_id = %s and id <> %s and role = 'owner'",
+        (workspace.tenant_id, workspace.membership_id),
+    )
+    if cur.fetchone() is not None:
+        return
+    spare_user = uuid4()
+    spare_email = f"rfq-spare-owner-{spare_user.hex[:10]}@example.test"
+    cur.execute("insert into auth.users (id,email) values (%s,%s)", (spare_user, spare_email))
+    cur.execute(
+        "insert into membership (tenant_id,user_id,email,role,is_active_workspace) "
+        "values (%s,%s,%s,'owner',true)",
+        (workspace.tenant_id, spare_user, spare_email),
+    )
+
+
+def _set_membership_role(cur: psycopg.Cursor, workspace: RfqWorkspace, role: str) -> None:
+    cur.execute("reset role")
+    if role != "owner":
+        _ensure_spare_owner(cur, workspace)
+    cur.execute(
+        "update membership set role = %s::member_role where id = %s",
+        (role, workspace.membership_id),
+    )
+
+
+def _act_as(
+    cur: psycopg.Cursor,
+    workspace: RfqWorkspace,
+    *,
+    role: str = "owner",
+    claim_role: str | None = None,
+) -> None:
+    """Act as the workspace member with `role` on their membership row.
+
+    RFQ write policies read the live membership role (20261018000009), so the row carries the
+    role under test. `claim_role` sets a different JWT member_role claim, as a token issued
+    before a role change would carry.
+    """
+    _set_membership_role(cur, workspace, role)
     cur.execute("set local role authenticated")
     cur.execute(
         "select set_config('request.jwt.claims', %s, true)",
-        (workspace.claims(role=role),),
+        (workspace.claims(role=claim_role or role),),
     )
 
 
@@ -432,7 +473,7 @@ def test_only_owner_or_buyer_can_update_their_rfq(
 #
 # The creator predicate alone is not enough: a member who created an RFQ and later holds another
 # role (or created it before 20261018000003) must not change its lines or recipients either. The
-# alpha workspace's own membership created alpha's RFQ; the member_role claim plays the role.
+# alpha workspace's own membership created alpha's RFQ; _act_as sets that membership's role.
 
 _NON_WRITER_ROLES = ["viewer", "approver", "branch_manager"]
 _WRITER_ROLES = ["owner", "buyer"]
@@ -591,3 +632,78 @@ def test_a_buyer_who_did_not_create_the_rfq_cannot_update_its_recipients(
             (alpha.rfq_recipient_id,),
         )
         assert cur.rowcount == 0
+
+
+# --- live role, not the JWT claim (20261018000009) -----------------------------------------------
+#
+# A token keeps the member_role it was issued with. A member demoted from owner/buyer must lose RFQ
+# write access on the next request, not when the token expires.
+
+
+@pytest.mark.parametrize("stale_claim", _WRITER_ROLES)
+def test_a_demoted_member_with_a_stale_writer_claim_cannot_write_rfqs(
+    rfq_workspaces: tuple[psycopg.Connection, RfqWorkspace, RfqWorkspace], stale_claim: str
+) -> None:
+    conn, alpha, _beta = rfq_workspaces
+    with conn.cursor() as cur:
+        supplier_id = _insert_extra_supplier(cur, alpha)
+        _act_as(cur, alpha, role="viewer", claim_role=stale_claim)
+
+        cur.execute("update rfq set needed_by_date = needed_by_date where id = %s", (alpha.rfq_id,))
+        assert cur.rowcount == 0
+        cur.execute("update rfq_line set quantity = 999 where id = %s", (alpha.rfq_line_id,))
+        assert cur.rowcount == 0
+        cur.execute(
+            "update rfq_recipient set outbound_message_id = 'tampered' where id = %s",
+            (alpha.rfq_recipient_id,),
+        )
+        assert cur.rowcount == 0
+        cur.execute("delete from rfq where id = %s", (alpha.rfq_id,))
+        assert cur.rowcount == 0
+
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            cur.execute("savepoint stale_line")
+            _insert_rfq_line(cur, alpha)
+        cur.execute("rollback to savepoint stale_line")
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            cur.execute("savepoint stale_recipient")
+            cur.execute(
+                "insert into rfq_recipient (tenant_id,rfq_id,supplier_id,status) "
+                "values (%s,%s,%s,'draft')",
+                (alpha.tenant_id, alpha.rfq_id, supplier_id),
+            )
+        cur.execute("rollback to savepoint stale_recipient")
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            cur.execute(
+                "insert into rfq (tenant_id,created_by_membership_id,status,needed_by_date,"
+                "idempotency_key) values (%s,%s,'draft',current_date,%s)",
+                (alpha.tenant_id, alpha.membership_id, uuid4()),
+            )
+
+
+def test_a_promoted_member_with_a_stale_viewer_claim_can_write_rfqs(
+    rfq_workspaces: tuple[psycopg.Connection, RfqWorkspace, RfqWorkspace],
+) -> None:
+    """The live role decides in both directions."""
+    conn, alpha, _beta = rfq_workspaces
+    with conn.cursor() as cur:
+        _act_as(cur, alpha, role="buyer", claim_role="viewer")
+        cur.execute("update rfq set needed_by_date = needed_by_date where id = %s", (alpha.rfq_id,))
+        assert cur.rowcount == 1
+
+
+@pytest.mark.parametrize(("role", "deleted"), [*((r, 0) for r in _NON_WRITER_ROLES), ("buyer", 1)])
+def test_only_an_owner_or_buyer_creator_can_delete_an_rfq(
+    rfq_workspaces: tuple[psycopg.Connection, RfqWorkspace, RfqWorkspace],
+    role: str,
+    deleted: int,
+) -> None:
+    """Deleting an RFQ cascades to its lines and recipients, so it needs the writer role too."""
+    conn, alpha, _beta = rfq_workspaces
+    with conn.cursor() as cur:
+        cur.execute("reset role")
+        cur.execute("delete from auto_preparation_event where tenant_id = %s", (alpha.tenant_id,))
+        cur.execute("delete from rfq_response where tenant_id = %s", (alpha.tenant_id,))
+        _act_as(cur, alpha, role=role)
+        cur.execute("delete from rfq where id = %s", (alpha.rfq_id,))
+        assert cur.rowcount == deleted
