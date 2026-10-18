@@ -7,6 +7,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { TranslatePipe } from '@ngx-translate/core';
 
 import type { MatchCandidate, MatchOutcome } from '../../../core/api/models';
+import { UnitLabelPipe } from '../../../core/format/unit-label';
 
 @Component({
   selector: 'app-match-resolution-candidates',
@@ -18,6 +19,7 @@ import type { MatchCandidate, MatchOutcome } from '../../../core/api/models';
     MatDividerModule,
     MatTooltipModule,
     TranslatePipe,
+    UnitLabelPipe,
   ],
   templateUrl: './match-resolution-candidates.component.html',
   styleUrl: './match-resolution-candidates.component.scss',

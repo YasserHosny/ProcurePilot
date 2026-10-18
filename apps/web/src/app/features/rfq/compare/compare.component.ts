@@ -12,7 +12,6 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatDatepickerModule } from '@angular/material/datepicker';
-import { MatNativeDateModule } from '@angular/material/core';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatIconModule } from '@angular/material/icon';
 import { TranslateModule, TranslatePipe, TranslateService } from '@ngx-translate/core';
@@ -26,10 +25,12 @@ import type { ApiError, Branch } from '../../../core/api/models';
 import { SessionService } from '../../../core/auth/session.service';
 import { parseIsoDateLocal, toIsoDate } from '../../../core/format/iso-date';
 import { CatalogueConfirmDialogComponent } from '../../catalogue/confirm-dialog/confirm-dialog.component';
+import { provideAppDateAdapter } from '../../../core/i18n/date-adapter';
 
 const LAST_BRANCH_STORAGE_PREFIX = 'pp.rfq.lastBranchId.';
 
 @Component({
+  providers: [provideAppDateAdapter()],
   selector: 'app-rfq-compare',
   standalone: true,
   imports: [
@@ -44,7 +45,6 @@ const LAST_BRANCH_STORAGE_PREFIX = 'pp.rfq.lastBranchId.';
     MatFormFieldModule,
     MatInputModule,
     MatDatepickerModule,
-    MatNativeDateModule,
     MatProgressSpinnerModule,
     MatIconModule,
     TranslateModule,

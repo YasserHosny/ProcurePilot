@@ -20,9 +20,12 @@ TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL")
 pytestmark = pytest.mark.skipif(not TEST_DATABASE_URL, reason="TEST_DATABASE_URL is not set")
 
 
-@pytest.mark.parametrize(("locale", "arabic"), [("ar", True), ("en", False)])
+@pytest.mark.parametrize(
+    ("locale", "member_locale", "arabic"),
+    [("ar", None, True), ("en", None, False), ("en", "ar", True), ("ar", "en", False)],
+)
 def test_send_localized_rfq_with_persisted_terms(
-    monkeypatch: pytest.MonkeyPatch, locale: str, arabic: bool
+    monkeypatch: pytest.MonkeyPatch, locale: str, member_locale: str | None, arabic: bool
 ) -> None:
     suffix = uuid4().hex
     email = f"rfq-email-{suffix}@example.test"
@@ -49,9 +52,10 @@ def test_send_localized_rfq_with_persisted_terms(
                 (tenant_id, tenant_name, f"rfq-email-{suffix}", invitation_id, locale),
             )
             cur.execute(
-                "insert into membership (id,tenant_id,user_id,email,role,is_active_workspace) "
-                "values (%s,%s,%s,%s,'owner',true)",
-                (membership_id, tenant_id, user_id, email),
+                "insert into membership "
+                "(id,tenant_id,user_id,email,role,is_active_workspace,preferred_locale) "
+                "values (%s,%s,%s,%s,'owner',true,%s)",
+                (membership_id, tenant_id, user_id, email, member_locale),
             )
             cur.execute(
                 "insert into canonical_product (id,name,base_unit) values (%s,%s,'kilogram')",
@@ -98,6 +102,12 @@ def test_send_localized_rfq_with_persisted_terms(
         assert len(FakeMailer.sent_messages) == 1
         msg = FakeMailer.sent_messages[0]
         assert tenant_name in msg.subject and tenant_name in msg.from_name
+        # Subject, date and body share one language: the sender's, then the workspace's.
+        if arabic:
+            assert msg.subject.startswith("طلب عرض سعر")
+            assert "Request for quotation" not in msg.subject
+        else:
+            assert msg.subject.startswith("Request for quotation")
         assert terms.splitlines()[0] in msg.body and terms.splitlines()[1] in msg.body
         assert terms.splitlines()[0] in msg.html and terms.splitlines()[1] in msg.html
         assert product_name in msg.body and product_name in msg.html

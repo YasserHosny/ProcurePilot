@@ -40,13 +40,9 @@
     <mat-card-content>
       <!-- Document Meta -->
       <div class="doc-meta-strip">
-        <span class="doc-badge">
+        <span class="doc-badge" [matTooltip]="quotation.document.mime_type">
           <mat-icon aria-hidden="true">insert_drive_file</mat-icon>
           {{ documentFileName }}
-        </span>
-        <span class="doc-badge">
-          <mat-icon aria-hidden="true">attachment</mat-icon>
-          {{ quotation.document.mime_type }}
         </span>
       </div>
 
@@ -82,16 +78,18 @@
       <!-- Provenance Details Box -->
       @if (activeExtraction; as fe) {
         <div class="provenance-card">
-          <h3 class="prov-title">{{ 'quotations.review.provenance.title' | translate }}</h3>
+          <h3 class="prov-title">
+            {{ 'quotations.review.provenance.title' | translate }}
+            @if (technicalDetails(fe); as details) {
+              <mat-icon
+                class="prov-details-icon"
+                tabindex="0"
+                [matTooltip]="details"
+                [attr.aria-label]="('quotations.review.provenance.technicalDetails' | translate) + ': ' + details"
+              >info_outline</mat-icon>
+            }
+          </h3>
           <div class="prov-grid">
-            <div class="prov-item">
-              <span class="prov-label">{{ 'quotations.review.provenance.method' | translate }}</span>
-              <span class="prov-val">{{ fe.extraction_method }}</span>
-            </div>
-            <div class="prov-item">
-              <span class="prov-label">{{ 'quotations.review.provenance.model' | translate }}</span>
-              <span class="prov-val">{{ fe.model_version }}</span>
-            </div>
             <div class="prov-item">
               <span class="prov-label">{{ 'quotations.review.provenance.page' | translate }}</span>
               <span class="prov-val">{{ fe.source_page || 1 }}</span>

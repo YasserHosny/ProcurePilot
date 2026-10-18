@@ -30,7 +30,7 @@
         @for (line of data.order.lines; track line.id) {
           @if (lineSummary(line.id); as summary) {
             <div class="line-row">
-              <div class="line-description"><span class="line-number">#{{ line.line_number }}</span><strong>{{ line.description }}</strong><span>{{ linePriceLabel(line) }}</span></div>
+              <div class="line-description"><span class="line-number">#{{ line.line_number }}</span><strong>{{ lineDescription(line.description) }}</strong><span>{{ linePriceLabel(line) }}</span></div>
               <div class="line-evidence"><span>{{ 'orders.detail.ordered' | translate }} <strong>{{ formatQuantity(summary.ordered_quantity) }}</strong></span><span class="evidence-value" [attr.data-state]="summary.confirmed.state">{{ 'orders.detail.confirmed' | translate }} <strong>{{ formatQuantity(summary.confirmed.quantity) }}</strong></span><span class="evidence-value" [attr.data-state]="summary.received.state">{{ 'orders.detail.received' | translate }} <strong>{{ formatQuantity(summary.received.quantity) }}</strong></span><span>{{ 'orders.detail.remaining' | translate }} <strong>{{ formatQuantity(summary.remaining_quantity) }}</strong></span></div>
             </div>
           }
@@ -72,7 +72,7 @@
         <form class="evidence-form" (ngSubmit)="recordConfirmation()">
           <h3>{{ 'orders.detail.confirmationFormTitle' | translate }}</h3>
           <div class="form-grid"><mat-form-field appearance="outline"><mat-label>{{ 'orders.detail.reference' | translate }}</mat-label><input matInput required [ngModel]="confirmationReference()" (ngModelChange)="confirmationReference.set($event)" name="confirmationReference" /></mat-form-field><mat-form-field appearance="outline"><mat-label>{{ 'orders.detail.confirmedDate' | translate }}</mat-label><input matInput required type="date" [ngModel]="confirmationDate()" (ngModelChange)="confirmationDate.set($event)" name="confirmationDate" /></mat-form-field></div>
-          @for (line of data.order.lines; track line.id) { <mat-form-field appearance="outline"><mat-label>{{ line.description }} · {{ 'orders.detail.confirmedQuantity' | translate }}</mat-label><input matInput required type="number" min="0" step="0.000001" [ngModel]="quantityValue(confirmationQuantities(), line)" (ngModelChange)="setQuantity('confirmation', line.id, $event)" [name]="'confirmation-' + line.id" /></mat-form-field> }
+          @for (line of data.order.lines; track line.id) { <mat-form-field appearance="outline"><mat-label>{{ lineDescription(line.description) }} · {{ 'orders.detail.confirmedQuantity' | translate }}</mat-label><input matInput required type="number" min="0" step="0.000001" [ngModel]="quantityValue(confirmationQuantities(), line)" (ngModelChange)="setQuantity('confirmation', line.id, $event)" [name]="'confirmation-' + line.id" /></mat-form-field> }
           <button mat-flat-button color="primary" type="submit" [disabled]="isSaving()" data-testid="save-confirmation">{{ 'orders.detail.save' | translate }}</button>
         </form>
       }
@@ -80,7 +80,7 @@
         <form class="evidence-form" (ngSubmit)="recordReceipt()">
           <h3>{{ 'orders.detail.receiptFormTitle' | translate }}</h3>
           <div class="form-grid"><mat-form-field appearance="outline"><mat-label>{{ 'orders.detail.reference' | translate }}</mat-label><input matInput required [ngModel]="receiptReference()" (ngModelChange)="receiptReference.set($event)" name="receiptReference" /></mat-form-field><mat-form-field appearance="outline"><mat-label>{{ 'orders.detail.receivedDate' | translate }}</mat-label><input matInput required type="date" [ngModel]="receiptDate()" (ngModelChange)="receiptDate.set($event)" name="receiptDate" /></mat-form-field></div>
-          @for (line of data.order.lines; track line.id) { <mat-form-field appearance="outline"><mat-label>{{ line.description }} · {{ 'orders.detail.receivedQuantity' | translate }}</mat-label><input matInput required type="number" min="0" step="0.000001" [ngModel]="quantityValue(receiptQuantities(), line)" (ngModelChange)="setQuantity('receipt', line.id, $event)" [name]="'receipt-' + line.id" /></mat-form-field> }
+          @for (line of data.order.lines; track line.id) { <mat-form-field appearance="outline"><mat-label>{{ lineDescription(line.description) }} · {{ 'orders.detail.receivedQuantity' | translate }}</mat-label><input matInput required type="number" min="0" step="0.000001" [ngModel]="quantityValue(receiptQuantities(), line)" (ngModelChange)="setQuantity('receipt', line.id, $event)" [name]="'receipt-' + line.id" /></mat-form-field> }
           <button mat-flat-button color="primary" type="submit" [disabled]="isSaving()" data-testid="save-receipt">{{ 'orders.detail.save' | translate }}</button>
         </form>
       }

@@ -16,6 +16,8 @@ import { catchError } from 'rxjs/operators';
 
 import { ApiService } from '../../../core/api/api.service';
 import type { Branch, ConfigOptions, ReferenceOption, Supplier } from '../../../core/api/models';
+import { FormatService } from '../../../core/format/format.service';
+import { FormatMoneyPipe } from '../../../core/format/money.pipe';
 import { I18nService } from '../../../core/i18n/i18n.service';
 import { SessionService } from '../../../core/auth/session.service';
 import {
@@ -39,6 +41,7 @@ import {
     MatProgressSpinnerModule,
     MatIconModule,
     TranslateModule,
+    FormatMoneyPipe,
   ],
   templateUrl: './guardrails.component.html',
   styleUrl: './guardrails.component.scss',
@@ -49,6 +52,7 @@ export class GuardrailsComponent implements OnInit {
   private readonly translate = inject(TranslateService);
   private readonly i18n = inject(I18nService);
   private readonly session = inject(SessionService);
+  private readonly format = inject(FormatService);
 
   readonly guardrails = signal<RfqGuardrail[]>([]);
   readonly suppliers = signal<readonly Supplier[]>([]);
@@ -112,6 +116,13 @@ export class GuardrailsComponent implements OnInit {
 
   variancePercent(guardrail: RfqGuardrail): number {
     return Number(guardrail.max_price_variance_pct) * 100;
+  }
+
+  summaryParams(guardrail: RfqGuardrail): Record<string, string> {
+    return {
+      min: this.format.formatNumber(guardrail.min_response_count),
+      variance: this.format.formatNumber(this.variancePercent(guardrail)),
+    };
   }
 
   save(): void {

@@ -6,6 +6,8 @@ import { TranslatePipe } from '@ngx-translate/core';
 
 import { FormatDatePipe } from '../../../core/format/date.pipe';
 import { FormatMoneyPipe } from '../../../core/format/money.pipe';
+import { FormatQuantityPipe } from '../../../core/format/quantity.pipe';
+import { UnitLabelPipe } from '../../../core/format/unit-label';
 import type { PriceHistoryPoint } from '../offers-api';
 
 export interface ChartPoint {
@@ -43,6 +45,8 @@ const PALETTE = [
     TranslatePipe,
     FormatDatePipe,
     FormatMoneyPipe,
+    FormatQuantityPipe,
+    UnitLabelPipe,
   ],
   templateUrl: './price-history-chart.component.html',
   styleUrl: './price-history-chart.component.scss',

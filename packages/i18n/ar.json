@@ -17,7 +17,9 @@
       "ar": "العربية (ar)"
     },
     "all": "الكل",
-    "cancel": "إلغاء"
+    "cancel": "إلغاء",
+    "retry": "إعادة المحاولة",
+    "notAvailable": "غير متوفر"
   },
   "auth": {
     "signin": {
@@ -899,7 +901,7 @@
         "supplierEmptyState": "لا يوجد موردون في مساحة العمل هذه حتى الآن.",
         "supplierEmptyAction": "إضافة مورد",
         "currencyLabel": "العملة",
-        "currencyPlaceholder": "مثال: USD, EUR, SAR",
+        "currencyPlaceholder": "مثال: {{currency}}",
         "currencyRequired": "العملة مطلوبة",
         "issueDateLabel": "تاريخ الإصدار",
         "expiryDateLabel": "تاريخ الانتهاء",
@@ -966,7 +968,8 @@
         "correctedValue": "القيمة المصححة:",
         "correctedBy": "تم التصحيح بواسطة:",
         "correctedAt": "تاريخ التصحيح:",
-        "showSource": "عرض في المستند"
+        "showSource": "عرض في المستند",
+        "technicalDetails": "تفاصيل تقنية"
       },
       "corrections": {
         "title": "تصحيح الحقل",
@@ -977,7 +980,7 @@
         "confirmAsIsTooltip": "تأكيد أن هذه القيمة صحيحة كما استُخرجت"
       },
       "arithmetic": {
-        "mismatchTitle": "تم اكتشاف عدم تطابق حسابي (US3)",
+        "mismatchTitle": "تم اكتشاف فرق حسابي",
         "mismatchDescription": "مجموع قيم البنود المستخرجة لا يطابق المبلغ الإجمالي المذكور في المستند. لا يمكن اعتماد عرض السعر حتى تتم تسوية هذا الفارق أو تصحيحه.",
         "statedTotal": "الإجمالي المذكور في المستند:",
         "computedTotal": "الإجمالي المحسوب للبنود:",
@@ -2903,7 +2906,7 @@
       "pendingVerification": "التحقق من التوفير معلق: {{product}}",
       "approvalRequest": "طلب موافقة رقم #{{number}}",
       "matchResolutionTask": "مطلوب مراجعة مطابقة: {{text}}",
-      "priceAnomaly": "شذوذ في السعر: {{product}} من {{supplier}}",
+      "priceAnomaly": "سعر غير معتاد: {{product}} من {{supplier}}",
       "expiringOffer": "عرض ينتهي قريباً: {{product}} من {{supplier}}"
     }
   },
@@ -2994,7 +2997,8 @@
         "configureAction": "تهيئة",
         "viewLogAction": "عرض السجل",
         "captureAction": "التقاط",
-        "importAction": "استيراد"
+        "importAction": "استيراد",
+        "manageAction": "إدارة"
       },
       "loading": "جارٍ تحميل لوحة معلومات الاستيراد...",
       "error": {
@@ -3137,7 +3141,8 @@
         "address": "مطابقة عنوان البريد",
         "domain": "مطابقة النطاق",
         "thread": "مطابقة سلسلة المراسلات",
-        "manual": "مطابقة يدوية"
+        "manual": "مطابقة يدوية",
+        "rfq_reply": "رد على طلب عرض سعر"
       },
       "viewQuotation": "عرض عرض السعر",
       "quotationLink": "عرض عرض السعر",
@@ -3167,7 +3172,8 @@
         "title": "تعذر تحميل سجل البريد",
         "generic": "حدث خطأ غير متوقع أثناء تحميل سجل رسائل البريد.",
         "retry": "إعادة المحاولة"
-      }
+      },
+      "matchedSupplier": "مورد مطابق"
     },
     "capture": {
       "title": "التقاط عروض الأسعار",
@@ -3320,7 +3326,7 @@
       "linesTotalLabel": "إجمالي البنود",
       "linePrefix": "البند",
       "noProduct": "-- لا يوجد --",
-      "currencyPlaceholder": "مثال: USD, GBP",
+      "currencyPlaceholder": "مثال: {{currency}}",
       "errors": {
         "required": "مطلوب",
         "currencyFormat": "رمز من 3 أحرف",
@@ -3866,5 +3872,12 @@
       },
       "unknownProduct": "منتج غير معروف"
     }
+  },
+  "units": {
+    "litre": "لتر",
+    "millilitre": "مل",
+    "kilogram": "كجم",
+    "gram": "جم",
+    "each": "وحدة"
   }
 }

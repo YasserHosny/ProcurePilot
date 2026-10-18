@@ -27,6 +27,7 @@ import type {
 import { SessionService } from '../../../core/auth/session.service';
 import { FormatDatePipe } from '../../../core/format/date.pipe';
 import { FormatMoneyPipe } from '../../../core/format/money.pipe';
+import { UnitLabelPipe } from '../../../core/format/unit-label';
 
 type MatchTaskSortBy = 'created_at' | 'priority' | 'status';
 type MatchTaskSortOrder = 'asc' | 'desc';
@@ -53,6 +54,7 @@ export interface QuotationTaskGroup {
     MatProgressSpinnerModule,
     MatTooltipModule,
     TranslatePipe,
+    UnitLabelPipe,
     FormatDatePipe,
     FormatMoneyPipe,
   ],

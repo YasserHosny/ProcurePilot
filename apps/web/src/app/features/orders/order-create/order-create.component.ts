@@ -6,7 +6,7 @@ import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormArray, FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
-import { MatOptionModule, provideNativeDateAdapter } from '@angular/material/core';
+import { MatOptionModule } from '@angular/material/core';
 import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
@@ -24,7 +24,8 @@ import { catchError, forkJoin, of } from 'rxjs';
 import { ApiService } from '../../../core/api/api.service';
 import type { Product, Supplier } from '../../../core/api/models';
 import { OrdersApiService, type PurchaseOrderCreate } from '../orders-api';
-import { packLabel } from '../pack-label';
+import { lineDescription, packLabel } from '../pack-label';
+import { provideAppDateAdapter } from '../../../core/i18n/date-adapter';
 
 interface OrderLineForm {
   workspace_product_id: FormControl<string | null>;
@@ -55,7 +56,7 @@ interface OrderLineForm {
     TranslatePipe,
     DecimalPipe,
   ],
-  providers: [provideNativeDateAdapter()],
+  providers: [provideAppDateAdapter()],
   templateUrl: './order-create.component.html',
   styleUrl: './order-create.component.scss',
 })
@@ -69,6 +70,7 @@ export class OrderCreateComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly requestsApi = inject(RequestsApiService);
   private readonly session = inject(SessionService);
+  readonly homeCurrency = this.session.homeCurrency() ?? 'USD';
 
   readonly suppliers = signal<Supplier[]>([]);
   readonly products = signal<Product[]>([]);
@@ -201,7 +203,7 @@ export class OrderCreateComponent implements OnInit {
           this.lines.push(
             new FormGroup<OrderLineForm>({
               workspace_product_id: new FormControl<string | null>(line.workspace_product_id),
-              description: new FormControl<string>(line.description, { nonNullable: true, validators: [Validators.required] }),
+              description: new FormControl<string>(lineDescription(line.description), { nonNullable: true, validators: [Validators.required] }),
               quantity: new FormControl<number | null>(parseFloat(line.ordered_quantity), { validators: [Validators.required, Validators.min(0.0001)] }),
               base_unit: new FormControl<string>(line.base_unit, { nonNullable: true, validators: [Validators.required] }),
               unit_price: new FormControl<number | null>(parseFloat(line.unit_price.amount), { validators: [Validators.required, Validators.min(0)] }),

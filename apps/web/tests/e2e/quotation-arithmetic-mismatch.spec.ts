@@ -38,7 +38,7 @@ test.describe('Quotation Arithmetic Mismatch (T055, US3)', () => {
     // The mismatch banner is present on every stub upload — stated total is never 75.00.
     const banner = page.locator('.arithmetic-mismatch-banner');
     await expect(banner).toBeVisible();
-    await expect(page.locator('.mismatch-title')).toContainText('Arithmetic Discrepancy Detected');
+    await expect(page.locator('.mismatch-title')).toContainText('Arithmetic discrepancy detected');
 
     // Breakdown: stated (88.00 or 77.00, hash-chosen) vs computed (always 75.00).
     const statedValue = page.locator('.breakdown-item').first().locator('.breakdown-val');

@@ -307,7 +307,14 @@ class DigestsService:
 
             now = datetime.now(UTC)
             period_start, period_end = derive_weekly_window(now, tz_name)
-            sub_locale = str(sub_row.get("locale") or "en") if sub_row else "en"
+            # The in-app view follows the reader's interface language; the subscription's
+            # own locale only governs the emailed digest.
+            sub_locale = str(
+                ctx.get("preferred_locale")
+                or (sub_row.get("locale") if sub_row else None)
+                or ctx.get("default_locale")
+                or "en"
+            )
             sections = self._assemble_sections(
                 conn,
                 tenant_id=member.tenant_id,

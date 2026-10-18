@@ -18,6 +18,8 @@ import { ApiService } from '../../../core/api/api.service';
 import type { ApiError, Product, Supplier } from '../../../core/api/models';
 import { FormatDatePipe } from '../../../core/format/date.pipe';
 import { FormatMoneyPipe } from '../../../core/format/money.pipe';
+import { FormatQuantityPipe } from '../../../core/format/quantity.pipe';
+import { UnitLabelPipe } from '../../../core/format/unit-label';
 import type { PriceHistoryResponse } from '../offers-api';
 import { PriceHistoryChartComponent } from './price-history-chart.component';
 
@@ -40,6 +42,8 @@ import { PriceHistoryChartComponent } from './price-history-chart.component';
     TranslatePipe,
     FormatDatePipe,
     FormatMoneyPipe,
+    FormatQuantityPipe,
+    UnitLabelPipe,
     PriceHistoryChartComponent,
   ],
   templateUrl: './product-intelligence.component.html',

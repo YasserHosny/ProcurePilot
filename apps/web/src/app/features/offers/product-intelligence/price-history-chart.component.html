@@ -110,10 +110,10 @@
         >
           <div class="tooltip-supplier">{{ active.raw.supplier_name }}</div>
           <div class="tooltip-price">
-            {{ active.raw.normalised_unit_price | formatMoney }} / {{ active.raw.base_unit }}
+            {{ active.raw.normalised_unit_price | formatMoney }} / {{ active.raw.base_unit | unitLabel }}
           </div>
           <div class="tooltip-meta">
-            {{ 'productIntelligence.historyTable.quantity' | translate }}: {{ active.raw.quantity }}
+            {{ 'productIntelligence.historyTable.quantity' | translate }}: {{ active.raw.quantity | formatQuantity }}
             · {{ active.raw.recorded_at | formatDate }}
           </div>
         </div>

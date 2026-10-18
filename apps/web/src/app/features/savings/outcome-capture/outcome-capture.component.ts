@@ -8,7 +8,6 @@ import { MatDividerModule } from '@angular/material/divider';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
-import { MatNativeDateModule } from '@angular/material/core';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
@@ -24,8 +23,11 @@ import {
   type PurchaseOutcomeCreate,
   SavingsApiService,
 } from '../savings-api';
+import { provideAppDateAdapter } from '../../../core/i18n/date-adapter';
+import { UnitLabelPipe } from '../../../core/format/unit-label';
 
 @Component({
+  providers: [provideAppDateAdapter()],
   selector: 'app-outcome-capture',
   standalone: true,
   imports: [
@@ -36,13 +38,13 @@ import {
     MatInputModule,
     MatSelectModule,
     MatDatepickerModule,
-    MatNativeDateModule,
     MatButtonModule,
     MatIconModule,
     MatDividerModule,
     MatProgressSpinnerModule,
     MatSnackBarModule,
     TranslatePipe,
+    UnitLabelPipe,
   ],
   templateUrl: './outcome-capture.component.html',
   styleUrl: './outcome-capture.component.scss',
@@ -52,6 +54,7 @@ export class OutcomeCaptureComponent implements OnInit {
   private readonly api = inject(ApiService);
   private readonly savingsApi = inject(SavingsApiService);
   private readonly session = inject(SessionService);
+  readonly homeCurrency = this.session.homeCurrency() ?? 'USD';
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly snackBar = inject(MatSnackBar);
@@ -74,6 +77,9 @@ export class OutcomeCaptureComponent implements OnInit {
     'disputed',
   ];
 
+  /** supported_base_unit codes; labels come from the `units` catalogue. */
+  readonly baseUnits = ['each', 'kilogram', 'gram', 'litre', 'millilitre'] as const;
+
   readonly form = this.fb.group({
     workspace_product_id: ['', [Validators.required]],
     supplier_id: [''],
@@ -83,7 +89,7 @@ export class OutcomeCaptureComponent implements OnInit {
     quantity: ['10', [Validators.required, Validators.pattern(/^\d+(\.\d{1,6})?$/)]],
     base_unit: ['each', [Validators.required]],
     unit_price_amount: ['', [Validators.required, Validators.pattern(/^-?\d+(\.\d{1,4})?$/)]],
-    currency: ['GBP', [Validators.required, Validators.pattern(/^[A-Z]{3}$/)]],
+    currency: [this.homeCurrency, [Validators.required, Validators.pattern(/^[A-Z]{3}$/)]],
     total_paid_amount: ['', [Validators.required, Validators.pattern(/^-?\d+(\.\d{1,4})?$/)]],
     delivery_result: ['delivered' as PurchaseDeliveryResult, [Validators.required]],
     ordered_at: [null as Date | null],

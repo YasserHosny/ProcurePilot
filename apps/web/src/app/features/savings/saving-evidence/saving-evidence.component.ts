@@ -29,6 +29,8 @@ import {
   isNegativeSaving,
   isPositiveSaving,
 } from '../savings-formatting';
+import { FormatQuantityPipe } from '../../../core/format/quantity.pipe';
+import { UnitLabelPipe } from '../../../core/format/unit-label';
 
 @Component({
   selector: 'app-saving-evidence',
@@ -45,6 +47,8 @@ import {
     MatProgressSpinnerModule,
     MatSnackBarModule,
     TranslatePipe,
+    FormatQuantityPipe,
+    UnitLabelPipe,
     FormatDatePipe,
     FormatMoneyPipe,
   ],

@@ -300,8 +300,8 @@
                     (input)="onQuantityChange(i, $any($event.target).value)"
                     required
                   />
-                  @if (baseUnitFor(item.workspace_product_id); as unit) {
-                    <mat-hint>{{ 'basketSplit.form.packHint' | translate:{ count: item.quantity, size: packBaseQuantityFor(item.workspace_product_id), total: baseQuantityFor(item), unit } }}</mat-hint>
+                  @if (baseUnitFor(item.workspace_product_id)) {
+                    <mat-hint>{{ 'basketSplit.form.packHint' | translate: packHintParams(item) }}</mat-hint>
                   }
                 </mat-form-field>
 
