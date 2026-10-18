@@ -31,6 +31,24 @@ class _Repository:
         self.invitations: dict[UUID, MemberInvitationRecord] = {}
         self.memberships: dict[tuple[UUID, UUID], Membership] = {}
 
+    locale = "en"
+
+    def workspace_for_email(self, *, bearer_token: str, tenant_id: UUID) -> tuple[str, str]:
+        assert bearer_token == "owner-token"
+        assert tenant_id == TENANT_ID
+        return "Example Workspace", self.locale
+
+    def rotate_token(
+        self, *, bearer_token: str, invitation_id: UUID, token_hash: str, expires_at: datetime
+    ) -> MemberInvitationRecord | None:
+        assert bearer_token == "owner-token"
+        invitation = self.invitations.get(invitation_id)
+        if invitation is None or invitation.status != "pending":
+            return None
+        updated = invitation.model_copy(update={"token_hash": token_hash, "expires_at": expires_at})
+        self.invitations[invitation_id] = updated
+        return updated
+
     def issue(
         self,
         *,
@@ -67,9 +85,7 @@ class _Repository:
     def list_pending(self, *, bearer_token: str) -> list[MemberInvitationRecord]:
         del bearer_token
         return [
-            invitation
-            for invitation in self.invitations.values()
-            if invitation.status == "pending"
+            invitation for invitation in self.invitations.values() if invitation.status == "pending"
         ]
 
     def revoke(
@@ -154,6 +170,7 @@ def service(
     monkeypatch: pytest.MonkeyPatch,
 ) -> MemberInvitationService:
     audit = _AuditWriter()
+    monkeypatch.setenv("RFQ_MAILER_MODE", "stub")
     monkeypatch.setattr(invitation_module, "get_audit_writer", lambda: audit)
     return MemberInvitationService(repository=repository, settings=get_settings())
 
@@ -183,7 +200,9 @@ def test_accept_invitation_creates_membership(
 ) -> None:
     _add_invitation(repository)
 
-    membership = service.accept(bearer_token=BEARER, token=TOKEN,
+    membership = service.accept(
+        bearer_token=BEARER,
+        token=TOKEN,
         user_id=INVITEE_USER_ID,
         accepting_email="buyer@example.test",
     )
@@ -201,11 +220,15 @@ def test_double_accept_returns_existing_membership_without_creating_a_second_one
 ) -> None:
     _add_invitation(repository)
 
-    first = service.accept(bearer_token=BEARER, token=TOKEN,
+    first = service.accept(
+        bearer_token=BEARER,
+        token=TOKEN,
         user_id=INVITEE_USER_ID,
         accepting_email="buyer@example.test",
     )
-    second = service.accept(bearer_token=BEARER, token=TOKEN,
+    second = service.accept(
+        bearer_token=BEARER,
+        token=TOKEN,
         user_id=INVITEE_USER_ID,
         accepting_email="buyer@example.test",
     )
@@ -322,3 +345,147 @@ def _add_invitation(
     )
     repository.invitations[invitation.id] = invitation
     return invitation.id
+
+
+@pytest.mark.parametrize("locale", ["en", "ar"])
+def test_issue_emails_invitation(
+    repository: _Repository, monkeypatch: pytest.MonkeyPatch, locale: str
+) -> None:
+    from procurepilot_api.shared.i18n import t
+    from procurepilot_api.shared.mailer import FakeMailer
+
+    audit = _AuditWriter()
+    monkeypatch.setattr(invitation_module, "get_audit_writer", lambda: audit)
+    repository.locale = locale
+    FakeMailer.clear()
+    mailer = FakeMailer()
+    settings = get_settings().model_copy(update={"web_origin": "https://app.example.test/"})
+    service = MemberInvitationService(repository=repository, settings=settings, mailer=mailer)
+    result = service.issue(
+        bearer_token="owner-token",
+        member=_owner(),
+        email="buyer@example.test",
+        role=MemberRole.buyer,
+    )
+    assert result.email_delivery == "sent"
+    assert len(mailer.sent_messages) == 1
+    message = mailer.sent_messages[0]
+    assert message.to == "buyer@example.test"
+    for content in (message.body, message.html):
+        assert "Example Workspace" in content
+        assert _owner().email in content
+        assert (
+            f"https://app.example.test/onboarding/accept-invitation?token={result.token}" in content
+        )
+    assert f'lang="{locale}"' in message.html
+    assert f'dir="{"rtl" if locale == "ar" else "ltr"}"' in message.html
+    assert message.subject == t(
+        "team.invitationEmail.subject", locale, workspace="Example Workspace"
+    )
+    event = audit.events[-1]
+    assert event.action == "member.invitation_emailed"
+    assert event.target["delivery"] == "sent"
+    assert event.outcome == "success"
+    for event in audit.events:
+        assert result.token not in str(event.target)
+        assert hash_member_invitation_token(result.token) not in str(event.target)
+
+
+def test_issue_without_config_still_returns_token(
+    repository: _Repository, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    audit = _AuditWriter()
+    monkeypatch.setattr(invitation_module, "get_audit_writer", lambda: audit)
+    monkeypatch.setenv("RFQ_MAILER_MODE", "stub")
+    service = MemberInvitationService(repository=repository, settings=get_settings())
+    result = service.issue(
+        bearer_token="owner-token",
+        member=_owner(),
+        email="buyer@example.test",
+        role=MemberRole.buyer,
+    )
+    assert result.token
+    assert result.email_delivery == "not_configured"
+    assert audit.events[-1].outcome == "refused"
+    assert audit.events[-1].target["delivery"] == "not_configured"
+
+
+@pytest.mark.parametrize("failure", ["provider", "lookup", "render"])
+def test_email_failure_does_not_lose_invitation(
+    repository: _Repository,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+    failure: str,
+) -> None:
+    from procurepilot_api.shared.mailer import FakeMailer
+
+    audit = _AuditWriter()
+    monkeypatch.setattr(invitation_module, "get_audit_writer", lambda: audit)
+
+    def fail(*args: object, **kwargs: object) -> None:
+        raise RuntimeError("sensitive exception text must not be logged")
+
+    mailer = FakeMailer()
+    if failure == "provider":
+        monkeypatch.setattr(mailer, "send", fail)
+    elif failure == "lookup":
+        monkeypatch.setattr(repository, "workspace_for_email", fail)
+    else:
+        monkeypatch.setattr(invitation_module, "render_invitation_email", fail)
+    service = MemberInvitationService(repository=repository, settings=get_settings(), mailer=mailer)
+    result = service.issue(
+        bearer_token="owner-token",
+        member=_owner(),
+        email="buyer@example.test",
+        role=MemberRole.buyer,
+    )
+    assert result.token
+    assert result.email_delivery == "failed"
+    assert audit.events[-1].outcome == "refused"
+    assert audit.events[-1].target["delivery"] == "failed"
+    assert result.token not in caplog.text
+    assert hash_member_invitation_token(result.token) not in caplog.text
+    assert "sensitive exception text" not in caplog.text
+    assert "RuntimeError" in caplog.text
+
+
+def test_resend_rotates_same_row_and_invalidates_old_token(
+    repository: _Repository, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from procurepilot_api.shared.mailer import FakeMailer
+
+    audit = _AuditWriter()
+    monkeypatch.setattr(invitation_module, "get_audit_writer", lambda: audit)
+    invitation_id = _add_invitation(repository)
+    before = repository.invitations[invitation_id]
+    FakeMailer.clear()
+    mailer = FakeMailer()
+    service = MemberInvitationService(repository=repository, settings=get_settings(), mailer=mailer)
+    result = service.resend(
+        bearer_token="owner-token", member=_owner(), invitation_id=invitation_id
+    )
+    assert result.id == invitation_id
+    assert result.token != TOKEN
+    assert result.expires_at > before.expires_at
+    assert repository.invitations[invitation_id].token_hash != before.token_hash
+    assert service.invitation_for_token(result.token).id == invitation_id
+    with pytest.raises(InvitationRefusedError):
+        service.invitation_for_token(TOKEN)
+    assert result.email_delivery == "sent"
+    assert len(mailer.sent_messages) == 1
+    assert audit.events[-2].action == "member.invitation_resent"
+    assert audit.events[-1].target["resend"] is True
+    for event in audit.events:
+        assert result.token not in str(event.target)
+        assert hash_member_invitation_token(result.token) not in str(event.target)
+
+
+@pytest.mark.parametrize("status", ["unknown", "accepted", "revoked", "expired"])
+def test_resend_missing_or_nonpending_is_not_found(
+    service: MemberInvitationService, repository: _Repository, status: str
+) -> None:
+    from procurepilot_api.errors import NotFoundError
+
+    invitation_id = uuid4() if status == "unknown" else _add_invitation(repository, status=status)
+    with pytest.raises(NotFoundError):
+        service.resend(bearer_token="owner-token", member=_owner(), invitation_id=invitation_id)

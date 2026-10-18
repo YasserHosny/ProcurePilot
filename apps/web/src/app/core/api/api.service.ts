@@ -200,6 +200,10 @@ export class ApiService {
     return this.http.post<Invitation>(`${this.base}/invitations`, { email, role });
   }
 
+  resendInvitation(id: string): Observable<Invitation> {
+    return this.http.post<Invitation>(`${this.base}/invitations/${id}/resend`, {});
+  }
+
   revokeInvitation(invitationId: string): Observable<void> {
     return this.http.delete<void>(`${this.base}/invitations/${invitationId}`);
   }

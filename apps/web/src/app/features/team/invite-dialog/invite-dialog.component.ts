@@ -2,7 +2,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { Component, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
-import { MatDialogModule, MatDialogRef } from '@angular/material/dialog';
+import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
@@ -42,6 +42,14 @@ export class InviteDialogComponent {
   private readonly translate = inject(TranslateService);
   private readonly dialogRef = inject(MatDialogRef<InviteDialogComponent, boolean>);
 
+  readonly data = inject<{ result: Invitation } | null>(MAT_DIALOG_DATA, { optional: true });
+
+  constructor() {
+    if (this.data?.result) {
+      this.showResult(this.data.result);
+    }
+  }
+
   readonly roles: readonly Role[] = ['owner', 'buyer', 'branch_manager', 'approver', 'viewer'];
 
   readonly isSubmitting = signal<boolean>(false);
@@ -70,15 +78,7 @@ export class InviteDialogComponent {
     this.api.invite(email.trim(), role).subscribe({
       next: (invitation) => {
         this.isSubmitting.set(false);
-        const token = (invitation as Invitation & { token?: string }).token;
-        const origin = typeof window !== 'undefined' ? window.location.origin : '';
-        const inviteUrl = token ? `${origin}/onboarding/accept-invitation?token=${encodeURIComponent(token)}` : undefined;
-
-        this.createdResult.set({
-          invitation,
-          token,
-          inviteUrl,
-        });
+        this.showResult(invitation);
       },
       error: (err: unknown) => {
         this.isSubmitting.set(false);
@@ -104,6 +104,13 @@ export class InviteDialogComponent {
         this.errorMessage.set(this.translate.instant('team.inviteDialog.genericError'));
       },
     });
+  }
+
+  private showResult(invitation: Invitation): void {
+    const token = invitation.token;
+    const origin = typeof window !== 'undefined' ? window.location.origin : '';
+    const inviteUrl = token ? `${origin}/onboarding/accept-invitation?token=${encodeURIComponent(token)}` : undefined;
+    this.createdResult.set({ invitation, token, inviteUrl });
   }
 
   copyToClipboard(textToCopy: string): void {

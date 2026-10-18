@@ -337,10 +337,10 @@ paths:
       responses:
         '201':
           description: >
-            Invitation created. The plaintext token is returned ONCE, in this response and
-            nowhere else — there is no email delivery in this chunk, so the owner passes it to
-            the invitee themselves. It is stored only as a hash, never logged, and never
-            appears in any listing.
+            Invitation created. The plaintext token is shown once in this response and stored
+            only as a hash, never logged or listed. The invitee is emailed via Mailgun when
+            configured, in the workspace language. email_delivery reports sent, not_configured,
+            or failed; the returned token allows a copy-link fallback in every case.
           content:
             application/json:
               schema:
@@ -351,6 +351,9 @@ paths:
                       token:
                         type: string
                         description: Shown once at creation; not retrievable afterwards.
+                      email_delivery:
+                        type: string
+                        enum: [sent, not_configured, failed]
         '403': { $ref: '#/components/responses/Forbidden' }
         '409':
           description: An invitation is already pending for that address
@@ -366,6 +369,36 @@ paths:
       responses:
         '204': { description: Revoked }
         '403': { $ref: '#/components/responses/Forbidden' }
+
+  /invitations/{invitation_id}/resend:
+    parameters:
+      - { name: invitation_id, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      summary: Resend a pending invitation (owner only)
+      description: >
+        Rotates the token on the same invitation and restarts its expiry. The old link
+        stops working immediately. Email is sent when Mailgun is configured.
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: Invitation rotated; new token shown once with delivery outcome.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Invitation'
+                  - type: object
+                    required: [token, email_delivery]
+                    properties:
+                      token: { type: string }
+                      email_delivery: { type: string, enum: [sent, not_configured, failed] }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404':
+          description: Invitation not found or no longer pending (including another tenant).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
 
   /invitations/accept:
     post:

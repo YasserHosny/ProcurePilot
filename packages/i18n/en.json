@@ -408,7 +408,8 @@
     "actions": {
       "changeRole": "Change role",
       "removeMember": "Remove member",
-      "revokeInvitation": "Revoke invitation"
+      "revokeInvitation": "Revoke invitation",
+      "resendInvitation": "Resend invitation"
     },
     "emptyMembers": "No members found in this workspace.",
     "emptyInvitations": "No pending invitations.",
@@ -433,13 +434,17 @@
       "cancelButton": "Cancel",
       "closeButton": "Close",
       "tokenCreatedTitle": "Invitation Created",
-      "tokenCreatedNotice": "Share this invitation link or token with the invitee. Because email delivery is not configured in this phase, the token is shown once only.",
+      "tokenCreatedNotice": "Keep a copy of this link to share if needed. It is only shown once.",
       "tokenLabel": "Invitation Token",
       "linkCopyButton": "Copy Link",
       "tokenCopyButton": "Copy Token",
       "copied": "Copied to clipboard!",
       "duplicateInviteError": "An invitation is already pending for this email address.",
-      "genericError": "Unable to create invitation. Please try again."
+      "genericError": "Unable to create invitation. Please try again.",
+      "resentTitle": "Invitation resent",
+      "emailedNotice": "Invitation emailed to {{email}}",
+      "notConfiguredWarning": "Email delivery is not configured. Copy the invitation link below and share it with your colleague.",
+      "failedWarning": "The invitation email could not be sent. Copy the link below and share it with your colleague."
     },
     "changeRoleDialog": {
       "title": "Change Member Role",
@@ -467,6 +472,16 @@
       "confirmButton": "Revoke Invitation",
       "cancelButton": "Cancel",
       "revokingButton": "Revoking..."
+    },
+    "invitationEmail": {
+      "subject": "Invitation to {{workspace}}",
+      "fromName": "{{workspace}} · ProcurePilot",
+      "greeting": "Hello,",
+      "intro": "{{inviter}} has invited you to join {{workspace}}.",
+      "role": "Your role: {{role}}",
+      "expiry": "This invitation expires on {{date}}.",
+      "accept": "Accept invitation",
+      "ignore": "If you were not expecting this invitation, you can ignore this email."
     }
   },
   "catalogue": {

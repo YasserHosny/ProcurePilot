@@ -408,7 +408,8 @@
     "actions": {
       "changeRole": "تغيير الدور",
       "removeMember": "إزالة العضو",
-      "revokeInvitation": "إلغاء الدعوة"
+      "revokeInvitation": "إلغاء الدعوة",
+      "resendInvitation": "إعادة إرسال الدعوة"
     },
     "emptyMembers": "لم يتم العثور على أعضاء في مساحة العمل هذه.",
     "emptyInvitations": "لا توجد دعوات معلقة.",
@@ -433,13 +434,17 @@
       "cancelButton": "إلغاء",
       "closeButton": "إغلاق",
       "tokenCreatedTitle": "تم إنشاء الدعوة بنجاح",
-      "tokenCreatedNotice": "شارك رابط الدعوة هذا أو رمز الدعوة مع الشخص المدعو. نظراً لعدم تفعيل الإرسال بالبريد في هذه المرحلة، يظهر الرمز لمرة واحدة فقط.",
+      "tokenCreatedNotice": "احتفظ بنسخة من هذا الرابط لمشاركته عند الحاجة. يُعرض مرة واحدة فقط.",
       "tokenLabel": "رمز الدعوة",
       "linkCopyButton": "نسخ الرابط",
       "tokenCopyButton": "نسخ الرمز",
       "copied": "تم النسخ إلى الحافظة!",
       "duplicateInviteError": "توجد دعوة معلقة بالفعل لهذا البريد الإلكتروني.",
-      "genericError": "تعذر إنشاء الدعوة. يُرجى المحاولة مرة أخرى."
+      "genericError": "تعذر إنشاء الدعوة. يُرجى المحاولة مرة أخرى.",
+      "resentTitle": "أُعيد إرسال الدعوة",
+      "emailedNotice": "أُرسلت الدعوة بالبريد الإلكتروني إلى {{email}}",
+      "notConfiguredWarning": "إرسال البريد الإلكتروني غير مهيأ. انسخ رابط الدعوة أدناه وشاركه مع زميلك.",
+      "failedWarning": "تعذّر إرسال رسالة الدعوة. انسخ الرابط أدناه وشاركه مع زميلك."
     },
     "changeRoleDialog": {
       "title": "تغيير دور العضو",
@@ -467,6 +472,16 @@
       "confirmButton": "إلغاء الدعوة",
       "cancelButton": "إلغاء",
       "revokingButton": "جاري الإلغاء..."
+    },
+    "invitationEmail": {
+      "subject": "دعوة للانضمام إلى {{workspace}}",
+      "fromName": "{{workspace}} · ProcurePilot",
+      "greeting": "مرحباً،",
+      "intro": "دعاك {{inviter}} للانضمام إلى {{workspace}}.",
+      "role": "دورك: {{role}}",
+      "expiry": "تنتهي صلاحية هذه الدعوة في {{date}}.",
+      "accept": "قبول الدعوة",
+      "ignore": "إذا لم تكن تتوقع هذه الدعوة، يمكنك تجاهل هذه الرسالة."
     }
   },
   "catalogue": {

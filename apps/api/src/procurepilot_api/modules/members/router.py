@@ -256,3 +256,13 @@ def revoke_invitation(
 ) -> Response:
     service.revoke(bearer_token=token, member=member, invitation_id=invitation_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post("/invitations/{invitation_id}/resend", response_model=MemberInvitation)
+def resend_invitation(
+    invitation_id: UUID,
+    token: Annotated[str, Depends(bearer_token)],
+    member: Annotated[CurrentMember, Depends(require_role(MemberRole.owner))],
+    service: Annotated[MemberInvitationService, Depends(get_member_invitation_service)],
+) -> MemberInvitation:
+    return service.resend(bearer_token=token, member=member, invitation_id=invitation_id)
