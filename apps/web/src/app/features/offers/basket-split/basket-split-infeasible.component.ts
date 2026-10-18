@@ -1,13 +1,14 @@
 import { CommonModule } from '@angular/common';
-import { Component, EventEmitter, Input, Output } from '@angular/core';
+import { Component, EventEmitter, Input, Output, inject } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatIconModule } from '@angular/material/icon';
-import { TranslatePipe } from '@ngx-translate/core';
+import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
 import type { Product, Supplier } from '../../../core/api/models';
 import type { BasketSplitJob, ViolatedOptimisationConstraint } from '../offers-api';
+import { constraintText } from './constraint-text';
 import type { BasketSplitUIState } from './basket-split-state';
 
 @Component({
@@ -25,6 +26,8 @@ import type { BasketSplitUIState } from './basket-split-state';
   styleUrl: './basket-split-infeasible.component.scss',
 })
 export class BasketSplitInfeasibleComponent {
+  private readonly translate = inject(TranslateService);
+
   @Input({ required: true }) uiState!: BasketSplitUIState;
   @Input({ required: true }) currentJob!: BasketSplitJob | null;
   @Input({ required: true }) isWriter = false;
@@ -50,6 +53,10 @@ export class BasketSplitInfeasibleComponent {
     const ids = this.currentJob?.error?.['product_ids'];
     const names = Array.isArray(ids) ? ids.map((id) => this.getProductName(String(id))).join(', ') : '';
     return { products: names };
+  }
+
+  constraintLabel(constraint: ViolatedOptimisationConstraint): string {
+    return constraintText(constraint, this.translate, (id) => this.getSupplierName(id));
   }
 
   getSupplierName(supplierId: string): string {

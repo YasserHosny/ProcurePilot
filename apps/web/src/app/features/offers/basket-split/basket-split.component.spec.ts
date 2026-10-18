@@ -684,6 +684,9 @@ describe('BasketSplitComponent (US3, T045)', () => {
         },
       };
 
+      const translate = TestBed.inject(TranslateService);
+      translate.setTranslation('en', en);
+      translate.use('en');
       component.currentJob.set(richJob);
       fixture.detectChanges();
 
@@ -693,7 +696,9 @@ describe('BasketSplitComponent (US3, T045)', () => {
       expect(component.validUntil()).toBe('2026-09-20T10:00:00Z');
 
       const el: HTMLElement = fixture.nativeElement;
-      expect(el.textContent).toContain('Supplier Alpha requires a GBP 250.00 minimum order value.');
+      // Constraints render as localised sentences chosen by kind, never the solver's free text.
+      expect(el.textContent).toContain('Minimum order value checked for Supplier Alpha');
+      expect(el.textContent).not.toContain('requires a GBP 250.00');
       expect(el.textContent).toContain('Supplier Alpha has moderate lead time risk.');
     });
   });

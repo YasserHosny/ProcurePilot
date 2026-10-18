@@ -28,7 +28,9 @@ def normalise_stored_result(result: object) -> object:
     out["confidence"] = _confidence(result.get("confidence"))
     out["risk_notes"] = _risk_notes(result.get("risk_notes", []))
     out["applied_constraints"] = [
-        _constraint(c, violated=False) for c in result.get("applied_constraints", [])
+        _constraint(c, violated=False)
+        for c in result.get("applied_constraints", [])
+        if not _is_solver_internal(c)
     ]
     out["violated_constraints"] = [
         _constraint(c, violated=True) for c in result.get("violated_constraints", [])
@@ -48,6 +50,11 @@ def _is_worker_advanced_result(result: dict[str, Any]) -> bool:
             for line in allocation.get("lines", [])
         )
     ) and "applied_constraints" in result
+
+
+def _is_solver_internal(constraint: dict[str, Any]) -> bool:
+    """The solver reports its deterministic tie-break as a constraint; buyers never see it."""
+    return "tie-break" in str(constraint.get("description", "")).lower()
 
 
 def _allocation(allocation: dict[str, Any]) -> dict[str, Any]:

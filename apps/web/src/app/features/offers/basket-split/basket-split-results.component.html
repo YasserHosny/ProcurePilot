@@ -62,14 +62,14 @@
       }
 
       <!-- Advanced Details: Constraints & Risk Notes -->
-      @if (appliedConstraints.length > 0 || violatedConstraints.length > 0 || riskNotes.length > 0) {
+      @if (visibleAppliedConstraints.length > 0 || violatedConstraints.length > 0 || riskNotes.length > 0) {
         <div class="rich-result-details">
-          @if (appliedConstraints.length > 0) {
+          @if (visibleAppliedConstraints.length > 0) {
             <div class="details-block applied-constraints">
               <h4>{{ 'advancedBasket.result.appliedConstraints' | translate }}</h4>
               <ul>
-                @for (ac of appliedConstraints; track $index) {
-                  <li>{{ ac.description || (('advancedBasket.constraints.' + (ac.kind || ac.type)) | translate) }}</li>
+                @for (ac of visibleAppliedConstraints; track $index) {
+                  <li>{{ constraintLabel(ac) }}</li>
                 }
               </ul>
             </div>
@@ -79,7 +79,7 @@
               <h4>{{ 'advancedBasket.result.violatedConstraints' | translate }}</h4>
               <ul>
                 @for (vc of violatedConstraints; track $index) {
-                  <li>{{ vc.description || vc.reason || (('advancedBasket.constraints.' + (vc.kind || vc.type)) | translate) }}</li>
+                  <li>{{ constraintLabel(vc) }}</li>
                 }
               </ul>
             </div>
@@ -124,7 +124,13 @@
                   <td class="product-cell">
                     {{ getProductName(line.workspace_product_id) }}
                   </td>
-                  <td>{{ line.quantity }}</td>
+                  <td>
+                    @let q = quantityDisplay(line);
+                    <span class="qty-primary">{{ q.primary }}</span>
+                    @if (q.secondary) {
+                      <small class="qty-secondary">{{ q.secondary }}</small>
+                    }
+                  </td>
                   <td><strong>{{ line.landed_cost | formatMoney }}</strong></td>
                 </tr>
               }

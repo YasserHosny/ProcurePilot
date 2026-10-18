@@ -1595,7 +1595,9 @@
       "infeasibleReason": "المنتج/المنتجات التالية لا تملك عروضاً مؤهلة من الموردين المحددين:",
       "missingSuppliers": "عروض غير متوفرة من: {{suppliers}}",
       "solverVersion": "إصدار نظام التحسين: {{version}}",
-      "computedAt": "تم الحساب في {{time}}"
+      "computedAt": "تم الحساب في {{time}}",
+      "packQuantity": "{{count}} × {{size}} {{unit}}",
+      "baseEquivalent": "الإجمالي {{total}} {{unit}}"
     },
     "actions": {
       "newSplit": "بدء تقسيم سلة جديد",
@@ -2001,7 +2003,9 @@
     }
   },
   "requests": {
-    "list": { "newRequestButton": "طلب جديد" },
+    "list": {
+      "newRequestButton": "طلب جديد"
+    },
     "title": "طلبات الشراء",
     "subtitle": "أنشئ وتابع طلبات الشراء لفروعك ومراكز التكلفة.",
     "status": {
@@ -2323,6 +2327,18 @@
       "rerun": "إعادة تشغيل التحسين",
       "newSplit": "بدء تقسيم جديد",
       "viewCompare": "مقارنة عروض المنتجات"
+    },
+    "constraintText": {
+      "minimum_order_value": "تم التحقق من الحد الأدنى لقيمة الطلب لدى {{supplier}}",
+      "free_delivery_threshold": "تم بلوغ حد التوصيل المجاني لدى {{supplier}}",
+      "delivery_fee": "طُبقت رسوم التوصيل لدى {{supplier}} (أقل من حد التوصيل المجاني)",
+      "quantity_tier": "طُبّق تسعير شرائح الكمية",
+      "supplier_exclusion": "تم استبعاد {{supplier}} بناءً على طلبك",
+      "urgency": "تم مراعاة الاستعجال المطلوب",
+      "risk_tolerance": "تمت مراعاة حدّ تحمّل مخاطر المورّد",
+      "no_eligible_supplier": "لا يوجد مورّد مؤهل لديه عرض حالي لهذا الصنف",
+      "currency_consistency": "لا يمكن الجمع بين عروض بعملات مختلفة",
+      "generic": "تم تطبيق قيد"
     }
   },
   "supplierIq": {

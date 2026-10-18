@@ -37,7 +37,7 @@
             <h3>{{ 'advancedBasket.result.violatedConstraints' | translate }}</h3>
             <ul>
               @for (vc of violatedConstraints; track $index) {
-                <li>{{ vc.description || vc.reason || (('advancedBasket.constraints.' + (vc.kind || vc.type)) | translate) }}</li>
+                <li>{{ constraintLabel(vc) }}</li>
               }
             </ul>
           </div>
