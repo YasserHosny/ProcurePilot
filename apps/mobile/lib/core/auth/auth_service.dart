@@ -60,7 +60,7 @@ class AuthException implements Exception {
 ///
 /// Sign-in/refresh hit the same Supabase Auth endpoints the web app uses
 /// (`/auth/v1/token`). Tokens are persisted through [SecureStorage].
-class AuthService {
+class AuthService extends ChangeNotifier {
   AuthService({
     required this.storage,
     required this.httpClient,
@@ -76,6 +76,9 @@ class AuthService {
   static const _accessTokenKey = 'access_token';
   static const _refreshTokenKey = 'refresh_token';
 
+  int _sessionGeneration = 0;
+  bool sessionExpired = false;
+
   String? accessToken;
   String? refreshToken;
 
@@ -88,10 +91,7 @@ class AuthService {
     final uri = Uri.parse('$supabaseUrl/auth/v1/token?grant_type=password');
     final response = await httpClient.post(
       uri,
-      headers: {
-        'apikey': supabaseAnonKey,
-        'Content-Type': 'application/json',
-      },
+      headers: {'apikey': supabaseAnonKey, 'Content-Type': 'application/json'},
       body: jsonEncode({'email': email, 'password': password}),
     );
 
@@ -120,18 +120,18 @@ class AuthService {
 
   /// Silently refreshes the session using the stored refresh token.
   Future<void> refreshSession() async {
+    final generation = _sessionGeneration;
     final token = refreshToken ?? await storage.read(_refreshTokenKey);
     if (token == null || token.isEmpty) {
       throw const AuthException('No refresh token available');
     }
 
-    final uri = Uri.parse('$supabaseUrl/auth/v1/token?grant_type=refresh_token');
+    final uri = Uri.parse(
+      '$supabaseUrl/auth/v1/token?grant_type=refresh_token',
+    );
     final response = await httpClient.post(
       uri,
-      headers: {
-        'apikey': supabaseAnonKey,
-        'Content-Type': 'application/json',
-      },
+      headers: {'apikey': supabaseAnonKey, 'Content-Type': 'application/json'},
       body: jsonEncode({'refresh_token': token}),
     );
 
@@ -139,6 +139,10 @@ class AuthService {
       throw AuthException(
         'Refresh failed (${response.statusCode}): ${response.body}',
       );
+    }
+
+    if (generation != _sessionGeneration) {
+      throw const AuthException('Session ended during refresh');
     }
 
     final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -151,6 +155,7 @@ class AuthService {
   /// Clears the local session and, if a device id has been recorded, calls
   /// [DELETE /devices/{id}] for this install's own registration.
   Future<void> signOut({DeviceRegistrar? deviceRegistrar}) async {
+    _sessionGeneration++;
     final deviceId = registeredDeviceId;
     if (deviceId != null && deviceId.isNotEmpty && deviceRegistrar != null) {
       try {
@@ -165,16 +170,26 @@ class AuthService {
     accessToken = null;
     refreshToken = null;
     registeredDeviceId = null;
+    notifyListeners();
+  }
+
+  /// Ends a rejected runtime session; the app observes this to reset navigation.
+  Future<void> expireSession() async {
+    await signOut();
+    sessionExpired = true;
+    notifyListeners();
   }
 
   Future<void> _setTokens({
     required String accessToken,
     required String refreshToken,
   }) async {
+    sessionExpired = false;
     this.accessToken = accessToken;
     this.refreshToken = refreshToken;
     await storage.write(_accessTokenKey, accessToken);
     await storage.write(_refreshTokenKey, refreshToken);
+    notifyListeners();
   }
 
   Map<String, dynamic>? _tryDecode(String body) {
