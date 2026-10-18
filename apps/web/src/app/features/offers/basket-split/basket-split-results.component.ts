@@ -6,6 +6,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
 import type { Product, Supplier } from '../../../core/api/models';
+import { FormatService } from '../../../core/format/format.service';
 import { FormatDatePipe } from '../../../core/format/date.pipe';
 import { FormatMoneyPipe } from '../../../core/format/money.pipe';
 import type {
@@ -13,6 +14,7 @@ import type {
   OptimisationConstraint,
   ViolatedOptimisationConstraint,
 } from '../offers-api';
+import { constraintText, isUserFacingConstraint } from './constraint-text';
 
 @Component({
   selector: 'app-basket-split-results',
@@ -32,6 +34,7 @@ import type {
 })
 export class BasketSplitResultsComponent {
   private readonly translate = inject(TranslateService);
+  private readonly format = inject(FormatService);
 
   @Input({ required: true }) currentJob!: BasketSplitJob | null;
   @Input({ required: true }) suppliers: readonly Supplier[] = [];
@@ -52,6 +55,52 @@ export class BasketSplitResultsComponent {
     const key = `advancedBasket.riskNotes.${note}`;
     const translated = this.translate.instant(key);
     return translated !== key ? translated : note;
+  }
+
+  /** Applied constraints worth showing a buyer (solver internals filtered out). */
+  get visibleAppliedConstraints(): readonly OptimisationConstraint[] {
+    return this.appliedConstraints.filter(isUserFacingConstraint);
+  }
+
+  constraintLabel(constraint: OptimisationConstraint | ViolatedOptimisationConstraint): string {
+    return constraintText(constraint, this.translate, (id) => this.getSupplierName(id));
+  }
+
+  /**
+   * ADR-020: quantities are bought in packs. The solver works in base units, so show
+   * "20 × 25 kg" first and the base total secondary. Loose goods (pack of 1) show base only.
+   */
+  quantityDisplay(line: { workspace_product_id: string; quantity: string }): {
+    primary: string;
+    secondary: string | null;
+  } {
+    const product = this.products.find((p) => p.id === line.workspace_product_id);
+    const base = parseFloat(line.quantity);
+    const rawUnit = product?.base_unit ?? '';
+    const unitKey = `rfq.email.units.${rawUnit}`;
+    const translatedUnit: string = this.translate.instant(unitKey);
+    const unit = translatedUnit === unitKey ? rawUnit : translatedUnit;
+    const fmt = (n: number): string =>
+      this.format.formatNumber(n, { maximumFractionDigits: 6 });
+    const pack = product?.pack;
+    const size = pack
+      ? parseFloat(pack.base_quantity ?? String(pack.pack_count * parseFloat(pack.unit_size)))
+      : 0;
+    if (!Number.isFinite(base) || !Number.isFinite(size) || size <= 1) {
+      return { primary: `${Number.isFinite(base) ? fmt(base) : line.quantity} ${unit}`.trim(), secondary: null };
+    }
+    const packs = base / size;
+    return {
+      primary: this.translate.instant('basketSplit.result.packQuantity', {
+        count: fmt(packs),
+        size: fmt(size),
+        unit,
+      }),
+      secondary: this.translate.instant('basketSplit.result.baseEquivalent', {
+        total: fmt(base),
+        unit,
+      }),
+    };
   }
 
   getSupplierName(supplierId: string): string {

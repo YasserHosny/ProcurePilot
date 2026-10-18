@@ -1595,7 +1595,9 @@
       "infeasibleReason": "The following item(s) have no eligible offers from the selected suppliers:",
       "missingSuppliers": "Missing offers from: {{suppliers}}",
       "solverVersion": "Solver Version: {{version}}",
-      "computedAt": "Computed at {{time}}"
+      "computedAt": "Computed at {{time}}",
+      "packQuantity": "{{count}} × {{size}} {{unit}}",
+      "baseEquivalent": "{{total}} {{unit}} in total"
     },
     "actions": {
       "newSplit": "Start New Basket Split",
@@ -2001,7 +2003,9 @@
     }
   },
   "requests": {
-    "list": { "newRequestButton": "New request" },
+    "list": {
+      "newRequestButton": "New request"
+    },
     "title": "Purchase Requests",
     "subtitle": "Create and track purchase requests for your branches and cost centres.",
     "status": {
@@ -2323,6 +2327,18 @@
       "rerun": "Rerun Optimisation",
       "newSplit": "Start New Split",
       "viewCompare": "Compare Product Offers"
+    },
+    "constraintText": {
+      "minimum_order_value": "Minimum order value checked for {{supplier}}",
+      "free_delivery_threshold": "Free-delivery threshold reached for {{supplier}}",
+      "delivery_fee": "Delivery fee applied for {{supplier}} (below the free-delivery threshold)",
+      "quantity_tier": "Quantity-tier pricing applied",
+      "supplier_exclusion": "{{supplier}} excluded as requested",
+      "urgency": "Requested urgency considered",
+      "risk_tolerance": "Supplier risk tolerance respected",
+      "no_eligible_supplier": "No eligible supplier has a current offer for this item",
+      "currency_consistency": "Offers in different currencies cannot be combined",
+      "generic": "Constraint applied"
     }
   },
   "supplierIq": {

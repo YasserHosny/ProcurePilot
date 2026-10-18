@@ -137,3 +137,14 @@ def test_legacy_stored_row_with_worker_shape_does_not_500() -> None:
     assert "advisory_only" in result  # type: ignore[operator]
     job = _job(row)
     assert job.status == "completed" and job.result is not None
+
+
+def test_solver_tie_break_is_not_exposed_as_an_applied_constraint() -> None:
+    row, _ = _solve()
+    applied = row["result"]["applied_constraints"]  # type: ignore[index]
+    assert any("tie-break" in c["description"] for c in applied), "worker still emits it"
+
+    job = _job(row)
+
+    assert isinstance(job.result, AdvancedBasketResult)
+    assert not any("tie-break" in c.description for c in job.result.applied_constraints)
