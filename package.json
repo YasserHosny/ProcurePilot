@@ -9,6 +9,7 @@
     "lint": "turbo run lint",
     "db:migrate": "supabase migration up --db-url \"$DATABASE_URL\"",
     "db:seed": "uv run --project apps/api python apps/api/scripts/seed.py",
+    "db:invite-member": "uv run --project apps/api python apps/api/scripts/invite_member.py",
     "test:api": "uv run --project apps/api pytest",
     "test:web": "pnpm --filter web test",
     "test:e2e": "pnpm --filter web test:e2e",
