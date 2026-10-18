@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import os
 from collections.abc import Iterator
+from typing import TypeAlias
 from uuid import UUID, uuid4
 
 import psycopg
@@ -85,6 +86,9 @@ def act_as(cur: psycopg.Cursor, tenant_id: UUID, user_id: UUID, claim_role: str)
     )
 
 
+Workspace: TypeAlias = tuple[psycopg.Cursor, UUID, dict[str, tuple[UUID, UUID]]]
+
+
 @pytest.fixture
 def workspace(
     conn: psycopg.Connection,
@@ -109,7 +113,9 @@ def _role_of(cur: psycopg.Cursor, membership_id: UUID) -> str:
 
 
 @pytest.mark.parametrize("claim_role", ["viewer", "owner"])
-def test_a_viewer_cannot_change_their_own_role_even_with_an_owner_claim(workspace, claim_role):
+def test_a_viewer_cannot_change_their_own_role_even_with_an_owner_claim(
+    workspace: Workspace, claim_role: str
+) -> None:
     cur, tenant_id, members = workspace
     viewer_id, viewer_user = members["viewer"]
     act_as(cur, tenant_id, viewer_user, claim_role)
@@ -118,7 +124,7 @@ def test_a_viewer_cannot_change_their_own_role_even_with_an_owner_claim(workspac
     cur.connection.rollback()
 
 
-def test_a_viewer_cannot_change_their_own_status(workspace):
+def test_a_viewer_cannot_change_their_own_status(workspace: Workspace) -> None:
     cur, tenant_id, members = workspace
     viewer_id, viewer_user = members["viewer"]
     act_as(cur, tenant_id, viewer_user, "viewer")
@@ -126,7 +132,7 @@ def test_a_viewer_cannot_change_their_own_status(workspace):
         cur.execute("update membership set status = 'removed' where id = %s", (viewer_id,))
 
 
-def test_a_buyer_cannot_change_another_members_row(workspace):
+def test_a_buyer_cannot_change_another_members_row(workspace: Workspace) -> None:
     cur, tenant_id, members = workspace
     viewer_id, _ = members["viewer"]
     _, buyer_user = members["buyer"]
@@ -139,7 +145,7 @@ def test_a_buyer_cannot_change_another_members_row(workspace):
     assert _role_of(cur, viewer_id) == "viewer"
 
 
-def test_authenticated_cannot_insert_or_delete_membership(workspace):
+def test_authenticated_cannot_insert_or_delete_membership(workspace: Workspace) -> None:
     cur, tenant_id, members = workspace
     viewer_id, viewer_user = members["viewer"]
     act_as(cur, tenant_id, viewer_user, "owner")
@@ -157,7 +163,9 @@ def test_authenticated_cannot_insert_or_delete_membership(workspace):
 @pytest.mark.parametrize(
     ("column", "value"), [("tenant_id", str(uuid4())), ("email", "'x@t'"), ("user_id", None)]
 )
-def test_identity_columns_are_not_updatable(workspace, column, value):
+def test_identity_columns_are_not_updatable(
+    workspace: Workspace, column: str, value: str | None
+) -> None:
     cur, tenant_id, members = workspace
     viewer_id, viewer_user = members["viewer"]
     act_as(cur, tenant_id, viewer_user, "viewer")
@@ -171,7 +179,7 @@ def test_identity_columns_are_not_updatable(workspace, column, value):
 # --- what the API does keeps working -----------------------------------------------------------
 
 
-def test_a_member_can_change_their_own_preferred_locale(workspace):
+def test_a_member_can_change_their_own_preferred_locale(workspace: Workspace) -> None:
     cur, tenant_id, members = workspace
     viewer_id, viewer_user = members["viewer"]
     act_as(cur, tenant_id, viewer_user, "viewer")
@@ -179,7 +187,7 @@ def test_a_member_can_change_their_own_preferred_locale(workspace):
     assert cur.rowcount == 1
 
 
-def test_an_owner_can_change_a_members_role_and_remove_a_member(workspace):
+def test_an_owner_can_change_a_members_role_and_remove_a_member(workspace: Workspace) -> None:
     cur, tenant_id, members = workspace
     viewer_id, _ = members["viewer"]
     buyer_id, _ = members["buyer"]
@@ -195,7 +203,7 @@ def test_an_owner_can_change_a_members_role_and_remove_a_member(workspace):
     assert _role_of(cur, viewer_id) == "buyer"
 
 
-def test_a_demoted_owner_with_a_stale_owner_claim_cannot_change_roles(workspace):
+def test_a_demoted_owner_with_a_stale_owner_claim_cannot_change_roles(workspace: Workspace) -> None:
     cur, tenant_id, members = workspace
     viewer_id, _ = members["viewer"]
     buyer_id, buyer_user = members["buyer"]
@@ -207,7 +215,7 @@ def test_a_demoted_owner_with_a_stale_owner_claim_cannot_change_roles(workspace)
     assert viewer_id  # the viewer row is untouched by construction
 
 
-def test_members_still_read_the_whole_workspace(workspace):
+def test_members_still_read_the_whole_workspace(workspace: Workspace) -> None:
     cur, tenant_id, members = workspace
     _, viewer_user = members["viewer"]
     act_as(cur, tenant_id, viewer_user, "viewer")
