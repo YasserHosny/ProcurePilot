@@ -133,7 +133,7 @@
                   </button>
                 }
 
-                @if (req.status === 'draft' || req.status === 'submitted' || req.status === 'ordered') {
+                @if (canWithdraw(req)) {
                   <button
                     mat-icon-button
                     type="button"

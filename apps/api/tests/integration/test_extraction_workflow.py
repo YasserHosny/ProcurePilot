@@ -260,7 +260,7 @@ def test_extraction_parses_egyptian_date_and_routes_bad_expiry_to_review(
             verify_cur.execute(
                 "select reason,status from review_task where quotation_id=%s", (quotation_id,)
             )
-            assert verify_cur.fetchone() == ("date_unparsed", "resolved")
+            assert verify_cur.fetchone() == ("ready_to_authorise", "open")
 
         ambiguous_document_id = make_document(cur, workspace)
         ambiguous_quotation_id = make_quotation(

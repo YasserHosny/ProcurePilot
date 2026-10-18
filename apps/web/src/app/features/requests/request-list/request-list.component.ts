@@ -13,6 +13,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { Router } from '@angular/router';
 import { TranslatePipe,
 TranslateService } from '@ngx-translate/core';
+import { SessionService } from '../../../core/auth/session.service';
 import { RoleDirective } from '../../../core/auth/role.directive';
 import { forkJoin, of } from 'rxjs';
 import { catchError } from 'rxjs/operators';
@@ -46,6 +47,7 @@ const I18N = 'requests';
   styleUrl: './request-list.component.scss',
 })
 export class RequestListComponent implements OnInit {
+  private readonly session = inject(SessionService);
   private readonly requestsApi = inject(RequestsApiService);
   private readonly organisationApi = inject(OrganisationApiService);
   private readonly formatService = inject(FormatService);
@@ -122,6 +124,13 @@ export class RequestListComponent implements OnInit {
 
   navigateToDetail(request: PurchaseRequest): void {
     this.router.navigate(['/requests', request.id]);
+  }
+
+  canWithdraw(request: PurchaseRequest): boolean {
+    return request.status === 'draft' || request.status === 'submitted' ||
+      (request.status === 'ordered' &&
+        (this.session.role() === 'owner' ||
+          this.session.currentMember()?.membership_id === request.requested_by_membership_id));
   }
 
   withdrawRequest(request: PurchaseRequest): void {

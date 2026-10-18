@@ -65,6 +65,7 @@ def load_me_for_token(settings: Settings, bearer_token: str, member: CurrentMemb
     membership = membership_rows[0]
     return Me(
         id=member.user_id,
+        membership_id=member.membership_id,
         email=member.email,
         role=member.role,
         preferred_locale=membership.get("preferred_locale"),

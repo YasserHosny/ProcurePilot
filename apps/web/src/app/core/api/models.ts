@@ -30,6 +30,7 @@ export interface Tenant {
 
 export interface Me {
   readonly id: string;
+  readonly membership_id?: string | null;
   readonly email: string;
   readonly role: Role;
   readonly preferred_locale: Locale | null;
