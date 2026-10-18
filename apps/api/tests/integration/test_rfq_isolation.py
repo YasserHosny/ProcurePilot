@@ -259,8 +259,8 @@ def _act_as(
     """Act as the workspace member with `role` on their membership row.
 
     RFQ write policies read the live membership role (current_membership_role, 20261018000009),
-    so the row carries the role under test. `claim_role` sets a different JWT member_role claim, as a token issued
-    before a role change would carry.
+    so the row carries the role under test. `claim_role` sets a different JWT member_role
+    claim, as a token issued before a role change would carry.
     """
     _set_membership_role(cur, workspace, role)
     cur.execute("set local role authenticated")
