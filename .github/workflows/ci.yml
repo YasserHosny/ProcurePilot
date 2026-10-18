@@ -32,6 +32,7 @@ jobs:
       pull-requests: read
     outputs:
       code: ${{ steps.code.outputs.code }}
+      web: ${{ steps.web-output.outputs.web }}
     steps:
       - name: Filter changed paths
         id: paths
@@ -46,6 +47,17 @@ jobs:
               - '!specs/**'
               - '!.specify/**'
               - '!**/*.md'
+      - name: Filter web changed paths
+        id: web
+        if: github.event_name != 'push'
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            web:
+              - 'apps/web/**'
+              - 'packages/**'
+              - '.github/workflows/**'
+              - 'supabase/config.toml'
       - name: Set code-change output
         id: code
         env:
@@ -56,6 +68,17 @@ jobs:
             echo 'code=true' >> "$GITHUB_OUTPUT"
           else
             echo "code=$CODE_PATHS" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Set web-change output
+        id: web-output
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          WEB_PATHS: ${{ steps.web.outputs.web }}
+        run: |
+          if [ "$EVENT_NAME" = push ]; then
+            echo 'web=true' >> "$GITHUB_OUTPUT"
+          else
+            echo "web=$WEB_PATHS" >> "$GITHUB_OUTPUT"
           fi
 
   api-image-i18n:
@@ -570,6 +593,10 @@ jobs:
       # (Supabase, Redis, API, worker, web), so no state is shared between shards; within a shard
       # the suite stays serial (workers: 1) exactly as before.
       - name: Accessibility — WCAG 2.1 AA, zero violations
+        # Skipped for PRs touching nothing under apps/web, packages or the workflows
+        # (backend-only changes), unless supabase/config.toml changes. Pushes to main
+        # always run it; the following step still runs the non-a11y specs either way.
+        if: needs.changes.outputs.web == 'true'
         # Its own step so an accessibility regression is named as one rather than buried among
         # the functional specs (FR-022, SC-006).
         working-directory: apps/web
