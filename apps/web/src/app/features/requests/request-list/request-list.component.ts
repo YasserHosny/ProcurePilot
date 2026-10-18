@@ -13,6 +13,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { Router } from '@angular/router';
 import { TranslatePipe,
 TranslateService } from '@ngx-translate/core';
+import { SessionService } from '../../../core/auth/session.service';
 import { RoleDirective } from '../../../core/auth/role.directive';
 import { forkJoin, of } from 'rxjs';
 import { catchError } from 'rxjs/operators';
@@ -20,6 +21,7 @@ import { catchError } from 'rxjs/operators';
 import type { ApiError, Branch, BranchList, PurchaseRequest, PurchaseRequestStatus } from '../../../core/api/models';
 import { FormatService } from '../../../core/format/format.service';
 import { OrganisationApiService } from '../../settings/organisation-api';
+import { CatalogueConfirmDialogComponent } from '../../catalogue/confirm-dialog/confirm-dialog.component';
 import { RequestsApiService } from '../requests-api';
 
 const I18N = 'requests';
@@ -45,6 +47,7 @@ const I18N = 'requests';
   styleUrl: './request-list.component.scss',
 })
 export class RequestListComponent implements OnInit {
+  private readonly session = inject(SessionService);
   private readonly requestsApi = inject(RequestsApiService);
   private readonly organisationApi = inject(OrganisationApiService);
   private readonly formatService = inject(FormatService);
@@ -123,7 +126,27 @@ export class RequestListComponent implements OnInit {
     this.router.navigate(['/requests', request.id]);
   }
 
+  canWithdraw(request: PurchaseRequest): boolean {
+    return request.status === 'draft' || request.status === 'submitted' ||
+      (request.status === 'ordered' &&
+        (this.session.role() === 'owner' ||
+          this.session.currentMember()?.membership_id === request.requested_by_membership_id));
+  }
+
   withdrawRequest(request: PurchaseRequest): void {
+    this.dialog.open(CatalogueConfirmDialogComponent, {
+      data: {
+        titleKey: `${I18N}.withdrawConfirmTitle`,
+        messageKey: `${I18N}.withdrawConfirmMessage`,
+        confirmKey: `${I18N}.actions.withdraw`,
+        isDestructive: true,
+      },
+    }).afterClosed().subscribe((confirmed: boolean) => {
+      if (confirmed) this.performWithdrawal(request);
+    });
+  }
+
+  private performWithdrawal(request: PurchaseRequest): void {
     this.requestsApi.withdrawRequest(request.id).subscribe({
       next: () => {
         this.loadRequests();
@@ -159,6 +182,11 @@ export class RequestListComponent implements OnInit {
   private handleError(err: unknown): void {
     if (err instanceof HttpErrorResponse) {
       const apiError = err.error as ApiError | undefined;
+      if (apiError?.details?.['reason'] === 'purchase_order_exists') {
+        this.errorMessage.set(this.translate.instant(`${I18N}.purchaseOrderExists`));
+        this.errorTraceId.set(apiError?.trace_id ?? null);
+        return;
+      }
       this.errorTraceId.set(apiError?.trace_id ?? null);
       this.errorMessage.set(
         apiError?.message ?? err.message ?? this.translate.instant(`${I18N}.genericError`),

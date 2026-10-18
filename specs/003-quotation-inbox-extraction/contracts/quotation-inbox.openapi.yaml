@@ -490,6 +490,6 @@ components:
         quotation_id: { type: string, format: uuid }
         status: { type: string, enum: [open, in_progress, resolved, auto_accepted] }
         priority: { type: string, enum: [low, normal, high] }
-        reason: { type: string, enum: [low_confidence, arithmetic_mismatch, read_failure, review_required] }
+        reason: { type: string, enum: [low_confidence, arithmetic_mismatch, read_failure, review_required, no_supplier_match, currency_unresolved, date_unparsed, merged_line_items, line_count_mismatch, total_unverified, ready_to_authorise] }
         created_at: { type: string, format: date-time }
         resolved_at: { type: string, format: date-time, nullable: true }

@@ -320,10 +320,7 @@ class QuotationService:
             )
             if not response.data:
                 quote = _quotation_row(client, quotation_id)
-                if (
-                    idempotency_key is not None
-                    and _archive_key_matches(quote, idempotency_key)
-                ):
+                if idempotency_key is not None and _archive_key_matches(quote, idempotency_key):
                     if not _archive_key_was_recorded(client, quotation_id, idempotency_key):
                         self._record(
                             bearer_token=bearer_token,
@@ -349,9 +346,7 @@ class QuotationService:
             target={
                 "quotation_id": str(quotation_id),
                 **(
-                    {"idempotency_key": str(idempotency_key)}
-                    if idempotency_key is not None
-                    else {}
+                    {"idempotency_key": str(idempotency_key)} if idempotency_key is not None else {}
                 ),
             },
         )
@@ -951,6 +946,44 @@ def _sync_open_review_tasks(client: object, confidence_threshold: float) -> None
         .execute()
         .data
     )
+    # Repair earlier sync results too: every in-review quotation needs an inbox task.
+    quotation_ids_with_tasks = {str(task["quotation_id"]) for task in open_tasks}
+    offset = 0
+    while True:
+        quotations = _rows(
+            client.table("quotation")
+            .select("id,tenant_id")
+            .eq("status", "in_review")
+            .is_("deleted_at", "null")
+            .order("id")
+            .range(offset, offset + 99)
+            .execute()
+            .data
+        )
+        for quotation in quotations:
+            if str(quotation["id"]) in quotation_ids_with_tasks:
+                continue
+            reason, priority = _current_review_task_blocker(
+                client, UUID(str(quotation["id"])), confidence_threshold
+            ) or ("ready_to_authorise", "low")
+            try:
+                client.table("review_task").insert(
+                    {
+                        "tenant_id": quotation["tenant_id"],
+                        "quotation_id": quotation["id"],
+                        "status": "open",
+                        "reason": reason,
+                        "priority": priority,
+                    }
+                ).execute()
+            except APIError as exc:
+                # A concurrent inbox read may already have repaired the missing task.
+                if exc.code != "23505":
+                    raise
+        if len(quotations) < 100:
+            break
+        offset += 100
+
     for task in open_tasks:
         if task.get("reason") in STICKY_REVIEW_REASONS:
             continue
@@ -981,7 +1014,7 @@ def _current_review_task_blocker(
 ) -> tuple[str, str] | None:
     quote = _one_row(
         client.table("quotation")
-        .select("id,supplier_id,arithmetic_status")
+        .select("id,status,supplier_id,arithmetic_status")
         .eq("id", str(quotation_id))
         .limit(2)
         .execute()
@@ -1001,6 +1034,8 @@ def _current_review_task_blocker(
         return ("low_confidence", "normal")
     if quote.get("supplier_id") is None:
         return ("no_supplier_match", "normal")
+    if quote.get("status") == "in_review":
+        return ("ready_to_authorise", "low")
     return None
 
 

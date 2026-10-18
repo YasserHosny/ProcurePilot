@@ -1417,10 +1417,16 @@ Request:
 
 ### `POST /requests/{request_id}/withdraw`
 
-- Requires bearer auth (the requester).
-- Moves `submitted -> withdrawn` and stamps `withdrawn_at`.
-- Returns `200` with the `PurchaseRequest`.
-- Returns `409` (`already_decided_or_withdrawn`) if the request is not `submitted`.
+- The requester or a workspace owner may withdraw a `draft`, `submitted`, or `ordered` request.
+- An `ordered` request may be withdrawn only when no purchase order references it with a status
+  other than `cancelled`. Even a draft PO blocks withdrawal (`409`, `purchase_order_exists`).
+- Sets `status = withdrawn`, stamps `withdrawn_at`, and records
+  `requests.purchase_request_withdrawn` with `previous_status` in the audit target.
+- Withdrawn requests no longer count toward committed budget spend. The PO absence check and
+  withdrawal share the PO allocation transaction lock; PO creation/editing rechecks request status
+  after acquiring that lock.
+- Returns `200` with the updated request; `403` (`not_requester`) for another member;
+  `404` for an invisible request; `409` (`already_decided_or_withdrawn`) for other states.
 
 ### `GET /approvals/pending`
 
@@ -2885,8 +2891,13 @@ Constitution Principle III (see `test_rfq_guardrail_boundary.py`'s executable pr
 - Lists every captured response to one RFQ for comparison, each with its per-line matched product
   (or an explicit `pending_match` flag when a line's extraction/matching hasn't completed yet —
   independent of and possibly lagging RFQ response capture) and quoted quantity/price.
+- Each `RfqResponseComparison` includes required `quotation_status` (the linked quotation's
+  current status: `pending`, `extracting`, `extracted`, `in_review`, `reviewed`, or `refused`).
+  Refused responses remain visible for the audit trail, including replies with no readable lines;
+  the compare view labels them refused and offers no Prepare Request action.
 - Scoped per FR-016: the RFQ's creator, or any owner/buyer, may read it.
-- Returns `200` with an `RfqResponseComparisonList`.
+- Returns `200` with an `RfqResponseComparisonList`. The response contract is recorded in
+  `specs/021-rfq-sourcing-autonomy/contracts/rfq-responses.openapi.yaml`.
 
 ### `POST /rfq/{rfq_id}/prepare-request`
 

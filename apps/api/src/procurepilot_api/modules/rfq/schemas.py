@@ -6,6 +6,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from procurepilot_api.modules.quotations.schemas import QuotationStatus
+
 RfqStatus = Literal["draft", "sent", "responded", "expired", "converted"]
 RfqRecipientStatus = Literal["draft", "sent", "failed"]
 
@@ -109,6 +111,7 @@ class RfqResponseComparison(BaseModel):
     rfq_id: UUID
     supplier_id: UUID
     submitted_at: datetime
+    quotation_status: QuotationStatus
     lines: list[RfqResponseLineComparison]
     guardrail_evaluations: list[RfqGuardrailEvaluation] = Field(default_factory=list)
 

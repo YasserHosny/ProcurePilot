@@ -248,7 +248,7 @@ export class CompareComponent implements OnInit {
   }
 
   isEligible(response: RfqResponseComparison): boolean {
-    return response.lines.every((l) => !l.pending_match);
+    return response.quotation_status !== 'refused' && response.lines.every((l) => !l.pending_match);
   }
 
   canPrepare(response: RfqResponseComparison): boolean {
@@ -256,6 +256,7 @@ export class CompareComponent implements OnInit {
   }
 
   prepareRequest(response: RfqResponseComparison): void {
+    if (response.quotation_status === 'refused') return;
     if (!this.isEligible(response)) {
       this.snackBar.open(
         this.translate.instant('rfq.compare.cannotPreparePending'),

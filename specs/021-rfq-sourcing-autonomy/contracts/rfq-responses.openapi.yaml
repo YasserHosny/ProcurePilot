@@ -1,0 +1,68 @@
+openapi: 3.1.0
+info:
+  title: ProcurePilot RFQ response comparison
+  version: 1.1.0
+  description: Response listing contract; other RFQ endpoints are documented in docs/architecture/api-specification.md.
+servers:
+  - url: /api/v1
+security:
+  - bearerAuth: []
+paths:
+  /rfq/{rfq_id}/responses:
+    get:
+      summary: List every captured RFQ response, including refused quotations
+      parameters:
+        - name: rfq_id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Response comparisons; refused quotations remain visible for audit purposes.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/RfqResponseComparison' }
+        '404':
+          description: RFQ not found or not visible to this member
+components:
+  securitySchemes:
+    bearerAuth: { type: http, scheme: bearer, bearerFormat: JWT }
+  schemas:
+    RfqResponseComparison:
+      type: object
+      required: [id, rfq_id, supplier_id, submitted_at, quotation_status, lines]
+      properties:
+        id: { type: string, format: uuid }
+        rfq_id: { type: string, format: uuid }
+        supplier_id: { type: string, format: uuid }
+        submitted_at: { type: string, format: date-time }
+        quotation_status:
+          type: string
+          enum: [pending, extracting, extracted, in_review, reviewed, refused]
+          description: Current linked quotation status. Refused responses cannot prepare requests.
+        lines:
+          type: array
+          items:
+            type: object
+            required: [workspace_product_id, quoted_quantity, quoted_unit_price_amount, quoted_unit_price_currency, pending_match]
+            properties:
+              workspace_product_id: { type: [string, 'null'], format: uuid }
+              quoted_quantity: { type: string }
+              quoted_unit_price_amount: { type: string }
+              quoted_unit_price_currency: { type: string }
+              pending_match: { type: boolean }
+        guardrail_evaluations:
+          type: array
+          items:
+            type: object
+            required: [guardrail_id, fired, reason]
+            properties:
+              guardrail_id: { type: string, format: uuid }
+              fired: { type: boolean }
+              reason: { type: string }

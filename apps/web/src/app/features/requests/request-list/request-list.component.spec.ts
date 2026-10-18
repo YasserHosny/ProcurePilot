@@ -1,13 +1,16 @@
 import { HttpErrorResponse } from '@angular/common/http';
+import { signal } from '@angular/core';
 import type { ComponentFixture } from '@angular/core/testing';
 import { TestBed } from '@angular/core/testing';
+import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { Router, provideRouter } from '@angular/router';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { of, throwError } from 'rxjs';
 
 import enCatalog from '../../../../../../../packages/i18n/en.json';
-import type { PurchaseRequest } from '../../../core/api/models';
+import { SessionService } from '../../../core/auth/session.service';
+import type { Me, PurchaseRequest, Role } from '../../../core/api/models';
 import { OrganisationApiService } from '../../settings/organisation-api';
 import { RequestsApiService } from '../requests-api';
 import { RequestListComponent } from './request-list.component';
@@ -38,20 +41,27 @@ const mockRequests: PurchaseRequest[] = [
 ];
 
 describe('RequestListComponent (T017)', () => {
+  const currentMember = signal<Pick<Me, 'id' | 'membership_id'> | null>(null);
+  const role = signal<Role | null>(null);
   let component: RequestListComponent;
   let fixture: ComponentFixture<RequestListComponent>;
   let requestsApi: jasmine.SpyObj<RequestsApiService>;
   let organisationApi: jasmine.SpyObj<OrganisationApiService>;
   let snackBarSpy: jasmine.SpyObj<MatSnackBar>;
+  let dialogSpy: jasmine.SpyObj<MatDialog>;
   let routerSpy: jasmine.SpyObj<Router>;
 
   beforeEach(async () => {
+    currentMember.set({ id: 'user-1', membership_id: 'm1' });
+    role.set('buyer');
     requestsApi = jasmine.createSpyObj('RequestsApiService', [
       'listRequests',
       'withdrawRequest',
     ]);
     organisationApi = jasmine.createSpyObj('OrganisationApiService', ['listBranches']);
     snackBarSpy = jasmine.createSpyObj('MatSnackBar', ['open']);
+    dialogSpy = jasmine.createSpyObj('MatDialog', ['open']);
+    dialogSpy.open.and.returnValue({ afterClosed: () => of(true) } as ReturnType<MatDialog['open']>);
     routerSpy = jasmine.createSpyObj('Router', ['navigate']);
 
     requestsApi.listRequests.and.returnValue(of({ items: mockRequests, next_cursor: null }));
@@ -69,6 +79,7 @@ describe('RequestListComponent (T017)', () => {
       imports: [RequestListComponent, TranslateModule.forRoot()],
       providers: [
         provideRouter([]),
+        { provide: SessionService, useValue: { currentMember, role } },
         { provide: RequestsApiService, useValue: requestsApi },
         { provide: OrganisationApiService, useValue: organisationApi },
       ],
@@ -78,6 +89,7 @@ describe('RequestListComponent (T017)', () => {
           providers: [
             { provide: MatSnackBar, useValue: snackBarSpy },
             { provide: Router, useValue: routerSpy },
+            { provide: MatDialog, useValue: dialogSpy },
           ],
         },
       })
@@ -190,6 +202,23 @@ describe('RequestListComponent (T017)', () => {
     expect(component.canCreateOrder({ ...mockRequests[1], status: 'ordered' })).toBeFalse();
   });
 
+  it('shows Withdraw on an ordered request and hides it on terminal requests', () => {
+    for (const status of ['ordered', 'withdrawn', 'rejected', 'approved'] as const) {
+      component.requests.set([{ ...mockRequests[0], status }]);
+      fixture.detectChanges();
+      const element = fixture.nativeElement as HTMLElement;
+      expect(Boolean(element.querySelector('button.danger-action'))).toBe(status === 'ordered');
+    }
+  });
+
+  it('asks for confirmation and leaves the request unchanged when cancelled', () => {
+    dialogSpy.open.and.returnValue({ afterClosed: () => of(false) } as ReturnType<MatDialog['open']>);
+    requestsApi.withdrawRequest.and.returnValue(of(mockRequests[0]));
+    component.withdrawRequest({ ...mockRequests[0], status: 'ordered' });
+    expect(dialogSpy.open).toHaveBeenCalled();
+    expect(requestsApi.withdrawRequest).not.toHaveBeenCalled();
+  });
+
   it('should withdraw a request and reload', () => {
     requestsApi.withdrawRequest.and.returnValue(
       of({ ...mockRequests[0], status: 'withdrawn' } as PurchaseRequest),
@@ -204,6 +233,33 @@ describe('RequestListComponent (T017)', () => {
       undefined,
       { duration: 3500 },
     );
+  });
+
+  for (const scenario of [
+    { label: 'requester', memberId: 'm1', role: 'buyer', visible: true },
+    { label: 'owner', memberId: 'm2', role: 'owner', visible: true },
+    { label: 'another buyer', memberId: 'm2', role: 'buyer', visible: false },
+  ] as const) {
+    it(`shows ordered Withdraw only when permitted: ${scenario.label}`, () => {
+      currentMember.set({ id: 'user-1', membership_id: scenario.memberId });
+      role.set(scenario.role);
+      component.requests.set([{ ...mockRequests[0], status: 'ordered' }]);
+      fixture.detectChanges();
+
+      const button = (fixture.nativeElement as HTMLElement).querySelector(
+        'button[aria-label="Withdraw request"]',
+      );
+      expect(button !== null).toBe(scenario.visible);
+    });
+  }
+
+  it('keeps draft and submitted Withdraw visible for another buyer', () => {
+    currentMember.set({ id: 'user-2', membership_id: 'm2' });
+    fixture.detectChanges();
+
+    expect((fixture.nativeElement as HTMLElement).querySelectorAll(
+      'button[aria-label="Withdraw request"]',
+    ).length).toBe(2);
   });
 
   it('should filter by status', () => {

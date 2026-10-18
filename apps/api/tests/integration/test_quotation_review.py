@@ -321,7 +321,7 @@ def test_missing_currency_blocks_confirmation(
         assert exc_info.value.details["reason"] == "currency_unresolved"
 
 
-def test_supplier_patch_resolves_low_confidence_review_task(
+def test_supplier_patch_keeps_task_until_authorised(
     conn: object, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     class AuditWriter:
@@ -368,7 +368,7 @@ def test_supplier_patch_resolves_low_confidence_review_task(
             patch=QuotationReviewPatch(supplier_id=supplier_id),
         )
         cur.execute("select status from review_task where quotation_id=%s", (fixture.quotation_id,))
-        assert cur.fetchone() == ("resolved",)
+        assert cur.fetchone() == ("open",)
         act_as(cur, workspace)
         monkeypatch.setattr(
             confirmation_service_module,
@@ -455,7 +455,7 @@ def test_review_queue_preserves_sticky_task_reasons(
         assert cur.fetchone() == ("in_review",)
 
 
-def test_reviewer_patch_resolves_structural_task_and_list_resolves_stale_dynamic_task(
+def test_reviewer_patch_keeps_task_and_list_resolves_extracted_stale_task(
     conn: object, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     class AuditWriter:
@@ -496,7 +496,7 @@ def test_reviewer_patch_resolves_structural_task_and_list_resolves_stale_dynamic
             ),
         )
         cur.execute("select status from review_task where quotation_id=%s", (fixture.quotation_id,))
-        assert cur.fetchone() == ("resolved",)
+        assert cur.fetchone() == ("open",)
 
         stale = make_extracted_quotation(cur, workspace)
         make_review_task(cur, workspace, stale.quotation_id, reason="low_confidence")

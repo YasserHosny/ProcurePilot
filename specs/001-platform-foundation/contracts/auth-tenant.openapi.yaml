@@ -555,6 +555,7 @@ components:
       required: [id, email, role, tenant]
       properties:
         id: { type: string, format: uuid }
+        membership_id: { type: string, format: uuid, nullable: true }
         email: { type: string, format: email }
         role: { $ref: '#/components/schemas/Role' }
         preferred_locale: { type: string, enum: [en, ar], nullable: true }

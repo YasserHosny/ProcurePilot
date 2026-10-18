@@ -86,7 +86,11 @@
       </mat-card-header>
 
       <mat-card-content>
-        <table mat-table [dataSource]="response.lines" class="lines-table">
+        <div *ngIf="response.quotation_status === 'refused'" role="status">
+          <strong>{{ 'rfq.compare.refused' | translate }}</strong>
+          <p>{{ 'rfq.compare.refusedExplanation' | translate }}</p>
+        </div>
+        <table *ngIf="response.quotation_status !== 'refused'" mat-table [dataSource]="response.lines" class="lines-table">
           <ng-container matColumnDef="product">
             <th mat-header-cell *matHeaderCellDef>{{ 'rfq.compare.product' | translate }}</th>
             <td mat-cell *matCellDef="let line">
@@ -123,7 +127,7 @@
           <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
         </table>
 
-        <div class="pending-warning" *ngIf="!isEligible(response)">
+        <div class="pending-warning" *ngIf="response.quotation_status !== 'refused' && !isEligible(response)">
           <mat-icon color="warn" aria-hidden="true">info</mat-icon>
           <span>{{ 'rfq.compare.cannotPreparePending' | translate }}</span>
         </div>
@@ -138,7 +142,7 @@
         </div>
       </mat-card-content>
 
-      <mat-card-actions align="end">
+      <mat-card-actions *ngIf="response.quotation_status !== 'refused'" align="end">
         <button mat-flat-button color="primary"
                 [disabled]="!canPrepare(response)"
                 (click)="prepareRequest(response)">

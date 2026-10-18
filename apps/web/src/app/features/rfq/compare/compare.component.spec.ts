@@ -20,6 +20,9 @@ import { Branch, Member, Supplier, Product } from '../../../core/api/models';
 import { SessionService } from '../../../core/auth/session.service';
 import { CatalogueConfirmDialogComponent } from '../../catalogue/confirm-dialog/confirm-dialog.component';
 
+import enCatalog from '../../../../../../../packages/i18n/en.json';
+import arCatalog from '../../../../../../../packages/i18n/ar.json';
+
 describe('CompareComponent (RFQ)', () => {
   let component: CompareComponent;
   let fixture: ComponentFixture<CompareComponent>;
@@ -71,6 +74,7 @@ describe('CompareComponent (RFQ)', () => {
         id: 'resp-1',
         rfq_id: 'rfq-1',
         supplier_id: 'supp-1',
+        quotation_status: 'reviewed',
         submitted_at: '2026-09-25T10:00:00Z',
         lines: [
           {
@@ -87,6 +91,7 @@ describe('CompareComponent (RFQ)', () => {
         id: 'resp-2',
         rfq_id: 'rfq-1',
         supplier_id: 'supp-2',
+        quotation_status: 'reviewed',
         submitted_at: '2026-09-25T11:00:00Z',
         lines: [
           {
@@ -212,6 +217,28 @@ describe('CompareComponent (RFQ)', () => {
     expect(reqDate?.getDate()).toBe(20);
     expect(component.supplierNames()['supp-1']).toBe('Supplier One');
     expect(component.productNames()['prod-1']).toBe('Product One');
+  });
+
+  it('keeps a refused response visible with an explanation and no prepare action', () => {
+    const response = Object.assign({}, dummyResponses.items[0], { quotation_status: 'refused' as const, lines: [] });
+    component.responses.set([response]);
+    fixture.detectChanges();
+    const element = fixture.nativeElement as HTMLElement;
+    expect(element.querySelector('.response-card')).not.toBeNull();
+    expect(element.textContent).toContain('rfq.compare.refused');
+    expect(element.textContent).toContain('rfq.compare.refusedExplanation');
+    expect(element.querySelector('mat-card-actions button')).toBeNull();
+    expect(component.canPrepare(response)).toBeFalse();
+    component.prepareRequest(response);
+    expect(mockRfqApi.prepareRequest).not.toHaveBeenCalled();
+  });
+
+  it('provides English and Arabic refused response copy', () => {
+    for (const catalog of [enCatalog, arCatalog]) {
+      const compare = catalog.rfq.compare as Record<string, string>;
+      expect(compare['refused']).toBeTruthy();
+      expect(compare['refusedExplanation']).toBeTruthy();
+    }
   });
 
   it('renders quoted quantities without trailing decimal zeroes in the comparison table', () => {

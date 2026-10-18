@@ -71,6 +71,7 @@ class MemberInvitationAccept(BaseModel):
 
 class Me(BaseModel):
     id: UUID
+    membership_id: UUID | None = None
     email: str
     role: MemberRole
     preferred_locale: Locale | None = None

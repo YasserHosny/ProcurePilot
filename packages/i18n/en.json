@@ -812,7 +812,8 @@
         "date_unparsed": "Date Not Recognised",
         "merged_line_items": "Multiple items were merged into one line",
         "line_count_mismatch": "Some quotation lines could not be extracted",
-        "total_unverified": "Quotation total could not be verified"
+        "total_unverified": "Quotation total could not be verified",
+        "ready_to_authorise": "Ready to authorise"
       },
       "columns": {
         "id": "Quotation ID",
@@ -2132,7 +2133,10 @@
       "draftMessage": "This draft was prepared automatically by a guardrail from {{supplier}}'s quote. Review it and submit it if it is right; nothing is ordered until it is approved.",
       "message": "This request was prepared automatically by a guardrail from {{supplier}}'s quote.",
       "unknownSupplier": "the winning supplier"
-    }
+    },
+    "withdrawConfirmTitle": "Withdraw purchase request?",
+    "withdrawConfirmMessage": "Withdraw this request? Any committed budget will be released. Requests linked to an active purchase order cannot be withdrawn.",
+    "purchaseOrderExists": "Cancel the linked purchase order before withdrawing this request."
   },
   "delivery": {
     "title": "Confirm Delivery",
@@ -3802,7 +3806,9 @@
       "draftNoticeTitle": "This RFQ hasn't been sent yet",
       "draftNoticeDescription": "Review or edit your draft, or send it to suppliers to start collecting responses.",
       "editDraft": "Edit",
-      "sendDraft": "Send"
+      "sendDraft": "Send",
+      "refused": "Refused",
+      "refusedExplanation": "The quotation from this reply was refused and cannot be used to prepare a request."
     },
     "history": {
       "title": "RFQ History",

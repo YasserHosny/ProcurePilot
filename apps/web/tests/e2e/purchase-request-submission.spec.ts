@@ -194,6 +194,7 @@ test.describe('Purchase Request Submission (chunk 008 US1)', () => {
 
     // Click withdraw on the first submitted request
     await page.locator('button.danger-action').first().click();
+    await page.locator('mat-dialog-container').getByRole('button', { name: 'Withdraw request', exact: true }).click();
 
     // Verify the snackbar confirms withdrawal
     await expect(page.locator('mat-snack-bar-container')).toBeVisible();

@@ -30,6 +30,7 @@ export interface Tenant {
 
 export interface Me {
   readonly id: string;
+  readonly membership_id?: string | null;
   readonly email: string;
   readonly role: Role;
   readonly preferred_locale: Locale | null;
@@ -423,6 +424,7 @@ export interface Job {
 export type ReviewTaskStatus = 'open' | 'in_progress' | 'resolved';
 export type ReviewTaskPriority = 'low' | 'normal' | 'high';
 export type ReviewTaskReason =
+  | 'ready_to_authorise'
   | 'low_confidence'
   | 'arithmetic_mismatch'
   | 'read_failure'

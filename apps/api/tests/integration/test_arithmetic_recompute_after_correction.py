@@ -138,12 +138,10 @@ def test_correcting_a_line_reconciles_arithmetic_and_unblocks_confirmation(
         )
         assert cur.fetchone() == ("reconciled",)
         cur.execute(
-            "select status, resolved_at from review_task where id = %s",
+            "select status, reason, resolved_at from review_task where id = %s",
             (task_id,),
         )
-        task_status, resolved_at = cur.fetchone()
-        assert task_status == "resolved"
-        assert resolved_at is not None
+        assert cur.fetchone() == ("open", "ready_to_authorise", None)
 
         monkeypatch.setattr(
             confirmation_service_module,
@@ -162,6 +160,13 @@ def test_correcting_a_line_reconciles_arithmetic_and_unblocks_confirmation(
             payload=None,
         )
         assert confirmed.status == "reviewed"
+        cur.execute(
+            "select status, resolved_at from review_task where id = %s",
+            (task_id,),
+        )
+        task_status, resolved_at = cur.fetchone()
+        assert task_status == "resolved"
+        assert resolved_at is not None
 
 
 def test_reconciled_arithmetic_task_switches_to_missing_supplier_blocker(

@@ -303,7 +303,9 @@ class _FakeCursor:
 
     def execute(self, statement: str, params: object = None) -> None:
         self.executed.append((statement, params))
-        if "record_audit_event" not in statement:
+        if statement.startswith("select status from purchase_request"):
+            self.last_row = {"status": "ordered"}
+        elif "record_audit_event" not in statement:
             self.last_row = {"id": str(UUID(int=20))}
 
     def executemany(self, _statement: str, _params: object) -> None:
@@ -735,6 +737,8 @@ def test_update_draft_order_idempotency_and_allocations(monkeypatch: pytest.Monk
 
     def mock_fetchone() -> dict[str, object] | None:
         nonlocal call_count
+        if cursor.executed[-1][0].startswith("select status from purchase_request"):
+            return {"status": "ordered"}
         call_count += 1
         if call_count == 1:
             # First call is locking the order
@@ -847,6 +851,8 @@ def test_update_draft_order_idempotency_and_allocations(monkeypatch: pytest.Monk
 
     def mock_fetchone_replay() -> dict[str, object] | None:
         nonlocal call_count
+        if cursor.executed[-1][0].startswith("select status from purchase_request"):
+            return {"status": "ordered"}
         call_count += 1
         if call_count == 1:
             return {
@@ -962,6 +968,8 @@ def test_order_mutations_acquire_advisory_locks(monkeypatch: pytest.MonkeyPatch)
 
     def mock_fetchone() -> dict[str, object] | None:
         nonlocal call_count
+        if cursor.executed[-1][0].startswith("select status from purchase_request"):
+            return {"status": "ordered"}
         call_count += 1
         if call_count == 1:
             # First call is locking the order row
@@ -1339,7 +1347,11 @@ def test_order_insert_prefers_request_pack_snapshot(
         monkeypatch.setattr(
             cursor,
             "fetchone",
-            lambda: {"id": ORDER, "status": "draft", "source_request_id": request_id},
+            lambda: (
+                {"status": "ordered"}
+                if cursor.executed[-1][0].startswith("select status from purchase_request")
+                else {"id": ORDER, "status": "draft", "source_request_id": request_id}
+            ),
         )
     service = OrdersService.__new__(OrdersService)
     service._settings = None
