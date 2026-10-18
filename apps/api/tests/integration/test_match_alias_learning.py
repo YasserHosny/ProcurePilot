@@ -355,6 +355,41 @@ def test_bulk_confirm_retry_with_same_key_replays_the_frozen_batch(
         assert _count(cur, "match_decision", second) == 1
 
 
+def test_bulk_confirm_empty_plan_is_frozen_under_the_key(
+    conn: object, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    with conn.cursor() as cur:
+        ensure_quotation_reference_data(cur)
+        workspace = make_workspace(cur, "bulk-exact-empty")
+        supplier_id = make_supplier(cur, workspace, name="Empty Plan Supplier")
+        product = make_workspace_product(cur, workspace, name="Empty Plan Oats 1kg")
+        db_client = PsycopgSupabaseClient(conn)
+        monkeypatch.setattr(resolution_module, "authenticated_client", lambda _s, _t: db_client)
+        resolution = MatchResolutionService(cast(Settings, _MatchingSettings()))
+        resolution._landed_cost = _NoopLandedCost()  # noqa: SLF001
+        member = _member(workspace)
+        key = uuid4()
+
+        act_as(cur, workspace)
+        empty = resolution.confirm_exact_matches(
+            bearer_token="t", member=member, idempotency_key=key
+        )
+        assert (empty.confirmed, empty.skipped) == (0, 0)
+
+        line = _reviewed_line(
+            cur, workspace, supplier_id, original_text="Empty Plan Oats 1kg", line_number=1
+        )
+        _candidate(cur, workspace, line, product)
+        _open_task(cur, workspace, line)
+        act_as(cur, workspace)
+
+        retry = resolution.confirm_exact_matches(
+            bearer_token="t", member=member, idempotency_key=key
+        )
+        assert (retry.confirmed, retry.skipped) == (0, 0)
+        assert _count(cur, "match_decision", line) == 0
+
+
 def _open_task(cur: psycopg.Cursor, workspace: object, line_id: UUID) -> None:
     act_as(cur, workspace)
     cur.execute(
