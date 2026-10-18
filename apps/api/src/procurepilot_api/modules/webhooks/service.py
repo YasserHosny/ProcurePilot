@@ -75,6 +75,9 @@ class WebhookService:
         member: CurrentMember,
         payload: WebhookSubscriptionCreate,
     ) -> WebhookSubscriptionCreated:
+        if self._settings.webhook_token_encryption_key is None:
+            # Webhook signing secrets must not be stored in plaintext.
+            raise ServiceUnavailableError(details={"dependency": "webhook_encryption_key"})
         try:
             validate_webhook_url(
                 str(payload.endpoint_url),

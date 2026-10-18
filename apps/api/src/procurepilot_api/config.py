@@ -1,7 +1,8 @@
 from functools import lru_cache
-from typing import Annotated, Literal
+from typing import Annotated, Literal, Self
 
-from pydantic import Field, SecretStr, field_validator
+from cryptography.fernet import Fernet
+from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 type ApiEnvironment = Literal["local", "staging", "production"]
@@ -248,9 +249,9 @@ class Settings(BaseSettings):
     # encryption from `cryptography`, already a transitive dependency via python-jose) is applied
     # at the application layer — not via Postgres's pgcrypto — specifically so the key itself
     # never has to travel over the database connection as a query parameter, where it could end
-    # up in query logs or pg_stat_statements. Optional, matching every other QuickBooks setting's
-    # own None-by-default shape (stub mode's fake tokens need no real protection); required in
-    # any deployment actually running accounting_provider_mode="quickbooks" against live tokens.
+    # up in query logs or pg_stat_statements. Tokens are encrypted at rest; startup refuses a
+    # live provider without its key. Optional in stub mode (fake tokens need no protection);
+    # required and enforced at startup in any deployment running a non-stub provider mode.
     accounting_token_encryption_key: SecretStr | None = Field(
         default=None, validation_alias="ACCOUNTING_TOKEN_ENCRYPTION_KEY"
     )
@@ -357,6 +358,34 @@ class Settings(BaseSettings):
         if value == "":
             return None
         return value
+
+    @model_validator(mode="after")
+    def validate_token_encryption_keys(self) -> Self:
+        if self.pos_provider_mode != "stub" and self.pos_token_encryption_key is None:
+            raise ValueError(
+                "POS_TOKEN_ENCRYPTION_KEY is required when POS_PROVIDER_MODE is"
+                f" '{self.pos_provider_mode}'"
+            )
+        if self.accounting_provider_mode != "stub" and self.accounting_token_encryption_key is None:
+            raise ValueError(
+                "ACCOUNTING_TOKEN_ENCRYPTION_KEY is required when ACCOUNTING_PROVIDER_MODE is"
+                f" '{self.accounting_provider_mode}'"
+            )
+
+        for key, env_var in (
+            (self.pos_token_encryption_key, "POS_TOKEN_ENCRYPTION_KEY"),
+            (self.accounting_token_encryption_key, "ACCOUNTING_TOKEN_ENCRYPTION_KEY"),
+            (self.webhook_token_encryption_key, "WEBHOOK_TOKEN_ENCRYPTION_KEY"),
+        ):
+            if key is not None:
+                raw_key = key.get_secret_value() if isinstance(key, SecretStr) else str(key)
+                try:
+                    Fernet(raw_key.encode("utf-8"))
+                except Exception:
+                    raise ValueError(
+                        f"{env_var} must be a valid 32-byte url-safe base64-encoded Fernet key"
+                    ) from None
+        return self
 
 
 @lru_cache(maxsize=1)

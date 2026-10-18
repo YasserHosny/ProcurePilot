@@ -5,6 +5,8 @@ from __future__ import annotations
 from uuid import uuid4
 
 import pytest
+from cryptography.fernet import Fernet
+from pydantic import SecretStr
 
 from procurepilot_api.config import Settings
 from procurepilot_api.deps import CurrentMember
@@ -39,7 +41,13 @@ def test_validator_rejects_disallowed_urls(url: str) -> None:
 
 @pytest.mark.parametrize("url", DISALLOWED)
 def test_create_subscription_refuses_disallowed_urls_with_422(url: str) -> None:
-    service = WebhookService(Settings(webhook_allow_private_endpoints=False))
+    test_key = Fernet.generate_key().decode()
+    service = WebhookService(
+        Settings(
+            webhook_allow_private_endpoints=False,
+            webhook_token_encryption_key=SecretStr(test_key),
+        )
+    )
     member = CurrentMember(
         membership_id=uuid4(),
         tenant_id=uuid4(),
