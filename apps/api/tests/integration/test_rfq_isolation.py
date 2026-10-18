@@ -426,3 +426,168 @@ def test_only_owner_or_buyer_can_update_their_rfq(
         _act_as(cur, alpha, role=role)
         cur.execute("update rfq set needed_by_date = needed_by_date where id = %s", (alpha.rfq_id,))
         assert cur.rowcount == updated
+
+
+# --- rfq_line / rfq_recipient writes (20261018000007) ------------------------------------------
+#
+# The creator predicate alone is not enough: a member who created an RFQ and later holds another
+# role (or created it before 20261018000003) must not change its lines or recipients either. The
+# alpha workspace's own membership created alpha's RFQ; the member_role claim plays the role.
+
+_NON_WRITER_ROLES = ["viewer", "approver", "branch_manager"]
+_WRITER_ROLES = ["owner", "buyer"]
+
+
+def _insert_rfq_line(cur: psycopg.Cursor, workspace: RfqWorkspace) -> None:
+    cur.execute(
+        "insert into rfq_line (tenant_id,rfq_id,workspace_product_id,quantity) "
+        "select tenant_id, rfq_id, workspace_product_id, 3 from rfq_line where id = %s",
+        (workspace.rfq_line_id,),
+    )
+
+
+def _insert_extra_supplier(cur: psycopg.Cursor, workspace: RfqWorkspace) -> UUID:
+    supplier_id = uuid4()
+    cur.execute("reset role")
+    cur.execute(
+        "insert into supplier (id,tenant_id,name) values (%s,%s,%s)",
+        (supplier_id, workspace.tenant_id, f"Extra supplier {supplier_id.hex[:6]}"),
+    )
+    return supplier_id
+
+
+@pytest.mark.parametrize("role", _NON_WRITER_ROLES)
+def test_a_creator_without_owner_or_buyer_role_cannot_insert_rfq_lines(
+    rfq_workspaces: tuple[psycopg.Connection, RfqWorkspace, RfqWorkspace], role: str
+) -> None:
+    conn, alpha, _beta = rfq_workspaces
+    with conn.cursor() as cur:
+        _act_as(cur, alpha, role=role)
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            _insert_rfq_line(cur, alpha)
+
+
+@pytest.mark.parametrize("role", _NON_WRITER_ROLES)
+def test_a_creator_without_owner_or_buyer_role_cannot_update_or_delete_rfq_lines(
+    rfq_workspaces: tuple[psycopg.Connection, RfqWorkspace, RfqWorkspace], role: str
+) -> None:
+    conn, alpha, _beta = rfq_workspaces
+    with conn.cursor() as cur:
+        _act_as(cur, alpha, role=role)
+        cur.execute("update rfq_line set quantity = 999 where id = %s", (alpha.rfq_line_id,))
+        assert cur.rowcount == 0
+        cur.execute("delete from rfq_line where id = %s", (alpha.rfq_line_id,))
+        assert cur.rowcount == 0
+        cur.execute("reset role")
+        cur.execute("select quantity from rfq_line where id = %s", (alpha.rfq_line_id,))
+        assert cur.fetchone()[0] == 10
+
+
+@pytest.mark.parametrize("role", _NON_WRITER_ROLES)
+def test_a_creator_without_owner_or_buyer_role_cannot_insert_rfq_recipients(
+    rfq_workspaces: tuple[psycopg.Connection, RfqWorkspace, RfqWorkspace], role: str
+) -> None:
+    conn, alpha, _beta = rfq_workspaces
+    with conn.cursor() as cur:
+        supplier_id = _insert_extra_supplier(cur, alpha)
+        _act_as(cur, alpha, role=role)
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            cur.execute(
+                "insert into rfq_recipient (tenant_id,rfq_id,supplier_id,status) "
+                "values (%s,%s,%s,'draft')",
+                (alpha.tenant_id, alpha.rfq_id, supplier_id),
+            )
+
+
+@pytest.mark.parametrize("role", _NON_WRITER_ROLES)
+def test_a_creator_without_owner_or_buyer_role_cannot_update_or_delete_rfq_recipients(
+    rfq_workspaces: tuple[psycopg.Connection, RfqWorkspace, RfqWorkspace], role: str
+) -> None:
+    conn, alpha, _beta = rfq_workspaces
+    with conn.cursor() as cur:
+        _act_as(cur, alpha, role=role)
+        cur.execute(
+            "update rfq_recipient set outbound_message_id = 'tampered' where id = %s",
+            (alpha.rfq_recipient_id,),
+        )
+        assert cur.rowcount == 0
+        cur.execute("delete from rfq_recipient where id = %s", (alpha.rfq_recipient_id,))
+        assert cur.rowcount == 0
+        cur.execute("reset role")
+        cur.execute(
+            "select outbound_message_id from rfq_recipient where id = %s",
+            (alpha.rfq_recipient_id,),
+        )
+        assert cur.fetchone()[0] != "tampered"
+
+
+@pytest.mark.parametrize("role", _WRITER_ROLES)
+def test_an_owner_or_buyer_creator_can_still_write_rfq_lines_and_recipients(
+    rfq_workspaces: tuple[psycopg.Connection, RfqWorkspace, RfqWorkspace], role: str
+) -> None:
+    """The draft edit and send paths (RfqService.update_draft / send) keep working."""
+    conn, alpha, _beta = rfq_workspaces
+    with conn.cursor() as cur:
+        supplier_id = _insert_extra_supplier(cur, alpha)
+        _act_as(cur, alpha, role=role)
+        _insert_rfq_line(cur, alpha)
+        assert cur.rowcount == 1
+        cur.execute("update rfq_line set quantity = 11 where id = %s", (alpha.rfq_line_id,))
+        assert cur.rowcount == 1
+        cur.execute(
+            "insert into rfq_recipient (tenant_id,rfq_id,supplier_id,status) "
+            "values (%s,%s,%s,'draft')",
+            (alpha.tenant_id, alpha.rfq_id, supplier_id),
+        )
+        assert cur.rowcount == 1
+        cur.execute(
+            "update rfq_recipient set status = 'sent', sent_at = now() "
+            "where rfq_id = %s and supplier_id = %s",
+            (alpha.rfq_id, supplier_id),
+        )
+        assert cur.rowcount == 1
+        cur.execute(
+            "delete from rfq_recipient where rfq_id = %s and supplier_id = %s",
+            (alpha.rfq_id, supplier_id),
+        )
+        assert cur.rowcount == 1
+        cur.execute("delete from rfq_line where id = %s", (alpha.rfq_line_id,))
+        assert cur.rowcount == 1
+
+
+def test_a_buyer_who_did_not_create_the_rfq_cannot_update_its_recipients(
+    rfq_workspaces: tuple[psycopg.Connection, RfqWorkspace, RfqWorkspace],
+) -> None:
+    """rfq_recipient_update used to admit any owner/buyer; it now matches rfq_update."""
+    conn, alpha, _beta = rfq_workspaces
+    other_user, other_membership = uuid4(), uuid4()
+    other_email = f"rfq-other-buyer-{other_user.hex[:10]}@example.test"
+    with conn.cursor() as cur:
+        cur.execute("reset role")
+        cur.execute("insert into auth.users (id,email) values (%s,%s)", (other_user, other_email))
+        cur.execute(
+            "insert into membership (id,tenant_id,user_id,email,role,is_active_workspace) "
+            "values (%s,%s,%s,%s,'buyer',true)",
+            (other_membership, alpha.tenant_id, other_user, other_email),
+        )
+        cur.execute("set local role authenticated")
+        cur.execute(
+            "select set_config('request.jwt.claims', %s, true)",
+            (
+                json.dumps(
+                    {
+                        "sub": str(other_user),
+                        "tenant_id": str(alpha.tenant_id),
+                        "role": "authenticated",
+                        "member_role": "buyer",
+                    }
+                ),
+            ),
+        )
+        cur.execute("select id from rfq_recipient where id = %s", (alpha.rfq_recipient_id,))
+        assert cur.fetchone() is not None, "owners and buyers still read every RFQ's recipients"
+        cur.execute(
+            "update rfq_recipient set outbound_message_id = 'tampered' where id = %s",
+            (alpha.rfq_recipient_id,),
+        )
+        assert cur.rowcount == 0
