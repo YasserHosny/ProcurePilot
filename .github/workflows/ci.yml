@@ -140,6 +140,10 @@ jobs:
       - name: Install web dependencies
         working-directory: apps/web
         run: pnpm install --ignore-workspace --frozen-lockfile
+      - name: E2E shard plan
+        run: |
+          python3 -m unittest discover -s scripts/ci -p 'test_e2e_shard.py' -v
+          python3 scripts/ci/e2e_shard.py check --total 3
       - name: Lint backend
         run: uv run --project apps/api ruff check apps/api
       - name: Lint web
@@ -442,6 +446,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # Matrix size and planner --total 3 must change together.
+        # Regenerate e2e-durations.json with e2e_shard.py from-logs.
         shard: [1, 2, 3]
     runs-on: ubuntu-latest
     services:
@@ -600,7 +606,13 @@ jobs:
         # Its own step so an accessibility regression is named as one rather than buried among
         # the functional specs (FR-022, SC-006).
         working-directory: apps/web
-        run: pnpm exec playwright test a11y --shard=${{ matrix.shard }}/3
+        run: |
+          files=$(python3 ../../scripts/ci/e2e_shard.py plan --shard ${{ matrix.shard }} --total 3 --kind a11y)
+          if [ -z "$files" ]; then
+            echo "::notice::No a11y end-to-end specs assigned to this shard"
+            exit 0
+          fi
+          pnpm exec playwright test $files
 
       - name: Run end-to-end specs
         # The accessibility step already ran every a11y spec; this complement is exactly the files
@@ -611,12 +623,12 @@ jobs:
           TZ: Asia/Dubai
         run: |
           google-chrome --version
-          files=$(cd tests/e2e && ls *.spec.ts | grep -v a11y | sed 's#^#tests/e2e/#')
+          files=$(python3 ../../scripts/ci/e2e_shard.py plan --shard ${{ matrix.shard }} --total 3 --kind functional)
           if [ -z "$files" ]; then
             echo "::error::No non-a11y end-to-end specs found"
             exit 1
           fi
-          pnpm exec playwright test $files --shard=${{ matrix.shard }}/3
+          pnpm exec playwright test $files
 
       - name: Upload failure artefacts
         if: failure()
