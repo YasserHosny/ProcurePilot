@@ -18,7 +18,7 @@ import type { ApiError } from '../../../core/api/models';
 import { FormatService } from '../../../core/format/format.service';
 import { FormatMoneyPipe } from '../../../core/format/money.pipe';
 import { toLocalMidnightIsoOrNull } from '../../../core/format/iso-date';
-import { packLabel } from '../../orders/pack-label';
+import { lineDescription, packLabel } from '../../orders/pack-label';
 import {
   type PurchaseDeliveryResult,
   type PurchaseOutcomeCreate,
@@ -138,6 +138,10 @@ export class OutcomeFromOrderComponent implements OnInit {
       parseFloat(line.quantity) > 0 &&
       AMOUNT_PATTERN.test(line.total.trim())
     );
+  }
+
+  description(line: PurchaseOutcomePrefillLine): string {
+    return lineDescription(line);
   }
 
   unitLabel(line: PurchaseOutcomePrefillLine): string {

@@ -42,10 +42,10 @@
               [checked]="edit.include"
               [disabled]="!edit.line.recordable || isSubmitting()"
               (change)="update(i, { include: $event.checked })"
-              [attr.aria-label]="edit.line.description"
+              [attr.aria-label]="description(edit.line)"
             ></mat-checkbox>
             <div class="line-description">
-              <strong>#{{ edit.line.line_number }} {{ edit.line.description }}</strong>
+              <strong>#{{ edit.line.line_number }} {{ description(edit.line) }}</strong>
               <span class="conversion">{{ conversionLabel(edit.line) }}</span>
               @if (edit.line.reason; as reason) {
                 <span class="line-reason" data-testid="line-reason">
