@@ -21,6 +21,7 @@ from procurepilot_api.modules.offers.basket_liveness import (
     optimiser_worker_alive,
     stale_code,
 )
+from procurepilot_api.modules.offers.basket_result_compat import normalise_stored_result
 from procurepilot_api.modules.offers.schemas import (
     AdvancedBasketOptimiseRequest,
     BasketOptimiseRequest,
@@ -562,7 +563,7 @@ def _job(row: dict[str, object]) -> BasketSplitJob:
             "supplier_ids": row["supplier_ids"],
             "items": row["items"],
             "status": row["status"],
-            "result": row.get("result"),
+            "result": normalise_stored_result(row.get("result")),
             "error": row.get("error"),
             "result_url": f"/api/v1/baskets/{row['id']}",
             "created_at": row["created_at"],
