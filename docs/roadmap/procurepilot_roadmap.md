@@ -73,7 +73,10 @@ Since 2026-10-15 the hosted demo tenant build has produced 30 findings. As of 20
 
 An internal security review of R3.2–R4.3 and the October fixes was completed on 2026-10-18
 (`docs/quality/r3.2-r4.x-security-review-record.md`). Its 7 Critical, High and Medium findings are fixed
-and deployed (#137, #138, #142, #156, #160); 8 Low and Info findings are tracked there.
+and merged (#137, #138, #142, #156, #160). #137 and #138 are deployed with their migrations applied to hosted;
+#142, #156 and #160 need no migration, but the webhook-worker part of #142 is not active on hosted because
+that worker is not deployed (see "Background workers on hosted" below). 8 Low and Info findings are tracked
+there.
 
 ### Gates
 
@@ -1371,7 +1374,7 @@ customer-configurable. Decisions 3 and 4 have not been revisited in this documen
 | # | Action | Where tracked |
 |---:|---|---|
 | 1 | Finish the hosted demo tenant and record the demo video | `docs/gtm/video/production-tracker.md` (PP-5, PP-6) |
-| 2 | Deploy the background workers hosted lacks (report schedules, offer refresh, exports, digests, webhooks, sync), then fix the open demo findings (22, 23, 25–30; 23 needs the owner's savings-baseline decision). The basket-split read (finding 21) was fixed in #131 | Delivery Status; `docs/gtm/demo-tenant/README.md` |
+| 2 | After the demo video is recorded (its flow needs none of them), deploy the background workers hosted lacks (report schedules, offer refresh, exports, digests, webhooks, sync) as **one** combined jobs container — one image/entrypoint serving all these low-volume queues, one deploy workflow modelled on #108, its env documented in `docs/operations/runbook.md` — then fix the open demo findings (22, 23, 25–30; 23 needs the owner's savings-baseline decision). The basket-split read (finding 21) was fixed in #131 | Delivery Status; `docs/gtm/demo-tenant/README.md` |
 | 3 | Run real Egyptian supplier quotes through extraction | `specs/022-home-currency-readiness/tasks.md` T015 (Jira PP-3) |
 | 4 | Reach 20 prospect conversations and sign the first pilot | `docs/gtm/gtm-execution-plan.md` (PP-11, PP-13, PP-10) |
 | 5 | Choose what to build from the partial and deferred scope above, driven by the pilot | This document, Delivery Status |
