@@ -614,18 +614,18 @@ Reached from **Create Order** on the order list (blank), **From approved request
 | 3 | **+ Record Purchase Outcome button** | Opens the outcome capture form (below) to record a purchase and automatically calculate savings. |
 | 4 | **Stats cards** | Three summary cards: **Total Verified Savings**, **Verified Outcomes** (count), **Pending Outcomes** (count). |
 | 5 | **Filters** | Status (All/Verified/Pending), supplier, and date range. **Clear Filters** resets all. |
-| 6 | **Savings table** | Each row: product, supplier, baseline value, actual paid, verified saving (delta), status, and recorded date. Click **View Evidence** to drill into the full calculation. |
+| 6 | **Savings table** | Each row: product, supplier, baseline value (with the baseline policy used beneath it, e.g. "Last PO Price"), actual paid, verified saving (delta), status, and recorded date. Click **View Evidence** to drill into the full calculation. |
 | 7 | **Empty state** | When no savings exist, "No savings recorded yet" with a **+ Record First Purchase** link. |
 
 ### Record Purchase Outcome
 
-Reached from **Record Purchase** on any Smart Compare offer, or **+ Record Purchase Outcome** on the ledger itself.
+Reached from **Record Purchase** on any Smart Compare offer, or **+ Record Purchase Outcome** on the ledger itself. To record what a purchase order bought, use **Record outcome** on the order instead (below) — it fills every line for you.
 
 ![Record Purchase Outcome](screenshots/13b-outcome-capture.jpg)
 
 | # | Element | Description |
 |---|---------|-------------|
-| 1 | **Historical Baseline Note** | States which baseline policy will be used to compute the saving (e.g. "Last Paid Price"). |
+| 1 | **Historical Baseline Note** | Explains the baseline: the last purchase-order price for the product, or the last quoted price when the product has no earlier purchase order. |
 | 2 | **Product / Supplier** | Pre-filled when arriving from Smart Compare. |
 | 3 | **Actual Quantity Ordered / Base Unit** | What you actually bought, in the product's normalised unit. |
 | 4 | **Actual Unit Price / Currency / Total Amount Paid** | What you actually paid — always with an explicit currency. |
@@ -634,6 +634,18 @@ Reached from **Record Purchase** on any Smart Compare offer, or **+ Record Purch
 | 7 | **Notes / Reference ID** | Optional free text, e.g. a PO number. |
 | 8 | **Record Outcome & Compute Saving** | Saves the outcome and immediately computes the saving against the baseline, taking you to the Saving Evidence screen. If the selected product has no price history yet, the form flags that no baseline is available for that product. |
 
+### Record Outcome from a Purchase Order
+
+**Route:** `/orders/:id/record-outcome` — the **Record outcome** button on a submitted, confirmed, received, or closed purchase order (owner and buyer).
+
+| # | Element | Description |
+|---|---------|-------------|
+| 1 | **Baseline note** | Savings are measured against the last purchase-order price for each product, excluding this order. |
+| 2 | **Delivery Outcome** | Pre-selected from the order status (Ordered, Partially Delivered, or Delivered); change it if needed. |
+| 3 | **One line per order line** | Each line shows the pack conversion (e.g. "2 × pack of 30 piece = 60 piece"), with the quantity in base units and the total paid (excluding tax) pre-filled and editable. Untick a line to skip it. |
+| 4 | **Lines that cannot be recorded** | Lines not linked to a catalogue product, with nothing ordered, or already recorded are greyed out; an already-recorded line links to its saving. |
+| 5 | **Save outcomes** | Records one purchase outcome per selected line, each linked to its order line. A line can be recorded only once. |
+
 ### Saving Evidence & Calculation
 
 ![Saving Evidence](screenshots/13c-saving-evidence.jpg)
@@ -641,9 +653,11 @@ Reached from **Record Purchase** on any Smart Compare offer, or **+ Record Purch
 | # | Element | Description |
 |---|---------|-------------|
 | 1 | **Verification banner** | "Pending Verification" (amber, with a **Verify Saving** button) until an owner or buyer verifies it, after which it reads "Verified (Immutable)" (green, with a lock icon) and the record can no longer be edited or deleted. |
-| 2 | **Saving Summary** | Net saving, actual vs. baseline total value, baseline unit price, baseline policy used, status, recorded/verified dates, and the calculation version. |
+| 2 | **Saving Summary** | Net saving, actual vs. baseline total value, baseline unit price, baseline policy used, the purchase order the baseline came from (for "Last PO Price", linked), status, recorded/verified dates, and the calculation version. |
 | 3 | **Purchase Details** | The full purchase record as entered. |
 | 4 | **Calculation Snapshot** | The exact formula applied ("Baseline Value − Actual Paid = Net Saving") and the competing offers that were on the table at compare time — the full evidence chain from quotation → match → offer → purchase → saving. |
+
+**Key concept — the baseline:** the saving is measured against the **last purchase-order price** for the product: the newest submitted, confirmed, received, or closed order line in the same base unit, excluding the order being recorded. PO prices are per pack, so the baseline is scaled to the outcome's base units (a carton of 30 at 172 against 60 pieces gives a baseline of 344). Without an earlier purchase order, the baseline falls back to the **last quoted price**, then the 6-month quoted average; otherwise no baseline is available.
 
 **Key concept — Verified Savings:**
 - Verified savings are **immutable** — once verified, they cannot be edited or deleted. If a correction is needed, a new adjustment record is created.

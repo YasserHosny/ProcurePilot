@@ -169,6 +169,7 @@ journey
 - `/home` -> **Basket Split** -> `/offers/basket-split` -> choose two suppliers + basket lines -> optimise -> `/offers/basket-split/:id`
 - `/home` -> **Alerts Inbox** -> `/alerts` -> open alert action -> Smart Compare, supplier detail, or Product Price Intelligence
 - `/home` -> **Savings Ledger** -> `/savings` -> **Record Purchase Outcome** -> `/savings/outcome-capture` -> compute saving -> `/savings/:id/evidence`
+- `/orders/:id` -> **Record outcome** -> `/orders/:id/record-outcome` -> save outcomes (one per PO line, baseline = last PO price) -> `/savings`
 - `/savings` -> **View Evidence** -> `/savings/:id/evidence`; `/savings/:id` is an alias
 - `/savings` -> **Export Savings** -> `/savings/export` -> generate export -> `/savings/export/:id`
 
