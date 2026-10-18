@@ -46,8 +46,14 @@ class _ApprovalQueueScreenState extends State<ApprovalQueueScreen> {
     }
   }
 
-  void _navigateToDecision(PurchaseRequest request) {
-    Navigator.of(context).pushNamed('/approvals/detail', arguments: request);
+  Future<void> _navigateToDecision(PurchaseRequest request) async {
+    final result = await Navigator.of(context).pushNamed(
+      '/approvals/detail',
+      arguments: request,
+    );
+    if (result == true && mounted) {
+      await _loadApprovals();
+    }
   }
 
   @override
@@ -80,7 +86,7 @@ class _ApprovalQueueScreenState extends State<ApprovalQueueScreen> {
                           key: Key('approvalQueueItem_$index'),
                           title: Text(
                             '${i18n.t('approvals.columns.requester')}: '
-                            '${request.requestedByMembershipId}',
+                            '${request.requesterDisplayName(i18n)}',
                           ),
                           subtitle: Text(
                             '${i18n.t('approvals.columns.requiredByDate')}: '

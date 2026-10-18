@@ -1431,19 +1431,58 @@ class RequestsService:
         rows_by_id = {str(row["id"]): row for row in _rows(response.data)}
         return [rows_by_id[request_id] for request_id in request_ids if request_id in rows_by_id]
 
-    def _fetch_lines_for(self, client: Client, request_id: str) -> list[dict[str, object]]:
+    def _fetch_product_details_batch(
+        self, client: Client, product_ids: list[str]
+    ) -> dict[str, dict[str, object | None]]:
+        if not product_ids:
+            return {}
         try:
             response = (
-                client.table("purchase_request_line")
-                .select(LINE_COLUMNS)
-                .eq("purchase_request_id", request_id)
-                .order("created_at")
-                .order("id")
+                client.table("workspace_product")
+                .select(
+                    "id,tenant_name,canonical_product(base_unit),pack_definition(id,base_quantity,created_at)"
+                )
+                .in_("id", product_ids)
                 .execute()
             )
         except APIError as exc:
             raise ServiceUnavailableError(details={"dependency": "database"}) from exc
-        return _rows(response.data)
+
+        result: dict[str, dict[str, object | None]] = {}
+        for row in _rows(response.data):
+            p_id = str(row["id"])
+            product_name = str(row["tenant_name"]) if row.get("tenant_name") is not None else None
+
+            base_unit: str | None = None
+            if isinstance(row.get("canonical_product"), dict):
+                cu = row["canonical_product"].get("base_unit")
+                base_unit = str(cu) if cu is not None else None
+            elif isinstance(row.get("canonical_product"), list) and row["canonical_product"]:
+                cu = row["canonical_product"][0].get("base_unit")
+                base_unit = str(cu) if cu is not None else None
+
+            pack_base_qty: object | None = None
+            if isinstance(row.get("pack_definition"), list) and row["pack_definition"]:
+                pack_defs = [
+                    pd
+                    for pd in row["pack_definition"]
+                    if isinstance(pd, dict) and pd.get("base_quantity") is not None
+                ]
+                if pack_defs:
+                    newest_pack = sorted(pack_defs, key=_pack_key, reverse=True)[0]
+                    pack_base_qty = newest_pack.get("base_quantity")
+            elif isinstance(row.get("pack_definition"), dict):
+                pack_base_qty = row["pack_definition"].get("base_quantity")
+
+            result[p_id] = {
+                "product_name": product_name,
+                "base_unit": base_unit,
+                "pack_base_quantity": pack_base_qty,
+            }
+        return result
+
+    def _fetch_lines_for(self, client: Client, request_id: str) -> list[dict[str, object]]:
+        return self._fetch_lines_batch(client, [request_id]).get(request_id, [])
 
     def _fetch_lines_batch(
         self, client: Client, request_ids: list[str]
@@ -1461,8 +1500,20 @@ class RequestsService:
             )
         except APIError as exc:
             raise ServiceUnavailableError(details={"dependency": "database"}) from exc
+
+        line_rows = _rows(response.data)
+        product_ids = list(
+            {str(r["workspace_product_id"]) for r in line_rows if r.get("workspace_product_id")}
+        )
+        product_details = self._fetch_product_details_batch(client, product_ids)
+
         result: dict[str, list[dict[str, object]]] = {rid: [] for rid in request_ids}
-        for row in _rows(response.data):
+        for row in line_rows:
+            p_info = product_details.get(str(row.get("workspace_product_id")), {})
+            row["product_name"] = p_info.get("product_name")
+            row["base_unit"] = p_info.get("base_unit")
+            row["pack_base_quantity"] = p_info.get("pack_base_quantity")
+
             rid = str(row["purchase_request_id"])
             if rid in result:
                 result[rid].append(row)
@@ -2072,9 +2123,7 @@ def _purchase_request(
     return PurchaseRequest(
         id=UUID(str(row["id"])),
         source_rfq_response_id=(
-            UUID(str(row["source_rfq_response_id"]))
-            if row.get("source_rfq_response_id")
-            else None
+            UUID(str(row["source_rfq_response_id"])) if row.get("source_rfq_response_id") else None
         ),
         branch_id=UUID(str(row["branch_id"])),
         cost_centre_id=(UUID(str(row["cost_centre_id"])) if row.get("cost_centre_id") else None),
@@ -2130,6 +2179,13 @@ def _purchase_request_line(
             else None
         ),
         quoted_unit_price=_money(quoted[0], quoted[1]) if quoted else None,
+        product_name=str(row["product_name"]) if row.get("product_name") is not None else None,
+        base_unit=str(row["base_unit"]) if row.get("base_unit") is not None else None,
+        pack_base_quantity=(
+            _decimal(row["pack_base_quantity"], scale=6)
+            if row.get("pack_base_quantity") is not None
+            else None
+        ),
     )
 
 
@@ -2409,3 +2465,9 @@ def _write_error(
 def _api_error_code(exc: APIError) -> str | None:
     code = getattr(exc, "code", None)
     return str(code) if code else None
+
+
+def _pack_key(p: dict[str, object]) -> tuple[str, str]:
+    c = p.get("created_at")
+    c_str = c.isoformat() if isinstance(c, datetime) else str(c or "")
+    return (c_str, str(p.get("id") or ""))

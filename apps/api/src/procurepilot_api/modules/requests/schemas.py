@@ -41,6 +41,9 @@ class PurchaseRequestLine(BaseModel):
     # response the request was prepared from; null for any line without that provenance. This,
     # not `estimated_unit_price` (a landed estimate), is what a purchase order may pre-fill.
     quoted_unit_price: Money | None = None
+    product_name: str | None = None
+    base_unit: str | None = None
+    pack_base_quantity: StrictStr | None = Field(default=None, pattern=r"^\d+(\.\d{1,6})?$")
 
 
 class PurchaseRequestLineInput(StrictApiModel):

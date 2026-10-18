@@ -127,6 +127,19 @@ Future<I18nLoader> loadTestI18n({String locale = 'en'}) async {
             'This request has already been decided by someone else.',
         'empty': 'No requests are currently awaiting your decision.',
         'notAvailable': 'Not available',
+        'unknownRequester': 'Unknown requester',
+        'unknownProduct': 'Unknown product',
+      },
+      'rfq': {
+        'email': {
+          'units': {
+            'litre': 'L',
+            'millilitre': 'mL',
+            'kilogram': 'kg',
+            'gram': 'g',
+            'each': 'pcs',
+          },
+        },
       },
       'requests': {
         'title': 'Purchase Requests',
@@ -238,7 +251,56 @@ Future<I18nLoader> loadTestI18n({String locale = 'en'}) async {
             'Low stock report queued — will send when back online.',
       },
     }),
-    '../../packages/i18n/ar.json': jsonEncode({}),
+    '../../packages/i18n/ar.json': jsonEncode({
+      'common': {
+        'brandName': 'ProcurePilot',
+        'loading': 'جاري التحميل...',
+        'comingSoon': 'قريباً',
+      },
+      'approvals': {
+        'title': 'قائمة الموافقات',
+        'columns': {
+          'requester': 'مقدم الطلب',
+          'requiredByDate': 'مطلوب قبل',
+        },
+        'actions': {'approve': 'اعتماد', 'reject': 'رفض'},
+        'unknownRequester': 'مقدم طلب غير معروف',
+        'unknownProduct': 'منتج غير معروف',
+        'approveSuccess': 'تم اعتماد الطلب.',
+        'rejectSuccess': 'تم رفض الطلب.',
+        'empty': 'لا توجد طلبات تنتظر قرارك حالياً.',
+      },
+      'rfq': {
+        'email': {
+          'units': {
+            'litre': 'لتر',
+            'millilitre': 'مل',
+            'kilogram': 'كجم',
+            'gram': 'جم',
+            'each': 'وحدة',
+          },
+        },
+      },
+      'requests': {
+        'title': 'طلبات الشراء',
+        'columns': {
+          'requiredByDate': 'مطلوب قبل',
+          'status': 'الحالة',
+        },
+        'status': {
+          'submitted': 'مقدمة',
+          'approved': 'معتمدة',
+          'rejected': 'مرفوضة',
+        },
+        'form': {
+          'linesTitle': 'البنود',
+          'quantityLabel': 'الكمية',
+        },
+      },
+      'mobileHome': {
+        'pendingApprovalsCount': '{{count}} طلب(ات) بانتظار قرارك',
+      },
+    }),
   });
   final i18n = I18nLoader(bundle: bundle);
   await i18n.load(locale);
