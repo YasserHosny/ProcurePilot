@@ -427,22 +427,19 @@ def _all_document_text(result: object) -> str:
 
 _TEXT_VALIDITY_CONFIDENCE = 0.6
 _VALIDITY_LABEL = (
-    r"(?:(?:العرض\s+)?(?:صالح|ساري)[ةه]?\s+حت[ىي]|صلاحي[ةه]\s+العرض(?:\s+حت[ىي])?|"
+    r"(?:(?:العرض\s+)?(?:صالح|ساري)[ةه]?\s+حت[ىي]|(?:ال)?صلاحي[ةه](?:\s+العرض)?(?:\s+حت[ىي])?|"
     r"تاريخ\s+(?:الانتهاء|انتهاء\s+العرض)|valid\s+(?:until|till|thru|through)|"
     r"validity(?:\s+date)?|expiry\s+date|expires(?:\s+on)?)"
 )
 _TEXT_DATE = r"\d{1,4}\s*[/.\-]\s*\d{1,2}\s*[/.\-]\s*\d{2,4}"
-# OCR of a photo can emit an RTL line in visual order ("29/10/2026 :صالح حتى 19/10/2026 ..."),
-# putting the value before its label; the colon tells which side the value is on.
-_VALIDITY_PATTERNS = tuple(
-    re.compile(pattern, re.I)
-    for pattern in (
-        rf"{_VALIDITY_LABEL}\s*[:：]\s*({_TEXT_DATE})",
-        rf"({_TEXT_DATE})\s*[:：]\s*{_VALIDITY_LABEL}",
-        rf"{_VALIDITY_LABEL}\s*[\-–]?\s*({_TEXT_DATE})",
-        rf"({_TEXT_DATE})\s*[\-–]?\s*{_VALIDITY_LABEL}",
-    )
+_VALIDITY_AFTER = re.compile(rf"{_VALIDITY_LABEL}\s*[:：]\s*({_TEXT_DATE})", re.I)
+_VALIDITY_AFTER_LOOSE = re.compile(
+    rf"{_VALIDITY_LABEL}\s*[\-–]?\s*({_TEXT_DATE})(?!\d)(?!\s*[:：])", re.I
 )
+# OCR of a photo can emit an RTL line in visual order ("29/10/2026 :صالح حتى 19/10/2026 ..."),
+# putting the value before its label. Only the label's own colon, right next to the date, makes
+# it the label's value; "Date: 19/10/2026 Validity: 30 days" must not yield the issue date.
+_VALIDITY_BEFORE = re.compile(rf"({_TEXT_DATE})\s*[:：]\s*{_VALIDITY_LABEL}", re.I)
 _VALIDITY_ALONE = re.compile(rf"{_VALIDITY_LABEL}\s*[:：\-–]?\s*$", re.I)
 _DATE_ALONE = re.compile(rf"^\s*({_TEXT_DATE})")
 
@@ -450,10 +447,17 @@ _DATE_ALONE = re.compile(rf"^\s*({_TEXT_DATE})")
 def _find_validity_date(text: str) -> str | None:
     lines = [line.strip() for line in text.splitlines()]
     for idx, line in enumerate(lines):
-        for pattern in _VALIDITY_PATTERNS:
-            match = pattern.search(line)
-            if match:
-                return match[1]
+        match = _VALIDITY_AFTER.search(line)
+        if match:
+            return match[1]
+        match = _VALIDITY_BEFORE.search(line)
+        # A date that follows another label's colon ("Date: 19/10/2026 :...") is that label's.
+        if match and not line[: match.start()].rstrip().endswith((":", "：")):
+            return match[1]
+        # Without a colon, a date followed by one is the next label's value in visual order.
+        match = _VALIDITY_AFTER_LOOSE.search(line)
+        if match:
+            return match[1]
         if _VALIDITY_ALONE.search(line):
             following = next((nxt for nxt in lines[idx + 1 :] if nxt), "")
             date_match = _DATE_ALONE.match(following)

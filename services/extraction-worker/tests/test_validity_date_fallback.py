@@ -78,3 +78,30 @@ def test_azure_due_date_still_wins_over_text_fallback() -> None:
 def test_no_validity_label_means_no_expiry() -> None:
     result = _parse_invoice_result(_photo_result(["التاريخ: 19/10/2026"]), "test")
     assert "expiry_date" not in result.header
+
+
+@pytest.mark.parametrize(
+    "meta_line",
+    [
+        "Date: 19/10/2026 Validity: 30 days",
+        "التاريخ: 19/10/2026 الصلاحية: 30 يوم",
+    ],
+)
+def test_issue_date_before_duration_validity_is_not_the_expiry(meta_line: str) -> None:
+    result = _parse_invoice_result(_photo_result([meta_line]), "test")
+    assert "expiry_date" not in result.header
+
+
+def test_bare_salahiya_label_with_date_is_extracted() -> None:
+    result = _parse_invoice_result(_photo_result(["الصلاحية: 29/10/2026"]), "test")
+    assert result.header["expiry_date"].value == "29/10/2026"
+
+
+def test_pre_label_date_owned_by_another_label_is_not_the_expiry() -> None:
+    result = _parse_invoice_result(_photo_result(["التاريخ: 19/10/2026 :الصلاحية 30 يوم"]), "test")
+    assert "expiry_date" not in result.header
+
+
+def test_visual_order_without_colon_does_not_truncate_next_labels_date() -> None:
+    result = _parse_invoice_result(_photo_result(["صالح حتى 19/10/2026 :التاريخ"]), "test")
+    assert "expiry_date" not in result.header
