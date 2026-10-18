@@ -573,6 +573,66 @@ def test_validity_expiring_reader_pinned_to_tenant_a_excludes_tenant_b(
     assert beta.landed_cost_id not in ids
 
 
+READER_CALLS = {
+    "savings": "select count(*) from reporting_savings_for_period(%s, '2026-01-01', '2026-12-31')",
+    "purchases": (
+        "select count(*) from reporting_purchases_for_period(%s, '2026-01-01', '2026-12-31')"
+    ),
+    "alert_snapshot": (
+        "select count(*) from reporting_alert_snapshot(%s, '2026-01-01', '2026-12-31')"
+    ),
+    "validity_expiring": "select count(*) from reporting_validity_expiring(%s, now(), 7)",
+    "branch_guard": "select reporting_assert_branch_visible(%s, null)",
+}
+
+
+@pytest.mark.parametrize("reader", sorted(READER_CALLS))
+def test_member_cannot_call_a_reader_for_another_tenant(
+    reporting_tenants: tuple[ReportingTenant, ReportingTenant], reader: str
+) -> None:
+    """The readers are SECURITY DEFINER and pinned to p_tenant_id, so the pin must be the
+    caller's own tenant: a member of alpha naming beta is refused (security review 2026-10-18,
+    finding 1)."""
+    alpha, beta = reporting_tenants
+    with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+        with conn.cursor() as cur:
+            act_as(cur, alpha.workspace)
+            with pytest.raises(psycopg.errors.InsufficientPrivilege):
+                cur.execute(READER_CALLS[reader], (beta.workspace.tenant_id,))
+
+
+@pytest.mark.parametrize("reader", sorted(READER_CALLS))
+def test_anon_cannot_call_a_reader(
+    reporting_tenants: tuple[ReportingTenant, ReportingTenant], reader: str
+) -> None:
+    """The public anon key reaches these over /rest/v1/rpc; it must read nothing."""
+    alpha, _beta = reporting_tenants
+    with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+        with conn.cursor() as cur:
+            cur.execute("set local role anon")
+            cur.execute("select set_config('request.jwt.claims', '{\"role\":\"anon\"}', true)")
+            with pytest.raises(psycopg.errors.InsufficientPrivilege):
+                cur.execute(READER_CALLS[reader], (alpha.workspace.tenant_id,))
+
+
+def test_member_can_call_a_reader_for_own_tenant(
+    reporting_tenants: tuple[ReportingTenant, ReportingTenant],
+) -> None:
+    """Positive control: the API's own path (authenticated, own claim) keeps working."""
+    alpha, beta = reporting_tenants
+    with psycopg.connect(TEST_DATABASE_URL or "") as conn:
+        with conn.cursor() as cur:
+            act_as(cur, alpha.workspace)
+            cur.execute(
+                "select purchase_record_id from reporting_purchases_for_period"
+                "(%s, %s, %s, null, null)",
+                (alpha.workspace.tenant_id, "2026-01-01", "2026-12-31"),
+            )
+            ids = {row[0] for row in cur.fetchall()}
+    assert alpha.purchase_id in ids
+    assert beta.purchase_id not in ids
+
+
 def test_branch_guard_raises_for_another_tenants_branch(
     reporting_tenants: tuple[ReportingTenant, ReportingTenant],
 ) -> None:
