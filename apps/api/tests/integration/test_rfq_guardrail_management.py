@@ -16,7 +16,11 @@ import pytest
 
 from procurepilot_api.config import get_settings
 from procurepilot_api.deps import CurrentMember
-from procurepilot_api.errors import PermissionDeniedError, UnprocessableEntityError
+from procurepilot_api.errors import (
+    NotFoundError,
+    PermissionDeniedError,
+    UnprocessableEntityError,
+)
 from procurepilot_api.modules.auth.jwt import MemberRole
 from procurepilot_api.modules.rfq.router import create_guardrail, update_guardrail
 from procurepilot_api.modules.rfq.schemas import GuardrailCreateInput, GuardrailUpdateInput
@@ -175,3 +179,145 @@ def test_create_then_update_guardrail_round_trip() -> None:
     )
     assert updated.enabled is True
     assert updated.id == created.id
+
+
+def _cost_centre(
+    cur: psycopg.Cursor,
+    tenant_id: uuid.UUID,
+    branch_id: uuid.UUID | None,
+    *,
+    archived: bool = False,
+) -> uuid.UUID:
+    cost_centre_id = uuid.uuid4()
+    cur.execute(
+        "insert into cost_centre (id, tenant_id, name, code, branch_id, is_archived) "
+        "values (%s, %s, 'CC', %s, %s, %s)",
+        (cost_centre_id, tenant_id, f"CC-{cost_centre_id.hex[:8]}", branch_id, archived),
+    )
+    return cost_centre_id
+
+
+def _guardrail_count(tenant_id: uuid.UUID) -> int:
+    with psycopg.connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
+        with conn.cursor() as cur:
+            cur.execute("set local role service_role")
+            cur.execute(
+                "select count(*) from auto_preparation_guardrail where tenant_id = %s",
+                (tenant_id,),
+            )
+            return int(cur.fetchone()[0])
+
+
+def _payload(branch_id: uuid.UUID, cost_centre_id: uuid.UUID | None) -> GuardrailCreateInput:
+    return GuardrailCreateInput(
+        max_order_value_amount=Decimal("1000.00"),
+        max_order_value_currency="GBP",
+        max_price_variance_pct=Decimal("0.10"),
+        default_branch_id=branch_id,
+        default_cost_centre_id=cost_centre_id,
+    )
+
+
+def test_guardrail_default_cost_centre_must_be_active_and_on_the_default_branch() -> None:
+    """Finding 38b: the guardrail carries an optional default cost centre, which must be an
+    active one on its default branch -- and another workspace's cost centre or branch is not
+    found, never accepted."""
+    with psycopg.connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
+        with conn.cursor() as cur:
+            tenant_id, user_id, membership_id, branch_id = _seed_tenant(cur)
+            other_branch = uuid.uuid4()
+            cur.execute(
+                "insert into branch (id,tenant_id,name) values (%s,%s,'Second')",
+                (other_branch, tenant_id),
+            )
+            on_branch = _cost_centre(cur, tenant_id, branch_id)
+            on_other_branch = _cost_centre(cur, tenant_id, other_branch)
+            org_wide = _cost_centre(cur, tenant_id, None)
+            archived = _cost_centre(cur, tenant_id, branch_id, archived=True)
+            foreign_tenant, _, _, foreign_branch = _seed_tenant(cur)
+            foreign_cost_centre = _cost_centre(cur, foreign_tenant, foreign_branch)
+        conn.commit()
+
+    member = _owner(tenant_id, user_id, membership_id)
+    service = RfqService(settings=get_settings())
+
+    with pytest.raises(NotFoundError):
+        create_guardrail(
+            payload=_payload(branch_id, foreign_cost_centre), member=member, service=service
+        )
+    with pytest.raises(NotFoundError):
+        create_guardrail(payload=_payload(foreign_branch, None), member=member, service=service)
+    for wrong in (on_other_branch, org_wide, archived):
+        with pytest.raises(UnprocessableEntityError):
+            create_guardrail(payload=_payload(branch_id, wrong), member=member, service=service)
+    assert _guardrail_count(tenant_id) == 0
+
+    created = create_guardrail(
+        payload=_payload(branch_id, on_branch), member=member, service=service
+    )
+    assert created.default_cost_centre_id == on_branch
+    assert service.list_guardrails(member=member)[0].default_cost_centre_id == on_branch
+
+    # Moving the branch away from the cost centre's branch is refused; moving both together,
+    # or clearing the cost centre, is fine.
+    with pytest.raises(UnprocessableEntityError):
+        update_guardrail(
+            guardrail_id=created.id,
+            payload=GuardrailUpdateInput(default_branch_id=other_branch),
+            member=member,
+            service=service,
+        )
+    with pytest.raises(NotFoundError):
+        update_guardrail(
+            guardrail_id=created.id,
+            payload=GuardrailUpdateInput(default_cost_centre_id=foreign_cost_centre),
+            member=member,
+            service=service,
+        )
+    moved = update_guardrail(
+        guardrail_id=created.id,
+        payload=GuardrailUpdateInput(
+            default_branch_id=other_branch, default_cost_centre_id=on_other_branch
+        ),
+        member=member,
+        service=service,
+    )
+    assert (moved.default_branch_id, moved.default_cost_centre_id) == (
+        other_branch,
+        on_other_branch,
+    )
+    cleared = update_guardrail(
+        guardrail_id=created.id,
+        payload=GuardrailUpdateInput(default_cost_centre_id=None),
+        member=member,
+        service=service,
+    )
+    assert cleared.default_cost_centre_id is None
+
+
+def test_another_workspaces_guardrail_is_not_found() -> None:
+    with psycopg.connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
+        with conn.cursor() as cur:
+            tenant_a, user_a, membership_a, branch_a = _seed_tenant(cur)
+            tenant_b, user_b, membership_b, branch_b = _seed_tenant(cur)
+            cost_centre_b = _cost_centre(cur, tenant_b, branch_b)
+        conn.commit()
+
+    service = RfqService(settings=get_settings())
+    owner_a = _owner(tenant_a, user_a, membership_a)
+    owner_b = _owner(tenant_b, user_b, membership_b)
+    guardrail_a = create_guardrail(
+        payload=_payload(branch_a, None), member=owner_a, service=service
+    )
+
+    with pytest.raises(NotFoundError):
+        update_guardrail(
+            guardrail_id=guardrail_a.id,
+            payload=GuardrailUpdateInput(
+                default_branch_id=branch_b, default_cost_centre_id=cost_centre_b
+            ),
+            member=owner_b,
+            service=service,
+        )
+    assert [g.id for g in service.list_guardrails(member=owner_b)] == []
+    assert service.list_guardrails(member=owner_a)[0].default_cost_centre_id is None

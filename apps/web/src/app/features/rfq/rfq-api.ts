@@ -95,6 +95,7 @@ export interface RfqGuardrail {
   max_price_variance_pct: string;
   enabled: boolean;
   default_branch_id: string;
+  default_cost_centre_id?: string | null;
   created_at: string;
 }
 
@@ -105,6 +106,7 @@ export interface RfqGuardrailPayload {
   min_response_count: number;
   max_price_variance_pct: string;
   default_branch_id: string;
+  default_cost_centre_id: string | null;
   enabled: boolean;
 }
 

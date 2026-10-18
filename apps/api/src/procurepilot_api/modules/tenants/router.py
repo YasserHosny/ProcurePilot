@@ -77,6 +77,25 @@ def update_tenant(
                 if exc.code == "22023":
                     raise UnprocessableEntityError(details={"currency": "unsupported"}) from exc
                 raise
+        default_locale = update.pop("default_locale", None)
+        if default_locale is not None:
+            # Same shape as the currency change: update + tenant.default_locale_changed audit in
+            # one transaction. RFQ emails go out in this language (finding 37).
+            try:
+                client.rpc(
+                    "set_tenant_default_locale",
+                    {
+                        "p_locale": default_locale,
+                        "p_actor_membership_id": str(member.membership_id),
+                        "p_actor_email": member.email,
+                    },
+                ).execute()
+            except APIError as exc:
+                if exc.code == "22023":
+                    raise UnprocessableEntityError(
+                        details={"default_locale": "unsupported"}
+                    ) from exc
+                raise
         if update:
             client.table("tenant").update(update).eq("id", str(member.tenant_id)).execute()
     return load_me_for_token(settings=settings, bearer_token=token, member=member).tenant

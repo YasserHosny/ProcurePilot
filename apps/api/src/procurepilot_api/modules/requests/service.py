@@ -41,6 +41,7 @@ from procurepilot_api.modules.requests.schemas import (
     ApprovalDelegationCreate,
     ApprovalDelegationList,
     ApprovalStep,
+    AutoPreparedProvenance,
     BudgetStatus,
     DeliveryConfirmationCreate,
     LowStockReport,
@@ -317,12 +318,33 @@ class RequestsService:
                     "order by created_at, id",
                     (member.tenant_id, request_id),
                 ).fetchall()
+
+                auto_prepared_row = None
+                if request_row.get("source_rfq_response_id"):
+                    auto_prepared_row = conn.execute(
+                        "select e.guardrail_id, e.rfq_id, e.supplier_id, "
+                        "s.name as supplier_name, e.created_at from auto_preparation_event e "
+                        "left join supplier s "
+                        "on s.tenant_id = e.tenant_id and s.id = e.supplier_id "
+                        "where e.tenant_id = %s and e.purchase_request_id = %s "
+                        "order by e.created_at limit 1",
+                        (member.tenant_id, request_id),
+                    ).fetchone()
         except (ConflictError, NotFoundError, UnprocessableEntityError):
             raise
         except psycopg.Error as exc:
             raise ServiceUnavailableError(details={"dependency": "database"}) from exc
 
-        return _purchase_request(request_row, line_rows, step_row)
+        return _purchase_request(
+            request_row,
+            line_rows,
+            step_row,
+            auto_prepared=(
+                AutoPreparedProvenance.model_validate(auto_prepared_row)
+                if auto_prepared_row
+                else None
+            ),
+        )
 
     def list_requests(
         self,
@@ -369,6 +391,7 @@ class RequestsService:
         lines_by_request = self._fetch_lines_batch(client, request_ids)
         steps_by_request = self._fetch_steps_batch(client, request_ids)
         requester_emails = self._fetch_requester_emails_batch(client, visible)
+        auto_prepared = self._fetch_auto_prepared_batch(client, visible)
 
         items = [
             self._purchase_request_with_budget_status(
@@ -378,6 +401,8 @@ class RequestsService:
                 steps_by_request.get(str(row["id"])),
                 requester_email=requester_emails.get(str(row["requested_by_membership_id"])),
                 requester_lookup=False,
+                auto_prepared=auto_prepared.get(str(row["id"])),
+                auto_prepared_lookup=False,
             )
             for row in visible
         ]
@@ -458,6 +483,7 @@ class RequestsService:
         lines_by_request = self._fetch_lines_batch(client, request_ids)
         steps_by_request = {str(step["purchase_request_id"]): step for step in visible_steps}
         requester_emails = self._fetch_requester_emails_batch(client, request_rows)
+        auto_prepared = self._fetch_auto_prepared_batch(client, request_rows)
 
         items = [
             self._purchase_request_with_budget_status(
@@ -467,6 +493,8 @@ class RequestsService:
                 steps_by_request.get(str(row["id"])),
                 requester_email=requester_emails.get(str(row["requested_by_membership_id"])),
                 requester_lookup=False,
+                auto_prepared=auto_prepared.get(str(row["id"])),
+                auto_prepared_lookup=False,
             )
             for row in request_rows
         ]
@@ -1988,12 +2016,18 @@ class RequestsService:
         *,
         requester_email: str | None = None,
         requester_lookup: bool = True,
+        auto_prepared: AutoPreparedProvenance | None = None,
+        auto_prepared_lookup: bool = True,
     ) -> PurchaseRequest:
         if requester_lookup:
             requester = self._fetch_requester(
                 client, str(request_row["requested_by_membership_id"])
             )
             requester_email = str(requester["email"]) if requester.get("email") else None
+        if auto_prepared_lookup:
+            auto_prepared = self._fetch_auto_prepared_batch(client, [request_row]).get(
+                str(request_row["id"])
+            )
         return _purchase_request(
             request_row,
             line_rows,
@@ -2001,7 +2035,54 @@ class RequestsService:
             budget_status=self._budget_status_for(client, request_row),
             quoted_prices=self._quoted_prices_for(request_row, line_rows),
             requester_email=requester_email,
+            auto_prepared=auto_prepared,
         )
+
+    def _fetch_auto_prepared_batch(
+        self, client: Client, request_rows: list[dict[str, object]]
+    ) -> dict[str, AutoPreparedProvenance]:
+        """Guardrail provenance per request id (finding 38a). Only a request prepared from an RFQ
+        response can have one, so others cost no query. auto_preparation_event is readable by
+        anyone who can read the request it prepared (20261018000008)."""
+        request_ids = [str(row["id"]) for row in request_rows if row.get("source_rfq_response_id")]
+        if not request_ids:
+            return {}
+        try:
+            events = _rows(
+                client.table("auto_preparation_event")
+                .select("purchase_request_id,guardrail_id,rfq_id,supplier_id,created_at")
+                .in_("purchase_request_id", request_ids)
+                .execute()
+                .data
+            )
+            supplier_ids = sorted({str(e["supplier_id"]) for e in events if e.get("supplier_id")})
+            supplier_names: dict[str, str] = {}
+            if supplier_ids:
+                suppliers = _rows(
+                    client.table("supplier")
+                    .select("id,name")
+                    .in_("id", supplier_ids)
+                    .execute()
+                    .data
+                )
+                supplier_names = {str(row["id"]): str(row["name"]) for row in suppliers}
+        except APIError as exc:
+            raise ServiceUnavailableError(details={"dependency": "database"}) from exc
+
+        provenance: dict[str, AutoPreparedProvenance] = {}
+        for event in sorted(events, key=lambda e: str(e["created_at"])):
+            request_id = str(event["purchase_request_id"])
+            if request_id in provenance:
+                continue
+            supplier_id = str(event["supplier_id"]) if event.get("supplier_id") else None
+            provenance[request_id] = AutoPreparedProvenance(
+                guardrail_id=UUID(str(event["guardrail_id"])),
+                rfq_id=UUID(str(event["rfq_id"])) if event.get("rfq_id") else None,
+                supplier_id=UUID(supplier_id) if supplier_id else None,
+                supplier_name=supplier_names.get(supplier_id) if supplier_id else None,
+                created_at=event["created_at"],
+            )
+        return provenance
 
     def _fetch_requester_emails_batch(
         self, client: Client, request_rows: list[dict[str, object]]
@@ -2132,12 +2213,14 @@ def _purchase_request(
     quoted_prices: dict[UUID, tuple[Decimal, str]] | None = None,
     requester_name: str | None = None,
     requester_email: str | None = None,
+    auto_prepared: AutoPreparedProvenance | None = None,
 ) -> PurchaseRequest:
     return PurchaseRequest(
         id=UUID(str(row["id"])),
         source_rfq_response_id=(
             UUID(str(row["source_rfq_response_id"])) if row.get("source_rfq_response_id") else None
         ),
+        auto_prepared=auto_prepared,
         branch_id=UUID(str(row["branch_id"])),
         cost_centre_id=(UUID(str(row["cost_centre_id"])) if row.get("cost_centre_id") else None),
         requested_by_membership_id=UUID(str(row["requested_by_membership_id"])),

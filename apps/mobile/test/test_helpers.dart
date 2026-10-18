@@ -142,6 +142,16 @@ Future<I18nLoader> loadTestI18n({String locale = 'en'}) async {
         },
       },
       'requests': {
+        'autoPrepared': {
+          'title':
+              "Prepared automatically by a guardrail",
+          'draftMessage':
+              "This draft was prepared automatically by a guardrail from {{supplier}}'s quote. Review it and submit it if it is right; nothing is ordered until it is approved.",
+          'message':
+              "This request was prepared automatically by a guardrail from {{supplier}}'s quote.",
+          'unknownSupplier':
+              "the winning supplier",
+        },
         'title': 'Purchase Requests',
         'subtitle': 'Create and track purchase requests',
         'status': {
@@ -282,6 +292,16 @@ Future<I18nLoader> loadTestI18n({String locale = 'en'}) async {
         },
       },
       'requests': {
+        'autoPrepared': {
+          'title':
+              "أعدّته الضوابط تلقائيًا",
+          'draftMessage':
+              "أعدّت الضوابط هذه المسودة تلقائيًا من عرض سعر {{supplier}}. راجعها وأرسلها إن كانت صحيحة؛ لن يُطلب أي شيء قبل الموافقة عليها.",
+          'message':
+              "أعدّت الضوابط هذا الطلب تلقائيًا من عرض سعر {{supplier}}.",
+          'unknownSupplier':
+              "المورّد الفائز",
+        },
         'title': 'طلبات الشراء',
         'columns': {
           'requiredByDate': 'مطلوب قبل',

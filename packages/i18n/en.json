@@ -2004,6 +2004,17 @@
     "roleScoping": {
       "branchScopedBadge": "Branch-scoped",
       "notFoundMessage": "This branch does not exist or is not available."
+    },
+    "workspaceLanguage": {
+      "title": "Workspace language",
+      "hint": "RFQ emails to suppliers, invitations and scheduled reports use this language. Members who haven't chosen their own language also see the app in it.",
+      "label": "Workspace language",
+      "save": "Save language",
+      "error": "The workspace language could not be saved. Try again.",
+      "options": {
+        "en": "English",
+        "ar": "Arabic"
+      }
     }
   },
   "requests": {
@@ -2085,6 +2096,14 @@
       "comment": "Decision comment",
       "decidedAt": "Decided on",
       "pending": "Pending approval"
+    },
+    "autoPrepared": {
+      "badge": "Auto-prepared",
+      "badgeTooltip": "Prepared automatically by a guardrail from {{supplier}}'s quote",
+      "title": "Prepared automatically by a guardrail",
+      "draftMessage": "This draft was prepared automatically by a guardrail from {{supplier}}'s quote. Review it and submit it if it is right; nothing is ordered until it is approved.",
+      "message": "This request was prepared automatically by a guardrail from {{supplier}}'s quote.",
+      "unknownSupplier": "the winning supplier"
     }
   },
   "delivery": {
@@ -3811,7 +3830,8 @@
         "maxOrderValue": "Maximum order value must be greater than zero.",
         "minResponses": "Minimum responses must be at least one.",
         "priceVariance": "Price variance must be between 0% and 100%.",
-        "branch": "Select a default branch."
+        "branch": "Select a default branch.",
+        "costCentre": "Choose an active cost centre on the default branch."
       },
       "errors": {
         "save": "Unable to save guardrail settings."
@@ -3836,7 +3856,10 @@
         "would_fire": "This response would fire the guardrail.",
         "ambiguous_guardrails": "Would fire, but another guardrail also matches — ambiguous, so neither fires",
         "fired": "Guardrail fired and prepared a draft request."
-      }
+      },
+      "costCentre": "Default cost centre",
+      "noCostCentre": "None",
+      "costCentreHint": "Optional. Must be an active cost centre on the default branch."
     },
     "email": {
       "subject": "Request for quotation — {{tenant}} — needed by {{date}}",

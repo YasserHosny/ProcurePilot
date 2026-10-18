@@ -15,7 +15,13 @@ import { of } from 'rxjs';
 import { catchError } from 'rxjs/operators';
 
 import { ApiService } from '../../../core/api/api.service';
-import type { Branch, ConfigOptions, ReferenceOption, Supplier } from '../../../core/api/models';
+import type {
+  Branch,
+  ConfigOptions,
+  CostCentre,
+  ReferenceOption,
+  Supplier,
+} from '../../../core/api/models';
 import { FormatService } from '../../../core/format/format.service';
 import { FormatMoneyPipe } from '../../../core/format/money.pipe';
 import { I18nService } from '../../../core/i18n/i18n.service';
@@ -57,6 +63,8 @@ export class GuardrailsComponent implements OnInit {
   readonly guardrails = signal<RfqGuardrail[]>([]);
   readonly suppliers = signal<readonly Supplier[]>([]);
   readonly branches = signal<readonly Branch[]>([]);
+  /** Active cost centres on the selected default branch (finding 38b). */
+  readonly costCentres = signal<readonly CostCentre[]>([]);
   readonly currencies = signal<readonly ReferenceOption[]>([]);
   readonly loading = signal(true);
   readonly saving = signal(false);
@@ -69,6 +77,7 @@ export class GuardrailsComponent implements OnInit {
   maxPriceVariancePercent = '';
   supplierAllowlist: string[] = [];
   defaultBranchId = '';
+  defaultCostCentreId: string | null = null;
   enabled = true;
 
   ngOnInit(): void {
@@ -83,6 +92,21 @@ export class GuardrailsComponent implements OnInit {
   currencyLabel(option: ReferenceOption): string {
     const label = this.i18n.currentLocale() === 'ar' ? option.label_ar : option.label_en;
     return `${label || option.code} (${option.code})`;
+  }
+
+  /** A cost centre belongs to one branch, so changing the branch clears the choice. */
+  onBranchChange(branchId: string): void {
+    this.defaultBranchId = branchId;
+    this.defaultCostCentreId = null;
+    this.loadCostCentres(branchId);
+  }
+
+  private loadCostCentres(branchId: string): void {
+    this.costCentres.set([]);
+    if (!branchId) return;
+    this.api.listCostCentres({ branch_id: branchId, is_archived: false, limit: 100 }).subscribe({
+      next: (response) => this.costCentres.set(response.items),
+    });
   }
 
   loadGuardrails(): void {
@@ -101,6 +125,8 @@ export class GuardrailsComponent implements OnInit {
     this.maxPriceVariancePercent = String(Number(guardrail.max_price_variance_pct) * 100);
     this.supplierAllowlist = [...(guardrail.supplier_allowlist ?? [])];
     this.defaultBranchId = guardrail.default_branch_id;
+    this.defaultCostCentreId = guardrail.default_cost_centre_id ?? null;
+    this.loadCostCentres(guardrail.default_branch_id);
     this.enabled = guardrail.enabled;
     this.errorMessage.set(null);
   }
@@ -153,6 +179,7 @@ export class GuardrailsComponent implements OnInit {
       min_response_count: this.minResponseCount,
       max_price_variance_pct: String(variance / 100),
       default_branch_id: this.defaultBranchId,
+      default_cost_centre_id: this.defaultCostCentreId,
       enabled: this.enabled,
     };
     this.saving.set(true);
@@ -176,6 +203,8 @@ export class GuardrailsComponent implements OnInit {
     this.maxPriceVariancePercent = '';
     this.supplierAllowlist = [];
     this.defaultBranchId = '';
+    this.defaultCostCentreId = null;
+    this.costCentres.set([]);
     this.enabled = true;
   }
 
@@ -187,6 +216,10 @@ export class GuardrailsComponent implements OnInit {
       } | undefined;
       if (body?.details?.['max_order_value_amount']) {
         this.errorMessage.set(this.translate.instant('rfq.guardrails.validation.maxOrderValue'));
+        return;
+      }
+      if (body?.details?.['default_cost_centre_id'] || body?.details?.['resource'] === 'cost_centre') {
+        this.errorMessage.set(this.translate.instant('rfq.guardrails.validation.costCentre'));
         return;
       }
       if (body?.details?.['max_price_variance_pct']) {

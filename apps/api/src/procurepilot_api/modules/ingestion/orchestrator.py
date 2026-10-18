@@ -11,6 +11,7 @@ from supabase import Client, create_client
 
 from procurepilot_api import db
 from procurepilot_api.config import Settings
+from procurepilot_api.modules.devices.push_job import enqueue_push_job
 from procurepilot_api.modules.ingestion.email_parser import (
     EmailParseError,
     InboundEmail,
@@ -20,6 +21,7 @@ from procurepilot_api.modules.ingestion.email_parser import (
 from procurepilot_api.modules.ingestion.extraction import enqueue_extraction as _enqueue_extraction
 from procurepilot_api.modules.ingestion.matcher import match_supplier
 from procurepilot_api.modules.rfq.guardrail_evaluation import compute_guardrail_evaluation
+from procurepilot_api.modules.rfq.guardrails import AutoPreparationGuardrail
 from procurepilot_api.shared.audit import AuditEventCreate, AuditOutcome, get_audit_writer
 from procurepilot_api.shared.logging import get_trace_id
 from procurepilot_api.shared.storage_keys import display_filename, safe_object_name
@@ -294,6 +296,29 @@ def _act_as_tenant(conn: psycopg.Connection, tenant_id: UUID) -> None:
         )
 
 
+def _guardrail_cost_centre(
+    cur: psycopg.Cursor, *, tenant_id: UUID, guardrail: AutoPreparationGuardrail
+) -> UUID | None:
+    """The guardrail's default cost centre, if it is still active and still on the guardrail's
+    default branch. It was checked when the guardrail was saved, but a cost centre can be
+    archived or moved to another branch later; preparing without one beats charging the draft
+    to the wrong place, and the owner reviews the draft before it goes anywhere."""
+    if guardrail.default_cost_centre_id is None:
+        return None
+    cur.execute(
+        "select 1 from cost_centre where tenant_id = %s and id = %s and branch_id = %s "
+        "and not is_archived",
+        (tenant_id, guardrail.default_cost_centre_id, guardrail.default_branch_id),
+    )
+    if cur.fetchone() is None:
+        logger.warning(
+            "Guardrail %s default cost centre is archived or no longer on its branch",
+            guardrail.id,
+        )
+        return None
+    return guardrail.default_cost_centre_id
+
+
 def _evaluate_guardrails_for_rfq(
     settings: Settings,
     conn: psycopg.Connection,
@@ -370,6 +395,15 @@ def _evaluate_guardrails_for_rfq(
                 email=member_row["email"],
                 role="owner",
             )
+            cost_centre_id = _guardrail_cost_centre(cur, tenant_id=tenant_id, guardrail=guardrail)
+            supplier_id = next(
+                (
+                    candidate.supplier_id
+                    for candidate in snapshot.candidates
+                    if candidate.rfq_response_id == winning_response_id
+                ),
+                None,
+            )
             # Deterministic per (tenant, rfq, guardrail): a retry over the same RFQ+guardrail
             # combination must replay, not duplicate -- prepare_request()/create_request() already
             # handle idempotent replay given a stable key, so derive one instead of a fresh uuid4().
@@ -380,16 +414,32 @@ def _evaluate_guardrails_for_rfq(
                 rfq_id=rfq_id,
                 rfq_response_id=winning_response_id,
                 branch_id=guardrail.default_branch_id,
-                cost_centre_id=None,
+                cost_centre_id=cost_centre_id,
                 required_by_date=snapshot.needed_by_date,
                 idempotency_key=idem_key,
             )
             cur.execute(
                 "insert into auto_preparation_event "
-                "(tenant_id, guardrail_id, rfq_response_id, purchase_request_id) "
-                "values (%s, %s, %s, %s)",
-                (tenant_id, guardrail.id, winning_response_id, result.purchase_request_id),
+                "(tenant_id, guardrail_id, rfq_response_id, purchase_request_id, rfq_id, "
+                "supplier_id) values (%s, %s, %s, %s, %s, %s)",
+                (
+                    tenant_id,
+                    guardrail.id,
+                    winning_response_id,
+                    result.purchase_request_id,
+                    rfq_id,
+                    supplier_id,
+                ),
             )
+            # Finding 38a: tell the guardrail's owner a draft is waiting for them, through the
+            # existing per-request push outbox (the same one approval decisions use; a tap opens
+            # the request). Committed with the event, enqueued after the commit below.
+            cur.execute(
+                "insert into push_notification (tenant_id, purchase_request_id, member_id) "
+                "values (%s, %s, %s) returning id",
+                (tenant_id, result.purchase_request_id, guardrail.created_by_membership_id),
+            )
+            notification_id = cur.fetchone()["id"]
             cur.execute(
                 "select record_audit_event(%s, 'success'::audit_outcome, %s, null, %s, "
                 "%s::jsonb, null)",
@@ -408,6 +458,14 @@ def _evaluate_guardrails_for_rfq(
                 ),
             )
             conn.commit()
+            try:
+                enqueue_push_job(settings, notification_id)
+            except Exception:
+                # The outbox row is committed; the retry sweep picks it up.
+                logger.exception(
+                    "push notification enqueue failed after an auto-preparation",
+                    extra={"notification_id": str(notification_id)},
+                )
     finally:
         # A failed SQL statement leaves the transaction unusable, so rollback first. This does
         # not release a session-level advisory lock; the explicit unlock below is still needed.

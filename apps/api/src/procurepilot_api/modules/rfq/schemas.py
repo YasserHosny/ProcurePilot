@@ -71,6 +71,7 @@ class AutoPreparationGuardrail(BaseModel):
     max_price_variance_pct: Decimal
     enabled: bool
     default_branch_id: UUID
+    default_cost_centre_id: UUID | None = None
     created_at: datetime
 
 
@@ -136,6 +137,7 @@ class GuardrailCreateInput(BaseModel):
     min_response_count: int = 1
     max_price_variance_pct: Decimal
     default_branch_id: UUID
+    default_cost_centre_id: UUID | None = None
     enabled: bool = True
 
     @field_validator("max_order_value_currency")
@@ -154,6 +156,7 @@ class GuardrailUpdateInput(BaseModel):
     min_response_count: int | None = None
     max_price_variance_pct: Decimal | None = None
     default_branch_id: UUID | None = None
+    default_cost_centre_id: UUID | None = None
     enabled: bool | None = None
 
     @field_validator("max_order_value_currency")

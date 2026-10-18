@@ -5,7 +5,7 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatButtonModule } from '@angular/material/button';
 import { TranslatePipe } from '@ngx-translate/core';
 import { ApiService } from '../../core/api/api.service';
-import type { ReferenceOption } from '../../core/api/models';
+import type { Locale, ReferenceOption } from '../../core/api/models';
 import { SessionService } from '../../core/auth/session.service';
 import { I18nService } from '../../core/i18n/i18n.service';
 
@@ -46,14 +46,34 @@ export class SettingsComponent implements OnInit {
   readonly currencies = signal<readonly ReferenceOption[]>([]);
   readonly selectedCurrency = signal('');
   readonly saving = signal(false);
+  readonly locales: readonly Locale[] = ['en', 'ar'];
+  readonly selectedLocale = signal<Locale>('en');
+  readonly savingLocale = signal(false);
+  readonly localeError = signal(false);
 
   ngOnInit(): void {
     this.selectedCurrency.set(this.session.homeCurrency() ?? '');
+    this.selectedLocale.set(this.workspaceLocale());
     this.api.configOptions().subscribe((config) => this.currencies.set(config.currencies));
   }
 
   currencyLabel(option: ReferenceOption): string {
     return `${(this.i18n.currentLocale() === 'ar' ? option.label_ar : option.label_en) || option.code} (${option.code})`;
+  }
+
+  /** The workspace default language: RFQ emails to suppliers go out in it (finding 37). */
+  workspaceLocale(): Locale {
+    return this.session.tenant()?.default_locale ?? 'en';
+  }
+
+  saveLocale(): void {
+    if (!this.session.hasRole('owner') || this.selectedLocale() === this.workspaceLocale()) return;
+    this.savingLocale.set(true);
+    this.localeError.set(false);
+    this.api.updateTenant({ default_locale: this.selectedLocale() }).subscribe({
+      next: (tenant) => { this.session.updateTenant(tenant); this.savingLocale.set(false); },
+      error: () => { this.savingLocale.set(false); this.localeError.set(true); },
+    });
   }
 
   saveCurrency(): void {
