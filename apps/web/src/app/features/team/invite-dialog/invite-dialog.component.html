@@ -72,10 +72,17 @@
 } @else {
   <h2 mat-dialog-title>
     <mat-icon class="success-icon" aria-hidden="true">check_circle</mat-icon>
-    {{ 'team.inviteDialog.tokenCreatedTitle' | translate }}
+    {{ (data?.result ? 'team.inviteDialog.resentTitle' : 'team.inviteDialog.tokenCreatedTitle') | translate }}
   </h2>
 
   <mat-dialog-content>
+    @if (createdResult()?.invitation?.email_delivery === 'sent') {
+      <p role="status">{{ 'team.inviteDialog.emailedNotice' | translate: { email: createdResult()?.invitation?.email } }}</p>
+    } @else if (createdResult()?.invitation?.email_delivery === 'failed') {
+      <div class="error-banner" role="status">{{ 'team.inviteDialog.failedWarning' | translate }}</div>
+    } @else if (createdResult()?.invitation?.email_delivery === 'not_configured') {
+      <div class="error-banner" role="status">{{ 'team.inviteDialog.notConfiguredWarning' | translate }}</div>
+    }
     <p class="dialog-subtitle">{{ 'team.inviteDialog.tokenCreatedNotice' | translate }}</p>
 
     @if (createdResult()?.inviteUrl; as url) {

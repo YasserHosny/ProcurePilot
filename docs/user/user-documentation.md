@@ -762,9 +762,11 @@ Reached from **Record Purchase** on any Smart Compare offer, or **+ Record Purch
 
 **Invitation flow:**
 1. Click **Invite Member** → enter email and select role → send.
-2. The invitee receives an email with a link to accept the invitation.
-3. They can create a new account or sign in with an existing one.
-4. Once accepted, they appear in the Members tab with their assigned role.
+2. When Mailgun is configured, the invitee receives an email in the workspace language with a link to accept. The dialog confirms “Invitation emailed to” their address. If email is not configured or sending fails, a distinct warning explains that the email was not sent and asks you to copy the link below.
+3. The copy-link fallback is always available. Keep or share it before closing the dialog: the token is shown once.
+4. Use **Resend invitation** next to Revoke on a pending invitation to create and email a new link. The old link stops working immediately and the expiry restarts. The result dialog shows delivery status and the new copy-link fallback.
+5. They can create a new account or sign in with an existing one.
+6. Once accepted, they appear in the Members tab with their assigned role.
 
 **Business value:** Team Management lets the owner delegate procurement work while preserving accountability. Each role creates a clear operating boundary, so buyers can move quickly and sensitive controls stay with the right people.
 

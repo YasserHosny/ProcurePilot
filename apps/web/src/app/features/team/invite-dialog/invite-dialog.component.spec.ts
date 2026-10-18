@@ -1,6 +1,6 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { MatDialogRef } from '@angular/material/dialog';
+import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { of, throwError } from 'rxjs';
 
@@ -15,7 +15,10 @@ describe('InviteDialogComponent (T058)', () => {
   let apiService: jasmine.SpyObj<ApiService>;
   let dialogRef: jasmine.SpyObj<MatDialogRef<InviteDialogComponent, boolean>>;
 
+  const dialogData: { result?: Invitation } = {};
+
   beforeEach(async () => {
+    delete dialogData.result;
     apiService = jasmine.createSpyObj('ApiService', ['invite']);
     dialogRef = jasmine.createSpyObj('MatDialogRef', ['close']);
 
@@ -23,6 +26,7 @@ describe('InviteDialogComponent (T058)', () => {
       imports: [InviteDialogComponent, TranslateModule.forRoot()],
       providers: [
         { provide: ApiService, useValue: apiService },
+        { provide: MAT_DIALOG_DATA, useValue: dialogData },
         { provide: MatDialogRef, useValue: dialogRef },
       ],
     }).compileComponents();
@@ -83,4 +87,37 @@ describe('InviteDialogComponent (T058)', () => {
 
     expect(component.errorMessage()).toContain('already pending');
   });
+  for (const delivery of ['sent', 'failed', 'not_configured'] as const) {
+    it(`shows ${delivery} delivery status and keeps the copy link`, () => {
+      apiService.invite.and.returnValue(of({
+        id: 'inv1', email: 'buyer@example.test', role: 'buyer', status: 'pending',
+        expires_at: '2026-10-25T00:00:00Z', token: 'example-invitation-token', email_delivery: delivery,
+      }));
+      component.form.controls.email.setValue('buyer@example.test');
+      component.onSubmit();
+      fixture.detectChanges();
+      const element: HTMLElement = fixture.nativeElement;
+      const notice = element.querySelector('[role="status"]');
+      expect(notice).not.toBeNull();
+      expect(notice?.textContent).toContain(delivery === 'sent' ? 'buyer@example.test' : 'Copy');
+      expect(element.querySelector('.token-input')?.getAttribute('readonly')).not.toBeNull();
+      expect(component.createdResult()?.inviteUrl).toContain('example-invitation-token');
+    });
+  }
+
+  it('opens directly in the success view for an injected resend result', () => {
+    dialogData.result = {
+      id: 'inv1', email: 'buyer@example.test', role: 'buyer', status: 'pending',
+      expires_at: '2026-10-25T00:00:00Z', token: 'example-resend-token', email_delivery: 'sent',
+    };
+    const resendFixture = TestBed.createComponent(InviteDialogComponent);
+    resendFixture.detectChanges();
+    const element: HTMLElement = resendFixture.nativeElement;
+    expect(element.querySelector('form')).toBeNull();
+    expect(element.textContent).toContain('Invitation resent');
+    expect(element.textContent).toContain('buyer@example.test');
+    expect(resendFixture.componentInstance.createdResult()?.inviteUrl).toContain('example-resend-token');
+    resendFixture.destroy();
+  });
+
 });

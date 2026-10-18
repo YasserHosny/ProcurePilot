@@ -52,6 +52,7 @@ class MemberInvitation(BaseModel):
     status: MemberInvitationStatus
     expires_at: datetime
     token: str | None = None
+    email_delivery: Literal["sent", "not_configured", "failed"] | None = None
 
 
 class MemberInvitationList(BaseModel):

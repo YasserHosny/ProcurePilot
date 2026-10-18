@@ -10,6 +10,7 @@ import enCatalog from '../../../../../../packages/i18n/en.json';
 import { ApiService } from '../../core/api/api.service';
 import type { Invitation, Member, Role } from '../../core/api/models';
 import { SessionService } from '../../core/auth/session.service';
+import { InviteDialogComponent } from './invite-dialog/invite-dialog.component';
 import { TeamComponent } from './team.component';
 
 describe('TeamComponent (T057)', () => {
@@ -57,6 +58,7 @@ describe('TeamComponent (T057)', () => {
       'createBranchRoleAssignment',
       'removeMember',
       'revokeInvitation',
+      'resendInvitation',
     ]);
     sessionService = jasmine.createSpyObj('SessionService', ['hasRole', 'currentMember', 'role']);
     dialogSpy = jasmine.createSpyObj('MatDialog', ['open']);
@@ -235,4 +237,21 @@ describe('TeamComponent (T057)', () => {
     expect(apiService.invitations).toHaveBeenCalledTimes(2);
     expect(snackBarSpy.open).toHaveBeenCalled();
   });
+  it('resends an invitation, opens its result dialog and refreshes the list', () => {
+    const result: Invitation = { ...mockInvitations[0], token: 'example-resend-token', email_delivery: 'sent' };
+    apiService.resendInvitation.and.returnValue(of(result));
+    apiService.invitations.calls.reset();
+    component.resendInvitation(mockInvitations[0]);
+    expect(apiService.resendInvitation).toHaveBeenCalledWith(mockInvitations[0].id);
+    expect(dialogSpy.open).toHaveBeenCalledWith(InviteDialogComponent, { width: '460px', data: { result } });
+    expect(apiService.invitations).toHaveBeenCalled();
+  });
+
+  it('shows a snackbar when resend fails', () => {
+    apiService.resendInvitation.and.returnValue(throwError(() => new Error('failed')));
+    component.resendInvitation(mockInvitations[0]);
+    expect(snackBarSpy.open).toHaveBeenCalled();
+    expect(dialogSpy.open).not.toHaveBeenCalled();
+  });
+
 });

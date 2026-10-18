@@ -3,8 +3,9 @@
 Operator tool: the CLI equivalent of an owner using Team -> Invite in the web app. It writes the
 same rows the API's ``MemberInvitationService.issue`` writes — a ``member_invitation`` holding
 only the sha256 of the token, plus a ``member.invited`` audit event attributed to the owner — and
-prints the acceptance link. The app does not email invitations, so the link must be sent to the
-invitee by hand; it is shown once and cannot be recovered later (only its hash is stored).
+prints the acceptance link. The CLI does not email invitations (the web flow does), so the link
+must be sent to the invitee by hand; it is shown once and cannot be recovered later (only its
+hash is stored).
 
 Run from the repo root with ``DATABASE_URL`` pointing at the target database:
 

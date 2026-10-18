@@ -20,6 +20,8 @@ class Settings(BaseSettings):
         validation_alias="API_CORS_ORIGINS"
     )
 
+    web_origin: str | None = Field(default=None, validation_alias="WEB_ORIGIN")
+
     supabase_url: str = Field(validation_alias="SUPABASE_URL")
     supabase_anon_key: SecretStr = Field(validation_alias="SUPABASE_ANON_KEY")
     supabase_service_role_key: SecretStr = Field(validation_alias="SUPABASE_SERVICE_ROLE_KEY")

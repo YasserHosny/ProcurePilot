@@ -238,6 +238,18 @@ export class TeamComponent implements OnInit {
     });
   }
 
+  resendInvitation(invitation: Invitation): void {
+    this.api.resendInvitation(invitation.id).subscribe({
+      next: (result) => {
+        this.dialog.open(InviteDialogComponent, { width: '460px', data: { result } });
+        this.loadInvitations();
+      },
+      error: () => {
+        this.snackBar.open(this.translate.instant('team.genericError'), undefined, { duration: 5000 });
+      },
+    });
+  }
+
   openRevokeInvitationDialog(invitation: Invitation): void {
     const dialogRef = this.dialog.open(ConfirmDialogComponent, {
       width: '440px',

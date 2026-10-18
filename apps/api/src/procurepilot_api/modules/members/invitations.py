@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import hashlib
+import logging
+import os
 import secrets
 from datetime import UTC, datetime, timedelta
-from typing import Protocol
+from typing import Literal, Protocol
+from urllib.parse import quote
 from uuid import UUID
 
 from postgrest.exceptions import APIError
@@ -14,22 +17,26 @@ from procurepilot_api.deps import CurrentMember
 from procurepilot_api.errors import (
     ConflictError,
     InvitationRefusedError,
+    NotFoundError,
     PermissionDeniedError,
     ServiceUnavailableError,
 )
 from procurepilot_api.modules.auth.jwt import MemberRole
+from procurepilot_api.modules.members.invitation_email import render_invitation_email
 from procurepilot_api.modules.members.models import MemberInvitation, Membership
 from procurepilot_api.modules.members.service import authenticated_client
 from procurepilot_api.shared.audit import AuditEventCreate, get_audit_writer
+from procurepilot_api.shared.mailer import Mailer, MailgunMailer
+
+logger = logging.getLogger(__name__)
 
 
 def anon_client(settings: Settings) -> Client:
     """A client with no user session, for calls that legitimately precede authentication."""
     return create_client(settings.supabase_url, settings.supabase_anon_key.get_secret_value())
 
-INVITATION_COLUMNS = (
-    "id,tenant_id,email,role,token_hash,invited_by,expires_at,status,created_at"
-)
+
+INVITATION_COLUMNS = "id,tenant_id,email,role,token_hash,invited_by,expires_at,status,created_at"
 
 
 class MemberInvitationRecord(MemberInvitation):
@@ -40,6 +47,14 @@ class MemberInvitationRecord(MemberInvitation):
 
 
 class MemberInvitationRepository(Protocol):
+    def workspace_for_email(self, *, bearer_token: str, tenant_id: UUID) -> tuple[str, str]:
+        pass
+
+    def rotate_token(
+        self, *, bearer_token: str, invitation_id: UUID, token_hash: str, expires_at: datetime
+    ) -> MemberInvitationRecord | None:
+        pass
+
     def issue(
         self,
         *,
@@ -91,6 +106,35 @@ class MemberInvitationRepository(Protocol):
 class SupabaseMemberInvitationRepository:
     def __init__(self, settings: Settings | None = None) -> None:
         self._settings = settings or get_settings()
+
+    def workspace_for_email(self, *, bearer_token: str, tenant_id: UUID) -> tuple[str, str]:
+        client = authenticated_client(self._settings, bearer_token)
+        response = (
+            client.table("tenant")
+            .select("name,default_locale")
+            .eq("id", str(tenant_id))
+            .single()
+            .execute()
+        )
+        return str(response.data["name"]), str(response.data["default_locale"])
+
+    def rotate_token(
+        self, *, bearer_token: str, invitation_id: UUID, token_hash: str, expires_at: datetime
+    ) -> MemberInvitationRecord | None:
+        client = authenticated_client(self._settings, bearer_token)
+        try:
+            # Update already returns rows; the pinned builder does not support .select().
+            response = (
+                client.table("member_invitation")
+                .update({"token_hash": token_hash, "expires_at": expires_at.isoformat()})
+                .eq("id", str(invitation_id))
+                .eq("status", "pending")
+                .execute()
+            )
+        except APIError as exc:
+            raise ServiceUnavailableError(details={"dependency": "database"}) from exc
+        rows = [_invitation(row) for row in _rows(response.data)]
+        return rows[0] if rows else None
 
     def issue(
         self,
@@ -291,8 +335,10 @@ class MemberInvitationService:
         self,
         repository: MemberInvitationRepository | None = None,
         settings: Settings | None = None,
+        mailer: Mailer | None = None,
     ) -> None:
         self._settings = settings or get_settings()
+        self._mailer = mailer
         self._repository = repository or SupabaseMemberInvitationRepository(self._settings)
 
     def issue(
@@ -330,6 +376,9 @@ class MemberInvitationService:
             ),
             bearer_token=bearer_token,
         )
+        delivery = self._send_invitation_email(
+            bearer_token=bearer_token, member=member, invitation=invitation, token=token
+        )
         return MemberInvitation(
             id=invitation.id,
             email=invitation.email,
@@ -337,7 +386,126 @@ class MemberInvitationService:
             status=invitation.status,
             expires_at=invitation.expires_at,
             token=token,
+            email_delivery=delivery,
         )
+
+    def resend(
+        self, *, bearer_token: str, member: CurrentMember, invitation_id: UUID
+    ) -> MemberInvitation:
+        """Rotate on the same id to preserve audit history and invalidate the old link immediately.
+
+        Overwriting its hash avoids the revoke-then-insert window against
+        member_invitation_one_pending_idx and keeps storage hash-only.
+        """
+        token = generate_member_invitation_token()
+        invitation = self._repository.rotate_token(
+            bearer_token=bearer_token,
+            invitation_id=invitation_id,
+            token_hash=hash_member_invitation_token(token),
+            expires_at=datetime.now(UTC)
+            + timedelta(days=self._settings.member_invitation_ttl_days),
+        )
+        if invitation is None:
+            raise NotFoundError(details={"resource": "invitation"})
+        get_audit_writer().record(
+            AuditEventCreate(
+                tenant_id=member.tenant_id,
+                actor_membership_id=member.membership_id,
+                actor_email=member.email,
+                action="member.invitation_resent",
+                target={"invitation_id": str(invitation.id)},
+                outcome="success",
+            ),
+            bearer_token=bearer_token,
+        )
+        delivery = self._send_invitation_email(
+            bearer_token=bearer_token,
+            member=member,
+            invitation=invitation,
+            token=token,
+            resend=True,
+        )
+        return MemberInvitation(
+            id=invitation.id,
+            email=invitation.email,
+            role=invitation.role,
+            status=invitation.status,
+            expires_at=invitation.expires_at,
+            token=token,
+            email_delivery=delivery,
+        )
+
+    def _send_invitation_email(
+        self,
+        *,
+        bearer_token: str,
+        member: CurrentMember,
+        invitation: MemberInvitationRecord,
+        token: str,
+        resend: bool = False,
+    ) -> Literal["sent", "not_configured", "failed"]:
+        delivery: Literal["sent", "not_configured", "failed"] = "not_configured"
+        try:
+            mailer = self._mailer
+            mode = os.environ.get("RFQ_MAILER_MODE", self._settings.rfq_mailer_mode)
+            if (
+                mailer is None
+                and mode == "mailgun"
+                and self._settings.mailgun_api_key
+                and self._settings.mailgun_sending_domain
+            ):
+                mailer = MailgunMailer()
+            if mailer is not None:
+                name, locale = self._repository.workspace_for_email(
+                    bearer_token=bearer_token, tenant_id=member.tenant_id
+                )
+                origin = self._settings.web_origin or self._settings.api_cors_origins[0]
+                accept_url = (
+                    f"{origin.rstrip('/')}/onboarding/accept-invitation"
+                    f"?token={quote(token, safe='')}"
+                )
+                rendered = render_invitation_email(
+                    workspace_name=name,
+                    inviter_email=member.email,
+                    role=invitation.role.value,
+                    expires_at=invitation.expires_at,
+                    accept_url=accept_url,
+                    locale=locale,
+                )
+                mailer.send(
+                    to=invitation.email,
+                    subject=rendered.subject,
+                    body=rendered.text,
+                    html=rendered.html,
+                    from_name=rendered.from_name,
+                )
+                delivery = "sent"
+        except Exception as exc:
+            delivery = "failed"
+            logger.warning(
+                "Invitation email failed invitation_id=%s exception=%s",
+                invitation.id,
+                type(exc).__name__,
+            )
+        target: dict[str, object] = {
+            "invitation_id": str(invitation.id),
+            "email": invitation.email,
+            "delivery": delivery,
+        }
+        if resend:
+            target["resend"] = True
+        get_audit_writer().record(
+            AuditEventCreate(
+                tenant_id=member.tenant_id,
+                actor_membership_id=member.membership_id,
+                actor_email=member.email,
+                action="member.invitation_emailed",
+                target=target,
+                outcome="success" if delivery == "sent" else "refused",
+            ),
+            bearer_token=bearer_token,
+        )
+        return delivery
 
     def list_pending(self, *, bearer_token: str) -> list[MemberInvitation]:
         return [
