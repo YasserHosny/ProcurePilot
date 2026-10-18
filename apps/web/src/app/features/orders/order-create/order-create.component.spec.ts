@@ -252,7 +252,7 @@ describe('OrderCreateComponent', () => {
 
   describe('quoted currency', () => {
     type Quote = { amount: string; currency: string } | null;
-    const loadLines = (quotes: Quote[]) => {
+    const loadLines = (quotes: Quote[], remaining: string[] = quotes.map(() => '5.000000')) => {
       const translate = TestBed.inject(TranslateService);
       translate.setTranslation('en', enCatalog);
       translate.use('en');
@@ -269,7 +269,7 @@ describe('OrderCreateComponent', () => {
       } as unknown as import('../../../core/api/models').PurchaseRequest));
       ordersApiService.getAllocations.and.returnValue(of({
         source_request_id: 'req-1',
-        lines: quotes.map((_, i) => ({ source_request_line_id: `rl-${i}`, requested_quantity: '5.000000', allocated_quantity: '0', remaining_quantity: '5.000000' })),
+        lines: quotes.map((_, i) => ({ source_request_line_id: `rl-${i}`, requested_quantity: '5.000000', allocated_quantity: '0', remaining_quantity: remaining[i] })),
       }));
       fixture = TestBed.createComponent(OrderCreateComponent);
       component = fixture.componentInstance;
@@ -286,6 +286,25 @@ describe('OrderCreateComponent', () => {
       component.submit();
       expect(ordersApiService.createOrder).not.toHaveBeenCalled();
       expect(component.errorMessage()).toContain('EUR');
+    });
+
+    it('ignores fully allocated lines when deciding whether quote currencies are mixed', () => {
+      loadLines([{ amount: '9.0000', currency: 'EUR' }, { amount: '10.0000', currency: 'USD' }], ['0', '5.000000']);
+      expect(component.lines.length).toBe(1);
+      expect(component.form.controls.currency.value).toBe('USD');
+      expect(component.lines.at(0).controls.unit_price.value).toBe(10);
+      expect(component.errorMessage()).toBeNull();
+    });
+
+    it('stops enforcing the quote currency once every pre-filled price has been replaced', () => {
+      loadLines([{ amount: '9.0000', currency: 'EUR' }]);
+      component.lines.at(0).controls.unit_price.setValue(1200);
+      component.form.patchValue({ order_number: 'PO-1', supplier_id: 's1', currency: 'EGP' });
+      ordersApiService.createOrder.calls.reset();
+      ordersApiService.createOrder.and.returnValue(of({ id: 'o1' }) as never);
+      component.submit();
+      expect(ordersApiService.createOrder).toHaveBeenCalledTimes(1);
+      expect(component.errorMessage()).toBeNull();
     });
 
     it('does not pre-fill prices when the quote lines mix currencies', () => {

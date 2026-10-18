@@ -78,6 +78,9 @@ export class OrderCreateComponent implements OnInit {
   readonly sourceRequest = signal<PurchaseRequest | null>(null);
   // Currency of the supplier quote the unit prices were pre-filled from; the order must use it.
   private readonly quotedCurrency = signal<string | null>(null);
+  // Pre-filled quoted price per source request line; the quote currency is enforced only while
+  // at least one of these values is still in the form unchanged.
+  private readonly prefilledQuotes = new Map<string, number>();
 
   packDescription(product: Product | undefined): string | null {
     return packLabel(product?.pack, product?.base_unit ?? '', this.translate, this.formatService).label;
@@ -241,8 +244,14 @@ export class OrderCreateComponent implements OnInit {
 
         // Pre-filled prices are in the quote's currency, so the order currency follows it. A
         // request whose quote lines mix currencies cannot be pre-filled into one order.
+        // Only lines still to be ordered count: a fully allocated line is not on this PO.
+        const remainingOf = (lineId: string) =>
+          parseFloat(allocations.lines.find(a => a.source_request_line_id === lineId)?.remaining_quantity || '0');
         const quotedCurrencies = new Set(
-          request.lines.map(l => l.quoted_unit_price?.currency).filter((c): c is string => !!c),
+          request.lines
+            .filter(l => remainingOf(l.id) > 0)
+            .map(l => l.quoted_unit_price?.currency)
+            .filter((c): c is string => !!c),
         );
         const prefillQuotes = quotedCurrencies.size === 1;
         if (prefillQuotes) {
@@ -259,6 +268,9 @@ export class OrderCreateComponent implements OnInit {
           const remaining = parseFloat(remainingStr);
           
           if (remaining > 0) {
+            if (prefillQuotes && reqLine.quoted_unit_price) {
+              this.prefilledQuotes.set(reqLine.id, parseFloat(reqLine.quoted_unit_price.amount));
+            }
             this.lines.push(
               new FormGroup<OrderLineForm>({
                 workspace_product_id: new FormControl<string | null>(reqLine.workspace_product_id || null),
@@ -328,7 +340,11 @@ export class OrderCreateComponent implements OnInit {
     const currency = value.currency;
 
     const quoted = this.quotedCurrency();
-    if (quoted && currency !== quoted) {
+    const quotedPriceStillInUse = value.lines.some(
+      l => l.source_request_line_id != null
+        && this.prefilledQuotes.get(l.source_request_line_id) === l.unit_price,
+    );
+    if (quoted && quotedPriceStillInUse && currency !== quoted) {
       this.errorMessage.set(
         this.translate.instant('orders.create.quotedCurrencyMismatch', { order: currency, quoted }),
       );
