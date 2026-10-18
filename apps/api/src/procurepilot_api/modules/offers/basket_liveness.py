@@ -60,3 +60,42 @@ def stale_code(
         if now - started_at > timedelta(seconds=expiry_seconds):
             return "optimiser_timeout"
     return None
+
+
+def attempt_token(row: dict[str, object]) -> str:
+    """Identifies one delivery attempt of a job.
+
+    Requeuing a failed job resets ``created_at``, so it doubles as a per-attempt token the
+    worker echoes back in every status transition (see the optimiser's repository). A delivery
+    from an expired attempt can then neither resurrect the failed row nor overwrite a retry.
+    """
+    created_at = row["created_at"]
+    assert isinstance(created_at, datetime)
+    return created_at.isoformat()
+
+
+def rq_job_id(row: dict[str, object]) -> str:
+    """Unique per attempt so a retry never collides with a stale RQ entry of the same job."""
+    created_at = row["created_at"]
+    assert isinstance(created_at, datetime)
+    return f"{row['id']}-{int(created_at.timestamp() * 1_000_000)}"
+
+
+def cancel_rq_job(settings: Settings, row: dict[str, object]) -> None:
+    """Best-effort removal of an expired attempt's queued delivery from Redis.
+
+    The worker-side attempt fence is what guarantees correctness; this just stops a dead
+    delivery from lingering in the queue.
+    """
+    try:
+        from redis import Redis
+        from rq.job import Job
+
+        connection = Redis.from_url(settings.redis_url)
+        for job_id in (rq_job_id(row), str(row["id"])):  # str(id): pre-fence deliveries
+            try:
+                Job.fetch(job_id, connection=connection).cancel()
+            except Exception:
+                continue
+    except Exception:
+        return
