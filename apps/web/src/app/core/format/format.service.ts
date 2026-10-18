@@ -46,10 +46,54 @@ export function formatExactQuantity(
   value: number | string | null | undefined,
   locale = 'en',
 ): string {
-  return formatLocaleNumber(value, locale, {
+  if (typeof value !== 'string' || !/^-?\d+(\.\d+)?$/.test(value)) {
+    return formatLocaleNumber(value, locale, {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 6,
+    });
+  }
+
+  const options = buildNumberFormatOptions(locale, {
     minimumFractionDigits: 0,
     maximumFractionDigits: 6,
   });
+  const nf = new Intl.NumberFormat(locale, options);
+  const parts = nf.formatToParts(-1234.5);
+  const group = parts.find(p => p.type === 'group')?.value ?? ',';
+  const decimal = parts.find(p => p.type === 'decimal')?.value ?? '.';
+  const intIdx = parts.findIndex(p => p.type === 'integer');
+  const minusPrefix = intIdx !== -1 ? parts.slice(0, intIdx).map(p => p.value).join('') : '-';
+  let lastNumberPartIdx = -1;
+  for (let i = parts.length - 1; i >= 0; i--) {
+    if (parts[i]?.type === 'fraction' || parts[i]?.type === 'integer') {
+      lastNumberPartIdx = i;
+      break;
+    }
+  }
+  const minusSuffix =
+    lastNumberPartIdx !== -1
+      ? parts.slice(lastNumberPartIdx + 1).map(p => p.value).join('')
+      : '';
+
+  const digits = Array.from({ length: 10 }, (_, i) => nf.format(i));
+
+  const isNegative = value.startsWith('-');
+  const unsigned = isNegative ? value.slice(1) : value;
+  const [rawInt = '', rawFrac] = unsigned.split('.');
+
+  const groupedInt = rawInt.replace(/\B(?=(\d{3})+(?!\d))/g, group);
+  const formattedInt = groupedInt.replace(/\d/g, d => digits[Number(d)] ?? d);
+
+  const frac = (rawFrac ?? '').slice(0, 6).replace(/0+$/, '');
+  let formattedFrac = '';
+  if (frac.length > 0) {
+    formattedFrac = decimal + frac.replace(/\d/g, d => digits[Number(d)] ?? d);
+  }
+
+  const signPrefix = isNegative ? minusPrefix : '';
+  const signSuffix = isNegative ? minusSuffix : '';
+
+  return `${signPrefix}${formattedInt}${formattedFrac}${signSuffix}`;
 }
 
 /**
