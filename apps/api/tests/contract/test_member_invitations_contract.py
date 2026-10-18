@@ -6,7 +6,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from procurepilot_api.deps import CurrentMember, bearer_token, current_member
-from procurepilot_api.errors import NotFoundError
+from procurepilot_api.errors import ConflictError, NotFoundError
 from procurepilot_api.main import create_app
 from procurepilot_api.modules.auth.jwt import MemberRole
 from procurepilot_api.modules.members.invitations import get_member_invitation_service
@@ -89,3 +89,20 @@ def test_resend_unknown_is_not_found_envelope(app: FastAPI) -> None:
         response = client.post(f"/api/v1/invitations/{uuid4()}/resend")
     assert response.status_code == 404
     assert set(response.json()) == {"code", "message", "details", "trace_id"}
+
+
+def test_resend_coalesced_conflict_envelope(app: FastAPI) -> None:
+    class ConflictInvitationService(InvitationService):
+        def resend(
+            self, *, bearer_token: str, member: CurrentMember, invitation_id: UUID
+        ) -> MemberInvitation:
+            raise ConflictError(details={"reason": "resent_recently", "retry_after_seconds": 45})
+
+    app.dependency_overrides[get_member_invitation_service] = ConflictInvitationService
+    with TestClient(app) as client:
+        response = client.post(f"/api/v1/invitations/{InvitationService.invitation_id}/resend")
+    assert response.status_code == 409
+    data = response.json()
+    assert set(data) == {"code", "message", "details", "trace_id"}
+    assert data["details"]["reason"] == "resent_recently"
+    assert data["details"]["retry_after_seconds"] == 45

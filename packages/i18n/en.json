@@ -419,6 +419,7 @@
     "removeSuccess": "Member removed successfully.",
     "lastOwnerErrorTitle": "Action Refused",
     "lastOwnerErrorMessage": "A workspace must retain at least one active owner. Demoting or removing the only owner is refused by the server.",
+    "resendTooSoon": "This invitation was just sent. Wait a minute before resending it.",
     "genericError": "An unexpected error occurred. Please try again.",
     "inviteDialog": {
       "title": "Invite a Colleague",

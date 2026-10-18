@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import math
 import os
 import secrets
 from datetime import UTC, datetime, timedelta
@@ -47,7 +48,18 @@ class MemberInvitationRepository(Protocol):
         pass
 
     def rotate_token(
-        self, *, bearer_token: str, invitation_id: UUID, token_hash: str, expires_at: datetime
+        self,
+        *,
+        bearer_token: str,
+        invitation_id: UUID,
+        token_hash: str,
+        expires_at: datetime,
+        rotated_before: datetime | None = None,
+    ) -> MemberInvitationRecord | None:
+        pass
+
+    def get_pending(
+        self, *, bearer_token: str, invitation_id: UUID
     ) -> MemberInvitationRecord | None:
         pass
 
@@ -115,16 +127,42 @@ class SupabaseMemberInvitationRepository:
         return str(response.data["name"]), str(response.data["default_locale"])
 
     def rotate_token(
-        self, *, bearer_token: str, invitation_id: UUID, token_hash: str, expires_at: datetime
+        self,
+        *,
+        bearer_token: str,
+        invitation_id: UUID,
+        token_hash: str,
+        expires_at: datetime,
+        rotated_before: datetime | None = None,
     ) -> MemberInvitationRecord | None:
         client = authenticated_client(self._settings, bearer_token)
         try:
             # Update already returns rows; the pinned builder does not support .select().
-            response = (
+            query = (
                 client.table("member_invitation")
                 .update({"token_hash": token_hash, "expires_at": expires_at.isoformat()})
                 .eq("id", str(invitation_id))
                 .eq("status", "pending")
+            )
+            if rotated_before is not None:
+                query = query.lte("expires_at", rotated_before.isoformat())
+            response = query.execute()
+        except APIError as exc:
+            raise ServiceUnavailableError(details={"dependency": "database"}) from exc
+        rows = [_invitation(row) for row in _rows(response.data)]
+        return rows[0] if rows else None
+
+    def get_pending(
+        self, *, bearer_token: str, invitation_id: UUID
+    ) -> MemberInvitationRecord | None:
+        client = authenticated_client(self._settings, bearer_token)
+        try:
+            response = (
+                client.table("member_invitation")
+                .select(INVITATION_COLUMNS)
+                .eq("id", str(invitation_id))
+                .eq("status", "pending")
+                .limit(2)
                 .execute()
             )
         except APIError as exc:
@@ -391,16 +429,41 @@ class MemberInvitationService:
 
         Overwriting its hash avoids the revoke-then-insert window against
         member_invitation_one_pending_idx and keeps storage hash-only.
+
+        Also refuses a resend within the cooldown window (default 60s) right after the
+        initial invite (since it was just emailed) or after a previous resend, raising
+        ConflictError with reason 'resent_recently'.
         """
+        now = datetime.now(UTC)
+        ttl = self._settings.member_invitation_ttl_days
+        cooldown = self._settings.member_invitation_resend_cooldown_seconds
+        not_after = now + timedelta(days=ttl) - timedelta(seconds=cooldown)
+
         token = generate_member_invitation_token()
         invitation = self._repository.rotate_token(
             bearer_token=bearer_token,
             invitation_id=invitation_id,
             token_hash=hash_member_invitation_token(token),
-            expires_at=datetime.now(UTC)
-            + timedelta(days=self._settings.member_invitation_ttl_days),
+            expires_at=now + timedelta(days=ttl),
+            rotated_before=not_after,
         )
         if invitation is None:
+            pending = self._repository.get_pending(
+                bearer_token=bearer_token,
+                invitation_id=invitation_id,
+            )
+            if pending is not None:
+                cooldown_expires_at = (
+                    _as_utc(pending.expires_at) - timedelta(days=ttl) + timedelta(seconds=cooldown)
+                )
+                remaining = int(math.ceil((cooldown_expires_at - now).total_seconds()))
+                retry_after_seconds = max(1, remaining)
+                raise ConflictError(
+                    details={
+                        "reason": "resent_recently",
+                        "retry_after_seconds": retry_after_seconds,
+                    }
+                )
             raise NotFoundError(details={"resource": "invitation"})
         get_audit_writer().record(
             AuditEventCreate(

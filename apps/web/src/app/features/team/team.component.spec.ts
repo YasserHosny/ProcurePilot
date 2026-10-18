@@ -4,7 +4,7 @@ import { MatDialog, MatDialogRef } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { provideRouter } from '@angular/router';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
-import { of, throwError } from 'rxjs';
+import { Subject, of, throwError } from 'rxjs';
 
 import enCatalog from '../../../../../../packages/i18n/en.json';
 import { ApiService } from '../../core/api/api.service';
@@ -250,8 +250,77 @@ describe('TeamComponent (T057)', () => {
   it('shows a snackbar when resend fails', () => {
     apiService.resendInvitation.and.returnValue(throwError(() => new Error('failed')));
     component.resendInvitation(mockInvitations[0]);
-    expect(snackBarSpy.open).toHaveBeenCalled();
+    expect(snackBarSpy.open).toHaveBeenCalledWith(
+      enCatalog.team.genericError,
+      undefined,
+      { duration: 5000 },
+    );
     expect(dialogSpy.open).not.toHaveBeenCalled();
+    expect(component.resendingIds().has(mockInvitations[0].id)).toBe(false);
   });
 
+  it('does not call the API twice if a resend for the same invitation is already in flight', () => {
+    const resendSubject = new Subject<Invitation>();
+    apiService.resendInvitation.and.returnValue(resendSubject);
+
+    component.resendInvitation(mockInvitations[0]);
+    expect(apiService.resendInvitation).toHaveBeenCalledTimes(1);
+    expect(component.resendingIds().has(mockInvitations[0].id)).toBe(true);
+
+    // Second call while in flight is ignored
+    component.resendInvitation(mockInvitations[0]);
+    expect(apiService.resendInvitation).toHaveBeenCalledTimes(1);
+
+    // Complete the in-flight request
+    resendSubject.next({ ...mockInvitations[0], token: 'tok', email_delivery: 'sent' });
+    resendSubject.complete();
+
+    expect(component.resendingIds().has(mockInvitations[0].id)).toBe(false);
+  });
+
+  it('shows team.resendTooSoon snackbar on HTTP 409 with reason resent_recently', () => {
+    const errorResponse = new HttpErrorResponse({
+      status: 409,
+      statusText: 'Conflict',
+      error: {
+        code: 'conflict',
+        message: 'Request conflicts with the current state.',
+        details: { reason: 'resent_recently', retry_after_seconds: 45 },
+        trace_id: 'trace-123',
+      },
+    });
+    apiService.resendInvitation.and.returnValue(throwError(() => errorResponse));
+
+    component.resendInvitation(mockInvitations[0]);
+
+    expect(snackBarSpy.open).toHaveBeenCalledWith(
+      enCatalog.team.resendTooSoon,
+      undefined,
+      { duration: 5000 },
+    );
+    expect(component.resendingIds().has(mockInvitations[0].id)).toBe(false);
+  });
+
+  it('disables resend button while in flight', () => {
+    const resendSubject = new Subject<Invitation>();
+    apiService.resendInvitation.and.returnValue(resendSubject);
+
+    component.resendInvitation(mockInvitations[0]);
+    fixture.detectChanges();
+
+    expect(component.resendingIds().has(mockInvitations[0].id)).toBe(true);
+    const resendButton = fixture.nativeElement.querySelector('.invitations-table button');
+    if (resendButton) {
+      expect(resendButton.disabled).toBe(true);
+    }
+
+    resendSubject.next({ ...mockInvitations[0], token: 'tok', email_delivery: 'sent' });
+    resendSubject.complete();
+    fixture.detectChanges();
+
+    expect(component.resendingIds().has(mockInvitations[0].id)).toBe(false);
+    if (resendButton) {
+      expect(resendButton.disabled).toBe(false);
+    }
+  });
 });

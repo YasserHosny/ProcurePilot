@@ -62,6 +62,7 @@ export class TeamComponent implements OnInit {
   readonly isLoadingInvitations = signal<boolean>(true);
   readonly members = signal<Member[]>([]);
   readonly invitations = signal<Invitation[]>([]);
+  readonly resendingIds = signal<ReadonlySet<string>>(new Set());
   readonly nextCursor = signal<string | null>(null);
 
   readonly errorMessage = signal<string | null>(null);
@@ -239,13 +240,41 @@ export class TeamComponent implements OnInit {
   }
 
   resendInvitation(invitation: Invitation): void {
+    if (this.resendingIds().has(invitation.id)) {
+      return;
+    }
+    this.resendingIds.update((ids) => {
+      const next = new Set(ids);
+      next.add(invitation.id);
+      return next;
+    });
+
     this.api.resendInvitation(invitation.id).subscribe({
       next: (result) => {
+        this.resendingIds.update((ids) => {
+          const next = new Set(ids);
+          next.delete(invitation.id);
+          return next;
+        });
         this.dialog.open(InviteDialogComponent, { width: '460px', data: { result } });
         this.loadInvitations();
       },
-      error: () => {
-        this.snackBar.open(this.translate.instant('team.genericError'), undefined, { duration: 5000 });
+      error: (err: unknown) => {
+        this.resendingIds.update((ids) => {
+          const next = new Set(ids);
+          next.delete(invitation.id);
+          return next;
+        });
+        const isResentRecently =
+          err instanceof HttpErrorResponse &&
+          err.status === 409 &&
+          (err.error as ApiError | undefined)?.details?.['reason'] === 'resent_recently';
+
+        const message = isResentRecently
+          ? this.translate.instant('team.resendTooSoon')
+          : this.translate.instant('team.genericError');
+
+        this.snackBar.open(message, undefined, { duration: 5000 });
       },
     });
   }
