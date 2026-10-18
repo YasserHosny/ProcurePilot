@@ -24,8 +24,14 @@ paths:
       summary: Record an actual purchase outcome and create a pending saving
       description: >
         Owner or buyer only. Creates one purchase_record and one paired saving_record in a single
-        transaction. Baseline values are read from the existing price-history model and stored at
-        record time; they are not recomputed during verification.
+        transaction. Baseline values are stored at record time and are not recomputed during
+        verification. Baseline policy order (owner decision 2026-10-18, demo findings 22/23):
+        last_po_price (the most recent submitted/confirmed/received/closed purchase-order line for
+        the product in the same base unit, excluding the order the outcome is recorded from),
+        then last_paid (latest quoted landed cost), then rolling_average_6m, then none_available.
+        With purchase_order_line_id the outcome is linked to that PO line; a line can be recorded
+        once (409 purchase_order_line_already_recorded) and only from a non-draft, non-cancelled
+        order (409 purchase_order_not_recordable).
       parameters:
         - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
@@ -51,6 +57,29 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Conflict' }
         '422': { $ref: '#/components/responses/Unprocessable' }
+
+  /purchases/prefill:
+    get:
+      summary: Outcome lines pre-filled from a purchase order
+      description: >
+        Owner or buyer only. One line per purchase-order line, converted from packs to base units
+        (ADR-020): quantity = ordered packs x pack_base_quantity, unit_price = pack price /
+        pack_base_quantity, total_paid = ordered packs x pack price (tax excluded). Draft and
+        cancelled orders return 409 purchase_order_not_recordable; another tenant's order is 404.
+      parameters:
+        - name: purchase_order_id
+          in: query
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Pre-filled outcome lines
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PurchaseOutcomePrefill' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
 
   /savings:
     get:
@@ -284,7 +313,7 @@ components:
 
     BaselinePolicy:
       type: string
-      enum: [last_paid, rolling_average_6m, none_available]
+      enum: [last_po_price, last_paid, rolling_average_6m, none_available]
 
     PurchaseDeliveryResult:
       type: string
@@ -306,6 +335,7 @@ components:
         quotation_line_id: { type: string, format: uuid, nullable: true }
         match_decision_id: { type: string, format: uuid, nullable: true }
         landed_cost_id: { type: string, format: uuid, nullable: true }
+        purchase_order_line_id: { type: string, format: uuid, nullable: true }
         quantity:
           type: string
           pattern: '^\d+(\.\d{1,6})?$'
@@ -344,6 +374,7 @@ components:
         quotation_line_id: { type: string, format: uuid, nullable: true }
         match_decision_id: { type: string, format: uuid, nullable: true }
         landed_cost_id: { type: string, format: uuid, nullable: true }
+        purchase_order_line_id: { type: string, format: uuid, nullable: true }
         quantity: { type: string, pattern: '^\d+(\.\d{1,6})?$' }
         base_unit: { type: string }
         unit_price: { $ref: '#/components/schemas/Money' }
@@ -379,6 +410,11 @@ components:
         baseline_source_landed_cost_ids:
           type: array
           items: { type: string, format: uuid }
+        baseline_source_po_line_ids:
+          type: array
+          nullable: true
+          items: { type: string, format: uuid }
+          description: purchase_order_line ids behind a last_po_price baseline.
         baseline_unit_price:
           oneOf:
             - $ref: '#/components/schemas/Money'
@@ -392,12 +428,46 @@ components:
           oneOf:
             - $ref: '#/components/schemas/Money'
             - type: 'null'
-        calculation_version: { type: string, example: saving-baseline-v1 }
+        calculation_version: { type: string, example: saving-baseline-v2 }
         calculation_inputs: { type: object, additionalProperties: true }
         recorded_by: { type: string, format: uuid }
         recorded_at: { type: string, format: date-time }
         verified_by: { type: string, format: uuid, nullable: true }
         verified_at: { type: string, format: date-time, nullable: true }
+
+    PurchaseOutcomePrefill:
+      type: object
+      required: [purchase_order_id, order_number, status, supplier_id, order_date, delivery_result, lines]
+      properties:
+        purchase_order_id: { type: string, format: uuid }
+        order_number: { type: string }
+        status: { type: string }
+        supplier_id: { type: string, format: uuid }
+        order_date: { type: string, format: date }
+        delivery_result: { $ref: '#/components/schemas/PurchaseDeliveryResult' }
+        lines:
+          type: array
+          items:
+            type: object
+            required: [purchase_order_line_id, line_number, description, ordered_packs, quantity,
+                       base_unit, unit_price, total_paid, recordable]
+            properties:
+              purchase_order_line_id: { type: string, format: uuid }
+              line_number: { type: integer }
+              description: { type: string }
+              workspace_product_id: { type: string, format: uuid, nullable: true }
+              ordered_packs: { type: string }
+              pack_base_quantity: { type: string, nullable: true }
+              quantity: { type: string, description: Base units }
+              base_unit: { type: string }
+              unit_price: { $ref: '#/components/schemas/Money' }
+              total_paid: { $ref: '#/components/schemas/Money' }
+              recordable: { type: boolean }
+              reason:
+                type: string
+                nullable: true
+                enum: [no_product, zero_quantity, already_recorded]
+              recorded_saving_id: { type: string, format: uuid, nullable: true }
 
     SavingList:
       type: object

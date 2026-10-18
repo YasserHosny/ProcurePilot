@@ -29,6 +29,8 @@ export function getDeliveryResultClass(result: PurchaseDeliveryResult): string {
 
 export function getBaselinePolicyClass(policy: BaselinePolicy): string {
   switch (policy) {
+    case 'last_po_price':
+      return 'policy-last-po';
     case 'last_paid':
       return 'policy-last-paid';
     case 'rolling_average_6m':

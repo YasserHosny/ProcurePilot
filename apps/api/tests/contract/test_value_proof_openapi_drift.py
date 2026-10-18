@@ -9,6 +9,7 @@ def test_value_proof_routes_are_registered() -> None:
 
     expected = {
         f"{API_PREFIX}/purchases",
+        f"{API_PREFIX}/purchases/prefill",
         f"{API_PREFIX}/savings",
         f"{API_PREFIX}/savings/{{id}}",
         f"{API_PREFIX}/savings/{{id}}/evidence",

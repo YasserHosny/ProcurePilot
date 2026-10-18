@@ -25,8 +25,9 @@ describe('SavingsLedgerComponent (T022)', () => {
       workspace_product_id: 'prod-1',
       supplier_id: 'supp-1',
       status: 'verified',
-      baseline_policy: 'last_paid',
-      baseline_source_landed_cost_ids: ['lc-1'],
+      baseline_policy: 'last_po_price',
+      baseline_source_landed_cost_ids: [],
+      baseline_source_po_line_ids: ['pol-1'],
       baseline_unit_price: { amount: '10.0000', currency: 'GBP' },
       baseline_value: { amount: '100.0000', currency: 'GBP' },
       actual_value: { amount: '80.0000', currency: 'GBP' },
@@ -105,6 +106,17 @@ describe('SavingsLedgerComponent (T022)', () => {
     expect(component.verifiedSavingsCount()).toBe(1);
     expect(component.pendingSavingsCount()).toBe(1);
     expect(component.totalVerifiedAmount()).toEqual({ amount: '20.00', currency: 'GBP' });
+  });
+
+  it('shows the baseline policy under each baseline value', () => {
+    const labels = Array.from(
+      (fixture.nativeElement as HTMLElement).querySelectorAll('[data-testid="baseline-policy"]'),
+    ).map((el) => el.textContent?.trim());
+    expect(labels).toEqual([
+      'savings.evidence.baselinePolicies.last_po_price',
+      'savings.evidence.baselinePolicies.last_paid',
+    ]);
+    expect(component.getPolicyClass('last_po_price')).toBe('policy-last-po');
   });
 
   it('should visually differentiate pending vs verified status', () => {

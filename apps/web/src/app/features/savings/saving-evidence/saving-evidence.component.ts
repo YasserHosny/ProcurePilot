@@ -173,6 +173,14 @@ export class SavingEvidenceComponent implements OnInit {
     return getBaselinePolicyClass(policy);
   }
 
+  /** The purchase order a last_po_price baseline was taken from, if any. */
+  baselineOrder(saving: SavingEvidence['saving_record']): { id: string; number: string } | null {
+    if (saving.baseline_policy !== 'last_po_price') return null;
+    const id = saving.calculation_inputs['source_purchase_order_id'];
+    const number = saving.calculation_inputs['source_order_number'];
+    return typeof id === 'string' && typeof number === 'string' ? { id, number } : null;
+  }
+
   getDeliveryClass(result: SavingEvidence['purchase_record']['delivery_result']): string {
     return getDeliveryResultClass(result);
   }

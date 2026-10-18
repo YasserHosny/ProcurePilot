@@ -38,6 +38,9 @@ class EvidenceService:
                     "source_landed_cost_ids": [
                         str(item) for item in saving.baseline_source_landed_cost_ids
                     ],
+                    "source_po_line_ids": [
+                        str(item) for item in saving.baseline_source_po_line_ids or []
+                    ],
                     "calculation_inputs": saving.calculation_inputs,
                 },
             )

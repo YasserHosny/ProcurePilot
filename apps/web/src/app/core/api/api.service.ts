@@ -67,6 +67,7 @@ import type {
   RefreshScheduleUpdate,
   PurchaseOutcomeCreate,
   PurchaseOutcomeCreated,
+  PurchaseOutcomePrefill,
   PurchaseRequest,
   PurchaseRequestCreate,
   PurchaseRequestList,
@@ -794,6 +795,11 @@ export class ApiService {
   ): Observable<PurchaseOutcomeCreated> {
     const headers = idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined;
     return this.http.post<PurchaseOutcomeCreated>(`${this.base}/purchases`, body, { headers });
+  }
+
+  getPurchasePrefill(purchaseOrderId: string): Observable<PurchaseOutcomePrefill> {
+    const query = new URLSearchParams({ purchase_order_id: purchaseOrderId });
+    return this.http.get<PurchaseOutcomePrefill>(`${this.base}/purchases/prefill?${query.toString()}`);
   }
 
   getSavings(params?: {

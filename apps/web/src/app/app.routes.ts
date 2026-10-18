@@ -245,6 +245,14 @@ export const routes: Routes = [
       },
 
       {
+        path: 'orders/:id/record-outcome',
+        canActivate: [roleGuard('owner', 'buyer')],
+        loadComponent: () =>
+          import('./features/savings/outcome-from-order/outcome-from-order.component').then(
+            (m) => m.OutcomeFromOrderComponent,
+          ),
+      },
+      {
         path: 'orders/:id',
         canActivate: [roleGuard('owner', 'buyer')],
         loadComponent: () =>

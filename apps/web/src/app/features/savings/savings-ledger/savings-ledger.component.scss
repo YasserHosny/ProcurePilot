@@ -264,3 +264,9 @@
   gap: 0.25rem;
   font-size: 0.85rem;
 }
+
+.baseline-cell .policy-label {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--mat-sys-on-surface-variant, #475569);
+}

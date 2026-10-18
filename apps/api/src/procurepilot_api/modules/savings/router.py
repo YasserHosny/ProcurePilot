@@ -13,6 +13,7 @@ from procurepilot_api.modules.savings.evidence import EvidenceService, get_evide
 from procurepilot_api.modules.savings.schemas import (
     PurchaseOutcomeCreate,
     PurchaseOutcomeCreated,
+    PurchaseOutcomePrefill,
     SavingEvidence,
     SavingList,
     SavingRecord,
@@ -41,6 +42,15 @@ def record_purchase(
     if not created:
         response.status_code = status.HTTP_200_OK
     return outcome
+
+
+@router.get("/purchases/prefill", response_model=PurchaseOutcomePrefill)
+def purchase_prefill(
+    purchase_order_id: Annotated[UUID, Query()],
+    member: Annotated[CurrentMember, Depends(require_role(*WRITE_ROLES))],
+    service: Annotated[SavingsService, Depends(get_savings_service)],
+) -> PurchaseOutcomePrefill:
+    return service.purchase_prefill(member=member, purchase_order_id=purchase_order_id)
 
 
 @router.get("/savings", response_model=SavingList)

@@ -1059,7 +1059,7 @@ export interface AlertDismissal {
 
 export type SavingStatus = 'pending' | 'verified';
 
-export type BaselinePolicy = 'last_paid' | 'rolling_average_6m' | 'none_available';
+export type BaselinePolicy = 'last_po_price' | 'last_paid' | 'rolling_average_6m' | 'none_available';
 
 export type PurchaseDeliveryResult =
   | 'ordered'
@@ -1074,6 +1074,7 @@ export interface PurchaseOutcomeCreate {
   readonly quotation_line_id?: string | null;
   readonly match_decision_id?: string | null;
   readonly landed_cost_id?: string | null;
+  readonly purchase_order_line_id?: string | null;
   readonly quantity: string;
   readonly base_unit: string;
   readonly unit_price: Money;
@@ -1091,6 +1092,7 @@ export interface PurchaseRecord {
   readonly quotation_line_id?: string | null;
   readonly match_decision_id?: string | null;
   readonly landed_cost_id?: string | null;
+  readonly purchase_order_line_id?: string | null;
   readonly quantity: string;
   readonly base_unit: string;
   readonly unit_price: Money;
@@ -1111,6 +1113,7 @@ export interface SavingRecord {
   readonly status: SavingStatus;
   readonly baseline_policy: BaselinePolicy;
   readonly baseline_source_landed_cost_ids: readonly string[];
+  readonly baseline_source_po_line_ids?: readonly string[] | null;
   readonly baseline_unit_price?: Money | null;
   readonly baseline_value?: Money | null;
   readonly actual_value: Money;
@@ -1121,6 +1124,33 @@ export interface SavingRecord {
   readonly recorded_at: string;
   readonly verified_by?: string | null;
   readonly verified_at?: string | null;
+}
+
+/** One PO line converted to an outcome line in base units (ADR-020); see GET /purchases/prefill. */
+export interface PurchaseOutcomePrefillLine {
+  readonly purchase_order_line_id: string;
+  readonly line_number: number;
+  readonly description: string;
+  readonly workspace_product_id: string | null;
+  readonly ordered_packs: string;
+  readonly pack_base_quantity: string | null;
+  readonly quantity: string;
+  readonly base_unit: string;
+  readonly unit_price: Money;
+  readonly total_paid: Money;
+  readonly recordable: boolean;
+  readonly reason: 'no_product' | 'zero_quantity' | 'already_recorded' | null;
+  readonly recorded_saving_id: string | null;
+}
+
+export interface PurchaseOutcomePrefill {
+  readonly purchase_order_id: string;
+  readonly order_number: string;
+  readonly status: string;
+  readonly supplier_id: string;
+  readonly order_date: string;
+  readonly delivery_result: PurchaseDeliveryResult;
+  readonly lines: readonly PurchaseOutcomePrefillLine[];
 }
 
 export interface PurchaseOutcomeCreated {
