@@ -455,6 +455,7 @@ class RfqService:
                         r.id as response_id,
                         rec.supplier_id,
                         r.created_at as submitted_at,
+                        q.status as quotation_status,
                         ql.id as ql_id,
                         ql.quantity,
                         ql.unit_price_amount,
@@ -462,6 +463,7 @@ class RfqService:
                         md.matched_workspace_product_id
                     from rfq_response r
                     join rfq_recipient rec on r.rfq_recipient_id = rec.id
+                    join quotation q on r.quotation_id = q.id
                     left join quotation_line ql on r.quotation_id = ql.quotation_id
                     left join match_decision md on ql.id = md.quotation_line_id
                     where r.tenant_id = %s and rec.rfq_id = %s
@@ -517,6 +519,7 @@ class RfqService:
                             "rfq_id": rfq_id,
                             "supplier_id": row["supplier_id"],
                             "submitted_at": row["submitted_at"],
+                            "quotation_status": row["quotation_status"],
                             "lines": [],
                             "guardrail_evaluations": evaluation_by_response.get(resp_id, []),
                         }

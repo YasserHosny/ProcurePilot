@@ -2,6 +2,7 @@ import { inject, Injectable } from '@angular/core';
 import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 
+import type { QuotationStatus } from '../../core/api/models';
 import { environment } from '../../../environments/environment';
 
 export interface Rfq {
@@ -73,6 +74,7 @@ export interface RfqResponseComparison {
   rfq_id: string;
   supplier_id: string;
   submitted_at: string;
+  quotation_status: QuotationStatus;
   lines: RfqResponseLineComparison[];
   guardrail_evaluations?: RfqGuardrailEvaluation[];
 }

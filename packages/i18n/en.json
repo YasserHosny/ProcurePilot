@@ -3778,7 +3778,9 @@
       "draftNoticeTitle": "This RFQ hasn't been sent yet",
       "draftNoticeDescription": "Review or edit your draft, or send it to suppliers to start collecting responses.",
       "editDraft": "Edit",
-      "sendDraft": "Send"
+      "sendDraft": "Send",
+      "refused": "Refused",
+      "refusedExplanation": "The quotation from this reply was refused and cannot be used to prepare a request."
     },
     "history": {
       "title": "RFQ History",

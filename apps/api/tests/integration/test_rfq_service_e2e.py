@@ -28,7 +28,7 @@ pytestmark = pytest.mark.skipif(
 
 def _seed_tenant(cur: psycopg.Cursor, *, email_suffix: str) -> tuple[UUID, UUID, UUID]:
     tenant_id, user_id, membership_id, invitation_id = uuid4(), uuid4(), uuid4(), uuid4()
-    email = f"rfq-e2e-{email_suffix}@example.test"
+    email = f"rfq-e2e-{email_suffix}-{user_id}@example.test"
 
     # See `catalogue_helpers.make_workspace`: a pooled backend may still carry a leaked role.
     cur.execute("reset role")
@@ -215,9 +215,7 @@ class _ListInsertTableQuery(PsycopgTableQuery):
     SQLSTATE) for '23505' (unique violation). Without this translation, a raw psycopg exception
     sails straight past that `except APIError` clause uncaught."""
 
-    def insert(
-        self, payload: dict[str, object] | list[dict[str, object]]
-    ) -> _ListInsertTableQuery:
+    def insert(self, payload: dict[str, object] | list[dict[str, object]]) -> _ListInsertTableQuery:
         self._operation = "insert"
         self._payload = payload  # type: ignore[assignment]
         return self
