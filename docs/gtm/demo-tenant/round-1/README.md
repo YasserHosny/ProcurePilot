@@ -80,11 +80,51 @@ create. The PO is a draft until submitted; ProcurePilot never writes back to sup
 
 ![PO-000001: evidence actions and timeline](08-po-actions.jpg)
 
+## Basket split (run 2026-10-18)
+
+Basket Split with الأمانة and النور, the five lines in packs (lentils 50, oil 10, rice 20, sugar 10,
+pasta 15). The optimiser on hosted completed the job (2511bb47) in about 2 seconds:
+
+| Supplier | Lines | Landed cost (EGP) |
+|---|---|---|
+| الأمانة | rice, sugar | 27,400 |
+| النور | lentils, oil, pasta | 28,575 |
+| **Split total** | | **55,975** — EGP 450 less than all from النور (56,425) |
+
+**Bug (finding 21):** the result page cannot load it. `GET /api/v1/baskets/{id}` returns 500 because the
+optimiser stores a result shape the API's `AdvancedBasketResult` rejects (lines lack `supplier_id`,
+`confidence` is an object not high/medium/low, extra `rule_version`/`advisory_only`). Hidden until now
+because hosted had no optimiser. Handed to the optimiser session 2026-10-18.
+
+## Savings ledger (checked 2026-10-18)
+
+Empty. Savings are not created from a PO: each purchase is recorded by hand (Savings Ledger → Record
+Purchase Outcome, one product line at a time, quantity in base units). The baseline is the
+`last_paid` price = the most recent landed cost for the product. With one round, that is the
+competing quote of the same RFQ (الأمانة's were recorded last), so recording PO-000001 would give:
+
+| Line (bought from النور) | Baseline = الأمانة quote | Paid | "Saving" |
+|---|---|---|---|
+| Rice 500 kg | 18,500 | 18,800 | −300 |
+| Oil 180 L | 17,250 | 16,800 | +450 |
+| Sugar 250 kg | 8,900 | 9,050 | −150 |
+| Lentils 50 kg | 3,650 (incl. delivery) | 3,600 | +50 |
+| Pasta 300 kg | 8,625 | 8,175 | +450 |
+
+Net +500, depending only on which quote was entered last — not recorded, to keep the demo ledger
+honest. Findings:
+
+- **22:** no path from a PO (or its delivery) to a purchase outcome; the buyer re-types each line, in
+  base units while the PO is in packs.
+- **23:** "last paid" uses quoted landed costs, not prices actually paid, and within one RFQ it picks
+  whichever quote was recorded last. Needs a product decision on the baseline (e.g. previous purchase
+  of the product, or the median of earlier rounds) before the video's savings number.
+
+Rounds 2–3 give the real history a savings number needs.
+
 ## Not yet run in round 1
 
-- Basket split across النور and الأمانة (optimiser deployed on hosted 2026-10-17, #108).
 - Phone approval (mobile build at 390×844).
-- Savings ledger entry for this PO.
 
 ## Open issues seen on these screens
 
