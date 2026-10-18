@@ -9,9 +9,11 @@ from typing import Literal, Protocol
 from urllib.parse import quote
 from uuid import UUID
 
+import psycopg
 from postgrest.exceptions import APIError
 from supabase import Client, create_client
 
+from procurepilot_api import db
 from procurepilot_api.config import Settings, get_settings
 from procurepilot_api.deps import CurrentMember
 from procurepilot_api.errors import (
@@ -29,12 +31,6 @@ from procurepilot_api.shared.audit import AuditEventCreate, get_audit_writer
 from procurepilot_api.shared.mailer import Mailer, MailgunMailer
 
 logger = logging.getLogger(__name__)
-
-
-def anon_client(settings: Settings) -> Client:
-    """A client with no user session, for calls that legitimately precede authentication."""
-    return create_client(settings.supabase_url, settings.supabase_anon_key.get_secret_value())
-
 
 INVITATION_COLUMNS = "id,tenant_id,email,role,token_hash,invited_by,expires_at,status,created_at"
 
@@ -270,24 +266,23 @@ class SupabaseMemberInvitationRepository:
         idempotent, returning the membership a first acceptance created rather than failing or
         duplicating.
         """
-        # Anon client, deliberately: the invitee has no session yet and cannot get one, because a
-        # session needs a tenant_id claim that only exists once this call has created the
-        # membership. The RPC proves authority from the token hash and the addressee's email
-        # instead of from the caller's claims.
-        client = anon_client(self._settings)
+        # Server-side connection, deliberately: the invitee has no session yet and cannot get
+        # one, because a session needs a tenant_id claim that only exists once this call has
+        # created the membership. The route has already proven the invitee owns the address
+        # (sign-up or password check), and the RPC re-checks the token hash and address. The
+        # function is no longer executable by anon (migration 20261018000004): through
+        # /rest/v1/rpc the anon key let any holder of an invitation link redeem it for an
+        # arbitrary user id.
         try:
-            response = client.rpc(
-                "accept_member_invitation",
-                {
-                    "p_token_hash": token_hash,
-                    "p_user_id": str(user_id),
-                    "p_email": email,
-                },
-            ).execute()
-        except APIError as exc:
+            with db.connect(self._settings.database_url.get_secret_value()) as conn:
+                row = conn.execute(
+                    "select accept_member_invitation(%s, %s::uuid, %s)",
+                    (token_hash, str(user_id), email),
+                ).fetchone()
+        except psycopg.Error as exc:
             raise ServiceUnavailableError(details={"dependency": "database"}) from exc
 
-        membership_id = response.data
+        membership_id = row[0] if row else None
         if not membership_id:
             # Unknown, expired, revoked, or already spent by someone else. Deliberately one
             # answer for all four: which it was is itself information (FR-005).

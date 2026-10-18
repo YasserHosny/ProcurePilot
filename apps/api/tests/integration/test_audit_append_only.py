@@ -23,6 +23,7 @@ pytestmark = pytest.mark.skipif(
     reason="TEST_DATABASE_URL is not set; needs a Postgres with the migrations applied",
 )
 
+
 def make_tenant(cur: psycopg.Cursor, label: str) -> UUID:
     """Create a self-contained tenant.
 
@@ -100,9 +101,7 @@ def test_writer_refuses_an_event_for_another_tenant(conn: psycopg.Connection) ->
         theirs = make_tenant(cur, "theirs")
         act_as_member(cur, mine)
         with pytest.raises(psycopg.errors.InsufficientPrivilege):
-            cur.execute(
-                "select record_audit_event('forged.event', 'success', %s::uuid)", (theirs,)
-            )
+            cur.execute("select record_audit_event('forged.event', 'success', %s::uuid)", (theirs,))
 
 
 def test_writer_records_a_pre_authentication_event(conn: psycopg.Connection) -> None:
@@ -116,3 +115,46 @@ def test_writer_records_a_pre_authentication_event(conn: psycopg.Connection) -> 
         )
         row = cur.fetchone()
         assert row is not None and row[0] > 0
+
+
+def test_anon_cannot_name_a_workspace(conn: psycopg.Connection) -> None:
+    """The public anon key could file events under any tenant id (security review 2026-10-18,
+    finding 1). A pre-authentication event names no tenant; naming one needs its claim."""
+    with conn.cursor() as cur:
+        target = make_tenant(cur, "anonforge")
+        cur.execute("set local role anon")
+        cur.execute("select set_config('request.jwt.claims', '{\"role\":\"anon\"}', true)")
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            cur.execute("select record_audit_event('forged.event', 'success', %s::uuid)", (target,))
+
+
+def test_anon_can_still_record_a_pre_authentication_event(conn: psycopg.Connection) -> None:
+    with conn.cursor() as cur:
+        cur.execute("set local role anon")
+        cur.execute("select set_config('request.jwt.claims', '{\"role\":\"anon\"}', true)")
+        cur.execute(
+            "select record_audit_event('auth.failed', 'refused', null, null, %s)",
+            ("someone@example.test",),
+        )
+        row = cur.fetchone()
+        assert row is not None and row[0] > 0
+
+
+def test_authenticated_without_a_claim_cannot_name_a_workspace(conn: psycopg.Connection) -> None:
+    with conn.cursor() as cur:
+        target = make_tenant(cur, "noclaim")
+        cur.execute("set local role authenticated")
+        cur.execute("select set_config('request.jwt.claims', '{}', true)")
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            cur.execute("select record_audit_event('forged.event', 'success', %s::uuid)", (target,))
+
+
+def test_server_side_writer_can_name_a_workspace(conn: psycopg.Connection) -> None:
+    """Workers connect through DATABASE_URL with no claim and no anon/authenticated role."""
+    with conn.cursor() as cur:
+        target = make_tenant(cur, "worker")
+        cur.execute("select record_audit_event('worker.event', 'success', %s::uuid)", (target,))
+        row = cur.fetchone()
+        assert row is not None and row[0] > 0
+        cur.execute("select tenant_id from audit_event where id = %s", (row[0],))
+        assert cur.fetchone() == (target,)
