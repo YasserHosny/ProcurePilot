@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Literal
 from uuid import UUID
 
-from pydantic import AnyHttpUrl, BaseModel, Field
+from pydantic import AliasChoices, AnyHttpUrl, BaseModel, Field
 
 type WebhookSubscriptionStatus = Literal["active", "paused", "revoked"]
 type WebhookDeliveryStatus = Literal["pending", "processing", "succeeded", "failed"]
@@ -12,7 +12,7 @@ type WebhookDeliveryStatus = Literal["pending", "processing", "succeeded", "fail
 
 class WebhookSubscriptionCreate(BaseModel):
     endpoint_url: AnyHttpUrl
-    events: list[str] = Field(default_factory=lambda: ["*"] , min_length=1, max_length=50)
+    events: list[str] = Field(default_factory=lambda: ["*"], min_length=1, max_length=50)
 
 
 class WebhookSubscription(BaseModel):
@@ -35,7 +35,7 @@ class WebhookSubscriptionList(BaseModel):
 class WebhookDelivery(BaseModel):
     id: UUID
     subscription_id: UUID
-    event_id: int
+    event_id: int = Field(validation_alias=AliasChoices("audit_event_id", "event_id"))
     event_type: str
     status: WebhookDeliveryStatus
     attempts: int
