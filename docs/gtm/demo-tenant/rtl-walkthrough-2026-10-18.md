@@ -11,10 +11,15 @@ layout.
 
 ## What works
 
-- Layout mirrors correctly: sidebar on the right, tables, forms, cards and back arrows.
-- All page titles, navigation, buttons, table headers, empty states and messages are Arabic.
-- Amounts on compare, basket split, PO and request pages use Arabic-Indic digits and «ج.م».
-- Product, supplier and branch names show in Arabic everywhere except the case in finding 33.
+- Layout mirrors correctly: sidebar on the right, tables, forms, cards and back arrows (exceptions in
+  finding 35).
+- Page titles, navigation, buttons, table headers, empty states and messages are Arabic, apart from
+  the raw keys, English alert titles and untranslated field labels in findings 31 and 36.
+- Line amounts and totals on compare, basket split, PO and request pages use Arabic-Indic digits and
+  «ج.م»; the exceptions (basket-split saving banner, guardrail card, request totals with "EGP") are in
+  finding 34.
+- Product and branch names show in Arabic, except the matched-product name on quote review
+  (finding 33); supplier names show in Arabic except in the email log (finding 36).
 
 ## Findings
 
