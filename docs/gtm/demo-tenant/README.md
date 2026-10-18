@@ -63,8 +63,13 @@ Lookups review (regions, currencies, tax models): [`lookups-review-2026-10-15.md
 | 34 | Dates and money formats in Arabic: date fields are MM/DD/YYYY (10/22/2026); guardrail card shows "EGP 30000.0000"; basket-split saving banner "EGP 450.00" in Latin digits beside «ج.م» amounts; currency placeholders suggest USD/GBP and Record Outcome defaults to GBP | inconsistent on camera; GBP wrong for an EGP tenant | not yet raised |
 | 35 | RTL layout: the guardrail "enabled" toggle label is clipped to «ل»; RFQ draft edit shows the raw quantity "120.000000", clipped to "0.000000" in the narrow field | looks broken on camera | not yet raised |
 | 36 | Technical details on user screens: email log lists suppliers as «المورد #<uuid>»; quote review shows `azure_di`, the model id, "Supplier Name" and `application/pdf` | noise on camera | not yet raised |
-| 37 | RFQ emails (subject and body) follow the tenant's `default_locale`, which is `en` for «مطاعم سند» and cannot be changed in the app after signup (only `PATCH /tenant`); Egyptian suppliers get an English email | supplier-facing language wrong on camera | not yet raised — needs a settings control; the demo tenant can be switched through the API with the owner's OK |
-| 38 | A guardrail-prepared request looks like any draft: no "prepared automatically by guardrail" marker on the request, and no cost centre (the guardrail only has a default branch) | the video's guardrail moment is invisible on screen | not yet raised |
+| 37 | RFQ emails (subject and body) follow the tenant's `default_locale`, which is `en` for «مطاعم سند» and cannot be changed in the app after signup (only `PATCH /tenant`); Egyptian suppliers get an English email | supplier-facing language wrong on camera | fixed — #165 merged + deployed 2026-10-18 (owner-only workspace language in Settings, audited); demo tenant set to `ar` |
+| 38 | A guardrail-prepared request looks like any draft: no "prepared automatically by guardrail" marker on the request, and no cost centre (the guardrail only has a default branch) | the video's guardrail moment is invisible on screen | fixed — #165 merged + deployed 2026-10-18: «أعدّته الضوابط تلقائيًا» banner on the request, owner email, guardrail default cost centre (demo guardrail set to «المطبخ — المعادي» 2026-10-18) |
+| 39 | The RFQ email states each quantity in the base unit: 12 sacks of 25 kg read «١٢ كجم (عبوة ١ × ٢٥ كجم)», 8 tins of oil «٨ لتر» | suppliers misquote; visible on camera | fixed — #180 merged 2026-10-18: «١٢ عبوة (٢٥ كجم للعبوة) — ٣٠٠ كجم», «٨٠ كجم» for 1-unit packs (round-4 dry run) |
+| 40 | Typing 22/10/2026 into an Arabic date picker gives 02/10/2026 (the first keystroke was wiped); the calendar works | wrong needed-by dates | fixed — #181 merged 2026-10-18 (all mat-datepicker screens) |
+| 41 | Quote review shows a flagged stated total as raw JSON: `{"amount":"24220.00","currency":"EGP"}` | on camera in the review scene | not yet raised (round-4 dry run) |
+| 42 | The WhatsApp-photo quote's «صالح حتى 29/10/2026» is not read into the expiry date (the PDF quotes' expiry is) | expiry empty on the photo quote | not yet raised (round-4 dry run) |
+| 43 | The guardrail drafts only from one reply that covers every RFQ line, so a round split across suppliers (oil/rice from two, onions from a third) never fires | by design; the storyboard's guardrail scene needs one full quote | decided 2026-10-18: in the recorded round الأمانة's photo quote covers all three items and the guardrail drafts from it (fired in the dry run) |
 
 Round 1 (2026-10-16 → 18): both quotes authorized, 10 matches confirmed, Smart Compare, request prepared at EGP 56,425 per pack, submitted, approved, **PO-000001 created** and the basket split run (saves EGP 450). The earlier request `6f460785-…` (wrong estimate 6,135.58, approved before fix 18, no PO) was set to `withdrawn` directly in the database on 2026-10-18 so it no longer counts against the Maadi budget (the app has no way to do this — finding 30); do not reuse it. Step by step: [`round-1/README.md`](round-1/README.md).
 
@@ -215,6 +220,7 @@ Leave the suppliers' `email_domains` empty (all are `gmail.com`).
 Round 1 step by step, with screenshots: [`round-1/README.md`](round-1/README.md).
 
 Rounds 2 and 3 step by step: [`round-2-3/README.md`](round-2-3/README.md).
+Round 4, the dry run of the recorded round (WhatsApp-photo quote, guardrail): [`round-4/README.md`](round-4/README.md).
 
 The workspace and both accounts already exist — do **not** create another tenant, and PO-000001 to
 PO-000004 exist — do not repeat rounds 1–3's requests or POs. Remaining work, with owners and status, is tracked in
