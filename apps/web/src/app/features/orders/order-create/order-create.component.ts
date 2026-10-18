@@ -1,5 +1,6 @@
 import { DecimalPipe } from '@angular/common';
 import { toIsoDate } from '../../../core/format/iso-date';
+import { FormatService } from '../../../core/format/format.service';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormArray, FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
@@ -23,6 +24,7 @@ import { catchError, forkJoin, of } from 'rxjs';
 import { ApiService } from '../../../core/api/api.service';
 import type { Product, Supplier } from '../../../core/api/models';
 import { OrdersApiService, type PurchaseOrderCreate } from '../orders-api';
+import { packLabel } from '../pack-label';
 
 interface OrderLineForm {
   workspace_product_id: FormControl<string | null>;
@@ -61,6 +63,7 @@ export class OrderCreateComponent implements OnInit {
   private readonly router = inject(Router);
   private readonly snackBar = inject(MatSnackBar);
   private readonly translate = inject(TranslateService);
+  private readonly formatService = inject(FormatService);
   private readonly api = inject(ApiService);
   private readonly ordersApi = inject(OrdersApiService);
   private readonly route = inject(ActivatedRoute);
@@ -74,25 +77,17 @@ export class OrderCreateComponent implements OnInit {
   readonly errorMessage = signal<string | null>(null);
   readonly sourceRequest = signal<PurchaseRequest | null>(null);
 
-  /** Pack description for a request/PO line ("pack of 18 litre"), or null when the pack is a
-   *  single base unit. Request quantities are in packs; this goes in the line description only -
-   *  `base_unit` stays the canonical unit because downstream code compares it exactly. */
-  private packDescription(product: Product | undefined): string | null {
-    if (!product?.pack) return null;
-    const baseQuantity = parseFloat(
-      product.pack.base_quantity ?? String(product.pack.pack_count * parseFloat(product.pack.unit_size)),
-    );
-    if (!(baseQuantity > 0) || baseQuantity === 1) return null;
-    return this.translate.instant('orders.create.packUnit', {
-      size: String(baseQuantity),
-      unit: product.base_unit,
-    });
+  packDescription(product: Product | undefined): string | null {
+    return packLabel(product?.pack, product?.base_unit ?? '', this.translate, this.formatService).label;
+  }
+
+  packHint(line: FormGroup<OrderLineForm>): string | null {
+    const product = this.products().find(p => p.id === line.controls.workspace_product_id.value);
+    return this.packDescription(product);
   }
 
   private requestLineDescription(product: Product | undefined): string {
-    const name = product?.tenant_name || '';
-    const pack = this.packDescription(product);
-    return pack ? `${name} (${pack})` : name;
+    return product?.tenant_name || '';
   }
 
   readonly requestAllocations = signal<RequestAllocation | null>(null);

@@ -1406,7 +1406,6 @@
     "quantityRequired": "Quantity must be greater than 0",
     "includeExpired": "Include expired offers",
     "recomputing": "Recalculating...",
-    "packHint": "{{count}} pack(s) × {{size}} {{unit}} = {{total}} {{unit}}",
     "unitLabel": "Unit: {{unit}}",
     "recommendation": {
       "title": "Recommended Offer",
@@ -1538,6 +1537,7 @@
       "itemsSectionTitle": "Basket Items",
       "product": "Product",
       "quantity": "Quantity",
+      "packHint": "{{count}} pack(s) × {{size}} {{unit}} = {{total}} {{unit}}",
       "unitLabel": "Unit: {{unit}}",
       "addItem": "Add Item",
       "addSupplier": "Add Supplier (2–10)",
@@ -1553,6 +1553,7 @@
       "completed": "Optimisation Completed",
       "failed": "Optimisation Job Failed",
       "failedMessage": "An error occurred during solver execution. Please try again.",
+      "noCurrentOffers": "No current offers from the selected suppliers for: {{products}}",
       "unavailableMessage": "The optimisation service is not responding. Please try again shortly, or contact support if this keeps happening.",
       "timeoutMessage": "The optimisation did not finish in time. Please try again."
     },
@@ -1984,6 +1985,7 @@
     }
   },
   "requests": {
+    "list": { "newRequestButton": "New request" },
     "title": "Purchase Requests",
     "subtitle": "Create and track purchase requests for your branches and cost centres.",
     "status": {
@@ -3261,7 +3263,7 @@
       "description": "Description",
       "quantity": "Quantity",
       "baseUnit": "Base Unit",
-      "unitPrice": "Unit Price",
+      "unitPrice": "Unit price (per pack)",
       "lineTax": "Line Tax",
       "lineTotal": "Line Total",
       "orderTotal": "Order Total",
@@ -3284,6 +3286,7 @@
       "creatingFromRequest": "Creating from Request",
       "estimateReference": "Estimate",
       "packUnit": "pack of {{size}} {{unit}}",
+      "baseUnitPrice": "per {{unit}}",
       "remainingQuantity": "Remaining Allocatable"
     },
     "status": {

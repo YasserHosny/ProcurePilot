@@ -58,6 +58,7 @@ class Money(StrictModel):
 
 
 class PurchaseOrderLine(StrictModel):
+    pack_base_quantity: Decimal | None = Field(default=None, gt=0)
     id: UUID
     line_number: int = Field(gt=0)
     workspace_product_id: UUID | None = None

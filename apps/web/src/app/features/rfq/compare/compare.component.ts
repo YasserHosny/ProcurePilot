@@ -19,6 +19,7 @@ import { TranslateModule, TranslatePipe, TranslateService } from '@ngx-translate
 
 import { ApiService } from '../../../core/api/api.service';
 import { RfqApi, RfqDetail, RfqGuardrail, RfqResponseComparison } from '../rfq-api';
+import { FormatService } from '../../../core/format/format.service';
 import { FormatMoneyPipe } from '../../../core/format/money.pipe';
 import { FormatDatePipe } from '../../../core/format/date.pipe';
 import type { ApiError, Branch } from '../../../core/api/models';
@@ -63,6 +64,7 @@ export class CompareComponent implements OnInit {
   private readonly dialog = inject(MatDialog);
   private readonly snackBar = inject(MatSnackBar);
   private readonly translate = inject(TranslateService);
+  private readonly formatService = inject(FormatService);
 
   readonly rfqId = signal<string>('');
   readonly rfqDetail = signal<RfqDetail | null>(null);
@@ -76,6 +78,8 @@ export class CompareComponent implements OnInit {
   readonly errorMessage = signal<string | null>(null);
   readonly guardrails = signal<readonly RfqGuardrail[]>([]);
   readonly currentMembershipId = signal<string | null>(null);
+
+  formatQuantity(value: string | number): string { return this.formatService.formatQuantity(value); }
 
   readonly displayedColumns = ['product', 'quantity', 'unitPrice', 'totalValue'];
 

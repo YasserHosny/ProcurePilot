@@ -68,7 +68,7 @@
       <p class="failed-message">
         {{
           errorMessage ||
-            ((failureMessageKey() ?? 'basketSplit.status.failedMessage') | translate)
+            ((failureMessageKey() ?? 'basketSplit.status.failedMessage') | translate: failureMessageParams())
         }}
       </p>
       <div class="failed-actions">

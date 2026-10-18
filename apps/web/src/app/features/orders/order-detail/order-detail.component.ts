@@ -8,7 +8,9 @@ import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
+import { packLabel } from '../pack-label';
 
+import { FormatService } from '../../../core/format/format.service';
 import { FormatDatePipe } from '../../../core/format/date.pipe';
 import { FormatMoneyPipe } from '../../../core/format/money.pipe';
 import {
@@ -42,6 +44,7 @@ export class OrderDetailComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly ordersApi = inject(OrdersApiService);
   private readonly translate = inject(TranslateService);
+  private readonly formatService = inject(FormatService);
 
   readonly evidence = signal<OrderEvidenceProjection | null>(null);
   readonly isLoading = signal(true);
@@ -69,9 +72,30 @@ export class OrderDetailComponent implements OnInit {
     this.isLoading.set(true);
     this.errorMessage.set(null);
     this.ordersApi.getOrder(this.orderId).subscribe({
-      next: (value) => { this.evidence.set(value); this.isLoading.set(false); },
+      next: (value) => {
+        this.evidence.set(value);
+        this.isLoading.set(false);
+      },
       error: () => { this.errorMessage.set(this.translate.instant('orders.loadError')); this.isLoading.set(false); },
     });
+  }
+
+  linePriceLabel(line: PurchaseOrderLine): string {
+    const { size, unit, label } = packLabel(
+      line.pack_base_quantity, line.base_unit, this.translate, this.formatService,
+    );
+    const amount = this.formatService.formatMoney(line.unit_price);
+    if (label !== null) {
+      const base = this.formatService.formatMoney({ amount: String(parseFloat(line.unit_price.amount) / size), currency: line.unit_price.currency });
+      return `${amount} / ${label} · ${base} / ${unit}`;
+    }
+    return `${amount} / ${unit}`;
+  }
+
+  formatQuantity(value: string | null): string {
+    return value === null
+      ? this.translate.instant('orders.notProvided')
+      : this.formatService.formatQuantity(value);
   }
 
   getStatusLabel(status: string): string { return this.translate.instant(`orders.status.${status}`); }

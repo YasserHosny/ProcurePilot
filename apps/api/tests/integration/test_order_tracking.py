@@ -570,3 +570,54 @@ def test_database_rejects_line_from_different_source_request() -> None:
                             line_id_b,
                         ),
                     )
+
+
+def test_order_pack_snapshot_survives_catalogue_changes_and_refreshes_on_draft_edit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    with committed_smart_context("order-pack-snapshot") as context:
+        member = member_from_workspace(context.workspace, role=MemberRole.owner)
+        client = TestClient(_app(monkeypatch, member), raise_server_exceptions=False)
+        with psycopg.connect(TEST_DATABASE_URL) as conn:
+            act_as(conn, context.workspace)
+            with conn.cursor() as cur:
+                cur.execute(
+                    "update pack_definition set pack_count = 1, unit_size = 0.5 "
+                    "where tenant_id = %s and workspace_product_id = %s",
+                    (context.workspace.tenant_id, context.product_id),
+                )
+            conn.commit()
+
+        payload = _base_order_payload(context.supplier_ids[0], uuid4(), uuid4(), context.product_id)
+        payload.pop("source_request_id")
+        payload["lines"][0].pop("source_request_line_id")
+        created = client.post(
+            "/api/v1/orders", json=payload, headers={"Idempotency-Key": str(uuid4())}
+        )
+        assert created.status_code == 201, created.text
+        order = created.json()
+        assert order["lines"][0]["pack_base_quantity"] == "0.500000"
+
+        with psycopg.connect(TEST_DATABASE_URL) as conn:
+            act_as(conn, context.workspace)
+            with conn.cursor() as cur:
+                cur.execute(
+                    "update pack_definition set unit_size = 2 "
+                    "where tenant_id = %s and workspace_product_id = %s",
+                    (context.workspace.tenant_id, context.product_id),
+                )
+                cur.execute(
+                    "select pack_base_quantity from purchase_order_line "
+                    "where tenant_id = %s and purchase_order_id = %s",
+                    (context.workspace.tenant_id, order["id"]),
+                )
+                assert cur.fetchone()[0] == Decimal("0.500000")
+            conn.commit()
+
+        edited = client.put(
+            f"/api/v1/orders/{order['id']}",
+            json=payload,
+            headers={"Idempotency-Key": str(uuid4())},
+        )
+        assert edited.status_code == 200, edited.text
+        assert edited.json()["lines"][0]["pack_base_quantity"] == "2.000000"
