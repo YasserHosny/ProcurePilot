@@ -78,7 +78,7 @@ export class OrderCreateComponent implements OnInit {
   readonly sourceRequest = signal<PurchaseRequest | null>(null);
 
   packDescription(product: Product | undefined): string | null {
-    return packLabel(product, product?.base_unit ?? '', this.translate, this.formatService).label;
+    return packLabel(product?.pack, product?.base_unit ?? '', this.translate, this.formatService).label;
   }
 
   packHint(line: FormGroup<OrderLineForm>): string | null {

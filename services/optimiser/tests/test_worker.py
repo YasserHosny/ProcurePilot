@@ -5,9 +5,15 @@ from uuid import uuid4
 
 import pytest
 
-from procurepilot_optimiser_worker.models import BasketItem
+from procurepilot_optimiser_worker import repository
+from procurepilot_optimiser_worker.models import (
+    AdvancedBasketRequest,
+    AdvancedOfferInput,
+    BasketItem,
+    Money,
+)
 from procurepilot_optimiser_worker.settings import WorkerSettings
-from procurepilot_optimiser_worker.solver import solve_two_supplier_split
+from procurepilot_optimiser_worker.solver import solve_advanced_basket, solve_two_supplier_split
 from procurepilot_optimiser_worker.worker import process_basket_split_job
 
 
@@ -135,25 +141,32 @@ def test_worker_failure_durably_marks_job_failed_after_exception_unwinds(
             conn.commit()
 
 
-def test_worker_marks_missing_current_offers_with_specific_error(
-    monkeypatch: pytest.MonkeyPatch,
+@pytest.fixture
+def advanced_request(monkeypatch: pytest.MonkeyPatch) -> AdvancedBasketRequest:
+    request = AdvancedBasketRequest(
+        id=uuid4(),
+        tenant_id=uuid4(),
+        supplier_ids=[uuid4(), uuid4()],
+        items=[BasketItem(workspace_product_id=uuid4(), quantity="1") for _ in range(2)],
+        rule_version="advanced-basket-v1",
+    )
+    monkeypatch.setattr(repository, "_load_advanced_job_snapshot", lambda *_, **__: ({}, {}))
+    monkeypatch.setattr(repository, "_advanced_request_from_snapshot", lambda **_: request)
+    monkeypatch.setattr(repository, "_supplier_terms_from_snapshot", lambda _: [])
+    monkeypatch.setattr(repository, "read_supplier_terms", lambda *_, **__: [])
+    monkeypatch.setattr(repository, "read_supplier_risks", lambda *_, **__: [])
+    return request
+
+
+def test_advanced_worker_zero_offers_fails_with_all_requested_product_ids(
+    monkeypatch: pytest.MonkeyPatch, advanced_request: AdvancedBasketRequest
 ) -> None:
     from collections.abc import Iterator
     from contextlib import contextmanager
 
     from procurepilot_optimiser_worker import worker
-    from procurepilot_optimiser_worker.models import BasketJob
     from procurepilot_optimiser_worker.repository import NoCurrentOffersError
 
-    job_id, tenant_id = uuid4(), uuid4()
-    job = BasketJob.model_validate(
-        {
-            "id": str(job_id),
-            "tenant_id": str(tenant_id),
-            "supplier_ids": [str(uuid4()), str(uuid4())],
-            "items": [{"workspace_product_id": str(uuid4()), "quantity": "1"}],
-        }
-    )
     captured: list[dict[str, object]] = []
 
     class FakeConnection:
@@ -167,8 +180,7 @@ def test_worker_marks_missing_current_offers_with_specific_error(
     monkeypatch.setattr(worker, "get_settings", lambda: WorkerSettings(database_url="unused"))
     monkeypatch.setattr(worker.db, "connect", fake_connect)
     monkeypatch.setattr(worker, "mark_running", lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(worker, "load_job", lambda *_args, **_kwargs: job)
-    monkeypatch.setattr(worker, "read_current_offers", lambda *_args, **_kwargs: [])
+    monkeypatch.setattr(repository, "read_current_advanced_offers", lambda *_, **__: [])
 
     def capture_failure(_conn: object, *, error: dict[str, object], **_kwargs: object) -> None:
         captured.append(error)
@@ -176,11 +188,41 @@ def test_worker_marks_missing_current_offers_with_specific_error(
     monkeypatch.setattr(worker, "mark_failed", capture_failure)
 
     with pytest.raises(NoCurrentOffersError):
-        process_basket_split_job({"job_id": str(job_id), "tenant_id": str(tenant_id)})
+        process_basket_split_job(
+            {
+                "job_id": str(advanced_request.id),
+                "tenant_id": str(advanced_request.tenant_id),
+                "request_kind": "advanced_basket_optimisation",
+            }
+        )
 
     assert captured == [
         {
             "code": "no_offers_for_products",
-            "product_ids": [str(job.items[0].workspace_product_id)],
+            "product_ids": [str(item.workspace_product_id) for item in advanced_request.items],
         }
     ]
+
+
+def test_partially_covered_advanced_basket_reaches_solver_as_infeasible(
+    monkeypatch: pytest.MonkeyPatch, advanced_request: AdvancedBasketRequest
+) -> None:
+    offer = AdvancedOfferInput(
+        offer_id=uuid4(),
+        workspace_product_id=advanced_request.items[0].workspace_product_id,
+        supplier_id=advanced_request.supplier_ids[0],
+        quantity="1",
+        total_landed_cost=Money(amount="10", currency="GBP"),
+        unit_landed_cost=Money(amount="10", currency="GBP"),
+        source_landed_cost_id=uuid4(),
+    )
+    monkeypatch.setattr(repository, "read_current_advanced_offers", lambda *_, **__: [offer])
+    input_payload = repository.load_advanced_optimisation_input(
+        None,
+        job_id=advanced_request.id,
+        tenant_id=advanced_request.tenant_id,
+    )
+    assert input_payload.offers == [offer]
+    assert len(input_payload.request.items) == 2
+    result = solve_advanced_basket(input_payload=input_payload)
+    assert result.feasible is False

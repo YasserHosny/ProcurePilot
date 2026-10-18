@@ -34,14 +34,6 @@ def process_basket_split_job(payload: dict[str, str]) -> None:
             else:
                 job = load_job(conn, job_id=job_id, tenant_id=tenant_id)
                 offers = read_current_offers(conn, job=job)
-                available = {offer.workspace_product_id for offer in offers}
-                missing = [
-                    str(item.workspace_product_id)
-                    for item in job.items
-                    if item.workspace_product_id not in available
-                ]
-                if missing:
-                    raise NoCurrentOffersError(missing)
                 result = solve_two_supplier_split(
                     supplier_ids=job.supplier_ids,
                     items=job.items,

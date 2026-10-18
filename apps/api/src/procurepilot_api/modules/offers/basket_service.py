@@ -85,7 +85,6 @@ class BasketService:
             self._expire_stuck_jobs(conn)
             _visible_suppliers(conn, payload.supplier_ids)
             _visible_products(conn, [item.workspace_product_id for item in payload.items])
-            _ensure_current_offers(conn, payload)
             request_snapshot = _request_snapshot(conn, member, payload)
             _ensure_no_active_equivalent(conn, payload, request_snapshot)
             job_id = uuid4()
@@ -232,37 +231,6 @@ def _visible_products(conn: object, product_ids: list[UUID]) -> None:
         found = {row[0] for row in cur.fetchall()}
     if found != set(product_ids):
         raise NotFoundError(details={"resource": "workspace_product"})
-
-
-def _ensure_current_offers(conn: object, payload: BasketRequest) -> None:
-    product_ids = [item.workspace_product_id for item in payload.items]
-    with conn.cursor() as cur:
-        cur.execute(
-            """
-            select distinct md.matched_workspace_product_id
-            from workspace_product wp
-            join match_decision md on md.matched_workspace_product_id = wp.id
-            join landed_cost lc on lc.match_decision_id = md.id
-            join quotation_line ql on ql.id = lc.quotation_line_id
-            join quotation q on q.id = ql.quotation_id
-            join supplier s on s.id = q.supplier_id
-            where wp.id = any(%s::uuid[])
-              and q.supplier_id = any(%s::uuid[])
-              and q.status = 'reviewed'
-              and s.status in ('active', 'preferred')
-              and (lc.valid_to is null or lc.valid_to >= now())
-            """,
-            (
-                [str(product_id) for product_id in product_ids],
-                [str(supplier_id) for supplier_id in payload.supplier_ids],
-            ),
-        )
-        available = {row[0] for row in cur.fetchall()}
-    missing = [str(product_id) for product_id in product_ids if product_id not in available]
-    if missing:
-        raise UnprocessableEntityError(
-            details={"reason": "no_offers_for_products", "product_ids": missing}
-        )
 
 
 def _ensure_no_active_equivalent(

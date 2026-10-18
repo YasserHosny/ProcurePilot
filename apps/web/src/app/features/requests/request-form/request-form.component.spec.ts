@@ -278,6 +278,16 @@ describe('RequestFormComponent — edit mode (T017)', () => {
     fixture.detectChanges();
   });
 
+  it('preserves all decimal digits when prefilling an editable quantity', () => {
+    requestsApi.getRequest.and.returnValue(of({ ...mockRequest, lines: [
+      { ...mockRequest.lines[0], quantity: '999999999999.999999' },
+    ] }));
+    const editFixture = TestBed.createComponent(RequestFormComponent);
+    editFixture.detectChanges();
+    expect(editFixture.componentInstance.lines.at(0).controls.quantity.value)
+      .toBe('999999999999.999999');
+  });
+
   it('should load the existing request and pre-fill the form', () => {
     expect(requestsApi.getRequest).toHaveBeenCalledWith('r1');
     expect(component.isEditMode()).toBeTrue();

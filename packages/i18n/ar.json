@@ -1406,7 +1406,6 @@
     "quantityRequired": "يجب أن تكون الكمية أكبر من 0",
     "includeExpired": "تضمين العروض منتهية الصلاحية",
     "recomputing": "جاري إعادة الحساب...",
-    "packHint": "{{count}} عبوة × {{size}} {{unit}} = {{total}} {{unit}}",
     "unitLabel": "الوحدة: {{unit}}",
     "recommendation": {
       "title": "العرض الموصى به",
@@ -1538,6 +1537,7 @@
       "itemsSectionTitle": "منتجات السلة",
       "product": "المنتج",
       "quantity": "الكمية",
+      "packHint": "{{count}} عبوة × {{size}} {{unit}} = {{total}} {{unit}}",
       "unitLabel": "الوحدة: {{unit}}",
       "addItem": "إضافة منتج",
       "addSupplier": "إضافة مورّد (٢-١٠)",

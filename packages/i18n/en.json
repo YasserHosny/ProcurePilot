@@ -1406,7 +1406,6 @@
     "quantityRequired": "Quantity must be greater than 0",
     "includeExpired": "Include expired offers",
     "recomputing": "Recalculating...",
-    "packHint": "{{count}} pack(s) × {{size}} {{unit}} = {{total}} {{unit}}",
     "unitLabel": "Unit: {{unit}}",
     "recommendation": {
       "title": "Recommended Offer",
@@ -1538,6 +1537,7 @@
       "itemsSectionTitle": "Basket Items",
       "product": "Product",
       "quantity": "Quantity",
+      "packHint": "{{count}} pack(s) × {{size}} {{unit}} = {{total}} {{unit}}",
       "unitLabel": "Unit: {{unit}}",
       "addItem": "Add Item",
       "addSupplier": "Add Supplier (2–10)",

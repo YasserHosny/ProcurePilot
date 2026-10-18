@@ -6,6 +6,7 @@ from types import SimpleNamespace
 from uuid import UUID
 
 import pytest
+from pydantic import ValidationError
 
 from procurepilot_api.deps import CurrentMember
 from procurepilot_api.errors import (
@@ -23,6 +24,7 @@ from procurepilot_api.modules.orders.schemas import (
     Money,
     PurchaseOrder,
     PurchaseOrderCreate,
+    PurchaseOrderDraftUpdate,
     PurchaseOrderLine,
     PurchaseOrderLineInput,
     SupplierConfirmationLineInput,
@@ -397,11 +399,13 @@ def test_flattened_order_rows_map_without_idempotency_extras() -> None:
         "line_total_amount": "10",
         "line_total_currency": "USD",
         "source_request_line_id": str(UUID(int=99)),
+        "pack_base_quantity": Decimal("0.500000"),
     }
     order = _order_model(raw, [line])
     assert order.id == ORDER
     assert order.source_request_id == UUID(int=88)
     assert order.lines[0].source_request_line_id == UUID(int=99)
+    assert order.model_dump(mode="json")["lines"][0]["pack_base_quantity"] == "0.500000"
 
 
 def test_flattened_confirmation_and_receipt_rows_map_explicitly() -> None:
@@ -1229,3 +1233,107 @@ def test_allocation_projection(monkeypatch: pytest.MonkeyPatch) -> None:
     assert l2.requested_quantity == Decimal("5.0")
     assert l2.allocated_quantity == Decimal("0")
     assert l2.remaining_quantity == Decimal("5.0")
+
+
+@pytest.mark.parametrize("edit", [False, True])
+@pytest.mark.parametrize("product_id", [UUID(int=9), None])
+def test_order_line_insert_snapshots_pack_from_tenant_product(
+    monkeypatch: pytest.MonkeyPatch, edit: bool, product_id: UUID | None
+) -> None:
+    cursor = _FakeCursor()
+    inserts: list[tuple[str, list[tuple[object, ...]]]] = []
+
+    def capture_insert(statement: str, params: list[tuple[object, ...]]) -> None:
+        inserts.append((statement, params))
+
+    monkeypatch.setattr(cursor, "executemany", capture_insert)
+    if edit:
+        monkeypatch.setattr(
+            cursor,
+            "fetchone",
+            lambda: {
+                "id": ORDER,
+                "status": "draft",
+                "source_request_id": None,
+            },
+        )
+    service = OrdersService.__new__(OrdersService)
+    monkeypatch.setattr(OrdersService, "_transaction", lambda *_: _RollbackContext(cursor))
+    monkeypatch.setattr(OrdersService, "_load_order_cursor", lambda *_: _order())
+    monkeypatch.setattr(OrdersService, "_audit_cursor", lambda *_: None)
+    monkeypatch.setattr(OrdersService, "_record_edit_idempotency_key", lambda *_, **__: False)
+    line = PurchaseOrderLineInput.model_validate(
+        {
+            **_order().lines[0].model_dump(exclude={"id", "pack_base_quantity"}),
+            "workspace_product_id": product_id,
+        }
+    )
+    payload = PurchaseOrderCreate(
+        order_number="PO-pack",
+        supplier_id=UUID(int=6),
+        order_date=date(2026, 9, 19),
+        total=Money(amount=Decimal("10"), currency="USD"),
+        tax=Money(amount=Decimal("0"), currency="USD"),
+        source_reference="manual:pack",
+        lines=(line,),
+    )
+    if edit:
+        service.update_draft_order(
+            bearer_token="token",
+            member=_member(),
+            order_id=ORDER,
+            payload=PurchaseOrderDraftUpdate(**payload.model_dump()),
+            idempotency_key=UUID(int=50),
+        )
+    else:
+        service.create_order(
+            bearer_token="token",
+            member=_member(),
+            payload=payload,
+            idempotency_key=UUID(int=50),
+        )
+
+    assert len(inserts) == 1
+    statement, parameters = inserts[0]
+    assert "source_request_line_id,pack_base_quantity)" in statement
+    assert "select pd.base_quantity from pack_definition pd" in statement
+    assert "pd.tenant_id = %s and pd.workspace_product_id = %s" in statement
+    assert "order by pd.created_at desc, pd.id desc limit 1" in statement
+    assert parameters[0][-2:] == (TENANT, product_id)
+    assert statement.count("%s") == len(parameters[0])
+
+
+def test_order_pack_snapshot_serializes_as_optional_decimal_string() -> None:
+    line = _order().lines[0]
+    assert line.model_dump(mode="json")["pack_base_quantity"] is None
+    snapshot = PurchaseOrderLine.model_validate(
+        {
+            **line.model_dump(),
+            "pack_base_quantity": "0.500000",
+        }
+    )
+    assert snapshot.model_dump(mode="json")["pack_base_quantity"] == "0.500000"
+
+
+@pytest.mark.parametrize("schema", [PurchaseOrderCreate, PurchaseOrderDraftUpdate])
+def test_order_client_cannot_supply_pack_snapshot(
+    schema: type[PurchaseOrderCreate],
+) -> None:
+    line = _order().lines[0].model_dump(exclude={"id"})
+    line["pack_base_quantity"] = "99"
+    with pytest.raises(ValidationError) as exc_info:
+        schema.model_validate(
+            {
+                "order_number": "PO-pack",
+                "supplier_id": UUID(int=6),
+                "order_date": "2026-09-19",
+                "total": {"amount": "10", "currency": "USD"},
+                "tax": {"amount": "0", "currency": "USD"},
+                "source_reference": "manual:pack",
+                "lines": [line],
+            }
+        )
+    assert any(
+        error["loc"] == ("lines", 0, "pack_base_quantity") and error["type"] == "extra_forbidden"
+        for error in exc_info.value.errors()
+    )

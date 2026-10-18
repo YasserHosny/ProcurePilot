@@ -3,7 +3,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { ActivatedRoute, provideRouter } from '@angular/router';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
-import { of, throwError } from 'rxjs';
+import { of } from 'rxjs';
 import { ApiService } from '../../../core/api/api.service';
 import type { Product } from '../../../core/api/models';
 
@@ -16,7 +16,7 @@ describe('OrderDetailComponent', () => {
   let catalogue: jasmine.SpyObj<ApiService>;
   const product: Product = {
     id: 'p1', tenant_name: 'Paper', canonical_name: 'Paper', base_unit: 'kilogram',
-    pack: { pack_count: 1, unit_size: '25', base_quantity: '25' }, status: 'active', created_at: '',
+    pack: { pack_count: 1, unit_size: '100', base_quantity: '100' }, status: 'active', created_at: '',
   };
 
   beforeEach(async () => {
@@ -33,7 +33,7 @@ describe('OrderDetailComponent', () => {
         source_kind: 'manual', source_reference: 'PO-1001', source_hash: null, created_by: 'member-1',
         created_at: '2026-09-20T10:00:00Z', updated_at: '2026-09-20T10:00:00Z', lines: [{
           id: 'line-1', line_number: 1, workspace_product_id: 'p1', description: 'Paper', ordered_quantity: '10',
-          base_unit: 'kilogram', unit_price: { amount: '940.00', currency: 'GBP' }, tax: { amount: '0.00', currency: 'GBP' },
+          base_unit: 'kilogram', pack_base_quantity: '25.000000', unit_price: { amount: '940.00', currency: 'GBP' }, tax: { amount: '0.00', currency: 'GBP' },
           line_total: { amount: '120.00', currency: 'GBP' },
         }],
       },
@@ -53,7 +53,7 @@ describe('OrderDetailComponent', () => {
       ],
     }).compileComponents();
     TestBed.inject(TranslateService).setTranslation('en', {
-      rfq: { email: { units: { kilogram: 'kg' } } },
+      rfq: { email: { units: { kilogram: 'kg', litre: 'L' } } },
       orders: {
         create: { packUnit: 'pack of {{size}} {{unit}}' },
         backToOrders: 'Back', retry: 'Retry', loadError: 'Load failed', saveError: 'Save failed', notProvided: 'Not provided',
@@ -73,30 +73,40 @@ describe('OrderDetailComponent', () => {
     fixture = TestBed.createComponent(OrderDetailComponent);
   });
 
-  it('loads the referenced product and shows pack and derived base unit prices', () => {
+  it('uses the saved pack snapshot despite a different live catalogue pack', () => {
     fixture.detectChanges();
     const component = fixture.componentInstance;
     const line = component.evidence()!.order.lines[0];
-    expect(catalogue.product).toHaveBeenCalledOnceWith('p1');
+    expect(catalogue.product).not.toHaveBeenCalled();
     expect(component.linePriceLabel(line)).toContain('pack of 25 kg');
     expect(component.linePriceLabel(line)).toContain('37.60');
   });
 
-  it('fetches distinct product IDs and tolerates an individual lookup failure', () => {
+  it('shows fractional pack size and derived per-litre price', () => {
     fixture.detectChanges();
     const component = fixture.componentInstance;
-    const data = component.evidence()!;
-    const line = data.order.lines[0];
-    api.getOrder.and.returnValue(of({ ...data, order: { ...data.order, lines: [
-      line, { ...line, id: 'line-2' }, { ...line, id: 'line-3', workspace_product_id: 'p2' },
-    ] } }));
-    catalogue.product.calls.reset();
-    catalogue.product.and.callFake(id => id === 'p1' ? of(product) : throwError(() => new Error('Unavailable')));
-    component.loadOrder();
-    expect(catalogue.product.calls.allArgs()).toEqual([['p1'], ['p2']]);
-    expect(component.products().get('p1')).toEqual(product);
-    expect(component.products().has('p2')).toBeFalse();
-    expect(component.linePriceLabel({ ...line, workspace_product_id: 'p2' })).toContain('/ kg');
+    const line = { ...component.evidence()!.order.lines[0],
+      base_unit: 'litre', pack_base_quantity: '0.500000',
+      unit_price: { amount: '10.00', currency: 'GBP' },
+    };
+    const label = component.linePriceLabel(line);
+    expect(label).toContain('pack of 0.5 L');
+    expect(label).toContain('20.00 / L');
+    expect(catalogue.product).not.toHaveBeenCalled();
+  });
+
+  it('shows only the unit for a size-one pack or an unknown snapshot', () => {
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    for (const size of ['1.000000', null, undefined]) {
+      const label = component.linePriceLabel({
+        ...component.evidence()!.order.lines[0], pack_base_quantity: size,
+      });
+      expect(label).toContain('/ kg');
+      expect(label).not.toContain('pack of');
+      expect(label).not.toContain('·');
+    }
+    expect(catalogue.product).not.toHaveBeenCalled();
   });
 
   it('formats lifecycle quantities and preserves missing values', () => {

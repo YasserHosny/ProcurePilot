@@ -20,6 +20,7 @@ import { catchError, distinctUntilChanged, finalize, switchMap, tap } from 'rxjs
 import { ApiService } from '../../../core/api/api.service';
 import { FormatDatePipe } from '../../../core/format/date.pipe';
 import { FormatService } from '../../../core/format/format.service';
+import { trimDecimal } from '../../../core/format/trim-decimal';
 import type {
   ApiError,
   Branch,
@@ -385,7 +386,7 @@ export class RequestFormComponent implements OnInit {
         const isReadOnly = req.status !== 'draft';
         this.lines.clear();
         for (const line of req.lines) {
-          const displayQty = isReadOnly ? this.formatQuantity(line.quantity) : String(parseFloat(line.quantity));
+          const displayQty = isReadOnly ? this.formatQuantity(line.quantity) : trimDecimal(line.quantity);
           const group = new FormGroup<LineFormGroup>({
             workspace_product_id: new FormControl<string>(line.workspace_product_id, {
               nonNullable: true,

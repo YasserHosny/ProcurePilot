@@ -55,14 +55,8 @@ def load_advanced_optimisation_input(
     request = _advanced_request_from_snapshot(row=row, snapshot=snapshot)
     supplier_terms = _supplier_terms_from_snapshot(snapshot)
     offers = read_current_advanced_offers(conn, request=request)
-    available = {offer.workspace_product_id for offer in offers}
-    missing = [
-        str(item.workspace_product_id)
-        for item in request.items
-        if item.workspace_product_id not in available
-    ]
-    if missing:
-        raise NoCurrentOffersError(missing)
+    if not offers:
+        raise NoCurrentOffersError([str(item.workspace_product_id) for item in request.items])
     return AdvancedOptimisationInput(
         request=request,
         offers=offers,
