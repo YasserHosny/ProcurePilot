@@ -206,6 +206,7 @@ class OrdersService:
         with self._transaction(member) as cur:
             if payload.source_request_id:
                 self._lock_requests(cur, member.tenant_id, {payload.source_request_id})
+                self._assert_request_still_ordered(cur, payload.source_request_id)
 
                 self._assert_request_allocation_available(
                     cur=cur,
@@ -362,6 +363,7 @@ class OrdersService:
                 self._lock_requests(cur, member.tenant_id, requests_to_lock)
 
             if payload.source_request_id:
+                self._assert_request_still_ordered(cur, payload.source_request_id)
                 self._assert_request_allocation_available(
                     cur=cur,
                     tenant_id=member.tenant_id,
@@ -575,6 +577,16 @@ class OrdersService:
             source_request_id=source_request_id,
             lines=tuple(line_allocations),
         )
+
+    @staticmethod
+    def _assert_request_still_ordered(cur: psycopg.Cursor, request_id: UUID) -> None:
+        # Validation before taking the allocation lock may have raced with withdrawal.
+        cur.execute("select status from purchase_request where id = %s", (request_id,))
+        request = cur.fetchone()
+        if request is None:
+            raise NotFoundError(details={"resource": "purchase_request"})
+        if request["status"] not in ("approved", "ordered"):
+            raise ConflictError(details={"reason": "request_not_approved"})
 
     @staticmethod
     def _lock_requests(cur: psycopg.Cursor, tenant_id: UUID, request_ids: set[UUID]) -> None:

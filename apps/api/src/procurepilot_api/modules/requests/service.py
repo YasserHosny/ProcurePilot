@@ -838,31 +838,8 @@ class RequestsService:
         request_id: UUID,
     ) -> PurchaseRequest:
         client = authenticated_client(self._settings, bearer_token)
-        existing = self._fetch_request(client, request_id)
-
-        if str(existing["status"]) not in ("draft", "submitted"):
-            raise ConflictError(details={"reason": "already_decided_or_withdrawn"})
-        _require_requester(existing, member)
-
         rid = str(request_id)
-        now = _now_iso()
-        try:
-            response = (
-                client.table("purchase_request")
-                .update(
-                    {
-                        "status": "withdrawn",
-                        "withdrawn_at": now,
-                        "updated_at": now,
-                    }
-                )
-                .eq("id", rid)
-                .execute()
-            )
-        except APIError as exc:
-            raise _write_error(exc) from exc
-
-        request_row = _one_row_or_not_found(response.data, resource="purchase_request")
+        request_row, previous_status = self._withdraw_request_row(member, request_id)
         line_rows = self._fetch_lines_for(client, rid)
         step_row = self._fetch_step(client, rid)
 
@@ -870,9 +847,63 @@ class RequestsService:
             bearer_token=bearer_token,
             member=member,
             action="requests.purchase_request_withdrawn",
-            target={"purchase_request_id": rid},
+            target={"purchase_request_id": rid, "previous_status": previous_status},
         )
         return self._purchase_request_with_budget_status(client, request_row, line_rows, step_row)
+
+    def _withdraw_request_row(
+        self, member: CurrentMember, request_id: UUID
+    ) -> tuple[dict[str, object], str]:
+        # Use the same transaction lock as PO creation/editing so the absence check
+        # and withdrawal cannot interleave with attaching a live purchase order.
+        claims = {
+            "sub": str(member.user_id),
+            "tenant_id": str(member.tenant_id),
+            "role": "authenticated",
+            "member_role": member.role.value,
+        }
+        try:
+            with db.connect(self._settings.database_url.get_secret_value()) as conn:
+                with conn.cursor(row_factory=dict_row) as cur:
+                    cur.execute("set local role authenticated")
+                    cur.execute(
+                        "select set_config('request.jwt.claims', %s, true)",
+                        (json.dumps(claims),),
+                    )
+                    lock_id = (member.tenant_id.int ^ request_id.int) & 0x7FFFFFFFFFFFFFFF
+                    cur.execute("select pg_advisory_xact_lock(%s)", (lock_id,))
+                    cur.execute(
+                        f"select {REQUEST_COLUMNS} from purchase_request where id = %s for update",
+                        (request_id,),
+                    )
+                    existing = cur.fetchone()
+                    if existing is None:
+                        raise NotFoundError(details={"resource": "purchase_request"})
+                    if member.role is not MemberRole.owner:
+                        _require_requester(existing, member)
+                    previous_status = str(existing["status"])
+                    if previous_status not in ("draft", "submitted", "ordered"):
+                        raise ConflictError(details={"reason": "already_decided_or_withdrawn"})
+                    if previous_status == "ordered":
+                        cur.execute(
+                            "select 1 from purchase_order where source_request_id = %s "
+                            "and status <> 'cancelled' limit 1",
+                            (request_id,),
+                        )
+                        if cur.fetchone() is not None:
+                            raise ConflictError(details={"reason": "purchase_order_exists"})
+                    cur.execute(
+                        "update purchase_request set status = 'withdrawn', "
+                        "withdrawn_at = now(), updated_at = now() where id = %s "
+                        f"returning {REQUEST_COLUMNS}",
+                        (request_id,),
+                    )
+                    row = cur.fetchone()
+                    if row is None:
+                        raise NotFoundError(details={"resource": "purchase_request"})
+                    return row, previous_status
+        except psycopg.Error as exc:
+            raise ServiceUnavailableError(details={"dependency": "database"}) from exc
 
     def confirm_delivery(
         self,

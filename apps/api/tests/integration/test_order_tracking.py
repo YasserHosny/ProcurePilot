@@ -649,3 +649,46 @@ def test_order_pack_snapshot_survives_catalogue_changes_and_refreshes_on_draft_e
         )
         assert edited.status_code == 200, edited.text
         assert edited.json()["lines"][0]["pack_base_quantity"] == "2.000000"
+
+
+def test_po_creation_rechecks_request_after_concurrent_withdrawal(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from procurepilot_api import db
+    from procurepilot_api.modules.requests.schemas import PurchaseRequest
+    from procurepilot_api.modules.requests.service import RequestsService
+
+    with committed_smart_context("order-withdraw-race") as context:
+        member = member_from_workspace(context.workspace, role=MemberRole.owner)
+        app = _app(monkeypatch, member)
+        with db.connect(TEST_DATABASE_URL or "") as conn:
+            req_id, line_id = _setup_approved_request(conn, context.workspace, context.product_id)
+
+        validate = RequestsService.validate_approved_request_for_order
+
+        def withdraw_after_validation(self: RequestsService, **kwargs: object) -> PurchaseRequest:
+            request = validate(self, **kwargs)
+            with db.connect(TEST_DATABASE_URL or "") as conn:
+                with conn.cursor() as cur:
+                    act_as(cur, context.workspace)
+                    cur.execute(
+                        "update purchase_request set status='withdrawn', withdrawn_at=now() "
+                        "where id=%s",
+                        (req_id,),
+                    )
+            return request
+
+        monkeypatch.setattr(
+            RequestsService, "validate_approved_request_for_order", withdraw_after_validation
+        )
+        payload = _base_order_payload(context.supplier_ids[0], req_id, line_id, context.product_id)
+        response = TestClient(app).post(
+            "/api/v1/orders", json=payload, headers={"Idempotency-Key": str(uuid4())}
+        )
+        assert response.status_code == 409, response.text
+        assert response.json()["details"]["reason"] == "request_not_approved"
+        with db.connect(TEST_DATABASE_URL or "") as conn:
+            count = conn.execute(
+                "select count(*) from purchase_order where source_request_id=%s", (req_id,)
+            ).fetchone()[0]
+            assert count == 0

@@ -1,6 +1,7 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import type { ComponentFixture } from '@angular/core/testing';
 import { TestBed } from '@angular/core/testing';
+import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { Router, provideRouter } from '@angular/router';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
@@ -43,6 +44,7 @@ describe('RequestListComponent (T017)', () => {
   let requestsApi: jasmine.SpyObj<RequestsApiService>;
   let organisationApi: jasmine.SpyObj<OrganisationApiService>;
   let snackBarSpy: jasmine.SpyObj<MatSnackBar>;
+  let dialogSpy: jasmine.SpyObj<MatDialog>;
   let routerSpy: jasmine.SpyObj<Router>;
 
   beforeEach(async () => {
@@ -52,6 +54,8 @@ describe('RequestListComponent (T017)', () => {
     ]);
     organisationApi = jasmine.createSpyObj('OrganisationApiService', ['listBranches']);
     snackBarSpy = jasmine.createSpyObj('MatSnackBar', ['open']);
+    dialogSpy = jasmine.createSpyObj('MatDialog', ['open']);
+    dialogSpy.open.and.returnValue({ afterClosed: () => of(true) } as ReturnType<MatDialog['open']>);
     routerSpy = jasmine.createSpyObj('Router', ['navigate']);
 
     requestsApi.listRequests.and.returnValue(of({ items: mockRequests, next_cursor: null }));
@@ -78,6 +82,7 @@ describe('RequestListComponent (T017)', () => {
           providers: [
             { provide: MatSnackBar, useValue: snackBarSpy },
             { provide: Router, useValue: routerSpy },
+            { provide: MatDialog, useValue: dialogSpy },
           ],
         },
       })
@@ -188,6 +193,23 @@ describe('RequestListComponent (T017)', () => {
       }),
     ).toBeTrue();
     expect(component.canCreateOrder({ ...mockRequests[1], status: 'ordered' })).toBeFalse();
+  });
+
+  it('shows Withdraw on an ordered request and hides it on terminal requests', () => {
+    for (const status of ['ordered', 'withdrawn', 'rejected', 'approved'] as const) {
+      component.requests.set([{ ...mockRequests[0], status }]);
+      fixture.detectChanges();
+      const element = fixture.nativeElement as HTMLElement;
+      expect(Boolean(element.querySelector('button.danger-action'))).toBe(status === 'ordered');
+    }
+  });
+
+  it('asks for confirmation and leaves the request unchanged when cancelled', () => {
+    dialogSpy.open.and.returnValue({ afterClosed: () => of(false) } as ReturnType<MatDialog['open']>);
+    requestsApi.withdrawRequest.and.returnValue(of(mockRequests[0]));
+    component.withdrawRequest({ ...mockRequests[0], status: 'ordered' });
+    expect(dialogSpy.open).toHaveBeenCalled();
+    expect(requestsApi.withdrawRequest).not.toHaveBeenCalled();
   });
 
   it('should withdraw a request and reload', () => {

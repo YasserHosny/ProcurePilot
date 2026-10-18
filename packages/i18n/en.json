@@ -2109,7 +2109,10 @@
       "draftMessage": "This draft was prepared automatically by a guardrail from {{supplier}}'s quote. Review it and submit it if it is right; nothing is ordered until it is approved.",
       "message": "This request was prepared automatically by a guardrail from {{supplier}}'s quote.",
       "unknownSupplier": "the winning supplier"
-    }
+    },
+    "withdrawConfirmTitle": "Withdraw purchase request?",
+    "withdrawConfirmMessage": "Withdraw this request? Any committed budget will be released. Requests linked to an active purchase order cannot be withdrawn.",
+    "purchaseOrderExists": "Cancel the linked purchase order before withdrawing this request."
   },
   "delivery": {
     "title": "Confirm Delivery",

@@ -7,7 +7,8 @@ info:
     resolved server-side from the token, cursor pagination capped at 100, Idempotency-Key on
     mutations, and the {code, message, details, trace_id} error envelope.
 
-    A purchase request moves draft -> submitted -> (approved | rejected | withdrawn). Submission
+    A purchase request moves draft -> submitted -> (ordered | rejected), with withdrawal
+    available from draft/submitted/ordered while the withdrawal rules permit it. Submission
     resolves an approver via threshold rules, active delegation, and an owner fallback
     (research.md R3), captures the request's estimated value from price history (research.md R2),
     and creates one approval_step. A same-tenant, different-branch reference for a branch-scoped
@@ -124,8 +125,13 @@ paths:
 
   /requests/{request_id}/withdraw:
     post:
-      summary: Withdraw a not-yet-decided request
-      description: Requester only. Refused once status is approved/rejected/withdrawn (FR-004).
+      summary: Withdraw a request before a live purchase order exists
+      description: >
+        Requester or workspace owner. Accepts draft/submitted/ordered. An ordered request
+        referencing any purchase order whose status is not cancelled returns 409 with
+        details.reason purchase_order_exists. Sets withdrawn_at, releases committed budget
+        spend, and audits previous_status. Other terminal states return 409 with
+        details.reason already_decided_or_withdrawn.
       parameters:
         - $ref: '#/components/parameters/RequestId'
       responses:
@@ -390,7 +396,7 @@ components:
 
     PurchaseRequestStatus:
       type: string
-      enum: [draft, submitted, approved, rejected, withdrawn]
+      enum: [draft, submitted, approved, ordered, rejected, withdrawn]
 
     ApprovalStepStatus:
       type: string
