@@ -318,3 +318,30 @@ def test_enqueue_happens_after_commit_and_snapshots_the_pack(
         assert snapshot is not None and str(context.product_id) in snapshot
         assert Decimal(snapshot[str(context.product_id)].base_quantity) > 0
         assert snapshot[str(context.product_id)].base_unit
+
+
+def test_pack_snapshot_takes_the_newest_of_duplicate_pack_definitions(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Legacy duplicates are resolved like the pack-snapshot migration: created_at desc, id desc."""
+    settings = settings_for_test_db(monkeypatch)
+
+    with committed_smart_context("advanced-newest-pack", supplier_count=2) as context:
+        with psycopg.connect(TEST_DATABASE_URL, prepare_threshold=None) as conn:
+            conn.execute(
+                "insert into pack_definition "
+                "(tenant_id,workspace_product_id,pack_count,unit_size,created_at) "
+                "values (%s,%s,12,5,now() + interval '1 minute')",
+                (context.workspace.tenant_id, context.product_id),
+            )
+            conn.commit()
+        monkeypatch.setattr(basket_service, "_enqueue_redis_job", lambda *_args: None)
+
+        job, _created = BasketService(settings).create_job(
+            member=context.member,
+            payload=_advanced_payload(context.supplier_ids, context.product_id),
+        )
+
+        snapshot = job.pack_snapshot
+        assert snapshot is not None
+        assert Decimal(snapshot[str(context.product_id)].base_quantity) == Decimal(60)
