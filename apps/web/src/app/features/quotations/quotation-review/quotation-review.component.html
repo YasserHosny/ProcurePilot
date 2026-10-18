@@ -101,7 +101,7 @@
         @for (field of flaggedFields(); track field.id) {
           <article class="flagged-field-row" [id]="'flagged-' + field.id" [class.flagged-highlight]="activeExtraction()?.id === field.id">
             <strong>{{ ('quotations.review.fieldLabels.' + field.fieldName) | translate }}</strong>
-            <span class="flagged-value" dir="auto">{{ displayExtractionValue(field.extraction.extracted_value) }}</span>
+            <span class="flagged-value" dir="auto">{{ field.extraction.extracted_value | formatExtraction: field.fieldName }}</span>
             @if (field.fieldName === 'supplier_name') {
               @if (!selectedSupplierId()) {
                 <span>{{ 'quotations.review.flagged.chooseSupplier' | translate }}</span>
