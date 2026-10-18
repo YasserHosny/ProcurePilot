@@ -105,7 +105,7 @@ Workspace creation is invitation-gated during the pilot programme. The form capt
 
 ![Accept Invitation](screenshots/01d-accept-invitation.jpg)
 
-Invited members arrive here from their email link. The token identifies the pending invitation, then the user signs in or creates credentials before being added to the workspace with the role assigned by the owner.
+Invited members arrive here from the invitation link the owner sent them (invitations are not emailed yet, see Team Management). The token identifies the pending invitation, then the user signs in or creates credentials before being added to the workspace with the role assigned by the owner.
 
 ### Plan Confirmation
 
@@ -761,8 +761,8 @@ Reached from **Record Purchase** on any Smart Compare offer, or **+ Record Purch
 | 5 | **Actions menu** (per member) | Options: Change Role, Remove Member. The workspace owner cannot be removed. |
 
 **Invitation flow:**
-1. Click **Invite Member** → enter email and select role → send.
-2. The invitee receives an email with a link to accept the invitation.
+1. Click **Invite Member** → enter email and select role → **Create Invitation**.
+2. The dialog shows the invitation link and token **once**. Copy the link (**Copy Link**) and send it to the invitee yourself, for example by WhatsApp or email. ProcurePilot does not email invitations yet. If you close the dialog without copying the link, revoke the invitation and create a new one.
 3. They can create a new account or sign in with an existing one.
 4. Once accepted, they appear in the Members tab with their assigned role.
 

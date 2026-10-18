@@ -17,7 +17,7 @@ basket split has not been re-run on hosted since.
 | 2 | Supplier attribution: sender-address history beats the RFQ thread | quotes from a shared sender credited to the wrong supplier | fixed — #84 merged 2026-10-16 |
 | 3 | Unit list offers both "Kilogram (kg)" and "Kilogram (kilogram)" | inconsistent product units | fixed in PP-6 PR (migration `20261017000001` remaps `kg`→`kilogram`; root cause was a test-fixture leak, fixtures fixed) — **apply the migration to hosted after merge** |
 | 4 | Import preview shows the pack as raw JSON (`{"pack_count":1,"unit_size":"1"}`) | cosmetic | fixed in PP-6 PR (pack rendered as `1 × 25 kg`, localised) |
-| 6 | Team invites are not emailed ("email delivery is not configured"); the link is shown once on screen | every pilot invite must be passed on by hand | to raise |
+| 6 | Team invites are not emailed ("email delivery is not configured"); the link is shown once on screen | every pilot invite must be passed on by hand | open — not emailed yet. Workarounds: the owner copies the link from the invite dialog, or an operator runs `pnpm db:invite-member` (#111, merged 2026-10-18; `docs/operations/local-dev.md`) |
 | 5 | Home page still labels shipped modules "Upcoming (Chunk 4.x)" | first screen a pilot customer sees looks unfinished | fixed in PP-6 PR (Home lists real module links; tax model / region show labels) |
 
 Lookups review (regions, currencies, tax models): [`lookups-review-2026-10-15.md`](lookups-review-2026-10-15.md).
