@@ -55,7 +55,7 @@ Lookups review (regions, currencies, tax models): [`lookups-review-2026-10-15.md
 | 26 | A refused RFQ reply (no attachment, `email-body.txt`) still shows as a response, with an empty card and an active Prepare Request button | confusing RFQ screen | not yet raised |
 | 27 | Bulk confirm of 11 exact matches takes ~25 s | slow on camera | not yet raised |
 | 28 | The phone app's web build signs out on page reload | web build only | not yet raised |
-| 29 | The web app signs out about every hour | interrupts long sessions | not yet investigated |
+| 29 | The web app signs out about every hour: nothing renewed the 1 h Supabase access token, and there was no refresh route | interrupts long sessions | fixed — #168 (`POST /auth/refresh` + web interceptor; mobile has the same gap mid-session) |
 | 30 | An ordered request with no PO cannot be cancelled: withdraw accepts only draft/submitted, and there is no cancel for ordered requests, so a mistaken approval keeps counting against the budget | stale spend stays committed | not yet raised |
 | 31 | Arabic UI shows raw i18n keys (`ingestion.dashboard.channels.manageAction`, `ingestion.emailLog.matchMethods.rfq_reply`) and English server-generated text: price-anomaly alerts ("Price anomaly: X from Y") | English on Arabic screens and in the supplier's inbox | not yet raised — RTL walkthrough 2026-10-18 |
 | 32 | Units stay English in Arabic: "10 عبوة × 1 kilogram", "(pack of 25 kilogram)" on PO lines, "/ kilogram" in product intelligence | visible on compare, basket split and PO screens | not yet raised |
