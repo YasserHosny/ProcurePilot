@@ -99,7 +99,8 @@ describe('OutcomeFromOrderComponent', () => {
     expect(component.lines().map((l) => l.include)).toEqual([true, false]);
     expect(component.deliveryResult()).toBe('delivered');
     const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
-    expect(text).toContain('2 × pack of 30 piece = 60 piece');
+    // Unit name comes from the shared rfq.email.units catalogue; assert the conversion, not the label.
+    expect(text).toMatch(/2 × pack of 30 (\S+) = 60 \1/);
     expect(text).toContain('Not linked to a catalogue product');
     expect(component.unitPrice(component.lines()[0])).toBe('5.5000');
   });

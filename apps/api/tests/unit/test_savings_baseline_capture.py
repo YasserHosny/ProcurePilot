@@ -36,8 +36,9 @@ class _Cursor:
 class _Connection:
     """Serves landed-cost rows for the quote query and PO rows for the PO query.
 
-    PO rows are filtered the way LAST_PO_PRICE_SQL filters them (status, excluded order) so the
-    tests exercise the same contract the SQL implements; order is the caller's.
+    PO rows are filtered the way LAST_PO_PRICE_SQL filters them (status, excluded order, base
+    unit, then limit 1) so the tests exercise the same contract the SQL implements; order is
+    the caller's.
     """
 
     def __init__(
@@ -54,11 +55,14 @@ class _Connection:
         params = self.po_params or {}
         statuses = params.get("statuses", [])
         excluded = params.get("exclude_order_id")
+        base_unit = params.get("base_unit")
         return [
             row
             for row in self._all_po_rows
-            if row["status"] in statuses and row["purchase_order_id"] != excluded
-        ]
+            if row["status"] in statuses
+            and row["purchase_order_id"] != excluded
+            and (base_unit is None or row["base_unit"] == base_unit)
+        ][:1]
 
     def cursor(self, **_kwargs: object) -> _Cursor:
         return _Cursor(self)

@@ -39,9 +39,11 @@ def _make_order(
     pack_price: str,
     packs: str = "2.000000",
     pack_size: str | None = "30.000000",
+    base_unit: str = "litre",
+    line_count: int = 1,
 ) -> tuple[UUID, UUID]:
     order_id, line_id = uuid4(), uuid4()
-    total = Decimal(pack_price) * Decimal(packs)
+    total = Decimal(pack_price) * Decimal(packs) * line_count
     with psycopg.connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
         with conn.cursor() as cur:
             reset_role(cur)
@@ -61,23 +63,26 @@ def _make_order(
                     context.workspace.membership_id,
                 ),
             )
-            cur.execute(
-                "insert into purchase_order_line (id,tenant_id,purchase_order_id,line_number,"
-                "workspace_product_id,description,ordered_quantity,base_unit,"
-                "unit_price_amount,unit_price_currency,tax_amount,tax_currency,"
-                "line_total_amount,line_total_currency,pack_base_quantity) "
-                "values (%s,%s,%s,1,%s,'Eggs carton',%s,'litre',%s,'GBP',0,'GBP',%s,'GBP',%s)",
-                (
-                    line_id,
-                    context.workspace.tenant_id,
-                    order_id,
-                    context.product_id,
-                    Decimal(packs),
-                    Decimal(pack_price),
-                    total,
-                    None if pack_size is None else Decimal(pack_size),
-                ),
-            )
+            for number in range(1, line_count + 1):
+                cur.execute(
+                    "insert into purchase_order_line (id,tenant_id,purchase_order_id,line_number,"
+                    "workspace_product_id,description,ordered_quantity,base_unit,"
+                    "unit_price_amount,unit_price_currency,tax_amount,tax_currency,"
+                    "line_total_amount,line_total_currency,pack_base_quantity) "
+                    "values (%s,%s,%s,%s,%s,'Eggs carton',%s,%s,%s,'GBP',0,'GBP',%s,'GBP',%s)",
+                    (
+                        line_id if number == 1 else uuid4(),
+                        context.workspace.tenant_id,
+                        order_id,
+                        number,
+                        context.product_id,
+                        Decimal(packs),
+                        base_unit,
+                        Decimal(pack_price),
+                        Decimal(pack_price) * Decimal(packs),
+                        None if pack_size is None else Decimal(pack_size),
+                    ),
+                )
         conn.commit()
     return order_id, line_id
 
@@ -156,6 +161,43 @@ def test_outcome_from_po_is_prefilled_in_base_units_and_baselined_on_last_po_pri
         assert again.lines[0].recordable is False
         assert again.lines[0].reason == "already_recorded"
         assert again.lines[0].recorded_saving_id == saving.id
+
+
+def test_newer_lines_in_another_base_unit_do_not_hide_a_comparable_po_price(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Codex review on #173: a row limit applied before the base-unit check let newer lines in
+    another unit push the comparable PO line out of the window."""
+    settings = settings_for_test_db(monkeypatch)
+    with committed_smart_context("po-outcome-units") as context:
+        add_costed_offer(context, supplier_id=context.supplier_ids[1], amount=Decimal("1.0000"))
+        _older, comparable_line = _make_order(
+            context, status="received", order_date=date(2026, 9, 1), pack_price="172.0000"
+        )
+        _make_order(
+            context,
+            status="received",
+            order_date=date(2026, 10, 1),
+            pack_price="1.0000",
+            base_unit="kilogram",
+            line_count=51,
+        )
+        created, _ = SavingsService(settings).record_purchase(
+            member=context.member,
+            payload=PurchaseOutcomeCreate(
+                workspace_product_id=context.product_id,
+                quantity=Decimal("60.000000"),
+                base_unit="litre",
+                unit_price=Money(amount=Decimal("5.5000"), currency="GBP"),
+                total_paid=Money(amount=Decimal("330.0000"), currency="GBP"),
+                delivery_result="delivered",
+            ),
+        )
+
+        saving = created.saving_record
+        assert saving.baseline_policy == "last_po_price"
+        assert saving.baseline_source_po_line_ids == [comparable_line]
+        assert saving.baseline_value == Money(amount=Decimal("344.0000"), currency="GBP")
 
 
 def test_without_purchase_orders_the_quote_baseline_still_applies(

@@ -39,8 +39,11 @@ join purchase_order po
 where pol.workspace_product_id = %(product_id)s
   and po.status::text = any(%(statuses)s)
   and (%(exclude_order_id)s::uuid is null or po.id <> %(exclude_order_id)s::uuid)
+  -- A line in another base unit is not comparable without a conversion we do not have. Filter
+  -- before the limit so newer lines in another unit can never hide a comparable one.
+  and (%(base_unit)s::text is null or pol.base_unit = %(base_unit)s::text)
 order by po.order_date desc, po.created_at desc, pol.created_at desc, pol.id desc
-limit 50
+limit 1
 """
 
 PRICE_HISTORY_SQL = """
@@ -244,13 +247,11 @@ def _last_po_price(
                 "product_id": product_id,
                 "statuses": list(PO_BASELINE_STATUSES),
                 "exclude_order_id": exclude_purchase_order_id,
+                "base_unit": base_unit,
             },
         )
         rows = [dict(row) for row in cur.fetchall()]
     for row in rows:
-        # A line in a different base unit is not comparable without a conversion we do not have.
-        if base_unit is not None and str(row["base_unit"]) != base_unit:
-            continue
         pack = row.get("pack_base_quantity")
         return PoPrice(
             purchase_order_line_id=UUID(str(row["purchase_order_line_id"])),
