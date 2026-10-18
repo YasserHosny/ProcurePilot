@@ -130,28 +130,61 @@ export class ConnectionSettingsComponent implements OnInit {
   }
 
   private handleOAuthCallbackParams(): void {
+    const code = this.route.snapshot?.queryParamMap?.get('accounting_code');
+    const state = this.route.snapshot?.queryParamMap?.get('accounting_state');
+    const realmId = this.route.snapshot?.queryParamMap?.get('realm_id');
     const status = this.route.snapshot?.queryParamMap?.get('accounting_connected');
+
+    if (code && state) {
+      this.accountingApi.completeConnection({ code, state, realm_id: realmId }).subscribe({
+        next: (conn) => {
+          this.connection.set(conn);
+          this.snackBar.open(
+            this.translate.instant('accounting.connection.connectedSuccess'),
+            undefined,
+            { duration: 3000 },
+          );
+          this.clearCallbackQueryParams();
+          this.loadConnection();
+        },
+        error: () => {
+          this.snackBar.open(
+            this.translate.instant('accounting.connection.connectFailed'),
+            undefined,
+            { duration: 4000 },
+          );
+          this.clearCallbackQueryParams();
+        },
+      });
+      return;
+    }
+
     if (status === 'success') {
       this.snackBar.open(
         this.translate.instant('accounting.connection.connectedSuccess'),
         undefined,
         { duration: 3000 },
       );
-      this.clearCallbackQueryParam();
+      this.clearCallbackQueryParams();
     } else if (status === 'failed') {
       this.snackBar.open(
         this.translate.instant('accounting.connection.connectFailed'),
         undefined,
         { duration: 4000 },
       );
-      this.clearCallbackQueryParam();
+      this.clearCallbackQueryParams();
     }
   }
 
-  private clearCallbackQueryParam(): void {
+  private clearCallbackQueryParams(): void {
     void this.router.navigate([], {
       relativeTo: this.route,
-      queryParams: { accounting_connected: null },
+      queryParams: {
+        accounting_connected: null,
+        accounting_code: null,
+        accounting_state: null,
+        realm_id: null,
+      },
       queryParamsHandling: 'merge',
       replaceUrl: true,
     });

@@ -174,6 +174,18 @@ export class AccountingApiService {
   }
 
   /**
+   * Completes the accounting provider OAuth authorization flow.
+   * On failure, emits an error matching {@link ApiError}.
+   */
+  completeConnection(payload: {
+    code: string;
+    state: string;
+    realm_id?: string | null;
+  }): Observable<AccountingConnection> {
+    return this.http.post<AccountingConnection>(`${this.base}/accounting/connect/complete`, payload);
+  }
+
+  /**
    * Fetches current connection status.
    * Returns 404 if no connection has been created for the tenant.
    * On failure, emits an error matching {@link ApiError}.

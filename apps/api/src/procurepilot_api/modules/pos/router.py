@@ -19,6 +19,7 @@ from procurepilot_api.errors import NotFoundError
 from procurepilot_api.modules.auth.jwt import MemberRole
 from procurepilot_api.modules.auth.rbac import require_role
 from procurepilot_api.modules.pos.schemas import (
+    CompleteConnectionRequest,
     ManualMatchRequest,
     PosConnection,
     PosProductMatch,
@@ -29,6 +30,7 @@ from procurepilot_api.modules.pos.schemas import (
 from procurepilot_api.modules.pos.service import (
     ConnectionService,
     get_connection_service,
+    verify_state,
 )
 from procurepilot_api.modules.pos.sync_service import (
     ConnectionNotActiveError,
@@ -55,21 +57,29 @@ def _frontend_redirect_url(
     settings: Settings,
     *,
     success: bool,
+    code: str | None = None,
+    state: str | None = None,
     error: str | None = None,
 ) -> str:
     """Build redirect URL to the web app's POS connection-settings screen.
 
     Route and query param match the frontend contract:
-    ConnectionSettingsComponent is mounted at /pos and reads
-    `pos_connected` = 'success' | 'failed'.
+    On success: /pos?pos_code=<code>&pos_state=<state>
+    On failure: /pos?pos_connected=failed&error=...
     """
     base = settings.api_cors_origins[0] if settings.api_cors_origins else settings.web_api_base_url
     base = base.rstrip("/")
     if base.endswith("/api/v1"):
         base = base[:-7]
-    params: dict[str, str] = {"pos_connected": "success" if success else "failed"}
-    if error:
-        params["error"] = error
+    if success:
+        params: dict[str, str] = {
+            "pos_code": code or "",
+            "pos_state": state or "",
+        }
+    else:
+        params = {"pos_connected": "failed"}
+        if error:
+            params["error"] = error
     return f"{base}/pos?{urlencode(params)}"
 
 
@@ -90,21 +100,15 @@ def start_connection(
     "/connect/callback",
     status_code=status.HTTP_302_FOUND,
     response_class=RedirectResponse,
-    operation_id="completePosConnection",
+    operation_id="handlePosOAuthCallback",
 )
 def complete_connection_callback(
-    state: Annotated[str, Query()],
-    service: Annotated[ConnectionService, Depends(get_connection_service)],
     settings: Annotated[Settings, Depends(get_settings)],
     code: Annotated[str | None, Query()] = None,
+    state: Annotated[str | None, Query()] = None,
     error: Annotated[str | None, Query()] = None,
 ) -> RedirectResponse:
-    row = service.complete_connection(
-        state=state,
-        code=code,
-        error=error,
-    )
-    if row is None:
+    if error or not code or not state or not verify_state(settings, state):
         return RedirectResponse(
             url=_frontend_redirect_url(
                 settings,
@@ -114,9 +118,35 @@ def complete_connection_callback(
             status_code=status.HTTP_302_FOUND,
         )
     return RedirectResponse(
-        url=_frontend_redirect_url(settings, success=True),
+        url=_frontend_redirect_url(
+            settings,
+            success=True,
+            code=code,
+            state=state,
+        ),
         status_code=status.HTTP_302_FOUND,
     )
+
+
+@router.post(
+    "/connect/complete",
+    status_code=status.HTTP_201_CREATED,
+    response_model=PosConnection,
+    operation_id="completePosConnection",
+)
+def complete_connection(
+    payload: CompleteConnectionRequest,
+    member: Annotated[CurrentMember, Depends(require_role(*OWNER))],
+    token: Annotated[str, Depends(bearer_token)],
+    service: Annotated[ConnectionService, Depends(get_connection_service)],
+) -> PosConnection:
+    row = service.complete_connection(
+        member,
+        code=payload.code,
+        state=payload.state,
+        bearer_token=token,
+    )
+    return PosConnection.model_validate(row)
 
 
 @router.get(

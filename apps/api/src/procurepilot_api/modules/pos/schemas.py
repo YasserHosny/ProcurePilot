@@ -23,6 +23,15 @@ class StartConnectionResponse(BaseModel):
     authorization_url: str
 
 
+class CompleteConnectionRequest(BaseModel):
+    """Request payload to complete Square OAuth connection."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    code: str
+    state: str
+
+
 class PosConnection(BaseModel):
     """An external POS/inventory system connection for a tenant (T012).
 

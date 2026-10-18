@@ -90,6 +90,14 @@ export class PosApiService {
   }
 
   /**
+   * Completes the Square OAuth authorization flow.
+   * On failure, emits an error matching {@link ApiError}.
+   */
+  completeConnection(payload: { code: string; state: string }): Observable<PosConnection> {
+    return this.http.post<PosConnection>(`${this.base}/pos/connect/complete`, payload);
+  }
+
+  /**
    * Fetches current connection status.
    * Returns 404 if no connection has been created for the tenant.
    * On failure, emits an error matching {@link ApiError}.

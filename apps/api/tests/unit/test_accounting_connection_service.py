@@ -10,10 +10,11 @@ import pytest
 from pydantic import SecretStr
 
 from procurepilot_api.deps import CurrentMember
+from procurepilot_api.errors import UnprocessableEntityError
 from procurepilot_api.modules.accounting.connector import CompanyInfo, OAuthTokens
 from procurepilot_api.modules.accounting.service import (
     ConnectionService,
-    _verify_state,
+    verify_state,
 )
 from procurepilot_api.modules.auth.jwt import MemberRole
 
@@ -107,9 +108,7 @@ def test_start_connection_uses_xero_and_binds_provider_mode_in_state(
     def db(_settings: object, _member: CurrentMember) -> Iterator[_Connection]:
         yield _Connection(cursor)
 
-    monkeypatch.setattr(
-        "procurepilot_api.modules.accounting.service._authenticated_db", db
-    )
+    monkeypatch.setattr("procurepilot_api.modules.accounting.service._authenticated_db", db)
     monkeypatch.setattr(
         "procurepilot_api.modules.accounting.service.get_accounting_connector",
         lambda configured: connector,
@@ -117,7 +116,7 @@ def test_start_connection_uses_xero_and_binds_provider_mode_in_state(
 
     url = ConnectionService(settings).start_connection(_member())
     state = parse_qs(urlparse(url).query)["state"][0]
-    payload = _verify_state(settings, state)
+    payload = verify_state(settings, state)
 
     assert payload is not None
     assert payload["provider"] == "xero"
@@ -144,9 +143,7 @@ def test_xero_callback_persists_verified_company_realm_and_uses_xero_redirect(
     def db(_settings: object, _member: CurrentMember) -> Iterator[_Connection]:
         yield _Connection(cursor)
 
-    monkeypatch.setattr(
-        "procurepilot_api.modules.accounting.service._authenticated_db", db
-    )
+    monkeypatch.setattr("procurepilot_api.modules.accounting.service._authenticated_db", db)
     monkeypatch.setattr(
         "procurepilot_api.modules.accounting.service.get_accounting_connector",
         lambda configured, **kwargs: connector,
@@ -159,6 +156,7 @@ def test_xero_callback_persists_verified_company_realm_and_uses_xero_redirect(
     state = service.start_connection(_member())
     state = parse_qs(urlparse(state).query)["state"][0]
     result = service.complete_connection(
+        _member(),
         state=state,
         code="xero-code",
         realm_id="untrusted-callback-value",
@@ -195,9 +193,7 @@ def test_callback_state_cannot_be_completed_after_provider_mode_changes(
     def db(_settings: object, _member: CurrentMember) -> Iterator[_Connection]:
         yield _Connection(cursor)
 
-    monkeypatch.setattr(
-        "procurepilot_api.modules.accounting.service._authenticated_db", db
-    )
+    monkeypatch.setattr("procurepilot_api.modules.accounting.service._authenticated_db", db)
     monkeypatch.setattr(
         "procurepilot_api.modules.accounting.service.get_accounting_connector",
         connector_factory,
@@ -208,28 +204,26 @@ def test_callback_state_cannot_be_completed_after_provider_mode_changes(
     state = parse_qs(urlparse(state_url).query)["state"][0]
     settings.accounting_provider_mode = "quickbooks"
 
-    assert (
+    with pytest.raises(UnprocessableEntityError):
         service.complete_connection(
+            _member(),
             state=state,
             code="code",
             realm_id="valid-quickbooks-realm",
         )
-        is None
-    )
 
     # The effective provider is the same, but the signed mode still binds the callback.
     settings.accounting_provider_mode = "stub"
     stub_state_url = service.start_connection(_member())
     stub_state = parse_qs(urlparse(stub_state_url).query)["state"][0]
     settings.accounting_provider_mode = "quickbooks"
-    assert (
+    with pytest.raises(UnprocessableEntityError):
         service.complete_connection(
+            _member(),
             state=stub_state,
             code="code",
             realm_id="valid-quickbooks-realm",
         )
-        is None
-    )
     assert connector_calls == 2
     assert not any(
         "insert into accounting_connection" in query.lower() for query, _ in cursor.calls

@@ -83,9 +83,7 @@ class RecordingAuditWriter:
 class _TestTableQuery(PsycopgTableQuery):
     """Adapter supporting single and multi-row inserts for psycopg-backed PostgREST testing."""
 
-    def insert(
-        self, payload: dict[str, object] | list[dict[str, object]]
-    ) -> _TestTableQuery:
+    def insert(self, payload: dict[str, object] | list[dict[str, object]]) -> _TestTableQuery:
         self._operation = "insert"
         self._payload = payload  # type: ignore[assignment]
         return self
@@ -101,17 +99,11 @@ class _TestTableQuery(PsycopgTableQuery):
                 sql.Identifier(self._table),
                 sql.SQL(",").join(sql.Identifier(key) for key in keys),
                 sql.SQL(",").join(
-                    sql.SQL("({})").format(
-                        sql.SQL(",").join(sql.Placeholder() for _ in keys)
-                    )
+                    sql.SQL("({})").format(sql.SQL(",").join(sql.Placeholder() for _ in keys))
                     for _ in self._payload
                 ),
             )
-            params = [
-                _adapt_value(key, row[key])
-                for row in self._payload
-                for key in keys
-            ]
+            params = [_adapt_value(key, row[key]) for row in self._payload for key in keys]
             return _Response(self._fetch(query, params))
         return super()._execute_insert()
 
@@ -410,6 +402,12 @@ def test_disconnecting_active_connection_does_not_disrupt_purchasing(
                 follow_redirects=False,
             )
             assert cb_res.status_code == 302
+            assert "pos_code=stub-auth-code" in cb_res.headers["location"]
+            comp_res = client.post(
+                "/api/v1/pos/connect/complete",
+                json={"code": "stub-auth-code", "state": state},
+            )
+            assert comp_res.status_code == 201
             assert client.get("/api/v1/pos/connection").json()["status"] == "active"
 
             # 2. Disconnect POS via the real disconnect endpoint

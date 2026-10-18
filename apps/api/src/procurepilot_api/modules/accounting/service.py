@@ -16,8 +16,8 @@ import json
 import logging
 import secrets
 import time
-from uuid import UUID
 
+import psycopg
 from psycopg.rows import dict_row
 
 from procurepilot_api.config import Settings, get_settings
@@ -25,7 +25,6 @@ from procurepilot_api.deps import CurrentMember
 from procurepilot_api.errors import ConflictError, NotFoundError, UnprocessableEntityError
 from procurepilot_api.modules.accounting.connector import get_accounting_connector
 from procurepilot_api.modules.accounting.schemas import SyncedBill, SyncedBillList
-from procurepilot_api.modules.auth.jwt import MemberRole
 from procurepilot_api.modules.offers.service import _authenticated_db
 from procurepilot_api.shared.audit import AuditEventCreate, get_audit_writer
 from procurepilot_api.shared.logging import get_trace_id
@@ -76,8 +75,8 @@ def _generate_state(settings: Settings, member: CurrentMember) -> str:
     )
 
 
-def _verify_state(
-    settings: Settings, state: str, max_age_seconds: int = 3600
+def verify_state(
+    settings: Settings, state: str, max_age_seconds: int = 600
 ) -> dict[str, object] | None:
     """Verify and decode a signed CSRF state token."""
     try:
@@ -160,53 +159,60 @@ class ConnectionService:
 
     def complete_connection(
         self,
-        state_or_member: CurrentMember | UUID | str | None = None,
-        code: str | None = None,
-        realm_id: str | None = None,
-        state: str | None = None,
-        error: str | None = None,
+        member: CurrentMember,
         *,
+        code: str,
+        state: str,
+        realm_id: str | None = None,
         bearer_token: str | None = None,
-    ) -> dict[str, object] | None:
+    ) -> dict[str, object]:
         """OAuth callback completion.
 
         Exchanges authorization code for tokens, creates the accounting_connection row,
-        and records an audit event. Returns the created connection row dict, or None if
-        authorization was declined or failed (spec Acceptance Scenario 1.3).
+        and records an audit event. Returns the created connection row dict.
         """
-        resolved_state: str | None = None
-        if state is not None:
-            resolved_state = state
-        elif isinstance(state_or_member, str) and "." in state_or_member:
-            resolved_state = state_or_member
-
-        if error or not code or not resolved_state:
-            return None
-
-        payload = _verify_state(self._settings, resolved_state)
+        payload = verify_state(self._settings, state, max_age_seconds=600)
         if not payload:
             logger.warning("Invalid or expired OAuth state token during callback completion")
-            return None
+            raise UnprocessableEntityError(details={"reason": "invalid_state"})
+
+        if str(payload.get("tenant_id")) != str(member.tenant_id) or str(
+            payload.get("membership_id")
+        ) != str(member.membership_id):
+            raise NotFoundError(details={"resource": "oauth_state"})
 
         configured_mode = self._settings.accounting_provider_mode
-        if (
-            payload.get("mode") != configured_mode
-            or payload.get("provider") != _effective_provider(self._settings)
+        if payload.get("mode") != configured_mode or payload.get("provider") != _effective_provider(
+            self._settings
         ):
             logger.warning("OAuth state provider or mode does not match current configuration")
-            return None
+            raise UnprocessableEntityError(details={"reason": "provider_mismatch"})
 
         is_quickbooks = _effective_provider(self._settings) == "quickbooks"
         if is_quickbooks and not realm_id:
-            return None
+            raise UnprocessableEntityError(details={"reason": "missing_realm_id"})
 
-        member = CurrentMember(
-            membership_id=UUID(str(payload["membership_id"])),
-            tenant_id=UUID(str(payload["tenant_id"])),
-            user_id=UUID(str(payload["user_id"])),
-            email=str(payload["email"]),
-            role=MemberRole(str(payload.get("role", "owner"))),
-        )
+        with _authenticated_db(self._settings, member) as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    select id from accounting_connection
+                    where tenant_id = %s and status <> 'disconnected'
+                    limit 1
+                    """,
+                    (member.tenant_id,),
+                )
+                if cur.fetchone() is not None:
+                    logger.warning(
+                        "Active accounting connection already exists for tenant %s",
+                        member.tenant_id,
+                    )
+                    raise ConflictError(
+                        details={
+                            "resource": "accounting_connection",
+                            "reason": "connection_already_exists",
+                        }
+                    )
 
         connector = get_accounting_connector(self._settings, realm_id=realm_id)
         try:
@@ -217,7 +223,7 @@ class ConnectionService:
             )
         except Exception as exc:
             logger.warning("Token exchange failed during complete_connection: %s", exc)
-            return None
+            raise UnprocessableEntityError(details={"reason": "authorization_failed"}) from exc
 
         try:
             company = connector.company_info()
@@ -228,7 +234,7 @@ class ConnectionService:
         except Exception as exc:
             logger.warning("Company info query failed during complete_connection: %s", exc)
             if not is_quickbooks:
-                return None
+                raise UnprocessableEntityError(details={"reason": "company_info_failed"}) from exc
             verified_realm_id = realm_id
             display_name = f"{_effective_provider(self._settings).title()} ({realm_id})"
 
@@ -244,11 +250,12 @@ class ConnectionService:
                         (member.tenant_id,),
                     )
                     if cur.fetchone() is not None:
-                        logger.warning(
-                            "Active accounting connection already exists for tenant %s",
-                            member.tenant_id,
+                        raise ConflictError(
+                            details={
+                                "resource": "accounting_connection",
+                                "reason": "connection_already_exists",
+                            }
                         )
-                        return None
 
                     cur.execute(
                         """
@@ -295,9 +302,14 @@ class ConnectionService:
                     )
                     row = dict(cur.fetchone())
                 conn.commit()
-        except Exception as exc:
-            logger.exception("Failed to insert accounting_connection: %s", exc)
-            return None
+        except psycopg.errors.UniqueViolation as exc:
+            logger.warning("UniqueViolation on accounting_connection insert: %s", exc)
+            raise ConflictError(
+                details={
+                    "resource": "accounting_connection",
+                    "reason": "connection_already_exists",
+                }
+            ) from exc
 
         _record_audit(
             bearer_token=bearer_token,

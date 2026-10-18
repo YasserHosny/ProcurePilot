@@ -22,6 +22,16 @@ class StartConnectionResponse(BaseModel):
     authorization_url: str
 
 
+class CompleteConnectionRequest(BaseModel):
+    """Request payload to complete accounting OAuth connection."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    code: str
+    state: str
+    realm_id: str | None = None
+
+
 class AccountingConnection(BaseModel):
     """An external accounting system connection for a tenant (T014).
 
@@ -244,6 +254,7 @@ class ResolveDiscrepancyRequest(BaseModel):
 
 __all__ = [
     "AccountingConnection",
+    "CompleteConnectionRequest",
     "PurchaseRecordDetail",
     "PurchaseOrderDetail",
     "ReconciliationDiscrepancy",

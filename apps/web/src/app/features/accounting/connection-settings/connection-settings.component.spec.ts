@@ -481,6 +481,87 @@ describe('ConnectionSettingsComponent (T016)', () => {
   });
 
   describe('OAuth callback query parameters', () => {
+    it('should complete connection and display success snackbar when accounting_code, accounting_state, and realm_id are present', fakeAsync(() => {
+      mockQueryParamMap.set('accounting_code', 'acct-code-123');
+      mockQueryParamMap.set('accounting_state', 'acct-state-456');
+      mockQueryParamMap.set('realm_id', 'stub-realm-999');
+
+      component.ngOnInit();
+      tick();
+
+      const completeReq = httpTestingController.expectOne('/api/v1/accounting/connect/complete');
+      expect(completeReq.request.method).toBe('POST');
+      expect(completeReq.request.body).toEqual({
+        code: 'acct-code-123',
+        state: 'acct-state-456',
+        realm_id: 'stub-realm-999',
+      });
+      completeReq.flush(mockActiveConnection);
+      tick();
+
+      expect(snackBarSpy.open).toHaveBeenCalledWith(
+        'accounting.connection.connectedSuccess',
+        undefined,
+        jasmine.objectContaining({ duration: 3000 }),
+      );
+
+      expect(router.navigate).toHaveBeenCalledWith([], {
+        relativeTo: jasmine.any(Object),
+        queryParams: {
+          accounting_connected: null,
+          accounting_code: null,
+          accounting_state: null,
+          realm_id: null,
+        },
+        queryParamsHandling: 'merge',
+        replaceUrl: true,
+      });
+
+      const connReqs = httpTestingController.match('/api/v1/accounting/connection');
+      for (const req of connReqs) {
+        req.flush(mockActiveConnection);
+      }
+    }));
+
+    it('should display error snackbar and clear query params when completeConnection fails', fakeAsync(() => {
+      mockQueryParamMap.set('accounting_code', 'acct-code-err');
+      mockQueryParamMap.set('accounting_state', 'acct-state-err');
+
+      component.ngOnInit();
+      tick();
+
+      const completeReq = httpTestingController.expectOne('/api/v1/accounting/connect/complete');
+      expect(completeReq.request.method).toBe('POST');
+      completeReq.flush(
+        { message: 'Invalid state' },
+        { status: 422, statusText: 'Unprocessable Entity' },
+      );
+      tick();
+
+      expect(snackBarSpy.open).toHaveBeenCalledWith(
+        'accounting.connection.connectFailed',
+        undefined,
+        jasmine.objectContaining({ duration: 4000 }),
+      );
+
+      expect(router.navigate).toHaveBeenCalledWith([], {
+        relativeTo: jasmine.any(Object),
+        queryParams: {
+          accounting_connected: null,
+          accounting_code: null,
+          accounting_state: null,
+          realm_id: null,
+        },
+        queryParamsHandling: 'merge',
+        replaceUrl: true,
+      });
+
+      httpTestingController.expectOne('/api/v1/accounting/connection').flush(
+        { message: 'Not found' },
+        { status: 404, statusText: 'Not Found' },
+      );
+    }));
+
     it('should display success snackbar and clean query param when accounting_connected=success is present', fakeAsync(() => {
       mockQueryParamMap.set('accounting_connected', 'success');
 
@@ -495,7 +576,12 @@ describe('ConnectionSettingsComponent (T016)', () => {
 
       expect(router.navigate).toHaveBeenCalledWith([], {
         relativeTo: jasmine.any(Object),
-        queryParams: { accounting_connected: null },
+        queryParams: {
+          accounting_connected: null,
+          accounting_code: null,
+          accounting_state: null,
+          realm_id: null,
+        },
         queryParamsHandling: 'merge',
         replaceUrl: true,
       });
@@ -517,7 +603,12 @@ describe('ConnectionSettingsComponent (T016)', () => {
 
       expect(router.navigate).toHaveBeenCalledWith([], {
         relativeTo: jasmine.any(Object),
-        queryParams: { accounting_connected: null },
+        queryParams: {
+          accounting_connected: null,
+          accounting_code: null,
+          accounting_state: null,
+          realm_id: null,
+        },
         queryParamsHandling: 'merge',
         replaceUrl: true,
       });

@@ -24,6 +24,7 @@ from procurepilot_api.modules.accounting.reconciliation_service import (
 )
 from procurepilot_api.modules.accounting.schemas import (
     AccountingConnection,
+    CompleteConnectionRequest,
     ReconciliationDiscrepancy,
     ReconciliationDiscrepancyList,
     ResolveDiscrepancyRequest,
@@ -34,6 +35,7 @@ from procurepilot_api.modules.accounting.schemas import (
 from procurepilot_api.modules.accounting.service import (
     ConnectionService,
     get_connection_service,
+    verify_state,
 )
 from procurepilot_api.modules.accounting.sync_service import (
     ConnectionNotActiveError,
@@ -57,26 +59,37 @@ def _discrepancy_resolve_limit() -> str:
     return get_settings().rate_limit_accounting_discrepancy_resolve
 
 
-
 def _frontend_redirect_url(
     settings: Settings,
     *,
     success: bool,
+    code: str | None = None,
+    state: str | None = None,
+    realm_id: str | None = None,
     error: str | None = None,
 ) -> str:
     """Build redirect URL to the web app's connection-settings screen.
 
     Route and query param match the frontend's own contract exactly:
-    ConnectionSettingsComponent is mounted at /accounting (see app.routes.ts) and reads
-    `accounting_connected` = 'success' | 'failed' (see handleOAuthCallbackParams).
+    ConnectionSettingsComponent is mounted at /accounting (see app.routes.ts).
+    On success: /accounting?accounting_code=<code>&accounting_state=<state>[&realm_id=<realmId>]
+    On failure: /accounting?accounting_connected=failed&error=...
     """
     base = settings.api_cors_origins[0] if settings.api_cors_origins else settings.web_api_base_url
     base = base.rstrip("/")
     if base.endswith("/api/v1"):
         base = base[:-7]
-    params: dict[str, str] = {"accounting_connected": "success" if success else "failed"}
-    if error:
-        params["error"] = error
+    if success:
+        params: dict[str, str] = {
+            "accounting_code": code or "",
+            "accounting_state": state or "",
+        }
+        if realm_id:
+            params["realm_id"] = realm_id
+    else:
+        params = {"accounting_connected": "failed"}
+        if error:
+            params["error"] = error
     return f"{base}/accounting?{urlencode(params)}"
 
 
@@ -97,23 +110,16 @@ def start_connection(
     "/connect/callback",
     status_code=status.HTTP_302_FOUND,
     response_class=RedirectResponse,
-    operation_id="completeAccountingConnection",
+    operation_id="handleAccountingOAuthCallback",
 )
 def complete_connection_callback(
-    state: Annotated[str, Query()],
-    service: Annotated[ConnectionService, Depends(get_connection_service)],
     settings: Annotated[Settings, Depends(get_settings)],
     code: Annotated[str | None, Query()] = None,
+    state: Annotated[str | None, Query()] = None,
     realm_id: Annotated[str | None, Query(alias="realmId")] = None,
     error: Annotated[str | None, Query()] = None,
 ) -> RedirectResponse:
-    row = service.complete_connection(
-        state=state,
-        code=code,
-        realm_id=realm_id,
-        error=error,
-    )
-    if row is None:
+    if error or not code or not state or not verify_state(settings, state):
         return RedirectResponse(
             url=_frontend_redirect_url(
                 settings,
@@ -123,9 +129,37 @@ def complete_connection_callback(
             status_code=status.HTTP_302_FOUND,
         )
     return RedirectResponse(
-        url=_frontend_redirect_url(settings, success=True),
+        url=_frontend_redirect_url(
+            settings,
+            success=True,
+            code=code,
+            state=state,
+            realm_id=realm_id,
+        ),
         status_code=status.HTTP_302_FOUND,
     )
+
+
+@router.post(
+    "/connect/complete",
+    status_code=status.HTTP_201_CREATED,
+    response_model=AccountingConnection,
+    operation_id="completeAccountingConnection",
+)
+def complete_connection(
+    payload: CompleteConnectionRequest,
+    member: Annotated[CurrentMember, Depends(require_role(*OWNER))],
+    token: Annotated[str, Depends(bearer_token)],
+    service: Annotated[ConnectionService, Depends(get_connection_service)],
+) -> AccountingConnection:
+    row = service.complete_connection(
+        member,
+        code=payload.code,
+        state=payload.state,
+        realm_id=payload.realm_id,
+        bearer_token=token,
+    )
+    return AccountingConnection.model_validate(row)
 
 
 @router.get(
@@ -284,4 +318,3 @@ def resolve_reconciliation_discrepancy(
         bearer_token=token,
     )
     return ReconciliationDiscrepancy.model_validate(result)
-

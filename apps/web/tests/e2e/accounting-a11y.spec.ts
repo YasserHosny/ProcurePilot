@@ -104,10 +104,16 @@ test.describe('Accounting Accessibility & RTL (014-accounting-integration, T037)
         const authUrl = new URL(startRes.authorization_url);
         const state = authUrl.searchParams.get('state');
         const apiBase = process.env['E2E_API_URL'] ?? 'http://localhost:8000/api/v1';
-        await fetch(
+        const callback = await fetch(
           `${apiBase}/accounting/connect/callback?code=stub-auth-code&realmId=stub-realm-12345&state=${state}`,
           { redirect: 'manual' },
         );
+        expect(callback.status).toBe(302);
+        await apiAsUser(ownerToken, 'POST', '/accounting/connect/complete', {
+          code: 'stub-auth-code',
+          state,
+          realm_id: 'stub-realm-12345',
+        });
       }
 
       // Check if bills or discrepancies exist; if not, trigger sync
