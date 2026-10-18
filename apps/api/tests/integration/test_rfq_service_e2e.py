@@ -12,7 +12,7 @@ from psycopg import sql
 from integration.quotation_helpers import PsycopgSupabaseClient, PsycopgTableQuery, _adapt_value
 from procurepilot_api.config import get_settings
 from procurepilot_api.deps import CurrentMember
-from procurepilot_api.errors import NotFoundError, UnprocessableEntityError
+from procurepilot_api.errors import ConflictError, NotFoundError, UnprocessableEntityError
 from procurepilot_api.modules.auth.jwt import MemberRole
 from procurepilot_api.modules.requests import service as requests_service_module
 from procurepilot_api.modules.requests.valuation import LineEstimate
@@ -215,9 +215,7 @@ class _ListInsertTableQuery(PsycopgTableQuery):
     SQLSTATE) for '23505' (unique violation). Without this translation, a raw psycopg exception
     sails straight past that `except APIError` clause uncaught."""
 
-    def insert(
-        self, payload: dict[str, object] | list[dict[str, object]]
-    ) -> _ListInsertTableQuery:
+    def insert(self, payload: dict[str, object] | list[dict[str, object]]) -> _ListInsertTableQuery:
         self._operation = "insert"
         self._payload = payload  # type: ignore[assignment]
         return self
@@ -414,6 +412,25 @@ def test_prepare_request_and_idempotency(monkeypatch: pytest.MonkeyPatch) -> Non
             cur.execute("select count(*) from purchase_request where tenant_id = %s", (tenant_id,))
             count = cur.fetchone()[0]
             assert count == 1
+
+    # One request per RFQ: a new preparation (different key, even from another response) is
+    # refused once the RFQ is converted, and creates nothing.
+    with pytest.raises(ConflictError) as refused:
+        service.prepare_request(
+            bearer_token="unused-token",
+            member=member,
+            rfq_id=rfq_id,
+            rfq_response_id=resp1_id,
+            branch_id=branch_id,
+            cost_centre_id=None,
+            required_by_date=date.today(),
+            idempotency_key=uuid4(),
+        )
+    assert refused.value.details == {"resource": "rfq", "reason": "rfq_already_converted"}
+    with psycopg.connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
+        with conn.cursor() as cur:
+            cur.execute("select count(*) from purchase_request where tenant_id = %s", (tenant_id,))
+            assert cur.fetchone()[0] == 1
 
 
 def test_prepare_request_not_found() -> None:

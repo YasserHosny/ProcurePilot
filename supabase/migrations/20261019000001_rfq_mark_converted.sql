@@ -11,8 +11,13 @@
 --   * the caller is an active owner or buyer (current_membership_role, live lookup);
 --   * the purchase request is in the caller's workspace and was prepared from a response to this
 --     RFQ (purchase_request.source_rfq_response_id);
---   * the RFQ is in the caller's workspace and is not a draft.
--- Returns whether the RFQ is now converted.
+--   * the RFQ is in the caller's workspace and is neither a draft nor already converted (one
+--     purchase request per RFQ; RfqService.prepare_request also serialises preparations of one
+--     RFQ and refuses a converted one).
+-- Returns whether this call converted the RFQ.
+--
+-- It also converts the RFQs a request was already prepared from while the update was
+-- creator-only (the backfill at the end).
 
 create or replace function mark_rfq_converted(p_rfq_id uuid, p_purchase_request_id uuid)
 returns boolean
@@ -45,7 +50,7 @@ begin
   set status = 'converted'
   where tenant_id = v_tenant
     and id = p_rfq_id
-    and status <> 'draft';
+    and status not in ('draft', 'converted');
 
   return found;
 end;
@@ -57,3 +62,19 @@ comment on function mark_rfq_converted(uuid, uuid) is
 
 revoke all on function mark_rfq_converted(uuid, uuid) from public, anon;
 grant execute on function mark_rfq_converted(uuid, uuid) to authenticated;
+
+-- Backfill: RFQs with a purchase request prepared from one of their responses, left
+-- 'sent'/'responded'/'expired' by the creator-only update.
+update rfq
+set status = 'converted'
+where status in ('sent', 'responded', 'expired')
+  and exists (
+    select 1
+    from rfq_recipient rec
+    join rfq_response resp
+      on resp.tenant_id = rec.tenant_id and resp.rfq_recipient_id = rec.id
+    join purchase_request pr
+      on pr.tenant_id = resp.tenant_id and pr.source_rfq_response_id = resp.id
+    where rec.tenant_id = rfq.tenant_id
+      and rec.rfq_id = rfq.id
+  );

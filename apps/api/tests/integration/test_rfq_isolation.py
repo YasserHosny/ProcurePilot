@@ -888,3 +888,19 @@ def test_a_draft_rfq_is_never_converted(
         cur.execute("select mark_rfq_converted(%s, %s)", (alpha.rfq_id, request_id))
         assert cur.fetchone()[0] is False
         assert _rfq_status(cur, alpha.rfq_id) == "draft"
+
+
+def test_an_already_converted_rfq_is_not_converted_again(
+    rfq_workspaces: tuple[psycopg.Connection, RfqWorkspace, RfqWorkspace],
+) -> None:
+    """One purchase request per RFQ: a second request from it does not report a conversion."""
+    conn, alpha, _beta = rfq_workspaces
+    with conn.cursor() as cur:
+        user_id, membership_id = _add_member(cur, alpha, "buyer")
+        first = _prepared_request(cur, alpha, membership_id, alpha.rfq_response_id)
+        second = _prepared_request(cur, alpha, membership_id, alpha.rfq_response_id)
+        _act_as_user(cur, alpha, user_id, "buyer")
+        cur.execute("select mark_rfq_converted(%s, %s)", (alpha.rfq_id, first))
+        assert cur.fetchone()[0] is True
+        cur.execute("select mark_rfq_converted(%s, %s)", (alpha.rfq_id, second))
+        assert cur.fetchone()[0] is False

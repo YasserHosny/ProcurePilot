@@ -548,6 +548,65 @@ class RfqService:
         required_by_date: date,
         idempotency_key: uuid.UUID,
     ) -> RfqPrepareRequestResponse:
+        # One purchase request per RFQ. The transaction-scoped advisory lock serialises
+        # preparations of the same RFQ (manual or guardrail), and the RFQ is marked converted on
+        # this same connection before the lock is released, so a second preparation sees
+        # 'converted'. The guardrail evaluator's own lock uses a different key.
+        with _authenticated_db(self.settings, member) as lock_conn:
+            with lock_conn.cursor(row_factory=dict_row) as cur:
+                cur.execute(
+                    "select pg_advisory_xact_lock(hashtextextended(%s, 0))",
+                    (f"rfq-prepare:{member.tenant_id}:{rfq_id}",),
+                )
+                cur.execute(
+                    "select status from rfq where id = %s and tenant_id = %s",
+                    (rfq_id, member.tenant_id),
+                )
+                rfq_row = cur.fetchone()
+                if rfq_row is not None and rfq_row["status"] == "converted":
+                    # A retry of the preparation that converted it gets that request back.
+                    cur.execute(
+                        "select id, status from purchase_request "
+                        "where tenant_id = %s and idempotency_key = %s",
+                        (member.tenant_id, str(idempotency_key)),
+                    )
+                    existing = cur.fetchone()
+                    if existing is None:
+                        from procurepilot_api.errors import ConflictError
+
+                        raise ConflictError(
+                            details={"resource": "rfq", "reason": "rfq_already_converted"}
+                        )
+                    return RfqPrepareRequestResponse(
+                        purchase_request_id=existing["id"], status=existing["status"]
+                    )
+            response = self._prepare_request_locked(
+                lock_conn,
+                bearer_token=bearer_token,
+                member=member,
+                rfq_id=rfq_id,
+                rfq_response_id=rfq_response_id,
+                branch_id=branch_id,
+                cost_centre_id=cost_centre_id,
+                required_by_date=required_by_date,
+                idempotency_key=idempotency_key,
+            )
+            lock_conn.commit()
+        return response
+
+    def _prepare_request_locked(
+        self,
+        lock_conn: psycopg.Connection,
+        *,
+        bearer_token: str,
+        member: CurrentMember,
+        rfq_id: uuid.UUID,
+        rfq_response_id: uuid.UUID,
+        branch_id: uuid.UUID,
+        cost_centre_id: uuid.UUID | None,
+        required_by_date: date,
+        idempotency_key: uuid.UUID,
+    ) -> RfqPrepareRequestResponse:
         with _authenticated_db(self.settings, member) as conn:
             with conn.cursor(row_factory=dict_row) as cur:
                 cur.execute(
@@ -639,85 +698,82 @@ class RfqService:
         )
 
         if created:
-            with _authenticated_db(self.settings, member) as conn:
-                with conn.cursor(row_factory=dict_row) as cur:
-                    total_amount = 0
-                    total_currency: str | None = None
+            with lock_conn.cursor(row_factory=dict_row) as cur:
+                total_amount = 0
+                total_currency: str | None = None
 
-                    cur.execute(
-                        "select id, workspace_product_id, quantity from purchase_request_line "
-                        "where purchase_request_id = %s and tenant_id = %s",
-                        (purchase_request.id, member.tenant_id),
-                    )
-                    pr_line_rows = cur.fetchall()
+                cur.execute(
+                    "select id, workspace_product_id, quantity from purchase_request_line "
+                    "where purchase_request_id = %s and tenant_id = %s",
+                    (purchase_request.id, member.tenant_id),
+                )
+                pr_line_rows = cur.fetchall()
 
-                    # Same valuation submit uses (per pack, landed charges included), so the
-                    # estimate cannot change between prepare and submit.
-                    source_estimates = estimate_from_source_response(
-                        conn,
-                        rfq_response_id=rfq_response_id,
-                        product_ids=list(matched_lines),
-                    )
+                # Same valuation submit uses (per pack, landed charges included), so the
+                # estimate cannot change between prepare and submit.
+                source_estimates = estimate_from_source_response(
+                    lock_conn,
+                    rfq_response_id=rfq_response_id,
+                    product_ids=list(matched_lines),
+                )
 
-                    for prl in pr_line_rows:
-                        pid = prl["workspace_product_id"]
-                        if pid in matched_lines:
-                            estimate = source_estimates.get(pid)
-                            if estimate is not None:
-                                q_amt = estimate.unit_price_amount
-                                q_curr = estimate.unit_price_currency
-                                landed_id = estimate.source_landed_cost_id
-                            else:
-                                q_amt = matched_lines[pid]["unit_price_amount"]
-                                q_curr = matched_lines[pid]["unit_price_currency"]
-                                landed_id = None
-                            qty = prl["quantity"]
+                for prl in pr_line_rows:
+                    pid = prl["workspace_product_id"]
+                    if pid in matched_lines:
+                        estimate = source_estimates.get(pid)
+                        if estimate is not None:
+                            q_amt = estimate.unit_price_amount
+                            q_curr = estimate.unit_price_currency
+                            landed_id = estimate.source_landed_cost_id
+                        else:
+                            q_amt = matched_lines[pid]["unit_price_amount"]
+                            q_curr = matched_lines[pid]["unit_price_currency"]
+                            landed_id = None
+                        qty = prl["quantity"]
 
-                            cur.execute(
-                                """
-                                update purchase_request_line
-                                set estimated_unit_price_amount = %s,
-                                    estimated_unit_price_currency = %s,
-                                    estimated_unit_price_source_landed_cost_id = %s
-                                where id = %s and tenant_id = %s
-                                """,
-                                (q_amt, q_curr, landed_id, prl["id"], member.tenant_id),
-                            )
-                            total_amount += q_amt * qty
-                            # A single RFQ response's quoted lines share one currency in
-                            # practice (see plan.md's Task 4 note) -- take the first, don't
-                            # attempt multi-currency summation.
-                            total_currency = total_currency or q_curr
+                        cur.execute(
+                            """
+                            update purchase_request_line
+                            set estimated_unit_price_amount = %s,
+                                estimated_unit_price_currency = %s,
+                                estimated_unit_price_source_landed_cost_id = %s
+                            where id = %s and tenant_id = %s
+                            """,
+                            (q_amt, q_curr, landed_id, prl["id"], member.tenant_id),
+                        )
+                        total_amount += q_amt * qty
+                        # A single RFQ response's quoted lines share one currency in
+                        # practice (see plan.md's Task 4 note) -- take the first, don't
+                        # attempt multi-currency summation.
+                        total_currency = total_currency or q_curr
 
-                    cur.execute(
-                        """
-                        update purchase_request
-                        set source_rfq_response_id = %s,
-                            estimated_total_amount = %s,
-                            estimated_total_currency = %s,
-                            has_incomplete_estimate = false
-                        where id = %s and tenant_id = %s
-                        """,
-                        (
-                            rfq_response_id,
-                            total_amount,
-                            total_currency,
-                            purchase_request.id,
-                            member.tenant_id,
-                        ),
-                    )
+                cur.execute(
+                    """
+                    update purchase_request
+                    set source_rfq_response_id = %s,
+                        estimated_total_amount = %s,
+                        estimated_total_currency = %s,
+                        has_incomplete_estimate = false
+                    where id = %s and tenant_id = %s
+                    """,
+                    (
+                        rfq_response_id,
+                        total_amount,
+                        total_currency,
+                        purchase_request.id,
+                        member.tenant_id,
+                    ),
+                )
 
-                    # 'converted' is a real, intended terminal RFQ status (spec.md's Key
-                    # Entities section, FR-017's history view) -- a successful preparation
-                    # closes the sourcing loop for this RFQ. rfq_update only matches the RFQ's
-                    # creator, so any other owner or buyer goes through mark_rfq_converted
-                    # (20261019000001), which checks the request came from this RFQ.
-                    cur.execute(
-                        "select mark_rfq_converted(%s, %s)",
-                        (rfq_id, purchase_request.id),
-                    )
-
-                    conn.commit()
+                # 'converted' is a real, intended terminal RFQ status (spec.md's Key
+                # Entities section, FR-017's history view) -- a successful preparation
+                # closes the sourcing loop for this RFQ. rfq_update only matches the RFQ's
+                # creator, so any other owner or buyer goes through mark_rfq_converted
+                # (20261019000001), which checks the request came from this RFQ.
+                cur.execute(
+                    "select mark_rfq_converted(%s, %s)",
+                    (rfq_id, purchase_request.id),
+                )
 
         return RfqPrepareRequestResponse(
             purchase_request_id=purchase_request.id, status=purchase_request.status
