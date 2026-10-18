@@ -564,11 +564,20 @@ class RfqService:
                 )
                 rfq_row = cur.fetchone()
                 if rfq_row is not None and rfq_row["status"] == "converted":
-                    # A retry of the preparation that converted it gets that request back.
+                    # A retry of the preparation that converted it gets that request back -- only a
+                    # request with this key that was prepared from one of this RFQ's responses.
                     cur.execute(
-                        "select id, status from purchase_request "
-                        "where tenant_id = %s and idempotency_key = %s",
-                        (member.tenant_id, str(idempotency_key)),
+                        """
+                        select pr.id, pr.status
+                        from purchase_request pr
+                        join rfq_response resp
+                          on resp.tenant_id = pr.tenant_id
+                         and resp.id = pr.source_rfq_response_id
+                        join rfq_recipient rec
+                          on rec.tenant_id = resp.tenant_id and rec.id = resp.rfq_recipient_id
+                        where pr.tenant_id = %s and pr.idempotency_key = %s and rec.rfq_id = %s
+                        """,
+                        (member.tenant_id, str(idempotency_key), rfq_id),
                     )
                     existing = cur.fetchone()
                     if existing is None:

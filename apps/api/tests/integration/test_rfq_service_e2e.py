@@ -427,9 +427,36 @@ def test_prepare_request_and_idempotency(monkeypatch: pytest.MonkeyPatch) -> Non
             idempotency_key=uuid4(),
         )
     assert refused.value.details == {"resource": "rfq", "reason": "rfq_already_converted"}
+
+    # A key that belongs to an unrelated request (not prepared from this RFQ) is not a replay.
+    unrelated_key = uuid4()
     with psycopg.connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
         with conn.cursor() as cur:
-            cur.execute("select count(*) from purchase_request where tenant_id = %s", (tenant_id,))
+            cur.execute(
+                "insert into purchase_request (tenant_id,branch_id,requested_by_membership_id,"
+                "required_by_date,status,idempotency_key) "
+                "values (%s,%s,%s,current_date + 7,'draft',%s)",
+                (tenant_id, branch_id, membership_id, unrelated_key),
+            )
+        conn.commit()
+    with pytest.raises(ConflictError):
+        service.prepare_request(
+            bearer_token="unused-token",
+            member=member,
+            rfq_id=rfq_id,
+            rfq_response_id=resp1_id,
+            branch_id=branch_id,
+            cost_centre_id=None,
+            required_by_date=date.today(),
+            idempotency_key=unrelated_key,
+        )
+    with psycopg.connect(TEST_DATABASE_URL or "", prepare_threshold=None) as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "select count(*) from purchase_request where tenant_id = %s "
+                "and source_rfq_response_id is not null",
+                (tenant_id,),
+            )
             assert cur.fetchone()[0] == 1
 
 
