@@ -146,10 +146,13 @@ def test_prepare_request_uses_rfq_needed_by_date_and_returns_draft_id(
                     "insert into rfq_recipient (id,tenant_id,rfq_id,supplier_id,status) values (%s,%s,%s,%s,'sent')",  # noqa: E501
                     (recipient_id, context.workspace.tenant_id, rfq_id, context.supplier_ids[0]),
                 )
+                # Responses are recorded by the ingestion worker as service_role (20261018000009).
+                cur.execute("set local role service_role")
                 cur.execute(
                     "insert into rfq_response (id,tenant_id,rfq_recipient_id,quotation_id) values (%s,%s,%s,%s)",  # noqa: E501
                     (response_id, context.workspace.tenant_id, recipient_id, quote_id),
                 )
+                cur.execute("set local role authenticated")
                 cur.execute(
                     "insert into match_decision (tenant_id,quotation_line_id,matched_workspace_product_id,outcome,is_automatic,confidence) values (%s,%s,%s,'no_match_new_product',true,0.99)",  # noqa: E501
                     (context.workspace.tenant_id, line_id, context.product_id),
@@ -238,10 +241,13 @@ def test_orders_next_number_supplier_prefill_and_duplicate_number_conflict(
                     document_id=make_document(cur, context.workspace),
                     supplier_id=context.supplier_ids[0],
                 )
+                # Responses are recorded by the ingestion worker as service_role (20261018000009).
+                cur.execute("set local role service_role")
                 cur.execute(
                     "insert into rfq_response (id,tenant_id,rfq_recipient_id,quotation_id) values (%s,%s,%s,%s)",  # noqa: E501
                     (response_id, context.workspace.tenant_id, recipient_id, quote_id),
                 )
+                cur.execute("set local role authenticated")
                 cur.execute(
                     "insert into purchase_request (id,tenant_id,branch_id,requested_by_membership_id,required_by_date,status,source_rfq_response_id) values (%s,%s,%s,%s,'2026-12-01','ordered',%s)",  # noqa: E501
                     (
