@@ -258,8 +258,8 @@ def _act_as(
 ) -> None:
     """Act as the workspace member with `role` on their membership row.
 
-    RFQ write policies read the live membership role (20261018000009), so the row carries the
-    role under test. `claim_role` sets a different JWT member_role claim, as a token issued
+    RFQ write policies read the live membership role (current_membership_role, 20261018000009),
+    so the row carries the role under test. `claim_role` sets a different JWT member_role claim, as a token issued
     before a role change would carry.
     """
     _set_membership_role(cur, workspace, role)
@@ -707,3 +707,48 @@ def test_only_an_owner_or_buyer_creator_can_delete_an_rfq(
         _act_as(cur, alpha, role=role)
         cur.execute("delete from rfq where id = %s", (alpha.rfq_id,))
         assert cur.rowcount == deleted
+
+
+def test_members_cannot_write_rfq_responses(
+    rfq_workspaces: tuple[psycopg.Connection, RfqWorkspace, RfqWorkspace],
+) -> None:
+    """Only the ingestion worker (service_role) records responses (20261018000009)."""
+    conn, alpha, _beta = rfq_workspaces
+    with conn.cursor() as cur:
+        _act_as(cur, alpha, role="owner")
+        cur.execute("savepoint response_insert")
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            cur.execute(
+                "insert into rfq_response (tenant_id,rfq_recipient_id,quotation_id) "
+                "select tenant_id, rfq_recipient_id, quotation_id from rfq_response where id = %s",
+                (alpha.rfq_response_id,),
+            )
+        cur.execute("rollback to savepoint response_insert")
+        cur.execute("savepoint response_update")
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            cur.execute(
+                "update rfq_response set created_at = created_at where id = %s",
+                (alpha.rfq_response_id,),
+            )
+        cur.execute("rollback to savepoint response_update")
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            cur.execute("delete from rfq_response where id = %s", (alpha.rfq_response_id,))
+
+
+@pytest.mark.parametrize(
+    ("live_role", "stale_claim", "updated"), [("buyer", "owner", 0), ("owner", "buyer", 1)]
+)
+def test_guardrail_updates_follow_the_live_owner_role(
+    rfq_workspaces: tuple[psycopg.Connection, RfqWorkspace, RfqWorkspace],
+    live_role: str,
+    stale_claim: str,
+    updated: int,
+) -> None:
+    conn, alpha, _beta = rfq_workspaces
+    with conn.cursor() as cur:
+        _act_as(cur, alpha, role=live_role, claim_role=stale_claim)
+        cur.execute(
+            "update auto_preparation_guardrail set enabled = enabled where id = %s",
+            (alpha.guardrail_id,),
+        )
+        assert cur.rowcount == updated

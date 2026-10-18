@@ -202,16 +202,31 @@ def test_an_owner_can_change_a_members_role_and_remove_a_member(workspace: Works
     assert _role_of(cur, viewer_id) == "buyer"
 
 
-def test_a_demoted_owner_with_a_stale_owner_claim_cannot_change_roles(workspace: Workspace) -> None:
+def test_a_demoted_owner_with_a_stale_owner_claim_cannot_change_roles(
+    workspace: Workspace,
+) -> None:
+    """buyer's token says owner (issued before a demotion); their live row says buyer."""
     cur, tenant_id, members = workspace
     viewer_id, _ = members["viewer"]
     buyer_id, buyer_user = members["buyer"]
-    # buyer's token says owner (issued before a demotion); their live row says buyer.
     act_as(cur, tenant_id, buyer_user, "owner")
+    cur.execute("update membership set role = 'buyer' where id = %s", (viewer_id,))
+    assert cur.rowcount == 0
+    cur.execute("savepoint self_promotion")
     with pytest.raises(psycopg.errors.InsufficientPrivilege):
         cur.execute("update membership set role = 'owner' where id = %s", (buyer_id,))
-    cur.connection.rollback()
-    assert viewer_id  # the viewer row is untouched by construction
+    cur.execute("rollback to savepoint self_promotion")
+    assert _role_of(cur, viewer_id) == "viewer"
+    assert _role_of(cur, buyer_id) == "buyer"
+
+
+def test_a_non_owner_cannot_change_their_own_active_workspace_flag(workspace: Workspace) -> None:
+    """Workspace switching goes through set_active_workspace (SECURITY DEFINER) instead."""
+    cur, tenant_id, members = workspace
+    viewer_id, viewer_user = members["viewer"]
+    act_as(cur, tenant_id, viewer_user, "viewer")
+    with pytest.raises(psycopg.errors.InsufficientPrivilege):
+        cur.execute("update membership set is_active_workspace = false where id = %s", (viewer_id,))
 
 
 def test_members_still_read_the_whole_workspace(workspace: Workspace) -> None:

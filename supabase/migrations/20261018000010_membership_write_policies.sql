@@ -16,7 +16,7 @@
 --   * UPDATE is allowed on the caller's own row or, for an owner, on any row in the workspace,
 --     and only on role, status, is_active_workspace and preferred_locale (column grants);
 --   * role, status and is_active_workspace may change only when the caller is an owner, checked
---     against the caller's live membership row (current_membership_live_role, 20261018000009);
+--     against the caller's live membership row (current_membership_role, 20260927000000);
 --   * no INSERT or DELETE for `authenticated` (definer functions and server-side code are
 --     unaffected).
 -- The existing owner guard (assert_tenant_retains_owner) still runs on every update and delete.
@@ -31,7 +31,7 @@ create policy membership_update on membership
   for update to authenticated
   using (
     tenant_id = current_tenant_id()
-    and (user_id = current_user_id() or current_membership_live_role() = 'owner')
+    and (user_id = current_user_id() or current_membership_role() = 'owner')
   )
   with check (tenant_id = current_tenant_id());
 
@@ -51,7 +51,7 @@ begin
   if (new.role is distinct from old.role
       or new.status is distinct from old.status
       or new.is_active_workspace is distinct from old.is_active_workspace)
-     and coalesce(current_membership_live_role(), '') <> 'owner' then
+     and coalesce(current_membership_role(), '') <> 'owner' then
     raise exception 'only a workspace owner can change a member''s role or status'
       using errcode = '42501';
   end if;
