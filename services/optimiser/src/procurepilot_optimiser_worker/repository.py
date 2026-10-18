@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
 
@@ -263,36 +264,58 @@ def read_supplier_risks(
     return [_supplier_risk(row) for row in rows]
 
 
-def mark_running(conn: psycopg.Connection, *, job_id: UUID) -> None:
+def mark_running(
+    conn: psycopg.Connection, *, job_id: UUID, attempt: datetime | None = None
+) -> bool:
+    """Claim a queued job for this delivery; False when it is no longer ours to run.
+
+    ``attempt`` is the API's per-attempt token (the job's ``created_at`` when it was enqueued).
+    A delivery from an expired attempt finds the row failed, or requeued under a newer token,
+    and must not touch it. ``None`` is a pre-fence delivery: only the status guard applies.
+    """
     with conn.cursor() as cur:
         cur.execute(
-            "update basket_split_job set status = 'running', started_at = now() where id = %s",
-            (job_id,),
+            "update basket_split_job set status = 'running', started_at = now() "
+            "where id = %s and status = 'queued' and (%s::timestamptz is null or created_at = %s)",
+            (job_id, attempt, attempt),
         )
+        return cur.rowcount == 1
 
 
-def mark_completed(conn: psycopg.Connection, *, job_id: UUID, result: object) -> None:
+def mark_completed(
+    conn: psycopg.Connection, *, job_id: UUID, result: object, attempt: datetime | None = None
+) -> bool:
     with conn.cursor() as cur:
         cur.execute(
             """
             update basket_split_job
             set status = 'completed', result = %s, completed_at = now()
-            where id = %s
+            where id = %s and status = 'running'
+              and (%s::timestamptz is null or created_at = %s)
             """,
-            (Jsonb(result), job_id),
+            (Jsonb(result), job_id, attempt, attempt),
         )
+        return cur.rowcount == 1
 
 
-def mark_failed(conn: psycopg.Connection, *, job_id: UUID, error: dict[str, object]) -> None:
+def mark_failed(
+    conn: psycopg.Connection,
+    *,
+    job_id: UUID,
+    error: dict[str, object],
+    attempt: datetime | None = None,
+) -> bool:
     with conn.cursor() as cur:
         cur.execute(
             """
             update basket_split_job
             set status = 'failed', error = %s, completed_at = now()
-            where id = %s
+            where id = %s and status = 'running'
+              and (%s::timestamptz is null or created_at = %s)
             """,
-            (Jsonb(error), job_id),
+            (Jsonb(error), job_id, attempt, attempt),
         )
+        return cur.rowcount == 1
 
 
 def _offer(row: dict[str, object]) -> OfferInput:
@@ -333,8 +356,7 @@ def _advanced_request_from_snapshot(
         id=UUID(str(row["id"])),
         tenant_id=UUID(str(row["tenant_id"])),
         supplier_ids=[
-            UUID(str(value))
-            for value in snapshot.get("supplier_ids", row["supplier_ids"])
+            UUID(str(value)) for value in snapshot.get("supplier_ids", row["supplier_ids"])
         ],
         items=[BasketItem.model_validate(item) for item in snapshot.get("items", row["items"])],
         hard_constraints=hard_constraints,
@@ -437,9 +459,7 @@ def _supplier_risk(row: dict[str, object]) -> SupplierRiskSignal:
         supplier_id=UUID(str(row["supplier_id"])),
         risk_score=str(risk_score.get("total", risk_score.get("score", "0.5000"))),
         confidence=confidence,
-        insufficient_evidence=bool(
-            risk_score.get("insufficient_evidence", source_total == 0)
-        ),
+        insufficient_evidence=bool(risk_score.get("insufficient_evidence", source_total == 0)),
         source_ids=[UUID(str(row["id"]))],
         rule_version=str(risk_score.get("rule_version", row["rule_version"])),
     )

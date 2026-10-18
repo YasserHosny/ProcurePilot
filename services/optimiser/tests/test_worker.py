@@ -179,7 +179,7 @@ def test_advanced_worker_zero_offers_fails_with_all_requested_product_ids(
 
     monkeypatch.setattr(worker, "get_settings", lambda: WorkerSettings(database_url="unused"))
     monkeypatch.setattr(worker.db, "connect", fake_connect)
-    monkeypatch.setattr(worker, "mark_running", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(worker, "mark_running", lambda *_args, **_kwargs: True)
     monkeypatch.setattr(repository, "read_current_advanced_offers", lambda *_, **__: [])
 
     def capture_failure(_conn: object, *, error: dict[str, object], **_kwargs: object) -> None:
