@@ -2,7 +2,9 @@
 
 **Feature Branch**: `004-matching-normalisation`
 **Created**: 2026-08-21
-**Status**: Shipped — merged to `main` (see `docs/roadmap/procurepilot_roadmap.md`, Delivery Status)
+**Status**: Merged to `main`, **partial / unvalidated** — the 92% precision and review-band gates are not
+proven (evaluator reports `not_validated_no_held_out_benchmark`), and T049 (landed-cost replay after a
+rule-version change) cannot be exercised yet (see `tasks.md`). Delivery Status: `docs/roadmap/procurepilot_roadmap.md`
 **Input**: User description: "Chunk 4.4: Matching and Normalisation. Reviewed quotation line items must be matched to catalogue products with calibrated confidence, using a layered pipeline: deterministic keys (GTIN, supplier SKU, alias hit), then pg_trgm lexical similarity, then pgvector semantic similarity, then feature scoring (brand, variant, pack, unit, price plausibility), landing on a calibrated confidence that auto-accepts, auto-rejects, or routes to a human match-resolution queue. A confirmed match or a no-match-create-new-product decision creates or reuses a ProductAlias so the same supplier wording never needs re-matching. Unit and pack normalisation must apply to matched quotation lines so quantities are comparable across suppliers. A landed-cost engine computes total cost per line as a deterministic, versioned, replayable function. Matching precision at auto-accept target 92 percent, human review band target 8 percent, both measured on a held-out labelled benchmark that does not yet exist."
 
 ## User Scenarios & Testing *(mandatory)*
