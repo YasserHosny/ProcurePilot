@@ -728,7 +728,8 @@ def make_workspace(cur: psycopg.Cursor, label: str) -> Workspace:
 def workspaces() -> Iterator[tuple[psycopg.Connection, Workspace, Workspace]]:
     """Two unrelated businesses on one database — the situation isolation must survive."""
     with psycopg.connect(TEST_DATABASE_URL or "") as conn:
-        with conn.cursor() as cur:
+        # make_workspace reads nothing back, so its ~120 inserts can share one round trip.
+        with conn.pipeline(), conn.cursor() as cur:
             alpha = make_workspace(cur, "alpha")
             beta = make_workspace(cur, "beta")
         yield conn, alpha, beta

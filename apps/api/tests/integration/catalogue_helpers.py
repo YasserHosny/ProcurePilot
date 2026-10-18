@@ -116,11 +116,16 @@ def delete_tenant_scoped_rows(cur: psycopg.Cursor, tenant_id: UUID) -> None:
     # for the owner-retention trigger elsewhere in this test suite.
     cur.execute("set session_replication_role = replica")
     try:
-        for table_name in tables:
-            cur.execute(
-                sql.SQL("delete from {} where tenant_id = %s").format(sql.Identifier(table_name)),
-                (tenant_id,),
-            )
+        # Pipeline mode sends all ~90 deletes in one network round trip instead of one each —
+        # against the hosted pooler (~68 ms RTT) that is ~0.3 s per tenant instead of ~6 s.
+        with cur.connection.pipeline():
+            for table_name in tables:
+                cur.execute(
+                    sql.SQL("delete from {} where tenant_id = %s").format(
+                        sql.Identifier(table_name)
+                    ),
+                    (tenant_id,),
+                )
     finally:
         cur.execute("set session_replication_role = default")
 
