@@ -176,7 +176,7 @@ class MatchResolutionService:
             plan = _stored_bulk_plan(client, member.tenant_id, idempotency_key)
         if plan is None:
             plan = self._exact_match_pairs(client)
-            if idempotency_key is not None and plan:
+            if idempotency_key is not None:
                 _store_bulk_plan(client, member.tenant_id, idempotency_key, plan)
         confirmed = 0
         skipped = 0
