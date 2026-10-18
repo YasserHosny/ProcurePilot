@@ -48,6 +48,24 @@ describe('AppDateAdapter', () => {
     expect(adapter.parse('')).toBeNull();
   });
 
+  it('parses typed text without announcing a locale change, and rejects partial dates', () => {
+    // Workspace region arrives after the adapter last synced: parsing must still go day-first
+    // without emitting localeChanges, which would make Material overwrite the typed text.
+    translate.use('en');
+    region.set('US');
+    adapter.format(new Date(2026, 9, 21), input);
+    region.set('GB');
+    const seen: number[] = [];
+    const sub = adapter.localeChanges.subscribe(() => seen.push(1));
+    for (const typed of ['2', '22', '22/1', '22/10/202']) {
+      const parsed = adapter.parse(typed);
+      expect(parsed && adapter.isValid(parsed)).withContext(typed).toBeFalsy();
+    }
+    expect(adapter.parse('22/10/2026')?.getDate()).toBe(22);
+    expect(seen.length).toBe(0);
+    sub.unsubscribe();
+  });
+
   it('names months in the interface language and starts Egyptian weeks on Saturday', () => {
     translate.use('ar');
     expect(adapter.getMonthNames('long')[9]).toBe('أكتوبر');
