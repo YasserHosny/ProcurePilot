@@ -10,7 +10,6 @@ from __future__ import annotations
 import json
 import os
 from collections.abc import Iterator
-from typing import TypeAlias
 from uuid import UUID, uuid4
 
 import psycopg
@@ -86,7 +85,7 @@ def act_as(cur: psycopg.Cursor, tenant_id: UUID, user_id: UUID, claim_role: str)
     )
 
 
-Workspace: TypeAlias = tuple[psycopg.Cursor, UUID, dict[str, tuple[UUID, UUID]]]
+type Workspace = tuple[psycopg.Cursor, UUID, dict[str, tuple[UUID, UUID]]]
 
 
 @pytest.fixture
