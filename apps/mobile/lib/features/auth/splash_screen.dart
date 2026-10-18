@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/auth/biometric_gate.dart';
@@ -7,13 +8,16 @@ import 'biometric_preference.dart';
 
 /// App launch gate.
 ///
+/// Web restores a stored session by refreshing it before entering home.
 /// On a fresh install, routes to the credential sign-in screen. On a return
 /// visit with a stored session and biometric unlock enabled, it uses the
 /// existing [BiometricGate] to unlock and refresh silently. If biometric is
 /// unavailable, not enrolled, cancelled, or fails, it falls back to plain
 /// credential sign-in — biometric is never a hard requirement.
 class SplashScreen extends StatefulWidget {
-  const SplashScreen({super.key});
+  const SplashScreen({super.key, this.isWeb = kIsWeb});
+
+  final bool isWeb;
 
   @override
   State<SplashScreen> createState() => _SplashScreenState();
@@ -30,14 +34,29 @@ class _SplashScreenState extends State<SplashScreen> {
     final services = ServiceProvider.of(context);
     final hasSession = await services.authService.loadStoredSession();
 
+    if (!mounted) return;
     if (!hasSession) {
       _goSignIn();
+      return;
+    }
+
+    if (widget.isWeb) {
+      try {
+        await services.authService.refreshSession();
+        if (!mounted) return;
+        _syncApiTokens();
+        _goHome();
+      } catch (_) {
+        await services.authService.signOut();
+        if (mounted) _goSignIn();
+      }
       return;
     }
 
     final biometricEnabled = await BiometricPreference(
       services.authService.storage,
     ).isEnabled();
+    if (!mounted) return;
     if (!biometricEnabled) {
       _goSignIn();
       return;
@@ -64,6 +83,7 @@ class _SplashScreenState extends State<SplashScreen> {
     final token = services.authService.accessToken;
     services.mobileApiClient.accessToken = token;
     services.approvalsApiClient.accessToken = token;
+    services.requestsApiClient.accessToken = token;
   }
 
   void _goSignIn() {

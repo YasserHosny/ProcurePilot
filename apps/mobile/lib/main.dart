@@ -9,6 +9,7 @@ import 'package:local_auth/local_auth.dart';
 import 'core/api/approvals_api_client.dart';
 import 'core/api/mobile_api_client.dart';
 import 'core/api/requests_api_client.dart';
+import 'core/api/session_http_client.dart';
 import 'core/auth/auth_service.dart';
 import 'core/auth/biometric_gate.dart';
 import 'core/camera/camera_capture.dart';
@@ -78,17 +79,23 @@ void main() async {
     supabaseAnonKey: supabaseAnonKey,
   );
 
+  final apiHttpClient = SessionHttpClient(
+    inner: httpClient,
+    authService: authService,
+    apiBaseUrl: apiBaseUrl,
+  );
+
   final mobileApiClient = MobileApiClient(
     apiBaseUrl: apiBaseUrl,
-    httpClient: httpClient,
+    httpClient: apiHttpClient,
   );
   final approvalsApiClient = ApprovalsApiClient(
     apiBaseUrl: apiBaseUrl,
-    httpClient: httpClient,
+    httpClient: apiHttpClient,
   );
   final requestsApiClient = RequestsApiClient(
     apiBaseUrl: apiBaseUrl,
-    httpClient: httpClient,
+    httpClient: apiHttpClient,
   );
   final offlineQueueService = OfflineQueueService(box: offlineQueueBox);
 
@@ -152,6 +159,8 @@ class _ProcurePilotAppState extends State<ProcurePilotApp> {
   @override
   void initState() {
     super.initState();
+    widget.authService.addListener(_sessionChanged);
+    _sessionChanged();
     _startOfflineReplay();
     _startNotifications();
   }
@@ -159,6 +168,11 @@ class _ProcurePilotAppState extends State<ProcurePilotApp> {
   @override
   void didUpdateWidget(ProcurePilotApp oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (widget.authService != oldWidget.authService) {
+      oldWidget.authService.removeListener(_sessionChanged);
+      widget.authService.addListener(_sessionChanged);
+      _sessionChanged();
+    }
     if (widget.notificationPermission != oldWidget.notificationPermission ||
         widget.mobileApiClient != oldWidget.mobileApiClient ||
         widget.requestsApiClient != oldWidget.requestsApiClient) {
@@ -178,9 +192,28 @@ class _ProcurePilotAppState extends State<ProcurePilotApp> {
 
   @override
   void dispose() {
+    widget.authService.removeListener(_sessionChanged);
     _notificationTapSubscription?.cancel();
     _offlineQueueReplay?.stop();
     super.dispose();
+  }
+
+  void _sessionChanged() {
+    final token = widget.authService.accessToken;
+    widget.mobileApiClient.accessToken = token;
+    widget.approvalsApiClient.accessToken = token;
+    widget.requestsApiClient.accessToken = token;
+    if (token == null) _notificationRegistrationStarted = false;
+    if (widget.authService.sessionExpired) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || !widget.authService.sessionExpired) return;
+        _navigatorKey.currentState?.pushNamedAndRemoveUntil(
+          '/signIn',
+          (_) => false,
+        );
+      });
+      WidgetsBinding.instance.ensureVisualUpdate();
+    }
   }
 
   void _startOfflineReplay() {
