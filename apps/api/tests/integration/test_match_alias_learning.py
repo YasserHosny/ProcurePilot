@@ -34,6 +34,7 @@ from procurepilot_api.modules.matching.resolution_service import MatchResolution
 from procurepilot_api.modules.matching.schemas import MatchResolutionRequest
 from procurepilot_api.modules.matching.service import MatchingService
 from procurepilot_api.shared.audit import AuditEventCreate
+from procurepilot_api.shared.logging import reset_trace_id, set_trace_id
 
 pytestmark = pytest.mark.skipif(
     not TEST_DATABASE_URL,
@@ -89,9 +90,7 @@ def _local_side_effects(conn: object, monkeypatch: pytest.MonkeyPatch) -> None:
     writer = _PsycopgAuditWriter(conn)
     monkeypatch.setattr(matching_module, "get_audit_writer", lambda: writer)
     monkeypatch.setattr(resolution_module, "get_audit_writer", lambda: writer)
-    monkeypatch.setattr(
-        resolution_module, "enqueue_guardrail_evaluation", lambda *_a, **_k: None
-    )
+    monkeypatch.setattr(resolution_module, "enqueue_guardrail_evaluation", lambda *_a, **_k: None)
 
 
 def test_human_resolution_learns_exact_alias_and_next_identical_wording_auto_matches(
@@ -188,9 +187,7 @@ def test_bulk_confirm_exact_matches_confirms_only_exact_names_and_learns_aliases
         for line_id in (exact_line, near_line):
             _open_task(cur, workspace, line_id)
         db_client = PsycopgSupabaseClient(conn)
-        monkeypatch.setattr(
-            resolution_module, "authenticated_client", lambda _s, _t: db_client
-        )
+        monkeypatch.setattr(resolution_module, "authenticated_client", lambda _s, _t: db_client)
         resolution = MatchResolutionService(cast(Settings, _MatchingSettings()))
         resolution._landed_cost = _NoopLandedCost()  # noqa: SLF001
         member = _member(workspace)
@@ -208,9 +205,7 @@ def test_bulk_confirm_exact_matches_confirms_only_exact_names_and_learns_aliases
         )
         assert cur.fetchone() == (False, "same_product")
         assert _alias_for_text(cur, "  bulk SUGAR  25kg")["workspace_product_id"] == exact_product
-        cur.execute(
-            "select status from match_task where quotation_line_id = %s", (near_line,)
-        )
+        cur.execute("select status from match_task where quotation_line_id = %s", (near_line,))
         assert cur.fetchone()[0] == "open"
         assert resolution.count_exact_matches(bearer_token="t").count == 0
 
@@ -328,9 +323,7 @@ def test_bulk_confirm_retry_with_same_key_replays_the_frozen_batch(
         key = uuid4()
 
         act_as(cur, workspace)
-        one = resolution.confirm_exact_matches(
-            bearer_token="t", member=member, idempotency_key=key
-        )
+        one = resolution.confirm_exact_matches(bearer_token="t", member=member, idempotency_key=key)
         assert (one.confirmed, one.skipped) == (1, 0)
 
         # The queue changes between the attempt and its retry: a new exact line appears.
@@ -605,3 +598,82 @@ def _count(cur: psycopg.Cursor, table: str, line_id: UUID) -> int:
     row = cur.fetchone()
     assert row is not None
     return int(row[0])
+
+
+@pytest.mark.parametrize("same_candidate", [True, False])
+def test_bulk_frozen_plan_handles_a_decision_between_attempts(
+    conn: object, monkeypatch: pytest.MonkeyPatch, same_candidate: bool
+) -> None:
+    with conn.cursor() as cur:
+        ensure_quotation_reference_data(cur)
+        workspace = make_workspace(cur, "bulk-intervening")
+        supplier = make_supplier(cur, workspace)
+        product = make_workspace_product(cur, workspace, name="Intervening Beans")
+        line = _reviewed_line(
+            cur, workspace, supplier, original_text="Intervening Beans", line_number=1
+        )
+        candidate = _candidate(cur, workspace, line, product)
+        _open_task(cur, workspace, line)
+        client = PsycopgSupabaseClient(conn)
+        monkeypatch.setattr(resolution_module, "authenticated_client", lambda _s, _t: client)
+        service = MatchResolutionService(cast(Settings, _MatchingSettings()))
+        service._landed_cost = _NoopLandedCost()  # noqa: SLF001
+        member = _member(workspace)
+        key = uuid4()
+        act_as(cur, workspace)
+        resolution_module._store_bulk_plan(client, workspace.tenant_id, key, [(line, candidate)])
+        # Another human decides after the plan was frozen, before this attempt resumes.
+        service.resolve(
+            bearer_token="t",
+            member=member,
+            line_id=line,
+            payload=MatchResolutionRequest(
+                outcome="same_product" if same_candidate else "different_pack",
+                selected_match_candidate_id=candidate,
+            ),
+        )
+        result = service.confirm_exact_matches(bearer_token="t", member=member, idempotency_key=key)
+        assert (result.confirmed, result.skipped) == ((1, 0) if same_candidate else (0, 1))
+        retry = service.confirm_exact_matches(bearer_token="t", member=member, idempotency_key=key)
+        assert retry == result
+        assert _count(cur, "match_decision", line) == 1
+
+
+def test_bulk_equal_alias_text_reuses_alias_and_enqueues_once(
+    conn: object, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from unittest.mock import Mock
+
+    with conn.cursor() as cur:
+        ensure_quotation_reference_data(cur)
+        workspace = make_workspace(cur, "bulk-reused-alias")
+        supplier = make_supplier(cur, workspace)
+        product = make_workspace_product(cur, workspace, name="Repeated Beans")
+        quotation = make_quotation(cur, workspace, supplier_id=supplier, status="reviewed")
+        for number, text in enumerate(["Repeated Beans", "repeated beans", "Repeated Beans"], 10):
+            line = make_line(cur, workspace, quotation)
+            cur.execute(
+                "update quotation_line set original_text=%s, line_number=%s where id=%s",
+                (text, number, line),
+            )
+            _candidate(cur, workspace, line, product)
+            _open_task(cur, workspace, line)
+        client = PsycopgSupabaseClient(conn)
+        monkeypatch.setattr(resolution_module, "authenticated_client", lambda _s, _t: client)
+        enqueue = Mock()
+        monkeypatch.setattr(resolution_module, "enqueue_guardrail_evaluation", enqueue)
+        service = MatchResolutionService(cast(Settings, _MatchingSettings()))
+        service._landed_cost = _NoopLandedCost()  # noqa: SLF001
+        token = set_trace_id("bulk-alias-trace")
+        try:
+            result = service.confirm_exact_matches(bearer_token="t", member=_member(workspace))
+        finally:
+            reset_trace_id(token)
+        assert (result.confirmed, result.skipped) == (3, 0)
+        cur.execute("select count(distinct alias_id) from match_decision")
+        assert cur.fetchone()[0] == 1
+        cur.execute("select count(*) from audit_event where trace_id='bulk-alias-trace'")
+        assert cur.fetchone()[0] == 3
+        enqueue.assert_called_once_with(
+            service._settings, tenant_id=workspace.tenant_id, quotation_id=quotation
+        )

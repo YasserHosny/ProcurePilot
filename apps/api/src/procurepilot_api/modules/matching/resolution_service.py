@@ -2,7 +2,12 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor
+from contextvars import copy_context
+from dataclasses import dataclass
 from datetime import UTC, datetime
+from threading import Lock
 from uuid import UUID, uuid5
 
 from postgrest.exceptions import APIError
@@ -23,6 +28,9 @@ from procurepilot_api.modules.matching.schemas import (
 )
 from procurepilot_api.modules.matching.scoring import decimal_string
 from procurepilot_api.modules.matching.service import (
+    CANONICAL_COLUMNS,
+    LINE_COLUMNS,
+    PRODUCT_COLUMNS,
     _candidate,
     _decision,
     _decision_for_line,
@@ -32,6 +40,7 @@ from procurepilot_api.modules.members.service import authenticated_client
 from procurepilot_api.shared.audit import AuditEventCreate, get_audit_writer
 from procurepilot_api.shared.logging import get_trace_id
 
+EXACT_CONFIRM_WORKERS = 12  # overlap hosted RTT; never more than twelve in-flight lines
 EXACT_CONFIRM_BATCH = 100  # exact pairs returned per call
 EXACT_SCAN_LIMIT = 1000  # open tasks examined while collecting them
 EXACT_LOOKUP_CHUNK = 100  # lines per batched read (keeps PostgREST URLs short)
@@ -54,6 +63,27 @@ class MatchResolutionService:
         idempotency_key: UUID | None = None,
     ) -> MatchDecision:
         client = authenticated_client(self._settings, bearer_token)
+        return self._resolve_with_client(
+            client=client,
+            bearer_token=bearer_token,
+            member=member,
+            line_id=line_id,
+            payload=payload,
+            idempotency_key=idempotency_key,
+        )
+
+    def _resolve_with_client(
+        self,
+        *,
+        client: object,
+        bearer_token: str,
+        member: CurrentMember,
+        line_id: UUID,
+        payload: MatchResolutionRequest,
+        idempotency_key: UUID | None,
+        defer_guardrail: Callable[[UUID], None] | None = None,
+    ) -> MatchDecision:
+        """The same resolution pipeline for single requests and isolated bulk workers."""
         fingerprint = _request_fingerprint(payload)
         if idempotency_key is not None:
             existing_request = _idempotency_record_for_key(
@@ -137,9 +167,13 @@ class MatchResolutionService:
         except APIError as exc:
             raise ServiceUnavailableError(details={"dependency": "database"}) from exc
         decision = _decision(client, _one_row(response.data, resource="match_decision"))
-        enqueue_guardrail_evaluation(
-            self._settings, tenant_id=member.tenant_id, quotation_id=UUID(str(line["quotation_id"]))
-        )
+        quotation_id = UUID(str(line["quotation_id"]))
+        if defer_guardrail is None:
+            enqueue_guardrail_evaluation(
+                self._settings, tenant_id=member.tenant_id, quotation_id=quotation_id
+            )
+        else:
+            defer_guardrail(quotation_id)
         self._complete_resolution_side_effects(
             client=client,
             bearer_token=bearer_token,
@@ -171,36 +205,137 @@ class MatchResolutionService:
         derives a per-line key from it, so a retry replays the same plan: lines already decided
         replay as confirmed, the rest are completed, and the queue is never re-selected."""
         client = authenticated_client(self._settings, bearer_token)
+        inputs: dict[tuple[str, str], _BulkReadResult] = {}
         plan: list[tuple[UUID, UUID]] | None = None
         if idempotency_key is not None:
             plan = _stored_bulk_plan(client, member.tenant_id, idempotency_key)
         if plan is None:
-            plan = self._exact_match_pairs(client)
+            plan = self._exact_match_pairs(client, inputs=inputs)
             if idempotency_key is not None:
                 _store_bulk_plan(client, member.tenant_id, idempotency_key, plan)
-        confirmed = 0
-        skipped = 0
-        for line_id, candidate_id in plan:
-            line_key = (
-                uuid5(idempotency_key, str(line_id)) if idempotency_key is not None else None
-            )
-            try:
-                self.resolve(
-                    bearer_token=bearer_token,
-                    member=member,
-                    line_id=line_id,
-                    payload=MatchResolutionRequest(
-                        outcome="same_product", selected_match_candidate_id=candidate_id
-                    ),
-                    idempotency_key=line_key,
-                )
-            except ConflictError:
-                skipped += 1
-                continue
-            confirmed += 1
-        return BulkConfirmResult(confirmed=confirmed, skipped=skipped)
+        if not plan:
+            return BulkConfirmResult(confirmed=0, skipped=0)
 
-    def _exact_match_pairs(self, client: object) -> list[tuple[UUID, UUID]]:
+        # Equal alias text must retain plan order: alias learning is a read/insert pair.
+        # Parallelizing equal text could create duplicates or change which product wins.
+        try:
+            missing = [
+                str(line_id)
+                for line_id, _ in plan
+                if ("quotation_line", str(line_id)) not in inputs
+            ]
+            if missing:
+                for row in _rows(
+                    client.table("quotation_line")
+                    .select(LINE_COLUMNS)
+                    .in_("id", missing)
+                    .execute()
+                    .data
+                ):
+                    inputs[("quotation_line", str(row["id"]))] = _BulkReadResult([row])
+            texts = {
+                row_id: str(result.data[0]["original_text"]).casefold()
+                for (table, row_id), result in inputs.items()
+                if table == "quotation_line"
+            }
+            # Populate the read-only input snapshot in bounded reads rather than once per line.
+            for table, ids in (
+                (
+                    "canonical_product",
+                    {
+                        str(result.data[0]["canonical_product_id"])
+                        for (name, _), result in inputs.items()
+                        if name == "workspace_product"
+                    },
+                ),
+                (
+                    "quotation",
+                    {
+                        str(result.data[0]["quotation_id"])
+                        for (name, _), result in inputs.items()
+                        if name == "quotation_line"
+                    },
+                ),
+            ):
+                if ids:
+                    for row in _rows(
+                        client.table(table)
+                        .select(_BULK_READ_COLUMNS[table])
+                        .in_("id", sorted(ids))
+                        .execute()
+                        .data
+                    ):
+                        inputs[(table, str(row["id"]))] = _BulkReadResult([row])
+        except APIError as exc:
+            raise ServiceUnavailableError(details={"dependency": "database"}) from exc
+        groups: dict[str, list[tuple[UUID, UUID]]] = {}
+        for pair in plan:
+            groups.setdefault(texts.get(str(pair[0]), str(pair[0])), []).append(pair)
+        quotations: set[UUID] = set()
+        quotation_lock = Lock()
+
+        def defer_guardrail(quotation_id: UUID) -> None:
+            with quotation_lock:
+                quotations.add(quotation_id)
+
+        def confirm_group(group: list[tuple[UUID, UUID]]) -> BulkConfirmResult:
+            # Each worker owns its authenticated client; no shared HTTP session or auth state.
+            worker_client = authenticated_client(self._settings, bearer_token)
+            read_client = _BulkReadClient(worker_client)
+            read_client.rows.update(inputs)
+            confirmed = skipped = 0
+            try:
+                for line_id, candidate_id in group:
+                    line_key = (
+                        uuid5(idempotency_key, str(line_id))
+                        if idempotency_key is not None
+                        else None
+                    )
+                    try:
+                        self._resolve_with_client(
+                            client=read_client,
+                            bearer_token=bearer_token,
+                            member=member,
+                            line_id=line_id,
+                            payload=MatchResolutionRequest(
+                                outcome="same_product", selected_match_candidate_id=candidate_id
+                            ),
+                            idempotency_key=line_key,
+                            defer_guardrail=defer_guardrail,
+                        )
+                    except ConflictError:
+                        skipped += 1
+                        continue
+                    confirmed += 1
+                return BulkConfirmResult(confirmed=confirmed, skipped=skipped)
+            finally:
+                postgrest = getattr(worker_client, "postgrest", None)
+                if postgrest is not None:
+                    postgrest.session.close()
+
+        try:
+            with ThreadPoolExecutor(max_workers=EXACT_CONFIRM_WORKERS) as executor:
+                # ContextVars carry the request trace ID into audit events in each worker.
+                futures = [
+                    executor.submit(copy_context().run, confirm_group, group)
+                    for group in groups.values()
+                ]
+                results = [future.result() for future in futures]
+        finally:
+            # The executor waits even on failure. Evaluate completed decisions only after all
+            # workers finish; preserve enqueue-on-insert even if a later side effect failed.
+            for quotation_id in sorted(quotations):
+                enqueue_guardrail_evaluation(
+                    self._settings, tenant_id=member.tenant_id, quotation_id=quotation_id
+                )
+        return BulkConfirmResult(
+            confirmed=sum(result.confirmed for result in results),
+            skipped=sum(result.skipped for result in results),
+        )
+
+    def _exact_match_pairs(
+        self, client: object, *, inputs: dict[tuple[str, str], _BulkReadResult] | None = None
+    ) -> list[tuple[UUID, UUID]]:
         """Up to EXACT_CONFIRM_BATCH (line, candidate) pairs, oldest task first.
 
         Bounded batched reads: one task query, then per chunk of EXACT_LOOKUP_CHUNK lines one
@@ -237,21 +372,21 @@ class MatchResolutionService:
                 product_ids = sorted(
                     {str(row["candidate_workspace_product_id"]) for row in candidates.values()}
                 )
-                names = {
-                    str(row["id"]): row["tenant_name"]
+                products = {
+                    str(row["id"]): row
                     for row in _rows(
                         client.table("workspace_product")
-                        .select("id,tenant_name")
+                        .select(PRODUCT_COLUMNS if inputs is not None else "id,tenant_name")
                         .in_("id", product_ids)
                         .execute()
                         .data
                     )
                 }
-                texts = {
-                    str(row["id"]): row.get("original_text")
+                lines = {
+                    str(row["id"]): row
                     for row in _rows(
                         client.table("quotation_line")
-                        .select("id,original_text")
+                        .select(LINE_COLUMNS if inputs is not None else "id,original_text")
                         .in_("id", list(candidates))
                         .execute()
                         .data
@@ -261,9 +396,18 @@ class MatchResolutionService:
                     candidate = candidates.get(line_id)
                     if candidate is None or len(pairs) >= EXACT_CONFIRM_BATCH:
                         continue
-                    name = names.get(str(candidate["candidate_workspace_product_id"]))
-                    if name is not None and is_exact_name_match(texts.get(line_id), name):
+                    product_id = str(candidate["candidate_workspace_product_id"])
+                    product = products.get(product_id)
+                    line = lines.get(line_id)
+                    if (
+                        product is not None
+                        and line is not None
+                        and is_exact_name_match(line.get("original_text"), product["tenant_name"])
+                    ):
                         pairs.append((UUID(line_id), UUID(str(candidate["id"]))))
+                        if inputs is not None:
+                            inputs[("workspace_product", product_id)] = _BulkReadResult([product])
+                            inputs[("quotation_line", line_id)] = _BulkReadResult([line])
         except APIError as exc:
             raise ServiceUnavailableError(details={"dependency": "database"}) from exc
         return pairs
@@ -368,6 +512,81 @@ class MatchResolutionService:
             ).eq("quotation_line_id", str(line_id)).in_("status", ["open", "in_progress"]).execute()
         except APIError as exc:
             raise ServiceUnavailableError(details={"dependency": "database"}) from exc
+
+
+# These projections include everything read by resolution and landed cost, without embeddings.
+# Inputs that resolution does not mutate are reused within a worker group. Decisions, aliases,
+# tasks and idempotency records always go to the database, including after writes and on retry.
+_BULK_READ_COLUMNS = {
+    "quotation_line": LINE_COLUMNS,
+    "workspace_product": PRODUCT_COLUMNS,
+    "canonical_product": CANONICAL_COLUMNS,
+    "quotation": "id,supplier_id,currency",
+}
+
+
+@dataclass(frozen=True)
+class _BulkReadResult:
+    data: list[dict[str, object]]
+
+
+class _BulkReadClient:
+    def __init__(self, client: object) -> None:
+        self._client = client
+        self.rows: dict[tuple[str, str], object] = {}
+
+    def table(self, name: str) -> object:
+        table = self._client.table(name)
+        if name in _BULK_READ_COLUMNS:
+            return _BulkReadTable(self, name, table)
+        return table
+
+
+class _BulkReadTable:
+    def __init__(self, client: _BulkReadClient, name: str, table: object) -> None:
+        self._client, self._name, self._table = client, name, table
+
+    def select(self, _columns: str) -> _BulkReadQuery:
+        return _BulkReadQuery(
+            self._client, self._name, self._table.select(_BULK_READ_COLUMNS[self._name])
+        )
+
+
+class _BulkReadQuery:
+    def __init__(self, client: _BulkReadClient, table: str, query: object) -> None:
+        self._client, self._table, self._query = client, table, query
+        self._filters: list[tuple[str, tuple[str, ...]]] = []
+        self._limit: int | None = None
+
+    def eq(self, column: str, value: str) -> _BulkReadQuery:
+        self._filters.append((column, (value,)))
+        self._query = self._query.eq(column, value)
+        return self
+
+    def in_(self, column: str, values: list[str]) -> _BulkReadQuery:
+        self._filters.append((column, tuple(values)))
+        self._query = self._query.in_(column, values)
+        return self
+
+    def limit(self, value: int) -> _BulkReadQuery:
+        self._limit = value
+        self._query = self._query.limit(value)
+        return self
+
+    def execute(self) -> object:
+        # eq(id, x) and in_(id, [x]) identify the same unique row, regardless of whether
+        # the caller asks for a one- or two-row limit. Other query shapes remain live.
+        if (
+            len(self._filters) != 1
+            or self._filters[0][0] != "id"
+            or len(self._filters[0][1]) != 1
+            or self._limit not in (None, 1, 2)
+        ):
+            return self._query.execute()
+        key = (self._table, self._filters[0][1][0])
+        if key not in self._client.rows:
+            self._client.rows[key] = self._query.execute()
+        return self._client.rows[key]
 
 
 def get_match_resolution_service() -> MatchResolutionService:
