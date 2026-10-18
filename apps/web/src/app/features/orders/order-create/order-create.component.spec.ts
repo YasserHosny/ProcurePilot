@@ -400,6 +400,43 @@ describe('OrderCreateComponent', () => {
     expect(component.packHint(component.lines.at(0))).toBe('عبوة ٢٥ كجم');
   });
 
+  it('uses the request pack snapshot in the prefill hint despite a different live pack', () => {
+    fixture.destroy();
+    const translate = TestBed.inject(TranslateService);
+    translate.setTranslation('en', enCatalog);
+    translate.setTranslation('ar', arCatalog);
+    translate.use('en');
+    routeSnapshot.queryParamMap = convertToParamMap({ source_request_id: 'req-1' });
+    apiService.products.and.returnValue(of({ items: [{
+      id: 'p1', tenant_name: 'Milk', base_unit: 'litre',
+      pack: { pack_count: 1, unit_size: '18', base_quantity: '18' },
+      status: 'active', created_at: '',
+    } as import('../../../core/api/models').Product], next_cursor: null }));
+    const request = {
+      id: 'req-1', branch_id: 'b1', requested_by_membership_id: 'm1',
+      required_by_date: '2026-10-01', status: 'approved',
+      lines: [{ id: 'rl-1', workspace_product_id: 'p1', quantity: '2.000000',
+        product_name: 'Milk', base_unit: 'litre', pack_base_quantity: '6.000000' }],
+      has_incomplete_estimate: false, created_at: '2026-09-29T00:00:00Z',
+    } as import('../../../core/api/models').PurchaseRequest;
+    requestsApiService.getRequest.and.returnValue(of(request));
+    ordersApiService.getAllocations.and.returnValue(of({ source_request_id: 'req-1', lines: [{
+      source_request_line_id: 'rl-1', requested_quantity: '2.000000',
+      allocated_quantity: '0', remaining_quantity: '2.000000',
+    }] }));
+    fixture = TestBed.createComponent(OrderCreateComponent);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+
+    expect(component.lines.at(0).controls.quantity.value).toBe(2);
+    expect(component.packHint(component.lines.at(0))).toBe('pack of 6 L');
+    translate.use('ar');
+    expect(component.packHint(component.lines.at(0))).toBe('عبوة ٦ لتر');
+    translate.use('en');
+    component.sourceRequest.set({ ...request, lines: [{ ...request.lines[0], pack_base_quantity: null }] });
+    expect(component.packHint(component.lines.at(0))).toBe('pack of 18 L');
+  });
+
   it('should auto-fill product details when selected', () => {
     component.onProductSelected(0, 'p1');
     const lineGroup = component.lines.at(0);

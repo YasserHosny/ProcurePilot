@@ -5,6 +5,7 @@ import { ApiService } from '../../core/api/api.service';
 import type {
   ApprovalDecisionInput,
   PurchaseRequest,
+  PurchaseRequestLine,
   PurchaseRequestCreate,
   PurchaseRequestList,
   PurchaseRequestStatus,
@@ -14,6 +15,7 @@ import type {
 export type {
   ApprovalDecisionInput,
   PurchaseRequest,
+  PurchaseRequestLine,
   PurchaseRequestCreate,
   PurchaseRequestList,
   PurchaseRequestStatus,

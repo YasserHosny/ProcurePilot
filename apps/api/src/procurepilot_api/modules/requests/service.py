@@ -80,7 +80,7 @@ REQUEST_COLUMNS = (
 )
 LINE_COLUMNS = (
     "id,purchase_request_id,workspace_product_id,quantity,note,"
-    "quantity_received,"
+    "quantity_received,pack_base_quantity,"
     "estimated_unit_price_amount,estimated_unit_price_currency,"
     "estimated_unit_price_source_landed_cost_id,estimated_at"
 )
@@ -1331,12 +1331,15 @@ class RequestsService:
         payload_lines: list,
         estimates: list[LineEstimate],
     ) -> list[dict[str, object]]:
+        product_ids = list(dict.fromkeys(str(line.workspace_product_id) for line in payload_lines))
+        pack_quantities = self._fetch_pack_quantities_batch(client, product_ids)
         inserts = [
             {
                 "tenant_id": tenant_id,
                 "purchase_request_id": request_id,
                 "workspace_product_id": str(line.workspace_product_id),
                 "quantity": line.quantity,
+                "pack_base_quantity": pack_quantities.get(str(line.workspace_product_id)),
                 "note": line.note,
                 "estimated_unit_price_amount": (
                     _format_decimal(est.unit_price_amount, scale=4)
@@ -1357,6 +1360,29 @@ class RequestsService:
         except APIError as exc:
             raise _write_error(exc) from exc
         return _rows(response.data)
+
+    def _fetch_pack_quantities_batch(
+        self, client: Client, product_ids: list[str]
+    ) -> dict[str, object]:
+        if not product_ids:
+            return {}
+        try:
+            response = (
+                client.table("pack_definition")
+                .select("workspace_product_id,base_quantity")
+                .in_("workspace_product_id", product_ids)
+                .order("created_at", desc=True)
+                .order("id", desc=True)
+                .execute()
+            )
+        except APIError as exc:
+            raise ServiceUnavailableError(details={"dependency": "database"}) from exc
+
+        # RLS scopes this lookup to the verified tenant. Match the migration's newest-wins rule.
+        result: dict[str, object] = {}
+        for row in _rows(response.data):
+            result.setdefault(str(row["workspace_product_id"]), row["base_quantity"])
+        return result
 
     def _fetch_request(self, client: Client, request_id: UUID) -> dict[str, object]:
         try:
@@ -1439,9 +1465,7 @@ class RequestsService:
         try:
             response = (
                 client.table("workspace_product")
-                .select(
-                    "id,tenant_name,canonical_product(base_unit),pack_definition(id,base_quantity,created_at)"
-                )
+                .select("id,tenant_name,canonical_product(base_unit)")
                 .in_("id", product_ids)
                 .execute()
             )
@@ -1461,23 +1485,9 @@ class RequestsService:
                 cu = row["canonical_product"][0].get("base_unit")
                 base_unit = str(cu) if cu is not None else None
 
-            pack_base_qty: object | None = None
-            if isinstance(row.get("pack_definition"), list) and row["pack_definition"]:
-                pack_defs = [
-                    pd
-                    for pd in row["pack_definition"]
-                    if isinstance(pd, dict) and pd.get("base_quantity") is not None
-                ]
-                if pack_defs:
-                    newest_pack = sorted(pack_defs, key=_pack_key, reverse=True)[0]
-                    pack_base_qty = newest_pack.get("base_quantity")
-            elif isinstance(row.get("pack_definition"), dict):
-                pack_base_qty = row["pack_definition"].get("base_quantity")
-
             result[p_id] = {
                 "product_name": product_name,
                 "base_unit": base_unit,
-                "pack_base_quantity": pack_base_qty,
             }
         return result
 
@@ -1512,7 +1522,6 @@ class RequestsService:
             p_info = product_details.get(str(row.get("workspace_product_id")), {})
             row["product_name"] = p_info.get("product_name")
             row["base_unit"] = p_info.get("base_unit")
-            row["pack_base_quantity"] = p_info.get("pack_base_quantity")
 
             rid = str(row["purchase_request_id"])
             if rid in result:
@@ -2465,9 +2474,3 @@ def _write_error(
 def _api_error_code(exc: APIError) -> str | None:
     code = getattr(exc, "code", None)
     return str(code) if code else None
-
-
-def _pack_key(p: dict[str, object]) -> tuple[str, str]:
-    c = p.get("created_at")
-    c_str = c.isoformat() if isinstance(c, datetime) else str(c or "")
-    return (c_str, str(p.get("id") or ""))

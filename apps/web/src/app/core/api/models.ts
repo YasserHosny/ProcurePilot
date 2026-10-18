@@ -1356,6 +1356,9 @@ export interface PurchaseRequestLine {
   readonly id: string;
   readonly workspace_product_id: string;
   readonly quantity: string;
+  readonly product_name?: string | null;
+  readonly base_unit?: string | null;
+  readonly pack_base_quantity?: string | null;
   readonly note?: string | null;
   readonly estimated_unit_price?: Money | null;
   readonly estimated_unit_price_source_landed_cost_id?: string | null;

@@ -509,7 +509,14 @@ def test_create_order_validates_request_linkage(monkeypatch: pytest.MonkeyPatch)
     product_id = UUID(int=9)
 
     cursor = _FakeCursor()
-    cursor.fetchall = lambda: [{"source_request_line_id": str(line_id), "allocated": Decimal("5")}]  # type: ignore[attr-defined]
+    cursor.fetchall = lambda: [
+        {
+            "id": str(line_id),
+            "pack_base_quantity": None,
+            "source_request_line_id": str(line_id),
+            "allocated": Decimal("5"),
+        }
+    ]  # type: ignore[attr-defined]
 
     transaction = _RollbackContext(cursor)
     service = OrdersService.__new__(OrdersService)
@@ -714,7 +721,14 @@ def test_update_draft_order_idempotency_and_allocations(monkeypatch: pytest.Monk
 
     cursor = _FakeCursor()
     # Mock for allocation check: return 2 allocated (from other orders)
-    cursor.fetchall = lambda: [{"source_request_line_id": str(line_id), "allocated": Decimal("2")}]  # type: ignore[attr-defined]
+    cursor.fetchall = lambda: [
+        {
+            "id": str(line_id),
+            "pack_base_quantity": None,
+            "source_request_line_id": str(line_id),
+            "allocated": Decimal("2"),
+        }
+    ]  # type: ignore[attr-defined]
 
     # Mock fetchone to return the order first, then None for idempotency/number checks
     call_count = 0
@@ -1301,6 +1315,98 @@ def test_order_line_insert_snapshots_pack_from_tenant_product(
     assert "order by pd.created_at desc, pd.id desc limit 1" in statement
     assert parameters[0][-2:] == (TENANT, product_id)
     assert statement.count("%s") == len(parameters[0])
+
+
+@pytest.mark.parametrize("edit", [False, True])
+@pytest.mark.parametrize("snapshot", [Decimal("6"), None])
+def test_order_insert_prefers_request_pack_snapshot(
+    monkeypatch: pytest.MonkeyPatch, edit: bool, snapshot: Decimal | None
+) -> None:
+    from procurepilot_api.modules.requests.service import RequestsService
+
+    request_id, source_line_id, product_id = UUID(int=7), UUID(int=8), UUID(int=9)
+    cursor = _FakeCursor()
+    inserts: list[tuple[str, list[tuple[object, ...]]]] = []
+
+    def fetchall() -> list[dict[str, object]]:
+        if "select id, pack_base_quantity from purchase_request_line" in cursor.executed[-1][0]:
+            return [{"id": source_line_id, "pack_base_quantity": snapshot}]
+        return []
+
+    cursor.fetchall = fetchall  # type: ignore[attr-defined]
+    monkeypatch.setattr(cursor, "executemany", lambda stmt, params: inserts.append((stmt, params)))
+    if edit:
+        monkeypatch.setattr(
+            cursor,
+            "fetchone",
+            lambda: {"id": ORDER, "status": "draft", "source_request_id": request_id},
+        )
+    service = OrdersService.__new__(OrdersService)
+    service._settings = None
+    monkeypatch.setattr(OrdersService, "_transaction", lambda *_: _RollbackContext(cursor))
+    monkeypatch.setattr(OrdersService, "_load_order_cursor", lambda *_: _order())
+    monkeypatch.setattr(OrdersService, "_audit_cursor", lambda *_: None)
+    monkeypatch.setattr(OrdersService, "_record_edit_idempotency_key", lambda *_, **__: False)
+    monkeypatch.setattr(
+        RequestsService,
+        "validate_approved_request_for_order",
+        lambda *_, **__: SimpleNamespace(
+            lines=[
+                SimpleNamespace(
+                    id=source_line_id, workspace_product_id=product_id, quantity=Decimal("20")
+                )
+            ]
+        ),
+    )
+    order_currency = "GBP"
+    line = PurchaseOrderLineInput.model_validate(
+        {
+            **_order().lines[0].model_dump(exclude={"id", "pack_base_quantity"}),
+            "workspace_product_id": product_id,
+            "source_request_line_id": source_line_id,
+            "unit_price": {"amount": Decimal("1"), "currency": order_currency},
+            "tax": {"amount": Decimal("0"), "currency": order_currency},
+            "line_total": {"amount": Decimal("10"), "currency": order_currency},
+        }
+    )
+    payload = PurchaseOrderCreate(
+        order_number="PO-request-pack",
+        supplier_id=UUID(int=6),
+        order_date=date(2026, 9, 19),
+        total=Money(amount=Decimal("20"), currency=order_currency),
+        tax=Money(amount=Decimal("0"), currency=order_currency),
+        source_reference="manual:pack",
+        source_request_id=request_id,
+        lines=(line, line.model_copy(update={"line_number": 2})),
+    )
+    if edit:
+        service.update_draft_order(
+            bearer_token="token",
+            member=_member(),
+            order_id=ORDER,
+            payload=PurchaseOrderDraftUpdate(**payload.model_dump()),
+            idempotency_key=UUID(int=50),
+        )
+    else:
+        service.create_order(
+            bearer_token="token",
+            member=_member(),
+            payload=payload,
+            idempotency_key=UUID(int=50),
+        )
+    snapshot_reads = [
+        (stmt, params)
+        for stmt, params in cursor.executed
+        if "select id, pack_base_quantity from purchase_request_line" in stmt
+    ]
+    assert len(snapshot_reads) == 1
+    assert snapshot_reads[0][1] == (TENANT, [source_line_id])
+    statement, params = inserts[0]
+    # SQL COALESCE chooses the source snapshot even if the live catalogue now says 18.
+    assert "coalesce(%s, (select pd.base_quantity from pack_definition pd" in statement
+    assert len(params) == 2
+    assert all(row[-3:] == (snapshot, TENANT, product_id) for row in params)
+    assert statement.count("%s") == len(params[0])
 
 
 def test_order_pack_snapshot_serializes_as_optional_decimal_string() -> None:

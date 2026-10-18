@@ -11,6 +11,7 @@ from procurepilot_api.modules.requests.schemas import (
     PurchaseRequestLineInput,
 )
 from procurepilot_api.modules.requests.service import RequestsService, _purchase_request_line
+from procurepilot_api.modules.requests.valuation import LineEstimate
 
 
 class RecordingSelectQuery:
@@ -22,6 +23,8 @@ class RecordingSelectQuery:
         self.tracker = tracker
         self.filters: list[tuple[str, str]] = []
         self.in_filters: list[tuple[str, list[str]]] = []
+        self.orders: list[tuple[str, bool]] = []
+        self.inserts: list[dict[str, object]] | None = None
 
     def select(self, columns: str) -> RecordingSelectQuery:
         self.tracker.append({"table": self.table_name, "op": "select", "columns": columns})
@@ -38,16 +41,26 @@ class RecordingSelectQuery:
         )
         return self
 
-    def order(self, *_args: object, **_kwargs: object) -> RecordingSelectQuery:
+    def insert(self, rows: list[dict[str, object]]) -> RecordingSelectQuery:
+        self.inserts = rows
+        self.tracker.append({"table": self.table_name, "op": "insert", "rows": rows})
+        return self
+
+    def order(self, column: str, *, desc: bool = False) -> RecordingSelectQuery:
+        self.orders.append((column, desc))
         return self
 
     def execute(self) -> SimpleNamespace:
+        if self.inserts is not None:
+            return SimpleNamespace(data=self.inserts)
         data = self.rows
         for col, val in self.filters:
             data = [r for r in data if str(r.get(col)) == val]
         for col, vals in self.in_filters:
             allowed = set(vals)
             data = [r for r in data if str(r.get(col)) in allowed]
+        for col, desc in reversed(self.orders):
+            data = sorted(data, key=lambda r: str(r.get(col, "")), reverse=desc)
         return SimpleNamespace(data=data)
 
 
@@ -57,9 +70,11 @@ class FakeEnrichmentClient:
         *,
         line_rows: list[dict[str, object]],
         product_rows: list[dict[str, object]],
+        pack_rows: list[dict[str, object]] | None = None,
     ) -> None:
         self.line_rows = line_rows
         self.product_rows = product_rows
+        self.pack_rows = pack_rows or []
         self.query_log: list[dict[str, object]] = []
 
     def table(self, name: str) -> RecordingSelectQuery:
@@ -67,6 +82,8 @@ class FakeEnrichmentClient:
             return RecordingSelectQuery(name, self.line_rows, self.query_log)
         if name == "workspace_product":
             return RecordingSelectQuery(name, self.product_rows, self.query_log)
+        if name == "pack_definition":
+            return RecordingSelectQuery(name, self.pack_rows, self.query_log)
         return RecordingSelectQuery(name, [], self.query_log)
 
 
@@ -81,6 +98,7 @@ def test_line_enrichment_one_batched_query_and_maps_fields() -> None:
         "purchase_request_id": req_id,
         "workspace_product_id": product_id_1,
         "quantity": "2.000000",
+        "pack_base_quantity": "6.000000",
         "quantity_received": None,
         "note": "Line 1",
         "estimated_unit_price_amount": "25.00",
@@ -94,6 +112,7 @@ def test_line_enrichment_one_batched_query_and_maps_fields() -> None:
         "purchase_request_id": req_id,
         "workspace_product_id": product_id_2,
         "quantity": "5.000000",
+        "pack_base_quantity": None,
         "quantity_received": None,
         "note": "Line 2",
         "estimated_unit_price_amount": "10.00",
@@ -107,6 +126,7 @@ def test_line_enrichment_one_batched_query_and_maps_fields() -> None:
         "purchase_request_id": req_id,
         "workspace_product_id": missing_product_id,
         "quantity": "1.000000",
+        "pack_base_quantity": "3.000000",
         "quantity_received": None,
         "note": "Missing product line",
         "estimated_unit_price_amount": None,
@@ -116,7 +136,7 @@ def test_line_enrichment_one_batched_query_and_maps_fields() -> None:
         "created_at": datetime.now(UTC).isoformat(),
     }
 
-    # product 1 has multiple pack definitions; newest created_at must win
+    # Live catalogue packs differ from the line snapshots and must not affect reads.
     product_1_data = {
         "id": product_id_1,
         "tenant_name": "Full Cream Milk",
@@ -140,7 +160,6 @@ def test_line_enrichment_one_batched_query_and_maps_fields() -> None:
         ],
     }
 
-    # product 2 has a tie in created_at; id desc tie-breaker must win
     tie_date = "2026-09-10T12:00:00Z"
     pack_low_id = "00000000-0000-0000-0000-000000000001"
     pack_high_id = "00000000-0000-0000-0000-000000000009"
@@ -175,6 +194,10 @@ def test_line_enrichment_one_batched_query_and_maps_fields() -> None:
         q for q in client.query_log if q["table"] == "workspace_product" and q["op"] == "select"
     ]
     assert len(wp_selects) == 1, f"Expected 1 workspace_product select query, got {len(wp_selects)}"
+    assert "pack_definition" not in wp_selects[0]["columns"]
+    assert not any(q["table"] == "pack_definition" for q in client.query_log)
+    line_select = next(q for q in client.query_log if q["table"] == "purchase_request_line")
+    assert "pack_base_quantity" in line_select["columns"]
 
     wp_in_filters = [
         q for q in client.query_log if q["table"] == "workspace_product" and q["op"] == "in_"
@@ -189,20 +212,20 @@ def test_line_enrichment_one_batched_query_and_maps_fields() -> None:
     # Map to schema models
     model_lines = [_purchase_request_line(r) for r in lines]
 
-    # Line 1: picked newest pack (18.000000)
+    # Snapshot survives a changed live pack.
     assert model_lines[0].product_name == "Full Cream Milk"
     assert model_lines[0].base_unit == "litre"
-    assert model_lines[0].pack_base_quantity == "18.000000"
+    assert model_lines[0].pack_base_quantity == "6.000000"
 
-    # Line 2: picked tie-breaker high ID (25.000000)
+    # An unknown historical pack stays unknown even when a live pack exists.
     assert model_lines[1].product_name == "Sugar 1kg"
     assert model_lines[1].base_unit == "kilogram"
-    assert model_lines[1].pack_base_quantity == "25.000000"
+    assert model_lines[1].pack_base_quantity is None
 
-    # Line missing: nulls when product not found
+    # Missing live labels do not erase a snapshot.
     assert model_lines[2].product_name is None
     assert model_lines[2].base_unit is None
-    assert model_lines[2].pack_base_quantity is None
+    assert model_lines[2].pack_base_quantity == "3.000000"
 
 
 def test_line_enrichment_nulls_when_pack_or_canonical_missing() -> None:
@@ -213,6 +236,7 @@ def test_line_enrichment_nulls_when_pack_or_canonical_missing() -> None:
         "purchase_request_id": req_id,
         "workspace_product_id": p_id,
         "quantity": "3.000000",
+        "pack_base_quantity": None,
         "created_at": datetime.now(UTC).isoformat(),
     }
     # Product without canonical_product or pack_definition
@@ -268,3 +292,76 @@ def test_purchase_request_line_input_rejects_enriched_fields() -> None:
             quantity="2",
             pack_base_quantity="18",  # type: ignore[call-arg]
         )
+
+
+def test_insert_lines_snapshots_newest_packs_with_one_batched_lookup() -> None:
+    product_ids = [str(uuid4()) for _ in range(3)]
+    packs = [
+        {
+            "id": "00000000-0000-0000-0000-000000000009",
+            "workspace_product_id": product_ids[0],
+            "created_at": "2026-09-01T00:00:00Z",
+            "base_quantity": "18.000000",
+        },
+        {
+            "id": "00000000-0000-0000-0000-000000000001",
+            "workspace_product_id": product_ids[0],
+            "created_at": "2026-09-15T00:00:00Z",
+            "base_quantity": "6.000000",
+        },
+        {
+            "id": "00000000-0000-0000-0000-000000000001",
+            "workspace_product_id": product_ids[1],
+            "created_at": "2026-09-15T00:00:00Z",
+            "base_quantity": "5.000000",
+        },
+        {
+            "id": "00000000-0000-0000-0000-000000000009",
+            "workspace_product_id": product_ids[1],
+            "created_at": "2026-09-15T00:00:00Z",
+            "base_quantity": "25.000000",
+        },
+    ]
+    client = FakeEnrichmentClient(line_rows=[], product_rows=[], pack_rows=packs)
+    # Repeated products still share the same lookup and snapshot.
+    lines = [
+        PurchaseRequestLineInput(workspace_product_id=pid, quantity="2")
+        for pid in [*product_ids, product_ids[0]]
+    ]
+    estimates = [LineEstimate(None, None, None) for _ in lines]
+    service = RequestsService()
+    rows = service._insert_lines(
+        client,
+        tenant_id=str(uuid4()),
+        request_id=str(uuid4()),
+        payload_lines=lines,
+        estimates=estimates,
+    )
+    assert [row["pack_base_quantity"] for row in rows] == [
+        "6.000000",
+        "25.000000",
+        None,
+        "6.000000",
+    ]
+    assert [row["quantity"] for row in rows] == ["2"] * 4
+    pack_selects = [
+        q for q in client.query_log if q["table"] == "pack_definition" and q["op"] == "select"
+    ]
+    assert len(pack_selects) == 1
+    pack_filter = next(
+        q for q in client.query_log if q["table"] == "pack_definition" and q["op"] == "in_"
+    )
+    assert pack_filter["values"] == product_ids
+    assert next(q for q in client.query_log if q["op"] == "insert")["rows"] == rows
+
+    # Replacing/editing lines snapshots the current pack again through the same insert path.
+    packs[1]["base_quantity"] = "12.000000"
+    replaced = service._insert_lines(
+        client,
+        tenant_id=str(uuid4()),
+        request_id=str(uuid4()),
+        payload_lines=lines,
+        estimates=estimates,
+    )
+    assert replaced[0]["pack_base_quantity"] == "12.000000"
+    assert rows[0]["pack_base_quantity"] == "6.000000"
