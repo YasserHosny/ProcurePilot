@@ -449,6 +449,17 @@ jobs:
           # cannot change the stack under us; bump deliberately.
           version: 2.121.0
 
+      - name: Install web dependencies
+        working-directory: apps/web
+        run: pnpm install --ignore-workspace --frozen-lockfile
+
+      # Compile while the ~2 min Supabase pull/start runs; the dev server only needs the API
+      # at request time. Readiness is verified before the first test.
+      - name: Start the web app
+        working-directory: apps/web
+        run: |
+          pnpm exec ng serve --port 4200 > /tmp/ng-serve.log 2>&1 &
+
       - name: Start Supabase
         # `supabase start` — NOT docker compose. Three GoTrue versions could not migrate against a
         # hand-assembled compose stack, including the pairing Supabase themselves publish; the CLI
@@ -544,19 +555,16 @@ jobs:
             echo "::error::extraction worker did not start or exited immediately"; exit 1;
           }
 
-      - name: Install web dependencies
-        working-directory: apps/web
-        run: pnpm install --ignore-workspace --frozen-lockfile
-
-      - name: Start the web app
-        working-directory: apps/web
+      - name: Wait for the web app
         run: |
-          pnpm exec ng serve --port 4200 &
-          for i in $(seq 1 60); do
+          for i in $(seq 1 90); do
             curl -sf http://localhost:4200/ >/dev/null && break
             sleep 2
           done
-          curl -sf http://localhost:4200/ >/dev/null
+          curl -sf http://localhost:4200/ >/dev/null || {
+            tail -n 50 /tmp/ng-serve.log
+            echo "::error::web app did not become ready"; exit 1
+          }
 
       # Specs are sharded by file across three runners. Each shard boots its own isolated stack
       # (Supabase, Redis, API, worker, web), so no state is shared between shards; within a shard
