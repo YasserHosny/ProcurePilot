@@ -420,6 +420,24 @@ components:
       properties:
         id: { type: string, format: uuid }
         workspace_product_id: { type: string, format: uuid }
+        product_name:
+          type: string
+          readOnly: true
+          nullable: true
+          description: Current workspace product display name; null when unavailable.
+        base_unit:
+          type: string
+          readOnly: true
+          nullable: true
+          description: Current canonical product base-unit display label; null when unavailable.
+        pack_base_quantity:
+          type: string
+          pattern: '^\d+(\.\d{1,6})?$'
+          readOnly: true
+          nullable: true
+          description: >
+            Decimal string snapshot of the purchasing pack size in base units at line
+            creation/edit (ADR-020). Request quantity is in packs. Null when no pack was known.
         quantity: { type: string, pattern: '^\d+(\.\d{1,6})?$' }
         note: { type: string, nullable: true }
         estimated_unit_price: { $ref: '#/components/schemas/Money' }
