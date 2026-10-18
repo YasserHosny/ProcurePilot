@@ -19,9 +19,9 @@ from procurepilot_api.config import get_settings
 from procurepilot_api.deps import CurrentMember
 from procurepilot_api.errors import NotFoundError
 from procurepilot_api.modules.auth.jwt import MemberRole
-from procurepilot_api.modules.ingestion import orchestrator
 from procurepilot_api.modules.ingestion.orchestrator import process_inbound_email
 from procurepilot_api.modules.requests.service import RequestsService
+from procurepilot_api.shared.mailer import FakeMailer
 
 sys.path.append(os.path.dirname(__file__))
 from test_rfq_response_capture import (  # noqa: E402, F401
@@ -169,14 +169,9 @@ async def test_guardrail_e2e(
     _patch_requests_service_for_test(
         monkeypatch, tenant_id=tenant_id, user_id=user_id, membership_id=membership_id
     )
-    # The owner notification goes through the push outbox; never enqueue a real RQ job (the
-    # configured Redis may be shared with workers pointed at another database).
-    enqueued_notifications: list[uuid.UUID] = []
-    monkeypatch.setattr(
-        orchestrator,
-        "enqueue_push_job",
-        lambda _settings, notification_id: enqueued_notifications.append(notification_id),
-    )
+    # The owner is told by email; RFQ_MAILER_MODE is stub here, so it lands in FakeMailer.
+    monkeypatch.setenv("RFQ_MAILER_MODE", "stub")
+    FakeMailer.clear()
 
     email_bytes = _create_email_bytes(f"<{uuid.uuid4()}@mail.com>", in_reply_to=msg_id)
     result = process_inbound_email(
@@ -265,14 +260,19 @@ async def test_guardrail_e2e(
             assert pr_row[1] == cost_centre_id
             assert pr_row[2] == branch_id
 
-            # Finding 38a: the guardrail's owner is notified through the push outbox.
+            # Finding 38a: the guardrail's owner gets one email linking to the draft.
+            cur.execute("select email from membership where id = %s", (membership_id,))
+            owner_email = cur.fetchone()[0]
+            owner_mail = [m for m in FakeMailer.sent_messages if m.to == owner_email]
+            assert len(owner_mail) == 1
+            assert "Supplier Capture" in owner_mail[0].subject
+            assert f"/requests/{purchase_request_id}" in owner_mail[0].body
+            # No push is queued: the push sender is still a stub that never delivers.
             cur.execute(
-                "select id, member_id from push_notification where purchase_request_id = %s",
+                "select count(*) from push_notification where purchase_request_id = %s",
                 (purchase_request_id,),
             )
-            notifications = cur.fetchall()
-            assert [row[1] for row in notifications] == [membership_id]
-            assert enqueued_notifications == [notifications[0][0]]
+            assert cur.fetchone()[0] == 0
 
             # FR-014: disabling the guardrail after it fired must not retroactively touch the
             # event or the request it already created.

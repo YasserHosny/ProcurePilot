@@ -3894,6 +3894,15 @@
         "12": "December"
       },
       "unknownProduct": "Unknown product"
+    },
+    "autoPreparedEmail": {
+      "subject": "Draft request ready to review — {{supplier}}",
+      "fromName": "{{workspace}} · ProcurePilot",
+      "greeting": "Hello,",
+      "intro": "A guardrail prepared a draft purchase request in {{workspace}} from {{supplier}}'s quote.",
+      "review": "Nothing has been ordered. Review the draft and submit it for approval if it is right.",
+      "open": "Open the draft request",
+      "why": "You receive this email because you created the guardrail."
     }
   },
   "units": {

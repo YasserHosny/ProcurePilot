@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import os
 from uuid import UUID, uuid4, uuid5
 
 import psycopg
@@ -11,7 +12,6 @@ from supabase import Client, create_client
 
 from procurepilot_api import db
 from procurepilot_api.config import Settings
-from procurepilot_api.modules.devices.push_job import enqueue_push_job
 from procurepilot_api.modules.ingestion.email_parser import (
     EmailParseError,
     InboundEmail,
@@ -20,10 +20,13 @@ from procurepilot_api.modules.ingestion.email_parser import (
 )
 from procurepilot_api.modules.ingestion.extraction import enqueue_extraction as _enqueue_extraction
 from procurepilot_api.modules.ingestion.matcher import match_supplier
+from procurepilot_api.modules.rfq.auto_prepared_email import render_auto_prepared_email
 from procurepilot_api.modules.rfq.guardrail_evaluation import compute_guardrail_evaluation
 from procurepilot_api.modules.rfq.guardrails import AutoPreparationGuardrail
 from procurepilot_api.shared.audit import AuditEventCreate, AuditOutcome, get_audit_writer
+from procurepilot_api.shared.i18n import t
 from procurepilot_api.shared.logging import get_trace_id
+from procurepilot_api.shared.mailer import FakeMailer, MailgunMailer
 from procurepilot_api.shared.storage_keys import display_filename, safe_object_name
 
 logger = logging.getLogger(__name__)
@@ -319,6 +322,54 @@ def _guardrail_cost_centre(
     return guardrail.default_cost_centre_id
 
 
+def _email_guardrail_owner(
+    settings: Settings,
+    *,
+    to: str,
+    workspace_name: str,
+    supplier_name: str | None,
+    locale: str,
+    purchase_request_id: UUID,
+) -> str:
+    """Email the guardrail's owner that a draft request is waiting, through the same mailer
+    RFQs and invitations use. Phone push is not used: its sender is still a stub that never
+    delivers (devices/push_job.py). Returns the delivery outcome, which is also logged."""
+    mode = os.environ.get("RFQ_MAILER_MODE", settings.rfq_mailer_mode)
+    if mode == "mailgun" and not (settings.mailgun_api_key and settings.mailgun_sending_domain):
+        logger.warning(
+            "auto-prepared request owner email not sent: Mailgun is not configured",
+            extra={"purchase_request_id": str(purchase_request_id)},
+        )
+        return "not_configured"
+    origin = settings.web_origin or settings.api_cors_origins[0]
+    rendered = render_auto_prepared_email(
+        workspace_name=workspace_name,
+        supplier_name=supplier_name or t("requests.autoPrepared.unknownSupplier", locale),
+        request_url=f"{origin.rstrip('/')}/requests/{purchase_request_id}",
+        locale=locale,
+    )
+    try:
+        mailer = MailgunMailer() if mode == "mailgun" else FakeMailer()
+        mailer.send(
+            to=to,
+            subject=rendered.subject,
+            body=rendered.text,
+            html=rendered.html,
+            from_name=rendered.from_name,
+        )
+    except Exception:
+        logger.exception(
+            "auto-prepared request owner email failed",
+            extra={"purchase_request_id": str(purchase_request_id)},
+        )
+        return "failed"
+    logger.info(
+        "auto-prepared request owner emailed",
+        extra={"purchase_request_id": str(purchase_request_id), "mailer_mode": mode},
+    )
+    return "sent"
+
+
 def _evaluate_guardrails_for_rfq(
     settings: Settings,
     conn: psycopg.Connection,
@@ -431,15 +482,16 @@ def _evaluate_guardrails_for_rfq(
                     supplier_id,
                 ),
             )
-            # Finding 38a: tell the guardrail's owner a draft is waiting for them, through the
-            # existing per-request push outbox (the same one approval decisions use; a tap opens
-            # the request). Committed with the event, enqueued after the commit below.
             cur.execute(
-                "insert into push_notification (tenant_id, purchase_request_id, member_id) "
-                "values (%s, %s, %s) returning id",
-                (tenant_id, result.purchase_request_id, guardrail.created_by_membership_id),
+                "select t.name as workspace_name, "
+                "coalesce(m.preferred_locale, t.default_locale) as locale, "
+                "(select s.name from supplier s where s.tenant_id = t.id and s.id = %s) "
+                "as supplier_name "
+                "from tenant t join membership m on m.tenant_id = t.id and m.id = %s "
+                "where t.id = %s",
+                (supplier_id, guardrail.created_by_membership_id, tenant_id),
             )
-            notification_id = cur.fetchone()["id"]
+            notice = cur.fetchone()
             cur.execute(
                 "select record_audit_event(%s, 'success'::audit_outcome, %s, null, %s, "
                 "%s::jsonb, null)",
@@ -458,13 +510,16 @@ def _evaluate_guardrails_for_rfq(
                 ),
             )
             conn.commit()
-            try:
-                enqueue_push_job(settings, notification_id)
-            except Exception:
-                # The outbox row is committed; the retry sweep picks it up.
-                logger.exception(
-                    "push notification enqueue failed after an auto-preparation",
-                    extra={"notification_id": str(notification_id)},
+            # Finding 38a: tell the guardrail's owner, after the draft is committed. A failed
+            # email never undoes the preparation; the request page and list mark it either way.
+            if notice is not None:
+                _email_guardrail_owner(
+                    settings,
+                    to=str(member_row["email"]),
+                    workspace_name=str(notice["workspace_name"]),
+                    supplier_name=notice["supplier_name"],
+                    locale=str(notice["locale"]),
+                    purchase_request_id=result.purchase_request_id,
                 )
     finally:
         # A failed SQL statement leaves the transaction unusable, so rollback first. This does

@@ -1,5 +1,5 @@
-"""Finding 38a/38b: guardrail provenance on purchase requests, and the worker's cost-centre
-fallback, without a database."""
+"""Finding 38a/38b: guardrail provenance on purchase requests, the owner email, and the
+worker's cost-centre fallback, without a database."""
 
 from __future__ import annotations
 
@@ -8,9 +8,16 @@ from types import SimpleNamespace
 from typing import Any
 from uuid import UUID, uuid4
 
-from procurepilot_api.modules.ingestion.orchestrator import _guardrail_cost_centre
+import pytest
+
+from procurepilot_api.modules.ingestion.orchestrator import (
+    _email_guardrail_owner,
+    _guardrail_cost_centre,
+)
 from procurepilot_api.modules.requests.service import RequestsService
+from procurepilot_api.modules.rfq.auto_prepared_email import render_auto_prepared_email
 from procurepilot_api.modules.rfq.guardrails import AutoPreparationGuardrail
+from procurepilot_api.shared.mailer import FakeMailer
 
 
 class _Query:
@@ -134,3 +141,87 @@ def test_worker_uses_the_cost_centre_only_while_it_is_still_valid() -> None:
     none = _Cursor(None)
     assert _guardrail_cost_centre(none, tenant_id=uuid4(), guardrail=_guardrail(None)) is None
     assert none.executed == []
+
+
+def _settings(**overrides: object) -> SimpleNamespace:
+    values: dict[str, object] = {
+        "rfq_mailer_mode": "stub",
+        "mailgun_api_key": None,
+        "mailgun_sending_domain": None,
+        "web_origin": "https://app.example.test/",
+        "api_cors_origins": ("http://localhost:4200",),
+    }
+    values.update(overrides)
+    return SimpleNamespace(**values)
+
+
+def test_owner_email_links_to_the_draft_in_the_owner_language(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("RFQ_MAILER_MODE", "stub")
+    FakeMailer.clear()
+    request_id = uuid4()
+
+    outcome = _email_guardrail_owner(
+        _settings(),  # type: ignore[arg-type]
+        to="owner@example.test",
+        workspace_name="مطاعم تجربة",
+        supplier_name="مخبز النور",
+        locale="ar",
+        purchase_request_id=request_id,
+    )
+
+    assert outcome == "sent"
+    (message,) = FakeMailer.sent_messages
+    assert message.to == "owner@example.test"
+    assert message.subject == "مسودة طلب جاهزة للمراجعة — مخبز النور"
+    assert f"https://app.example.test/requests/{request_id}" in message.body
+    assert message.html is not None and 'dir="rtl"' in message.html
+
+
+def test_owner_email_escapes_names_and_falls_back_to_english() -> None:
+    rendered = render_auto_prepared_email(
+        workspace_name="A & B <Ltd>",
+        supplier_name="<script>",
+        request_url="https://app.example.test/requests/1",
+        locale="fr",
+    )
+    assert rendered.locale == "en"
+    assert "<script>" not in rendered.html
+    assert "&lt;script&gt;" in rendered.html
+    assert "Nothing has been ordered" in rendered.text
+
+
+def test_owner_email_reports_unconfigured_mailgun_without_sending(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("RFQ_MAILER_MODE", "mailgun")
+    FakeMailer.clear()
+    outcome = _email_guardrail_owner(
+        _settings(rfq_mailer_mode="mailgun"),  # type: ignore[arg-type]
+        to="owner@example.test",
+        workspace_name="W",
+        supplier_name=None,
+        locale="en",
+        purchase_request_id=uuid4(),
+    )
+    assert outcome == "not_configured"
+    assert FakeMailer.sent_messages == []
+
+
+def test_owner_email_failure_is_reported_not_raised(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("RFQ_MAILER_MODE", "stub")
+
+    def boom(*_args: object, **_kwargs: object) -> None:
+        raise RuntimeError("smtp down")
+
+    monkeypatch.setattr(FakeMailer, "send", boom)
+    outcome = _email_guardrail_owner(
+        _settings(),  # type: ignore[arg-type]
+        to="owner@example.test",
+        workspace_name="W",
+        supplier_name="S",
+        locale="en",
+        purchase_request_id=uuid4(),
+    )
+    assert outcome == "failed"
