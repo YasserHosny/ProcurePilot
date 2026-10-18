@@ -14,8 +14,10 @@ on:
   push:
     branches: [main]
 
+# Every push to main gets its own group so merges validate in parallel instead of queueing.
+# Trade-off: more simultaneous runner usage when merges bunch up.
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-${{ github.event_name == 'push' && github.sha || github.ref }}
   # Cancel superseded PR runs to save runner time.
   # Pushes to main must finish so every merged commit is tested.
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
