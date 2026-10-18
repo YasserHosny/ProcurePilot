@@ -111,7 +111,13 @@ def test_send_localized_rfq_with_persisted_terms(
         assert terms.splitlines()[0] in msg.body and terms.splitlines()[1] in msg.body
         assert terms.splitlines()[0] in msg.html and terms.splitlines()[1] in msg.html
         assert product_name in msg.body and product_name in msg.html
-        assert ("٥٠ كجم" if arabic else "50 kg") in msg.body
+        # 50 packs of 20 × 25 kg: quantity is in packs (ADR-020), with the base-unit total.
+        expected = (
+            "٥٠ عبوة (٥٠٠ كجم للعبوة) — ٢٥٠٠٠ كجم"
+            if arabic
+            else "50 packs (500 kg each) — 25000 kg"
+        )
+        assert expected in msg.body and expected in msg.html
         if arabic:
             assert 'dir="rtl"' in msg.html
         assert sent_recipients[0].outbound_message_id == msg.message_id
