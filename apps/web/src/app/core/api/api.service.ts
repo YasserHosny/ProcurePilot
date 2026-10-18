@@ -129,6 +129,11 @@ export class ApiService {
     return this.http.post<Session>(`${this.base}/auth/login`, { email, password });
   }
 
+  /** Renews an expired session. Needs no bearer token; the tenant claim comes from the server. */
+  refreshSession(refreshToken: string): Observable<Session> {
+    return this.http.post<Session>(`${this.base}/auth/refresh`, { refresh_token: refreshToken });
+  }
+
   logout(): Observable<void> {
     return this.http.post<void>(`${this.base}/auth/logout`, {});
   }

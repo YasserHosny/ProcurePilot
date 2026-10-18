@@ -104,6 +104,36 @@ paths:
               schema: { $ref: '#/components/schemas/Error' }
         '429': { $ref: '#/components/responses/RateLimited' }
 
+  /auth/refresh:
+    post:
+      summary: Exchange a refresh token for a new session
+      description: >
+        Called when the access token has expired (or is about to), so it needs no bearer token.
+        The tenant is not chosen by the caller — the access-token hook re-reads the persisted
+        active workspace, so the new token carries the same tenant_id claim as before.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refresh_token]
+              properties:
+                refresh_token: { type: string }
+      responses:
+        '200':
+          description: Session renewed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Session' }
+        '401':
+          description: The refresh token is invalid, expired, or already used
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+
   /auth/logout:
     post:
       summary: Sign out and invalidate the refresh token
