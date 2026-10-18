@@ -499,9 +499,8 @@ jobs:
         # Skip studio/postgres-meta (dashboard), vector/logflare (analytics), edge-runtime (no
         # functions), mailpit (auth email confirmations are off in supabase/config.toml), and
         # realtime (the app does not use it). This limits startup to the five services the app uses.
-        # Stagger shard pulls to reduce public.ecr.aws contention, then retry transient failures.
+        # Retry transient startup failures with increasing backoff.
         run: |
-          sleep $(( (${{ matrix.shard }} - 1) * 25 ))
           for attempt in 1 2 3 4 5; do
             if supabase start -x studio,vector,logflare,edge-runtime,postgres-meta,mailpit,realtime; then
               exit 0
