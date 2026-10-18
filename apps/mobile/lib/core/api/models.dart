@@ -1,5 +1,7 @@
 import 'package:flutter/foundation.dart';
 
+import '../i18n/i18n_loader.dart';
+
 /// Platform values supported by the mobile device registration endpoint.
 enum DevicePlatform {
   ios,
@@ -194,6 +196,9 @@ class PurchaseRequestLine {
     this.note,
     this.estimatedUnitPrice,
     this.quantityReceived,
+    this.productName,
+    this.baseUnit,
+    this.packBaseQuantity,
   });
 
   final String id;
@@ -206,6 +211,17 @@ class PurchaseRequestLine {
   /// string, same convention as [quantity].
   final String? quantityReceived;
 
+  final String? productName;
+  final String? baseUnit;
+  final String? packBaseQuantity;
+
+  String productDisplayName(I18nLoader i18n) {
+    if (productName != null && productName!.trim().isNotEmpty) {
+      return productName!.trim();
+    }
+    return i18n.t('approvals.unknownProduct');
+  }
+
   factory PurchaseRequestLine.fromJson(Map<String, dynamic> json) {
     return PurchaseRequestLine(
       id: json['id'] as String,
@@ -216,6 +232,9 @@ class PurchaseRequestLine {
           ? null
           : Money.fromJson(json['estimated_unit_price'] as Map<String, dynamic>),
       quantityReceived: json['quantity_received'] as String?,
+      productName: json['product_name'] as String?,
+      baseUnit: json['base_unit'] as String?,
+      packBaseQuantity: json['pack_base_quantity'] as String?,
     );
   }
 
@@ -226,6 +245,10 @@ class PurchaseRequestLine {
         if (note != null) 'note': note,
         if (estimatedUnitPrice != null)
           'estimated_unit_price': estimatedUnitPrice!.toJson(),
+        if (quantityReceived != null) 'quantity_received': quantityReceived,
+        if (productName != null) 'product_name': productName,
+        if (baseUnit != null) 'base_unit': baseUnit,
+        if (packBaseQuantity != null) 'pack_base_quantity': packBaseQuantity,
       };
 }
 
@@ -327,6 +350,8 @@ class PurchaseRequest {
     required this.branchId,
     this.costCentreId,
     required this.requestedByMembershipId,
+    this.requesterName,
+    this.requesterEmail,
     required this.requiredByDate,
     required this.status,
     required this.lines,
@@ -347,6 +372,8 @@ class PurchaseRequest {
   final String branchId;
   final String? costCentreId;
   final String requestedByMembershipId;
+  final String? requesterName;
+  final String? requesterEmail;
   final String requiredByDate;
   final String status;
   final List<PurchaseRequestLine> lines;
@@ -366,6 +393,16 @@ class PurchaseRequest {
   final String? deliveryConfirmedByMembershipId;
   final bool hasDeliveryDiscrepancy;
 
+  String requesterDisplayName(I18nLoader i18n) {
+    if (requesterName != null && requesterName!.trim().isNotEmpty) {
+      return requesterName!.trim();
+    }
+    if (requesterEmail != null && requesterEmail!.trim().isNotEmpty) {
+      return requesterEmail!.trim();
+    }
+    return i18n.t('approvals.unknownRequester');
+  }
+
   factory PurchaseRequest.fromJson(Map<String, dynamic> json) {
     final lines = (json['lines'] as List<dynamic>)
         .map((e) => PurchaseRequestLine.fromJson(e as Map<String, dynamic>))
@@ -375,6 +412,8 @@ class PurchaseRequest {
       branchId: json['branch_id'] as String,
       costCentreId: json['cost_centre_id'] as String?,
       requestedByMembershipId: json['requested_by_membership_id'] as String,
+      requesterName: json['requester_name'] as String?,
+      requesterEmail: json['requester_email'] as String?,
       requiredByDate: json['required_by_date'] as String,
       status: json['status'] as String,
       lines: lines,
@@ -413,6 +452,8 @@ class PurchaseRequest {
         'branch_id': branchId,
         if (costCentreId != null) 'cost_centre_id': costCentreId,
         'requested_by_membership_id': requestedByMembershipId,
+        if (requesterName != null) 'requester_name': requesterName,
+        if (requesterEmail != null) 'requester_email': requesterEmail,
         'required_by_date': requiredByDate,
         'status': status,
         'lines': lines.map((e) => e.toJson()).toList(),

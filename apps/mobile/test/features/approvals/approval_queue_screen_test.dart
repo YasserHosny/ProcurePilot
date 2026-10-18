@@ -8,12 +8,22 @@ import '../../test_helpers.dart';
 void main() {
   group('ApprovalQueueScreen', () {
     late FakeApprovalsApiClient fakeClient;
+    late FakeRequestsApiClient fakeRequestsClient;
 
     setUp(() {
+      fakeRequestsClient = FakeRequestsApiClient();
       fakeClient = FakeApprovalsApiClient()
         ..pendingResults = [
-          pendingRequest(id: 'req-1', requester: 'member-1'),
-          pendingRequest(id: 'req-2', requester: 'member-2'),
+          pendingRequest(
+            id: 'req-1',
+            requester: 'member-uuid-1111',
+            requesterName: 'Sarah Connor',
+          ),
+          pendingRequest(
+            id: 'req-2',
+            requester: 'member-uuid-2222',
+            requesterEmail: 'john@example.com',
+          ),
         ];
     });
 
@@ -23,21 +33,42 @@ void main() {
         tester,
         child: const ApprovalQueueScreen(),
         approvalsApiClient: fakeClient,
+        requestsApiClient: fakeRequestsClient,
         locale: locale,
       );
       await tester.pumpAndSettle();
     }
 
-    testWidgets('renders pending requests from listPendingApprovals', (
+    testWidgets('renders requester name or email, never the raw membership UUID', (
       tester,
     ) async {
       await pumpQueue(tester);
 
       expect(find.text('Approval Queue'), findsOneWidget);
       expect(find.byKey(const Key('approvalQueueList')), findsOneWidget);
-      expect(find.text('Requester: member-1'), findsOneWidget);
-      expect(find.text('Requester: member-2'), findsOneWidget);
+      expect(find.text('Requester: Sarah Connor'), findsOneWidget);
+      expect(find.text('Requester: john@example.com'), findsOneWidget);
+      expect(find.textContaining('member-uuid-1111'), findsNothing);
+      expect(find.textContaining('member-uuid-2222'), findsNothing);
       expect(find.text('USD 125.00'), findsNWidgets(2));
+    });
+
+    testWidgets('falls back to localised unknown requester when name and email are missing', (
+      tester,
+    ) async {
+      fakeClient.pendingResults = [
+        pendingRequest(
+          id: 'req-3',
+          requester: 'member-uuid-3333',
+        ),
+      ];
+      await pumpQueue(tester);
+      expect(find.text('Requester: Unknown requester'), findsOneWidget);
+      expect(find.textContaining('member-uuid-3333'), findsNothing);
+
+      await pumpQueue(tester, locale: 'ar');
+      expect(find.textContaining('مقدم طلب غير معروف'), findsOneWidget);
+      expect(find.textContaining('member-uuid-3333'), findsNothing);
     });
 
     testWidgets('renders empty state when no approvals are pending', (
@@ -58,6 +89,7 @@ void main() {
         pendingRequest(
           id: 'req-egp',
           requester: 'member-egp',
+          requesterName: 'Ahmed',
           total: const Money(amount: '12500', currency: 'EGP'),
         ),
       ];
@@ -68,18 +100,49 @@ void main() {
       expect(find.textContaining('١٢٬٥٠٠٫٠٠'), findsOneWidget);
       expect(find.byType(Directionality), findsWidgets);
     });
+
+    testWidgets('navigating to decision screen and approving reloads queue', (
+      tester,
+    ) async {
+      await pumpQueue(tester);
+      expect(find.byKey(const Key('approvalQueueItem_0')), findsOneWidget);
+
+      // Simulate backend having 0 pending items once approved
+      fakeClient.pendingResults = [];
+
+      await tester.tap(find.byKey(const Key('approvalQueueItem_0')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('approvalDecisionApproveButton')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('approvalDecisionApproveButton')));
+      await tester.pumpAndSettle();
+
+      // Popped back to ApprovalQueueScreen
+      expect(find.byType(ApprovalQueueScreen), findsOneWidget);
+      expect(find.byKey(const Key('approvalDecisionApproveButton')), findsNothing);
+
+      // Reloaded queue
+      expect(
+        find.text('No requests are currently awaiting your decision.'),
+        findsOneWidget,
+      );
+    });
   });
 }
 
 PurchaseRequest pendingRequest({
   required String id,
   required String requester,
+  String? requesterName,
+  String? requesterEmail,
   Money total = const Money(amount: '125.00', currency: 'USD'),
 }) {
   return PurchaseRequest(
     id: id,
     branchId: 'branch-1',
     requestedByMembershipId: requester,
+    requesterName: requesterName,
+    requesterEmail: requesterEmail,
     requiredByDate: '2026-10-01',
     status: 'submitted',
     lines: const [

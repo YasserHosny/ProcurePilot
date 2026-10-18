@@ -104,6 +104,17 @@ void main() {
         expect(approvalControl(), findsNothing);
         expect(rejectionControl(), findsNothing);
 
+        // Verify Semantics button label
+        expect(
+          find.byWidgetPredicate(
+            (w) =>
+                w is Semantics &&
+                w.properties.button == true &&
+                w.properties.label == '3 pending',
+          ),
+          findsOneWidget,
+        );
+
         await tester.tap(find.byKey(const Key('pendingApprovalsCount')));
         await tester.pumpAndSettle();
 
@@ -111,6 +122,48 @@ void main() {
         expect(find.text('Approval Queue'), findsOneWidget);
       },
     );
+
+    testWidgets('returning from approvals queue refreshes pending count', (
+      tester,
+    ) async {
+      final auth =
+          FakeAuthService(
+              storage: FakeStorage(),
+              httpClient: defaultTestHttpClient(),
+              supabaseUrl: 'https://test.supabase.co',
+              supabaseAnonKey: 'test-anon-key',
+            )
+            ..accessToken = makeAccessToken('approver')
+            ..refreshToken = 'refresh-token'
+            ..tokenRole = 'approver';
+
+      final client = pendingClient(count: 3);
+
+      await pumpWithServices(
+        tester,
+        child: const HomeScreen(),
+        authService: auth,
+        approvalsApiClient: client,
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('3 pending'), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('pendingApprovalsCount')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Approval Queue'), findsOneWidget);
+
+      // Pending approvals count changed in backend
+      client.pendingResults = client.pendingResults.take(1).toList();
+
+      final navigator = tester.state<NavigatorState>(find.byType(Navigator));
+      navigator.pop();
+      await tester.pumpAndSettle();
+
+      expect(find.byType(HomeScreen), findsOneWidget);
+      expect(find.text('1 pending'), findsOneWidget);
+    });
 
     testWidgets('owner also sees pending count and no approval controls', (
       tester,

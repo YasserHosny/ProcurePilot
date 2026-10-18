@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/api/models.dart';
 import '../../core/i18n/i18n_loader.dart';
 import '../../core/format/money_format.dart';
+import '../../core/format/quantity_format.dart';
 import '../service_provider.dart';
 
 /// Read-only purchase-request detail screen.
@@ -96,7 +97,7 @@ class RequestContextSection extends StatelessWidget {
         ),
         RequestInfoRow(
           label: i18n.t('approvals.columns.requester'),
-          value: request.requestedByMembershipId,
+          value: request.requesterDisplayName(i18n),
         ),
         if (request.estimatedTotal != null)
           RequestInfoRow(
@@ -132,15 +133,28 @@ class RequestContextSection extends StatelessWidget {
         const SizedBox(height: 8),
         ...request.lines.asMap().entries.map((entry) {
           final line = entry.value;
+          final formattedQty = formatQuantity(
+            line.quantity,
+            packBaseQuantity: line.packBaseQuantity,
+            baseUnit: line.baseUnit,
+            locale: i18n.locale,
+            i18n: i18n,
+          );
           final subtitleLines = [
-            '${i18n.t('requests.form.quantityLabel')}: ${line.quantity}',
+            '${i18n.t('requests.form.quantityLabel')}: $formattedQty',
             if (line.quantityReceived != null)
-              '${i18n.t('delivery.quantityReceivedLabel')}: ${line.quantityReceived}',
+              '${i18n.t('delivery.quantityReceivedLabel')}: ${formatQuantity(
+                line.quantityReceived!,
+                packBaseQuantity: line.packBaseQuantity,
+                baseUnit: line.baseUnit,
+                locale: i18n.locale,
+                i18n: i18n,
+              )}',
           ];
           return Card(
             child: ListTile(
               key: Key('requestDetailLine_${entry.key}'),
-              title: Text(line.workspaceProductId),
+              title: Text(line.productDisplayName(i18n)),
               subtitle: Text(subtitleLines.join('\n')),
               trailing: line.estimatedUnitPrice != null
                   ? Text(_formatMoney(i18n, line.estimatedUnitPrice!))

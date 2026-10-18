@@ -87,6 +87,15 @@ class _HomeScreenState extends State<HomeScreen> {
     await Navigator.of(context).pushReplacementNamed('/signIn');
   }
 
+  Future<void> _navigateToApprovals() async {
+    await Navigator.of(context).pushNamed('/approvals');
+    if (!mounted) return;
+    final session = _session;
+    if (session?.isApprover ?? false) {
+      await _loadPendingCount(session!);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final i18n = _i18n;
@@ -131,7 +140,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   loading: _pendingCountLoading,
                   error: _pendingCountError,
                   i18n: i18n,
-                  onTap: () => Navigator.of(context).pushNamed('/approvals'),
+                  onTap: _navigateToApprovals,
                 ),
               ],
             ],
@@ -171,19 +180,24 @@ class _PendingCountWidget extends StatelessWidget {
     }
 
     final displayCount = count ?? 0;
+    final text = i18n.t(
+      'mobileHome.pendingApprovalsCount',
+      params: {'count': displayCount.toString()},
+    );
+
     return Card(
-      child: InkWell(
-        key: const Key('pendingApprovalsCount'),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Text(
-            i18n.t(
-              'mobileHome.pendingApprovalsCount',
-              params: {'count': displayCount.toString()},
-            ),
+      clipBehavior: Clip.antiAlias,
+      child: Semantics(
+        button: true,
+        label: text,
+        child: ListTile(
+          key: const Key('pendingApprovalsCount'),
+          title: Text(
+            text,
             style: Theme.of(context).textTheme.bodyLarge,
           ),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: onTap,
         ),
       ),
     );

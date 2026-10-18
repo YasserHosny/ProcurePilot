@@ -16,6 +16,7 @@ class ApprovalDecisionScreen extends StatefulWidget {
 class _ApprovalDecisionScreenState extends State<ApprovalDecisionScreen> {
   final _commentController = TextEditingController();
   bool _submitting = false;
+  bool _succeeded = false;
   String? _message;
   bool _messageIsError = false;
 
@@ -49,14 +50,20 @@ class _ApprovalDecisionScreenState extends State<ApprovalDecisionScreen> {
         );
       }
       if (!mounted) return;
+      final successText = _i18n.t(
+        action == 'approve'
+            ? 'approvals.approveSuccess'
+            : 'approvals.rejectSuccess',
+      );
       setState(() {
-        _message = _i18n.t(
-          action == 'approve'
-              ? 'approvals.approveSuccess'
-              : 'approvals.rejectSuccess',
-        );
+        _succeeded = true;
+        _message = successText;
         _messageIsError = false;
       });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(successText)),
+      );
+      Navigator.of(context).pop(true);
     } on ApiException catch (e) {
       if (!mounted) return;
       setState(() {
@@ -94,6 +101,8 @@ class _ApprovalDecisionScreenState extends State<ApprovalDecisionScreen> {
       );
     }
 
+    final disabled = _submitting || _succeeded;
+
     return Scaffold(
       appBar: AppBar(title: Text(i18n.t('approvals.title'))),
       body: SafeArea(
@@ -112,7 +121,7 @@ class _ApprovalDecisionScreenState extends State<ApprovalDecisionScreen> {
               ),
               minLines: 2,
               maxLines: 4,
-              enabled: !_submitting,
+              enabled: !disabled,
             ),
             const SizedBox(height: 16),
             if (_message != null)
@@ -133,7 +142,7 @@ class _ApprovalDecisionScreenState extends State<ApprovalDecisionScreen> {
                 Expanded(
                   child: OutlinedButton(
                     key: const Key('approvalDecisionCancelButton'),
-                    onPressed: _submitting
+                    onPressed: disabled
                         ? null
                         : () => Navigator.of(context).pop(),
                     child: Text(
@@ -145,7 +154,7 @@ class _ApprovalDecisionScreenState extends State<ApprovalDecisionScreen> {
                 Expanded(
                   child: FilledButton(
                     key: const Key('approvalDecisionApproveButton'),
-                    onPressed: _submitting
+                    onPressed: disabled
                         ? null
                         : () => _submitDecision(args, 'approve'),
                     child: Text(i18n.t('approvals.actions.approve')),
@@ -156,7 +165,7 @@ class _ApprovalDecisionScreenState extends State<ApprovalDecisionScreen> {
             const SizedBox(height: 12),
             FilledButton.tonal(
               key: const Key('approvalDecisionRejectButton'),
-              onPressed: _submitting
+              onPressed: disabled
                   ? null
                   : () => _submitDecision(args, 'reject'),
               child: Text(i18n.t('approvals.actions.reject')),
