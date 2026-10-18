@@ -455,6 +455,24 @@ describe('ConnectionSettingsComponent (T014)', () => {
   });
 
   describe('OAuth callback query parameters', () => {
+    it('keeps Connect disabled and skips the status load until the completion POST settles', fakeAsync(() => {
+      mockQueryParamMap.set('pos_code', 'race-code');
+      mockQueryParamMap.set('pos_state', 'race-state');
+
+      component.ngOnInit();
+      tick();
+
+      const completeReq = httpTestingController.expectOne('/api/v1/pos/connect/complete');
+      expect(component.isMutating()).toBeTrue();
+      httpTestingController.expectNone('/api/v1/pos/connection');
+
+      completeReq.flush(mockActiveConnection);
+      tick();
+
+      expect(component.isMutating()).toBeFalse();
+      httpTestingController.expectOne('/api/v1/pos/connection').flush(mockActiveConnection);
+    }));
+
     it('should complete connection and display success snackbar when pos_code and pos_state are present', fakeAsync(() => {
       mockQueryParamMap.set('pos_code', 'square-code-123');
       mockQueryParamMap.set('pos_state', 'square-state-456');

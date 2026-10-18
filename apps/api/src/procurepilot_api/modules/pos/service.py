@@ -30,7 +30,12 @@ from psycopg.rows import dict_row
 from procurepilot_api import db
 from procurepilot_api.config import Settings, get_settings
 from procurepilot_api.deps import CurrentMember
-from procurepilot_api.errors import ConflictError, NotFoundError, UnprocessableEntityError
+from procurepilot_api.errors import (
+    ConflictError,
+    NotFoundError,
+    ServiceUnavailableError,
+    UnprocessableEntityError,
+)
 from procurepilot_api.modules.offers.service import _authenticated_db
 from procurepilot_api.modules.pos.connector import (
     OAuthTokens,
@@ -310,8 +315,12 @@ class ConnectionService:
                     )
                     row = dict(cur.fetchone())
                 conn.commit()
-        except psycopg.errors.UniqueViolation as exc:
-            logger.warning("UniqueViolation on pos_connection insert: %s", exc)
+        except ServiceUnavailableError as exc:
+            # _authenticated_db rewraps every psycopg error; a concurrent completion that loses
+            # the partial unique index race is a conflict, not an outage.
+            if not isinstance(exc.__cause__, psycopg.errors.UniqueViolation):
+                raise
+            logger.warning("UniqueViolation on pos_connection insert: %s", exc.__cause__)
             raise ConflictError(
                 details={
                     "resource": "pos_connection",
