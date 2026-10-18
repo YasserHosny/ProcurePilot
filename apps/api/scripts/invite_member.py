@@ -7,7 +7,10 @@ prints the acceptance link. The CLI does not email invitations (the web flow doe
 must be sent to the invitee by hand; it is shown once and cannot be recovered later (only its
 hash is stored).
 
-Run from the repo root with ``DATABASE_URL`` pointing at the target database:
+The repo-root ``.env`` is loaded automatically (exported variables win); pass ``--env-file``
+to specify an alternative file.
+
+Run from the repo root with ``DATABASE_URL`` configured in ``.env`` or exported:
 
     pnpm db:invite-member --owner-email owner@example.com --email new@example.com --role buyer
 
@@ -24,14 +27,17 @@ import os
 import secrets
 import sys
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from typing import Any
 from urllib.parse import quote
 
 import psycopg
+from dotenv import load_dotenv
 from psycopg.rows import dict_row
 
 ROLES = ("owner", "buyer", "branch_manager", "approver", "viewer")
 ACCEPT_PATH = "/onboarding/accept-invitation"
+DEFAULT_ENV_FILE = Path(__file__).resolve().parents[3] / ".env"
 
 
 def hash_token(token: str) -> str:
@@ -53,6 +59,17 @@ def default_web_origin() -> str:
     return first or "http://localhost:4200"
 
 
+def load_env_file(path: Path) -> bool:
+    """Load KEY=VALUE pairs from a dotenv file into os.environ without overriding.
+
+    Returns False if the file does not exist.
+    """
+    path = Path(path)
+    if not path.is_file():
+        return False
+    return load_dotenv(dotenv_path=path, override=False)
+
+
 def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--owner-email", required=True, help="An active owner of the workspace.")
@@ -65,6 +82,12 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         help="Revoke an existing pending invitation for this address and issue a new one.",
     )
     parser.add_argument("--web-origin", default=None, help="Defaults to WEB_ORIGIN.")
+    parser.add_argument(
+        "--env-file",
+        type=Path,
+        default=DEFAULT_ENV_FILE,
+        help="Path to .env file to load (defaults to repo-root .env).",
+    )
     parser.add_argument("--json", action="store_true", help="Machine-readable output.")
     args = parser.parse_args(argv)
     args.email = args.email.strip()
@@ -212,11 +235,17 @@ def record_audit(
 
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(sys.argv[1:] if argv is None else argv)
+    load_env_file(args.env_file)
     dsn = os.environ.get("DATABASE_URL")
     if not dsn:
-        print("DATABASE_URL is not set. Copy .env.example to .env first.", file=sys.stderr)
+        print(
+            "DATABASE_URL is not set. The repo-root .env is loaded automatically "
+            "(exported variables win). Copy .env.example to .env or pass --env-file.",
+            file=sys.stderr,
+        )
         return 1
 
+    args.web_origin = args.web_origin or default_web_origin()
     result = run(args, dsn)
     if args.json:
         print(json.dumps(result))
