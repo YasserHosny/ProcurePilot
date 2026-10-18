@@ -1719,7 +1719,7 @@
       "notesPlaceholder": "e.g., PO #12345, delivery note...",
       "baselineNoticeTitle": "Historical Baseline Note",
       "baselineUnavailable": "No previous price history exists for this product. The purchase will be recorded with 'none_available' baseline policy.",
-      "baselineAvailable": "Baseline will be computed from documented price history ({{policy}}).",
+      "baselineAvailable": "Baseline: the last purchase-order price for this product, or the documented quote history when there is no purchase order ({{policy}}).",
       "deliveryResults": {
         "ordered": "Ordered",
         "partially_delivered": "Partially Delivered",
@@ -1752,7 +1752,8 @@
       "statusVerified": "Verified (Immutable)",
       "baselinePolicy": "Baseline Policy",
       "baselinePolicies": {
-        "last_paid": "Last Paid Price",
+        "last_po_price": "Last PO Price",
+        "last_paid": "Last Quoted Price",
         "rolling_average_6m": "6-Month Rolling Average",
         "none_available": "No Baseline Available"
       },
@@ -1778,7 +1779,30 @@
       "competingOffersCard": "Competing Offers at Compare Time",
       "noCompetingOffers": "No competing offers recorded in the comparison context.",
       "calculationCard": "Calculation Snapshot",
-      "formula": "Formula: Baseline Value − Actual Paid = Net Saving"
+      "formula": "Formula: Baseline Value − Actual Paid = Net Saving",
+      "baselineSourceOrder": "Baseline purchase order"
+    },
+    "fromOrder": {
+      "title": "Record outcome — {{order}}",
+      "subtitle": "One line per order line, converted from packs to base units. Check and edit before saving.",
+      "backToOrder": "Back to order",
+      "baselineNote": "Savings are measured against the last purchase-order price for each product, excluding this order. Products without an earlier order fall back to the last quoted price.",
+      "conversion": "{{packs}} × {{pack}} = {{quantity}} {{unit}}",
+      "quantityLabel": "Quantity ({{unit}})",
+      "totalLabel": "Total paid excl. tax ({{currency}})",
+      "unitPriceHint": "{{price}} per {{unit}}",
+      "submit": "Save {{count}} outcomes",
+      "success": "{{count}} purchase outcomes recorded.",
+      "loadError": "This order could not be loaded.",
+      "saveError": "Some outcomes could not be saved. Saved lines are marked below; try the rest again.",
+      "notRecordable": "Outcomes can only be recorded for a submitted, confirmed or received order.",
+      "alreadyRecorded": "An outcome was already recorded for one of these order lines.",
+      "viewSaving": "View saving",
+      "reasons": {
+        "no_product": "Not linked to a catalogue product",
+        "zero_quantity": "Nothing ordered on this line",
+        "already_recorded": "Outcome already recorded"
+      }
     }
   },
   "exports": {
@@ -3391,7 +3415,8 @@
       "cancel": "Cancel Order",
       "cancelConfirmTitle": "Cancel Purchase Order?",
       "cancelConfirmMessage": "Are you sure you want to cancel this order? Any received quantity will remain consumed, and any unreceived quantity will be released back to the source request.",
-      "cancelOrder": "Yes, Cancel Order"
+      "cancelOrder": "Yes, Cancel Order",
+      "recordOutcome": "Record outcome"
     }
   },
   "accounting": {

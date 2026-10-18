@@ -62,7 +62,7 @@ describe('OrderDetailComponent', () => {
           eyebrow: 'Purchase order', createdAt: 'Created {{date}}', orderDate: 'Order date', expectedDelivery: 'Expected',
           total: 'Total', confirmation: 'Confirmation', receipt: 'Receipt', linesTitle: 'Lines', linesSubtitle: 'Evidence',
           ordered: 'Ordered', confirmed: 'Confirmed', received: 'Received', remaining: 'Remaining', actionsTitle: 'Actions',
-          actionsSubtitle: 'Internal', submit: 'Submit', recordConfirmation: 'Confirm', recordReceipt: 'Receive',
+          actionsSubtitle: 'Internal', submit: 'Submit', recordOutcome: 'Record outcome', recordConfirmation: 'Confirm', recordReceipt: 'Receive',
           confirmationFormTitle: 'Confirmation', receiptFormTitle: 'Receipt', reference: 'Reference', confirmedDate: 'Date',
           receivedDate: 'Date', confirmedQuantity: 'Quantity', receivedQuantity: 'Quantity', save: 'Save',
           timelineTitle: 'Timeline', orderCreated: 'Created', confirmationRecorded: 'Confirmed', receiptRecorded: 'Receipt {{reference}}',
@@ -129,5 +129,16 @@ describe('OrderDetailComponent', () => {
     expect(fixture.nativeElement.textContent).toContain('Paper');
     expect(fixture.nativeElement.textContent).toContain('Confirm');
     expect(fixture.nativeElement.textContent).toContain('Receive');
+  });
+
+  it('links a sent order to recording its purchase outcome', () => {
+    fixture.detectChanges();
+    const link = (fixture.nativeElement as HTMLElement).querySelector('[data-testid="record-outcome"]');
+    expect(link?.textContent).toContain('Record outcome');
+    expect(link?.getAttribute('href')).toBe('/orders/order-1/record-outcome');
+    const component = fixture.componentInstance;
+    expect(component.canRecordOutcome('received')).toBeTrue();
+    expect(component.canRecordOutcome('draft')).toBeFalse();
+    expect(component.canRecordOutcome('cancelled')).toBeFalse();
   });
 });

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Any, Literal
 from uuid import UUID
@@ -10,6 +10,8 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from procurepilot_api.modules.catalogue.units import canonical_base_unit
 
 MoneyAmount = Decimal
+BaselinePolicy = Literal["last_po_price", "last_paid", "rolling_average_6m", "none_available"]
+DeliveryResult = Literal["ordered", "partially_delivered", "delivered", "cancelled", "disputed"]
 
 
 class Money(BaseModel):
@@ -30,11 +32,14 @@ class PurchaseOutcomeCreate(BaseModel):
     quotation_line_id: UUID | None = None
     match_decision_id: UUID | None = None
     landed_cost_id: UUID | None = None
+    # Set when the outcome is recorded from a purchase order line (finding 22); the baseline then
+    # excludes that purchase order.
+    purchase_order_line_id: UUID | None = None
     quantity: Decimal = Field(gt=0, decimal_places=6)
     base_unit: str
     unit_price: Money
     total_paid: Money
-    delivery_result: Literal["ordered", "partially_delivered", "delivered", "cancelled", "disputed"]
+    delivery_result: DeliveryResult
     ordered_at: datetime | None = None
     delivered_at: datetime | None = None
     notes: str | None = Field(default=None, max_length=2000)
@@ -52,6 +57,7 @@ class PurchaseRecord(BaseModel):
     quotation_line_id: UUID | None = None
     match_decision_id: UUID | None = None
     landed_cost_id: UUID | None = None
+    purchase_order_line_id: UUID | None = None
     quantity: Decimal
     base_unit: str
     unit_price: Money
@@ -70,8 +76,9 @@ class SavingRecord(BaseModel):
     workspace_product_id: UUID
     supplier_id: UUID | None = None
     status: Literal["pending", "verified"]
-    baseline_policy: Literal["last_paid", "rolling_average_6m", "none_available"]
+    baseline_policy: BaselinePolicy
     baseline_source_landed_cost_ids: list[UUID]
+    baseline_source_po_line_ids: list[UUID] | None = None
     baseline_unit_price: Money | None = None
     baseline_value: Money | None = None
     actual_value: Money
@@ -101,3 +108,31 @@ class SavingEvidence(BaseModel):
     match_decision: dict[str, Any] | None = None
     competing_offers: list[dict[str, Any]]
     calculation: dict[str, Any]
+
+
+class PurchaseOutcomePrefillLine(BaseModel):
+    """One PO line converted to an outcome line: base units and per-base-unit price (ADR-020)."""
+
+    purchase_order_line_id: UUID
+    line_number: int
+    description: str
+    workspace_product_id: UUID | None = None
+    ordered_packs: Decimal
+    pack_base_quantity: Decimal | None = None
+    quantity: Decimal
+    base_unit: str
+    unit_price: Money
+    total_paid: Money
+    recordable: bool
+    reason: Literal["no_product", "zero_quantity", "already_recorded"] | None = None
+    recorded_saving_id: UUID | None = None
+
+
+class PurchaseOutcomePrefill(BaseModel):
+    purchase_order_id: UUID
+    order_number: str
+    status: str
+    supplier_id: UUID
+    order_date: date
+    delivery_result: DeliveryResult
+    lines: list[PurchaseOutcomePrefillLine]

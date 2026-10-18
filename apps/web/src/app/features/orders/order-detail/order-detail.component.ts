@@ -98,6 +98,11 @@ export class OrderDetailComponent implements OnInit {
       : this.formatService.formatExactQuantity(value);
   }
 
+  /** Purchase outcomes (savings) can be recorded from a sent order, not a draft or cancelled one. */
+  canRecordOutcome(status: string): boolean {
+    return ['submitted', 'confirmed', 'partially_received', 'received', 'closed'].includes(status);
+  }
+
   getStatusLabel(status: string): string { return this.translate.instant(`orders.status.${status}`); }
   getEvidenceLabel(state: EvidenceState): string { return this.translate.instant(`orders.evidence.${state}`); }
 

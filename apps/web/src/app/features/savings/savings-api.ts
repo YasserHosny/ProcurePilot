@@ -8,6 +8,8 @@ import type {
   PurchaseDeliveryResult,
   PurchaseOutcomeCreate,
   PurchaseOutcomeCreated,
+  PurchaseOutcomePrefill,
+  PurchaseOutcomePrefillLine,
   PurchaseRecord,
   SavingCalculationEvidence,
   SavingEvidence,
@@ -24,6 +26,8 @@ export type {
   PurchaseRecord,
   SavingRecord,
   PurchaseOutcomeCreated,
+  PurchaseOutcomePrefill,
+  PurchaseOutcomePrefillLine,
   SavingList,
   SavingCalculationEvidence,
   SavingEvidence,
@@ -39,6 +43,10 @@ export class SavingsApiService {
     idempotencyKey?: string,
   ): Observable<PurchaseOutcomeCreated> {
     return this.api.recordPurchase(body, idempotencyKey);
+  }
+
+  getPurchasePrefill(purchaseOrderId: string): Observable<PurchaseOutcomePrefill> {
+    return this.api.getPurchasePrefill(purchaseOrderId);
   }
 
   getSavings(params?: {

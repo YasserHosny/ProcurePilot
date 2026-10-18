@@ -125,6 +125,13 @@
             </span>
           </div>
 
+          @if (baselineOrder(evidence.saving_record); as order) {
+            <div class="detail-row">
+              <span class="detail-label">{{ 'savings.evidence.baselineSourceOrder' | translate }}</span>
+              <a class="detail-val" [routerLink]="['/orders', order.id]" data-testid="baseline-source-order">{{ order.number }}</a>
+            </div>
+          }
+
           <mat-divider></mat-divider>
 
           <div class="detail-row">

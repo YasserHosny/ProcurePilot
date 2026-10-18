@@ -797,6 +797,7 @@ rows behind.
 | `quotation_line_id` | uuid | Optional FK -> QuotationLine; evidence link when the purchase followed a quoted line |
 | `match_decision_id` | uuid | Optional FK -> MatchDecision; evidence link when the purchase followed a confirmed match |
 | `landed_cost_id` | uuid | Optional FK -> LandedCost; evidence link to the compared offer when present |
+| `purchase_order_line_id` | uuid | Optional tenant-pinned FK -> PurchaseOrderLine when the outcome was recorded from a PO; unique per tenant, and its order is excluded from the baseline |
 | `recorded_by` | uuid | Required FK -> Membership; human who recorded the outcome |
 | `quantity` | numeric(18,6) | Required actual ordered quantity; check `> 0` |
 | `base_unit` | text | Required FK -> `supported_base_unit.code` |
@@ -831,8 +832,9 @@ of the purchase evidence row.
 | `workspace_product_id` | uuid | Required FK -> WorkspaceProduct; copied for filtering and ledger display |
 | `supplier_id` | uuid | Optional FK -> Supplier; copied from the purchase record |
 | `status` | enum | `pending` or `verified`; default `pending` |
-| `baseline_policy` | enum | `last_paid`, `rolling_average_6m`, or `none_available`; actual policy used at record time |
-| `baseline_source_landed_cost_ids` | uuid[] | Source landed-cost rows from the price-history summary; empty only when no baseline exists |
+| `baseline_policy` | enum | `last_po_price`, `last_paid` (latest quoted landed cost), `rolling_average_6m`, or `none_available`; actual policy used at record time, tried in that order |
+| `baseline_source_landed_cost_ids` | uuid[] | Source landed-cost rows from the price-history summary; empty for `last_po_price` and when no baseline exists |
+| `baseline_source_po_line_ids` | uuid[] | Optional source `purchase_order_line` rows of a `last_po_price` baseline (pack price / `pack_base_quantity`, ADR-020); null for quote-based policies |
 | `baseline_unit_price_amount` | numeric(18,4) | Optional normalised unit baseline amount |
 | `baseline_unit_price_currency` | text | Optional FK -> `supported_currency.code`; required with `baseline_unit_price_amount` |
 | `baseline_value_amount` | numeric(18,4) | Optional baseline unit price multiplied by recorded quantity |
@@ -841,7 +843,7 @@ of the purchase evidence row.
 | `actual_value_currency` | text | Required FK -> `supported_currency.code` |
 | `delta_amount` | numeric(18,4) | Optional signed saving, `baseline_value - actual_value`; positive, zero, and negative values are valid |
 | `delta_currency` | text | Optional FK -> `supported_currency.code`; required with `delta_amount` |
-| `calculation_version` | text | Required calculation identifier, for example `saving-baseline-v1` |
+| `calculation_version` | text | Required calculation identifier, for example `saving-baseline-v2` (v2 adds `last_po_price`) |
 | `calculation_inputs` | jsonb | Required replay snapshot: quantity, selected policy, source point ids, window months, and actual total |
 | `recorded_by` | uuid | Required FK -> Membership; copied from the purchase record |
 | `recorded_at` | timestamptz | Required time the baseline, actual, and delta were captured |

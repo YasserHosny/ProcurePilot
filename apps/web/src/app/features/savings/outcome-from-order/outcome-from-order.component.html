@@ -1,0 +1,104 @@
+<div class="outcome-from-order">
+  <a mat-button [routerLink]="['/orders', orderId]" class="back-link">
+    <mat-icon aria-hidden="true">arrow_back</mat-icon>{{ 'savings.fromOrder.backToOrder' | translate }}
+  </a>
+
+  <div class="page-header">
+    <h1>{{ 'savings.fromOrder.title' | translate: { order: prefill()?.order_number ?? '' } }}</h1>
+    <p>{{ 'savings.fromOrder.subtitle' | translate }}</p>
+  </div>
+
+  @if (errorMessage(); as error) {
+    <mat-card class="error-banner" role="alert">
+      <mat-icon aria-hidden="true">error_outline</mat-icon><span>{{ error }}</span>
+    </mat-card>
+  }
+
+  @if (isLoading()) {
+    <div class="loading-state" aria-live="polite">
+      <mat-spinner [attr.aria-label]="'common.loading' | translate" diameter="40"></mat-spinner>
+    </div>
+  } @else {
+    @if (prefill(); as order) {
+    <mat-card class="form-card">
+      <div class="info-banner" role="status">
+        <mat-icon aria-hidden="true">insights</mat-icon>
+        <span>{{ 'savings.fromOrder.baselineNote' | translate }}</span>
+      </div>
+
+      <mat-form-field appearance="outline" class="delivery-field">
+        <mat-label>{{ 'savings.outcomeCapture.deliveryResultLabel' | translate }}</mat-label>
+        <mat-select [ngModel]="deliveryResult()" (ngModelChange)="deliveryResult.set($event)" data-testid="delivery-result">
+          @for (result of deliveryResults; track result) {
+            <mat-option [value]="result">{{ 'savings.outcomeCapture.deliveryResults.' + result | translate }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+
+      <div class="line-list" data-testid="outcome-lines">
+        @for (edit of lines(); track edit.line.purchase_order_line_id; let i = $index) {
+          <div class="line-row" [class.disabled]="!edit.line.recordable" data-testid="outcome-line">
+            <mat-checkbox
+              [checked]="edit.include"
+              [disabled]="!edit.line.recordable || isSubmitting()"
+              (change)="update(i, { include: $event.checked })"
+              [attr.aria-label]="edit.line.description"
+            ></mat-checkbox>
+            <div class="line-description">
+              <strong>#{{ edit.line.line_number }} {{ edit.line.description }}</strong>
+              <span class="conversion">{{ conversionLabel(edit.line) }}</span>
+              @if (edit.line.reason; as reason) {
+                <span class="line-reason" data-testid="line-reason">
+                  {{ 'savings.fromOrder.reasons.' + reason | translate }}
+                  @if (edit.line.recorded_saving_id; as savingId) {
+                    <a [routerLink]="['/savings', savingId, 'evidence']">{{ 'savings.fromOrder.viewSaving' | translate }}</a>
+                  }
+                </span>
+              }
+            </div>
+            @if (edit.line.recordable) {
+              <mat-form-field appearance="outline" class="qty-field">
+                <mat-label>{{ 'savings.fromOrder.quantityLabel' | translate: { unit: unitLabel(edit.line) } }}</mat-label>
+                <input
+                  matInput
+                  type="text"
+                  inputmode="decimal"
+                  [ngModel]="edit.quantity"
+                  (ngModelChange)="update(i, { quantity: $event })"
+                  [disabled]="!edit.include || isSubmitting()"
+                  data-testid="line-quantity"
+                />
+              </mat-form-field>
+              <mat-form-field appearance="outline" class="total-field">
+                <mat-label>{{ 'savings.fromOrder.totalLabel' | translate: { currency: edit.line.total_paid.currency } }}</mat-label>
+                <input
+                  matInput
+                  type="text"
+                  inputmode="decimal"
+                  [ngModel]="edit.total"
+                  (ngModelChange)="update(i, { total: $event })"
+                  [disabled]="!edit.include || isSubmitting()"
+                  data-testid="line-total"
+                />
+                @if (unitPrice(edit); as price) {
+                  <mat-hint>{{ 'savings.fromOrder.unitPriceHint' | translate: { price: ({ amount: price, currency: edit.line.total_paid.currency } | formatMoney), unit: unitLabel(edit.line) } }}</mat-hint>
+                }
+              </mat-form-field>
+            }
+          </div>
+        }
+      </div>
+
+      <div class="form-actions">
+        <a mat-stroked-button [routerLink]="['/orders', order.purchase_order_id]">{{ 'savings.outcomeCapture.cancelButton' | translate }}</a>
+        <button mat-flat-button color="primary" type="button" (click)="submit()" [disabled]="!canSubmit()" data-testid="save-outcomes">
+          @if (isSubmitting()) {
+            <mat-spinner [attr.aria-label]="'common.loading' | translate" diameter="18"></mat-spinner>
+          }
+          {{ 'savings.fromOrder.submit' | translate: { count: selectedCount() } }}
+        </button>
+      </div>
+    </mat-card>
+    }
+  }
+</div>
