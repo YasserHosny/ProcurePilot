@@ -19,19 +19,27 @@ abstract class BiometricAuth {
 
 /// Adapter around [LocalAuthentication].
 class LocalAuthAdapter implements BiometricAuth {
-  const LocalAuthAdapter(this._localAuth);
+  const LocalAuthAdapter(this._localAuth, {bool? isWeb})
+      : _isWeb = isWeb ?? kIsWeb;
 
   final LocalAuthentication _localAuth;
+  final bool _isWeb;
 
   @override
   Future<bool> isAvailable() async {
-    final available = await _localAuth.canCheckBiometrics;
-    final enrolled = await _localAuth.getAvailableBiometrics();
-    return available && enrolled.isNotEmpty;
+    if (_isWeb) return false;
+    try {
+      final available = await _localAuth.canCheckBiometrics;
+      final enrolled = await _localAuth.getAvailableBiometrics();
+      return available && enrolled.isNotEmpty;
+    } on Exception {
+      return false;
+    }
   }
 
   @override
   Future<bool> authenticate({required String localizedReason}) async {
+    if (_isWeb) return false;
     try {
       return await _localAuth.authenticate(
         localizedReason: localizedReason,

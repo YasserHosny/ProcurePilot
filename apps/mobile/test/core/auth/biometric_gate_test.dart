@@ -1,8 +1,10 @@
 import 'dart:convert';
 
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:local_auth/local_auth.dart';
 import 'package:procurepilot_mobile/core/auth/auth_service.dart';
 import 'package:procurepilot_mobile/core/auth/biometric_gate.dart';
 
@@ -101,4 +103,166 @@ void main() {
       expect(result, BiometricResult.failed);
     });
   });
+
+  group('LocalAuthAdapter and BiometricGate with platform fakes', () {
+    test('returns false and notAvailable when plugin throws PlatformException', () async {
+      final fake = _FakePlatformExceptionLocalAuth();
+      final adapter = LocalAuthAdapter(fake, isWeb: false);
+
+      expect(await adapter.isAvailable(), isFalse);
+      expect(await adapter.authenticate(localizedReason: 'Test'), isFalse);
+
+      final gate = BiometricGate(
+        biometricAuth: adapter,
+        authService: _authService(refreshStatus: 200),
+      );
+      final result = await gate.unlock(localizedReason: 'Test');
+      expect(result, BiometricResult.notAvailable);
+      expect(fake.canCheckBiometricsCalls, greaterThanOrEqualTo(1));
+    });
+
+    test('returns false and notAvailable when plugin throws MissingPluginException', () async {
+      final fake = _FakeMissingPluginExceptionLocalAuth();
+      final adapter = LocalAuthAdapter(fake, isWeb: false);
+
+      expect(await adapter.isAvailable(), isFalse);
+      expect(await adapter.authenticate(localizedReason: 'Test'), isFalse);
+
+      final gate = BiometricGate(
+        biometricAuth: adapter,
+        authService: _authService(refreshStatus: 200),
+      );
+      final result = await gate.unlock(localizedReason: 'Test');
+      expect(result, BiometricResult.notAvailable);
+      expect(fake.canCheckBiometricsCalls, greaterThanOrEqualTo(1));
+    });
+
+    test('returns false when isWeb: true and fake is never called', () async {
+      final fake = _FakePlatformExceptionLocalAuth();
+      final adapter = LocalAuthAdapter(fake, isWeb: true);
+
+      expect(await adapter.isAvailable(), isFalse);
+      expect(await adapter.authenticate(localizedReason: 'Test'), isFalse);
+
+      final gate = BiometricGate(
+        biometricAuth: adapter,
+        authService: _authService(refreshStatus: 200),
+      );
+      final result = await gate.unlock(localizedReason: 'Test');
+      expect(result, BiometricResult.notAvailable);
+
+      expect(fake.canCheckBiometricsCalls, equals(0));
+      expect(fake.getAvailableBiometricsCalls, equals(0));
+      expect(fake.authenticateCalls, equals(0));
+    });
+
+    test('returns true when normal fake has biometrics enrolled (regression)', () async {
+      final fake = _FakeEnrolledLocalAuth();
+      final adapter = LocalAuthAdapter(fake, isWeb: false);
+
+      expect(await adapter.isAvailable(), isTrue);
+      expect(await adapter.authenticate(localizedReason: 'Test'), isTrue);
+
+      final gate = BiometricGate(
+        biometricAuth: adapter,
+        authService: _authService(refreshStatus: 200),
+      );
+      final result = await gate.unlock(localizedReason: 'Test');
+      expect(result, BiometricResult.success);
+
+      expect(fake.canCheckBiometricsCalls, greaterThanOrEqualTo(1));
+      expect(fake.getAvailableBiometricsCalls, greaterThanOrEqualTo(1));
+      expect(fake.authenticateCalls, equals(2));
+    });
+  });
+}
+
+class _FakePlatformExceptionLocalAuth extends LocalAuthentication {
+  int canCheckBiometricsCalls = 0;
+  int getAvailableBiometricsCalls = 0;
+  int authenticateCalls = 0;
+
+  @override
+  Future<bool> get canCheckBiometrics {
+    canCheckBiometricsCalls++;
+    throw PlatformException(code: 'ERROR', message: 'Biometrics unavailable');
+  }
+
+  @override
+  Future<List<BiometricType>> getAvailableBiometrics() {
+    getAvailableBiometricsCalls++;
+    throw PlatformException(code: 'ERROR', message: 'Biometrics unavailable');
+  }
+
+  @override
+  Future<bool> authenticate({
+    required String localizedReason,
+    Iterable<dynamic>? authMessages,
+    AuthenticationOptions options = const AuthenticationOptions(),
+  }) {
+    authenticateCalls++;
+    throw PlatformException(code: 'ERROR', message: 'Biometrics unavailable');
+  }
+}
+
+class _FakeMissingPluginExceptionLocalAuth extends LocalAuthentication {
+  int canCheckBiometricsCalls = 0;
+  int getAvailableBiometricsCalls = 0;
+  int authenticateCalls = 0;
+
+  @override
+  Future<bool> get canCheckBiometrics {
+    canCheckBiometricsCalls++;
+    throw MissingPluginException(
+      'No implementation found for method canCheckBiometrics on channel plugins.flutter.io/local_auth',
+    );
+  }
+
+  @override
+  Future<List<BiometricType>> getAvailableBiometrics() {
+    getAvailableBiometricsCalls++;
+    throw MissingPluginException(
+      'No implementation found for method getAvailableBiometrics on channel plugins.flutter.io/local_auth',
+    );
+  }
+
+  @override
+  Future<bool> authenticate({
+    required String localizedReason,
+    Iterable<dynamic>? authMessages,
+    AuthenticationOptions options = const AuthenticationOptions(),
+  }) {
+    authenticateCalls++;
+    throw MissingPluginException(
+      'No implementation found for method authenticate on channel plugins.flutter.io/local_auth',
+    );
+  }
+}
+
+class _FakeEnrolledLocalAuth extends LocalAuthentication {
+  int canCheckBiometricsCalls = 0;
+  int getAvailableBiometricsCalls = 0;
+  int authenticateCalls = 0;
+
+  @override
+  Future<bool> get canCheckBiometrics async {
+    canCheckBiometricsCalls++;
+    return true;
+  }
+
+  @override
+  Future<List<BiometricType>> getAvailableBiometrics() async {
+    getAvailableBiometricsCalls++;
+    return const [BiometricType.fingerprint];
+  }
+
+  @override
+  Future<bool> authenticate({
+    required String localizedReason,
+    Iterable<dynamic>? authMessages,
+    AuthenticationOptions options = const AuthenticationOptions(),
+  }) async {
+    authenticateCalls++;
+    return true;
+  }
 }

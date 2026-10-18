@@ -54,8 +54,13 @@ class _SignInScreenState extends State<SignInScreen> {
 
       _syncApiTokens();
 
-      final biometricAvailable = await _biometricGate.biometricAuth
-          .isAvailable();
+      bool biometricAvailable = false;
+      try {
+        biometricAvailable =
+            await _biometricGate.biometricAuth.isAvailable();
+      } catch (_) {
+        biometricAvailable = false;
+      }
       if (!mounted) return;
 
       if (biometricAvailable) {

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:procurepilot_mobile/core/auth/auth_service.dart';
+import 'package:procurepilot_mobile/core/auth/biometric_gate.dart';
 import 'package:procurepilot_mobile/features/auth/sign_in_screen.dart';
 import 'package:procurepilot_mobile/features/auth/splash_screen.dart';
 import 'package:procurepilot_mobile/features/home/home_screen.dart';
@@ -260,5 +262,49 @@ void main() {
         expect(find.text('rate limit exceeded'), findsNothing);
       },
     );
+
+    testWidgets('sign-in navigates to /home when isAvailable throws', (
+      tester,
+    ) async {
+      final auth = FakeAuthService(
+        storage: FakeStorage(),
+        httpClient: defaultTestHttpClient(),
+        supabaseUrl: 'https://test.supabase.co',
+        supabaseAnonKey: 'test-anon-key',
+      )..tokenRole = 'branch_manager';
+
+      await pumpWithServices(
+        tester,
+        child: const SignInScreen(),
+        authService: auth,
+        biometricAuth: _ThrowingBiometricAuth(),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.byKey(const Key('signInEmailField')),
+        'user@example.com',
+      );
+      await tester.enterText(
+        find.byKey(const Key('signInPasswordField')),
+        'password',
+      );
+      await tester.tap(find.byKey(const Key('signInSubmitButton')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Home'), findsOneWidget);
+    });
   });
+}
+
+class _ThrowingBiometricAuth implements BiometricAuth {
+  @override
+  Future<bool> isAvailable() async {
+    throw MissingPluginException(
+      'No implementation found for method canCheckBiometrics on channel plugins.flutter.io/local_auth',
+    );
+  }
+
+  @override
+  Future<bool> authenticate({required String localizedReason}) async => false;
 }
