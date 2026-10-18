@@ -3906,7 +3906,9 @@
       "termsHeading": "شروط المشتري",
       "replyInstructions": "يرجى الرد مباشرة على هذا البريد أو إرسال عرض السعر إلى:",
       "englishSummary": "هذا طلب عرض سعر من {{tenant}}.",
-      "packHint": "(عبوة {{count}} × {{size}} {{unit}})",
+      "packQuantity": "{{count}} عبوة ({{size}} {{unit}} للعبوة) — {{total}} {{unit}}",
+      "packQuantityOne": "عبوة واحدة ({{size}} {{unit}})",
+      "packsOnly": "{{count}} عبوة",
       "units": {
         "litre": "لتر",
         "millilitre": "مل",

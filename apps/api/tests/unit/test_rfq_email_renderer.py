@@ -26,8 +26,8 @@ def test_arabic_email_localises_dates_units_and_rtl() -> None:
         reply_to="reply@example.test",
     )
     assert "مطاعم سند" in mail.subject and "مطاعم سند" in mail.from_name
-    assert "٢٠ أكتوبر ٢٠٢٦" in mail.text and "٥٠ كجم" in mail.text
-    assert "عبوة ٢٠ × ٢٥ كجم" in mail.text and "تسليم صباحاً" in mail.text
+    assert "٢٠ أكتوبر ٢٠٢٦" in mail.text
+    assert "٥٠ عبوة (٥٠٠ كجم للعبوة) — ٢٥٠٠٠ كجم" in mail.text and "تسليم صباحاً" in mail.text
     assert 'lang="ar" dir="rtl"' in mail.html and "This is a request" in mail.text
 
 
@@ -73,7 +73,7 @@ def test_english_email_and_terms_escaping() -> None:
         reply_to="a@b.test",
     )
     assert "Acme" in mail.subject and "Acme" in mail.from_name
-    assert "12.5 kg" in mail.text and "<script>alert(1)</script>" in mail.text
+    assert "12.5 packs" in mail.text and "<script>alert(1)</script>" in mail.text
     assert "&lt;script&gt;" in mail.html and "<script>" not in mail.html
     assert 'lang="en" dir="ltr"' in mail.html
     assert "terms" in mail.text and "terms" in mail.html
@@ -105,3 +105,62 @@ def test_email_translation_key_parity() -> None:
         return result
 
     assert paths(en) == paths(ar)
+
+
+# Finding 39: rfq_line.quantity is in packs (ADR-020). The email states the pack count, the
+# size of one pack, and the base-unit total; a one-base-unit pack reads as the base unit alone.
+_RICE = RfqEmailLine(
+    product_name="أرز مصري (شيكارة 25 كجم)",
+    quantity=Decimal("12.000000"),
+    unit_code="kilogram",
+    pack_count=Decimal("1"),
+    unit_size=Decimal("25.000000"),
+)
+_CARTON = RfqEmailLine(
+    product_name="Foil koshary boxes (carton 500)",
+    quantity=Decimal("4.000000"),
+    unit_code="each",
+    pack_count=Decimal("500"),
+    unit_size=Decimal("1.000000"),
+)
+_ONION = RfqEmailLine(
+    product_name="بصل أبيض",
+    quantity=Decimal("80.000000"),
+    unit_code="kilogram",
+    pack_count=Decimal("1"),
+    unit_size=Decimal("1.000000"),
+)
+
+
+def _render(locale: str, lines: list[RfqEmailLine]) -> str:
+    return render_rfq_email(
+        tenant_name="مطاعم سند",
+        locale=locale,
+        needed_by=date(2026, 10, 20),
+        lines=lines,
+        tenant_terms=None,
+        reply_to=None,
+    ).text
+
+
+def test_arabic_email_states_packs_size_and_base_total() -> None:
+    text = _render("ar", [_RICE, _ONION])
+    assert "- أرز مصري (شيكارة 25 كجم): ١٢ عبوة (٢٥ كجم للعبوة) — ٣٠٠ كجم" in text
+    assert "- بصل أبيض: ٨٠ كجم\n" in text
+    assert "١٢ كجم" not in text and "عبوة ١ ×" not in text
+
+
+def test_english_email_states_packs_size_and_base_total() -> None:
+    text = _render("en", [_CARTON, _ONION])
+    assert "- Foil koshary boxes (carton 500): 4 packs (500 pcs each) — 2000 pcs" in text
+    assert "- بصل أبيض: 80 kg\n" in text
+    assert "4 pcs" not in text and "pack 500 × 1" not in text
+
+
+def test_single_pack_and_unknown_pack_size() -> None:
+    one = _RICE.model_copy(update={"quantity": Decimal("1")})
+    assert "1 pack (25 kg)" in _render("en", [one])
+    assert "عبوة واحدة (٢٥ كجم)" in _render("ar", [one])
+    unknown = _RICE.model_copy(update={"pack_count": None, "unit_size": None})
+    assert ": 12 packs\n" in _render("en", [unknown])
+    assert ": ١٢ عبوة\n" in _render("ar", [unknown])

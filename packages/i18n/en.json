@@ -3906,7 +3906,9 @@
       "termsHeading": "Buyer terms",
       "replyInstructions": "Please reply directly to this email or send your quotation to:",
       "englishSummary": "This is a request for quotation from {{tenant}}.",
-      "packHint": "(pack {{count}} × {{size}} {{unit}})",
+      "packQuantity": "{{count}} packs ({{size}} {{unit}} each) — {{total}} {{unit}}",
+      "packQuantityOne": "1 pack ({{size}} {{unit}})",
+      "packsOnly": "{{count}} packs",
       "units": {
         "litre": "L",
         "millilitre": "mL",
