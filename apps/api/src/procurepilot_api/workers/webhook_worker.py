@@ -20,6 +20,8 @@ from procurepilot_api.modules.webhooks.service import (
     sign_webhook_payload,
 )
 from procurepilot_api.modules.webhooks.url_safety import (
+    PinnedWebhookTransport,
+    UnsafeUrlError,
     categorize_delivery_error,
     check_endpoint_url_safety,
 )
@@ -38,6 +40,9 @@ def tick(settings: Settings, *, http_client: httpx.Client | None = None) -> dict
     client = http_client or httpx.Client(
         timeout=settings.webhook_request_timeout_seconds,
         follow_redirects=False,
+        # A proxy would resolve the endpoint itself, outside the pinned transport.
+        trust_env=settings.webhook_allow_private_endpoints,
+        transport=(None if settings.webhook_allow_private_endpoints else PinnedWebhookTransport()),
     )
     close_client = http_client is None
     try:
@@ -123,6 +128,9 @@ def _deliver_one(settings: Settings, client: httpx.Client, delivery: dict[str, A
             follow_redirects=False,
         )
         response.raise_for_status()
+    except UnsafeUrlError:
+        _mark_failed(settings, delivery_id, "endpoint_not_allowed")
+        return "failed"
     except Exception as exc:
         error_cat = categorize_delivery_error(exc)
         attempts = int(delivery["attempts"])
