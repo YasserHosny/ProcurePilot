@@ -34,6 +34,7 @@ jobs:
       pull-requests: read
     outputs:
       code: ${{ steps.code.outputs.code }}
+      web: ${{ steps.web-output.outputs.web }}
     steps:
       - name: Filter changed paths
         id: paths
@@ -48,6 +49,17 @@ jobs:
               - '!specs/**'
               - '!.specify/**'
               - '!**/*.md'
+      - name: Filter web changed paths
+        id: web
+        if: github.event_name != 'push'
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            web:
+              - 'apps/web/**'
+              - 'packages/**'
+              - '.github/workflows/**'
+              - 'supabase/config.toml'
       - name: Set code-change output
         id: code
         env:
@@ -58,6 +70,17 @@ jobs:
             echo 'code=true' >> "$GITHUB_OUTPUT"
           else
             echo "code=$CODE_PATHS" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Set web-change output
+        id: web-output
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          WEB_PATHS: ${{ steps.web.outputs.web }}
+        run: |
+          if [ "$EVENT_NAME" = push ]; then
+            echo 'web=true' >> "$GITHUB_OUTPUT"
+          else
+            echo "web=$WEB_PATHS" >> "$GITHUB_OUTPUT"
           fi
 
   api-image-i18n:
@@ -119,6 +142,10 @@ jobs:
       - name: Install web dependencies
         working-directory: apps/web
         run: pnpm install --ignore-workspace --frozen-lockfile
+      - name: E2E shard plan
+        run: |
+          python3 -m unittest discover -s scripts/ci -p 'test_e2e_shard.py' -v
+          python3 scripts/ci/e2e_shard.py check --total 3
       - name: Lint backend
         run: uv run --project apps/api ruff check apps/api
       - name: Lint web
@@ -421,6 +448,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # Matrix size and planner --total 3 must change together.
+        # Regenerate e2e-durations.json with e2e_shard.py from-logs.
         shard: [1, 2, 3]
     runs-on: ubuntu-latest
     services:
@@ -451,6 +480,17 @@ jobs:
           # cannot change the stack under us; bump deliberately.
           version: 2.121.0
 
+      - name: Install web dependencies
+        working-directory: apps/web
+        run: pnpm install --ignore-workspace --frozen-lockfile
+
+      # Compile while the ~2 min Supabase pull/start runs; the dev server only needs the API
+      # at request time. Readiness is verified before the first test.
+      - name: Start the web app
+        working-directory: apps/web
+        run: |
+          pnpm exec ng serve --port 4200 > /tmp/ng-serve.log 2>&1 &
+
       - name: Start Supabase
         # `supabase start` — NOT docker compose. Three GoTrue versions could not migrate against a
         # hand-assembled compose stack, including the pairing Supabase themselves publish; the CLI
@@ -461,9 +501,8 @@ jobs:
         # Skip studio/postgres-meta (dashboard), vector/logflare (analytics), edge-runtime (no
         # functions), mailpit (auth email confirmations are off in supabase/config.toml), and
         # realtime (the app does not use it). This limits startup to the five services the app uses.
-        # Stagger shard pulls to reduce public.ecr.aws contention, then retry transient failures.
+        # Retry transient startup failures with increasing backoff.
         run: |
-          sleep $(( (${{ matrix.shard }} - 1) * 25 ))
           for attempt in 1 2 3 4 5; do
             if supabase start -x studio,vector,logflare,edge-runtime,postgres-meta,mailpit,realtime; then
               exit 0
@@ -546,28 +585,35 @@ jobs:
             echo "::error::extraction worker did not start or exited immediately"; exit 1;
           }
 
-      - name: Install web dependencies
-        working-directory: apps/web
-        run: pnpm install --ignore-workspace --frozen-lockfile
-
-      - name: Start the web app
-        working-directory: apps/web
+      - name: Wait for the web app
         run: |
-          pnpm exec ng serve --port 4200 &
-          for i in $(seq 1 60); do
+          for i in $(seq 1 90); do
             curl -sf http://localhost:4200/ >/dev/null && break
             sleep 2
           done
-          curl -sf http://localhost:4200/ >/dev/null
+          curl -sf http://localhost:4200/ >/dev/null || {
+            tail -n 50 /tmp/ng-serve.log
+            echo "::error::web app did not become ready"; exit 1
+          }
 
       # Specs are sharded by file across three runners. Each shard boots its own isolated stack
       # (Supabase, Redis, API, worker, web), so no state is shared between shards; within a shard
       # the suite stays serial (workers: 1) exactly as before.
       - name: Accessibility — WCAG 2.1 AA, zero violations
+        # Skipped for PRs touching nothing under apps/web, packages or the workflows
+        # (backend-only changes), unless supabase/config.toml changes. Pushes to main
+        # always run it; the following step still runs the non-a11y specs either way.
+        if: needs.changes.outputs.web == 'true'
         # Its own step so an accessibility regression is named as one rather than buried among
         # the functional specs (FR-022, SC-006).
         working-directory: apps/web
-        run: pnpm exec playwright test a11y --shard=${{ matrix.shard }}/3
+        run: |
+          files=$(python3 ../../scripts/ci/e2e_shard.py plan --shard ${{ matrix.shard }} --total 3 --kind a11y)
+          if [ -z "$files" ]; then
+            echo "::notice::No a11y end-to-end specs assigned to this shard"
+            exit 0
+          fi
+          pnpm exec playwright test $files
 
       - name: Run end-to-end specs
         # The accessibility step already ran every a11y spec; this complement is exactly the files
@@ -578,12 +624,12 @@ jobs:
           TZ: Asia/Dubai
         run: |
           google-chrome --version
-          files=$(cd tests/e2e && ls *.spec.ts | grep -v a11y | sed 's#^#tests/e2e/#')
+          files=$(python3 ../../scripts/ci/e2e_shard.py plan --shard ${{ matrix.shard }} --total 3 --kind functional)
           if [ -z "$files" ]; then
             echo "::error::No non-a11y end-to-end specs found"
             exit 1
           fi
-          pnpm exec playwright test $files --shard=${{ matrix.shard }}/3
+          pnpm exec playwright test $files
 
       - name: Upload failure artefacts
         if: failure()
