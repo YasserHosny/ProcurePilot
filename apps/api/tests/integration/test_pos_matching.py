@@ -54,9 +54,7 @@ class RecordingAuditWriter:
         self.events.append(event)
 
 
-def _app(
-    monkeypatch: pytest.MonkeyPatch, member: object
-) -> tuple[FastAPI, RecordingAuditWriter]:
+def _app(monkeypatch: pytest.MonkeyPatch, member: object) -> tuple[FastAPI, RecordingAuditWriter]:
     monkeypatch.setenv("POS_PROVIDER_MODE", "stub")
     settings = settings_for_test_db(monkeypatch)
     audit_writer = RecordingAuditWriter()
@@ -78,10 +76,17 @@ def _connect_owner(client: TestClient) -> dict[str, object]:
     start_res = client.post("/api/v1/pos/connect")
     assert start_res.status_code == 200
     state = parse_qs(urlparse(start_res.json()["authorization_url"]).query)["state"][0]
-    client.get(
+    cb_res = client.get(
         f"/api/v1/pos/connect/callback?code=stub-auth-code&state={state}",
         follow_redirects=False,
     )
+    assert cb_res.status_code == 302
+    assert "pos_code=stub-auth-code" in cb_res.headers["location"]
+    comp_res = client.post(
+        "/api/v1/pos/connect/complete",
+        json={"code": "stub-auth-code", "state": state},
+    )
+    assert comp_res.status_code == 201
     return client.get("/api/v1/pos/connection").json()
 
 

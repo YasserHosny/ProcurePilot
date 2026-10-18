@@ -37,9 +37,7 @@ def _app(monkeypatch: pytest.MonkeyPatch, member: object) -> FastAPI:
 def _schedule_count(tenant_id: object) -> int:
     with psycopg.connect(TEST_DATABASE_URL or "") as conn:
         with conn.cursor() as cur:
-            cur.execute(
-                "select count(*) from report_schedule where tenant_id = %s", (tenant_id,)
-            )
+            cur.execute("select count(*) from report_schedule where tenant_id = %s", (tenant_id,))
             return int(cur.fetchone()[0])
 
 
@@ -69,9 +67,7 @@ def test_export_create_rate_limit_refuses_without_queueing(
     with committed_smart_context("rl-export-create") as context:
         settings_for_test_db(monkeypatch)
         member = member_from_workspace(context.workspace)
-        monkeypatch.setattr(
-            export_service_module, "_enqueue_export_job", lambda *_a, **_k: None
-        )
+        monkeypatch.setattr(export_service_module, "_enqueue_export_job", lambda *_a, **_k: None)
         client = TestClient(_app(monkeypatch, member), raise_server_exceptions=False)
 
         payload = {
@@ -259,8 +255,13 @@ def test_accounting_discrepancy_resolve_rate_limit_refuses_without_resolving(
                             id, tenant_id, connection_id, provider_vendor_id, display_name
                         ) values (%s, %s, %s, %s, %s)
                         """,
-                        (vendor_id, context.workspace.tenant_id, connection_id,
-                         f"rl-vendor-{i}", f"Rate Limit Vendor {i}"),
+                        (
+                            vendor_id,
+                            context.workspace.tenant_id,
+                            connection_id,
+                            f"rl-vendor-{i}",
+                            f"Rate Limit Vendor {i}",
+                        ),
                     )
                     cur.execute(
                         """
@@ -269,8 +270,13 @@ def test_accounting_discrepancy_resolve_rate_limit_refuses_without_resolving(
                             amount, currency, bill_date, provider_status
                         ) values (%s, %s, %s, %s, %s, 100.00, 'USD', current_date, 'open')
                         """,
-                        (bill_id, context.workspace.tenant_id, connection_id,
-                         f"rl-bill-{i}", vendor_id),
+                        (
+                            bill_id,
+                            context.workspace.tenant_id,
+                            connection_id,
+                            f"rl-bill-{i}",
+                            vendor_id,
+                        ),
                     )
                     cur.execute(
                         """
@@ -319,6 +325,13 @@ def _connect_pos_owner(client: TestClient) -> dict[str, object]:
         follow_redirects=False,
     )
     assert cb_res.status_code == 302, cb_res.text
+    assert "pos_code=stub-auth-code" in cb_res.headers["location"]
+
+    comp_res = client.post(
+        "/api/v1/pos/connect/complete",
+        json={"code": "stub-auth-code", "state": state},
+    )
+    assert comp_res.status_code == 201, comp_res.text
 
     conn_res = client.get("/api/v1/pos/connection")
     assert conn_res.status_code == 200, conn_res.text

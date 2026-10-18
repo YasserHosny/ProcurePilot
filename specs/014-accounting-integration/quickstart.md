@@ -27,7 +27,7 @@ To manually verify against a real QuickBooks sandbox before shipping:
    QUICKBOOKS_ENVIRONMENT=sandbox
    ```
 3. Sign in as an owner, go to the new accounting connection settings screen, and connect the
-   sandbox company.
+   sandbox company (completion is now done by the signed-in owner from the app).
 
 ## Testing
 

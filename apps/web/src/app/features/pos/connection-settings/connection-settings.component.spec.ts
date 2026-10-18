@@ -455,6 +455,84 @@ describe('ConnectionSettingsComponent (T014)', () => {
   });
 
   describe('OAuth callback query parameters', () => {
+    it('should complete connection and display success snackbar when pos_code and pos_state are present', fakeAsync(() => {
+      mockQueryParamMap.set('pos_code', 'square-code-123');
+      mockQueryParamMap.set('pos_state', 'square-state-456');
+
+      component.ngOnInit();
+      tick();
+
+      const completeReq = httpTestingController.expectOne('/api/v1/pos/connect/complete');
+      expect(completeReq.request.method).toBe('POST');
+      expect(completeReq.request.body).toEqual({
+        code: 'square-code-123',
+        state: 'square-state-456',
+      });
+      completeReq.flush(mockActiveConnection);
+      tick();
+
+      expect(snackBarSpy.open).toHaveBeenCalledWith(
+        'pos.connection.connectedSuccess',
+        undefined,
+        jasmine.objectContaining({ duration: 3000 }),
+      );
+
+      expect(router.navigate).toHaveBeenCalledWith([], {
+        relativeTo: jasmine.any(Object),
+        queryParams: {
+          pos_connected: null,
+          pos_code: null,
+          pos_state: null,
+        },
+        queryParamsHandling: 'merge',
+        replaceUrl: true,
+      });
+
+      // loadConnection was also triggered
+      const connReqs = httpTestingController.match('/api/v1/pos/connection');
+      for (const req of connReqs) {
+        req.flush(mockActiveConnection);
+      }
+    }));
+
+    it('should display error snackbar and clear query params when completeConnection fails', fakeAsync(() => {
+      mockQueryParamMap.set('pos_code', 'square-code-err');
+      mockQueryParamMap.set('pos_state', 'square-state-err');
+
+      component.ngOnInit();
+      tick();
+
+      const completeReq = httpTestingController.expectOne('/api/v1/pos/connect/complete');
+      expect(completeReq.request.method).toBe('POST');
+      completeReq.flush(
+        { message: 'Invalid state' },
+        { status: 422, statusText: 'Unprocessable Entity' },
+      );
+      tick();
+
+      expect(snackBarSpy.open).toHaveBeenCalledWith(
+        'pos.connection.connectFailed',
+        undefined,
+        jasmine.objectContaining({ duration: 4000 }),
+      );
+
+      expect(router.navigate).toHaveBeenCalledWith([], {
+        relativeTo: jasmine.any(Object),
+        queryParams: {
+          pos_connected: null,
+          pos_code: null,
+          pos_state: null,
+        },
+        queryParamsHandling: 'merge',
+        replaceUrl: true,
+      });
+
+      httpTestingController.expectOne('/api/v1/pos/connection').flush(
+        { message: 'Not found' },
+        { status: 404, statusText: 'Not Found' },
+      );
+    }));
+
     it('should display success snackbar and clean query param when pos_connected=success is present', fakeAsync(() => {
       mockQueryParamMap.set('pos_connected', 'success');
 
@@ -469,7 +547,11 @@ describe('ConnectionSettingsComponent (T014)', () => {
 
       expect(router.navigate).toHaveBeenCalledWith([], {
         relativeTo: jasmine.any(Object),
-        queryParams: { pos_connected: null },
+        queryParams: {
+          pos_connected: null,
+          pos_code: null,
+          pos_state: null,
+        },
         queryParamsHandling: 'merge',
         replaceUrl: true,
       });
@@ -491,7 +573,11 @@ describe('ConnectionSettingsComponent (T014)', () => {
 
       expect(router.navigate).toHaveBeenCalledWith([], {
         relativeTo: jasmine.any(Object),
-        queryParams: { pos_connected: null },
+        queryParams: {
+          pos_connected: null,
+          pos_code: null,
+          pos_state: null,
+        },
         queryParamsHandling: 'merge',
         replaceUrl: true,
       });

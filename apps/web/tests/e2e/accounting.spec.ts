@@ -101,7 +101,7 @@ test.describe('Accounting Integration (014-accounting-integration, T036)', () =>
 
     // 2. Click Connect and complete the stub OAuth flow
     // Intercept the browser's navigation to QuickBooks OAuth consent screen and fulfill
-    // with a redirect to the backend's OAuth completion callback endpoint.
+    // with a redirect to the backend's OAuth callback endpoint.
     await page.route('**/connect/oauth2**', async (route) => {
       const url = new URL(route.request().url());
       const state = url.searchParams.get('state') ?? '';

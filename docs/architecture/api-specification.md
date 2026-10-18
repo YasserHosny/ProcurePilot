@@ -2205,9 +2205,9 @@ Role-based access control is evaluated individually per endpoint:
   **owner or buyer** (`require_role(owner, buyer)`).
 - Connection status inspection (`GET /accounting/connection`), synced bills list (`GET /accounting/bills`),
   and reconciliation discrepancies inspection (`GET /accounting/discrepancies`): accessible to **any authenticated tenant member**.
-- OAuth callback completion (`GET /accounting/connect/callback`): public redirect endpoint, **no Bearer auth**;
-  secured against CSRF forgery via constant-time HMAC-SHA256 signature verification over tenant and actor claims
-  embedded in the `state` parameter.
+- OAuth callback redirect (`GET /accounting/connect/callback`): public redirect endpoint, **no Bearer auth**;
+  verifies state signature and freshness, then redirects to the web app. Completion is now done by the signed-in owner from the app.
+- Connection completion (`POST /accounting/connect/complete`): authenticated owner-only mutation that completes the connection.
 
 ### `POST /accounting/connect`
 
@@ -2237,18 +2237,25 @@ Role-based access control is evaluated individually per endpoint:
   - `realmId` (aliased in Python as `realm_id`, optional string): QuickBooks company/realm identifier.
   - `error` (optional string): error code returned if the user declined consent or authorization failed (e.g. `access_denied`).
 - State verification: Validates signature using constant-time comparison against the application signing secret
-  (`_get_signing_secret()`) and verifies token freshness (`max_age_seconds=3600`). Rehydrates caller identity
-  from the token payload to establish tenant context.
-- Error and decline handling: If `error` is present, `code` is omitted, `realmId` is omitted, or state validation fails,
-  the endpoint creates **no database records** (guaranteeing against half-created connections per spec Acceptance Scenario 1.3).
+  (`_get_signing_secret()`) and verifies token freshness (`max_age_seconds=600`).
+- Redirect behavior: Always returns `302 Found` (`RedirectResponse`) to the web frontend at `/accounting`:
+  - On success: `{web_base_url}/accounting?accounting_code={code}&accounting_state={state}[&realm_id={realmId}]`
+  - On failure or user decline: `{web_base_url}/accounting?accounting_connected=failed&error={error_code}`
+- Completion is now done by the signed-in owner from the app via `POST /accounting/connect/complete`.
+
+### `POST /accounting/connect/complete`
+
+- Owner only (`require_role(owner)`); non-owners receive `403` (`ForbiddenError`). Requires Bearer auth.
+- Request body: `{ "code": str, "state": str, "realm_id": str | None }` (`CompleteConnectionRequest`).
+- State verification: Validates state signature and freshness (`max_age_seconds=600`). Requires that the state's
+  `tenant_id` and `membership_id` match the authenticated caller; on mismatch, raises `404 Not Found`
+  (`details: {resource: "oauth_state"}`).
+- Active connection check: Verifies no active connection already exists (raises `409 Conflict` if present).
 - Token exchange and connection creation: Exchanges authorization code for OAuth access and refresh tokens
   (`connector.exchange_code_for_tokens()`), retrieves company metadata (`connector.company_info()`) to extract `display_name`,
   and inserts an `accounting_connection` row with `status = 'active'`, `provider = 'quickbooks'`, `realm_id`, and initial credentials.
-- Auditing: Records `accounting.connection_created`.
-- Redirect behavior: Always returns `302 Found` (`RedirectResponse`) to the web frontend at `/accounting` (specifically
-  redirecting to `/accounting`, not `/accounting/connection-settings`):
-  - On success: `{web_base_url}/accounting?accounting_connected=success`
-  - On failure or user decline: `{web_base_url}/accounting?accounting_connected=failed&error={error_code}`
+- Auditing: Records `accounting.connection_created` with the caller's bearer token.
+- Returns `201 Created` with `AccountingConnection`.
 
 ### `GET /accounting/connection`
 
@@ -2439,8 +2446,9 @@ Role-based access control is evaluated individually per endpoint:
   `rate_limit_pos_match`.
 - Connection status inspection (`GET /pos/connection`) and synced signal inspection (`GET /pos/signals`):
   accessible to **any authenticated tenant member**.
-- OAuth callback completion (`GET /pos/connect/callback`): public redirect endpoint, **no Bearer auth**;
-  secured by an HMAC-SHA256 signed `state` parameter containing tenant and actor claims.
+- OAuth callback redirect (`GET /pos/connect/callback`): public redirect endpoint, **no Bearer auth**;
+  verifies state signature and freshness, then redirects to the web app. Completion is now done by the signed-in owner from the app.
+- Connection completion (`POST /pos/connect/complete`): authenticated owner-only mutation that completes the connection.
 
 ### `POST /pos/connect`
 
@@ -2464,13 +2472,25 @@ Role-based access control is evaluated individually per endpoint:
   - `state` (required string): signed CSRF state token generated by `POST /pos/connect`.
   - `code` (optional string): OAuth authorization code.
   - `error` (optional string): provider error code when consent is declined or authorization fails.
-- If `error` is present, `code` is omitted, state validation fails, token exchange fails, insert fails, or another
-  non-disconnected connection appears before insert, the service creates no connection row and returns `302 Found` to
-  `/pos?pos_connected=failed&error={error_code}`.
-- On success, exchanges the code for tokens, encrypts access/refresh tokens with `shared/token_crypto.py`, fetches
-  `PosAccountInfo` for the display name when available (falling back to Square merchant text if metadata lookup fails),
-  inserts a new `pos_connection` row with `status = 'active'`, records `pos.connection_created`, and redirects with
-  `302 Found` to `/pos?pos_connected=success`.
+- State verification: Validates signature and verifies token freshness (`max_age_seconds=600`).
+- Redirect behavior: Always returns `302 Found` (`RedirectResponse`) to the web frontend at `/pos`:
+  - On success: `{web_base_url}/pos?pos_code={code}&pos_state={state}`
+  - On failure or user decline: `{web_base_url}/pos?pos_connected=failed&error={error_code}`
+- Completion is now done by the signed-in owner from the app via `POST /pos/connect/complete`.
+
+### `POST /pos/connect/complete`
+
+- Owner only (`require_role(owner)`); non-owners receive `403` (`ForbiddenError`). Requires Bearer auth.
+- Request body: `{ "code": str, "state": str }` (`CompleteConnectionRequest`).
+- State verification: Validates state signature and freshness (`max_age_seconds=600`). Requires that the state's
+  `tenant_id` and `membership_id` match the authenticated caller; on mismatch, raises `404 Not Found`
+  (`details: {resource: "oauth_state"}`).
+- Active connection check: Verifies no active connection already exists (raises `409 Conflict` if present).
+- Token exchange and connection creation: Exchanges authorization code for OAuth access and refresh tokens,
+  retrieves account metadata to extract `display_name`, and inserts a `pos_connection` row with
+  `status = 'active'`, `provider = 'square'`, and initial credentials.
+- Auditing: Records `pos.connection_created` with the caller's bearer token.
+- Returns `201 Created` with `PosConnection`.
 
 ### `GET /pos/connection`
 

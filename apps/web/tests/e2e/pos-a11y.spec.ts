@@ -53,6 +53,10 @@ async function completePosConnection(token: string): Promise<void> {
     { redirect: 'manual' },
   );
   expect(callback.status).toBe(302);
+  await apiAsUser(token, 'POST', '/pos/connect/complete', {
+    code: 'stub-auth-code',
+    state,
+  });
 }
 
 interface StoredSession {

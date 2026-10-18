@@ -125,28 +125,59 @@ export class ConnectionSettingsComponent implements OnInit {
   }
 
   private handleOAuthCallbackParams(): void {
+    const code = this.route.snapshot?.queryParamMap?.get('pos_code');
+    const state = this.route.snapshot?.queryParamMap?.get('pos_state');
     const status = this.route.snapshot?.queryParamMap?.get('pos_connected');
+
+    if (code && state) {
+      this.posApi.completeConnection({ code, state }).subscribe({
+        next: (conn) => {
+          this.connection.set(conn);
+          this.snackBar.open(
+            this.translate.instant('pos.connection.connectedSuccess'),
+            undefined,
+            { duration: 3000 },
+          );
+          this.clearCallbackQueryParams();
+          this.loadConnection();
+        },
+        error: () => {
+          this.snackBar.open(
+            this.translate.instant('pos.connection.connectFailed'),
+            undefined,
+            { duration: 4000 },
+          );
+          this.clearCallbackQueryParams();
+        },
+      });
+      return;
+    }
+
     if (status === 'success') {
       this.snackBar.open(
         this.translate.instant('pos.connection.connectedSuccess'),
         undefined,
         { duration: 3000 },
       );
-      this.clearCallbackQueryParam();
+      this.clearCallbackQueryParams();
     } else if (status === 'failed') {
       this.snackBar.open(
         this.translate.instant('pos.connection.connectFailed'),
         undefined,
         { duration: 4000 },
       );
-      this.clearCallbackQueryParam();
+      this.clearCallbackQueryParams();
     }
   }
 
-  private clearCallbackQueryParam(): void {
+  private clearCallbackQueryParams(): void {
     void this.router.navigate([], {
       relativeTo: this.route,
-      queryParams: { pos_connected: null },
+      queryParams: {
+        pos_connected: null,
+        pos_code: null,
+        pos_state: null,
+      },
       queryParamsHandling: 'merge',
       replaceUrl: true,
     });

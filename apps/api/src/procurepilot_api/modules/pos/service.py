@@ -31,7 +31,6 @@ from procurepilot_api import db
 from procurepilot_api.config import Settings, get_settings
 from procurepilot_api.deps import CurrentMember
 from procurepilot_api.errors import ConflictError, NotFoundError, UnprocessableEntityError
-from procurepilot_api.modules.auth.jwt import MemberRole
 from procurepilot_api.modules.offers.service import _authenticated_db
 from procurepilot_api.modules.pos.connector import (
     OAuthTokens,
@@ -77,8 +76,8 @@ def _generate_state(settings: Settings, member: CurrentMember) -> str:
     )
 
 
-def _verify_state(
-    settings: Settings, state: str, max_age_seconds: int = 3600
+def verify_state(
+    settings: Settings, state: str, max_age_seconds: int = 600
 ) -> dict[str, object] | None:
     """Verify and decode a signed CSRF state token."""
     try:
@@ -183,42 +182,50 @@ class ConnectionService:
 
     def complete_connection(
         self,
-        state_or_member: CurrentMember | UUID | str | None = None,
-        code: str | None = None,
-        state: str | None = None,
-        error: str | None = None,
+        member: CurrentMember,
         *,
+        code: str,
+        state: str,
         bearer_token: str | None = None,
-    ) -> dict[str, object] | None:
+    ) -> dict[str, object]:
         """OAuth callback completion.
 
         Exchanges authorization code for tokens, encrypts tokens, creates a NEW
         pos_connection row (a reconnect after a disconnect always inserts a new row,
         never reactivating an old disconnected one), and records an audit event.
-        Returns the created connection row dict, or None if authorization was
-        declined or failed (spec Acceptance Scenario 1.3).
+        Returns the created connection row dict.
         """
-        resolved_state: str | None = None
-        if state is not None:
-            resolved_state = state
-        elif isinstance(state_or_member, str) and "." in state_or_member:
-            resolved_state = state_or_member
-
-        if error or not code or not resolved_state:
-            return None
-
-        payload = _verify_state(self._settings, resolved_state)
+        payload = verify_state(self._settings, state, max_age_seconds=600)
         if not payload:
             logger.warning("Invalid or expired OAuth state token during POS callback completion")
-            return None
+            raise UnprocessableEntityError(details={"reason": "invalid_state"})
 
-        member = CurrentMember(
-            membership_id=UUID(str(payload["membership_id"])),
-            tenant_id=UUID(str(payload["tenant_id"])),
-            user_id=UUID(str(payload["user_id"])),
-            email=str(payload["email"]),
-            role=MemberRole(str(payload.get("role", "owner"))),
-        )
+        if str(payload.get("tenant_id")) != str(member.tenant_id) or str(
+            payload.get("membership_id")
+        ) != str(member.membership_id):
+            raise NotFoundError(details={"resource": "oauth_state"})
+
+        with _authenticated_db(self._settings, member) as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    select id from pos_connection
+                    where tenant_id = %s and status <> 'disconnected'
+                    limit 1
+                    """,
+                    (member.tenant_id,),
+                )
+                if cur.fetchone() is not None:
+                    logger.warning(
+                        "Active POS connection already exists for tenant %s",
+                        member.tenant_id,
+                    )
+                    raise ConflictError(
+                        details={
+                            "resource": "pos_connection",
+                            "reason": "connection_already_exists",
+                        }
+                    )
 
         connector = get_pos_connector(self._settings)
         try:
@@ -228,7 +235,7 @@ class ConnectionService:
             )
         except Exception as exc:
             logger.warning("Token exchange failed during POS complete_connection: %s", exc)
-            return None
+            raise UnprocessableEntityError(details={"reason": "authorization_failed"}) from exc
 
         # Determine account info for display name
         try:
@@ -252,11 +259,12 @@ class ConnectionService:
                         (member.tenant_id,),
                     )
                     if cur.fetchone() is not None:
-                        logger.warning(
-                            "Active POS connection already exists for tenant %s",
-                            member.tenant_id,
+                        raise ConflictError(
+                            details={
+                                "resource": "pos_connection",
+                                "reason": "connection_already_exists",
+                            }
                         )
-                        return None
 
                     cur.execute(
                         """
@@ -302,9 +310,14 @@ class ConnectionService:
                     )
                     row = dict(cur.fetchone())
                 conn.commit()
-        except Exception as exc:
-            logger.exception("Failed to insert pos_connection: %s", exc)
-            return None
+        except psycopg.errors.UniqueViolation as exc:
+            logger.warning("UniqueViolation on pos_connection insert: %s", exc)
+            raise ConflictError(
+                details={
+                    "resource": "pos_connection",
+                    "reason": "connection_already_exists",
+                }
+            ) from exc
 
         row["display_name"] = row["external_account_name"]
 
@@ -418,9 +431,7 @@ class ConnectionService:
     # Token operations via _service_role_db (service_role only)
     # -------------------------------------------------------------------------
 
-    def get_decrypted_tokens(
-        self, tenant_id: UUID, connection_id: UUID
-    ) -> tuple[str, str]:
+    def get_decrypted_tokens(self, tenant_id: UUID, connection_id: UUID) -> tuple[str, str]:
         """Read and decrypt OAuth access and refresh tokens via service_role connection."""
         with _service_role_db(self._settings) as sr_conn:
             with sr_conn.cursor(row_factory=dict_row) as cur:

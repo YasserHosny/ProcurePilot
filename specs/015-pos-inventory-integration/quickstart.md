@@ -29,7 +29,7 @@ To manually verify against a real Square sandbox before shipping:
    POS_TOKEN_ENCRYPTION_KEY=...
    ```
 3. Sign in as an owner, go to the new POS connection settings screen, and connect the sandbox
-   seller account.
+   seller account (completion is now done by the signed-in owner from the app).
 
 ## Testing
 
