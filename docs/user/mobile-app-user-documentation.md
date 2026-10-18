@@ -302,8 +302,9 @@ switcher yet on mobile — language currently follows the device/system locale. 
 Settings screen previewed in section 18 adds one.)
 
 **Money amounts:** the My Requests list, Approval Queue and Request Detail show each amount as its currency code and
-a grouped number with that currency's own number of decimal places — three for KWD, BHD and OMR,
-none for JPY, two for most others — for example `EGP 12,500.00`. In Arabic the digits and separators
+a grouped number: three decimal places for KWD, BHD and OMR, none for JPY, KRW, CLP, VND and ISK, and
+two for every other currency (the app does not yet read each currency's configured minor units) — for
+example `EGP 12,500.00`. In Arabic the digits and separators
 are Arabic, for example `EGP ١٢٬٥٠٠٫٠٠`.
 
 **Tips:**

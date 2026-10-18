@@ -16,7 +16,7 @@ checked on the hosted demo tenant after deploy.
 | Hosted migrations | `20261014000001_tenant_set_currency`, `20261014000002_review_reason_currency_unresolved` applied 2026-10-15 (`supabase migration list` shows them remote) |
 | EGP default end-to-end test | PR #83, `6e01f74`: EGP workspace → order, RFQ guardrail and supplier forms default to EGP; an explicit USD order is saved as USD. Passed CI End-to-end. Not yet shown to fail when the expected currency is wrong |
 | Open tasks | T015 real Egyptian quotes through the full pipeline (needs Azure keys); T018 mobile screenshots (needs Flutter + emulator); T020 full test pass |
-| Known gap | Mobile **My Requests** list still prints raw amounts (`request_list_screen.dart:168`); only Approval Queue and Request Detail are formatted |
+| Known gap (closed) | Mobile **My Requests** list printed raw amounts; fixed by PR #124 (`formatMoney`), merged 2026-10-18 |
 
 ## Demo fix wave (2026-10-15 to 10-17)
 
@@ -37,7 +37,7 @@ Merge dates are UTC.
 | #109 | `8304739` | 2026-10-17 | Verified matches, exact-name bulk confirm | 20 (partly) | Deployed; hosted still on the stub embedding |
 | #110 | `4ebef39` | 2026-10-17 | Per-pack estimates (ADR-020) | 18 | Deployed; PO step not yet re-run on hosted |
 
-Since this record: finding 19 (request-flow gaps) fixed by PR #112, merged 2026-10-17, not yet re-run on hosted. Still open: finding 6 (team invites not emailed; PR #111 adds an
+Since this record: finding 19 (request-flow gaps) fixed by PR #112, merged and deployed 2026-10-17, and verified on hosted 2026-10-18 (round 1 request → approval → PO-000001). Still open: finding 6 (team invites not emailed; PR #111 adds an
 operator workaround).
 
 All migrations in the repository up to `20261017000003` are applied to hosted (checked 2026-10-18).
