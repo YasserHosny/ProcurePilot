@@ -3,7 +3,10 @@ import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 
+import arCatalog from '../../../../../../../packages/i18n/ar.json';
+import enCatalog from '../../../../../../../packages/i18n/en.json';
 import type { FieldExtraction, QuotationDetail } from '../../../core/api/models';
+import { FormatService } from '../../../core/format/format.service';
 import { QuotationDocPreviewComponent } from './quotation-doc-preview.component';
 
 describe('QuotationDocPreviewComponent provenance', () => {
@@ -54,5 +57,85 @@ describe('QuotationDocPreviewComponent provenance', () => {
     expect(fixture.nativeElement.querySelector('.extraction-field-label').textContent.trim()).toBe('اسم المورد');
     const icon = fixture.nativeElement.querySelector('.prov-details-icon') as HTMLElement;
     expect(icon.getAttribute('aria-label')).toContain('bedrock · test-model');
+  });
+
+  it('renders a money-shaped value in provenance original value via FormatService.formatMoney in en and ar without .mono class', () => {
+    const formatService = TestBed.inject(FormatService);
+    const translate = TestBed.inject(TranslateService);
+    translate.setTranslation('en', enCatalog, true);
+    translate.setTranslation('ar', arCatalog, true);
+    translate.use('en');
+
+    fixture.componentRef.setInput('activeExtraction', {
+      id: 'field-total',
+      field_name: 'stated_total',
+      extracted_value: { amount: '24220.00', currency: 'EGP' },
+      corrected_value: null,
+      extraction_method: 'bedrock',
+      model_version: 'test-model',
+      source_page: 1,
+      confidence: '0.6790',
+    } as FieldExtraction);
+    fixture.detectChanges();
+
+    const provVals = Array.from(fixture.nativeElement.querySelectorAll('.prov-val')) as HTMLElement[];
+    const origVal = provVals[1];
+    expect(origVal).toBeTruthy();
+    expect(origVal.classList.contains('mono')).toBeFalse();
+    expect(origVal.textContent).not.toContain('"amount"');
+    expect(origVal.textContent).not.toContain('{');
+    expect(origVal.textContent?.trim()).toBe(formatService.formatMoney({ amount: '24220.00', currency: 'EGP' }));
+
+    translate.use('ar');
+    fixture.detectChanges();
+
+    expect(origVal.classList.contains('mono')).toBeFalse();
+    expect(origVal.textContent).not.toContain('"amount"');
+    expect(origVal.textContent).not.toContain('{');
+    expect(origVal.textContent?.trim()).toBe(formatService.formatMoney({ amount: '24220.00', currency: 'EGP' }));
+    expect(origVal.textContent).toContain('٢٤');
+  });
+
+  it('renders plain string provenance without reformatting and keeps raw text', () => {
+    fixture.componentRef.setInput('activeExtraction', {
+      id: 'field-supplier',
+      field_name: 'supplier_name',
+      extracted_value: 'Acme Corporation',
+      corrected_value: null,
+      extraction_method: 'bedrock',
+      model_version: 'test-model',
+      source_page: 1,
+      confidence: '0.9000',
+    } as FieldExtraction);
+    fixture.detectChanges();
+
+    const provVals = Array.from(fixture.nativeElement.querySelectorAll('.prov-val')) as HTMLElement[];
+    const origVal = provVals[1];
+    expect(origVal.textContent?.trim()).toBe('Acme Corporation');
+    expect(origVal.classList.contains('mono')).toBeFalse();
+  });
+
+  it('renders an issue_date ISO date in provenance through date formatting', () => {
+    const formatService = TestBed.inject(FormatService);
+    const translate = TestBed.inject(TranslateService);
+    translate.use('en');
+
+    fixture.componentRef.setInput('activeExtraction', {
+      id: 'field-date',
+      field_name: 'issue_date',
+      extracted_value: '2026-08-20',
+      corrected_value: null,
+      extraction_method: 'bedrock',
+      model_version: 'test-model',
+      source_page: 1,
+      confidence: '0.9000',
+    } as FieldExtraction);
+    fixture.detectChanges();
+
+    const provVals = Array.from(fixture.nativeElement.querySelectorAll('.prov-val')) as HTMLElement[];
+    const origVal = provVals[1];
+    expect(origVal.textContent?.trim()).not.toBe('2026-08-20');
+    expect(origVal.textContent?.trim()).toBe(formatService.formatDate(new Date(2026, 7, 20)));
+    expect(origVal.classList.contains('mono')).toBeFalse();
   });
 });

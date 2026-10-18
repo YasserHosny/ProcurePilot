@@ -36,6 +36,7 @@ import type {
 import { SessionService } from '../../../core/auth/session.service';
 import { FormatDatePipe } from '../../../core/format/date.pipe';
 import { FormatMoneyPipe } from '../../../core/format/money.pipe';
+import { FormatExtractionPipe } from '../../../core/format/extraction-value.pipe';
 import { QuotationReviewBannersComponent } from './quotation-review-banners.component';
 import { QuotationDocPreviewComponent } from './quotation-doc-preview.component';
 import { QuotationLinesComponent } from './quotation-lines.component';
@@ -105,6 +106,7 @@ type QuotationTimestampFields = QuotationDetail & {
     TranslatePipe,
     FormatDatePipe,
     FormatMoneyPipe,
+    FormatExtractionPipe,
     QuotationReviewBannersComponent,
     QuotationDocPreviewComponent,
     QuotationLinesComponent,
@@ -593,10 +595,6 @@ export class QuotationReviewComponent implements OnInit, OnDestroy {
       unit_size: 'Unit Size',
     };
     return labels[fieldName] || fieldName.replace(/_/g, ' ');
-  }
-
-  displayExtractionValue(value: unknown): string {
-    return typeof value === 'string' ? value : JSON.stringify(value ?? '');
   }
 
   getEffectiveValue(entityType: 'quotation' | 'quotation_line', entityId: string, fieldName: string, defaultValue: unknown): unknown {
