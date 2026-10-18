@@ -17,7 +17,7 @@ export function packLabel(
   const translated: string = translate.instant(key);
   const unit = translated === key ? baseUnit : translated;
   const label: string | null = Number.isFinite(size) && size > 0 && size !== 1
-    ? translate.instant('orders.create.packUnit', { size: format.formatNumber(size, { maximumFractionDigits: 6 }), unit })
+    ? translate.instant('orders.create.packUnit', { size: format.formatExactQuantity(size), unit })
     : null;
   return { size, unit, label };
 }
