@@ -265,4 +265,9 @@ def resend_invitation(
     member: Annotated[CurrentMember, Depends(require_role(MemberRole.owner))],
     service: Annotated[MemberInvitationService, Depends(get_member_invitation_service)],
 ) -> MemberInvitation:
+    """Resend a pending member invitation.
+
+    Refuses resends within the cooldown window (default 60s) right after the
+    initial invite or a prior resend, raising ConflictError (HTTP 409).
+    """
     return service.resend(bearer_token=token, member=member, invitation_id=invitation_id)

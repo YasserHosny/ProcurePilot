@@ -377,9 +377,8 @@ paths:
       summary: Resend a pending invitation (owner only)
       description: >
         Rotates the token on the same invitation and restarts its expiry. The old link
-        stops working immediately. Email is sent when Mailgun is configured.
-      parameters:
-        - $ref: '#/components/parameters/IdempotencyKey'
+        stops working immediately. Email is sent when Mailgun is configured. Repeated
+        clicks within the cooldown window are coalesced.
       responses:
         '200':
           description: Invitation rotated; new token shown once with delivery outcome.
@@ -396,6 +395,11 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '404':
           description: Invitation not found or no longer pending (including another tenant).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '409':
+          description: Resent within the cooldown (default 60s); details.reason = resent_recently, details.retry_after_seconds.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }

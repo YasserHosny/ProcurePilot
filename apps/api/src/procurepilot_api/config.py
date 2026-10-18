@@ -37,6 +37,9 @@ class Settings(BaseSettings):
 
     platform_invitation_ttl_days: int = Field(validation_alias="PLATFORM_INVITATION_TTL_DAYS", gt=0)
     member_invitation_ttl_days: int = Field(validation_alias="MEMBER_INVITATION_TTL_DAYS", gt=0)
+    member_invitation_resend_cooldown_seconds: int = Field(
+        default=60, validation_alias="MEMBER_INVITATION_RESEND_COOLDOWN_SECONDS", ge=0
+    )
 
     rate_limit_auth: str = Field(validation_alias="RATE_LIMIT_AUTH")
     redis_url: str = Field(default="redis://localhost:6379/0", validation_alias="REDIS_URL")
