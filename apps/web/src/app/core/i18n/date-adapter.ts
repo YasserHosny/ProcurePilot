@@ -38,6 +38,9 @@ export class AppDateAdapter extends NativeDateAdapter {
 
   constructor() {
     super();
+    // Start in the interface locale. Material rewrites the input text on every localeChanges,
+    // so a first sync from inside parse() wiped the first typed digit (finding 40).
+    this.syncLocale();
     // Re-emit localeChanges on a language switch so date inputs already on screen reformat
     // and an open calendar relabels, instead of waiting for the next adapter call.
     this.translate?.onLangChange
@@ -80,8 +83,9 @@ export class AppDateAdapter extends NativeDateAdapter {
     return super.format(date, displayFormat);
   }
 
+  // Never syncs the locale: that emits localeChanges, and Material would overwrite what the
+  // user is typing. Day/month order comes from isDayFirst(), not from this.locale.
   override parse(value: unknown, parseFormat?: unknown): Date | null {
-    this.syncLocale();
     if (typeof value === 'string') {
       const text = toLatinDigits(value.trim());
       if (!text) return null;
@@ -94,6 +98,8 @@ export class AppDateAdapter extends NativeDateAdapter {
           ? this.build(year, second, first)
           : this.build(year, first, second);
       }
+      // Anything else (a partly typed "22/1") is invalid, never Date.parse's month-first guess.
+      return this.invalid();
     }
     return super.parse(value, parseFormat);
   }

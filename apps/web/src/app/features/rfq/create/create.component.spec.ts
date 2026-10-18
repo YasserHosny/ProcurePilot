@@ -99,6 +99,34 @@ describe('RfqCreateComponent', () => {
     fixture.detectChanges();
   });
 
+
+  // Finding 40: typing 22/10/2026 used to give 02/10/2026 -- the first keystroke synced the
+  // adapter's locale, and Material reformats the input on every locale change, wiping the "2".
+  for (const [lang, typed] of [['en', '22/10/2026'], ['ar', '22/10/2026'], ['ar', '٢٢/١٠/٢٠٢٦']]) {
+    it(`keeps a day-first date typed key by key (${lang}, ${typed})`, () => {
+      // Open the form with the workspace already in this language, as on hosted.
+      fixture.destroy();
+      translate.use(lang);
+      fixture = TestBed.createComponent(RfqCreateComponent);
+      component = fixture.componentInstance;
+      fixture.detectChanges();
+      const input = fixture.nativeElement.querySelector(
+        'input[formcontrolname="neededByDate"]',
+      ) as HTMLInputElement;
+      for (const key of typed) {
+        input.value += key;
+        input.dispatchEvent(new Event('input'));
+        fixture.detectChanges();
+      }
+      input.dispatchEvent(new Event('blur'));
+      fixture.detectChanges();
+
+      const value = component.form.controls.neededByDate.value;
+      expect([value?.getFullYear(), value?.getMonth(), value?.getDate()]).toEqual([2026, 9, 22]);
+      expect(input.value).toBe('22/10/2026');
+    });
+  }
+
   it('should create', () => {
     expect(component).toBeTruthy();
   });
