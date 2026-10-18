@@ -6,7 +6,9 @@ Status 2026-10-18: **restaurant tenant set up on hosted** — workspace «مطا
 suppliers, owner (`pp-owner`) and Buyer (`pp-buyer`) accounts, inbound email address. **Round 1 reached
 a purchase order:** PO-000001 (draft, EGP 56,425, النور) created 2026-10-18 — do not create it again.
 Basket split ran on hosted and its result renders (split saves EGP 450; finding 21 fixed by #131). Step-by-step
-record: [`round-1/README.md`](round-1/README.md).
+record: [`round-1/README.md`](round-1/README.md). **Rounds 2 and 3 reached purchase orders** the same day:
+PO-000002 (EGP 4,720, الحاج سيد), PO-000003 (20,770, الفيروز), PO-000004 (6,880, باك مصر), approved on the
+phone — [`round-2-3/README.md`](round-2-3/README.md).
 
 ### Findings from the build (real product bugs)
 
@@ -48,6 +50,12 @@ Lookups review (regions, currencies, tax models): [`lookups-review-2026-10-15.md
 | 21 | **Completed basket split cannot be read: `GET /baskets/{id}` → 500** — the optimiser stores an advanced result the API's `AdvancedBasketResult` rejects (no `supplier_id` on lines, `confidence` object vs high/medium/low, extra `rule_version`/`advisory_only`) | **basket split result never shows on hosted** | fixed — #131 merged + deployed 2026-10-18 (read-side adapter + contract test); round-1 split renders on hosted |
 | 22 | No path from a PO or delivery to a purchase outcome: savings need each line re-typed in Record Purchase Outcome, in base units while the PO is in packs | savings step is manual and error-prone on camera | not yet raised |
 | 23 | Savings baseline `last_paid` is the latest *quoted* landed cost, not a price paid; within one RFQ it is whichever quote was recorded last (round 1 would show −300/+450/−150/+50/+450) | savings number arbitrary until there is purchase history; needs a product decision on the baseline | not yet raised — needs the owner's decision |
+| 24 | Remaining budget ignores approved spend: approval sets a request to `ordered`, but committed spend counts only `submitted`/`approved`, so Maadi still shows the full 380,000 after ~92,000 ordered | budget warnings never fire on real spend | not yet raised — fix task suggested 2026-10-18 |
+| 25 | A quote `In Review` with no low-confidence field gets no review task, so it is missing from the Quotation Inbox (الحاج سيد) | quote reachable only by link | not yet raised |
+| 26 | A refused RFQ reply (no attachment, `email-body.txt`) still shows as a response, with an empty card and an active Prepare Request button | confusing RFQ screen | not yet raised |
+| 27 | Bulk confirm of 11 exact matches takes ~25 s | slow on camera | not yet raised |
+| 28 | The phone app's web build signs out on page reload | web build only | not yet raised |
+| 29 | The web app signs out about every hour | interrupts long sessions | not yet investigated |
 
 Round 1 (2026-10-16 → 18): both quotes authorized, 10 matches confirmed, Smart Compare, request prepared at EGP 56,425 per pack, submitted, approved, **PO-000001 created** and the basket split run (saves EGP 450). The earlier request `6f460785-…` (wrong estimate 6,135.58, approved before fix 18) is left as is; do not reuse it. Step by step: [`round-1/README.md`](round-1/README.md).
 
@@ -197,7 +205,9 @@ Leave the suppliers' `email_domains` empty (all are `gmail.com`).
 
 Round 1 step by step, with screenshots: [`round-1/README.md`](round-1/README.md).
 
-The workspace and both accounts already exist — do **not** create another tenant, and PO-000001 exists —
-do not repeat round 1's request or PO. Remaining work, with owners and status, is tracked in
-[`../video/production-tracker.md`](../video/production-tracker.md): decide the savings baseline (finding 23); guardrail and phone approval; switch the tenant to
-Arabic and walk the flow RTL; rounds 2 and 3; then the recorded round.
+Rounds 2 and 3 step by step: [`round-2-3/README.md`](round-2-3/README.md).
+
+The workspace and both accounts already exist — do **not** create another tenant, and PO-000001 to
+PO-000004 exist — do not repeat rounds 1–3's requests or POs. Remaining work, with owners and status, is tracked in
+[`../video/production-tracker.md`](../video/production-tracker.md): decide the savings baseline (finding 23); the guardrail; switch the tenant to
+Arabic and walk the flow RTL; then the recorded round.
