@@ -55,6 +55,14 @@ Run migrations against the hosted database only:
 pnpm db:migrate
 ```
 
+`db:migrate` then runs `pnpm db:check-privileges`, a read-only check that every migration file is
+recorded as applied and that `anon`/`authenticated` hold no table rights the migrations do not
+grant (no TRUNCATE/REFERENCES/TRIGGER/MAINTAIN, no integration-token columns, no default grants
+on new tables, forced RLS on every table a client role can reach). It exits non-zero on any
+problem. A warning about `supabase_admin`'s default privileges is expected on hosted: the
+migrating role cannot change them, so a table created in the dashboard or SQL editor needs an
+explicit `REVOKE`. Run the check on its own at any time with `pnpm db:check-privileges`.
+
 Seed hosted reference data and a platform invitation:
 
 ```bash

@@ -75,6 +75,7 @@ docs/              product, architecture, roadmap, quality, operations
 ```bash
 docker compose up --build   # whole stack: api + web + local Supabase
 pnpm db:migrate             # apply versioned SQL migrations
+pnpm db:check-privileges    # read-only: migrations applied, client-role grants as intended
 pnpm db:seed                # reference data + a platform invitation token
 pnpm test                   # everything
 pnpm test:api               # pytest
@@ -106,7 +107,7 @@ No `any`. Shared validation schemas come from `packages/validation`.
 (or the worker's own `db.connect`): it sets `prepare_threshold=None`, which Supabase's
 transaction-mode pooler needs (PR #87). A bare `psycopg.connect` fails there with
 `DuplicatePreparedStatement`. Deploys never run migrations — apply them to hosted with
-`pnpm db:migrate` and check with `supabase migration list`.
+`pnpm db:migrate` (which ends with `pnpm db:check-privileges`) and check with `supabase migration list`.
 
 **Quantities** — request, RFQ and PO quantities are in the purchasing unit (pack) and prices are
 per pack; base-unit conversion is only for cross-supplier comparison (ADR-020).
