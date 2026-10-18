@@ -362,7 +362,7 @@ real push provider — section 13) from a notification tap carrying that request
 
 | # | Element | Description |
 |---|---------|-------------|
-| 1 | **Request context** | Required-by date, status, requester, estimated total, a remaining-budget figure or an exceeds-budget badge when a budget applies, and an incomplete-estimate badge when some lines lack pricing. |
+| 1 | **Request context** | Required-by date, status, requester, estimated total, a remaining-budget figure or an exceeds-budget badge when a budget applies, and an incomplete-estimate badge when some lines lack pricing. A request an RFQ guardrail drafted opens with a **Prepared automatically by a guardrail** banner naming the supplier whose quote it came from; Approval Decision shows the same banner. |
 | 2 | **Line items** | One row per line: product, quantity, quantity received (once delivery has started), and estimated unit price. |
 | 3 | **Confirm Delivery button** | Shown only while the request's status is `ordered`. Opens the Confirm Delivery screen (section 11). |
 | 4 | **Report Quality Issue button** | Shown only while the request's status is `delivered`. Opens the Quality Issue screen (section 11). |

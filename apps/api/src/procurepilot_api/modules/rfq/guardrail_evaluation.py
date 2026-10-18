@@ -49,7 +49,8 @@ def compute_guardrail_evaluation(
     cur.execute(
         "select id, tenant_id, enabled, min_response_count, max_order_value_amount, "
         "max_order_value_currency, max_price_variance_pct, supplier_allowlist, "
-        "category_allowlist, default_branch_id, created_by_membership_id, created_at "
+        "category_allowlist, default_branch_id, default_cost_centre_id, created_by_membership_id, "
+        "created_at "
         "from auto_preparation_guardrail where tenant_id = %s and enabled = true",
         (tenant_id,),
     )

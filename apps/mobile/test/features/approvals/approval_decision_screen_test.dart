@@ -263,6 +263,49 @@ void main() {
         findsNothing,
       );
     });
+
+    testWidgets('a manually drafted request shows no auto-prepared banner', (
+      tester,
+    ) async {
+      await pumpDecision(tester, decisionRequest());
+      expect(find.byKey(const Key('requestAutoPreparedBanner')), findsNothing);
+    });
+
+    testWidgets(
+      'tells the approver a guardrail prepared the request from the winning quote',
+      (tester) async {
+        await pumpDecision(
+          tester,
+          decisionRequest(autoPreparedSupplier: 'Nile Bakery'),
+        );
+
+        expect(
+          find.byKey(const Key('requestAutoPreparedBanner')),
+          findsOneWidget,
+        );
+        expect(find.text('Prepared automatically by a guardrail'), findsOneWidget);
+        expect(
+          find.text(
+            "This request was prepared automatically by a guardrail from Nile Bakery's quote.",
+          ),
+          findsOneWidget,
+        );
+      },
+    );
+
+    testWidgets('auto-prepared banner is localised in Arabic', (tester) async {
+      await pumpDecision(
+        tester,
+        decisionRequest(autoPreparedSupplier: 'مخبز النور'),
+        locale: 'ar',
+      );
+
+      expect(find.text('أعدّته الضوابط تلقائيًا'), findsOneWidget);
+      expect(
+        find.text('أعدّت الضوابط هذا الطلب تلقائيًا من عرض سعر مخبز النور.'),
+        findsOneWidget,
+      );
+    });
   });
 }
 
@@ -273,6 +316,7 @@ PurchaseRequest decisionRequest({
   String quantity = '5',
   String? packBaseQuantity,
   String? baseUnit,
+  String? autoPreparedSupplier,
 }) {
   return PurchaseRequest(
     id: 'req-1',
@@ -306,5 +350,12 @@ PurchaseRequest decisionRequest({
       status: 'pending',
     ),
     createdAt: DateTime.utc(2026, 9, 13),
+    autoPrepared: autoPreparedSupplier == null
+        ? null
+        : AutoPreparedProvenance(
+            guardrailId: 'guardrail-1',
+            supplierName: autoPreparedSupplier,
+            createdAt: DateTime.utc(2026, 10, 18),
+          ),
   );
 }

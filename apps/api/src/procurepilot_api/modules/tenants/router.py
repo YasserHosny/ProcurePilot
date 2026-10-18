@@ -5,7 +5,7 @@ from postgrest.exceptions import APIError
 
 from procurepilot_api.config import Settings, get_settings
 from procurepilot_api.deps import CurrentMember, bearer_token, current_member
-from procurepilot_api.errors import UnprocessableEntityError
+from procurepilot_api.errors import PermissionDeniedError, UnprocessableEntityError
 from procurepilot_api.modules.auth.jwt import MemberRole
 from procurepilot_api.modules.auth.rbac import require_role
 from procurepilot_api.modules.members.models import SessionResponse
@@ -76,6 +76,22 @@ def update_tenant(
             except APIError as exc:
                 if exc.code == "22023":
                     raise UnprocessableEntityError(details={"currency": "unsupported"}) from exc
+                raise
+        default_locale = update.pop("default_locale", None)
+        if default_locale is not None:
+            # Same shape as the currency change: update + tenant.default_locale_changed audit in
+            # one transaction. RFQ emails go out in this language (finding 37).
+            try:
+                # The function checks the live owner role and names the caller in the audit
+                # event itself; it takes no actor arguments.
+                client.rpc("set_tenant_default_locale", {"p_locale": default_locale}).execute()
+            except APIError as exc:
+                if exc.code == "22023":
+                    raise UnprocessableEntityError(
+                        details={"default_locale": "unsupported"}
+                    ) from exc
+                if exc.code == "42501":
+                    raise PermissionDeniedError(details={"role": "owner_required"}) from exc
                 raise
         if update:
             client.table("tenant").update(update).eq("id", str(member.tenant_id)).execute()

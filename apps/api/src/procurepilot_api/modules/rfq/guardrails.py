@@ -38,6 +38,7 @@ class AutoPreparationGuardrail:
     default_branch_id: UUID
     created_by_membership_id: UUID
     created_at: datetime | None = None
+    default_cost_centre_id: UUID | None = None
 
 
 @dataclass

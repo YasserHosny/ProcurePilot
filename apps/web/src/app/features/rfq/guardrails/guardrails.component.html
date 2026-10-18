@@ -17,7 +17,15 @@
       <mat-form-field appearance="outline"><mat-label>{{ 'rfq.guardrails.minResponses' | translate }}</mat-label><input matInput type="number" min="1" step="1" [(ngModel)]="minResponseCount"></mat-form-field>
       <mat-form-field appearance="outline"><mat-label>{{ 'rfq.guardrails.priceVariance' | translate }}</mat-label><input matInput type="number" min="0" max="100" [(ngModel)]="maxPriceVariancePercent"><span matTextSuffix>%</span></mat-form-field>
       <mat-form-field appearance="outline"><mat-label>{{ 'rfq.guardrails.suppliers' | translate }}</mat-label><mat-select multiple [(ngModel)]="supplierAllowlist"><mat-option *ngFor="let supplier of suppliers()" [value]="supplier.id">{{ supplier.name }}</mat-option></mat-select></mat-form-field>
-      <mat-form-field appearance="outline"><mat-label>{{ 'rfq.guardrails.branch' | translate }}</mat-label><mat-select [(ngModel)]="defaultBranchId"><mat-option *ngFor="let branch of branches()" [value]="branch.id">{{ branch.name }}</mat-option></mat-select></mat-form-field>
+      <mat-form-field appearance="outline"><mat-label>{{ 'rfq.guardrails.branch' | translate }}</mat-label><mat-select [ngModel]="defaultBranchId" (ngModelChange)="onBranchChange($event)"><mat-option *ngFor="let branch of branches()" [value]="branch.id">{{ branch.name }}</mat-option></mat-select></mat-form-field>
+      <mat-form-field appearance="outline" class="cost-centre-field">
+        <mat-label>{{ 'rfq.guardrails.costCentre' | translate }}</mat-label>
+        <mat-select [(ngModel)]="defaultCostCentreId" [disabled]="!defaultBranchId">
+          <mat-option [value]="null">{{ 'rfq.guardrails.noCostCentre' | translate }}</mat-option>
+          <mat-option *ngFor="let costCentre of costCentres()" [value]="costCentre.id">{{ costCentre.name }} ({{ costCentre.code }})</mat-option>
+        </mat-select>
+        <mat-hint>{{ 'rfq.guardrails.costCentreHint' | translate }}</mat-hint>
+      </mat-form-field>
     </div>
     <mat-slide-toggle [(ngModel)]="enabled">{{ 'rfq.guardrails.enabled' | translate }}</mat-slide-toggle>
     <div class="form-actions"><button mat-button *ngIf="editingId()" (click)="cancelEdit()">{{ 'rfq.guardrails.cancel' | translate }}</button><button mat-flat-button color="primary" [disabled]="saving()" (click)="save()">{{ 'rfq.guardrails.save' | translate }}</button></div>

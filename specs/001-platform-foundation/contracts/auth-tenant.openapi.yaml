@@ -236,7 +236,13 @@ paths:
               type: object
               properties:
                 name: { type: string, maxLength: 200 }
-                default_locale: { type: string, enum: [en, ar] }
+                default_locale:
+                  type: string
+                  enum: [en, ar]
+                  description: >-
+                    Workspace language: RFQ emails to suppliers and invitations use it. A change
+                    is written with the tenant.default_locale_changed audit event in the same
+                    transaction.
       responses:
         '200':
           description: Updated

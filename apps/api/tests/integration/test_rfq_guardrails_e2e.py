@@ -6,6 +6,7 @@ The reply is captured first with no extracted lines. Extraction, review, matchin
 evaluation are then simulated in their production order.
 """
 
+import json
 import os
 import sys
 import uuid
@@ -15,7 +16,12 @@ import psycopg
 import pytest
 
 from procurepilot_api.config import get_settings
+from procurepilot_api.deps import CurrentMember
+from procurepilot_api.errors import NotFoundError
+from procurepilot_api.modules.auth.jwt import MemberRole
 from procurepilot_api.modules.ingestion.orchestrator import process_inbound_email
+from procurepilot_api.modules.requests.service import RequestsService
+from procurepilot_api.shared.mailer import FakeMailer
 
 sys.path.append(os.path.dirname(__file__))
 from test_rfq_response_capture import (  # noqa: E402, F401
@@ -124,18 +130,29 @@ async def test_guardrail_e2e(
                 (uuid.uuid4(), tenant_id, hist_ql_id, hist_md_id),
             )
 
+            # Finding 38b: the guardrail's default cost centre (on its default branch) must land
+            # on the prepared request.
+            cost_centre_id = uuid.uuid4()
+            cur.execute(
+                "insert into cost_centre (id, tenant_id, name, code, branch_id) "
+                "values (%s, %s, 'Kitchen', %s, %s)",
+                (cost_centre_id, tenant_id, f"CC-{cost_centre_id.hex[:8]}", branch_id),
+            )
+
             guardrail_id = uuid.uuid4()
             cur.execute(
                 "insert into auto_preparation_guardrail "
                 "(id, tenant_id, created_by_membership_id, default_branch_id, "
+                "default_cost_centre_id, "
                 "max_order_value_amount, max_order_value_currency, min_response_count, "
                 "max_price_variance_pct, enabled) "
-                "values (%s, %s, %s, %s, %s, %s, %s, %s, %s)",
+                "values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
                 (
                     guardrail_id,
                     tenant_id,
                     membership_id,
                     branch_id,
+                    cost_centre_id,
                     Decimal("1000.00"),
                     "USD",
                     1,
@@ -152,6 +169,9 @@ async def test_guardrail_e2e(
     _patch_requests_service_for_test(
         monkeypatch, tenant_id=tenant_id, user_id=user_id, membership_id=membership_id
     )
+    # The owner is told by email; RFQ_MAILER_MODE is stub here, so it lands in FakeMailer.
+    monkeypatch.setenv("RFQ_MAILER_MODE", "stub")
+    FakeMailer.clear()
 
     email_bytes = _create_email_bytes(f"<{uuid.uuid4()}@mail.com>", in_reply_to=msg_id)
     result = process_inbound_email(
@@ -218,21 +238,41 @@ async def test_guardrail_e2e(
             assert cur.fetchone()[0] == "converted"
 
             cur.execute(
-                "select purchase_request_id from auto_preparation_event where guardrail_id = %s",
+                "select purchase_request_id, rfq_id, supplier_id from auto_preparation_event "
+                "where guardrail_id = %s",
                 (guardrail_id,),
             )
             event_row = cur.fetchone()
             assert event_row is not None
             purchase_request_id = event_row[0]
             assert purchase_request_id is not None
+            assert event_row[1] == rfq_id
+            assert event_row[2] == supplier_id
 
             cur.execute(
-                "select source_rfq_response_id from purchase_request where id = %s",
+                "select source_rfq_response_id, cost_centre_id, branch_id "
+                "from purchase_request where id = %s",
                 (purchase_request_id,),
             )
             pr_row = cur.fetchone()
             assert pr_row is not None
             assert pr_row[0] is not None
+            assert pr_row[1] == cost_centre_id
+            assert pr_row[2] == branch_id
+
+            # Finding 38a: the guardrail's owner gets one email linking to the draft.
+            cur.execute("select email from membership where id = %s", (membership_id,))
+            owner_email = cur.fetchone()[0]
+            owner_mail = [m for m in FakeMailer.sent_messages if m.to == owner_email]
+            assert len(owner_mail) == 1
+            assert "Supplier Capture" in owner_mail[0].subject
+            assert f"/requests/{purchase_request_id}" in owner_mail[0].body
+            # No push is queued: the push sender is still a stub that never delivers.
+            cur.execute(
+                "select count(*) from push_notification where purchase_request_id = %s",
+                (purchase_request_id,),
+            )
+            assert cur.fetchone()[0] == 0
 
             # FR-014: disabling the guardrail after it fired must not retroactively touch the
             # event or the request it already created.
@@ -249,3 +289,115 @@ async def test_guardrail_e2e(
 
             cur.execute("select id from purchase_request where id = %s", (purchase_request_id,))
             assert cur.fetchone() is not None
+
+    _assert_provenance_visibility(
+        test_db,
+        tenant_id=tenant_id,
+        branch_id=branch_id,
+        purchase_request_id=purchase_request_id,
+        guardrail_id=guardrail_id,
+        rfq_id=rfq_id,
+        supplier_id=supplier_id,
+    )
+
+
+def _member_row(
+    cur: psycopg.Cursor, tenant_id: uuid.UUID, role: str
+) -> tuple[uuid.UUID, uuid.UUID]:
+    user_id, membership_id = uuid.uuid4(), uuid.uuid4()
+    email = f"guardrail-{role}-{membership_id}@example.test"
+    cur.execute("insert into auth.users (id,email) values (%s,%s)", (user_id, email))
+    cur.execute(
+        "insert into membership (id,tenant_id,user_id,email,role,is_active_workspace) "
+        "values (%s,%s,%s,%s,%s,true)",
+        (membership_id, tenant_id, user_id, email, role),
+    )
+    return user_id, membership_id
+
+
+def _member(
+    tenant_id: uuid.UUID, user_id: uuid.UUID, membership_id: uuid.UUID, role: MemberRole
+) -> CurrentMember:
+    return CurrentMember(
+        membership_id=membership_id,
+        tenant_id=tenant_id,
+        user_id=user_id,
+        email="member@example.test",
+        role=role,
+    )
+
+
+def _visible_events(test_db: str, member: CurrentMember, purchase_request_id: uuid.UUID) -> int:
+    claims = json.dumps(
+        {
+            "sub": str(member.user_id),
+            "tenant_id": str(member.tenant_id),
+            "role": "authenticated",
+            "member_role": member.role.value,
+        }
+    )
+    with psycopg.connect(test_db, prepare_threshold=None) as conn:
+        conn.execute("set local role authenticated")
+        conn.execute("select set_config('request.jwt.claims', %s, true)", (claims,))
+        row = conn.execute(
+            "select count(*) from auto_preparation_event where purchase_request_id = %s",
+            (purchase_request_id,),
+        ).fetchone()
+        return int(row[0])
+
+
+def _assert_provenance_visibility(
+    test_db: str,
+    *,
+    tenant_id: uuid.UUID,
+    branch_id: uuid.UUID,
+    purchase_request_id: uuid.UUID,
+    guardrail_id: uuid.UUID,
+    rfq_id: uuid.UUID,
+    supplier_id: uuid.UUID,
+) -> None:
+    """Finding 38a: anyone who can see the prepared request -- including an approver, who has
+    no access to the RFQ itself -- sees that a guardrail prepared it and from whose quote. A
+    member who cannot see the request, or another workspace, sees neither."""
+    with psycopg.connect(test_db, prepare_threshold=None) as conn:
+        with conn.cursor() as cur:
+            approver_user, approver_membership = _member_row(cur, tenant_id, "approver")
+            fenced_user, fenced_membership = _member_row(cur, tenant_id, "approver")
+            other_branch = uuid.uuid4()
+            cur.execute(
+                "insert into branch (id, tenant_id, name) values (%s, %s, 'Other')",
+                (other_branch, tenant_id),
+            )
+            cur.execute(
+                "insert into branch_role_assignment (tenant_id, membership_id, branch_id) "
+                "values (%s, %s, %s)",
+                (tenant_id, fenced_membership, other_branch),
+            )
+            other_tenant, _ = _seed_tenant_and_supplier(cur)
+            cur.execute(
+                "select id, user_id from membership where tenant_id = %s limit 1", (other_tenant,)
+            )
+            outsider_membership, outsider_user = cur.fetchone()
+        conn.commit()
+
+    service = RequestsService(get_settings())
+    approver = _member(tenant_id, approver_user, approver_membership, MemberRole.approver)
+    seen = service.get_request(
+        bearer_token="unused", member=approver, request_id=purchase_request_id
+    )
+    assert seen.auto_prepared is not None
+    assert seen.auto_prepared.guardrail_id == guardrail_id
+    assert seen.auto_prepared.rfq_id == rfq_id
+    assert seen.auto_prepared.supplier_id == supplier_id
+    assert seen.auto_prepared.supplier_name == "Supplier Capture"
+    assert _visible_events(test_db, approver, purchase_request_id) == 1
+
+    fenced = _member(tenant_id, fenced_user, fenced_membership, MemberRole.approver)
+    with pytest.raises(NotFoundError):
+        service.get_request(bearer_token="unused", member=fenced, request_id=purchase_request_id)
+    assert _visible_events(test_db, fenced, purchase_request_id) == 0
+
+    outsider = _member(other_tenant, outsider_user, outsider_membership, MemberRole.owner)
+    with pytest.raises(NotFoundError):
+        service.get_request(bearer_token="unused", member=outsider, request_id=purchase_request_id)
+    assert _visible_events(test_db, outsider, purchase_request_id) == 0

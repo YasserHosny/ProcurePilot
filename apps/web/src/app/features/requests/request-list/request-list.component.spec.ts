@@ -118,6 +118,39 @@ describe('RequestListComponent (T017)', () => {
     expect(compiled.textContent).toContain('b1');
   });
 
+  it('marks a guardrail-prepared request and leaves manual ones unmarked', () => {
+    requestsApi.listRequests.and.returnValue(
+      of({
+        items: [
+          {
+            ...mockRequests[0],
+            source_rfq_response_id: 'resp-1',
+            auto_prepared: {
+              guardrail_id: 'g1',
+              rfq_id: 'rfq1',
+              supplier_id: 's1',
+              supplier_name: 'Nile Bakery',
+              created_at: '2026-10-18T09:00:00Z',
+            },
+          },
+          mockRequests[1],
+        ],
+        next_cursor: null,
+      }),
+    );
+    component.loadRequests();
+    fixture.detectChanges();
+
+    const badges = (fixture.nativeElement as HTMLElement).querySelectorAll(
+      '[data-testid="auto-prepared-badge"]',
+    );
+    expect(badges.length).toBe(1);
+    expect(badges[0].textContent?.trim()).toBe('Auto-prepared');
+    expect(badges[0].getAttribute('title')).toBe(
+      "Prepared automatically by a guardrail from Nile Bakery's quote",
+    );
+  });
+
   it('should show the empty state when no requests exist', () => {
     requestsApi.listRequests.and.returnValue(of({ items: [], next_cursor: null }));
     component.loadRequests();

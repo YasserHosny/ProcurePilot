@@ -342,6 +342,41 @@ class BudgetStatus {
       };
 }
 
+/// Set when an RFQ auto-preparation guardrail, not a person, drafted the request.
+@immutable
+class AutoPreparedProvenance {
+  const AutoPreparedProvenance({
+    required this.guardrailId,
+    this.rfqId,
+    this.supplierId,
+    this.supplierName,
+    required this.createdAt,
+  });
+
+  final String guardrailId;
+  final String? rfqId;
+  final String? supplierId;
+  final String? supplierName;
+  final DateTime createdAt;
+
+  factory AutoPreparedProvenance.fromJson(Map<String, dynamic> json) =>
+      AutoPreparedProvenance(
+        guardrailId: json['guardrail_id'] as String,
+        rfqId: json['rfq_id'] as String?,
+        supplierId: json['supplier_id'] as String?,
+        supplierName: json['supplier_name'] as String?,
+        createdAt: DateTime.parse(json['created_at'] as String),
+      );
+
+  Map<String, dynamic> toJson() => {
+        'guardrail_id': guardrailId,
+        if (rfqId != null) 'rfq_id': rfqId,
+        if (supplierId != null) 'supplier_id': supplierId,
+        if (supplierName != null) 'supplier_name': supplierName,
+        'created_at': createdAt.toIso8601String(),
+      };
+}
+
 /// A purchase request, as returned by the 008 Requests + Approvals contract.
 @immutable
 class PurchaseRequest {
@@ -366,6 +401,7 @@ class PurchaseRequest {
     this.deliveredAt,
     this.deliveryConfirmedByMembershipId,
     this.hasDeliveryDiscrepancy = false,
+    this.autoPrepared,
   });
 
   final String id;
@@ -392,6 +428,9 @@ class PurchaseRequest {
   final DateTime? deliveredAt;
   final String? deliveryConfirmedByMembershipId;
   final bool hasDeliveryDiscrepancy;
+
+  /// Non-null when a guardrail prepared this request from an RFQ response.
+  final AutoPreparedProvenance? autoPrepared;
 
   String requesterDisplayName(I18nLoader i18n) {
     if (requesterName != null && requesterName!.trim().isNotEmpty) {
@@ -444,6 +483,10 @@ class PurchaseRequest {
           json['delivery_confirmed_by_membership_id'] as String?,
       hasDeliveryDiscrepancy:
           json['has_delivery_discrepancy'] as bool? ?? false,
+      autoPrepared: json['auto_prepared'] == null
+          ? null
+          : AutoPreparedProvenance.fromJson(
+              json['auto_prepared'] as Map<String, dynamic>),
     );
   }
 
@@ -469,6 +512,7 @@ class PurchaseRequest {
         if (deliveryConfirmedByMembershipId != null)
           'delivery_confirmed_by_membership_id': deliveryConfirmedByMembershipId,
         'has_delivery_discrepancy': hasDeliveryDiscrepancy,
+        if (autoPrepared != null) 'auto_prepared': autoPrepared!.toJson(),
       };
 }
 

@@ -84,9 +84,12 @@ class RequestContextSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final i18n = ServiceProvider.of(context).i18n;
+    final autoPrepared = request.autoPrepared;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        if (autoPrepared != null)
+          _AutoPreparedBanner(request: request, provenance: autoPrepared),
         RequestInfoRow(
           label: i18n.t('requests.columns.requiredByDate'),
           value: request.requiredByDate,
@@ -235,6 +238,59 @@ class RequestInfoRow extends StatelessWidget {
           Text('$label: ', style: const TextStyle(fontWeight: FontWeight.bold)),
           Expanded(child: Text(value)),
         ],
+      ),
+    );
+  }
+}
+
+/// Says that a guardrail, not a person, drafted the request, and from whose quote.
+class _AutoPreparedBanner extends StatelessWidget {
+  const _AutoPreparedBanner({required this.request, required this.provenance});
+
+  final PurchaseRequest request;
+  final AutoPreparedProvenance provenance;
+
+  @override
+  Widget build(BuildContext context) {
+    final i18n = ServiceProvider.of(context).i18n;
+    final scheme = Theme.of(context).colorScheme;
+    final supplier = provenance.supplierName?.trim().isNotEmpty == true
+        ? provenance.supplierName!.trim()
+        : i18n.t('requests.autoPrepared.unknownSupplier');
+    final messageKey = request.status == 'draft'
+        ? 'requests.autoPrepared.draftMessage'
+        : 'requests.autoPrepared.message';
+    return Card(
+      key: const Key('requestAutoPreparedBanner'),
+      color: scheme.secondaryContainer,
+      margin: const EdgeInsets.only(bottom: 12),
+      child: Padding(
+        padding: const EdgeInsetsDirectional.all(12),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(Icons.smart_toy_outlined, color: scheme.onSecondaryContainer),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    i18n.t('requests.autoPrepared.title'),
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          color: scheme.onSecondaryContainer,
+                        ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    i18n.t(messageKey, params: {'supplier': supplier}),
+                    style: TextStyle(color: scheme.onSecondaryContainer),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
