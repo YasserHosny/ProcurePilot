@@ -84,7 +84,7 @@ class AuditWriter:
 
     def _record_server_side(self, payload: dict[str, object]) -> None:
         # A workspace event with no caller token comes from a worker or other server-side code.
-        # The anon key can no longer name a workspace (migration 20261018000002), so these go
+        # The anon key can no longer name a workspace (migration 20261018000004), so these go
         # over DATABASE_URL, the same trusted connection the workers already hold.
         with db.connect(self._settings.database_url.get_secret_value()) as conn:
             conn.execute(

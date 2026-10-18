@@ -225,7 +225,7 @@ class SupabaseMemberInvitationRepository:
         # one, because a session needs a tenant_id claim that only exists once this call has
         # created the membership. The route has already proven the invitee owns the address
         # (sign-up or password check), and the RPC re-checks the token hash and address. The
-        # function is no longer executable by anon (migration 20261018000002): through
+        # function is no longer executable by anon (migration 20261018000004): through
         # /rest/v1/rpc the anon key let any holder of an invitation link redeem it for an
         # arbitrary user id.
         try:

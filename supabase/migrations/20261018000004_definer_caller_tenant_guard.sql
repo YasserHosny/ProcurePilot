@@ -1,4 +1,4 @@
--- 20261018000002_definer_caller_tenant_guard.sql — security review 2026-10-18 (issue #122),
+-- 20261018000004_definer_caller_tenant_guard.sql — security review 2026-10-18 (issue #122),
 -- finding 1.
 --
 -- The R2.5 reporting readers (20260915000005) are SECURITY DEFINER and pinned to p_tenant_id on

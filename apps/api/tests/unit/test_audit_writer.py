@@ -1,7 +1,7 @@
 """AuditWriter routing: a workspace event with no caller token goes over DATABASE_URL.
 
 The anon key may no longer name a workspace in record_audit_event (migration
-20261018000002), so server-side writers must not use it for tenant events.
+20261018000004), so server-side writers must not use it for tenant events.
 """
 
 from __future__ import annotations
