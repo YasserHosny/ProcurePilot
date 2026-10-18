@@ -115,9 +115,15 @@ describe('FormatService (T069)', () => {
       expect(service.formatExactQuantity('0.000001')).toBe('0.000001');
       expect(service.formatExactQuantity('1.234567')).toBe('1.234567');
       expect(service.formatExactQuantity('50.000000')).toBe('50');
+      expect(service.formatExactQuantity('999999999999.999999')).toBe('999,999,999,999.999999');
+      expect(service.formatExactQuantity('1234567.100000')).toBe('1,234,567.1');
+      expect(service.formatExactQuantity('-12.500000')).toBe('-12.5');
       expect(formatExactQuantity('0.000001', 'en')).toBe('0.000001');
       expect(formatExactQuantity('1.234567', 'en')).toBe('1.234567');
       expect(formatExactQuantity('50.000000', 'en')).toBe('50');
+      expect(formatExactQuantity('999999999999.999999', 'en')).toBe('999,999,999,999.999999');
+      expect(formatExactQuantity('1234567.100000', 'en')).toBe('1,234,567.1');
+      expect(formatExactQuantity('-12.500000', 'en')).toBe('-12.5');
     });
 
     it('renders Arabic-Indic digits for exact 6-decimal quantities when locale is ar', () => {
@@ -125,9 +131,15 @@ describe('FormatService (T069)', () => {
       expect(service.formatExactQuantity('0.000001')).toBe('٠٫٠٠٠٠٠١');
       expect(service.formatExactQuantity('1.234567')).toBe('١٫٢٣٤٥٦٧');
       expect(service.formatExactQuantity('50.000000')).toBe('٥٠');
+      expect(service.formatExactQuantity('999999999999.999999')).toBe('٩٩٩٬٩٩٩٬٩٩٩٬٩٩٩٫٩٩٩٩٩٩');
+      expect(service.formatExactQuantity('1234567.100000')).toBe('١٬٢٣٤٬٥٦٧٫١');
+      expect(service.formatExactQuantity('-12.500000')).toBe('؜-١٢٫٥');
       expect(formatExactQuantity('0.000001', 'ar')).toBe('٠٫٠٠٠٠٠١');
       expect(formatExactQuantity('1.234567', 'ar')).toBe('١٫٢٣٤٥٦٧');
       expect(formatExactQuantity('50.000000', 'ar')).toBe('٥٠');
+      expect(formatExactQuantity('999999999999.999999', 'ar')).toBe('٩٩٩٬٩٩٩٬٩٩٩٬٩٩٩٫٩٩٩٩٩٩');
+      expect(formatExactQuantity('1234567.100000', 'ar')).toBe('١٬٢٣٤٬٥٦٧٫١');
+      expect(formatExactQuantity('-12.500000', 'ar')).toBe('؜-١٢٫٥');
     });
 
     it('retains default 2-decimal truncation for formatQuantity', () => {
