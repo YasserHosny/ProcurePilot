@@ -236,15 +236,18 @@ class OrdersService:
                     raise ConflictError(details={"reason": "order_number_exists"})
                 raise ConflictError(details={"reason": "idempotency_key_exists"})
             order_id = UUID(str(row["id"]))
+            request_pack_snapshots = self._request_pack_snapshots(
+                cur, member.tenant_id, [line.source_request_line_id for line in payload.lines]
+            )
             cur.executemany(
                 "insert into purchase_order_line (tenant_id,purchase_order_id,line_number,"
                 "workspace_product_id,description,ordered_quantity,base_unit,unit_price_amount,"
                 "unit_price_currency,tax_amount,tax_currency,line_total_amount,"
                 "line_total_currency,source_request_id,source_request_line_id,pack_base_quantity) "
                 "values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,"
-                "(select pd.base_quantity from pack_definition pd "
+                "coalesce(%s, (select pd.base_quantity from pack_definition pd "
                 "where pd.tenant_id = %s and pd.workspace_product_id = %s "
-                "order by pd.created_at desc, pd.id desc limit 1))",
+                "order by pd.created_at desc, pd.id desc limit 1)))",
                 [
                     (
                         member.tenant_id,
@@ -262,6 +265,7 @@ class OrdersService:
                         line.line_total.currency,
                         payload.source_request_id,
                         line.source_request_line_id,
+                        request_pack_snapshots.get(line.source_request_line_id),
                         member.tenant_id,
                         line.workspace_product_id,
                     )
@@ -271,6 +275,21 @@ class OrdersService:
             order = self._load_order_cursor(cur, order_id)
             self._audit_cursor(cur, member, "orders.purchase_order_created", order_id)
         return order, True
+
+    @staticmethod
+    def _request_pack_snapshots(
+        cur: psycopg.Cursor, tenant_id: UUID, source_line_ids: list[UUID | None]
+    ) -> dict[UUID, Decimal | None]:
+        ids = list(dict.fromkeys(identifier for identifier in source_line_ids if identifier))
+        if not ids:
+            return {}
+        # Reuse the authenticated transaction: tenant isolation stays enforced by RLS.
+        cur.execute(
+            "select id, pack_base_quantity from purchase_request_line "
+            "where tenant_id = %s and id = any(%s)",
+            (tenant_id, ids),
+        )
+        return {UUID(str(row["id"])): row["pack_base_quantity"] for row in cur.fetchall()}
 
     def update_draft_order(
         self,
@@ -379,15 +398,18 @@ class OrdersService:
                 (member.tenant_id, order_id),
             )
 
+            request_pack_snapshots = self._request_pack_snapshots(
+                cur, member.tenant_id, [line.source_request_line_id for line in payload.lines]
+            )
             cur.executemany(
                 "insert into purchase_order_line (tenant_id,purchase_order_id,line_number,"
                 "workspace_product_id,description,ordered_quantity,base_unit,unit_price_amount,"
                 "unit_price_currency,tax_amount,tax_currency,line_total_amount,"
                 "line_total_currency,source_request_id,source_request_line_id,pack_base_quantity) "
                 "values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,"
-                "(select pd.base_quantity from pack_definition pd "
+                "coalesce(%s, (select pd.base_quantity from pack_definition pd "
                 "where pd.tenant_id = %s and pd.workspace_product_id = %s "
-                "order by pd.created_at desc, pd.id desc limit 1))",
+                "order by pd.created_at desc, pd.id desc limit 1)))",
                 [
                     (
                         member.tenant_id,
@@ -405,6 +427,7 @@ class OrdersService:
                         line.line_total.currency,
                         payload.source_request_id,
                         line.source_request_line_id,
+                        request_pack_snapshots.get(line.source_request_line_id),
                         member.tenant_id,
                         line.workspace_product_id,
                     )

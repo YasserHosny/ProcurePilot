@@ -85,6 +85,17 @@ export class OrderCreateComponent implements OnInit {
 
   packHint(line: FormGroup<OrderLineForm>): string | null {
     const product = this.products().find(p => p.id === line.controls.workspace_product_id.value);
+    const requestLine = this.sourceRequest()?.lines.find(
+      candidate => candidate.id === line.controls.source_request_line_id.value,
+    );
+    if (requestLine?.pack_base_quantity != null) {
+      return packLabel(
+        requestLine.pack_base_quantity,
+        requestLine.base_unit ?? product?.base_unit ?? line.controls.base_unit.value,
+        this.translate,
+        this.formatService,
+      ).label;
+    }
     return this.packDescription(product);
   }
 
@@ -251,11 +262,11 @@ export class OrderCreateComponent implements OnInit {
             this.lines.push(
               new FormGroup<OrderLineForm>({
                 workspace_product_id: new FormControl<string | null>(reqLine.workspace_product_id || null),
-                description: new FormControl<string>(this.requestLineDescription(products.items.find(p => p.id === reqLine.workspace_product_id)), { nonNullable: true, validators: [Validators.required] }),
+                description: new FormControl<string>(reqLine.product_name ?? this.requestLineDescription(products.items.find(p => p.id === reqLine.workspace_product_id)), { nonNullable: true, validators: [Validators.required] }),
                 quantity: new FormControl<number | null>(remaining, { validators: [Validators.required, Validators.min(0.0001), Validators.max(remaining)] }),
                 // Request quantities are in PACKS. Only the supplier's quoted per-pack price pre-fills
-                // the PO; the (landed) estimate stays a reference, and say "pack of 18 litre" in the description.
-                base_unit: new FormControl<string>(products.items.find(p => p.id === reqLine.workspace_product_id)?.base_unit || 'EA', { nonNullable: true, validators: [Validators.required] }),
+                // the PO; the (landed) estimate stays a reference. packHint uses the request snapshot.
+                base_unit: new FormControl<string>(reqLine.base_unit ?? products.items.find(p => p.id === reqLine.workspace_product_id)?.base_unit ?? 'EA', { nonNullable: true, validators: [Validators.required] }),
                 unit_price: new FormControl<number | null>(prefillQuotes && reqLine.quoted_unit_price ? parseFloat(reqLine.quoted_unit_price.amount) : null, { validators: [Validators.required, Validators.min(0)] }),
                 line_tax: new FormControl<number | null>(0, { validators: [Validators.min(0)] }),
                 source_request_line_id: new FormControl<string | null>(reqLine.id),
