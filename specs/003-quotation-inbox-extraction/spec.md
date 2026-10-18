@@ -2,7 +2,9 @@
 
 **Feature Branch**: `003-quotation-inbox-extraction`
 **Created**: 2026-08-21
-**Status**: Shipped — merged to `main` (see `docs/roadmap/procurepilot_roadmap.md`, Delivery Status)
+**Status**: Merged to `main`, **unvalidated** — the ≥90% held-out extraction quality gate has not been
+measured (no held-out benchmark; the evaluator reports `gate_status=not_validated_stub_provider_no_held_out_benchmark`,
+see `plan.md`). Delivery Status: `docs/roadmap/procurepilot_roadmap.md`
 **Input**: User description: "Chunk 4.3: Quotation Inbox + Extraction Review — a workspace uploads supplier quotation documents (PDF, and likely image/email-derived text); an AI extraction step reads them into structured line items (product references, quantities, pack sizes, unit prices, currency); a human reviewer confirms or corrects each extracted line, with a confidence score and provenance back to the source document, before anything becomes trusted commercial data feeding the catalogue's suppliers/products and the eventual Smart Compare engine. First chunk to introduce Redis for the extraction worker's job queue."
 
 ## User Scenarios & Testing *(mandatory)*

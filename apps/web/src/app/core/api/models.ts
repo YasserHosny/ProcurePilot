@@ -61,6 +61,8 @@ export interface Member {
 }
 
 export interface Invitation {
+  readonly token?: string;
+  readonly email_delivery?: 'sent' | 'not_configured' | 'failed';
   readonly id: string;
   readonly email: string;
   readonly role: Role;

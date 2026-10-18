@@ -18,9 +18,13 @@ from procurepilot_api.errors import (
 )
 from procurepilot_api.modules.offers.basket_liveness import (
     STALE_MESSAGES,
+    attempt_token,
+    cancel_rq_job,
     optimiser_worker_alive,
+    rq_job_id,
     stale_code,
 )
+from procurepilot_api.modules.offers.basket_result_compat import normalise_stored_result
 from procurepilot_api.modules.offers.schemas import (
     AdvancedBasketOptimiseRequest,
     BasketOptimiseRequest,
@@ -60,13 +64,15 @@ class BasketService:
                     existing = dict(existing)
                     if existing["status"] != "failed":
                         return _job(existing), False
+                    # Requeue first: the new created_at is this attempt's fence token.
+                    requeued = _requeue_failed_job(conn, UUID(str(existing["id"])))
                     try:
-                        _enqueue_redis_job(self._settings, existing, member)
+                        _enqueue_redis_job(self._settings, requeued, member)
                     except ServiceUnavailableError:
                         _compensate_failed_enqueue(conn, UUID(str(existing["id"])))
                         conn.commit()
                         raise
-                    job = _job(_requeue_failed_job(conn, UUID(str(existing["id"]))))
+                    job = _job(requeued)
                     if isinstance(payload, AdvancedBasketOptimiseRequest):
                         _record_audit(
                             bearer_token=bearer_token,
@@ -180,6 +186,7 @@ class BasketService:
         """
         error = {"code": code, "message": STALE_MESSAGES[code]}
         completed_at = datetime.now(UTC)
+        cancel_rq_job(self._settings, row)
         with conn.cursor() as cur:
             cur.execute(
                 "update basket_split_job set status = 'failed', error = %s, completed_at = %s "
@@ -503,13 +510,14 @@ def _enqueue_redis_job(settings: Settings, row: dict[str, object], member: Curre
                     if isinstance(row.get("request_snapshot"), dict)
                     else None
                 ),
+                "attempt": attempt_token(row),
                 "request_kind": (
                     row["request_snapshot"].get("kind")
                     if isinstance(row.get("request_snapshot"), dict)
                     else "basket_split"
                 ),
             },
-            job_id=str(row["id"]),
+            job_id=rq_job_id(row),
         )
     except Exception as exc:
         raise ServiceUnavailableError(details={"dependency": "redis"}) from exc
@@ -562,7 +570,7 @@ def _job(row: dict[str, object]) -> BasketSplitJob:
             "supplier_ids": row["supplier_ids"],
             "items": row["items"],
             "status": row["status"],
-            "result": row.get("result"),
+            "result": normalise_stored_result(row.get("result")),
             "error": row.get("error"),
             "result_url": f"/api/v1/baskets/{row['id']}",
             "created_at": row["created_at"],

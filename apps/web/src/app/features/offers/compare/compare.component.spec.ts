@@ -125,7 +125,7 @@ describe('CompareComponent (US1, SC-002, T020, T029)', () => {
   };
 
   beforeEach(async () => {
-    apiService = jasmine.createSpyObj<ApiService>('ApiService', ['products', 'compareOffers']);
+    apiService = jasmine.createSpyObj<ApiService>('ApiService', ['products', 'product', 'compareOffers']);
     apiService.products.and.returnValue(
       of({
         items: [
@@ -265,6 +265,39 @@ describe('CompareComponent (US1, SC-002, T020, T029)', () => {
     productList.next({ items: [tin], next_cursor: null });
     expect(apiService.compareOffers).toHaveBeenCalledTimes(1);
     expect(apiService.compareOffers.calls.mostRecent().args[0].quantity).toBe('180');
+  });
+
+  describe('product outside the loaded catalogue page', () => {
+    const tin = {
+      id: '00000000-0000-4000-8000-0000000000aa',
+      tenant_name: 'Sunflower oil tin 18L',
+      canonical_name: 'Sunflower oil',
+      base_unit: 'litre',
+      pack: { pack_count: 1, unit_size: '18' },
+      status: 'active' as const,
+      created_at: '2026-08-01T00:00:00Z',
+    };
+
+    it('fetches the product itself and compares 10 tins as 180 litres', () => {
+      apiService.product.and.returnValue(of(tin) as never);
+      apiService.compareOffers.calls.reset();
+      component.selectedProductId.set(tin.id);
+      component.quantityInput.set('10');
+      component.fetchComparison(tin.id);
+      expect(apiService.product).toHaveBeenCalledWith(tin.id);
+      expect(apiService.compareOffers.calls.mostRecent().args[0].quantity).toBe('180');
+    });
+
+    it('stops instead of assuming one base unit per pack when the product cannot be loaded', () => {
+      apiService.product.and.returnValue(throwError(() => new HttpErrorResponse({ status: 500 })) as never);
+      apiService.compareOffers.calls.reset();
+      component.selectedProductId.set(tin.id);
+      component.quantityInput.set('10');
+      component.fetchComparison(tin.id);
+      expect(apiService.compareOffers).not.toHaveBeenCalled();
+      expect(component.errorMessage()).toBe(enCatalog.compare.packUnknown);
+      expect(component.isLoading()).toBeFalse();
+    });
   });
 
   it('should render unknown stock signal correctly', () => {

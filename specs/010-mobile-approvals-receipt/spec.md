@@ -2,7 +2,9 @@
 
 **Feature Branch**: `010-mobile-approvals-receipt`
 **Created**: 2026-09-13
-**Status**: Shipped — merged to `main` (see `docs/roadmap/procurepilot_roadmap.md`, Delivery Status)
+**Status**: Partial — merged to `main`, but push notifications are never delivered (`_send_to_device()`
+is a stub with no FCM/APNs provider; see spec 009), so the approver's push and the requester's
+decision notification do not arrive. Delivery Status: `docs/roadmap/procurepilot_roadmap.md`
 **Input**: User description: "Mobile approvals and delivery receipt (R2.3, roadmap §7.2, M12-M13).
 Extend the Flutter mobile app (specs/009-mobile-app-mvp) so an approver can review and decide on a
 pending purchase request from their phone with full context (lines, estimated total, budget

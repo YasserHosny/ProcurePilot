@@ -91,6 +91,24 @@ test.describe('Compare-grid recalculation performance (T031, FR-025)', () => {
       await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(comparison) });
     });
 
+    // The compare page now loads the selected product itself when it is not in the catalogue
+    // list (it needs the pack size); mock that lookup for this synthetic product.
+    await page.route(`**/api/v1/products/${productId}`, (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          id: productId,
+          tenant_name: 'Synthetic product',
+          canonical_name: 'Synthetic product',
+          base_unit: 'kilogram',
+          pack: { pack_count: 1, unit_size: '1' },
+          status: 'active',
+          created_at: '2026-08-01T00:00:00Z',
+        }),
+      }),
+    );
+
     await page.goto(`/offers/compare?product_id=${productId}`);
     await expect(page.locator('.page-title')).toContainText('Smart Compare');
     await expect(page.locator('.landed-cost-cell')).toHaveCount(OFFER_COUNT);

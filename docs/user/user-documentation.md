@@ -732,7 +732,7 @@ Reached from **Record Purchase** on any Smart Compare offer, or **+ Record Purch
 |---|---------|-------------|
 | 1 | **Page title — "Approval Queue"** | Requests awaiting your decision. Only requests routed to you — directly, or via an active delegation (section 22) — based on threshold approval rules appear here. |
 | 2 | **Approvals table** | One row per pending request: required-by date, requester (name or email), branch, cost centre, estimated total (with an "incomplete estimate" badge when some lines lack pricing), budget status, and line count. Budget status uses the most specific budget that applies: the cost centre's, otherwise the branch's, otherwise an organisation-wide budget; only when none of the three exists does it show **No budget configured** and say why. |
-| 3 | **Budget Status column** | Shows the remaining budget after this request, or an amber "Budget Exceeded" badge with a tooltip and the remaining-budget figure when the request would exceed the applicable budget. Blank when no budget applies. |
+| 3 | **Budget Status column** | Shows the remaining budget after this request, or an amber "Budget Exceeded" badge with a tooltip and the remaining-budget figure when the request would exceed the applicable budget. When no cost-centre, branch or organisation budget applies it shows **No budget configured** with the reason; it is blank only when the request cannot be valued (no budget status). |
 | 4 | **Lines column + expand toggle** | Shows the line count; the expand icon reveals a nested table underneath the row with each line's product, quantity, unit price, and note — so you can review the full request without leaving the queue. |
 | 5 | **Approve / Reject buttons** | Each row has both actions. Either opens a confirmation dialog with an optional comment field before committing the decision. |
 | 6 | **Empty state** | "No requests awaiting your decision" style message when the queue is empty, instead of a blank table. |
@@ -762,9 +762,11 @@ Reached from **Record Purchase** on any Smart Compare offer, or **+ Record Purch
 
 **Invitation flow:**
 1. Click **Invite Member** → enter email and select role → send.
-2. The invitee receives an email with a link to accept the invitation.
-3. They can create a new account or sign in with an existing one.
-4. Once accepted, they appear in the Members tab with their assigned role.
+2. When Mailgun is configured, the invitee receives an email in the workspace language with a link to accept. The dialog confirms “Invitation emailed to” their address. If email is not configured or sending fails, a distinct warning explains that the email was not sent and asks you to copy the link below.
+3. The copy-link fallback is always available. Keep or share it before closing the dialog: the token is shown once.
+4. Use **Resend invitation** next to Revoke on a pending invitation to create and email a new link. The old link stops working immediately and the expiry restarts. The result dialog shows delivery status and the new copy-link fallback.
+5. They can create a new account or sign in with an existing one.
+6. Once accepted, they appear in the Members tab with their assigned role.
 
 **Business value:** Team Management lets the owner delegate procurement work while preserving accountability. Each role creates a clear operating boundary, so buyers can move quickly and sensitive controls stay with the right people.
 

@@ -89,6 +89,24 @@ test.describe('Matching trust signals @a11y', () => {
     await page.route('**/api/v1/offers/compare*', (route) =>
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(comparison) }),
     );
+    // The compare page now loads the selected product itself when it is not in the catalogue
+    // list (it needs the pack size); mock that lookup for this synthetic product.
+    await page.route(`**/api/v1/products/${PRODUCT_ID}`, (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          id: PRODUCT_ID,
+          tenant_name: 'Synthetic product',
+          canonical_name: 'Synthetic product',
+          base_unit: 'kilogram',
+          pack: { pack_count: 1, unit_size: '1' },
+          status: 'active',
+          created_at: '2026-08-01T00:00:00Z',
+        }),
+      }),
+    );
+
     await page.goto(`/offers/compare?product_id=${PRODUCT_ID}`);
     await expect(page.locator('.landed-cost-cell')).toHaveCount(2);
 

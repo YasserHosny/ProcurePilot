@@ -228,6 +228,10 @@
                   <td mat-cell *matCellDef="let inv">
                     <div *appRole="'owner'">
                       @if (inv.status === 'pending') {
+                        <button mat-button type="button" (click)="resendInvitation(inv)">
+                          <mat-icon aria-hidden="true">send</mat-icon>
+                          <span>{{ 'team.actions.resendInvitation' | translate }}</span>
+                        </button>
                         <button
                           mat-button
                           color="warn"

@@ -129,3 +129,41 @@ def test_requeueing_a_failed_job_restarts_the_expiry_clock() -> None:
     assert "created_at = now()" in sql
     assert "started_at = null" in sql
     assert row["status"] == "queued"
+
+
+def test_each_attempt_gets_its_own_token_and_rq_job_id() -> None:
+    from procurepilot_api.modules.offers.basket_liveness import attempt_token, rq_job_id
+
+    job_id = uuid4()
+    first = {"id": job_id, "created_at": NOW}
+    retry = {"id": job_id, "created_at": NOW + timedelta(seconds=1)}
+
+    assert attempt_token(first) != attempt_token(retry)
+    assert rq_job_id(first) != rq_job_id(retry)
+    assert rq_job_id(first).startswith(str(job_id))
+
+
+def test_enqueue_payload_carries_the_attempt_token(monkeypatch: pytest.MonkeyPatch) -> None:
+    import redis
+    import rq
+
+    captured: dict[str, object] = {}
+
+    class FakeQueue:
+        def __init__(self, *_: object, **__: object) -> None: ...
+
+        def enqueue(self, func: str, payload: dict[str, object], job_id: str) -> None:
+            captured.update(payload=payload, job_id=job_id)
+
+    monkeypatch.setattr(rq, "Queue", FakeQueue)
+    monkeypatch.setattr(redis.Redis, "from_url", staticmethod(lambda *_: object()))
+    job_id = uuid4()
+    row = {"id": job_id, "created_at": NOW, "request_snapshot": None}
+    member = type("M", (), {"tenant_id": uuid4()})()
+    settings = type("S", (), {"basket_split_queue_name": "q", "redis_url": "redis://x"})()
+
+    basket_service._enqueue_redis_job(settings, row, member)  # type: ignore[arg-type]
+
+    assert captured["payload"]["attempt"] == NOW.isoformat()  # type: ignore[index]
+    assert captured["job_id"] != str(job_id)
+    assert str(captured["job_id"]).startswith(str(job_id))
