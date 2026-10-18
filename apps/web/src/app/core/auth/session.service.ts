@@ -1,24 +1,16 @@
-import { HttpContext, HttpContextToken, HttpErrorResponse, HttpRequest } from '@angular/common/http';
+import { HttpContext, HttpErrorResponse } from '@angular/common/http';
 import { Injectable, NgZone, computed, inject, signal } from '@angular/core';
 import { Observable, defer, finalize, of, shareReplay, switchMap, tap, throwError } from 'rxjs';
 
 import { ApiService } from '../api/api.service';
 import type { Me, Role, Session, WorkspaceSummary } from '../api/models';
+import { REBUILD_ON_REPLAY } from './http-context';
 
 const ACCESS_TOKEN_KEY = 'pp.access_token';
 const REFRESH_TOKEN_KEY = 'pp.refresh_token';
 
 /** Renew this long before `exp`, so a request in flight never carries a token about to lapse. */
 export const REFRESH_LEAD_MS = 60_000;
-
-/**
- * Lets a request rebuild itself before the interceptor replays it after a refresh. A request
- * whose BODY carries the refresh token (the workspace switch) must not be replayed verbatim:
- * the refresh just rotated that token, so the replay would spend a dead one.
- */
-export const REBUILD_ON_REPLAY = new HttpContextToken<
-  ((req: HttpRequest<unknown>) => HttpRequest<unknown>) | null
->(() => null);
 
 /**
  * True only when the server has definitively refused the refresh token. A 429, a 5xx or a

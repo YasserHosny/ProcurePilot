@@ -3,6 +3,7 @@ import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 
 import { environment } from '../../../environments/environment';
+import { SEND_SESSION_TOKEN } from '../auth/http-context';
 import type {
   Alert,
   AlertDismissal,
@@ -419,9 +420,10 @@ export class ApiService {
         formData.append(k, v);
       }
       formData.append('file', file);
-      return this.http.post<void>(uploadUrl, formData);
+      return this.http.post<void>(uploadUrl, formData, { context: storageContext() });
     }
     return this.http.put<void>(uploadUrl, file, {
+      context: storageContext(),
       headers: {
         'Content-Type': file.type || 'application/octet-stream',
       },
@@ -1083,4 +1085,9 @@ export class ApiService {
   cancelApprovalDelegation(delegationId: string): Observable<void> {
     return this.http.delete<void>(`${this.base}/approvals/delegations/${delegationId}`);
   }
+}
+
+/** The upload URL is a Storage object URL our API issued; Storage authorises it with the JWT. */
+function storageContext(): HttpContext {
+  return new HttpContext().set(SEND_SESSION_TOKEN, true);
 }

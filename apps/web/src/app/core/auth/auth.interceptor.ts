@@ -10,7 +10,8 @@ import { Router } from '@angular/router';
 import { Observable, catchError, switchMap, throwError } from 'rxjs';
 
 import { environment } from '../../../environments/environment';
-import { REBUILD_ON_REPLAY, SessionService, refreshWasRejected } from './session.service';
+import { REBUILD_ON_REPLAY, SEND_SESSION_TOKEN } from './http-context';
+import { SessionService, refreshWasRejected } from './session.service';
 
 /** Set on a request replayed after a refresh, so a second 401 signs out instead of looping. */
 const REPLAYED_AFTER_REFRESH = new HttpContextToken<boolean>(() => false);
@@ -40,10 +41,13 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
   };
 
   const attempt = (request: HttpRequest<unknown>): Observable<HttpEvent<unknown>> => {
-    // Only our API gets the bearer token. Anything else — a presigned storage upload, a
-    // translation file — must never see it, and its 401 says nothing about our session.
+    // Only our API gets the bearer token by default. Anything else — a translation file, a
+    // third-party URL — must never see it, and its 401 says nothing about our session.
+    // A server-issued upload target may opt in to the token, but its 401 still does not touch
+    // the session.
     if (!isOwnApi(request.url)) {
-      return next(request);
+      const token = request.context.get(SEND_SESSION_TOKEN) ? session.accessToken : null;
+      return next(token ? request.clone({ setHeaders: { Authorization: `Bearer ${token}` } }) : request);
     }
     const sentToken = session.accessToken;
     const authorised = sentToken

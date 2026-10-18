@@ -4,6 +4,7 @@ import { TestBed, fakeAsync, tick } from '@angular/core/testing';
 import { Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 
+import { ApiService } from '../api/api.service';
 import type { Session } from '../api/models';
 import { authInterceptor } from './auth.interceptor';
 import { restoreSessionOnStartup } from './session-initializer';
@@ -201,6 +202,29 @@ describe('authInterceptor token refresh (demo finding 29)', () => {
     req.flush(null, { status: 401, statusText: 'Unauthorized' }); // e.g. the URL expired
 
     await expectAsync(result).toBeRejected();
+    expect(navigate).not.toHaveBeenCalled();
+    expect(localStorage.getItem('pp.refresh_token')).toBe('refresh-1');
+  });
+
+  it('sends the token to the Storage upload URL our API issued, without touching the session on 401', async () => {
+    // documents/service.py `_signed_upload_url`: a Storage object URL authorised by the JWT.
+    localStorage.setItem('pp.access_token', renewed);
+    const api = TestBed.inject(ApiService);
+    const url = 'http://127.0.0.1:54321/storage/v1/object/quotation-documents/t/d/quote.pdf';
+
+    const ok = firstValueFrom(api.uploadFileToStorage(url, new File(['x'], 'quote.pdf')));
+    const put = backend.expectOne(url);
+    expect(put.request.headers.get('Authorization')).toBe(`Bearer ${renewed}`);
+    put.flush(null);
+    await ok;
+
+    const fields = firstValueFrom(api.uploadFileToStorage(url, new File(['x'], 'q.pdf'), { k: 'v' }));
+    const post = backend.expectOne(url);
+    expect(post.request.headers.get('Authorization')).toBe(`Bearer ${renewed}`);
+    post.flush(null, { status: 401, statusText: 'Unauthorized' });
+
+    await expectAsync(fields).toBeRejected();
+    backend.expectNone('/api/v1/auth/refresh');
     expect(navigate).not.toHaveBeenCalled();
     expect(localStorage.getItem('pp.refresh_token')).toBe('refresh-1');
   });
