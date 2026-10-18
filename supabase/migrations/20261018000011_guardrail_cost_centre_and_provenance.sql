@@ -1,4 +1,4 @@
--- 20261018000008_guardrail_cost_centre_and_provenance.sql — hosted demo-tenant findings 37/38
+-- 20261018000011_guardrail_cost_centre_and_provenance.sql — hosted demo-tenant findings 37/38
 -- (docs/gtm/demo-tenant/rtl-walkthrough-2026-10-18.md), spec 021-rfq-sourcing-autonomy.
 --
 -- 38b. auto_preparation_guardrail.default_cost_centre_id (optional). Composite FK on
@@ -15,11 +15,14 @@
 --        by the worker at preparation time and backfilled here for existing rows;
 --      - event_select also admits a member who can see the prepared purchase_request. The
 --        subquery runs under the caller's own purchase_request RLS, so this grants nothing
---        beyond "you can see the request, so you can see how it was prepared".
+--        beyond "you can see the request, so you can see how it was prepared". The role check
+--        uses the live current_membership_role(), not the JWT claim, as 20261018000009 does.
 --
 -- 37.  set_tenant_default_locale(): change tenant.default_locale (the language RFQ emails go
---      out in) and record tenant.default_locale_changed in one transaction, the same shape as
---      set_tenant_currency (20261014000001).
+--      out in) and record tenant.default_locale_changed in one transaction. Unlike
+--      set_tenant_currency (20261014000001) it enforces owner-only itself (authenticated can
+--      call it directly through PostgREST) and takes no actor arguments: the audit event
+--      names the caller's own live membership.
 
 -- 38b ----------------------------------------------------------------------------------------
 alter table auto_preparation_guardrail add column default_cost_centre_id uuid;
@@ -56,7 +59,7 @@ create policy event_select on auto_preparation_event
   using (
     tenant_id = current_tenant_id()
     and (
-      current_member_role() in ('owner', 'buyer')
+      current_membership_role() in ('owner', 'buyer')
       or exists (
         select 1 from auto_preparation_guardrail g
         where g.tenant_id = auto_preparation_event.tenant_id
@@ -73,24 +76,29 @@ create policy event_select on auto_preparation_event
 
 -- 37 -----------------------------------------------------------------------------------------
 -- SECURITY INVOKER: the caller's RLS still applies, so a member only ever touches their own
--- tenant row. Owner-only is enforced by the API layer, as for PATCH /tenant.
-create or replace function set_tenant_default_locale(
-  p_locale               text,
-  p_actor_membership_id  uuid,
-  p_actor_email          text
-)
+-- tenant row. Owner-only is checked here with the live role, not only by the API.
+create or replace function set_tenant_default_locale(p_locale text)
 returns text
 language plpgsql
 security invoker
 set search_path = public
 as $$
 declare
-  v_tenant uuid := current_tenant_id();
-  v_old    text;
+  v_tenant     uuid := current_tenant_id();
+  v_membership uuid := current_membership_id();
+  v_email      text;
+  v_old        text;
 begin
+  if v_membership is null or current_membership_role() is distinct from 'owner' then
+    raise exception 'only the workspace owner can change the workspace language'
+      using errcode = '42501';
+  end if;
+
   if p_locale is null or p_locale not in ('en', 'ar') then
     raise exception 'unsupported locale' using errcode = '22023';
   end if;
+
+  select email into v_email from membership where id = v_membership;
 
   select default_locale into v_old from tenant where id = v_tenant for update;
   if not found then
@@ -103,8 +111,8 @@ begin
       'tenant.default_locale_changed',
       'success'::audit_outcome,
       v_tenant,
-      p_actor_membership_id,
-      p_actor_email,
+      v_membership,
+      v_email,
       jsonb_build_object('from', v_old, 'to', p_locale),
       null
     );
@@ -114,8 +122,8 @@ begin
 end;
 $$;
 
-revoke execute on function set_tenant_default_locale(text, uuid, text) from public, anon;
-grant execute on function set_tenant_default_locale(text, uuid, text) to authenticated;
+revoke execute on function set_tenant_default_locale(text) from public, anon;
+grant execute on function set_tenant_default_locale(text) to authenticated;
 
 comment on function set_tenant_default_locale is
-  'Atomically sets tenant.default_locale (en or ar; RFQ emails use it) and records the tenant.default_locale_changed audit event.';
+  'Owner only (live role). Atomically sets tenant.default_locale (en or ar; RFQ emails use it) and records tenant.default_locale_changed naming the calling membership.';
