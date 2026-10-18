@@ -709,10 +709,12 @@ class RfqService:
 
                     # 'converted' is a real, intended terminal RFQ status (spec.md's Key
                     # Entities section, FR-017's history view) -- a successful preparation
-                    # closes the sourcing loop for this RFQ.
+                    # closes the sourcing loop for this RFQ. rfq_update only matches the RFQ's
+                    # creator, so any other owner or buyer goes through mark_rfq_converted
+                    # (20261019000001), which checks the request came from this RFQ.
                     cur.execute(
-                        "update rfq set status = 'converted' where id = %s and tenant_id = %s",
-                        (rfq_id, member.tenant_id),
+                        "select mark_rfq_converted(%s, %s)",
+                        (rfq_id, purchase_request.id),
                     )
 
                     conn.commit()
