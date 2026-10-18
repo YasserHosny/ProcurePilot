@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime
+
 import os
 from uuid import uuid4
 
@@ -91,9 +93,7 @@ def test_worker_failure_durably_marks_job_failed_after_exception_unwinds(
                     Jsonb(
                         [
                             {
-                                "workspace_product_id": (
-                                    "00000000-0000-4000-8000-000000000001"
-                                ),
+                                "workspace_product_id": ("00000000-0000-4000-8000-000000000001"),
                                 "quantity": "1.000000",
                             }
                         ]
@@ -133,9 +133,7 @@ def test_worker_failure_durably_marks_job_failed_after_exception_unwinds(
                 try:
                     cur.execute("delete from tenant where id = %s", (tenant_id,))
                     cur.execute("delete from auth.users where id = %s", (user_id,))
-                    cur.execute(
-                        "delete from platform_invitation where id = %s", (invitation_id,)
-                    )
+                    cur.execute("delete from platform_invitation where id = %s", (invitation_id,))
                 finally:
                     cur.execute("set session_replication_role = default")
             conn.commit()
@@ -179,7 +177,7 @@ def test_advanced_worker_zero_offers_fails_with_all_requested_product_ids(
 
     monkeypatch.setattr(worker, "get_settings", lambda: WorkerSettings(database_url="unused"))
     monkeypatch.setattr(worker.db, "connect", fake_connect)
-    monkeypatch.setattr(worker, "mark_running", lambda *_args, **_kwargs: True)
+    monkeypatch.setattr(worker, "mark_running", lambda *_args, **_kwargs: datetime.now(UTC))
     monkeypatch.setattr(repository, "read_current_advanced_offers", lambda *_, **__: [])
 
     def capture_failure(_conn: object, *, error: dict[str, object], **_kwargs: object) -> None:

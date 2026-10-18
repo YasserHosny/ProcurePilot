@@ -52,93 +52,19 @@ class BasketService:
         idempotency_key: UUID | None = None,
     ) -> tuple[BasketSplitJob, bool]:
         with _authenticated_db(self._settings, member) as conn:
-            if idempotency_key is not None:
-                with conn.cursor(row_factory=dict_row) as cur:
-                    cur.execute(
-                        "select * from basket_split_job "
-                        "where tenant_id = %s and idempotency_key = %s limit 1",
-                        (member.tenant_id, idempotency_key),
-                    )
-                    existing = cur.fetchone()
-                if existing is not None:
-                    existing = dict(existing)
-                    if existing["status"] != "failed":
-                        return _job(existing), False
-                    # Requeue first: the new created_at is this attempt's fence token.
-                    requeued = _requeue_failed_job(conn, UUID(str(existing["id"])))
-                    try:
-                        _enqueue_redis_job(self._settings, requeued, member)
-                    except ServiceUnavailableError:
-                        _compensate_failed_enqueue(conn, UUID(str(existing["id"])))
-                        conn.commit()
-                        raise
-                    job = _job(requeued)
-                    if isinstance(payload, AdvancedBasketOptimiseRequest):
-                        _record_audit(
-                            bearer_token=bearer_token,
-                            member=member,
-                            action="offers.advanced_basket_submitted",
-                            target={
-                                "basket_split_job_id": str(job.id),
-                                "supplier_ids": [
-                                    str(supplier_id) for supplier_id in payload.supplier_ids
-                                ],
-                                "line_count": len(payload.items),
-                                "rule_version": ADVANCED_BASKET_RULE_VERSION,
-                            },
-                        )
-                    return job, True
-            self._expire_stuck_jobs(conn)
-            _visible_suppliers(conn, payload.supplier_ids)
-            _visible_products(conn, [item.workspace_product_id for item in payload.items])
-            request_snapshot = _request_snapshot(conn, member, payload)
-            _ensure_no_active_equivalent(conn, payload, request_snapshot)
-            job_id = uuid4()
-            with conn.cursor() as cur:
-                cur.execute("savepoint basket_split_job_insert")
+            job, created, pending = self._create_job_in_tx(
+                conn, member=member, payload=payload, idempotency_key=idempotency_key
+            )
+        if pending is not None:
+            # Enqueue only after the row is committed: a worker that dequeues first would
+            # otherwise find nothing to claim and drop the delivery as stale.
             try:
-                with conn.cursor(row_factory=dict_row) as cur:
-                    cur.execute(
-                        """
-                        insert into basket_split_job
-                          (id, tenant_id, requested_by, supplier_ids, items, request_snapshot,
-                           idempotency_key, status)
-                        values (%s, %s, %s, %s, %s, %s, %s, 'queued')
-                        returning *
-                        """,
-                        (
-                            job_id,
-                            member.tenant_id,
-                            member.membership_id,
-                            [str(supplier_id) for supplier_id in payload.supplier_ids],
-                            Jsonb([item.model_dump(mode="json") for item in payload.items]),
-                            Jsonb(request_snapshot) if request_snapshot is not None else None,
-                            idempotency_key,
-                        ),
-                    )
-                    row = dict(cur.fetchone())
-            except psycopg.errors.UniqueViolation:
-                with conn.cursor() as cur:
-                    cur.execute("rollback to savepoint basket_split_job_insert")
-                    cur.execute("release savepoint basket_split_job_insert")
-                with conn.cursor(row_factory=dict_row) as cur:
-                    cur.execute(
-                        "select * from basket_split_job "
-                        "where tenant_id = %s and idempotency_key = %s limit 1",
-                        (member.tenant_id, idempotency_key),
-                    )
-                    existing = cur.fetchone()
-                if existing is None:
-                    raise
-                return _job(dict(existing)), False
-            try:
-                _enqueue_redis_job(self._settings, row, member)
+                _enqueue_redis_job(self._settings, pending, member)
             except ServiceUnavailableError:
-                _compensate_failed_enqueue(conn, UUID(str(row["id"])))
-                conn.commit()
+                with _authenticated_db(self._settings, member) as conn:
+                    _compensate_failed_enqueue(conn, UUID(str(pending["id"])))
                 raise
-            job = _job(row)
-        if isinstance(payload, AdvancedBasketOptimiseRequest):
+        if created and isinstance(payload, AdvancedBasketOptimiseRequest):
             _record_audit(
                 bearer_token=bearer_token,
                 member=member,
@@ -150,7 +76,76 @@ class BasketService:
                     "rule_version": ADVANCED_BASKET_RULE_VERSION,
                 },
             )
-        return job, True
+        return job, created
+
+    def _create_job_in_tx(
+        self,
+        conn: object,
+        *,
+        member: CurrentMember,
+        payload: BasketRequest,
+        idempotency_key: UUID | None,
+    ) -> tuple[BasketSplitJob, bool, dict[str, object] | None]:
+        """Persist (or find) the job; returns the row to enqueue once this transaction commits."""
+        if idempotency_key is not None:
+            with conn.cursor(row_factory=dict_row) as cur:
+                cur.execute(
+                    "select * from basket_split_job "
+                    "where tenant_id = %s and idempotency_key = %s limit 1",
+                    (member.tenant_id, idempotency_key),
+                )
+                existing = cur.fetchone()
+            if existing is not None:
+                existing = dict(existing)
+                if existing["status"] != "failed":
+                    return _job(existing), False, None
+                # Requeue first: the new created_at is this attempt's fence token.
+                requeued = _requeue_failed_job(conn, UUID(str(existing["id"])))
+                return _job(requeued), True, requeued
+        self._expire_stuck_jobs(conn)
+        _visible_suppliers(conn, payload.supplier_ids)
+        _visible_products(conn, [item.workspace_product_id for item in payload.items])
+        request_snapshot = _request_snapshot(conn, member, payload)
+        _ensure_no_active_equivalent(conn, payload, request_snapshot)
+        job_id = uuid4()
+        with conn.cursor() as cur:
+            cur.execute("savepoint basket_split_job_insert")
+        try:
+            with conn.cursor(row_factory=dict_row) as cur:
+                cur.execute(
+                    """
+                    insert into basket_split_job
+                      (id, tenant_id, requested_by, supplier_ids, items, request_snapshot,
+                       idempotency_key, status)
+                    values (%s, %s, %s, %s, %s, %s, %s, 'queued')
+                    returning *
+                    """,
+                    (
+                        job_id,
+                        member.tenant_id,
+                        member.membership_id,
+                        [str(supplier_id) for supplier_id in payload.supplier_ids],
+                        Jsonb([item.model_dump(mode="json") for item in payload.items]),
+                        Jsonb(request_snapshot) if request_snapshot is not None else None,
+                        idempotency_key,
+                    ),
+                )
+                row = dict(cur.fetchone())
+        except psycopg.errors.UniqueViolation:
+            with conn.cursor() as cur:
+                cur.execute("rollback to savepoint basket_split_job_insert")
+                cur.execute("release savepoint basket_split_job_insert")
+            with conn.cursor(row_factory=dict_row) as cur:
+                cur.execute(
+                    "select * from basket_split_job "
+                    "where tenant_id = %s and idempotency_key = %s limit 1",
+                    (member.tenant_id, idempotency_key),
+                )
+                existing = cur.fetchone()
+            if existing is None:
+                raise
+            return _job(dict(existing)), False, None
+        return _job(row), True, row
 
     def get_job(self, *, member: CurrentMember, job_id: UUID) -> BasketSplitJob:
         with _authenticated_db(self._settings, member) as conn:
@@ -321,12 +316,40 @@ def _request_snapshot(
             "quality": _weight(weights["quality"]),
         },
         "weights": weights,
+        "pack_snapshot": _pack_snapshot(
+            conn, [item.workspace_product_id for item in payload.items]
+        ),
         "supplier_terms": supplier_terms,
         "constraints": _constraints_from_supplier_terms(
             supplier_terms,
             payload.excluded_supplier_ids,
             payload.urgency,
         ),
+    }
+
+
+def _pack_snapshot(conn: object, product_ids: list[UUID]) -> dict[str, dict[str, str]]:
+    """Pack size and base unit per product at submission (first pack, as the catalogue shows)."""
+    with conn.cursor(row_factory=dict_row) as cur:
+        cur.execute(
+            """
+            select distinct on (wp.id)
+              wp.id, pd.base_quantity, cp.base_unit
+            from workspace_product wp
+            join canonical_product cp on cp.id = wp.canonical_product_id
+            join pack_definition pd on pd.workspace_product_id = wp.id
+            where wp.id = any(%s::uuid[])
+            order by wp.id, pd.created_at
+            """,
+            ([str(product_id) for product_id in product_ids],),
+        )
+        rows = cur.fetchall()
+    return {
+        str(row["id"]): {
+            "base_quantity": f"{Decimal(str(row['base_quantity'])):f}",
+            "base_unit": str(row["base_unit"]),
+        }
+        for row in rows
     }
 
 
@@ -570,11 +593,16 @@ def _job(row: dict[str, object]) -> BasketSplitJob:
             "supplier_ids": row["supplier_ids"],
             "items": row["items"],
             "status": row["status"],
-            "result": normalise_stored_result(row.get("result")),
+            "result": normalise_stored_result(row.get("result"), row["supplier_ids"]),
             "error": row.get("error"),
             "result_url": f"/api/v1/baskets/{row['id']}",
             "created_at": row["created_at"],
             "started_at": row.get("started_at"),
             "completed_at": row.get("completed_at"),
+            "pack_snapshot": (
+                row["request_snapshot"].get("pack_snapshot")
+                if isinstance(row.get("request_snapshot"), dict)
+                else None
+            ),
         }
     )

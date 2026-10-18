@@ -30,10 +30,11 @@ def process_basket_split_job(payload: dict[str, str]) -> None:
         try:
             claimed = mark_running(conn, job_id=job_id, attempt=attempt)
             conn.commit()
-            if not claimed:
+            if claimed is None:
                 # The API expired this attempt (or requeued the job under a newer one).
                 logger.warning("skipping stale basket split delivery for job %s", job_id)
                 return
+            attempt = claimed  # pin every later transition to the attempt we actually claimed
             if _is_advanced_job(payload):
                 input_payload = load_advanced_optimisation_input(
                     conn,

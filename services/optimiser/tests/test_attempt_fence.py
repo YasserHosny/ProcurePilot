@@ -30,6 +30,9 @@ class _Cursor:
         self.conn.sql.append((" ".join(sql.split()), params))
         self.rowcount = 1 if self.conn.claim else 0
 
+    def fetchone(self) -> tuple[datetime] | None:
+        return (ATTEMPT,) if self.conn.claim else None
+
 
 class _Conn:
     def __init__(self, *, claim: bool) -> None:
@@ -59,6 +62,39 @@ def test_transitions_are_conditional_on_status_and_attempt() -> None:
     assert "status = 'queued'" in running and "created_at = %s" in running
     assert "status = 'running'" in completed and "created_at = %s" in completed
     assert "status = 'running'" in failed and "created_at = %s" in failed
+
+
+def test_tokenless_claim_returns_the_claimed_attempt_for_later_transitions() -> None:
+    conn = _Conn(claim=True)
+
+    claimed = repository.mark_running(conn, job_id=uuid4(), attempt=None)  # type: ignore[arg-type]
+
+    assert claimed == ATTEMPT
+
+
+def test_tokenless_delivery_pins_completion_to_the_attempt_it_claimed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    seen: dict[str, object] = {}
+    monkeypatch.setattr(worker, "get_settings", lambda: WorkerSettings(database_url="x"))
+    monkeypatch.setattr(worker.db, "connect", lambda _dsn: _Conn(claim=True))
+    monkeypatch.setattr(worker, "mark_running", lambda *_a, **_k: ATTEMPT)
+    monkeypatch.setattr(
+        worker, "load_job", lambda *_a, **_k: type("J", (), {"supplier_ids": [], "items": []})()
+    )
+    monkeypatch.setattr(worker, "read_current_offers", lambda *_a, **_k: [])
+    monkeypatch.setattr(
+        worker,
+        "solve_two_supplier_split",
+        lambda **_k: type("R", (), {"model_dump": lambda self, mode: {}})(),
+    )
+    monkeypatch.setattr(
+        worker, "mark_completed", lambda _c, **kw: seen.update(attempt=kw["attempt"])
+    )
+
+    worker.process_basket_split_job({"job_id": str(uuid4()), "tenant_id": str(uuid4())})
+
+    assert seen["attempt"] == ATTEMPT  # no payload attempt, yet completion is still fenced
 
 
 def test_stale_delivery_is_skipped_without_solving(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -135,7 +171,7 @@ def test_old_delivery_cannot_touch_a_retried_attempt() -> None:
                     (job_id,),
                 )
             # The expired delivery arrives while the row is failed: must not resurrect it.
-            assert not repository.mark_running(conn, job_id=job_id, attempt=first_attempt)
+            assert repository.mark_running(conn, job_id=job_id, attempt=first_attempt) is None
             with conn.cursor() as cur:
                 cur.execute(
                     "update basket_split_job set status='queued', completed_at=null, "
@@ -145,14 +181,40 @@ def test_old_delivery_cannot_touch_a_retried_attempt() -> None:
                 )
                 second_attempt = cur.fetchone()[0]
             # ... and while the retry is queued: still must not claim it.
-            assert not repository.mark_running(conn, job_id=job_id, attempt=first_attempt)
-            assert repository.mark_running(conn, job_id=job_id, attempt=second_attempt)
+            assert repository.mark_running(conn, job_id=job_id, attempt=first_attempt) is None
+            assert repository.mark_running(conn, job_id=job_id, attempt=second_attempt) is not None
+            # A tokenless (legacy) delivery claims the queued retry, then pins to what it claimed.
+            # (Shown on a throwaway re-queue below.)
             # A late result from the old attempt cannot overwrite the retry.
             assert not repository.mark_completed(
                 conn, job_id=job_id, result={"stale": True}, attempt=first_attempt
             )
             assert repository.mark_completed(
                 conn, job_id=job_id, result={"ok": True}, attempt=second_attempt
+            )
+            # Tokenless (legacy) delivery: claims the queued attempt, then is pinned to it.
+            with conn.cursor() as cur:
+                cur.execute(
+                    "update basket_split_job set status='queued', result=null, "
+                    "completed_at=null, started_at=null, created_at=now() + interval '2 seconds' "
+                    "where id=%s",
+                    (job_id,),
+                )
+            legacy_token = repository.mark_running(conn, job_id=job_id, attempt=None)
+            assert legacy_token is not None
+            with conn.cursor() as cur:  # API expires it and the user retries -> new attempt
+                cur.execute(
+                    "update basket_split_job set status='queued', started_at=null, "
+                    "created_at=now() + interval '3 seconds' where id=%s",
+                    (job_id,),
+                )
+            assert not repository.mark_completed(
+                conn, job_id=job_id, result={"legacy": True}, attempt=legacy_token
+            )
+            final = repository.mark_running(conn, job_id=job_id, attempt=None)
+            assert final is not None and final != legacy_token
+            assert repository.mark_completed(
+                conn, job_id=job_id, result={"ok": True}, attempt=final
             )
             conn.commit()
             with conn.cursor() as cur:

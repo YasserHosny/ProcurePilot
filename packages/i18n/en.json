@@ -2341,6 +2341,18 @@
       "no_eligible_supplier": "No eligible supplier has a current offer for this item",
       "currency_consistency": "Offers in different currencies cannot be combined",
       "generic": "Constraint applied"
+    },
+    "violationText": {
+      "minimum_order_value": "{{supplier}} does not meet its minimum order value",
+      "free_delivery_threshold": "Free-delivery threshold not reached for {{supplier}}",
+      "delivery_fee": "Delivery fee could not be avoided for {{supplier}}",
+      "quantity_tier": "Quantity-tier pricing could not be applied",
+      "supplier_exclusion": "{{supplier}} was excluded but is still required",
+      "urgency": "The requested urgency cannot be met",
+      "risk_tolerance": "{{supplier}} exceeds the requested risk tolerance",
+      "no_eligible_supplier": "No eligible supplier has a current offer for this item",
+      "currency_consistency": "Offers in different currencies cannot be combined",
+      "generic": "A requirement could not be met"
     }
   },
   "supplierIq": {

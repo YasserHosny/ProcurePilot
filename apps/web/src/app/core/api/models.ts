@@ -828,7 +828,7 @@ export interface SingleSupplierBaseline {
 export interface InfeasibleBasketItem {
   readonly workspace_product_id: string;
   readonly requested_quantity: string;
-  readonly reason: 'no_offer_from_named_suppliers';
+  readonly reason: 'no_offer_from_named_suppliers' | 'mixed_currency_offers';
   readonly missing_supplier_ids: readonly string[];
 }
 
@@ -878,6 +878,13 @@ export interface BasketSplitJob {
   readonly created_at: string;
   readonly started_at?: string | null;
   readonly completed_at?: string | null;
+  /** Pack definition per product as of submission (ADR-020); absent on older jobs. */
+  readonly pack_snapshot?: Readonly<Record<string, BasketPackSnapshot>> | null;
+}
+
+export interface BasketPackSnapshot {
+  readonly base_quantity: string;
+  readonly base_unit: string;
 }
 
 // --- R2.4 Supplier IQ & Scorecards ---------------------------------------

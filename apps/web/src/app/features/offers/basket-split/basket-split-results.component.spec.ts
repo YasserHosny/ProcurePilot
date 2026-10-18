@@ -64,10 +64,15 @@ describe('BasketSplitResultsComponent — packs and constraint copy', () => {
   let fixture: ComponentFixture<BasketSplitResultsComponent>;
   let translate: TranslateService;
 
-  function render(applied: unknown[], violated: unknown[] = []): HTMLElement {
-    fixture.componentRef.setInput('currentJob', job);
+  function render(
+    applied: unknown[],
+    violated: unknown[] = [],
+    currentJob: BasketSplitJob = job,
+    products: Product[] = [rice, loose],
+  ): HTMLElement {
+    fixture.componentRef.setInput('currentJob', currentJob);
     fixture.componentRef.setInput('suppliers', [supplier]);
-    fixture.componentRef.setInput('products', [rice, loose]);
+    fixture.componentRef.setInput('products', products);
     fixture.componentRef.setInput('solverConfidence', 'high');
     fixture.componentRef.setInput('validUntil', null);
     fixture.componentRef.setInput('appliedConstraints', applied);
@@ -123,6 +128,45 @@ describe('BasketSplitResultsComponent — packs and constraint copy', () => {
     const text = el.querySelector('.applied-constraints')?.textContent ?? '';
     expect(text).toContain('Al Nour');
     expect(text).toContain('تم استبعاد');
+  });
+
+  it('treats a pack smaller than one base unit as a pack, not loose goods', () => {
+    const halfKg = {
+      ...rice,
+      pack: { pack_count: 1, unit_size: '0.5', base_quantity: '0.5' },
+    } as unknown as Product;
+    const el = render([], [], job, [halfKg, loose]);
+    const primary = el.querySelector('.alloc-table tbody tr td:nth-child(2) .qty-primary');
+    expect(primary?.textContent?.trim()).toBe('1,000 × 0.5 kg');
+  });
+
+  it("renders historical results with the pack captured at submission, not today's catalogue", () => {
+    const snapshotJob = {
+      ...job,
+      pack_snapshot: { 'p-rice': { base_quantity: '10', base_unit: 'kilogram' } },
+    } as unknown as BasketSplitJob;
+    const el = render([], [], snapshotJob);
+    const primary = el.querySelector('.alloc-table tbody tr td:nth-child(2) .qty-primary');
+    expect(primary?.textContent?.trim()).toBe('50 × 10 kg');
+  });
+
+  it('words a violated constraint as a failure, not as the applied rule', () => {
+    const el = render(
+      [{ kind: 'minimum_order_value', supplier_id: 's1', description: 'x' }],
+      [{ kind: 'minimum_order_value', supplier_id: 's1', description: 'x', reason: 'x' }],
+    );
+    expect(el.querySelector('.applied-constraints')?.textContent).toContain(
+      'Minimum order value checked for Al Nour',
+    );
+    const violated = el.querySelector('.violated-constraints')?.textContent ?? '';
+    expect(violated).toContain('Al Nour does not meet its minimum order value');
+    expect(violated).not.toContain('checked');
+  });
+
+  it('has Arabic violation copy', () => {
+    translate.use('ar');
+    const el = render([], [{ kind: 'no_eligible_supplier', description: 'x', reason: 'x' }]);
+    expect(el.querySelector('.violated-constraints')?.textContent).toContain('لا يوجد مورّد مؤهل');
   });
 
   it('flags only the tie-break as internal', () => {

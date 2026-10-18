@@ -87,9 +87,7 @@ def test_advanced_basket_refuses_mixed_currency_supplier_constraints(
                 payload=_advanced_payload(context.supplier_ids, context.product_id),
             )
 
-        assert exc_info.value.details == {
-            "currency": "mixed_advanced_basket_currency"
-        }
+        assert exc_info.value.details == {"currency": "mixed_advanced_basket_currency"}
         assert _basket_jobs(context.workspace.tenant_id) == []
 
 
@@ -290,3 +288,33 @@ def _purchase_request_count(tenant_id: UUID) -> int:
 
 def _noop_enqueue(_settings: object, _row: dict[str, object], _member: object) -> None:
     return None
+
+
+def test_enqueue_happens_after_commit_and_snapshots_the_pack(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A worker may dequeue the instant the job is enqueued, so the row must already be
+    committed (visible from another connection) by then; and the pack definition in force at
+    submission is stored so historical results keep rendering with it (ADR-020)."""
+    settings = settings_for_test_db(monkeypatch)
+    seen: dict[str, object] = {}
+
+    with committed_smart_context("advanced-after-commit", supplier_count=2) as context:
+
+        def enqueue_probe(_settings: object, row: dict[str, object], _member: object) -> None:
+            with psycopg.connect(TEST_DATABASE_URL, prepare_threshold=None) as other:
+                with other.cursor() as cur:
+                    cur.execute("select status from basket_split_job where id = %s", (row["id"],))
+                    seen["visible"] = cur.fetchone()
+
+        monkeypatch.setattr(basket_service, "_enqueue_redis_job", enqueue_probe)
+        job, _created = BasketService(settings).create_job(
+            member=context.member,
+            payload=_advanced_payload(context.supplier_ids, context.product_id),
+        )
+
+        assert seen["visible"] == ("queued",)
+        snapshot = job.pack_snapshot
+        assert snapshot is not None and str(context.product_id) in snapshot
+        assert Decimal(snapshot[str(context.product_id)].base_quantity) > 0
+        assert snapshot[str(context.product_id)].base_unit

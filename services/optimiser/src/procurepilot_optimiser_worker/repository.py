@@ -266,20 +266,25 @@ def read_supplier_risks(
 
 def mark_running(
     conn: psycopg.Connection, *, job_id: UUID, attempt: datetime | None = None
-) -> bool:
-    """Claim a queued job for this delivery; False when it is no longer ours to run.
+) -> datetime | None:
+    """Claim a queued job for this delivery.
 
-    ``attempt`` is the API's per-attempt token (the job's ``created_at`` when it was enqueued).
-    A delivery from an expired attempt finds the row failed, or requeued under a newer token,
-    and must not touch it. ``None`` is a pre-fence delivery: only the status guard applies.
+    Returns the claimed attempt's ``created_at`` (the fence token), or None when the job is no
+    longer ours to run. ``attempt`` is the API's per-attempt token; a delivery from an expired
+    attempt finds the row failed, or requeued under a newer token, and must not touch it.
+    ``attempt=None`` is a tokenless (pre-fence) delivery: it claims whatever attempt is queued
+    *now*, and every later transition is still pinned to the ``created_at`` returned here, so it
+    can never overwrite a requeued attempt.
     """
     with conn.cursor() as cur:
         cur.execute(
             "update basket_split_job set status = 'running', started_at = now() "
-            "where id = %s and status = 'queued' and (%s::timestamptz is null or created_at = %s)",
+            "where id = %s and status = 'queued' and (%s::timestamptz is null or created_at = %s) "
+            "returning created_at",
             (job_id, attempt, attempt),
         )
-        return cur.rowcount == 1
+        row = cur.fetchone()
+        return row[0] if row else None
 
 
 def mark_completed(
