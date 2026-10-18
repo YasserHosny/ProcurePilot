@@ -5,7 +5,8 @@ The first full purchasing round run through the real product on hosted
 `pp-owner`. Dataset and findings: [`../README.md`](../README.md). Video status:
 [`../../video/production-tracker.md`](../../video/production-tracker.md).
 
-Screenshots were taken from the live demo tenant on 2026-10-18, after PRs #108–#112 were deployed.
+Screenshots were taken from the live demo tenant on 2026-10-18, after PRs #108–#112 were deployed;
+screenshots 02, 03 and 07 were retaken after #128 deployed (quantities without trailing zeros, per-pack PO prices).
 They show the product as it is, including the open label issues listed at the end.
 
 ## The round in one line
@@ -84,6 +85,9 @@ create. The PO is a draft until submitted; ProcurePilot never writes back to sup
 
 Basket Split with الأمانة and النور, the five lines in packs (lentils 50, oil 10, rice 20, sugar 10,
 pasta 15). The optimiser on hosted completed the job (2511bb47) in about 2 seconds:
+
+![Basket Split: الأمانة and النور, five lines in packs](09-basket-split-input.jpg)
+
 
 | Supplier | Lines | Landed cost (EGP) |
 |---|---|---|
