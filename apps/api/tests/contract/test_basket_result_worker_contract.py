@@ -148,3 +148,33 @@ def test_solver_tie_break_is_not_exposed_as_an_applied_constraint() -> None:
 
     assert isinstance(job.result, AdvancedBasketResult)
     assert not any("tie-break" in c.description for c in job.result.applied_constraints)
+
+
+def test_infeasible_items_are_synthesised_from_per_item_violations() -> None:
+    row, _ = _solve(offer_for_second=False)
+    missing_product = next(
+        v["workspace_product_id"]
+        for v in row["result"]["violated_constraints"]  # type: ignore[index]
+        if v["kind"] == "no_eligible_supplier"
+    )
+
+    job = _job(row)
+
+    assert isinstance(job.result, AdvancedBasketResult)
+    assert [str(i.workspace_product_id) for i in job.result.infeasible_items] == [missing_product]
+    item = job.result.infeasible_items[0]
+    assert item.reason == "no_offer_from_named_suppliers"
+    assert item.missing_supplier_ids == row["supplier_ids"]
+
+
+def test_job_exposes_the_pack_snapshot_stored_at_submission() -> None:
+    row, _ = _solve()
+    product_id = str(uuid4())
+    row["request_snapshot"] = {
+        "pack_snapshot": {product_id: {"base_quantity": "0.5", "base_unit": "kilogram"}}
+    }
+
+    job = _job(row)
+
+    assert job.pack_snapshot is not None
+    assert job.pack_snapshot[product_id].base_quantity == "0.5"

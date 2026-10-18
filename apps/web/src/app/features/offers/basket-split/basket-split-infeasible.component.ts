@@ -56,7 +56,12 @@ export class BasketSplitInfeasibleComponent {
   }
 
   constraintLabel(constraint: ViolatedOptimisationConstraint): string {
-    return constraintText(constraint, this.translate, (id) => this.getSupplierName(id));
+    return constraintText(
+      constraint,
+      this.translate,
+      (id) => this.getSupplierName(id),
+      'violated',
+    );
   }
 
   getSupplierName(supplierId: string): string {

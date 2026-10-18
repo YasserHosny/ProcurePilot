@@ -79,7 +79,7 @@
               <h4>{{ 'advancedBasket.result.violatedConstraints' | translate }}</h4>
               <ul>
                 @for (vc of violatedConstraints; track $index) {
-                  <li>{{ constraintLabel(vc) }}</li>
+                  <li>{{ constraintLabel(vc, 'violated') }}</li>
                 }
               </ul>
             </div>

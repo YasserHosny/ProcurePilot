@@ -62,8 +62,11 @@ export class BasketSplitResultsComponent {
     return this.appliedConstraints.filter(isUserFacingConstraint);
   }
 
-  constraintLabel(constraint: OptimisationConstraint | ViolatedOptimisationConstraint): string {
-    return constraintText(constraint, this.translate, (id) => this.getSupplierName(id));
+  constraintLabel(
+    constraint: OptimisationConstraint | ViolatedOptimisationConstraint,
+    outcome: 'applied' | 'violated' = 'applied',
+  ): string {
+    return constraintText(constraint, this.translate, (id) => this.getSupplierName(id), outcome);
   }
 
   /**
@@ -76,17 +79,25 @@ export class BasketSplitResultsComponent {
   } {
     const product = this.products.find((p) => p.id === line.workspace_product_id);
     const base = parseFloat(line.quantity);
-    const rawUnit = product?.base_unit ?? '';
+    const rawUnit =
+      this.currentJob?.pack_snapshot?.[line.workspace_product_id]?.base_unit ??
+      product?.base_unit ??
+      '';
     const unitKey = `rfq.email.units.${rawUnit}`;
     const translatedUnit: string = this.translate.instant(unitKey);
     const unit = translatedUnit === unitKey ? rawUnit : translatedUnit;
     const fmt = (n: number): string =>
       this.format.formatNumber(n, { maximumFractionDigits: 6 });
+    // Prefer the pack definition captured at submission: the catalogue may have changed since.
+    const snapshot = this.currentJob?.pack_snapshot?.[line.workspace_product_id];
     const pack = product?.pack;
-    const size = pack
-      ? parseFloat(pack.base_quantity ?? String(pack.pack_count * parseFloat(pack.unit_size)))
-      : 0;
-    if (!Number.isFinite(base) || !Number.isFinite(size) || size <= 1) {
+    const size = snapshot
+      ? parseFloat(snapshot.base_quantity)
+      : pack
+        ? parseFloat(pack.base_quantity ?? String(pack.pack_count * parseFloat(pack.unit_size)))
+        : 0;
+    // Only a pack of exactly one base unit is "loose goods"; a 0.5 kg pack is still a pack.
+    if (!Number.isFinite(base) || !Number.isFinite(size) || size <= 0 || size === 1) {
       return { primary: `${Number.isFinite(base) ? fmt(base) : line.quantity} ${unit}`.trim(), secondary: null };
     }
     const packs = base / size;

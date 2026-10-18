@@ -2341,6 +2341,18 @@
       "no_eligible_supplier": "لا يوجد مورّد مؤهل لديه عرض حالي لهذا الصنف",
       "currency_consistency": "لا يمكن الجمع بين عروض بعملات مختلفة",
       "generic": "تم تطبيق قيد"
+    },
+    "violationText": {
+      "minimum_order_value": "{{supplier}} لا يستوفي الحد الأدنى لقيمة الطلب",
+      "free_delivery_threshold": "لم يتم بلوغ حد التوصيل المجاني لدى {{supplier}}",
+      "delivery_fee": "تعذّر تجنب رسوم التوصيل لدى {{supplier}}",
+      "quantity_tier": "تعذّر تطبيق تسعير شرائح الكمية",
+      "supplier_exclusion": "تم استبعاد {{supplier}} لكنه لا يزال مطلوباً",
+      "urgency": "لا يمكن تلبية الاستعجال المطلوب",
+      "risk_tolerance": "{{supplier}} يتجاوز حدّ تحمّل المخاطر المطلوب",
+      "no_eligible_supplier": "لا يوجد مورّد مؤهل لديه عرض حالي لهذا الصنف",
+      "currency_consistency": "لا يمكن الجمع بين عروض بعملات مختلفة",
+      "generic": "تعذّر استيفاء أحد المتطلبات"
     }
   },
   "supplierIq": {

@@ -316,6 +316,18 @@ class AdvancedBasketResult(StrictApiModel):
     solver_version: str
     computed_at: datetime
     valid_until: datetime | None = None
+    infeasible_items: list[InfeasibleBasketItem] = Field(default_factory=list)
+
+
+class PackSnapshot(StrictApiModel):
+    """Pack definition of a product as it was when the job was submitted (ADR-020).
+
+    Quantities in a result are base units; rendering them as packs must use the pack that was
+    current at submission, not whatever the catalogue says now.
+    """
+
+    base_quantity: StrictStr
+    base_unit: StrictStr
 
 
 class BasketSplitJob(BaseModel):
@@ -329,6 +341,7 @@ class BasketSplitJob(BaseModel):
     error: dict[str, object] | None = None
     started_at: datetime | None = None
     completed_at: datetime | None = None
+    pack_snapshot: dict[str, PackSnapshot] | None = None
 
 
 class SupplierQuantityTier(StrictApiModel):

@@ -19,11 +19,14 @@ export function constraintText(
   constraint: ConstraintLike,
   translate: TranslateService,
   supplierName: (supplierId: string) => string,
+  outcome: 'applied' | 'violated' = 'applied',
 ): string {
   const params = {
     supplier: constraint.supplier_id ? supplierName(constraint.supplier_id) : '',
   };
-  const key = `advancedBasket.constraintText.${constraint.kind ?? 'generic'}`;
+  // A violated constraint is a failure, so it must not reuse the "applied" wording.
+  const group = outcome === 'violated' ? 'violationText' : 'constraintText';
+  const key = `advancedBasket.${group}.${constraint.kind ?? 'generic'}`;
   const text: string = translate.instant(key, params);
-  return text === key ? translate.instant('advancedBasket.constraintText.generic') : text;
+  return text === key ? translate.instant(`advancedBasket.${group}.generic`) : text;
 }
