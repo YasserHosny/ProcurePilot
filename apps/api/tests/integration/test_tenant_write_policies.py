@@ -120,7 +120,9 @@ def test_a_non_owner_cannot_change_the_workspace_even_with_an_owner_claim(
 
 
 @pytest.mark.parametrize("role", ["owner", "viewer"])
-def test_nobody_inserts_or_deletes_a_tenant_as_authenticated(workspace: Workspace, role: str) -> None:
+def test_nobody_inserts_or_deletes_a_tenant_as_authenticated(
+    workspace: Workspace, role: str
+) -> None:
     cur, tenant_id, users = workspace
     act_as(cur, tenant_id, users[role], role)
     cur.execute("savepoint before_delete")
