@@ -41,6 +41,24 @@ def _date(value: date, locale: str) -> str:
     return f"{_digits(str(value.day), locale)} {month} {_digits(str(value.year), locale)}"
 
 
+def _line_amount(item: RfqEmailLine, locale: str) -> str:
+    """The requested amount: rfq_line.quantity is in packs (ADR-020), so state the pack count,
+    the size of one pack and the base-unit total. A one-base-unit pack (loose goods sold per kg)
+    reads as the base unit alone."""
+    quantity = _decimal(item.quantity, locale)
+    if item.pack_count is None or item.unit_size is None:
+        return t("rfq.email.packsOnly", locale, count=quantity)
+    unit = t(f"rfq.email.units.{item.unit_code}", locale)
+    per_pack = item.pack_count * item.unit_size
+    if per_pack == 1:
+        return f"{quantity} {unit}"
+    size = _decimal(per_pack, locale)
+    if item.quantity == 1:
+        return t("rfq.email.packQuantityOne", locale, size=size, unit=unit)
+    total = _decimal(item.quantity * per_pack, locale)
+    return t("rfq.email.packQuantity", locale, count=quantity, size=size, unit=unit, total=total)
+
+
 def render_rfq_email(
     *,
     tenant_name: str,
@@ -65,18 +83,7 @@ def render_rfq_email(
     quantity_lines: list[str] = []
     item_html: list[str] = []
     for item in lines:
-        quantity = _decimal(item.quantity, lang)
-        unit = t(f"rfq.email.units.{item.unit_code}", lang)
-        amount = f"{quantity} {unit}"
-        if item.pack_count is not None and item.unit_size is not None:
-            pack = t(
-                "rfq.email.packHint",
-                lang,
-                count=_decimal(item.pack_count, lang),
-                size=_decimal(item.unit_size, lang),
-                unit=unit,
-            )
-            amount += f" {pack}"
+        amount = _line_amount(item, lang)
         quantity_lines.append(f"- {item.product_name}: {amount}")
         item_html.append(f"<li>{html.escape(item.product_name)}: {html.escape(amount)}</li>")
     text_lines = [
