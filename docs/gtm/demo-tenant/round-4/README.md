@@ -2,7 +2,7 @@
 
 Dry run of the round the demo video records (production tracker items 2.4 and 2.5): Maadi low stock
 of oil, rice and onions → RFQ to three suppliers → quotes including a WhatsApp photo → guardrail
-drafts the request → phone approval → PO → savings. Run on hosted against «مطاعم سند», in Arabic,
+drafts the request → phone approval → PO → savings, completed end to end. Run on hosted against «مطاعم سند», in Arabic,
 through the real screens (web in Chrome, supplier replies from Gmail).
 
 ## What ran
@@ -19,7 +19,9 @@ through the real screens (web in Chrome, supplier replies from Gmail).
 | الأمانة sends an updated photo quote covering all three (`IMG-20261019-WA0011.jpg`, onions 80 × 17.25, total 25,600 ج.م) | read correctly; its three lines matched automatically from the earlier decisions |
 | Guardrail fires | **draft request `7a880ac5`, EGP 25,600, from الأمانة's photo quote**, with the «أعدّته الضوابط تلقائيًا» banner; RFQ → converted; owner email «مسودة طلب جاهزة للمراجعة — الأمانة للتجارة» 2 s later |
 | Request submitted for approval | Maadi remaining budget shown as 287,755 |
-| Phone approval → PO → savings | not yet: needs the approver signed in to the phone web build |
+| Phone approval | approved on the phone web build (Arabic): the approval screen shows the «أعدّته الضوابط تلقائيًا» banner, lines, total and remaining budget; request → ordered |
+| PO | **PO-000005** created from the approved request (supplier, lines and prices pre-filled), EGP 25,600, sent |
+| Savings | **Record outcome** on PO-000005 pre-filled three lines in base units; saved. Baseline = last PO price: rice 37.60/kg (PO-000001, 940 a sack) → +180; onions 18.50/kg (PO-000002) → +100; oil 93.33/L (PO-000001, 1,680 a tin) → +320. **Total 600 EGP**, pending verification |
 
 Decision (owner, 2026-10-18): in the recorded round, الأمانة's photo quote covers all three items, so
 the guardrail drafts the request from the photo in one scene.
@@ -28,7 +30,9 @@ the guardrail drafts the request from the photo in one scene.
 
 - Guardrail default cost centre set to «المطبخ — المعادي» (the dry-run draft had none).
 - #180 and #181 merged; check they are deployed before recording.
-- Findings 41 (raw JSON stated total on review) and 42 (photo expiry date not read) are still open.
+- Findings 41 (raw JSON stated total on review) and 42 (photo expiry date not read) have fix sessions running.
+- On camera: the phone approval list shows the requester's email, not a name; the PO banner shows the request's raw id; Record outcome shows raw quantities and amounts (`300.000000`, `11100.0000`); PO lines show the base unit in English (finding 32).
+- The approved 3,450 request from round 2–3 still has no PO; it appears in «من طلب شراء معتمد».
 - Record with a fresh RFQ; this one is converted.
 
 ## Files
