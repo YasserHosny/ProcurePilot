@@ -16,7 +16,7 @@ Spec, style and storyboard decisions: [`README.md`](README.md). Status: [`produc
 | Beat map of the track (334 beats) | [`music/antalya-beaches-beats.csv`](music/antalya-beaches-beats.csv) | yes |
 | Recording scripts | [`source/record/`](source/record/) | yes |
 | Edit scripts | v1 [`source/edit/`](source/edit/), v2 [`source/edit-v2/`](source/edit-v2/) | yes |
-| Finished cuts (`procurepilot-demo-{ar,en}-{16x9,9x16-60s}.mp4`) | v2.0 and v2.1 in [`cuts/`](cuts/); v1 only on the recording machine (`~/Videos/pp-recording/edit/v1/`) | v2.x yes; v1 no: it shows the owner's email |
+| Finished cuts (`procurepilot-demo-{ar,en}-{16x9,9x16-60s}.mp4`) | every version in [`cuts/`](cuts/README.md) | yes (v1 only with the email masked) |
 
 `fetch-assets.sh` pins each third-party file by URL and SHA-256, so a rebuild uses byte-identical media.
 
@@ -118,9 +118,21 @@ Built by Codex from [`review-codex-2026-10-19.md`](review-codex-2026-10-19.md): 
 - Vertical shots that had become thin strips were recropped closer to the 972×1040 frame: comparison (880,590,790,470), guardrail draft (435,90,800,820), submit (435,480,800,520), ledger (630,290,800,620).
 - −14.0 LUFS on all four cuts; durations unchanged.
 
+### v2.2 (2026-10-20, after the owner's review)
+
+The owner raised four points: the English cuts show the Arabic interface; the kitchen stock opening does not show the problem; loading states run too long; some crops cut off the button being clicked. Codex verified each against the frames and listed every occurrence ([`source/edit-v2.2/OWNER-REVIEW-FINDINGS.md`](source/edit-v2.2/OWNER-REVIEW-FINDINGS.md)); Agy built the fixes (Codex was at its usage limit) and Claude checked them frame by frame, sending back two that were still wrong (the pointer resting on «رفض» after the confirm panel collapsed, and Create PO ending on a busy button).
+
+- Edit fixes: [`source/edit-v2.2/CHANGES-v2.2.md`](source/edit-v2.2/CHANGES-v2.2.md), edit decision list in `source/edit-v2.2/edl.py`.
+- Openings, two variants (both 5 s for 16:9 and 3.1 s for 9:16, same caption): an HTML animation rendered frame by frame (`source/opening/OpeningChaos.html`, `render.cjs`), and a live recording of a WhatsApp Web–style desktop and Excel driven by Playwright and captured from the tab over CDP (`DesktopChaos.html`, `scene0.cjs`, `assemble.py`). Tab capture replaced the GNOME screencast for this clip because on Wayland the kiosk window did not land on the recorded screen.
+- Still open: the interface is Arabic in the English cuts (needs an English-locale re-record), and the old footage shows "litre" on the PO form.
+
+## Masking at source
+
+`source/mask/mask_raw.py` burns opaque boxes into copies of the four raw clips that show the email (`~/Videos/pp-recording/masked/`), from the per-frame glyph-template audit, with a 3-frame halo around every detected run (the detector misses page transitions) and fixed time windows on the phone clip (it misses the approvals-list card and the detail screen's slide-in). `source/mask/audit_masked.py` re-runs the detector on the masked copies (0 matches; 5 on the unmasked guardrail clip as a control). v1 and v2.2 are built from these copies.
+
 ## Privacy
 
-The owner's email (`…+pp-owner@gmail.com`) is visible in `s2` / `s2b` (quote review «رُفع بواسطة» / «راجعه»), in `s3` (the request page) and in `s4` (phone approval «مقدم الطلب»), so it also appears in the four v1 cuts, which must not be posted. The v2 cuts mask it in every frame (see v2 above). The raw clips stay out of git until they are masked at source. Stills that show it are left out of `screens/`.
+The owner's email (`…+pp-owner@gmail.com`) is visible in `s2` / `s2b` (quote review «رُفع بواسطة» / «راجعه»), in `s3` (the request page) and in `s4` (phone approval «مقدم الطلب»), so it appeared in the original v1 cuts, which never left the recording machine. Every committed cut is masked (see Masking at source). The raw clips stay out of git until they are masked at source. Stills that show it are left out of `screens/`.
 
 ## Known on-camera rough edges
 
