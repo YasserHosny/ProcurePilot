@@ -125,7 +125,7 @@ paths from the session that made them — edit the paths at the top before reuse
 
 ## Recording and edit (2026-10-19)
 
-**3-minute Arabic cut rendered** (`procurepilot-demo-ar-16x9.mp4`, 3:00.00, 1920×1080, 30 fps, −14.6 LUFS,
+**Four cuts rendered**: Arabic and English, 3:00 16:9 and 60 s 9:16 (`procurepilot-demo-{ar,en}-16x9.mp4`, `procurepilot-demo-{ar,en}-9x16-60s.mp4`; the Arabic 3:00 is, 3:00.00, 1920×1080, 30 fps, −14.6 LUFS,
 peak −2.2 dBFS; 15.6 MB, kept out of git, shared with the owner). Recorded live on hosted against
 «مطاعم سند» in one round: phone low-stock report → RFQ to النور, الأمانة, الحاج سيد → replies by email
 including الأمانة's WhatsApp photo of a printed quote → photo read and authorised → line comparison →
@@ -146,6 +146,10 @@ How it was made (`source/record/`, `source/edit/`; scripts carry absolute scratc
 - **Edit:** `build.py` (ffmpeg from `imageio-ffmpeg`) cuts, speeds and concatenates 21 segments to
   2:50.25, then the approved outro; music = the track 0:00–2:50.25 at −6.6 dB (the outro's own gain, so
   the hand-over is seamless), limiter −3 dB before AAC.
+- **Other cuts:** `build_v.py` (60-second 9:16: phone scenes full height, web scenes cropped to the key area,
+  music from the track's 2:00, fast outro at 0:51.34), `make_en.py` + `render_cards_en_.cjs` /
+  `render_cards_env_.cjs` (English cards, LTR) and `build_en.py` / `build_v_en.py`; `final.sh` muxes any
+  body with its outro. Comparison beat: Smart Compare (`scene3c.cjs`).
 
 ## Open
 
