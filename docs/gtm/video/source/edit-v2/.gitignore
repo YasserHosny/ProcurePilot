@@ -1,0 +1,11 @@
+# Build outputs; rebuild.sh regenerates them.
+*.mp4
+*.log
+segments/
+graphics/
+proof/
+sheets/
+analysis/
+tmp/
+deps/
+reference/

@@ -9,14 +9,14 @@ Spec, style and storyboard decisions: [`README.md`](README.md). Status: [`produc
 |---|---|---|
 | Screen recordings (9 clips, web 1920×1080, phone 390×844, H.264 30 fps) | `~/Videos/pp-recording/` on the recording machine | **Not yet**: several show the owner's email address (see Privacy) |
 | Stills of every scene (3 per clip, email-free ones only) | [`screens/`](screens/) | yes |
-| Card stills and the card HTML as rendered (Arabic, English, 16:9, 9:16) | [`cards/`](cards/) | yes |
+| Card stills (each card at full opacity, taken from the v1 cuts) and the card HTML (Arabic, English, 16:9, 9:16) | [`cards/`](cards/) | yes |
 | Logo sting, end card and outros (approved 2026-10-15) | [`renders/`](renders/) | yes |
 | Music: Antalya Beaches by DayFox (Pixabay, 6.0 MB) | `music/` | no: licence; [`fetch-assets.sh`](fetch-assets.sh) downloads and checks it |
 | Stock: Pexels 4253325 kitchen (16:9) and 31735802 chef at the grill (9:16) | `source/stock/` | no: licence; same script |
 | Beat map of the track (334 beats) | [`music/antalya-beaches-beats.csv`](music/antalya-beaches-beats.csv) | yes |
 | Recording scripts | [`source/record/`](source/record/) | yes |
-| Edit scripts | [`source/edit/`](source/edit/) | yes |
-| Finished cuts (`procurepilot-demo-{ar,en}-{16x9,9x16-60s}.mp4`) | `~/Videos/pp-recording/edit/`, shared with the owner | no |
+| Edit scripts | v1 [`source/edit/`](source/edit/), v2 [`source/edit-v2/`](source/edit-v2/) | yes |
+| Finished cuts (`procurepilot-demo-{ar,en}-{16x9,9x16-60s}.mp4`) | v1 `~/Videos/pp-recording/edit/`, v2 `~/Videos/pp-recording/edit/v2/`, shared with the owner | no |
 
 `fetch-assets.sh` pins each third-party file by URL and SHA-256, so a rebuild uses byte-identical media.
 
@@ -95,10 +95,22 @@ The same footage and timings. Cards come from `source/edit/make_en.py` (LTR, the
 
 ## Rebuild
 
+### v2 (current candidate)
+
+`source/edit-v2/` rebuilds all four v2 cuts: `./rebuild.sh` from that folder. Inputs come from `paths.py`, each overridable by environment: `PP_RAW` (the raw clips), `PP_FFMPEG` (an ffmpeg 7 with libx264), `PP_VIDEO_DOCS` (this folder, after `./fetch-assets.sh`) and `PP_PYTHON` (a Python with numpy and Pillow built with Raqm, for Arabic shaping). Outputs, segment caches and proof frames land beside the scripts and are git-ignored. Per-cut edit decision lists, mask intervals and measurements: [`source/edit-v2/CHANGES.md`](source/edit-v2/CHANGES.md).
+
+### v1
+
 1. `./fetch-assets.sh` (music and stock, checked by SHA-256).
 2. Record: start the kiosk window, sign in, run `source/record/scene*.cjs` (paths at the top of each script).
-3. Cards: `node source/edit/render_cards*.cjs <boards> <frames>`.
+3. Cards: run each renderer on its own, for example `node source/edit/render_cards.cjs <boards dir> <frames dir>`, then the same for `render_cards_v.cjs`, `render_cards_en_.cjs` and `render_cards_env_.cjs`. A shell glob would pass the other renderers to the first as its arguments.
 4. Bodies: `python source/edit/build*.py`; mux each with `source/edit/final.sh <body> <outro> <music start> <body length> <out> [w h]`.
+
+The v1 scripts are kept as they ran: their first lines hard-code the recording machine's scratch, ffmpeg and stock paths. Edit those lines before running them elsewhere, or use v2.
+
+## v2 (2026-10-19, after the Codex review)
+
+Built by Codex from [`review-codex-2026-10-19.md`](review-codex-2026-10-19.md): the email is masked in every frame where it appears (opaque boxes applied at source resolution, 344 proof frames inspected); captions over the footage replace most full-screen cards, with «بيانات تجريبية · واجهة عربية» / "Demo data · Arabic interface" on each; the first product shot is at 3 s (16:9) and 1.5 s (9:16); decision moments get 1–2.5 s holds; 460 EGP is labelled as this order against last purchase-order prices and 1,060 EGP as the demo ledger including the dry run; the comparison is labelled as oil ×8; the vertical cut shows the sent PO and the recorded outcome before the counter. 16:9 runs 2:15, 9:16 runs 0:55; −14.1 LUFS. Not done: an s3b all-lines insert (captions were corrected instead), and the notification card is still illustrative.
 
 ## Privacy
 
