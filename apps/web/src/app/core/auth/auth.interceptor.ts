@@ -11,7 +11,7 @@ import { Observable, catchError, switchMap, throwError } from 'rxjs';
 
 import { environment } from '../../../environments/environment';
 import { REBUILD_ON_REPLAY, SEND_SESSION_TOKEN } from './http-context';
-import { SessionService, refreshWasRejected } from './session.service';
+import { SessionService, refreshWasRejected, tokenTenant } from './session.service';
 
 /** Set on a request replayed after a refresh, so a second 401 signs out instead of looping. */
 const REPLAYED_AFTER_REFRESH = new HttpContextToken<boolean>(() => false);
@@ -59,6 +59,9 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
         if (!(error instanceof HttpErrorResponse) || error.status !== 401) {
           return throwError(() => error);
         }
+        // Credential endpoints own their errors. In particular, a refresh 401 must reach
+        // SessionService before anything clears storage, so it can retry a rotated token.
+        if (NO_REFRESH_PATHS.includes(apiPath(request.url))) return throwError(() => error);
         if (!mayRefresh(request) || !session.refreshToken) {
           signOut();
           return throwError(() => error);
@@ -69,19 +72,25 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
         });
         // Rebuilt lazily, after the refresh, so it sees the rotated refresh token.
         const replay = (): HttpRequest<unknown> => (rebuild ? rebuild(marked) : marked);
+        // The token decides the workspace, so a request is only replayed under the workspace it
+        // was sent for. If a switch landed meanwhile, it fails instead of running in the new one.
+        const replayInSameWorkspace = (): Observable<HttpEvent<unknown>> =>
+          tokenTenant(session.accessToken) === tokenTenant(sentToken)
+            ? attempt(replay())
+            : throwError(() => error);
         // A refresh already landed while this request was out: replay with the new token.
         const current = session.accessToken;
         if (current && current !== sentToken) {
-          return attempt(replay());
+          return replayInSameWorkspace();
         }
-        return session.refresh().pipe(
+        return session.refresh(rebuild !== null).pipe(
           catchError((refreshError: unknown) => {
             // A rate-limited or unreachable refresh leaves the session intact; only a refused
             // refresh token ends it.
             if (refreshWasRejected(refreshError)) signOut();
             return throwError(() => error);
           }),
-          switchMap(() => attempt(replay())),
+          switchMap(() => replayInSameWorkspace()),
         );
       }),
     );
@@ -97,6 +106,9 @@ function isOwnApi(url: string): boolean {
 
 function mayRefresh(req: HttpRequest<unknown>): boolean {
   if (req.context.get(REPLAYED_AFTER_REFRESH)) return false;
-  const path = req.url.slice(environment.apiBaseUrl.length).split('?')[0];
-  return !NO_REFRESH_PATHS.includes(path);
+  return !NO_REFRESH_PATHS.includes(apiPath(req.url));
+}
+
+function apiPath(url: string): string {
+  return url.slice(environment.apiBaseUrl.length).split('?')[0];
 }

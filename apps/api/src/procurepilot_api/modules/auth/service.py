@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
+from gotrue.errors import AuthApiError
 from supabase import Client, create_client
 
 from procurepilot_api.config import Settings, get_settings
@@ -38,8 +39,13 @@ class AuthService:
     def reissue_session(self, *, refresh_token: str) -> SessionResponse:
         try:
             response = self._client().auth.refresh_session(refresh_token)
+        except AuthApiError as exc:
+            if exc.status in {400, 401, 403, 422}:
+                raise AuthenticationError(details={"reason": "session_refresh_failed"}) from exc
+            raise ServiceUnavailableError(details={"dependency": "supabase_auth"}) from exc
         except Exception as exc:
-            raise AuthenticationError(details={"reason": "session_refresh_failed"}) from exc
+            # Network failures, rate limits and upstream outages do not reject the token.
+            raise ServiceUnavailableError(details={"dependency": "supabase_auth"}) from exc
         return self.session_response(response)
 
     def logout(self, *, access_token: str, refresh_token: str | None) -> None:
