@@ -1,0 +1,24 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Readex+Pro:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+@property --n{syntax:'<integer>';inherits:true;initial-value:0}
+@counter-style pad3ar{system:extends arabic-indic;pad:3 "٠"}
+.sv{--target:460}
+.sv-num{animation:svCount 2.4s cubic-bezier(.15,.85,.25,1) .4s both;--k:round(down,calc(var(--n) / 1000),1);--r:calc(var(--n) - var(--k) * 1000);counter-reset:k var(--k) r var(--r)}
+.sv-num::before{content:counter(k,arabic-indic) "٬" counter(r,pad3ar)}
+.sv-num.sv-small::before{content:counter(r,arabic-indic)}
+@keyframes svCount{from{--n:0}to{--n:var(--target)}}
+.sv-in{animation:svIn .6s cubic-bezier(.2,.8,.2,1) both}
+@keyframes svIn{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+.sv-pop{animation:svPop .5s cubic-bezier(.2,1.4,.4,1) 2.8s both}
+@keyframes svPop{from{opacity:0;transform:scale(.6)}to{opacity:1;transform:none}}
+</style>
+</head><body style="margin:0">
+<div class="sv" dir="rtl" style="width:1920px;height:1080px;background:#0B2545;font-family:'Readex Pro',sans-serif;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:24px">
+<div class="sv-in" style="font-size:52px;font-weight:500;color:#D7E3F0">وفّرت في الطلب ده</div>
+<div style="display:flex;align-items:baseline;gap:28px"><span class="sv-num sv-small" style="font-size:220px;font-weight:700;color:#19B8A4;line-height:1;font-variant-numeric:tabular-nums"></span><span style="font-size:96px;font-weight:600">ج.م</span></div>
+<div class="sv-pop" style="font-size:40px;font-weight:500;background:#13345C;border-radius:999px;padding:14px 36px">من تقرير التوفير — بالأرقام الحقيقية</div>
+</div>
+</body></html>

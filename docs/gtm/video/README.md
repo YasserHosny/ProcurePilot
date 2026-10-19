@@ -125,6 +125,8 @@ paths from the session that made them — edit the paths at the top before reuse
 
 ## Recording and edit (2026-10-19)
 
+Full generation plan, edit decision lists and the materials index: [`generation-plan.md`](generation-plan.md). Licensed music and stock are fetched and checksum-verified by [`fetch-assets.sh`](fetch-assets.sh) rather than committed.
+
 **Four cuts rendered**: Arabic and English, 3:00 16:9 and 60 s 9:16 (`procurepilot-demo-{ar,en}-16x9.mp4`, `procurepilot-demo-{ar,en}-9x16-60s.mp4`; the Arabic 3:00 is, 3:00.00, 1920×1080, 30 fps, −14.6 LUFS,
 peak −2.2 dBFS; 15.6 MB, kept out of git, shared with the owner). Recorded live on hosted against
 «مطاعم سند» in one round: phone low-stock report → RFQ to النور, الأمانة, الحاج سيد → replies by email
