@@ -11,7 +11,7 @@ import { Observable, catchError, switchMap, throwError } from 'rxjs';
 
 import { environment } from '../../../environments/environment';
 import { REBUILD_ON_REPLAY, SEND_SESSION_TOKEN } from './http-context';
-import { SessionService, refreshWasRejected } from './session.service';
+import { SessionService, refreshWasRejected, tokenTenant } from './session.service';
 
 /** Set on a request replayed after a refresh, so a second 401 signs out instead of looping. */
 const REPLAYED_AFTER_REFRESH = new HttpContextToken<boolean>(() => false);
@@ -72,10 +72,16 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
         });
         // Rebuilt lazily, after the refresh, so it sees the rotated refresh token.
         const replay = (): HttpRequest<unknown> => (rebuild ? rebuild(marked) : marked);
+        // The token decides the workspace, so a request is only replayed under the workspace it
+        // was sent for. If a switch landed meanwhile, it fails instead of running in the new one.
+        const replayInSameWorkspace = (): Observable<HttpEvent<unknown>> =>
+          tokenTenant(session.accessToken) === tokenTenant(sentToken)
+            ? attempt(replay())
+            : throwError(() => error);
         // A refresh already landed while this request was out: replay with the new token.
         const current = session.accessToken;
         if (current && current !== sentToken) {
-          return attempt(replay());
+          return replayInSameWorkspace();
         }
         return session.refresh(rebuild !== null).pipe(
           catchError((refreshError: unknown) => {
@@ -84,7 +90,7 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
             if (refreshWasRejected(refreshError)) signOut();
             return throwError(() => error);
           }),
-          switchMap(() => attempt(replay())),
+          switchMap(() => replayInSameWorkspace()),
         );
       }),
     );

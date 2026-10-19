@@ -11,9 +11,9 @@ import { restoreSessionOnStartup } from './session-initializer';
 import { REFRESH_LEAD_MS, SessionService } from './session.service';
 
 /** A JWT-shaped token whose payload carries `exp` (seconds). Signature is irrelevant client-side. */
-function jwt(expSecondsFromNow: number, marker = 'x'): string {
+function jwt(expSecondsFromNow: number, marker = 'x', tenantId?: string): string {
   const exp = Math.floor(Date.now() / 1000) + expSecondsFromNow;
-  const payload = btoa(JSON.stringify({ exp, marker }))
+  const payload = btoa(JSON.stringify({ exp, marker, tenant_id: tenantId }))
     .replace(/\+/g, '-')
     .replace(/\//g, '_')
     .replace(/=+$/, '');
@@ -445,18 +445,59 @@ describe('authInterceptor token refresh (demo finding 29)', () => {
     expect(navigate).toHaveBeenCalledWith(['/auth/sign-in']);
   }));
 
-  it('a pending workspace switch and an interceptor refresh share the rotation', fakeAsync(() => {
-    sessionService.adopt(session(jwt(1800), 'refresh-1'));
+  it('a 401 during a workspace switch waits for it but is not replayed in the new workspace', fakeAsync(() => {
+    sessionService.adopt(session(jwt(1800, 'a', 'tenant-a'), 'refresh-1'));
     sessionService.switchWorkspace('tenant-b').subscribe();
     const put = backend.expectOne('/api/v1/me/active-workspace');
-    http.get('/api/v1/orders').subscribe();
+    let failed: unknown = null;
+    http.post('/api/v1/orders', {}).subscribe({ error: (e: unknown) => (failed = e) });
     backend.expectOne('/api/v1/orders').flush(null, { status: 401, statusText: 'Unauthorized' });
     backend.expectNone('/api/v1/auth/refresh');
-    put.flush(session(jwt(3600), 'refresh-2'));
-    backend.expectOne('/api/v1/orders').flush([]);
+    put.flush(session(jwt(3600, 'b', 'tenant-b'), 'refresh-2'));
+    backend.expectNone('/api/v1/orders');
+    expect(failed).toBeTruthy();
     expect(localStorage.getItem('pp.refresh_token')).toBe('refresh-2');
+    expect(sessionService.isAuthenticated()).toBeTrue();
     expect(navigate).not.toHaveBeenCalled();
     sessionService.logout();
+  }));
+
+  it('a 401 that lands after a switch already finished is not replayed in the new workspace', fakeAsync(() => {
+    sessionService.adopt(session(jwt(1800, 'a', 'tenant-a'), 'refresh-1'));
+    let failed = false;
+    http.post('/api/v1/orders', {}).subscribe({ error: () => (failed = true) });
+    const order = backend.expectOne('/api/v1/orders');
+    sessionService.switchWorkspace('tenant-b').subscribe();
+    backend.expectOne('/api/v1/me/active-workspace').flush(session(jwt(3600, 'b', 'tenant-b'), 'refresh-2'));
+    order.flush(null, { status: 401, statusText: 'Unauthorized' });
+    backend.expectNone('/api/v1/orders');
+    backend.expectNone('/api/v1/auth/refresh');
+    expect(failed).toBeTrue();
+    expect(sessionService.isAuthenticated()).toBeTrue();
+    expect(navigate).not.toHaveBeenCalled();
+    sessionService.logout();
+  }));
+
+  it('a refresh in the same workspace still replays the request', fakeAsync(() => {
+    localStorage.setItem('pp.access_token', jwt(-10, 'old', 'tenant-a'));
+    http.get('/api/v1/orders').subscribe();
+    backend.expectOne('/api/v1/orders').flush(null, { status: 401, statusText: 'Unauthorized' });
+    backend.expectOne('/api/v1/auth/refresh').flush(session(jwt(3600, 'new', 'tenant-a'), 'refresh-2'));
+    backend.expectOne('/api/v1/orders').flush([]);
+    expect(navigate).not.toHaveBeenCalled();
+    sessionService.logout();
+  }));
+
+  it('a rejected wake refresh signs out and leaves the protected screen', fakeAsync(() => {
+    sessionService.adopt(session(jwt(300), 'refresh-1'));
+    const now = Date.now();
+    spyOn(Date, 'now').and.returnValue(now + 8 * 60 * 60 * 1000);
+    spyOnProperty(document, 'visibilityState', 'get').and.returnValue('visible');
+    document.dispatchEvent(new Event('visibilitychange'));
+    backend.expectOne('/api/v1/auth/refresh').flush(null, { status: 400, statusText: 'Bad Request' });
+    expect(localStorage.getItem('pp.refresh_token')).toBeNull();
+    expect(sessionService.isAuthenticated()).toBeFalse();
+    expect(navigate).toHaveBeenCalledWith(['/auth/sign-in']);
   }));
 
   it('a refresh reads storage when subscribed rather than when created', fakeAsync(() => {

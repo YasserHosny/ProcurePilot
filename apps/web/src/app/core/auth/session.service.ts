@@ -1,5 +1,6 @@
 import { HttpContext, HttpErrorResponse } from '@angular/common/http';
 import { DestroyRef, Injectable, NgZone, computed, inject, signal } from '@angular/core';
+import { Router } from '@angular/router';
 import { Observable, catchError, defer, finalize, of, shareReplay, switchMap, tap, throwError } from 'rxjs';
 
 import { ApiService } from '../api/api.service';
@@ -20,18 +21,30 @@ export function refreshWasRejected(error: unknown): boolean {
   return error instanceof HttpErrorResponse && [400, 401, 403, 422].includes(error.status);
 }
 
-/** The token's `exp` in epoch milliseconds, or null if it is not a readable JWT. */
-export function tokenExpiry(token: string | null): number | null {
+function tokenClaims(token: string | null): Record<string, unknown> | null {
   if (!token) return null;
   const payload = token.split('.')[1];
   if (!payload) return null;
   try {
-    const json = atob(payload.replace(/-/g, '+').replace(/_/g, '/'));
-    const exp = (JSON.parse(json) as { exp?: unknown }).exp;
-    return typeof exp === 'number' ? exp * 1000 : null;
+    return JSON.parse(atob(payload.replace(/-/g, '+').replace(/_/g, '/'))) as Record<string, unknown>;
   } catch {
     return null;
   }
+}
+
+/** The token's `exp` in epoch milliseconds, or null if it is not a readable JWT. */
+export function tokenExpiry(token: string | null): number | null {
+  const exp = tokenClaims(token)?.['exp'];
+  return typeof exp === 'number' ? exp * 1000 : null;
+}
+
+/**
+ * The workspace a token was issued for (the access-token hook's `tenant_id` claim), or null.
+ * Only used to refuse replaying a request under a different workspace; the server decides tenancy.
+ */
+export function tokenTenant(token: string | null): string | null {
+  const tenant = tokenClaims(token)?.['tenant_id'];
+  return typeof tenant === 'string' ? tenant : null;
 }
 
 /**
@@ -44,6 +57,7 @@ export function tokenExpiry(token: string | null): number | null {
 export class SessionService {
   private readonly api = inject(ApiService);
   private readonly zone = inject(NgZone);
+  private readonly router = inject(Router);
   private inFlightRefresh: Observable<Session> | null = null;
   private refreshTimer: ReturnType<typeof setTimeout> | null = null;
   private switching = false;
@@ -250,7 +264,10 @@ export class SessionService {
     this.clearRefreshTimer();
     this.zone.run(() => this.refresh().subscribe({
       error: (error: unknown) => {
-        if (refreshWasRejected(error)) this.logout();
+        if (!refreshWasRejected(error)) return;
+        // Guards only run on navigation, so leave the protected screen now.
+        this.logout();
+        void this.router.navigate(['/auth/sign-in']);
       },
     }));
   }
