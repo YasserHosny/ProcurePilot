@@ -26,6 +26,14 @@ class MemberSession {
   /// Roles that can raise purchase requests from a branch context.
   bool get canRequestItems =>
       role == 'owner' || role == 'buyer' || role == 'branch_manager';
+
+  /// Roles that can record low-stock reports from a branch context.
+  ///
+  /// In the backend, `POST /low-stock-reports` authorizes owners and members
+  /// assigned to the branch (or unscoped members without branch assignments,
+  /// e.g. buyers), matching the request-writing permissions.
+  bool get canReportLowStock =>
+      role == 'owner' || role == 'buyer' || role == 'branch_manager';
 }
 
 /// Parses the [member_role] claim from a Supabase access token.

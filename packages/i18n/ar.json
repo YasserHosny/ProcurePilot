@@ -373,6 +373,7 @@
     "title": "الرئيسية",
     "roleLabel": "دورك",
     "requestItems": "طلب عناصر",
+    "reportLowStock": "الإبلاغ عن انخفاض المخزون",
     "pendingApprovalsCount": "{{count}} طلب(ات) بانتظار قرارك",
     "pendingCountError": "تعذر تحميل عدد الطلبات المعلقة",
     "signOut": "تسجيل الخروج"

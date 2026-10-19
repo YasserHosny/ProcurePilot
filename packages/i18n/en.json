@@ -373,6 +373,7 @@
     "title": "Home",
     "roleLabel": "Your role",
     "requestItems": "Request items",
+    "reportLowStock": "Report low stock",
     "pendingApprovalsCount": "{{count}} request(s) awaiting your decision",
     "pendingCountError": "Unable to load pending count",
     "signOut": "Sign out"

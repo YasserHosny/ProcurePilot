@@ -94,9 +94,17 @@ Future<I18nLoader> loadTestI18n({String locale = 'en'}) async {
         'title': 'Home',
         'roleLabel': 'Your role',
         'requestItems': 'Request items',
+        'reportLowStock': 'Report low stock',
         'pendingApprovalsCount': '{{count}} pending',
         'pendingCountError': 'Count error',
         'signOut': 'Sign out',
+      },
+      'units': {
+        'litre': 'L',
+        'millilitre': 'mL',
+        'kilogram': 'kg',
+        'gram': 'g',
+        'each': 'pcs',
       },
       'approvals': {
         'title': 'Approval Queue',
@@ -317,8 +325,29 @@ Future<I18nLoader> loadTestI18n({String locale = 'en'}) async {
           'quantityLabel': 'الكمية',
         },
       },
+      'units': {
+        'litre': 'لتر',
+        'millilitre': 'مل',
+        'kilogram': 'كجم',
+        'gram': 'جم',
+        'each': 'وحدة',
+      },
       'mobileHome': {
+        'title': 'الرئيسية',
+        'roleLabel': 'دورك',
+        'requestItems': 'طلب عناصر',
+        'reportLowStock': 'الإبلاغ عن انخفاض المخزون',
         'pendingApprovalsCount': '{{count}} طلب(ات) بانتظار قرارك',
+        'pendingCountError': 'تعذر تحميل عدد الطلبات المعلقة',
+        'signOut': 'تسجيل الخروج',
+      },
+      'lowStock': {
+        'title': 'بلاغ انخفاض المخزون',
+        'actionLabel': 'المخزون منخفض',
+        'countRemainingLabel': 'الكمية المتبقية',
+        'submittedMessage': 'تم إرسال بلاغ انخفاض المخزون.',
+        'queuedMessage':
+            'بلاغ انخفاض المخزون في قائمة الانتظار — سيتم الإرسال عند عودة الاتصال.',
       },
     }),
   });

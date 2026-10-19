@@ -82,7 +82,7 @@ const Map<String, String> _unitAliases = {
 };
 
 /// Localises a raw unit code (e.g. `litre` -> `L` in English, `لتر` in Arabic)
-/// using translations from `rfq.email.units.*`.
+/// using translations from `units.*` or `rfq.email.units.*`.
 /// Falls back to the raw unit string if unknown or untranslated.
 String localizeUnit(
   String? unit, {
@@ -91,6 +91,11 @@ String localizeUnit(
   if (unit == null || unit.trim().isEmpty) return '';
   final raw = unit.trim().toLowerCase();
   final canonical = _unitAliases[raw] ?? raw;
+  final unitKey = 'units.$canonical';
+  final unitLookedUp = i18n.t(unitKey);
+  if (unitLookedUp != unitKey) {
+    return unitLookedUp;
+  }
   final key = 'rfq.email.units.$canonical';
   final lookedUp = i18n.t(key);
   if (lookedUp != key) {

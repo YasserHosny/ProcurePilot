@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:procurepilot_mobile/core/api/models.dart';
 import 'package:procurepilot_mobile/features/home/home_screen.dart';
+import 'package:procurepilot_mobile/features/low_stock/low_stock_report_screen.dart';
 
 import '../../test_helpers.dart';
 
@@ -220,5 +221,95 @@ void main() {
       expect(approvalControl(), findsNothing);
       expect(rejectionControl(), findsNothing);
     });
+
+    testWidgets(
+      'home low stock action is shown for allowed roles (branch_manager, buyer, owner)',
+      (tester) async {
+        for (final role in ['branch_manager', 'buyer', 'owner']) {
+          final auth =
+              FakeAuthService(
+                  storage: FakeStorage(),
+                  httpClient: defaultTestHttpClient(),
+                  supabaseUrl: 'https://test.supabase.co',
+                  supabaseAnonKey: 'test-anon-key',
+                )
+                ..accessToken = makeAccessToken(role)
+                ..refreshToken = 'refresh-token'
+                ..tokenRole = role;
+
+          await pumpWithServices(
+            tester,
+            child: const HomeScreen(),
+            authService: auth,
+          );
+          await tester.pumpAndSettle();
+
+          expect(
+            find.byKey(const Key('homeLowStockButton')),
+            findsOneWidget,
+            reason: '$role must see the low-stock report button on home',
+          );
+        }
+      },
+    );
+
+    testWidgets(
+      'home low stock action navigates to /lowStock when tapped',
+      (tester) async {
+        final auth =
+            FakeAuthService(
+                storage: FakeStorage(),
+                httpClient: defaultTestHttpClient(),
+                supabaseUrl: 'https://test.supabase.co',
+                supabaseAnonKey: 'test-anon-key',
+              )
+              ..accessToken = makeAccessToken('branch_manager')
+              ..refreshToken = 'refresh-token'
+              ..tokenRole = 'branch_manager';
+
+        await pumpWithServices(
+          tester,
+          child: const HomeScreen(),
+          authService: auth,
+        );
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.byKey(const Key('homeLowStockButton')));
+        await tester.pumpAndSettle();
+
+        expect(find.byType(LowStockReportScreen), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'home low stock action is hidden for disallowed roles (approver, viewer)',
+      (tester) async {
+        for (final role in ['approver', 'viewer']) {
+          final auth =
+              FakeAuthService(
+                  storage: FakeStorage(),
+                  httpClient: defaultTestHttpClient(),
+                  supabaseUrl: 'https://test.supabase.co',
+                  supabaseAnonKey: 'test-anon-key',
+                )
+                ..accessToken = makeAccessToken(role)
+                ..refreshToken = 'refresh-token'
+                ..tokenRole = role;
+
+          await pumpWithServices(
+            tester,
+            child: const HomeScreen(),
+            authService: auth,
+          );
+          await tester.pumpAndSettle();
+
+          expect(
+            find.byKey(const Key('homeLowStockButton')),
+            findsNothing,
+            reason: '$role must not see the low-stock report button on home',
+          );
+        }
+      },
+    );
   });
 }
