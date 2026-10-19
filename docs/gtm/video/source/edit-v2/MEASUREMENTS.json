@@ -1,0 +1,34 @@
+[
+  {
+    "file": "procurepilot-demo-ar-16x9.mp4",
+    "duration": 135.15,
+    "integrated_lufs": "-14.06",
+    "true_peak_dbtp": "-1.31",
+    "proof_frames": 100,
+    "sha256": "7eb26bde271349579f2757ad47215306efd0fffbe230d730aaad1a084a792c3b"
+  },
+  {
+    "file": "procurepilot-demo-en-16x9.mp4",
+    "duration": 135.15,
+    "integrated_lufs": "-14.06",
+    "true_peak_dbtp": "-1.31",
+    "proof_frames": 100,
+    "sha256": "6e48af3bad5ecc035cc0450585fc5a10f982fdf8690698b5a861275ac6e1fa80"
+  },
+  {
+    "file": "procurepilot-demo-ar-9x16-60s.mp4",
+    "duration": 55.012,
+    "integrated_lufs": "-14.14",
+    "true_peak_dbtp": "-2.80",
+    "proof_frames": 72,
+    "sha256": "2b020d79b29c650c00849a6c1aceef8c99dc8b837394d74e9ad3e0cbf1646083"
+  },
+  {
+    "file": "procurepilot-demo-en-9x16-60s.mp4",
+    "duration": 55.012,
+    "integrated_lufs": "-14.14",
+    "true_peak_dbtp": "-2.80",
+    "proof_frames": 72,
+    "sha256": "68c12b86c6c1c308a2e7c6f273158861f9cc9b9569cd9fc2d6e6517e5439692b"
+  }
+]
