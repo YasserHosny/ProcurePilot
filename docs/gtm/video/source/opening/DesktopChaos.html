@@ -1,0 +1,77 @@
+<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Arabic:wght@400;600&family=Readex+Pro:wght@400;600&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden;font-family:'Noto Sans Arabic','Readex Pro',sans-serif;background:#d1d7db}
+#app{position:absolute;inset:0 0 58px 0;display:flex;background:#fff}
+.side{width:560px;border-left:1px solid #e3e3e3;display:flex;flex-direction:column}
+.shead{background:#f0f2f5;height:76px;display:flex;align-items:center;padding:0 22px;font:600 26px 'Readex Pro';color:#41525d;justify-content:space-between}
+.search{margin:10px 14px;background:#f0f2f5;border-radius:10px;height:44px;padding:10px 16px;color:#8696a0;font-size:18px}
+.item{display:flex;gap:16px;align-items:center;padding:14px 20px;border-bottom:1px solid #f0f2f5;cursor:pointer}
+.item.sel{background:#f0f2f5}
+.av{width:58px;height:58px;border-radius:50%;background:#dfe5e7;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:24px;color:#54656f;flex:none}
+.nm{font-size:22px;font-weight:600;color:#111b21}.ms{font-size:18px;color:#667781;margin-top:2px;white-space:nowrap;overflow:hidden;max-width:330px}
+.meta{margin-inline-start:auto;text-align:left;font-size:15px;color:#25d366}.bd{margin-top:6px;background:#25d366;color:#fff;border-radius:14px;min-width:28px;height:28px;display:inline-flex;align-items:center;justify-content:center;font-weight:600;padding:0 8px;font-size:16px}
+.bd:empty{display:none}
+.main{flex:1;display:flex;flex-direction:column;background:#efeae2}
+.mhead{background:#f0f2f5;height:76px;display:flex;align-items:center;gap:16px;padding:0 22px;font-size:24px;font-weight:600;color:#111b21}
+.msgs{flex:1;padding:24px 70px;display:flex;flex-direction:column;gap:12px;overflow:hidden}
+.b{align-self:flex-start;background:#fff;border-radius:10px;padding:10px 16px;font-size:22px;max-width:60%;box-shadow:0 1px .5px rgba(0,0,0,.13);animation:in .25s ease-out}
+.b small{display:block;text-align:left;font-size:14px;color:#8696a0}
+.b.img img{width:280px;display:block;border-radius:8px;cursor:pointer}.b.img{padding:5px}
+.empty{margin:auto;color:#667781;font-size:22px;text-align:center}
+.foot{height:68px;background:#f0f2f5;padding:12px 20px}.foot div{background:#fff;border-radius:10px;height:44px;color:#8696a0;padding:9px 16px;font-size:18px}
+.lb{position:absolute;inset:0 0 58px 0;background:rgba(11,20,26,.92);display:none;align-items:center;justify-content:center;z-index:5}
+.lb img{height:92%}.lb.on{display:flex}
+.task{position:absolute;left:0;right:0;bottom:0;height:58px;background:#1f2a30;display:flex;gap:10px;align-items:center;justify-content:center}
+.ic{width:46px;height:46px;border-radius:10px;display:flex;align-items:center;justify-content:center;color:#fff;font:600 22px 'Readex Pro';cursor:pointer}
+.ic.on{outline:2px solid #8ab4f8}
+.xl{position:absolute;left:110px;top:60px;width:1300px;height:820px;background:#fff;box-shadow:0 20px 50px rgba(0,0,0,.4);display:none;z-index:4;flex-direction:column}
+.xl.on{display:flex}
+.xt{background:#217346;color:#fff;font:600 21px 'Readex Pro';padding:12px 20px;display:flex;justify-content:space-between}
+.fx{height:44px;border-bottom:1px solid #ddd;display:flex;align-items:center;padding:0 16px;font-size:20px;color:#333;gap:14px}.fx b{color:#217346;font-family:'Readex Pro'}
+table{border-collapse:collapse;font-size:28px;margin:0}
+td,th{border:1px solid #d4d4d4;height:66px;min-width:300px;padding:0 16px}
+th{background:#f3f3f3;color:#555;font-weight:600}
+td.rn,th.rn{min-width:64px;background:#f3f3f3;color:#777;text-align:center}
+td:focus{outline:3px solid #217346;outline-offset:-3px}
+td.num{direction:ltr;text-align:right}
+@keyframes in{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+body.m .side{width:100%}.body.m .main{display:none}
+body.m #app{inset:0}body.m .task{display:none}
+body.m .main{position:absolute;inset:0;display:none}body.m.chat .main{display:flex}
+body.m .msgs{padding:16px 12px}body.m .b{max-width:85%}
+body.m .xl{left:0;top:0;width:100%;height:100%;box-shadow:none}
+body.m td,body.m th{min-width:96px;font-size:20px;height:56px;padding:0 8px}body.m td.rn,body.m th.rn{min-width:34px}
+body.m .lb{inset:0}
+</style></head><body>
+<div id="app">
+ <div class="side"><div class="shead">WhatsApp<span>⋮</span></div><div class="search">بحث أو بدء محادثة جديدة</div><div id="list"></div></div>
+ <div class="main"><div class="mhead" id="mh"><div class="av">أ</div><span id="mt">الأمانة للتجارة</span></div><div class="msgs" id="msgs"><div class="empty">اختر محادثة</div></div><div class="foot"><div>اكتب رسالة</div></div></div>
+</div>
+<div class="lb" id="lb"><img src="quote.jpg"></div>
+<div class="xl" id="xl"><div class="xt"><span>مقارنة الأسعار - نسخة 7 (نهائي).xlsx</span><span>Excel</span></div><div class="fx"><b>fx</b><span id="fxv"></span></div>
+<table id="t"><tr><th class="rn"></th><th>المورد</th><th>الصنف</th><th>سعر العبوة</th></tr></table></div>
+<div class="task"><div class="ic on" id="icwa" style="background:#25d366">W</div><div class="ic" id="icxl" style="background:#217346">X</div></div>
+<script>
+const M=location.hash.includes('m'); if(M) document.body.classList.add('m');
+const chats={nour:{n:'النور للمواد الغذائية',a:'ن',last:'📄 عرض سعر NR-26-0419.pdf',c:0,t:'9:38'},
+ amana:{n:'الأمانة للتجارة',a:'أ',last:'',c:0,t:'9:41'},sayed:{n:'الحاج سيد للخضار',a:'س',last:'',c:0,t:'9:40'},
+ maadi:{n:'مدير فرع المعادي',a:'م',last:'',c:0,t:'9:42'}};
+let order=['nour'];
+function draw(){document.getElementById('list').innerHTML=order.map(k=>{const c=chats[k];return `<div class="item" id="it-${k}"><div class="av">${c.a}</div><div><div class="nm">${c.n}</div><div class="ms">${c.last}</div></div><div class="meta">${c.t}<br><span class="bd">${c.c||''}</span></div></div>`}).join('');
+ for(const k of order) document.getElementById('it-'+k).onclick=()=>openChat(k);}
+window.arrive=(k,msg,t)=>{const c=chats[k];c.last=msg;c.c++;c.t=t||c.t;order=[k,...order.filter(x=>x!==k)];draw();};
+const conv={amana:[['صباح الخير يا فندم، العرض أهو','9:41'],['IMG','9:41'],['زيت ١٦١٠ · رز ٩١٠ · بصل ١٦٫٧٥','9:41']]};
+function openChat(k){chats[k].c=0;draw();document.getElementById('it-'+k).classList.add('sel');document.getElementById('mt').textContent=chats[k].n;
+ const box=document.getElementById('msgs');box.innerHTML='';document.body.classList.add('chat');
+ (conv[k]||[]).forEach(([m,t],i)=>setTimeout(()=>{const d=document.createElement('div');
+   if(m==='IMG'){d.className='b img';d.innerHTML='<img id="qimg" src="quote.jpg"><small>'+t+'</small>';d.querySelector('img').onclick=()=>document.getElementById('lb').classList.add('on');}
+   else{d.className='b';d.innerHTML=m+'<small>'+t+'</small>';}box.appendChild(d);},i*350));}
+document.getElementById('lb').onclick=()=>document.getElementById('lb').classList.remove('on');
+window.showSheet=(on)=>{document.getElementById('xl').classList.toggle('on',on);document.getElementById('icxl').classList.toggle('on',on);document.getElementById('icwa').classList.toggle('on',!on);};
+document.getElementById('icxl').onclick=()=>showSheet(true);document.getElementById('icwa').onclick=()=>showSheet(false);
+const T=document.getElementById('t');for(let r=2;r<=9;r++){const tr=T.insertRow();tr.innerHTML=`<td class="rn">${r}</td><td contenteditable></td><td contenteditable></td><td contenteditable class="num"></td>`;}
+T.addEventListener('input',e=>document.getElementById('fxv').textContent=e.target.textContent);
+draw();
+</script></body></html>

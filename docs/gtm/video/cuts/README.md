@@ -1,17 +1,17 @@
 # Demo video cuts
 
-Every rendered version of the «مطاعم سند» demo video, newest first. Each version has four cuts: Arabic and English, 16:9 (YouTube, LinkedIn, website) and 9:16 (Reels, TikTok, Shorts, WhatsApp status). App screens are Arabic in every cut; the English cuts translate the captions and callouts.
+Every rendered version of the «مطاعم سند» demo video, newest first. Each version has four cuts: Arabic and English, 16:9 (YouTube, LinkedIn, website) and 9:16 (Reels, TikTok, Shorts, WhatsApp status), named `procurepilot-demo-{ar,en}-{16x9,9x16-60s}.mp4`. App screens are Arabic in every cut; the English cuts translate the captions.
 
-How each version was made: [`../generation-plan.md`](../generation-plan.md). Review that led to v2: [`../review-codex-2026-10-19.md`](../review-codex-2026-10-19.md).
+How each version was made: [`../generation-plan.md`](../generation-plan.md). Reviews: [`../review-codex-2026-10-19.md`](../review-codex-2026-10-19.md) (led to v2.0) and [`../source/edit-v2.2/OWNER-REVIEW-FINDINGS.md`](../source/edit-v2.2/OWNER-REVIEW-FINDINGS.md) (owner comments, led to v2.2).
 
-| Version | Date | Cuts | Length (16:9 / 9:16) | What it is |
-|---|---|---|---|---|
-| **v2.1** (current candidate) | 2026-10-19 | [`v2.1/`](v2.1/) | 2:15 / 0:55 | v2.0 with the phone low-stock scene re-recorded after #195 (starts from the home-screen button, confirmation reads «١ لتر») and four vertical shots recropped to fill the frame. |
-| v2.0 | 2026-10-19 | [`v2.0/`](v2.0/) | 2:15 / 0:55 | Codex's rebuild from its review: email masked, captions over footage instead of full-screen cards, product on screen by 3 s, decision holds, savings labelled by scope, comparison labelled as oil ×8, «بيانات تجريبية» on every caption. |
-| v1 | 2026-10-19 | not in git | 3:00 / 0:59.85 | The first edit: seven full-screen cards, footage at up to 3–4×. **Shows the owner's email address** (quote review, request page, phone approval), so it stays on the recording machine (`~/Videos/pp-recording/edit/v1/`) and must not be posted. Its edit decision lists are in the generation plan and its scripts in [`../source/edit/`](../source/edit/). |
+| Version | Cuts | Length (16:9 / 9:16) | What it is |
+|---|---|---|---|
+| **v2.2 — animated opening** | [`v2.2-anim/`](v2.2-anim/) | 1:59 / 0:53 | v2.1 with the owner's review fixed: openings that show the problem (here an animation: supplier quotes piling up on WhatsApp, then copied by hand into Excel with a typo), click targets fully in frame, loading and busy states trimmed, no pointer on the wrong control, approval captions timed to the result, larger phone and outcome shots, no repeated PO passage. Built from source clips with the email masked at source. |
+| **v2.2 — clip opening** | [`v2.2-clip/`](v2.2-clip/) | 1:59 / 0:53 | The same edit with the opening as a recorded screen clip (WhatsApp Web–style desktop → Excel, typed live). |
+| v2.1 | [`v2.1/`](v2.1/) | 2:15 / 0:55 | v2.0 with the phone low-stock scene re-recorded after #195 and fuller vertical crops. |
+| v2.0 | [`v2.0/`](v2.0/) | 2:15 / 0:55 | Codex's rebuild from its review: email masked, captions over footage, faster start, decision holds, savings labelled by scope. |
+| v1 (email masked) | [`v1/`](v1/) | 3:00 / 0:59.85 | The first edit, rebuilt from its original scripts with the email masked in the source clips. Kept for history; the unmasked original never left the recording machine. |
 
-Files in each version folder: `procurepilot-demo-{ar,en}-{16x9,9x16-60s}.mp4`, H.264 30 fps + AAC 256 kb/s, about −14 LUFS integrated.
+All committed cuts were checked for the owner's email: the masked source clips pass the glyph-template detector with 0 matches (and a control run on an unmasked clip still finds it), the v2.x cuts pass `verify_output_masks.py`, and the transition and boundary frames were inspected by eye (see the plan's Privacy section).
 
-Both v2 versions were checked frame by frame for the email: `source/edit-v2/verify_output_masks.py` passes on all eight files, and v2.0's 344 proof frames were inspected by eye.
-
-Third-party media inside the cuts: music «Antalya Beaches» by DayFox (Pixabay) and stock clips Pexels 4253325 and 31735802, used under the Pixabay and Pexels licences, which allow use inside a video; the source files themselves are not redistributed here (see [`../fetch-assets.sh`](../fetch-assets.sh)). The notification card is illustrative and the data is demo data.
+Third-party media inside the cuts: music «Antalya Beaches» by DayFox (Pixabay) and Pexels stock clips 4253325 and 31735802 (v1–v2.1 openings), used under the Pixabay and Pexels licences, which allow use inside a video; the source files themselves are not redistributed here (see [`../fetch-assets.sh`](../fetch-assets.sh)). The notification card is illustrative, the WhatsApp/Excel opening is a staged mock with demo data, and all data is demo data.
