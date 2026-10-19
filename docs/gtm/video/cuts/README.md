@@ -6,6 +6,7 @@ How each version was made: [`../generation-plan.md`](../generation-plan.md). Rev
 
 | Version | Cuts | Length (16:9 / 9:16) | What it is |
 |---|---|---|---|
+| **v2.2 — editorial collage (Arabic only)** | [`v2.2-editorial/`](v2.2-editorial/) | 1:59 / 0:53 | The v2.2 storyboard restyled as a Contemporary Arabic Editorial Collage: oversized Arabic kinetic type, grayscale halftone paper cutouts, off-white / near-black / matte orange-red, shallow 2.5D, graphic transitions, app footage as grayscale printed plates. Arabic 16:9 and 9:16 only. Source: [`../source/edit-editorial/`](../source/edit-editorial/). |
 | **v2.2 — animated opening** | [`v2.2-anim/`](v2.2-anim/) | 1:59 / 0:53 | v2.1 with the owner's review fixed: openings that show the problem (here an animation: supplier quotes piling up on WhatsApp, then copied by hand into Excel with a typo), click targets fully in frame, loading and busy states trimmed, no pointer on the wrong control, approval captions timed to the result, larger phone and outcome shots, no repeated PO passage. Built from source clips with the email masked at source. |
 | **v2.2 — clip opening** | [`v2.2-clip/`](v2.2-clip/) | 1:59 / 0:53 | The same edit with the opening as a recorded screen clip (WhatsApp Web–style desktop → Excel, typed live). |
 | v2.1 | [`v2.1/`](v2.1/) | 2:15 / 0:55 | v2.0 with the phone low-stock scene re-recorded after #195 and fuller vertical crops. |
