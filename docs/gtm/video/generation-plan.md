@@ -114,7 +114,7 @@ Built by Codex from [`review-codex-2026-10-19.md`](review-codex-2026-10-19.md): 
 
 ## Privacy
 
-The owner's email (`…+pp-owner@gmail.com`) is visible in `s2` / `s2b` (quote review «رُفع بواسطة» / «راجعه»), in `s3` (the request page) and in `s4` (phone approval «مقدم الطلب»), so it also appears in the four finished cuts. These must be masked before any public posting, and the raw clips stay out of git until then. Stills that show it are left out of `screens/`.
+The owner's email (`…+pp-owner@gmail.com`) is visible in `s2` / `s2b` (quote review «رُفع بواسطة» / «راجعه»), in `s3` (the request page) and in `s4` (phone approval «مقدم الطلب»), so it also appears in the four v1 cuts, which must not be posted. The v2 cuts mask it in every frame (see v2 above). The raw clips stay out of git until they are masked at source. Stills that show it are left out of `screens/`.
 
 ## Known on-camera rough edges
 
