@@ -8,8 +8,8 @@ PHONE=[30,231,276,25,'0xfff7ff']
 # Landscape stays below 3:00; condensed waits, retained evidence and deliberate holds.
 FULL=[
  shot('stock',0,3,3,'open'),
- shot('s0-phone-lowstock',7.5,20.5,8,'low'),
- shot('s0-phone-lowstock',21,22.5,3,'low',freeze=1.5),
+ shot('s0-phone-lowstock-v3',1.5,20.5,8,'low'),
+ shot('s0-phone-lowstock-v3',21.3,22.8,3,'low',freeze=1.5),
  shot('s1-rfq',2.5,5,2.5,'rfq'),
  shot('s1-rfq',6,37.5,13,'rfq',(400,100,1000,900)),
  shot('s1-rfq',40,43,4,'rfq',(400,100,1000,900),freeze=1),
@@ -35,19 +35,19 @@ FULL=[
 # Every web crop is a deliberate successive view; active content lies y=475..1515.
 VERT=[
  shot('stock-v',.5,2,1.5,'open'),
- shot('s0-phone-lowstock',14,20.3,3.5,'low',(0,50,390,330)),
- shot('s0-phone-lowstock',21,22.5,2.5,'low',(0,335,390,240),freeze=1),
+ shot('s0-phone-lowstock-v3',2,11,3.5,'low',(0,0,390,420)),
+ shot('s0-phone-lowstock-v3',21.3,22.8,2.5,'low',(0,335,390,240),freeze=1),
  shot('s1-rfq',34,37,3,'rfq',(420,190,815,820)),
  shot('s2b-photo-closeup',4,6,3,'photo',(995,245,660,500),freeze=1,mask=QUOTE),
  shot('s2b-photo-closeup',10,11,3,'fields',(250,250,700,385),freeze=2,mask=QUOTE),
- shot('s3c-smart-compare',12,14,4.5,'prices',(255,550,1405,480),freeze=2.5),
- shot('s3-guardrail-draft',9,10.5,3.5,'draft',(430,140,805,150),freeze=2),
- shot('s3-guardrail-draft',26,29,2,'submit',(435,760,795,220)),
+ shot('s3c-smart-compare',12,14,4.5,'prices',(880,590,790,470),freeze=2.5),
+ shot('s3-guardrail-draft',9,10.5,3.5,'draft',(435,90,800,820),freeze=2),
+ shot('s3-guardrail-draft',26,29,2,'submit',(435,480,800,520)),
  shot('s4-phone-approve',9,11,4,'approve',(0,65,390,295),freeze=2,mask=PHONE),
  shot('s4-phone-approve',13,18.6,3,'approved',(0,380,390,464),mask=PHONE),
  shot('s5-po-savings',34,36,3,'sent',(1100,95,470,605),freeze=1),
  shot('s5-po-savings',45.5,47.5,3,'outcome',(775,150,1100,630),freeze=1),
  shot('counter',0,1,4,None),
- shot('s6-savings-close',10,11,3,'ledger',(1030,295,410,105),freeze=2),
+ shot('s6-savings-close',10,11,3,'ledger',(630,290,800,620),freeze=2),
 ]
 if __name__=='__main__':print('bodies',sum(x['d'] for x in FULL),sum(x['d'] for x in VERT))
