@@ -6,6 +6,7 @@ import 'package:uuid/uuid.dart';
 import '../../core/api/mobile_api_client.dart';
 import '../../core/api/models.dart';
 import '../../core/api/requests_api_client.dart';
+import '../../core/format/quantity_format.dart';
 import '../../core/i18n/i18n_loader.dart';
 import '../../core/offline_queue/offline_queue_service.dart';
 import '../../core/offline_queue/status_widgets.dart';
@@ -334,11 +335,26 @@ class _LowStockReportScreenState extends State<LowStockReportScreen> {
                   ),
                 if (_submittedReport!.countRemaining != null) ...[
                   const SizedBox(height: 8),
-                  Text(
-                    '${i18n.t('lowStock.countRemainingLabel')}: ${_submittedReport!.countRemaining}',
-                    key: const Key('lowStockConfirmationCount'),
-                    textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.bodyMedium,
+                  Builder(
+                    builder: (context) {
+                      final formattedQty = formatDecimal(
+                        _submittedReport!.countRemaining!,
+                        locale: i18n.locale,
+                      );
+                      final unit = localizeUnit(
+                        _selectedProduct?.baseUnit,
+                        i18n: i18n,
+                      );
+                      final countDisplay = unit.isNotEmpty
+                          ? '$formattedQty $unit'
+                          : formattedQty;
+                      return Text(
+                        '${i18n.t('lowStock.countRemainingLabel')}: $countDisplay',
+                        key: const Key('lowStockConfirmationCount'),
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      );
+                    },
                   ),
                 ],
                 const SizedBox(height: 24),
@@ -394,7 +410,9 @@ class _LowStockReportScreenState extends State<LowStockReportScreen> {
                         _selectedProduct!.tenantName,
                         key: const Key('lowStockSelectedProductName'),
                       ),
-                      subtitle: Text(_selectedProduct!.baseUnit),
+                      subtitle: Text(
+                        localizeUnit(_selectedProduct!.baseUnit, i18n: i18n),
+                      ),
                       trailing: IconButton(
                         key: const Key('lowStockClearProductButton'),
                         icon: const Icon(Icons.close),
@@ -435,7 +453,9 @@ class _LowStockReportScreenState extends State<LowStockReportScreen> {
                           return ListTile(
                             key: Key('lowStockProductResult_$index'),
                             title: Text(product.tenantName),
-                            subtitle: Text(product.baseUnit),
+                            subtitle: Text(
+                              localizeUnit(product.baseUnit, i18n: i18n),
+                            ),
                             onTap: () => _selectProduct(product),
                           );
                         },

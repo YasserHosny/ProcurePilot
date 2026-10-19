@@ -103,6 +103,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final role = session?.role;
     final roleLabel = i18n.t('common.roles.${role ?? 'viewer'}');
     final canRequest = session?.canRequestItems ?? false;
+    final canReportLowStock = session?.canReportLowStock ?? false;
     final isApprover = session?.isApprover ?? false;
 
     return Scaffold(
@@ -133,6 +134,16 @@ class _HomeScreenState extends State<HomeScreen> {
                   onPressed: () =>
                       Navigator.of(context).pushNamed('/requests/new'),
                 ),
+              if (canReportLowStock) ...[
+                if (canRequest) const SizedBox(height: 12),
+                ElevatedButton.icon(
+                  key: const Key('homeLowStockButton'),
+                  icon: const Icon(Icons.inventory_2_outlined),
+                  label: Text(i18n.t('mobileHome.reportLowStock')),
+                  onPressed: () =>
+                      Navigator.of(context).pushNamed('/lowStock'),
+                ),
+              ],
               if (isApprover) ...[
                 const SizedBox(height: 24),
                 _PendingCountWidget(

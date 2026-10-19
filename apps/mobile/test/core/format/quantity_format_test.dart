@@ -43,18 +43,22 @@ void main() {
 
   group('formatDecimal', () {
     test('formats whole numbers trimming trailing zeros in English', () {
+      expect(formatDecimal('1.000000', locale: 'en'), '1');
       expect(formatDecimal('2.000000', locale: 'en'), '2');
       expect(formatDecimal('100.0', locale: 'en'), '100');
     });
 
     test('formats fractions up to 6 digits trimming trailing zeros in English', () {
+      expect(formatDecimal('12.5', locale: 'en'), '12.5');
       expect(formatDecimal('2.500000', locale: 'en'), '2.5');
       expect(formatDecimal('0.123456', locale: 'en'), '0.123456');
       expect(formatDecimal('12500.750000', locale: 'en'), '12,500.75');
     });
 
     test('formats numbers using Arabic-Indic digits in Arabic', () {
+      expect(formatDecimal('1.000000', locale: 'ar'), '١');
       expect(formatDecimal('2.000000', locale: 'ar'), '٢');
+      expect(formatDecimal('12.5', locale: 'ar'), '١٢٫٥');
       expect(formatDecimal('18.000000', locale: 'ar'), '١٨');
       expect(formatDecimal('2.500000', locale: 'ar'), '٢٫٥');
       expect(formatDecimal('12500.750000', locale: 'ar'), '١٢٬٥٠٠٫٧٥');

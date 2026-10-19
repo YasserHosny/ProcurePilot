@@ -19,6 +19,24 @@ void main() {
       createdAt: DateTime.now(),
     );
 
+    final milkProductLitre = CatalogueProduct(
+      id: '00000000-0000-0000-0000-000000000003',
+      tenantName: 'Fresh Milk 1L',
+      canonicalName: 'Fresh Milk 1L',
+      baseUnit: 'litre',
+      status: 'active',
+      createdAt: DateTime.now(),
+    );
+
+    final riceProductKg = CatalogueProduct(
+      id: '00000000-0000-0000-0000-000000000004',
+      tenantName: 'Basmati Rice 10kg',
+      canonicalName: 'Basmati Rice 10kg',
+      baseUnit: 'kilogram',
+      status: 'active',
+      createdAt: DateTime.now(),
+    );
+
     setUp(() {
       fakeMobileClient = FakeMobileApiClient();
       fakeRequestsClient = FakeRequestsApiClient()
@@ -37,6 +55,7 @@ void main() {
       WidgetTester tester, {
       CatalogueProduct? product,
       String? branchId,
+      String locale = 'en',
     }) async {
       await pumpWithServices(
         tester,
@@ -46,6 +65,7 @@ void main() {
         ),
         mobileApiClient: fakeMobileClient,
         requestsApiClient: fakeRequestsClient,
+        locale: locale,
       );
       await tester.pumpAndSettle();
     }
@@ -247,5 +267,140 @@ void main() {
       expect(fakeMobileClient.createLowStockCalls, isEmpty);
       expect(find.text('Branch is required.'), findsOneWidget);
     });
+
+    testWidgets(
+      'success screen shows formatted quantity with localised unit in English for whole number 1',
+      (tester) async {
+        fakeMobileClient.createLowStockResult = LowStockReport(
+          id: 'report-1',
+          branchId: '00000000-0000-0000-0000-000000000001',
+          memberId: 'member-1',
+          workspaceProductId: milkProductLitre.id,
+          countRemaining: '1.000000',
+          createdAt: DateTime.now(),
+        );
+
+        await pumpScreen(tester, product: milkProductLitre);
+        await enterText(
+          tester,
+          const Key('lowStockCountRemainingField'),
+          '1.000000',
+        );
+        await tapButton(tester, const Key('lowStockSubmitButton'));
+
+        expect(find.byKey(const Key('lowStockConfirmationView')), findsOneWidget);
+        expect(
+          find.byKey(const Key('lowStockConfirmationCount')),
+          findsOneWidget,
+        );
+        expect(find.text('Count remaining: 1 L'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'success screen shows formatted quantity with localised unit in English for decimal 12.5',
+      (tester) async {
+        fakeMobileClient.createLowStockResult = LowStockReport(
+          id: 'report-2',
+          branchId: '00000000-0000-0000-0000-000000000001',
+          memberId: 'member-1',
+          workspaceProductId: riceProductKg.id,
+          countRemaining: '12.5',
+          createdAt: DateTime.now(),
+        );
+
+        await pumpScreen(tester, product: riceProductKg);
+        await enterText(
+          tester,
+          const Key('lowStockCountRemainingField'),
+          '12.5',
+        );
+        await tapButton(tester, const Key('lowStockSubmitButton'));
+
+        expect(find.byKey(const Key('lowStockConfirmationView')), findsOneWidget);
+        expect(find.text('Count remaining: 12.5 kg'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'success screen shows formatted quantity with localised unit in Arabic for whole number 1',
+      (tester) async {
+        fakeMobileClient.createLowStockResult = LowStockReport(
+          id: 'report-ar-1',
+          branchId: '00000000-0000-0000-0000-000000000001',
+          memberId: 'member-1',
+          workspaceProductId: milkProductLitre.id,
+          countRemaining: '1.000000',
+          createdAt: DateTime.now(),
+        );
+
+        await pumpScreen(tester, product: milkProductLitre, locale: 'ar');
+        await enterText(
+          tester,
+          const Key('lowStockCountRemainingField'),
+          '1.000000',
+        );
+        await tapButton(tester, const Key('lowStockSubmitButton'));
+
+        expect(find.byKey(const Key('lowStockConfirmationView')), findsOneWidget);
+        expect(find.text('الكمية المتبقية: ١ لتر'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'success screen shows formatted quantity with localised unit in Arabic for decimal 12.5',
+      (tester) async {
+        fakeMobileClient.createLowStockResult = LowStockReport(
+          id: 'report-ar-2',
+          branchId: '00000000-0000-0000-0000-000000000001',
+          memberId: 'member-1',
+          workspaceProductId: riceProductKg.id,
+          countRemaining: '12.5',
+          createdAt: DateTime.now(),
+        );
+
+        await pumpScreen(tester, product: riceProductKg, locale: 'ar');
+        await enterText(
+          tester,
+          const Key('lowStockCountRemainingField'),
+          '12.5',
+        );
+        await tapButton(tester, const Key('lowStockSubmitButton'));
+
+        expect(find.byKey(const Key('lowStockConfirmationView')), findsOneWidget);
+        expect(find.text('الكمية المتبقية: ١٢٫٥ كجم'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'product search result and selected product card show localised unit label in Arabic',
+      (tester) async {
+        fakeRequestsClient.catalogueSearchResults = [milkProductLitre, riceProductKg];
+
+        await pumpScreen(tester, locale: 'ar');
+
+        await enterText(
+          tester,
+          const Key('lowStockProductSearchField'),
+          'Milk',
+        );
+        await tester.pump(const Duration(milliseconds: 350));
+        await tester.pumpAndSettle();
+
+        expect(find.byKey(const Key('lowStockProductResult_0')), findsOneWidget);
+        expect(find.text('لتر'), findsOneWidget);
+        expect(find.text('litre'), findsNothing);
+
+        await tester.tap(find.byKey(const Key('lowStockProductResult_0')));
+        await tester.pumpAndSettle();
+
+        expect(
+          find.byKey(const Key('lowStockSelectedProductCard')),
+          findsOneWidget,
+        );
+        expect(find.text('لتر'), findsOneWidget);
+        expect(find.text('litre'), findsNothing);
+      },
+    );
   });
 }
