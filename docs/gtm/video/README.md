@@ -93,9 +93,11 @@ Same keyframes, beats, sound cues and mix as the Arabic outro — only the text 
 | Pop | Clean Minimal Pop — DRAGON-STUDIO | [Pixabay](https://pixabay.com/sound-effects/clean-minimal-pop-467466/) |
 | Whoosh | Soft luxury air whoosh #8 — Sdanezis | [Pixabay](https://pixabay.com/sound-effects/film-special-effects-soft-luxury-air-whoosh-8-592506/) |
 | Chime | Positive Notification — Universfield | [Pixabay](https://pixabay.com/sound-effects/film-special-effects-positive-notification-351299/) |
+| Opening shot (16:9) | Two men in aprons are working in a kitchen — cottonbro studio (51 s, 2048×1080 25 fps, 24.9 MB) | [Pexels](https://www.pexels.com/video/two-men-in-aprons-are-working-in-a-kitchen-4253325/) · Pexels License |
+| Opening shot (9:16 cut) | Chef Grilling Meat in a Busy Kitchen — Allan González (10 s, 2160×3840 30 fps, 29.9 MB) | [Pexels](https://www.pexels.com/video/chef-grilling-meat-in-a-busy-kitchen-31735802/) · Pexels License |
 
-All Pixabay Content License: free commercial use, no attribution required. Audio files are not
-committed (re-download from the links); `music/antalya-beaches-beats.csv` holds the 334 beat
+Pixabay Content License and Pexels License: free commercial use, no attribution required. Audio and
+video files are not committed (stock clips go in `source/stock/`, ignored by git) (re-download from the links); `music/antalya-beaches-beats.csv` holds the 334 beat
 times from librosa so alignment can be redone without re-analysing.
 
 Mix: music −4 dB under cues; cue gains tick −6, swish −4, pop 0, whoosh −6, chime −3 dB; final

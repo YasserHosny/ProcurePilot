@@ -47,7 +47,7 @@ plus-address send-as aliases, 30 products, inbound email address.
 
 | # | Item | Owner | Status | Depends on |
 |---|---|---|---|---|
-| 3.1 | Opening shot: free kitchen/storeroom stock footage (Pexels/Pixabay) | Orch (User OK to download) | not started | — |
+| 3.1 | Opening shot: free kitchen/storeroom stock footage (Pexels/Pixabay) | Orch (User OK to download) | ✅ 2026-10-19: two Pexels clips downloaded with the owner's OK (16:9 kitchen, 9:16 chef at the grill), in `source/stock/` (not committed); sources in [README](README.md) | — |
 | 3.2 | Motion-graphics boards: Arabic text cards, animated savings counter, «وصل إشعار للمدير» card, phone frame | Orch | ✅ boards built — logo canvas boards 14–17 (scene cards 7×3.2 s, savings counter with a `--target` variable, notification card, phone frame with the screen rect x741 y67 437×945); to render to MP4 once the recording exists | — |
 | 3.3 | Record the screencast: web 1920×1080, phone 390×844, scene by scene per the storyboard | Orch | blocked | stages 1–2 |
 | 3.4 | Edit on the music (Antalya Beaches) with the rendered outro at 2:50.25 → 3-minute cut | Orch | blocked | 3.1–3.3 |
