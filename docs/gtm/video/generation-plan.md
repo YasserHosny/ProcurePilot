@@ -112,6 +112,12 @@ The v1 scripts are kept as they ran: their first lines hard-code the recording m
 
 Built by Codex from [`review-codex-2026-10-19.md`](review-codex-2026-10-19.md): the email is masked in every frame where it appears (opaque boxes applied at source resolution, 344 proof frames inspected); captions over the footage replace most full-screen cards, with «بيانات تجريبية · واجهة عربية» / "Demo data · Arabic interface" on each; the first product shot is at 3 s (16:9) and 1.5 s (9:16); decision moments get 1–2.5 s holds; 460 EGP is labelled as this order against last purchase-order prices and 1,060 EGP as the demo ledger including the dry run; the comparison is labelled as oil ×8; the vertical cut shows the sent PO and the recorded outcome before the counter. 16:9 runs 2:15, 9:16 runs 0:55; −14.1 LUFS. Not done: an s3b all-lines insert (captions were corrected instead), and the notification card is still illustrative.
 
+### v2.1 (2026-10-19, evening)
+
+- The phone low-stock scene was re-recorded after #195: it now starts from the home screen's «الإبلاغ عن انخفاض المخزون» button and the confirmation reads «الكمية المتبقية: ١ لتر». Source: `s0-phone-lowstock-v3` = take `s0b` (0–21 s, ends while sending) + `s0c` (the confirmation, 0.5–5 s). It filed one more real low-stock report (oil, Maadi, 1) in the demo tenant.
+- Vertical shots that had become thin strips were recropped closer to the 972×1040 frame: comparison (880,590,790,470), guardrail draft (435,90,800,820), submit (435,480,800,520), ledger (630,290,800,620).
+- −14.0 LUFS on all four cuts; durations unchanged.
+
 ## Privacy
 
 The owner's email (`…+pp-owner@gmail.com`) is visible in `s2` / `s2b` (quote review «رُفع بواسطة» / «راجعه»), in `s3` (the request page) and in `s4` (phone approval «مقدم الطلب»), so it also appears in the four v1 cuts, which must not be posted. The v2 cuts mask it in every frame (see v2 above). The raw clips stay out of git until they are masked at source. Stills that show it are left out of `screens/`.
