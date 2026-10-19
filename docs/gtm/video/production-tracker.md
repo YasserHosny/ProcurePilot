@@ -49,8 +49,8 @@ plus-address send-as aliases, 30 products, inbound email address.
 |---|---|---|---|---|
 | 3.1 | Opening shot: free kitchen/storeroom stock footage (Pexels/Pixabay) | Orch (User OK to download) | ✅ 2026-10-19: two Pexels clips downloaded with the owner's OK (16:9 kitchen, 9:16 chef at the grill), in `source/stock/` (not committed); sources in [README](README.md) | — |
 | 3.2 | Motion-graphics boards: Arabic text cards, animated savings counter, «وصل إشعار للمدير» card, phone frame | Orch | ✅ boards built — logo canvas boards 14–17 (scene cards 7×3.2 s, savings counter with a `--target` variable, notification card, phone frame with the screen rect x741 y67 437×945); to render to MP4 once the recording exists | — |
-| 3.3 | Record the screencast: web 1920×1080, phone 390×844, scene by scene per the storyboard | Orch | blocked | stages 1–2 |
-| 3.4 | Edit on the music (Antalya Beaches) with the rendered outro at 2:50.25 → 3-minute cut | Orch | blocked | 3.1–3.3 |
+| 3.3 | Record the screencast: web 1920×1080, phone 390×844, scene by scene per the storyboard | Orch | ✅ 2026-10-19: 9 clips recorded on hosted (web 1920×1080 in a clean kiosk window, phone 390×844); see [README](README.md#recording-and-edit-2026-10-19) | stages 1–2 |
+| 3.4 | Edit on the music (Antalya Beaches) with the rendered outro at 2:50.25 → 3-minute cut | Orch | ✅ 2026-10-19: 3-minute Arabic cut rendered (music, cards, outro at 2:50.25); waiting for the owner’s review (3.7) | 3.1–3.3 |
 | 3.5 | 60-second vertical cut (outro at 0:51.34) | Orch | blocked | 3.4 |
 | 3.6 | English versions (swap text cards; English outros already rendered) | Orch | blocked | 3.4, 3.5 |
 | 3.7 | User review of the recorded run, then of the cuts | User | — | 3.3, 3.6 |
@@ -84,3 +84,4 @@ plus-address send-as aliases, 30 products, inbound email address.
 | 2026-10-18 (afternoon) | Arabic RTL walkthrough (findings 31–37). Guardrail created in Arabic and fired on a real emailed quote: draft request 9e657ae3 (EGP 2,190) with no human prepare step. Savings baseline decided: last PO price (fix in progress). |
 | 2026-10-18 (evening) | PRs #165/#168/#169/#170/#173/#176 merged; migrations 0011, 0012, 20261019000000, 20261019000001 applied to hosted. Round-4 dry run (2.4/2.5): RFQ sent from the app, three supplier replies from Gmail incl. a WhatsApp photo, guardrail fired on the photo quote and emailed the owner; request submitted. PO-000001–000004 marked sent so the last-PO-price baseline exists. Findings 39–43; #180 (RFQ email packs) and #181 (typed dates) merged. |
 | 2026-10-19 | Round-4 dry run completed: phone approval, PO-000005 (EGP 25,600, الأمانة), outcome recorded from the PO, savings 600 EGP against the last PO price (rice +180, onions +100, oil +320). Stage 2 is ready for recording. |
+| 2026-10-19 (evening) | Recording done on hosted (low-stock report, RFQ, WhatsApp-photo quote, guardrail draft 25,140 EGP, phone approval, PO-000006, savings 460; ledger 1,060 verified). 3-minute Arabic cut rendered and sent for review. Findings 44 (web signed out after ~8 h idle), 45 (no low-stock entry on phone home), 46 (raw «1.000000» quantity) raised as fix cards. |

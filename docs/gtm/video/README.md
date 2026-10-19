@@ -123,6 +123,30 @@ CSS animation and seeks it with the Web Animations API, 30 fps). `source/mix_aud
 cues and mixes music + cues with ffmpeg (`imageio-ffmpeg`). Both scripts carry absolute scratch
 paths from the session that made them — edit the paths at the top before reuse.
 
+## Recording and edit (2026-10-19)
+
+**3-minute Arabic cut rendered** (`procurepilot-demo-ar-16x9.mp4`, 3:00.00, 1920×1080, 30 fps, −14.6 LUFS,
+peak −2.2 dBFS; 15.6 MB, kept out of git, shared with the owner). Recorded live on hosted against
+«مطاعم سند» in one round: phone low-stock report → RFQ to النور, الأمانة, الحاج سيد → replies by email
+including الأمانة's WhatsApp photo of a printed quote → photo read and authorised → line comparison →
+the guardrail drafted request 25,140 EGP from the photo quote → approved on the phone → PO-000006 →
+outcome recorded from the PO → savings 460 EGP on this order; 1,060 EGP verified in the ledger (this
+round plus the round-4 dry run, each against the last PO price).
+
+How it was made (`source/record/`, `source/edit/`; scripts carry absolute scratch paths, edit them first):
+- **Clean browser:** a separate Chrome profile in `--kiosk` with `--remote-debugging-port=9333` on the
+  recording screen; the user signs in once. Scenes are Playwright scripts over CDP (`lib.cjs`,
+  `scene*.cjs`) with a drawn pointer and human-paced typing; the OS pointer is not recorded.
+- **Capture:** GNOME Shell's `org.gnome.Shell.Screencast.ScreencastArea` over D-Bus (`screencast.py`),
+  H.264; the recording is bound to the calling process.
+- **Phone:** the Flutter web build served by `mobile_proxy.py` on :4310, emulated at 390×844 by
+  `phone-driver.cjs` (commands from a JSON file), placed in the phone-frame board.
+- **Cards:** boards 14–17 rendered frame by frame (`render_cards.cjs`); the notification card names the
+  real request and the counter shows the real 460.
+- **Edit:** `build.py` (ffmpeg from `imageio-ffmpeg`) cuts, speeds and concatenates 21 segments to
+  2:50.25, then the approved outro; music = the track 0:00–2:50.25 at −6.6 dB (the outro's own gain, so
+  the hand-over is seamless), limiter −3 dB before AAC.
+
 ## Open
 
 What is left before recording, with owners and status: [`production-tracker.md`](production-tracker.md).
