@@ -59,6 +59,9 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
         if (!(error instanceof HttpErrorResponse) || error.status !== 401) {
           return throwError(() => error);
         }
+        // Credential endpoints own their errors. In particular, a refresh 401 must reach
+        // SessionService before anything clears storage, so it can retry a rotated token.
+        if (NO_REFRESH_PATHS.includes(apiPath(request.url))) return throwError(() => error);
         if (!mayRefresh(request) || !session.refreshToken) {
           signOut();
           return throwError(() => error);
@@ -74,7 +77,7 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
         if (current && current !== sentToken) {
           return attempt(replay());
         }
-        return session.refresh().pipe(
+        return session.refresh(rebuild !== null).pipe(
           catchError((refreshError: unknown) => {
             // A rate-limited or unreachable refresh leaves the session intact; only a refused
             // refresh token ends it.
@@ -97,6 +100,9 @@ function isOwnApi(url: string): boolean {
 
 function mayRefresh(req: HttpRequest<unknown>): boolean {
   if (req.context.get(REPLAYED_AFTER_REFRESH)) return false;
-  const path = req.url.slice(environment.apiBaseUrl.length).split('?')[0];
-  return !NO_REFRESH_PATHS.includes(path);
+  return !NO_REFRESH_PATHS.includes(apiPath(req.url));
+}
+
+function apiPath(url: string): string {
+  return url.slice(environment.apiBaseUrl.length).split('?')[0];
 }

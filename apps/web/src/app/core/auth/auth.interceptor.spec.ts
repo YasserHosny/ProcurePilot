@@ -396,6 +396,116 @@ describe('authInterceptor token refresh (demo finding 29)', () => {
     sessionService.logout();
   }));
 
+  it('a late timer, visibility wake and interceptor share one refresh after hours idle', fakeAsync(() => {
+    sessionService.adopt(session(jwt(300), 'refresh-1'));
+    const now = Date.now();
+    spyOn(Date, 'now').and.returnValue(now + 8 * 60 * 60 * 1000);
+    spyOnProperty(document, 'visibilityState', 'get').and.returnValue('visible');
+    document.dispatchEvent(new Event('visibilitychange'));
+    const refresh = backend.expectOne('/api/v1/auth/refresh');
+    http.get('/api/v1/orders').subscribe();
+    backend.expectOne('/api/v1/orders').flush(null, { status: 401, statusText: 'Unauthorized' });
+    tick(300_000);
+    backend.expectNone('/api/v1/auth/refresh');
+    refresh.flush(session(jwt(3600), 'refresh-2'));
+    backend.expectOne('/api/v1/orders').flush([]);
+    document.dispatchEvent(new Event('visibilitychange'));
+    backend.expectNone('/api/v1/auth/refresh');
+    expect(sessionService.isAuthenticated()).toBeTrue();
+    expect(navigate).not.toHaveBeenCalled();
+    sessionService.logout();
+  }));
+
+  it('a rejected stale refresh retries once with storage without signing out', fakeAsync(() => {
+    http.get('/api/v1/orders').subscribe();
+    backend.expectOne('/api/v1/orders').flush(null, { status: 401, statusText: 'Unauthorized' });
+    const stale = backend.expectOne('/api/v1/auth/refresh');
+    expect(stale.request.body).toEqual({ refresh_token: 'refresh-1' });
+    localStorage.setItem('pp.refresh_token', 'refresh-from-other-tab');
+    stale.flush(null, { status: 401, statusText: 'Unauthorized' });
+    expect(localStorage.getItem('pp.refresh_token')).toBe('refresh-from-other-tab');
+    const retry = backend.expectOne('/api/v1/auth/refresh');
+    expect(retry.request.body).toEqual({ refresh_token: 'refresh-from-other-tab' });
+    retry.flush(session(jwt(3600), 'refresh-3'));
+    backend.expectOne('/api/v1/orders').flush([]);
+    expect(sessionService.isAuthenticated()).toBeTrue();
+    expect(navigate).not.toHaveBeenCalled();
+    sessionService.logout();
+  }));
+
+  it('a genuinely rejected refresh with the same stored token signs out', fakeAsync(() => {
+    let failed = false;
+    http.get('/api/v1/orders').subscribe({ error: () => (failed = true) });
+    backend.expectOne('/api/v1/orders').flush(null, { status: 401, statusText: 'Unauthorized' });
+    backend.expectOne('/api/v1/auth/refresh').flush(null, { status: 401, statusText: 'Unauthorized' });
+    backend.expectNone('/api/v1/auth/refresh');
+    expect(failed).toBeTrue();
+    expect(localStorage.getItem('pp.access_token')).toBeNull();
+    expect(localStorage.getItem('pp.refresh_token')).toBeNull();
+    expect(navigate).toHaveBeenCalledWith(['/auth/sign-in']);
+  }));
+
+  it('a pending workspace switch and an interceptor refresh share the rotation', fakeAsync(() => {
+    sessionService.adopt(session(jwt(1800), 'refresh-1'));
+    sessionService.switchWorkspace('tenant-b').subscribe();
+    const put = backend.expectOne('/api/v1/me/active-workspace');
+    http.get('/api/v1/orders').subscribe();
+    backend.expectOne('/api/v1/orders').flush(null, { status: 401, statusText: 'Unauthorized' });
+    backend.expectNone('/api/v1/auth/refresh');
+    put.flush(session(jwt(3600), 'refresh-2'));
+    backend.expectOne('/api/v1/orders').flush([]);
+    expect(localStorage.getItem('pp.refresh_token')).toBe('refresh-2');
+    expect(navigate).not.toHaveBeenCalled();
+    sessionService.logout();
+  }));
+
+  it('a refresh reads storage when subscribed rather than when created', fakeAsync(() => {
+    const pending = sessionService.refresh();
+    localStorage.setItem('pp.refresh_token', 'latest-refresh');
+    pending.subscribe();
+    const refresh = backend.expectOne('/api/v1/auth/refresh');
+    expect(refresh.request.body).toEqual({ refresh_token: 'latest-refresh' });
+    refresh.flush(session(jwt(3600), 'refresh-3'));
+    sessionService.logout();
+  }));
+
+  it('a rejected stale refresh retries at most once', fakeAsync(() => {
+    http.get('/api/v1/orders').subscribe({ error: () => undefined });
+    backend.expectOne('/api/v1/orders').flush(null, { status: 401, statusText: 'Unauthorized' });
+    const stale = backend.expectOne('/api/v1/auth/refresh');
+    localStorage.setItem('pp.refresh_token', 'refresh-2');
+    stale.flush(null, { status: 400, statusText: 'Bad Request' });
+    backend.expectOne('/api/v1/auth/refresh').flush(null, { status: 400, statusText: 'Bad Request' });
+    backend.expectNone('/api/v1/auth/refresh');
+    expect(localStorage.getItem('pp.refresh_token')).toBeNull();
+    expect(navigate).toHaveBeenCalledWith(['/auth/sign-in']);
+  }));
+
+  for (const status of [0, 429, 500, 503]) {
+    it(`a wake refresh failure with status ${status} preserves tokens`, fakeAsync(() => {
+      sessionService.adopt(session(jwt(300), 'refresh-1'));
+      const now = Date.now();
+      spyOn(Date, 'now').and.returnValue(now + 8 * 60 * 60 * 1000);
+      spyOnProperty(document, 'visibilityState', 'get').and.returnValue('visible');
+      document.dispatchEvent(new Event('visibilitychange'));
+      const refresh = backend.expectOne('/api/v1/auth/refresh');
+      if (status === 0) refresh.error(new ProgressEvent('error'));
+      else refresh.flush(null, { status, statusText: 'Transient failure' });
+      expect(localStorage.getItem('pp.refresh_token')).toBe('refresh-1');
+      expect(sessionService.isAuthenticated()).toBeTrue();
+      expect(navigate).not.toHaveBeenCalled();
+      sessionService.logout();
+    }));
+  }
+
+  it('a transient startup /me error preserves the stored session', fakeAsync(() => {
+    localStorage.setItem('pp.access_token', jwt(1800));
+    TestBed.runInInjectionContext(() => restoreSessionOnStartup()).subscribe();
+    backend.expectOne('/api/v1/me').flush(null, { status: 503, statusText: 'Unavailable' });
+    expect(localStorage.getItem('pp.refresh_token')).toBe('refresh-1');
+    expect(navigate).not.toHaveBeenCalled();
+  }));
+
   it('sign-out cancels the proactive refresh', fakeAsync(() => {
     sessionService.adopt(session(jwt(300), 'refresh-1'));
     sessionService.logout();

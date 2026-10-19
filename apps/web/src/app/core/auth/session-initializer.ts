@@ -36,7 +36,7 @@ export function restoreSessionOnStartup(): Observable<null> {
       // A refused token ends the session. A refresh that was merely rate-limited or could not
       // reach the server keeps the tokens for the next load; the guard still sends the person
       // to sign-in for now, since no member was restored.
-      if (!usedRefresh || refreshWasRejected(error)) session.logout();
+      if (refreshWasRejected(error)) session.logout();
       return of(null);
     }),
   );

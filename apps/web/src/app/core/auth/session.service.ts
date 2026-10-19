@@ -1,6 +1,6 @@
 import { HttpContext, HttpErrorResponse } from '@angular/common/http';
-import { Injectable, NgZone, computed, inject, signal } from '@angular/core';
-import { Observable, defer, finalize, of, shareReplay, switchMap, tap, throwError } from 'rxjs';
+import { DestroyRef, Injectable, NgZone, computed, inject, signal } from '@angular/core';
+import { Observable, catchError, defer, finalize, of, shareReplay, switchMap, tap, throwError } from 'rxjs';
 
 import { ApiService } from '../api/api.service';
 import type { Me, Role, Session, WorkspaceSummary } from '../api/models';
@@ -47,6 +47,20 @@ export class SessionService {
   private inFlightRefresh: Observable<Session> | null = null;
   private refreshTimer: ReturnType<typeof setTimeout> | null = null;
   private switching = false;
+  private inFlightWorkspace: Observable<Session> | null = null;
+
+  constructor() {
+    const onVisibilityChange = (): void => {
+      if (document.visibilityState === 'visible') this.refreshOnWake();
+    };
+    this.zone.runOutsideAngular(() =>
+      document.addEventListener('visibilitychange', onVisibilityChange),
+    );
+    inject(DestroyRef).onDestroy(() => {
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      this.clearRefreshTimer();
+    });
+  }
 
   private readonly member = signal<Me | null>(null);
 
@@ -98,13 +112,29 @@ export class SessionService {
    * The workspace is not sent: the access-token hook re-reads the persisted active workspace,
    * so the renewed token carries the same tenant claim. Tenancy stays the server's decision.
    */
-  refresh(): Observable<Session> {
+  refresh(workspaceReplay = false): Observable<Session> {
+    // A successful switch already renews the session. Only the switch's own 401 recovery
+    // may refresh while it is pending, since that rejected PUT has not spent the token.
+    if (this.inFlightWorkspace && !workspaceReplay) return this.inFlightWorkspace;
     if (this.inFlightRefresh) return this.inFlightRefresh;
-    const refreshToken = this.refreshToken;
-    if (!refreshToken) {
-      return throwError(() => new Error('cannot refresh the session without a refresh token'));
-    }
-    const request = this.api.refreshSession(refreshToken).pipe(
+    // Read at subscription time, never retain a token in an unstarted observable.
+    const request = defer(() => {
+      const sentToken = this.refreshToken;
+      if (!sentToken) {
+        return throwError(() => new Error('cannot refresh the session without a refresh token'));
+      }
+      return this.api.refreshSession(sentToken).pipe(
+        catchError((error: unknown) => {
+          const latestToken = this.refreshToken;
+          // Another tab or workspace operation may have rotated storage while we were out.
+          // Retry only once; a rejection of the current token must still end the session.
+          if (refreshWasRejected(error) && latestToken && latestToken !== sentToken) {
+            return this.api.refreshSession(latestToken);
+          }
+          return throwError(() => error);
+        }),
+      );
+    }).pipe(
       tap((s) => this.adopt(s)),
       finalize(() => {
         if (this.inFlightRefresh === request) this.inFlightRefresh = null;
@@ -137,16 +167,33 @@ export class SessionService {
         body: { ...(req.body as Record<string, unknown>), refresh_token: this.refreshToken },
       }),
     );
-    return defer(() => {
+    const request: Observable<Session> = defer(() => {
+      if (this.inFlightWorkspace) {
+        return this.inFlightWorkspace.pipe(switchMap(() => this.switchWorkspace(tenantId)));
+      }
       this.switching = true;
       const ready: Observable<unknown> =
         this.inFlightRefresh ?? (this.accessTokenNeedsRefresh() ? this.refresh() : of(null));
       return ready.pipe(
-        switchMap(() => this.api.setActiveWorkspace(tenantId, this.refreshToken ?? '', context)),
-        tap((s) => this.adopt(s)),
-        finalize(() => (this.switching = false)),
+        switchMap(() => {
+          // Another switch may have started while both were awaiting the same refresh.
+          if (this.inFlightWorkspace) {
+            return this.inFlightWorkspace.pipe(switchMap(() => this.switchWorkspace(tenantId)));
+          }
+          this.inFlightWorkspace = request;
+          return this.api.setActiveWorkspace(tenantId, this.refreshToken ?? '', context);
+        }),
+        tap((s) => {
+          if (this.inFlightWorkspace === request) this.inFlightWorkspace = null;
+          this.adopt(s);
+        }),
+        finalize(() => {
+          if (this.inFlightWorkspace === request) this.inFlightWorkspace = null;
+          this.switching = false;
+        }),
       );
-    });
+    }).pipe(shareReplay({ bufferSize: 1, refCount: false }));
+    return request;
   }
 
   workspaces(): Observable<{ items: WorkspaceSummary[] }> {
@@ -174,8 +221,8 @@ export class SessionService {
   }
 
   /**
-   * Renews the session shortly before the access token expires. A failure here is left alone:
-   * the next request's 401 retries the refresh and signs out only if that fails too.
+   * Renews the session shortly before the access token expires. Only a definitive rejection
+   * ends the session; transient failures leave it available for the next wake or request.
    *
    * The timer runs outside Angular's zone so an hour-long pending task never holds the app
    * "unstable"; the refresh itself re-enters the zone.
@@ -188,16 +235,24 @@ export class SessionService {
     this.zone.runOutsideAngular(() => {
       this.refreshTimer = setTimeout(() => {
         this.refreshTimer = null;
-        // A workspace switch is spending the refresh token; its adopt() re-arms this timer.
-        if (this.switching) return;
-        // Another tab may already have renewed the shared token; just re-arm for it.
-        if (!this.accessTokenNeedsRefresh()) {
-          this.scheduleRefresh();
-          return;
-        }
-        this.zone.run(() => this.refresh().subscribe({ error: () => undefined }));
+        this.refreshOnWake();
       }, delay);
     });
+  }
+
+  /** Both a thawed timer and visibility wake use the same expiry check and shared request. */
+  private refreshOnWake(): void {
+    if (this.switching || !this.refreshToken) return;
+    if (!this.accessTokenNeedsRefresh()) {
+      this.scheduleRefresh();
+      return;
+    }
+    this.clearRefreshTimer();
+    this.zone.run(() => this.refresh().subscribe({
+      error: (error: unknown) => {
+        if (refreshWasRejected(error)) this.logout();
+      },
+    }));
   }
 
   private clearRefreshTimer(): void {
