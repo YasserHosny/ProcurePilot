@@ -16,7 +16,7 @@ Spec, style and storyboard decisions: [`README.md`](README.md). Status: [`produc
 | Beat map of the track (334 beats) | [`music/antalya-beaches-beats.csv`](music/antalya-beaches-beats.csv) | yes |
 | Recording scripts | [`source/record/`](source/record/) | yes |
 | Edit scripts | v1 [`source/edit/`](source/edit/), v2 [`source/edit-v2/`](source/edit-v2/) | yes |
-| Finished cuts (`procurepilot-demo-{ar,en}-{16x9,9x16-60s}.mp4`) | v1 `~/Videos/pp-recording/edit/`, v2 `~/Videos/pp-recording/edit/v2/`, shared with the owner | no |
+| Finished cuts (`procurepilot-demo-{ar,en}-{16x9,9x16-60s}.mp4`) | v2.0 and v2.1 in [`cuts/`](cuts/); v1 only on the recording machine (`~/Videos/pp-recording/edit/v1/`) | v2.x yes; v1 no: it shows the owner's email |
 
 `fetch-assets.sh` pins each third-party file by URL and SHA-256, so a rebuild uses byte-identical media.
 
