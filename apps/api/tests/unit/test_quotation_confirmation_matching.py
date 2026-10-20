@@ -112,7 +112,7 @@ class _ConflictingInsert:
     def table(self, _name: str) -> _ConflictingInsert:
         return self
 
-    def insert(self, _values: dict[str, object]) -> _ConflictingInsert:
+    def insert(self, _values: dict[str, object] | list[dict[str, object]]) -> _ConflictingInsert:
         return self
 
     def execute(self) -> None:
@@ -163,3 +163,132 @@ def test_matching_concurrent_preparation_reuses_unique_constraint_winner(
     else:
         service._create_task(client, member, line, reason="no_candidate")  # noqa: SLF001
         assert next(tasks, "exhausted") == "exhausted"
+
+
+def test_matching_preparation_never_routes_a_partial_candidate_set(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = get_settings().model_copy(
+        update={
+            "matching_fuzzy_auto_accept_enabled": True,
+            "matching_auto_accept_threshold": 0.92,
+            "matching_review_margin": 0.05,
+        }
+    )
+    service = MatchingService(settings)
+    member = _member()
+    line = {"id": uuid4(), "quotation_id": uuid4()}
+    candidates = [
+        {"workspace_product_id": uuid4(), "confidence": "0.98", "reasons": {}},
+        {"workspace_product_id": uuid4(), "confidence": "0.97", "reasons": {}},
+    ]
+    visible: list[dict[str, object]] = []
+    decisions: list[object] = []
+    task_reasons: list[object] = []
+    observations: list[int] = []
+
+    class InterleavedInsert:
+        def __init__(self) -> None:
+            self.rows: list[dict[str, object]] = []
+
+        def table(self, name: str) -> InterleavedInsert:
+            assert name == "match_candidate"
+            return self
+
+        def insert(self, payload: dict[str, object] | list[dict[str, object]]) -> InterleavedInsert:
+            self.rows = payload if isinstance(payload, list) else [payload]
+            return self
+
+        def execute(self) -> SimpleNamespace:
+            # PostgREST commits one insert statement, then the competing GET runs.
+            # The old implementation exposes rank 1 alone at this exact boundary.
+            existing_products = {row["candidate_workspace_product_id"] for row in visible}
+            if any(row["candidate_workspace_product_id"] in existing_products for row in self.rows):
+                raise APIError({"code": "23505", "message": "concurrent insert"})
+            committed = [{"id": uuid4(), **row} for row in self.rows]
+            visible.extend(committed)
+            observations.append(len(visible))
+            service._ensure_pipeline(  # noqa: SLF001
+                client=self, member=member, quote={}, lines=[line]
+            )
+            return SimpleNamespace(data=list(reversed(committed)))
+
+    monkeypatch.setattr(service, "_backfill_missing_embeddings", lambda _client: None)
+    monkeypatch.setattr(matching_module, "_decision_for_line", lambda *_a: None)
+    monkeypatch.setattr(matching_module, "_candidate_rows", lambda *_a: list(visible))
+    monkeypatch.setattr(
+        service, "_create_automatic_decision", lambda *_a, **_k: decisions.append(True)
+    )
+    monkeypatch.setattr(
+        service, "_create_task", lambda *_a, **kwargs: task_reasons.append(kwargs["reason"])
+    )
+    client = InterleavedInsert()
+    persisted = service._persist_candidates(client, member, line, candidates)  # noqa: SLF001
+    service._route_or_accept(client, member, line, persisted)  # noqa: SLF001
+    assert decisions == []
+    assert observations == [2]
+    assert [row["rank"] for row in persisted] == [1, 2]
+    assert task_reasons == ["close_candidates", "close_candidates"]
+
+    # A losing runner with a different computed set must route the winner's entire
+    # committed set, rather than just reusing its own overlapping candidate.
+    reused = service._persist_candidates(client, member, line, candidates[:1])  # noqa: SLF001
+    assert reused == visible
+    service._route_or_accept(client, member, line, reused)  # noqa: SLF001
+    assert decisions == []
+    assert task_reasons[-1] == "close_candidates"
+
+
+@pytest.mark.parametrize("deterministic_top", [True, False])
+def test_matching_deterministic_preparation_preserves_below_threshold_auto_accept(
+    deterministic_top: bool,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    service = MatchingService(
+        get_settings().model_copy(update={"matching_auto_accept_threshold": 0.92})
+    )
+    member = _member()
+    line = {"id": uuid4(), "quotation_id": uuid4()}
+    deterministic = SimpleNamespace(
+        workspace_product_id=uuid4(), confidence="0.80", reasons={"alias_hit": True}
+    )
+    persisted = [
+        {
+            "id": uuid4(),
+            "candidate_workspace_product_id": deterministic.workspace_product_id,
+            "confidence": "0.80",
+            "reasons": {"alias_hit": deterministic_top},
+        }
+    ]
+    decisions: list[object] = []
+    task_reasons: list[object] = []
+    monkeypatch.setattr(service, "_backfill_missing_embeddings", lambda _client: None)
+    monkeypatch.setattr(matching_module, "_decision_for_line", lambda *_a: None)
+    monkeypatch.setattr(matching_module, "_candidate_rows", lambda *_a: [])
+    for name in (
+        "_deterministic_products_for_line",
+        "_aliases_for_line",
+        "_supplier_code_aliases_for_line",
+    ):
+        monkeypatch.setattr(matching_module, name, lambda *_a: [])
+    monkeypatch.setattr(matching_module, "find_deterministic_candidate", lambda **_k: deterministic)
+    # This can be our deterministic set or another runner's non-deterministic
+    # set returned by the atomic insert's conflict reload.
+    monkeypatch.setattr(service, "_persist_candidates", lambda *_a: persisted)
+    monkeypatch.setattr(
+        service,
+        "_create_automatic_decision",
+        lambda _client, _member, _line, candidate, **_k: decisions.append(candidate),
+    )
+    monkeypatch.setattr(
+        service, "_create_task", lambda *_a, **kwargs: task_reasons.append(kwargs["reason"])
+    )
+    service._ensure_pipeline(  # noqa: SLF001
+        client=object(), member=member, quote={}, lines=[line], bearer_token="caller-token"
+    )
+    if deterministic_top:
+        assert decisions == persisted
+        assert task_reasons == []
+    else:
+        assert decisions == []
+        assert task_reasons == ["low_confidence"]
