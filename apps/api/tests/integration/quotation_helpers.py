@@ -300,7 +300,7 @@ class PsycopgTableQuery:
         self._service_role = service_role
         self._claims = claims
         self._operation = "select"
-        self._payload: dict[str, object] | None = None
+        self._payload: dict[str, object] | list[dict[str, object]] | None = None
         self._where: list[tuple[str, str, object]] = []
         self._limit: int | None = None
         self._offset: int | None = None
@@ -309,7 +309,7 @@ class PsycopgTableQuery:
         self._operation = "select"
         return self
 
-    def insert(self, payload: dict[str, object]) -> PsycopgTableQuery:
+    def insert(self, payload: dict[str, object] | list[dict[str, object]]) -> PsycopgTableQuery:
         self._operation = "insert"
         self._payload = payload
         return self
@@ -406,18 +406,25 @@ class PsycopgTableQuery:
     def _execute_insert(self) -> object:
         if self._payload is None:
             raise AssertionError("insert payload is required")
-        keys = list(self._payload)
-        query = sql.SQL("insert into {} ({}) values ({}) returning *").format(
+        rows = self._payload if isinstance(self._payload, list) else [self._payload]
+        if not rows:
+            return _Response([])
+        keys = list(rows[0])
+        values = sql.SQL(",").join(
+            sql.SQL("({})").format(sql.SQL(",").join(sql.Placeholder() for _key in keys))
+            for _row in rows
+        )
+        query = sql.SQL("insert into {} ({}) values {} returning *").format(
             sql.Identifier(self._table),
             sql.SQL(",").join(sql.Identifier(key) for key in keys),
-            sql.SQL(",").join(sql.Placeholder() for _key in keys),
+            values,
         )
         return _Response(
-            self._fetch(query, [_adapt_value(key, self._payload[key]) for key in keys])
+            self._fetch(query, [_adapt_value(key, row[key]) for row in rows for key in keys])
         )
 
     def _execute_update(self) -> object:
-        if self._payload is None:
+        if not isinstance(self._payload, dict):
             raise AssertionError("update payload is required")
         keys = list(self._payload)
         params = [_adapt_value(key, self._payload[key]) for key in keys]

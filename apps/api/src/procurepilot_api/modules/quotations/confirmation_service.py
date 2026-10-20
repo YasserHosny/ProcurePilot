@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from datetime import UTC, datetime
 from uuid import UUID
 
@@ -8,12 +9,15 @@ from postgrest.exceptions import APIError
 from procurepilot_api.config import Settings, get_settings
 from procurepilot_api.deps import CurrentMember
 from procurepilot_api.errors import ConflictError, ServiceUnavailableError
+from procurepilot_api.modules.matching.service import MatchingService
 from procurepilot_api.modules.members.service import authenticated_client
 from procurepilot_api.modules.quotations.review_gate import blocking_low_confidence_fields
 from procurepilot_api.modules.quotations.schemas import ConfirmRequest, Quotation
 from procurepilot_api.modules.quotations.service import _one_row, _quotation
 from procurepilot_api.shared.audit import AuditEventCreate, get_audit_writer
 from procurepilot_api.shared.logging import get_trace_id
+
+logger = logging.getLogger(__name__)
 
 
 class QuotationConfirmationService:
@@ -132,6 +136,14 @@ class QuotationConfirmationService:
             ),
             bearer_token=bearer_token,
         )
+        # Each PostgREST mutation above has committed before matching starts. Reuse the
+        # GET pipeline with the caller's JWT; preparation is best effort and retryable.
+        try:
+            MatchingService(self._settings).quotation_matches(
+                bearer_token=bearer_token, member=member, quotation_id=quotation_id
+            )
+        except Exception:
+            logger.exception("Failed to prepare matching for quotation %s", quotation_id)
         return _quotation(rows)
 
 

@@ -527,9 +527,15 @@ class MatchingService:
                         }
                     ],
                 )
-                self._create_automatic_decision(
-                    client, member, line, persisted[0], bearer_token=bearer_token
-                )
+                if _candidate_is_deterministic(persisted[0]):
+                    self._create_automatic_decision(
+                        client, member, line, persisted[0], bearer_token=bearer_token
+                    )
+                else:
+                    # A concurrent runner persisted a non-deterministic set first.
+                    self._route_or_accept(
+                        client, member, line, persisted, bearer_token=bearer_token
+                    )
                 continue
             candidates = build_similarity_candidates(
                 client=client,
@@ -559,31 +565,34 @@ class MatchingService:
         line: dict[str, object],
         candidates: list[dict[str, object]],
     ) -> list[dict[str, object]]:
-        persisted: list[dict[str, object]] = []
-        for rank, candidate in enumerate(candidates, start=1):
-            try:
-                response = (
-                    client.table("match_candidate")
-                    .insert(
-                        {
-                            "tenant_id": str(member.tenant_id),
-                            "quotation_line_id": str(line["id"]),
-                            "candidate_workspace_product_id": str(
-                                candidate["workspace_product_id"]
-                            ),
-                            "confidence": decimal_string(candidate["confidence"]),
-                            "reasons": candidate["reasons"],
-                            "rank": rank,
-                            "scoring_version": SCORING_VERSION,
-                            "embedding_model": self._embeddings.model,
-                        }
-                    )
-                    .execute()
-                )
-            except APIError as exc:
-                raise ServiceUnavailableError(details={"dependency": "database"}) from exc
-            persisted.extend(_rows(response.data))
-        return persisted
+        if not candidates:
+            return []
+        payload = [
+            {
+                "tenant_id": str(member.tenant_id),
+                "quotation_line_id": str(line["id"]),
+                "candidate_workspace_product_id": str(candidate["workspace_product_id"]),
+                "confidence": decimal_string(candidate["confidence"]),
+                "reasons": candidate["reasons"],
+                "rank": rank,
+                "scoring_version": SCORING_VERSION,
+                "embedding_model": self._embeddings.model,
+            }
+            for rank, candidate in enumerate(candidates, start=1)
+        ]
+        try:
+            # PostgREST inserts the whole array in one transaction. Other runners
+            # must see either no candidates or the complete set before routing.
+            response = client.table("match_candidate").insert(payload).execute()
+        except APIError as exc:
+            if exc.code == "23505":
+                # The winning statement has committed its entire set. Route that
+                # set, even when this runner computed different candidates.
+                existing = _candidate_rows(client, UUID(str(line["id"])))
+                if existing:
+                    return existing
+            raise ServiceUnavailableError(details={"dependency": "database"}) from exc
+        return sorted(_rows(response.data), key=lambda row: int(row["rank"]))
 
     def _route_or_accept(
         self,
@@ -660,6 +669,10 @@ class MatchingService:
                 .execute()
             )
         except APIError as exc:
+            if exc.code == "23505":
+                existing = _decision_for_line(client, UUID(str(line["id"])))
+                if existing is not None:
+                    return existing
             raise ServiceUnavailableError(details={"dependency": "database"}) from exc
         decision = _one_row(response.data, resource="match_decision")
         enqueue_guardrail_evaluation(
@@ -715,6 +728,8 @@ class MatchingService:
                 .execute()
             )
         except APIError as exc:
+            if exc.code == "23505" and _open_task_for_line(client, UUID(str(line["id"]))):
+                return
             raise ServiceUnavailableError(details={"dependency": "database"}) from exc
         task = _one_row(response.data, resource="match_task")
         if bearer_token is not None:
