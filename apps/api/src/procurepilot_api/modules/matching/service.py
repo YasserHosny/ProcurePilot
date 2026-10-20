@@ -581,6 +581,21 @@ class MatchingService:
                     .execute()
                 )
             except APIError as exc:
+                if exc.code == "23505":
+                    # A concurrent preparation may have inserted this candidate first.
+                    existing = next(
+                        (
+                            row
+                            for row in _candidate_rows(client, UUID(str(line["id"])))
+                            if str(row["candidate_workspace_product_id"])
+                            == str(candidate["workspace_product_id"])
+                            and row["scoring_version"] == SCORING_VERSION
+                        ),
+                        None,
+                    )
+                    if existing is not None:
+                        persisted.append(existing)
+                        continue
                 raise ServiceUnavailableError(details={"dependency": "database"}) from exc
             persisted.extend(_rows(response.data))
         return persisted
@@ -660,6 +675,10 @@ class MatchingService:
                 .execute()
             )
         except APIError as exc:
+            if exc.code == "23505":
+                existing = _decision_for_line(client, UUID(str(line["id"])))
+                if existing is not None:
+                    return existing
             raise ServiceUnavailableError(details={"dependency": "database"}) from exc
         decision = _one_row(response.data, resource="match_decision")
         enqueue_guardrail_evaluation(
@@ -715,6 +734,8 @@ class MatchingService:
                 .execute()
             )
         except APIError as exc:
+            if exc.code == "23505" and _open_task_for_line(client, UUID(str(line["id"]))):
+                return
             raise ServiceUnavailableError(details={"dependency": "database"}) from exc
         task = _one_row(response.data, resource="match_task")
         if bearer_token is not None:
