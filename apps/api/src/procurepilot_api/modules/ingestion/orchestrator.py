@@ -383,9 +383,10 @@ def _evaluate_guardrails_for_rfq(
     as the guardrail's own creator (an owner). Never creates, submits, or transmits anything
     beyond that draft; never bypasses the approval queue."""
     advisory_key = f"{tenant_id}:{rfq_id}"
-    with conn.cursor() as cur:
-        cur.execute("select pg_advisory_lock(hashtextextended(%s, 0))", (advisory_key,))
+    committed = False
     try:
+        with conn.cursor() as cur:
+            cur.execute("select pg_advisory_xact_lock(hashtextextended(%s, 0))", (advisory_key,))
         with conn.cursor(row_factory=dict_row) as cur:
             cur.execute("set local role service_role")
             snapshot = compute_guardrail_evaluation(cur, tenant_id=tenant_id, rfq_id=rfq_id)
@@ -404,10 +405,14 @@ def _evaluate_guardrails_for_rfq(
             guardrail, decision = fires[0]
             winning_response_id = decision.winning_response_id
 
-            # The session-level advisory lock acquired before any reads serializes evaluators for
-            # this tenant/RFQ while prepare_request() uses its own connection to update the RFQ.
-            # Keep it until the event and audit rows are committed, so a waiting evaluator cannot
-            # observe an incomplete firing. The outer finally always releases it, including returns.
+            # The transaction-level advisory lock acquired before any reads serializes evaluators
+            # for this tenant/RFQ while prepare_request() uses its own connection to update the RFQ.
+            # Being transaction-scoped (pg_advisory_xact_lock), it holds across the evaluation,
+            # draft preparation, and the insertion of event and audit rows. When conn.commit()
+            # finishes the transaction, the lock is atomically released by PostgreSQL. If the
+            # evaluation returns early or raises, the outer finally rolls back the transaction,
+            # releasing the lock immediately without leaking a session-level lock under a
+            # transaction-mode pooler (e.g. Supavisor).
             cur.execute(
                 "select 1 from auto_preparation_event where tenant_id = %s and guardrail_id = %s "
                 "and rfq_response_id = %s",
@@ -510,6 +515,7 @@ def _evaluate_guardrails_for_rfq(
                 ),
             )
             conn.commit()
+            committed = True
             # Finding 38a: tell the guardrail's owner, after the draft is committed. A failed
             # email never undoes the preparation; the request page and list mark it either way.
             if notice is not None:
@@ -522,11 +528,13 @@ def _evaluate_guardrails_for_rfq(
                     purchase_request_id=result.purchase_request_id,
                 )
     finally:
-        # A failed SQL statement leaves the transaction unusable, so rollback first. This does
-        # not release a session-level advisory lock; the explicit unlock below is still needed.
-        conn.rollback()
-        with conn.cursor() as cur:
-            cur.execute("select pg_advisory_unlock(hashtextextended(%s, 0))", (advisory_key,))
+        if not committed:
+            try:
+                conn.rollback()
+            except Exception:
+                logger.exception(
+                    "Failed to rollback guardrail evaluation transaction for RFQ %s", rfq_id
+                )
 
 
 def _validate_content(settings: Settings, email_data: InboundEmail) -> str | None:
