@@ -53,7 +53,7 @@ plus-address send-as aliases, 30 products, inbound email address.
 | 3.4 | Edit on the music (Antalya Beaches) with the rendered outro at 2:50.25 → 3-minute cut | Orch | ✅ 2026-10-19: 3-minute Arabic cut rendered (music, cards, outro at 2:50.25); waiting for the owner’s review (3.7) | 3.1–3.3 |
 | 3.5 | 60-second vertical cut (outro at 0:51.34) | Orch | ✅ 2026-10-19: 60-second 9:16 cut (track 2:00→, fast outro at 0:51.34, ends 0:59.85; phone scenes full height, web scenes cropped) | 3.4 |
 | 3.6 | English versions (swap text cards; English outros already rendered) | Orch | ✅ 2026-10-19: English 3:00 and 60 s cuts: same footage, English cards (LTR) and the English outros | 3.4, 3.5 |
-| 3.7 | User review of the recorded run, then of the cuts | User | — | 3.3, 3.6 |
+| 3.7 | User review of the recorded run, then of the cuts | User | ⏳ in progress: owner comments on v2.1 (2026-10-20) applied in v2.2; still to do — pick the opening (animated or clip) and a final look at the cuts | 3.3, 3.6 |
 | ✅ | Logo sting, end cards, music, sound cues, Arabic + English outros, founder title | — | done (#79, #80) | — |
 
 ## Not blocking the video
@@ -86,3 +86,5 @@ plus-address send-as aliases, 30 products, inbound email address.
 | 2026-10-19 | Round-4 dry run completed: phone approval, PO-000005 (EGP 25,600, الأمانة), outcome recorded from the PO, savings 600 EGP against the last PO price (rice +180, onions +100, oil +320). Stage 2 is ready for recording. |
 | 2026-10-19 (evening) | Recording done on hosted (low-stock report, RFQ, WhatsApp-photo quote, guardrail draft 25,140 EGP, phone approval, PO-000006, savings 460; ledger 1,060 verified). 3-minute Arabic cut rendered and sent for review. Findings 44 (web signed out after ~8 h idle), 45 (no low-stock entry on phone home), 46 (raw «1.000000» quantity) raised as fix cards. |
 | 2026-10-19 (night) | Comparison beat swapped to Smart Compare (recommended الأمانة, 12,880 vs 13,080 landed). 60-second vertical cut and both English cuts rendered; all four sent to the owner for review (3.7). Loudness −14.6 / −13.8 LUFS, peaks ≤ −2.2 dBFS. |
+| 2026-10-19 (late) | Codex reviewed the plan; v2.0 (email masked, captions over footage, faster start) and v2.1 (phone low-stock re-recorded after #195, fuller vertical crops) built; all versions committed under `cuts/` with v1 rebuilt with the email masked at source (#194, #197–#199). |
+| 2026-10-20 | Owner review of v2.1: English cuts showed the Arabic UI, the opening did not show the problem, loading shown too long, cropped click targets. v2.2 fixes those with two openings (animation / recorded clip) (#199); round 5 recorded with the English interface for English-UI cuts (#201, #202); Arabic editorial collage cuts from a cloud session reviewed, audio clipping fixed, merged (#200). Product fixes from round 5: findings 47–49 (#203, #206, #207). Next: owner picks the opening and gives the cuts a final look (3.7). |
