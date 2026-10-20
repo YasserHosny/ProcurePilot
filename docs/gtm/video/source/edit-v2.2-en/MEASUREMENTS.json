@@ -1,0 +1,26 @@
+{
+  "procurepilot-demo-ar-16x9.mp4": {
+    "sha256": "c6c4b62c11e9598acbf972b67a953ffca19399cad59a4be04098dd566853c292",
+    "duration": "00:01:56.95",
+    "integrated_lufs": -13.8,
+    "true_peak_db": -1.3
+  },
+  "procurepilot-demo-en-16x9.mp4": {
+    "sha256": "e28e941419004d025bdcbfaf4aa545bbd5b9dca849004364d0cac7cf9fe3fc46",
+    "duration": "00:01:56.95",
+    "integrated_lufs": -13.8,
+    "true_peak_db": -1.3
+  },
+  "procurepilot-demo-ar-9x16-60s.mp4": {
+    "sha256": "d18defbe30c7b10b6275bf57899c05042484870c7b130b16196d9a05f7772db1",
+    "duration": "00:00:51.81",
+    "integrated_lufs": -14.2,
+    "true_peak_db": -2.8
+  },
+  "procurepilot-demo-en-9x16-60s.mp4": {
+    "sha256": "ee5d47fa3c41dcedfe4ebbdb7c35f7711c9ffb337e33d9bfd1c721f2fb7e2931",
+    "duration": "00:00:51.81",
+    "integrated_lufs": -14.2,
+    "true_peak_db": -2.8
+  }
+}
