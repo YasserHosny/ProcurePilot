@@ -73,6 +73,10 @@ Lookups review (regions, currencies, tax models): [`lookups-review-2026-10-15.md
 | 44 | The web app signed the owner out after ~8 h idle despite the #168 session refresh: a timer frozen during sleep never fired, and a refresh 401 cleared storage before a rotated token could be retried | sign-in again mid-recording | fixed — #193 merged 2026-10-19 (refresh on wake and on a late timer, one retry with a rotated token; a request is never replayed under another workspace) |
 | 45 | The phone home screen has no way into low-stock reporting (the screen exists at `/lowStock`) | the low-stock scene had to open the route directly | fixed — #195 merged 2026-10-19 (“Report low stock” for owner, buyer, branch manager) |
 | 46 | Phone low-stock screens show raw units ("litre") and the count as «1.000000» | on camera in the phone low-stock scene | fixed — #195 merged 2026-10-19 (localised units, count formatted per locale); the recorded clip predates it |
+| 47 | Guardrail evaluation leaks its per-RFQ advisory lock behind the transaction pooler: it takes a session-level `pg_advisory_lock`, rolls back, then unlocks in a new transaction that can land on another server connection. The lock stays on an idle pooled backend and every later evaluation for that RFQ blocks (the email-ingestion worker with it) until the pooler recycles the backend | guardrail draft ~6 minutes late in round 5; inbound email ingestion stalled meanwhile | fix in progress (round 5, 2026-10-20) |
+| 48 | Product matching for an authorised quote is started by the review page after authorisation (`initializeMatching`). Leaving the page before that call completes leaves the quote's lines unmatched with no task in the match queue, so the RFQ's guardrail never fires; the only way back is the page's «Prepare Product Matching» button | a supplier reply silently blocks the guardrail | not yet raised (round 5) |
+| 49 | The English date inputs show an `mm/dd/yyyy` placeholder (quotation inbox filters), but the RFQ needed-by date rejects `10/22/2026` and accepts `22/10/2026` | confusing in the English UI | not yet raised (round 5) |
+| 50 | The kiosk web tab signed out after ~6 h idle during round 5. That tab was loaded before #193 deployed, so it likely ran the old bundle; to re-check with a freshly loaded tab | sign-in needed mid-round | to verify |
 
 Round 1 (2026-10-16 → 18): both quotes authorized, 10 matches confirmed, Smart Compare, request prepared at EGP 56,425 per pack, submitted, approved, **PO-000001 created** and the basket split run (saves EGP 450). The earlier request `6f460785-…` (wrong estimate 6,135.58, approved before fix 18, no PO) was set to `withdrawn` directly in the database on 2026-10-18 so it no longer counts against the Maadi budget (the app has no way to do this — finding 30); do not reuse it. Step by step: [`round-1/README.md`](round-1/README.md).
 
@@ -224,6 +228,8 @@ Round 1 step by step, with screenshots: [`round-1/README.md`](round-1/README.md)
 
 Rounds 2 and 3 step by step: [`round-2-3/README.md`](round-2-3/README.md).
 Round 4, the dry run of the recorded round (WhatsApp-photo quote, guardrail): [`round-4/README.md`](round-4/README.md).
+
+Round 5, the same flow recorded with the English interface for the English video cuts (PO-000007, EGP 200 saved, ledger EGP 1,260): [`round-5/README.md`](round-5/README.md).
 
 The workspace and both accounts already exist — do **not** create another tenant, and PO-000001 to
 PO-000004 exist — do not repeat rounds 1–3's requests or POs. Remaining work, with owners and status, is tracked in
