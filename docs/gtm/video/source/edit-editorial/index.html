@@ -1,0 +1,31 @@
+<!doctype html><html><head><meta charset="utf-8">
+<style>
+@font-face{font-family:'Readex Pro';src:url(fonts/rp1.ttf);font-weight:300}
+@font-face{font-family:'Readex Pro';src:url(fonts/rp2.ttf);font-weight:400}
+@font-face{font-family:'Readex Pro';src:url(fonts/rp3.ttf);font-weight:500}
+@font-face{font-family:'Readex Pro';src:url(fonts/rp4.ttf);font-weight:600}
+@font-face{font-family:'Readex Pro';src:url(fonts/rp5.ttf);font-weight:700}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{background:#ECE8E1;overflow:hidden}
+#stage{position:relative;overflow:hidden;background:#ECE8E1;font-family:'Readex Pro',sans-serif}
+.el{position:absolute;left:0;top:0}
+.txt{white-space:nowrap;overflow:hidden;padding:.02em .04em .06em;font-feature-settings:"kern"}
+.txt .in{display:block}
+.img{overflow:hidden}
+.img img{width:100%;height:100%;object-fit:cover;display:block}
+.plate{overflow:hidden;background:#fff}
+.plate img{position:absolute;left:0;top:0;filter:grayscale(1) contrast(1.07) brightness(1.01)}
+.platefx{position:absolute;inset:0;background:rgba(232,220,200,.13);mix-blend-mode:multiply}
+.grain{position:absolute;inset:0;z-index:9999;pointer-events:none;mix-blend-mode:soft-light;opacity:.55;background-size:1920px 1920px}
+svg#svgdefs{position:absolute;width:0;height:0}
+</style></head><body>
+<svg id="svgdefs"><defs id="defs"></defs></svg>
+<div id="stage"></div>
+<script src="data.js"></script>
+<script>
+const FMT=(location.hash||'#h').slice(1); const st=document.getElementById('stage');
+if(FMT==='v'){st.style.width='1080px';st.style.height='1920px';}else{st.style.width='1920px';st.style.height='1080px';}
+</script>
+<script src="engine.js"></script>
+<script>document.write('<script src="spec_'+FMT+'.js"><\/script>');</script>
+</body></html>
