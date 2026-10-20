@@ -1,8 +1,10 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
-import { toIsoDate } from '../../../core/format/iso-date';
+import { parseIsoDateLocal, toIsoDate, toIsoDateOrNull } from '../../../core/format/iso-date';
+import { provideAppDateAdapter } from '../../../core/i18n/date-adapter';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
+import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
@@ -24,10 +26,12 @@ import {
 @Component({
   selector: 'app-reorder-queue',
   standalone: true,
+  providers: [provideAppDateAdapter()],
   imports: [
     FormsModule,
     MatButtonModule,
     MatCardModule,
+    MatDatepickerModule,
     MatFormFieldModule,
     MatIconModule,
     MatInputModule,
@@ -55,7 +59,12 @@ export class ReorderQueueComponent implements OnInit {
   readonly errorMessage = signal<string | null>(null);
   readonly selectedBranchId = signal('');
   readonly requiredByDate = signal(defaultRequiredByDate());
+  readonly requiredByDateModel = computed(() => parseIsoDateLocal(this.requiredByDate()));
   readonly isWriter = computed(() => this.session.hasRole('owner', 'buyer'));
+
+  onRequiredByDateChange(date: Date | null): void {
+    this.requiredByDate.set(toIsoDateOrNull(date) ?? '');
+  }
 
   ngOnInit(): void {
     this.loadBranches();

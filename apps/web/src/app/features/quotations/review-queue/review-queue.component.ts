@@ -5,6 +5,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatChipsModule } from '@angular/material/chips';
+import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
@@ -22,7 +23,9 @@ import type { ApiError, ReviewTask, ReviewTaskPriority, ReviewTaskStatus } from 
 import { RoleDirective } from '../../../core/auth/role.directive';
 import { SessionService } from '../../../core/auth/session.service';
 import { FormatDatePipe } from '../../../core/format/date.pipe';
+import { parseIsoDateLocal, toIsoDateOrNull } from '../../../core/format/iso-date';
 import { FormatMoneyPipe } from '../../../core/format/money.pipe';
+import { provideAppDateAdapter } from '../../../core/i18n/date-adapter';
 
 type ReviewTaskSortBy = 'created_at' | 'stated_total' | 'priority' | 'status';
 type ReviewTaskSortOrder = 'asc' | 'desc';
@@ -30,6 +33,7 @@ type ReviewTaskSortOrder = 'asc' | 'desc';
 @Component({
   selector: 'app-review-queue',
   standalone: true,
+  providers: [provideAppDateAdapter()],
   imports: [
     FormsModule,
     RouterLink,
@@ -40,6 +44,7 @@ type ReviewTaskSortOrder = 'asc' | 'desc';
     MatIconModule,
     MatInputModule,
     MatChipsModule,
+    MatDatepickerModule,
     MatFormFieldModule,
     MatMenuModule,
     MatSelectModule,
@@ -69,6 +74,8 @@ export class ReviewQueueComponent implements OnInit {
   readonly searchQuery = signal<string>('');
   readonly dateFrom = signal<string | null>(null);
   readonly dateTo = signal<string | null>(null);
+  readonly dateFromModel = computed(() => parseIsoDateLocal(this.dateFrom()));
+  readonly dateToModel = computed(() => parseIsoDateLocal(this.dateTo()));
   readonly sortBy = signal<ReviewTaskSortBy>('created_at');
   readonly sortOrder = signal<ReviewTaskSortOrder>('desc');
   readonly errorMessage = signal<string | null>(null);
@@ -217,14 +224,20 @@ export class ReviewQueueComponent implements OnInit {
     }, 300);
   }
 
-  onDateFromChange(value: string | null): void {
-    this.dateFrom.set(value || null);
-    this.loadTasks();
+  onDateFromChange(value: Date | string | null): void {
+    const next = toIsoDateOrNull(value);
+    if (this.dateFrom() !== next) {
+      this.dateFrom.set(next);
+      this.loadTasks();
+    }
   }
 
-  onDateToChange(value: string | null): void {
-    this.dateTo.set(value || null);
-    this.loadTasks();
+  onDateToChange(value: Date | string | null): void {
+    const next = toIsoDateOrNull(value);
+    if (this.dateTo() !== next) {
+      this.dateTo.set(next);
+      this.loadTasks();
+    }
   }
 
   onSortChange(sort: Sort): void {

@@ -22,6 +22,7 @@ import {
   MatDialogModule,
   MatDialogRef,
 } from '@angular/material/dialog';
+import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
@@ -43,17 +44,21 @@ import type {
   Member,
 } from '../../../core/api/models';
 import { SessionService } from '../../../core/auth/session.service';
+import { toIsoDateOrNull } from '../../../core/format/iso-date';
+import { provideAppDateAdapter } from '../../../core/i18n/date-adapter';
 import { ApprovalsApiService } from '../../approvals/approvals-api';
 
 const DELEGATIONS_I18N = 'approvals.delegations';
 
 function dateRangeValidator(group: AbstractControl): ValidationErrors | null {
-  const startsOn = group.get('starts_on')?.value as string | null | undefined;
-  const endsOn = group.get('ends_on')?.value as string | null | undefined;
-  if (!startsOn || !endsOn) {
+  const startsOn = group.get('starts_on')?.value as Date | string | null | undefined;
+  const endsOn = group.get('ends_on')?.value as Date | string | null | undefined;
+  const startsIso = toIsoDateOrNull(startsOn);
+  const endsIso = toIsoDateOrNull(endsOn);
+  if (!startsIso || !endsIso) {
     return null;
   }
-  if (endsOn < startsOn) {
+  if (endsIso < startsIso) {
     return { endsOnBeforeStartsOn: true };
   }
   return null;
@@ -62,6 +67,7 @@ function dateRangeValidator(group: AbstractControl): ValidationErrors | null {
 @Component({
   selector: 'app-delegation-list',
   standalone: true,
+  providers: [provideAppDateAdapter()],
   imports: [
     ReactiveFormsModule,
     MatCardModule,
@@ -71,6 +77,7 @@ function dateRangeValidator(group: AbstractControl): ValidationErrors | null {
     MatProgressSpinnerModule,
     MatSnackBarModule,
     MatDialogModule,
+    MatDatepickerModule,
     MatFormFieldModule,
     MatInputModule,
     MatSelectModule,
@@ -139,8 +146,8 @@ export class DelegationListComponent implements OnInit {
   readonly form = this.fb.group(
     {
       delegate_membership_id: this.fb.nonNullable.control('', [Validators.required]),
-      starts_on: this.fb.nonNullable.control('', [Validators.required]),
-      ends_on: this.fb.nonNullable.control('', [Validators.required]),
+      starts_on: this.fb.control<Date | string | null>(null, [Validators.required]),
+      ends_on: this.fb.control<Date | string | null>(null, [Validators.required]),
     },
     { validators: [dateRangeValidator] },
   );
@@ -187,8 +194,8 @@ export class DelegationListComponent implements OnInit {
 
     this.form.reset({
       delegate_membership_id: '',
-      starts_on: '',
-      ends_on: '',
+      starts_on: null,
+      ends_on: null,
     });
 
     this.delegationDialogRef = this.dialog.open(this.delegationDialogTemplate, {
@@ -214,8 +221,8 @@ export class DelegationListComponent implements OnInit {
     const raw = this.form.getRawValue();
     const payload: ApprovalDelegationCreate = {
       delegate_membership_id: raw.delegate_membership_id.trim(),
-      starts_on: raw.starts_on,
-      ends_on: raw.ends_on,
+      starts_on: toIsoDateOrNull(raw.starts_on) ?? '',
+      ends_on: toIsoDateOrNull(raw.ends_on) ?? '',
     };
 
     this.approvalsApi.createApprovalDelegation(payload).subscribe({

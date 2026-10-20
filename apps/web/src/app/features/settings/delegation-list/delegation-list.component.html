@@ -151,10 +151,12 @@
         <mat-label>{{ 'approvals.delegations.form.startsOnLabel' | translate }}</mat-label>
         <input
           matInput
-          type="date"
+          [matDatepicker]="startsOnPicker"
           formControlName="starts_on"
           required
         />
+        <mat-datepicker-toggle matIconSuffix [for]="startsOnPicker"></mat-datepicker-toggle>
+        <mat-datepicker #startsOnPicker></mat-datepicker>
         @if (form.controls.starts_on.hasError('required')) {
           <mat-error>{{ 'approvals.delegations.form.startsOnRequired' | translate }}</mat-error>
         }
@@ -165,10 +167,12 @@
         <mat-label>{{ 'approvals.delegations.form.endsOnLabel' | translate }}</mat-label>
         <input
           matInput
-          type="date"
+          [matDatepicker]="endsOnPicker"
           formControlName="ends_on"
           required
         />
+        <mat-datepicker-toggle matIconSuffix [for]="endsOnPicker"></mat-datepicker-toggle>
+        <mat-datepicker #endsOnPicker></mat-datepicker>
         @if (form.controls.ends_on.hasError('required')) {
           <mat-error>{{ 'approvals.delegations.form.endsOnRequired' | translate }}</mat-error>
         } @else if (form.hasError('endsOnBeforeStartsOn')) {

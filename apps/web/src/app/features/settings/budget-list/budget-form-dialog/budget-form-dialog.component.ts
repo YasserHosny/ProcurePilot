@@ -2,6 +2,7 @@ import { HttpErrorResponse } from "@angular/common/http";
 import { Component, inject, signal } from "@angular/core";
 import { AbstractControl, FormBuilder, ReactiveFormsModule, Validators } from "@angular/forms";
 import { MatButtonModule } from "@angular/material/button";
+import { MatDatepickerModule } from "@angular/material/datepicker";
 import { MatDialogModule, MatDialogRef } from "@angular/material/dialog";
 import { MatFormFieldModule } from "@angular/material/form-field";
 import { MatIconModule } from "@angular/material/icon";
@@ -27,6 +28,8 @@ import type {
 } from "../../../../core/api/models";
 import { ApiService } from "../../../../core/api/api.service";
 import { SessionService } from "../../../../core/auth/session.service";
+import { toIsoDateOrNull } from "../../../../core/format/iso-date";
+import { provideAppDateAdapter } from "../../../../core/i18n/date-adapter";
 import { I18nService } from "../../../../core/i18n/i18n.service";
 import { OrganisationApiService } from "../../organisation-api";
 
@@ -42,9 +45,11 @@ const SCOPES: readonly BudgetScope[] = ["organisation", "branch", "cost_centre"]
 @Component({
   selector: "app-budget-form-dialog",
   standalone: true,
+  providers: [provideAppDateAdapter()],
   imports: [
     ReactiveFormsModule,
     MatDialogModule,
+    MatDatepickerModule,
     MatFormFieldModule,
     MatInputModule,
     MatSelectModule,
@@ -91,7 +96,7 @@ export class BudgetFormDialogComponent {
       [Validators.required],
     ),
     period: this.fb.control<BudgetPeriod | null>(null, [Validators.required]),
-    period_start: this.fb.nonNullable.control("", [Validators.required]),
+    period_start: this.fb.control<Date | string | null>(null, [Validators.required]),
     scope: this.fb.control<BudgetScope | null>(null, [Validators.required]),
     branch_id: this.fb.control<string | null>(null),
     cost_centre_id: this.fb.control<string | null>(null),
@@ -132,7 +137,7 @@ export class BudgetFormDialogComponent {
       amount: raw.amount.trim(),
       currency: raw.currency,
       period,
-      period_start: raw.period_start,
+      period_start: toIsoDateOrNull(raw.period_start) ?? '',
       scope,
       branch_id: scope === "branch" ? raw.branch_id : null,
       cost_centre_id: scope === "cost_centre" ? raw.cost_centre_id : null,

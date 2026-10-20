@@ -141,4 +141,82 @@ describe('OrderDetailComponent', () => {
     expect(component.canRecordOutcome('draft')).toBeFalse();
     expect(component.canRecordOutcome('cancelled')).toBeFalse();
   });
+
+  it('accepts typed day-first confirmation date, shows day-first format, and produces ISO timestamp in payload', async () => {
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    component.confirmationOpen.set(true);
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    const input = (fixture.nativeElement as HTMLElement).querySelector(
+      'input[name="confirmationDate"]'
+    ) as HTMLInputElement;
+    expect(input).toBeTruthy();
+
+    input.value = '';
+    for (const char of '22/10/2026') {
+      input.value += char;
+      input.dispatchEvent(new Event('input'));
+      fixture.detectChanges();
+    }
+    input.dispatchEvent(new Event('blur'));
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    expect(component.confirmationDate()).toBe('2026-10-22');
+    expect(input.value).toBe('22/10/2026');
+
+    component.confirmationReference.set('CONF-999');
+    api.recordConfirmation.and.returnValue(of(component.evidence()!));
+
+    component.recordConfirmation();
+
+    expect(api.recordConfirmation).toHaveBeenCalledWith(
+      'order-1',
+      jasmine.objectContaining({
+        supplier_reference: 'CONF-999',
+        confirmed_at: '2026-10-22T12:00:00Z',
+      }),
+    );
+  });
+
+  it('accepts typed day-first receipt date, shows day-first format, and produces ISO date in payload', async () => {
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    component.receiptOpen.set(true);
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    const input = (fixture.nativeElement as HTMLElement).querySelector(
+      'input[name="receiptDate"]'
+    ) as HTMLInputElement;
+    expect(input).toBeTruthy();
+
+    input.value = '';
+    for (const char of '25/10/2026') {
+      input.value += char;
+      input.dispatchEvent(new Event('input'));
+      fixture.detectChanges();
+    }
+    input.dispatchEvent(new Event('blur'));
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    expect(component.receiptDate()).toBe('2026-10-25');
+    expect(input.value).toBe('25/10/2026');
+
+    component.receiptReference.set('REC-888');
+    api.recordReceipt.and.returnValue(of(component.evidence()!));
+
+    component.recordReceipt();
+
+    expect(api.recordReceipt).toHaveBeenCalledWith(
+      'order-1',
+      jasmine.objectContaining({
+        receipt_reference: 'REC-888',
+        receipt_date: '2026-10-25',
+      }),
+    );
+  });
 });

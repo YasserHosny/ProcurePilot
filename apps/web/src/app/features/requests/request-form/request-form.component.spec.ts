@@ -12,6 +12,7 @@ import type { BranchList, Member, PurchaseRequest } from '../../../core/api/mode
 import { OrganisationApiService } from '../../settings/organisation-api';
 import { RequestsApiService } from '../requests-api';
 import { RequestFormComponent } from './request-form.component';
+import { provideAppDateAdapter } from '../../../core/i18n/date-adapter';
 
 const mockRequest: PurchaseRequest = {
   id: 'r1',
@@ -77,6 +78,7 @@ describe('RequestFormComponent — create mode (T017)', () => {
       .overrideComponent(RequestFormComponent, {
         set: {
           providers: [
+            provideAppDateAdapter(),
             { provide: MatSnackBar, useValue: snackBarSpy },
             { provide: Router, useValue: routerSpy },
           ],
@@ -262,6 +264,7 @@ describe('RequestFormComponent — edit mode (T017)', () => {
       .overrideComponent(RequestFormComponent, {
         set: {
           providers: [
+            provideAppDateAdapter(),
             { provide: MatSnackBar, useValue: snackBarSpy },
             { provide: Router, useValue: routerSpy },
           ],
@@ -293,7 +296,7 @@ describe('RequestFormComponent — edit mode (T017)', () => {
     expect(component.isEditMode()).toBeTrue();
     expect(component.form.controls.branch_id.value).toBe('b1');
     expect(component.form.controls.cost_centre_id.value).toBe('cc1');
-    expect(component.form.controls.required_by_date.value).toBe('2026-09-15');
+    expect(component.form.controls.required_by_date.value).toEqual(new Date(2026, 8, 15));
     expect(component.lines.length).toBe(1);
     expect(component.lines.at(0).controls.workspace_product_id.value).toBe('wp1');
     expect(component.products()[0]?.tenant_name).toBe('Nitrile Gloves');
@@ -336,6 +339,35 @@ describe('RequestFormComponent — edit mode (T017)', () => {
       required_by_date: '2026-10-01',
     }));
     expect(requestsApi.createRequest).not.toHaveBeenCalled();
+  });
+
+  it('accepts a typed day-first date, displays day-first format, and emits ISO date in payload', () => {
+    fixture.detectChanges();
+    const input = fixture.nativeElement.querySelector(
+      'input[formcontrolname="required_by_date"]'
+    ) as HTMLInputElement;
+    expect(input).toBeTruthy();
+
+    input.value = '';
+    for (const char of '22/10/2026') {
+      input.value += char;
+      input.dispatchEvent(new Event('input'));
+      fixture.detectChanges();
+    }
+    input.dispatchEvent(new Event('blur'));
+    fixture.detectChanges();
+
+    const val = component.form.controls.required_by_date.value;
+    expect(val instanceof Date).toBeTrue();
+    if (val instanceof Date) {
+      expect([val.getFullYear(), val.getMonth(), val.getDate()]).toEqual([2026, 9, 22]);
+    }
+    expect(input.value).toBe('22/10/2026');
+
+    component.saveDraft();
+    expect(requestsApi.updateRequest).toHaveBeenCalledWith('r1', jasmine.objectContaining({
+      required_by_date: '2026-10-22',
+    }));
   });
 
   it('should submit the request and navigate to the list', () => {

@@ -92,11 +92,25 @@
       </mat-form-field>
       <mat-form-field appearance="outline" class="filter-field date-field">
         <mat-label>{{ 'matching.queue.filters.dateFrom' | translate }}</mat-label>
-        <input matInput type="date" [ngModel]="dateFrom()" (ngModelChange)="onDateFromChange($event)" />
+        <input
+          matInput
+          [matDatepicker]="dateFromPicker"
+          [ngModel]="dateFromModel()"
+          (ngModelChange)="onDateFromChange($event)"
+        />
+        <mat-datepicker-toggle matIconSuffix [for]="dateFromPicker"></mat-datepicker-toggle>
+        <mat-datepicker #dateFromPicker></mat-datepicker>
       </mat-form-field>
       <mat-form-field appearance="outline" class="filter-field date-field">
         <mat-label>{{ 'matching.queue.filters.dateTo' | translate }}</mat-label>
-        <input matInput type="date" [ngModel]="dateTo()" (ngModelChange)="onDateToChange($event)" />
+        <input
+          matInput
+          [matDatepicker]="dateToPicker"
+          [ngModel]="dateToModel()"
+          (ngModelChange)="onDateToChange($event)"
+        />
+        <mat-datepicker-toggle matIconSuffix [for]="dateToPicker"></mat-datepicker-toggle>
+        <mat-datepicker #dateToPicker></mat-datepicker>
       </mat-form-field>
     </mat-card-content>
   </mat-card>

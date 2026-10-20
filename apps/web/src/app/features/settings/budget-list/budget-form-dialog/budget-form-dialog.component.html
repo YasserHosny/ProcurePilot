@@ -61,10 +61,12 @@
       <mat-label>{{ 'organisation.budgets.form.periodStartLabel' | translate }}</mat-label>
       <input
         matInput
-        type="date"
+        [matDatepicker]="periodStartPicker"
         formControlName="period_start"
         required
       />
+      <mat-datepicker-toggle matIconSuffix [for]="periodStartPicker"></mat-datepicker-toggle>
+      <mat-datepicker #periodStartPicker></mat-datepicker>
       @if (form.controls.period_start.hasError('required')) {
         <mat-error>{{ 'organisation.budgets.form.periodStartRequired' | translate }}</mat-error>
       }
