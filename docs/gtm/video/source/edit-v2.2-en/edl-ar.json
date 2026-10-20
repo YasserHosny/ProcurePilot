@@ -1,0 +1,365 @@
+[
+  {
+    "src": "stock",
+    "a": 0,
+    "b": 3,
+    "d": 3,
+    "cap": "open",
+    "crop": null,
+    "freeze": 0,
+    "mask": null
+  },
+  {
+    "src": "s0-phone-lowstock-v3",
+    "a": 1.5,
+    "b": 19.4,
+    "d": 7.5,
+    "cap": "low",
+    "crop": null,
+    "freeze": 0,
+    "mask": null
+  },
+  {
+    "src": "s0-phone-lowstock-v3",
+    "a": 21.3,
+    "b": 22.8,
+    "d": 3,
+    "cap": "low",
+    "crop": null,
+    "freeze": 1.5,
+    "mask": null
+  },
+  {
+    "src": "s1-rfq",
+    "a": 2.5,
+    "b": 5,
+    "d": 2.5,
+    "cap": "rfq",
+    "crop": null,
+    "freeze": 0,
+    "mask": null
+  },
+  {
+    "src": "s1-rfq",
+    "a": 6,
+    "b": 37.5,
+    "d": 12,
+    "cap": "rfq",
+    "crop": [
+      400,
+      100,
+      1000,
+      900
+    ],
+    "freeze": 0,
+    "mask": null
+  },
+  {
+    "src": "s1-rfq",
+    "a": 40.5,
+    "b": 41.65,
+    "d": 2.2,
+    "cap": "rfq",
+    "crop": [
+      400,
+      180,
+      1000,
+      900
+    ],
+    "freeze": 0,
+    "mask": null
+  },
+  {
+    "src": "s2-quote-photo",
+    "a": 2.5,
+    "b": 3.95,
+    "d": 1.5,
+    "cap": "photo",
+    "crop": null,
+    "freeze": 0,
+    "mask": null
+  },
+  {
+    "src": "s2b-photo-closeup",
+    "a": 4,
+    "b": 8,
+    "d": 4.5,
+    "cap": "photo",
+    "crop": [
+      240,
+      65,
+      1450,
+      1000
+    ],
+    "freeze": 1,
+    "mask": [
+      800,
+      110,
+      148,
+      108,
+      "white"
+    ]
+  },
+  {
+    "src": "s2b-photo-closeup",
+    "a": 10,
+    "b": 12,
+    "d": 4,
+    "cap": "fields",
+    "crop": [
+      240,
+      240,
+      720,
+      690
+    ],
+    "freeze": 2,
+    "mask": [
+      800,
+      110,
+      148,
+      108,
+      "white"
+    ]
+  },
+  {
+    "src": "s2b-photo-closeup",
+    "a": 18,
+    "b": 21,
+    "d": 4,
+    "cap": "lines",
+    "crop": [
+      240,
+      295,
+      720,
+      450
+    ],
+    "freeze": 1.5,
+    "mask": null
+  },
+  {
+    "src": "s2-quote-photo",
+    "a": 25.2,
+    "b": 26.7,
+    "d": 2.2,
+    "cap": "authorise",
+    "crop": [
+      240,
+      120,
+      1450,
+      900
+    ],
+    "freeze": 0,
+    "mask": null
+  },
+  {
+    "src": "s3c-smart-compare",
+    "a": 5.5,
+    "b": 11.5,
+    "d": 5,
+    "cap": "compare",
+    "crop": [
+      240,
+      100,
+      1450,
+      950
+    ],
+    "freeze": 0,
+    "mask": null
+  },
+  {
+    "src": "s3c-smart-compare",
+    "a": 12,
+    "b": 15,
+    "d": 5,
+    "cap": "prices",
+    "crop": [
+      250,
+      550,
+      1420,
+      480
+    ],
+    "freeze": 2,
+    "mask": null
+  },
+  {
+    "src": "s3-guardrail-draft",
+    "a": 9,
+    "b": 11,
+    "d": 4,
+    "cap": "draft",
+    "crop": [
+      430,
+      90,
+      815,
+      290
+    ],
+    "freeze": 2,
+    "mask": null
+  },
+  {
+    "src": "s3-guardrail-draft",
+    "a": 16,
+    "b": 27.2,
+    "d": 6,
+    "cap": "submit",
+    "crop": [
+      425,
+      90,
+      825,
+      920
+    ],
+    "freeze": 0,
+    "mask": null
+  },
+  {
+    "src": "s4-phone-approve",
+    "a": 9,
+    "b": 12.5,
+    "d": 4,
+    "cap": "approve",
+    "crop": [
+      0,
+      65,
+      390,
+      500
+    ],
+    "freeze": 0,
+    "mask": [
+      30,
+      231,
+      276,
+      25,
+      "0xfff7ff"
+    ]
+  },
+  {
+    "src": "s4-phone-approve",
+    "a": 12.5,
+    "b": 14.0,
+    "d": 2.5,
+    "cap": "approve_action",
+    "crop": [
+      0,
+      380,
+      390,
+      464
+    ],
+    "freeze": 0,
+    "mask": null
+  },
+  {
+    "src": "s4-phone-approve",
+    "a": 17.1,
+    "b": 18.6,
+    "d": 3.5,
+    "cap": "approved",
+    "crop": [
+      0,
+      380,
+      390,
+      464
+    ],
+    "freeze": 2.0,
+    "mask": null
+  },
+  {
+    "src": "s5-po-savings",
+    "a": 7.5,
+    "b": 17.5,
+    "d": 5,
+    "cap": "po",
+    "crop": [
+      350,
+      100,
+      1220,
+      900
+    ],
+    "freeze": 0,
+    "mask": null
+  },
+  {
+    "src": "s5-po-savings",
+    "a": 17.5,
+    "b": 18.5,
+    "d": 1.8,
+    "cap": "po",
+    "crop": [
+      350,
+      160,
+      1220,
+      900
+    ],
+    "freeze": 0,
+    "mask": null
+  },
+  {
+    "src": "s5-po-savings",
+    "a": 34,
+    "b": 37.8,
+    "d": 4.5,
+    "cap": "sent",
+    "crop": [
+      355,
+      80,
+      1220,
+      960
+    ],
+    "freeze": 1.5,
+    "mask": null
+  },
+  {
+    "src": "s5-po-savings",
+    "a": 40.5,
+    "b": 46.3,
+    "d": 4,
+    "cap": "outcome",
+    "crop": [
+      770,
+      120,
+      1110,
+      690
+    ],
+    "freeze": 0,
+    "mask": null
+  },
+  {
+    "src": "s5-po-savings",
+    "a": 50.5,
+    "b": 53,
+    "d": 4,
+    "cap": "outcome",
+    "crop": [
+      220,
+      235,
+      1370,
+      760
+    ],
+    "freeze": 2,
+    "mask": null
+  },
+  {
+    "src": "counter",
+    "a": 0,
+    "b": 1,
+    "d": 5,
+    "cap": null,
+    "crop": null,
+    "freeze": 0,
+    "mask": null
+  },
+  {
+    "src": "s6-savings-close",
+    "a": 9,
+    "b": 13,
+    "d": 6.5,
+    "cap": "ledger",
+    "crop": [
+      220,
+      170,
+      1230,
+      800
+    ],
+    "freeze": 2.5,
+    "mask": null
+  }
+]
