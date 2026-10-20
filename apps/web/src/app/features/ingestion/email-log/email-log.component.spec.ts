@@ -353,6 +353,31 @@ describe('EmailLogComponent', () => {
       expect(component.logs().length).toBe(1);
     });
 
+    it('accepts a typed day-first date, shows day-first format, and produces ISO date in filter request', () => {
+      const inputs = (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLInputElement>('.filter-field input[matinput]');
+      // inputs[0] is fromDomain, inputs[1] is dateFrom, inputs[2] is dateTo
+      expect(inputs.length).toBe(3);
+      const dateFromInput = inputs[1];
+
+      dateFromInput.value = '';
+      for (const char of '22/10/2026') {
+        dateFromInput.value += char;
+        dateFromInput.dispatchEvent(new Event('input'));
+        fixture.detectChanges();
+      }
+      dateFromInput.dispatchEvent(new Event('blur'));
+      fixture.detectChanges();
+
+      expect(component.dateFrom()).toBe('2026-10-22');
+      expect(dateFromInput.value).toBe('22/10/2026');
+
+      const req = httpTestingController.expectOne(
+        '/api/v1/ingestion/emails?limit=50&date_from=2026-10-22'
+      );
+      expect(req.request.method).toBe('GET');
+      req.flush({ items: [], next_cursor: null });
+    });
+
     it('should reset all filters and reload logs', () => {
       component.statusFilter.set('failed');
       component.fromDomain.set('unknown-vendor.net');

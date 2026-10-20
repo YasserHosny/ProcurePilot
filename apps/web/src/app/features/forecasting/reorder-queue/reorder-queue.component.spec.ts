@@ -156,4 +156,33 @@ describe('ReorderQueueComponent (R4.0)', () => {
     expect(component.proposals()[0].status).toBe('prepared');
     expect(component.proposals()[0].purchase_request_id).toBe('request-1');
   });
+
+  it('accepts a typed day-first date, shows day-first format, and emits ISO date in outgoing request', () => {
+    fixture.detectChanges();
+    const input = fixture.nativeElement.querySelector(
+      'input[matinput]'
+    ) as HTMLInputElement;
+    expect(input).toBeTruthy();
+
+    input.value = '';
+    for (const char of '22/10/2026') {
+      input.value += char;
+      input.dispatchEvent(new Event('input'));
+      fixture.detectChanges();
+    }
+    input.dispatchEvent(new Event('blur'));
+    fixture.detectChanges();
+
+    expect(component.requiredByDate()).toBe('2026-10-22');
+    expect(input.value).toBe('22/10/2026');
+
+    component.prepareRequest(proposal);
+    expect(forecastingApi.prepareRequest).toHaveBeenCalledWith(
+      'proposal-1',
+      jasmine.objectContaining({
+        branch_id: 'branch-1',
+        required_by_date: '2026-10-22',
+      }),
+    );
+  });
 });

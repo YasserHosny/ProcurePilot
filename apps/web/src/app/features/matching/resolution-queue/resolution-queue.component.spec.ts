@@ -376,6 +376,29 @@ describe('ResolutionQueueComponent', () => {
     expect(component.hasActiveFilters()).toBeFalse();
   });
 
+  it('accepts a typed day-first date, shows day-first format, and produces ISO date in filter query', () => {
+    const inputs = (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLInputElement>('.date-field input[matinput]');
+    expect(inputs.length).toBe(2);
+    const dateFromInput = inputs[0];
+
+    dateFromInput.value = '';
+    for (const char of '22/10/2026') {
+      dateFromInput.value += char;
+      dateFromInput.dispatchEvent(new Event('input'));
+      fixture.detectChanges();
+    }
+    dateFromInput.dispatchEvent(new Event('blur'));
+    fixture.detectChanges();
+
+    expect(component.dateFrom()).toBe('2026-10-22');
+    expect(dateFromInput.value).toBe('22/10/2026');
+    expect(apiService.getMatchTasks).toHaveBeenCalledWith(
+      jasmine.objectContaining({
+        date_from: '2026-10-22',
+      }),
+    );
+  });
+
   it('should calculate relative age correctly', () => {
     const now = new Date();
     expect(component.ageLabel(now.toISOString())).toBe('just now');

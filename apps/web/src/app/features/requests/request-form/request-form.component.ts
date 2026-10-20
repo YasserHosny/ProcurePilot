@@ -19,6 +19,7 @@ import { catchError, distinctUntilChanged, finalize, switchMap, tap } from 'rxjs
 import { ApiService } from '../../../core/api/api.service';
 import { FormatDatePipe } from '../../../core/format/date.pipe';
 import { FormatService } from '../../../core/format/format.service';
+import { parseIsoDateLocal, toIsoDateOrNull } from '../../../core/format/iso-date';
 import { trimDecimal } from '../../../core/format/trim-decimal';
 import type {
   ApiError,
@@ -120,10 +121,7 @@ export class RequestFormComponent implements OnInit {
   readonly form = new FormGroup({
     branch_id: new FormControl<string>('', { nonNullable: true, validators: [Validators.required] }),
     cost_centre_id: new FormControl<string>('', { nonNullable: true }),
-    required_by_date: new FormControl<string>('', {
-      nonNullable: true,
-      validators: [Validators.required],
-    }),
+    required_by_date: new FormControl<Date | string | null>(null, [Validators.required]),
     lines: new FormArray<FormGroup<LineFormGroup>>([]),
   });
 
@@ -322,7 +320,7 @@ export class RequestFormComponent implements OnInit {
     return {
       branch_id: value.branch_id,
       cost_centre_id: value.cost_centre_id || null,
-      required_by_date: value.required_by_date,
+      required_by_date: toIsoDateOrNull(value.required_by_date) ?? '',
       lines: value.lines.map((l) => ({
         workspace_product_id: l.workspace_product_id,
         // The API contract carries quantity as a decimal string (monetary-rule style), while
@@ -380,7 +378,7 @@ export class RequestFormComponent implements OnInit {
         this.form.patchValue({
           branch_id: req.branch_id,
           cost_centre_id: req.cost_centre_id ?? '',
-          required_by_date: req.required_by_date,
+          required_by_date: parseIsoDateLocal(req.required_by_date),
         });
 
         const isReadOnly = req.status !== 'draft';

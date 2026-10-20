@@ -74,7 +74,26 @@
       @if (confirmationOpen()) {
         <form class="evidence-form" (ngSubmit)="recordConfirmation()">
           <h3>{{ 'orders.detail.confirmationFormTitle' | translate }}</h3>
-          <div class="form-grid"><mat-form-field appearance="outline"><mat-label>{{ 'orders.detail.reference' | translate }}</mat-label><input matInput required [ngModel]="confirmationReference()" (ngModelChange)="confirmationReference.set($event)" name="confirmationReference" /></mat-form-field><mat-form-field appearance="outline"><mat-label>{{ 'orders.detail.confirmedDate' | translate }}</mat-label><input matInput required type="date" [ngModel]="confirmationDate()" (ngModelChange)="confirmationDate.set($event)" name="confirmationDate" /></mat-form-field></div>
+          <div class="form-grid">
+            <mat-form-field appearance="outline">
+              <mat-label>{{ 'orders.detail.reference' | translate }}</mat-label>
+              <input matInput required [ngModel]="confirmationReference()" (ngModelChange)="confirmationReference.set($event)" name="confirmationReference" />
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>{{ 'orders.detail.confirmedDate' | translate }}</mat-label>
+              <input
+                matInput
+                required
+                [matDatepicker]="confirmationDatePicker"
+                [ngModel]="confirmationDateModel()"
+                (ngModelChange)="onConfirmationDateChange($event)"
+                [ngModelOptions]="{standalone: true}"
+                name="confirmationDate"
+              />
+              <mat-datepicker-toggle matIconSuffix [for]="confirmationDatePicker"></mat-datepicker-toggle>
+              <mat-datepicker #confirmationDatePicker></mat-datepicker>
+            </mat-form-field>
+          </div>
           @for (line of data.order.lines; track line.id) { <mat-form-field appearance="outline"><mat-label>{{ lineDescription(line) }} · {{ 'orders.detail.confirmedQuantity' | translate }}</mat-label><input matInput required type="number" min="0" step="0.000001" [ngModel]="quantityValue(confirmationQuantities(), line)" (ngModelChange)="setQuantity('confirmation', line.id, $event)" [name]="'confirmation-' + line.id" /></mat-form-field> }
           <button mat-flat-button color="primary" type="submit" [disabled]="isSaving()" data-testid="save-confirmation">{{ 'orders.detail.save' | translate }}</button>
         </form>
@@ -82,7 +101,26 @@
       @if (receiptOpen()) {
         <form class="evidence-form" (ngSubmit)="recordReceipt()">
           <h3>{{ 'orders.detail.receiptFormTitle' | translate }}</h3>
-          <div class="form-grid"><mat-form-field appearance="outline"><mat-label>{{ 'orders.detail.reference' | translate }}</mat-label><input matInput required [ngModel]="receiptReference()" (ngModelChange)="receiptReference.set($event)" name="receiptReference" /></mat-form-field><mat-form-field appearance="outline"><mat-label>{{ 'orders.detail.receivedDate' | translate }}</mat-label><input matInput required type="date" [ngModel]="receiptDate()" (ngModelChange)="receiptDate.set($event)" name="receiptDate" /></mat-form-field></div>
+          <div class="form-grid">
+            <mat-form-field appearance="outline">
+              <mat-label>{{ 'orders.detail.reference' | translate }}</mat-label>
+              <input matInput required [ngModel]="receiptReference()" (ngModelChange)="receiptReference.set($event)" name="receiptReference" />
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>{{ 'orders.detail.receivedDate' | translate }}</mat-label>
+              <input
+                matInput
+                required
+                [matDatepicker]="receiptDatePicker"
+                [ngModel]="receiptDateModel()"
+                (ngModelChange)="onReceiptDateChange($event)"
+                [ngModelOptions]="{standalone: true}"
+                name="receiptDate"
+              />
+              <mat-datepicker-toggle matIconSuffix [for]="receiptDatePicker"></mat-datepicker-toggle>
+              <mat-datepicker #receiptDatePicker></mat-datepicker>
+            </mat-form-field>
+          </div>
           @for (line of data.order.lines; track line.id) { <mat-form-field appearance="outline"><mat-label>{{ lineDescription(line) }} · {{ 'orders.detail.receivedQuantity' | translate }}</mat-label><input matInput required type="number" min="0" step="0.000001" [ngModel]="quantityValue(receiptQuantities(), line)" (ngModelChange)="setQuantity('receipt', line.id, $event)" [name]="'receipt-' + line.id" /></mat-form-field> }
           <button mat-flat-button color="primary" type="submit" [disabled]="isSaving()" data-testid="save-receipt">{{ 'orders.detail.save' | translate }}</button>
         </form>

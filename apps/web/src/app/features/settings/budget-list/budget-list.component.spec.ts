@@ -535,4 +535,50 @@ describe("BudgetFormDialogComponent (T030)", () => {
     expect(dialogRefSpy.close).toHaveBeenCalledWith(false);
     expect(organisationApi.createBudget).not.toHaveBeenCalled();
   });
+
+  it("should accept a typed day-first date, show day-first format, and produce ISO date in payload", async () => {
+    const { component, fixture } = await createDialog(mockTenant);
+
+    const input = fixture.nativeElement.querySelector(
+      'input[formcontrolname="period_start"]',
+    ) as HTMLInputElement;
+    expect(input).toBeTruthy();
+
+    input.value = "";
+    for (const char of "22/10/2026") {
+      input.value += char;
+      input.dispatchEvent(new Event("input"));
+      fixture.detectChanges();
+    }
+    input.dispatchEvent(new Event("blur"));
+    fixture.detectChanges();
+
+    const val = component.form.controls.period_start.value;
+    expect(val instanceof Date).toBeTrue();
+    if (val instanceof Date) {
+      expect([val.getFullYear(), val.getMonth(), val.getDate()]).toEqual([2026, 9, 22]);
+    }
+    expect(input.value).toBe("22/10/2026");
+
+    component.form.controls.amount.setValue("50000");
+    component.form.controls.currency.setValue("EGP");
+    component.form.controls.period.setValue("monthly");
+    component.form.controls.scope.setValue("organisation");
+
+    const created: BudgetCreated = { ...mockBudgets[1], id: "bg9", overlap_warning: false };
+    organisationApi.createBudget.and.returnValue(of(created));
+
+    component.onSubmit();
+
+    expect(organisationApi.createBudget).toHaveBeenCalledWith(
+      jasmine.objectContaining({
+        amount: "50000",
+        currency: "EGP",
+        period: "monthly",
+        period_start: "2026-10-22",
+        scope: "organisation",
+      }),
+    );
+    expect(dialogRefSpy.close).toHaveBeenCalledWith(created);
+  });
 });

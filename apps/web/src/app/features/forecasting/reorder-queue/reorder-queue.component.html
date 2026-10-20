@@ -49,10 +49,12 @@
           <mat-label>{{ 'forecasting.controls.requiredBy' | translate }}</mat-label>
           <input
             matInput
-            type="date"
-            [ngModel]="requiredByDate()"
-            (ngModelChange)="requiredByDate.set($event)"
+            [matDatepicker]="requiredByPicker"
+            [ngModel]="requiredByDateModel()"
+            (ngModelChange)="onRequiredByDateChange($event)"
           />
+          <mat-datepicker-toggle matIconSuffix [for]="requiredByPicker"></mat-datepicker-toggle>
+          <mat-datepicker #requiredByPicker></mat-datepicker>
         </mat-form-field>
       </div>
     </section>

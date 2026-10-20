@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatChipsModule } from '@angular/material/chips';
+import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
@@ -16,6 +17,8 @@ import { RouterLink } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
 import { FormatDatePipe } from '../../../core/format/date.pipe';
+import { parseIsoDateLocal, toIsoDateOrNull } from '../../../core/format/iso-date';
+import { provideAppDateAdapter } from '../../../core/i18n/date-adapter';
 import {
   type IngestionEmailLog,
   type IngestionEmailStatus,
@@ -26,6 +29,7 @@ import {
 @Component({
   selector: 'app-email-log',
   standalone: true,
+  providers: [provideAppDateAdapter()],
   imports: [
     FormsModule,
     NgClass,
@@ -33,6 +37,7 @@ import {
     MatButtonModule,
     MatCardModule,
     MatChipsModule,
+    MatDatepickerModule,
     MatFormFieldModule,
     MatIconModule,
     MatInputModule,
@@ -62,6 +67,24 @@ export class EmailLogComponent implements OnInit {
   readonly fromDomain = signal<string>('');
   readonly dateFrom = signal<string>('');
   readonly dateTo = signal<string>('');
+  readonly dateFromModel = computed(() => parseIsoDateLocal(this.dateFrom()));
+  readonly dateToModel = computed(() => parseIsoDateLocal(this.dateTo()));
+
+  onDateFromChange(date: Date | null): void {
+    const next = toIsoDateOrNull(date) ?? '';
+    if (this.dateFrom() !== next) {
+      this.dateFrom.set(next);
+      this.onFilterChange();
+    }
+  }
+
+  onDateToChange(date: Date | null): void {
+    const next = toIsoDateOrNull(date) ?? '';
+    if (this.dateTo() !== next) {
+      this.dateTo.set(next);
+      this.onFilterChange();
+    }
+  }
 
   readonly statusOptions: readonly IngestionEmailStatus[] = [
     'received',

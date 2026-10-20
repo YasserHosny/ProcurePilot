@@ -16,6 +16,7 @@ import type {
   Me,
 } from '../../../core/api/models';
 import { SessionService } from '../../../core/auth/session.service';
+import { provideAppDateAdapter } from '../../../core/i18n/date-adapter';
 import { ApprovalsApiService } from '../../approvals/approvals-api';
 import { DelegationListComponent } from './delegation-list.component';
 
@@ -143,6 +144,7 @@ describe('DelegationListComponent', () => {
       .overrideComponent(DelegationListComponent, {
         set: {
           providers: [
+            provideAppDateAdapter(),
             { provide: MatDialog, useValue: dialogSpy },
             { provide: MatSnackBar, useValue: snackBarSpy },
           ],
@@ -259,6 +261,70 @@ describe('DelegationListComponent', () => {
       undefined,
       { duration: 3500 },
     );
+  });
+
+  it('accepts typed day-first dates, shows day-first format, and produces ISO dates in payload', () => {
+    component.openCreateDialog();
+    const viewRef = component.delegationDialogTemplate.createEmbeddedView(null);
+    viewRef.detectChanges();
+    for (const node of viewRef.rootNodes) {
+      if (node instanceof HTMLElement) {
+        fixture.nativeElement.appendChild(node);
+      }
+    }
+    fixture.detectChanges();
+
+    const startsInput = fixture.nativeElement.querySelector(
+      'input[formcontrolname="starts_on"]',
+    ) as HTMLInputElement;
+    const endsInput = fixture.nativeElement.querySelector(
+      'input[formcontrolname="ends_on"]',
+    ) as HTMLInputElement;
+    expect(startsInput).toBeTruthy();
+    expect(endsInput).toBeTruthy();
+
+    startsInput.value = '';
+    for (const char of '22/10/2026') {
+      startsInput.value += char;
+      startsInput.dispatchEvent(new Event('input'));
+      fixture.detectChanges();
+    }
+    startsInput.dispatchEvent(new Event('blur'));
+    fixture.detectChanges();
+
+    endsInput.value = '';
+    for (const char of '25/10/2026') {
+      endsInput.value += char;
+      endsInput.dispatchEvent(new Event('input'));
+      fixture.detectChanges();
+    }
+    endsInput.dispatchEvent(new Event('blur'));
+    fixture.detectChanges();
+
+    expect(startsInput.value).toBe('22/10/2026');
+    expect(endsInput.value).toBe('25/10/2026');
+
+    const startsVal = component.form.controls.starts_on.value;
+    const endsVal = component.form.controls.ends_on.value;
+    expect(startsVal instanceof Date).toBeTrue();
+    expect(endsVal instanceof Date).toBeTrue();
+    if (startsVal instanceof Date) {
+      expect([startsVal.getFullYear(), startsVal.getMonth(), startsVal.getDate()]).toEqual([2026, 9, 22]);
+    }
+    if (endsVal instanceof Date) {
+      expect([endsVal.getFullYear(), endsVal.getMonth(), endsVal.getDate()]).toEqual([2026, 9, 25]);
+    }
+
+    component.form.controls.delegate_membership_id.setValue('m2');
+    approvalsApi.createApprovalDelegation.and.returnValue(of(mockDelegations[0]));
+
+    component.saveDelegation();
+
+    expect(approvalsApi.createApprovalDelegation).toHaveBeenCalledWith({
+      delegate_membership_id: 'm2',
+      starts_on: '2026-10-22',
+      ends_on: '2026-10-25',
+    });
   });
 
   it('should surface dialog error when delegation creation fails', () => {

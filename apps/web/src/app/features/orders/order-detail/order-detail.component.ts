@@ -1,7 +1,8 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
+import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
@@ -13,6 +14,8 @@ import { lineDescription, packLabel } from '../pack-label';
 import { FormatService } from '../../../core/format/format.service';
 import { FormatDatePipe } from '../../../core/format/date.pipe';
 import { FormatMoneyPipe } from '../../../core/format/money.pipe';
+import { parseIsoDateLocal, toIsoDateOrNull } from '../../../core/format/iso-date';
+import { provideAppDateAdapter } from '../../../core/i18n/date-adapter';
 import {
   OrdersApiService,
   type EvidenceState,
@@ -24,10 +27,12 @@ import {
 @Component({
   selector: 'app-order-detail',
   standalone: true,
+  providers: [provideAppDateAdapter()],
   imports: [
     FormsModule,
     MatButtonModule,
     MatCardModule,
+    MatDatepickerModule,
     MatFormFieldModule,
     MatIconModule,
     MatInputModule,
@@ -57,8 +62,18 @@ export class OrderDetailComponent implements OnInit {
   readonly confirmationDate = signal('');
   readonly receiptReference = signal('');
   readonly receiptDate = signal('');
+  readonly confirmationDateModel = computed(() => parseIsoDateLocal(this.confirmationDate()));
+  readonly receiptDateModel = computed(() => parseIsoDateLocal(this.receiptDate()));
   readonly confirmationQuantities = signal<Record<string, string>>({});
   readonly receiptQuantities = signal<Record<string, string>>({});
+
+  onConfirmationDateChange(date: Date | null): void {
+    this.confirmationDate.set(toIsoDateOrNull(date) ?? '');
+  }
+
+  onReceiptDateChange(date: Date | null): void {
+    this.receiptDate.set(toIsoDateOrNull(date) ?? '');
+  }
 
   private orderId = '';
 

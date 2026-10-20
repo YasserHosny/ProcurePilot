@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatChipsModule } from '@angular/material/chips';
+import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
@@ -27,7 +28,9 @@ import type {
 import { SessionService } from '../../../core/auth/session.service';
 import { FormatDatePipe } from '../../../core/format/date.pipe';
 import { FormatMoneyPipe } from '../../../core/format/money.pipe';
+import { parseIsoDateLocal, toIsoDateOrNull } from '../../../core/format/iso-date';
 import { UnitLabelPipe } from '../../../core/format/unit-label';
+import { provideAppDateAdapter } from '../../../core/i18n/date-adapter';
 
 type MatchTaskSortBy = 'created_at' | 'priority' | 'status';
 type MatchTaskSortOrder = 'asc' | 'desc';
@@ -40,6 +43,7 @@ export interface QuotationTaskGroup {
 @Component({
   selector: 'app-resolution-queue',
   standalone: true,
+  providers: [provideAppDateAdapter()],
   imports: [
     FormsModule,
     RouterLink,
@@ -48,6 +52,7 @@ export interface QuotationTaskGroup {
     MatIconModule,
     MatInputModule,
     MatChipsModule,
+    MatDatepickerModule,
     MatFormFieldModule,
     MatSelectModule,
     MatSortModule,
@@ -78,6 +83,8 @@ export class ResolutionQueueComponent implements OnInit {
   readonly searchQuery = signal<string>('');
   readonly dateFrom = signal<string | null>(null);
   readonly dateTo = signal<string | null>(null);
+  readonly dateFromModel = computed(() => parseIsoDateLocal(this.dateFrom()));
+  readonly dateToModel = computed(() => parseIsoDateLocal(this.dateTo()));
   readonly sortBy = signal<MatchTaskSortBy>('created_at');
   readonly sortOrder = signal<MatchTaskSortOrder>('desc');
   readonly errorMessage = signal<string | null>(null);
@@ -325,16 +332,22 @@ export class ResolutionQueueComponent implements OnInit {
     }, 300);
   }
 
-  onDateFromChange(value: string | null): void {
-    this.dateFrom.set(value || null);
-    this.syncQueryParams();
-    this.loadTasks();
+  onDateFromChange(value: Date | string | null): void {
+    const next = toIsoDateOrNull(value);
+    if (this.dateFrom() !== next) {
+      this.dateFrom.set(next);
+      this.syncQueryParams();
+      this.loadTasks();
+    }
   }
 
-  onDateToChange(value: string | null): void {
-    this.dateTo.set(value || null);
-    this.syncQueryParams();
-    this.loadTasks();
+  onDateToChange(value: Date | string | null): void {
+    const next = toIsoDateOrNull(value);
+    if (this.dateTo() !== next) {
+      this.dateTo.set(next);
+      this.syncQueryParams();
+      this.loadTasks();
+    }
   }
 
   onSortChange(sort: Sort): void {

@@ -46,20 +46,24 @@
           <mat-label>{{ 'ingestion.emailLog.filters.dateFrom' | translate }}</mat-label>
           <input
             matInput
-            type="date"
-            [ngModel]="dateFrom()"
-            (ngModelChange)="dateFrom.set($event); onFilterChange()"
+            [matDatepicker]="dateFromPicker"
+            [ngModel]="dateFromModel()"
+            (ngModelChange)="onDateFromChange($event)"
           />
+          <mat-datepicker-toggle matIconSuffix [for]="dateFromPicker"></mat-datepicker-toggle>
+          <mat-datepicker #dateFromPicker></mat-datepicker>
         </mat-form-field>
 
         <mat-form-field appearance="outline" class="filter-field">
           <mat-label>{{ 'ingestion.emailLog.filters.dateTo' | translate }}</mat-label>
           <input
             matInput
-            type="date"
-            [ngModel]="dateTo()"
-            (ngModelChange)="dateTo.set($event); onFilterChange()"
+            [matDatepicker]="dateToPicker"
+            [ngModel]="dateToModel()"
+            (ngModelChange)="onDateToChange($event)"
           />
+          <mat-datepicker-toggle matIconSuffix [for]="dateToPicker"></mat-datepicker-toggle>
+          <mat-datepicker #dateToPicker></mat-datepicker>
         </mat-form-field>
 
         <button
