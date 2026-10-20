@@ -1,0 +1,262 @@
+[
+  {
+    "src": "open-clip-9x16",
+    "a": 0,
+    "b": 3.1,
+    "d": 3.1,
+    "cap": "open",
+    "crop": null,
+    "freeze": 0,
+    "mask": null
+  },
+  {
+    "src": "s0-phone-lowstock",
+    "a": 3.2,
+    "b": 18,
+    "d": 3,
+    "cap": "low",
+    "crop": [
+      0,
+      0,
+      390,
+      410
+    ],
+    "freeze": 0,
+    "mask": null
+  },
+  {
+    "src": "s0-phone-lowstock",
+    "a": 19,
+    "b": 21.3,
+    "d": 1.8,
+    "cap": "low",
+    "crop": [
+      0,
+      65,
+      390,
+      315
+    ],
+    "freeze": 0,
+    "mask": null
+  },
+  {
+    "src": "s0-phone-lowstock",
+    "a": 22.3,
+    "b": 23.3,
+    "d": 2,
+    "cap": "low",
+    "crop": [
+      0,
+      335,
+      390,
+      285
+    ],
+    "freeze": 1,
+    "mask": null
+  },
+  {
+    "src": "s1-rfq",
+    "a": 33,
+    "b": 36.5,
+    "d": 2.5,
+    "cap": "rfq",
+    "crop": [
+      680,
+      170,
+      800,
+      860
+    ],
+    "freeze": 0,
+    "mask": null
+  },
+  {
+    "src": "s2b-photo-closeup",
+    "a": 4.5,
+    "b": 6,
+    "d": 2.5,
+    "cap": "photo",
+    "crop": [
+      240,
+      150,
+      690,
+      610
+    ],
+    "freeze": 1,
+    "mask": null
+  },
+  {
+    "src": "s2b-photo-closeup",
+    "a": 8,
+    "b": 9,
+    "d": 2.5,
+    "cap": "fields",
+    "crop": [
+      965,
+      180,
+      710,
+      425
+    ],
+    "freeze": 1.5,
+    "mask": null
+  },
+  {
+    "src": "s3c-smart-compare",
+    "a": 14,
+    "b": 16,
+    "d": 3.5,
+    "cap": "prices",
+    "crop": [
+      250,
+      860,
+      720,
+      185
+    ],
+    "freeze": 1.5,
+    "mask": null
+  },
+  {
+    "src": "s3-guardrail-draft",
+    "a": 20,
+    "b": 21.5,
+    "d": 3,
+    "cap": "draft",
+    "crop": [
+      680,
+      90,
+      820,
+      880
+    ],
+    "freeze": 1.5,
+    "mask": null
+  },
+  {
+    "src": "s3-guardrail-draft",
+    "a": 34.4,
+    "b": 35.366667,
+    "d": 1.5,
+    "cap": "submit",
+    "crop": [
+      680,
+      720,
+      820,
+      270
+    ],
+    "freeze": 0,
+    "mask": null
+  },
+  {
+    "src": "s4-phone-approve",
+    "a": 8,
+    "b": 9.5,
+    "d": 2.5,
+    "cap": "approve",
+    "crop": [
+      0,
+      65,
+      390,
+      295
+    ],
+    "freeze": 1,
+    "mask": null
+  },
+  {
+    "src": "s4-phone-approve",
+    "a": 11.8,
+    "b": 12.4,
+    "d": 1.5,
+    "cap": "approve_action",
+    "crop": [
+      0,
+      580,
+      390,
+      264
+    ],
+    "freeze": 0,
+    "mask": null
+  },
+  {
+    "src": "s4-phone-approve",
+    "a": 16.4,
+    "b": 17.4,
+    "d": 2.5,
+    "cap": "approved",
+    "crop": [
+      0,
+      380,
+      390,
+      464
+    ],
+    "freeze": 1.5,
+    "mask": null
+  },
+  {
+    "src": "s5-po-savings",
+    "a": 28.8,
+    "b": 30.3,
+    "d": 2.5,
+    "cap": "sent",
+    "crop": [
+      350,
+      120,
+      1210,
+      195
+    ],
+    "freeze": 1,
+    "mask": null
+  },
+  {
+    "src": "s5-po-savings",
+    "a": 39.8,
+    "b": 40.566667,
+    "d": 1.5,
+    "cap": "outcome",
+    "crop": [
+      700,
+      600,
+      450,
+      200
+    ],
+    "freeze": 0,
+    "mask": null
+  },
+  {
+    "src": "s6-savings-close",
+    "a": 0.4,
+    "b": 1.4,
+    "d": 2.5,
+    "cap": "outcome",
+    "crop": [
+      490,
+      355,
+      780,
+      285
+    ],
+    "freeze": 1.5,
+    "mask": null
+  },
+  {
+    "src": "counter",
+    "a": 0,
+    "b": 1,
+    "d": 3.5,
+    "cap": null,
+    "crop": null,
+    "freeze": 0,
+    "mask": null
+  },
+  {
+    "src": "s6-savings-close",
+    "a": 7,
+    "b": 8,
+    "d": 3,
+    "cap": "ledger",
+    "crop": [
+      490,
+      350,
+      780,
+      290
+    ],
+    "freeze": 2,
+    "mask": null
+  }
+]

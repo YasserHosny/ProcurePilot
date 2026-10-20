@@ -1,0 +1,5 @@
+[{"a":"goto","url":"http://localhost:4310/#/home","ms":4500},{"a":"rec"},{"a":"wait","ms":1500},
+{"a":"tap","x":195,"y":188,"pause":1800},{"a":"tap","x":195,"y":96,"pause":700},{"a":"type","text":"زيت","pause":3500},{"a":"shot","path":"/tmp/claude-1000/-media-yasserhosny-My-Passport-Work-Projects-ProcurePilot/1c3520f5-a777-4834-b5ef-0684f2157c72/scratchpad/chk/s0a.png"},
+{"a":"tap","x":200,"y":146,"pause":1600},{"a":"shot","path":"/tmp/claude-1000/-media-yasserhosny-My-Passport-Work-Projects-ProcurePilot/1c3520f5-a777-4834-b5ef-0684f2157c72/scratchpad/chk/s0b.png"},{"a":"tap","x":195,"y":200,"pause":1100},{"a":"tap","x":195,"y":251,"pause":1100},
+{"a":"tap","x":195,"y":272,"pause":600},{"a":"type","text":"1","pause":1200},{"a":"tap","x":287,"y":336,"pause":7000},
+{"a":"shot","path":"/tmp/claude-1000/-media-yasserhosny-My-Passport-Work-Projects-ProcurePilot/1c3520f5-a777-4834-b5ef-0684f2157c72/scratchpad/chk/s0en.png"}]

@@ -126,6 +126,10 @@ The owner raised four points: the English cuts show the Arabic interface; the ki
 - Openings, two variants (both 5 s for 16:9 and 3.1 s for 9:16, same caption): an HTML animation rendered frame by frame (`source/opening/OpeningChaos.html`, `render.cjs`), and a live recording of a WhatsApp Web–style desktop and Excel driven by Playwright and captured from the tab over CDP (`DesktopChaos.html`, `scene0.cjs`, `assemble.py`). Tab capture replaced the GNOME screencast for this clip because on Wayland the kiosk window did not land on the recorded screen.
 - Still open: the interface is Arabic in the English cuts (needs an English-locale re-record), and the old footage shows "litre" on the PO form.
 
+### v2.2 English UI (2026-10-20)
+
+The English cuts re-recorded with the English interface: a fresh round on the demo tenant (round 5) driven through the English web UI (owner profile switched to English, then back to Arabic) and an English phone build, captured from the browser tab over CDP (`source/record-en/`, frames assembled by `source/opening/assemble.py`). Codex built the edit (`source/edit-v2.2-en/`, `edl-en.py`, `CHANGES-v2.2-en.md`) from new English masks made at source; Claude checked the email areas frame by frame. Codex's privacy proof images are not committed because their "before" halves show the unmasked email.
+
 ## Masking at source
 
 `source/mask/mask_raw.py` burns opaque boxes into copies of the four raw clips that show the email (`~/Videos/pp-recording/masked/`), from the per-frame glyph-template audit, with a 3-frame halo around every detected run (the detector misses page transitions) and fixed time windows on the phone clip (it misses the approvals-list card and the detail screen's slide-in). `source/mask/audit_masked.py` re-runs the detector on the masked copies (0 matches; 5 on the unmasked guardrail clip as a control). v1 and v2.2 are built from these copies.
