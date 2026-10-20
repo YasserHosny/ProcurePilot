@@ -29,12 +29,12 @@ python3 extract.py && python3 make_data.py && python3 make_textures.py && ./fetc
 for i in 0 1 2 3; do node render.cjs h frames-h $((i*893)) $(( (i+1)*893 > 3569 ? 3569 : (i+1)*893 )) & done; wait
 # audio = v2.1 cut audio with the removed passage taken out
 ffmpeg -i ../../cuts/v2.1/procurepilot-demo-ar-16x9.mp4 -filter_complex \
-  "[0:a]atrim=0:109.2,asetpts=N/SR/TB[a];[0:a]atrim=start=125.4,asetpts=N/SR/TB[b];[a][b]concat=n=2:v=0:a=1" audio_h.wav
+  "[0:a]atrim=0:109.2,asetpts=N/SR/TB[a];[0:a]atrim=start=125.4,asetpts=N/SR/TB[b];[a][b]concat=n=2:v=0:a=1,alimiter=limit=0.7:level=false" audio_h.wav
 ffmpeg -framerate 30 -i frames-h/%05d.jpg -i audio_h.wav -c:v libx264 -crf 21 -tune grain -pix_fmt yuv420p \
-  -c:a aac -b:a 192k -shortest -movflags +faststart procurepilot-demo-ar-16x9.mp4
+  -c:a aac -b:a 256k -shortest -movflags +faststart procurepilot-demo-ar-16x9.mp4
 ```
 
-The vertical cut is the same with `v`, 1602 frames, and audio from `../../cuts/v2.1/procurepilot-demo-ar-9x16-60s.mp4` trimmed at `[0, 44.9] + [46.512, end]`. Set `PP_PLAYWRIGHT` / `PP_CHROME` if Playwright or Chromium live elsewhere.
+The vertical cut is the same with `v`, 1602 frames, and audio from `../../cuts/v2.1/procurepilot-demo-ar-9x16-60s.mp4` trimmed at `[0, 44.9] + [46.512, end]`. The limiter (with `level=false`, so it does not re-amplify) and AAC at 256 kb/s keep the 16:9 peak at -2.0 dBFS (-13.9 LUFS); without the limiter the joined v2.1 audio clips at about +0.3 dBFS, and at 192 kb/s AAC overshoots back to +0.4 dBFS even with it. The vertical audio peaks at -3.1 dBFS and needs no limiter. Set `PP_PLAYWRIGHT` / `PP_CHROME` if Playwright or Chromium live elsewhere.
 
 ## Known gaps
 
