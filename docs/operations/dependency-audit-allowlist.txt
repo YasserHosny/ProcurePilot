@@ -10,7 +10,7 @@
 # read by pnpm itself from `pnpm.auditConfig.ignoreGhsas` in the root package.json (kept in
 # sync with the GHSA column below — pnpm does not read this file).
 #
-# Last reviewed: 2026-09-16, by Claude (orchestrator, Wave 18 T034/T036).
+# Last reviewed: 2026-10-21, by Claude (orchestrator, CI dependency-audit follow-up).
 
 ## Python (pip-audit)
 
@@ -42,6 +42,8 @@
 | GHSA-p297-fm68-3q8c        | @angular/common   | 19.2.25   | none            | FE/Agy | Information leak via `HttpTransferCache` bypass with `withRequestsMadeViaParent`. Not used (no SSR). No fix on 19.x. |
 | GHSA-hh8m-fm6v-7cvg        | @angular/core, @angular/compiler | 19.2.25 | none | FE/Agy | Sanitization bypass via directive host bindings on concrete host elements. No patched version on 19.x. |
 | GHSA-ff3f-86qr-9cv3        | @angular/router   | 19.2.25   | none            | FE/Agy | SSR-only DoS via numeric URL matrix parameters. This app has no SSR, so it is not exposed; no fix on 19.x; added 2026-10-02. |
+| GHSA-62vg-58rm-qff7        | @angular/router   | 19.2.25   | none            | FE/Agy | SSR-only DoS via unmatched empty-path outlet route matching. This app has no SSR, so it is not exposed; no fix on 19.x; added 2026-10-21. |
+| GHSA-jfgx-762w-99vr        | @angular/common   | 19.2.25   | none            | FE/Agy | XSRF token leakage via URL parsing in the HttpClient XSRF handling. Unlike the SSR-only entries this one is not SSR-specific, but this app authenticates with a bearer `Authorization` header (`auth.interceptor.ts`), configures no XSRF handling, and the API issues no XSRF cookie, so there is no token to leak; exposure is theoretical. No fix on 19.x; added 2026-10-21. |
 
 All ten JS findings and all four Python findings share one root cause category: **no upstream
 fix exists yet** at the pinned major/minor line this project is on (Angular 19, FastAPI 0.115.6 /
