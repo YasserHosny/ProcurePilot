@@ -261,3 +261,17 @@ tasks (see the top of this file). The next feature has not been scoped.
 - 020-grounded-procurement-analyst: R4.2 merged to main (PR #25) — grounded, cited
   question-answering over tenant data, all four user stories plus Polish complete
 - 002-catalogue-suppliers: Added unchanged — Python 3.12 (backend), TypeScript 5.6 / Angular 19 (web), SQL + unchanged from chunk 4.1. One addition under consideration for CSV
+
+## Agent skills
+
+### Issue tracker
+
+Issues are tracked in GitHub Issues on YasserHosny/ProcurePilot (via `gh`). See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Default five-role vocabulary (needs-triage, needs-info, ready-for-agent, ready-for-human, wontfix). See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: one root `GLOSSARY.md`; ADRs live in `docs/architecture/adrs.md`. See `docs/agents/domain.md`.
