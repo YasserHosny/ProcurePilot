@@ -1,6 +1,6 @@
 # iron-sys.com → company website (bunny.net)
 
-Set up 2026-10-22. How the company domain reaches the `iron-systems-website` container, and how to
+Set up 2026-10-22 (Jira PP-19, plan G-11). How the company domain reaches the `iron-systems-website` container, and how to
 repeat it for another app.
 
 ## Current setup
