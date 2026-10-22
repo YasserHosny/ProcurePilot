@@ -1,0 +1,7 @@
+plates/
+tex/
+fonts/
+data.js
+frames-*/
+*.wav
+*.mp4

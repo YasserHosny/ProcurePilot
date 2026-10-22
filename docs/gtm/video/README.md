@@ -16,6 +16,8 @@ Design source for every animated element (logo sting, end cards):
 
 ## Style (decided)
 
+> **Superseded for art direction 2026-10-22:** [`motion-style.md`](motion-style.md) is the binding motion-graphics direction (editorial, brand-led). The honesty rules below still apply.
+
 - **Whole video:** screencast of the real product (web + phone) as the backbone, with a 2D
   motion-graphics layer — zoom-ins, highlights, Arabic text cards, an animated counter for the
   saving. **No 3D, no voice-over.** Text + music, because WhatsApp/LinkedIn/Reels autoplay muted.

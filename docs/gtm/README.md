@@ -20,6 +20,8 @@ Jira keys, and the handoff log.
 | [`company-formation/egypt-company-setup-guide.md`](company-formation/egypt-company-setup-guide.md) | Step-by-step guide (Arabic): one-person company at GAFI, Law 6/2025 simplified tax (verified rates + consulting exclusion), VAT, e-invoicing, banking, costs, checklist |
 | [`company-formation/cost-comparison.md`](company-formation/cost-comparison.md) | 3-year cost comparison (Arabic): Egypt simplified vs. standard vs. adding US LLC / Delaware C-Corp / UAE free zone, at three revenue scenarios |
 | [`company-formation/flip-readiness.md`](company-formation/flip-readiness.md) | Flip readiness (Arabic): what to set up now (IP assignment, assets, cap table) so a later Delaware/holding flip is cheap; Delaware facts verified; group experiences |
+| [`whatsapp-card/`](whatsapp-card/) | WhatsApp pilot-invite cards (Arabic, 1080×1350): brand-kit card `pilot-card-ar.png` and photo card `pilot-card-ar-photo.png` (Higgsfield z_image background, text overlaid in HTML); `pilot-card-ar-photo.mp4` — 8 s push-in with text fade-in, built locally with ffmpeg (Higgsfield video needs a paid plan); source HTML + `caption-ar.txt` |
+| [`website/iron-sys-domain-setup.md`](website/iron-sys-domain-setup.md) | Company website domain: `www.iron-sys.com` → bunny.net container `iron-systems-website` (GoDaddy CNAME + bunny SSL), bare domain 301-forwarded; steps to link another container to a subdomain |
 | [`test-fixtures/egypt-quotes/`](test-fixtures/egypt-quotes/) | 5 synthetic Egyptian supplier quotes + `expected.json` for extraction testing (spec 022 US2, PP-3). Fictional suppliers, each marked TEST FIXTURE |
 
 ## Live documents (source of truth — edit there, not here)
