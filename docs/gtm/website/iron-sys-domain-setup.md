@@ -20,7 +20,7 @@ record (Zoho MX, mail, `procurepilot`, `procurepilot-api`, `form-craft`, …) wa
 
 GoDaddy cannot put a CNAME on the bare domain (`@`), and bunny expects a CNAME. An A record to the
 bunny IP would work today but breaks silently if bunny changes that IP. So the site lives on `www`,
-and GoDaddy's forwarding service (its own A records `3.33.152.147` / `15.197.142.173`) redirects the
+and GoDaddy's forwarding service (its own A records, `3.33.251.168` / `15.197.225.128` since HTTPS forwarding went live; managed by GoDaddy, do not edit) redirects the
 bare domain there.
 
 ## Verified 2026-10-22
@@ -30,8 +30,10 @@ bare domain there.
   SHA-256, same bunny pull zone `6848635`, title "Iron Systems | Powering Businesses with
   Intelligent Technologies"), so `www` is served by the container itself.
 - `http://iron-sys.com` → 301 → `https://www.iron-sys.com/`.
-- `https://iron-sys.com` → timed out right after setup. GoDaddy says the HTTPS certificate for
-  forwarding can take a few hours; re-check scheduled. Update this line with the result.
+- `https://iron-sys.com` → 301 → `https://www.iron-sys.com/` (verified 2026-10-23 01:57). Certificate
+  `CN=iron-sys.com`, issued by GoDaddy, expires 2027-05-08. It took GoDaddy about 6 hours to start
+  serving HTTPS: until then, port 443 on the forwarding IPs timed out with no certificate. When it
+  went live, the forwarding A records changed from `3.33.152.147` / `15.197.142.173`.
 
 ## Linking another bunny container to a subdomain
 
