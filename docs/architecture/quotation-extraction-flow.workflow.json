@@ -1,0 +1,105 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "Quotation Extraction Flow",
+    "locale": "en",
+    "quality_profile": "showcase",
+    "output": "docs/architecture/quotation-extraction-flow.html",
+    "repository": {
+      "url": "https://github.com/YasserHosny/ProcurePilot.git",
+      "provider": "github",
+      "link_mode": "web",
+      "revision": "78eb1b6b359bcda52ccd9244b335ac0f4bebc356"
+    }
+  },
+  "lanes": [
+    { "id": "intake", "label": "API intake (apps/api)" },
+    { "id": "upper", "label": "Queue + upper branches" },
+    { "id": "worker", "label": "Extraction worker" },
+    { "id": "lower", "label": "Fallback + failures", "variant": "exception" }
+  ],
+  "groups": [
+    { "id": "readers", "label": "Readers", "lane": "worker", "fromCol": 2, "toCol": 3, "variant": "emphasis" }
+  ],
+  "mainPath": ["web", "queue", "load", "choose", "bedrock", "normalise", "gate", "extracted"],
+  "nodes": [
+    { "id": "email", "lane": "intake", "col": 0, "type": "external", "label": "Inbound email", "sublabel": "Mailgun → quotation", "sources": [
+      { "path": "apps/api/src/procurepilot_api/modules/ingestion/orchestrator.py", "line": 63, "end_line": 90, "label": "process_inbound_email" },
+      { "path": "apps/api/src/procurepilot_api/modules/ingestion/orchestrator.py", "line": 152, "end_line": 160, "label": "quotation + job rows" },
+      { "path": "apps/api/src/procurepilot_api/modules/ingestion/orchestrator.py", "line": 247, "end_line": 259, "label": "enqueue after commit" } ] },
+    { "id": "web", "lane": "intake", "col": 1, "type": "frontend", "label": "Web extract", "sublabel": "POST /extract · retry", "sources": [
+      { "path": "apps/api/src/procurepilot_api/modules/extraction/router.py", "line": 18, "end_line": 39, "label": "POST /quotations/{id}/extract" },
+      { "path": "apps/api/src/procurepilot_api/modules/extraction/service.py", "line": 50, "end_line": 104, "label": "pending|refused only" },
+      { "path": "apps/api/src/procurepilot_api/modules/quotations/service.py", "line": 393, "end_line": 414, "label": "retry_extraction" } ] },
+    { "id": "capture", "lane": "intake", "col": 2, "type": "frontend", "label": "Mobile capture", "sublabel": "photo / file upload", "sources": [
+      { "path": "apps/api/src/procurepilot_api/modules/ingestion/capture_service.py", "line": 55, "end_line": 83, "label": "mime check + Storage" },
+      { "path": "apps/api/src/procurepilot_api/modules/ingestion/capture_service.py", "line": 104, "end_line": 139, "label": "quotation + job + enqueue" } ] },
+    { "id": "queue", "lane": "upper", "col": 1, "type": "messagebus", "label": "Queue job", "sublabel": "extraction_job · RQ", "tag": "quotation-extraction", "sources": [
+      { "path": "apps/api/src/procurepilot_api/modules/extraction/queue.py", "line": 7, "end_line": 29, "label": "enqueue payload" },
+      { "path": "apps/api/src/procurepilot_api/modules/ingestion/extraction.py", "line": 12, "end_line": 28, "label": "ingestion enqueue" },
+      { "path": "services/extraction-worker/src/procurepilot_extraction_worker/__main__.py", "line": 10, "end_line": 14, "label": "RQ worker" } ] },
+    { "id": "load", "lane": "worker", "col": 1, "type": "backend", "label": "Load document", "sublabel": "job running · fetch bytes", "sources": [
+      { "path": "services/extraction-worker/src/procurepilot_extraction_worker/worker.py", "line": 32, "end_line": 46, "label": "process_extraction_job" },
+      { "path": "services/extraction-worker/src/procurepilot_extraction_worker/worker.py", "line": 476, "end_line": 508, "label": "document row + Storage" } ] },
+    { "id": "choose", "lane": "worker", "col": 2, "type": "backend", "label": "Choose reader", "sublabel": "mime type + provider mode", "sources": [
+      { "path": "services/extraction-worker/src/procurepilot_extraction_worker/worker.py", "line": 108, "end_line": 150, "label": "_extract" } ] },
+    { "id": "structured", "lane": "upper", "col": 3, "type": "backend", "label": "CSV / XLSX parser", "sublabel": "cells read directly, no AI", "sources": [
+      { "path": "services/extraction-worker/src/procurepilot_extraction_worker/structured_parse.py", "line": 18, "end_line": 31, "label": "structured parse" } ] },
+    { "id": "bedrock", "lane": "worker", "col": 3, "type": "cloud", "label": "Bedrock (Claude)", "sublabel": "default for PDF / image", "sources": [
+      { "path": "services/extraction-worker/src/procurepilot_extraction_worker/bedrock.py", "line": 70, "end_line": 80, "label": "BedrockExtractionProvider" },
+      { "path": "services/extraction-worker/src/procurepilot_extraction_worker/worker.py", "line": 140, "end_line": 149, "label": "fallback on exception" } ] },
+    { "id": "azure", "lane": "lower", "col": 3, "type": "cloud", "label": "Azure DI", "sublabel": "fallback · or azure_di mode", "sources": [
+      { "path": "services/extraction-worker/src/procurepilot_extraction_worker/azure_di.py", "line": 25, "end_line": 40, "label": "AzureDocumentIntelligenceProvider" },
+      { "path": "services/extraction-worker/src/procurepilot_extraction_worker/worker.py", "line": 135, "end_line": 139, "label": "azure_di mode" } ] },
+    { "id": "normalise", "lane": "worker", "col": 4, "type": "database", "label": "Normalise + persist", "sublabel": "dates · currency · arithmetic", "tag": "supplier match", "sources": [
+      { "path": "services/extraction-worker/src/procurepilot_extraction_worker/worker.py", "line": 53, "end_line": 58, "label": "pipeline order" },
+      { "path": "services/extraction-worker/src/procurepilot_extraction_worker/worker.py", "line": 152, "end_line": 236, "label": "lines + field_extraction" },
+      { "path": "services/extraction-worker/src/procurepilot_extraction_worker/worker.py", "line": 320, "end_line": 350, "label": "pg_trgm supplier match" } ] },
+    { "id": "gate", "lane": "worker", "col": 5, "type": "security", "label": "Review gate", "sublabel": "first review reason wins", "sources": [
+      { "path": "services/extraction-worker/src/procurepilot_extraction_worker/worker.py", "line": 59, "end_line": 80, "label": "status decision" },
+      { "path": "services/extraction-worker/src/procurepilot_extraction_worker/worker.py", "line": 353, "end_line": 397, "label": "_review_reason" } ] },
+    { "id": "extracted", "lane": "upper", "col": 5, "type": "database", "label": "Extracted", "sublabel": "quotation.status", "sources": [
+      { "path": "services/extraction-worker/src/procurepilot_extraction_worker/worker.py", "line": 281, "end_line": 317, "label": "update quotation" } ] },
+    { "id": "review", "lane": "lower", "col": 5, "type": "database", "label": "In review", "sublabel": "open review_task", "sources": [
+      { "path": "services/extraction-worker/src/procurepilot_extraction_worker/worker.py", "line": 457, "end_line": 473, "label": "_upsert_review_task" } ] },
+    { "id": "refused", "lane": "lower", "col": 1, "type": "security", "label": "Refused", "sublabel": "job failed · rollback", "sources": [
+      { "path": "services/extraction-worker/src/procurepilot_extraction_worker/worker.py", "line": 91, "end_line": 105, "label": "except path" },
+      { "path": "services/extraction-worker/src/procurepilot_extraction_worker/worker.py", "line": 543, "end_line": 545, "label": "_refuse_quotation" } ] }
+  ],
+  "edges": [
+    { "id": "email-queue", "from": "email", "to": "queue", "variant": "default" },
+    { "id": "web-queue", "from": "web", "to": "queue", "variant": "emphasis" },
+    { "id": "capture-queue", "from": "capture", "to": "queue", "variant": "default" },
+    { "id": "queue-load", "from": "queue", "to": "load", "label": "RQ job", "variant": "dashed", "role": "async" },
+    { "id": "load-choose", "from": "load", "to": "choose", "variant": "emphasis" },
+    { "id": "choose-structured", "from": "choose", "to": "structured", "label": "csv/xlsx", "variant": "default", "role": "branch" },
+    { "id": "choose-bedrock", "from": "choose", "to": "bedrock", "label": "pdf/image", "variant": "emphasis" },
+    { "id": "choose-azure", "from": "choose", "to": "azure", "label": "azure_di mode", "variant": "default", "role": "branch" },
+    { "id": "bedrock-azure", "from": "bedrock", "to": "azure", "label": "on error", "variant": "dashed", "role": "error" },
+    { "id": "bedrock-normalise", "from": "bedrock", "to": "normalise", "variant": "emphasis" },
+    { "id": "structured-normalise", "from": "structured", "to": "normalise", "variant": "default" },
+    { "id": "azure-normalise", "from": "azure", "to": "normalise", "variant": "default" },
+    { "id": "normalise-gate", "from": "normalise", "to": "gate", "variant": "emphasis" },
+    { "id": "gate-extracted", "from": "gate", "to": "extracted", "label": "no reason", "variant": "emphasis" },
+    { "id": "gate-review", "from": "gate", "to": "review", "label": "reason found", "variant": "security", "role": "branch" },
+    { "id": "load-refused", "from": "load", "to": "refused", "label": "any exception", "variant": "security", "role": "error" }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "How a quote enters", "items": [
+      "Web upload creates a pending quotation; extraction starts on POST /extract",
+      "Email and mobile capture create quotation + job, then enqueue after commit",
+      "A failed Redis enqueue stays retryable via retry_extraction or the requeue_extraction CLI"
+    ] },
+    { "dot": "amber", "title": "Review reasons (in order)", "items": [
+      "read_failure · currency_unresolved · date_unparsed · merged_line_items",
+      "line_count_mismatch · arithmetic_mismatch · total_unverified",
+      "low_confidence (below 0.85) · no_supplier_match"
+    ] },
+    { "dot": "rose", "title": "Never guessed", "items": [
+      "No evidenced currency → home currency stored only as a suggestion",
+      "Unparsed dates keep raw evidence; canonical columns stay NULL",
+      "Refused is reserved for unreadable documents or a process failure"
+    ] }
+  ]
+}
