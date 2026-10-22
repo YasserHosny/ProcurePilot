@@ -98,9 +98,9 @@ set up, what is next, who does it, and what blocks what.
 | E-1 | PP-4 | G-4 | PP-8 | G-9 | PP-13 |
 | P-4 | PP-14 | G-5 | PP-9 | G-10 | PP-17 |
 | P-5 | PP-15 | P-6 | PP-16 | P-7 | PP-18 |
-| G-11 | PP-19 | | | | |
+| G-11 | PP-19 | G-12 | PP-20 | | |
 
-PP-14..PP-18 were added 2026-10-22 to track work done since 2026-10-15 that had no Jira task. PP-19 (G-11, company website on iron-sys.com, `docs/gtm/website/`) was added the same day.
+PP-14..PP-18 were added 2026-10-22 to track work done since 2026-10-15 that had no Jira task. PP-19 (G-11, company website on iron-sys.com, `docs/gtm/website/`) was added the same day. PP-20 (G-12, WhatsApp pilot-invite cards + video, `docs/gtm/whatsapp-card/`) was added the same day.
 
 **Progress convention:** the PP workflow has only To Do and Done. Until the owner adds
 In Progress / Waiting on User / In Review columns (board settings; the connector cannot), work
