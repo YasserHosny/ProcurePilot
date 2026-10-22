@@ -96,7 +96,15 @@ set up, what is next, who does it, and what blocks what.
 | P-2 (C3) | PP-2 | G-2 | PP-6 | G-7 | PP-11 |
 | P-3 (C2) | PP-3 | G-3 | PP-7 | G-8 | PP-12 |
 | E-1 | PP-4 | G-4 | PP-8 | G-9 | PP-13 |
-| | | G-5 | PP-9 | | |
+| P-4 | PP-14 | G-5 | PP-9 | G-10 | PP-17 |
+| P-5 | PP-15 | P-6 | PP-16 | P-7 | PP-18 |
+
+PP-14..PP-18 were added 2026-10-22 to track work done since 2026-10-15 that had no Jira task.
+
+**Progress convention:** the PP workflow has only To Do and Done. Until the owner adds
+In Progress / Waiting on User / In Review columns (board settings; the connector cannot), work
+in flight carries the `in-progress` label, and each update is a dated **Progress** comment saying
+what is done and what is left. Dependencies are Jira *Blocks* links matching §4.
 
 D-1..D-3 (user decisions), J-* (setup) and G-0 (commit) are tracked in this file only.
 
@@ -167,6 +175,7 @@ Atlassian connector) · **Lane** (code lane via Speckit: Codex / agy / OpenCode)
 | [ ] G-7 | Community + target list: personal network audit, Egyptian founder/SME communities, LinkedIn search; each prospect → an SP Lead at Target | User (list), Orch (create Leads) | J-1, J-4 | ≥20 Leads in SP | SP |
 | [ ] G-8 | Pilot onboarding runbook: CSV/manual supplier + catalogue load, branches/approvers, inbound-email address for WhatsApp-forwarded quotes, first live RFQ, support WhatsApp group (4 working-hour response) | Orch | E-1, P-1, P-3 | Runbook doc linked on PP task, dry-run on demo tenant | PP |
 | [ ] G-9 | Outreach: work SP to 20 conversations at Talked+ | User | G-2, G-5, G-7 | 20 Leads at Talked or beyond | SP |
+| [ ] G-10 | Company formation: Egyptian one-person company on the simplified regime (research in `docs/gtm/company-formation/`) | User | — | Company registered; name + tax ID on PP-17, then into G-6 | PP |
 
 ### P — Product tasks (PP `from-demo` → Speckit spec → code lane)
 
@@ -178,6 +187,11 @@ PR → CI → merge → link PR on the PP task. Refs are in the GTM plan's curre
 | [x] P-1 | **C1** | Wire the **existing** `tenant.currency` (required at sign-up, returned by `/me`, already used by budget/threshold forms) into the forms that still default to USD: PO create, guardrails, quotation review fallbacks. No new setting, no schema/RLS change | Orch (spec + tenancy part), Lane (forms) | — | Merged; demo tenant set to EGP and every form opens in EGP — **done: 022 (#73), PP-1 Done** |
 | [ ] P-2 | **C3** | Locale-aware money formatting on mobile (grouping, currency minor units, ar/en) for approval queue + request detail | Lane | — | Merged; `flutter test` green; screenshots show `EGP 12,500.00` (and Arabic locale equivalent) — **code merged in 022 (#73, #124); stays open until the screenshots (022 T018) exist** |
 | [ ] P-3 | **C2** | Test extraction with 5 real Egyptian quotes (incl. Arabic-Indic digits, ج.م / جنيه / LE); recognise Egyptian markers; replace the GBP fallback with **human review** for unresolved currency — never a tenant-currency default (also Azure DI £/$/€-only + hard-coded USD path; landed-cost GBP default) | Orch (test), Lane (fix) | — | Test results recorded on PP task; fix merged; q1–q3 extract as EGP; q4–q5 land flagged for review with no guessed currency — **fix merged in 022 (#73); the real-quote run is 022 T015, still open** |
+
+| [ ] P-4 | — | One combined jobs container for the background workers hosted lacks (report schedules, offer refresh, exports, digests, webhooks, accounting/POS sync); deploy workflow modelled on #108 | Lane, User (container) | demo video recorded | Deployed; overdue schedules run on hosted (PP-14) |
+| [ ] P-5 | finding 20 | Real product-matching embeddings on hosted (stub scores exact names 55%) — switch on the Bedrock provider (#62) or decide to keep the stub | User (cost OK), Orch | — | Decision on PP-15; if on, exact names score above auto-accept |
+| [ ] P-6 | finding 50 | Hidden/idle web tab signs out after a few hours; visible tab renews fine | Orch → Lane | — | Hidden tab survives several expiries, or cause fixed (PP-16) |
+| [x] P-7 | findings 1–49 | Demo-tenant fix wave record (PRs per finding) | — | — | PP-18 Done |
 
 ### E — Pilot environment
 
@@ -241,4 +255,5 @@ Append one row per session. Newest at the bottom. Include Jira keys and PR numbe
 | 2026-10-15 | Claude (orchestrator) | Founder title **Dr. Yasser Hosny / «د. ياسر حسني»** applied everywhere it is shown: one-pager (canvas AR+EN, PDF re-exported, re-attached to PP-8), DM script intro lines, video end cards + outros (re-rendered), video README. Pilot agreement unchanged (signature fields are blank). English video versions added: sting "Compare. Choose. Save." + English end cards, 16:9 and fast 9:16, same beats/audio. | PP-5 demo tenant → screencast recording |
 | 2026-10-17 | Claude (orchestrator) | Company-formation research in `docs/gtm/company-formation/` (Arabic): 22 Lean Startup Circle Egypt posts + all comments read via Claude in Chrome, key facts verified against official/professional sources (Law 6/2025 rates + consulting exclusion, VAT, e-invoicing, OPC capital EGP 1,000, Delaware $400 LLC tax, Form 5472, BOI). Recommendation: Egyptian one-person company on the simplified regime now; Delaware C-Corp flip only at a funding round. Setup guide, 3-year cost comparison, flip-readiness checklist added. | User books an Egyptian accountant (questions in `recommendations.md` §6), then incorporates; pilot agreement (G-6) moves to the company name |
 | 2026-10-18 | Claude (orchestrator) | P-1 ticked (shipped in 022, #73). P-2 code merged (#73/#124) but left open until its screenshots (022 T018). P-3 fix merged, real-quote run still 022 T015. Roadmap v1.2 records the security review and the background workers missing on hosted | Demo video first; then one combined jobs container for the missing workers; demo findings 22–30 |
+| 2026-10-22 | Claude (orchestrator) | Jira brought up to date with work since 10-18. **Done:** PP-5 (demo tenant, walkthrough runs end to end), new PP-18 (fix-wave record, findings 1–49). **Progress comments + `in-progress` label:** PP-2 (T018 screenshots left), PP-3 (T015 real-quote run left), PP-6 (cuts v2.2, owner review left), PP-10 (liability cap, lawyer, company name left). PP-4 status comment. **New:** PP-14 (combined jobs container), PP-15 (finding 20), PP-16 (finding 50), PP-17 (company formation). Blocks links per §4; priorities High on the critical path (PP-3, PP-4, PP-6, PP-11, PP-13). | User: add board columns (see §2 progress convention), then the orchestrator moves issues; user reviews video cuts (PP-6) |
 | | | | |
