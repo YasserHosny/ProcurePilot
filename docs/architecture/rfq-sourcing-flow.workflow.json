@@ -1,0 +1,90 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "RFQ Sourcing Flow",
+    "locale": "en",
+    "quality_profile": "showcase",
+    "output": "docs/architecture/rfq-sourcing-flow.html",
+    "repository": {
+      "url": "https://github.com/YasserHosny/ProcurePilot.git",
+      "provider": "github",
+      "link_mode": "web",
+      "revision": "eaccf1890ac58724000c92f2ad3546963c512f77"
+    }
+  },
+  "lanes": [
+    { "id": "buyer", "label": "Buyer (web app)" },
+    { "id": "mail", "label": "Mailgun + supplier" },
+    { "id": "api", "label": "Ingestion + matching (apps/api)" },
+    { "id": "request", "label": "Purchase request" }
+  ],
+  "groups": [
+    { "id": "autonomy", "label": "Guarded auto-preparation", "lane": "api", "fromCol": 5, "toCol": 5, "variant": "security" }
+  ],
+  "mainPath": ["create", "send", "mailgun", "reply", "match", "extract", "compare", "prepare", "draft"],
+  "nodes": [
+    { "id": "create", "lane": "buyer", "col": 0, "type": "frontend", "label": "Create RFQ", "sublabel": "lines + suppliers · draft", "tag": "PUT edits draft", "sources": [
+      { "path": "apps/api/src/procurepilot_api/modules/rfq/router.py", "line": 148, "end_line": 181, "label": "POST /rfq" },
+      { "path": "apps/api/src/procurepilot_api/modules/rfq/service.py", "line": 89, "end_line": 135, "label": "rfq row in draft" },
+      { "path": "apps/api/src/procurepilot_api/modules/rfq/service.py", "line": 204, "end_line": 240, "label": "update_draft" } ] },
+    { "id": "send", "lane": "buyer", "col": 1, "type": "frontend", "label": "Send RFQ", "sublabel": "draft → sent", "sources": [
+      { "path": "apps/api/src/procurepilot_api/modules/rfq/router.py", "line": 182, "end_line": 206, "label": "POST /rfq/{id}/send" },
+      { "path": "apps/api/src/procurepilot_api/modules/rfq/service.py", "line": 275, "end_line": 345, "label": "send: recipients + Reply-To" },
+      { "path": "apps/api/src/procurepilot_api/modules/rfq/service.py", "line": 415, "end_line": 432, "label": "rfq.status = sent" } ] },
+    { "id": "mailgun", "lane": "mail", "col": 1, "type": "cloud", "label": "Mailgun send", "sublabel": "localised email per supplier", "sources": [
+      { "path": "apps/api/src/procurepilot_api/modules/rfq/service.py", "line": 346, "end_line": 409, "label": "render + send per recipient" },
+      { "path": "apps/api/src/procurepilot_api/modules/rfq/email.py", "line": 1, "end_line": 122, "label": "render_rfq_email" } ] },
+    { "id": "reply", "lane": "mail", "col": 2, "type": "external", "label": "Supplier replies", "sublabel": "quote to forwarding address", "sources": [
+      { "path": "apps/api/src/procurepilot_api/modules/rfq/service.py", "line": 334, "end_line": 341, "label": "Reply-To forwarding" },
+      { "path": "apps/api/src/procurepilot_api/modules/ingestion/orchestrator.py", "line": 63, "end_line": 74, "label": "process_inbound_email" } ] },
+    { "id": "match", "lane": "api", "col": 2, "type": "backend", "label": "Match reply to RFQ", "sublabel": "In-Reply-To / References", "tag": "rfq → responded", "sources": [
+      { "path": "apps/api/src/procurepilot_api/modules/ingestion/orchestrator.py", "line": 114, "end_line": 145, "label": "reply wins attribution" },
+      { "path": "apps/api/src/procurepilot_api/modules/rfq/response_matching.py", "line": 20, "end_line": 61, "label": "match_rfq_response" },
+      { "path": "apps/api/src/procurepilot_api/modules/ingestion/orchestrator.py", "line": 162, "end_line": 179, "label": "rfq_response + responded" } ] },
+    { "id": "extract", "lane": "api", "col": 3, "type": "backend", "label": "Extract + match lines", "sublabel": "quotation → match_decision", "sources": [
+      { "path": "apps/api/src/procurepilot_api/modules/ingestion/orchestrator.py", "line": 247, "end_line": 254, "label": "enqueue extraction" },
+      { "path": "apps/api/src/procurepilot_api/modules/matching/service.py", "line": 677, "end_line": 680, "label": "enqueue guardrail_eval" },
+      { "path": "apps/api/src/procurepilot_api/modules/ingestion/guardrail_jobs.py", "line": 13, "end_line": 41, "label": "only RFQ-linked quotes" } ] },
+    { "id": "guardrail", "lane": "api", "col": 5, "type": "security", "label": "Guardrail evaluation", "sublabel": "all responses matched?", "tag": "ADR-019", "sources": [
+      { "path": "apps/api/src/procurepilot_api/workers/email_ingestion_worker.py", "line": 144, "end_line": 177, "label": "guardrail_eval job" },
+      { "path": "apps/api/src/procurepilot_api/modules/ingestion/orchestrator.py", "line": 373, "end_line": 422, "label": "lock, snapshot, first fire" },
+      { "path": "apps/api/src/procurepilot_api/modules/rfq/guardrail_evaluation.py", "line": 34, "end_line": 122, "label": "enabled guardrails + pending" } ] },
+    { "id": "compare", "lane": "buyer", "col": 3, "type": "frontend", "label": "Compare responses", "sublabel": "quoted lines side by side", "sources": [
+      { "path": "apps/api/src/procurepilot_api/modules/rfq/router.py", "line": 207, "end_line": 223, "label": "GET /rfq/{id}/responses" },
+      { "path": "apps/api/src/procurepilot_api/modules/rfq/service.py", "line": 437, "end_line": 470, "label": "list_responses" } ] },
+    { "id": "prepare", "lane": "buyer", "col": 4, "type": "frontend", "label": "Prepare request", "sublabel": "buyer picks a response", "sources": [
+      { "path": "apps/api/src/procurepilot_api/modules/rfq/router.py", "line": 224, "end_line": 254, "label": "POST /prepare-request" },
+      { "path": "apps/api/src/procurepilot_api/modules/rfq/service.py", "line": 542, "end_line": 560, "label": "one request per RFQ" } ] },
+    { "id": "draft", "lane": "request", "col": 4, "type": "database", "label": "Draft purchase request", "sublabel": "per-pack estimates · RFQ converted", "tag": "human submits", "sources": [
+      { "path": "apps/api/src/procurepilot_api/modules/rfq/service.py", "line": 705, "end_line": 788, "label": "estimates + mark converted" },
+      { "path": "apps/api/src/procurepilot_api/modules/requests/service.py", "line": 160, "end_line": 175, "label": "status draft" } ] }
+  ],
+  "edges": [
+    { "id": "create-send", "from": "create", "to": "send", "variant": "emphasis" },
+    { "id": "send-mailgun", "from": "send", "to": "mailgun", "label": "per recipient", "variant": "emphasis" },
+    { "id": "mailgun-reply", "from": "mailgun", "to": "reply", "label": "email", "variant": "dashed", "role": "async" },
+    { "id": "reply-match", "from": "reply", "to": "match", "label": "inbound", "variant": "emphasis" },
+    { "id": "match-extract", "from": "match", "to": "extract", "variant": "emphasis" },
+    { "id": "extract-compare", "from": "extract", "to": "compare", "label": "responses", "variant": "emphasis" },
+    { "id": "compare-prepare", "from": "compare", "to": "prepare", "variant": "emphasis" },
+    { "id": "prepare-draft", "from": "prepare", "to": "draft", "label": "manual", "variant": "emphasis" },
+    { "id": "extract-guardrail", "from": "extract", "to": "guardrail", "label": "guardrail_eval job", "variant": "dashed", "role": "async" },
+    { "id": "guardrail-draft", "from": "guardrail", "to": "draft", "label": "fires", "variant": "security", "role": "branch" }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "Reply attribution", "items": [
+      "Direct In-Reply-To parent first, then newest same-supplier reference",
+      "Ambiguous across suppliers → no rfq_response, normal cascade/review"
+    ] },
+    { "dot": "rose", "title": "Guardrail limits", "items": [
+      "Waits until every non-refused response is reviewed and fully matched",
+      "Checks min responses, max order value, price variance, supplier and category allowlists",
+      "Uses the same prepare_request as the buyer, then emails the guardrail owner"
+    ] },
+    { "dot": "amber", "title": "Never autonomous purchasing", "items": [
+      "Both paths stop at a draft request; a human submits it into approvals",
+      "One request per RFQ: a second preparation sees converted and replays"
+    ] }
+  ]
+}
