@@ -11,7 +11,7 @@ only when stages 1 and 2 are done.
 Owners: **Orch** = Demo generation session (Claude, orchestrator) · **Lane** = coding session started
 from a fix card · **User** = Dr. Yasser Hosny.
 
-Status as of 2026-10-18.
+Status as of 2026-10-22. **Style:** every cut follows [`motion-style.md`](motion-style.md) (owner direction 2026-10-22).
 
 ## Stage 1 — Product flow works end to end (critical path)
 
@@ -53,7 +53,8 @@ plus-address send-as aliases, 30 products, inbound email address.
 | 3.4 | Edit on the music (Antalya Beaches) with the rendered outro at 2:50.25 → 3-minute cut | Orch | ✅ 2026-10-19: 3-minute Arabic cut rendered (music, cards, outro at 2:50.25); waiting for the owner’s review (3.7) | 3.1–3.3 |
 | 3.5 | 60-second vertical cut (outro at 0:51.34) | Orch | ✅ 2026-10-19: 60-second 9:16 cut (track 2:00→, fast outro at 0:51.34, ends 0:59.85; phone scenes full height, web scenes cropped) | 3.4 |
 | 3.6 | English versions (swap text cards; English outros already rendered) | Orch | ✅ 2026-10-19: English 3:00 and 60 s cuts: same footage, English cards (LTR) and the English outros | 3.4, 3.5 |
-| 3.7 | User review of the recorded run, then of the cuts | User | ⏳ in progress: owner comments on v2.1 (2026-10-20) applied in v2.2; still to do — pick the opening (animated or clip) and a final look at the cuts | 3.3, 3.6 |
+| 3.7 | User review of the recorded run, then of the cuts | User | ⏳ v2.1 comments (2026-10-20) applied in v2.2. Final review now waits for **3.8**: review v2.3 instead of picking between the v2.2 openings | 3.3, 3.6, 3.8 |
+| 3.8 | **v2.3 brand editorial**: the v2.2 edit re-art-directed per [`motion-style.md`](motion-style.md): official Navy/Teal/Mist/Paper palette, Readex Pro, official logo SVGs, Converge bar/arrow transitions, navy duotone footage plates. Arabic + English, 16:9 + 9:16. Content, copy and timing unchanged | Orch | ⏳ Arabic 16:9 + 9:16 rendered 2026-10-22 ([`cuts/v2.3-brand/`](cuts/v2.3-brand/)); English (round-5 English-UI footage) after the owner approves the look | 3.6 |
 | ✅ | Logo sting, end cards, music, sound cues, Arabic + English outros, founder title | — | done (#79, #80) | — |
 
 ## Not blocking the video
@@ -88,3 +89,5 @@ plus-address send-as aliases, 30 products, inbound email address.
 | 2026-10-19 (night) | Comparison beat swapped to Smart Compare (recommended الأمانة, 12,880 vs 13,080 landed). 60-second vertical cut and both English cuts rendered; all four sent to the owner for review (3.7). Loudness −14.6 / −13.8 LUFS, peaks ≤ −2.2 dBFS. |
 | 2026-10-19 (late) | Codex reviewed the plan; v2.0 (email masked, captions over footage, faster start) and v2.1 (phone low-stock re-recorded after #195, fuller vertical crops) built; all versions committed under `cuts/` with v1 rebuilt with the email masked at source (#194, #197–#199). |
 | 2026-10-20 | Owner review of v2.1: English cuts showed the Arabic UI, the opening did not show the problem, loading shown too long, cropped click targets. v2.2 fixes those with two openings (animation / recorded clip) (#199); round 5 recorded with the English interface for English-UI cuts (#201, #202); Arabic editorial collage cuts from a cloud session reviewed, audio clipping fixed, merged (#200). Product fixes from round 5: findings 47–49 (#203, #206, #207). Next: owner picks the opening and gives the cuts a final look (3.7). |
+| 2026-10-22 | Owner set a binding motion-graphics direction (editorial, brand-led, adaptive colour). Recorded in `motion-style.md` with a gap review: v2.2-editorial uses an invented palette and recolours the logo. Started 3.8 (v2.3 brand editorial); owner's final review moves to v2.3. |
+| 2026-10-22 (later) | v2.3 brand editorial, Arabic 16:9 (1:59) and 9:16 (0:53) rendered: brand palette, navy duotone plates, Converge bar wipes, official logo SVGs. Waiting on owner review of the look before the English cut. |
