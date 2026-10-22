@@ -58,3 +58,6 @@ samples/
 
 # Local orchestration scratch (briefs, one-off scripts) -- never committed
 scratch/
+
+# Archify scratch output (diagrams worth keeping move to docs/)
+.archify/
