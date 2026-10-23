@@ -39,7 +39,10 @@ from procurepilot_api.modules.orders.service import (
     _receipt_model,
     _submit_action,
 )
-from procurepilot_api.modules.orders.validation import build_lifecycle_summary
+from procurepilot_api.modules.orders.validation import (
+    build_lifecycle_summary,
+    progress_order_status,
+)
 
 TENANT = UUID("00000000-0000-0000-0000-000000000001")
 MEMBER = UUID("00000000-0000-0000-0000-000000000002")
@@ -127,6 +130,83 @@ def test_lifecycle_accumulates_partial_multiple_receipts_without_zero_for_missin
     assert summary.status == "partially_received"
     assert summary.lines[0].received.quantity == Decimal("7")
     assert summary.lines[0].remaining_quantity == Decimal("3")
+
+
+@pytest.mark.parametrize(
+    ("current", "confirmed", "received", "expected"),
+    [
+        # Spec 016 US1: a confirmation advances a submitted order.
+        ("submitted", True, None, "confirmed"),
+        ("submitted", False, None, "submitted"),
+        # Any receipt short of every line in full is a partial delivery.
+        ("submitted", False, Decimal("4"), "partially_received"),
+        ("confirmed", True, Decimal("4"), "partially_received"),
+        ("partially_received", True, Decimal("9.99"), "partially_received"),
+        # Cumulative receipts covering every ordered line (over-receipt included) are received.
+        ("partially_received", True, Decimal("10"), "received"),
+        ("confirmed", True, Decimal("12"), "received"),
+        # A zero-quantity receipt line is evidence of a delivery, not of goods received.
+        ("confirmed", True, Decimal("0"), "partially_received"),
+        # Draft, cancelled and closed orders are never moved by evidence.
+        ("draft", True, Decimal("10"), "draft"),
+        ("cancelled", True, Decimal("4"), "cancelled"),
+        ("closed", True, Decimal("10"), "closed"),
+        # Evidence never moves an order backwards.
+        ("received", True, None, "received"),
+    ],
+)
+def test_progress_order_status_follows_evidence(
+    current: str, confirmed: bool, received: Decimal | None, expected: str
+) -> None:
+    received_by_line = {} if received is None else {LINE: received}
+    assert (
+        progress_order_status(
+            current,  # type: ignore[arg-type]
+            confirmed=confirmed,
+            ordered_by_line={LINE: Decimal("10")},
+            received_by_line=received_by_line,
+        )
+        == expected
+    )
+
+
+def test_progress_order_status_needs_every_line_received() -> None:
+    other = UUID(int=99)
+    assert (
+        progress_order_status(
+            "confirmed",
+            confirmed=True,
+            ordered_by_line={LINE: Decimal("10"), other: Decimal("2")},
+            received_by_line={LINE: Decimal("10")},
+        )
+        == "partially_received"
+    )
+
+
+def test_lifecycle_shows_confirmed_after_a_confirmation() -> None:
+    order = _order()
+    confirmation = SimpleNamespace(
+        id=UUID(int=40),
+        tenant_id=TENANT,
+        purchase_order_id=ORDER,
+        supplier_reference="SO-1",
+        confirmed_at=datetime(2026, 9, 20, tzinfo=UTC),
+        expected_delivery_date=None,
+        source_kind="manual",
+        source_reference="so:1",
+        source_hash=None,
+        recorded_by=MEMBER,
+        created_at=datetime(2026, 9, 20, tzinfo=UTC),
+        lines=(
+            SimpleNamespace(
+                id=UUID(int=41),
+                purchase_order_line_id=LINE,
+                confirmed_quantity=Decimal("10"),
+                confirmed_unit_price=None,
+            ),
+        ),
+    )
+    assert build_lifecycle_summary(order, confirmations=(confirmation,)).status == "confirmed"
 
 
 def test_write_requires_owner_or_buyer_and_idempotency_key() -> None:
@@ -305,6 +385,8 @@ class _FakeCursor:
         self.executed.append((statement, params))
         if statement.startswith("select status from purchase_request"):
             self.last_row = {"status": "ordered"}
+        elif statement.startswith("select status::text as status"):
+            self.last_row = {"status": "submitted", "confirmed": False}
         elif "record_audit_event" not in statement:
             self.last_row = {"id": str(UUID(int=20))}
 
@@ -313,6 +395,9 @@ class _FakeCursor:
 
     def fetchone(self) -> dict[str, object] | None:
         return self.last_row
+
+    def fetchall(self) -> list[dict[str, object]]:
+        return []
 
 
 class _RollbackContext:

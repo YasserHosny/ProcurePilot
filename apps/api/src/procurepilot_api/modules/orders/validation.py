@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from decimal import Decimal
 from uuid import UUID
 
@@ -10,9 +10,43 @@ from procurepilot_api.modules.orders.schemas import (
     EvidenceProjection,
     LifecycleLineSummary,
     LifecycleSummary,
+    OrderStatus,
     PurchaseOrder,
     SupplierConfirmation,
 )
+
+# Evidence moves an order forward only from these states. Draft orders have not been sent,
+# and cancelled/closed orders are final, so recorded evidence leaves them where they are.
+_EVIDENCE_PROGRESSABLE: frozenset[OrderStatus] = frozenset(
+    {"submitted", "confirmed", "partially_received"}
+)
+
+
+def progress_order_status(
+    current: OrderStatus,
+    *,
+    confirmed: bool,
+    ordered_by_line: Mapping[UUID, Decimal],
+    received_by_line: Mapping[UUID, Decimal],
+) -> OrderStatus:
+    """Spec 016 US1 status from recorded evidence; never moves an order backwards.
+
+    `received_by_line` holds cumulative received quantity for lines with any receipt. Every
+    ordered line received in full (over-receipt included) is `received`; any receipt short of
+    that is `partially_received`; a supplier confirmation alone is `confirmed`.
+    """
+    if current not in _EVIDENCE_PROGRESSABLE:
+        return current
+    if received_by_line:
+        if all(
+            received_by_line.get(line_id, Decimal("0")) >= ordered
+            for line_id, ordered in ordered_by_line.items()
+        ):
+            return "received"
+        return "partially_received"
+    if confirmed and current == "submitted":
+        return "confirmed"
+    return current
 
 
 def validate_confirmation_against_order(
@@ -133,19 +167,12 @@ def build_lifecycle_summary(
 
     confirmation_state = "available" if latest_confirmation is not None else "pending"
     receipt_state = "available" if receipt_list else "pending"
-    status = order.status
-    if (
-        order.status not in {"cancelled", "closed"}
-        and receipt_list
-        and all(
-            summary.received.quantity is not None
-            and summary.received.quantity >= summary.ordered_quantity
-            for summary in summaries
-        )
-    ):
-        status = "received"
-    elif order.status not in {"cancelled", "closed"} and receipt_list:
-        status = "partially_received"
+    status = progress_order_status(
+        order.status,
+        confirmed=latest_confirmation is not None,
+        ordered_by_line={line.id: line.ordered_quantity for line in order.lines},
+        received_by_line=received_by_line,
+    )
     return LifecycleSummary(
         purchase_order_id=order.id,
         status=status,

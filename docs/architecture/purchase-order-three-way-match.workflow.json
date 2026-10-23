@@ -333,8 +333,10 @@
       "dot": "amber",
       "title": "Order status in practice",
       "items": [
-        "The code sets draft, submitted and cancelled only",
-        "confirmed, partially_received, received and closed exist in the enum but nothing sets them yet",
+        "Create sets draft, submit sets submitted, cancel sets cancelled",
+        "A supplier confirmation moves submitted to confirmed",
+        "A receipt moves the order to partially_received, or to received once every line is received in full",
+        "Evidence never moves an order backwards or touches draft, cancelled or closed; nothing sets closed yet",
         "Cancel is refused once an order is received or closed"
       ]
     },
