@@ -21,6 +21,7 @@ from integration.smart_compare_helpers import (
 from procurepilot_api.deps import bearer_token, current_member
 from procurepilot_api.main import create_app
 from procurepilot_api.modules.auth.jwt import MemberRole
+from procurepilot_api.modules.orders import service as orders_service
 from procurepilot_api.modules.requests import service as requests_service
 
 pytestmark = pytest.mark.skipif(
@@ -499,6 +500,120 @@ def test_cancellation_releases_unreceived_quantity_but_retains_receipts(
                     (order_id,),
                 )
                 assert cur.fetchone()[0] == Decimal("4")
+
+
+def test_confirmation_and_receipts_advance_stored_order_status(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Spec 016 US1: submitted -> confirmed -> partially_received -> received, stored."""
+    with (
+        committed_smart_context("order-status") as context,
+        psycopg.connect(TEST_DATABASE_URL, autocommit=True) as reader,
+    ):
+        member = member_from_workspace(context.workspace, role=MemberRole.owner)
+        client = TestClient(_app(monkeypatch, member), raise_server_exceptions=False)
+        # Evidence endpoints read the order through PostgREST; serve that from Postgres as
+        # the tenant so RLS still applies.
+        monkeypatch.setattr(
+            orders_service,
+            "authenticated_client",
+            lambda _settings, _bearer_token: PsycopgSupabaseClient(
+                reader, claims=context.workspace.claims()
+            ),
+        )
+
+        with psycopg.connect(TEST_DATABASE_URL) as conn:
+            req_id, line_id = _setup_approved_request(conn, context.workspace, context.product_id)
+
+        payload = _base_order_payload(
+            context.supplier_ids[0], req_id, line_id, context.product_id, qty="10"
+        )
+        created = client.post(
+            "/api/v1/orders", json=payload, headers={"Idempotency-Key": str(uuid4())}
+        )
+        assert created.status_code == 201, created.text
+        order_id = created.json()["id"]
+        order_line_id = created.json()["lines"][0]["id"]
+
+        def stored_status() -> str:
+            with psycopg.connect(TEST_DATABASE_URL) as conn, conn.cursor() as cur:
+                cur.execute("select status::text from purchase_order where id = %s", (order_id,))
+                return str(cur.fetchone()[0])
+
+        def receive(quantity: str, reference: str, key: str | None = None) -> dict[str, object]:
+            res = client.post(
+                f"/api/v1/orders/{order_id}/receipts",
+                json={
+                    "receipt_reference": reference,
+                    "receipt_date": "2026-10-01",
+                    "source_reference": f"test:{reference}",
+                    "lines": [
+                        {"purchase_order_line_id": order_line_id, "received_quantity": quantity}
+                    ],
+                },
+                headers={"Idempotency-Key": key or str(uuid4())},
+            )
+            assert res.status_code == 200, res.text
+            return res.json()
+
+        submitted = client.post(
+            f"/api/v1/orders/{order_id}/submit", headers={"Idempotency-Key": str(uuid4())}
+        )
+        assert submitted.status_code == 200, submitted.text
+        assert stored_status() == "submitted"
+
+        confirmation_key = str(uuid4())
+        confirmation_body = {
+            "supplier_reference": "SO-1",
+            "confirmed_at": "2026-09-30T10:00:00Z",
+            "source_reference": "test:so-1",
+            "lines": [{"purchase_order_line_id": order_line_id, "confirmed_quantity": "10"}],
+        }
+        confirmed = client.post(
+            f"/api/v1/orders/{order_id}/confirmations",
+            json=confirmation_body,
+            headers={"Idempotency-Key": confirmation_key},
+        )
+        assert confirmed.status_code == 200, confirmed.text
+        assert confirmed.json()["order"]["status"] == "confirmed"
+        assert confirmed.json()["lifecycle"]["status"] == "confirmed"
+        assert stored_status() == "confirmed"
+
+        first_receipt_key = str(uuid4())
+        partial = receive("4", "GRN-1", first_receipt_key)
+        assert partial["order"]["status"] == "partially_received"
+        assert stored_status() == "partially_received"
+        # A retried receipt is the same receipt: still 4 received, not 8.
+        retried = receive("4", "GRN-1", first_receipt_key)
+        assert len(retried["receipts"]) == 1
+        assert Decimal(str(retried["lifecycle"]["lines"][0]["received"]["quantity"])) == 4
+
+        # Replaying the confirmation after a delivery must not move the order backwards.
+        replay = client.post(
+            f"/api/v1/orders/{order_id}/confirmations",
+            json=confirmation_body,
+            headers={"Idempotency-Key": confirmation_key},
+        )
+        assert replay.status_code == 200, replay.text
+        assert stored_status() == "partially_received"
+
+        complete = receive("6", "GRN-2")
+        assert complete["order"]["status"] == "received"
+        assert complete["lifecycle"]["status"] == "received"
+        assert stored_status() == "received"
+
+        refused = client.post(
+            f"/api/v1/orders/{order_id}/cancel", headers={"Idempotency-Key": str(uuid4())}
+        )
+        assert refused.status_code == 409, refused.text
+        assert refused.json()["details"]["reason"] == "order_not_cancellable"
+
+        with psycopg.connect(TEST_DATABASE_URL) as conn, conn.cursor() as cur:
+            cur.execute(
+                "select count(*) from audit_event where action = %s and tenant_id = %s",
+                ("orders.purchase_order_status_changed", context.workspace.tenant_id),
+            )
+            assert cur.fetchone()[0] == 3
 
 
 def test_cross_tenant_and_role_rejections(

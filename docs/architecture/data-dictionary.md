@@ -1194,8 +1194,15 @@ ProcurePilot only; no provider-send/write/cancel method exists.
 
 State transitions for US4: create yields `draft`; `PUT /orders/{id}` may edit only `draft`;
 `POST /orders/{id}/submit` moves `draft -> submitted`; `POST /orders/{id}/cancel` moves a
-cancellable order to `cancelled`. Cancellation is internal and preserves receipt/confirmation
-evidence.
+cancellable order (anything but `received` or `closed`) to `cancelled`. Cancellation is internal
+and preserves receipt/confirmation evidence.
+
+Evidence transitions (spec 016 FR-021): recording a supplier confirmation moves `submitted ->
+confirmed`; recording a delivery receipt moves `submitted | confirmed | partially_received` to
+`partially_received`, or to `received` once every line's cumulative received quantity reaches its
+ordered quantity. Evidence never moves an order backwards and leaves `draft`, `cancelled` and
+`closed` unchanged. Each change is audited as `orders.purchase_order_status_changed`. Nothing sets
+`closed` yet.
 
 ## `PurchaseOrderLine`
 

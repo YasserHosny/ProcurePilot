@@ -164,6 +164,29 @@ and the request's approval status remains unchanged.
 - **FR-018**: The system MUST reserve the full ordered quantity for all non-cancelled POs (draft, submitted, confirmed, received) and compute remaining quantities from these allocations.
 - **FR-019**: The system MUST serialize concurrent create, edit, and cancel operations atomically at the purchase request scope to prevent over-allocation races. Mutations MUST remain idempotent.
 - **FR-020**: The system MUST NOT delete evidence on PO cancellation. The cancel operation MUST leave immutable received quantity consumed, release unreceived quantity, and MUST NOT call an external provider.
+- **FR-021** (added 2026-10-23): The stored `purchase_order.status` MUST follow recorded evidence
+  (User Story 1). It is recomputed in the same transaction as each supplier confirmation or delivery
+  receipt, with the order row locked:
+  - `submitted -> confirmed` when a supplier confirmation is recorded;
+  - `submitted | confirmed | partially_received -> partially_received` when a receipt is recorded
+    and at least one line's cumulative received quantity is below its ordered quantity;
+  - `-> received` once every line's cumulative received quantity reaches its ordered quantity
+    (over-receipt counts as received; the excess stays visible as `over_received_quantity`).
+
+  Evidence never moves an order backwards (a later confirmation leaves a partially received order
+  where it is) and never moves `draft`, `cancelled` or `closed` orders. Each change is audited as
+  `orders.purchase_order_status_changed`. `received` and `closed` orders cannot be cancelled;
+  `partially_received` orders can (FR-020). Nothing sets `closed` yet: closing an order is not
+  specified in this release.
+
+  Before 2026-10-23 the status was only derived for the order detail view
+  (`build_lifecycle_summary`), so the stored status stayed `submitted`. Readers of the stored
+  status were affected: Supplier IQ service risk and the quality-issue rate (`received`/`closed`
+  only), and the savings delivery result.
+
+  Existing orders are not backfilled: the status is recomputed only when new evidence is recorded.
+  On 2026-10-23 the hosted database had two orders with earlier evidence, both in throwaway E2E
+  tenants and none on the demo tenant, so no backfill was needed.
 
 ## Data Entities
 

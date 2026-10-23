@@ -44,6 +44,7 @@ from procurepilot_api.modules.orders.schemas import (
 )
 from procurepilot_api.modules.orders.validation import (
     build_lifecycle_summary,
+    progress_order_status,
     validate_confirmation_against_order,
     validate_receipt_against_order,
 )
@@ -743,6 +744,7 @@ class OrdersService:
         except ValueError as exc:
             raise UnprocessableEntityError(details={"reason": "invalid_confirmation"}) from exc
         with self._transaction(member) as cur:
+            self._lock_order_cursor(cur, member.tenant_id, order_id)
             cur.execute(
                 "insert into supplier_confirmation (tenant_id,purchase_order_id,supplier_reference,"
                 "confirmed_at,expected_delivery_date,source_kind,source_reference,source_hash,"
@@ -765,9 +767,11 @@ class OrdersService:
             row = cur.fetchone()
             created = row is not None
             if row is None:
+                # Evidence is append-only (no UPDATE grant), so no row lock: the order lock
+                # above already serializes writers, and the conflicting insert has committed.
                 cur.execute(
                     f"select {CONFIRMATION_COLUMNS},purchase_order_id from supplier_confirmation "
-                    "where tenant_id = %s and idempotency_key = %s for update",
+                    "where tenant_id = %s and idempotency_key = %s",
                     (member.tenant_id, idempotency_key),
                 )
                 row = cur.fetchone()
@@ -799,6 +803,7 @@ class OrdersService:
                 self._audit_cursor(
                     cur, member, "orders.supplier_confirmation_recorded", confirmation_id
                 )
+            self._progress_status_cursor(cur, member, order_id)
             confirmation = self._load_confirmation_cursor(cur, confirmation_id)
         return self._evidence(client, order_id)
 
@@ -835,6 +840,7 @@ class OrdersService:
         except ValueError as exc:
             raise UnprocessableEntityError(details={"reason": "invalid_receipt"}) from exc
         with self._transaction(member) as cur:
+            self._lock_order_cursor(cur, member.tenant_id, order_id)
             cur.execute(
                 "insert into delivery_receipt (tenant_id,purchase_order_id,receipt_reference,"
                 "receipt_date,"
@@ -856,9 +862,11 @@ class OrdersService:
             row = cur.fetchone()
             created = row is not None
             if row is None:
+                # Evidence is append-only (no UPDATE grant), so no row lock: the order lock
+                # above already serializes writers, and the conflicting insert has committed.
                 cur.execute(
                     f"select {RECEIPT_COLUMNS} from delivery_receipt "
-                    "where tenant_id = %s and idempotency_key = %s for update",
+                    "where tenant_id = %s and idempotency_key = %s",
                     (member.tenant_id, idempotency_key),
                 )
                 row = cur.fetchone()
@@ -883,6 +891,7 @@ class OrdersService:
                     ],
                 )
                 self._audit_cursor(cur, member, "orders.delivery_receipt_recorded", receipt_id)
+            self._progress_status_cursor(cur, member, order_id)
             receipt = self._load_receipt_cursor(cur, receipt_id)
         return self._evidence(client, order_id)
 
@@ -925,6 +934,56 @@ class OrdersService:
             raise
         except psycopg.Error as exc:
             raise _database_error(exc) from exc
+
+    @staticmethod
+    def _lock_order_cursor(cur: psycopg.Cursor, tenant_id: UUID, order_id: UUID) -> None:
+        """Serialize evidence writes with each other and with submit/cancel on this order."""
+        cur.execute(
+            "select 1 from purchase_order where tenant_id = %s and id = %s for update",
+            (tenant_id, order_id),
+        )
+        if cur.fetchone() is None:
+            raise NotFoundError(details={"resource": "purchase_order"})
+
+    def _progress_status_cursor(
+        self, cur: psycopg.Cursor, member: CurrentMember, order_id: UUID
+    ) -> None:
+        """Store the spec 016 US1 status the order's recorded evidence now supports."""
+        cur.execute(
+            "select status::text as status, exists (select 1 from supplier_confirmation sc "
+            "where sc.tenant_id = po.tenant_id and sc.purchase_order_id = po.id) as confirmed "
+            "from purchase_order po where po.tenant_id = %s and po.id = %s",
+            (member.tenant_id, order_id),
+        )
+        header = cur.fetchone()
+        if header is None:
+            raise NotFoundError(details={"resource": "purchase_order"})
+        cur.execute(
+            "select pol.id, pol.ordered_quantity, sum(drl.received_quantity) as received "
+            "from purchase_order_line pol left join delivery_receipt_line drl "
+            "on drl.tenant_id = pol.tenant_id and drl.purchase_order_line_id = pol.id "
+            "where pol.tenant_id = %s and pol.purchase_order_id = %s group by pol.id",
+            (member.tenant_id, order_id),
+        )
+        lines = cur.fetchall()
+        status = progress_order_status(
+            header["status"],
+            confirmed=bool(header["confirmed"]),
+            ordered_by_line={UUID(str(row["id"])): row["ordered_quantity"] for row in lines},
+            received_by_line={
+                UUID(str(row["id"])): row["received"]
+                for row in lines
+                if row["received"] is not None
+            },
+        )
+        if status == header["status"]:
+            return
+        cur.execute(
+            "update purchase_order set status = %s::purchase_order_status, updated_at = now() "
+            "where tenant_id = %s and id = %s",
+            (status, member.tenant_id, order_id),
+        )
+        self._audit_cursor(cur, member, "orders.purchase_order_status_changed", order_id)
 
     @staticmethod
     def _audit_cursor(

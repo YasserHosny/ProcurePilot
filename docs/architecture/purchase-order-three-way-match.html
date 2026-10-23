@@ -5645,8 +5645,10 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
           <h3>Order status in practice</h3>
         </div>
         <ul>
-          <li>The code sets draft, submitted and cancelled only</li>
-          <li>confirmed, partially_received, received and closed exist in the enum but nothing sets them yet</li>
+          <li>Create sets draft, submit sets submitted, cancel sets cancelled</li>
+          <li>A supplier confirmation moves submitted to confirmed</li>
+          <li>A receipt moves the order to partially_received, or to received once every line is received in full</li>
+          <li>Evidence never moves an order backwards or touches draft, cancelled or closed; nothing sets closed yet</li>
           <li>Cancel is refused once an order is received or closed</li>
         </ul>
       </div>
