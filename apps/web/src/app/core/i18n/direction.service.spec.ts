@@ -1,5 +1,6 @@
+import { DOCUMENT } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { DOCUMENT } from '@angular/common';
+
 import { Directionality } from '@angular/cdk/bidi';
 
 import { DirectionService } from './direction.service';
