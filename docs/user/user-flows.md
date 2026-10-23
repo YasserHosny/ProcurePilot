@@ -12,7 +12,7 @@
 ## Access and Workspace Setup
 
 - `/auth/sign-in` -> sign in -> `/home`
-- `/auth/sign-in` -> **Forgot password?** -> `/auth/password-reset` -> email reset link
+- `/auth/sign-in` -> **Forgot password?** -> `/auth/password-reset` -> email reset link -> `/auth/update-password` -> new password -> `/auth/sign-in`
 - `/auth/sign-in` -> **Create workspace** -> `/onboarding/signup` -> invitation token + workspace details -> `/onboarding/plan` -> `/home`
 - `/onboarding/accept-invitation?token=...` -> accept member invitation -> `/home`
 - Guarded page while signed out -> `/auth/sign-in?returnUrl=...` -> original page after sign-in

@@ -170,6 +170,31 @@ paths:
         '202': { description: Accepted }
         '429': { $ref: '#/components/responses/RateLimited' }
 
+  /auth/password-update:
+    post:
+      summary: Set a new password from the emailed recovery link
+      description: >-
+        The reset email links to the web app's `/auth/update-password` page, which passes the
+        recovery session's tokens from the link's URL fragment. Supabase verifies them. A
+        successful change is audited as `auth.password_reset_completed`.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [access_token, refresh_token, password]
+              properties:
+                access_token: { type: string, minLength: 1 }
+                refresh_token: { type: string, minLength: 1 }
+                password: { type: string, minLength: 12 }
+      responses:
+        '204': { description: Password changed }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '422': { description: Password refused (too short, too weak, or the same as before) }
+        '429': { $ref: '#/components/responses/RateLimited' }
+
   /me:
     get:
       summary: The caller, their role, and their active workspace

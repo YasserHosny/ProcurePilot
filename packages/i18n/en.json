@@ -58,6 +58,27 @@
       "rateLimitedError": "Too many password reset requests. Please wait a few moments and try again.",
       "genericError": "Unable to process reset request. Please check your connection and try again."
     },
+    "update": {
+      "title": "Choose a new password",
+      "subtitle": "Enter a new password for your account. Use at least {{min}} characters.",
+      "passwordLabel": "New password",
+      "confirmLabel": "Confirm new password",
+      "passwordRequired": "Password is required",
+      "passwordMinLength": "Use at least {{min}} characters",
+      "mismatch": "The passwords do not match",
+      "submitButton": "Save new password",
+      "submittingButton": "Saving...",
+      "successTitle": "Password changed",
+      "successMessage": "You can now sign in with your new password.",
+      "signInButton": "Go to sign in",
+      "invalidTitle": "This link has expired or was already used",
+      "invalidMessage": "Request a new password reset email and open the newest link in it.",
+      "requestNewLink": "Request a new link",
+      "samePasswordError": "The new password must be different from your current one.",
+      "weakPasswordError": "That password is too weak. Choose a longer or less common one.",
+      "rateLimitedError": "Too many attempts. Please wait a few moments and try again.",
+      "genericError": "Unable to change your password. Please check your connection and try again."
+    },
     "biometric": {
       "enableTitle": "Enable biometric unlock?",
       "enableMessage": "Use your device's fingerprint or face recognition to unlock ProcurePilot next time instead of typing your password.",

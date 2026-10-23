@@ -193,6 +193,7 @@ PR → CI → merge → link PR on the PP task. Refs are in the GTM plan's curre
 | [ ] P-5 | finding 20 | Real product-matching embeddings on hosted (stub scores exact names 55%) — switch on the Bedrock provider (#62) or decide to keep the stub | User (cost OK), Orch | — | Decision on PP-15; if on, exact names score above auto-accept |
 | [ ] P-6 | finding 50 | Hidden/idle web tab signs out after a few hours; visible tab renews fine | Orch → Lane | — | Hidden tab survives several expiries, or cause fixed (PP-16) |
 | [x] P-7 | findings 1–49 | Demo-tenant fix wave record (PRs per finding) | — | — | PP-18 Done |
+| [ ] P-8 | email audit | Password reset broken on hosted: Site URL was localhost, no set-password page, no custom SMTP (2 emails/hour) | Orch (config + code), User (SMTP credentials) | — | Live reset on hosted: email arrives, link opens `/auth/update-password`, new password signs in (PP-28) |
 
 ### E — Pilot environment
 

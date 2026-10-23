@@ -144,6 +144,15 @@ export class ApiService {
     return this.http.post<void>(`${this.base}/auth/password-reset`, { email });
   }
 
+  /** Sets a new password with the recovery session from the reset email's link (PP-28). */
+  updatePassword(accessToken: string, refreshToken: string, password: string): Observable<void> {
+    return this.http.post<void>(`${this.base}/auth/password-update`, {
+      access_token: accessToken,
+      refresh_token: refreshToken,
+      password,
+    });
+  }
+
   // --- identity -----------------------------------------------------------
 
   me(): Observable<Me> {
