@@ -184,6 +184,10 @@ and the request's approval status remains unchanged.
   status were affected: Supplier IQ service risk and the quality-issue rate (`received`/`closed`
   only), and the savings delivery result.
 
+  Existing orders are not backfilled: the status is recomputed only when new evidence is recorded.
+  On 2026-10-23 the hosted database had two orders with earlier evidence, both in throwaway E2E
+  tenants and none on the demo tenant, so no backfill was needed.
+
 ## Data Entities
 
 - `purchase_order`: internal order header, supplier, lifecycle status, dates, currency, totals, and `source_request_id` to link to at most one purchase request.
