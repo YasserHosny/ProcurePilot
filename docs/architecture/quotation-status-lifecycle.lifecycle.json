@@ -10,7 +10,7 @@
       "url": "https://github.com/YasserHosny/ProcurePilot.git",
       "provider": "github",
       "link_mode": "web",
-      "revision": "73deb00ca5fcda9551ab9607481bc3ad6d096667"
+      "revision": "6f3382c0311167f69193938afb45212228071802"
     }
   },
   "mainPath": [
@@ -25,7 +25,7 @@
       "type": "start",
       "label": "Pending",
       "sublabel": "document attached",
-      "tag": "upload, email, capture",
+      "tag": "web upload",
       "step": "01",
       "sources": [
         {
@@ -35,16 +35,10 @@
           "label": "web: create pending"
         },
         {
-          "path": "apps/api/src/procurepilot_api/modules/ingestion/orchestrator.py",
-          "line": 770,
-          "end_line": 789,
-          "label": "email: pending + job"
-        },
-        {
-          "path": "apps/api/src/procurepilot_api/modules/ingestion/capture_service.py",
-          "line": 104,
-          "end_line": 124,
-          "label": "capture: pending + job"
+          "path": "apps/api/src/procurepilot_api/modules/ingestion/extraction.py",
+          "line": 34,
+          "end_line": 60,
+          "label": "enqueue failed: back to pending"
         }
       ]
     },
@@ -53,7 +47,7 @@
       "type": "active",
       "label": "Extracting",
       "sublabel": "extraction job queued",
-      "tag": "web only",
+      "tag": "upload, email, capture",
       "step": "02",
       "sources": [
         {
@@ -63,10 +57,16 @@
           "label": "POST /extract"
         },
         {
-          "path": "apps/api/src/procurepilot_api/modules/quotations/service.py",
-          "line": 414,
-          "end_line": 445,
-          "label": "retry_extraction"
+          "path": "apps/api/src/procurepilot_api/modules/ingestion/orchestrator.py",
+          "line": 778,
+          "end_line": 797,
+          "label": "email: insert extracting + job"
+        },
+        {
+          "path": "apps/api/src/procurepilot_api/modules/ingestion/capture_service.py",
+          "line": 110,
+          "end_line": 132,
+          "label": "capture: insert extracting + job"
         }
       ]
     },
@@ -219,21 +219,21 @@
       "variant": "security"
     },
     {
-      "id": "pending-extracted",
-      "from": "pending",
-      "to": "extracted",
-      "label": "email/capture",
+      "id": "extracting-pending",
+      "from": "extracting",
+      "to": "pending",
+      "label": "enqueue fails",
       "variant": "dashed",
-      "note": "also straight to In review or Refused"
+      "note": "job marked failed"
     }
   ],
   "cards": [
     {
       "dot": "amber",
-      "title": "Email and capture skip Extracting",
+      "title": "Email and capture start at Extracting",
       "items": [
-        "They create the quotation and its extraction job together and stay Pending",
-        "The worker then writes Extracted, In review or Refused straight from Pending"
+        "They insert the quotation as Extracting with its extraction job, in one transaction",
+        "If the job cannot be queued, it is marked failed and the quotation returns to Pending for POST /extract"
       ]
     },
     {
