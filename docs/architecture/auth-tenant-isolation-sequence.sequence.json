@@ -23,7 +23,7 @@
         {
           "path": "apps/mobile/lib/core/api/approvals_api_client.dart",
           "line": 14,
-          "end_line": 39,
+          "end_line": 46,
           "label": "Bearer calls"
         }
       ]
@@ -63,7 +63,7 @@
         {
           "path": "apps/api/src/procurepilot_api/deps.py",
           "line": 54,
-          "end_line": 100,
+          "end_line": 106,
           "label": "resolve member"
         },
         {

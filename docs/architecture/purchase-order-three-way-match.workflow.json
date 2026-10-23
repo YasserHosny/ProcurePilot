@@ -62,7 +62,7 @@
       "col": 0,
       "type": "frontend",
       "label": "Draft PO",
-      "sublabel": "from ordered request or manual",
+      "sublabel": "from approved request or manual",
       "sources": [
         {
           "path": "apps/api/src/procurepilot_api/modules/orders/service.py",
@@ -221,7 +221,7 @@
       "col": 5,
       "type": "database",
       "label": "Match result",
-      "sublabel": "matched · partial · review",
+      "sublabel": "matched · partial · needs_review",
       "sources": [
         {
           "path": "apps/api/src/procurepilot_api/modules/accounting/three_way_match_persistence.py",
@@ -242,7 +242,7 @@
         {
           "path": "apps/api/src/procurepilot_api/modules/accounting/router.py",
           "line": 279,
-          "end_line": 310,
+          "end_line": 320,
           "label": "list + resolve"
         },
         {
@@ -343,7 +343,7 @@
       "title": "Evidence only",
       "items": [
         "Orders are internal records; nothing is sent to a supplier or provider",
-        "Confirmations and receipts are recorded by people and cannot exceed the order"
+        "Confirmations and receipts are recorded by people; quantities above the order are allowed and show up as over-receipt or over-billing"
       ]
     }
   ]

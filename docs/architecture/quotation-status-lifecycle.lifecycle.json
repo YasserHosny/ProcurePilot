@@ -208,8 +208,23 @@
       "id": "refused-extracting",
       "from": "refused",
       "to": "extracting",
-      "label": "retry / new document",
+      "label": "retry",
       "variant": "dashed"
+    },
+    {
+      "id": "extracted-refused",
+      "from": "extracted",
+      "to": "refused",
+      "label": "refuse",
+      "variant": "security"
+    },
+    {
+      "id": "pending-extracted",
+      "from": "pending",
+      "to": "extracted",
+      "label": "email/capture",
+      "variant": "dashed",
+      "note": "also straight to In review or Refused"
     }
   ],
   "cards": [
@@ -234,7 +249,7 @@
       "dot": "slate",
       "title": "Also",
       "items": [
-        "Extracted can be refused directly, like In review; any reviewer edit moves it to In review",
+        "Any reviewer edit on Extracted moves it to In review",
         "Retry or a replaced document is allowed from any state except Pending or Extracting",
         "Archiving sets deleted_at and resolves open review tasks; it is not a status"
       ]

@@ -74,13 +74,13 @@
         {
           "path": "apps/api/src/procurepilot_api/main.py",
           "line": 53,
-          "end_line": 69,
+          "end_line": 96,
           "label": "app + routers"
         },
         {
           "path": "apps/api/src/procurepilot_api/deps.py",
           "line": 39,
-          "end_line": 60,
+          "end_line": 70,
           "label": "JWT → member"
         }
       ]
@@ -150,7 +150,7 @@
         {
           "path": "apps/mobile/lib/core/api/approvals_api_client.dart",
           "line": 14,
-          "end_line": 39,
+          "end_line": 46,
           "label": "calls /api/v1"
         }
       ]
@@ -345,8 +345,8 @@
     },
     {
       "from": "mailgun",
-      "to": "ingest",
-      "label": "webhook → job",
+      "to": "api",
+      "label": "inbound webhook",
       "variant": "dashed"
     },
     {
@@ -369,6 +369,12 @@
       "from": "extraction",
       "to": "storage",
       "label": "download"
+    },
+    {
+      "from": "ingest",
+      "to": "postgres",
+      "label": "claims jobs",
+      "variant": "dashed"
     }
   ],
   "cards": [
@@ -386,7 +392,7 @@
       "title": "Queues",
       "items": [
         "Redis/RQ carries extraction and basket-split jobs; the API reaches Redis over the workers app's Anycast IP",
-        "Inbound email and guardrail evaluation use a database queue (ingestion_jobs)"
+        "Inbound email goes Mailgun → API webhook → ingestion_jobs table, which the ingestion worker polls; guardrail evaluation uses the same table"
       ]
     },
     {
@@ -394,7 +400,7 @@
       "title": "Not shown",
       "items": [
         "Workers also read and write Postgres directly",
-        "Export, digest, report and sync workers run locally via docker-compose; the runbook lists no hosted container for them",
+        "Export, webhook, offer-refresh and catalogue-refresh workers have docker-compose services; digest, report and accounting/POS sync workers have none, and the runbook lists no hosted container for any of them",
         "Accounting/POS integrations, push notifications and the analyst's Bedrock calls"
       ]
     }
