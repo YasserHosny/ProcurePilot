@@ -61,3 +61,6 @@ e96bf3fdfa6b1638d4defcc8acba665490e97736:apps/api/src/procurepilot_api/modules/o
 # payload is "{}" (e30) and whose signature is the literal word "signature". It authenticates
 # nothing; the same string already appears on six other lines of this file from earlier commits.
 6f3382c0311167f69193938afb45212228071802:apps/api/tests/integration/test_capture_service.py:generic-api-key:219
+# Same placeholder JWT, re-pinned to the squash-merge commit of #224 (the entry above names the
+# PR-branch commit, which a squash merge does not carry onto main).
+e1980f707d1b508bcdee36ec301500ebd462c51d:apps/api/tests/integration/test_capture_service.py:generic-api-key:219
