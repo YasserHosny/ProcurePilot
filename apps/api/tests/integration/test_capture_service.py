@@ -70,7 +70,7 @@ def _fake_queue(monkeypatch: pytest.MonkeyPatch) -> list[dict[str, object]]:
     return enqueued
 
 
-def test_capture_creates_pending_quotation_and_queues_extraction(
+def test_capture_creates_extracting_quotation_and_queues_extraction(
     monkeypatch: pytest.MonkeyPatch, _fake_queue: list[dict[str, object]]
 ) -> None:
     settings = settings_for_test_db(monkeypatch)
@@ -87,7 +87,7 @@ def test_capture_creates_pending_quotation_and_queues_extraction(
             bearer_token="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.signature",
         )
 
-        assert result["status"] == "pending"
+        assert result["status"] == "extracting"
         quotation_id = result["quotation_id"]
 
         assert len(_fake_queue) == 1
@@ -101,7 +101,7 @@ def test_capture_creates_pending_quotation_and_queues_extraction(
                 )
                 quotation = cur.fetchone()
                 assert quotation is not None
-                assert quotation["status"] == "pending"
+                assert quotation["status"] == "extracting"
                 assert quotation["source"] == "capture"
                 assert quotation["supplier_id"] == supplier_id
 
@@ -127,7 +127,7 @@ def test_capture_creates_pending_quotation_and_queues_extraction(
                 assert job["status"] == "queued"
 
 
-def test_capture_creates_pending_quotation_for_an_image_upload(
+def test_capture_creates_extracting_quotation_for_an_image_upload(
     monkeypatch: pytest.MonkeyPatch, _fake_queue: list[dict[str, object]]
 ) -> None:
     settings = settings_for_test_db(monkeypatch)
@@ -144,7 +144,7 @@ def test_capture_creates_pending_quotation_for_an_image_upload(
             bearer_token="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.signature",
         )
 
-        assert result["status"] == "pending"
+        assert result["status"] == "extracting"
         quotation_id = result["quotation_id"]
 
         assert len(_fake_queue) == 1
@@ -158,7 +158,7 @@ def test_capture_creates_pending_quotation_for_an_image_upload(
                 )
                 quotation = cur.fetchone()
                 assert quotation is not None
-                assert quotation["status"] == "pending"
+                assert quotation["status"] == "extracting"
                 assert quotation["source"] == "capture"
                 assert quotation["supplier_id"] == supplier_id
 
@@ -196,8 +196,42 @@ def test_capture_without_supplier_id_is_allowed(
             bearer_token="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.signature",
         )
 
-        assert result["status"] == "pending"
+        assert result["status"] == "extracting"
         assert len(_fake_queue) == 1
+
+
+def test_capture_failed_enqueue_leaves_quotation_pending_and_job_failed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = settings_for_test_db(monkeypatch)
+
+    def _redis_down(_settings: object, **_kwargs: object) -> None:
+        raise ConnectionError("redis unavailable")
+
+    monkeypatch.setattr(capture_service_module, "enqueue_extraction", _redis_down)
+    with committed_smart_context("capture-enqueue-fail", supplier_count=1) as context:
+        result = CaptureService(settings).create_capture(
+            member=context.member,
+            file_content=_PDF_BYTES,
+            filename="receipt.pdf",
+            supplier_id=None,
+            notes=None,
+            bearer_token="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.signature",
+        )
+
+        assert result["status"] == "pending"
+        with psycopg.connect(TEST_DATABASE_URL or "", row_factory=psycopg.rows.dict_row) as conn:
+            with conn.cursor() as cur:
+                cur.execute("select status from quotation where id = %s", (result["quotation_id"],))
+                assert cur.fetchone()["status"] == "pending"
+                cur.execute(
+                    "select status, error from extraction_job where quotation_id = %s",
+                    (result["quotation_id"],),
+                )
+                job = cur.fetchone()
+                # Released so POST /quotations/{id}/extract can pick it up again.
+                assert job["status"] == "failed"
+                assert job["error"]["code"] == "redis_enqueue_failed"
 
 
 def test_capture_rejects_oversized_file(

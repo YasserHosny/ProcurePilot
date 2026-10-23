@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import json
 from uuid import UUID
+
+import psycopg
 
 from procurepilot_api.config import Settings
 
@@ -26,3 +29,32 @@ def enqueue_extraction(
         },
         job_id=str(job_id),
     )
+
+
+def release_failed_enqueue(conn: psycopg.Connection, *, job_id: UUID, quotation_id: UUID) -> None:
+    """Undo `extracting` when the Redis push failed, as the web path's own compensation does.
+
+    The job is marked failed and the quotation goes back to `pending`, so POST
+    /quotations/{id}/extract can queue it again. The caller sets the tenant context and commits.
+    """
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            update extraction_job
+            set status = 'failed', error = %s::jsonb, completed_at = now()
+            where id = %s and status = 'queued'
+            """,
+            (
+                json.dumps(
+                    {
+                        "code": "redis_enqueue_failed",
+                        "message": "Extraction job could not be queued in Redis.",
+                    }
+                ),
+                job_id,
+            ),
+        )
+        cur.execute(
+            "update quotation set status = 'pending' where id = %s and status = 'extracting'",
+            (quotation_id,),
+        )
