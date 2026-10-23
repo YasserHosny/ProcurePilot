@@ -1,6 +1,6 @@
 import { NgClass } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
@@ -42,6 +42,7 @@ import {
     RoleDirective,
   ],
   templateUrl: './email-config.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './email-config.component.scss',
 })
 export class EmailConfigComponent implements OnInit {

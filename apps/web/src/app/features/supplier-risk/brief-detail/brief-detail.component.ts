@@ -1,4 +1,4 @@
-import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, DestroyRef, OnInit, computed, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -32,6 +32,7 @@ type BriefError = 'load' | 'action';
     FormatDatePipe,
   ],
   templateUrl: './brief-detail.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './brief-detail.component.scss',
 })
 export class BriefDetailComponent implements OnInit {

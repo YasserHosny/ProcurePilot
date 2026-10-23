@@ -77,7 +77,7 @@
 
   <mat-dialog-content>
     @if (createdResult()?.invitation?.email_delivery === 'sent') {
-      <p role="status">{{ 'team.inviteDialog.emailedNotice' | translate: { email: createdResult()?.invitation?.email } }}</p>
+      <p role="status">{{ 'team.inviteDialog.emailedNotice' | translate: { email: $safeNavigationMigration(createdResult()?.invitation?.email) } }}</p>
     } @else if (createdResult()?.invitation?.email_delivery === 'failed') {
       <div class="error-banner" role="status">{{ 'team.inviteDialog.failedWarning' | translate }}</div>
     } @else if (createdResult()?.invitation?.email_delivery === 'not_configured') {

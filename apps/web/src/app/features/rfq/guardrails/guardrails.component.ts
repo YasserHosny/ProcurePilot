@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 
 import { FormsModule } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
@@ -49,6 +49,7 @@ import {
     FormatMoneyPipe
 ],
   templateUrl: './guardrails.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './guardrails.component.scss',
 })
 export class GuardrailsComponent implements OnInit {

@@ -1,5 +1,5 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
@@ -37,6 +37,7 @@ interface ErrorAlert {
     TranslatePipe,
   ],
   templateUrl: './accept-invitation.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './accept-invitation.component.scss',
 })
 export class AcceptInvitationComponent implements OnInit {

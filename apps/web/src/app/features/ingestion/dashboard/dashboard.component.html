@@ -89,11 +89,11 @@
           <mat-card-content>
             <div class="rate-header">
               <span class="rate-title">{{ 'ingestion.dashboard.rates.supplierMatchRate' | translate }}</span>
-              <span class="rate-value">{{ formatRate(stats()?.supplier_match_rate) }}</span>
+              <span class="rate-value">{{ formatRate($safeNavigationMigration(stats()?.supplier_match_rate)) }}</span>
             </div>
             <mat-progress-bar
               mode="determinate"
-              [value]="getRatePercent(stats()?.supplier_match_rate)"
+              [value]="getRatePercent($safeNavigationMigration(stats()?.supplier_match_rate))"
               class="rate-progress match-rate-bar"
               [attr.aria-label]="'ingestion.dashboard.rates.supplierMatchRate' | translate"
             ></mat-progress-bar>
@@ -106,11 +106,11 @@
           <mat-card-content>
             <div class="rate-header">
               <span class="rate-title">{{ 'ingestion.dashboard.rates.extractionSuccessRate' | translate }}</span>
-              <span class="rate-value">{{ formatRate(stats()?.extraction_success_rate) }}</span>
+              <span class="rate-value">{{ formatRate($safeNavigationMigration(stats()?.extraction_success_rate)) }}</span>
             </div>
             <mat-progress-bar
               mode="determinate"
-              [value]="getRatePercent(stats()?.extraction_success_rate)"
+              [value]="getRatePercent($safeNavigationMigration(stats()?.extraction_success_rate))"
               class="rate-progress extraction-rate-bar"
               [attr.aria-label]="'ingestion.dashboard.rates.extractionSuccessRate' | translate"
             ></mat-progress-bar>
@@ -129,7 +129,7 @@
         <mat-card class="coverage-card">
           <mat-card-content>
             <span class="coverage-label">{{ 'ingestion.dashboard.coverage.integrationShare' | translate }}</span>
-            <strong class="coverage-value">{{ formatRate(stats()?.integration_sourced_share) }}</strong>
+            <strong class="coverage-value">{{ formatRate($safeNavigationMigration(stats()?.integration_sourced_share)) }}</strong>
             <span class="coverage-detail">{{ stats()?.integration_sourced_quotation_count ?? 0 }} / {{ stats()?.active_quotation_count ?? 0 }} {{ 'ingestion.dashboard.coverage.quotations' | translate }}</span>
           </mat-card-content>
         </mat-card>

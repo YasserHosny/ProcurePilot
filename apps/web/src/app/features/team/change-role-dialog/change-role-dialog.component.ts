@@ -1,4 +1,4 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
@@ -44,6 +44,7 @@ const BRANCH_SCOPED_ROLES: readonly Role[] = ['branch_manager', 'approver'];
     TranslatePipe,
   ],
   templateUrl: './change-role-dialog.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './change-role-dialog.component.scss',
 })
 export class ChangeRoleDialogComponent {

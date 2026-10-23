@@ -1,6 +1,6 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { DatePipe, SlicePipe } from '@angular/common';
-import { Component, DestroyRef, computed, inject, signal } from '@angular/core';
+import { Component, DestroyRef, computed, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -78,6 +78,7 @@ const MAX_FILE_SIZE_BYTES = 25 * 1024 * 1024; // 25 MB
     TranslatePipe,
   ],
   templateUrl: './quotation-upload.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './quotation-upload.component.scss',
 })
 export class QuotationUploadComponent {

@@ -1,4 +1,4 @@
-import { Component, computed, inject, input, signal } from '@angular/core';
+import { Component, computed, inject, input, signal, ChangeDetectionStrategy } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
@@ -35,6 +35,7 @@ type ComponentKey = (typeof COMPONENT_KEYS)[number];
     FormatDatePipe,
   ],
   templateUrl: './scorecard-v2-panel.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './scorecard-v2-panel.component.scss',
 })
 export class ScorecardV2PanelComponent {

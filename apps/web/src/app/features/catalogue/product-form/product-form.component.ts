@@ -1,5 +1,5 @@
 import { HttpErrorResponse } from "@angular/common/http";
-import { Component, OnInit, computed, inject, signal } from "@angular/core";
+import { Component, OnInit, computed, inject, signal, ChangeDetectionStrategy } from "@angular/core";
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from "@angular/forms";
 import { MatButtonModule } from "@angular/material/button";
 import { MatCardModule } from "@angular/material/card";
@@ -40,6 +40,7 @@ import { computeBaseQuantity } from "../normalisation";
     FormatDatePipe,
   ],
   templateUrl: "./product-form.component.html",
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: "./product-form.component.scss",
 })
 export class ProductFormComponent implements OnInit {

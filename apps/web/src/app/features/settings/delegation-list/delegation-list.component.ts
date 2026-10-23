@@ -7,6 +7,7 @@ import {
   computed,
   inject,
   signal,
+  ChangeDetectionStrategy
 } from '@angular/core';
 import {
   AbstractControl,
@@ -85,6 +86,7 @@ function dateRangeValidator(group: AbstractControl): ValidationErrors | null {
     TranslatePipe,
   ],
   templateUrl: './delegation-list.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './delegation-list.component.scss',
 })
 export class DelegationListComponent implements OnInit {

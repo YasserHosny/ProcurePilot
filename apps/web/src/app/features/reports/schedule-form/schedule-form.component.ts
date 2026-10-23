@@ -1,5 +1,5 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
@@ -39,6 +39,7 @@ interface ApiErrorShape {
     TranslatePipe,
   ],
   templateUrl: './schedule-form.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './schedule-form.component.scss',
 })
 export class ScheduleFormComponent implements OnInit {

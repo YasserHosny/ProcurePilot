@@ -1,6 +1,6 @@
 import { NgClass } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, DestroyRef, OnInit, computed, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { toIsoDate } from '../../../core/format/iso-date';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
@@ -58,6 +58,7 @@ import { provideAppDateAdapter } from '../../../core/i18n/date-adapter';
     TranslatePipe,
   ],
   templateUrl: './export-savings.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './export-savings.component.scss',
 })
 export class ExportSavingsComponent implements OnInit {

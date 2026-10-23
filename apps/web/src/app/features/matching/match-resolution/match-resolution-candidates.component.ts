@@ -1,5 +1,5 @@
 
-import { Component, EventEmitter, Input, Output } from '@angular/core';
+import { Component, EventEmitter, Input, Output, ChangeDetectionStrategy } from '@angular/core';
 import { MatCardModule } from '@angular/material/card';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatIconModule } from '@angular/material/icon';
@@ -21,6 +21,7 @@ import { UnitLabelPipe } from '../../../core/format/unit-label';
     UnitLabelPipe
 ],
   templateUrl: './match-resolution-candidates.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './match-resolution-candidates.component.scss',
 })
 export class MatchResolutionCandidatesComponent {

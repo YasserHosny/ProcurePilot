@@ -1,5 +1,5 @@
 
-import { Component, Input, inject } from '@angular/core';
+import { Component, Input, inject, ChangeDetectionStrategy } from '@angular/core';
 import { MatExpansionModule } from '@angular/material/expansion';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
@@ -19,6 +19,7 @@ import { FormatDatePipe } from '../../../core/format/date.pipe';
     FormatDatePipe
 ],
   templateUrl: './quotation-audit-trail.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './quotation-audit-trail.component.scss',
 })
 export class QuotationAuditTrailComponent {

@@ -1,4 +1,4 @@
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
@@ -43,6 +43,7 @@ import {
     FormatMoneyPipe,
   ],
   templateUrl: './order-detail.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './order-detail.component.scss',
 })
 export class OrderDetailComponent implements OnInit {

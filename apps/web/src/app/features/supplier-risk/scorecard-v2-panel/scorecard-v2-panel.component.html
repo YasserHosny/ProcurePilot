@@ -74,7 +74,7 @@
           @for (row of componentRows(); track row.key) {
             <tr data-testid="risk-component-row">
               <th scope="row">{{ 'supplierRisk.components.' + row.key | translate }}</th>
-              <td>{{ percent(row.value?.risk) }}</td>
+              <td>{{ percent($safeNavigationMigration(row.value?.risk)) }}</td>
               <td>{{ percent(weight(row.key)) }}</td>
               <td>{{ 'supplierRisk.confidence.' + (row.value?.confidence ?? 'low') | translate }}</td>
               <td>

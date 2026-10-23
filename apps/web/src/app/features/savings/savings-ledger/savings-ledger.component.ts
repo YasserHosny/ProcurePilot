@@ -1,6 +1,6 @@
 import { NgClass } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { toIsoDate } from '../../../core/format/iso-date';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -66,6 +66,7 @@ import { provideAppDateAdapter } from '../../../core/i18n/date-adapter';
     RoleDirective,
   ],
   templateUrl: './savings-ledger.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './savings-ledger.component.scss',
 })
 export class SavingsLedgerComponent implements OnInit {

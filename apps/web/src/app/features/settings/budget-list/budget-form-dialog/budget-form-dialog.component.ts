@@ -1,5 +1,5 @@
 import { HttpErrorResponse } from "@angular/common/http";
-import { Component, inject, signal } from "@angular/core";
+import { Component, inject, signal, ChangeDetectionStrategy } from "@angular/core";
 import { AbstractControl, FormBuilder, ReactiveFormsModule, Validators } from "@angular/forms";
 import { MatButtonModule } from "@angular/material/button";
 import { MatDatepickerModule } from "@angular/material/datepicker";
@@ -59,6 +59,7 @@ const SCOPES: readonly BudgetScope[] = ["organisation", "branch", "cost_centre"]
     TranslatePipe,
   ],
   templateUrl: "./budget-form-dialog.component.html",
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: "./budget-form-dialog.component.scss",
 })
 export class BudgetFormDialogComponent {

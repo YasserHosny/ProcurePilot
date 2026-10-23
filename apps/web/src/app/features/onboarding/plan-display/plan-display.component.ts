@@ -1,5 +1,5 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatChipsModule } from '@angular/material/chips';
@@ -29,6 +29,7 @@ import {
     TranslatePipe,
   ],
   templateUrl: './plan-display.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './plan-display.component.scss',
 })
 export class PlanDisplayComponent implements OnInit {

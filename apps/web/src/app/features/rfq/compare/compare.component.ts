@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -52,6 +52,7 @@ const LAST_BRANCH_STORAGE_PREFIX = 'pp.rfq.lastBranchId.';
     FormatDatePipe
 ],
   templateUrl: './compare.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './compare.component.scss',
 })
 export class CompareComponent implements OnInit {

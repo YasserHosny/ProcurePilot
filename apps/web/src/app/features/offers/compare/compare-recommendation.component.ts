@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, Input } from '@angular/core';
+import { Component, Input, ChangeDetectionStrategy } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatDividerModule } from '@angular/material/divider';
@@ -28,6 +28,7 @@ import type { ProjectedOffer } from './compare-projection';
     FormatMoneyPipe,
   ],
   templateUrl: './compare-recommendation.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './compare-recommendation.component.scss',
 })
 export class CompareRecommendationComponent {

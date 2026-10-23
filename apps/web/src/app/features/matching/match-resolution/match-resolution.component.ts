@@ -1,5 +1,5 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, HostListener, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, HostListener, OnInit, computed, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { FormBuilder, FormGroup, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
@@ -66,6 +66,7 @@ import { UnitLabelPipe } from '../../../core/format/unit-label';
     MatchResolutionCandidatesComponent,
   ],
   templateUrl: './match-resolution.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './match-resolution.component.scss',
 })
 export class MatchResolutionComponent implements OnInit {

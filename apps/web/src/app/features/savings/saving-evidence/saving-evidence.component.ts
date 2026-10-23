@@ -1,6 +1,6 @@
 import { NgClass } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatChipsModule } from '@angular/material/chips';
@@ -53,6 +53,7 @@ import { UnitLabelPipe } from '../../../core/format/unit-label';
     FormatMoneyPipe,
   ],
   templateUrl: './saving-evidence.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './saving-evidence.component.scss',
 })
 export class SavingEvidenceComponent implements OnInit {

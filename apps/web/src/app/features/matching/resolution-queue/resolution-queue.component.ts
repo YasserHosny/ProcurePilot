@@ -1,5 +1,5 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
@@ -64,6 +64,7 @@ export interface QuotationTaskGroup {
     FormatMoneyPipe,
   ],
   templateUrl: './resolution-queue.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './resolution-queue.component.scss',
 })
 export class ResolutionQueueComponent implements OnInit {

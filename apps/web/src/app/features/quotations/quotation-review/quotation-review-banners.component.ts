@@ -1,5 +1,5 @@
 
-import { Component, EventEmitter, Input, Output } from '@angular/core';
+import { Component, EventEmitter, Input, Output, ChangeDetectionStrategy } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatIconModule } from '@angular/material/icon';
@@ -23,6 +23,7 @@ import { FormatMoneyPipe } from '../../../core/format/money.pipe';
     FormatMoneyPipe
 ],
   templateUrl: './quotation-review-banners.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './quotation-review-banners.component.scss',
 })
 export class QuotationReviewBannersComponent {

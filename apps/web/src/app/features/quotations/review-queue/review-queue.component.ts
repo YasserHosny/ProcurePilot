@@ -1,5 +1,5 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
@@ -57,6 +57,7 @@ type ReviewTaskSortOrder = 'asc' | 'desc';
     FormatMoneyPipe,
   ],
   templateUrl: './review-queue.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './review-queue.component.scss',
 })
 export class ReviewQueueComponent implements OnInit {

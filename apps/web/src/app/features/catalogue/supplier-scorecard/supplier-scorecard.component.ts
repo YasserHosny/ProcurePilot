@@ -1,6 +1,6 @@
 import { NgClass } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, DestroyRef, OnInit, computed, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
@@ -165,7 +165,7 @@ import { ScorecardV2PanelComponent } from '../../supplier-risk/scorecard-v2-pane
                 </div>
                 @if (scorecard()?.window_start) {
                   <p class="window-dates">
-                    {{ scorecard()?.window_start | formatDate }} — {{ scorecard()?.window_end | formatDate }}
+                    {{ $safeNavigationMigration(scorecard()?.window_start) | formatDate }} — {{ $safeNavigationMigration(scorecard()?.window_end) | formatDate }}
                   </p>
                 }
               </mat-card-content>
@@ -324,12 +324,12 @@ import { ScorecardV2PanelComponent } from '../../supplier-risk/scorecard-v2-pane
           <footer class="scorecard-footer">
             @if (scorecard()?.rule_version) {
               <span>
-                {{ 'supplierIq.ruleVersion' | translate:{ version: scorecard()?.rule_version } }}
+                {{ 'supplierIq.ruleVersion' | translate:{ version: $safeNavigationMigration(scorecard()?.rule_version) } }}
               </span>
             }
             @if (scorecard()?.computed_at) {
               <span>
-                {{ 'supplierIq.computedAt' | translate:{ date: (scorecard()?.computed_at | formatDate) } }}
+                {{ 'supplierIq.computedAt' | translate:{ date: ($safeNavigationMigration(scorecard()?.computed_at) | formatDate) } }}
               </span>
             }
           </footer>
@@ -337,6 +337,7 @@ import { ScorecardV2PanelComponent } from '../../supplier-risk/scorecard-v2-pane
       }
     </main>
     `,
+  changeDetection: ChangeDetectionStrategy.Eager,
   styles: [
     `
       .scorecard-page {

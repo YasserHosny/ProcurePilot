@@ -2,7 +2,7 @@ import { DecimalPipe } from '@angular/common';
 import { toIsoDate } from '../../../core/format/iso-date';
 import { FormatService } from '../../../core/format/format.service';
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { FormArray, FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
@@ -58,6 +58,7 @@ interface OrderLineForm {
   ],
   providers: [provideAppDateAdapter()],
   templateUrl: './order-create.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './order-create.component.scss',
 })
 export class OrderCreateComponent implements OnInit {

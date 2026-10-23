@@ -1,5 +1,5 @@
 
-import { Component, EventEmitter, Input, Output, inject } from '@angular/core';
+import { Component, EventEmitter, Input, Output, inject, ChangeDetectionStrategy } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatDividerModule } from '@angular/material/divider';
@@ -22,6 +22,7 @@ import type { BasketSplitUIState } from './basket-split-state';
     TranslatePipe
 ],
   templateUrl: './basket-split-infeasible.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './basket-split-infeasible.component.scss',
 })
 export class BasketSplitInfeasibleComponent {

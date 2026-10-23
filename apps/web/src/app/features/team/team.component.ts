@@ -1,5 +1,5 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatChipsModule } from '@angular/material/chips';
@@ -47,6 +47,7 @@ import { InviteDialogComponent } from './invite-dialog/invite-dialog.component';
     RoleDirective,
   ],
   templateUrl: './team.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './team.component.scss',
 })
 export class TeamComponent implements OnInit {

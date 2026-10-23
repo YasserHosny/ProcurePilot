@@ -1,5 +1,5 @@
 import { HttpErrorResponse } from "@angular/common/http";
-import { Component, OnInit, computed, inject, signal } from "@angular/core";
+import { Component, OnInit, computed, inject, signal, ChangeDetectionStrategy } from "@angular/core";
 import {
   AbstractControl,
   FormBuilder,
@@ -69,6 +69,7 @@ function moneyGroupValidator(amountKey: string, currencyKey: string) {
     TranslatePipe,
   ],
   templateUrl: "./supplier-form.component.html",
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: "./supplier-form.component.scss",
 })
 export class SupplierFormComponent implements OnInit {

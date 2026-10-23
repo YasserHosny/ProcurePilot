@@ -1,4 +1,4 @@
-import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClient, withXhr } from '@angular/common/http';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { ActivatedRoute, provideRouter } from '@angular/router';
@@ -48,7 +48,7 @@ describe('OrderDetailComponent', () => {
       imports: [OrderDetailComponent, TranslateModule.forRoot()],
       providers: [
         { provide: ApiService, useValue: catalogue },
-        provideHttpClient(), provideNoopAnimations(), provideRouter([]), { provide: OrdersApiService, useValue: api },
+        provideHttpClient(withXhr()), provideNoopAnimations(), provideRouter([]), { provide: OrdersApiService, useValue: api },
         { provide: ActivatedRoute, useValue: { snapshot: { paramMap: { get: () => 'order-1' } } } },
       ],
     }).compileComponents();

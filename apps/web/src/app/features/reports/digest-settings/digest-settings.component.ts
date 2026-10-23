@@ -1,5 +1,5 @@
 import { DecimalPipe, NgClass } from '@angular/common';
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatChipsModule } from '@angular/material/chips';
@@ -37,6 +37,7 @@ import {
     DecimalPipe,
   ],
   templateUrl: './digest-settings.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './digest-settings.component.scss',
 })
 export class DigestSettingsComponent implements OnInit {

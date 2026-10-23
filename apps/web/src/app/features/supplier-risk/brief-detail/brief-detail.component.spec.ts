@@ -94,7 +94,7 @@ describe('BriefDetailComponent', () => {
     await TestBed.configureTestingModule({
       imports: [BriefDetailComponent, TranslateModule.forRoot()],
       providers: [
-        provideHttpClient(),
+        provideHttpClient(withXhr()),
         provideHttpClientTesting(),
         provideNoopAnimations(),
         provideRouter([]),
@@ -202,5 +202,5 @@ describe('BriefDetailComponent', () => {
     expect(fixture.nativeElement.querySelector('[data-testid="brief-item"]')).toBeNull();
   });
 });
-import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClient, withXhr } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
