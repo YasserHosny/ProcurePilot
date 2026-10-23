@@ -33,27 +33,27 @@
         <div formArrayName="lines" class="lines-section">
           <h3>{{ 'rfq.create.itemsLabel' | translate }}</h3>
 
-          <div *ngFor="let line of linesFormArray.controls; let i=index" [formGroupName]="i" class="line-row">
-            <mat-form-field appearance="outline" class="item-product-field">
-              <mat-label>{{ 'rfq.create.productIdLabel' | translate }}</mat-label>
-              <mat-select formControlName="workspace_product_id" required [placeholder]="'rfq.create.productIdPlaceholder' | translate">
-                @for (prod of products(); track prod.id) {
-                  <mat-option [value]="prod.id">
-                    {{ prod.tenant_name }} @if (prod.variant) { ({{ prod.variant }}) }
-                  </mat-option>
-                }
-              </mat-select>
-            </mat-form-field>
-
-            <mat-form-field appearance="outline" class="item-qty-field">
-              <mat-label>{{ 'rfq.create.quantityLabel' | translate }}</mat-label>
-              <input matInput type="number" step="0.01" min="0.01" formControlName="quantity" required [placeholder]="'rfq.create.quantityPlaceholder' | translate" />
-            </mat-form-field>
-
-            <button mat-icon-button type="button" color="warn" (click)="removeLine(i)" [disabled]="linesFormArray.length === 1" [attr.aria-label]="'rfq.create.removeLineButton' | translate">
-              <mat-icon aria-hidden="true">delete</mat-icon>
-            </button>
-          </div>
+          @for (line of linesFormArray.controls; track line; let i = $index) {
+            <div [formGroupName]="i" class="line-row">
+              <mat-form-field appearance="outline" class="item-product-field">
+                <mat-label>{{ 'rfq.create.productIdLabel' | translate }}</mat-label>
+                <mat-select formControlName="workspace_product_id" required [placeholder]="'rfq.create.productIdPlaceholder' | translate">
+                  @for (prod of products(); track prod.id) {
+                    <mat-option [value]="prod.id">
+                      {{ prod.tenant_name }} @if (prod.variant) { ({{ prod.variant }}) }
+                    </mat-option>
+                  }
+                </mat-select>
+              </mat-form-field>
+              <mat-form-field appearance="outline" class="item-qty-field">
+                <mat-label>{{ 'rfq.create.quantityLabel' | translate }}</mat-label>
+                <input matInput type="number" step="0.01" min="0.01" formControlName="quantity" required [placeholder]="'rfq.create.quantityPlaceholder' | translate" />
+              </mat-form-field>
+              <button mat-icon-button type="button" color="warn" (click)="removeLine(i)" [disabled]="linesFormArray.length === 1" [attr.aria-label]="'rfq.create.removeLineButton' | translate">
+                <mat-icon aria-hidden="true">delete</mat-icon>
+              </button>
+            </div>
+          }
 
           <button mat-stroked-button type="button" (click)="addLine()">
             <mat-icon aria-hidden="true">add</mat-icon>
@@ -86,7 +86,9 @@
             <mat-label>{{ 'rfq.create.tenantTermsLabel' | translate }}</mat-label>
             <textarea matInput formControlName="tenantTerms" rows="4" maxlength="4000" [placeholder]="'rfq.create.tenantTermsPlaceholder' | translate"></textarea>
             <mat-hint align="end">{{ form.controls.tenantTerms.value?.length ?? 0 }} / 4000</mat-hint>
-            <mat-error *ngIf="form.controls.tenantTerms.hasError('maxlength')">{{ 'rfq.create.tenantTermsTooLong' | translate }}</mat-error>
+            @if (form.controls.tenantTerms.hasError('maxlength')) {
+              <mat-error>{{ 'rfq.create.tenantTermsTooLong' | translate }}</mat-error>
+            }
           </mat-form-field>
         </div>
 
@@ -103,25 +105,31 @@
       </form>
     </mat-card>
 
-    <mat-card *ngIf="rejectedSuppliers().length > 0" class="rejections-card">
-      <h4>{{ 'rfq.create.rejectedSuppliersTitle' | translate }}</h4>
-      <ul>
-        <li *ngFor="let rej of rejectedSuppliers()">
-          {{ rej.supplier_id }} - {{ rej.reason }}
-        </li>
-      </ul>
-    </mat-card>
+    @if (rejectedSuppliers().length > 0) {
+      <mat-card class="rejections-card">
+        <h4>{{ 'rfq.create.rejectedSuppliersTitle' | translate }}</h4>
+        <ul>
+          @for (rej of rejectedSuppliers(); track rej) {
+            <li>
+              {{ rej.supplier_id }} - {{ rej.reason }}
+            </li>
+          }
+        </ul>
+      </mat-card>
+    }
 
-    <mat-card *ngIf="rfqId() !== null" class="send-card">
-      <p>{{ 'rfq.create.rfqStatusLabel' | translate }}: <strong>{{ ('rfq.history.status_' + rfqStatus()) | translate }}</strong></p>
-      <button mat-flat-button color="accent" type="button" (click)="onSend()" [disabled]="isSending() || rfqStatus() === 'sent'">
-        @if (isSending()) {
-          <mat-spinner diameter="18"></mat-spinner>
-          <span>{{ 'rfq.create.sendingButton' | translate }}</span>
-        } @else {
-          {{ 'rfq.create.sendButton' | translate }}
-        }
-      </button>
-    </mat-card>
+    @if (rfqId() !== null) {
+      <mat-card class="send-card">
+        <p>{{ 'rfq.create.rfqStatusLabel' | translate }}: <strong>{{ ('rfq.history.status_' + rfqStatus()) | translate }}</strong></p>
+        <button mat-flat-button color="accent" type="button" (click)="onSend()" [disabled]="isSending() || rfqStatus() === 'sent'">
+          @if (isSending()) {
+            <mat-spinner diameter="18"></mat-spinner>
+            <span>{{ 'rfq.create.sendingButton' | translate }}</span>
+          } @else {
+            {{ 'rfq.create.sendButton' | translate }}
+          }
+        </button>
+      </mat-card>
+    }
   }
 </div>

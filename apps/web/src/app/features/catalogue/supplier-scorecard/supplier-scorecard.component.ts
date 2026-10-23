@@ -1,4 +1,4 @@
-import { NgClass, NgFor, NgIf } from '@angular/common';
+import { NgClass } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
@@ -36,8 +36,6 @@ import { ScorecardV2PanelComponent } from '../../supplier-risk/scorecard-v2-pane
   selector: 'app-supplier-scorecard',
   standalone: true,
   imports: [
-    NgIf,
-    NgFor,
     NgClass,
     RouterLink,
     MatCardModule,
@@ -50,8 +48,8 @@ import { ScorecardV2PanelComponent } from '../../supplier-risk/scorecard-v2-pane
     MatProgressSpinnerModule,
     TranslatePipe,
     FormatDatePipe,
-    ScorecardV2PanelComponent,
-  ],
+    ScorecardV2PanelComponent
+],
   template: `
     <main role="main" aria-labelledby="scorecard-heading" class="scorecard-page">
       <!-- Back navigation -->
@@ -61,265 +59,284 @@ import { ScorecardV2PanelComponent } from '../../supplier-risk/scorecard-v2-pane
           [routerLink]="['/suppliers', supplierId()]"
           class="back-link"
           [attr.aria-label]="'supplierIq.backToSupplier' | translate"
-        >
+          >
           <mat-icon aria-hidden="true">arrow_back</mat-icon>
           {{ 'supplierIq.backToSupplier' | translate }}
         </a>
       </nav>
-
+    
       <!-- Page header -->
       <header class="page-header">
         <div class="header-titles">
           <h1 id="scorecard-heading">{{ 'supplierIq.header' | translate }}</h1>
-          <p class="supplier-subtitle" *ngIf="supplierName()">
-            {{ supplierName() }}
-          </p>
+          @if (supplierName()) {
+            <p class="supplier-subtitle">
+              {{ supplierName() }}
+            </p>
+          }
         </div>
-
+    
         <!-- Window Selection -->
         <div class="window-selector" role="group" [attr.aria-label]="'supplierIq.windowLabel' | translate:{ months: windowMonths() }">
           <mat-chip-set>
-            <mat-chip
-              *ngFor="let months of [3, 6, 12]"
-              [highlighted]="windowMonths() === months"
-              (click)="changeWindow(months)"
-              tabindex="0"
-              (keydown.enter)="changeWindow(months)"
-              (keydown.space)="changeWindow(months)"
-              [attr.aria-label]="'supplierIq.windowLabel' | translate:{ months: months }"
-            >
-              {{ 'supplierIq.windowLabel' | translate:{ months: months } }}
-            </mat-chip>
+            @for (months of [3, 6, 12]; track months) {
+              <mat-chip
+                [highlighted]="windowMonths() === months"
+                (click)="changeWindow(months)"
+                tabindex="0"
+                (keydown.enter)="changeWindow(months)"
+                (keydown.space)="changeWindow(months)"
+                [attr.aria-label]="'supplierIq.windowLabel' | translate:{ months: months }"
+                >
+                {{ 'supplierIq.windowLabel' | translate:{ months: months } }}
+              </mat-chip>
+            }
           </mat-chip-set>
         </div>
       </header>
-
+    
       <!-- Loading State -->
-      <div *ngIf="isLoading()" class="loading-state" role="status">
-        <mat-spinner [attr.aria-label]="'common.loading' | translate" diameter="48"></mat-spinner>
-        <p>{{ 'common.loading' | translate }}</p>
-      </div>
-
-      <!-- Error State -->
-      <div *ngIf="errorMessage() && !isLoading()" class="error-banner" role="alert">
-        <mat-icon aria-hidden="true">error_outline</mat-icon>
-        <span>{{ errorMessage() }}</span>
-      </div>
-
-      <!-- Scorecard Content -->
-      <div *ngIf="scorecard() && !isLoading()" class="scorecard-content">
-        <!-- Insufficient evidence notice -->
-        <section
-          *ngIf="isInsufficient()"
-          role="status"
-          aria-live="polite"
-          [attr.aria-label]="'supplierIq.insufficientEvidence.badge' | translate"
-          class="insufficient-notice"
-        >
-          <mat-chip-set>
-            <mat-chip color="warn" highlighted>
-              <mat-icon matChipAvatar aria-hidden="true">warning</mat-icon>
-              {{ 'supplierIq.insufficientEvidence.badge' | translate }}
-            </mat-chip>
-          </mat-chip-set>
-          <p class="notice-text">{{ 'supplierIq.insufficientEvidence.notice' | translate }}</p>
-        </section>
-
-        <!-- Top summary row: Risk Score & Confidence -->
-        <div class="summary-cards-row">
-          <!-- Overall Risk Card -->
-          <mat-card class="summary-card risk-card" tabindex="0">
-            <mat-card-header>
-              <mat-card-title>{{ 'supplierIq.riskScore.label' | translate }}</mat-card-title>
-            </mat-card-header>
-            <mat-card-content>
-              <div class="risk-metric-display">
-                <span class="risk-score-value">{{ formatRiskScore(displayRiskTotal()) }}</span>
-                <span class="risk-level-badge" [ngClass]="riskLevel()">
-                  {{ ('supplierIq.riskScore.' + riskLevel()) | translate }}
-                </span>
-              </div>
-              <p class="risk-rule-version" *ngIf="displayRiskVersion()">
-                {{ displayRiskVersion() }}
-              </p>
-            </mat-card-content>
-          </mat-card>
-
-          <!-- Confidence & Validity Card -->
-          <mat-card class="summary-card confidence-card" tabindex="0">
-            <mat-card-header>
-              <mat-card-title>{{ 'supplierIq.confidence.label' | translate }}</mat-card-title>
-            </mat-card-header>
-            <mat-card-content>
-              <div class="confidence-display">
-                <span class="confidence-badge" [ngClass]="confidence()">
-                  {{ ('supplierIq.confidence.' + confidence()) | translate }}
-                </span>
-              </div>
-              <p class="window-dates" *ngIf="scorecard()?.window_start">
-                {{ scorecard()?.window_start | formatDate }} — {{ scorecard()?.window_end | formatDate }}
-              </p>
-            </mat-card-content>
-          </mat-card>
+      @if (isLoading()) {
+        <div class="loading-state" role="status">
+          <mat-spinner [attr.aria-label]="'common.loading' | translate" diameter="48"></mat-spinner>
+          <p>{{ 'common.loading' | translate }}</p>
         </div>
-
-        <!-- Performance Metrics Grid -->
-        <section aria-labelledby="metrics-heading" class="metrics-section">
-          <h2 id="metrics-heading" class="section-heading">{{ 'supplierIq.metrics.sectionTitle' | translate }}</h2>
-
-          <div class="metrics-grid" role="list" [attr.aria-label]="'supplierIq.metrics.sectionTitle' | translate">
-            <!-- Fulfilment Rate -->
-            <mat-card role="listitem" class="metric-card" tabindex="0">
+      }
+    
+      <!-- Error State -->
+      @if (errorMessage() && !isLoading()) {
+        <div class="error-banner" role="alert">
+          <mat-icon aria-hidden="true">error_outline</mat-icon>
+          <span>{{ errorMessage() }}</span>
+        </div>
+      }
+    
+      <!-- Scorecard Content -->
+      @if (scorecard() && !isLoading()) {
+        <div class="scorecard-content">
+          <!-- Insufficient evidence notice -->
+          @if (isInsufficient()) {
+            <section
+              role="status"
+              aria-live="polite"
+              [attr.aria-label]="'supplierIq.insufficientEvidence.badge' | translate"
+              class="insufficient-notice"
+              >
+              <mat-chip-set>
+                <mat-chip color="warn" highlighted>
+                  <mat-icon matChipAvatar aria-hidden="true">warning</mat-icon>
+                  {{ 'supplierIq.insufficientEvidence.badge' | translate }}
+                </mat-chip>
+              </mat-chip-set>
+              <p class="notice-text">{{ 'supplierIq.insufficientEvidence.notice' | translate }}</p>
+            </section>
+          }
+          <!-- Top summary row: Risk Score & Confidence -->
+          <div class="summary-cards-row">
+            <!-- Overall Risk Card -->
+            <mat-card class="summary-card risk-card" tabindex="0">
               <mat-card-header>
-                <mat-card-title>{{ 'supplierIq.metrics.fulfilmentRate' | translate }}</mat-card-title>
+                <mat-card-title>{{ 'supplierIq.riskScore.label' | translate }}</mat-card-title>
               </mat-card-header>
               <mat-card-content>
-                <div class="metric-value">{{ formatMetricValue(metrics()['fulfilment_rate']) }}</div>
-                <div class="metric-sample-count" *ngIf="metrics()['fulfilment_rate'] as m">
-                  {{ 'supplierIq.sampleCounts.samples' | translate:{ count: m.sample_count } }}
+                <div class="risk-metric-display">
+                  <span class="risk-score-value">{{ formatRiskScore(displayRiskTotal()) }}</span>
+                  <span class="risk-level-badge" [ngClass]="riskLevel()">
+                    {{ ('supplierIq.riskScore.' + riskLevel()) | translate }}
+                  </span>
                 </div>
+                @if (displayRiskVersion()) {
+                  <p class="risk-rule-version">
+                    {{ displayRiskVersion() }}
+                  </p>
+                }
               </mat-card-content>
             </mat-card>
-
-            <!-- Quality Score -->
-            <mat-card role="listitem" class="metric-card" tabindex="0">
+            <!-- Confidence & Validity Card -->
+            <mat-card class="summary-card confidence-card" tabindex="0">
               <mat-card-header>
-                <mat-card-title>{{ 'supplierIq.metrics.qualityScore' | translate }}</mat-card-title>
+                <mat-card-title>{{ 'supplierIq.confidence.label' | translate }}</mat-card-title>
               </mat-card-header>
               <mat-card-content>
-                <div class="metric-value">{{ formatMetricValue(metrics()['quality_score']) }}</div>
-                <div class="metric-sample-count" *ngIf="metrics()['quality_score'] as m">
-                  {{ 'supplierIq.sampleCounts.samples' | translate:{ count: m.sample_count } }}
+                <div class="confidence-display">
+                  <span class="confidence-badge" [ngClass]="confidence()">
+                    {{ ('supplierIq.confidence.' + confidence()) | translate }}
+                  </span>
                 </div>
-              </mat-card-content>
-            </mat-card>
-
-            <!-- Price Competitiveness -->
-            <mat-card role="listitem" class="metric-card" tabindex="0">
-              <mat-card-header>
-                <mat-card-title>{{ 'supplierIq.metrics.priceCompetitiveness' | translate }}</mat-card-title>
-              </mat-card-header>
-              <mat-card-content>
-                <div class="metric-value">{{ formatMetricValue(metrics()['price_competitiveness']) }}</div>
-                <div class="metric-sample-count" *ngIf="metrics()['price_competitiveness'] as m">
-                  {{ 'supplierIq.sampleCounts.samples' | translate:{ count: m.sample_count } }}
-                </div>
-              </mat-card-content>
-            </mat-card>
-
-            <!-- Spend Exposure -->
-            <mat-card role="listitem" class="metric-card" tabindex="0">
-              <mat-card-header>
-                <mat-card-title>{{ 'supplierIq.metrics.spendExposure' | translate }}</mat-card-title>
-              </mat-card-header>
-              <mat-card-content>
-                <div class="metric-value">{{ formatMetricValue(metrics()['spend_exposure']) }}</div>
-                <div class="metric-sample-count" *ngIf="metrics()['spend_exposure'] as m">
-                  {{ 'supplierIq.sampleCounts.samples' | translate:{ count: m.sample_count } }}
-                </div>
-              </mat-card-content>
-            </mat-card>
-
-            <!-- Freshness Score -->
-            <mat-card role="listitem" class="metric-card" tabindex="0">
-              <mat-card-header>
-                <mat-card-title>{{ 'supplierIq.metrics.freshnessScore' | translate }}</mat-card-title>
-              </mat-card-header>
-              <mat-card-content>
-                <div class="metric-value">{{ formatMetricValue(metrics()['freshness_score']) }}</div>
-                <div class="metric-sample-count" *ngIf="metrics()['freshness_score'] as m">
-                  {{ 'supplierIq.sampleCounts.samples' | translate:{ count: m.sample_count } }}
-                </div>
-              </mat-card-content>
-            </mat-card>
-
-            <!-- Savings Contribution -->
-            <mat-card role="listitem" class="metric-card" tabindex="0">
-              <mat-card-header>
-                <mat-card-title>{{ 'supplierIq.metrics.savingsContribution' | translate }}</mat-card-title>
-              </mat-card-header>
-              <mat-card-content>
-                <div class="metric-value">{{ formatMetricValue(metrics()['savings_contribution']) }}</div>
-                <div class="metric-sample-count" *ngIf="metrics()['savings_contribution'] as m">
-                  {{ 'supplierIq.sampleCounts.samples' | translate:{ count: m.sample_count } }}
-                </div>
+                @if (scorecard()?.window_start) {
+                  <p class="window-dates">
+                    {{ scorecard()?.window_start | formatDate }} — {{ scorecard()?.window_end | formatDate }}
+                  </p>
+                }
               </mat-card-content>
             </mat-card>
           </div>
-        </section>
-
-        <!-- Risk Sub-scores Breakdown -->
-        <section aria-labelledby="risk-breakdown-heading" class="risk-section" *ngIf="riskScore()?.sub_scores?.length">
-          <h2 id="risk-breakdown-heading" class="section-heading">{{ 'supplierIq.riskScore.breakdown' | translate }}</h2>
-
-          <div class="sub-scores-grid">
-            <mat-card *ngFor="let sub of riskScore()?.sub_scores" class="sub-score-card" tabindex="0">
-              <div class="sub-score-header">
-                <span class="sub-score-name">{{ ('supplierIq.subScores.' + sub.name) | translate }}</span>
-                <span class="sub-score-val">{{ formatRiskScore(sub.score) }}</span>
+          <!-- Performance Metrics Grid -->
+          <section aria-labelledby="metrics-heading" class="metrics-section">
+            <h2 id="metrics-heading" class="section-heading">{{ 'supplierIq.metrics.sectionTitle' | translate }}</h2>
+            <div class="metrics-grid" role="list" [attr.aria-label]="'supplierIq.metrics.sectionTitle' | translate">
+              <!-- Fulfilment Rate -->
+              <mat-card role="listitem" class="metric-card" tabindex="0">
+                <mat-card-header>
+                  <mat-card-title>{{ 'supplierIq.metrics.fulfilmentRate' | translate }}</mat-card-title>
+                </mat-card-header>
+                <mat-card-content>
+                  <div class="metric-value">{{ formatMetricValue(metrics()['fulfilment_rate']) }}</div>
+                  @if (metrics()['fulfilment_rate']; as m) {
+                    <div class="metric-sample-count">
+                      {{ 'supplierIq.sampleCounts.samples' | translate:{ count: m.sample_count } }}
+                    </div>
+                  }
+                </mat-card-content>
+              </mat-card>
+              <!-- Quality Score -->
+              <mat-card role="listitem" class="metric-card" tabindex="0">
+                <mat-card-header>
+                  <mat-card-title>{{ 'supplierIq.metrics.qualityScore' | translate }}</mat-card-title>
+                </mat-card-header>
+                <mat-card-content>
+                  <div class="metric-value">{{ formatMetricValue(metrics()['quality_score']) }}</div>
+                  @if (metrics()['quality_score']; as m) {
+                    <div class="metric-sample-count">
+                      {{ 'supplierIq.sampleCounts.samples' | translate:{ count: m.sample_count } }}
+                    </div>
+                  }
+                </mat-card-content>
+              </mat-card>
+              <!-- Price Competitiveness -->
+              <mat-card role="listitem" class="metric-card" tabindex="0">
+                <mat-card-header>
+                  <mat-card-title>{{ 'supplierIq.metrics.priceCompetitiveness' | translate }}</mat-card-title>
+                </mat-card-header>
+                <mat-card-content>
+                  <div class="metric-value">{{ formatMetricValue(metrics()['price_competitiveness']) }}</div>
+                  @if (metrics()['price_competitiveness']; as m) {
+                    <div class="metric-sample-count">
+                      {{ 'supplierIq.sampleCounts.samples' | translate:{ count: m.sample_count } }}
+                    </div>
+                  }
+                </mat-card-content>
+              </mat-card>
+              <!-- Spend Exposure -->
+              <mat-card role="listitem" class="metric-card" tabindex="0">
+                <mat-card-header>
+                  <mat-card-title>{{ 'supplierIq.metrics.spendExposure' | translate }}</mat-card-title>
+                </mat-card-header>
+                <mat-card-content>
+                  <div class="metric-value">{{ formatMetricValue(metrics()['spend_exposure']) }}</div>
+                  @if (metrics()['spend_exposure']; as m) {
+                    <div class="metric-sample-count">
+                      {{ 'supplierIq.sampleCounts.samples' | translate:{ count: m.sample_count } }}
+                    </div>
+                  }
+                </mat-card-content>
+              </mat-card>
+              <!-- Freshness Score -->
+              <mat-card role="listitem" class="metric-card" tabindex="0">
+                <mat-card-header>
+                  <mat-card-title>{{ 'supplierIq.metrics.freshnessScore' | translate }}</mat-card-title>
+                </mat-card-header>
+                <mat-card-content>
+                  <div class="metric-value">{{ formatMetricValue(metrics()['freshness_score']) }}</div>
+                  @if (metrics()['freshness_score']; as m) {
+                    <div class="metric-sample-count">
+                      {{ 'supplierIq.sampleCounts.samples' | translate:{ count: m.sample_count } }}
+                    </div>
+                  }
+                </mat-card-content>
+              </mat-card>
+              <!-- Savings Contribution -->
+              <mat-card role="listitem" class="metric-card" tabindex="0">
+                <mat-card-header>
+                  <mat-card-title>{{ 'supplierIq.metrics.savingsContribution' | translate }}</mat-card-title>
+                </mat-card-header>
+                <mat-card-content>
+                  <div class="metric-value">{{ formatMetricValue(metrics()['savings_contribution']) }}</div>
+                  @if (metrics()['savings_contribution']; as m) {
+                    <div class="metric-sample-count">
+                      {{ 'supplierIq.sampleCounts.samples' | translate:{ count: m.sample_count } }}
+                    </div>
+                  }
+                </mat-card-content>
+              </mat-card>
+            </div>
+          </section>
+          <!-- Risk Sub-scores Breakdown -->
+          @if (riskScore()?.sub_scores?.length) {
+            <section aria-labelledby="risk-breakdown-heading" class="risk-section">
+              <h2 id="risk-breakdown-heading" class="section-heading">{{ 'supplierIq.riskScore.breakdown' | translate }}</h2>
+              <div class="sub-scores-grid">
+                @for (sub of riskScore()?.sub_scores; track sub) {
+                  <mat-card class="sub-score-card" tabindex="0">
+                    <div class="sub-score-header">
+                      <span class="sub-score-name">{{ ('supplierIq.subScores.' + sub.name) | translate }}</span>
+                      <span class="sub-score-val">{{ formatRiskScore(sub.score) }}</span>
+                    </div>
+                    <div class="sub-score-weight">
+                      <span>{{ 'supplierIq.riskScore.weightLabel' | translate:{ weight: sub.weight } }}</span>
+                    </div>
+                  </mat-card>
+                }
               </div>
-              <div class="sub-score-weight">
-                <span>{{ 'supplierIq.riskScore.weightLabel' | translate:{ weight: sub.weight } }}</span>
-              </div>
+            </section>
+          }
+          <!-- Source Evidence Counts -->
+          <section aria-labelledby="evidence-heading" class="evidence-section">
+            <h2 id="evidence-heading" class="section-heading">{{ 'supplierIq.sourceEvidence.sectionTitle' | translate }}</h2>
+            <mat-card class="evidence-card">
+              <dl class="evidence-list">
+                <div class="evidence-row">
+                  <dt>{{ 'supplierIq.sourceEvidence.purchaseRecord' | translate }}</dt>
+                  <dd><strong>{{ sourceCounts()['purchase_record'] ?? 0 }}</strong></dd>
+                </div>
+                <div class="evidence-row">
+                  <dt>{{ 'supplierIq.sourceEvidence.tenantPurchaseRecord' | translate }}</dt>
+                  <dd><strong>{{ sourceCounts()['tenant_purchase_record'] ?? 0 }}</strong></dd>
+                </div>
+                <div class="evidence-row">
+                  <dt>{{ 'supplierIq.sourceEvidence.deliveryQualityIssue' | translate }}</dt>
+                  <dd><strong>{{ sourceCounts()['delivery_quality_issue'] ?? 0 }}</strong></dd>
+                </div>
+                <div class="evidence-row">
+                  <dt>{{ 'supplierIq.sourceEvidence.landedCost' | translate }}</dt>
+                  <dd><strong>{{ sourceCounts()['landed_cost'] ?? 0 }}</strong></dd>
+                </div>
+                <div class="evidence-row">
+                  <dt>{{ 'supplierIq.sourceEvidence.marketLandedCost' | translate }}</dt>
+                  <dd><strong>{{ sourceCounts()['market_landed_cost'] ?? 0 }}</strong></dd>
+                </div>
+                <div class="evidence-row">
+                  <dt>{{ 'supplierIq.sourceEvidence.savingRecord' | translate }}</dt>
+                  <dd><strong>{{ sourceCounts()['saving_record'] ?? 0 }}</strong></dd>
+                </div>
+                <div class="evidence-row">
+                  <dt>{{ 'supplierIq.sourceEvidence.tenantSavingRecord' | translate }}</dt>
+                  <dd><strong>{{ sourceCounts()['tenant_saving_record'] ?? 0 }}</strong></dd>
+                </div>
+              </dl>
             </mat-card>
-          </div>
-        </section>
-
-        <!-- Source Evidence Counts -->
-        <section aria-labelledby="evidence-heading" class="evidence-section">
-          <h2 id="evidence-heading" class="section-heading">{{ 'supplierIq.sourceEvidence.sectionTitle' | translate }}</h2>
-
-          <mat-card class="evidence-card">
-            <dl class="evidence-list">
-              <div class="evidence-row">
-                <dt>{{ 'supplierIq.sourceEvidence.purchaseRecord' | translate }}</dt>
-                <dd><strong>{{ sourceCounts()['purchase_record'] ?? 0 }}</strong></dd>
-              </div>
-              <div class="evidence-row">
-                <dt>{{ 'supplierIq.sourceEvidence.tenantPurchaseRecord' | translate }}</dt>
-                <dd><strong>{{ sourceCounts()['tenant_purchase_record'] ?? 0 }}</strong></dd>
-              </div>
-              <div class="evidence-row">
-                <dt>{{ 'supplierIq.sourceEvidence.deliveryQualityIssue' | translate }}</dt>
-                <dd><strong>{{ sourceCounts()['delivery_quality_issue'] ?? 0 }}</strong></dd>
-              </div>
-              <div class="evidence-row">
-                <dt>{{ 'supplierIq.sourceEvidence.landedCost' | translate }}</dt>
-                <dd><strong>{{ sourceCounts()['landed_cost'] ?? 0 }}</strong></dd>
-              </div>
-              <div class="evidence-row">
-                <dt>{{ 'supplierIq.sourceEvidence.marketLandedCost' | translate }}</dt>
-                <dd><strong>{{ sourceCounts()['market_landed_cost'] ?? 0 }}</strong></dd>
-              </div>
-              <div class="evidence-row">
-                <dt>{{ 'supplierIq.sourceEvidence.savingRecord' | translate }}</dt>
-                <dd><strong>{{ sourceCounts()['saving_record'] ?? 0 }}</strong></dd>
-              </div>
-              <div class="evidence-row">
-                <dt>{{ 'supplierIq.sourceEvidence.tenantSavingRecord' | translate }}</dt>
-                <dd><strong>{{ sourceCounts()['tenant_saving_record'] ?? 0 }}</strong></dd>
-              </div>
-            </dl>
-          </mat-card>
-        </section>
-
-        <app-scorecard-v2-panel
-          [scorecard]="scorecard()!"
-          [supplierId]="supplierId()"
-        />
-
-        <!-- Scorecard Footer Metadata -->
-        <footer class="scorecard-footer">
-          <span *ngIf="scorecard()?.rule_version">
-            {{ 'supplierIq.ruleVersion' | translate:{ version: scorecard()?.rule_version } }}
-          </span>
-          <span *ngIf="scorecard()?.computed_at">
-            {{ 'supplierIq.computedAt' | translate:{ date: (scorecard()?.computed_at | formatDate) } }}
-          </span>
-        </footer>
-      </div>
+          </section>
+          <app-scorecard-v2-panel
+            [scorecard]="scorecard()!"
+            [supplierId]="supplierId()"
+            />
+          <!-- Scorecard Footer Metadata -->
+          <footer class="scorecard-footer">
+            @if (scorecard()?.rule_version) {
+              <span>
+                {{ 'supplierIq.ruleVersion' | translate:{ version: scorecard()?.rule_version } }}
+              </span>
+            }
+            @if (scorecard()?.computed_at) {
+              <span>
+                {{ 'supplierIq.computedAt' | translate:{ date: (scorecard()?.computed_at | formatDate) } }}
+              </span>
+            }
+          </footer>
+        </div>
+      }
     </main>
-  `,
+    `,
   styles: [
     `
       .scorecard-page {

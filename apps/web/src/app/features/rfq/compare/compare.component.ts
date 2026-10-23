@@ -1,5 +1,5 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
@@ -34,7 +34,6 @@ const LAST_BRANCH_STORAGE_PREFIX = 'pp.rfq.lastBranchId.';
   selector: 'app-rfq-compare',
   standalone: true,
   imports: [
-    CommonModule,
     FormsModule,
     MatCardModule,
     MatButtonModule,
@@ -50,8 +49,8 @@ const LAST_BRANCH_STORAGE_PREFIX = 'pp.rfq.lastBranchId.';
     TranslateModule,
     TranslatePipe,
     FormatMoneyPipe,
-    FormatDatePipe,
-  ],
+    FormatDatePipe
+],
   templateUrl: './compare.component.html',
   styleUrl: './compare.component.scss',
 })

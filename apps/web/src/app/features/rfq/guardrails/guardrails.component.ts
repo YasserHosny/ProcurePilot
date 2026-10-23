@@ -1,5 +1,5 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { FormsModule } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
 import { MatButtonModule } from '@angular/material/button';
@@ -36,7 +36,6 @@ import {
   selector: 'app-rfq-guardrails',
   standalone: true,
   imports: [
-    CommonModule,
     FormsModule,
     MatButtonModule,
     MatCardModule,
@@ -47,8 +46,8 @@ import {
     MatProgressSpinnerModule,
     MatIconModule,
     TranslateModule,
-    FormatMoneyPipe,
-  ],
+    FormatMoneyPipe
+],
   templateUrl: './guardrails.component.html',
   styleUrl: './guardrails.component.scss',
 })

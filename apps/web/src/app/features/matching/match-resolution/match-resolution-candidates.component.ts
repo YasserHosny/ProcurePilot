@@ -1,4 +1,4 @@
-import { CommonModule } from '@angular/common';
+
 import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { MatCardModule } from '@angular/material/card';
 import { MatDividerModule } from '@angular/material/divider';
@@ -13,14 +13,13 @@ import { UnitLabelPipe } from '../../../core/format/unit-label';
   selector: 'app-match-resolution-candidates',
   standalone: true,
   imports: [
-    CommonModule,
     MatCardModule,
     MatIconModule,
     MatDividerModule,
     MatTooltipModule,
     TranslatePipe,
-    UnitLabelPipe,
-  ],
+    UnitLabelPipe
+],
   templateUrl: './match-resolution-candidates.component.html',
   styleUrl: './match-resolution-candidates.component.scss',
 })

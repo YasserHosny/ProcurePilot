@@ -1,4 +1,4 @@
-import { CommonModule } from '@angular/common';
+
 import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCheckboxModule } from '@angular/material/checkbox';
@@ -14,15 +14,14 @@ import { FormatMoneyPipe } from '../../../core/format/money.pipe';
   selector: 'app-quotation-review-banners',
   standalone: true,
   imports: [
-    CommonModule,
     RouterLink,
     MatButtonModule,
     MatCheckboxModule,
     MatIconModule,
     MatTooltipModule,
     TranslatePipe,
-    FormatMoneyPipe,
-  ],
+    FormatMoneyPipe
+],
   templateUrl: './quotation-review-banners.component.html',
   styleUrl: './quotation-review-banners.component.scss',
 })

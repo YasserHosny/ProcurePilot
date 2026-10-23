@@ -1,5 +1,5 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { ReactiveFormsModule, FormBuilder, Validators, FormArray } from '@angular/forms';
 import { MatCardModule } from '@angular/material/card';
@@ -27,7 +27,6 @@ import { trimDecimal } from '../../../core/format/trim-decimal';
   selector: 'app-rfq-create',
   standalone: true,
   imports: [
-    CommonModule,
     RouterModule,
     ReactiveFormsModule,
     MatCardModule,
@@ -38,8 +37,8 @@ import { trimDecimal } from '../../../core/format/trim-decimal';
     MatIconModule,
     MatDatepickerModule,
     MatProgressSpinnerModule,
-    TranslateModule,
-  ],
+    TranslateModule
+],
   templateUrl: './create.component.html',
   styleUrl: './create.component.scss',
 })
