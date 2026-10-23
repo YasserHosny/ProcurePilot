@@ -1,0 +1,350 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "Purchase Order and Three-Way Match",
+    "locale": "en",
+    "quality_profile": "showcase",
+    "output": "docs/architecture/purchase-order-three-way-match.html",
+    "repository": {
+      "url": "https://github.com/YasserHosny/ProcurePilot.git",
+      "provider": "github",
+      "link_mode": "web",
+      "revision": "73deb00ca5fcda9551ab9607481bc3ad6d096667"
+    },
+    "legend": {
+      "entries": {
+        "frontend": {
+          "label": "User action"
+        },
+        "backend": {
+          "label": "Service step"
+        },
+        "database": {
+          "label": "Stored state"
+        },
+        "cloud": {
+          "label": "External service"
+        },
+        "security": {
+          "label": "Gate or failure"
+        }
+      }
+    }
+  },
+  "lanes": [
+    {
+      "id": "po",
+      "label": "Purchase order evidence (web + API)"
+    },
+    {
+      "id": "sync",
+      "label": "Accounting sync (Xero / QuickBooks)"
+    },
+    {
+      "id": "outcome",
+      "label": "Match outcome",
+      "variant": "exception"
+    }
+  ],
+  "mainPath": [
+    "draft",
+    "submit",
+    "confirm",
+    "receipt",
+    "evaluate",
+    "result"
+  ],
+  "nodes": [
+    {
+      "id": "draft",
+      "lane": "po",
+      "col": 0,
+      "type": "frontend",
+      "label": "Draft PO",
+      "sublabel": "from approved request or manual",
+      "sources": [
+        {
+          "path": "apps/api/src/procurepilot_api/modules/orders/service.py",
+          "line": 146,
+          "end_line": 190,
+          "label": "create_order: draft"
+        },
+        {
+          "path": "apps/api/src/procurepilot_api/modules/requests/service.py",
+          "line": 95,
+          "end_line": 103,
+          "label": "orderable request states"
+        }
+      ]
+    },
+    {
+      "id": "submit",
+      "lane": "po",
+      "col": 1,
+      "type": "frontend",
+      "label": "Submit PO",
+      "sublabel": "draft → submitted",
+      "sources": [
+        {
+          "path": "apps/api/src/procurepilot_api/modules/orders/service.py",
+          "line": 679,
+          "end_line": 710,
+          "label": "submit_order"
+        },
+        {
+          "path": "apps/api/src/procurepilot_api/modules/orders/service.py",
+          "line": 1121,
+          "end_line": 1127,
+          "label": "draft only"
+        }
+      ]
+    },
+    {
+      "id": "confirm",
+      "lane": "po",
+      "col": 2,
+      "type": "frontend",
+      "label": "Supplier confirmation",
+      "sublabel": "qty + price per line",
+      "sources": [
+        {
+          "path": "apps/api/src/procurepilot_api/modules/orders/service.py",
+          "line": 712,
+          "end_line": 803,
+          "label": "record_confirmation"
+        }
+      ]
+    },
+    {
+      "id": "receipt",
+      "lane": "po",
+      "col": 3,
+      "type": "frontend",
+      "label": "Delivery receipt",
+      "sublabel": "received qty per line",
+      "sources": [
+        {
+          "path": "apps/api/src/procurepilot_api/modules/orders/service.py",
+          "line": 805,
+          "end_line": 888,
+          "label": "record_receipt"
+        }
+      ]
+    },
+    {
+      "id": "cancelled",
+      "lane": "outcome",
+      "col": 1,
+      "type": "security",
+      "label": "Cancelled",
+      "sublabel": "frees request allocation",
+      "sources": [
+        {
+          "path": "apps/api/src/procurepilot_api/modules/orders/service.py",
+          "line": 448,
+          "end_line": 495,
+          "label": "cancel_order"
+        }
+      ]
+    },
+    {
+      "id": "trigger",
+      "lane": "sync",
+      "col": 2,
+      "type": "backend",
+      "label": "Sync run",
+      "sublabel": "daily worker or POST /sync",
+      "sources": [
+        {
+          "path": "apps/api/src/procurepilot_api/workers/accounting_sync_worker.py",
+          "line": 26,
+          "end_line": 45,
+          "label": "due connections"
+        },
+        {
+          "path": "apps/api/src/procurepilot_api/modules/accounting/router.py",
+          "line": 194,
+          "end_line": 210,
+          "label": "manual sync"
+        }
+      ]
+    },
+    {
+      "id": "bills",
+      "lane": "sync",
+      "col": 3,
+      "type": "cloud",
+      "label": "Fetch bills",
+      "sublabel": "vendors + bills upserted",
+      "sources": [
+        {
+          "path": "apps/api/src/procurepilot_api/modules/accounting/sync_service.py",
+          "line": 402,
+          "end_line": 448,
+          "label": "vendors, bills"
+        }
+      ]
+    },
+    {
+      "id": "evaluate",
+      "lane": "sync",
+      "col": 4,
+      "type": "backend",
+      "label": "Three-way evaluation",
+      "sublabel": "bill vs order vs evidence",
+      "tag": "tolerance ruleset",
+      "sources": [
+        {
+          "path": "apps/api/src/procurepilot_api/modules/accounting/sync_service.py",
+          "line": 458,
+          "end_line": 465,
+          "label": "runs inside sync"
+        },
+        {
+          "path": "apps/api/src/procurepilot_api/modules/accounting/three_way_sync_service.py",
+          "line": 225,
+          "end_line": 280,
+          "label": "per bill"
+        },
+        {
+          "path": "apps/api/src/procurepilot_api/modules/accounting/three_way_match_service.py",
+          "line": 409,
+          "end_line": 470,
+          "label": "evaluate_three_way_match"
+        }
+      ]
+    },
+    {
+      "id": "result",
+      "lane": "sync",
+      "col": 5,
+      "type": "database",
+      "label": "Match result",
+      "sublabel": "matched · partial · needs_review",
+      "sources": [
+        {
+          "path": "apps/api/src/procurepilot_api/modules/accounting/three_way_match_persistence.py",
+          "line": 44,
+          "end_line": 150,
+          "label": "persist + discrepancies"
+        }
+      ]
+    },
+    {
+      "id": "discrepancy",
+      "lane": "outcome",
+      "col": 5,
+      "type": "security",
+      "label": "Discrepancies",
+      "sublabel": "resolved by a person",
+      "sources": [
+        {
+          "path": "apps/api/src/procurepilot_api/modules/accounting/router.py",
+          "line": 279,
+          "end_line": 320,
+          "label": "list + resolve"
+        },
+        {
+          "path": "supabase/migrations/20260919000007_three_way_match_discrepancy.sql",
+          "line": 3,
+          "end_line": 11,
+          "label": "discrepancy types"
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "id": "draft-submit",
+      "from": "draft",
+      "to": "submit",
+      "variant": "emphasis"
+    },
+    {
+      "id": "submit-confirm",
+      "from": "submit",
+      "to": "confirm",
+      "variant": "emphasis"
+    },
+    {
+      "id": "confirm-receipt",
+      "from": "confirm",
+      "to": "receipt",
+      "variant": "emphasis"
+    },
+    {
+      "id": "receipt-evaluate",
+      "from": "receipt",
+      "to": "evaluate",
+      "label": "order evidence",
+      "variant": "emphasis",
+      "toSide": "top"
+    },
+    {
+      "id": "evaluate-result",
+      "from": "evaluate",
+      "to": "result",
+      "variant": "emphasis"
+    },
+    {
+      "id": "submit-cancelled",
+      "from": "submit",
+      "to": "cancelled",
+      "label": "cancel",
+      "variant": "security",
+      "role": "branch"
+    },
+    {
+      "id": "trigger-bills",
+      "from": "trigger",
+      "to": "bills",
+      "variant": "default"
+    },
+    {
+      "id": "bills-evaluate",
+      "from": "bills",
+      "to": "evaluate",
+      "label": "supplier bills",
+      "variant": "dashed",
+      "role": "async",
+      "toSide": "left"
+    },
+    {
+      "id": "result-discrepancy",
+      "from": "result",
+      "to": "discrepancy",
+      "label": "variance found",
+      "variant": "security",
+      "role": "branch"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "How a bill finds its order",
+      "items": [
+        "Candidate orders for the bill's matched supplier; none → invoice_without_order, several → ambiguous_order",
+        "Missing confirmation or receipt is a discrepancy; the result is partial or unavailable",
+        "Quantity, price, currency and over-billing are checked line by line within tolerance"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Order status in practice",
+      "items": [
+        "The code sets draft, submitted and cancelled only",
+        "confirmed, partially_received, received and closed exist in the enum but nothing sets them yet",
+        "Cancel is refused once an order is received or closed"
+      ]
+    },
+    {
+      "dot": "slate",
+      "title": "Evidence only",
+      "items": [
+        "Orders are internal records; nothing is sent to a supplier or provider",
+        "Confirmations and receipts are recorded by people; quantities above the order are allowed and show up as over-receipt or over-billing"
+      ]
+    }
+  ]
+}

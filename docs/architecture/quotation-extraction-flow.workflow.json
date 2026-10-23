@@ -5,6 +5,7 @@
     "title": "Quotation Extraction Flow",
     "locale": "en",
     "quality_profile": "showcase",
+    "legend": { "entries": { "frontend": { "label": "User action" }, "backend": { "label": "Service step" }, "database": { "label": "Stored state" }, "cloud": { "label": "External service" }, "security": { "label": "Gate or failure" }, "messagebus": { "label": "Queue or task" }, "external": { "label": "Outside party" } } },
     "output": "docs/architecture/quotation-extraction-flow.html",
     "repository": {
       "url": "https://github.com/YasserHosny/ProcurePilot.git",
