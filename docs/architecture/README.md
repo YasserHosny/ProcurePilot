@@ -31,6 +31,6 @@ repository root:
 node <archify>/bin/archify.mjs finalize workflow docs/architecture/rfq-sourcing-flow.workflow.json docs/architecture/rfq-sourcing-flow.html --repo-root . --quality showcase --out-dir .archify/rfq-review
 ```
 
-Use `lifecycle` instead of `workflow` for the `.lifecycle.json` file. `--out-dir` moves the browser-check and finalize
+Use the subcommand that matches the file's suffix: `workflow`, `lifecycle`, `architecture` or `sequence`. `--out-dir` moves the browser-check and finalize
 receipts into the ignored `.archify/` folder; the `*.delivery.json` receipt is still written next to the HTML, so
 delete it rather than commit it.
