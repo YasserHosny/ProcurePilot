@@ -1,0 +1,64 @@
+{
+  "schema_version": 3,
+  "diagram_type": "lifecycle",
+  "meta": {
+    "title": "Purchase Request Approval Lifecycle",
+    "locale": "en",
+    "quality_profile": "showcase",
+    "output": "docs/architecture/purchase-request-approval-lifecycle.html",
+    "repository": {
+      "url": "https://github.com/YasserHosny/ProcurePilot.git",
+      "provider": "github",
+      "link_mode": "web",
+      "revision": "9fcd827f3323549c5b651758e4a2b1d23b202485"
+    }
+  },
+  "mainPath": ["draft", "submitted", "ordered", "delivered"],
+  "states": [
+    { "id": "draft", "type": "start", "label": "Draft", "sublabel": "manual, RFQ or guardrail", "tag": "editable", "step": "01", "sources": [
+      { "path": "apps/api/src/procurepilot_api/modules/requests/service.py", "line": 140, "end_line": 175, "label": "create_request: status draft" },
+      { "path": "apps/api/src/procurepilot_api/modules/requests/service.py", "line": 656, "end_line": 670, "label": "PATCH only while draft" } ] },
+    { "id": "submitted", "type": "waiting", "label": "Submitted", "sublabel": "one pending approval step", "tag": "awaiting approver", "step": "02", "sources": [
+      { "path": "apps/api/src/procurepilot_api/modules/requests/service.py", "line": 743, "end_line": 831, "label": "submit: freeze estimates" },
+      { "path": "apps/api/src/procurepilot_api/modules/requests/service.py", "line": 1772, "end_line": 1827, "label": "create approval_step" },
+      { "path": "apps/api/src/procurepilot_api/modules/requests/routing.py", "line": 38, "end_line": 128, "label": "threshold, delegate, owner" } ] },
+    { "id": "ordered", "type": "active", "label": "Ordered", "sublabel": "approved = ordered", "tag": "PO can be drafted", "step": "03", "sources": [
+      { "path": "apps/api/src/procurepilot_api/modules/requests/service.py", "line": 1127, "end_line": 1141, "label": "approve_request" },
+      { "path": "apps/api/src/procurepilot_api/modules/requests/service.py", "line": 1998, "end_line": 2055, "label": "request + step in one tx" } ] },
+    { "id": "delivered", "type": "success", "label": "Delivered", "sublabel": "quantities received", "tag": "quality issues allowed", "step": "04", "sources": [
+      { "path": "apps/api/src/procurepilot_api/modules/requests/service.py", "line": 908, "end_line": 975, "label": "confirm_delivery" },
+      { "path": "apps/api/src/procurepilot_api/modules/requests/service.py", "line": 993, "end_line": 1004, "label": "issues only once delivered" } ] },
+    { "id": "rejected", "type": "failure", "label": "Rejected", "sublabel": "approver declined", "tag": "terminal", "sources": [
+      { "path": "apps/api/src/procurepilot_api/modules/requests/service.py", "line": 1143, "end_line": 1157, "label": "reject_request" },
+      { "path": "apps/api/src/procurepilot_api/modules/requests/service.py", "line": 1900, "end_line": 1918, "label": "assigned approver or owner" } ] },
+    { "id": "withdrawn", "type": "neutral", "label": "Withdrawn", "sublabel": "requester or owner", "tag": "terminal", "sources": [
+      { "path": "apps/api/src/procurepilot_api/modules/requests/service.py", "line": 833, "end_line": 852, "label": "withdraw_request" },
+      { "path": "apps/api/src/procurepilot_api/modules/requests/service.py", "line": 854, "end_line": 906, "label": "allowed states + PO check" } ] }
+  ],
+  "transitions": [
+    { "id": "draft-submitted", "from": "draft", "to": "submitted", "label": "submit", "note": "needs lines; routes approver", "variant": "emphasis" },
+    { "id": "submitted-ordered", "from": "submitted", "to": "ordered", "label": "approve", "note": "push to requester", "variant": "emphasis" },
+    { "id": "ordered-delivered", "from": "ordered", "to": "delivered", "label": "confirm delivery", "variant": "emphasis" },
+    { "id": "submitted-rejected", "from": "submitted", "to": "rejected", "label": "reject", "variant": "security" },
+    { "id": "draft-withdrawn", "from": "draft", "to": "withdrawn", "label": "withdraw" },
+    { "id": "submitted-withdrawn", "from": "submitted", "to": "withdrawn", "label": "withdraw" },
+    { "id": "ordered-withdrawn", "from": "ordered", "to": "withdrawn", "label": "withdraw", "note": "only with no live PO" }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "Who approves", "items": [
+      "Narrowest matching threshold rule in the request's currency; branch rules beat tenant-wide",
+      "An active delegation hands the step to the delegate",
+      "No rule or no estimate → the workspace owner",
+      "Removing the assigned approver escalates the pending step"
+    ] },
+    { "dot": "amber", "title": "Decision guarantees", "items": [
+      "Request, step and push notification are written in one transaction",
+      "Only the assigned approver or the owner can decide",
+      "A concurrent withdrawal makes the decision fail with 409"
+    ] },
+    { "dot": "slate", "title": "Legacy status", "items": [
+      "The enum still has 'approved', but approval now lands directly on 'ordered'",
+      "Purchase orders are drafted only from approved/ordered requests"
+    ] }
+  ]
+}
