@@ -1,0 +1,254 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "Authenticated Request and Tenant Isolation",
+    "locale": "en",
+    "quality_profile": "showcase",
+    "output": "docs/architecture/auth-tenant-isolation-sequence.html",
+    "repository": {
+      "url": "https://github.com/YasserHosny/ProcurePilot.git",
+      "provider": "github",
+      "link_mode": "web",
+      "revision": "73deb00ca5fcda9551ab9607481bc3ad6d096667"
+    }
+  },
+  "participants": [
+    {
+      "id": "client",
+      "type": "frontend",
+      "label": "Web / mobile",
+      "sublabel": "signed-in member",
+      "sources": [
+        {
+          "path": "apps/mobile/lib/core/api/approvals_api_client.dart",
+          "line": 14,
+          "end_line": 39,
+          "label": "Bearer calls"
+        }
+      ]
+    },
+    {
+      "id": "auth",
+      "type": "security",
+      "label": "Supabase Auth",
+      "sublabel": "token hook + JWKS",
+      "sources": [
+        {
+          "path": "supabase/migrations/20260819000006_auth_hook.sql",
+          "line": 22,
+          "end_line": 61,
+          "label": "custom_access_token_hook"
+        },
+        {
+          "path": "apps/api/src/procurepilot_api/modules/auth/jwks.py",
+          "line": 39,
+          "end_line": 101,
+          "label": "JWKS cache"
+        }
+      ]
+    },
+    {
+      "id": "api",
+      "type": "backend",
+      "label": "FastAPI",
+      "sublabel": "/api/v1",
+      "sources": [
+        {
+          "path": "apps/api/src/procurepilot_api/modules/auth/jwt.py",
+          "line": 95,
+          "end_line": 124,
+          "label": "verify_supabase_jwt"
+        },
+        {
+          "path": "apps/api/src/procurepilot_api/deps.py",
+          "line": 54,
+          "end_line": 100,
+          "label": "resolve member"
+        },
+        {
+          "path": "apps/api/src/procurepilot_api/modules/quotations/service.py",
+          "line": 1168,
+          "end_line": 1174,
+          "label": "no row → 404"
+        }
+      ]
+    },
+    {
+      "id": "db",
+      "type": "database",
+      "label": "Postgres",
+      "sublabel": "via PostgREST · RLS",
+      "sources": [
+        {
+          "path": "supabase/migrations/20260819000004_rls.sql",
+          "line": 29,
+          "end_line": 51,
+          "label": "current_tenant_id + policy"
+        },
+        {
+          "path": "apps/api/src/procurepilot_api/modules/members/service.py",
+          "line": 39,
+          "end_line": 42,
+          "label": "client carries user JWT"
+        }
+      ]
+    }
+  ],
+  "segments": [
+    {
+      "from": 150,
+      "to": 255,
+      "label": "Sign in"
+    },
+    {
+      "from": 270,
+      "to": 510,
+      "label": "Verify token"
+    },
+    {
+      "from": 520,
+      "to": 690,
+      "label": "Tenant-scoped read"
+    }
+  ],
+  "messages": [
+    {
+      "id": "sign-in",
+      "from": "client",
+      "to": "auth",
+      "y": 175,
+      "label": "sign in",
+      "variant": "default"
+    },
+    {
+      "id": "token",
+      "from": "auth",
+      "to": "client",
+      "y": 220,
+      "label": "access token",
+      "variant": "return",
+      "note": "hook adds tenant_id + member_role from the active membership"
+    },
+    {
+      "id": "request",
+      "from": "client",
+      "to": "api",
+      "y": 290,
+      "label": "GET /quotations/{id} + Bearer",
+      "variant": "emphasis"
+    },
+    {
+      "id": "jwks",
+      "from": "api",
+      "to": "auth",
+      "y": 330,
+      "label": "fetch JWKS",
+      "variant": "dashed",
+      "note": "cached; refetched for an unknown key id"
+    },
+    {
+      "id": "keys",
+      "from": "auth",
+      "to": "api",
+      "y": 390,
+      "label": "public keys",
+      "variant": "return"
+    },
+    {
+      "id": "member",
+      "from": "api",
+      "to": "db",
+      "y": 430,
+      "label": "tenant + membership",
+      "variant": "security",
+      "note": "after signature, aud, iss and exp checks"
+    },
+    {
+      "id": "member-row",
+      "from": "db",
+      "to": "api",
+      "y": 490,
+      "label": "one active membership",
+      "variant": "return"
+    },
+    {
+      "id": "select",
+      "from": "api",
+      "to": "db",
+      "y": 540,
+      "label": "select quotation",
+      "variant": "emphasis",
+      "note": "RLS: tenant_id = current_tenant_id()"
+    },
+    {
+      "id": "rows",
+      "from": "db",
+      "to": "api",
+      "y": 600,
+      "label": "0 rows if another tenant's",
+      "variant": "return"
+    },
+    {
+      "id": "not-found",
+      "from": "api",
+      "to": "client",
+      "y": 640,
+      "label": "404 not_found",
+      "variant": "return",
+      "note": "cross-tenant reads are not found, never forbidden"
+    }
+  ],
+  "activations": [
+    {
+      "participant": "auth",
+      "from": 170,
+      "to": 226,
+      "type": "security"
+    },
+    {
+      "participant": "api",
+      "from": 285,
+      "to": 646,
+      "type": "backend"
+    },
+    {
+      "participant": "auth",
+      "from": 325,
+      "to": 396,
+      "type": "security"
+    },
+    {
+      "participant": "db",
+      "from": 425,
+      "to": 496,
+      "type": "database"
+    },
+    {
+      "participant": "db",
+      "from": 535,
+      "to": 606,
+      "type": "database"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Where the tenant comes from",
+      "items": [
+        "Only the signed tenant_id claim; never a path, query or header",
+        "The hook runs on every issue and refresh, so a role change applies on the next refresh",
+        "No active membership → no tenant claim → every policy denies"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "Enforced in the database",
+      "items": [
+        "Tenant tables enable and force row-level security keyed on current_tenant_id()",
+        "The API queries with the member's own JWT, so PostgREST applies those policies",
+        "A token whose tenant or role disagrees with the membership row is rejected with 401"
+      ]
+    }
+  ]
+}

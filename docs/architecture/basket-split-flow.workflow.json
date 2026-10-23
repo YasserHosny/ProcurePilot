@@ -1,0 +1,408 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "Basket Split Flow",
+    "locale": "en",
+    "quality_profile": "showcase",
+    "output": "docs/architecture/basket-split-flow.html",
+    "repository": {
+      "url": "https://github.com/YasserHosny/ProcurePilot.git",
+      "provider": "github",
+      "link_mode": "web",
+      "revision": "73deb00ca5fcda9551ab9607481bc3ad6d096667"
+    },
+    "legend": {
+      "entries": {
+        "frontend": {
+          "label": "User action"
+        },
+        "backend": {
+          "label": "Service step"
+        },
+        "database": {
+          "label": "Stored state"
+        },
+        "security": {
+          "label": "Gate or failure"
+        },
+        "messagebus": {
+          "label": "Queue or task"
+        },
+        "external": {
+          "label": "Outside party"
+        }
+      }
+    }
+  },
+  "lanes": [
+    {
+      "id": "web",
+      "label": "Buyer (web app)"
+    },
+    {
+      "id": "api",
+      "label": "API (offers module)"
+    },
+    {
+      "id": "worker",
+      "label": "Optimiser worker"
+    },
+    {
+      "id": "fail",
+      "label": "Skips + failures",
+      "variant": "exception"
+    }
+  ],
+  "mainPath": [
+    "optimise",
+    "validate",
+    "enqueue",
+    "claim",
+    "solve",
+    "completed"
+  ],
+  "nodes": [
+    {
+      "id": "optimise",
+      "lane": "web",
+      "col": 0,
+      "type": "frontend",
+      "label": "Optimise basket",
+      "sublabel": "POST /baskets/optimise",
+      "sources": [
+        {
+          "path": "apps/api/src/procurepilot_api/modules/offers/router.py",
+          "line": 158,
+          "end_line": 179,
+          "label": "202 Accepted + job"
+        }
+      ]
+    },
+    {
+      "id": "validate",
+      "lane": "api",
+      "col": 1,
+      "type": "backend",
+      "label": "Validate + snapshot",
+      "sublabel": "suppliers, products, terms",
+      "tag": "no duplicate active job",
+      "sources": [
+        {
+          "path": "apps/api/src/procurepilot_api/modules/offers/basket_service.py",
+          "line": 83,
+          "end_line": 111,
+          "label": "idempotency + checks"
+        },
+        {
+          "path": "apps/api/src/procurepilot_api/modules/offers/basket_service.py",
+          "line": 195,
+          "end_line": 208,
+          "label": "expire stuck jobs first"
+        }
+      ]
+    },
+    {
+      "id": "enqueue",
+      "lane": "api",
+      "col": 2,
+      "type": "messagebus",
+      "label": "Queue job",
+      "sublabel": "basket_split_job · RQ",
+      "tag": "after commit",
+      "sources": [
+        {
+          "path": "apps/api/src/procurepilot_api/modules/offers/basket_service.py",
+          "line": 46,
+          "end_line": 68,
+          "label": "enqueue after commit"
+        },
+        {
+          "path": "apps/api/src/procurepilot_api/modules/offers/basket_service.py",
+          "line": 112,
+          "end_line": 135,
+          "label": "insert queued row"
+        },
+        {
+          "path": "apps/api/src/procurepilot_api/modules/offers/basket_service.py",
+          "line": 518,
+          "end_line": 549,
+          "label": "payload + attempt token"
+        }
+      ]
+    },
+    {
+      "id": "claim",
+      "lane": "worker",
+      "col": 2,
+      "type": "backend",
+      "label": "Claim attempt",
+      "sublabel": "queued → running",
+      "tag": "attempt fence",
+      "sources": [
+        {
+          "path": "services/optimiser/src/procurepilot_optimiser_worker/worker.py",
+          "line": 23,
+          "end_line": 37,
+          "label": "process_basket_split_job"
+        },
+        {
+          "path": "services/optimiser/src/procurepilot_optimiser_worker/repository.py",
+          "line": 267,
+          "end_line": 287,
+          "label": "mark_running"
+        }
+      ]
+    },
+    {
+      "id": "solve",
+      "lane": "worker",
+      "col": 3,
+      "type": "backend",
+      "label": "CP-SAT solve",
+      "sublabel": "two-supplier or advanced",
+      "tag": "OR-Tools",
+      "sources": [
+        {
+          "path": "services/optimiser/src/procurepilot_optimiser_worker/worker.py",
+          "line": 38,
+          "end_line": 52,
+          "label": "pick solver by request kind"
+        },
+        {
+          "path": "services/optimiser/src/procurepilot_optimiser_worker/solver.py",
+          "line": 38,
+          "end_line": 60,
+          "label": "solve_two_supplier_split"
+        },
+        {
+          "path": "services/optimiser/src/procurepilot_optimiser_worker/solver.py",
+          "line": 111,
+          "end_line": 140,
+          "label": "solve_advanced_basket"
+        }
+      ]
+    },
+    {
+      "id": "completed",
+      "lane": "worker",
+      "col": 4,
+      "type": "database",
+      "label": "Completed",
+      "sublabel": "split + baselines saved",
+      "sources": [
+        {
+          "path": "services/optimiser/src/procurepilot_optimiser_worker/worker.py",
+          "line": 53,
+          "end_line": 56,
+          "label": "store result"
+        },
+        {
+          "path": "services/optimiser/src/procurepilot_optimiser_worker/repository.py",
+          "line": 290,
+          "end_line": 305,
+          "label": "mark_completed"
+        }
+      ]
+    },
+    {
+      "id": "stale",
+      "lane": "fail",
+      "col": 2,
+      "type": "external",
+      "label": "Stale delivery",
+      "sublabel": "attempt expired · skipped",
+      "sources": [
+        {
+          "path": "services/optimiser/src/procurepilot_optimiser_worker/worker.py",
+          "line": 33,
+          "end_line": 36,
+          "label": "claimed is None"
+        }
+      ]
+    },
+    {
+      "id": "failed",
+      "lane": "fail",
+      "col": 3,
+      "type": "security",
+      "label": "Solve failed",
+      "sublabel": "no offers / error",
+      "sources": [
+        {
+          "path": "services/optimiser/src/procurepilot_optimiser_worker/worker.py",
+          "line": 57,
+          "end_line": 74,
+          "label": "error codes"
+        },
+        {
+          "path": "services/optimiser/src/procurepilot_optimiser_worker/repository.py",
+          "line": 306,
+          "end_line": 325,
+          "label": "mark_failed"
+        }
+      ]
+    },
+    {
+      "id": "poll",
+      "lane": "web",
+      "col": 5,
+      "type": "frontend",
+      "label": "Poll job",
+      "sublabel": "GET /baskets/{id}",
+      "sources": [
+        {
+          "path": "apps/api/src/procurepilot_api/modules/offers/router.py",
+          "line": 182,
+          "end_line": 188,
+          "label": "get_basket"
+        },
+        {
+          "path": "apps/api/src/procurepilot_api/modules/offers/basket_service.py",
+          "line": 152,
+          "end_line": 163,
+          "label": "get_job"
+        }
+      ]
+    },
+    {
+      "id": "stalecheck",
+      "lane": "api",
+      "col": 5,
+      "type": "security",
+      "label": "Stuck-job check",
+      "sublabel": "worker alive? too old?",
+      "sources": [
+        {
+          "path": "apps/api/src/procurepilot_api/modules/offers/basket_liveness.py",
+          "line": 28,
+          "end_line": 62,
+          "label": "liveness + stale_code"
+        },
+        {
+          "path": "apps/api/src/procurepilot_api/modules/offers/basket_service.py",
+          "line": 165,
+          "end_line": 176,
+          "label": "_stale_code"
+        }
+      ]
+    },
+    {
+      "id": "expired",
+      "lane": "fail",
+      "col": 5,
+      "type": "security",
+      "label": "Failed as stuck",
+      "sublabel": "unavailable / timeout",
+      "tag": "retry allowed",
+      "sources": [
+        {
+          "path": "apps/api/src/procurepilot_api/modules/offers/basket_liveness.py",
+          "line": 18,
+          "end_line": 25,
+          "label": "stale codes + messages"
+        },
+        {
+          "path": "apps/api/src/procurepilot_api/modules/offers/basket_service.py",
+          "line": 178,
+          "end_line": 193,
+          "label": "_fail_stuck + cancel RQ"
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "id": "optimise-validate",
+      "from": "optimise",
+      "to": "validate",
+      "variant": "emphasis"
+    },
+    {
+      "id": "validate-enqueue",
+      "from": "validate",
+      "to": "enqueue",
+      "variant": "emphasis"
+    },
+    {
+      "id": "enqueue-claim",
+      "from": "enqueue",
+      "to": "claim",
+      "label": "RQ basket-split",
+      "variant": "dashed",
+      "role": "async"
+    },
+    {
+      "id": "claim-solve",
+      "from": "claim",
+      "to": "solve",
+      "variant": "emphasis"
+    },
+    {
+      "id": "solve-completed",
+      "from": "solve",
+      "to": "completed",
+      "variant": "emphasis"
+    },
+    {
+      "id": "claim-stale",
+      "from": "claim",
+      "to": "stale",
+      "label": "not ours",
+      "variant": "dashed",
+      "role": "branch"
+    },
+    {
+      "id": "solve-failed",
+      "from": "solve",
+      "to": "failed",
+      "label": "exception",
+      "variant": "security",
+      "role": "error"
+    },
+    {
+      "id": "poll-stalecheck",
+      "from": "poll",
+      "to": "stalecheck",
+      "label": "each poll",
+      "variant": "default"
+    },
+    {
+      "id": "stalecheck-expired",
+      "from": "stalecheck",
+      "to": "expired",
+      "label": "stuck",
+      "variant": "security",
+      "role": "error"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Attempt fence",
+      "items": [
+        "Each attempt's created_at is its token; a retry resets it",
+        "The worker claims and writes only if the token still matches",
+        "A late delivery from an expired attempt cannot overwrite a retry"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "When a job counts as stuck",
+      "items": [
+        "Queued with no RQ worker on the queue past the stall window → optimiser_unavailable",
+        "Queued or running past the expiry window → optimiser_timeout",
+        "A failed job is requeued when the same Idempotency-Key is retried"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Solver output",
+      "items": [
+        "Cheapest allocation per item across the chosen suppliers, with single-supplier baselines",
+        "Advanced jobs add supplier terms, risk limits and excluded suppliers",
+        "Items without a usable offer are reported as infeasible"
+      ]
+    }
+  ]
+}

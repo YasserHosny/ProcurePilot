@@ -1,0 +1,243 @@
+{
+  "schema_version": 3,
+  "diagram_type": "lifecycle",
+  "meta": {
+    "title": "Quotation Status Lifecycle",
+    "locale": "en",
+    "quality_profile": "showcase",
+    "output": "docs/architecture/quotation-status-lifecycle.html",
+    "repository": {
+      "url": "https://github.com/YasserHosny/ProcurePilot.git",
+      "provider": "github",
+      "link_mode": "web",
+      "revision": "73deb00ca5fcda9551ab9607481bc3ad6d096667"
+    }
+  },
+  "mainPath": [
+    "pending",
+    "extracting",
+    "extracted",
+    "reviewed"
+  ],
+  "states": [
+    {
+      "id": "pending",
+      "type": "start",
+      "label": "Pending",
+      "sublabel": "document attached",
+      "tag": "upload, email, capture",
+      "step": "01",
+      "sources": [
+        {
+          "path": "apps/api/src/procurepilot_api/modules/quotations/service.py",
+          "line": 94,
+          "end_line": 119,
+          "label": "web: create pending"
+        },
+        {
+          "path": "apps/api/src/procurepilot_api/modules/ingestion/orchestrator.py",
+          "line": 770,
+          "end_line": 789,
+          "label": "email: pending + job"
+        },
+        {
+          "path": "apps/api/src/procurepilot_api/modules/ingestion/capture_service.py",
+          "line": 104,
+          "end_line": 124,
+          "label": "capture: pending + job"
+        }
+      ]
+    },
+    {
+      "id": "extracting",
+      "type": "active",
+      "label": "Extracting",
+      "sublabel": "extraction job queued",
+      "tag": "web only",
+      "step": "02",
+      "sources": [
+        {
+          "path": "apps/api/src/procurepilot_api/modules/extraction/service.py",
+          "line": 50,
+          "end_line": 79,
+          "label": "POST /extract"
+        },
+        {
+          "path": "apps/api/src/procurepilot_api/modules/quotations/service.py",
+          "line": 414,
+          "end_line": 445,
+          "label": "retry_extraction"
+        }
+      ]
+    },
+    {
+      "id": "extracted",
+      "type": "decision",
+      "label": "Extracted",
+      "sublabel": "no review reason",
+      "step": "03",
+      "sources": [
+        {
+          "path": "services/extraction-worker/src/procurepilot_extraction_worker/worker.py",
+          "line": 59,
+          "end_line": 80,
+          "label": "worker sets status"
+        }
+      ]
+    },
+    {
+      "id": "reviewed",
+      "type": "success",
+      "label": "Reviewed",
+      "sublabel": "human confirmed",
+      "tag": "feeds matching",
+      "step": "04",
+      "sources": [
+        {
+          "path": "apps/api/src/procurepilot_api/modules/quotations/confirmation_service.py",
+          "line": 49,
+          "end_line": 68,
+          "label": "confirm guards"
+        },
+        {
+          "path": "apps/api/src/procurepilot_api/modules/quotations/confirmation_service.py",
+          "line": 106,
+          "end_line": 123,
+          "label": "status reviewed"
+        }
+      ]
+    },
+    {
+      "id": "in_review",
+      "type": "waiting",
+      "label": "In review",
+      "sublabel": "open review_task",
+      "tag": "reason code",
+      "sources": [
+        {
+          "path": "services/extraction-worker/src/procurepilot_extraction_worker/worker.py",
+          "line": 353,
+          "end_line": 397,
+          "label": "_review_reason"
+        },
+        {
+          "path": "apps/api/src/procurepilot_api/modules/quotations/review_service.py",
+          "line": 53,
+          "end_line": 56,
+          "label": "edits move to in_review"
+        }
+      ]
+    },
+    {
+      "id": "refused",
+      "type": "failure",
+      "label": "Refused",
+      "sublabel": "unreadable or rejected",
+      "sources": [
+        {
+          "path": "services/extraction-worker/src/procurepilot_extraction_worker/worker.py",
+          "line": 91,
+          "end_line": 105,
+          "label": "worker failure"
+        },
+        {
+          "path": "apps/api/src/procurepilot_api/modules/quotations/review_service.py",
+          "line": 207,
+          "end_line": 227,
+          "label": "reviewer refuses"
+        }
+      ]
+    }
+  ],
+  "transitions": [
+    {
+      "id": "pending-extracting",
+      "from": "pending",
+      "to": "extracting",
+      "label": "extract",
+      "variant": "emphasis"
+    },
+    {
+      "id": "extracting-extracted",
+      "from": "extracting",
+      "to": "extracted",
+      "label": "worker: clean",
+      "variant": "emphasis"
+    },
+    {
+      "id": "extracted-reviewed",
+      "from": "extracted",
+      "to": "reviewed",
+      "label": "confirm",
+      "variant": "emphasis"
+    },
+    {
+      "id": "extracting-in-review",
+      "from": "extracting",
+      "to": "in_review",
+      "label": "worker: reason"
+    },
+    {
+      "id": "extracted-in-review",
+      "from": "extracted",
+      "to": "in_review",
+      "label": "edit"
+    },
+    {
+      "id": "in-review-reviewed",
+      "from": "in_review",
+      "to": "reviewed",
+      "label": "confirm",
+      "note": "supplier + currency set"
+    },
+    {
+      "id": "extracting-refused",
+      "from": "extracting",
+      "to": "refused",
+      "label": "worker fails",
+      "variant": "security"
+    },
+    {
+      "id": "in-review-refused",
+      "from": "in_review",
+      "to": "refused",
+      "label": "refuse",
+      "variant": "security"
+    },
+    {
+      "id": "refused-extracting",
+      "from": "refused",
+      "to": "extracting",
+      "label": "retry / new document",
+      "variant": "dashed"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "amber",
+      "title": "Email and capture skip Extracting",
+      "items": [
+        "They create the quotation and its extraction job together and stay Pending",
+        "The worker then writes Extracted, In review or Refused straight from Pending"
+      ]
+    },
+    {
+      "dot": "cyan",
+      "title": "Confirm needs",
+      "items": [
+        "A supplier and an evidenced currency",
+        "No unresolved low-confidence fields",
+        "An acknowledged arithmetic mismatch, if there is one"
+      ]
+    },
+    {
+      "dot": "slate",
+      "title": "Also",
+      "items": [
+        "Extracted can be refused directly, like In review; any reviewer edit moves it to In review",
+        "Retry or a replaced document is allowed from any state except Pending or Extracting",
+        "Archiving sets deleted_at and resolves open review tasks; it is not a status"
+      ]
+    }
+  ]
+}

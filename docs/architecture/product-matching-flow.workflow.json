@@ -1,0 +1,337 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "Product Matching Flow",
+    "locale": "en",
+    "quality_profile": "showcase",
+    "output": "docs/architecture/product-matching-flow.html",
+    "repository": {
+      "url": "https://github.com/YasserHosny/ProcurePilot.git",
+      "provider": "github",
+      "link_mode": "web",
+      "revision": "73deb00ca5fcda9551ab9607481bc3ad6d096667"
+    },
+    "legend": {
+      "entries": {
+        "frontend": {
+          "label": "User action"
+        },
+        "backend": {
+          "label": "Service step"
+        },
+        "database": {
+          "label": "Stored state"
+        },
+        "security": {
+          "label": "Gate or failure"
+        },
+        "messagebus": {
+          "label": "Queue or task"
+        }
+      }
+    }
+  },
+  "lanes": [
+    {
+      "id": "decision",
+      "label": "Match decision"
+    },
+    {
+      "id": "pipeline",
+      "label": "Matching pipeline (per line)"
+    },
+    {
+      "id": "queue",
+      "label": "Resolution queue (human)",
+      "variant": "exception"
+    }
+  ],
+  "mainPath": [
+    "confirm",
+    "deterministic",
+    "similarity",
+    "route",
+    "decided",
+    "effects"
+  ],
+  "nodes": [
+    {
+      "id": "confirm",
+      "lane": "pipeline",
+      "col": 0,
+      "type": "frontend",
+      "label": "Quotation confirmed",
+      "sublabel": "status reviewed",
+      "sources": [
+        {
+          "path": "apps/api/src/procurepilot_api/modules/quotations/confirmation_service.py",
+          "line": 139,
+          "end_line": 147,
+          "label": "starts matching"
+        },
+        {
+          "path": "apps/api/src/procurepilot_api/modules/matching/service.py",
+          "line": 84,
+          "end_line": 105,
+          "label": "reviewed quotes only"
+        }
+      ]
+    },
+    {
+      "id": "deterministic",
+      "lane": "pipeline",
+      "col": 1,
+      "type": "backend",
+      "label": "Exact lookup",
+      "sublabel": "GTIN · supplier code · alias",
+      "sources": [
+        {
+          "path": "apps/api/src/procurepilot_api/modules/matching/deterministic.py",
+          "line": 18,
+          "end_line": 41,
+          "label": "find_deterministic_candidate"
+        },
+        {
+          "path": "apps/api/src/procurepilot_api/modules/matching/service.py",
+          "line": 511,
+          "end_line": 539,
+          "label": "hit → automatic decision"
+        }
+      ]
+    },
+    {
+      "id": "similarity",
+      "lane": "pipeline",
+      "col": 2,
+      "type": "backend",
+      "label": "Similarity search",
+      "sublabel": "trigram + embeddings",
+      "tag": "embeddings stub by default",
+      "sources": [
+        {
+          "path": "apps/api/src/procurepilot_api/modules/matching/search.py",
+          "line": 37,
+          "end_line": 81,
+          "label": "build_similarity_candidates"
+        },
+        {
+          "path": "apps/api/src/procurepilot_api/modules/matching/service.py",
+          "line": 540,
+          "end_line": 559,
+          "label": "persist ranked candidates"
+        },
+        {
+          "path": "apps/api/src/procurepilot_api/config.py",
+          "line": 209,
+          "end_line": 217,
+          "label": "trigram 0.30 · stub embeddings"
+        }
+      ]
+    },
+    {
+      "id": "route",
+      "lane": "pipeline",
+      "col": 3,
+      "type": "security",
+      "label": "Route or accept",
+      "sublabel": "≥ 0.92 and clear lead",
+      "tag": "fuzzy auto-accept off",
+      "sources": [
+        {
+          "path": "apps/api/src/procurepilot_api/modules/matching/service.py",
+          "line": 597,
+          "end_line": 642,
+          "label": "_route_or_accept"
+        },
+        {
+          "path": "apps/api/src/procurepilot_api/config.py",
+          "line": 197,
+          "end_line": 208,
+          "label": "threshold + margin"
+        }
+      ]
+    },
+    {
+      "id": "decided",
+      "lane": "decision",
+      "col": 4,
+      "type": "database",
+      "label": "Match decision",
+      "sublabel": "line → workspace product",
+      "sources": [
+        {
+          "path": "apps/api/src/procurepilot_api/modules/matching/service.py",
+          "line": 644,
+          "end_line": 680,
+          "label": "automatic decision"
+        },
+        {
+          "path": "apps/api/src/procurepilot_api/modules/matching/resolution_service.py",
+          "line": 139,
+          "end_line": 168,
+          "label": "human decision + alias"
+        }
+      ]
+    },
+    {
+      "id": "effects",
+      "lane": "decision",
+      "col": 5,
+      "type": "backend",
+      "label": "Side effects",
+      "sublabel": "landed cost · guardrail job",
+      "sources": [
+        {
+          "path": "apps/api/src/procurepilot_api/modules/matching/resolution_service.py",
+          "line": 415,
+          "end_line": 468,
+          "label": "resolve task, landed cost"
+        },
+        {
+          "path": "apps/api/src/procurepilot_api/modules/matching/service.py",
+          "line": 677,
+          "end_line": 680,
+          "label": "enqueue guardrail_eval"
+        }
+      ]
+    },
+    {
+      "id": "task",
+      "lane": "queue",
+      "col": 3,
+      "type": "messagebus",
+      "label": "Match task",
+      "sublabel": "reason + top candidate",
+      "sources": [
+        {
+          "path": "apps/api/src/procurepilot_api/modules/matching/service.py",
+          "line": 703,
+          "end_line": 760,
+          "label": "_create_task"
+        },
+        {
+          "path": "apps/api/src/procurepilot_api/modules/matching/router.py",
+          "line": 38,
+          "end_line": 64,
+          "label": "next task / queue"
+        }
+      ]
+    },
+    {
+      "id": "resolve",
+      "lane": "queue",
+      "col": 4,
+      "type": "frontend",
+      "label": "Buyer resolves",
+      "sublabel": "same product or new",
+      "tag": "alias learned",
+      "sources": [
+        {
+          "path": "apps/api/src/procurepilot_api/modules/matching/router.py",
+          "line": 118,
+          "end_line": 135,
+          "label": "POST /match"
+        },
+        {
+          "path": "apps/api/src/procurepilot_api/modules/matching/resolution_service.py",
+          "line": 75,
+          "end_line": 138,
+          "label": "_resolve_with_client"
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "id": "confirm-deterministic",
+      "from": "confirm",
+      "to": "deterministic",
+      "variant": "emphasis"
+    },
+    {
+      "id": "deterministic-similarity",
+      "from": "deterministic",
+      "to": "similarity",
+      "label": "no exact hit",
+      "variant": "emphasis"
+    },
+    {
+      "id": "deterministic-decided",
+      "from": "deterministic",
+      "to": "decided",
+      "label": "exact hit",
+      "variant": "default",
+      "role": "branch"
+    },
+    {
+      "id": "similarity-route",
+      "from": "similarity",
+      "to": "route",
+      "variant": "emphasis"
+    },
+    {
+      "id": "route-decided",
+      "from": "route",
+      "to": "decided",
+      "label": "accept",
+      "variant": "emphasis"
+    },
+    {
+      "id": "route-task",
+      "from": "route",
+      "to": "task",
+      "label": "review",
+      "variant": "security",
+      "role": "branch"
+    },
+    {
+      "id": "task-resolve",
+      "from": "task",
+      "to": "resolve",
+      "variant": "default"
+    },
+    {
+      "id": "resolve-decided",
+      "from": "resolve",
+      "to": "decided",
+      "label": "decide",
+      "variant": "default"
+    },
+    {
+      "id": "decided-effects",
+      "from": "decided",
+      "to": "effects",
+      "variant": "emphasis"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "rose",
+      "title": "When a line goes to review",
+      "items": [
+        "no_candidate: nothing found",
+        "close_candidates: top two within 0.05",
+        "fuzzy_match_review: similarity-only match that would pass but fuzzy auto-accept is off",
+        "low_confidence: top candidate below 0.92"
+      ]
+    },
+    {
+      "dot": "cyan",
+      "title": "Learning",
+      "items": [
+        "A human decision stores the line text as an alias for that product",
+        "The next quote with the same text is an exact alias hit and auto-accepts",
+        "Bulk confirm accepts exact-name matches from the queue in one action"
+      ]
+    },
+    {
+      "dot": "slate",
+      "title": "Not shown",
+      "items": [
+        "Embeddings use a stub hash model unless MATCHING_EMBEDDING_PROVIDER_MODE=bedrock",
+        "POS and accounting have their own matching services"
+      ]
+    }
+  ]
+}

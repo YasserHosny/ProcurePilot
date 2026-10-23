@@ -1,0 +1,402 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "ProcurePilot System Architecture",
+    "locale": "en",
+    "quality_profile": "showcase",
+    "output": "docs/architecture/system-architecture.html",
+    "repository": {
+      "url": "https://github.com/YasserHosny/ProcurePilot.git",
+      "provider": "github",
+      "link_mode": "web",
+      "revision": "73deb00ca5fcda9551ab9607481bc3ad6d096667"
+    }
+  },
+  "layout": {
+    "mode": "grid",
+    "origin": [
+      40,
+      40
+    ],
+    "cols": 6,
+    "cellW": 150,
+    "cellH": 64,
+    "gapX": 110,
+    "gapY": 84
+  },
+  "components": [
+    {
+      "id": "users",
+      "type": "external",
+      "label": "Buyers + approvers",
+      "sublabel": "browser",
+      "row": 0,
+      "col": 0,
+      "sources": [
+        {
+          "path": "infra/nginx/nginx.conf",
+          "line": 50,
+          "end_line": 56,
+          "label": "SPA + /api/ proxy"
+        }
+      ]
+    },
+    {
+      "id": "web",
+      "type": "frontend",
+      "label": "Web SPA",
+      "sublabel": "Angular 19 · Nginx",
+      "row": 0,
+      "col": 1,
+      "sources": [
+        {
+          "path": "infra/docker/web.Dockerfile",
+          "line": 1,
+          "label": "web image"
+        },
+        {
+          "path": "infra/nginx/nginx.conf",
+          "line": 55,
+          "end_line": 56,
+          "label": "proxy_pass :8000"
+        }
+      ]
+    },
+    {
+      "id": "api",
+      "type": "backend",
+      "label": "FastAPI backend",
+      "sublabel": "modular monolith · /api/v1",
+      "row": 0,
+      "col": 2,
+      "sources": [
+        {
+          "path": "apps/api/src/procurepilot_api/main.py",
+          "line": 53,
+          "end_line": 69,
+          "label": "app + routers"
+        },
+        {
+          "path": "apps/api/src/procurepilot_api/deps.py",
+          "line": 39,
+          "end_line": 60,
+          "label": "JWT → member"
+        }
+      ]
+    },
+    {
+      "id": "postgres",
+      "type": "database",
+      "label": "Supabase Postgres",
+      "sublabel": "RLS per tenant",
+      "row": 0,
+      "col": 4,
+      "sources": [
+        {
+          "path": "apps/api/src/procurepilot_api/db.py",
+          "line": 1,
+          "end_line": 30,
+          "label": "pooler, no prepared stmts"
+        }
+      ]
+    },
+    {
+      "id": "auth",
+      "type": "security",
+      "label": "Supabase Auth",
+      "sublabel": "JWT issuer · JWKS",
+      "row": 0,
+      "col": 5,
+      "sources": [
+        {
+          "path": "apps/api/src/procurepilot_api/modules/auth/jwt.py",
+          "line": 59,
+          "end_line": 95,
+          "label": "JWKS key + verify"
+        }
+      ]
+    },
+    {
+      "id": "storage",
+      "type": "database",
+      "label": "Supabase Storage",
+      "sublabel": "quotes + attachments",
+      "row": 1,
+      "col": 4,
+      "sources": [
+        {
+          "path": "apps/api/src/procurepilot_api/modules/ingestion/capture_service.py",
+          "line": 77,
+          "end_line": 83,
+          "label": "upload"
+        },
+        {
+          "path": "services/extraction-worker/src/procurepilot_extraction_worker/worker.py",
+          "line": 492,
+          "end_line": 508,
+          "label": "worker download"
+        }
+      ]
+    },
+    {
+      "id": "mobile",
+      "type": "frontend",
+      "label": "Mobile app",
+      "sublabel": "Flutter",
+      "row": 1,
+      "col": 0,
+      "sources": [
+        {
+          "path": "apps/mobile/lib/core/api/approvals_api_client.dart",
+          "line": 14,
+          "end_line": 39,
+          "label": "calls /api/v1"
+        }
+      ]
+    },
+    {
+      "id": "redis",
+      "type": "messagebus",
+      "label": "Redis + RQ",
+      "sublabel": "shared-redis",
+      "row": 1,
+      "col": 2,
+      "sources": [
+        {
+          "path": "docs/operations/runbook.md",
+          "line": 144,
+          "end_line": 160,
+          "label": "workers app, Anycast IP"
+        }
+      ]
+    },
+    {
+      "id": "optimiser",
+      "type": "backend",
+      "label": "Optimiser worker",
+      "sublabel": "basket split · CP-SAT",
+      "row": 1,
+      "col": 3,
+      "sources": [
+        {
+          "path": "services/optimiser/src/procurepilot_optimiser_worker/__main__.py",
+          "line": 20,
+          "end_line": 27,
+          "label": "RQ basket-split"
+        }
+      ]
+    },
+    {
+      "id": "suppliers",
+      "type": "external",
+      "label": "Suppliers",
+      "sublabel": "email quotes",
+      "row": 2,
+      "col": 0,
+      "sources": [
+        {
+          "path": "docs/operations/runbook.md",
+          "line": 272,
+          "end_line": 276,
+          "label": "inbound path"
+        }
+      ]
+    },
+    {
+      "id": "mailgun",
+      "type": "cloud",
+      "label": "Mailgun",
+      "sublabel": "inbound + RFQ send",
+      "row": 2,
+      "col": 1,
+      "sources": [
+        {
+          "path": "apps/api/src/procurepilot_api/shared/mailer.py",
+          "line": 72,
+          "end_line": 80,
+          "label": "MailgunMailer"
+        },
+        {
+          "path": "apps/api/src/procurepilot_api/modules/ingestion/router.py",
+          "line": 168,
+          "end_line": 186,
+          "label": "signed webhook"
+        }
+      ]
+    },
+    {
+      "id": "ingest",
+      "type": "backend",
+      "label": "Ingestion worker",
+      "sublabel": "inbound email jobs",
+      "row": 2,
+      "col": 2,
+      "sources": [
+        {
+          "path": "apps/api/src/procurepilot_api/workers/email_ingestion_worker.py",
+          "line": 21,
+          "end_line": 62,
+          "label": "DB-backed queue"
+        }
+      ]
+    },
+    {
+      "id": "extraction",
+      "type": "backend",
+      "label": "Extraction worker",
+      "sublabel": "quotes → lines",
+      "row": 2,
+      "col": 3,
+      "sources": [
+        {
+          "path": "services/extraction-worker/src/procurepilot_extraction_worker/worker.py",
+          "line": 32,
+          "end_line": 58,
+          "label": "process_extraction_job"
+        }
+      ]
+    },
+    {
+      "id": "ai",
+      "type": "cloud",
+      "label": "Bedrock · Azure DI",
+      "sublabel": "document reading",
+      "row": 3,
+      "col": 3,
+      "sources": [
+        {
+          "path": "services/extraction-worker/src/procurepilot_extraction_worker/worker.py",
+          "line": 128,
+          "end_line": 149,
+          "label": "Bedrock, Azure fallback"
+        }
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "bunny.net · procurepilot-production",
+      "wraps": [
+        "web",
+        "api"
+      ]
+    },
+    {
+      "kind": "region",
+      "label": "bunny.net · procurepilot-workers",
+      "wraps": [
+        "redis",
+        "optimiser",
+        "ingest",
+        "extraction"
+      ]
+    },
+    {
+      "kind": "region",
+      "label": "Supabase",
+      "wraps": [
+        "postgres",
+        "auth",
+        "storage"
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "from": "users",
+      "to": "web",
+      "label": "HTTPS",
+      "variant": "emphasis"
+    },
+    {
+      "from": "web",
+      "to": "api",
+      "label": "/api/ proxy",
+      "variant": "emphasis"
+    },
+    {
+      "from": "mobile",
+      "to": "api",
+      "label": "HTTPS + JWT"
+    },
+    {
+      "from": "api",
+      "to": "postgres",
+      "label": "SQL under RLS",
+      "variant": "emphasis"
+    },
+    {
+      "from": "api",
+      "to": "redis",
+      "label": "enqueue"
+    },
+    {
+      "from": "redis",
+      "to": "optimiser",
+      "label": "jobs",
+      "variant": "dashed"
+    },
+    {
+      "from": "suppliers",
+      "to": "mailgun",
+      "label": "email"
+    },
+    {
+      "from": "mailgun",
+      "to": "ingest",
+      "label": "webhook → job",
+      "variant": "dashed"
+    },
+    {
+      "from": "ingest",
+      "to": "redis",
+      "label": "enqueue"
+    },
+    {
+      "from": "redis",
+      "to": "extraction",
+      "label": "jobs",
+      "variant": "dashed"
+    },
+    {
+      "from": "extraction",
+      "to": "ai",
+      "label": "read document"
+    },
+    {
+      "from": "extraction",
+      "to": "storage",
+      "label": "download"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Tenancy",
+      "items": [
+        "The API verifies the Supabase JWT and takes the tenant from its claim",
+        "Postgres row-level security enforces tenant isolation on every table",
+        "Workers connect to Postgres directly and scope every query by the job's tenant_id"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Queues",
+      "items": [
+        "Redis/RQ carries extraction and basket-split jobs; the API reaches Redis over the workers app's Anycast IP",
+        "Inbound email and guardrail evaluation use a database queue (ingestion_jobs)"
+      ]
+    },
+    {
+      "dot": "slate",
+      "title": "Not shown",
+      "items": [
+        "Workers also read and write Postgres directly",
+        "Export, digest, report and sync workers run locally via docker-compose; the runbook lists no hosted container for them",
+        "Accounting/POS integrations, push notifications and the analyst's Bedrock calls"
+      ]
+    }
+  ]
+}
