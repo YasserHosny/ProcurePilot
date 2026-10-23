@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from uuid import UUID, uuid4
 
 import magic
@@ -13,7 +14,10 @@ from procurepilot_api.errors import (
     UnprocessableEntityError,
     UnsupportedMediaTypeError,
 )
-from procurepilot_api.modules.ingestion.extraction import enqueue_extraction
+from procurepilot_api.modules.ingestion.extraction import (
+    enqueue_extraction,
+    release_failed_enqueue,
+)
 from procurepilot_api.modules.offers.service import _authenticated_db
 from procurepilot_api.shared.audit import AuditEventCreate, AuditOutcome, get_audit_writer
 from procurepilot_api.shared.logging import get_trace_id
@@ -24,6 +28,8 @@ from procurepilot_api.shared.storage_keys import display_filename, safe_object_n
 # upload), so this mirrors the manual-upload flow's own document+quotation+extraction_job
 # creation rather than routing through `ingestion_jobs` the way email (an externally-triggered,
 # webhook-driven channel) needs to.
+
+logger = logging.getLogger(__name__)
 
 _ACCEPTED_MIME_TYPES = {"application/pdf", "image/jpeg", "image/png", "image/heic"}
 
@@ -105,7 +111,7 @@ class CaptureService:
                 cur.execute(
                     """
                     insert into quotation (tenant_id, document_id, supplier_id, status, source)
-                    values (%s, %s, %s, 'pending', 'capture')
+                    values (%s, %s, %s, 'extracting', 'capture')
                     returning id
                     """,
                     (member.tenant_id, document_id, supplier_id),
@@ -125,6 +131,7 @@ class CaptureService:
 
             conn.commit()
 
+        status = "extracting"
         try:
             enqueue_extraction(
                 self._settings,
@@ -134,9 +141,15 @@ class CaptureService:
                 document_id=document_id,
             )
         except Exception:
-            # Durably created already; retryable via the existing retry_extraction endpoint,
-            # same recovery path a manually-uploaded quotation has for the identical failure.
-            pass
+            # Durably created already; back to pending so POST /quotations/{id}/extract can
+            # queue it again, the same recovery a manually-uploaded quotation gets.
+            try:
+                with _authenticated_db(self._settings, member) as conn:
+                    release_failed_enqueue(conn, job_id=job_id, quotation_id=quotation_id)
+                    conn.commit()
+                status = "pending"
+            except Exception:
+                logger.exception("Could not release failed extraction job %s", job_id)
 
         self._record_audit(
             bearer_token=bearer_token,
@@ -153,7 +166,7 @@ class CaptureService:
             outcome="success",
         )
 
-        return {"quotation_id": quotation_id, "status": "pending"}
+        return {"quotation_id": quotation_id, "status": status}
 
     def _record_audit(
         self,

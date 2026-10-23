@@ -24,7 +24,7 @@ named in its `.json` source.
 | [Purchase request approval lifecycle](purchase-request-approval-lifecycle.html) | Draft → submitted → ordered → delivered, reject and withdraw exits, approver routing | `9fcd827` |
 | [System architecture](system-architecture.html) | bunny.net production and workers apps, Redis, Supabase (Postgres, Auth, Storage), Mailgun, Bedrock / Azure DI | `73deb00` |
 | [Authenticated request and tenant isolation](auth-tenant-isolation-sequence.html) | Token hook adds tenant_id → JWT verification → row-level security → cross-tenant reads return 404 | `73deb00` |
-| [Quotation status lifecycle](quotation-status-lifecycle.html) | Pending → extracting → extracted → reviewed, with in review and refused branches | `73deb00` |
+| [Quotation status lifecycle](quotation-status-lifecycle.html) | Pending → extracting → extracted → reviewed, with in review and refused branches | `6f3382c` |
 | [Product matching flow](product-matching-flow.html) | Exact lookup → similarity search → auto-accept or review queue → match decision | `73deb00` |
 | [Basket split flow](basket-split-flow.html) | Optimise job → RQ → optimiser worker (attempt-fenced, CP-SAT) → result; stuck jobs failed on poll | `73deb00` |
 | [Purchase order and three-way match](purchase-order-three-way-match.html) | PO, confirmation and receipt evidence + accounting bills → match result → discrepancies | `73deb00` |

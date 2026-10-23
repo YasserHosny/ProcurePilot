@@ -19,6 +19,7 @@ from procurepilot_api.modules.ingestion.email_parser import (
     parse_email,
 )
 from procurepilot_api.modules.ingestion.extraction import enqueue_extraction as _enqueue_extraction
+from procurepilot_api.modules.ingestion.extraction import release_failed_enqueue
 from procurepilot_api.modules.ingestion.matcher import match_supplier
 from procurepilot_api.modules.rfq.auto_prepared_email import render_auto_prepared_email
 from procurepilot_api.modules.rfq.guardrail_evaluation import compute_guardrail_evaluation
@@ -254,9 +255,16 @@ def process_inbound_email(
         )
     except Exception:
         logger.exception("Failed to enqueue extraction for quotation %s", quotation_id)
-        # The quotation and document are already durably created; a failed enqueue is retryable
-        # via the existing retry_extraction endpoint, matching how a manually-uploaded quotation
-        # recovers from the same failure mode (quotations/service.py's own _enqueue_extraction).
+        # The quotation and document are already durably created; releasing the job puts the
+        # quotation back to pending so POST /quotations/{id}/extract can queue it again, the same
+        # recovery a manually-uploaded quotation gets (extraction/service.py's compensation).
+        try:
+            with db.connect(settings.database_url.get_secret_value()) as conn:
+                _act_as_tenant(conn, tenant_id)
+                release_failed_enqueue(conn, job_id=job_id, quotation_id=quotation_id)
+                conn.commit()
+        except Exception:
+            logger.exception("Could not release failed extraction job %s", job_id)
 
     _record_audit(
         tenant_id=tenant_id,
@@ -780,7 +788,7 @@ def _insert_quotation(
             """
             insert into quotation
               (tenant_id, document_id, supplier_id, status, source, ingestion_email_id)
-            values (%s, %s, %s, 'pending', 'email', %s)
+            values (%s, %s, %s, 'extracting', 'email', %s)
             returning id
             """,
             (tenant_id, document_id, supplier_id, ingestion_email_id),

@@ -56,3 +56,8 @@ e96bf3fdfa6b1638d4defcc8acba665490e97736:apps/api/src/procurepilot_api/modules/o
 044b2165cf735616ee5b7af188192873e55b9877:apps/api/src/procurepilot_api/modules/digests/router.py:generic-api-key:55
 044b2165cf735616ee5b7af188192873e55b9877:apps/api/src/procurepilot_api/modules/exports/router.py:generic-api-key:36
 044b2165cf735616ee5b7af188192873e55b9877:apps/api/src/procurepilot_api/modules/offers/router.py:generic-api-key:86
+
+# A placeholder bearer token in an integration test (PR #224): a hand-written HS256 JWT whose
+# payload is "{}" (e30) and whose signature is the literal word "signature". It authenticates
+# nothing; the same string already appears on six other lines of this file from earlier commits.
+6f3382c0311167f69193938afb45212228071802:apps/api/tests/integration/test_capture_service.py:generic-api-key:219

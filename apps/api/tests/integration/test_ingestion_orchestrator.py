@@ -408,7 +408,52 @@ def test_matched_supplier_email_creates_document_quotation_and_extraction_job(
         assert quotation_row["source"] == "email"
         assert quotation_row["supplier_id"] == supplier_id
         assert str(quotation_row["ingestion_email_id"]) == str(log_row["id"])
+        # spec 003 data-model: pending -> extracting once an extraction job exists.
+        assert quotation_row["status"] == "extracting"
         assert job_row["status"] == "queued"
+
+
+def test_failed_extraction_enqueue_leaves_email_quotation_pending_and_job_failed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = settings_for_test_db(monkeypatch)
+    _patch_storage_and_queue(monkeypatch)
+
+    def _redis_down(_settings: object, **_kwargs: object) -> None:
+        raise ConnectionError("redis unavailable")
+
+    monkeypatch.setattr(orchestrator_module, "_enqueue_extraction", _redis_down)
+
+    with committed_smart_context(
+        "ingestion-orchestrator-enqueue-fail", supplier_count=1
+    ) as context:
+        _seed_email_config(context.workspace.tenant_id, context.workspace.membership_id)
+        raw_email = _build_email(from_addr="sales@acme.com", message_id="<msg-redis@acme.com>")
+
+        result = orchestrator_module.process_inbound_email(
+            settings,
+            tenant_id=context.workspace.tenant_id,
+            raw_email_bytes=raw_email,
+            raw_email_ref="tenants/x/raw-email/redis.eml",
+        )
+
+        assert result["status"] == "completed"
+        with psycopg.connect(TEST_DATABASE_URL or "", row_factory=dict_row) as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "select status from quotation where id = %s", (UUID(result["quotation_id"]),)
+                )
+                quotation_row = cur.fetchone()
+                cur.execute(
+                    "select status, error from extraction_job where quotation_id = %s",
+                    (UUID(result["quotation_id"]),),
+                )
+                job_row = cur.fetchone()
+
+        # Released so POST /quotations/{id}/extract can pick it up again (no active job left).
+        assert quotation_row["status"] == "pending"
+        assert job_row["status"] == "failed"
+        assert job_row["error"]["code"] == "redis_enqueue_failed"
 
 
 def test_arabic_filename_is_stored_as_ascii_key_and_preserved_for_display(

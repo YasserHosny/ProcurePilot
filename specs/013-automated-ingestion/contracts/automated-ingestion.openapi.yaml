@@ -140,8 +140,10 @@ paths:
       description: >
         Owner or buyer. Accepts an image (JPEG, PNG, HEIC) or PDF file with
         optional supplier attribution and notes. Synchronously creates a quotation
-        record with source='capture' and status='pending', stores the document,
-        and queues extraction.
+        record with source='capture' and status='extracting' (spec 003 lifecycle),
+        stores the document, and queues extraction. If the job cannot be queued,
+        the job is marked failed and the quotation is returned as 'pending' so
+        POST /quotations/{id}/extract can queue it again.
       tags: [Ingestion]
       security:
         - BearerAuth: []
@@ -449,7 +451,7 @@ components:
           format: uuid
         status:
           type: string
-          enum: [pending]
+          enum: [extracting, pending]
 
     CatalogueImportResult:
       type: object
