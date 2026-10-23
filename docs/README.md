@@ -19,7 +19,7 @@
 
 ## Technical
 
-- [`architecture/README.md`](architecture/README.md) — Architecture index, including interactive flow diagrams of quotation extraction, RFQ sourcing and purchase request approval.
+- [`architecture/README.md`](architecture/README.md) — Architecture index, including interactive diagrams of the system, auth and tenant isolation, and the main procurement flows.
 - [`architecture/tech-stack-blueprint.md`](architecture/tech-stack-blueprint.md) — Reusable blueprint for the Angular + FastAPI + Supabase + Bunny stack.
 - [`architecture/adrs.md`](architecture/adrs.md) — Architecture Decision Records (Angular, Flutter, Supabase, Bedrock/Azure DI, Bunny, Nginx, migrations, monorepo, AI eval, workers app, responsive design, remote DB, extraction fallback, structured logging).
 - [`architecture/engineering-spec.md`](architecture/engineering-spec.md) — Low-Level Design: service boundaries, API patterns, data layer, algorithms, state management, security model.
