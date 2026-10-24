@@ -166,16 +166,17 @@ export class LandingGalleryComponent implements OnDestroy {
       previousMobileScrollIndex = index;
       if (!changed) return;
 
-      // Only card changes scroll the nav; locale and view-query changes must not trigger it.
+      // Only card changes scroll the nav on phone (max-width: 820px); first render,
+      // locale changes, and view-query changes must not scroll. Never scrolls the window.
+      // Compute from layout bounding boxes so offsetParent nesting cannot break alignment.
       untracked(() => {
         const nav = this.stepList()?.nativeElement;
         const activeStep = this.stepElements()[index]?.nativeElement;
-        if (nav && activeStep && window.matchMedia('(max-width: 820px)').matches) {
-          // The positioned nav is the offset parent. RTL scrollLeft is negative in Chromium.
-          const left = this.isRtl()
-            ? activeStep.offsetLeft + activeStep.offsetWidth - nav.clientWidth
-            : activeStep.offsetLeft;
-          nav.scrollTo({ left, behavior: 'instant' });
+        if (nav && activeStep && typeof window !== 'undefined' && window.matchMedia('(max-width: 820px)').matches) {
+          const nb = nav.getBoundingClientRect();
+          const ab = activeStep.getBoundingClientRect();
+          const delta = this.isRtl() ? ab.right - nb.right : ab.left - nb.left;
+          nav.scrollBy({ left: delta, behavior: 'instant' });
         }
       });
     });

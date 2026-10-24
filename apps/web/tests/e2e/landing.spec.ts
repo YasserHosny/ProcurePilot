@@ -184,6 +184,40 @@ test.describe('Guest Landing Page (PPS-35, PPS-36, PPS-45)', () => {
       await expect(firstImage).toHaveAttribute('src', `/landing/${nextLocale}/01-quotation-review.jpg`);
       await expect.poll(() => page.evaluate(() => Math.abs(window.scrollY))).toBeLessThanOrEqual(1);
     });
+
+    test(`at 375x812 in ${locale}, pressing Next four times keeps active chip inside row bounding box and window.scrollX at 0`, async ({ page }) => {
+      await page.setViewportSize({ width: 375, height: 812 });
+      await page.addInitScript((initialLocale) => {
+        localStorage.setItem('pp.locale', initialLocale);
+      }, locale);
+      await page.goto('/');
+
+      const stepsRow = page.locator('.gallery-steps');
+      await expect(stepsRow).toBeVisible();
+
+      const nextBtn = page.locator('.gallery-nav-btn.next-btn');
+      await expect(nextBtn).toBeVisible();
+
+      for (let i = 1; i <= 4; i++) {
+        await nextBtn.click();
+        const activeChip = page.locator('.gallery-step.active');
+        await expect(activeChip).toBeVisible();
+
+        await expect.poll(async () => {
+          const rowBox = await stepsRow.boundingBox();
+          const chipBox = await activeChip.boundingBox();
+          if (!rowBox || !chipBox) return false;
+
+          return (
+            chipBox.x >= rowBox.x - 1 &&
+            chipBox.x + chipBox.width <= rowBox.x + rowBox.width + 1
+          );
+        }).toBe(true);
+
+        const scrollX = await page.evaluate(() => window.scrollX);
+        expect(scrollX).toBe(0);
+      }
+    });
   }
 
   test('no horizontal page scroll at 375px', async ({ page }) => {
