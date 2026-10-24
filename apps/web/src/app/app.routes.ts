@@ -27,6 +27,13 @@ export const routes: Routes = [
             (m) => m.PasswordResetComponent,
           ),
       },
+      {
+        path: 'update-password',
+        loadComponent: () =>
+          import('./features/auth/update-password/update-password.component').then(
+            (m) => m.UpdatePasswordComponent,
+          ),
+      },
       { path: '', pathMatch: 'full', redirectTo: 'sign-in' },
     ],
   },
