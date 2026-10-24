@@ -121,3 +121,71 @@ def test_percentage_never_taken_as_money_or_line_quantity_or_price() -> None:
     assert result.stated_total is not None
     assert result.stated_total.value == {"amount": "200.00", "currency": "EGP"}
     assert validate_arithmetic(result).status == "reconciled"
+
+
+def test_total_labels_without_whitelisted_wording_reconcile() -> None:
+    # «إجمالي القيمة»
+    payload_ar = _make_table_payload(
+        [["بند 1", "1", "1,000.00", "1,000.00"]],
+        "إجمالي القيمة",
+        "1,000.00 ر.س",
+    )
+    result_ar = _parse_invoice_result(payload_ar, "layout:test")
+    assert len(result_ar.lines) == 1
+    assert result_ar.expected_line_count == 1
+    assert result_ar.stated_total is not None
+    assert result_ar.stated_total.value == {"amount": "1000.00", "currency": "SAR"}
+    assert validate_arithmetic(result_ar).status == "reconciled"
+
+    # "Total Value"
+    payload_en = _make_table_payload(
+        [["Item 1", "2", "500.00", "1,000.00"]],
+        "Total Value",
+        "1,000.00 SAR",
+    )
+    result_en = _parse_invoice_result(payload_en, "layout:test")
+    assert len(result_en.lines) == 1
+    assert result_en.expected_line_count == 1
+    assert result_en.stated_total is not None
+    assert result_en.stated_total.value == {"amount": "1000.00", "currency": "SAR"}
+    assert validate_arithmetic(result_en).status == "reconciled"
+
+
+def test_item_label_with_glued_letters_stays_a_line() -> None:
+    # «مجموعة أدوات» starts with «مجموعة», which is glued to «ة» and must NOT be a total
+    payload = _make_table_payload(
+        [["مجموعة أدوات", "2", "50.00", "100.00"]],
+        "الإجمالي",
+        "100.00 ر.س",
+    )
+    result = _parse_invoice_result(payload, "layout:test")
+    assert len(result.lines) == 1
+    assert result.lines[0].original_text == "مجموعة أدوات"
+    assert result.expected_line_count == 1
+    assert result.stated_total is not None
+    assert result.stated_total.value == {"amount": "100.00", "currency": "SAR"}
+    assert validate_arithmetic(result).status == "reconciled"
+
+
+def test_visual_order_rate_adjacent_to_amount() -> None:
+    # F2: "4,440.00 %15" must not swallow 4,440.00 as percentage
+    text = "الإجمالي شامل ضريبة 4,440.00 %15 ر.س"
+    field = _find_grand_total(text, "SAR")
+    assert field is not None
+    assert field.value == {"amount": "4440.00", "currency": "SAR"}
+
+    # In a table total row
+    payload = _make_table_payload(
+        [
+            ["بند أول", "2", "1,000.00", "2,000.00"],
+            ["بند ثان", "2", "1,220.00", "2,440.00"],
+        ],
+        "الإجمالي شامل ضريبة 4,440.00 %15 ر.س",
+        "4,440.00 ر.س",
+    )
+    result = _parse_invoice_result(payload, "layout:test")
+    assert len(result.lines) == 2
+    assert result.expected_line_count == 2
+    assert result.stated_total is not None
+    assert result.stated_total.value == {"amount": "4440.00", "currency": "SAR"}
+    assert validate_arithmetic(result).status == "reconciled"
