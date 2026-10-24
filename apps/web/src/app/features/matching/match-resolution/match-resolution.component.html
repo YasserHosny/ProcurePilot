@@ -166,27 +166,27 @@
           <div class="cost-breakdown-grid">
             <div class="cost-item">
               <span class="cost-label">{{ 'matching.resolution.landedCost.unitPrice' | translate }}</span>
-              <span class="cost-val">{{ lc.unit_price | formatMoney }}</span>
+              <span class="pp-figures cost-val">{{ lc.unit_price | formatMoney }}</span>
             </div>
             <div class="cost-item">
               <span class="cost-label">{{ 'matching.resolution.landedCost.vatAmount' | translate }}</span>
-              <span class="cost-val">{{ lc.vat_amount | formatMoney }}</span>
+              <span class="pp-figures cost-val">{{ lc.vat_amount | formatMoney }}</span>
             </div>
             <div class="cost-item">
               <span class="cost-label">{{ 'matching.resolution.landedCost.deliveryFee' | translate }}</span>
-              <span class="cost-val">{{ lc.delivery_fee | formatMoney }}</span>
+              <span class="pp-figures cost-val">{{ lc.delivery_fee | formatMoney }}</span>
             </div>
             <div class="cost-item">
               <span class="cost-label">{{ 'matching.resolution.landedCost.discount' | translate }}</span>
-              <span class="cost-val discount-val">-{{ lc.discount | formatMoney }}</span>
+              <span class="pp-figures cost-val discount-val">-{{ lc.discount | formatMoney }}</span>
             </div>
             <div class="cost-item">
               <span class="cost-label">{{ 'matching.resolution.landedCost.otherCharges' | translate }}</span>
-              <span class="cost-val">{{ lc.other_charges | formatMoney }}</span>
+              <span class="pp-figures cost-val">{{ lc.other_charges | formatMoney }}</span>
             </div>
             <div class="cost-item total-item">
               <span class="cost-label">{{ 'matching.resolution.landedCost.total' | translate }}</span>
-              <strong class="cost-val total-val">{{ lc.total | formatMoney }}</strong>
+              <strong class="pp-figures cost-val total-val">{{ lc.total | formatMoney }}</strong>
             </div>
           </div>
 

@@ -407,6 +407,14 @@ tr[aria-selected='true'] > td:first-child { box-shadow: inset 3px 0 0 var(--pp-t
 // Footer row of reconciled figures: <tr mat-footer-row class="pp-total">
 tr.pp-total > td { border-block-start: 1px solid var(--pp-table-header-border); color: var(--pp-text-strong); font-weight: var(--pp-weight-strong); }
 
+// Readex Pro has no tabular figures: numeric mat-cells, footer totals and money fields opt in.
+// On a <mat-form-field class="pp-figures"> the token reaches the input; labels keep Readex Pro.
+.pp-figures {
+  font-family: var(--pp-table-numeric-font);
+  font-variant-numeric: tabular-nums lining-nums;
+  line-height: var(--pp-table-numeric-leading);
+  @include mat.form-field-overrides((container-text-font: var(--pp-field-money-font)));
+}
 // Figures and their headers sit at the end of the column
 :is(td, th).pp-end { text-align: end; }
 // Verified totals only: a footer total reconciled with its documents. Never a headline figure.
@@ -427,7 +435,8 @@ html, body {
 
 body {
   margin: 0;
-  font-family: Roboto, "Helvetica Neue", sans-serif;
+  // Readex Pro for Latin and Arabic alike (docs/brand/README.md); figures opt into .pp-figures.
+  font-family: var(--pp-font);
   text-align: start;
   // The UA shows an I-beam over any selectable text (`cursor: auto`), which reads as
   // "editable" on labels, values, badges — everywhere. Default to the arrow for the whole
@@ -457,8 +466,6 @@ mat-icon {
 }
 
 [dir="rtl"] {
-  font-family: Roboto, "Segoe UI", "Cairo", Tahoma, sans-serif;
-
   .rtl-flip {
     transform: scaleX(-1);
   }

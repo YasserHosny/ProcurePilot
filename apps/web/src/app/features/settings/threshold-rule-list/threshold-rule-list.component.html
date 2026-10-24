@@ -59,7 +59,7 @@
             <th mat-header-cell *matHeaderCellDef>
               {{ 'approvals.thresholdRules.columns.minAmount' | translate }}
             </th>
-            <td mat-cell *matCellDef="let rule">
+            <td mat-cell *matCellDef="let rule" class="pp-figures">
               <span class="amount-val">
                 {{ { amount: rule.min_amount, currency: rule.currency } | formatMoney }}
               </span>
@@ -71,7 +71,7 @@
             <th mat-header-cell *matHeaderCellDef>
               {{ 'approvals.thresholdRules.columns.maxAmount' | translate }}
             </th>
-            <td mat-cell *matCellDef="let rule">
+            <td mat-cell *matCellDef="let rule" class="pp-figures">
               @if (rule.max_amount) {
                 <span class="amount-val">
                   {{ { amount: rule.max_amount, currency: rule.currency } | formatMoney }}
@@ -190,7 +190,7 @@
       </mat-form-field>
 
       <!-- Min Amount -->
-      <mat-form-field appearance="outline" class="full-width">
+      <mat-form-field appearance="outline" class="pp-figures full-width">
         <mat-label>{{ 'approvals.thresholdRules.form.minAmountLabel' | translate }}</mat-label>
         <input
           matInput
@@ -208,7 +208,7 @@
       </mat-form-field>
 
       <!-- Max Amount -->
-      <mat-form-field appearance="outline" class="full-width">
+      <mat-form-field appearance="outline" class="pp-figures full-width">
         <mat-label>{{ 'approvals.thresholdRules.form.maxAmountLabel' | translate }}</mat-label>
         <input
           matInput

@@ -14,7 +14,7 @@
   <mat-card class="form-card">
     <h2>{{ (editingId() ? 'rfq.guardrails.editTitle' : 'rfq.guardrails.createTitle') | translate }}</h2>
     <div class="form-grid">
-      <mat-form-field appearance="outline"><mat-label>{{ 'rfq.guardrails.maxOrderValue' | translate }}</mat-label><input matInput type="number" min="0.01" [(ngModel)]="maxOrderValue"></mat-form-field>
+      <mat-form-field appearance="outline" class="pp-figures"><mat-label>{{ 'rfq.guardrails.maxOrderValue' | translate }}</mat-label><input matInput type="number" min="0.01" [(ngModel)]="maxOrderValue"></mat-form-field>
       <mat-form-field appearance="outline"><mat-label>{{ 'rfq.guardrails.currency' | translate }}</mat-label><mat-select [(ngModel)]="currency">@for (option of currencies(); track option) {
       <mat-option [value]="option.code">{{ currencyLabel(option) }}</mat-option>
     }</mat-select></mat-form-field>

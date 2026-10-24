@@ -72,7 +72,7 @@
             <th mat-header-cell *matHeaderCellDef>
               {{ 'approvals.columns.estimatedTotal' | translate }}
             </th>
-            <td mat-cell *matCellDef="let req" class="total-cell">
+            <td mat-cell *matCellDef="let req" class="pp-figures total-cell">
               <span class="total-amount">{{ formatMoney(req) }}</span>
               @if (req.has_incomplete_estimate) {
                 <span class="incomplete-badge">
@@ -222,7 +222,7 @@
                             <tr class="line-item-row">
                               <td class="product-col">{{ getProductName(line.workspace_product_id) }}</td>
                               <td class="quantity-col">{{ line.quantity }}</td>
-                              <td class="price-col">{{ formatLinePrice(line) }}</td>
+                              <td class="pp-figures price-col">{{ formatLinePrice(line) }}</td>
                               <td class="note-col">
                                 {{ line.note || ('approvals.notAvailable' | translate) }}
                               </td>
