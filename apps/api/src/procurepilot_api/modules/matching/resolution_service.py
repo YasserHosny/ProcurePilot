@@ -521,7 +521,7 @@ _BULK_READ_COLUMNS = {
     "quotation_line": LINE_COLUMNS,
     "workspace_product": PRODUCT_COLUMNS,
     "canonical_product": CANONICAL_COLUMNS,
-    "quotation": "id,supplier_id,currency",
+    "quotation": "id,supplier_id,currency,expiry_date",
 }
 
 

@@ -13,6 +13,7 @@ from zoneinfo import ZoneInfo
 
 from procurepilot_api.deps import CurrentMember
 from procurepilot_api.modules.landed_cost.service import LandedCostService
+from procurepilot_api.modules.matching.resolution_service import _BulkReadClient
 
 TENANT_ID = uuid4()
 QUOTATION_ID = uuid4()
@@ -27,8 +28,12 @@ class _Query:
         self._table = table
         self._filters: dict[str, str] = {}
         self._insert: dict[str, object] | None = None
+        self._columns: list[str] | None = None
 
-    def select(self, *_args: object) -> _Query:
+    def select(self, columns: str = "*", *_args: object) -> _Query:
+        # Honour the projection, as PostgREST does, so a caller that narrows the columns
+        # really loses the ones it left out.
+        self._columns = None if columns == "*" else columns.split(",")
         return self
 
     def eq(self, column: str, value: object) -> _Query:
@@ -39,6 +44,10 @@ class _Query:
         return self
 
     def limit(self, *_args: object) -> _Query:
+        return self
+
+    def in_(self, column: str, values: list[str]) -> _Query:
+        self._filters[column] = str(values[0])
         return self
 
     def insert(self, payload: dict[str, object]) -> _Query:
@@ -56,6 +65,8 @@ class _Query:
             for row in rows
             if all(str(row.get(column)) == value for column, value in self._filters.items())
         ]
+        if self._columns is not None:
+            matched = [{c: row.get(c) for c in self._columns if c in row} for row in matched]
         return SimpleNamespace(data=matched)
 
 
@@ -104,9 +115,9 @@ def _member() -> CurrentMember:
     )
 
 
-def _compute(client: _FakeClient) -> dict[str, object]:
+def _compute(client: _FakeClient, *, via: object | None = None) -> dict[str, object]:
     LandedCostService(settings=SimpleNamespace()).compute_for_line_with_client(
-        client=client, member=_member(), line_id=LINE_ID
+        client=via or client, member=_member(), line_id=LINE_ID
     )
     (row,) = client.tables["landed_cost"]
     return row
@@ -145,3 +156,14 @@ def test_offer_from_quotation_already_expired_is_recorded_as_expired() -> None:
     assert valid_to < datetime.now(UTC)
     # landed_cost_valid_to_after_valid_from: an already-lapsed quote must not violate it.
     assert _parse(row["valid_from"]) <= valid_to
+
+
+def test_bulk_confirm_read_cache_carries_the_quotation_expiry() -> None:
+    # Bulk confirm of exact-name matches computes landed cost through a read-through cache
+    # with fixed projections; it must not drop the expiry date.
+    expiry = (datetime.now(UTC) - timedelta(days=3)).date()
+    client = _FakeClient(expiry_date=expiry.isoformat(), timezone="UTC")
+    row = _compute(client, via=_BulkReadClient(client))
+
+    assert row.get("valid_to") is not None
+    assert _parse(row["valid_to"]) < datetime.now(UTC)
