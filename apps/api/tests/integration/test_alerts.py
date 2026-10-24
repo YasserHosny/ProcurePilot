@@ -11,6 +11,7 @@ from integration.smart_compare_helpers import (
     committed_smart_context,
     settings_for_test_db,
 )
+from procurepilot_api import db
 from procurepilot_api.modules.alerts.service import AlertService
 
 pytestmark = pytest.mark.skipif(
@@ -79,3 +80,34 @@ def test_alerts_are_live_dismissible_and_recur_when_condition_changes(
         assert len(recurring) == 1
         assert recurring[0].id != expiring.id
         assert recurring[0].evidence["landed_cost_id"] == str(second_current.landed_cost_id)
+
+
+def test_listing_alerts_opens_one_connection_however_many_products_and_suppliers(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Hosted, every connection is a TLS handshake to the pooler plus two setup statements. One
+    # connection per product and per supplier made GET /alerts take 48 s on the demo tenant.
+    settings = settings_for_test_db(monkeypatch)
+    now = datetime.now(UTC)
+    with committed_smart_context("alerts-one-conn", supplier_count=2) as context:
+        for supplier_id in context.supplier_ids:
+            add_costed_offer(
+                context,
+                supplier_id=supplier_id,
+                amount=Decimal("1.0000"),
+                valid_to=now + timedelta(days=30),
+                recorded_at=now,
+            )
+
+        opened = 0
+        real_connect = db.connect
+
+        def counting_connect(*args: object, **kwargs: object) -> object:
+            nonlocal opened
+            opened += 1
+            return real_connect(*args, **kwargs)
+
+        monkeypatch.setattr(db, "connect", counting_connect)
+        AlertService(settings).list_alerts(member=context.member)
+
+        assert opened == 1

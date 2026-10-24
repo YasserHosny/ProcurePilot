@@ -4,6 +4,7 @@ import base64
 import json
 from collections.abc import Iterator
 from contextlib import contextmanager
+from contextvars import ContextVar
 from datetime import UTC, datetime
 from decimal import Decimal
 from uuid import UUID
@@ -248,8 +249,38 @@ def get_offer_service() -> OfferService:
     return OfferService()
 
 
+_shared_db: ContextVar[tuple[CurrentMember, psycopg.Connection] | None] = ContextVar(
+    "shared_authenticated_db", default=None
+)
+
+
+@contextmanager
+def shared_authenticated_db(
+    settings: Settings, member: CurrentMember
+) -> Iterator[psycopg.Connection]:
+    """Serve every _authenticated_db call for `member` inside this block from one connection.
+
+    For read paths that fan out per product or supplier: hosted, each new connection is a TLS
+    handshake to the pooler plus two setup statements. A call for a different member still
+    opens its own connection, so claims never cross members.
+    """
+    with _authenticated_db(settings, member) as conn:
+        token = _shared_db.set((member, conn))
+        try:
+            yield conn
+        finally:
+            _shared_db.reset(token)
+
+
 @contextmanager
 def _authenticated_db(settings: Settings, member: CurrentMember) -> Iterator[psycopg.Connection]:
+    shared = _shared_db.get()
+    if shared is not None and shared[0] == member:
+        try:
+            yield shared[1]
+        except psycopg.Error as exc:
+            raise ServiceUnavailableError(details={"dependency": "database"}) from exc
+        return
     try:
         with db.connect(settings.database_url.get_secret_value()) as conn:
             with conn.cursor() as cur:

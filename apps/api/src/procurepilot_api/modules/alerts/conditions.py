@@ -19,12 +19,13 @@ from procurepilot_api.modules.alerts.fingerprints import (
 )
 from procurepilot_api.modules.alerts.schemas import Alert
 from procurepilot_api.modules.offers.price_history import historical_average_excluding
-from procurepilot_api.modules.offers.schemas import Offer
+from procurepilot_api.modules.offers.schemas import Offer, PriceHistoryResponse
 from procurepilot_api.modules.offers.service import (
     OfferService,
     _authenticated_db,
     _offer,
     _subtract_calendar_months,
+    shared_authenticated_db,
 )
 
 # Duplicate-line detection must see every current landed cost per supplier. The compare view
@@ -79,8 +80,14 @@ class AlertConditionService:
         self._offers = OfferService(self._settings)
 
     def live_alerts(self, *, member: CurrentMember, kind: str | None = None) -> list[Alert]:
+        # Every condition below queries per product and per supplier; one connection for all.
+        with shared_authenticated_db(self._settings, member):
+            return self._live_alerts(member=member, kind=kind)
+
+    def _live_alerts(self, *, member: CurrentMember, kind: str | None) -> list[Alert]:
         now = datetime.now(UTC)
         alerts: list[Alert] = []
+        offers = _PriceHistoryMemo(self._offers)
         for product in _active_products(self._settings, member):
             product_id = UUID(str(product["id"]))
             compare = self._offers.compare_offers(
@@ -95,9 +102,9 @@ class AlertConditionService:
                     _preferred_disappeared_alerts(self._settings, member, product, compare, now)
                 )
             if kind in {None, "price_swing"}:
-                alerts.extend(_price_swing_alerts(self._offers, member, compare, now))
+                alerts.extend(_price_swing_alerts(offers, member, compare, now))
             if kind in {None, "price_spike"}:
-                alerts.extend(_price_spike_alerts(self._offers, member, compare, now))
+                alerts.extend(_price_spike_alerts(offers, member, compare, now))
             if kind in {None, "likely_duplicate_quotation_line"}:
                 alerts.extend(
                     _duplicate_line_alerts(
@@ -108,7 +115,7 @@ class AlertConditionService:
                     )
                 )
             if kind in {None, "decimal_or_quantity_anomaly"}:
-                alerts.extend(_decimal_anomaly_alerts(self._offers, member, compare, now))
+                alerts.extend(_decimal_anomaly_alerts(offers, member, compare, now))
             if kind in {None, "delivery_cost_anomaly"}:
                 alerts.extend(_delivery_cost_alerts(self._settings, member, compare, now))
             if kind in {None, "supplier_quality_trend_change"}:
@@ -117,6 +124,25 @@ class AlertConditionService:
             alerts,
             key=lambda alert: (alert.kind, str(alert.workspace_product_id), alert.id),
         )
+
+
+class _PriceHistoryMemo:
+    """OfferService whose price_history is fetched once per product: the swing, spike and
+    decimal checks all read the same six-month window."""
+
+    def __init__(self, offers: OfferService) -> None:
+        self._offers = offers
+        self._histories: dict[tuple[UUID, int], PriceHistoryResponse] = {}
+
+    def price_history(
+        self, *, member: CurrentMember, product_id: UUID, window_months: int
+    ) -> PriceHistoryResponse:
+        key = (product_id, window_months)
+        if key not in self._histories:
+            self._histories[key] = self._offers.price_history(
+                member=member, product_id=product_id, window_months=window_months
+            )
+        return self._histories[key]
 
 
 def get_alert_condition_service() -> AlertConditionService:
