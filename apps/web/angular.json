@@ -38,6 +38,11 @@
                 "glob": "*.json",
                 "input": "i18n",
                 "output": "assets/i18n"
+              },
+              {
+                "glob": "**/*",
+                "input": "src/assets",
+                "output": "assets"
               }
             ],
             "styles": [
@@ -112,6 +117,11 @@
                 "glob": "*.json",
                 "input": "i18n",
                 "output": "assets/i18n"
+              },
+              {
+                "glob": "**/*",
+                "input": "src/assets",
+                "output": "assets"
               }
             ],
             "styles": [

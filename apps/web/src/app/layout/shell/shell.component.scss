@@ -23,22 +23,10 @@
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  color: t.$brand-primary;
   text-decoration: none;
 }
 
-.brand-icon {
-  font-size: 24px;
-  inline-size: 24px;
-  block-size: 24px;
-}
 
-.brand-title {
-  font-size: 1.125rem;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  color: #0f172a;
-}
 
 .workspace-badge {
   display: flex;
@@ -259,8 +247,7 @@
 
 @include bp.mobile {
   .shell-toolbar { gap: 0.25rem; padding-inline: 0.5rem; }
-  .brand-icon, .workspace-name, .dropdown-icon { display: none; }
-  .brand-title { font-size: 1rem; }
+  .workspace-name, .dropdown-icon { display: none; }
   .workspace-switcher-btn { padding: 0.25rem 0.5rem; min-width: 0; }
   .shell-sidenav { inline-size: 260px; }
   .main-content { padding: 0.75rem; }

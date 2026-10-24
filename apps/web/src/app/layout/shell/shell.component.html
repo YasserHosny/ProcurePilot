@@ -10,8 +10,7 @@
     </button>
 
     <a routerLink="/home" class="brand-section">
-      <mat-icon class="brand-icon" aria-hidden="true">insights</mat-icon>
-      <span class="brand-title">{{ 'common.brandName' | translate }}</span>
+      <app-brand-logo [height]="28" />
     </a>
 
     @if (tenant(); as currentTenant) {
