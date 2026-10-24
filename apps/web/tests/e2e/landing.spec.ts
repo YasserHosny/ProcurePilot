@@ -54,12 +54,15 @@ test.describe('Guest Landing Page (PPS-35, PPS-36, PPS-45)', () => {
     const step2 = page.locator('.gallery-step-btn').nth(1);
     await expect(step1).toHaveClass(/active/);
 
+    const rail = page.locator('.gallery-rail');
+    const initialScrollLeft = await rail.evaluate((el) => el.scrollLeft);
     const nextBtn = page.locator('.gallery-nav-btn.next-btn');
     await nextBtn.click();
 
     await expect(step2).toHaveClass(/active/);
     const card2 = page.locator('.gallery-card').nth(1);
     await expect(card2).toHaveClass(/active/);
+    await expect.poll(() => rail.evaluate((el) => el.scrollLeft)).toBeGreaterThan(initialScrollLeft);
   });
 
   test('keyboard ArrowRight on the rail scrolls so card 2 becomes active', async ({ page }) => {
@@ -89,9 +92,32 @@ test.describe('Guest Landing Page (PPS-35, PPS-36, PPS-45)', () => {
     const step2 = page.locator('.gallery-step-btn').nth(1);
     await expect(step2).toHaveClass(/active/);
 
-    const newScrollLeft = await rail.evaluate((el) => el.scrollLeft);
-    expect(newScrollLeft).toBeLessThanOrEqual(initialScrollLeft);
+    await expect.poll(() => rail.evaluate((el) => el.scrollLeft)).toBeLessThan(initialScrollLeft);
   });
+
+  for (const locale of ['en', 'ar'] as const) {
+    test(`at 375x812, ${locale} load and language toggle keep the page at the top`, async ({ page }) => {
+      await page.setViewportSize({ width: 375, height: 812 });
+      await page.addInitScript((initialLocale) => {
+        localStorage.setItem('pp.locale', initialLocale);
+      }, locale);
+      await page.goto('/');
+
+      const html = page.locator('html');
+      const firstImage = page.locator('.gallery-card-image').first();
+      await expect(html).toHaveAttribute('lang', locale);
+      await expect(firstImage).toHaveAttribute('src', `/landing/${locale}/01-quotation-review.jpg`);
+      await expect.poll(() => page.evaluate(() => Math.abs(window.scrollY))).toBeLessThanOrEqual(1);
+
+      await page.getByRole('button', { name: locale === 'en' ? 'عربي' : 'EN', exact: true }).click();
+
+      const nextLocale = locale === 'en' ? 'ar' : 'en';
+      await expect(html).toHaveAttribute('lang', nextLocale);
+      await expect(html).toHaveAttribute('dir', nextLocale === 'ar' ? 'rtl' : 'ltr');
+      await expect(firstImage).toHaveAttribute('src', `/landing/${nextLocale}/01-quotation-review.jpg`);
+      await expect.poll(() => page.evaluate(() => Math.abs(window.scrollY))).toBeLessThanOrEqual(1);
+    });
+  }
 
   test('no horizontal page scroll at 375px', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 667 });

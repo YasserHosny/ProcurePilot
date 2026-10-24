@@ -113,7 +113,7 @@ describe('ScreenshotDialogComponent', () => {
       expect(component.currentIndex()).toBe(2);
       let img: HTMLImageElement = fixture.nativeElement.querySelector('.dialog-image');
       expect(img.getAttribute('src')).toBe(multiItems[2].src);
-      expect(nextBtn.disabled).toBeTrue();
+      expect(nextBtn.getAttribute('aria-disabled')).toBe('true');
 
       // Click prev -> index 1
       prevBtn.click();
@@ -126,8 +126,33 @@ describe('ScreenshotDialogComponent', () => {
       expect(component.currentIndex()).toBe(0);
       img = fixture.nativeElement.querySelector('.dialog-image');
       expect(img.getAttribute('src')).toBe(multiItems[0].src);
-      expect(prevBtn.disabled).toBeTrue();
+      expect(prevBtn.getAttribute('aria-disabled')).toBe('true');
     });
+
+    for (const direction of ['next', 'prev'] as const) {
+      it(`keeps ${direction} focusable and focused at the end without moving out of range`, () => {
+        const button: HTMLButtonElement = fixture.nativeElement.querySelector(`.${direction}-btn`);
+        button.focus();
+        expect(document.activeElement).toBe(button);
+
+        button.click();
+        fixture.detectChanges();
+
+        const endIndex = direction === 'next' ? multiItems.length - 1 : 0;
+        expect(component.currentIndex()).toBe(endIndex);
+        expect(button.getAttribute('aria-disabled')).toBe('true');
+        expect(button.disabled).toBeFalse();
+        expect(button.tabIndex).toBeGreaterThanOrEqual(0);
+        expect(document.activeElement).toBe(button);
+
+        button.blur();
+        button.focus();
+        expect(document.activeElement).toBe(button);
+        button.click();
+        fixture.detectChanges();
+        expect(component.currentIndex()).toBe(endIndex);
+      });
+    }
 
     it('supports ArrowRight and ArrowLeft keyboard navigation', () => {
       const eventRight = new KeyboardEvent('keydown', { key: 'ArrowRight' });

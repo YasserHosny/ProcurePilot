@@ -83,7 +83,7 @@
       }
     </ul>
 
-    <nav class="gallery-step-index" [attr.aria-label]="'landing.gallery.railLabel' | translate">
+    <nav #stepIndexEl class="gallery-step-index" [attr.aria-label]="'landing.gallery.railLabel' | translate">
       @for (card of galleryCards; track card.id; let i = $index) {
         <button
           type="button"

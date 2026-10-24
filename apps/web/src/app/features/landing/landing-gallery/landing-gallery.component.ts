@@ -10,6 +10,8 @@ import {
   afterRenderEffect,
   inject,
   model,
+  untracked,
+  viewChild,
   viewChildren,
 } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
@@ -104,15 +106,29 @@ export class LandingGalleryComponent implements AfterViewInit, OnDestroy {
   readonly currentLocale = this.i18n.currentLocale;
   readonly isRtl = this.i18n.isRtl;
 
+  private readonly stepIndex = viewChild<ElementRef<HTMLElement>>('stepIndexEl');
   private readonly stepElements = viewChildren<ElementRef<HTMLElement>>('stepEl');
 
   constructor() {
+    let previousIndex: number | undefined;
     afterRenderEffect(() => {
-      const activeStep = this.stepElements()[this.activeCardIndex()]?.nativeElement;
-      this.currentLocale();
-      if (window.matchMedia('(max-width: 600px)').matches) {
-        activeStep?.scrollIntoView({ behavior: 'instant', block: 'nearest', inline: 'nearest' });
-      }
+      const index = this.activeCardIndex();
+      const changed = previousIndex !== undefined && previousIndex !== index;
+      previousIndex = index;
+      if (!changed) return;
+
+      // Only card changes scroll the nav; locale and view-query changes must not trigger it.
+      untracked(() => {
+        const nav = this.stepIndex()?.nativeElement;
+        const activeStep = this.stepElements()[index]?.nativeElement;
+        if (nav && activeStep && window.matchMedia('(max-width: 600px)').matches) {
+          // The positioned nav is the offset parent. RTL scrollLeft is negative in Chromium.
+          const left = this.isRtl()
+            ? activeStep.offsetLeft + activeStep.offsetWidth - nav.clientWidth
+            : activeStep.offsetLeft;
+          nav.scrollTo({ left, behavior: 'instant' });
+        }
+      });
     });
   }
 

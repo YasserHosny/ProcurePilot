@@ -18,6 +18,7 @@
       class="dialog-nav-btn prev-btn"
       (click)="prev()"
       [disabled]="currentIndex() === 0"
+      [disabledInteractive]="true"
       [attr.aria-label]="'landing.gallery.previous' | translate"
     >
       <mat-icon aria-hidden="true">{{ isRtl() ? 'chevron_right' : 'chevron_left' }}</mat-icon>
@@ -37,6 +38,7 @@
       class="dialog-nav-btn next-btn"
       (click)="next()"
       [disabled]="currentIndex() >= items().length - 1"
+      [disabledInteractive]="true"
       [attr.aria-label]="'landing.gallery.next' | translate"
     >
       <mat-icon aria-hidden="true">{{ isRtl() ? 'chevron_left' : 'chevron_right' }}</mat-icon>

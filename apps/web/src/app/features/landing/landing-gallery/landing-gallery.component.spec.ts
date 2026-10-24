@@ -51,6 +51,85 @@ describe('LandingGalleryComponent', () => {
     expect(component).toBeTruthy();
   });
 
+  for (const initialIndex of [0, 2]) {
+    it(`does not scroll on first mobile render with initial index ${initialIndex}`, async () => {
+      fixture.destroy();
+      spyOn(window, 'matchMedia').and.returnValue({ matches: true } as MediaQueryList);
+      const navScrollTo = spyOn(Element.prototype, 'scrollTo');
+      const windowScrollTo = spyOn(window, 'scrollTo');
+      const scrollIntoView = spyOn(Element.prototype, 'scrollIntoView');
+
+      fixture = TestBed.createComponent(LandingGalleryComponent);
+      fixture.componentRef.setInput('activeCardIndex', initialIndex);
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      expect(navScrollTo).not.toHaveBeenCalled();
+      expect(windowScrollTo).not.toHaveBeenCalled();
+      expect(scrollIntoView).not.toHaveBeenCalled();
+    });
+  }
+
+  it('does not scroll the nav or window when locale changes on mobile', async () => {
+    spyOn(window, 'matchMedia').and.returnValue({ matches: true } as MediaQueryList);
+    const nav: HTMLElement = fixture.nativeElement.querySelector('.gallery-step-index');
+    const navScrollTo = spyOn(nav, 'scrollTo');
+    const windowScrollTo = spyOn(window, 'scrollTo');
+    const scrollIntoView = spyOn(Element.prototype, 'scrollIntoView');
+
+    i18nService.setLocale('ar');
+    fixture.detectChanges();
+    await fixture.whenStable();
+    expect(navScrollTo).not.toHaveBeenCalled();
+
+    // An actual index change scrolls only the nav, then a locale change must leave it alone.
+    component.activeCardIndex.set(1);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    expect(navScrollTo).toHaveBeenCalledTimes(1);
+    navScrollTo.calls.reset();
+
+    i18nService.setLocale('en');
+    fixture.detectChanges();
+    await fixture.whenStable();
+    expect(navScrollTo).not.toHaveBeenCalled();
+    expect(windowScrollTo).not.toHaveBeenCalled();
+    expect(scrollIntoView).not.toHaveBeenCalled();
+  });
+
+  for (const locale of ['en', 'ar'] as const) {
+    it(`scrolls only the mobile step nav using ${locale} offsets when the index changes`, async () => {
+      spyOn(window, 'matchMedia').and.returnValue({ matches: true } as MediaQueryList);
+      i18nService.setLocale(locale);
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      const nav: HTMLElement = fixture.nativeElement.querySelector('.gallery-step-index');
+      const step: HTMLElement = fixture.nativeElement.querySelectorAll('.gallery-step-btn')[1];
+      spyOnProperty(nav, 'clientWidth', 'get').and.returnValue(320);
+      spyOnProperty(step, 'offsetLeft', 'get').and.returnValue(locale === 'ar' ? -100 : 240);
+      spyOnProperty(step, 'offsetWidth', 'get').and.returnValue(80);
+      const navScrollTo: jasmine.Spy<(options: ScrollToOptions) => void> = spyOn(nav, 'scrollTo');
+      const windowScrollTo = spyOn(window, 'scrollTo');
+      const scrollIntoView = spyOn(Element.prototype, 'scrollIntoView');
+
+      component.activeCardIndex.set(1);
+      fixture.detectChanges();
+      await fixture.whenStable();
+      expect(navScrollTo).toHaveBeenCalledOnceWith({
+        left: locale === 'ar' ? -340 : 240,
+        behavior: 'instant',
+      });
+
+      component.activeCardIndex.set(1);
+      fixture.detectChanges();
+      await fixture.whenStable();
+      expect(navScrollTo).toHaveBeenCalledTimes(1);
+      expect(windowScrollTo).not.toHaveBeenCalled();
+      expect(scrollIntoView).not.toHaveBeenCalled();
+    });
+  }
+
   it('rail renders 5 cards with numbered labels and captions', () => {
     const cards = fixture.debugElement.queryAll(By.css('.gallery-card'));
     expect(cards.length).toBe(5);
