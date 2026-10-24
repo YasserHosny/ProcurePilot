@@ -91,6 +91,9 @@ export async function correctStatedTotal(page: Page): Promise<void> {
   await input.fill('');
   await input.pressSequentially(STUB_COMPUTED_TOTAL);
   await input.blur();
+  // A keystroke that lands anywhere else stages a wrong total, which otherwise only shows up
+  // after save as a mismatch banner that never clears (PPS-46).
+  await expect(input).toHaveValue(STUB_COMPUTED_TOTAL);
 }
 
 /**
@@ -110,7 +113,22 @@ export async function resolveIssueDateFlag(page: Page): Promise<void> {
 
 /** Saves pending corrections and asserts they were persisted with attribution and took effect. */
 export async function saveCorrections(page: Page): Promise<void> {
+  // Wait on the PATCH itself, not only on the page: the Issue Date corrected tag is already
+  // visible before save, so the tag check alone never proved the save happened. When the
+  // mismatch banner survives a save, the status and saved stated total say why (PPS-46).
+  const saved = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'PATCH' &&
+      /\/api\/v1\/quotations\/[^/]+$/.test(new URL(response.url()).pathname),
+  );
   await page.locator('button.save-btn').click();
+  const response = await saved;
+  const body = await response.text();
+  expect(response.ok(), `save returned ${response.status()}: ${body.slice(0, 500)}`).toBe(true);
+  const statedTotal = (JSON.parse(body) as { stated_total?: { amount?: string } }).stated_total;
+  expect(Number(statedTotal?.amount), `stated total after save: ${JSON.stringify(statedTotal)}`).toBe(
+    Number(STUB_COMPUTED_TOTAL),
+  );
   await expect(page.locator('.corrected-tag').first()).toBeVisible();
   await expect(page.locator('.arithmetic-mismatch-banner')).toBeHidden();
   await expect(page.locator('button.confirm-btn')).toBeEnabled();
