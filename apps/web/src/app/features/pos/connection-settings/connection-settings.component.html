@@ -78,10 +78,10 @@
               </div>
             </div>
             <button
-              mat-flat-button
+              mat-stroked-button
               color="warn"
               type="button"
-              class="reconnect-btn"
+              class="pp-danger reconnect-btn"
               [disabled]="isMutating()"
               (click)="connect()"
               data-testid="reconnect-btn"
@@ -161,7 +161,7 @@
                 mat-stroked-button
                 color="warn"
                 type="button"
-                class="disconnect-btn"
+                class="pp-danger disconnect-btn"
                 [disabled]="isMutating()"
                 (click)="disconnect()"
                 data-testid="disconnect-btn"

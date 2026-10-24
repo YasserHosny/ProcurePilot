@@ -143,7 +143,7 @@
                             <mat-icon aria-hidden="true">admin_panel_settings</mat-icon>
                             <span>{{ 'team.actions.changeRole' | translate }}</span>
                           </button>
-                          <button mat-menu-item (click)="openRemoveMemberDialog(member)" class="danger-action">
+                          <button mat-menu-item (click)="openRemoveMemberDialog(member)" class="danger-action pp-danger">
                             <mat-icon aria-hidden="true" color="warn">person_remove</mat-icon>
                             <span>{{ 'team.actions.removeMember' | translate }}</span>
                           </button>
@@ -242,7 +242,7 @@
                           color="warn"
                           type="button"
                           (click)="openRevokeInvitationDialog(inv)"
-                          class="revoke-btn"
+                          class="pp-danger revoke-btn"
                         >
                           <mat-icon aria-hidden="true">cancel</mat-icon>
                           <span>{{ 'team.actions.revokeInvitation' | translate }}</span>

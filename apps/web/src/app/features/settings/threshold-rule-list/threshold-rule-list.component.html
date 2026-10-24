@@ -313,12 +313,12 @@
       {{ 'approvals.thresholdRules.deleteDialog.cancelButton' | translate }}
     </button>
     <button
-      mat-flat-button
+      mat-stroked-button
       color="warn"
       type="button"
       (click)="confirmDelete()"
       [disabled]="isDeleting()"
-      class="delete-confirm-btn"
+      class="pp-danger delete-confirm-btn"
     >
       @if (isDeleting()) {
         <mat-spinner diameter="18" class="inline-spinner"></mat-spinner>

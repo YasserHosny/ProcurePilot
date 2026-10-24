@@ -145,7 +145,7 @@
             </span>
             <button
               mat-stroked-button
-              color="warn"
+              color="warn" class="pp-danger"
               type="button"
               (click)="bulkArchive()"
               [disabled]="isBulkArchiving() || isBulkRefusing() || isBulkReprioritising()"
@@ -159,7 +159,7 @@
             </button>
             <button
               mat-stroked-button
-              color="warn"
+              color="warn" class="pp-danger"
               type="button"
               (click)="bulkRefuse()"
               [disabled]="isBulkArchiving() || isBulkRefusing() || isBulkReprioritising()"
