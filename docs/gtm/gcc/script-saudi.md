@@ -1,6 +1,6 @@
 # Saudi demo video — script (GCC, purchasing manager)
 
-Status 2026-10-25: **draft for the owner's review.** Written with `technical-video-script` and `localization-strategy`
+Status 2026-10-25: **approved by the owner.** Written with `technical-video-script` and `localization-strategy`
 from the revised v2.4 script ([`../video/cuts/v2.4-ledger/script.md`](../video/cuts/v2.4-ledger/script.md), PPS-59). Structure, honesty rules and the
 brand motion system are unchanged; the language register, market examples, currency and tax change.
 

@@ -1,6 +1,6 @@
 # Saudi demo (G-13, PPS-39) — plan
 
-Status 2026-10-25: product support live on hosted (#266 merged, migration applied, extraction worker deployed); workspace not created yet (owner step). Owner chose Saudi Arabia as the first GCC market. Built the same way as the Egypt
+Status 2026-10-25: product support live on hosted (#266 merged, migration applied, extraction worker deployed); plan approved by the owner 2026-10-25; workspace not created yet (owner step). Owner chose Saudi Arabia as the first GCC market. Built the same way as the Egypt
 demo («مطاعم سند», [`../demo-tenant/README.md`](../demo-tenant/README.md)): a separate workspace on hosted, real
 runs through the product, a recorded video in Arabic and English. The Egyptian tenant is never touched.
 
