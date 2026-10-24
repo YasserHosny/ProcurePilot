@@ -195,7 +195,8 @@ test.describe('Request budget status', () => {
     // actions column is expand-lines/approve/reject only), so this test doesn't invent a
     // drill-through the real UI never built.
     const row = page
-      .locator('tr.request-row', { hasText: requiredBy })
+      // The queue renders the required-by date locale-formatted (PPS-48): 2030-03-15 → Mar 15, 2030.
+      .locator('tr.request-row', { hasText: 'Mar 15, 2030' })
       .filter({ hasText: 'GBP 1,500' });
     await expect(row).toBeVisible();
     await expect(row.locator('.budget-warning-badge')).toBeVisible();

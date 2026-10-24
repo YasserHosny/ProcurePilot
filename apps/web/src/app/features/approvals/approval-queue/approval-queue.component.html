@@ -37,7 +37,7 @@
               {{ 'approvals.columns.requiredByDate' | translate }}
             </th>
             <td mat-cell *matCellDef="let req" class="date-cell">
-              {{ req.required_by_date }}
+              {{ formatRequiredBy(req.required_by_date) }}
             </td>
           </ng-container>
 
@@ -149,9 +149,7 @@
               {{ 'approvals.columns.lines' | translate }}
             </th>
             <td mat-cell *matCellDef="let req" class="lines-cell">
-              <span class="lines-count">
-                {{ req.lines.length }} {{ (req.lines.length === 1 ? 'approvals.line' : 'approvals.lines') | translate }}
-              </span>
+              <span class="lines-count">{{ lineCountLabel(req.lines.length) }}</span>
               <button
                 mat-icon-button
                 type="button"
@@ -201,7 +199,7 @@
                 <div class="line-details-wrapper">
                   <div class="line-details-header">
                     <span class="line-details-title">
-                      {{ 'requests.form.linesTitle' | translate }} ({{ req.lines.length }})
+                      {{ 'requests.form.linesTitle' | translate }} ({{ formatNumber(req.lines.length) }})
                     </span>
                   </div>
                   @if (req.lines.length === 0) {
