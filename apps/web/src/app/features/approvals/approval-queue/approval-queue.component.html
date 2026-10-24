@@ -221,7 +221,7 @@
                           @for (line of req.lines; track line.id) {
                             <tr class="line-item-row">
                               <td class="product-col">{{ getProductName(line.workspace_product_id) }}</td>
-                              <td class="quantity-col">{{ line.quantity }}</td>
+                              <td class="pp-figures quantity-col">{{ line.quantity | formatQuantity }}</td>
                               <td class="pp-figures price-col">{{ formatLinePrice(line) }}</td>
                               <td class="note-col">
                                 {{ line.note || ('approvals.notAvailable' | translate) }}
