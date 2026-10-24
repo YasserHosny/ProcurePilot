@@ -29,7 +29,11 @@
       [matMenuTriggerFor]="workspaceMenu"
       class="workspace-switcher-btn"
       type="button"
-      [attr.aria-label]="'shell.switchWorkspace' | translate"
+      [attr.aria-label]="
+        tenant()?.name
+          ? ('shell.switchWorkspaceNamed' | translate: { name: tenant()?.name })
+          : ('shell.switchWorkspace' | translate)
+      "
       (click)="loadWorkspaces()"
     >
       <mat-icon aria-hidden="true">swap_horiz</mat-icon>
@@ -67,7 +71,7 @@
       [matMenuTriggerFor]="accountMenu"
       class="account-btn"
       type="button"
-      [attr.aria-label]="'shell.accountMenuLabel' | translate"
+      [attr.aria-label]="'shell.accountMenuNamed' | translate: { initials: userInitials() }"
     >
       <div class="account-avatar">
         {{ userInitials() }}
