@@ -26,6 +26,7 @@
   font-size: var(--pp-text-16);
   font-weight: var(--pp-weight-medium);
   color: var(--pp-text-strong);
+  line-height: var(--pp-leading-tight);
 }
 
 .dialog-close-btn {
@@ -34,17 +35,40 @@
 }
 
 .dialog-body {
+  position: relative;
   padding: var(--pp-space-4);
   background: var(--pp-surface-sunken);
   display: flex;
   justify-content: center;
   align-items: center;
+  gap: var(--pp-space-3);
   overflow: auto;
+}
+
+.dialog-nav-btn {
+  color: var(--pp-text-strong);
+  flex-shrink: 0;
+  background: var(--pp-surface-card);
+  border: 1px solid var(--pp-border);
+  box-shadow: var(--pp-elev-1);
+
+  &[disabled] {
+    opacity: 0.35;
+    cursor: not-allowed;
+  }
+}
+
+.dialog-image-wrapper {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex: 1;
+  max-inline-size: 100%;
 }
 
 .dialog-image {
   max-inline-size: 100%;
-  max-block-size: 78vh;
+  max-block-size: 75vh;
   inline-size: auto;
   block-size: auto;
   aspect-ratio: 16 / 10;

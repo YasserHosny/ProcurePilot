@@ -1,18 +1,22 @@
+import AxeBuilder from '@axe-core/playwright';
 import { test, expect } from '@playwright/test';
 
 /**
- * Guest Landing Page E2E Tests — PPS-35 & PPS-36.
+ * Guest Landing Page E2E Tests — PPS-37 (Landing v2).
  *
- * Requirements:
+ * Guarantees:
  * - Unauthenticated "/" displays the landing page (not a redirect to /auth/sign-in)
  * - Sign in navigates to /auth/sign-in
- * - RTL (ar) render has dir="rtl" and Arabic copy
- * - Runs as a guest without storageState
- * - Gallery tab switch changes the active image
- * - Enlarge opens a dialog and Escape closes it returning focus
  * - Iron Systems links point to https://www.iron-sys.com/ with rel noopener
+ * - RTL (ar) render has dir="rtl" and Arabic copy
+ * - Language toggle flow between EN and Arabic
+ * - Screenshot dialog named by caption + axe scan while open + focus return
+ * - Next button scrolls the rail so card 2 becomes active
+ * - Keyboard ArrowRight on the rail does the same
+ * - In Arabic the rail starts at the right and "next" moves leftwards
+ * - No horizontal page scroll at 375px
  */
-test.describe('Guest Landing Page (PPS-35 / PPS-36)', () => {
+test.describe('Guest Landing Page (PPS-37)', () => {
   test('unauthenticated "/" displays the landing page without redirecting', async ({ page }) => {
     await page.goto('/');
 
@@ -22,13 +26,13 @@ test.describe('Guest Landing Page (PPS-35 / PPS-36)', () => {
     // Verify hero headline is visible
     const headline = page.locator('.hero-headline');
     await expect(headline).toBeVisible();
-    await expect(headline).toContainText('Compare supplier quotes. Keep purchasing under control.');
+    await expect(headline).toContainText('Every supplier price, traced to the quote it came from.');
 
     // Verify workflow section is rendered with four steps
     const stepCards = page.locator('.step-card');
     await expect(stepCards).toHaveCount(4);
 
-    // Verify Gallery section is rendered with tabs
+    // Verify Gallery section is rendered
     const gallerySection = page.locator('.gallery-section');
     await expect(gallerySection).toBeVisible();
 
@@ -43,26 +47,66 @@ test.describe('Guest Landing Page (PPS-35 / PPS-36)', () => {
     await expect(ironSysLinks.first()).toHaveAttribute('target', '_blank');
   });
 
-  test('gallery tab switch changes the displayed screenshot', async ({ page }) => {
+  test('next button scrolls the rail so card 2 becomes active', async ({ page }) => {
     await page.goto('/');
 
-    const galleryImage = page.locator('.gallery-section .gallery-image').first();
-    await expect(galleryImage).toBeVisible();
-    await expect(galleryImage).toHaveAttribute('src', /01-quotation-review\.jpg/);
+    const step1 = page.locator('.gallery-step-btn').nth(0);
+    const step2 = page.locator('.gallery-step-btn').nth(1);
+    await expect(step1).toHaveClass(/active/);
 
-    // Click the second tab (Smart Compare)
-    const secondTab = page.locator('.gallery-tab-group .mat-mdc-tab').nth(1);
-    await secondTab.click();
+    const nextBtn = page.locator('.gallery-nav-btn.next-btn');
+    await nextBtn.click();
 
-    // Check that gallery image switches to 02-smart-compare.jpg
-    const activeGalleryImage = page.locator('.mat-mdc-tab-body-active .gallery-image');
-    await expect(activeGalleryImage).toHaveAttribute('src', /02-smart-compare\.jpg/);
+    await expect(step2).toHaveClass(/active/);
+    const card2 = page.locator('.gallery-card').nth(1);
+    await expect(card2).toHaveClass(/active/);
   });
 
-  test('Enlarge opens a dialog and Escape closes it returning focus', async ({ page }) => {
+  test('keyboard ArrowRight on the rail scrolls so card 2 becomes active', async ({ page }) => {
     await page.goto('/');
 
-    const enlargeBtn = page.locator('.mat-mdc-tab-body-active .enlarge-button').first();
+    const rail = page.locator('.gallery-rail');
+    await rail.focus();
+    await page.keyboard.press('ArrowRight');
+
+    const step2 = page.locator('.gallery-step-btn').nth(1);
+    await expect(step2).toHaveClass(/active/);
+  });
+
+  test('in Arabic the rail starts at the right and next moves leftwards', async ({ page }) => {
+    await page.goto('/');
+    await page.evaluate(() => {
+      localStorage.setItem('pp.locale', 'ar');
+    });
+    await page.reload();
+
+    const rail = page.locator('.gallery-rail');
+    const initialScrollLeft = await rail.evaluate((el) => el.scrollLeft);
+
+    const nextBtn = page.locator('.gallery-nav-btn.next-btn');
+    await nextBtn.click();
+
+    const step2 = page.locator('.gallery-step-btn').nth(1);
+    await expect(step2).toHaveClass(/active/);
+
+    const newScrollLeft = await rail.evaluate((el) => el.scrollLeft);
+    expect(newScrollLeft).toBeLessThanOrEqual(initialScrollLeft);
+  });
+
+  test('no horizontal page scroll at 375px', async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 667 });
+    await page.goto('/');
+
+    const hasHorizontalScroll = await page.evaluate(() => {
+      return document.documentElement.scrollWidth > document.documentElement.clientWidth;
+    });
+    expect(hasHorizontalScroll).toBe(false);
+  });
+
+  test('Enlarge opens a dialog named by caption, runs axe scan, and Escape closes it returning focus', async ({ page }) => {
+    await page.goto('/');
+
+    const enlargeBtn = page.locator('.gallery-card.active .gallery-enlarge-btn');
     await expect(enlargeBtn).toBeVisible();
     await enlargeBtn.focus();
     await enlargeBtn.click();
@@ -70,6 +114,17 @@ test.describe('Guest Landing Page (PPS-35 / PPS-36)', () => {
     // Wait for the dialog to be visible
     const dialog = page.locator('mat-dialog-container');
     await expect(dialog).toBeVisible();
+
+    // Verify dialog is named by caption
+    const dialogTitle = dialog.locator('[mat-dialog-title]');
+    await expect(dialogTitle).toBeVisible();
+    await expect(dialogTitle).toHaveText(/The supplier's PDF/i);
+
+    // Run axe scan while dialog is open
+    const results = await new AxeBuilder({ page })
+      .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+      .analyze();
+    expect(results.violations).toEqual([]);
 
     // Close via Escape key
     await page.keyboard.press('Escape');
@@ -114,7 +169,7 @@ test.describe('Guest Landing Page (PPS-35 / PPS-36)', () => {
 
     const headline = page.locator('.hero-headline');
     await expect(headline).toBeVisible();
-    await expect(headline).toContainText('قارن عروض الموردين، وأحكم متابعة مشترياتك.');
+    await expect(headline).toContainText('كل سعر من مورديك، موثَّق بعرض السعر الذي جاء منه.');
   });
 
   test('toggles language between EN and Arabic on public pages', async ({ page }) => {
@@ -131,12 +186,12 @@ test.describe('Guest Landing Page (PPS-35 / PPS-36)', () => {
     await expect(html).toHaveAttribute('dir', 'rtl');
     await expect(html).toHaveAttribute('lang', 'ar');
     const headline = page.locator('.hero-headline');
-    await expect(headline).toContainText('قارن عروض الموردين، وأحكم متابعة مشترياتك.');
+    await expect(headline).toContainText('كل سعر من مورديك، موثَّق بعرض السعر الذي جاء منه.');
 
     await page.reload();
     await expect(html).toHaveAttribute('dir', 'rtl');
     await expect(html).toHaveAttribute('lang', 'ar');
-    await expect(headline).toContainText('قارن عروض الموردين، وأحكم متابعة مشترياتك.');
+    await expect(headline).toContainText('كل سعر من مورديك، موثَّق بعرض السعر الذي جاء منه.');
 
     await page.goto('/auth/sign-in');
     await expect(html).toHaveAttribute('dir', 'rtl');
