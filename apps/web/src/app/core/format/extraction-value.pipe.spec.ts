@@ -23,7 +23,7 @@ describe('FormatExtractionPipe and extraction formatting helpers', () => {
       providers: [
         provideHttpClient(withXhr()),
         provideHttpClientTesting(),
-        provideTranslateService({ defaultLanguage: 'en' }),
+        provideTranslateService({ fallbackLang: 'en' }),
         FormatService,
         FormatExtractionPipe,
       ],

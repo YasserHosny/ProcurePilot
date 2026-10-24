@@ -75,7 +75,7 @@ export class ScheduleFormComponent implements OnInit {
   });
 
   ngOnInit(): void {
-    const currentLang = this.translate.currentLang;
+    const currentLang = this.translate.getCurrentLang();
     if (currentLang === 'ar') {
       this.form.controls.locale.setValue('ar');
     }

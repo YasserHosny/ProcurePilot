@@ -11,7 +11,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { TranslateModule, TranslateService } from '@ngx-translate/core';
+import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { forkJoin } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
 
@@ -37,7 +37,7 @@ import { trimDecimal } from '../../../core/format/trim-decimal';
     MatIconModule,
     MatDatepickerModule,
     MatProgressSpinnerModule,
-    TranslateModule
+    TranslatePipe,
 ],
   templateUrl: './create.component.html',
   changeDetection: ChangeDetectionStrategy.Eager,

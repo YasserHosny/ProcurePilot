@@ -2,7 +2,7 @@ import { Pipe, PipeTransform } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { provideRouter, Router } from '@angular/router';
-import { TranslateModule, TranslateService } from '@ngx-translate/core';
+import { TranslateService, provideTranslateService } from '@ngx-translate/core';
 import { of } from 'rxjs';
 
 import { FormatDatePipe } from '../../../core/format/date.pipe';
@@ -62,8 +62,9 @@ describe('AnalystHistoryComponent (R4.2)', () => {
     analystApi.listConversations.and.returnValue(of(pageOf([])));
 
     await TestBed.configureTestingModule({
-      imports: [AnalystHistoryComponent, TranslateModule.forRoot()],
+      imports: [AnalystHistoryComponent],
       providers: [
+        provideTranslateService(),
         provideNoopAnimations(),
         provideRouter([]),
         { provide: AnalystApiService, useValue: analystApi },

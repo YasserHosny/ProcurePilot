@@ -1,7 +1,7 @@
 import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
 import { signal } from '@angular/core';
 import { provideRouter } from '@angular/router';
-import { TranslateModule, TranslateService } from '@ngx-translate/core';
+import { TranslateService, provideTranslateService } from '@ngx-translate/core';
 import { Subject, firstValueFrom, of, throwError } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
 
@@ -149,8 +149,9 @@ describe('ResolutionQueueComponent', () => {
     };
 
     await TestBed.configureTestingModule({
-      imports: [ResolutionQueueComponent, TranslateModule.forRoot()],
+      imports: [ResolutionQueueComponent],
       providers: [
+        provideTranslateService(),
         provideRouter([]),
         { provide: ApiService, useValue: apiService },
         { provide: SessionService, useValue: mockSession },

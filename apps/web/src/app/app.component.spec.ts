@@ -14,7 +14,7 @@ describe('AppComponent', () => {
         provideRouter([]),
         provideHttpClient(withXhr()),
         provideHttpClientTesting(),
-        provideTranslateService({ defaultLanguage: 'en' }),
+        provideTranslateService({ fallbackLang: 'en' }),
       ],
     }).compileComponents();
   });

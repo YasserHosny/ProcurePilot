@@ -4,7 +4,7 @@ import { signal } from '@angular/core';
 import { By } from '@angular/platform-browser';
 import { MatDatepicker } from '@angular/material/datepicker';
 import { ActivatedRoute, provideRouter } from '@angular/router';
-import { TranslateModule, TranslateService } from '@ngx-translate/core';
+import { TranslateService, provideTranslateService } from '@ngx-translate/core';
 import { of, throwError } from 'rxjs';
 
 import arCatalog from '../../../../../../../packages/i18n/ar.json';
@@ -132,8 +132,9 @@ describe('QuotationReviewComponent (T051, T057, T062)', () => {
     };
 
     await TestBed.configureTestingModule({
-      imports: [QuotationReviewComponent, TranslateModule.forRoot()],
+      imports: [QuotationReviewComponent],
       providers: [
+        provideTranslateService(),
         provideRouter([]),
         { provide: ApiService, useValue: apiService },
         { provide: SessionService, useValue: mockSession },

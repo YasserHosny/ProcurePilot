@@ -6,7 +6,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { By } from '@angular/platform-browser';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { provideRouter } from '@angular/router';
-import { TranslateModule, TranslateService } from '@ngx-translate/core';
+import { TranslateService, provideTranslateService } from '@ngx-translate/core';
 
 import type { Role } from '../../../core/api/models';
 import { SessionService } from '../../../core/auth/session.service';
@@ -216,8 +216,9 @@ describe('DiscrepanciesComponent (T031)', () => {
     };
 
     await TestBed.configureTestingModule({
-      imports: [DiscrepanciesComponent, TranslateModule.forRoot()],
+      imports: [DiscrepanciesComponent],
       providers: [
+        provideTranslateService(),
         provideHttpClient(withXhr()),
         provideHttpClientTesting(),
         provideNoopAnimations(),

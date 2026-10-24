@@ -27,7 +27,7 @@ export class I18nService {
 
   constructor() {
     this.translate.addLangs(['en', 'ar']);
-    this.translate.setDefaultLang('en');
+    this.translate.setFallbackLang('en');
 
     // Restore guest preference or default
     const storedLocale = (localStorage.getItem(LOCALE_STORAGE_KEY) as Locale | null) ?? 'en';

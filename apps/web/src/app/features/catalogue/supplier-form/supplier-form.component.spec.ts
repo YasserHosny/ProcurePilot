@@ -2,7 +2,7 @@ import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { signal } from "@angular/core";
 import { MatSnackBar } from "@angular/material/snack-bar";
 import { ActivatedRoute, provideRouter } from "@angular/router";
-import { TranslateModule, TranslateService } from "@ngx-translate/core";
+import { TranslateService, provideTranslateService } from "@ngx-translate/core";
 import { of } from "rxjs";
 
 import enCatalog from "../../../../../../../packages/i18n/en.json";
@@ -48,8 +48,9 @@ describe("SupplierFormComponent (T025)", () => {
     };
 
     await TestBed.configureTestingModule({
-      imports: [SupplierFormComponent, TranslateModule.forRoot()],
+      imports: [SupplierFormComponent],
       providers: [
+        provideTranslateService(),
         provideRouter([]),
         { provide: ApiService, useValue: apiService },
         { provide: SessionService, useValue: mockSession },

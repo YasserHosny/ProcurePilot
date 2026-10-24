@@ -1,7 +1,7 @@
 import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { signal } from "@angular/core";
 import { ActivatedRoute, provideRouter } from "@angular/router";
-import { TranslateModule, TranslateService } from "@ngx-translate/core";
+import { TranslateService, provideTranslateService } from "@ngx-translate/core";
 import { of, throwError } from "rxjs";
 
 import arCatalog from "../../../../../../../packages/i18n/ar.json";
@@ -48,8 +48,9 @@ describe("ImportWizardComponent (T033)", () => {
     };
 
     await TestBed.configureTestingModule({
-      imports: [ImportWizardComponent, ImportWizardPreviewComponent, TranslateModule.forRoot()],
+      imports: [ImportWizardComponent, ImportWizardPreviewComponent],
       providers: [
+        provideTranslateService(),
         provideRouter([]),
         { provide: ApiService, useValue: apiService },
         { provide: SessionService, useValue: mockSession },

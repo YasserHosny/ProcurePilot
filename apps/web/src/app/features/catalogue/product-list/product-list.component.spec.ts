@@ -3,7 +3,7 @@ import { signal } from "@angular/core";
 import { MatDialog, MatDialogRef } from "@angular/material/dialog";
 import { MatSnackBar } from "@angular/material/snack-bar";
 import { provideRouter } from "@angular/router";
-import { TranslateModule, TranslateService } from "@ngx-translate/core";
+import { TranslateService, provideTranslateService } from "@ngx-translate/core";
 import { of } from "rxjs";
 
 import enCatalog from "../../../../../../../packages/i18n/en.json";
@@ -55,8 +55,9 @@ describe("ProductListComponent (T016)", () => {
     };
 
     await TestBed.configureTestingModule({
-      imports: [ProductListComponent, TranslateModule.forRoot()],
+      imports: [ProductListComponent],
       providers: [
+        provideTranslateService(),
         provideRouter([]),
         { provide: ApiService, useValue: apiService },
         { provide: SessionService, useValue: mockSession },

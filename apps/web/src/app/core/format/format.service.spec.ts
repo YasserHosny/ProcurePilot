@@ -19,7 +19,7 @@ describe('FormatService (T069)', () => {
       providers: [
         provideHttpClient(withXhr()),
         provideHttpClientTesting(),
-        provideTranslateService({ defaultLanguage: 'en' }),
+        provideTranslateService({ fallbackLang: 'en' }),
         FormatService,
       ],
     });

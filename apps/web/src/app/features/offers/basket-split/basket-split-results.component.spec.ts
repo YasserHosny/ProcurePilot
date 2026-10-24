@@ -1,6 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
-import { TranslateModule, TranslateService } from '@ngx-translate/core';
+import { TranslateService, provideTranslateService } from '@ngx-translate/core';
 
 import ar from '../../../../../../../packages/i18n/ar.json';
 import en from '../../../../../../../packages/i18n/en.json';
@@ -85,8 +85,8 @@ describe('BasketSplitResultsComponent — packs and constraint copy', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      imports: [BasketSplitResultsComponent, TranslateModule.forRoot()],
-      providers: [provideNoopAnimations()],
+      imports: [BasketSplitResultsComponent],
+      providers: [provideTranslateService(), provideNoopAnimations()],
     });
     translate = TestBed.inject(TranslateService);
     translate.setTranslation('en', en);

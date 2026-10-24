@@ -1,7 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
-import { TranslateModule, TranslateService } from '@ngx-translate/core';
+import { TranslateService, provideTranslateService } from '@ngx-translate/core';
 import { of, throwError } from 'rxjs';
 
 import { AnalystApiService, type AnalystConversation, type AnalystTurn } from '../analyst-api';
@@ -65,8 +65,9 @@ describe('AnalystConversationComponent (R4.2)', () => {
     ]);
 
     await TestBed.configureTestingModule({
-      imports: [AnalystConversationComponent, TranslateModule.forRoot()],
+      imports: [AnalystConversationComponent],
       providers: [
+        provideTranslateService(),
         provideNoopAnimations(),
         provideRouter([]),
         { provide: AnalystApiService, useValue: analystApi },
@@ -287,8 +288,9 @@ describe('AnalystConversationComponent — reopening via route param (R4.2 T033)
     );
 
     await TestBed.configureTestingModule({
-      imports: [AnalystConversationComponent, TranslateModule.forRoot()],
+      imports: [AnalystConversationComponent],
       providers: [
+        provideTranslateService(),
         provideNoopAnimations(),
         provideRouter([]),
         { provide: AnalystApiService, useValue: api },

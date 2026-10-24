@@ -13,7 +13,7 @@ import {
 export class AppMissingTranslationHandler implements MissingTranslationHandler {
   handle(params: MissingTranslationHandlerParams): string {
     const key = params.key;
-    const currentLang = params.translateService.currentLang || params.translateService.defaultLang || 'en';
+    const currentLang = params.translateService.getCurrentLang() || params.translateService.getFallbackLang() || 'en';
     const message = `[i18n] MISSING TRANSLATION: Key "${key}" not found in locale "${currentLang}".`;
 
     if (isDevMode()) {

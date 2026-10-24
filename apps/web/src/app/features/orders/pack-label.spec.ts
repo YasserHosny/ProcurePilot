@@ -1,5 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import { TranslateModule, TranslateService } from '@ngx-translate/core';
+import { TranslateService, provideTranslateService } from '@ngx-translate/core';
 import en from '../../../../../../packages/i18n/en.json';
 import { FormatService } from '../../core/format/format.service';
 import { packLabel } from './pack-label';
@@ -9,7 +9,7 @@ describe('packLabel', () => {
   let format: FormatService;
 
   beforeEach(() => {
-    TestBed.configureTestingModule({ imports: [TranslateModule.forRoot()] });
+    TestBed.configureTestingModule({ providers: [provideTranslateService()] });
     translate = TestBed.inject(TranslateService);
     translate.setTranslation('en', en);
     translate.use('en');

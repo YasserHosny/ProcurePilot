@@ -1,5 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { TranslateModule } from '@ngx-translate/core';
+import { provideTranslateService } from '@ngx-translate/core';
 import { of, throwError } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
 import { signal } from '@angular/core';
@@ -52,8 +52,9 @@ describe('GuardrailsComponent', () => {
     }));
 
     await TestBed.configureTestingModule({
-      imports: [GuardrailsComponent, TranslateModule.forRoot()],
+      imports: [GuardrailsComponent],
       providers: [
+        provideTranslateService(),
         { provide: RfqApi, useValue: rfqApi },
         { provide: ApiService, useValue: api },
         { provide: SessionService, useValue: {

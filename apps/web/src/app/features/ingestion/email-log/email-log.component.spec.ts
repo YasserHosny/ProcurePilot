@@ -3,7 +3,7 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { provideRouter } from '@angular/router';
-import { TranslateModule } from '@ngx-translate/core';
+import { provideTranslateService } from '@ngx-translate/core';
 
 import type { IngestionEmailLog, IngestionEmailLogList } from '../ingestion-api';
 import { EmailLogComponent } from './email-log.component';
@@ -142,8 +142,9 @@ describe('EmailLogComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [EmailLogComponent, TranslateModule.forRoot()],
+      imports: [EmailLogComponent],
       providers: [
+        provideTranslateService(),
         provideHttpClient(withXhr()),
         provideHttpClientTesting(),
         provideNoopAnimations(),

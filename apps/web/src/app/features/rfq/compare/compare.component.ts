@@ -14,7 +14,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatIconModule } from '@angular/material/icon';
-import { TranslateModule, TranslatePipe, TranslateService } from '@ngx-translate/core';
+import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
 import { ApiService } from '../../../core/api/api.service';
 import { RfqApi, RfqDetail, RfqGuardrail, RfqResponseComparison } from '../rfq-api';
@@ -46,7 +46,6 @@ const LAST_BRANCH_STORAGE_PREFIX = 'pp.rfq.lastBranchId.';
     MatDatepickerModule,
     MatProgressSpinnerModule,
     MatIconModule,
-    TranslateModule,
     TranslatePipe,
     FormatMoneyPipe,
     FormatDatePipe

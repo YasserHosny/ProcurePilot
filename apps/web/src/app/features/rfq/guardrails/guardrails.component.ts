@@ -10,7 +10,7 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatIconModule } from '@angular/material/icon';
-import { TranslateModule, TranslateService } from '@ngx-translate/core';
+import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { of } from 'rxjs';
 import { catchError } from 'rxjs/operators';
 
@@ -45,7 +45,7 @@ import {
     MatSlideToggleModule,
     MatProgressSpinnerModule,
     MatIconModule,
-    TranslateModule,
+    TranslatePipe,
     FormatMoneyPipe
 ],
   templateUrl: './guardrails.component.html',

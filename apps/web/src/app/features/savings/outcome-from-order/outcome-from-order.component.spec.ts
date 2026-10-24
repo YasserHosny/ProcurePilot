@@ -2,7 +2,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { ActivatedRoute, Router, provideRouter } from '@angular/router';
-import { TranslateModule, TranslateService } from '@ngx-translate/core';
+import { TranslateService, provideTranslateService } from '@ngx-translate/core';
 import { of, throwError } from 'rxjs';
 
 import { toLocalMidnightIso } from '../../../core/format/iso-date';
@@ -68,8 +68,9 @@ describe('OutcomeFromOrderComponent', () => {
     api.recordPurchase.and.returnValue(of({} as PurchaseOutcomeCreated));
 
     await TestBed.configureTestingModule({
-      imports: [OutcomeFromOrderComponent, TranslateModule.forRoot()],
+      imports: [OutcomeFromOrderComponent],
       providers: [
+        provideTranslateService(),
         provideNoopAnimations(),
         provideRouter([]),
         { provide: SavingsApiService, useValue: api },

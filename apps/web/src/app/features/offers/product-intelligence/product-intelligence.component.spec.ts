@@ -3,7 +3,7 @@ import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { provideRouter } from '@angular/router';
-import { TranslateModule } from '@ngx-translate/core';
+import { provideTranslateService } from '@ngx-translate/core';
 import { of } from 'rxjs';
 
 import { ApiService } from '../../../core/api/api.service';
@@ -104,8 +104,9 @@ describe('ProductIntelligenceComponent (US2, T034)', () => {
     apiService.getPriceHistory.and.returnValue(of(mockHistoryResponse));
 
     await TestBed.configureTestingModule({
-      imports: [ProductIntelligenceComponent, TranslateModule.forRoot()],
+      imports: [ProductIntelligenceComponent],
       providers: [
+        provideTranslateService(),
         provideNoopAnimations(),
         provideHttpClient(withXhr()),
         provideHttpClientTesting(),

@@ -3,7 +3,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { MatDialog, MatDialogRef } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { provideRouter } from '@angular/router';
-import { TranslateModule, TranslateService } from '@ngx-translate/core';
+import { TranslateService, provideTranslateService } from '@ngx-translate/core';
 import { Subject, of, throwError } from 'rxjs';
 
 import enCatalog from '../../../../../../packages/i18n/en.json';
@@ -69,8 +69,9 @@ describe('TeamComponent (T057)', () => {
     sessionService.hasRole.and.returnValue(true);
 
     await TestBed.configureTestingModule({
-      imports: [TeamComponent, TranslateModule.forRoot()],
+      imports: [TeamComponent],
       providers: [
+        provideTranslateService(),
         provideRouter([]),
         { provide: ApiService, useValue: apiService },
         { provide: SessionService, useValue: sessionService },

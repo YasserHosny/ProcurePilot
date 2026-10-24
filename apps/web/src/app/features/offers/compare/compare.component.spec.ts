@@ -3,7 +3,7 @@ import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { provideRouter } from '@angular/router';
-import { TranslateModule, TranslateService } from '@ngx-translate/core';
+import { TranslateService, provideTranslateService } from '@ngx-translate/core';
 import { Subject, of, throwError } from 'rxjs';
 
 import enCatalog from '../../../../../../../packages/i18n/en.json';
@@ -148,8 +148,9 @@ describe('CompareComponent (US1, SC-002, T020, T029)', () => {
     posApiService.listSignals.and.returnValue(of({ items: [], next_cursor: null }));
 
     await TestBed.configureTestingModule({
-      imports: [CompareComponent, TranslateModule.forRoot()],
+      imports: [CompareComponent],
       providers: [
+        provideTranslateService(),
         provideNoopAnimations(),
         provideHttpClient(withXhr()),
         provideHttpClientTesting(),

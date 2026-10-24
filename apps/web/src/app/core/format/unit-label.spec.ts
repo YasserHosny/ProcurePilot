@@ -1,5 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import { TranslateModule, TranslateService } from '@ngx-translate/core';
+import { TranslateService, provideTranslateService } from '@ngx-translate/core';
 
 import ar from '../../../../../../packages/i18n/ar.json';
 import en from '../../../../../../packages/i18n/en.json';
@@ -8,7 +8,7 @@ import { unitLabel } from './unit-label';
 
 describe('unitLabel', () => {
   it('labels supported base units in the interface language and passes unknown codes through', () => {
-    TestBed.configureTestingModule({ imports: [TranslateModule.forRoot()] });
+    TestBed.configureTestingModule({ providers: [provideTranslateService()] });
     const translate = TestBed.inject(TranslateService);
     translate.setTranslation('en', en);
     translate.setTranslation('ar', ar);

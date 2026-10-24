@@ -6,7 +6,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { By } from '@angular/platform-browser';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { ActivatedRoute, Router, provideRouter } from '@angular/router';
-import { TranslateModule, TranslateService } from '@ngx-translate/core';
+import { TranslateService, provideTranslateService } from '@ngx-translate/core';
 
 import type { Role } from '../../../core/api/models';
 import { SessionService } from '../../../core/auth/session.service';
@@ -70,8 +70,9 @@ describe('ConnectionSettingsComponent (T014)', () => {
     };
 
     await TestBed.configureTestingModule({
-      imports: [ConnectionSettingsComponent, TranslateModule.forRoot()],
+      imports: [ConnectionSettingsComponent],
       providers: [
+        provideTranslateService(),
         provideHttpClient(withXhr()),
         provideHttpClientTesting(),
         provideNoopAnimations(),

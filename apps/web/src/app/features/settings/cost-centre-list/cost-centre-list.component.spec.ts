@@ -6,7 +6,7 @@ import type { WritableSignal } from "@angular/core";
 import { MAT_DIALOG_DATA, MatDialog, MatDialogRef } from "@angular/material/dialog";
 import { MatSnackBar } from "@angular/material/snack-bar";
 import { provideRouter } from "@angular/router";
-import { TranslateModule, TranslateService } from "@ngx-translate/core";
+import { TranslateService, provideTranslateService } from "@ngx-translate/core";
 import { of, throwError } from "rxjs";
 
 import enCatalog from "../../../../../../../packages/i18n/en.json";
@@ -179,8 +179,9 @@ describe("CostCentreListComponent (T023)", () => {
     apiService.members.and.returnValue(of({ items: mockMembers, next_cursor: null }));
 
     await TestBed.configureTestingModule({
-      imports: [CostCentreListComponent, TranslateModule.forRoot()],
+      imports: [CostCentreListComponent],
       providers: [
+        provideTranslateService(),
         provideRouter([]),
         { provide: OrganisationApiService, useValue: organisationApi },
         { provide: ApiService, useValue: apiService },
@@ -396,8 +397,9 @@ describe("CostCentreFormDialogComponent (T023)", () => {
     fixture: ComponentFixture<CostCentreFormDialogComponent>;
   }> {
     await TestBed.configureTestingModule({
-      imports: [CostCentreFormDialogComponent, TranslateModule.forRoot()],
+      imports: [CostCentreFormDialogComponent],
       providers: [
+        provideTranslateService(),
         { provide: OrganisationApiService, useValue: organisationApi },
         { provide: ApiService, useValue: apiService },
         { provide: MatDialogRef, useValue: dialogRefSpy },

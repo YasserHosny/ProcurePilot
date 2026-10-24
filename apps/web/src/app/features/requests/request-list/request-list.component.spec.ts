@@ -5,7 +5,7 @@ import { TestBed } from '@angular/core/testing';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { Router, provideRouter } from '@angular/router';
-import { TranslateModule, TranslateService } from '@ngx-translate/core';
+import { TranslateService, provideTranslateService } from '@ngx-translate/core';
 import { of, throwError } from 'rxjs';
 
 import enCatalog from '../../../../../../../packages/i18n/en.json';
@@ -76,8 +76,9 @@ describe('RequestListComponent (T017)', () => {
     );
 
     await TestBed.configureTestingModule({
-      imports: [RequestListComponent, TranslateModule.forRoot()],
+      imports: [RequestListComponent],
       providers: [
+        provideTranslateService(),
         provideRouter([]),
         { provide: SessionService, useValue: { currentMember, role } },
         { provide: RequestsApiService, useValue: requestsApi },

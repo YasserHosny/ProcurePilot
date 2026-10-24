@@ -8,7 +8,7 @@ import { ActivatedRoute, Router, provideRouter } from '@angular/router';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { of, throwError } from 'rxjs';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
-import { TranslateModule, TranslateService } from '@ngx-translate/core';
+import { TranslateService, provideTranslateService } from '@ngx-translate/core';
 import { Product, Supplier } from '../../../core/api/models';
 
 describe('RfqCreateComponent', () => {
@@ -38,8 +38,9 @@ describe('RfqCreateComponent', () => {
     );
 
     await TestBed.configureTestingModule({
-      imports: [RfqCreateComponent, TranslateModule.forRoot()],
+      imports: [RfqCreateComponent],
       providers: [
+        provideTranslateService(),
         provideHttpClient(withXhr()),
         provideHttpClientTesting(),
         provideNoopAnimations(),

@@ -4,7 +4,7 @@ import { signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { provideRouter } from '@angular/router';
-import { TranslateModule } from '@ngx-translate/core';
+import { provideTranslateService } from '@ngx-translate/core';
 import { Subject, of, throwError } from 'rxjs';
 
 import { SessionService } from '../../../core/auth/session.service';
@@ -81,8 +81,9 @@ describe('RiskQueueComponent', () => {
     );
 
     await TestBed.configureTestingModule({
-      imports: [RiskQueueComponent, TranslateModule.forRoot()],
+      imports: [RiskQueueComponent],
       providers: [
+        provideTranslateService(),
         provideHttpClient(withXhr()),
         provideHttpClientTesting(),
         provideNoopAnimations(),

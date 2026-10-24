@@ -534,7 +534,7 @@ export class MatchResolutionComponent implements OnInit {
   }
 
   localizedUnitLabel(unit: BaseUnit): string {
-    return this.translate.currentLang === 'ar' ? unit.label_ar : unit.label_en;
+    return this.translate.getCurrentLang() === 'ar' ? unit.label_ar : unit.label_en;
   }
 
   private handleError(err: unknown): void {

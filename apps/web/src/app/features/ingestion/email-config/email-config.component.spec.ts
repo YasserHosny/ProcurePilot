@@ -6,7 +6,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { By } from '@angular/platform-browser';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { provideRouter } from '@angular/router';
-import { TranslateModule } from '@ngx-translate/core';
+import { provideTranslateService } from '@ngx-translate/core';
 
 import type { Role } from '../../../core/api/models';
 import { SessionService } from '../../../core/auth/session.service';
@@ -54,8 +54,9 @@ describe('EmailConfigComponent (T022)', () => {
     };
 
     await TestBed.configureTestingModule({
-      imports: [EmailConfigComponent, TranslateModule.forRoot()],
+      imports: [EmailConfigComponent],
       providers: [
+        provideTranslateService(),
         provideHttpClient(withXhr()),
         provideHttpClientTesting(),
         provideNoopAnimations(),

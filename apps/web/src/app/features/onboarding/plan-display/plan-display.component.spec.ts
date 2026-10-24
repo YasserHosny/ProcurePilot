@@ -2,7 +2,7 @@ import { signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { Router, provideRouter } from '@angular/router';
-import { TranslateModule } from '@ngx-translate/core';
+import { provideTranslateService } from '@ngx-translate/core';
 import { of, throwError } from 'rxjs';
 
 import type { Role } from '../../../core/api/models';
@@ -60,8 +60,9 @@ describe('PlanDisplayComponent (T056)', () => {
     mockBillingApiService.checkActiveCatalogueProductsLimit.and.returnValue(of(sampleLimitCheck));
 
     await TestBed.configureTestingModule({
-      imports: [PlanDisplayComponent, TranslateModule.forRoot()],
+      imports: [PlanDisplayComponent],
       providers: [
+        provideTranslateService(),
         provideNoopAnimations(),
         provideRouter([]),
         { provide: BillingApiService, useValue: mockBillingApiService },

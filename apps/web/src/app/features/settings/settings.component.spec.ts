@@ -5,7 +5,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatSelectModule } from '@angular/material/select';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
-import { TranslateModule, TranslatePipe, TranslateService } from '@ngx-translate/core';
+import { TranslatePipe, TranslateService, provideTranslateService } from '@ngx-translate/core';
 import { of, throwError } from 'rxjs';
 
 import enCatalog from '../../../../../../packages/i18n/en.json';
@@ -41,8 +41,9 @@ describe('SettingsComponent workspace language (finding 37)', () => {
 
   async function create(): Promise<void> {
     await TestBed.configureTestingModule({
-      imports: [SettingsComponent, TranslateModule.forRoot(), NoopAnimationsModule],
+      imports: [SettingsComponent, NoopAnimationsModule],
       providers: [
+        provideTranslateService(),
         { provide: ApiService, useValue: api },
         { provide: SessionService, useValue: session },
         { provide: I18nService, useValue: { currentLocale: () => 'en' } },
