@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+from datetime import date, timedelta
 from typing import Protocol
 
 from procurepilot_extraction_worker.models import (
@@ -33,7 +34,8 @@ class FakeExtractionProvider:
     Explicitly selected, never a fallback: production keeps the loud bedrock -> azure_di
     failure path. The e2e specs' whole quotation recipe (support/canonical-flow.ts) encodes
     this provider's fixed output — two lines totalling £75.00, a hash-chosen mismatched
-    stated total, and a low-confidence issue date — so its values must not drift.
+    stated total, and a low-confidence issue date — so its values must not drift. The two dates
+    are the exception: they move with the run date so the quote is never already expired.
     """
 
     method = "bedrock"
@@ -43,6 +45,11 @@ class FakeExtractionProvider:
         seed = int(hashlib.sha256(f"{document_id}:{storage_path}".encode()).hexdigest()[:8], 16)
         low_confidence = 0.62 if seed % 2 == 0 else 0.78
         mismatch_total = "88.00" if seed % 3 == 0 else "77.00"
+        # Dates relative to the run: the quote must still be valid when Smart Compare reads it,
+        # since offers expire with their quotation and expired offers are hidden by default.
+        today = date.today()
+        issue_date = (today - timedelta(days=3)).isoformat()
+        expiry_date = (today + timedelta(days=27)).isoformat()
         return ExtractionResult(
             method="bedrock",
             model_version=self.model_version,
@@ -61,8 +68,8 @@ class FakeExtractionProvider:
                     1,
                     {"bbox": [0.72, 0.1, 0.8, 0.15]},
                 ),
-                "issue_date": ExtractedField("issue_date", "2026-08-21", low_confidence, 1, None),
-                "expiry_date": ExtractedField("expiry_date", "2026-09-20", 0.9, 1, None),
+                "issue_date": ExtractedField("issue_date", issue_date, low_confidence, 1, None),
+                "expiry_date": ExtractedField("expiry_date", expiry_date, 0.9, 1, None),
             },
             lines=[
                 ExtractedLine(

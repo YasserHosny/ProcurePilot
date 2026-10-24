@@ -106,7 +106,7 @@ since the 2026-10-24 move; the old `PP` key is in brackets.
 | P-13 | PPS-38 | P-14 | PPS-35 | P-15 | PPS-36 |
 | P-16 | PPS-37 | P-17 | PPS-40 | P-18 | PPS-42 |
 | P-19 | PPS-44 | P-21 | PPS-46 | P-22 | PPS-47 |
-| P-20 | PPS-45 | P-23 | PPS-49 | | |
+| P-20 | PPS-45 | P-23 | PPS-49 | P-24 | PPS-50 |
 | P-25 | PPS-51 | | | | |
 
 Without a plan ID: PPS-2 (PP-21), PPS-7 (PP-22), PPS-8 (PP-23), PPS-22 (PP-24), PPS-27 (PP-25),
@@ -222,6 +222,7 @@ PR → CI → merge → link PR on the PPS task. Refs are in the GTM plan's curr
 | [ ] P-22 | — | CI: the five deploy workflows shared one BuildKit cache scope with `mode=max`, filling 10.4 GB of the 10 GB Actions cache and evicting pnpm/uv caches; each image now has its own scope (`mode=min` for single-stage, `max` for web). E2E sharded five ways instead of three (predicted ~199 s of specs per shard, was ~330 s) | Orch | — | PR merged with every required check green on its head commit; measured shard times recorded in `docs/operations/ci-pipeline.md` (PPS-47) |
 | [ ] P-20 | — | Landing page v2 from an impeccable critique (26/40) and a copywriting pass: provenance-led hero with a 2x recommendation crop, merged "how it works", native scroll-snap screenshot rail (peek, prev/next, step index, keyboard, RTL, lightbox), navy evidence band with a ledger excerpt (double rule on the verified line), navy pilot panel with copy-email and FAQs beside it, Iron Systems byline; page split into gallery/evidence/pilot components | Orch → Agy (UI) + Codex (captures, polish) | P-15 | PR merged with every required check green on its head commit; checked in en, ar and at 375 px (PPS-45) |
 | [ ] P-23 | — | Mobile user guide: the Google Stitch concept mockups (2026-09-11, pre-ship) replaced by real renders of the shipped app from a tagged Flutter capture test (17 screens, EN + AR sign-in/home); Approvals, Delivery and Quality Issue get images; Settings keeps its preview mockup | Orch → Agy | P-17 | PR merged; guide shows real screenshots (PPS-49) |
+| [ ] P-24 | — | Smart Compare showed quote-derived offers as open-ended: `landed_cost.valid_to` was never written. It now carries the quotation's expiry (end of that day in the tenant's reporting timezone); a lapsed quote reads as expired. Existing rows are append-only and stay open-ended | Orch | — | PR merged with every required check green on its head commit (PPS-50) |
 | [ ] P-25 | — | Mobile request detail showed the approver as a raw member ID and the decision time as an ISO timestamp (found by P-23). The approval step now carries `assigned_email` (looked up through the caller's RLS client, like `requester_email`; `assigned_name` reserved), mobile shows name → email → "Unknown approver", and `decided_at` is a local date in en/ar via a shared intl `formatDateTime` | Orch → Codex (API) + Agy (mobile) | P-23 | PR merged; full `flutter test` green locally; `07-request-detail.png` regenerated (PPS-51) |
 
 ### E — Pilot environment
