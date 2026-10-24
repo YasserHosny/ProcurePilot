@@ -33,7 +33,10 @@ describe('BrandLogoComponent', () => {
     expect(img().style.blockSize).toBe('28px');
   });
 
-  it('switches to the Arabic lockup and alt text when the language is Arabic', () => {
+  it('swaps a rendered logo to the Arabic lockup and alt text when the language changes', () => {
+    fixture.detectChanges();
+    expect(img().getAttribute('src')).toBe('assets/brand/procurepilot-horizontal.svg');
+
     translate.use('ar');
     fixture.detectChanges();
 
@@ -48,9 +51,20 @@ describe('BrandLogoComponent', () => {
     expect(img().getAttribute('src')).toBe('assets/brand/procurepilot-mark.svg');
   });
 
-  it('is never mirrored', () => {
-    fixture.detectChanges();
+  describe('in a right-to-left page', () => {
+    afterEach(() => {
+      document.documentElement.removeAttribute('dir');
+    });
 
-    expect(getComputedStyle(img()).transform).toBe('none');
+    it('is never mirrored', () => {
+      // The global stylesheet (loaded by Karma) mirrors directional icons under [dir='rtl'];
+      // the arrow in the mark means "forward", so the logo must stay as drawn.
+      document.documentElement.dir = 'rtl';
+      translate.use('ar');
+      fixture.detectChanges();
+
+      expect(getComputedStyle(img()).transform).toBe('none');
+      expect(getComputedStyle(fixture.nativeElement as HTMLElement).transform).toBe('none');
+    });
   });
 });

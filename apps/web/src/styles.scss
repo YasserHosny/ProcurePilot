@@ -15,8 +15,10 @@ html {
       theme-type: light,
     ),
     typography: (
-      plain-family: "Readex Pro",
-      brand-family: "Readex Pro",
+      // Same stack as --pp-font-sans: Material components keep a sans-serif face until Readex
+      // Pro has loaded (display=swap) or if it never does.
+      plain-family: ("Readex Pro", "Segoe UI", Tahoma, sans-serif),
+      brand-family: ("Readex Pro", "Segoe UI", Tahoma, sans-serif),
       regular-weight: 400,
       medium-weight: 500,
       bold-weight: 600,
