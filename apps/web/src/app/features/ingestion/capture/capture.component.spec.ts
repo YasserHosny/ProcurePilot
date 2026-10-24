@@ -181,9 +181,11 @@ describe('CaptureComponent (T024)', () => {
 
     const successContainer = fixture.debugElement.query(By.css('.result-container.success'));
     expect(successContainer).not.toBeNull();
-    const routerLink = fixture.debugElement.query(By.css('a[mat-flat-button]'));
-    expect(routerLink).not.toBeNull();
-    expect(routerLink.attributes['ng-reflect-router-link']).toContain('quot-xyz-789');
+    const reviewLink = fixture.debugElement.query(By.css('a[mat-flat-button]'));
+    expect(reviewLink).not.toBeNull();
+    expect((reviewLink.nativeElement as HTMLAnchorElement).getAttribute('href')).toBe(
+      '/quotations/quot-xyz-789',
+    );
   });
 
   it('should show error message and failed state when API returns an error', () => {
