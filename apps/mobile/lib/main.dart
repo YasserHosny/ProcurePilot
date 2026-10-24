@@ -16,6 +16,7 @@ import 'core/camera/camera_capture.dart';
 import 'core/i18n/i18n_loader.dart';
 import 'core/offline_queue/offline_queue_replay.dart';
 import 'core/offline_queue/offline_queue_service.dart';
+import 'core/theme/app_theme.dart';
 import 'features/approvals/approval_decision_screen.dart';
 import 'features/approvals/approval_queue_screen.dart';
 import 'features/auth/biometric_offer_screen.dart';
@@ -285,6 +286,7 @@ class _ProcurePilotAppState extends State<ProcurePilotApp> {
           child: MaterialApp(
             navigatorKey: _navigatorKey,
             title: widget.i18n.t('common.brandName'),
+            theme: AppTheme.lightTheme,
             locale: Locale(widget.i18n.locale),
             builder: (context, child) {
               return Directionality(

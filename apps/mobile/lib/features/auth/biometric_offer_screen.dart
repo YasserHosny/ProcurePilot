@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/theme/brand_logo.dart';
 import '../service_provider.dart';
 import 'biometric_preference.dart';
 
@@ -24,7 +25,7 @@ class BiometricOfferScreen extends StatelessWidget {
     final i18n = ServiceProvider.of(context).i18n;
 
     return Scaffold(
-      appBar: AppBar(title: Text(i18n.t('common.brandName'))),
+      appBar: AppBar(title: const BrandLogo(height: 28)),
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(24),

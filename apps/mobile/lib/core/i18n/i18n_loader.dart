@@ -25,7 +25,7 @@ class I18nLoader extends ChangeNotifier {
 
   /// Loads the catalogue for [locale] from the bundled assets.
   Future<void> load(String locale) async {
-    final path = '../../packages/i18n/$locale.json';
+    final path = 'assets/i18n/$locale.json';
     final raw = await _bundle.loadString(path);
     _translations = jsonDecode(raw) as Map<String, dynamic>;
     _locale = locale;

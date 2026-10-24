@@ -14,6 +14,7 @@ import 'package:procurepilot_mobile/core/auth/biometric_gate.dart';
 import 'package:procurepilot_mobile/core/camera/camera_capture.dart';
 import 'package:procurepilot_mobile/core/i18n/i18n_loader.dart';
 import 'package:procurepilot_mobile/core/offline_queue/offline_queue_service.dart';
+import 'package:procurepilot_mobile/core/theme/app_theme.dart';
 import 'package:procurepilot_mobile/features/approvals/approval_decision_screen.dart';
 import 'package:procurepilot_mobile/features/approvals/approval_queue_screen.dart';
 import 'package:procurepilot_mobile/features/auth/biometric_offer_screen.dart';
@@ -47,7 +48,7 @@ class TestAssetBundle extends AssetBundle {
 /// Returns a loaded [I18nLoader] backed by a minimal English catalogue.
 Future<I18nLoader> loadTestI18n({String locale = 'en'}) async {
   final bundle = TestAssetBundle({
-    '../../packages/i18n/en.json': jsonEncode({
+    'assets/i18n/en.json': jsonEncode({
       'common': {
         'brandName': 'ProcurePilot',
         'loading': 'Loading...',
@@ -269,7 +270,7 @@ Future<I18nLoader> loadTestI18n({String locale = 'en'}) async {
             'Low stock report queued — will send when back online.',
       },
     }),
-    '../../packages/i18n/ar.json': jsonEncode({
+    'assets/i18n/ar.json': jsonEncode({
       'common': {
         'brandName': 'ProcurePilot',
         'loading': 'جاري التحميل...',
@@ -945,6 +946,7 @@ class TestServiceProvider extends StatelessWidget {
       i18n: i18n,
       offlineQueueService: offlineQueueService,
       child: MaterialApp(
+        theme: AppTheme.lightTheme,
         locale: Locale(i18n.locale),
         builder: (context, child) => Directionality(
           textDirection: i18n.textDirection,
