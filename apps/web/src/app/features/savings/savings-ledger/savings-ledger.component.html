@@ -191,8 +191,18 @@
             <th mat-header-cell *matHeaderCellDef>{{ 'savings.ledger.table.delta' | translate }}</th>
             <td mat-cell *matCellDef="let saving" class="delta-cell">
               @if (saving.delta) {
-                <span class="delta-badge" [ngClass]="getDeltaClass(saving.delta)">
+                <span
+                  class="delta-badge"
+                  data-testid="saving-delta"
+                  [ngClass]="getDeltaClass(saving.delta)"
+                  [class.delta-pending]="saving.status !== 'verified'"
+                >
                   {{ isPositive(saving.delta) ? '+' : '' }}{{ saving.delta | formatMoney }}
+                  @if (saving.status !== 'verified') {
+                    <span class="delta-pending-hint" data-testid="delta-pending-hint">{{
+                      'savings.ledger.table.deltaPendingHint' | translate
+                    }}</span>
+                  }
                 </span>
               } @else {
                 <span class="text-muted">—</span>
