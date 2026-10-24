@@ -199,6 +199,11 @@
   color: var(--pp-warning);
 }
 
+td.date-cell {
+  white-space: nowrap;
+  min-inline-size: 7.5rem;
+}
+
 .actions-cell {
   display: flex;
   align-items: center;

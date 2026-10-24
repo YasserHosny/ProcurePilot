@@ -203,6 +203,11 @@
   color: var(--pp-text-muted);
 }
 
+td.date-cell {
+  white-space: nowrap;
+  min-inline-size: 7.5rem;
+}
+
 .lines-cell,
 .actions-cell {
   display: flex;

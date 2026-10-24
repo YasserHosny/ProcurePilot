@@ -315,4 +315,14 @@ describe('RequestListComponent (T017)', () => {
     expect(component.formatRequiredBy('2026-09-20')).toContain('٢٠');
     expect(/[0-9]/.test(component.formatRequiredBy('2026-09-20'))).toBeFalse();
   });
+
+  // Guards PPS-60: in Arabic, the Required By date was clipped by Material's table
+  // ellipsis without whitespace: nowrap and min-inline-size. The clip itself depends
+  // on real font metrics and is verified by the landing-gallery capture.
+  it('prevents clipping on the Required By cell via date-cell styling', () => {
+    const cell = fixture.nativeElement.querySelector('td.mat-column-requiredByDate') as HTMLElement;
+    expect(cell).toBeTruthy();
+    expect(cell.classList.contains('date-cell')).toBeTrue();
+    expect(getComputedStyle(cell).whiteSpace).toBe('nowrap');
+  });
 });
