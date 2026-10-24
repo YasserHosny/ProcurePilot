@@ -232,7 +232,7 @@ PR → CI → merge → link PR on the PPS task. Refs are in the GTM plan's curr
 | [ ] P-28 | — | Found by the P-24 hosted check: bulk confirm reads "1 matches confirmed." — `matching.queue.exact.*` counted strings have no plural forms (en, and ar's full plural set) | Orch | — | a count of 1 reads "1 match confirmed.", Arabic counts correct, with a component test (PPS-56) |
 | [x] P-29 | — | Arabic UI said «وفر» / «وفورات» for a saving; Egyptian buyers say «توفير» / «توفيرات» (owner, 2026-10-25). 56 `ar.json` values and four Arabic E2E assertions; other roots («متوفر», «يوفر», «أوفر») untouched | Orch → Codex | — | **done 2026-10-25: #263 merged, CI green; PPS-58 Done** |
 | [ ] P-30 | — | Demo video v2.4 jumped from the pain to the result without saying the product answers it. Script revised: product bridge in beat 1, a pain card before each chapter's fix, an honest promise, caption fixes, beat 9 dropped; script moved to `video/cuts/v2.4-ledger/script.md` | Orch, User (approval) | — | owner approves the copy, `make_data.py` splits pain/fix cards, four cuts re-rendered (PPS-59) |
-| [x] P-31 | — | Material's `savings` glyph is a piggy bank (owner, 2026-10-25). Money-saved icons now `payments` (banknotes; was `toll`, owner chose 2026-10-25), empty budget list `account_balance_wallet`; 8 uses in 7 web files | Orch | — | **done 2026-10-25: #271 merged; icon switched to `payments` in #273; PPS-61** |
+| [x] P-31 | — | Material's `savings` glyph is a piggy bank (owner, 2026-10-25). Money-saved icons now `payments` (banknotes; was `toll`, owner chose 2026-10-25), empty budget list `account_balance_wallet`; 8 uses in 7 web files | Orch | — | **done 2026-10-25: #271 merged; icon switched to `payments` in #275; PPS-61** |
 
 ### E — Pilot environment
 
