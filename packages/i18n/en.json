@@ -17,6 +17,12 @@
       "en": "English (en)",
       "ar": "العربية (ar)"
     },
+    "languageToggle": {
+      "switchToAr": "Switch to Arabic",
+      "switchToEn": "Switch to English",
+      "labelAr": "عربي",
+      "labelEn": "EN"
+    },
     "all": "All",
     "cancel": "Cancel",
     "retry": "Retry",

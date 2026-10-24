@@ -35,6 +35,11 @@ describe('LandingComponent', () => {
     expect(ledeEl.nativeElement.textContent.trim()).toBe('landing.hero.lede');
   });
 
+  it('renders the language toggle in header actions', () => {
+    const toggleEl = fixture.debugElement.query(By.css('app-language-toggle'));
+    expect(toggleEl).toBeTruthy();
+  });
+
   it('points the sign-in links to /auth/sign-in', () => {
     const headerSignIn = fixture.debugElement.query(By.css('.header-signin-btn'));
     expect(headerSignIn).toBeTruthy();

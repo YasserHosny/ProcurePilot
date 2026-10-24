@@ -1,5 +1,5 @@
 import { Directionality } from '@angular/cdk/bidi';
-import { computed, DOCUMENT, signal, WritableSignal } from '@angular/core';
+import { computed, signal, WritableSignal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideTranslateService } from '@ngx-translate/core';
 import { of } from 'rxjs';
@@ -63,9 +63,8 @@ describe('I18nService', () => {
 
   afterEach(() => {
     localStorage.clear();
-    const doc = TestBed.inject(DOCUMENT);
-    doc.documentElement.setAttribute('dir', 'ltr');
-    doc.documentElement.setAttribute('lang', 'en');
+    const dirService = TestBed.inject(DirectionService);
+    dirService.setDirection('ltr', 'en');
   });
 
   it('preserves guest Arabic preference after construction and effects flush', () => {

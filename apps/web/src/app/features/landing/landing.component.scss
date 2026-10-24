@@ -46,6 +46,12 @@
   padding: var(--pp-space-3) var(--pp-space-4);
 }
 
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--pp-space-2);
+}
+
 .footer-container {
   flex-wrap: wrap;
   gap: var(--pp-space-4);

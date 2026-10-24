@@ -6,6 +6,7 @@ import { TranslatePipe } from '@ngx-translate/core';
 
 import { environment } from '../../../environments/environment';
 import { BrandLogoComponent } from '../../layout/brand-logo/brand-logo.component';
+import { LanguageToggleComponent } from '../../layout/language-toggle/language-toggle.component';
 
 export interface ScreenshotCard {
   readonly src: string;
@@ -22,6 +23,7 @@ export const SCREENSHOT_CARDS: readonly ScreenshotCard[] = [];
   standalone: true,
   imports: [
     BrandLogoComponent,
+    LanguageToggleComponent,
     RouterLink,
     MatButtonModule,
     MatIconModule,

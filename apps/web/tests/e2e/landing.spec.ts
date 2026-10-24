@@ -71,4 +71,36 @@ test.describe('Guest Landing Page (PPS-35)', () => {
     await expect(headline).toBeVisible();
     await expect(headline).toContainText('كل رقم يعود إلى عرض السعر الذي جاء منه.');
   });
+
+  test('toggles language between EN and Arabic on public pages', async ({ page }) => {
+    await page.goto('/');
+
+    const html = page.locator('html');
+    await expect(html).toHaveAttribute('dir', 'ltr');
+    await expect(html).toHaveAttribute('lang', 'en');
+
+    const landingToggle = page.getByRole('button', { name: 'عربي' });
+    await expect(landingToggle).toBeVisible();
+    await landingToggle.click();
+
+    await expect(html).toHaveAttribute('dir', 'rtl');
+    await expect(html).toHaveAttribute('lang', 'ar');
+    const headline = page.locator('.hero-headline');
+    await expect(headline).toContainText('كل رقم يعود إلى عرض السعر الذي جاء منه.');
+
+    await page.reload();
+    await expect(html).toHaveAttribute('dir', 'rtl');
+    await expect(html).toHaveAttribute('lang', 'ar');
+    await expect(headline).toContainText('كل رقم يعود إلى عرض السعر الذي جاء منه.');
+
+    await page.goto('/auth/sign-in');
+    await expect(html).toHaveAttribute('dir', 'rtl');
+    await expect(html).toHaveAttribute('lang', 'ar');
+
+    const signinToggle = page.getByRole('button', { name: 'EN' });
+    await expect(signinToggle).toBeVisible();
+    await signinToggle.click();
+    await expect(html).toHaveAttribute('dir', 'ltr');
+    await expect(html).toHaveAttribute('lang', 'en');
+  });
 });
