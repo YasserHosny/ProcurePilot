@@ -104,7 +104,7 @@ since the 2026-10-24 move; the old `PP` key is in brackets.
 | P-8 | PPS-25 (PP-28) | P-9 | PPS-17 (PP-29) | J-7 | PPS-30 |
 | P-10 | PPS-32 | P-11 | PPS-33 | P-12 | PPS-34 |
 | P-13 | PPS-38 | P-14 | PPS-35 | P-15 | PPS-36 |
-| P-19 | PPS-44 | | | | |
+| P-19 | PPS-44 | P-22 | PPS-47 | | |
 
 Without a plan ID: PPS-2 (PP-21), PPS-7 (PP-22), PPS-8 (PP-23), PPS-22 (PP-24), PPS-27 (PP-25),
 PPS-28 (PP-26), PPS-23 (PP-27) — architecture diagrams and two shipped code changes, all Done.
@@ -212,6 +212,7 @@ PR → CI → merge → link PR on the PPS task. Refs are in the GTM plan's curr
 | [x] P-14 | — | Guest landing page at `/` (Ledger design): hero, how it works, Sign in, Request pilot access (mailto; sign-up stays invitation-gated), EN / عربي toggle on the landing and sign-in pages, hidden gallery slot; signed-in users still go to `/home` | Orch → Agy | P-11 | PR merged with every required check green on its head commit; driven in a browser in en + ar (PPS-35) — **done 2026-10-24: #240** |
 | [ ] P-15 | — | Rich landing page from the owner-reviewed content (Codex + Agy review): audience-led hero, buyer fit, 4-step workflow, 5-tab en/ar product gallery (MatDialog), evidence section, "Built by Iron Systems" band + iron-sys.com links, pilot invitation with pre-filled email and Q&A. Gallery images captured from the hosted app with one reserved synthetic tenant (`landing-gallery-demo`), never local Supabase | Orch → Agy (UI) + Codex (captures) | P-14 | PR merged with every required check green on its head commit (PPS-36) |
 | [ ] P-19 | — | Savings Ledger labelled every delta "Verified Saving", Pending rows included. Column is now "Saving (Delta)"; a pending delta is outlined with "Calculated, not yet verified" under it; user docs §16 updated | Orch | — | PR merged with every required check green on its head commit (PPS-44) |
+| [ ] P-22 | — | CI: the five deploy workflows shared one BuildKit cache scope with `mode=max`, filling 10.4 GB of the 10 GB Actions cache and evicting pnpm/uv caches; each image now has its own scope (`mode=min` for single-stage, `max` for web). E2E sharded five ways instead of three (predicted ~199 s of specs per shard, was ~330 s) | Orch | — | PR merged with every required check green on its head commit; measured shard times recorded in `docs/operations/ci-pipeline.md` (PPS-47) |
 
 ### E — Pilot environment
 

@@ -55,8 +55,8 @@ jobs:
           tags: |
             ${{ steps.meta.outputs.tag_latest }}
             ${{ steps.meta.outputs.tag_sha }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=extraction-worker
+          cache-to: type=gha,scope=extraction-worker,mode=min
 
       - name: Update container on bunny.net Magic Containers
         uses: BunnyWay/actions/container-update-image@container-update-image_0.2.2

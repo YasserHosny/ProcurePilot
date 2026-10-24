@@ -17,10 +17,10 @@ outside `docs/`, `specs/`, `.specify/` and `*.md`. If not, every job except the 
   path is under both `apps/web/**` and `packages/**`, so a positive-only `web` filter would match nothing; the
   second step uses the default `any` quantifier.
 
-## End-to-end is sharded three ways
+## End-to-end is sharded five ways
 
 Playwright runs with `workers: 1`, so the suite is serial inside a shard. The `e2e-shard` matrix splits the spec
-*files* across three runners with the duration-balanced planner `scripts/ci/e2e_shard.py` (each shard runs explicit
+*files* across five runners with the duration-balanced planner `scripts/ci/e2e_shard.py` (each shard runs explicit
 file lists, not Playwright's `--shard`), each with its own isolated Supabase, Redis, API, extraction worker and web
 app. The aggregate job `e2e`, named exactly `End-to-end`, passes when the matrix succeeded or was skipped, so the
 check name other tooling may rely on is unchanged.
@@ -43,9 +43,18 @@ check name other tooling may rely on is unchanged.
 - **Duration-balanced shards.** `scripts/ci/e2e_shard.py plan` does a deterministic longest-processing-time split
   over `scripts/ci/e2e-durations.json`: a11y and functional files are balanced together, so a shard's two steps sum
   to a balanced total. Specs missing from the manifest get the median of the measured weights (1 s if none are
-  measured) and are never dropped. The matrix size and the planner's `--total 3` must change together. The `lint`
+  measured) and are never dropped. The matrix size and the planner's `--total 5` must change together. The `lint`
   job runs the planner's unit tests plus `check`, so a new spec cannot be silently left out. Regenerate the manifest
   from downloaded CI list-reporter logs with `e2e_shard.py from-logs`.
+
+## Docker layer cache (deploy workflows)
+
+The five `deploy-*.yml` workflows cache BuildKit layers in the Actions cache, each under its own `scope` (`api`,
+`email-ingestion-worker`, `extraction-worker`, `optimiser`, `web`). Before 2026-10-24 they all used the default scope
+with `mode=max`: each image's build overwrote the shared cache index, so builds rarely reused each other's blobs,
+and the orphaned blobs filled 10.4 GB of the repository's 10 GB Actions cache. That evicted the pnpm and uv caches CI
+relies on. The four single-stage images now use `mode=min`, which stores the same layers for a single-stage build;
+`web.Dockerfile` is two-stage, so it keeps `mode=max` to cache its build stage.
 
 ## Concurrency
 
@@ -64,7 +73,13 @@ in parallel instead of queueing behind each other, and none is ever cancelled. P
 
 Runner speed varies about ±30% run to run, so single runs are indicative only.
 
-Sharding costs roughly three times the ~150 s stack start-up in runner minutes, in exchange for about half the wait.
+Sharding costs roughly five times the ~150 s stack start-up in runner minutes, in exchange for a shorter wait. Runner
+minutes are free on this public repository; the limit that matters is the Free plan's ~20 concurrent jobs, which one
+run (five shards plus about eight other jobs) stays under.
+
+**2026-10-24: three shards → five.** With three shards the slowest shard ran 6–8 min, of which ~5.3 min was specs
+and ~2 min fixed stack start-up. The planner predicts ~330 s of specs per shard at `--total 3` and ~199 s at
+`--total 5` (imbalance 1.019, all 63 spec files assigned once), so the E2E critical path should drop by about two minutes. Not yet measured.
 
 ## Verified after merge
 
@@ -79,6 +94,5 @@ Sharding costs roughly three times the ~150 s stack start-up in runner minutes, 
   Revisit if shard times drift.
 - Impact-based E2E spec selection is the biggest remaining lever and the riskiest; keep the full suite on `main`.
 - Serve a prebuilt web app instead of `ng serve` (still `ng serve` in ci.yml).
-- Add a fourth shard.
 - Use `pytest-xdist` for backend tests (Backend tests are ~150–210 s, the next floor once E2E shrinks).
 - Two Playwright workers for the a11y step only (needs a shared-owner-state audit first).
