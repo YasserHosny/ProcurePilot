@@ -87,7 +87,7 @@ export class HomeComponent implements OnInit {
     {
       key: 'savings',
       route: '/savings',
-      icon: 'toll',
+      icon: 'payments',
       titleKey: 'home.modules.savings.title',
       descriptionKey: 'home.modules.savings.description',
     },

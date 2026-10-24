@@ -46,7 +46,7 @@
   <div class="stats-grid">
     <mat-card class="stat-card total-savings-card">
       <div class="stat-icon-wrap">
-        <mat-icon aria-hidden="true">toll</mat-icon>
+        <mat-icon aria-hidden="true">payments</mat-icon>
       </div>
       <div class="stat-content">
         <span class="stat-label">{{ 'savings.ledger.stats.totalVerified' | translate }}</span>
@@ -134,7 +134,7 @@
       </div>
     } @else if (savings().length === 0) {
       <div class="empty-state">
-        <mat-icon class="empty-icon" aria-hidden="true">toll</mat-icon>
+        <mat-icon class="empty-icon" aria-hidden="true">payments</mat-icon>
         <h2 class="empty-title">{{ 'savings.ledger.empty.title' | translate }}</h2>
         <p class="empty-message">{{ 'savings.ledger.empty.message' | translate }}</p>
         <div class="empty-actions">

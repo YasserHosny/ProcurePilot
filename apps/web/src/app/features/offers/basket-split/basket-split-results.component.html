@@ -33,7 +33,7 @@
         @if (baselineInfo.type !== 'neither_feasible') {
           <div class="baseline-comparison-box" [ngClass]="baselineInfo.type">
             <mat-icon aria-hidden="true">
-              {{ baselineInfo.type === 'split_saves' ? 'toll' : 'info' }}
+              {{ baselineInfo.type === 'split_saves' ? 'payments' : 'info' }}
             </mat-icon>
             <div class="baseline-text">
               @if (baselineInfo.type === 'split_saves') {
