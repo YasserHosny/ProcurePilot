@@ -230,7 +230,7 @@
   .no-subject {
     font-size: 0.875rem;
     font-style: italic;
-    color: var(--pp-border-strong);
+    color: var(--pp-text-muted);
   }
 }
 
@@ -336,7 +336,7 @@
 
 .unmatched-supplier {
   font-size: 0.85rem;
-  color: var(--pp-border-strong);
+  color: var(--pp-text-muted);
   font-style: italic;
 }
 
@@ -359,7 +359,7 @@
 
   .no-quotation {
     font-size: 0.875rem;
-    color: var(--pp-border-strong);
+    color: var(--pp-text-muted);
   }
 }
 
@@ -376,7 +376,7 @@
   }
 
   .no-error {
-    color: var(--pp-border-strong);
+    color: var(--pp-text-muted);
     font-size: 0.875rem;
   }
 }
@@ -402,7 +402,7 @@
 
 .no-more-text {
   font-size: 0.85rem;
-  color: var(--pp-border-strong);
+  color: var(--pp-text-muted);
 }
 
 @media print {

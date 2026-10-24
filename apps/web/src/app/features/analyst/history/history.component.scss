@@ -24,7 +24,7 @@
   align-items: center;
   justify-content: center;
   padding: 48px 0;
-  color: var(--pp-border-strong);
+  color: var(--pp-text-muted);
 
   mat-icon {
     font-size: 48px;
@@ -59,7 +59,7 @@
   display: flex;
   justify-content: space-between;
   font-size: 12px;
-  color: var(--pp-border-strong);
+  color: var(--pp-text-muted);
 }
 
 .history-card-question {
