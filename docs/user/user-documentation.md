@@ -125,7 +125,7 @@ The final step of workspace creation: a summary card showing the workspace's pla
 
 | # | Element | Description |
 |---|---------|-------------|
-| 1 | **Top bar** | Shows the ProcurePilot brand, your active workspace name, and the account menu (workspace switcher, language toggle, sign out). |
+| 1 | **Top bar** | Shows the ProcurePilot brand, your active workspace name, the workspace switcher, and the account menu (language, contact support, sign out). |
 | 2 | **Side navigation** | Provides module switching for authenticated users. It is shown separately below so page screenshots can focus on the work area. |
 | 3 | **Welcome banner** | Displays your workspace name and confirms your workspace is provisioned with database-level tenant isolation and role-based access control. |
 | 4 | **Tenant & Security card** | Shows your Tenant ID, workspace slug, and the isolation level (PostgreSQL Row-Level Security, FORCED). This is read-only and confirms your data is fully isolated. |
@@ -1391,6 +1391,7 @@ If you hit any of these, it's not something wrong with your setup — flag it to
 
 ## Getting Help
 
-- In-app feedback: **Account menu → Send Feedback**.
-- Email: support@procurepilot.example.com.
+- In the app: **Account menu → Contact support** opens an email to support.
+- Email: support@iron-sys.com.
+- Security issues: security@iron-sys.com (see `SECURITY.md`). Privacy and data requests: privacy@iron-sys.com.
 - Response target: within 1 business day for paid plans.

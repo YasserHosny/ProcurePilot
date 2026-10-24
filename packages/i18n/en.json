@@ -204,6 +204,7 @@
     "accountMenuNamed": "{{initials}}, account options",
     "rolePrefix": "Role:",
     "mfaEnabledBadge": "MFA Active",
+    "contactSupport": "Contact support",
     "signOut": "Sign out",
     "language": "Language",
     "selectLanguage": "Select language",

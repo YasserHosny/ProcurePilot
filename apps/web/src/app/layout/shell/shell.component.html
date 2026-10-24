@@ -101,6 +101,11 @@
 
       <mat-divider></mat-divider>
 
+      <a mat-menu-item [href]="supportMailto">
+        <mat-icon aria-hidden="true">support_agent</mat-icon>
+        <span>{{ 'shell.contactSupport' | translate }}</span>
+      </a>
+
       <button mat-menu-item (click)="onSignOut()">
         <mat-icon aria-hidden="true">logout</mat-icon>
         <span>{{ 'shell.signOut' | translate }}</span>
