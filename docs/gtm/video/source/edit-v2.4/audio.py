@@ -19,8 +19,10 @@ def main():
     import argparse
     parser=argparse.ArgumentParser();parser.add_argument('--only');args=parser.parse_args()
     report=json.loads((ROOT/'proof/audio.json').read_text()) if args.only and (ROOT/'proof/audio.json').exists() else {}
+    timeline=json.loads((ROOT/'timeline.json').read_text())
     for lang in ['ar','en']:
-        for fmt,body,total,offset in [('h',102,111.75,0),('v',51,59.5,120)]:
+        for fmt,offset in [('h',0),('v',120)]:
+            body=timeline[fmt]['body'];total=body+timeline[fmt]['outro']
             if args.only and f'{lang}-{fmt}' not in args.only.split(','):continue
             suffix='' if lang=='ar' else '-en';aspect='16x9' if fmt=='h' else '9x16'
             outro=ROOT/'../../renders'/('outro-'+aspect+suffix+'.mp4')

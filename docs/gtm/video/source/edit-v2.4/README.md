@@ -1,14 +1,25 @@
 # ProcurePilot v2.4 — Ledger UI edit
 
-**Result-insert delta, 2026-10-25: prepared for orchestrator rendering.** The original four cuts
-were owner-reviewed and merged. This revision replaces the processing tails in beats 7 and 11 with
-real result footage from the same quotations and requests. Captions are unchanged. No video rendering
-or commit was performed for this delta; any existing MP4s and final-file measurements predate it.
+**Caption revision 2026-10-25 (PPS-59), owner-approved: prepared for orchestrator rendering.**
+Copy only, footage unchanged. Captions come verbatim from the revised
+[`script.md`](../../cuts/v2.4-ledger/script.md) ("Revision 2026-10-25"). A Copy cell with ` / ` becomes
+two cards: the pain card for the beat's first 2.5 s, then the fix card for the rest of the beat.
 
-The quotation result is restricted to the header (source y=60–470), with a teal underline beneath its
-recorded authorised status. The request result is an enlarged Approval block showing the approved
-bar and decision date. Both inserts hold for 1.8 s (54 frames) in every cut. The vertical cuts replace
-existing tails within their original slots, so no RFQ/PO trimming or vertical audio rebuild is needed.
+- 16:9: beat 1 opens on the bridge card «ProcurePilot لمشتريات المطاعم» / "ProcurePilot, for restaurant
+  purchasing" and grows from 6 to 8 s. Pain cards open beats 3, 5, 8, 10 and 13.
+- 9:16: fix card only, except beat 1 (name card, then the saving) and beat 13 (the owner's question,
+  then the counter).
+- Beat 9 (basket split) stays dropped. Beat 7 shrinks from 6 to 5 s; the 1.8 s result inserts after
+  Authorise (beat 7) and Approve (beat 11) are kept.
+- Arabic captions use «توفير» / «توفيرات», never «وفر» / «وفورات»; `check_timeline.cjs` fails on either.
+- Beat 8 still crops Smart Compare to source y=520–655 (the offer-validity line is at y≈663–681) and the
+  row strip to the supplier, unit price and landed-cost columns, so "Valid until" stays out of frame.
+
+**Result-insert delta, 2026-10-25.** Beats 7 and 11 end on real result footage from the same quotations
+and requests instead of the processing tails. The quotation result is restricted to the header (source
+y=60–470), with a teal underline beneath its recorded authorised status. The request result is an
+enlarged Approval block showing the approved bar and decision date. Both inserts hold for 1.8 s
+(54 frames) in every cut.
 
 ## Changes from v2.3
 
@@ -20,8 +31,9 @@ caption copy, without rewriting it. Names inside the English UI remain the tenan
 The original approved openings and outro media are used. Outro video is appended by stream copy.
 
 Beats 4 (supplier email) and 9 (basket split) have no footage and are dropped under the approved cut plan.
-Horizontal body: 102 s (3060 frames); vertical body: 51 s (1530 frames). Nominal totals including the
-approved outros: 111.75 s and approximately 59.51 s. Actual final container durations require rendering and ffprobe.
+Horizontal body: 103 s (3090 frames); vertical body: 1529 frames (50.97 s). Nominal totals including the
+approved outros: 112.75 s (≈1:53) and approximately 59.47 s. The music is trimmed to the frame-exact body,
+so the outro audio starts on the video seam. Actual final container durations require rendering and ffprobe.
 
 ## Rebuild — offline, exact commands
 
@@ -46,10 +58,10 @@ To render on a host where Chrome can run, the exact remaining commands after pre
 ```bash
 export NODE_PATH=/home/yasserhosny/Work/Projects/ProcurePilot/apps/web/node_modules
 export PP_CHROME=/usr/bin/google-chrome
-node render.cjs h ar frames-ar-h 0 3060
-node render.cjs v ar frames-ar-v 0 1530
-node render.cjs h en frames-en-h 0 3060
-node render.cjs v en frames-en-v 0 1530
+node render.cjs h ar frames-caption-ar-h 0 3090
+node render.cjs v ar frames-caption-ar-v 0 1529
+node render.cjs h en frames-caption-en-h 0 3090
+node render.cjs v en frames-caption-en-v 0 1529
 /home/yasserhosny/Work/pp-video-env/bin/python finish.py
 ```
 
@@ -199,77 +211,79 @@ PASS: seven native-resolution positive/negative controls; C and NumPy agree
 
 ## Edit decision lists
 
+Cards: `pain`/`bridge` then `fix`, as offsets within the beat. Card text is the revised script verbatim.
+
 ### AR 16:9
 
-| Beat | Output start | Slot length | Source | Source span → subslot |
-|---|---:|---:|---|---|
-| 0 | 0 s | 4 s | opening-h | 0–4 s → 4 s |
-| 1 | 4 s | 6 s | masked/ar/s5-po-savings.mp4 | 26–28 s → 3 s; 42–42 s → 3 s |
-| 2 | 10 s | 7 s | masked/ar/s0-phone-lowstock.mp4 | 1.5–3.5 s → 1 s; 11–20.5 s → 4 s; 21.8–22.1 s → 2 s |
-| 3 | 17 s | 11 s | masked/ar/s1-rfq.mp4 | 4–18 s → 3 s; 24–34 s → 3.5 s; 40.5–43.3 s → 3 s; 44.2–44.2 s → 1.5 s |
-| 5 | 28 s | 5 s | masked/ar/s2-quote-photo.mp4 | 0.3–4.8 s → 5 s |
-| 6 | 33 s | 12 s | masked/ar/s2-quote-photo.mp4 | 8–11 s → 3 s; 22–23 s → 3 s; 24–25 s → 4 s; 8.5–8.5 s → 2 s |
-| 7 | 45 s | 6 s | masked/ar/s2-quote-photo.mp4, masked/ar/s2r-authorised.mp4 | 24.5–26.3 s → 4.2 s; 0.5–2.3 s → 1.8 s |
-| 8 | 51 s | 11 s | masked/ar/s3c-smart-compare.mp4 | 10.5–14 s → 3 s; 20–27 s → 5.5 s; 29–29 s → 2.5 s |
-| 10 | 62 s | 10 s | masked/ar/s3-guardrail-draft.mp4 | 5–10 s → 4 s; 16–22 s → 4 s; 22.5–24.1 s → 2 s |
-| 11 | 72 s | 8 s | masked/ar/s4-phone-approve.mp4, masked/ar/s4r-approved.mp4 | 5–5.5 s → 1 s; 7–8 s → 2 s; 13.5–15.15 s → 3.2 s; 0.5–2.3 s → 1.8 s |
-| 12 | 80 s | 9 s | masked/ar/s5-po-savings.mp4 | 3–9 s → 2.5 s; 13–20 s → 2.5 s; 22–23.2 s → 2 s; 26–26 s → 2 s |
-| 13 | 89 s | 7 s | masked/ar/s5-po-savings.mp4 | 32–35 s → 2 s; 36–38.5 s → 3 s; 42–42 s → 2 s |
-| 14 | 96 s | 6 s | masked/ar/s6-savings-close.mp4 | 4–8 s → 6 s |
-| 15 | 102 s | 9.75 s nominal | `../../renders/outro-16x9.mp4` | Full approved file, unchanged |
+| Beat | Output start | Slot length | Source | Source span → subslot | Cards |
+|---|---:|---:|---|---|---|
+| 0 | 0 s | 4 s | opening-h | 0–4 s → 4 s | fix 0–4 s |
+| 1 | 4 s | 8 s | masked/ar/s5-po-savings.mp4 | 26–28 s → 4 s; 42–42 s → 4 s | bridge 0–2.5 s; fix 2.5–8 s |
+| 2 | 12 s | 7 s | masked/ar/s0-phone-lowstock.mp4 | 1.5–3.5 s → 1 s; 11–20.5 s → 4 s; 21.8–22.1 s → 2 s | fix 0–7 s |
+| 3 | 19 s | 11 s | masked/ar/s1-rfq.mp4 | 4–18 s → 3 s; 24–34 s → 3.5 s; 40.5–43.3 s → 3 s; 44.2–44.2 s → 1.5 s | pain 0–2.5 s; fix 2.5–11 s |
+| 5 | 30 s | 5 s | masked/ar/s2-quote-photo.mp4 | 0.3–4.8 s → 5 s | pain 0–2.5 s; fix 2.5–5 s |
+| 6 | 35 s | 12 s | masked/ar/s2-quote-photo.mp4 | 8–11 s → 3 s; 22–23 s → 3 s; 24–25 s → 4 s; 8.5–8.5 s → 2 s | fix 0–12 s |
+| 7 | 47 s | 5 s | masked/ar/s2-quote-photo.mp4, masked/ar/s2r-authorised.mp4 | 24.5–26.3 s → 3.2 s; 0.5–2.3 s → 1.8 s | fix 0–5 s |
+| 8 | 52 s | 11 s | masked/ar/s3c-smart-compare.mp4 | 10.5–14 s → 3 s; 20–27 s → 5.5 s; 29–29 s → 2.5 s | pain 0–2.5 s; fix 2.5–11 s |
+| 10 | 63 s | 10 s | masked/ar/s3-guardrail-draft.mp4 | 5–10 s → 4 s; 16–22 s → 4 s; 22.5–24.1 s → 2 s | pain 0–2.5 s; fix 2.5–10 s |
+| 11 | 73 s | 8 s | masked/ar/s4-phone-approve.mp4, masked/ar/s4r-approved.mp4 | 5–5.5 s → 1 s; 7–8 s → 2 s; 13.5–15.15 s → 3.2 s; 0.5–2.3 s → 1.8 s | fix 0–8 s |
+| 12 | 81 s | 9 s | masked/ar/s5-po-savings.mp4 | 3–9 s → 2.5 s; 13–20 s → 2.5 s; 22–23.2 s → 2 s; 26–26 s → 2 s | fix 0–9 s |
+| 13 | 90 s | 7 s | masked/ar/s5-po-savings.mp4 | 32–35 s → 2 s; 36–38.5 s → 3 s; 42–42 s → 2 s | pain 0–2.5 s; fix 2.5–7 s |
+| 14 | 97 s | 6 s | masked/ar/s6-savings-close.mp4 | 4–8 s → 6 s | fix 0–6 s |
+| 15 | 103 s | 9.75 s nominal | `../../renders/outro-16x9.mp4` | Full approved file, unchanged | (outro) |
 
 ### AR 9:16
 
-| Beat | Output start | Slot length | Source | Source span → subslot |
-|---|---:|---:|---|---|
-| 0 | 0 s | 3 s | opening-v | 0–3 s → 3 s |
-| 1 | 3 s | 4 s | masked/ar/s5-po-savings.mp4 | 42–42 s → 4 s |
-| 3 | 7 s | 6 s | masked/ar/s1-rfq.mp4 | 24–28 s → 3 s; 40.5–43.3 s → 1.5 s; 44.2–44.2 s → 1.5 s |
-| 5 | 13 s | 3 s | masked/ar/s2-quote-photo.mp4 | 0.3–4.8 s → 3 s |
-| 6 | 16 s | 7 s | masked/ar/s2-quote-photo.mp4 | 8–11 s → 2 s; 24–25 s → 3 s; 8.5–8.5 s → 2 s |
-| 7 | 23 s | 3 s | masked/ar/s2-quote-photo.mp4, masked/ar/s2r-authorised.mp4 | 24.5–26.3 s → 1.2 s; 0.5–2.3 s → 1.8 s |
-| 8 | 26 s | 7 s | masked/ar/s3c-smart-compare.mp4 | 20–27 s → 5 s; 29–29 s → 2 s |
-| 10 | 33 s | 5 s | masked/ar/s3-guardrail-draft.mp4 | 5–10 s → 3 s; 20–23 s → 2 s |
-| 11 | 38 s | 5 s | masked/ar/s4-phone-approve.mp4, masked/ar/s4r-approved.mp4 | 7–8 s → 1 s; 13.5–15.15 s → 2.2 s; 0.5–2.3 s → 1.8 s |
-| 12 | 43 s | 4 s | masked/ar/s5-po-savings.mp4 | 22–23.2 s → 2 s; 26–26 s → 2 s |
-| 13 | 47 s | 4 s | masked/ar/s5-po-savings.mp4 | 36–38.5 s → 2 s; 42–42 s → 2 s |
-| 15 | 51 s | 8.5 s nominal | `../../renders/outro-9x16.mp4` | Full approved file, unchanged |
+| Beat | Output start | Slot length | Source | Source span → subslot | Cards |
+|---|---:|---:|---|---|---|
+| 0 | 0 s | 3 s | opening-v | 0–3 s → 3 s | fix 0–3 s |
+| 1 | 3 s | 4 s | masked/ar/s5-po-savings.mp4 | 26–26 s → 2.5 s; 42–42 s → 1.5 s | bridge 0–2.5 s; fix 2.5–4 s |
+| 3 | 7 s | 5.73333 s | masked/ar/s1-rfq.mp4 | 24–28 s → 2.73333 s; 40.5–43.3 s → 1.5 s; 44.2–44.2 s → 1.5 s | fix 0–5.73333 s |
+| 5 | 12.7333 s | 3 s | masked/ar/s2-quote-photo.mp4 | 0.3–4.8 s → 3 s | fix 0–3 s |
+| 6 | 15.7333 s | 7 s | masked/ar/s2-quote-photo.mp4 | 8–11 s → 2 s; 24–25 s → 3 s; 8.5–8.5 s → 2 s | fix 0–7 s |
+| 7 | 22.7333 s | 3 s | masked/ar/s2-quote-photo.mp4, masked/ar/s2r-authorised.mp4 | 24.5–26.3 s → 1.2 s; 0.5–2.3 s → 1.8 s | fix 0–3 s |
+| 8 | 25.7333 s | 7 s | masked/ar/s3c-smart-compare.mp4 | 20–27 s → 5 s; 29–29 s → 2 s | fix 0–7 s |
+| 10 | 32.7333 s | 5 s | masked/ar/s3-guardrail-draft.mp4 | 5–10 s → 3 s; 20–23 s → 2 s | fix 0–5 s |
+| 11 | 37.7333 s | 5 s | masked/ar/s4-phone-approve.mp4, masked/ar/s4r-approved.mp4 | 7–8 s → 1 s; 13.5–15.15 s → 2.2 s; 0.5–2.3 s → 1.8 s | fix 0–5 s |
+| 12 | 42.7333 s | 3.73333 s | masked/ar/s5-po-savings.mp4 | 22–23.2 s → 1.73333 s; 26–26 s → 2 s | fix 0–3.73333 s |
+| 13 | 46.4667 s | 4.5 s | masked/ar/s5-po-savings.mp4 | 36–38.5 s → 2.5 s; 42–42 s → 2 s | pain 0–2.5 s; fix 2.5–4.5 s |
+| 15 | 50.9667 s (frame 1529) | 8.5 s nominal | `../../renders/outro-9x16.mp4` | Full approved file, unchanged | (outro) |
 
 ### EN 16:9
 
-| Beat | Output start | Slot length | Source | Source span → subslot |
-|---|---:|---:|---|---|
-| 0 | 0 s | 4 s | opening-h | 0–4 s → 4 s |
-| 1 | 4 s | 6 s | masked/en/s5-po-savings.mp4 | 26–28 s → 3 s; 44.5–44.5 s → 3 s |
-| 2 | 10 s | 7 s | masked/en/s0-phone-lowstock.mp4 | 1.5–3.5 s → 1 s; 11–20.5 s → 4 s; 21.8–22.1 s → 2 s |
-| 3 | 17 s | 11 s | masked/en/s1-rfq.mp4 | 4–18 s → 3 s; 24–34 s → 3.5 s; 40.5–43.3 s → 3 s; 44.2–44.2 s → 1.5 s |
-| 5 | 28 s | 5 s | masked/en/s2-quote-photo.mp4 | 0.3–4.8 s → 5 s |
-| 6 | 33 s | 12 s | masked/en/s2-quote-photo.mp4 | 8–11 s → 3 s; 22–23 s → 3 s; 24–25 s → 4 s; 8.5–8.5 s → 2 s |
-| 7 | 45 s | 6 s | masked/en/s2-quote-photo.mp4, masked/en/s2r-authorised.mp4 | 24.5–26.3 s → 4.2 s; 0.5–2.3 s → 1.8 s |
-| 8 | 51 s | 11 s | masked/en/s3c-smart-compare.mp4 | 10.5–14 s → 3 s; 20–27 s → 5.5 s; 29–29 s → 2.5 s |
-| 10 | 62 s | 10 s | masked/en/s3-guardrail-draft.mp4 | 5–10 s → 4 s; 16–22 s → 4 s; 22.5–24.1 s → 2 s |
-| 11 | 72 s | 8 s | masked/en/s4-phone-approve.mp4, masked/en/s4r-approved.mp4 | 5–5.5 s → 1 s; 7–8 s → 2 s; 13.5–15.15 s → 3.2 s; 0.5–2.3 s → 1.8 s |
-| 12 | 80 s | 9 s | masked/en/s5-po-savings.mp4 | 3–9 s → 2.5 s; 13–20 s → 2.5 s; 22–23.2 s → 2 s; 26–26 s → 2 s |
-| 13 | 89 s | 7 s | masked/en/s5-po-savings.mp4 | 32–35 s → 2 s; 38–40.3 s → 3 s; 44.5–44.5 s → 2 s |
-| 14 | 96 s | 6 s | masked/en/s6-savings-close.mp4 | 4–8 s → 6 s |
-| 15 | 102 s | 9.75 s nominal | `../../renders/outro-16x9-en.mp4` | Full approved file, unchanged |
+| Beat | Output start | Slot length | Source | Source span → subslot | Cards |
+|---|---:|---:|---|---|---|
+| 0 | 0 s | 4 s | opening-h | 0–4 s → 4 s | fix 0–4 s |
+| 1 | 4 s | 8 s | masked/en/s5-po-savings.mp4 | 26–28 s → 4 s; 44.5–44.5 s → 4 s | bridge 0–2.5 s; fix 2.5–8 s |
+| 2 | 12 s | 7 s | masked/en/s0-phone-lowstock.mp4 | 1.5–3.5 s → 1 s; 11–20.5 s → 4 s; 21.8–22.1 s → 2 s | fix 0–7 s |
+| 3 | 19 s | 11 s | masked/en/s1-rfq.mp4 | 4–18 s → 3 s; 24–34 s → 3.5 s; 40.5–43.3 s → 3 s; 44.2–44.2 s → 1.5 s | pain 0–2.5 s; fix 2.5–11 s |
+| 5 | 30 s | 5 s | masked/en/s2-quote-photo.mp4 | 0.3–4.8 s → 5 s | pain 0–2.5 s; fix 2.5–5 s |
+| 6 | 35 s | 12 s | masked/en/s2-quote-photo.mp4 | 8–11 s → 3 s; 22–23 s → 3 s; 24–25 s → 4 s; 8.5–8.5 s → 2 s | fix 0–12 s |
+| 7 | 47 s | 5 s | masked/en/s2-quote-photo.mp4, masked/en/s2r-authorised.mp4 | 24.5–26.3 s → 3.2 s; 0.5–2.3 s → 1.8 s | fix 0–5 s |
+| 8 | 52 s | 11 s | masked/en/s3c-smart-compare.mp4 | 10.5–14 s → 3 s; 20–27 s → 5.5 s; 29–29 s → 2.5 s | pain 0–2.5 s; fix 2.5–11 s |
+| 10 | 63 s | 10 s | masked/en/s3-guardrail-draft.mp4 | 5–10 s → 4 s; 16–22 s → 4 s; 22.5–24.1 s → 2 s | pain 0–2.5 s; fix 2.5–10 s |
+| 11 | 73 s | 8 s | masked/en/s4-phone-approve.mp4, masked/en/s4r-approved.mp4 | 5–5.5 s → 1 s; 7–8 s → 2 s; 13.5–15.15 s → 3.2 s; 0.5–2.3 s → 1.8 s | fix 0–8 s |
+| 12 | 81 s | 9 s | masked/en/s5-po-savings.mp4 | 3–9 s → 2.5 s; 13–20 s → 2.5 s; 22–23.2 s → 2 s; 26–26 s → 2 s | fix 0–9 s |
+| 13 | 90 s | 7 s | masked/en/s5-po-savings.mp4 | 32–35 s → 2 s; 38–40.3 s → 3 s; 44.5–44.5 s → 2 s | pain 0–2.5 s; fix 2.5–7 s |
+| 14 | 97 s | 6 s | masked/en/s6-savings-close.mp4 | 4–8 s → 6 s | fix 0–6 s |
+| 15 | 103 s | 9.75 s nominal | `../../renders/outro-16x9-en.mp4` | Full approved file, unchanged | (outro) |
 
 ### EN 9:16
 
-| Beat | Output start | Slot length | Source | Source span → subslot |
-|---|---:|---:|---|---|
-| 0 | 0 s | 3 s | opening-v | 0–3 s → 3 s |
-| 1 | 3 s | 4 s | masked/en/s5-po-savings.mp4 | 44.5–44.5 s → 4 s |
-| 3 | 7 s | 6 s | masked/en/s1-rfq.mp4 | 24–28 s → 3 s; 40.5–43.3 s → 1.5 s; 44.2–44.2 s → 1.5 s |
-| 5 | 13 s | 3 s | masked/en/s2-quote-photo.mp4 | 0.3–4.8 s → 3 s |
-| 6 | 16 s | 7 s | masked/en/s2-quote-photo.mp4 | 8–11 s → 2 s; 24–25 s → 3 s; 8.5–8.5 s → 2 s |
-| 7 | 23 s | 3 s | masked/en/s2-quote-photo.mp4, masked/en/s2r-authorised.mp4 | 24.5–26.3 s → 1.2 s; 0.5–2.3 s → 1.8 s |
-| 8 | 26 s | 7 s | masked/en/s3c-smart-compare.mp4 | 20–27 s → 5 s; 29–29 s → 2 s |
-| 10 | 33 s | 5 s | masked/en/s3-guardrail-draft.mp4 | 5–10 s → 3 s; 20–23 s → 2 s |
-| 11 | 38 s | 5 s | masked/en/s4-phone-approve.mp4, masked/en/s4r-approved.mp4 | 7–8 s → 1 s; 13.5–15.15 s → 2.2 s; 0.5–2.3 s → 1.8 s |
-| 12 | 43 s | 4 s | masked/en/s5-po-savings.mp4 | 22–23.2 s → 2 s; 26–26 s → 2 s |
-| 13 | 47 s | 4 s | masked/en/s5-po-savings.mp4 | 38–40.3 s → 2 s; 44.5–44.5 s → 2 s |
-| 15 | 51 s | 8.5 s nominal | `../../renders/outro-9x16-en.mp4` | Full approved file, unchanged |
+| Beat | Output start | Slot length | Source | Source span → subslot | Cards |
+|---|---:|---:|---|---|---|
+| 0 | 0 s | 3 s | opening-v | 0–3 s → 3 s | fix 0–3 s |
+| 1 | 3 s | 4 s | masked/en/s5-po-savings.mp4 | 26–26 s → 2.5 s; 44.5–44.5 s → 1.5 s | bridge 0–2.5 s; fix 2.5–4 s |
+| 3 | 7 s | 5.73333 s | masked/en/s1-rfq.mp4 | 24–28 s → 2.73333 s; 40.5–43.3 s → 1.5 s; 44.2–44.2 s → 1.5 s | fix 0–5.73333 s |
+| 5 | 12.7333 s | 3 s | masked/en/s2-quote-photo.mp4 | 0.3–4.8 s → 3 s | fix 0–3 s |
+| 6 | 15.7333 s | 7 s | masked/en/s2-quote-photo.mp4 | 8–11 s → 2 s; 24–25 s → 3 s; 8.5–8.5 s → 2 s | fix 0–7 s |
+| 7 | 22.7333 s | 3 s | masked/en/s2-quote-photo.mp4, masked/en/s2r-authorised.mp4 | 24.5–26.3 s → 1.2 s; 0.5–2.3 s → 1.8 s | fix 0–3 s |
+| 8 | 25.7333 s | 7 s | masked/en/s3c-smart-compare.mp4 | 20–27 s → 5 s; 29–29 s → 2 s | fix 0–7 s |
+| 10 | 32.7333 s | 5 s | masked/en/s3-guardrail-draft.mp4 | 5–10 s → 3 s; 20–23 s → 2 s | fix 0–5 s |
+| 11 | 37.7333 s | 5 s | masked/en/s4-phone-approve.mp4, masked/en/s4r-approved.mp4 | 7–8 s → 1 s; 13.5–15.15 s → 2.2 s; 0.5–2.3 s → 1.8 s | fix 0–5 s |
+| 12 | 42.7333 s | 3.73333 s | masked/en/s5-po-savings.mp4 | 22–23.2 s → 1.73333 s; 26–26 s → 2 s | fix 0–3.73333 s |
+| 13 | 46.4667 s | 4.5 s | masked/en/s5-po-savings.mp4 | 38–40.3 s → 2.5 s; 44.5–44.5 s → 2 s | pain 0–2.5 s; fix 2.5–4.5 s |
+| 15 | 50.9667 s (frame 1529) | 8.5 s nominal | `../../renders/outro-9x16-en.mp4` | Full approved file, unchanged | (outro) |
 
 The shot clocks skip navigation/dead time; explicit static subslots hold decision results for at least 1.5 s. Beat 13
 uses a kinetic counter (AR 300 EGP; EN 200 EGP), with the recorded per-line values in the plate. Quote
@@ -282,8 +296,13 @@ cannot certify those visual properties.
 ## Audio measurements — actual master and AAC preview output
 
 Music starts at 0:00 for 16:9 and 2:00 for 9:16, at −6.6 dB with a 0.5 s fade-in, then the original
-outro audio. A −3 dBFS sample limiter runs before AAC 256 kb/s. Measurements below are for the supplied
-audio masters/previews, not the pending result-insert final video files. `proof/audio.json` retains numeric results.
+outro audio. A −3 dBFS sample limiter runs before AAC 256 kb/s. `audio.py` asserts AAC true peak
+≤ −2 dBFS and integrated loudness −14 ± 1 LUFS for every mix.
+
+**Not yet re-measured for the caption revision.** The figures below are the latest in `proof/audio.json`.
+They come from the 102 s body (16:9 PCM 111.749 s, nominal 111.75 s), not the 103 s body. Summary:
+16:9 I −14.8 LUFS, TP −2.3 dBFS PCM / −2.6 dBFS AAC; 9:16 I −13.7 / −13.8 LUFS, TP −2.8 / −3.0 dBFS.
+`bash rebuild.sh prepare` replaces them (expected 16:9 PCM ≈ 112.75 s); update this section from its output.
 
 ```text
 ar-h.wav Summary:
@@ -421,7 +440,7 @@ output is invented; no final-cut review sheet is substituted with a source sheet
 The original Authorise and phone Approve takes end before a useful result hold. The newly recorded
 same-record end states now replace those tails in both formats. This resolves the former missing-result
 limitation without synthesising a status. Final visual review and final-file measurements belong to
-the orchestrator after rendering. The approved script, captions and outro files are unchanged.
+the orchestrator after rendering. Captions follow the 2026-10-25 script revision; the outro files are unchanged.
 
 ## Files and evidence
 
@@ -430,8 +449,11 @@ Editable source: `privacy.py`, `result_privacy.py`, `matcher.c`, `check_detector
 `audio.py`, `finish.py`, `execution_report.py`, `review_sources.py`, `write_readme.py`, `rebuild.sh`, `.gitignore`, `README.md`.
 Generated/ignored: `masked/{ar,en}/`, `proof/`, `plates/`, `data.js`, `tex/`, `audio/`, `tmp/`, Python
 bytecode, and inspection PNGs under `raw/{ar,en}/`. Fonts and original MP4 inputs were already staged.
-Structural scene-boundary and plate-path checks for all four cuts pass (`proof/results-timeline-check.log`);
-these checks do not replace final visual review.
+`check_timeline.cjs` runs structural scene-boundary and plate-path checks for all four cuts, plus the
+caption-revision checks: body frames, totals, no beats 4/9, card counts and timing, the beat 1 name card,
+and no «وفر» / «وفورات». These checks do not replace final visual review.
+Caption-revision changes: `make_data.py`, `timeline.json`, `compose.js`, `spec_h.js`, `spec_v.js`,
+`check_timeline.cjs`, `audio.py`, `finish.py`, `rebuild.sh`, `README.md`; generated `data.js`.
 Delta changes: `result_privacy.py`, `privacy.py`, `extract.py`, `make_data.py`, `timeline.json`,
 `compose.js`, `spec_h.js`, `check_timeline.cjs`, `audio.py`, `finish.py`, `rebuild.sh`,
 `execution_report.py`, `write_readme.py`, `README.md`; generated `data.js`, four masked result clips,

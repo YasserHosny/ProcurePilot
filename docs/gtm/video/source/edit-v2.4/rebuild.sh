@@ -25,8 +25,8 @@ case "${1:-render}" in
   # Chrome's singleton socket path must stay under ~107 bytes: render with a short temp dir.
   export TMPDIR="$(mktemp -d /tmp/pp-render-XXXX)"
   for lang in ar en; do
-   node render.cjs h "$lang" "frames-$lang-h" 0 3060
-   node render.cjs v "$lang" "frames-$lang-v" 0 1530
+   node render.cjs h "$lang" "frames-caption-$lang-h" 0 3090
+   node render.cjs v "$lang" "frames-caption-$lang-v" 0 1529
   done
   "$PY" finish.py
   ;;

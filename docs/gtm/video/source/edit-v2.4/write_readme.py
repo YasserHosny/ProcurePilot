@@ -30,8 +30,8 @@ caption copy, without rewriting it. Names inside the English UI remain the tenan
 The original approved openings and outro media are used. Outro video is appended by stream copy.
 
 Beats 4 (supplier email) and 9 (basket split) have no footage and are dropped under the approved cut plan.
-Horizontal body: 102 s (3060 frames); vertical body: 51 s (1530 frames). Nominal totals including the
-approved outros: 111.75 s and approximately 59.51 s. Actual final container durations require rendering and ffprobe.
+Horizontal body: 103 s (3090 frames); vertical body: 1529 frames (50.97 s). Nominal totals including the
+approved outros: 112.75 s (≈1:53) and approximately 59.47 s. Actual final container durations require rendering and ffprobe.
 
 ## Rebuild — offline, exact commands
 
@@ -56,10 +56,10 @@ To render on a host where Chrome can run, the exact remaining commands after pre
 ```bash
 export NODE_PATH=/home/yasserhosny/Work/Projects/ProcurePilot/apps/web/node_modules
 export PP_CHROME=/usr/bin/google-chrome
-node render.cjs h ar frames-ar-h 0 3060
-node render.cjs v ar frames-ar-v 0 1530
-node render.cjs h en frames-en-h 0 3060
-node render.cjs v en frames-en-v 0 1530
+node render.cjs h ar frames-caption-ar-h 0 3090
+node render.cjs v ar frames-caption-ar-v 0 1529
+node render.cjs h en frames-caption-en-h 0 3090
+node render.cjs v en frames-caption-en-v 0 1529
 /home/yasserhosny/Work/pp-video-env/bin/python finish.py
 ```
 
