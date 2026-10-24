@@ -29,17 +29,10 @@ from procurepilot_extraction_worker.settings import WorkerSettings, get_settings
 MODEL_ID = "prebuilt-invoice"
 
 _PERCENTAGE_PATTERN = re.compile(
-    r"(?:[\d٠-٩۰-۹][\d٠-٩۰-۹.,٬٫]*\s*[%٪\u066a]|[%٪\u066a]\s*[\d٠-٩۰-۹][\d٠-٩۰-۹.,٬٫]*)",
+    r"(?:[\d٠-٩۰-۹][\d٠-٩۰-۹.,٬٫]*\s*[%٪\u066a](?![\d٠-٩۰-۹])|[%٪\u066a]\s*[\d٠-٩۰-۹][\d٠-٩۰-۹.,٬٫]*)",
 )
 _TOTAL_ROW_RE = re.compile(
-    r"(?:^|[\s:：\-–])(?:الاجمالي|اجمالي|االجمايل|المجموع|مجموع|grand\s+total|total)"
-    r"(?:"
-    r"\s+(?:النهائي|النهايي|الكلي|العام|شامل|مع|قبل|بعد|ضريب[ةه]|الضريب[ةه]|القائم|الصافي|"
-    r"المطلوب|المستحق|قدره|فقط|amount|price|due|net|gross|payable|incl\.?|including|inclusive|"
-    r"before|after|excl\.?|excluding|vat|tax|for|of)"
-    r"|\s*(?:[\d.,:：()（）/\\\-_%٪\u066a]+|ر\.?\s*س\.?|SAR|SR|ج\.م|LE|EGP|\$|£|€)"
-    r"|\s*$"
-    r")",
+    r"(?<![^\W\d_])(?:grand\s+total|total|الاجمالي|اجمالي|االجمايل|المجموع|مجموع)(?![^\W\d_])",
     re.IGNORECASE,
 )
 
@@ -260,8 +253,14 @@ def _parse_line_table(result: object, model_version: str) -> ExtractionResult | 
                     if role and value:
                         data.setdefault(role, value)
             desc = data.get("description", "").replace("\n", " ").strip()
-            qty = _clean_number(data.get("quantity", ""))
-            price = _clean_number(data.get("unit_price", ""))
+            qty_raw = data.get("quantity", "")
+            if qty_raw and qty_raw == data.get("description"):
+                qty_raw = ""
+            price_raw = data.get("unit_price", "")
+            if price_raw and price_raw == data.get("description"):
+                price_raw = ""
+            qty = _clean_number(qty_raw)
+            price = _clean_number(price_raw)
             total = _clean_number(data.get("line_total", ""))
             label = " ".join(
                 value.replace("\n", " ").strip()
@@ -285,7 +284,7 @@ def _parse_line_table(result: object, model_version: str) -> ExtractionResult | 
             fallback_amount = (
                 total or currency_amount or (numeric_amounts[-1] if numeric_amounts else None)
             )
-            is_total = _is_total_row(label) or _is_total_row(desc)
+            is_total = qty is None and (_is_total_row(label) or _is_total_row(desc))
             if is_total and fallback_amount is None:
                 for value in expanded.values():
                     val_clean = _PERCENTAGE_PATTERN.sub("", value).strip()
