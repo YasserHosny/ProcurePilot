@@ -25,14 +25,15 @@ export interface SupplierSeries {
   readonly pathD: string;
 }
 
+// Ledger chart series (docs/design/design-system.html): six categories anchored on navy, no teal
+// (teal means savings). CSS custom properties, so the template binds them as style, not attributes.
 const PALETTE = [
-  '#2563eb', // blue
-  '#059669', // emerald
-  '#d97706', // amber
-  '#7c3aed', // violet
-  '#dc2626', // red
-  '#0891b2', // cyan
-  '#db2777', // pink
+  'var(--pp-chart-1)',
+  'var(--pp-chart-2)',
+  'var(--pp-chart-3)',
+  'var(--pp-chart-4)',
+  'var(--pp-chart-5)',
+  'var(--pp-chart-6)',
 ];
 
 @Component({

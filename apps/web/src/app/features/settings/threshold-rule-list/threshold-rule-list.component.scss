@@ -19,7 +19,7 @@
   margin: 0;
   font-size: 1.375rem;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--pp-text-strong);
   letter-spacing: 0;
 
   @include bp.mobile {
@@ -42,14 +42,14 @@
   gap: 0.75rem;
   padding-inline: 1rem;
   padding-block: 0.75rem;
-  background-color: #fef2f2;
-  border: 1px solid #fee2e2;
+  background-color: var(--pp-error-container);
+  border: 1px solid var(--pp-error-container);
   border-radius: 8px;
-  color: #991b1b;
+  color: var(--pp-error);
   letter-spacing: 0;
 
   .error-icon {
-    color: #ef4444;
+    color: var(--pp-error);
     font-size: 24px;
     inline-size: 24px;
     block-size: 24px;
@@ -73,7 +73,7 @@
 
   .error-trace {
     font-size: 0.75rem;
-    color: #b91c1c;
+    color: var(--pp-error);
     font-family: monospace;
   }
 }
@@ -81,8 +81,8 @@
 .rules-card {
   border-radius: 8px;
   letter-spacing: 0;
-  background-color: #ffffff;
-  border: 1px solid #e2e8f0;
+  background-color: var(--pp-surface-card);
+  border: 1px solid var(--pp-border);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
   overflow: hidden;
 }
@@ -95,7 +95,7 @@
   justify-content: center;
   padding-block: 3rem;
   gap: 1rem;
-  color: #475569;
+  color: var(--pp-text-muted);
   letter-spacing: 0;
 }
 
@@ -103,7 +103,7 @@
   font-size: 48px;
   inline-size: 48px;
   block-size: 48px;
-  color: #cbd5e1;
+  color: var(--pp-text-muted);
 }
 
 .table-responsive {
@@ -115,7 +115,7 @@
   letter-spacing: 0;
 
   th.mat-header-cell {
-    color: #475569;
+    color: var(--pp-text-muted);
     font-size: 0.8125rem;
     font-weight: 600;
     text-transform: uppercase;
@@ -127,25 +127,25 @@
     padding-inline: 1rem;
     padding-block: 0.875rem;
     font-size: 0.875rem;
-    color: #1e293b;
+    color: var(--pp-text-strong);
     letter-spacing: 0;
   }
 }
 
 .branch-label {
   font-weight: 600;
-  color: #0f172a;
+  color: var(--pp-text-strong);
 }
 
 .amount-val {
   font-weight: 600;
   font-feature-settings: 'tnum';
   font-variant-numeric: tabular-nums;
-  color: #0f172a;
+  color: var(--pp-text-strong);
 }
 
 .uncapped-label {
-  color: #64748b;
+  color: var(--pp-text-muted);
   font-style: italic;
 }
 
@@ -153,15 +153,15 @@
   display: inline-block;
   padding-inline: 0.5rem;
   padding-block: 0.125rem;
-  background-color: #f1f5f9;
+  background-color: var(--pp-surface-sunken);
   border-radius: 4px;
   font-size: 0.75rem;
   font-weight: 600;
-  color: #475569;
+  color: var(--pp-text-muted);
 }
 
 .approver-val {
-  color: #334155;
+  color: var(--pp-text);
   word-break: break-all;
 }
 
@@ -172,18 +172,18 @@
 }
 
 .edit-action {
-  color: #475569;
+  color: var(--pp-text-muted);
 
   &:hover {
-    color: #0f172a;
+    color: var(--pp-text-strong);
   }
 }
 
 .danger-action {
-  color: #ef4444;
+  color: var(--pp-error);
 
   &:hover {
-    color: #dc2626;
+    color: var(--pp-error);
   }
 }
 
@@ -217,7 +217,7 @@
 
 .delete-message {
   margin: 0;
-  color: #334155;
+  color: var(--pp-text);
   font-size: 0.9375rem;
   letter-spacing: 0;
 }

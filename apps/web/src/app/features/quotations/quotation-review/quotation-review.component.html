@@ -59,7 +59,7 @@
         @if (isWriter()) {
           <button
             mat-stroked-button
-            color="warn"
+            color="warn" class="pp-danger"
             type="button"
             (click)="archiveQuotation()"
             [disabled]="isArchiving()"
@@ -596,7 +596,7 @@
               type="button"
               (click)="refuseQuotation()"
               [disabled]="isRefusing() || isSaving() || isConfirming()"
-              class="refuse-btn"
+              class="pp-danger refuse-btn"
             >
               @if (isRefusing()) {
                 <mat-spinner [attr.aria-label]="'common.loading' | translate" diameter="18"></mat-spinner>

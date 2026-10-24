@@ -16,14 +16,14 @@
 
     .supplier-name {
       font-weight: 600;
-      color: #0f172a;
+      color: var(--pp-text-strong);
     }
 
     .supplier-scorecard-icon-btn {
       width: 28px;
       height: 28px;
       line-height: 28px;
-      color: #4f46e5;
+      color: var(--pp-primary);
     }
 
     .mini-rec-badge {
@@ -32,9 +32,9 @@
       gap: 0.25rem;
       font-size: 0.75rem;
       font-weight: 600;
-      color: #047857;
-      background-color: #ecfdf5;
-      border: 1px solid #a7f3d0;
+      color: var(--pp-success);
+      background-color: var(--pp-success-container);
+      border: 1px solid var(--pp-success);
       border-radius: 4px;
       padding: 0.1rem 0.4rem;
       margin-top: 0.25rem;
@@ -55,14 +55,14 @@
     font-size: 0.75rem;
     font-weight: 600;
 
-    &.confidence-high { background-color: #d1fae5; color: #065f46; }
-    &.confidence-medium { background-color: #fef3c7; color: #92400e; }
-    &.confidence-low { background-color: #fee2e2; color: #991b1b; }
+    &.confidence-high { background-color: var(--pp-success-container); color: var(--pp-success); }
+    &.confidence-medium { background-color: var(--pp-warning-container); color: var(--pp-warning); }
+    &.confidence-low { background-color: var(--pp-error-container); color: var(--pp-error); }
   }
 
   .lead-time-cell {
     font-size: 0.85rem;
-    color: #475569;
+    color: var(--pp-text-muted);
   }
 
   .supplier-risk-cell {
@@ -81,10 +81,10 @@
       font-size: 0.75rem;
       font-weight: 600;
 
-      &.risk-band-low { background-color: #d1fae5; color: #065f46; }
-      &.risk-band-medium { background-color: #fef3c7; color: #92400e; }
-      &.risk-band-high { background-color: #fee2e2; color: #991b1b; }
-      &.risk-band-unknown { background-color: #f1f5f9; color: #64748b; }
+      &.risk-band-low { background-color: var(--pp-success-container); color: var(--pp-success); }
+      &.risk-band-medium { background-color: var(--pp-warning-container); color: var(--pp-warning); }
+      &.risk-band-high { background-color: var(--pp-error-container); color: var(--pp-error); }
+      &.risk-band-unknown { background-color: var(--pp-surface-sunken); color: var(--pp-text-muted); }
 
       .risk-badge-icon {
         font-size: 0.85rem;
@@ -97,25 +97,25 @@
       width: 24px;
       height: 24px;
       line-height: 24px;
-      color: #64748b;
+      color: var(--pp-text-muted);
     }
   }
 
   .rec-row {
-    background-color: #f0fdf4;
+    background-color: var(--pp-success-container);
   }
 
   .expired-row {
     opacity: 0.6;
-    background-color: #f8fafc;
+    background-color: var(--pp-surface-page);
   }
 
   .expired-tag {
     display: inline-block;
     padding: 0.1rem 0.4rem;
     border-radius: 4px;
-    background-color: #fee2e2;
-    color: #b91c1c;
+    background-color: var(--pp-error-container);
+    color: var(--pp-error);
     font-size: 0.75rem;
     font-weight: 600;
   }
@@ -132,7 +132,7 @@
   }
 
   .text-muted {
-    color: #94a3b8;
+    color: var(--pp-text-muted);
     font-style: italic;
   }
 }

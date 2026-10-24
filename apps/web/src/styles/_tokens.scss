@@ -1,35 +1,33 @@
-// ProcurePilot design tokens — task T082 (FR-021).
+// ProcurePilot design tokens: SCSS names kept for existing callers (task T082, FR-021).
 //
-// One place for colour, typography and spacing, so the shell is consistent by construction rather
-// than by each screen re-deciding. Values are the ones already in use; this file names them so the
-// next screen inherits rather than invents.
+// The values now live in the Ledger token sheet (_ledger-tokens.scss, loaded once from
+// styles.scss as CSS custom properties). These variables only point at it, so an SCSS caller and
+// a var(--pp-*) caller can never disagree. New code reads var(--pp-*) directly.
 //
-// Contrast note: $text-muted is #475569, not the #94a3b8 this started as. That measured 2.87:1
-// against white — under the WCAG AA minimum of 4.5:1 — and Angular Material applies an inherited
-// opacity on top, so the effective contrast was lower still. Any new muted tone must clear 4.5:1
-// AFTER blending; the axe-core specs in apps/web/tests/e2e/a11y.spec.ts will catch it if not.
+// Contrast: every muted tone must clear WCAG AA 4.5:1 after Material's inherited opacity; the
+// axe-core specs in apps/web/tests/e2e/a11y.spec.ts catch a regression.
 
 // --- Colour ---------------------------------------------------------------
-$brand-primary: #4f46e5;
-$brand-primary-dark: #4338ca;
-$brand-primary-tint: #e0e7ff;
+$brand-primary: var(--pp-primary);
+$brand-primary-dark: var(--pp-primary-hover);
+$brand-primary-tint: var(--pp-primary-container);
 
-$text-strong: #0f172a;
-$text-default: #334155;
-$text-muted: #475569;   // WCAG AA compliant after Material's inherited opacity
-$text-on-brand: #ffffff;
+$text-strong: var(--pp-text-strong);
+$text-default: var(--pp-text);
+$text-muted: var(--pp-text-muted);
+$text-on-brand: var(--pp-on-primary);
 
-$surface-page: #f8fafc;
-$surface-card: #ffffff;
-$surface-subtle: #f1f5f9;
-$border-subtle: #e2e8f0;
+$surface-page: var(--pp-surface-page);
+$surface-card: var(--pp-surface-card);
+$surface-subtle: var(--pp-surface-sunken);
+$border-subtle: var(--pp-border);
 
-$state-error: #b91c1c;
-$state-warning: #b45309;
-$state-success: #15803d;
+$state-error: var(--pp-error);
+$state-warning: var(--pp-warning);
+$state-success: var(--pp-success);
 
 // --- Typography -----------------------------------------------------------
-$font-family-base: Roboto, 'Helvetica Neue', sans-serif;
+$font-family-base: var(--pp-font);
 $font-size-sm: 0.8125rem;
 $font-size-base: 0.875rem;
 $font-size-lg: 1rem;
@@ -40,12 +38,12 @@ $font-weight-bold: 600;
 
 // --- Spacing --------------------------------------------------------------
 // A 4px scale. Use these rather than ad-hoc rem values so rhythm stays consistent.
-$space-1: 0.25rem;
-$space-2: 0.5rem;
-$space-3: 0.75rem;
-$space-4: 1rem;
-$space-6: 1.5rem;
-$space-8: 2rem;
+$space-1: var(--pp-space-1);
+$space-2: var(--pp-space-2);
+$space-3: var(--pp-space-3);
+$space-4: var(--pp-space-4);
+$space-6: var(--pp-space-6);
+$space-8: var(--pp-space-8);
 
 // --- Radius and elevation -------------------------------------------------
 $radius-sm: 4px;

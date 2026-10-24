@@ -11,13 +11,8 @@
 .page-header {
   margin-block-end: 24px;
 
-  .mat-headline-4 {
+  .page-title {
     margin-block-end: 8px;
-  }
-
-  .mat-body-1 {
-    color: var(--sys-outline);
-    margin: 0;
   }
 }
 
@@ -62,8 +57,9 @@
   gap: 16px;
   padding: 16px;
   margin-block-end: 24px;
-  background: var(--sys-surface);
-  border-radius: 8px;
+  background: var(--pp-surface-card);
+  border: 1px solid var(--pp-border);
+  border-radius: var(--pp-radius-card);
   align-items: center;
 }
 

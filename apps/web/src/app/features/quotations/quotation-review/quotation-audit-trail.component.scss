@@ -22,7 +22,7 @@
 
 .audit-entry {
   padding: 0.75rem 0;
-  border-block-end: 1px solid #e2e8f0;
+  border-block-end: 1px solid var(--pp-border);
 
   &:last-child {
     border-block-end: 0;
@@ -32,13 +32,13 @@
 .audit-action {
   font-size: 0.95rem;
   font-weight: 700;
-  color: #1e293b;
+  color: var(--pp-text-strong);
 }
 
 .audit-details {
   margin: 0.35rem 0 0;
   padding-inline-start: 1.1rem;
-  color: #334155;
+  color: var(--pp-text);
   font-size: 0.85rem;
   line-height: 1.45;
 
@@ -52,12 +52,12 @@
   gap: 0.75rem;
   flex-wrap: wrap;
   margin-block-start: 0.25rem;
-  color: #64748b;
+  color: var(--pp-text-muted);
   font-size: 0.82rem;
 }
 
 .audit-empty {
   margin: 0;
   padding-block: 0.5rem;
-  color: #64748b;
+  color: var(--pp-text-muted);
 }

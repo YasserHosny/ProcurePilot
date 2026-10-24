@@ -1,0 +1,197 @@
+// ProcurePilot Ledger tokens (docs/design/design-system.html, <style id="pp-tokens">).
+// Copied from the adopted design system (P-10, PPS-32); keep it in step with that page.
+// Brand (docs/brand/README.md, Converge, adopted 2026-10-14): Navy #0B2545, Teal #12A594,
+// Teal text #0C7A6E, Teal on dark #19B8A4, Mist #C9D6E3, Paper #F4F6F9, Readex Pro.
+// Documented exception: Readex Pro has no tabular figures, so figures in tables use Noto Kufi Arabic.
+//
+// Three layers. A selector reads its own layer or the one directly beneath it, never further:
+//   LAYER 1 primitive  raw values with no meaning. Only semantic tokens read them.
+//   LAYER 2 semantic   what a value is for. The only layer a dark theme would redefine.
+//   LAYER 3 component  one component's decisions, each pointing at a semantic token.
+//                      Components read these; Angular Material overrides (styles.scss) read these.
+//
+// Light only. The page's dark (navy night) blocks are not shipped: dark mode is a separate
+// decision, so there is no prefers-color-scheme block and no data-theme switch here.
+:root{
+  /* LAYER 1: primitive */
+  /* brand navy, anchored on Navy #0B2545 (800); 200 is Mist */
+  --pp-navy-50:#EEF2F7; --pp-navy-100:#DCE4EE; --pp-navy-200:#C9D6E3; --pp-navy-300:#9FB2C8; --pp-navy-400:#6F86A3;
+  --pp-navy-500:#4A6283; --pp-navy-600:#2C4466; --pp-navy-700:#1A3457; --pp-navy-800:#0B2545; --pp-navy-900:#071A33; --pp-navy-950:#061629;
+  /* brand teal, reserved for the best offer and money saved.
+     500 #12A594 graphics and large figures only, 700 #0C7A6E small text on light, 400 #19B8A4 on dark */
+  --pp-teal-50:#E7F6F3; --pp-teal-100:#CFEFEA; --pp-teal-200:#9FE0D6; --pp-teal-300:#5ECDBE; --pp-teal-400:#19B8A4;
+  --pp-teal-500:#12A594; --pp-teal-600:#0E8F80; --pp-teal-700:#0C7A6E; --pp-teal-800:#095C53; --pp-teal-900:#0A3A3F;
+  /* ledger paper (light neutrals, navy-tinted) and night paper (dark neutrals, derived from navy) */
+  --pp-paper-0:#FFFFFF; --pp-paper-50:#F4F6F9; --pp-paper-100:#E8EDF3; --pp-paper-200:#D2DAE4;
+  --pp-paper-400:#8494A8; --pp-paper-600:#4F5F75; --pp-paper-800:#2A3B52; --pp-paper-900:#0B2545;
+  --pp-night-50:#FFFFFF; --pp-night-100:#C9D6E3; --pp-night-300:#9DB0C7; --pp-night-400:#7088A8;
+  --pp-night-750:#1F3D63; --pp-night-700:#2A4568; --pp-night-800:#13305A; --pp-night-850:#0B2545; --pp-night-900:#061629; --pp-night-950:#04101F;
+  /* status hues. Green is a yellower green than brand teal, so approved never reads as saved */
+  --pp-green-100:#DCF2E3; --pp-green-300:#7CD992; --pp-green-600:#15803D; --pp-green-700:#166534; --pp-green-900:#10301F;
+  --pp-amber-100:#FBEBD3; --pp-amber-300:#F0B45A; --pp-amber-700:#8A4B00; --pp-amber-900:#3A2A10;
+  --pp-red-100:#FBE4E1;   --pp-red-300:#FF8A80;   --pp-red-700:#A3231B;   --pp-red-900:#3D1C24;
+  --pp-blue-100:#E0EAFB;  --pp-blue-300:#93B4F5;  --pp-blue-700:#1D4ED8;  --pp-blue-900:#12274A;
+  /* chart hues (never used for UI chrome; no teal-ish series) */
+  --pp-cobalt-300:#86AEEA; --pp-cobalt-600:#2F67B2; --pp-plum-300:#D79AD2; --pp-plum-600:#8E4A8A;
+  --pp-ochre-300:#D9B451;  --pp-ochre-600:#8C6D00;  --pp-rust-300:#F09A70; --pp-rust-600:#B4512A;
+  /* type: Readex Pro for Latin and Arabic. Noto Kufi Arabic only where digits must align */
+  --pp-font-sans:"Readex Pro", "Segoe UI", Tahoma, sans-serif;
+  --pp-font-kufi:"Noto Kufi Arabic", "Readex Pro", sans-serif;
+  --pp-size-12:0.75rem; --pp-size-14:0.875rem; --pp-size-16:1rem; --pp-size-18:1.125rem;
+  --pp-size-21:1.3125rem; --pp-size-24:1.5rem; --pp-size-36:2.25rem; --pp-size-48:3rem;
+  --pp-weight-400:400; --pp-weight-500:500; --pp-weight-600:600;
+  /* space: 4px base */
+  --pp-space-1:4px; --pp-space-2:8px; --pp-space-3:12px; --pp-space-4:16px; --pp-space-5:20px;
+  --pp-space-6:24px; --pp-space-8:32px; --pp-space-10:40px; --pp-space-12:48px; --pp-space-16:64px;
+  /* shape */
+  --pp-radius-3:3px; --pp-radius-6:6px; --pp-radius-10:10px; --pp-radius-16:16px; --pp-radius-999:999px;
+  /* time */
+  --pp-ms-120:120ms; --pp-ms-220:220ms; --pp-ms-360:360ms; --pp-ms-900:900ms;
+  --pp-curve-standard:cubic-bezier(.2,.7,.2,1); --pp-curve-exit:cubic-bezier(.4,0,1,1);
+
+  /* LAYER 2: semantic */
+  color-scheme: light;
+  --pp-primary:var(--pp-navy-800); --pp-on-primary:var(--pp-paper-0); --pp-primary-hover:var(--pp-navy-900);
+  --pp-primary-container:var(--pp-navy-100); --pp-on-primary-container:var(--pp-navy-800);
+  --pp-surface-page:var(--pp-paper-50); --pp-surface-card:var(--pp-paper-0); --pp-surface-sunken:var(--pp-paper-100);
+  --pp-surface-raised:var(--pp-paper-0); --pp-border:var(--pp-paper-200); --pp-border-strong:var(--pp-paper-400);
+  --pp-text-strong:var(--pp-paper-900); --pp-text:var(--pp-paper-800); --pp-text-muted:var(--pp-paper-600);
+  --pp-inverse-surface:var(--pp-navy-800); --pp-on-inverse-surface:var(--pp-paper-50); --pp-inverse-primary:var(--pp-navy-200);
+  --pp-success:var(--pp-green-700); --pp-success-container:var(--pp-green-100);
+  --pp-warning:var(--pp-amber-700); --pp-warning-container:var(--pp-amber-100);
+  --pp-error:var(--pp-red-700);     --pp-error-container:var(--pp-red-100); --pp-on-error:var(--pp-paper-0);
+  --pp-info:var(--pp-blue-700);     --pp-info-container:var(--pp-blue-100);
+  --pp-savings:var(--pp-teal-700); --pp-savings-container:var(--pp-teal-50); --pp-savings-rule:var(--pp-teal-500); --pp-on-savings:var(--pp-paper-0);
+  --pp-focus:var(--pp-teal-700);
+  --pp-scrim:rgba(6,22,41,.55); --pp-shadow:var(--pp-navy-800);
+  /* data visualisation: six categories anchored on navy, a five-step navy ramp; teal only for savings */
+  --pp-chart-1:var(--pp-navy-800); --pp-chart-2:var(--pp-cobalt-600); --pp-chart-3:var(--pp-plum-600);
+  --pp-chart-4:var(--pp-ochre-600); --pp-chart-5:var(--pp-rust-600); --pp-chart-6:var(--pp-navy-400);
+  --pp-seq-1:var(--pp-navy-100); --pp-seq-2:var(--pp-navy-300); --pp-seq-3:var(--pp-navy-500); --pp-seq-4:var(--pp-navy-700); --pp-seq-5:var(--pp-navy-950);
+  --pp-chart-grid:var(--pp-border); --pp-chart-axis:var(--pp-border-strong);
+  /* type roles */
+  --pp-font:var(--pp-font-sans);
+  --pp-font-figures:var(--pp-font-kufi);
+  --pp-leading-figures:1.35;
+  --pp-text-12:var(--pp-size-12); --pp-text-14:var(--pp-size-14); --pp-text-16:var(--pp-size-16); --pp-text-18:var(--pp-size-18);
+  --pp-text-21:var(--pp-size-21); --pp-text-24:var(--pp-size-24); --pp-text-36:var(--pp-size-36); --pp-text-48:var(--pp-size-48);
+  --pp-leading-tight:1.2; --pp-leading:1.5; --pp-leading-ar:1.7;
+  --pp-weight-regular:var(--pp-weight-400); --pp-weight-medium:var(--pp-weight-500); --pp-weight-strong:var(--pp-weight-600);
+  --pp-tracking-display:-0.02em;
+  /* shape roles: radius grows with the size of the thing */
+  --pp-radius-chip:var(--pp-radius-3); --pp-radius-control:var(--pp-radius-6); --pp-radius-card:var(--pp-radius-10); --pp-radius-panel:var(--pp-radius-16); --pp-radius-pill:var(--pp-radius-999);
+  /* elevation: borders first, shadow only for things that float */
+  --pp-elev-0:none;
+  --pp-elev-1:0 1px 0 rgba(11,37,69,.06);
+  --pp-elev-2:0 1px 2px rgba(11,37,69,.08), 0 4px 12px rgba(11,37,69,.06);
+  --pp-elev-3:0 2px 4px rgba(11,37,69,.10), 0 16px 40px rgba(11,37,69,.14);
+  /* motion roles: short, and only to show what changed */
+  --pp-ease:var(--pp-curve-standard); --pp-ease-exit:var(--pp-curve-exit);
+  --pp-dur-fast:var(--pp-ms-120); --pp-dur:var(--pp-ms-220); --pp-dur-slow:var(--pp-ms-360); --pp-dur-rule:var(--pp-ms-900);
+  /* icons: Material Symbols Outlined */
+  --pp-icon-16:16px; --pp-icon-20:20px; --pp-icon-24:24px; --pp-icon-weight:300;
+
+  /* LAYER 3: component */
+  /* button */
+  --pp-button-height-sm:30px; --pp-button-height-md:36px; --pp-button-height-lg:48px;
+  --pp-button-padding-inline:var(--pp-space-4); --pp-button-gap:var(--pp-space-2); --pp-button-radius:var(--pp-radius-control);
+  --pp-button-primary-bg:var(--pp-primary); --pp-button-primary-fg:var(--pp-on-primary); --pp-button-primary-bg-hover:var(--pp-primary-hover);
+  --pp-button-tonal-bg:var(--pp-primary-container); --pp-button-tonal-fg:var(--pp-on-primary-container); --pp-button-tonal-border-hover:var(--pp-primary);
+  --pp-button-outline-bg:var(--pp-surface-card); --pp-button-outline-fg:var(--pp-text-strong); --pp-button-outline-border:var(--pp-border-strong); --pp-button-outline-bg-hover:var(--pp-surface-sunken);
+  --pp-button-text-fg:var(--pp-primary); --pp-button-text-bg-hover:var(--pp-primary-container);
+  --pp-button-danger-fg:var(--pp-error); --pp-button-danger-border:var(--pp-error); --pp-button-danger-bg:var(--pp-surface-card); --pp-button-danger-bg-hover:var(--pp-error-container);
+  --pp-button-disabled-bg:var(--pp-surface-sunken); --pp-button-disabled-fg:var(--pp-text-muted);
+  --pp-button-focus-ring:var(--pp-focus);
+  --pp-button-icon-fg:var(--pp-text-muted); --pp-button-raised-shadow:var(--pp-elev-1); --pp-button-progress-fg:var(--pp-button-disabled-fg);
+  /* focus ring: one indicator for every Material control */
+  --pp-focus-ring-color:var(--pp-focus); --pp-focus-ring-width:2px; --pp-focus-ring-radius:var(--pp-radius-control);
+  /* field: text input, select, textarea, money input */
+  --pp-field-height:40px; --pp-field-bg:var(--pp-surface-card); --pp-field-fg:var(--pp-text-strong);
+  --pp-field-border:var(--pp-border-strong); --pp-field-border-hover:var(--pp-text-muted); --pp-field-border-focus:var(--pp-primary); --pp-field-border-error:var(--pp-error);
+  --pp-field-radius:var(--pp-radius-control); --pp-field-padding-inline:var(--pp-space-3);
+  --pp-field-label-fg:var(--pp-text-strong); --pp-field-help-fg:var(--pp-text-muted); --pp-field-affix-fg:var(--pp-text-muted);
+  --pp-field-disabled-bg:var(--pp-surface-sunken); --pp-field-money-font:var(--pp-font-figures);
+  --pp-field-filled-bg:var(--pp-surface-sunken); --pp-field-padding-block:var(--pp-space-2); --pp-field-font-size:var(--pp-text-14);
+  /* table */
+  --pp-table-bg:var(--pp-surface-card); --pp-table-header-fg:var(--pp-text-muted); --pp-table-header-border:var(--pp-border-strong);
+  --pp-table-row-height:44px; --pp-table-row-border:var(--pp-border); --pp-table-row-hover:color-mix(in srgb, var(--pp-primary-container) 40%, transparent);
+  --pp-table-row-selected-bg:var(--pp-primary-container); --pp-table-row-selected-edge:var(--pp-primary);
+  --pp-table-cell-padding-inline:var(--pp-space-3);
+  --pp-table-best-bg:color-mix(in srgb, var(--pp-savings-container) 55%, var(--pp-surface-card)); --pp-table-best-edge:var(--pp-savings-rule);
+  --pp-table-numeric-font:var(--pp-font-figures); --pp-table-numeric-leading:var(--pp-leading-figures);
+  --pp-table-total-rule:var(--pp-savings-rule);
+  --pp-table-header-height:40px; --pp-table-sort-arrow:var(--pp-text-muted);
+  /* chip: shape-coded status */
+  --pp-chip-height:24px; --pp-chip-radius:var(--pp-radius-chip); --pp-chip-padding-inline:8px;
+  --pp-chip-draft-fg:var(--pp-text); --pp-chip-draft-border:var(--pp-border-strong);
+  --pp-chip-pending-fg:var(--pp-warning); --pp-chip-pending-bg:var(--pp-warning-container);
+  --pp-chip-approved-fg:var(--pp-success); --pp-chip-approved-bg:var(--pp-success-container);
+  --pp-chip-rejected-fg:var(--pp-error); --pp-chip-rejected-bg:var(--pp-error-container);
+  --pp-chip-review-fg:var(--pp-info); --pp-chip-review-bg:var(--pp-info-container);
+  --pp-chip-best-fg:var(--pp-savings); --pp-chip-best-bg:var(--pp-savings-container);
+  --pp-chip-font-size:var(--pp-text-12); --pp-chip-selected-bg:var(--pp-primary-container); --pp-chip-selected-fg:var(--pp-on-primary-container);
+  /* folio: provenance of an extracted number (document id, page, confidence) */
+  --pp-folio-fg:var(--pp-primary); --pp-folio-bg:var(--pp-surface-card); --pp-folio-border:var(--pp-border-strong); --pp-folio-border-hover:var(--pp-primary);
+  /* dialog */
+  --pp-dialog-bg:var(--pp-surface-raised); --pp-dialog-radius:var(--pp-radius-panel); --pp-dialog-shadow:var(--pp-elev-3);
+  --pp-dialog-scrim:var(--pp-scrim); --pp-dialog-width:440px; --pp-dialog-padding:var(--pp-space-6); --pp-dialog-motion:var(--pp-dur-slow);
+  --pp-dialog-title-fg:var(--pp-text-strong); --pp-dialog-fg:var(--pp-text); --pp-dialog-title-size:var(--pp-text-21);
+  /* menu: menus, select and autocomplete panels */
+  --pp-menu-bg:var(--pp-surface-raised); --pp-menu-radius:var(--pp-radius-control); --pp-menu-shadow:var(--pp-elev-2);
+  --pp-menu-item-fg:var(--pp-text-strong); --pp-menu-item-icon:var(--pp-text-muted); --pp-menu-divider:var(--pp-border); --pp-menu-danger-fg:var(--pp-error);
+  --pp-menu-selected-bg:var(--pp-primary-container); --pp-menu-selected-fg:var(--pp-on-primary-container);
+  /* calendar (datepicker) */
+  --pp-calendar-bg:var(--pp-surface-raised); --pp-calendar-radius:var(--pp-radius-card); --pp-calendar-shadow:var(--pp-elev-2);
+  --pp-calendar-fg:var(--pp-text-strong); --pp-calendar-muted-fg:var(--pp-text-muted); --pp-calendar-divider:var(--pp-border);
+  --pp-calendar-selected-bg:var(--pp-primary); --pp-calendar-selected-fg:var(--pp-on-primary); --pp-calendar-today-outline:var(--pp-border-strong); --pp-calendar-range-bg:var(--pp-primary-container);
+  /* tabs */
+  --pp-tabs-height:40px; --pp-tabs-fg:var(--pp-text-muted); --pp-tabs-fg-active:var(--pp-text-strong); --pp-tabs-bg-hover:var(--pp-surface-sunken);
+  --pp-tabs-indicator:var(--pp-primary); --pp-tabs-indicator-height:2px; --pp-tabs-border:var(--pp-border);
+  /* nav: sidebar and mobile bar */
+  --pp-nav-width:220px; --pp-nav-bg:var(--pp-surface-card); --pp-nav-border:var(--pp-border);
+  --pp-nav-item-fg:var(--pp-text); --pp-nav-item-icon:var(--pp-text-muted); --pp-nav-item-bg-hover:var(--pp-surface-sunken);
+  --pp-nav-item-active-bg:var(--pp-primary-container); --pp-nav-item-active-fg:var(--pp-on-primary-container); --pp-nav-count-fg:var(--pp-text-muted);
+  --pp-nav-item-height:36px; --pp-nav-item-radius:var(--pp-radius-control); --pp-nav-icon-size:18px; --pp-nav-item-size:var(--pp-text-14);
+  --pp-nav-content-bg:var(--pp-surface-page); --pp-nav-scrim:var(--pp-scrim); --pp-nav-radius:0;
+  /* toolbar (app bar) */
+  --pp-toolbar-bg:var(--pp-surface-card); --pp-toolbar-fg:var(--pp-text-strong); --pp-toolbar-height:56px; --pp-toolbar-title-size:var(--pp-text-16);
+  /* list: documents, lines, anything that is not navigation */
+  --pp-list-fg:var(--pp-text-strong); --pp-list-supporting-fg:var(--pp-text-muted); --pp-list-icon:var(--pp-text-muted);
+  /* divider */
+  --pp-divider-color:var(--pp-border); --pp-divider-width:1px;
+  /* toast (snack bar) */
+  --pp-toast-bg:var(--pp-inverse-surface); --pp-toast-fg:var(--pp-on-inverse-surface); --pp-toast-action:var(--pp-inverse-primary);
+  --pp-toast-radius:var(--pp-radius-control); --pp-toast-shadow:var(--pp-elev-3); --pp-toast-max-width:420px;
+  /* badge */
+  --pp-badge-bg:var(--pp-primary); --pp-badge-fg:var(--pp-on-primary); --pp-badge-height:18px;
+  --pp-badge-quiet-bg:var(--pp-surface-sunken); --pp-badge-quiet-fg:var(--pp-text); --pp-badge-quiet-border:var(--pp-border);
+  /* tooltip */
+  --pp-tooltip-bg:var(--pp-inverse-surface); --pp-tooltip-fg:var(--pp-on-inverse-surface); --pp-tooltip-radius:var(--pp-radius-control);
+  --pp-tooltip-max-width:200px; --pp-tooltip-offset:8px;
+  /* pagination: cursor-based, so Previous/Next and Load more only */
+  --pp-pager-fg:var(--pp-text-muted); --pp-pager-gap:var(--pp-space-3); --pp-pager-page-size:25;
+  /* checkbox and radio */
+  --pp-check-size:18px; --pp-check-border:var(--pp-field-border); --pp-check-border-hover:var(--pp-primary);
+  --pp-check-checked-bg:var(--pp-primary); --pp-check-mark:var(--pp-on-primary); --pp-check-disabled-bg:var(--pp-surface-sunken);
+  /* switch (slide toggle) */
+  --pp-switch-width:38px; --pp-switch-height:22px; --pp-switch-track-off:var(--pp-surface-sunken); --pp-switch-track-on:var(--pp-primary);
+  --pp-switch-thumb-off:var(--pp-text-muted); --pp-switch-thumb-on:var(--pp-on-primary);
+  --pp-switch-thumb-size:14px; --pp-switch-thumb-inset:4px; --pp-switch-border:var(--pp-field-border);
+  /* progress: bar and spinner */
+  --pp-progress-indicator:var(--pp-primary); --pp-progress-track:var(--pp-surface-sunken); --pp-progress-height:4px; --pp-progress-radius:var(--pp-radius-pill);
+  /* banner */
+  --pp-banner-edge-width:3px; --pp-banner-radius:var(--pp-radius-control); --pp-banner-fg:var(--pp-text-strong);
+  /* card and kpi */
+  --pp-card-bg:var(--pp-surface-card); --pp-card-border:var(--pp-border); --pp-card-radius:var(--pp-radius-card);
+  --pp-card-sunken-bg:var(--pp-surface-sunken); --pp-card-shadow:var(--pp-elev-1); --pp-card-title-size:var(--pp-text-18); --pp-card-subtitle-fg:var(--pp-text-muted);
+  /* expansion panel: a card that opens. A 1px spread shadow draws its border: Material has no outline token for it */
+  --pp-expansion-bg:var(--pp-surface-card); --pp-expansion-radius:var(--pp-radius-card); --pp-expansion-edge:0 0 0 1px var(--pp-border);
+  --pp-expansion-title-fg:var(--pp-text-strong); --pp-expansion-description-fg:var(--pp-text-muted); --pp-expansion-header-height:48px;
+  --pp-kpi-value-fg:var(--pp-savings); --pp-kpi-value-size:var(--pp-text-36);
+  /* chart */
+  --pp-chart-savings:var(--pp-savings-rule); --pp-chart-bar-radius:2px;
+}
+/* reduced motion: every duration token drops to zero, so nothing slides or fades */
+@media (prefers-reduced-motion: reduce){
+  :root{ --pp-dur-fast:0ms; --pp-dur:0ms; --pp-dur-slow:0ms; --pp-dur-rule:0ms; }
+}

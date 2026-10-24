@@ -1,0 +1,11 @@
+:host {
+  display: inline-flex;
+  align-items: center;
+}
+
+// Width follows the artwork; no transform, so the logo is never mirrored in RTL.
+.brand-logo {
+  display: block;
+  inline-size: auto;
+  max-inline-size: 100%;
+}

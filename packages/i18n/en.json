@@ -1,6 +1,7 @@
 {
   "common": {
     "brandName": "ProcurePilot",
+    "logoAlt": "ProcurePilot",
     "appTagline": "Procurement Intelligence",
     "traceId": "Reference ID",
     "loading": "Loading...",

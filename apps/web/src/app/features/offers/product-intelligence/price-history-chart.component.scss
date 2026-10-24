@@ -12,13 +12,13 @@
   flex-wrap: wrap;
   gap: 1rem;
   padding: 0.5rem 0.75rem;
-  background-color: #f8fafc;
+  background-color: var(--pp-surface-page);
   border-radius: 6px;
   font-size: 0.85rem;
 
   .legend-title {
     font-weight: 600;
-    color: #64748b;
+    color: var(--pp-text-muted);
   }
 
   .legend-item {
@@ -34,7 +34,7 @@
     }
 
     .legend-name {
-      color: #334155;
+      color: var(--pp-text);
       font-weight: 500;
     }
   }
@@ -51,20 +51,20 @@
     display: block;
 
     .grid-line {
-      stroke: #e2e8f0;
+      stroke: var(--pp-chart-grid);
       stroke-width: 1;
       stroke-dasharray: 4, 4;
     }
 
     .tick-line {
-      stroke: #94a3b8;
+      stroke: var(--pp-chart-axis);
       stroke-width: 1.5;
     }
 
     .axis-label {
       font-size: 11px;
       font-family: inherit;
-      fill: #64748b;
+      fill: var(--pp-text-muted);
 
       &.y-axis-label {
         alignment-baseline: middle;
@@ -72,13 +72,14 @@
     }
 
     .point-circle {
+      stroke: var(--pp-surface-card);
       cursor: pointer;
       transition: r 0.15s ease, stroke-width 0.15s ease;
 
       &:hover,
       &:focus {
         outline: none;
-        stroke: #0f172a;
+        stroke: var(--pp-text-strong);
         stroke-width: 2.5;
       }
     }
@@ -87,8 +88,8 @@
   .point-tooltip {
     position: absolute;
     transform: translate(-50%, -100%);
-    background-color: #0f172a;
-    color: #ffffff;
+    background-color: var(--pp-tooltip-bg);
+    color: var(--pp-tooltip-fg);
     padding: 0.5rem 0.75rem;
     border-radius: 6px;
     font-size: 0.8rem;
@@ -105,13 +106,13 @@
     .tooltip-price {
       font-size: 0.95rem;
       font-weight: 700;
-      color: #34d399;
+      color: var(--pp-tooltip-fg);
       margin-bottom: 0.2rem;
     }
 
     .tooltip-meta {
       font-size: 0.75rem;
-      color: #cbd5e1;
+      color: var(--pp-inverse-primary);
     }
   }
 }
@@ -119,6 +120,6 @@
 .chart-empty {
   padding: 3rem 1rem;
   text-align: center;
-  color: #94a3b8;
+  color: var(--pp-text-muted);
   font-size: 0.95rem;
 }

@@ -15,6 +15,7 @@ import { ApiService } from '../../../core/api/api.service';
 import type { ApiError, ConfigOptions } from '../../../core/api/models';
 import { SessionService } from '../../../core/auth/session.service';
 import { I18nService } from '../../../core/i18n';
+import { BrandLogoComponent } from '../../../layout/brand-logo/brand-logo.component';
 
 interface ErrorAlert {
   readonly type: 'error' | 'forbidden';
@@ -27,6 +28,7 @@ interface ErrorAlert {
   selector: 'app-signup',
   standalone: true,
   imports: [
+    BrandLogoComponent,
     ReactiveFormsModule,
     RouterLink,
     MatCardModule,

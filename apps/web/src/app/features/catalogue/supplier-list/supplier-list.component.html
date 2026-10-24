@@ -111,7 +111,7 @@
 
           <ng-container matColumnDef="minOrderValue">
             <th mat-header-cell *matHeaderCellDef>{{ 'catalogue.suppliers.columns.minOrderValue' | translate }}</th>
-            <td mat-cell *matCellDef="let supplier">
+            <td mat-cell *matCellDef="let supplier" class="pp-figures">
               @if (supplier.minimum_order_value) {
                 <span>{{ supplier.minimum_order_value | formatMoney }}</span>
               } @else {
@@ -122,7 +122,7 @@
 
           <ng-container matColumnDef="deliveryFee">
             <th mat-header-cell *matHeaderCellDef>{{ 'catalogue.suppliers.columns.deliveryFee' | translate }}</th>
-            <td mat-cell *matCellDef="let supplier">
+            <td mat-cell *matCellDef="let supplier" class="pp-figures">
               @if (supplier.delivery_fee) {
                 <span>{{ supplier.delivery_fee | formatMoney }}</span>
               } @else {

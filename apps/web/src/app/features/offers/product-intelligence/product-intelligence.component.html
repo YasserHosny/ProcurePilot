@@ -188,7 +188,7 @@
           <!-- Normalised Unit Price Column -->
           <ng-container matColumnDef="unitPrice">
             <th mat-header-cell *matHeaderCellDef>{{ 'productIntelligence.historyTable.unitPrice' | translate }}</th>
-            <td mat-cell *matCellDef="let pt">
+            <td mat-cell *matCellDef="let pt" class="pp-figures">
               <strong>{{ pt.normalised_unit_price | formatMoney }}</strong> / {{ pt.base_unit | unitLabel }}
             </td>
           </ng-container>
@@ -196,13 +196,13 @@
           <!-- Landed Total Cost Column -->
           <ng-container matColumnDef="totalCost">
             <th mat-header-cell *matHeaderCellDef>{{ 'productIntelligence.historyTable.totalCost' | translate }}</th>
-            <td mat-cell *matCellDef="let pt">{{ pt.landed_cost_total | formatMoney }}</td>
+            <td mat-cell *matCellDef="let pt" class="pp-figures">{{ pt.landed_cost_total | formatMoney }}</td>
           </ng-container>
 
           <!-- Quantity Column -->
           <ng-container matColumnDef="quantity">
             <th mat-header-cell *matHeaderCellDef>{{ 'productIntelligence.historyTable.quantity' | translate }}</th>
-            <td mat-cell *matCellDef="let pt">{{ pt.quantity | formatQuantity }} {{ pt.base_unit | unitLabel }}</td>
+            <td mat-cell *matCellDef="let pt" class="pp-figures">{{ pt.quantity | formatQuantity }} {{ pt.base_unit | unitLabel }}</td>
           </ng-container>
 
           <!-- Validity Column -->

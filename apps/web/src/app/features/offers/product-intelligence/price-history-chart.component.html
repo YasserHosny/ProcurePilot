@@ -68,7 +68,7 @@
             @if (series.pathD) {
               <path
                 [attr.d]="series.pathD"
-                [attr.stroke]="series.color"
+                [style.stroke]="series.color"
                 class="series-path"
                 fill="none"
                 stroke-width="2.5"
@@ -87,8 +87,7 @@
                 [attr.cx]="pt.x"
                 [attr.cy]="pt.y"
                 [attr.r]="hoveredPoint() === pt ? 6 : 4.5"
-                [attr.fill]="pt.color"
-                stroke="#ffffff"
+                [style.fill]="pt.color"
                 stroke-width="2"
                 class="point-circle"
                 (mouseenter)="onPointHover(pt)"

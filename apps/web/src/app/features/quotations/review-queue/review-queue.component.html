@@ -145,7 +145,7 @@
             </span>
             <button
               mat-stroked-button
-              color="warn"
+              color="warn" class="pp-danger"
               type="button"
               (click)="bulkArchive()"
               [disabled]="isBulkArchiving() || isBulkRefusing() || isBulkReprioritising()"
@@ -159,7 +159,7 @@
             </button>
             <button
               mat-stroked-button
-              color="warn"
+              color="warn" class="pp-danger"
               type="button"
               (click)="bulkRefuse()"
               [disabled]="isBulkArchiving() || isBulkRefusing() || isBulkReprioritising()"
@@ -304,7 +304,7 @@
               <th mat-header-cell *matHeaderCellDef mat-sort-header>
                 {{ 'quotations.queue.columns.statedTotal' | translate }}
               </th>
-              <td mat-cell *matCellDef="let task">
+              <td mat-cell *matCellDef="let task" class="pp-figures">
                 @if (task.stated_total) {
                   {{ task.stated_total | formatMoney }}
                 } @else {

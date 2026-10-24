@@ -12,11 +12,13 @@ import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
 import { ApiService } from '../../../core/api/api.service';
 import type { ApiError } from '../../../core/api/models';
+import { BrandLogoComponent } from '../../../layout/brand-logo/brand-logo.component';
 
 @Component({
   selector: 'app-password-reset',
   standalone: true,
   imports: [
+    BrandLogoComponent,
     ReactiveFormsModule,
     RouterLink,
     MatCardModule,

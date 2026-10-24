@@ -103,7 +103,7 @@
                     color="warn"
                     (click)="dismissAlert(alert)"
                     [disabled]="dismissingAlertIds().has(alert.id)"
-                    class="dismiss-btn"
+                    class="pp-danger dismiss-btn"
                   >
                     @if (dismissingAlertIds().has(alert.id)) {
                       <mat-spinner [attr.aria-label]="'common.loading' | translate" diameter="16" class="btn-spinner"></mat-spinner>

@@ -147,7 +147,7 @@
             </div>
 
             <div class="form-row">
-              <mat-form-field appearance="outline">
+              <mat-form-field appearance="outline" class="pp-figures">
                 <mat-label>{{ 'orders.create.unitPrice' | translate }}</mat-label>
                 <input matInput type="number" step="0.01" formControlName="unit_price" />
                 @if (packHint(line); as pack) {
@@ -161,7 +161,7 @@
                 }
               </mat-form-field>
 
-              <mat-form-field appearance="outline">
+              <mat-form-field appearance="outline" class="pp-figures">
                 <mat-label>{{ 'orders.create.lineTax' | translate }}</mat-label>
                 <input matInput type="number" step="0.01" formControlName="line_tax" />
                 @if (line.controls.line_tax.hasError('min')) {
@@ -183,11 +183,11 @@
       <mat-card class="totals-card">
         <div>
           <span>{{ 'orders.create.linesTotalLabel' | translate }}:</span>
-          <span>{{ form.value.currency || 'USD' }} {{ computedTotals().linesTotal | number:'1.2-2' }}</span>
+          <span class="pp-figures">{{ form.value.currency || 'USD' }} {{ computedTotals().linesTotal | number:'1.2-2' }}</span>
         </div>
         <div class="tax-row">
           <span>{{ 'orders.create.orderTax' | translate }}:</span>
-          <mat-form-field appearance="outline" subscriptSizing="dynamic" class="tax-field">
+          <mat-form-field appearance="outline" subscriptSizing="dynamic" class="pp-figures tax-field">
             <input
               matInput
               type="number"
@@ -199,7 +199,7 @@
         </div>
         <div class="grand-total">
           <span>{{ 'orders.create.orderTotal' | translate }}:</span>
-          <span>{{ form.value.currency || 'USD' }} {{ computedTotals().orderTotal | number:'1.2-2' }}</span>
+          <span class="pp-figures">{{ form.value.currency || 'USD' }} {{ computedTotals().orderTotal | number:'1.2-2' }}</span>
         </div>
       </mat-card>
 

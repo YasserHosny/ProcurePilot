@@ -12,11 +12,13 @@ import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
 import type { ApiError } from '../../../core/api/models';
 import { SessionService } from '../../../core/auth/session.service';
+import { BrandLogoComponent } from '../../../layout/brand-logo/brand-logo.component';
 
 @Component({
   selector: 'app-sign-in',
   standalone: true,
   imports: [
+    BrandLogoComponent,
     ReactiveFormsModule,
     RouterLink,
     MatCardModule,

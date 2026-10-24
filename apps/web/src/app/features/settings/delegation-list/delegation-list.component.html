@@ -227,12 +227,12 @@
       {{ 'approvals.delegations.cancelDialog.cancelButton' | translate }}
     </button>
     <button
-      mat-flat-button
+      mat-stroked-button
       color="warn"
       type="button"
       (click)="confirmCancel()"
       [disabled]="isCancelling()"
-      class="cancel-confirm-btn"
+      class="pp-danger cancel-confirm-btn"
     >
       @if (isCancelling()) {
         <mat-spinner diameter="18" class="inline-spinner"></mat-spinner>

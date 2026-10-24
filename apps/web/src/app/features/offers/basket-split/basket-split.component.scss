@@ -11,18 +11,18 @@
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  background-color: #f1f5f9;
-  border-inline-start: 4px solid #64748b;
+  background-color: var(--pp-surface-sunken);
+  border-inline-start: 4px solid var(--pp-border-strong);
   padding: 0.75rem 1rem;
   border-radius: 4px;
   font-size: 0.85rem;
-  color: #334155;
+  color: var(--pp-text);
 
   mat-icon {
     font-size: 1.2rem;
     width: 1.2rem;
     height: 1.2rem;
-    color: #64748b;
+    color: var(--pp-text-muted);
   }
 }
 
@@ -33,13 +33,13 @@
   justify-content: center;
   padding: 4rem 1rem;
   gap: 1rem;
-  color: var(--mat-sys-on-surface-variant, #64748b);
+  color: var(--pp-text-muted);
 }
 
 .form-card {
   padding: 1.5rem;
   border-radius: 8px;
-  background-color: var(--mat-sys-surface, #ffffff);
+  background-color: var(--pp-surface-card);
 
   .form-section {
     padding: 1rem 0;
@@ -47,7 +47,7 @@
     .section-title {
       font-size: 1.1rem;
       font-weight: 600;
-      color: #1e293b;
+      color: var(--pp-text-strong);
       margin: 0 0 1rem 0;
     }
 
@@ -74,7 +74,7 @@
     }
 
     .error-text {
-      color: #ef4444;
+      color: var(--pp-error);
       font-size: 0.85rem;
       margin-top: 1.5rem;
       margin-bottom: 0;
@@ -130,7 +130,7 @@
   padding: 4rem 2rem;
   border-radius: 8px;
   text-align: center;
-  background-color: var(--mat-sys-surface, #ffffff);
+  background-color: var(--pp-surface-card);
 
   .progress-content {
     display: flex;
@@ -142,13 +142,13 @@
     .progress-title {
       font-size: 1.3rem;
       font-weight: 600;
-      color: #1e293b;
+      color: var(--pp-text-strong);
       margin: 1.5rem 0 0.5rem 0;
     }
 
     .progress-sub {
       font-size: 0.9rem;
-      color: #64748b;
+      color: var(--pp-text-muted);
       margin: 0 0 1.5rem 0;
     }
 
@@ -190,7 +190,7 @@
 .weights-section {
   margin-block-start: 1rem;
   padding: 0.75rem 1rem;
-  background: var(--mat-sys-surface-variant, #f8fafc);
+  background: var(--pp-surface-sunken);
   border-radius: 6px;
 
   .weights-title {
@@ -212,12 +212,12 @@
       .weight-label {
         font-size: 0.8rem;
         font-weight: 500;
-        color: #334155;
+        color: var(--pp-text);
       }
 
       input[type='range'] {
         width: 100%;
-        accent-color: var(--mat-sys-primary, #0284c7);
+        accent-color: var(--pp-primary);
       }
     }
   }

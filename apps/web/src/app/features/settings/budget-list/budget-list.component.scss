@@ -18,7 +18,7 @@
   margin: 0;
   font-size: 1.375rem;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--pp-text-strong);
 
   @include bp.mobile {
     font-size: 1.125rem;
@@ -40,13 +40,13 @@
   gap: 0.75rem;
   padding-inline: 1rem;
   padding-block: 0.75rem;
-  background-color: #fffbeb;
-  border: 1px solid #fde68a;
+  background-color: var(--pp-warning-container);
+  border: 1px solid var(--pp-warning);
   border-radius: 8px;
-  color: #92400e;
+  color: var(--pp-warning);
 
   .info-icon {
-    color: #f59e0b;
+    color: var(--pp-warning);
     font-size: 20px;
     inline-size: 20px;
     block-size: 20px;
@@ -65,13 +65,13 @@
   gap: 0.75rem;
   padding-inline: 1rem;
   padding-block: 0.75rem;
-  background-color: #fef2f2;
-  border: 1px solid #fee2e2;
+  background-color: var(--pp-error-container);
+  border: 1px solid var(--pp-error-container);
   border-radius: 8px;
-  color: #991b1b;
+  color: var(--pp-error);
 
   .error-icon {
-    color: #ef4444;
+    color: var(--pp-error);
     font-size: 24px;
     inline-size: 24px;
     block-size: 24px;
@@ -95,15 +95,15 @@
 
   .error-trace {
     font-size: 0.75rem;
-    color: #b91c1c;
+    color: var(--pp-error);
     font-family: monospace;
   }
 }
 
 .budgets-card {
   border-radius: 12px;
-  background-color: #ffffff;
-  border: 1px solid #e2e8f0;
+  background-color: var(--pp-surface-card);
+  border: 1px solid var(--pp-border);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
   overflow: hidden;
 }
@@ -116,14 +116,14 @@
   justify-content: center;
   padding-block: 3rem;
   gap: 1rem;
-  color: #475569;
+  color: var(--pp-text-muted);
 }
 
 .empty-icon {
   font-size: 48px;
   inline-size: 48px;
   block-size: 48px;
-  color: #cbd5e1;
+  color: var(--pp-text-muted);
 }
 
 .table-responsive {
@@ -134,7 +134,7 @@
   inline-size: 100%;
 
   th.mat-header-cell {
-    color: #475569;
+    color: var(--pp-text-muted);
     font-size: 0.8125rem;
     font-weight: 600;
     text-transform: uppercase;
@@ -145,11 +145,11 @@
     padding-inline: 1rem;
     padding-block: 0.875rem;
     font-size: 0.875rem;
-    color: #1e293b;
+    color: var(--pp-text-strong);
   }
 }
 
 .budget-amount {
   font-weight: 600;
-  color: #0f172a;
+  color: var(--pp-text-strong);
 }
