@@ -39,7 +39,7 @@
               [attr.data-testid]="'approved-request-option-' + req.id"
             >
               <span>
-                {{ req.required_by_date }}
+                {{ formatRequiredBy(req.required_by_date) }}
                 @if (req.estimated_total) {
                   · {{ formatApprovedRequestMoney(req) }}
                 }

@@ -20,6 +20,7 @@ import { catchError } from 'rxjs/operators';
 
 import type { ApiError, Branch, BranchList, PurchaseRequest, PurchaseRequestStatus } from '../../../core/api/models';
 import { FormatService } from '../../../core/format/format.service';
+import { parseIsoDateLocal } from '../../../core/format/iso-date';
 import { OrganisationApiService } from '../../settings/organisation-api';
 import { CatalogueConfirmDialogComponent } from '../../catalogue/confirm-dialog/confirm-dialog.component';
 import { RequestsApiService } from '../requests-api';
@@ -117,6 +118,10 @@ export class RequestListComponent implements OnInit {
   
   navigateToCreateOrder(request: PurchaseRequest): void {
     this.router.navigate(['/orders/new'], { queryParams: { source_request_id: request.id } });
+  }
+
+  formatRequiredBy(value: string | null | undefined): string {
+    return this.formatService.formatDate(parseIsoDateLocal(value));
   }
 
   canCreateOrder(request: PurchaseRequest): boolean {

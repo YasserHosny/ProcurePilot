@@ -20,7 +20,7 @@ const mockRequests: PurchaseRequest[] = [
     id: 'r1',
     branch_id: 'b1',
     requested_by_membership_id: 'm1',
-    required_by_date: '2026-09-01',
+    required_by_date: '2026-09-20',
     status: 'draft',
     lines: [],
     has_incomplete_estimate: false,
@@ -298,5 +298,21 @@ describe('RequestListComponent (T017)', () => {
 
     expect(component.errorMessage()).toBe('Boom');
     expect(component.errorTraceId()).toBe('tr_err');
+  });
+
+  it('formats required-by date with locale sensitivity in en and ar', () => {
+    const compiled = fixture.nativeElement as HTMLElement;
+    const dateCell = compiled.querySelector('td.cdk-column-requiredByDate, td.mat-column-requiredByDate');
+    expect(dateCell?.textContent?.trim()).toBe('Sep 20, 2026');
+    expect(component.formatRequiredBy('2026-09-20')).toBe('Sep 20, 2026');
+
+    TestBed.inject(TranslateService).use('ar');
+    fixture.detectChanges();
+
+    expect(dateCell?.textContent).toContain('٢٠');
+    expect(dateCell?.textContent).toContain('٢٠٢٦');
+    expect(/[0-9]/.test(dateCell?.textContent ?? '')).toBeFalse();
+    expect(component.formatRequiredBy('2026-09-20')).toContain('٢٠');
+    expect(/[0-9]/.test(component.formatRequiredBy('2026-09-20'))).toBeFalse();
   });
 });
