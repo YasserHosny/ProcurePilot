@@ -11,3 +11,6 @@ sheets/
 tmp/
 *.wav
 *.mp4
+
+audio/
+__pycache__/
