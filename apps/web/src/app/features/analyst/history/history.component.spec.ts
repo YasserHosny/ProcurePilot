@@ -117,6 +117,20 @@ describe('AnalystHistoryComponent (R4.2)', () => {
     expect(items[0].textContent).toContain('How much have we spent this month?');
   });
 
+  // WCAG 2.5.3 Label in Name: the card shows its date, question count and question, so its
+  // accessible name must come from that visible text, not from a label naming the question only.
+  it('names each history item by its visible text', () => {
+    analystApi.listConversations.and.returnValue(of(pageOf([conversation])));
+    fixture.detectChanges();
+
+    const item = (fixture.nativeElement as HTMLElement).querySelector<HTMLElement>(
+      '[data-testid="analyst-history-item"]',
+    )!;
+    expect(item.getAttribute('aria-label')).toBeNull();
+    expect(item.getAttribute('role')).toBe('button');
+    expect(item.textContent).toContain('How much have we spent this month?');
+  });
+
   it('navigates to the conversation when an item is opened', () => {
     analystApi.listConversations.and.returnValue(of(pageOf([conversation])));
     fixture.detectChanges();
