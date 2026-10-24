@@ -172,7 +172,7 @@
 .progress-title { font-size: 1.25rem; font-weight: 600; margin-top: 1.5rem; }
 .result-title { font-size: 1.35rem; font-weight: 700; }
 .progress-hint { font-size: 0.9rem; max-width: 450px; }
-.result-message { font-size: 0.95rem; max-width: 500px; word-break: break-all; }
+.result-message { font-size: 0.95rem; max-width: 500px; overflow-wrap: anywhere; }
 .progress-bar { width: 100%; max-width: 380px; margin-block: 1rem; }
 .file-caption { font-size: 0.85rem; margin: 0.5rem 0 0; }
 .result-details { display: flex; gap: 0.75rem; margin-block-end: 2rem; flex-wrap: wrap; justify-content: center; }

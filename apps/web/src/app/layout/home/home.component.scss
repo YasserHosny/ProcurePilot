@@ -198,7 +198,7 @@
   font-weight: 500;
   color: var(--pp-text-strong);
   text-align: end;
-  word-break: break-all;
+  overflow-wrap: anywhere;
   max-inline-size: 100%;
   overflow: hidden;
   text-overflow: ellipsis;

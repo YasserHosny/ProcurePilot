@@ -162,7 +162,7 @@
 
 .approver-val {
   color: var(--pp-text);
-  word-break: break-all;
+  overflow-wrap: anywhere;
 }
 
 .actions-cell {
