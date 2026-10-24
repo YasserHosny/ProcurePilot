@@ -105,7 +105,11 @@ test.describe('Approval Queue (chunk 008 US2)', () => {
     await expect(row).toBeVisible();
     await expect(row.locator('.requester-cell')).toContainText(ownerEmail);
     await expect(row.locator('.requester-cell')).not.toContainText(request.requesterId);
-    await expect(row).toContainText(request.requiredByDate);
+    // The required-by date renders as a locale-formatted local calendar date (PPS-48).
+    const [year, month, day] = request.requiredByDate.split('-').map(Number);
+    await expect(row.locator('.date-cell')).toHaveText(
+      new Intl.DateTimeFormat('en', { dateStyle: 'medium' }).format(new Date(year!, month! - 1, day!)),
+    );
     await expect(row).toContainText('1 line');
 
     await row.locator('.expand-lines-btn').click();

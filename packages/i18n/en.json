@@ -2164,7 +2164,8 @@
       "assignedTo": "Assigned to",
       "comment": "Decision comment",
       "decidedAt": "Decided on",
-      "pending": "Pending approval"
+      "pending": "Pending approval",
+      "unknownApprover": "Unknown approver"
     },
     "autoPrepared": {
       "badge": "Auto-prepared",
@@ -2246,8 +2247,14 @@
     "empty": "No requests are currently awaiting your decision.",
     "notAvailable": "Not available",
     "costCentreNone": "None (branch-level)",
-    "line": "line",
-    "lines": "lines",
+    "lineCount": {
+      "zero": "{{count}} lines",
+      "one": "{{count}} line",
+      "two": "{{count}} lines",
+      "few": "{{count}} lines",
+      "many": "{{count}} lines",
+      "other": "{{count}} lines"
+    },
     "viewLines": "View lines",
     "hideLines": "Hide lines",
     "noLines": "No line items.",

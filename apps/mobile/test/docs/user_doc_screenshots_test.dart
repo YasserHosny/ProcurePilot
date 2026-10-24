@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'package:procurepilot_mobile/core/api/approvals_api_client.dart';
 import 'package:procurepilot_mobile/core/api/mobile_api_client.dart';
 import 'package:procurepilot_mobile/core/api/models.dart';
@@ -202,6 +203,7 @@ final _requestOrdered = PurchaseRequest(
   approvalStep: ApprovalStep(
     id: 'step-001',
     assignedMembershipId: 'mem-sarah',
+    assignedEmail: 'sarah.manager@sanad-demo.example',
     source: 'branch_manager',
     status: 'approved',
     comment: 'Approved for Maadi kitchen weekly stock.',
@@ -417,6 +419,7 @@ Future<void> _renderAndCapture({
 
 void main() {
   setUpAll(() async {
+    await initializeDateFormatting();
     await _loadAppFontsAndAssets();
   });
 

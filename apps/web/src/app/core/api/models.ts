@@ -1407,6 +1407,8 @@ export interface PurchaseRequestLineInput {
 export interface ApprovalStep {
   readonly id: string;
   readonly assigned_membership_id: string;
+  readonly assigned_name?: string | null;
+  readonly assigned_email?: string | null;
   readonly source: ApprovalStepSource;
   readonly status: ApprovalStepStatus;
   readonly comment?: string | null;

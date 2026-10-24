@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:http/http.dart' as http;
+import 'package:intl/date_symbol_data_local.dart';
 import 'package:local_auth/local_auth.dart';
 
 import 'core/api/approvals_api_client.dart';
@@ -55,6 +56,7 @@ final Map<String, WidgetBuilder> appRoutes = {
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await initializeDateFormatting();
 
   const supabaseUrl = String.fromEnvironment('SUPABASE_URL', defaultValue: '');
   const supabaseAnonKey = String.fromEnvironment(

@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'package:procurepilot_mobile/core/api/models.dart';
 import 'package:procurepilot_mobile/core/api/approvals_api_client.dart';
 import 'package:procurepilot_mobile/core/api/mobile_api_client.dart';
@@ -47,6 +48,7 @@ class TestAssetBundle extends AssetBundle {
 
 /// Returns a loaded [I18nLoader] backed by a minimal English catalogue.
 Future<I18nLoader> loadTestI18n({String locale = 'en'}) async {
+  await initializeDateFormatting();
   final bundle = TestAssetBundle({
     'assets/i18n/en.json': jsonEncode({
       'common': {
@@ -137,6 +139,7 @@ Future<I18nLoader> loadTestI18n({String locale = 'en'}) async {
         'empty': 'No requests are currently awaiting your decision.',
         'notAvailable': 'Not available',
         'unknownRequester': 'Unknown requester',
+        'unknownApprover': 'Unknown approver',
         'unknownProduct': 'Unknown product',
       },
       'rfq': {
@@ -215,6 +218,7 @@ Future<I18nLoader> loadTestI18n({String locale = 'en'}) async {
           'comment': 'Decision comment',
           'decidedAt': 'Decided on',
           'pending': 'Pending approval',
+          'unknownApprover': 'Unknown approver',
         },
       },
       'delivery': {
@@ -284,6 +288,7 @@ Future<I18nLoader> loadTestI18n({String locale = 'en'}) async {
         },
         'actions': {'approve': 'اعتماد', 'reject': 'رفض'},
         'unknownRequester': 'مقدم طلب غير معروف',
+        'unknownApprover': 'معتمد غير معروف',
         'unknownProduct': 'منتج غير معروف',
         'approveSuccess': 'تم اعتماد الطلب.',
         'rejectSuccess': 'تم رفض الطلب.',
@@ -315,6 +320,14 @@ Future<I18nLoader> loadTestI18n({String locale = 'en'}) async {
         'columns': {
           'requiredByDate': 'مطلوب قبل',
           'status': 'الحالة',
+        },
+        'approval': {
+          'sectionTitle': 'الاعتماد',
+          'assignedTo': 'معيّن إلى',
+          'comment': 'تعليق القرار',
+          'decidedAt': 'تاريخ القرار',
+          'pending': 'بانتظار الاعتماد',
+          'unknownApprover': 'معتمد غير معروف',
         },
         'status': {
           'submitted': 'مقدمة',

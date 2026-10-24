@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:procurepilot_mobile/core/api/models.dart';
+import 'package:procurepilot_mobile/core/format/date_format.dart';
 import 'package:procurepilot_mobile/features/requests/request_detail_screen.dart';
 import 'package:procurepilot_mobile/features/requests/request_list_screen.dart';
 
@@ -144,7 +145,12 @@ void main() {
 
       expect(find.text('Approved by branch policy'), findsOneWidget);
       expect(
-        find.text(DateTime.utc(2026, 9, 10, 12, 0, 0).toIso8601String()),
+        find.text(
+          formatDateTime(
+            DateTime.utc(2026, 9, 10, 12, 0, 0),
+            locale: 'en',
+          ),
+        ),
         findsOneWidget,
       );
     });

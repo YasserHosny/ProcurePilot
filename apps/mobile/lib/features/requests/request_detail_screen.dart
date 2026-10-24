@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/api/models.dart';
+import '../../core/format/date_format.dart';
 import '../../core/i18n/i18n_loader.dart';
 import '../../core/format/money_format.dart';
 import '../../core/format/quantity_format.dart';
@@ -205,7 +206,7 @@ class RequestApprovalStepSection extends StatelessWidget {
         ),
         RequestInfoRow(
           label: i18n.t('requests.approval.assignedTo'),
-          value: step.assignedMembershipId,
+          value: step.assignedDisplayName(i18n),
         ),
         if (step.status != 'pending') ...[
           if (step.comment != null)
@@ -216,7 +217,8 @@ class RequestApprovalStepSection extends StatelessWidget {
           if (step.decidedAt != null)
             RequestInfoRow(
               label: i18n.t('requests.approval.decidedAt'),
-              value: step.decidedAt!.toIso8601String(),
+              value: formatDateTime(step.decidedAt!, locale: i18n.locale),
+              valueStyle: LedgerTypography.tabularFigures(),
             ),
         ] else
           Padding(

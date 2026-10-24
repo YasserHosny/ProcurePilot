@@ -361,10 +361,8 @@ real push provider — section 13) from a notification tap carrying that request
 | 5 | **Approval section** | Read-only: a status chip, who it's assigned to, and — once decided — the approver's comment and decision timestamp. There is no approve/reject control on this screen; that lives in the Approval Queue (section 10). |
 
 **Current display limitation:** lines show the product's catalogue name, or an "unknown product"
-label when the server sends no name. In the Approval section, however, "Assigned to" shows the
-approver's internal member ID rather than their name, and the decision time is shown as a raw
-timestamp (for example `2026-10-24T14:30:00.000Z`) rather than a local date — a known gap, to be
-fixed.
+label when the server sends no name. "Assigned to" shows the approver's email (or "Unknown approver"),
+and the decision time is shown as a local date and time in the app's language.
 
 **Business value:** a structured, native request flow captures what the web form captures —
 who needs the item, where, by when, and at what estimated cost — from the device a branch user

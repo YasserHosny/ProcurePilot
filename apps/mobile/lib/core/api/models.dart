@@ -278,6 +278,8 @@ class ApprovalStep {
   const ApprovalStep({
     required this.id,
     required this.assignedMembershipId,
+    this.assignedName,
+    this.assignedEmail,
     required this.source,
     required this.status,
     this.comment,
@@ -287,16 +289,30 @@ class ApprovalStep {
 
   final String id;
   final String assignedMembershipId;
+  final String? assignedName;
+  final String? assignedEmail;
   final String source;
   final String status;
   final String? comment;
   final String? decidedByMembershipId;
   final DateTime? decidedAt;
 
+  String assignedDisplayName(I18nLoader i18n) {
+    if (assignedName != null && assignedName!.trim().isNotEmpty) {
+      return assignedName!.trim();
+    }
+    if (assignedEmail != null && assignedEmail!.trim().isNotEmpty) {
+      return assignedEmail!.trim();
+    }
+    return i18n.t('requests.approval.unknownApprover');
+  }
+
   factory ApprovalStep.fromJson(Map<String, dynamic> json) {
     return ApprovalStep(
       id: json['id'] as String,
       assignedMembershipId: json['assigned_membership_id'] as String,
+      assignedName: json['assigned_name'] as String?,
+      assignedEmail: json['assigned_email'] as String?,
       source: json['source'] as String,
       status: json['status'] as String,
       comment: json['comment'] as String?,
@@ -310,6 +326,8 @@ class ApprovalStep {
   Map<String, dynamic> toJson() => {
         'id': id,
         'assigned_membership_id': assignedMembershipId,
+        if (assignedName != null) 'assigned_name': assignedName,
+        if (assignedEmail != null) 'assigned_email': assignedEmail,
         'source': source,
         'status': status,
         if (comment != null) 'comment': comment,

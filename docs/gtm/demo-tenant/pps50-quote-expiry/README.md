@@ -36,8 +36,8 @@ through the whole expiry day. Before the fix, every offer from a quotation had `
    ([12](12-utc-workspace-reads-nov-4.jpg)). «مطاعم سند» is on Africa/Cairo, so it reads correctly. An
    Egyptian pilot that never changes the timezone in Settings would see the date shifted, and its offer
    would stay valid two hours too long. Options: default the timezone from the region at sign-up, or
-   format the expiry as a calendar date in the workspace timezone. Not fixed here.
+   format the expiry as a calendar date in the workspace timezone. Tracked as PPS-55 (P-27).
 2. **"1 matches confirmed."** The bulk-confirm result string (`matching.queue.exact.confirmed` in
-   `packages/i18n`) has no singular form.
+   `packages/i18n`) has no singular form. Tracked as PPS-56 (P-28).
 3. Offers written before the deploy stay open-ended, because `landed_cost` is append-only. The two quotes
    from rounds 6 and 7 still show "no expiry date"; a new quote on «مطاعم سند» will show its expiry.
