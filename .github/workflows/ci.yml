@@ -145,7 +145,7 @@ jobs:
       - name: E2E shard plan
         run: |
           python3 -m unittest discover -s scripts/ci -p 'test_e2e_shard.py' -v
-          python3 scripts/ci/e2e_shard.py check --total 3
+          python3 scripts/ci/e2e_shard.py check --total 5
       - name: Lint backend
         run: uv run --project apps/api ruff check apps/api
       - name: Lint web
@@ -442,15 +442,15 @@ jobs:
         run: pnpm exec ng build
 
   e2e-shard:
-    name: End-to-end shard ${{ matrix.shard }}/3
+    name: End-to-end shard ${{ matrix.shard }}/5
     needs: changes
     if: needs.changes.outputs.code == 'true'
     strategy:
       fail-fast: false
       matrix:
-        # Matrix size and planner --total 3 must change together.
+        # Matrix size and planner --total 5 must change together.
         # Regenerate e2e-durations.json with e2e_shard.py from-logs.
-        shard: [1, 2, 3]
+        shard: [1, 2, 3, 4, 5]
     runs-on: ubuntu-latest
     services:
       # The quotation extraction pipeline (services/extraction-worker) is an RQ consumer over
@@ -596,7 +596,7 @@ jobs:
             echo "::error::web app did not become ready"; exit 1
           }
 
-      # Specs are sharded by file across three runners. Each shard boots its own isolated stack
+      # Specs are sharded by file across five runners. Each shard boots its own isolated stack
       # (Supabase, Redis, API, worker, web), so no state is shared between shards; within a shard
       # the suite stays serial (workers: 1) exactly as before.
       - name: Accessibility — WCAG 2.1 AA, zero violations
@@ -608,7 +608,7 @@ jobs:
         # the functional specs (FR-022, SC-006).
         working-directory: apps/web
         run: |
-          files=$(python3 ../../scripts/ci/e2e_shard.py plan --shard ${{ matrix.shard }} --total 3 --kind a11y)
+          files=$(python3 ../../scripts/ci/e2e_shard.py plan --shard ${{ matrix.shard }} --total 5 --kind a11y)
           if [ -z "$files" ]; then
             echo "::notice::No a11y end-to-end specs assigned to this shard"
             exit 0
@@ -624,7 +624,7 @@ jobs:
           TZ: Asia/Dubai
         run: |
           google-chrome --version
-          files=$(python3 ../../scripts/ci/e2e_shard.py plan --shard ${{ matrix.shard }} --total 3 --kind functional)
+          files=$(python3 ../../scripts/ci/e2e_shard.py plan --shard ${{ matrix.shard }} --total 5 --kind functional)
           if [ -z "$files" ]; then
             echo "::error::No non-a11y end-to-end specs found"
             exit 1

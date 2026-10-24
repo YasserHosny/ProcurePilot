@@ -55,8 +55,8 @@ jobs:
           tags: |
             ${{ steps.meta.outputs.tag_latest }}
             ${{ steps.meta.outputs.tag_sha }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=optimiser
+          cache-to: type=gha,scope=optimiser,mode=min
 
       - name: Check the container exists in the bunny.net workers app
         # The container is created once by the owner (see docs/operations/runbook.md §7.7);
