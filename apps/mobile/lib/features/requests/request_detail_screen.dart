@@ -4,6 +4,7 @@ import '../../core/api/models.dart';
 import '../../core/i18n/i18n_loader.dart';
 import '../../core/format/money_format.dart';
 import '../../core/format/quantity_format.dart';
+import '../../core/theme/ledger_typography.dart';
 import '../service_provider.dart';
 
 /// Read-only purchase-request detail screen.
@@ -106,11 +107,13 @@ class RequestContextSection extends StatelessWidget {
           RequestInfoRow(
             label: i18n.t('requests.columns.estimatedTotal'),
             value: _formatMoney(i18n, request.estimatedTotal!),
+            valueStyle: LedgerTypography.tabularFigures(),
           ),
         if (request.budgetStatus != null) ...[
           RequestInfoRow(
             label: i18n.t('requests.budgetStatus.remainingLabel'),
             value: _formatMoney(i18n, request.budgetStatus!.remainingAmount),
+            valueStyle: LedgerTypography.tabularFigures(),
           ),
           if (request.budgetStatus!.exceeds)
             Padding(
@@ -160,7 +163,10 @@ class RequestContextSection extends StatelessWidget {
               title: Text(line.productDisplayName(i18n)),
               subtitle: Text(subtitleLines.join('\n')),
               trailing: line.estimatedUnitPrice != null
-                  ? Text(_formatMoney(i18n, line.estimatedUnitPrice!))
+                  ? Text(
+                      _formatMoney(i18n, line.estimatedUnitPrice!),
+                      style: LedgerTypography.tabularFigures(),
+                    )
                   : null,
             ),
           );
@@ -223,10 +229,16 @@ class RequestApprovalStepSection extends StatelessWidget {
 }
 
 class RequestInfoRow extends StatelessWidget {
-  const RequestInfoRow({super.key, required this.label, required this.value});
+  const RequestInfoRow({
+    super.key,
+    required this.label,
+    required this.value,
+    this.valueStyle,
+  });
 
   final String label;
   final String value;
+  final TextStyle? valueStyle;
 
   @override
   Widget build(BuildContext context) {
@@ -236,7 +248,7 @@ class RequestInfoRow extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text('$label: ', style: const TextStyle(fontWeight: FontWeight.bold)),
-          Expanded(child: Text(value)),
+          Expanded(child: Text(value, style: valueStyle)),
         ],
       ),
     );

@@ -8,6 +8,7 @@ import '../../core/api/requests_api_client.dart';
 import '../../core/i18n/i18n_loader.dart';
 import '../../core/offline_queue/offline_queue_service.dart';
 import '../../core/offline_queue/status_widgets.dart';
+import '../../core/theme/ledger_typography.dart';
 import '../service_provider.dart';
 
 /// Purchase-request form screen.
@@ -644,6 +645,7 @@ class _LineItemEditorState extends State<_LineItemEditor> {
             TextFormField(
               key: Key('requestLine_${widget.index}_quantity'),
               controller: _quantityController,
+              style: LedgerTypography.tabularFigures(),
               decoration: InputDecoration(
                 labelText: i18n.t('requests.form.quantityLabel'),
               ),

@@ -10,6 +10,9 @@ import '../../core/format/quantity_format.dart';
 import '../../core/i18n/i18n_loader.dart';
 import '../../core/offline_queue/offline_queue_service.dart';
 import '../../core/offline_queue/status_widgets.dart';
+import '../../core/theme/brand_colors.dart';
+import '../../core/theme/brand_logo.dart';
+import '../../core/theme/ledger_typography.dart';
 import '../service_provider.dart';
 
 /// Low-stock report screen (User Story 3 / T032).
@@ -301,7 +304,22 @@ class _LowStockReportScreenState extends State<LowStockReportScreen> {
 
     if (_submittedReport != null) {
       return Scaffold(
-        appBar: AppBar(title: Text(i18n.t('lowStock.title'))),
+        appBar: AppBar(
+          title: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const BrandLogo(height: 28),
+              const SizedBox(width: 8),
+              Flexible(
+                child: Text(
+                  i18n.t('lowStock.title'),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+        ),
         body: SafeArea(
           child: Padding(
             padding: const EdgeInsets.all(24),
@@ -318,10 +336,13 @@ class _LowStockReportScreenState extends State<LowStockReportScreen> {
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      const Icon(
+                      Icon(
                         Icons.check_circle_outline,
-                        key: Key('lowStockSuccessIcon'),
-                        color: Colors.green,
+                        key: const Key('lowStockSuccessIcon'),
+                        color: Theme.of(context)
+                                .extension<LedgerColors>()
+                                ?.success ??
+                            const Color(0xFF166534),
                         size: 64,
                       ),
                       const SizedBox(height: 16),
@@ -352,7 +373,10 @@ class _LowStockReportScreenState extends State<LowStockReportScreen> {
                         '${i18n.t('lowStock.countRemainingLabel')}: $countDisplay',
                         key: const Key('lowStockConfirmationCount'),
                         textAlign: TextAlign.center,
-                        style: Theme.of(context).textTheme.bodyMedium,
+                        style: Theme.of(context)
+                            .textTheme
+                            .bodyMedium
+                            ?.merge(LedgerTypography.tabularFigures()),
                       );
                     },
                   ),
@@ -381,7 +405,22 @@ class _LowStockReportScreenState extends State<LowStockReportScreen> {
     }
 
     return Scaffold(
-      appBar: AppBar(title: Text(i18n.t('lowStock.title'))),
+      appBar: AppBar(
+        title: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const BrandLogo(height: 28),
+            const SizedBox(width: 8),
+            Flexible(
+              child: Text(
+                i18n.t('lowStock.title'),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+      ),
       body: SafeArea(
         child: Form(
           key: _formKey,
@@ -494,6 +533,7 @@ class _LowStockReportScreenState extends State<LowStockReportScreen> {
                 TextFormField(
                   key: const Key('lowStockCountRemainingField'),
                   controller: _countRemainingController,
+                  style: LedgerTypography.tabularFigures(),
                   decoration: InputDecoration(
                     labelText: i18n.t('lowStock.countRemainingLabel'),
                     hintText: '0',

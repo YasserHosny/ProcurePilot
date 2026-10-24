@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/auth/auth_service.dart';
 import '../../core/auth/biometric_gate.dart';
 import '../../core/i18n/i18n_loader.dart';
+import '../../core/theme/brand_logo.dart';
 import '../service_provider.dart';
 
 /// Credential sign-in screen.
@@ -120,7 +121,7 @@ class _SignInScreenState extends State<SignInScreen> {
     final i18n = _i18n;
 
     return Scaffold(
-      appBar: AppBar(title: Text(i18n.t('common.brandName'))),
+      appBar: AppBar(title: const BrandLogo(height: 28)),
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(24),
@@ -128,6 +129,8 @@ class _SignInScreenState extends State<SignInScreen> {
             key: _formKey,
             child: ListView(
               children: [
+                const Center(child: BrandLogo(height: 44)),
+                const SizedBox(height: 24),
                 Text(
                   i18n.t('auth.signin.title'),
                   style: Theme.of(context).textTheme.headlineSmall,

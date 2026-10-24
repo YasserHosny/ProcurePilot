@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 
 import '../../core/api/approvals_api_client.dart';
 import '../../core/api/models.dart';
-import '../../core/i18n/i18n_loader.dart';
 import '../../core/format/money_format.dart';
+import '../../core/i18n/i18n_loader.dart';
+import '../../core/theme/brand_logo.dart';
+import '../../core/theme/ledger_typography.dart';
 import '../service_provider.dart';
 
 class ApprovalQueueScreen extends StatefulWidget {
@@ -60,7 +62,22 @@ class _ApprovalQueueScreenState extends State<ApprovalQueueScreen> {
   Widget build(BuildContext context) {
     final i18n = _i18n;
     return Scaffold(
-      appBar: AppBar(title: Text(i18n.t('approvals.title'))),
+      appBar: AppBar(
+        title: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const BrandLogo(height: 28),
+            const SizedBox(width: 8),
+            Flexible(
+              child: Text(
+                i18n.t('approvals.title'),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+      ),
       body: SafeArea(
         child: Column(
           children: [
@@ -108,6 +125,7 @@ class _ApprovalQueueScreenState extends State<ApprovalQueueScreen> {
     if (money == null) return null;
     return Text(
       formatMoney(money.amount, money.currency, locale: _i18n.locale),
+      style: LedgerTypography.tabularFigures(fontWeight: FontWeight.w600),
     );
   }
 }

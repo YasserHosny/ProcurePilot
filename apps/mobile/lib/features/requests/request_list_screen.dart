@@ -4,6 +4,8 @@ import '../../core/api/models.dart';
 import '../../core/api/requests_api_client.dart';
 import '../../core/format/money_format.dart';
 import '../../core/i18n/i18n_loader.dart';
+import '../../core/theme/brand_logo.dart';
+import '../../core/theme/ledger_typography.dart';
 import '../service_provider.dart';
 
 /// Lists the signed-in member's own purchase requests with status filtering.
@@ -64,7 +66,20 @@ class _RequestListScreenState extends State<RequestListScreen> {
     final i18n = _i18n;
     return Scaffold(
       appBar: AppBar(
-        title: Text(i18n.t('requests.title')),
+        title: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const BrandLogo(height: 28),
+            const SizedBox(width: 8),
+            Flexible(
+              child: Text(
+                i18n.t('requests.title'),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
         actions: [
           IconButton(
             key: const Key('requestListNewRequestButton'),
@@ -166,6 +181,9 @@ class _RequestListScreenState extends State<RequestListScreen> {
 
   Widget? _moneyText(Money? money) {
     if (money == null) return null;
-    return Text(formatMoney(money.amount, money.currency, locale: _i18n.locale));
+    return Text(
+      formatMoney(money.amount, money.currency, locale: _i18n.locale),
+      style: LedgerTypography.tabularFigures(fontWeight: FontWeight.w600),
+    );
   }
 }

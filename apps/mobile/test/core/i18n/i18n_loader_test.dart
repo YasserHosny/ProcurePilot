@@ -42,8 +42,8 @@ void main() {
   group('I18nLoader', () {
     test('loads English catalogue and resolves dotted keys', () async {
       final bundle = _MapAssetBundle({
-        '../../packages/i18n/en.json': en,
-        '../../packages/i18n/ar.json': ar,
+        'assets/i18n/en.json': en,
+        'assets/i18n/ar.json': ar,
       });
       final loader = I18nLoader(bundle: bundle);
 
@@ -57,8 +57,8 @@ void main() {
 
     test('loads Arabic catalogue and switches to RTL', () async {
       final bundle = _MapAssetBundle({
-        '../../packages/i18n/en.json': en,
-        '../../packages/i18n/ar.json': ar,
+        'assets/i18n/en.json': en,
+        'assets/i18n/ar.json': ar,
       });
       final loader = I18nLoader(bundle: bundle);
 
@@ -72,10 +72,10 @@ void main() {
 
     test('supports simple {{param}} substitution', () async {
       final bundle = _MapAssetBundle({
-        '../../packages/i18n/en.json': jsonEncode({
+        'assets/i18n/en.json': jsonEncode({
           'greeting': 'Hello {{name}}',
         }),
-        '../../packages/i18n/ar.json': ar,
+        'assets/i18n/ar.json': ar,
       });
       final loader = I18nLoader(bundle: bundle);
       await loader.load('en');
@@ -88,8 +88,8 @@ void main() {
 
     test('returns the key itself for missing translations', () async {
       final bundle = _MapAssetBundle({
-        '../../packages/i18n/en.json': en,
-        '../../packages/i18n/ar.json': ar,
+        'assets/i18n/en.json': en,
+        'assets/i18n/ar.json': ar,
       });
       final loader = I18nLoader(bundle: bundle);
       await loader.load('en');

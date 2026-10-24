@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/api/approvals_api_client.dart';
 import '../../core/auth/auth_service.dart';
 import '../../core/i18n/i18n_loader.dart';
+import '../../core/theme/brand_logo.dart';
 import '../auth/auth_session.dart';
 import '../auth/biometric_preference.dart';
 import '../auth/device_registrar.dart';
@@ -108,7 +109,20 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(i18n.t('mobileHome.title')),
+        title: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const BrandLogo(height: 28),
+            const SizedBox(width: 8),
+            Flexible(
+              child: Text(
+                i18n.t('mobileHome.title'),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
         actions: [
           IconButton(
             key: const Key('signOutButton'),
