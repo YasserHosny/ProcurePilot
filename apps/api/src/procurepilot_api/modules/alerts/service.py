@@ -11,7 +11,7 @@ from procurepilot_api.deps import CurrentMember
 from procurepilot_api.errors import NotFoundError, ServiceUnavailableError, UnprocessableEntityError
 from procurepilot_api.modules.alerts.conditions import AlertConditionService
 from procurepilot_api.modules.alerts.schemas import AlertDismissal, AlertList
-from procurepilot_api.modules.offers.service import _authenticated_db
+from procurepilot_api.modules.offers.service import _authenticated_db, shared_authenticated_db
 from procurepilot_api.shared.audit import AuditEventCreate, get_audit_writer
 from procurepilot_api.shared.logging import get_trace_id
 
@@ -31,8 +31,9 @@ class AlertService:
     ) -> AlertList:
         capped_limit = max(1, min(limit, 100))
         offset = _decode_cursor(cursor)
-        live = self._conditions.live_alerts(member=member, kind=kind)
-        dismissed = _dismissed_fingerprints(self._settings, member)
+        with shared_authenticated_db(self._settings, member):
+            live = self._conditions.live_alerts(member=member, kind=kind)
+            dismissed = _dismissed_fingerprints(self._settings, member)
         visible = [alert for alert in live if alert.id not in dismissed]
         page = visible[offset : offset + capped_limit]
         next_cursor = (
