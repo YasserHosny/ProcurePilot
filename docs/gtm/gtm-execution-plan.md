@@ -107,7 +107,7 @@ since the 2026-10-24 move; the old `PP` key is in brackets.
 | P-16 | PPS-37 | P-17 | PPS-40 | P-18 | PPS-42 |
 | P-19 | PPS-44 | P-21 | PPS-46 | P-22 | PPS-47 |
 | P-20 | PPS-45 | P-23 | PPS-49 | P-24 | PPS-50 |
-| P-25 | PPS-51 | | | | |
+| P-25 | PPS-51 | G-13 | PPS-39 | | |
 
 Without a plan ID: PPS-2 (PP-21), PPS-7 (PP-22), PPS-8 (PP-23), PPS-22 (PP-24), PPS-27 (PP-25),
 PPS-28 (PP-26), PPS-23 (PP-27) — architecture diagrams and two shipped code changes, all Done.
