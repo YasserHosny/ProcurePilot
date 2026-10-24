@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime, time, timedelta
 from decimal import Decimal
 from uuid import UUID
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from postgrest.exceptions import APIError
 
@@ -79,7 +80,8 @@ class LandedCostService:
         pack = _pack_row(client, UUID(str(product["id"])))
         quantity = Decimal(str(line.get("quantity") or "1"))
         base_quantity = Decimal(str(pack["base_quantity"]))
-        quote_currency = _quotation_currency(client, UUID(str(line["quotation_id"])))
+        quote = _quotation_row(client, UUID(str(line["quotation_id"])))
+        quote_currency = str(quote["currency"]).upper() if quote.get("currency") else None
         unit_currency = _required_currency(
             _resolve_currency(line.get("unit_price_currency"), quote_currency)
         )
@@ -97,22 +99,21 @@ class LandedCostService:
                 else None,
                 delivery_fee=MoneyValue(
                     Decimal(str(line.get("delivery_fee_amount") or "0")),
-                    str(
-                        line.get("delivery_fee_currency")
-                        or unit_currency
-                    ),
+                    str(line.get("delivery_fee_currency") or unit_currency),
                 ),
                 discount=MoneyValue(
                     Decimal(str(line.get("discount_amount") or "0")),
-                    str(
-                        line.get("discount_currency")
-                        or unit_currency
-                    ),
+                    str(line.get("discount_currency") or unit_currency),
                 ),
             ),
             rule_version=version,
         )
-        now = datetime.now(UTC).isoformat()
+        recorded_at = datetime.now(UTC)
+        valid_to = _quotation_valid_to(client, member.tenant_id, quote.get("expiry_date"))
+        # A quote that had already lapsed when it was matched still satisfies
+        # landed_cost_valid_to_after_valid_from, and reads as expired, not open-ended.
+        valid_from = recorded_at if valid_to is None else min(recorded_at, valid_to)
+        now = recorded_at.isoformat()
         try:
             response = (
                 client.table("landed_cost")
@@ -138,7 +139,8 @@ class LandedCostService:
                         "total_currency": result.total.currency,
                         "raw_inputs": result.raw_inputs,
                         "rule_version": version,
-                        "valid_from": now,
+                        "valid_from": valid_from.isoformat(),
+                        "valid_to": valid_to.isoformat() if valid_to is not None else None,
                         "recorded_at": now,
                     }
                 )
@@ -232,16 +234,47 @@ def _required_currency(currency: str | None) -> str:
     return currency
 
 
-def _quotation_currency(client: object, quotation_id: UUID) -> str | None:
+def _quotation_row(client: object, quotation_id: UUID) -> dict[str, object]:
     response = (
         client.table("quotation")
-        .select("currency")
+        .select("currency,expiry_date")
         .eq("id", str(quotation_id))
         .limit(1)
         .execute()
     )
     rows = getattr(response, "data", None) or []
-    return str(rows[0]["currency"]).upper() if rows and rows[0].get("currency") else None
+    return rows[0] if rows else {}
+
+
+def _quotation_valid_to(client: object, tenant_id: UUID, expiry_date: object) -> datetime | None:
+    """The last instant of the quotation's expiry day, in the tenant's reporting timezone.
+
+    A quote "valid until 3 Nov" is still good on 3 Nov, so the offer lapses when that local
+    day ends. No expiry date means the offer stays open-ended.
+    """
+    if expiry_date is None:
+        return None
+    expiry = expiry_date if isinstance(expiry_date, date) else date.fromisoformat(str(expiry_date))
+    next_day = datetime.combine(
+        expiry + timedelta(days=1), time.min, _tenant_timezone(client, tenant_id)
+    )
+    return (next_day - timedelta(microseconds=1)).astimezone(UTC)
+
+
+def _tenant_timezone(client: object, tenant_id: UUID) -> ZoneInfo:
+    response = (
+        client.table("tenant")
+        .select("reporting_timezone")
+        .eq("id", str(tenant_id))
+        .limit(1)
+        .execute()
+    )
+    rows = getattr(response, "data", None) or []
+    name = str(rows[0].get("reporting_timezone") or "UTC") if rows else "UTC"
+    try:
+        return ZoneInfo(name)
+    except (ZoneInfoNotFoundError, ValueError):
+        return ZoneInfo("UTC")
 
 
 def _product_row(client: object, product_id: UUID) -> dict[str, object]:
