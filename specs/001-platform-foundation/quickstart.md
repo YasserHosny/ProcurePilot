@@ -102,7 +102,7 @@ job (FR-024) — check the compose logs for the `db` service rather than retryin
 
 Then in the browser:
 
-1. Open http://localhost:4200 → you are redirected to sign-in.
+1. Open http://localhost:4200 → the guest landing page; choose **Sign in**.
 2. Follow the sign-up link, paste the seeded invitation token.
 3. Enter a business name, and pick a region, currency, and tax model — there is no default, by
    design (FR-031).
