@@ -1,0 +1,3 @@
+tags:
+  docs:
+    skip: "Excluded from default test runs. Run with: flutter test --tags docs --run-skipped test/docs/"

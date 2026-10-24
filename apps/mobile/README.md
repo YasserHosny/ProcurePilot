@@ -39,3 +39,16 @@ flutter test
 
 Local persistence uses Hive (not sqflite) — a pure-Dart key-value store with no native SQLite
 dependency, so `flutter test` runs deterministically without an Android/iOS toolchain.
+
+## Documentation Screenshots
+
+The user guide screenshots (`docs/user/screenshots/mobile/`) are rendered offline from real app
+widgets at 390x844 logical px (devicePixelRatio 2.0) with real fonts (`Readex Pro`,
+`Noto Kufi Arabic`, `MaterialIcons`) and Ledger styling. The capture test is tagged `docs` and
+skipped by default in normal test runs via `dart_test.yaml`.
+
+To regenerate the documentation screenshots:
+
+```bash
+cd apps/mobile && flutter test --tags docs --run-skipped test/docs/
+```

@@ -28,15 +28,18 @@
 
 ---
 
-**About the images in this doc:** the screenshots below are mockups from the ProcurePilot
-Mobile Stitch design system (`stitch_design_system_implementation`), not live captures from a
-running device or simulator — this pass reviewed the app's actual source
-(`apps/mobile/lib/features/`) and its own widget test suite, not a live build. Sections 3–6 have
-a matching mockup and a **"Shipped vs. mockup"** note calling out anything in the image the
-current build doesn't actually do. Sections 9–12 cover screens that are fully built and tested
-but, for three of them, never had a design mockup produced (Approvals, Delivery Confirmation,
-Quality Issue Reporting) — those sections are text-only. Section 18 uses the remaining mockups
-to preview the one screen that genuinely doesn't exist yet (Settings).
+**About the images in this doc:** the screenshots below are real offline renders of the shipped
+ProcurePilot mobile app (Flutter, iOS + Android), rendered through the production Ledger design
+system (`AppTheme`, `lib/core/theme/`) with Cairo restaurant group context ("Nile Kitchens", branches
+Maadi/Zamalek, explicit EGP amounts). The screenshots were rendered at 390x844 logical px
+(devicePixelRatio 2.0) directly from the offline test suite (`apps/mobile/test/docs/user_doc_screenshots_test.dart`).
+Section 18 retains the original design preview mockup for Settings, which does not exist in the app yet.
+
+To regenerate all screenshots:
+
+```bash
+cd apps/mobile && flutter test --tags docs --run-skipped test/docs/
+```
 
 For the web app's screens, see [ProcurePilot User Documentation](user-documentation.md). For
 route-by-route web navigation paths, see [ProcurePilot User Flows](user-flows.md).
@@ -121,7 +124,8 @@ at the branch — requesting, approving, confirming delivery, flagging a problem
 
 **First screen after Splash on a fresh install, or whenever there's no valid stored session.**
 
-![Sign In — design mockup](screenshots/mobile/01-sign-in-mockup.png)
+![Sign In](screenshots/mobile/01-sign-in.png)
+![Sign In — Arabic](screenshots/mobile/01-sign-in-ar.png)
 
 | # | Element | Description |
 |---|---------|-------------|
@@ -157,18 +161,13 @@ app for those (section 1 of the web documentation).
 signals without creating a separate identity model. The same workspace membership and role
 boundaries apply everywhere.
 
-**Shipped vs. mockup:** the mockup's "Forgot password?" link and EN/AR language segmented
-control aren't wired up in the shipped screen — password reset and account creation stay
-web-only, and language follows the device locale (section 8). The "Need an account? Contact your
-procurement administrator" footer and the SSO/SOC2 badges are mockup chrome only.
-
 ---
 
 ## 4. Enable Biometric Unlock
 
 **Shown once, immediately after a successful sign-in, only on a device that supports biometrics.**
 
-![Enable Biometric Unlock — design mockup](screenshots/mobile/02-biometric-enable-mockup.png)
+![Enable Biometric Unlock](screenshots/mobile/02-biometric-enable.png)
 
 | # | Element | Description |
 |---|---------|-------------|
@@ -194,16 +193,13 @@ of your stored session, never a replacement for it or a requirement to use the a
 **Business value:** biometric unlock removes friction for frequent mobile checks while keeping
 the user's verified workspace identity as the source of authority.
 
-**Shipped vs. mockup:** the shipped sheet is simpler than the mockup — no branded top app bar,
-no "hardware security module" footnote, and the copy is a shorter, more direct sentence.
-
 ---
 
 ## 5. App Launch (Splash / Returning-Device Unlock)
 
 A brief loading screen shown every time the app starts, before Sign In or Home.
 
-![Returning-device biometric unlock — design mockup](screenshots/mobile/03-biometric-unlock-mockup.png)
+![App Launch (Splash / Returning-Device Unlock)](screenshots/mobile/03-biometric-unlock.png)
 
 You won't normally interact with it — it decides where to send you:
 
@@ -214,7 +210,7 @@ You won't normally interact with it — it decides where to send you:
    failed, or unavailable biometric check falls back to Sign In rather than blocking you.
 
 **Tips:**
-- A short Splash state is normal while the app checks local session state.
+- A short Splash state is normal while the app checks local session state. The screen displays a plain loading indicator while the biometric check runs, with silent fallback to Sign In on anything other than success.
 - Repeated fallback to Sign In usually means biometric unlock is disabled, unavailable, or the
   stored session can no longer be refreshed.
 - If your organisation removed your access, signing in again will fail with the same access
@@ -223,19 +219,15 @@ You won't normally interact with it — it decides where to send you:
 **Business value:** return-launch handling makes mobile quick enough for short operational
 checks while still validating that the session can be trusted.
 
-**Shipped vs. mockup:** the mockup's personalized "Welcome back, Sarah K." branch-header card,
-"Use password instead" link, and EN/AR switcher aren't in the shipped screen — today it's a
-plain loading indicator while the biometric check runs, with silent fallback to Sign In on
-anything other than success.
-
 ---
 
 ## 6. Home
 
 **Landing screen after sign-in or a successful biometric unlock.**
 
-![Home — Branch Manager, design mockup](screenshots/mobile/04-home-branch-manager-mockup.png)
-![Home — Approver, design mockup](screenshots/mobile/04b-home-approver-mockup.png)
+![Home — Branch Manager](screenshots/mobile/04-home-branch-manager.png)
+![Home — Approver](screenshots/mobile/04b-home-approver.png)
+![Home — Branch Manager (Arabic)](screenshots/mobile/04-home-branch-manager-ar.png)
 
 | # | Element | Description |
 |---|---------|-------------|
@@ -264,13 +256,6 @@ and a launch point, not the decision surface itself.
 **Business value:** Home gives the user a low-friction operational signal — who they are in the
 workspace and whether a request or an approval needs attention — with one tap into the screen
 that actually does something about it.
-
-**Shipped vs. mockup:** the shipped Home is simpler than the mockup — a role label, a **Request
-items** button, and (for approvers) a single plain count card, with no bottom navigation bar,
-"New request" hero card, Low-stock report tile, "My requests" tile, or recent-activity feed (see
-section 18). The mockup's approver card also says pending approvals are reviewed on a "desktop
-authorization terminal" — that line is no longer accurate to the shipped product: approve and
-reject are now native mobile actions (section 10), reached directly from this same count.
 
 ---
 
@@ -327,6 +312,9 @@ own requests, a create/edit form, and a read-only detail view.
 
 **Route:** `/requests`
 
+![My Requests](screenshots/mobile/06-my-requests-list.png)
+![My Requests — Empty State](screenshots/mobile/06b-my-requests-empty.png)
+
 Lists the signed-in member's own purchase requests, filterable by status.
 
 | # | Element | Description |
@@ -339,6 +327,8 @@ Lists the signed-in member's own purchase requests, filterable by status.
 ### New / Edit Purchase Request
 
 **Route:** `/requests/new` (also used when editing a saved draft)
+
+![New Purchase Request](screenshots/mobile/05-new-request.png)
 
 | # | Element | Description |
 |---|---------|-------------|
@@ -360,6 +350,8 @@ connectivity.
 Reached from **My Requests**, immediately after submitting a new request, or (once wired to a
 real push provider — section 13) from a notification tap carrying that request's ID.
 
+![Request Detail](screenshots/mobile/07-request-detail.png)
+
 | # | Element | Description |
 |---|---------|-------------|
 | 1 | **Request context** | Required-by date, status, requester, estimated total, a remaining-budget figure or an exceeds-budget badge when a budget applies, and an incomplete-estimate badge when some lines lack pricing. A request an RFQ guardrail drafted opens with a **Prepared automatically by a guardrail** banner naming the supplier whose quote it came from; Approval Decision shows the same banner. |
@@ -368,9 +360,11 @@ real push provider — section 13) from a notification tap carrying that request
 | 4 | **Report Quality Issue button** | Shown only while the request's status is `delivered`. Opens the Quality Issue screen (section 11). |
 | 5 | **Approval section** | Read-only: a status chip, who it's assigned to, and — once decided — the approver's comment and decision timestamp. There is no approve/reject control on this screen; that lives in the Approval Queue (section 10). |
 
-**Current display limitation:** a line's product is shown by its internal product ID rather
-than its catalogue name — the same friendly-name-resolution gap noted on the equivalent web
-screen (section 19 of the web documentation).
+**Current display limitation:** lines show the product's catalogue name, or an "unknown product"
+label when the server sends no name. In the Approval section, however, "Assigned to" shows the
+approver's internal member ID rather than their name, and the decision time is shown as a raw
+timestamp (for example `2026-10-24T14:30:00.000Z`) rather than a local date — a known gap, to be
+fixed.
 
 **Business value:** a structured, native request flow captures what the web form captures —
 who needs the item, where, by when, and at what estimated cost — from the device a branch user
@@ -384,6 +378,8 @@ already has in hand, and keeps working through a dead signal thanks to offline q
 
 **Route:** `/approvals`
 
+![Approval Queue](screenshots/mobile/10-approval-queue.png)
+
 Lists every request currently pending the signed-in approver's decision — the same backend list
 that drives the Home pending-decision count (section 6).
 
@@ -396,6 +392,8 @@ that drives the Home pending-decision count (section 6).
 ### Approval Decision
 
 **Route:** `/approvals/detail`
+
+![Approval Decision](screenshots/mobile/10b-approval-decision.png)
 
 | # | Element | Description |
 |---|---------|-------------|
@@ -421,6 +419,8 @@ Detail screen (section 9) once its status makes the action relevant.
 
 **Route:** `/delivery/confirm` — reached from an `ordered` request's **Confirm Delivery** button.
 
+![Confirm Delivery](screenshots/mobile/11-delivery-confirmation.png)
+
 | # | Element | Description |
 |---|---------|-------------|
 | 1 | **Request context** | The same context block as Request Detail. |
@@ -431,6 +431,8 @@ Detail screen (section 9) once its status makes the action relevant.
 
 **Route:** `/delivery/qualityIssue` — reached from a `delivered` request's **Report Quality
 Issue** button.
+
+![Report Quality Issue](screenshots/mobile/11b-quality-issue.png)
 
 | # | Element | Description |
 |---|---------|-------------|
@@ -453,6 +455,9 @@ remember the details until they're back at a desktop. Photo evidence is optional
 ## 12. Low-Stock Report
 
 **Route:** `/lowStock`
+
+![Low-Stock Report](screenshots/mobile/08-low-stock-report.png)
+![Low-Stock Report — Success](screenshots/mobile/08b-low-stock-report-success.png)
 
 A lightweight "shelf is running low" signal, unrelated to any specific purchase request — the
 screen itself is fully built and tested, but **nothing in the shipped app currently navigates
@@ -604,7 +609,7 @@ A: No. It is optional and can always fall back to password sign-in.
 | 4 | Navigation | No bottom navigation or Settings screen exists yet — every screen is reached by a specific action from wherever it's linked (see section 18 for the target design). |
 | 5 | Language | No in-app language switcher; the app follows the device locale. |
 | 6 | Sessions | If a session is revoked server-side, the mobile client's own refresh-token exchange happens directly against Supabase Auth rather than through ProcurePilot's API — this path has a documented gap in test coverage, not a confirmed bug (see the engineering notes in `apps/api/tests/integration/test_session_revocation.py`). |
-| 7 | Documentation images | Mobile screenshots are design mockups, not simulator captures, and three shipped screens (Approvals, Delivery Confirmation, Quality Issue Reporting) never had a mockup produced at all. The shipped-vs-mockup notes and the text-only sections are the source of truth for current behaviour. |
+| 7 | Documentation images | Mobile screenshots are real offline renders of the shipped Flutter app generated via `cd apps/mobile && flutter test --tags docs --run-skipped test/docs/` through the Ledger design system. Settings (section 18) remains the only design mockup because that screen is not yet implemented. |
 | 8 | Commercial modules | Catalogue, suppliers, import, quotations, matching, compare, basket split, alerts, savings, team management, and organisation settings are web-only today. |
 
 If you hit anything beyond this list, flag it to the product team.
@@ -618,7 +623,7 @@ Most of the screens originally previewed in this section are now shipped — see
 
 ### Settings
 
-![Settings — design mockup](screenshots/mobile/09-settings-mockup.png)
+![Settings — Design preview of future screen](screenshots/mobile/09-settings-mockup.png)
 
 A dedicated Settings screen: account info, assigned branch, a notification toggle, an in-app
 language switcher, help/feedback, app version, and sign-out. Today, the only settings-like
@@ -633,11 +638,10 @@ without pushing users back to the web app for small account tasks.
 
 ### Bottom navigation
 
-The mockups throughout this document (Home, My Requests, Request Detail, Low-Stock Report) show
-a persistent bottom navigation bar (Home / Requests / Settings). The shipped app has no bottom
-navigation — every screen today is reached by a specific button or link from wherever it's
-documented above, which is also why sections 9 and 12 note missing entry points rather than a
-missing tab.
+The original design preview mockups showed a persistent bottom navigation bar (Home / Requests /
+Settings). The shipped app has no bottom navigation — every screen today is reached by a specific
+button or link from wherever it's documented above, which is also why sections 9 and 12 note
+missing entry points rather than a missing tab.
 
 ---
 
