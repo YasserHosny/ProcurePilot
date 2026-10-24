@@ -102,7 +102,7 @@ since the 2026-10-24 move; the old `PP` key is in brackets.
 | P-6 | PPS-10 (PP-16) | G-6 | PPS-15 (PP-10) | G-12 | PPS-1 (PP-20) |
 | P-7 | PPS-3 (PP-18) | E-1 | PPS-29 (PP-4) | | |
 | P-8 | PPS-25 (PP-28) | P-9 | PPS-17 (PP-29) | J-7 | PPS-30 |
-| P-10 | PPS-32 | | | | |
+| P-10 | PPS-32 | P-11 | PPS-33 | P-12 | PPS-34 |
 
 Without a plan ID: PPS-2 (PP-21), PPS-7 (PP-22), PPS-8 (PP-23), PPS-22 (PP-24), PPS-27 (PP-25),
 PPS-28 (PP-26), PPS-23 (PP-27) — architecture diagrams and two shipped code changes, all Done.
@@ -204,6 +204,8 @@ PR → CI → merge → link PR on the PPS task. Refs are in the GTM plan's curr
 | [x] P-8 | email audit | Password reset broken on hosted: Site URL was localhost, no set-password page, no custom SMTP (2 emails/hour) | Orch (config + code), User (SMTP credentials) | — | Live reset on hosted: email arrives, link opens `/auth/update-password`, new password signs in — **done 2026-10-24: #227, #228, #229, Mailgun SMTP; PPS-25 Done** |
 | [ ] P-9 | — | Upgrade the web app to Angular 22 + Material 22 (TypeScript 6.0, ngx-translate 18, Sentry 11, `@angular/build`, Node 24 in CI/Docker) so the new design system is built on the current Material API | Orch | — | PR merged with every required check green on its head commit (PPS-17) |
 | [ ] P-10 | — | Design system for the web app: Ledger look on the Converge brand, three-layer tokens, aligned with Angular Material 22 (`docs/design/`); app implementation follows after P-9 | Orch | P-9 (to implement) | Docs PR merged (PPS-32) |
+| [ ] P-11 | — | Build the design system into `apps/web`: tokens, Material 22 theme, Readex Pro + Noto Kufi figures, Material Symbols, Converge logo, hard-coded colours mapped to tokens | Orch → Agy | P-9, P-10 | PR #235 merged with every required check green, user-doc screenshots regenerated (PPS-33) |
+| [ ] P-12 | — | Flaky `mat-select` E2E since Angular 22: Material 22's 100 ms panel fade still takes clicks, so re-opening a select right after a pick hits the old panel; E2E runs with reduced motion | Orch → Agy | P-9 | Fix merged, main CI green on its head (PPS-34) |
 
 ### E — Pilot environment
 
