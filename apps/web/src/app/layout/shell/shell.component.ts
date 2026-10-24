@@ -130,7 +130,7 @@ export class ShellComponent implements OnInit {
       id: 'insight',
       labelKey: 'shell.insight',
       items: [
-        { route: '/savings', labelKey: 'shell.navSavings', icon: 'savings' },
+        { route: '/savings', labelKey: 'shell.navSavings', icon: 'toll' },
         { route: '/reports', labelKey: 'reports.nav', icon: 'assessment' },
         { route: '/forecasting', labelKey: 'shell.navForecasting', icon: 'trending_up', roles: ['owner', 'buyer'] },
         { route: '/alerts', labelKey: 'shell.navAlerts', icon: 'notifications' },
