@@ -221,7 +221,7 @@ There is **no APScheduler / cron** in Phase 2 — worker runs are enqueue-trigge
 | File | Purpose |
 |---|---|
 | `infra/docker/api.Dockerfile` | `python:3.12-slim` + the `uv` binary (from `ghcr.io/astral-sh/uv:0.6.2`). Non-root `appuser` (uid 1001). Lays the source out under `/workspace/apps/api` **with `packages/py-logging` two levels up**, so `[tool.uv.sources]`'s relative path resolves identically to a plain checkout. `uv pip install -e .`. Healthcheck `curl /api/v1/health`. `uvicorn procurepilot_api.main:app` on `8000`. Also the **export-worker** image (different `command`). |
-| `infra/docker/web.Dockerfile` | Multi-stage. **Build:** `node:20-alpine` + `corepack` `pnpm@9.15.4` → `pnpm install` → `pnpm run build` (with a fallback that normalises Angular's `dist/web/browser` output path). **Serve:** `nginx:1.27-alpine`, copies the SPA, renders `nginx.conf` via `envsubst '${BACKEND_HOST}'` at start. Healthcheck `wget /`. |
+| `infra/docker/web.Dockerfile` | Multi-stage. **Build:** `node:24-alpine` + `corepack` `pnpm@9.15.4` → `pnpm install` → `pnpm run build` (with a fallback that normalises Angular's `dist/web/browser` output path). **Serve:** `nginx:1.27-alpine`, copies the SPA, renders `nginx.conf` via `envsubst '${BACKEND_HOST}'` at start. Healthcheck `wget /`. |
 | `infra/docker/extraction-worker.Dockerfile` | Same `/workspace` layout pattern as the API image; runs `python -m procurepilot_extraction_worker`. |
 
 ### docker-compose (local only)
@@ -398,7 +398,7 @@ The distinctive choices, in the order they matter:
    entrypoint where the job is API-owned (exports).
 7. **Two-stage container images with a `/workspace` layout.** Python images place the app two
    directories deep so a local editable package (`packages/py-logging`) resolves by the same
-   relative path in the container as in a checkout. The web image is `node:20-alpine` build →
+   relative path in the container as in a checkout. The web image is `node:24-alpine` build →
    `nginx:1.27-alpine` serve, with `envsubst '${BACKEND_HOST}'` at start.
 8. **GitHub Actions → GHCR → bunny.net Magic Containers.** One `ci.yml` (secrets, lint, backend
    tests on a real pgvector Postgres, a dedicated tenant-isolation job, web unit + build, and a

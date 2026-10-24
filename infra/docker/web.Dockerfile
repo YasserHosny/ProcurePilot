@@ -1,5 +1,5 @@
 # Stage 1: Build Angular application
-FROM node:20-alpine AS build
+FROM node:24-alpine AS build
 
 WORKDIR /app
 
@@ -15,7 +15,7 @@ RUN pnpm install --no-frozen-lockfile
 RUN cd apps/web && pnpm run build
 
 # Normalize build output directory for stage 2
-# Angular 19 outputs to dist/<project>/browser/ — check deepest path first
+# The Angular application builder outputs to dist/<project>/browser/ — check deepest path first
 RUN if [ -d "apps/web/dist/web/browser" ]; then \
         cp -r apps/web/dist/web/browser /app/build-output; \
     elif [ -d "apps/web/dist/browser" ]; then \
