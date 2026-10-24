@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'package:intl/intl.dart';
 import 'package:procurepilot_mobile/core/format/date_format.dart';
 
 void main() {
@@ -34,6 +35,34 @@ void main() {
         formatDateTime(utcDateTime, locale: 'ar'),
         formatDateTime(utcDateTime.toLocal(), locale: 'ar'),
       );
+    });
+  });
+
+  group('formatDate', () {
+    setUpAll(() async {
+      await initializeDateFormatting();
+    });
+
+    test('formats ISO date in English', () {
+      expect(formatDate('2026-10-28', locale: 'en'), 'Oct 28, 2026');
+    });
+
+    test('formats ISO date in Arabic with Arabic-Indic digits', () {
+      final formatted = formatDate('2026-10-28', locale: 'ar');
+      expect(formatted, '٢٨ أكتوبر ٢٠٢٦');
+      expect(formatted.contains('٢٠٢٦'), isTrue);
+      expect(RegExp(r'[0-9]').hasMatch(formatted), isFalse);
+    });
+
+    test('returns unparseable input unchanged', () {
+      expect(formatDate('not-a-date', locale: 'en'), 'not-a-date');
+      expect(formatDate('not-a-date', locale: 'ar'), 'not-a-date');
+    });
+
+    test('result does not depend on time zone', () {
+      final formatted = formatDate('2026-10-28', locale: 'en');
+      expect(formatted, 'Oct 28, 2026');
+      expect(formatted, DateFormat.yMMMd('en').format(DateTime(2026, 10, 28)));
     });
   });
 }

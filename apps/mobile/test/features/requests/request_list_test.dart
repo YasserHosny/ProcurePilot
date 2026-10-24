@@ -83,6 +83,36 @@ void main() {
       expect(find.byKey(const Key('requestStatus_approved')), findsOneWidget);
       expect(find.byKey(const Key('requestStatus_submitted')), findsNothing);
     });
+
+    testWidgets('formats required-by date in English and Arabic', (tester) async {
+      fakeClient.listResults = [
+        PurchaseRequest(
+          id: 'req-date',
+          branchId: 'branch-1',
+          requestedByMembershipId: 'member-1',
+          requiredByDate: '2026-10-28',
+          status: 'submitted',
+          lines: const [],
+          hasIncompleteEstimate: false,
+          createdAt: DateTime.now(),
+        ),
+      ];
+
+      await pumpList(tester);
+      expect(find.text('Required By: Oct 28, 2026'), findsOneWidget);
+      expect(find.textContaining('2026-10-28'), findsNothing);
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      await pumpWithServices(
+        tester,
+        child: const RequestListScreen(),
+        requestsApiClient: fakeClient,
+        locale: 'ar',
+      );
+      await tester.pumpAndSettle();
+      expect(find.textContaining('مطلوب قبل: ٢٨ أكتوبر ٢٠٢٦'), findsOneWidget);
+      expect(find.textContaining('2026-10-28'), findsNothing);
+    });
   });
 
   group('RequestDetailScreen', () {
