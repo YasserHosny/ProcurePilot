@@ -10,7 +10,14 @@ from azure.ai.documentintelligence import DocumentIntelligenceClient
 from azure.ai.documentintelligence.models import AnalyzeDocumentRequest
 from azure.core.credentials import AzureKeyCredential
 
-from procurepilot_extraction_worker.currency import detect_currency, parse_localised_decimal
+from procurepilot_extraction_worker.currency import (
+    _EGP_MARKER,
+    _OTHER_MARKER,
+    _SAR_MARKER,
+    _adjacent_to_number,
+    detect_currency,
+    parse_localised_decimal,
+)
 from procurepilot_extraction_worker.models import (
     ExtractedField,
     ExtractedLine,
@@ -91,7 +98,11 @@ def _parse_invoice_result(result: object, model_version: str) -> ExtractionResul
         header["supplier_name"] = _make_field("supplier_name", vendor, fields, "VendorName")
 
     currency_text = _all_document_text(result)
-    currency = _infer_currency_state(fields)[0] or detect_currency(currency_text)
+    currency, currency_conflict = _infer_currency_state(fields)
+    if currency_conflict or _has_currency_conflict(currency_text):
+        currency = None
+    else:
+        currency = currency or detect_currency(currency_text)
     if currency is not None:
         header["currency"] = ExtractedField("currency", currency, 0.90, 1, None)
 
@@ -488,9 +499,13 @@ def _has_before_tax_total(text: str) -> bool:
 
 
 def _has_currency_conflict(text: str) -> bool:
-    egp = bool(re.search(r"ج\s*\.\s*م|جنيه|\bEGP\b|\bL\.?E\.?\b|\bLE\b", text, re.I))
-    other = bool(re.search(r"\$|\bUSD\b|£|\bGBP\b|€|\bEUR\b", text, re.I))
-    return egp and other
+    codes = {
+        code
+        for code, pattern in (("EGP", _EGP_MARKER), ("SAR", _SAR_MARKER))
+        if any(_adjacent_to_number(text, *match.span()) for match in pattern.finditer(text))
+    }
+    other = any(_adjacent_to_number(text, *match.span()) for match in _OTHER_MARKER.finditer(text))
+    return len(codes) > 1 or (bool(codes) and other)
 
 
 def _merge_headers(
@@ -611,6 +626,7 @@ def _make_field(
 
 
 def _clean_number(s: str) -> str | None:
+    s = _SAR_MARKER.sub("", s)
     s = re.sub(
         r"ج\s*\.\s*م\.?|جنيه(?:\s+مصري)?|(?<![A-Z])L\.?\s*E\.?(?![A-Z])|\b(?:EGP|USD|GBP|EUR)\b",
         "",
@@ -639,6 +655,7 @@ def _clean_number(s: str) -> str | None:
 
 
 def _numeric_cell_amount(text: str) -> str | None:
+    text = _SAR_MARKER.sub("", text)
     cleaned = re.sub(
         r"ج\s*\.\s*م\.?|جنيه(?:\s+مصري)?|(?<![A-Z])L\.?\s*E\.?(?![A-Z])|\b(?:EGP|USD|GBP|EUR)\b|[$£€]",
         "",
@@ -675,5 +692,5 @@ def _infer_currency_state(fields: dict[str, Any]) -> tuple[str | None, bool]:
                 codes.add(code)
     if marker_currency:
         codes.add(marker_currency)
-    conflict = len(codes) > 1
-    return (next(iter(codes)) if len(codes) == 1 else None, conflict)
+    conflict = len(codes) > 1 or _has_currency_conflict(all_content)
+    return (next(iter(codes)) if len(codes) == 1 and not conflict else None, conflict)

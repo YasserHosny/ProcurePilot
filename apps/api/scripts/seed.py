@@ -32,6 +32,7 @@ REGIONS: list[tuple[str, str, str]] = [
     ("GB", "United Kingdom", "المملكة المتحدة"),
     ("EG", "Egypt", "مصر"),
     ("AE", "United Arab Emirates", "الإمارات العربية المتحدة"),
+    ("SA", "Saudi Arabia", "المملكة العربية السعودية"),
 ]
 
 CURRENCIES: list[tuple[str, str, str, int]] = [
@@ -39,12 +40,14 @@ CURRENCIES: list[tuple[str, str, str, int]] = [
     ("EGP", "Egyptian Pound", "جنيه مصري", 2),
     ("AED", "UAE Dirham", "درهم إماراتي", 2),
     ("USD", "US Dollar", "دولار أمريكي", 2),
+    ("SAR", "Saudi Riyal", "ريال سعودي", 2),
 ]
 
 TAX_MODELS: list[tuple[str, str, str, str]] = [
     ("uk_vat_standard", "UK VAT (standard)", "ضريبة القيمة المضافة بالمملكة المتحدة", "GB"),
     ("eg_vat_standard", "Egypt VAT (standard)", "ضريبة القيمة المضافة بمصر", "EG"),
     ("ae_vat_standard", "UAE VAT (standard)", "ضريبة القيمة المضافة بالإمارات", "AE"),
+    ("sa_vat_standard", "Saudi VAT (standard)", "ضريبة القيمة المضافة بالسعودية", "SA"),
 ]
 
 
