@@ -202,6 +202,7 @@ final _requestOrdered = PurchaseRequest(
   approvalStep: ApprovalStep(
     id: 'step-001',
     assignedMembershipId: 'mem-sarah',
+    assignedEmail: 'sarah.manager@sanad-demo.example',
     source: 'branch_manager',
     status: 'approved',
     comment: 'Approved for Maadi kitchen weekly stock.',

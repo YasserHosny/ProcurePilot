@@ -2164,7 +2164,8 @@
       "assignedTo": "Assigned to",
       "comment": "Decision comment",
       "decidedAt": "Decided on",
-      "pending": "Pending approval"
+      "pending": "Pending approval",
+      "unknownApprover": "Unknown approver"
     },
     "autoPrepared": {
       "badge": "Auto-prepared",

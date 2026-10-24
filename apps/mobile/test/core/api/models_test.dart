@@ -131,5 +131,54 @@ void main() {
         expect(line.productDisplayName(i18nEn), isNot(contains('00000000-0000')));
       });
     });
+
+    group('ApprovalStep', () {
+      test('parses assigned_name and assigned_email from json and round-trips to json', () {
+        final json = {
+          'id': 'step-1',
+          'assigned_membership_id': '00000000-0000-0000-0000-000000000001',
+          'assigned_name': 'Sarah Connor',
+          'assigned_email': 'sarah@example.com',
+          'source': 'branch_manager',
+          'status': 'pending',
+        };
+
+        final step = ApprovalStep.fromJson(json);
+        expect(step.assignedName, 'Sarah Connor');
+        expect(step.assignedEmail, 'sarah@example.com');
+        expect(step.assignedDisplayName(i18nEn), 'Sarah Connor');
+        expect(step.assignedDisplayName(i18nAr), 'Sarah Connor');
+        expect(step.toJson()['assigned_name'], 'Sarah Connor');
+        expect(step.toJson()['assigned_email'], 'sarah@example.com');
+      });
+
+      test('falls back to email when name is null or whitespace', () {
+        final step = ApprovalStep(
+          id: 'step-1',
+          assignedMembershipId: '00000000-0000-0000-0000-000000000001',
+          assignedName: '   ',
+          assignedEmail: 'sarah@example.com',
+          source: 'branch_manager',
+          status: 'pending',
+        );
+        expect(step.assignedDisplayName(i18nEn), 'sarah@example.com');
+      });
+
+      test('falls back to localised unknown approver when name and email are missing', () {
+        final step = ApprovalStep(
+          id: 'step-1',
+          assignedMembershipId: '00000000-0000-0000-0000-000000000001',
+          assignedName: null,
+          assignedEmail: null,
+          source: 'branch_manager',
+          status: 'pending',
+        );
+        expect(step.assignedDisplayName(i18nEn), 'Unknown approver');
+        expect(step.assignedDisplayName(i18nAr), 'معتمد غير معروف');
+        expect(step.assignedDisplayName(i18nEn), isNot(contains('00000000-0000')));
+        expect(step.toJson().containsKey('assigned_name'), isFalse);
+        expect(step.toJson().containsKey('assigned_email'), isFalse);
+      });
+    });
   });
 }
