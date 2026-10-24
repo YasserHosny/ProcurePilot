@@ -3984,7 +3984,8 @@
   },
   "landing": {
     "header": {
-      "byIronSystems": "من تطوير Iron Systems ↗",
+      "byIronSystemsPrefix": "من تطوير",
+      "byIronSystemsSuffix": "↗",
       "productScreens": "شاشات النظام",
       "signIn": "تسجيل الدخول"
     },
@@ -4049,8 +4050,10 @@
       "statusVerified": "تم التحقق"
     },
     "ironSystems": {
+      "brandName": "Iron Systems",
       "eyebrow": "«ذكاءٌ بهندسةٍ دقيقة»",
-      "text": "بروكيور بايلوت من تطوير Iron Systems، شركة برمجيات تنطلق من منهج هندسي وتعمل في الذكاء الاصطناعي والبرمجيات المخصّصة والأتمتة وتكامل الأنظمة.",
+      "textBeforeBrand": "بروكيور بايلوت من تطوير",
+      "textAfterBrand": "، شركة برمجيات تنطلق من منهج هندسي وتعمل في الذكاء الاصطناعي والبرمجيات المخصّصة والأتمتة وتكامل الأنظمة.",
       "link": "iron-sys.com ↗"
     },
     "pilot": {
@@ -4072,7 +4075,7 @@
       "a4": "لا شيء طوال فترة التجربة المتفق عليها."
     },
     "footer": {
-      "builtBy": "من تطوير Iron Systems",
+      "builtByPrefix": "من تطوير",
       "contactSupportPrefix": "للتواصل: ",
       "signIn": "تسجيل الدخول",
       "copyright": "© ٢٠٢٦ ProcurePilot. جميع الحقوق محفوظة."

@@ -87,6 +87,7 @@
       @for (card of galleryCards; track card.id; let i = $index) {
         <button
           type="button"
+          #stepEl
           class="gallery-step-btn"
           [class.active]="activeCardIndex() === i"
           [attr.aria-current]="activeCardIndex() === i ? 'true' : null"

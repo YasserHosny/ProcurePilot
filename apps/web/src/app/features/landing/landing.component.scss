@@ -90,6 +90,8 @@
   letter-spacing: 0.05em;
 }
 
+.maker-brand { white-space: nowrap; unicode-bidi: isolate; }
+
 /* Links */
 .brand-link { display: inline-flex; }
 
@@ -333,6 +335,7 @@
 }
 
 @media (max-width: 600px) {
+  .hero-preview { display: none; }
   .header-maker-link,
   .header-nav-link {
     display: none !important;

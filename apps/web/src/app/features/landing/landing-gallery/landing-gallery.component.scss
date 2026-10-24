@@ -12,7 +12,6 @@
   max-inline-size: 1120px;
   margin-inline: auto;
   padding-inline: var(--pp-space-4);
-  box-sizing: border-box;
 }
 
 .gallery-header-row {
@@ -62,7 +61,7 @@
   overflow-x: auto;
   scroll-snap-type: x mandatory;
   overscroll-behavior-x: contain;
-  padding-inline: max(var(--pp-space-4), calc((100vw - 1120px) / 2));
+  padding-inline: 0;
   padding-block: var(--pp-space-2) var(--pp-space-4);
   margin: 0;
   list-style: none;
@@ -198,6 +197,19 @@
 }
 
 @media (max-width: 600px) {
+  .gallery-step-index {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    padding-block-end: 2px;
+  }
+
+  .gallery-step-btn {
+    flex: 0 0 auto;
+    white-space: nowrap;
+    margin-block-end: 0;
+  }
+
   .gallery-card {
     flex: 0 0 86vw;
   }

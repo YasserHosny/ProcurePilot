@@ -7,8 +7,10 @@ import {
   QueryList,
   ViewChild,
   ViewChildren,
+  afterRenderEffect,
   inject,
   model,
+  viewChildren,
 } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
@@ -101,6 +103,18 @@ export class LandingGalleryComponent implements AfterViewInit, OnDestroy {
   readonly activeCardIndex = model<number>(0);
   readonly currentLocale = this.i18n.currentLocale;
   readonly isRtl = this.i18n.isRtl;
+
+  private readonly stepElements = viewChildren<ElementRef<HTMLElement>>('stepEl');
+
+  constructor() {
+    afterRenderEffect(() => {
+      const activeStep = this.stepElements()[this.activeCardIndex()]?.nativeElement;
+      this.currentLocale();
+      if (window.matchMedia('(max-width: 600px)').matches) {
+        activeStep?.scrollIntoView({ behavior: 'instant', block: 'nearest', inline: 'nearest' });
+      }
+    });
+  }
 
   private observer: IntersectionObserver | null = null;
 

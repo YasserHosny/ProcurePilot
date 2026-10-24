@@ -3984,7 +3984,8 @@
   },
   "landing": {
     "header": {
-      "byIronSystems": "By Iron Systems ↗",
+      "byIronSystemsPrefix": "By",
+      "byIronSystemsSuffix": "↗",
       "productScreens": "Product screens",
       "signIn": "Sign in"
     },
@@ -4049,8 +4050,10 @@
       "statusVerified": "Verified"
     },
     "ironSystems": {
+      "brandName": "Iron Systems",
       "eyebrow": "Intelligence, Engineered.",
-      "text": "ProcurePilot is built by Iron Systems, an engineering-first software house working in AI, custom software, automation and system integration.",
+      "textBeforeBrand": "ProcurePilot is built by",
+      "textAfterBrand": ", an engineering-first software house working in AI, custom software, automation and system integration.",
       "link": "iron-sys.com ↗"
     },
     "pilot": {
@@ -4072,7 +4075,7 @@
       "a4": "Nothing during the agreed pilot period."
     },
     "footer": {
-      "builtBy": "Built by Iron Systems",
+      "builtByPrefix": "Built by",
       "contactSupportPrefix": "Contact: ",
       "signIn": "Sign in",
       "copyright": "© 2026 ProcurePilot. All rights reserved."
