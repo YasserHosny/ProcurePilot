@@ -468,4 +468,40 @@ describe('ApprovalQueueComponent', () => {
       }),
     ).toBe('Not available');
   });
+
+  it('should format line item quantity without trailing zeros in en and with Arabic-Indic digits in ar', () => {
+    const testRequest: PurchaseRequest = {
+      ...mockPendingRequests[0],
+      id: 'req-pps43',
+      lines: [
+        {
+          id: 'line-pps43',
+          workspace_product_id: 'prod-gloves',
+          quantity: '20.000000',
+          estimated_unit_price: { amount: '15.00', currency: 'SAR' },
+          note: null,
+        },
+      ],
+    };
+    approvalsApi.listPendingApprovals.and.returnValue(
+      of({ items: [testRequest], next_cursor: null }),
+    );
+    component.loadPendingApprovals();
+    fixture.detectChanges();
+
+    component.toggleExpand('req-pps43');
+    fixture.detectChanges();
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    const quantityCell = compiled.querySelector('.quantity-col');
+    expect(quantityCell?.textContent?.trim()).toBe('20');
+
+    TestBed.inject(TranslateService).use('ar');
+    component.toggleExpand('req-pps43');
+    fixture.detectChanges();
+    component.toggleExpand('req-pps43');
+    fixture.detectChanges();
+
+    expect(compiled.querySelector('.quantity-col')?.textContent?.trim()).toBe('٢٠');
+  });
 });
