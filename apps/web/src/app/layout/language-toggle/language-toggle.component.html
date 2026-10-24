@@ -1,0 +1,10 @@
+@let s = state();
+<button
+  mat-button
+  type="button"
+  class="lang-toggle-btn"
+  (click)="toggleLanguage()"
+  [attr.title]="s.titleKey | translate"
+>
+  <span [attr.lang]="s.lang" class="lang-label">{{ s.labelKey | translate }}</span>
+</button>

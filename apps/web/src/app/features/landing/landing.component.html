@@ -1,0 +1,145 @@
+<div class="landing-page">
+  <header class="landing-header">
+    <div class="header-container">
+      <a routerLink="/" class="brand-link" [attr.aria-label]="'common.brandName' | translate">
+        <app-brand-logo [height]="36" />
+      </a>
+      <div class="header-actions">
+        <app-language-toggle />
+        <a mat-button routerLink="/auth/sign-in" class="header-signin-btn">
+          {{ 'landing.header.signIn' | translate }}
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <main class="landing-main">
+    <section class="landing-hero" aria-labelledby="hero-headline">
+      <div class="hero-container">
+        <h1 id="hero-headline" class="hero-headline">
+          {{ 'landing.hero.headline' | translate }}
+        </h1>
+        <p class="hero-lede">
+          {{ 'landing.hero.lede' | translate }}
+        </p>
+        <div class="hero-actions">
+          <a mat-flat-button color="primary" routerLink="/auth/sign-in" class="hero-primary-btn">
+            {{ 'landing.hero.signIn' | translate }}
+          </a>
+          <a mat-stroked-button [href]="supportMailto" class="hero-secondary-btn">
+            {{ 'landing.hero.requestAccess' | translate }}
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <section class="how-it-works-section" aria-labelledby="how-it-works-heading">
+      <div class="section-container">
+        <div class="section-header">
+          <h2 id="how-it-works-heading" class="section-title">
+            {{ 'landing.howItWorks.title' | translate }}
+          </h2>
+          <p class="section-subtitle">
+            {{ 'landing.howItWorks.subtitle' | translate }}
+          </p>
+        </div>
+
+        <div class="steps-grid">
+          <div class="step-card">
+            <div class="step-icon-wrapper" aria-hidden="true">
+              <mat-icon>mail</mat-icon>
+            </div>
+            <h3 class="step-title">{{ 'landing.howItWorks.step1Title' | translate }}</h3>
+            <p class="step-description">{{ 'landing.howItWorks.step1Description' | translate }}</p>
+          </div>
+
+          <div class="step-card">
+            <div class="step-icon-wrapper" aria-hidden="true">
+              <mat-icon>table_chart</mat-icon>
+            </div>
+            <h3 class="step-title">{{ 'landing.howItWorks.step2Title' | translate }}</h3>
+            <p class="step-description">{{ 'landing.howItWorks.step2Description' | translate }}</p>
+          </div>
+
+          <div class="step-card">
+            <div class="step-icon-wrapper" aria-hidden="true">
+              <mat-icon>verified_user</mat-icon>
+            </div>
+            <h3 class="step-title">{{ 'landing.howItWorks.step3Title' | translate }}</h3>
+            <p class="step-description">{{ 'landing.howItWorks.step3Description' | translate }}</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    @if (screenshotCards().length > 0) {
+      <section class="gallery-section" aria-labelledby="gallery-heading">
+        <div class="section-container">
+          <div class="section-header">
+            <h2 id="gallery-heading" class="section-title">
+              {{ 'landing.gallery.title' | translate }}
+            </h2>
+            <p class="section-subtitle">
+              {{ 'landing.gallery.subtitle' | translate }}
+            </p>
+          </div>
+
+          <div class="gallery-grid" role="list">
+            @for (card of screenshotCards(); track card.src) {
+              <div
+                class="gallery-card"
+                role="button"
+                tabindex="0"
+                (click)="openModal(card)"
+                (keydown.enter)="openModal(card)"
+                (keydown.space)="openModal(card); $event.preventDefault()"
+                [attr.aria-label]="card.captionKey | translate"
+              >
+                <div class="card-image-wrapper">
+                  <img [src]="card.src" [alt]="card.alt | translate" loading="lazy" class="gallery-image" />
+                </div>
+                <p class="card-caption">{{ card.captionKey | translate }}</p>
+              </div>
+            }
+          </div>
+        </div>
+      </section>
+
+      @if (activeScreenshot(); as active) {
+        <div
+          class="modal-backdrop"
+          (click)="onBackdropClick($event)"
+          (keydown.escape)="closeModal()"
+          role="dialog"
+          aria-modal="true"
+          tabindex="0"
+          [attr.aria-label]="active.captionKey | translate"
+        >
+          <div class="modal-dialog">
+            <button
+              mat-icon-button
+              type="button"
+              class="modal-close-btn"
+              (click)="closeModal()"
+              [attr.aria-label]="'landing.gallery.close' | translate"
+            >
+              <mat-icon>close</mat-icon>
+            </button>
+            <img [src]="active.src" [alt]="active.alt | translate" class="modal-image" />
+            <p class="modal-caption">{{ active.captionKey | translate }}</p>
+          </div>
+        </div>
+      }
+    }
+  </main>
+
+  <footer class="landing-footer">
+    <div class="footer-container">
+      <a [href]="supportMailto" class="footer-support-link">
+        <mat-icon aria-hidden="true" class="footer-icon">support_agent</mat-icon>
+        <span>{{ 'landing.footer.contactSupport' | translate }}</span>
+      </a>
+      <p class="footer-copyright">{{ 'landing.footer.copyright' | translate }}</p>
+    </div>
+  </footer>
+</div>

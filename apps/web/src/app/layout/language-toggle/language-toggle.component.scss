@@ -1,0 +1,15 @@
+:host {
+  display: inline-flex;
+}
+
+.lang-toggle-btn {
+  min-inline-size: 0;
+  padding-inline: var(--pp-space-2);
+  font-family: var(--pp-font);
+  font-weight: var(--pp-weight-medium);
+  color: var(--pp-primary);
+}
+
+.lang-label {
+  font-size: var(--pp-text-14);
+}
