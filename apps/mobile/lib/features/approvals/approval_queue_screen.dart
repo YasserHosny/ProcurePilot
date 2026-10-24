@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/api/approvals_api_client.dart';
 import '../../core/api/models.dart';
+import '../../core/format/date_format.dart';
 import '../../core/format/money_format.dart';
 import '../../core/i18n/i18n_loader.dart';
 import '../../core/theme/brand_logo.dart';
@@ -107,7 +108,7 @@ class _ApprovalQueueScreenState extends State<ApprovalQueueScreen> {
                           ),
                           subtitle: Text(
                             '${i18n.t('approvals.columns.requiredByDate')}: '
-                            '${request.requiredByDate}',
+                            '${formatDate(request.requiredByDate, locale: _i18n.locale)}',
                           ),
                           trailing: _moneyText(request.estimatedTotal),
                           onTap: () => _navigateToDecision(request),
