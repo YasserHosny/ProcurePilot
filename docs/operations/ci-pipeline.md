@@ -77,9 +77,22 @@ Sharding costs roughly five times the ~150 s stack start-up in runner minutes, i
 minutes are free on this public repository; the limit that matters is the Free plan's ~20 concurrent jobs, which one
 run (five shards plus about eight other jobs) stays under.
 
-**2026-10-24: three shards → five.** With three shards the slowest shard ran 6–8 min, of which ~5.3 min was specs
+**2026-10-24: three shards → five.** With three shards the slowest shard ran 7–8.5 min, of which ~5.3 min was specs
 and ~2 min fixed stack start-up. The planner predicts ~330 s of specs per shard at `--total 3` and ~199 s at
-`--total 5` (imbalance 1.019, all 63 spec files assigned once), so the E2E critical path should drop by about two minutes. Not yet measured.
+`--total 5` (imbalance 1.019, all 63 spec files assigned once), so the E2E critical path should drop by about two minutes. Measured
+(a single run each, so indicative only given ±30% runner noise):
+
+| Run | Shards | Slowest shard | Whole run |
+|---|---|---|---|
+| Last green 3-shard run before the change (`40103000301`, `3bb0ebb`) | 419–511 s | 511 s | 8.7 min |
+| PR #248 (`40107239093`, head `085ee78`) | 264–340 s | 340 s | 5.9 min |
+| `main` after merge (`40108797199`, `54de45f`; a11y always runs on `main`) | 267–342 s | 342 s | 7.0 min |
+
+Shards run about 2.4 min over the planner's ~199 s prediction: the fixed ~2 min stack start-up is not in the
+manifest, so per-shard predictions understate wall time by that much.
+
+After the cache fix the Actions cache went from 10.78 GB (955 shared-scope BuildKit entries) to 1.54 GB once
+each deploy had rebuilt its own scope, so the pnpm and uv caches are no longer evicted.
 
 ## Verified after merge
 
