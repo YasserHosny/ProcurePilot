@@ -255,6 +255,35 @@ describe('ShellComponent account menu', () => {
       expect(sourcingItems.hidden).toBeFalse();
     });
 
+    it('applies nav-group--active only to the group owning the current route', async () => {
+      const router = TestBed.inject(Router);
+      const root = fixture.nativeElement as HTMLElement;
+
+      await router.navigateByUrl('/requests');
+      fixture.detectChanges();
+
+      const purchasingGroup = root.querySelector('#nav-group-purchasing')?.closest('.nav-group');
+      const sourcingGroup = root.querySelector('#nav-group-sourcing')?.closest('.nav-group');
+      const catalogueGroup = root.querySelector('#nav-group-catalogue')?.closest('.nav-group');
+      const insightGroup = root.querySelector('#nav-group-insight')?.closest('.nav-group');
+      const setupGroup = root.querySelector('#nav-group-setup')?.closest('.nav-group');
+
+      expect(purchasingGroup?.classList.contains('nav-group--active')).toBeTrue();
+      expect(sourcingGroup?.classList.contains('nav-group--active')).toBeFalse();
+      expect(catalogueGroup?.classList.contains('nav-group--active')).toBeFalse();
+      expect(insightGroup?.classList.contains('nav-group--active')).toBeFalse();
+      expect(setupGroup?.classList.contains('nav-group--active')).toBeFalse();
+
+      await router.navigateByUrl('/quotations');
+      fixture.detectChanges();
+
+      expect(purchasingGroup?.classList.contains('nav-group--active')).toBeFalse();
+      expect(sourcingGroup?.classList.contains('nav-group--active')).toBeTrue();
+      expect(catalogueGroup?.classList.contains('nav-group--active')).toBeFalse();
+      expect(insightGroup?.classList.contains('nav-group--active')).toBeFalse();
+      expect(setupGroup?.classList.contains('nav-group--active')).toBeFalse();
+    });
+
     it('expands owning group and disables toggle on child routes like /analyst/:id and /rfq/compare/:id', async () => {
       const router = TestBed.inject(Router);
       localStorage.setItem('pp.sidebar.collapsed', JSON.stringify(['insight', 'sourcing']));
