@@ -111,7 +111,7 @@ test.describe('Value Proof & Savings Ledger (T023, US1)', () => {
     await page.goto('/savings');
 
     await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
-    await expect(page.locator('.page-title')).toContainText('سجل الوفورات');
+    await expect(page.locator('.page-title')).toContainText('سجل التوفيرات');
 
     await page.goto('/savings/outcome-capture');
     await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');

@@ -42,6 +42,6 @@ test.describe('Savings Export Screen (T041, US2)', () => {
     await page.goto('/savings/export');
 
     await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
-    await expect(page.locator('.page-title')).toContainText('تصدير سجل الوفورات');
+    await expect(page.locator('.page-title')).toContainText('تصدير سجل التوفيرات');
   });
 });
