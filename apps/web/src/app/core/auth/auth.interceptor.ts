@@ -17,7 +17,13 @@ import { SessionService, refreshWasRejected, tokenTenant } from './session.servi
 const REPLAYED_AFTER_REFRESH = new HttpContextToken<boolean>(() => false);
 
 /** Endpoints whose 401 means "these credentials are wrong", never "renew and retry". */
-const NO_REFRESH_PATHS = ['/auth/login', '/auth/refresh', '/auth/logout'];
+const NO_REFRESH_PATHS = [
+  '/auth/login',
+  '/auth/refresh',
+  '/auth/logout',
+  // An expired reset link is not the caller's session expiring (PP-28).
+  '/auth/password-update',
+];
 
 /**
  * Attaches the bearer token to OUR API's requests only, and reacts to a rejected one.

@@ -181,6 +181,19 @@ describe('authInterceptor token refresh (demo finding 29)', () => {
     backend.expectNone('/api/v1/auth/refresh');
   });
 
+  it('an expired password-reset link neither refreshes nor signs the visitor out (PP-28)', async () => {
+    const result = firstValueFrom(http.post('/api/v1/auth/password-update', {}));
+    backend
+      .expectOne('/api/v1/auth/password-update')
+      .flush({ code: 'auth.unauthenticated' }, { status: 401, statusText: 'Unauthorized' });
+
+    await expectAsync(result).toBeRejected();
+    backend.expectNone('/api/v1/auth/refresh');
+    expect(navigate).not.toHaveBeenCalled();
+    expect(localStorage.getItem('pp.access_token')).toBe(expired);
+    expect(localStorage.getItem('pp.refresh_token')).toBe('refresh-1');
+  });
+
   it('a 401 from outside our API neither refreshes nor signs out', async () => {
     const result = firstValueFrom(http.get('/i18n/en.json'));
     const req = backend.expectOne('/i18n/en.json');

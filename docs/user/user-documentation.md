@@ -91,6 +91,8 @@ so tables, forms, and review panels remain legible.
 
 Enter your work email and submit the form to request a reset email. The flow stays outside the authenticated app shell, so users who are locked out can recover access without selecting a workspace first.
 
+The email's link opens **Choose a new password** (`/auth/update-password`). Enter the new password twice (at least 12 characters) and save, then sign in with it. A link that has expired or was already used shows **Request a new link** instead; request a fresh email and open its newest link.
+
 ### Create workspace
 
 **Route:** `/onboarding/signup`

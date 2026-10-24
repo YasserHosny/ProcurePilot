@@ -63,6 +63,16 @@ test.describe('Accessibility @a11y', () => {
     expect(results.violations, describeViolations(results)).toEqual([]);
   });
 
+  test('the set-new-password screen has no WCAG 2.1 AA violations @a11y', async ({ page }) => {
+    // A syntactically valid recovery fragment shows the form; the tokens are never sent.
+    await page.goto(
+      '/auth/update-password#access_token=a&refresh_token=r&token_type=bearer&type=recovery',
+    );
+    await page.getByLabel(/new password/i).first().waitFor();
+    const results = await scan(page);
+    expect(results.violations, describeViolations(results)).toEqual([]);
+  });
+
   test('the authenticated shell has no WCAG 2.1 AA violations @a11y', async ({ page }) => {
     await signIn(page);
     const results = await scan(page);

@@ -12,6 +12,12 @@ class PasswordResetRequest(BaseModel):
     email: str
 
 
+class PasswordUpdateRequest(BaseModel):
+    access_token: str = Field(min_length=1)
+    refresh_token: str = Field(min_length=1)
+    password: str = Field(min_length=12)
+
+
 class RefreshRequest(BaseModel):
     refresh_token: str = Field(min_length=1)
 

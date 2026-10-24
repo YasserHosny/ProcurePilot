@@ -9,6 +9,7 @@ from procurepilot_api.modules.auth.models import (
     LoginRequest,
     LogoutRequest,
     PasswordResetRequest,
+    PasswordUpdateRequest,
     RefreshRequest,
 )
 from procurepilot_api.modules.auth.service import AuthService, get_auth_service
@@ -82,3 +83,31 @@ def password_reset(
 ) -> Response:
     service.request_password_reset(email=payload.email)
     return Response(status_code=status.HTTP_202_ACCEPTED)
+
+
+@router.post("/password-update", status_code=status.HTTP_204_NO_CONTENT)
+@limiter.limit(AUTH_LIMIT)
+def password_update(
+    request: Request,
+    payload: Annotated[PasswordUpdateRequest, Body()],
+    service: Annotated[AuthService, Depends(get_auth_service)],
+    audit: Annotated[AuditWriter, Depends(get_audit_writer)],
+) -> Response:
+    """Set a new password from the emailed recovery link.
+
+    Unauthenticated like `/refresh`: the recovery session's tokens arrive in the body, straight
+    from the link's URL fragment, and Supabase itself verifies them.
+    """
+    email = service.update_password(
+        access_token=payload.access_token,
+        refresh_token=payload.refresh_token,
+        password=payload.password,
+    )
+    audit.record(
+        AuditEventCreate(
+            actor_email=email or None,
+            action="auth.password_reset_completed",
+            outcome="success",
+        )
+    )
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from gotrue.errors import AuthApiError
+from gotrue.errors import AuthApiError, AuthInvalidJwtError
 from supabase import Client, create_client
 
 from procurepilot_api.config import Settings, get_settings
@@ -11,9 +11,14 @@ from procurepilot_api.errors import (
     AuthenticationError,
     InvalidCredentialsError,
     ServiceUnavailableError,
+    UnprocessableEntityError,
 )
 from procurepilot_api.modules.members.models import SessionResponse
 from procurepilot_api.modules.members.service import load_me_for_token
+
+# The web page that receives the emailed recovery link and sets the new password. Its full URL
+# must be in the Supabase Auth redirect allow list, or Supabase falls back to the Site URL.
+PASSWORD_UPDATE_PATH = "/auth/update-password"
 
 
 class AuthService:
@@ -58,10 +63,37 @@ class AuthService:
             raise AuthenticationError(details={"reason": "logout_failed"}) from exc
 
     def request_password_reset(self, *, email: str) -> None:
+        origin = self._settings.web_origin or self._settings.api_cors_origins[0]
+        redirect_to = f"{origin.rstrip('/')}{PASSWORD_UPDATE_PATH}"
         try:
-            self._client().auth.reset_password_email(email)
+            self._client().auth.reset_password_email(email, {"redirect_to": redirect_to})
         except Exception:
             return
+
+    def update_password(self, *, access_token: str, refresh_token: str, password: str) -> str:
+        """Set a new password with the recovery session from the emailed link.
+
+        Returns the account's email for the audit trail.
+        """
+        try:
+            client = self._client()
+            client.auth.set_session(access_token, refresh_token)
+            response = client.auth.update_user({"password": password})
+        except (AuthInvalidJwtError, IndexError, ValueError) as exc:
+            # The client parses the access token before any network call: a truncated or
+            # hand-edited link fails here, and is as invalid as an expired one.
+            raise AuthenticationError(details={"reason": "recovery_link_invalid"}) from exc
+        except AuthApiError as exc:
+            if exc.status in {400, 401, 403}:
+                raise AuthenticationError(details={"reason": "recovery_link_invalid"}) from exc
+            if exc.status == 422:
+                raise UnprocessableEntityError(
+                    details={"reason": exc.code or "password_refused"}
+                ) from exc
+            raise ServiceUnavailableError(details={"dependency": "supabase_auth"}) from exc
+        except Exception as exc:
+            raise ServiceUnavailableError(details={"dependency": "supabase_auth"}) from exc
+        return str(_attribute(_attribute(response, "user"), "email") or "")
 
     def session_response(self, response: object) -> SessionResponse:
         session = _extract_session(response)
