@@ -19,7 +19,7 @@ const TAP = `(() => { if (document.getElementById('__ppc')) return; const c=docu
   await sleep(800);
   let dir = null; const times = [];
   for (const c of steps) {
-    if (c.a === 'goto') { await page.goto(c.url); await sleep(c.ms || 4000); }
+    if (c.a === 'goto') { await page.goto(c.url); await page.reload(); await sleep(c.ms || 4000); } // reload: a hash-only goto keeps the old app instance
     else if (c.a === 'rec' && name) { dir = path.join(CAP, name); fs.rmSync(dir, { recursive: true, force: true }); fs.mkdirSync(dir, { recursive: true });
       cdp.on('Page.screencastFrame', (f) => { const i = times.length; times.push(f.metadata.timestamp); fs.writeFileSync(`${dir}/${String(i).padStart(5, '0')}.png`, Buffer.from(f.data, 'base64')); cdp.send('Page.screencastFrameAck', { sessionId: f.sessionId }).catch(() => {}); });
       await cdp.send('Page.startScreencast', { format: 'png', maxWidth: 390, maxHeight: 844 }); await sleep(1200); }
