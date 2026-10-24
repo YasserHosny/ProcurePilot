@@ -34,6 +34,7 @@ import type {
   PurchaseRequestLine,
 } from '../../../core/api/models';
 import { FormatService } from '../../../core/format/format.service';
+import { FormatQuantityPipe } from '../../../core/format/quantity.pipe';
 import { RequestsApiService } from '../../requests/requests-api';
 import { OrganisationApiService } from '../../settings/organisation-api';
 import { ApprovalsApiService } from '../approvals-api';
@@ -145,6 +146,7 @@ export class ApprovalDecisionDialogComponent {
     MatDialogModule,
     MatTooltipModule,
     TranslatePipe,
+    FormatQuantityPipe,
   ],
   templateUrl: './approval-queue.component.html',
   changeDetection: ChangeDetectionStrategy.Eager,

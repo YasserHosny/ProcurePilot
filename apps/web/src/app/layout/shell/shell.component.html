@@ -114,251 +114,75 @@
 
   <mat-sidenav-container class="sidenav-container">
     <mat-sidenav #sidenav [mode]="sidenavMode()" [opened]="sidenavOpened()" class="shell-sidenav">
-      <div class="nav-section-title">{{ 'shell.navSectionMain' | translate }}</div>
+      <div class="nav-home-wrap">
+        <a
+          mat-list-item
+          [routerLink]="homeItem.route"
+          routerLinkActive="active"
+          class="nav-item"
+        >
+          <mat-icon aria-hidden="true">{{ homeItem.icon }}</mat-icon>
+          <span class="nav-label">{{ homeItem.labelKey | translate }}</span>
+        </a>
+      </div>
 
-      <a
-        mat-list-item
-        routerLink="/home"
-        routerLinkActive="active"
-        class="nav-item"
-      >
-        <mat-icon aria-hidden="true">dashboard</mat-icon>
-        <span class="nav-label">{{ 'shell.navHome' | translate }}</span>
-      </a>
+      @for (group of navGroups; track group.id) {
+        <div class="nav-group">
+          <h2 class="nav-group-heading">
+            <button
+              type="button"
+              class="nav-section-title nav-group-toggle"
+              [id]="'nav-group-header-' + group.id"
+              [attr.aria-expanded]="!isGroupCollapsed(group.id)"
+              [attr.aria-controls]="'nav-group-' + group.id"
+              [attr.aria-label]="
+                (!isGroupCollapsed(group.id) ? 'shell.hideGroup' : 'shell.showGroup')
+                  | translate: { group: (group.labelKey | translate) }
+              "
+              [disabled]="isGroupActive(group.id)"
+              (click)="toggleGroup(group.id)"
+            >
+              <span class="nav-group-title-text" [id]="'nav-group-title-' + group.id">{{ group.labelKey | translate }}</span>
+              <mat-icon class="nav-group-chevron" [class.rtl-chevron]="isRtl()" aria-hidden="true">expand_more</mat-icon>
+            </button>
+          </h2>
 
-      <a
-        mat-list-item
-        routerLink="/products"
-        routerLinkActive="active"
-        class="nav-item"
-      >
-        <mat-icon aria-hidden="true">inventory_2</mat-icon>
-        <span class="nav-label">{{ 'shell.navProducts' | translate }}</span>
-      </a>
-
-      <a
-        mat-list-item
-        routerLink="/suppliers"
-        routerLinkActive="active"
-        class="nav-item"
-      >
-        <mat-icon aria-hidden="true">store</mat-icon>
-        <span class="nav-label">{{ 'shell.navSuppliers' | translate }}</span>
-      </a>
-
-      <a
-        mat-list-item
-        routerLink="/supplier-risk"
-        routerLinkActive="active"
-        class="nav-item"
-      >
-        <mat-icon aria-hidden="true">shield</mat-icon>
-        <span class="nav-label">{{ 'shell.navSupplierRisk' | translate }}</span>
-      </a>
-
-      <a
-        mat-list-item
-        routerLink="/analyst"
-        routerLinkActive="active"
-        [routerLinkActiveOptions]="{exact: true}"
-        class="nav-item"
-      >
-        <mat-icon aria-hidden="true">forum</mat-icon>
-        <span class="nav-label">{{ 'shell.navAnalyst' | translate }}</span>
-      </a>
-
-      <a
-        mat-list-item
-        routerLink="/analyst/history"
-        routerLinkActive="active"
-        class="nav-item"
-      >
-        <mat-icon aria-hidden="true">history</mat-icon>
-        <span class="nav-label">{{ 'analyst.navHistory' | translate }}</span>
-      </a>
-
-      <a
-        mat-list-item
-        routerLink="/import"
-        routerLinkActive="active"
-        class="nav-item"
-        *appRole="['owner', 'buyer']"
-      >
-        <mat-icon aria-hidden="true">upload_file</mat-icon>
-        <span class="nav-label">{{ 'shell.navImport' | translate }}</span>
-      </a>
-
-      <a
-        mat-list-item
-        routerLink="/quotations"
-        routerLinkActive="active"
-        class="nav-item"
-      >
-        <mat-icon aria-hidden="true">receipt_long</mat-icon>
-        <span class="nav-label">{{ 'shell.navQuotations' | translate }}</span>
-      </a>
-
-      <a
-        mat-list-item
-        routerLink="/matching"
-        routerLinkActive="active"
-        class="nav-item"
-      >
-        <mat-icon aria-hidden="true">compare_arrows</mat-icon>
-        <span class="nav-label">{{ 'shell.navMatching' | translate }}</span>
-      </a>
-
-      <a
-        mat-list-item
-        routerLink="/orders"
-        routerLinkActive="active"
-        class="nav-item"
-      >
-        <mat-icon aria-hidden="true">assignment</mat-icon>
-        <span class="nav-label">{{ 'shell.navOrders' | translate }}</span>
-      </a>
-
-      <a
-        mat-list-item
-        routerLink="/rfq/history"
-        routerLinkActive="active"
-        class="nav-item"
-      >
-        <mat-icon aria-hidden="true">history</mat-icon>
-        <span class="nav-label">{{ 'shell.navRfq' | translate }}</span>
-      </a>
-
-      <a
-        mat-list-item
-        routerLink="/offers/compare"
-        routerLinkActive="active"
-        class="nav-item"
-      >
-        <mat-icon aria-hidden="true">auto_awesome</mat-icon>
-        <span class="nav-label">{{ 'shell.navCompare' | translate }}</span>
-      </a>
-
-      <a
-        mat-list-item
-        routerLink="/offers/basket-split"
-        routerLinkActive="active"
-        class="nav-item"
-      >
-        <mat-icon aria-hidden="true">call_split</mat-icon>
-        <span class="nav-label">{{ 'shell.navBasketSplit' | translate }}</span>
-      </a>
-
-      <a
-        mat-list-item
-        routerLink="/alerts"
-        routerLinkActive="active"
-        class="nav-item"
-      >
-        <mat-icon aria-hidden="true">notifications</mat-icon>
-        <span class="nav-label">{{ 'shell.navAlerts' | translate }}</span>
-      </a>
-
-      <a
-        mat-list-item
-        routerLink="/forecasting"
-        routerLinkActive="active"
-        class="nav-item"
-        *appRole="['owner', 'buyer']"
-      >
-        <mat-icon aria-hidden="true">trending_up</mat-icon>
-        <span class="nav-label">{{ 'shell.navForecasting' | translate }}</span>
-      </a>
-
-      <a
-        mat-list-item
-        routerLink="/savings"
-        routerLinkActive="active"
-        class="nav-item"
-      >
-        <mat-icon aria-hidden="true">savings</mat-icon>
-        <span class="nav-label">{{ 'shell.navSavings' | translate }}</span>
-      </a>
-
-      <a
-        mat-list-item
-        routerLink="/reports"
-        routerLinkActive="active"
-        class="nav-item"
-      >
-        <mat-icon aria-hidden="true">assessment</mat-icon>
-        <span class="nav-label">{{ 'reports.nav' | translate }}</span>
-      </a>
-
-      <a
-        mat-list-item
-        routerLink="/ingestion"
-        routerLinkActive="active"
-        class="nav-item"
-      >
-        <mat-icon aria-hidden="true">inbox</mat-icon>
-        <span class="nav-label">{{ 'ingestion.nav' | translate }}</span>
-      </a>
-
-      <a
-        mat-list-item
-        routerLink="/accounting"
-        routerLinkActive="active"
-        class="nav-item"
-      >
-        <mat-icon aria-hidden="true">account_balance</mat-icon>
-        <span class="nav-label">{{ 'accounting.nav' | translate }}</span>
-      </a>
-
-      <a
-        mat-list-item
-        routerLink="/pos"
-        routerLinkActive="active"
-        class="nav-item"
-      >
-        <mat-icon aria-hidden="true">point_of_sale</mat-icon>
-        <span class="nav-label">{{ 'pos.nav' | translate }}</span>
-      </a>
-
-      <a
-        mat-list-item
-        routerLink="/requests"
-        routerLinkActive="active"
-        class="nav-item"
-      >
-        <mat-icon aria-hidden="true">shopping_cart</mat-icon>
-        <span class="nav-label">{{ 'shell.navRequests' | translate }}</span>
-      </a>
-
-      <a
-        mat-list-item
-        routerLink="/approvals"
-        routerLinkActive="active"
-        class="nav-item"
-      >
-        <mat-icon aria-hidden="true">approval</mat-icon>
-        <span class="nav-label">{{ 'shell.navApprovals' | translate }}</span>
-      </a>
-
-      <a
-        mat-list-item
-        routerLink="/team"
-        routerLinkActive="active"
-        class="nav-item"
-        *appRole="'owner'"
-      >
-        <mat-icon aria-hidden="true">group</mat-icon>
-        <span class="nav-label">{{ 'shell.navTeam' | translate }}</span>
-      </a>
-
-      <a
-        mat-list-item
-        routerLink="/settings"
-        routerLinkActive="active"
-        class="nav-item"
-      >
-        <mat-icon aria-hidden="true">settings</mat-icon>
-        <span class="nav-label">{{ 'shell.navSettings' | translate }}</span>
-      </a>
+          <div
+            [id]="'nav-group-' + group.id"
+            class="nav-group-items"
+            role="group"
+            [attr.aria-labelledby]="'nav-group-title-' + group.id"
+            [hidden]="isGroupCollapsed(group.id)"
+          >
+            @for (item of group.items; track item.route) {
+              @if (!item.roles) {
+                <a
+                  mat-list-item
+                  [routerLink]="item.route"
+                  routerLinkActive="active"
+                  [routerLinkActiveOptions]="item.exact ? { exact: true } : { exact: false }"
+                  class="nav-item"
+                >
+                  <mat-icon aria-hidden="true">{{ item.icon }}</mat-icon>
+                  <span class="nav-label">{{ item.labelKey | translate }}</span>
+                </a>
+              } @else {
+                <a
+                  mat-list-item
+                  [routerLink]="item.route"
+                  routerLinkActive="active"
+                  [routerLinkActiveOptions]="item.exact ? { exact: true } : { exact: false }"
+                  class="nav-item"
+                  *appRole="item.roles"
+                >
+                  <mat-icon aria-hidden="true">{{ item.icon }}</mat-icon>
+                  <span class="nav-label">{{ item.labelKey | translate }}</span>
+                </a>
+              }
+            }
+          </div>
+        </div>
+      }
     </mat-sidenav>
 
     <!--

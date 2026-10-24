@@ -219,7 +219,14 @@
     "navAlerts": "صندوق التنبيهات",
     "navIntelligence": "ذكاء الأسعار",
     "navForecasting": "توقعات إعادة الطلب",
-    "navRfq": "سجل طلبات عروض الأسعار"
+    "navRfq": "سجل طلبات عروض الأسعار",
+    "sourcing": "التوريد",
+    "purchasing": "الشراء",
+    "catalogue": "الكتالوج",
+    "insight": "الرؤى",
+    "setup": "الإعداد",
+    "showGroup": "إظهار {{group}}",
+    "hideGroup": "إخفاء {{group}}"
   },
   "analyst": {
     "title": "محلل المشتريات",

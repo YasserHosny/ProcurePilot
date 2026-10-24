@@ -68,7 +68,7 @@ test.describe('ProcurePilot Localisation & RTL Layout (T071)', () => {
 
     // Verify Shell & Home navigation strings are now Arabic
     await expect(page.locator('.nav-item.active .nav-label')).toHaveText('نظرة عامة');
-    await expect(page.locator('.nav-section-title')).toHaveText('التنقل الرئيسي');
+    await expect(page.locator('.nav-group-title-text').first()).toHaveText('التوريد');
     await expect(page.locator('.badge-active span')).toHaveText('مساحة العمل المستقلة نشطة');
 
     // Reload page to verify persistence across reloads

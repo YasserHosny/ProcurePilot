@@ -26,7 +26,7 @@ test.describe("Catalogue Product Master (T018)", () => {
     const started = Date.now();
 
     // Navigate to Products
-    await page.click('a[routerLink="/products"]');
+    await page.locator('.shell-sidenav').getByRole('link', { name: 'Products' }).click();
     await page.waitForURL("**/products");
     await expect(page.locator(".page-title")).toContainText("Product Master");
 

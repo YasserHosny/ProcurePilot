@@ -52,7 +52,7 @@ test.describe('ProcurePilot Team Management (T061)', () => {
     // SC-003: an owner can invite a colleague and see them active in under 2 minutes.
     const started = Date.now();
     // Navigate to Team Management
-    await page.click('a[routerLink="/team"]');
+    await page.locator('.shell-sidenav').getByRole('link', { name: 'Team Management' }).click();
     await page.waitForURL('**/team');
 
     await expect(page.locator('.page-title')).toContainText('Team Management');

@@ -187,7 +187,7 @@ Release R3.0 (`013-automated-ingestion`) introduces multi-channel ingestion (inb
 ## 12. End-to-End Conventions (added 2026-10-18)
 
 These come from flaky or misleading E2E runs fixed in October 2026 (PRs #77, #78, #85, #93). CI's shape —
-docs-only skip, three shards, accessibility split — is in `docs/operations/ci-pipeline.md`.
+docs-only skip, five shards, accessibility split — is in `docs/operations/ci-pipeline.md`.
 
 - **Run one spec** with `pnpm --filter web exec playwright test <spec>`. `pnpm --filter web test:e2e -- <spec>`
   silently runs the whole suite.
