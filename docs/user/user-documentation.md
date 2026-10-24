@@ -125,7 +125,7 @@ The final step of workspace creation: a summary card showing the workspace's pla
 
 | # | Element | Description |
 |---|---------|-------------|
-| 1 | **Top bar** | Shows the ProcurePilot brand, your active workspace name, and the account menu (workspace switcher, language toggle, sign out). |
+| 1 | **Top bar** | Shows the ProcurePilot brand, your active workspace name, the workspace switcher, and the account menu (language, contact support, sign out). |
 | 2 | **Side navigation** | Provides module switching for authenticated users. It is shown separately below so page screenshots can focus on the work area. |
 | 3 | **Welcome banner** | Displays your workspace name and confirms your workspace is provisioned with database-level tenant isolation and role-based access control. |
 | 4 | **Tenant & Security card** | Shows your Tenant ID, workspace slug, and the isolation level (PostgreSQL Row-Level Security, FORCED). This is read-only and confirms your data is fully isolated. |
