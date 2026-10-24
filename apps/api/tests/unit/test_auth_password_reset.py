@@ -4,7 +4,7 @@ from types import SimpleNamespace
 from unittest.mock import Mock
 
 import pytest
-from gotrue.errors import AuthApiError, AuthRetryableError
+from gotrue.errors import AuthApiError, AuthInvalidJwtError, AuthRetryableError
 
 from procurepilot_api.config import Settings, get_settings
 from procurepilot_api.errors import (
@@ -77,6 +77,27 @@ def test_expired_or_used_link_is_unauthenticated(
 ) -> None:
     client = Mock()
     client.auth.set_session.side_effect = AuthApiError("expired", status, "session_not_found")
+    service = _service(client, monkeypatch)
+
+    with pytest.raises(AuthenticationError) as raised:
+        service.update_password(access_token="a", refresh_token="r", password="a-new-long-password")
+
+    assert raised.value.details == {"reason": "recovery_link_invalid"}
+
+
+@pytest.mark.parametrize(
+    "error",
+    [
+        # A link whose token is not JWT-shaped at all (truncated or hand-edited).
+        IndexError("list index out of range"),
+        AuthInvalidJwtError("Invalid JWT structure"),
+    ],
+)
+def test_malformed_link_is_unauthenticated(
+    error: Exception, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    client = Mock()
+    client.auth.set_session.side_effect = error
     service = _service(client, monkeypatch)
 
     with pytest.raises(AuthenticationError) as raised:

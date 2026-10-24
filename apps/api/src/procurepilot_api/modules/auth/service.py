@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from gotrue.errors import AuthApiError
+from gotrue.errors import AuthApiError, AuthInvalidJwtError
 from supabase import Client, create_client
 
 from procurepilot_api.config import Settings, get_settings
@@ -79,6 +79,10 @@ class AuthService:
             client = self._client()
             client.auth.set_session(access_token, refresh_token)
             response = client.auth.update_user({"password": password})
+        except (AuthInvalidJwtError, IndexError, ValueError) as exc:
+            # The client parses the access token before any network call: a truncated or
+            # hand-edited link fails here, and is as invalid as an expired one.
+            raise AuthenticationError(details={"reason": "recovery_link_invalid"}) from exc
         except AuthApiError as exc:
             if exc.status in {400, 401, 403}:
                 raise AuthenticationError(details={"reason": "recovery_link_invalid"}) from exc
