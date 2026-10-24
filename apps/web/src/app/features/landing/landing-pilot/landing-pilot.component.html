@@ -1,0 +1,48 @@
+<section class="pilot-section" aria-labelledby="pilot-heading">
+  <div class="pilot-container pilot-faq-grid">
+    <div class="pilot-panel">
+      <h2 id="pilot-heading" class="pilot-title">
+        {{ 'landing.pilot.title' | translate }}
+      </h2>
+      <p class="pilot-body">
+        {{ 'landing.pilot.body' | translate }}
+      </p>
+      <div class="pilot-actions">
+        <a mat-flat-button class="pilot-primary-btn" [href]="mailtoLink()">
+          {{ 'landing.pilot.cta' | translate }}
+        </a>
+      </div>
+      <div class="pilot-email-row">
+        <span class="pilot-email-text">
+          {{ 'landing.pilot.orEmail' | translate }} <bdi class="email-bdi">{{ supportEmail }}</bdi>
+        </span>
+        <button
+          mat-stroked-button
+          type="button"
+          class="copy-email-btn"
+          (click)="copyEmail()"
+        >
+          <mat-icon aria-hidden="true">{{ emailCopied() ? 'check' : 'content_copy' }}</mat-icon>
+          <span>{{ (emailCopied() ? 'landing.pilot.copied' : 'landing.pilot.copyEmail') | translate }}</span>
+        </button>
+        <span class="cdk-visually-hidden" aria-live="polite">
+          {{ emailCopied() ? ('landing.pilot.copied' | translate) : '' }}
+        </span>
+      </div>
+    </div>
+
+    <div class="faq-list">
+      @for (item of faqItems; track item.id) {
+        <details class="faq-row">
+          <summary class="faq-summary">
+            <span class="faq-question">{{ item.qKey | translate }}</span>
+            <mat-icon class="faq-chevron" aria-hidden="true">expand_more</mat-icon>
+          </summary>
+          <div class="faq-answer">
+            <p>{{ item.aKey | translate }}</p>
+          </div>
+        </details>
+      }
+    </div>
+  </div>
+</section>

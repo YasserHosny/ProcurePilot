@@ -29,13 +29,9 @@ describe('LandingComponent', () => {
       providers: [
         provideRouter([]),
         provideTranslateService(),
+        { provide: MatDialog, useValue: dialogSpy },
       ],
     })
-      .overrideComponent(LandingComponent, {
-        set: {
-          providers: [{ provide: MatDialog, useValue: dialogSpy }],
-        },
-      })
       .compileComponents();
 
     translate = TestBed.inject(TranslateService);

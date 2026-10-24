@@ -50,8 +50,8 @@
             <img
               [src]="heroImageSrc()"
               [alt]="heroImageAlt()"
-              width="1440"
-              height="900"
+              width="2304"
+              height="478"
               class="hero-preview-image"
             />
           </figure>
@@ -94,150 +94,9 @@
       </div>
     </section>
 
-    <section id="gallery" class="gallery-section" aria-labelledby="gallery-heading">
-      <div class="section-container">
-        <div class="gallery-header-row">
-          <div class="gallery-header-text">
-            <h2 id="gallery-heading" class="section-title">
-              {{ 'landing.gallery.title' | translate }}
-            </h2>
-            <p class="section-subtitle">
-              {{ 'landing.gallery.subtitle' | translate }}
-            </p>
-          </div>
-          <div class="gallery-controls">
-            <button
-              mat-icon-button
-              type="button"
-              class="gallery-nav-btn prev-btn"
-              (click)="prevCard()"
-              [disabled]="activeCardIndex() === 0"
-              [attr.aria-label]="'landing.gallery.previous' | translate"
-            >
-              <mat-icon aria-hidden="true">{{ isRtl() ? 'arrow_forward' : 'arrow_back' }}</mat-icon>
-            </button>
-            <button
-              mat-icon-button
-              type="button"
-              class="gallery-nav-btn next-btn"
-              (click)="nextCard()"
-              [disabled]="activeCardIndex() === galleryCards.length - 1"
-              [attr.aria-label]="'landing.gallery.next' | translate"
-            >
-              <mat-icon aria-hidden="true">{{ isRtl() ? 'arrow_back' : 'arrow_forward' }}</mat-icon>
-            </button>
-          </div>
-        </div>
+    <app-landing-gallery [(activeCardIndex)]="activeCardIndex" />
 
-        <ul
-          #railEl
-          class="gallery-rail"
-          role="list"
-          tabindex="0"
-          aria-roledescription="carousel"
-          [attr.aria-label]="'landing.gallery.railLabel' | translate"
-          (keydown)="onRailKeydown($event)"
-        >
-          @for (card of galleryCards; track card.id; let i = $index) {
-            <li
-              #cardEl
-              class="gallery-card"
-              [class.active]="activeCardIndex() === i"
-              role="group"
-              [attr.data-index]="i"
-              [attr.aria-label]="getCardAriaLabel(i, card)"
-            >
-              <figure class="gallery-card-figure">
-                <div class="gallery-card-top-bar">
-                  <span class="gallery-card-numbered-label">{{ card.numberedLabelKey | translate }}</span>
-                </div>
-                <div class="gallery-image-wrapper">
-                  <img
-                    [src]="'/landing/' + currentLocale() + '/' + card.file"
-                    [alt]="('landing.gallery.altPrefix' | translate) + (card.captionKey | translate)"
-                    width="1440"
-                    height="900"
-                    [loading]="i < 2 ? 'eager' : 'lazy'"
-                    class="gallery-card-image"
-                  />
-                  <button
-                    mat-icon-button
-                    type="button"
-                    class="gallery-enlarge-btn"
-                    (click)="openEnlargeDialog(i)"
-                    [attr.aria-label]="'landing.gallery.enlarge' | translate"
-                  >
-                    <mat-icon aria-hidden="true">zoom_in</mat-icon>
-                  </button>
-                </div>
-                <figcaption class="gallery-card-caption">
-                  <p class="gallery-caption-sentence">{{ card.captionKey | translate }}</p>
-                  <span class="gallery-demonstration-chip">{{ 'landing.gallery.demonstrationChip' | translate }}</span>
-                </figcaption>
-              </figure>
-            </li>
-          }
-        </ul>
-
-        <nav class="gallery-step-index" [attr.aria-label]="'landing.gallery.railLabel' | translate">
-          @for (card of galleryCards; track card.id; let i = $index) {
-            <button
-              type="button"
-              class="gallery-step-btn"
-              [class.active]="activeCardIndex() === i"
-              [attr.aria-current]="activeCardIndex() === i ? 'true' : null"
-              (click)="scrollToCard(i)"
-            >
-              {{ card.labelKey | translate }}
-            </button>
-          }
-        </nav>
-      </div>
-    </section>
-
-    <section class="evidence-section" aria-labelledby="evidence-heading">
-      <div class="section-container evidence-container">
-        <div class="evidence-text-col">
-          <h2 id="evidence-heading" class="evidence-title">
-            {{ 'landing.evidence.title' | translate }}
-          </h2>
-          <p class="evidence-body">
-            {{ 'landing.evidence.body' | translate }}
-          </p>
-          <p class="evidence-second-point">
-            {{ 'landing.evidence.secondPoint' | translate }}
-          </p>
-        </div>
-        <div class="evidence-card-col">
-          <div class="ledger-excerpt-card">
-            <div class="excerpt-header">
-              <span class="excerpt-chip demonstration">{{ 'landing.evidence.demonstrationLabel' | translate }}</span>
-            </div>
-            <div class="excerpt-rows">
-              <div class="excerpt-row">
-                <span class="excerpt-label">{{ 'landing.evidence.rowLastQuoted' | translate }}</span>
-                <span class="excerpt-amount pp-figures">{{ demoLastQuoted | formatMoney:currentLocale() }}</span>
-              </div>
-              <div class="excerpt-row">
-                <span class="excerpt-label">{{ 'landing.evidence.rowPaid' | translate }}</span>
-                <span class="excerpt-amount pp-figures">{{ demoPaid | formatMoney:currentLocale() }}</span>
-              </div>
-              <div class="excerpt-row">
-                <span class="excerpt-label">{{ 'landing.evidence.rowCalculated' | translate }}</span>
-                <span class="excerpt-amount pp-figures">{{ demoCalculated | formatMoney:currentLocale() }}</span>
-              </div>
-              <div class="excerpt-row verified-row">
-                <div class="verified-label-group">
-                  <span class="excerpt-label">{{ 'landing.evidence.rowVerified' | translate }}</span>
-                  <span class="excerpt-chip verified">{{ 'landing.evidence.statusVerified' | translate }}</span>
-                </div>
-                <span class="excerpt-amount pp-figures">{{ demoVerified | formatMoney:currentLocale() }}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
+    <app-landing-evidence />
 
     <section class="maker-byline-band" aria-label="Iron Systems">
       <div class="section-container byline-container">
@@ -251,54 +110,7 @@
       </div>
     </section>
 
-    <section class="pilot-section" aria-labelledby="pilot-heading">
-      <div class="section-container pilot-faq-grid">
-        <div class="pilot-panel">
-          <h2 id="pilot-heading" class="pilot-title">
-            {{ 'landing.pilot.title' | translate }}
-          </h2>
-          <p class="pilot-body">
-            {{ 'landing.pilot.body' | translate }}
-          </p>
-          <div class="pilot-actions">
-            <a mat-flat-button class="pilot-primary-btn" [href]="mailtoLink()">
-              {{ 'landing.pilot.cta' | translate }}
-            </a>
-          </div>
-          <div class="pilot-email-row">
-            <span class="pilot-email-text">
-              {{ 'landing.pilot.orEmail' | translate }} <bdi class="email-bdi">{{ supportEmail }}</bdi>
-            </span>
-            <button
-              mat-stroked-button
-              type="button"
-              class="copy-email-btn"
-              (click)="copyEmail()"
-            >
-              <mat-icon aria-hidden="true">{{ emailCopied() ? 'check' : 'content_copy' }}</mat-icon>
-              <span>{{ (emailCopied() ? 'landing.pilot.copied' : 'landing.pilot.copyEmail') | translate }}</span>
-            </button>
-            <span class="cdk-visually-hidden" aria-live="polite">
-              {{ emailCopied() ? ('landing.pilot.copied' | translate) : '' }}
-            </span>
-          </div>
-        </div>
-
-        <div class="faq-list">
-          @for (item of faqItems; track item.id) {
-            <details class="faq-row">
-              <summary class="faq-summary">
-                <span class="faq-question">{{ item.qKey | translate }}</span>
-                <mat-icon class="faq-chevron" aria-hidden="true">expand_more</mat-icon>
-              </summary>
-              <div class="faq-answer">
-                <p>{{ item.aKey | translate }}</p>
-              </div>
-            </details>
-          }
-        </div>
-      </div>
-    </section>
+    <app-landing-pilot [(emailCopied)]="emailCopied" />
   </main>
 
   <footer class="landing-footer">

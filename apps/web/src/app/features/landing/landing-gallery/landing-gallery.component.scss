@@ -1,0 +1,204 @@
+:host {
+  display: block;
+}
+
+.gallery-section {
+  background: var(--pp-surface-page);
+  padding-block: var(--pp-space-12);
+  border-block-end: 1px solid var(--pp-border);
+}
+
+.gallery-container {
+  max-inline-size: 1120px;
+  margin-inline: auto;
+  padding-inline: var(--pp-space-4);
+  box-sizing: border-box;
+}
+
+.gallery-header-row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--pp-space-4);
+  margin-block-end: var(--pp-space-6);
+}
+
+.section-title {
+  margin: 0;
+  font-size: var(--pp-text-24);
+  font-weight: var(--pp-weight-strong);
+  color: var(--pp-text-strong);
+  line-height: var(--pp-leading-tight);
+}
+
+.section-subtitle {
+  margin: var(--pp-space-2) 0 0;
+  font-size: var(--pp-text-16);
+  line-height: var(--pp-leading);
+  color: var(--pp-text-muted);
+  max-inline-size: 720px;
+}
+
+.gallery-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--pp-space-2);
+}
+
+.gallery-nav-btn {
+  color: var(--pp-primary);
+  border: 1px solid var(--pp-border-strong);
+  background: var(--pp-surface-card);
+
+  &[disabled] {
+    opacity: 0.35;
+    cursor: not-allowed;
+  }
+}
+
+.gallery-rail {
+  display: flex;
+  gap: var(--pp-space-6);
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  overscroll-behavior-x: contain;
+  padding-inline: max(var(--pp-space-4), calc((100vw - 1120px) / 2));
+  padding-block: var(--pp-space-2) var(--pp-space-4);
+  margin: 0;
+  list-style: none;
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    scroll-behavior: smooth;
+  }
+}
+
+.gallery-card {
+  flex: 0 0 min(72vw, 760px);
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+}
+
+.gallery-card-figure {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--pp-space-3);
+}
+
+.gallery-card-numbered-label {
+  font-size: var(--pp-text-16);
+  font-weight: var(--pp-weight-strong);
+  color: var(--pp-text-strong);
+}
+
+.gallery-image-wrapper {
+  position: relative;
+  border-radius: var(--pp-radius-card);
+  box-shadow: var(--pp-elev-1);
+  border: 1px solid var(--pp-border);
+  overflow: hidden;
+  background: var(--pp-surface-card);
+  transition: box-shadow var(--pp-dur) var(--pp-ease);
+
+  &:hover,
+  &:focus-within {
+    box-shadow: var(--pp-elev-2);
+  }
+}
+
+.gallery-card-image {
+  display: block;
+  inline-size: 100%;
+  aspect-ratio: 16 / 10;
+  block-size: auto;
+  object-fit: contain;
+  background: var(--pp-surface-sunken);
+  cursor: pointer;
+}
+
+.gallery-enlarge-btn {
+  position: absolute;
+  inset-block-end: var(--pp-space-3);
+  inset-inline-end: var(--pp-space-3);
+  background: var(--pp-surface-card);
+  color: var(--pp-text-strong);
+  border: 1px solid var(--pp-border);
+  box-shadow: var(--pp-elev-1);
+}
+
+.gallery-card-caption {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--pp-space-3);
+}
+
+.gallery-caption-sentence {
+  margin: 0;
+  font-size: var(--pp-text-14);
+  line-height: var(--pp-leading);
+  color: var(--pp-text-muted);
+  flex: 1;
+}
+
+.gallery-demonstration-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px var(--pp-space-2);
+  font-size: var(--pp-text-12);
+  font-weight: var(--pp-weight-medium);
+  border-radius: var(--pp-radius-chip);
+  background: var(--pp-surface-sunken);
+  color: var(--pp-text-muted);
+  border: 1px solid var(--pp-border);
+  white-space: nowrap;
+}
+
+.gallery-step-index {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--pp-space-2);
+  margin-block-start: var(--pp-space-6);
+  border-block-end: 1px solid var(--pp-border);
+}
+
+.gallery-step-btn {
+  background: transparent;
+  border: 0;
+  padding: var(--pp-space-2) var(--pp-space-3);
+  font-family: inherit;
+  font-size: var(--pp-text-14);
+  font-weight: var(--pp-weight-medium);
+  color: var(--pp-text-muted);
+  cursor: pointer;
+  border-block-end: 2px solid transparent;
+  margin-block-end: -1px;
+  transition: color var(--pp-dur) var(--pp-ease), border-color var(--pp-dur) var(--pp-ease);
+
+  &:hover {
+    color: var(--pp-text-strong);
+  }
+
+  &.active {
+    color: var(--pp-primary);
+    border-block-end-color: var(--pp-primary);
+    font-weight: var(--pp-weight-strong);
+  }
+
+  &:focus-visible {
+    outline: var(--pp-focus-ring-width) solid var(--pp-focus-ring-color);
+  }
+}
+
+@media (max-width: 600px) {
+  .gallery-card {
+    flex: 0 0 86vw;
+  }
+}

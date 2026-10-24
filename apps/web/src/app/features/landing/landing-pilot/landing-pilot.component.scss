@@ -1,0 +1,169 @@
+:host {
+  display: block;
+}
+
+.pilot-section {
+  background: var(--pp-surface-page);
+  padding-block: var(--pp-space-12);
+  border-block-end: 1px solid var(--pp-border);
+}
+
+.pilot-container {
+  max-inline-size: 1120px;
+  margin-inline: auto;
+  padding-inline: var(--pp-space-4);
+  box-sizing: border-box;
+}
+
+.pilot-faq-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: start;
+  gap: var(--pp-space-8);
+}
+
+.pilot-panel {
+  background: var(--pp-inverse-surface);
+  color: var(--pp-on-inverse-surface);
+  border-radius: var(--pp-radius-panel);
+  padding: var(--pp-space-8);
+  display: flex;
+  flex-direction: column;
+  gap: var(--pp-space-4);
+  text-align: start;
+
+  .email-bdi {
+    color: var(--pp-on-inverse-surface);
+    font-weight: var(--pp-weight-medium);
+    white-space: nowrap;
+  }
+}
+
+.pilot-title {
+  margin: 0;
+  font-size: var(--pp-text-24);
+  font-weight: var(--pp-weight-strong);
+  color: var(--pp-on-inverse-surface);
+  line-height: var(--pp-leading-tight);
+}
+
+.pilot-body {
+  margin: 0;
+  font-size: var(--pp-text-16);
+  line-height: var(--pp-leading);
+  color: var(--pp-navy-200);
+}
+
+.pilot-actions {
+  margin-block: var(--pp-space-2);
+}
+
+/* Defect 3: Light filled button for primary CTA on navy */
+.pilot-primary-btn {
+  min-inline-size: 160px;
+  block-size: var(--pp-button-height-lg);
+  font-size: var(--pp-text-16);
+  font-weight: var(--pp-weight-strong);
+  background-color: var(--pp-on-inverse-surface) !important;
+  color: var(--pp-primary) !important;
+
+  &:hover {
+    background-color: var(--pp-surface-page) !important;
+  }
+
+  &:focus-visible {
+    outline: var(--pp-focus-ring-width) solid var(--pp-on-inverse-surface);
+    outline-offset: 2px;
+  }
+}
+
+.pilot-email-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--pp-space-3);
+  font-size: var(--pp-text-14);
+  color: var(--pp-navy-200);
+}
+
+/* Defect 3: Outlined button with --pp-on-inverse-surface text + border and visible label */
+.copy-email-btn {
+  color: var(--pp-on-inverse-surface) !important;
+  border: 1px solid var(--pp-on-inverse-surface) !important;
+  background: transparent;
+
+  mat-icon,
+  span {
+    color: var(--pp-on-inverse-surface) !important;
+  }
+
+  &:hover {
+    background-color: rgba(255, 255, 255, 0.08) !important;
+  }
+
+  &:focus-visible {
+    outline: var(--pp-focus-ring-width) solid var(--pp-on-inverse-surface);
+    outline-offset: 2px;
+  }
+}
+
+.faq-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--pp-space-3);
+}
+
+.faq-row {
+  background: var(--pp-surface-card);
+  border: 1px solid var(--pp-border);
+  border-radius: var(--pp-radius-control);
+  padding: var(--pp-space-4);
+  box-shadow: var(--pp-elev-1);
+}
+
+.faq-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--pp-space-3);
+  font-size: var(--pp-text-16);
+  font-weight: var(--pp-weight-medium);
+  color: var(--pp-text-strong);
+  cursor: pointer;
+  list-style: none;
+
+  &::-webkit-details-marker {
+    display: none;
+  }
+
+  &:focus-visible {
+    outline: var(--pp-focus-ring-width) solid var(--pp-focus-ring-color);
+  }
+}
+
+.faq-chevron {
+  flex-shrink: 0;
+  transition: transform var(--pp-dur) var(--pp-ease);
+  color: var(--pp-text-muted);
+}
+
+details[open] .faq-chevron {
+  transform: rotate(180deg);
+}
+
+.faq-answer {
+  margin-block-start: var(--pp-space-3);
+
+  p {
+    margin: 0;
+    font-size: var(--pp-text-14);
+    line-height: var(--pp-leading);
+    color: var(--pp-text-muted);
+  }
+}
+
+@media (max-width: 900px) {
+  .pilot-faq-grid {
+    grid-template-columns: 1fr;
+  }
+}
