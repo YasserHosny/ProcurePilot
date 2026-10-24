@@ -57,7 +57,7 @@
           <button mat-stroked-button type="button" (click)="receiptOpen.set(!receiptOpen())" [disabled]="isSaving()" data-testid="open-receipt-form"><mat-icon aria-hidden="true">inventory_2</mat-icon>{{ 'orders.detail.recordReceipt' | translate }}</button>
         }
         @if (canRecordOutcome(data.order.status)) {
-          <a mat-stroked-button color="primary" [routerLink]="['/orders', data.order.id, 'record-outcome']" data-testid="record-outcome"><mat-icon aria-hidden="true">toll</mat-icon>{{ 'orders.detail.recordOutcome' | translate }}</a>
+          <a mat-stroked-button color="primary" [routerLink]="['/orders', data.order.id, 'record-outcome']" data-testid="record-outcome"><mat-icon aria-hidden="true">payments</mat-icon>{{ 'orders.detail.recordOutcome' | translate }}</a>
         }
       </div>
 
