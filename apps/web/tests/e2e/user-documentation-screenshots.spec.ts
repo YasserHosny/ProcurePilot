@@ -310,16 +310,21 @@ async function buildCommercialFixtures(page: Page): Promise<ScreenshotFixtures> 
   const ownerCreds = credentials();
   await setOwnerLocale('en');
 
+  // CI captures into a fresh database exactly once (playwright.docs.config.ts never retries),
+  // so the sample names need no timestamp there. A timestamp's digit widths changed where names
+  // wrapped and pushed 10-smart-compare over the drift limit at random (PPS-46). Local runs
+  // against a reused database keep it so the names stay unique.
   const stamp = Date.now();
+  const named = (base: string): string => (process.env['CI'] ? base : `${base} ${stamp}`);
   const product = await createTestProduct(ownerToken, {
-    tenant_name: `Docs Capture Copy Paper ${stamp}`,
+    tenant_name: named('Docs Capture Copy Paper'),
     base_unit: 'each',
     pack_count: 5,
     unit_size: '80',
     brand: 'DocsCo',
   });
-  const supplier = await createTestSupplier(ownerToken, `Docs Capture Supplier ${stamp}`);
-  const workflowSupplier = await createTestSupplier(ownerToken, `Docs Capture Quote Supplier ${stamp}`);
+  const supplier = await createTestSupplier(ownerToken, named('Docs Capture Supplier'));
+  const workflowSupplier = await createTestSupplier(ownerToken, named('Docs Capture Quote Supplier'));
 
   let quotationId: string | undefined;
   let matchedProductId = product.id;
@@ -334,7 +339,7 @@ async function buildCommercialFixtures(page: Page): Promise<ScreenshotFixtures> 
     const matchedProduct = await captureAndResolveMatchScreenshots(
       page,
       quotationId,
-      `Docs Capture Tomatoes ${stamp}`,
+      named('Docs Capture Tomatoes'),
     );
     matchedProductId = matchedProduct.id;
   } catch (error) {
@@ -364,13 +369,13 @@ async function buildCommercialFixtures(page: Page): Promise<ScreenshotFixtures> 
   );
 
   const branch = await apiAsUser<{ id: string; name: string }>(ownerToken, 'POST', '/organisation/branches', {
-    name: `Docs Capture Branch ${stamp}`,
+    name: named('Docs Capture Branch'),
     address: '42 Documentation Road',
     region: 'GB',
   });
   await apiAsUser(ownerToken, 'POST', '/organisation/cost-centres', {
-    name: `Docs Capture Cost Centre ${stamp}`,
-    code: `DOCS-${String(stamp).slice(-6)}`,
+    name: named('Docs Capture Cost Centre'),
+    code: process.env['CI'] ? 'DOCS-CAPTURE' : `DOCS-${String(stamp).slice(-6)}`,
     branch_id: branch.id,
   });
   await apiAsUser(ownerToken, 'POST', '/organisation/budgets', {
