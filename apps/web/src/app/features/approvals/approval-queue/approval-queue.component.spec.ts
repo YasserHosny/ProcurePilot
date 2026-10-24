@@ -7,6 +7,7 @@ import { TranslateService, provideTranslateService } from '@ngx-translate/core';
 import { of, throwError } from 'rxjs';
 
 import enCatalog from '../../../../../../../packages/i18n/en.json';
+import arCatalog from '../../../../../../../packages/i18n/ar.json';
 import { ApiService } from '../../../core/api/api.service';
 import type { PurchaseRequest } from '../../../core/api/models';
 import { RequestsApiService } from '../../requests/requests-api';
@@ -166,6 +167,7 @@ describe('ApprovalQueueComponent', () => {
 
     const translate = TestBed.inject(TranslateService);
     translate.setTranslation('en', enCatalog);
+    translate.setTranslation('ar', arCatalog);
     translate.use('en');
 
     fixture = TestBed.createComponent(ApprovalQueueComponent);
@@ -190,7 +192,7 @@ describe('ApprovalQueueComponent', () => {
     expect(compiled.textContent).toContain('mem-requ');
     expect(compiled.textContent).toContain('North Branch');
     expect(compiled.textContent).toContain('Operations CC');
-    expect(compiled.textContent).toContain('2026-09-20');
+    expect(compiled.textContent).toContain('Sep 20, 2026');
     expect(compiled.textContent).toContain('SAR 1,250');
 
     expect(compiled.textContent).toContain('South Branch');
@@ -503,5 +505,87 @@ describe('ApprovalQueueComponent', () => {
     fixture.detectChanges();
 
     expect(compiled.querySelector('.quantity-col')?.textContent?.trim()).toBe('٢٠');
+  });
+
+  it('should format required-by dates, line count labels, and numbers via helper methods', () => {
+    expect(component.formatRequiredBy('2026-09-20')).toBe('Sep 20, 2026');
+    expect(component.formatRequiredBy(null)).toBe('—');
+    expect(component.formatRequiredBy(undefined)).toBe('—');
+    expect(component.formatRequiredBy('invalid')).toBe('—');
+
+    expect(component.lineCountLabel(0)).toBe('0 lines');
+    expect(component.lineCountLabel(1)).toBe('1 line');
+    expect(component.lineCountLabel(2)).toBe('2 lines');
+    expect(component.lineCountLabel(5)).toBe('5 lines');
+
+    expect(component.formatNumber(2)).toBe('2');
+
+    TestBed.inject(TranslateService).use('ar');
+
+    expect(component.formatRequiredBy('2026-09-20')).toContain('٢٠');
+    expect(component.lineCountLabel(0)).toBe('لا توجد بنود');
+    expect(component.lineCountLabel(1)).toBe('بند واحد');
+    expect(component.lineCountLabel(2)).toBe('بندان');
+    expect(component.lineCountLabel(3)).toBe('٣ بنود');
+    expect(component.lineCountLabel(11)).toBe('١١ بندًا');
+    expect(component.lineCountLabel(100)).toBe('١٠٠ بند');
+    expect(component.formatNumber(2)).toBe('٢');
+  });
+
+  it('should format required-by date, line count labels, and line items title in en and ar (PPS-48)', () => {
+    const testRequests: PurchaseRequest[] = [
+      {
+        ...mockPendingRequests[0],
+        id: 'req-2-lines',
+        required_by_date: '2026-09-20',
+        lines: [mockPendingRequests[0].lines[0], mockPendingRequests[0].lines[1]],
+      },
+      {
+        ...mockPendingRequests[0],
+        id: 'req-1-line',
+        required_by_date: '2026-09-20',
+        lines: [mockPendingRequests[0].lines[0]],
+      },
+      {
+        ...mockPendingRequests[0],
+        id: 'req-3-lines',
+        required_by_date: '2026-09-20',
+        lines: [
+          mockPendingRequests[0].lines[0],
+          mockPendingRequests[0].lines[1],
+          { ...mockPendingRequests[0].lines[0], id: 'line-3' },
+        ],
+      },
+    ];
+
+    approvalsApi.listPendingApprovals.and.returnValue(
+      of({ items: testRequests, next_cursor: null }),
+    );
+    component.loadPendingApprovals();
+    fixture.detectChanges();
+
+    component.toggleExpand('req-2-lines');
+    fixture.detectChanges();
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    const dateCells = compiled.querySelectorAll('.date-cell');
+    expect(dateCells[0]?.textContent?.trim()).toBe('Sep 20, 2026');
+
+    const lineCountSpans = compiled.querySelectorAll('.lines-count');
+    expect(lineCountSpans[0]?.textContent?.trim()).toBe('2 lines');
+    expect(lineCountSpans[1]?.textContent?.trim()).toBe('1 line');
+
+    const titleEl = compiled.querySelector('.line-details-title');
+    expect(titleEl?.textContent?.trim()).toBe('Line Items (2)');
+
+    // Switch to Arabic and verify locale-aware formatting and plural categories
+    TestBed.inject(TranslateService).use('ar');
+    fixture.detectChanges();
+
+    expect(dateCells[0]?.textContent).toContain('٢٠');
+    expect(lineCountSpans[0]?.textContent?.trim()).toBe('بندان');
+    expect(lineCountSpans[1]?.textContent?.trim()).toBe('بند واحد');
+    expect(lineCountSpans[2]?.textContent?.trim()).toBe('٣ بنود');
+    expect(compiled.querySelector('.line-details-title')?.textContent?.trim()).toContain('(٢)');
   });
 });

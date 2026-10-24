@@ -34,6 +34,7 @@ import type {
   PurchaseRequestLine,
 } from '../../../core/api/models';
 import { FormatService } from '../../../core/format/format.service';
+import { parseIsoDateLocal } from '../../../core/format/iso-date';
 import { FormatQuantityPipe } from '../../../core/format/quantity.pipe';
 import { RequestsApiService } from '../../requests/requests-api';
 import { OrganisationApiService } from '../../settings/organisation-api';
@@ -365,6 +366,27 @@ export class ApprovalQueueComponent implements OnInit {
 
   formatBudgetRemaining(request: PurchaseRequest): string {
     return this.formatService.formatCurrencyAmount(request.budget_status?.remaining_amount);
+  }
+
+  formatRequiredBy(value: string | null | undefined): string {
+    const locale = this.translate.getCurrentLang() || this.translate.getFallbackLang() || 'en';
+    const isAr = locale.startsWith('ar');
+    return this.formatService.formatDate(parseIsoDateLocal(value), {
+      dateStyle: 'medium',
+      ...(isAr ? { numberingSystem: 'arab' } : {}),
+    });
+  }
+
+  lineCountLabel(count: number): string {
+    const locale = this.translate.getCurrentLang() || this.translate.getFallbackLang() || 'en';
+    const category = new Intl.PluralRules(locale).select(count);
+    return this.translate.instant(`approvals.lineCount.${category}`, {
+      count: this.formatService.formatNumber(count),
+    });
+  }
+
+  formatNumber(value: number | string | null | undefined): string {
+    return this.formatService.formatNumber(value);
   }
 
   formatMoney(request: PurchaseRequest): string {
