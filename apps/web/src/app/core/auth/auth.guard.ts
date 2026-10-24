@@ -17,6 +17,17 @@ export const authGuard: CanActivateFn = (_route, state) => {
   });
 };
 
+/** Guards routes that are for unauthenticated guests only (e.g. landing page). Authenticated members are redirected to '/home'. */
+export const guestGuard: CanActivateFn = () => {
+  const session = inject(SessionService);
+  const router = inject(Router);
+
+  if (session.isAuthenticated()) {
+    return router.createUrlTree(['/home']);
+  }
+  return true;
+};
+
 /**
  * Guards routes restricted to particular roles.
  *

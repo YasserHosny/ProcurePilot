@@ -1,6 +1,6 @@
 import { Routes } from '@angular/router';
 
-import { authGuard, roleGuard } from './core/auth/auth.guard';
+import { authGuard, guestGuard, roleGuard } from './core/auth/auth.guard';
 
 export const rfqGuardrailsOwnerGuard = roleGuard('owner');
 
@@ -12,6 +12,13 @@ export const rfqGuardrailsOwnerGuard = roleGuard('owner');
  */
 export const routes: Routes = [
   // --- public routes ---
+  {
+    path: '',
+    pathMatch: 'full',
+    canActivate: [guestGuard],
+    loadComponent: () =>
+      import('./features/landing/landing.component').then((m) => m.LandingComponent),
+  },
   {
     path: 'auth',
     children: [

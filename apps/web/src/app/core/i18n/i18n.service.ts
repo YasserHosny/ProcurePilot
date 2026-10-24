@@ -48,6 +48,9 @@ export class I18nService {
     // no flicker, nothing — because the revert happened in the same tick. Tracking the last value
     // the session reported means a user's explicit choice is never fought by a stale one.
     effect(() => {
+      if (!this.session.isAuthenticated()) {
+        return;
+      }
       const active = this.session.activeLocale();
       if (active && active !== this.lastSessionLocale) {
         this.lastSessionLocale = active;

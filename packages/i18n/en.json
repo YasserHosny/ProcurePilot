@@ -3974,5 +3974,35 @@
     "kilogram": "kg",
     "gram": "g",
     "each": "pcs"
+  },
+  "landing": {
+    "header": {
+      "signIn": "Sign in"
+    },
+    "hero": {
+      "headline": "Every number traces back to the quote it came from.",
+      "lede": "ProcurePilot turns fragmented supplier quotes into clear, comparable purchasing decisions with proven savings — keeping you in full control.",
+      "signIn": "Sign in",
+      "requestAccess": "Request pilot access"
+    },
+    "howItWorks": {
+      "title": "How it works",
+      "subtitle": "From messy supplier quotes to verified savings in three steps.",
+      "step1Title": "1. Quotes arrive",
+      "step1Description": "Supplier quotations arrive via email, PDF uploads, or mobile photos from the branch.",
+      "step2Title": "2. Clear comparison",
+      "step2Description": "Every price is extracted and normalised into comparable lines, tracing back to its original document.",
+      "step3Title": "3. Human authorisation",
+      "step3Description": "A person reviews and authorises the purchase, and every saving is proven on the ledger."
+    },
+    "gallery": {
+      "title": "See ProcurePilot in action",
+      "subtitle": "Explore the interface designed for clarity and confidence.",
+      "close": "Close preview"
+    },
+    "footer": {
+      "contactSupport": "Contact support",
+      "copyright": "© 2026 ProcurePilot. All rights reserved."
+    }
   }
 }

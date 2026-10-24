@@ -51,6 +51,12 @@ test.describe('Accessibility @a11y', () => {
     await page.waitForURL('**/home');
   }
 
+  test('the landing page has no WCAG 2.1 AA violations @a11y', async ({ page }) => {
+    await page.goto('/');
+    const results = await scan(page);
+    expect(results.violations, describeViolations(results)).toEqual([]);
+  });
+
   test('the sign-in screen has no WCAG 2.1 AA violations @a11y', async ({ page }) => {
     await page.goto('/auth/sign-in');
     const results = await scan(page);
