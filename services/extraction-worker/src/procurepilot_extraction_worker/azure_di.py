@@ -28,6 +28,21 @@ from procurepilot_extraction_worker.settings import WorkerSettings, get_settings
 
 MODEL_ID = "prebuilt-invoice"
 
+_PERCENTAGE_PATTERN = re.compile(
+    r"(?:[\d٠-٩۰-۹][\d٠-٩۰-۹.,٬٫]*\s*[%٪\u066a]|[%٪\u066a]\s*[\d٠-٩۰-۹][\d٠-٩۰-۹.,٬٫]*)",
+)
+_TOTAL_ROW_RE = re.compile(
+    r"(?:^|[\s:：\-–])(?:الاجمالي|اجمالي|االجمايل|المجموع|مجموع|grand\s+total|total)"
+    r"(?:"
+    r"\s+(?:النهائي|النهايي|الكلي|العام|شامل|مع|قبل|بعد|ضريب[ةه]|الضريب[ةه]|القائم|الصافي|"
+    r"المطلوب|المستحق|قدره|فقط|amount|price|due|net|gross|payable|incl\.?|including|inclusive|"
+    r"before|after|excl\.?|excluding|vat|tax|for|of)"
+    r"|\s*(?:[\d.,:：()（）/\\\-_%٪\u066a]+|ر\.?\s*س\.?|SAR|SR|ج\.م|LE|EGP|\$|£|€)"
+    r"|\s*$"
+    r")",
+    re.IGNORECASE,
+)
+
 
 class AzureDocumentIntelligenceProvider:
     method = "azure_di"
@@ -254,21 +269,40 @@ def _parse_line_table(result: object, model_version: str) -> ExtractionResult | 
                 if value and _numeric_cell_amount(value) is None
             )
             desc = desc or label
-            numeric_amounts = [
-                _numeric_cell_amount(value)
-                for value in expanded.values()
-                if _numeric_cell_amount(value) is not None
-            ]
-            fallback_amount = total or (numeric_amounts[-1] if numeric_amounts else None)
-            if qty is None and _is_total_row(label):
-                if fallback_amount or price:
-                    amount = fallback_amount or price
-                    if amount:
-                        candidate = _money_field("stated_total", amount, currency, 0.9)
-                        if _is_before_tax_row(label):
-                            before_tax_total = candidate
-                        else:
-                            stated_total = candidate
+            currency_amount: str | None = None
+            numeric_amounts: list[str] = []
+            for value in expanded.values():
+                val_clean = _PERCENTAGE_PATTERN.sub("", value).strip()
+                amt = _numeric_cell_amount(val_clean)
+                if amt is not None:
+                    numeric_amounts.append(amt)
+                    if (
+                        _SAR_MARKER.search(value)
+                        or _EGP_MARKER.search(value)
+                        or _OTHER_MARKER.search(value)
+                    ):
+                        currency_amount = amt
+            fallback_amount = (
+                total or currency_amount or (numeric_amounts[-1] if numeric_amounts else None)
+            )
+            is_total = _is_total_row(label) or _is_total_row(desc)
+            if is_total and fallback_amount is None:
+                for value in expanded.values():
+                    val_clean = _PERCENTAGE_PATTERN.sub("", value).strip()
+                    extracted_amts = re.findall(r"[\d٠-٩۰-۹][\d٠-٩۰-۹.,٬٫]*", val_clean)
+                    if extracted_amts:
+                        cleaned = _clean_number(extracted_amts[-1])
+                        if cleaned:
+                            fallback_amount = cleaned
+                            break
+            if is_total:
+                amount = fallback_amount or price
+                if amount:
+                    candidate = _money_field("stated_total", amount, currency, 0.9)
+                    if _is_before_tax_row(label) or _is_before_tax_row(desc):
+                        before_tax_total = candidate
+                    else:
+                        stated_total = candidate
                 continue
             if qty is None and _is_tax_row(label):
                 continue
@@ -387,12 +421,8 @@ def _skeleton(text: str) -> str:
 
 
 def _is_total_row(desc: str) -> bool:
-    n = _normalise_header(desc)
-    skeleton = _skeleton(desc)
-    return any(
-        _normalise_header(x) in n or _skeleton(x) in skeleton
-        for x in ("الإجمالي النهائي", "الإجمالي قبل الضريبة", "الإجمالي", "total", "grand total")
-    )
+    n = _normalise_header(desc).strip()
+    return _TOTAL_ROW_RE.search(n) is not None
 
 
 def _is_before_tax_row(desc: str) -> bool:
@@ -482,9 +512,24 @@ def _find_grand_total(text: str, currency: str | None) -> ExtractedField | None:
     grand_total: ExtractedField | None = None
     for line in text.splitlines():
         if _is_total_row(line):
-            amounts = re.findall(r"[\d٠-٩۰-۹][\d٠-٩۰-۹.,٬٫]*", line)
+            clean_line = _PERCENTAGE_PATTERN.sub("", line)
+            amounts = re.findall(r"[\d٠-٩۰-۹][\d٠-٩۰-۹.,٬٫]*", clean_line)
             if amounts:
-                amount = _clean_number(amounts[-1])
+                amount: str | None = None
+                for match in re.finditer(r"[\d٠-٩۰-۹][\d٠-٩۰-۹.,٬٫]*", clean_line):
+                    candidate_amt = _clean_number(match.group())
+                    if not candidate_amt:
+                        continue
+                    start, end = match.span()
+                    before = clean_line[:start].rstrip()
+                    after = clean_line[end:].lstrip()
+                    if any(
+                        m.search(before[-10:]) or m.search(after[:10])
+                        for m in (_SAR_MARKER, _EGP_MARKER, _OTHER_MARKER)
+                    ):
+                        amount = candidate_amt
+                if not amount:
+                    amount = _clean_number(amounts[-1])
                 if amount:
                     candidate = _money_field("stated_total", amount, currency, 0.9)
                     if _is_before_tax_row(line):
@@ -626,6 +671,7 @@ def _make_field(
 
 
 def _clean_number(s: str) -> str | None:
+    s = _PERCENTAGE_PATTERN.sub("", s)
     s = _SAR_MARKER.sub("", s)
     s = re.sub(
         r"ج\s*\.\s*م\.?|جنيه(?:\s+مصري)?|(?<![A-Z])L\.?\s*E\.?(?![A-Z])|\b(?:EGP|USD|GBP|EUR)\b",
@@ -655,6 +701,7 @@ def _clean_number(s: str) -> str | None:
 
 
 def _numeric_cell_amount(text: str) -> str | None:
+    text = _PERCENTAGE_PATTERN.sub("", text)
     text = _SAR_MARKER.sub("", text)
     cleaned = re.sub(
         r"ج\s*\.\s*م\.?|جنيه(?:\s+مصري)?|(?<![A-Z])L\.?\s*E\.?(?![A-Z])|\b(?:EGP|USD|GBP|EUR)\b|[$£€]",
