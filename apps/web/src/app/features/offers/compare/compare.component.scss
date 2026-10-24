@@ -16,8 +16,8 @@
 
 .controls-card {
   border-radius: 12px;
-  background-color: #ffffff;
-  border: 1px solid #e2e8f0;
+  background-color: var(--pp-surface-card);
+  border: 1px solid var(--pp-border);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
@@ -52,7 +52,7 @@
   justify-content: space-between;
   gap: 1rem;
   padding-top: 0.5rem;
-  border-top: 1px solid #f1f5f9;
+  border-top: 1px solid var(--pp-border);
 
   .supplier-filters {
     display: flex;
@@ -63,7 +63,7 @@
     .filter-label {
       font-size: 0.85rem;
       font-weight: 500;
-      color: #64748b;
+      color: var(--pp-text-muted);
       margin-inline-end: 0.25rem;
     }
   }
@@ -75,8 +75,8 @@
 
 .product-summary-card {
   border-radius: 12px;
-  background-color: #f8fafc;
-  border: 1px solid #e2e8f0;
+  background-color: var(--pp-surface-page);
+  border: 1px solid var(--pp-border);
 
   .product-meta {
     display: flex;
@@ -94,13 +94,13 @@
         font-weight: 600;
         text-transform: uppercase;
         letter-spacing: 0.5px;
-        color: #64748b;
+        color: var(--pp-text-muted);
       }
 
       .meta-value {
         font-size: 0.95rem;
         font-weight: 600;
-        color: #1e293b;
+        color: var(--pp-text-strong);
       }
     }
   }
@@ -112,8 +112,8 @@
   align-items: center;
   gap: 1.5rem;
   padding: 0.75rem 1rem;
-  background-color: #f8fafc;
-  border-top: 1px solid #e2e8f0;
+  background-color: var(--pp-surface-page);
+  border-top: 1px solid var(--pp-border);
   border-radius: 0 0 12px 12px;
 
   .pos-signal-item {
@@ -121,30 +121,30 @@
     align-items: center;
     gap: 0.375rem;
     font-size: 0.875rem;
-    color: #334155;
+    color: var(--pp-text);
 
     .signal-icon {
       font-size: 1.125rem;
       width: 1.125rem;
       height: 1.125rem;
-      color: #64748b;
+      color: var(--pp-text-muted);
     }
 
     .signal-label {
-      color: #64748b;
+      color: var(--pp-text-muted);
     }
 
     .signal-value {
-      color: #0f172a;
+      color: var(--pp-text-strong);
       font-weight: 600;
     }
 
     .signal-unit {
-      color: #64748b;
+      color: var(--pp-text-muted);
     }
 
     .signal-meta {
-      color: #64748b;
+      color: var(--pp-text-muted);
       font-size: 0.8125rem;
       margin-inline-start: 0.25rem;
     }
@@ -157,12 +157,12 @@
       font-weight: 600;
       text-transform: uppercase;
       letter-spacing: 0.025em;
-      background-color: #fef3c7;
-      color: #92400e;
+      background-color: var(--pp-warning-container);
+      color: var(--pp-warning);
     }
 
     .provisional-value {
-      color: #b45309;
+      color: var(--pp-warning);
     }
   }
 }

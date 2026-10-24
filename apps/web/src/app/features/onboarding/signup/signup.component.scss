@@ -5,7 +5,7 @@
   align-items: center;
   padding-inline: 1rem;
   padding-block: 2rem;
-  background: linear-gradient(135deg, #f8fafc 0%, #eef2ff 100%);
+  background: linear-gradient(135deg, var(--pp-surface-page) 0%, var(--pp-primary-container) 100%);
   box-sizing: border-box;
 }
 
@@ -16,7 +16,7 @@
   padding-block: 2.5rem;
   border-radius: 12px;
   box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.04);
-  background-color: #ffffff;
+  background-color: var(--pp-surface-card);
 }
 
 .brand-header {
@@ -31,14 +31,14 @@
   margin-block-end: 0.5rem;
   font-size: 1.5rem;
   font-weight: 600;
-  color: #0f172a;
+  color: var(--pp-text-strong);
 }
 
 .card-subtitle {
   margin: 0;
   margin-block-end: 1.5rem;
   font-size: 0.875rem;
-  color: #64748b;
+  color: var(--pp-text-muted);
   line-height: 1.4;
 }
 
@@ -49,11 +49,11 @@
   padding-inline: 0.75rem;
   padding-block: 0.5rem;
   margin-block-end: 1.5rem;
-  background-color: #eef2ff;
-  border: 1px solid #c7d2fe;
+  background-color: var(--pp-primary-container);
+  border: 1px solid var(--pp-primary);
   border-radius: 6px;
   font-size: 0.8125rem;
-  color: #3730a3;
+  color: var(--pp-primary);
 
   mat-icon {
     font-size: 18px;
@@ -74,15 +74,15 @@
   line-height: 1.4;
 
   &.error {
-    background-color: #fef2f2;
-    border: 1px solid #fecaca;
-    color: #991b1b;
+    background-color: var(--pp-error-container);
+    border: 1px solid var(--pp-error);
+    color: var(--pp-error);
   }
 
   &.forbidden {
-    background-color: #fffbeb;
-    border: 1px solid #fde68a;
-    color: #92400e;
+    background-color: var(--pp-warning-container);
+    border: 1px solid var(--pp-warning);
+    color: var(--pp-warning);
   }
 
   .alert-title {
@@ -92,7 +92,7 @@
   .trace-id {
     margin-block-start: 0.25rem;
     font-size: 0.75rem;
-    color: #6b7280;
+    color: var(--pp-text-muted);
     font-family: monospace;
   }
 }
@@ -142,11 +142,11 @@
 .signin-prompt {
   text-align: center;
   font-size: 0.875rem;
-  color: #64748b;
+  color: var(--pp-text-muted);
   margin-block-start: 0.5rem;
 
   a {
-    color: #4f46e5;
+    color: var(--pp-primary);
     text-decoration: none;
     font-weight: 500;
     margin-inline-start: 0.25rem;

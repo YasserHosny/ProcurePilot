@@ -26,7 +26,7 @@
   font-size: 1.75rem;
   font-weight: 700;
   margin: 0 0 0.25rem 0;
-  color: var(--mat-sys-on-surface, #1e293b);
+  color: var(--pp-text-strong);
 
   @include bp.mobile {
     font-size: 1.25rem;
@@ -36,7 +36,7 @@
 .page-subtitle {
   font-size: 0.95rem;
   margin: 0;
-  color: var(--mat-sys-on-surface-variant, #64748b);
+  color: var(--pp-text-muted);
 }
 
 .header-actions {
@@ -53,7 +53,7 @@
 .controls-card {
   padding: 1.25rem;
   border-radius: 8px;
-  background-color: var(--mat-sys-surface, #ffffff);
+  background-color: var(--pp-surface-card);
 }
 
 .controls-grid {
@@ -79,7 +79,7 @@
   justify-content: center;
   padding: 4rem 1rem;
   gap: 1rem;
-  color: var(--mat-sys-on-surface-variant, #64748b);
+  color: var(--pp-text-muted);
 }
 
 .metrics-grid {
@@ -95,7 +95,7 @@
 .metric-card {
   padding: 1.25rem;
   border-radius: 8px;
-  background-color: var(--mat-sys-surface, #ffffff);
+  background-color: var(--pp-surface-card);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
   display: flex;
   flex-direction: column;
@@ -113,54 +113,54 @@
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  color: #64748b;
+  color: var(--pp-text-muted);
 }
 
 .metric-icon {
-  color: #94a3b8;
+  color: var(--pp-text-muted);
   font-size: 1.25rem;
   width: 1.25rem;
   height: 1.25rem;
 
   &.highlight {
-    color: #10b981;
+    color: var(--pp-success);
   }
 }
 
 .metric-value {
   font-size: 1.6rem;
   font-weight: 800;
-  color: #0f172a;
+  color: var(--pp-text-strong);
   margin-bottom: 0.25rem;
 
   &.highlight {
-    color: #059669;
+    color: var(--pp-success);
   }
 
   &.muted {
     font-size: 1.2rem;
-    color: #94a3b8;
+    color: var(--pp-text-muted);
     font-weight: 500;
   }
 }
 
 .metric-sub {
   font-size: 0.8rem;
-  color: #64748b;
+  color: var(--pp-text-muted);
   margin-bottom: 0.5rem;
 }
 
 .metric-trace {
   margin-top: auto;
   font-size: 0.75rem;
-  color: #3b82f6;
+  color: var(--pp-info);
   font-weight: 500;
 }
 
 .chart-card {
   padding: 1.5rem;
   border-radius: 8px;
-  background-color: var(--mat-sys-surface, #ffffff);
+  background-color: var(--pp-surface-card);
 
   .card-header {
     margin-bottom: 1rem;
@@ -175,14 +175,14 @@
   font-size: 1.15rem;
   font-weight: 700;
   margin: 0;
-  color: #0f172a;
+  color: var(--pp-text-strong);
 }
 
 .table-card {
   padding: 0;
   border-radius: 8px;
   overflow-x: auto;
-  background-color: var(--mat-sys-surface, #ffffff);
+  background-color: var(--pp-surface-card);
 
   .card-header {
     padding: 1.25rem 1.25rem 0.5rem;
@@ -196,24 +196,24 @@
   th {
     font-weight: 600;
     font-size: 0.85rem;
-    color: #475569;
-    background-color: #f8fafc;
+    color: var(--pp-text-muted);
+    background-color: var(--pp-surface-page);
     padding: 0.85rem 1rem;
   }
 
   td {
     font-size: 0.9rem;
     padding: 0.85rem 1rem;
-    border-bottom: 1px solid #f1f5f9;
+    border-bottom: 1px solid var(--pp-border);
   }
 
   .supplier-cell {
     font-weight: 600;
-    color: #0f172a;
+    color: var(--pp-text-strong);
   }
 
   .text-muted {
-    color: #94a3b8;
+    color: var(--pp-text-muted);
     font-style: italic;
   }
 }
@@ -236,20 +236,20 @@
   font-size: 3.5rem;
   width: 3.5rem;
   height: 3.5rem;
-  color: #94a3b8;
+  color: var(--pp-text-muted);
   margin-bottom: 1rem;
 }
 
 .empty-title {
   font-size: 1.25rem;
   font-weight: 600;
-  color: #1e293b;
+  color: var(--pp-text-strong);
   margin: 0 0 0.5rem 0;
 }
 
 .empty-message {
   font-size: 0.95rem;
-  color: #64748b;
+  color: var(--pp-text-muted);
   margin: 0 0 1.5rem 0;
   line-height: 1.5;
 }

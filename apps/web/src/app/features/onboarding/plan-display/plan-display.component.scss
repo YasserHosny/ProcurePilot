@@ -30,8 +30,8 @@
   width: 64px;
   height: 64px;
   border-radius: 50%;
-  background-color: var(--mat-sys-primary-container, #dcfce7);
-  color: var(--mat-sys-primary, #15803d);
+  background-color: var(--pp-primary-container);
+  color: var(--pp-primary);
   margin-block-end: 0.5rem;
 
   .brand-icon {
@@ -45,7 +45,7 @@
   font-size: 2rem;
   font-weight: 800;
   margin: 0;
-  color: var(--mat-sys-on-surface, #0f172a);
+  color: var(--pp-text-strong);
 
   @include bp.mobile {
     font-size: 1.5rem;
@@ -54,7 +54,7 @@
 
 .page-subtitle {
   margin: 0;
-  color: var(--mat-sys-on-surface-variant, #64748b);
+  color: var(--pp-text-muted);
   font-size: 1rem;
   max-width: 540px;
 }
@@ -65,12 +65,12 @@
   align-items: flex-start;
   gap: 0.75rem;
   padding: 1rem;
-  background-color: var(--mat-sys-error-container, #fef2f2);
-  border: 1px solid var(--mat-sys-error, #f87171);
+  background-color: var(--pp-error-container);
+  border: 1px solid var(--pp-error);
   border-radius: 8px;
 
   .error-icon {
-    color: var(--mat-sys-error, #dc2626);
+    color: var(--pp-error);
     flex-shrink: 0;
   }
 }
@@ -84,18 +84,18 @@
 .error-title {
   font-weight: 600;
   font-size: 0.85rem;
-  color: var(--mat-sys-error, #991b1b);
+  color: var(--pp-error);
 }
 
 .error-message {
   font-size: 0.9rem;
-  color: var(--mat-sys-on-error-container, #7f1d1d);
+  color: var(--pp-error);
 }
 
 .error-trace {
   font-family: monospace;
   font-size: 0.75rem;
-  color: var(--mat-sys-on-error-container, #991b1b);
+  color: var(--pp-error);
 }
 
 .loading-state {
@@ -105,7 +105,7 @@
   justify-content: center;
   gap: 1rem;
   padding: 4rem 2rem;
-  color: var(--mat-sys-on-surface-variant, #64748b);
+  color: var(--pp-text-muted);
 }
 
 .plan-content-grid {
@@ -145,14 +145,14 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  color: var(--mat-sys-primary, #0369a1);
+  color: var(--pp-primary);
 }
 
 .plan-name {
   font-size: 1.75rem;
   font-weight: 800;
   margin: 0;
-  color: var(--mat-sys-on-surface, #0f172a);
+  color: var(--pp-text-strong);
 }
 
 .price-tag {
@@ -165,12 +165,12 @@
 .price-amount {
   font-size: 1.25rem;
   font-weight: 700;
-  color: #15803d;
+  color: var(--pp-success);
 }
 
 .price-cycle {
   font-size: 0.8rem;
-  color: #64748b;
+  color: var(--pp-text-muted);
   text-transform: capitalize;
 }
 
@@ -187,7 +187,7 @@
   text-transform: uppercase;
   letter-spacing: 0.5px;
   margin: 0;
-  color: #475569;
+  color: var(--pp-text-muted);
 }
 
 .features-list {
@@ -204,10 +204,10 @@
   align-items: center;
   gap: 0.75rem;
   font-size: 0.95rem;
-  color: #1e293b;
+  color: var(--pp-text-strong);
 
   .check-icon {
-    color: #16a34a;
+    color: var(--pp-success);
     font-size: 20px;
     width: 20px;
     height: 20px;
@@ -222,9 +222,9 @@
   flex-wrap: wrap;
   gap: 0.75rem;
   padding: 1rem;
-  background-color: #f8fafc;
+  background-color: var(--pp-surface-page);
   border-radius: 8px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--pp-border);
 }
 
 .limit-info {
@@ -233,7 +233,7 @@
   gap: 0.75rem;
 
   .limit-icon {
-    color: #0284c7;
+    color: var(--pp-info);
   }
 }
 
@@ -246,19 +246,19 @@
 .limit-name {
   font-weight: 600;
   font-size: 0.9rem;
-  color: #1e293b;
+  color: var(--pp-text-strong);
 }
 
 .limit-desc {
   font-size: 0.8rem;
-  color: #64748b;
+  color: var(--pp-text-muted);
 }
 
 .limit-usage {
   font-size: 0.85rem;
   font-weight: 600;
-  color: #334155;
-  background-color: #e2e8f0;
+  color: var(--pp-text);
+  background-color: var(--pp-surface-sunken);
   padding: 0.2rem 0.5rem;
   border-radius: 4px;
 }
@@ -268,11 +268,11 @@
   align-items: center;
   gap: 0.5rem;
   padding: 0.75rem 1rem;
-  background-color: #f0fdf4;
-  border: 1px solid #bbf7d0;
+  background-color: var(--pp-success-container);
+  border: 1px solid var(--pp-success);
   border-radius: 8px;
   font-size: 0.8rem;
-  color: #166534;
+  color: var(--pp-success);
 
   .info-icon {
     font-size: 18px;

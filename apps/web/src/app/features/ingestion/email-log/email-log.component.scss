@@ -28,7 +28,7 @@
     display: inline-flex;
     align-items: center;
     gap: 0.25rem;
-    color: var(--mat-sys-on-surface-variant, #64748b);
+    color: var(--pp-text-muted);
     padding-inline-start: 0;
 
     mat-icon {
@@ -49,13 +49,13 @@
   margin: 0;
   font-size: 1.75rem;
   font-weight: 700;
-  color: var(--mat-sys-on-surface, #0f172a);
+  color: var(--pp-text-strong);
 }
 
 .page-subtitle {
   margin: 0;
   font-size: 0.95rem;
-  color: var(--mat-sys-on-surface-variant, #64748b);
+  color: var(--pp-text-muted);
 }
 
 .log-card {
@@ -94,12 +94,12 @@
   align-items: center;
   gap: 0.75rem;
   padding: 1rem;
-  background: var(--mat-sys-error-container, #fef2f2);
-  border: 1px solid var(--mat-sys-error, #f87171);
+  background: var(--pp-error-container);
+  border: 1px solid var(--pp-error);
   border-radius: 8px;
 
   .error-icon {
-    color: var(--mat-sys-error, #dc2626);
+    color: var(--pp-error);
     flex-shrink: 0;
   }
 }
@@ -113,12 +113,12 @@
   .error-title {
     font-weight: 600;
     font-size: 0.85rem;
-    color: var(--mat-sys-error, #991b1b);
+    color: var(--pp-error);
   }
 
   .error-message {
     font-size: 0.9rem;
-    color: var(--mat-sys-on-error-container, #7f1d1d);
+    color: var(--pp-error);
   }
 }
 
@@ -134,7 +134,7 @@
 
 .loading-state {
   gap: 1rem;
-  color: var(--mat-sys-on-surface-variant, #64748b);
+  color: var(--pp-text-muted);
 }
 
 .empty-state {
@@ -144,20 +144,20 @@
     font-size: 48px;
     width: 48px;
     height: 48px;
-    color: var(--mat-sys-outline, #94a3b8);
+    color: var(--pp-border-strong);
   }
 
   .empty-title {
     font-size: 1.25rem;
     font-weight: 600;
     margin: 0;
-    color: var(--mat-sys-on-surface, #1e293b);
+    color: var(--pp-text-strong);
   }
 
   .empty-message {
     max-width: 480px;
     margin: 0;
-    color: var(--mat-sys-on-surface-variant, #64748b);
+    color: var(--pp-text-muted);
     font-size: 0.95rem;
   }
 }
@@ -171,7 +171,7 @@
 
   th {
     font-weight: 600;
-    color: var(--mat-sys-on-surface-variant, #475569);
+    color: var(--pp-text-muted);
     white-space: nowrap;
   }
 
@@ -183,7 +183,7 @@
 .received-cell {
   white-space: nowrap;
   font-size: 0.875rem;
-  color: var(--mat-sys-on-surface-variant, #64748b);
+  color: var(--pp-text-muted);
 }
 
 .sender-cell {
@@ -198,13 +198,13 @@
   .sender-address {
     font-weight: 500;
     font-size: 0.875rem;
-    color: var(--mat-sys-on-surface, #1e293b);
+    color: var(--pp-text-strong);
     word-break: break-all;
   }
 
   .sender-domain {
     font-size: 0.75rem;
-    color: var(--mat-sys-on-surface-variant, #64748b);
+    color: var(--pp-text-muted);
   }
 }
 
@@ -220,7 +220,7 @@
 
   .subject-text {
     font-size: 0.875rem;
-    color: var(--mat-sys-on-surface, #1e293b);
+    color: var(--pp-text-strong);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -230,7 +230,7 @@
   .no-subject {
     font-size: 0.875rem;
     font-style: italic;
-    color: var(--mat-sys-outline, #94a3b8);
+    color: var(--pp-border-strong);
   }
 }
 
@@ -240,8 +240,8 @@
   gap: 0.15rem;
   padding: 0.1rem 0.35rem;
   border-radius: 4px;
-  background: var(--mat-sys-surface-variant, #f1f5f9);
-  color: var(--mat-sys-on-surface-variant, #475569);
+  background: var(--pp-surface-sunken);
+  color: var(--pp-text-muted);
   font-size: 0.75rem;
 
   .attach-icon {
@@ -269,40 +269,40 @@
   }
 
   &.status-received {
-    background: #f1f5f9;
-    color: #334155;
-    border: 1px solid #cbd5e1;
+    background: var(--pp-surface-sunken);
+    color: var(--pp-text);
+    border: 1px solid var(--pp-border);
   }
 
   &.status-processing {
-    background: #e0f2fe;
-    color: #0369a1;
-    border: 1px solid #7dd3fc;
+    background: var(--pp-info-container);
+    color: var(--pp-info);
+    border: 1px solid var(--pp-info);
   }
 
   &.status-completed {
-    background: #dcfce7;
-    color: #15803d;
-    border: 1px solid #86efac;
+    background: var(--pp-success-container);
+    color: var(--pp-success);
+    border: 1px solid var(--pp-success);
   }
 
   &.status-failed {
-    background: #fee2e2;
-    color: #b91c1c;
-    border: 1px solid #fca5a5;
+    background: var(--pp-error-container);
+    color: var(--pp-error);
+    border: 1px solid var(--pp-error);
     font-weight: 700;
   }
 
   &.status-duplicate {
-    background: #f3e8ff;
-    color: #7e22ce;
-    border: 1px solid #d8b4fe;
+    background: var(--pp-primary-container);
+    color: var(--pp-primary);
+    border: 1px solid var(--pp-primary);
   }
 
   &.status-rejected {
-    background: #ffedd5;
-    color: #c2410c;
-    border: 1px solid #fed7aa;
+    background: var(--pp-warning-container);
+    color: var(--pp-warning);
+    border: 1px solid var(--pp-warning);
   }
 }
 
@@ -318,7 +318,7 @@
   .supplier-name {
     font-size: 0.875rem;
     font-weight: 500;
-    color: var(--mat-sys-on-surface, #1e293b);
+    color: var(--pp-text-strong);
   }
 
   .match-method-chip {
@@ -327,16 +327,16 @@
     border-radius: 4px;
     font-size: 0.7rem;
     font-weight: 600;
-    background: var(--mat-sys-surface-variant, #f1f5f9);
-    color: var(--mat-sys-on-surface-variant, #475569);
-    border: 1px solid var(--mat-sys-outline-variant, #e2e8f0);
+    background: var(--pp-surface-sunken);
+    color: var(--pp-text-muted);
+    border: 1px solid var(--pp-border);
     width: fit-content;
   }
 }
 
 .unmatched-supplier {
   font-size: 0.85rem;
-  color: var(--mat-sys-outline, #94a3b8);
+  color: var(--pp-border-strong);
   font-style: italic;
 }
 
@@ -348,7 +348,7 @@
     align-items: center;
     gap: 0.25rem;
     font-size: 0.85rem;
-    color: var(--mat-sys-primary, #2563eb);
+    color: var(--pp-primary);
 
     mat-icon {
       font-size: 18px;
@@ -359,7 +359,7 @@
 
   .no-quotation {
     font-size: 0.875rem;
-    color: var(--mat-sys-outline, #94a3b8);
+    color: var(--pp-border-strong);
   }
 }
 
@@ -369,14 +369,14 @@
   .error-detail {
     display: block;
     font-size: 0.8rem;
-    color: var(--mat-sys-error, #dc2626);
+    color: var(--pp-error);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
   .no-error {
-    color: var(--mat-sys-outline, #94a3b8);
+    color: var(--pp-border-strong);
     font-size: 0.875rem;
   }
 }
@@ -402,7 +402,7 @@
 
 .no-more-text {
   font-size: 0.85rem;
-  color: var(--mat-sys-outline, #94a3b8);
+  color: var(--pp-border-strong);
 }
 
 @media print {

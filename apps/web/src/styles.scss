@@ -495,7 +495,7 @@ mat-icon {
   font-size: 1.75rem;
   font-weight: 700;
   margin: 0 0 0.25rem;
-  color: var(--mat-sys-on-surface, #1e293b);
+  color: var(--pp-text-strong);
 
   @media (max-width: 600px) {
     font-size: 1.25rem;
@@ -504,7 +504,7 @@ mat-icon {
 
 .page-subtitle {
   font-size: 0.95rem;
-  color: var(--mat-sys-on-surface-variant, #64748b);
+  color: var(--pp-text-muted);
   margin: 0;
 }
 
@@ -514,15 +514,15 @@ mat-icon {
   gap: 0.75rem;
   padding: 1rem;
   border-radius: 8px;
-  background-color: #fef2f2;
-  border: 1px solid #fecaca;
-  color: #991b1b;
+  background-color: var(--pp-error-container);
+  border: 1px solid var(--pp-error);
+  color: var(--pp-error);
   margin-block-end: 1.5rem;
 }
 
 .error-icon {
   flex-shrink: 0;
-  color: #dc2626;
+  color: var(--pp-error);
 }
 
 .error-content,
@@ -540,7 +540,7 @@ mat-icon {
 
 .error-trace {
   font-size: 0.8rem;
-  color: #7f1d1d;
+  color: var(--pp-error);
   font-family: monospace;
 }
 
@@ -551,9 +551,9 @@ mat-icon {
   gap: 0.75rem;
   padding: 0.75rem 1rem;
   border-radius: 8px;
-  background-color: #f1f5f9;
-  border: 1px solid #e2e8f0;
-  color: #334155;
+  background-color: var(--pp-surface-sunken);
+  border: 1px solid var(--pp-border);
+  color: var(--pp-text);
   font-size: 0.875rem;
   margin-block-end: 1.25rem;
 }
@@ -566,7 +566,7 @@ mat-icon {
   justify-content: center;
   padding: 4rem 1rem;
   gap: 1rem;
-  color: var(--mat-sys-on-surface-variant, #64748b);
+  color: var(--pp-text-muted);
 }
 
 .empty-state-card {
@@ -587,20 +587,20 @@ mat-icon {
   font-size: 3.5rem;
   width: 3.5rem;
   height: 3.5rem;
-  color: #94a3b8;
+  color: var(--pp-text-muted);
   margin-bottom: 1rem;
 }
 
 .empty-title {
   font-size: 1.25rem;
   font-weight: 600;
-  color: #1e293b;
+  color: var(--pp-text-strong);
   margin: 0 0 0.5rem;
 }
 
 .empty-message {
   font-size: 0.95rem;
-  color: #64748b;
+  color: var(--pp-text-muted);
   margin: 0 0 1.5rem;
   line-height: 1.5;
 }
@@ -621,7 +621,7 @@ mat-icon {
 }
 
 .confirm-dialog {
-  background: #fff;
+  background: var(--pp-surface-card);
   border-radius: 12px;
   padding: 1.5rem;
   max-width: 480px;
@@ -633,19 +633,19 @@ mat-icon {
   font-size: 1.2rem;
   font-weight: 700;
   margin: 0 0 0.75rem;
-  color: #1e293b;
+  color: var(--pp-text-strong);
 }
 
 .confirm-dialog-message {
   font-size: 0.95rem;
-  color: #475569;
+  color: var(--pp-text-muted);
   margin: 0 0 0.75rem;
 }
 
 .confirm-dialog-warn {
   font-size: 0.85rem;
-  color: #b45309;
-  background: #fef3c7;
+  color: var(--pp-warning);
+  background: var(--pp-warning-container);
   padding: 0.5rem 0.75rem;
   border-radius: 6px;
   margin: 0 0 0.75rem;
@@ -666,12 +666,12 @@ mat-icon {
   border-radius: 9999px;
   font-size: 0.85rem;
   font-weight: 500;
-  background-color: #f1f5f9;
-  color: #475569;
+  background-color: var(--pp-surface-sunken);
+  color: var(--pp-text-muted);
 
   &.status-extracted {
-    background-color: #e0e7ff;
-    color: #3730a3;
+    background-color: var(--pp-primary-container);
+    color: var(--pp-primary);
   }
 }
 
@@ -686,13 +686,13 @@ mat-icon {
   margin-block-end: 1rem;
 
   &.success-circle {
-    background-color: #dcfce7;
-    color: #15803d;
+    background-color: var(--pp-success-container);
+    color: var(--pp-success);
   }
 
   &.failure-circle {
-    background-color: #fee2e2;
-    color: #dc2626;
+    background-color: var(--pp-error-container);
+    color: var(--pp-error);
   }
 
   mat-icon {
@@ -712,10 +712,10 @@ mat-icon {
 
 .quotation-badge {
   font-family: monospace;
-  background: #f1f5f9;
+  background: var(--pp-surface-sunken);
   padding: 0.2rem 0.4rem;
   border-radius: 4px;
-  color: #334155;
+  color: var(--pp-text);
   font-size: 0.8rem;
 }
 
@@ -745,20 +745,20 @@ mat-icon {
 
   &.confidence-high,
   &.high {
-    background-color: #d1fae5;
-    color: #065f46;
+    background-color: var(--pp-success-container);
+    color: var(--pp-success);
   }
 
   &.confidence-medium,
   &.medium {
-    background-color: #fef3c7;
-    color: #92400e;
+    background-color: var(--pp-warning-container);
+    color: var(--pp-warning);
   }
 
   &.confidence-low,
   &.low {
-    background-color: #fee2e2;
-    color: #991b1b;
+    background-color: var(--pp-error-container);
+    color: var(--pp-error);
   }
 }
 

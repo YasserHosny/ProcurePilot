@@ -367,7 +367,7 @@ import { ScorecardV2PanelComponent } from '../../supplier-risk/scorecard-v2-pane
       }
 
       .supplier-subtitle {
-        color: #5f6368;
+        color: var(--pp-text-muted);
         font-size: 1.125rem;
         margin-block-start: 0.25rem;
         margin-block-end: 0;
@@ -391,16 +391,16 @@ import { ScorecardV2PanelComponent } from '../../supplier-risk/scorecard-v2-pane
         gap: 0.75rem;
         padding: 1rem;
         border-radius: 4px;
-        background-color: var(--mat-warn-lighter-color, #ffebee);
-        color: var(--mat-warn-color, #c62828);
+        background-color: var(--pp-error-container);
+        color: var(--pp-error);
         margin-block-end: 1.5rem;
       }
 
       .insufficient-notice {
         margin-block-end: 1.5rem;
         padding: 1rem;
-        border-inline-start: 4px solid var(--mat-warn-color, #f44336);
-        background-color: var(--mat-warn-lighter-color, #fce4ec);
+        border-inline-start: 4px solid var(--pp-error);
+        background-color: var(--pp-error-container);
         border-radius: 4px;
       }
 
@@ -446,25 +446,25 @@ import { ScorecardV2PanelComponent } from '../../supplier-risk/scorecard-v2-pane
 
       .risk-level-badge.low,
       .confidence-badge.high {
-        background-color: #e8f5e9;
-        color: #2e7d32;
+        background-color: var(--pp-success-container);
+        color: var(--pp-success);
       }
 
       .risk-level-badge.medium,
       .confidence-badge.medium {
-        background-color: #fff8e1;
-        color: #7c4a03;
+        background-color: var(--pp-warning-container);
+        color: var(--pp-warning);
       }
 
       .risk-level-badge.high,
       .confidence-badge.low {
-        background-color: #ffebee;
-        color: #c62828;
+        background-color: var(--pp-error-container);
+        color: var(--pp-error);
       }
 
       .risk-rule-version,
       .window-dates {
-        color: #5f6368;
+        color: var(--pp-text-muted);
         font-size: 0.8125rem;
         margin-block-start: 0.5rem;
         margin-block-end: 0;
@@ -496,7 +496,7 @@ import { ScorecardV2PanelComponent } from '../../supplier-risk/scorecard-v2-pane
       .metric-card:focus,
       .summary-card:focus,
       .sub-score-card:focus {
-        outline: 2px solid var(--mat-primary-color, #1976d2);
+        outline: 2px solid var(--pp-focus);
         outline-offset: 2px;
       }
 
@@ -508,7 +508,7 @@ import { ScorecardV2PanelComponent } from '../../supplier-risk/scorecard-v2-pane
 
       .metric-sample-count {
         font-size: 0.8125rem;
-        color: var(--mat-hint-color, #757575);
+        color: var(--pp-text-muted);
       }
 
       .sub-scores-grid {
@@ -530,7 +530,7 @@ import { ScorecardV2PanelComponent } from '../../supplier-risk/scorecard-v2-pane
 
       .sub-score-weight {
         font-size: 0.75rem;
-        color: var(--mat-hint-color, #757575);
+        color: var(--pp-text-muted);
         margin-block-start: 0.25rem;
       }
 
@@ -546,7 +546,7 @@ import { ScorecardV2PanelComponent } from '../../supplier-risk/scorecard-v2-pane
         display: flex;
         justify-content: space-between;
         padding-block: 0.75rem;
-        border-block-end: 1px solid var(--mat-divider-color, #e0e0e0);
+        border-block-end: 1px solid var(--pp-border);
       }
 
       .evidence-row:last-child {
@@ -564,11 +564,11 @@ import { ScorecardV2PanelComponent } from '../../supplier-risk/scorecard-v2-pane
       .scorecard-footer {
         display: flex;
         justify-content: space-between;
-        color: var(--mat-hint-color, #757575);
+        color: var(--pp-text-muted);
         font-size: 0.8125rem;
         margin-block-start: 1rem;
         padding-block-start: 1rem;
-        border-block-start: 1px solid var(--mat-divider-color, #e0e0e0);
+        border-block-start: 1px solid var(--pp-border);
       }
     `,
   ],

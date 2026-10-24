@@ -24,7 +24,7 @@
   align-items: center;
   justify-content: center;
   padding: 48px 0;
-  color: var(--mat-sys-outline, #64748b);
+  color: var(--pp-border-strong);
 
   mat-icon {
     font-size: 48px;
@@ -45,7 +45,7 @@
   transition: background-color 0.2s;
 
   &:hover, &:focus-visible {
-    background-color: var(--mat-sys-surface-container-high, #e2e8f0);
+    background-color: var(--pp-surface-raised);
   }
 
   mat-card-content {
@@ -59,13 +59,13 @@
   display: flex;
   justify-content: space-between;
   font-size: 12px;
-  color: var(--mat-sys-outline, #64748b);
+  color: var(--pp-border-strong);
 }
 
 .history-card-question {
   font-size: 16px;
   font-weight: 500;
-  color: var(--mat-sys-on-surface, #0f172a);
+  color: var(--pp-text-strong);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
