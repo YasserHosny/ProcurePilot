@@ -19,6 +19,7 @@ import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
 import { ApiService } from '../../../core/api/api.service';
 import type { ApiError } from '../../../core/api/models';
+import { BrandLogoComponent } from '../../../layout/brand-logo/brand-logo.component';
 
 /** Matches the API's minimum (`PasswordUpdateRequest.password`). */
 const MIN_PASSWORD_LENGTH = 12;
@@ -56,6 +57,7 @@ function passwordsMatch(group: AbstractControl): ValidationErrors | null {
   selector: 'app-update-password',
   standalone: true,
   imports: [
+    BrandLogoComponent,
     ReactiveFormsModule,
     RouterLink,
     MatCardModule,

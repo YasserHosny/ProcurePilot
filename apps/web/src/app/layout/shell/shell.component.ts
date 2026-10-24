@@ -16,12 +16,14 @@ import type { Locale, Role, WorkspaceSummary } from '../../core/api/models';
 import { RoleDirective } from '../../core/auth/role.directive';
 import { SessionService } from '../../core/auth/session.service';
 import { I18nService } from '../../core/i18n';
+import { BrandLogoComponent } from '../brand-logo/brand-logo.component';
 import { environment } from '../../../environments/environment';
 
 @Component({
   selector: 'app-shell',
   standalone: true,
   imports: [
+    BrandLogoComponent,
     RouterOutlet,
     RouterLink,
     RouterLinkActive,

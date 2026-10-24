@@ -102,8 +102,8 @@ table {
   }
 
   &.status-converted {
-    background-color: #e6f4ea;
-    color: #137333;
+    background-color: var(--pp-success-container);
+    color: var(--pp-success);
   }
 
   &.status-expired {

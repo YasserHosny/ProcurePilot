@@ -26,7 +26,7 @@
   font-size: 1.75rem;
   font-weight: 700;
   margin: 0 0 0.25rem 0;
-  color: var(--mat-sys-on-surface, #1e293b);
+  color: var(--pp-text-strong);
 
   @include bp.mobile {
     font-size: 1.25rem;
@@ -35,7 +35,7 @@
 
 .page-subtitle {
   margin: 0;
-  color: var(--mat-sys-on-surface-variant, #64748b);
+  color: var(--pp-text-muted);
   font-size: 0.95rem;
 }
 
@@ -44,12 +44,12 @@
   align-items: flex-start;
   gap: 0.75rem;
   padding: 1rem;
-  background-color: var(--mat-sys-error-container, #fef2f2);
-  border: 1px solid var(--mat-sys-error, #f87171);
+  background-color: var(--pp-error-container);
+  border: 1px solid var(--pp-error);
   border-radius: 8px;
 
   .error-icon {
-    color: var(--mat-sys-error, #dc2626);
+    color: var(--pp-error);
     flex-shrink: 0;
   }
 }
@@ -63,18 +63,18 @@
 .error-title {
   font-weight: 600;
   font-size: 0.85rem;
-  color: var(--mat-sys-error, #991b1b);
+  color: var(--pp-error);
 }
 
 .error-message {
   font-size: 0.9rem;
-  color: var(--mat-sys-on-error-container, #7f1d1d);
+  color: var(--pp-error);
 }
 
 .error-trace {
   font-family: monospace;
   font-size: 0.75rem;
-  color: var(--mat-sys-on-error-container, #991b1b);
+  color: var(--pp-error);
 }
 
 .compliance-note {
@@ -82,15 +82,15 @@
   align-items: center;
   gap: 0.5rem;
   padding: 0.75rem 1rem;
-  background-color: #f8fafc;
-  border: 1px solid #e2e8f0;
+  background-color: var(--pp-surface-page);
+  border: 1px solid var(--pp-border);
   border-radius: 8px;
   font-size: 0.85rem;
-  color: #475569;
+  color: var(--pp-text-muted);
   margin-block-end: 1.25rem;
 
   .note-icon {
-    color: #0284c7;
+    color: var(--pp-info);
     flex-shrink: 0;
   }
 }
@@ -135,7 +135,7 @@
   .section-label {
     font-weight: 600;
     font-size: 0.9rem;
-    color: #334155;
+    color: var(--pp-text);
   }
 }
 
@@ -157,11 +157,11 @@
     height: 20px;
 
     &.excel-icon {
-      color: #16a34a;
+      color: var(--pp-success);
     }
 
     &.pdf-icon {
-      color: #dc2626;
+      color: var(--pp-error);
     }
   }
 }
@@ -211,12 +211,12 @@
   font-size: 1.35rem;
   font-weight: 700;
   margin: 0;
-  color: #1e293b;
+  color: var(--pp-text-strong);
 }
 
 .status-desc {
   font-size: 0.95rem;
-  color: #64748b;
+  color: var(--pp-text-muted);
   margin: 0;
 }
 
@@ -239,15 +239,15 @@
 }
 
 .row-count-badge {
-  background-color: #f1f5f9;
+  background-color: var(--pp-surface-sunken);
   font-weight: 600;
-  color: #334155;
+  color: var(--pp-text);
 }
 
 .format-badge {
-  background-color: #e0f2fe;
+  background-color: var(--pp-info-container);
   font-weight: 700;
-  color: #0369a1;
+  color: var(--pp-info);
 }
 
 .download-actions {
@@ -282,16 +282,16 @@
 }
 
 .success-icon-wrap {
-  background-color: #dcfce7;
-  color: #16a34a;
+  background-color: var(--pp-success-container);
+  color: var(--pp-success);
 }
 
 .info-icon-wrap {
-  background-color: #e0f2fe;
-  color: #0284c7;
+  background-color: var(--pp-info-container);
+  color: var(--pp-info);
 }
 
 .failed-icon-wrap {
-  background-color: #fee2e2;
-  color: #dc2626;
+  background-color: var(--pp-error-container);
+  color: var(--pp-error);
 }

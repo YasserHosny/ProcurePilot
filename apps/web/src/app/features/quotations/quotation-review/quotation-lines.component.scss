@@ -20,7 +20,7 @@
 .no-lines-notice {
   padding: 2rem 1rem;
   text-align: center;
-  color: #64748b;
+  color: var(--pp-text-muted);
 }
 
 .lines-accordion {
@@ -33,7 +33,7 @@
   border-radius: 8px !important;
 
   &.active-panel {
-    border-color: #3b82f6;
+    border-color: var(--pp-info);
     box-shadow: 0 2px 4px rgba(59, 130, 246, 0.1);
   }
 }
@@ -66,7 +66,7 @@
 .line-summary-total {
   font-weight: 700;
   font-size: 0.85rem;
-  color: #1e293b;
+  color: var(--pp-text-strong);
   white-space: nowrap;
 }
 
@@ -74,16 +74,16 @@
   font-weight: 700;
   font-size: 0.8rem;
   padding: 0.15rem 0.4rem;
-  background: #f1f5f9;
+  background: var(--pp-surface-sunken);
   border-radius: 4px;
-  color: #475569;
+  color: var(--pp-text-muted);
   flex-shrink: 0;
 }
 
 .line-original-text {
   font-weight: 600;
   font-size: 0.95rem;
-  color: #1e293b;
+  color: var(--pp-text-strong);
   flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -92,8 +92,8 @@
 
 .removal-badge {
   font-size: 0.75rem;
-  color: #b91c1c;
-  background: #fee2e2;
+  color: var(--pp-error);
+  background: var(--pp-error-container);
   padding: 0.15rem 0.4rem;
   border-radius: 4px;
   font-weight: 600;
@@ -104,12 +104,12 @@
   font-weight: 700;
   padding: 0.15rem 0.4rem;
   border-radius: 9999px;
-  background: #dcfce7;
-  color: #166534;
+  background: var(--pp-success-container);
+  color: var(--pp-success);
 
   &.low-conf {
-    background: #fef3c7;
-    color: #b45309;
+    background: var(--pp-warning-container);
+    color: var(--pp-warning);
   }
 }
 
@@ -125,7 +125,7 @@
 
   &:focus-visible {
     border-radius: 4px;
-    box-shadow: 0 0 0 2px #3b82f6;
+    box-shadow: 0 0 0 2px var(--pp-info);
   }
 }
 
@@ -135,13 +135,13 @@
 
 .currency-suffix {
   font-size: 0.8rem;
-  color: #64748b;
+  color: var(--pp-text-muted);
   font-weight: 500;
 }
 
 .corrected-tag {
   font-size: 0.7rem;
-  color: #2563eb;
+  color: var(--pp-info);
   font-weight: 600;
 }
 
@@ -155,9 +155,9 @@
   gap: 0.5rem;
   padding: 0.75rem 1rem;
   border-radius: 8px;
-  background: #f0fdf4;
-  border: 1px solid #bbf7d0;
-  color: #166534;
+  background: var(--pp-success-container);
+  border: 1px solid var(--pp-success);
+  color: var(--pp-success);
   margin-block-start: 0.5rem;
 }
 
@@ -168,14 +168,14 @@
 
 .new-line-detail {
   font-size: 0.85rem;
-  color: #475569;
+  color: var(--pp-text-muted);
 }
 
 .new-line-badge {
   font-size: 0.75rem;
   font-weight: 700;
-  background: #dcfce7;
-  color: #15803d;
+  background: var(--pp-success-container);
+  color: var(--pp-success);
   padding: 0.15rem 0.4rem;
   border-radius: 4px;
 }

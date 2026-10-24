@@ -148,14 +148,14 @@
 
           <ng-container matColumnDef="pack">
             <th mat-header-cell *matHeaderCellDef>{{ 'catalogue.products.columns.pack' | translate }}</th>
-            <td mat-cell *matCellDef="let product">
+            <td mat-cell *matCellDef="let product" class="pp-figures">
               {{ formatPack(product) }}
             </td>
           </ng-container>
 
           <ng-container matColumnDef="normalised">
             <th mat-header-cell *matHeaderCellDef>{{ 'catalogue.products.columns.normalised' | translate }}</th>
-            <td mat-cell *matCellDef="let product" class="normalised-cell">
+            <td mat-cell *matCellDef="let product" class="pp-figures normalised-cell">
               <strong>{{ formatNormalised(product) }}</strong>
             </td>
           </ng-container>

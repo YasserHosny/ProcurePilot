@@ -57,7 +57,7 @@
             <th mat-header-cell *matHeaderCellDef>
               {{ 'organisation.budgets.columns.amount' | translate }}
             </th>
-            <td mat-cell *matCellDef="let budget">
+            <td mat-cell *matCellDef="let budget" class="pp-figures">
               <span class="budget-amount">{{ budget.amount | formatMoney }}</span>
             </td>
           </ng-container>

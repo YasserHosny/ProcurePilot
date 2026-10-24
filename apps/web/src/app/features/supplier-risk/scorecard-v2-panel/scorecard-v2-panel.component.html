@@ -74,8 +74,8 @@
           @for (row of componentRows(); track row.key) {
             <tr data-testid="risk-component-row">
               <th scope="row">{{ 'supplierRisk.components.' + row.key | translate }}</th>
-              <td>{{ percent($safeNavigationMigration(row.value?.risk)) }}</td>
-              <td>{{ percent(weight(row.key)) }}</td>
+              <td class="pp-figures">{{ percent($safeNavigationMigration(row.value?.risk)) }}</td>
+              <td class="pp-figures">{{ percent(weight(row.key)) }}</td>
               <td>{{ 'supplierRisk.confidence.' + (row.value?.confidence ?? 'low') | translate }}</td>
               <td>
                 @if (row.value) {
@@ -143,7 +143,7 @@
                   <th scope="row">{{ bucket.currency }}</th>
                   <td>{{ bucket.supplier_spend }} {{ bucket.currency }}</td>
                   <td>{{ bucket.tenant_spend }} {{ bucket.currency }}</td>
-                  <td>{{ percent(bucket.share) }}</td>
+                  <td class="pp-figures">{{ percent(bucket.share) }}</td>
                   <td>{{ bucket.sample_count }}</td>
                 </tr>
               }

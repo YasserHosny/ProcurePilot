@@ -1,6 +1,7 @@
 {
   "common": {
     "brandName": "ProcurePilot",
+    "logoAlt": "بروكيور بايلوت",
     "appTagline": "ذكاء المشتريات",
     "traceId": "مُعرّف المرجع",
     "loading": "جاري التحميل...",

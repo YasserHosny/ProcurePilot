@@ -38,7 +38,7 @@ test.describe('ProcurePilot Localisation & RTL Layout (T071)', () => {
     await expect(html).toHaveAttribute('dir', 'ltr');
     await expect(html).toHaveAttribute('lang', 'en');
 
-    await expect(page.locator('.brand-name')).toContainText('ProcurePilot');
+    await expect(page.locator('.brand-header img')).toHaveAttribute('alt', 'ProcurePilot');
     await expect(page.locator('.card-title')).toContainText('Sign in to your workspace');
   });
 

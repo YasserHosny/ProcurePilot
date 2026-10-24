@@ -25,7 +25,7 @@
     font-size: 1.75rem;
     font-weight: 700;
     margin: 0 0 0.25rem 0;
-    color: var(--mat-sys-on-surface, #1e293b);
+    color: var(--pp-text-strong);
 
     @include bp.mobile {
       font-size: 1.25rem;
@@ -34,7 +34,7 @@
 
   .page-subtitle {
     margin: 0;
-    color: var(--mat-sys-on-surface-variant, #64748b);
+    color: var(--pp-text-muted);
     font-size: 0.95rem;
   }
 }
@@ -44,13 +44,13 @@
   align-items: flex-start;
   gap: 0.75rem;
   padding: 1rem;
-  background-color: var(--mat-sys-surface-container-high, #f0fdf4);
-  border: 1px solid var(--mat-sys-outline-variant, #bbf7d0);
+  background-color: var(--pp-surface-raised);
+  border: 1px solid var(--pp-border);
   border-radius: 8px;
   margin-block-end: 1.5rem;
 
   .info-icon {
-    color: var(--mat-sys-primary, #15803d);
+    color: var(--pp-primary);
     flex-shrink: 0;
   }
 
@@ -62,12 +62,12 @@
     .info-title {
       font-weight: 600;
       font-size: 0.9rem;
-      color: var(--mat-sys-on-surface, #166534);
+      color: var(--pp-text-strong);
     }
 
     .info-desc {
       font-size: 0.85rem;
-      color: var(--mat-sys-on-surface-variant, #14532d);
+      color: var(--pp-text-muted);
     }
   }
 }
@@ -77,12 +77,12 @@
   align-items: flex-start;
   gap: 0.75rem;
   padding: 1rem;
-  background-color: var(--mat-sys-error-container, #fef2f2);
-  border: 1px solid var(--mat-sys-error, #f87171);
+  background-color: var(--pp-error-container);
+  border: 1px solid var(--pp-error);
   border-radius: 8px;
 
   .error-icon {
-    color: var(--mat-sys-error, #dc2626);
+    color: var(--pp-error);
     flex-shrink: 0;
   }
 
@@ -94,18 +94,18 @@
     .error-title {
       font-weight: 600;
       font-size: 0.85rem;
-      color: var(--mat-sys-error, #991b1b);
+      color: var(--pp-error);
     }
 
     .error-message {
       font-size: 0.9rem;
-      color: var(--mat-sys-on-error-container, #7f1d1d);
+      color: var(--pp-error);
     }
 
     .error-trace {
       font-family: monospace;
       font-size: 0.75rem;
-      color: var(--mat-sys-on-error-container, #991b1b);
+      color: var(--pp-error);
     }
   }
 }
@@ -117,7 +117,7 @@
   justify-content: center;
   gap: 1rem;
   padding: 4rem 2rem;
-  color: var(--mat-sys-on-surface-variant, #64748b);
+  color: var(--pp-text-muted);
 }
 
 .form-card {

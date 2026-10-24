@@ -3,7 +3,7 @@
   flex-direction: column;
   gap: 1rem;
   margin-block-start: 1.5rem;
-  border-block-start: 1px solid #e2e8f0;
+  border-block-start: 1px solid var(--pp-border);
   padding-block-start: 1.5rem;
 }
 
@@ -15,14 +15,14 @@
 
   h2 {
     margin: 0 0 0.25rem;
-    color: #0f172a;
+    color: var(--pp-text-strong);
     font-size: 1.25rem;
     letter-spacing: 0;
   }
 
   p {
     margin: 0;
-    color: #64748b;
+    color: var(--pp-text-muted);
     font-size: 0.875rem;
   }
 
@@ -45,29 +45,29 @@
 .status-tag {
   border-radius: 4px;
   padding: 0.25rem 0.5rem;
-  background: #e2e8f0;
-  color: #334155;
+  background: var(--pp-surface-sunken);
+  color: var(--pp-text);
   font-size: 0.75rem;
   font-weight: 700;
 
   &.gate {
-    background: #fef3c7;
-    color: #854d0e;
+    background: var(--pp-warning-container);
+    color: var(--pp-warning);
   }
 
   &.stale {
-    background: #fee2e2;
-    color: #991b1b;
+    background: var(--pp-error-container);
+    color: var(--pp-error);
   }
 
   &.current {
-    background: #dcfce7;
-    color: #166534;
+    background: var(--pp-success-container);
+    color: var(--pp-success);
   }
 }
 
 .validity-date {
-  color: #64748b;
+  color: var(--pp-text-muted);
   font-size: 0.75rem;
 }
 
@@ -75,17 +75,17 @@
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  border: 1px solid #cbd5e1;
+  border: 1px solid var(--pp-border);
   border-radius: 6px;
   padding: 0.75rem;
-  background: #f8fafc;
-  color: #334155;
+  background: var(--pp-surface-page);
+  color: var(--pp-text);
   font-size: 0.875rem;
 
   &.error {
-    border-color: #fecaca;
-    background: #fef2f2;
-    color: #991b1b;
+    border-color: var(--pp-error);
+    background: var(--pp-error-container);
+    color: var(--pp-error);
   }
 }
 
@@ -101,7 +101,7 @@
 
   th,
   td {
-    border-block-end: 1px solid #e2e8f0;
+    border-block-end: 1px solid var(--pp-border);
     padding: 0.65rem 0.75rem;
     text-align: start;
     vertical-align: top;
@@ -109,13 +109,13 @@
   }
 
   thead th {
-    color: #475569;
+    color: var(--pp-text-muted);
     font-size: 0.75rem;
     text-transform: uppercase;
   }
 
   tbody th {
-    color: #0f172a;
+    color: var(--pp-text-strong);
   }
 }
 
@@ -127,17 +127,17 @@
 .evidence-line {
   display: block;
   margin-block-start: 0.2rem;
-  color: #475569;
+  color: var(--pp-text-muted);
   font-size: 0.75rem;
 }
 
 a.evidence-line {
-  color: #075985;
+  color: var(--pp-info);
 }
 
 .currency-section h3 {
   margin: 0 0 0.5rem;
-  color: #334155;
+  color: var(--pp-text);
   font-size: 1rem;
   letter-spacing: 0;
 }

@@ -45,7 +45,7 @@
           <button mat-stroked-button color="primary" type="button" [routerLink]="['/orders', data.order.id, 'edit']" [disabled]="isSaving()" data-testid="edit-order">
             <mat-icon aria-hidden="true">edit</mat-icon>{{ 'orders.detail.edit' | translate }}
           </button>
-          <button mat-stroked-button color="warn" type="button" (click)="cancelOrder()" [disabled]="isSaving()" data-testid="cancel-order">
+          <button mat-stroked-button color="warn" class="pp-danger" type="button" (click)="cancelOrder()" [disabled]="isSaving()" data-testid="cancel-order">
             <mat-icon aria-hidden="true">cancel</mat-icon>{{ 'orders.detail.cancel' | translate }}
           </button>
           <button mat-flat-button color="primary" type="button" (click)="submitOrder()" [disabled]="isSaving()" data-testid="submit-order">
@@ -67,7 +67,7 @@
           <p>{{ 'orders.detail.cancelConfirmMessage' | translate }}</p>
           <div class="actions">
             <button mat-button type="button" (click)="cancelOpen.set(false)" [disabled]="isSaving()">{{ 'common.cancel' | translate }}</button>
-            <button mat-flat-button color="warn" type="button" (click)="confirmCancel()" [disabled]="isSaving()" data-testid="confirm-cancel">{{ 'orders.detail.cancelOrder' | translate }}</button>
+            <button mat-stroked-button color="warn" class="pp-danger" type="button" (click)="confirmCancel()" [disabled]="isSaving()" data-testid="confirm-cancel">{{ 'orders.detail.cancelOrder' | translate }}</button>
           </div>
         </div>
       }

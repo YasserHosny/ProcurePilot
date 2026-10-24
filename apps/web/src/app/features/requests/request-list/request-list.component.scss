@@ -22,7 +22,7 @@
   font-size: 1.75rem;
   font-weight: 700;
   letter-spacing: -0.02em;
-  color: #0f172a;
+  color: var(--pp-text-strong);
 
   @include bp.mobile {
     font-size: 1.25rem;
@@ -33,7 +33,7 @@
   margin: 0;
   font-size: 0.9375rem;
   line-height: 1.5;
-  color: #64748b;
+  color: var(--pp-text-muted);
 }
 
 .action-btn {
@@ -64,13 +64,13 @@
   gap: 0.75rem;
   padding-inline: 1rem;
   padding-block: 0.75rem;
-  background-color: #fef2f2;
-  border: 1px solid #fee2e2;
+  background-color: var(--pp-error-container);
+  border: 1px solid var(--pp-error-container);
   border-radius: 8px;
-  color: #991b1b;
+  color: var(--pp-error);
 
   .error-icon {
-    color: #ef4444;
+    color: var(--pp-error);
     font-size: 24px;
     inline-size: 24px;
     block-size: 24px;
@@ -89,15 +89,15 @@
 
   .error-trace {
     font-size: 0.75rem;
-    color: #b91c1c;
+    color: var(--pp-error);
     font-family: monospace;
   }
 }
 
 .requests-card {
   border-radius: 12px;
-  background-color: #ffffff;
-  border: 1px solid #e2e8f0;
+  background-color: var(--pp-surface-card);
+  border: 1px solid var(--pp-border);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
   overflow: hidden;
 }
@@ -110,14 +110,14 @@
   justify-content: center;
   padding-block: 3rem;
   gap: 1rem;
-  color: #475569;
+  color: var(--pp-text-muted);
 }
 
 .empty-icon {
   font-size: 48px;
   inline-size: 48px;
   block-size: 48px;
-  color: #cbd5e1;
+  color: var(--pp-text-muted);
 }
 
 .table-responsive {
@@ -128,7 +128,7 @@
   inline-size: 100%;
 
   th.mat-header-cell {
-    color: #475569;
+    color: var(--pp-text-muted);
     font-size: 0.8125rem;
     font-weight: 600;
     text-transform: uppercase;
@@ -139,7 +139,7 @@
     padding-inline: 1rem;
     padding-block: 0.875rem;
     font-size: 0.875rem;
-    color: #1e293b;
+    color: var(--pp-text-strong);
   }
 }
 
@@ -147,7 +147,7 @@
   cursor: pointer;
 
   &:hover {
-    background-color: #f8fafc;
+    background-color: var(--pp-surface-page);
   }
 }
 
@@ -160,30 +160,30 @@
   font-weight: 600;
 
   &[data-status='draft'] {
-    background-color: #f1f5f9;
-    color: #475569;
+    background-color: var(--pp-surface-sunken);
+    color: var(--pp-text-muted);
   }
 
   &[data-status='submitted'] {
-    background-color: #eff6ff;
-    color: #1d4ed8;
+    background-color: var(--pp-info-container);
+    color: var(--pp-info);
   }
 
   &[data-status='approved'] {
-    background-color: #ecfdf5;
-    color: #059669;
+    background-color: var(--pp-success-container);
+    color: var(--pp-success);
   }
 
   &[data-status='rejected'] {
-    background-color: #fef2f2;
-    color: #dc2626;
+    background-color: var(--pp-error-container);
+    color: var(--pp-error);
   }
 
   &[data-status='withdrawn'] {
-    background-color: #f5f5f4;
+    background-color: var(--pp-surface-sunken);
     // stone-600: the previous stone-500 text sat at 4.4:1 on this background, just under the
     // WCAG 2.1 AA 4.5:1 threshold that the a11y gate enforces on the populated list.
-    color: #57534e;
+    color: var(--pp-text);
   }
 }
 
@@ -195,8 +195,8 @@
   border-radius: 4px;
   font-size: 0.6875rem;
   font-weight: 500;
-  background-color: #fef3c7;
-  color: #92400e;
+  background-color: var(--pp-warning-container);
+  color: var(--pp-warning);
 }
 
 .actions-cell {
@@ -206,7 +206,7 @@
 }
 
 .danger-action {
-  color: #ef4444;
+  color: var(--pp-error);
 }
 
 .auto-prepared-badge {
@@ -217,6 +217,6 @@
   border-radius: 4px;
   font-size: 0.6875rem;
   font-weight: 500;
-  background-color: #ede9fe;
-  color: #5b21b6;
+  background-color: var(--pp-primary-container);
+  color: var(--pp-primary);
 }
