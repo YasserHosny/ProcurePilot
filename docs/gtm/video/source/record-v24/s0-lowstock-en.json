@@ -1,0 +1,4 @@
+[{"a":"key","key":"Escape","pause":500},{"a":"goto","url":"http://localhost:4310/#/home","ms":8000},{"a":"rec"},{"a":"wait","ms":1500},
+{"a":"tap","x":195,"y":182,"pause":1800},{"a":"tap","x":195,"y":96,"pause":700},{"a":"type","text":"زيت","pause":3500},
+{"a":"tap","x":150,"y":150,"pause":1600},{"a":"tap","x":195,"y":190,"pause":1100},{"a":"tap","x":195,"y":238,"pause":1100},
+{"a":"tap","x":195,"y":260,"pause":600},{"a":"type","text":"1","pause":1200},{"a":"tap","x":287,"y":322,"pause":7000}]

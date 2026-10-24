@@ -1,0 +1,1477 @@
+{
+  "h": {
+    "body": 101,
+    "outro": 9.75,
+    "scenes": [
+      {
+        "beat": 0,
+        "start": 0,
+        "duration": 4,
+        "spans": [
+          [
+            "opening-h",
+            0,
+            4,
+            4
+          ]
+        ],
+        "crop": null,
+        "copy": {
+          "ar": "٣ موردين… ٣ صيغ… وشيت بتكتبه بإيدك.",
+          "en": "Three suppliers. Three formats. One sheet you retype by hand."
+        },
+        "spans_by_language": {
+          "ar": [
+            [
+              "opening-h",
+              0,
+              4,
+              4
+            ]
+          ],
+          "en": [
+            [
+              "opening-h",
+              0,
+              4,
+              4
+            ]
+          ]
+        }
+      },
+      {
+        "beat": 1,
+        "start": 4,
+        "duration": 6,
+        "spans": [
+          [
+            "s5-po-savings",
+            26,
+            28,
+            3
+          ],
+          [
+            "s5-po-savings",
+            42,
+            42,
+            3
+          ]
+        ],
+        "crop": null,
+        "copy": {
+          "ar": "من بلاغ نقص… لأمر شراء معتمد. في مكان واحد.",
+          "en": "From a low-stock report to an approved PO. In one place."
+        },
+        "spans_by_language": {
+          "ar": [
+            [
+              "s5-po-savings",
+              26,
+              28,
+              3
+            ],
+            [
+              "s5-po-savings",
+              42,
+              42,
+              3
+            ]
+          ],
+          "en": [
+            [
+              "s5-po-savings",
+              26,
+              28,
+              3
+            ],
+            [
+              "s5-po-savings",
+              44.5,
+              44.5,
+              3
+            ]
+          ]
+        }
+      },
+      {
+        "beat": 2,
+        "start": 10,
+        "duration": 7,
+        "spans": [
+          [
+            "s0-phone-lowstock",
+            1.5,
+            3.5,
+            1
+          ],
+          [
+            "s0-phone-lowstock",
+            11,
+            20.5,
+            4
+          ],
+          [
+            "s0-phone-lowstock",
+            21.8,
+            22.1,
+            2
+          ]
+        ],
+        "crop": null,
+        "copy": {
+          "ar": "الفرع بيبلّغ من الموبايل: الزيت قرب يخلص.",
+          "en": "The branch reports it from the phone: oil is running low."
+        },
+        "spans_by_language": {
+          "ar": [
+            [
+              "s0-phone-lowstock",
+              1.5,
+              3.5,
+              1
+            ],
+            [
+              "s0-phone-lowstock",
+              11,
+              20.5,
+              4
+            ],
+            [
+              "s0-phone-lowstock",
+              21.8,
+              22.1,
+              2
+            ]
+          ],
+          "en": [
+            [
+              "s0-phone-lowstock",
+              1.5,
+              3.5,
+              1
+            ],
+            [
+              "s0-phone-lowstock",
+              11,
+              20.5,
+              4
+            ],
+            [
+              "s0-phone-lowstock",
+              21.8,
+              22.1,
+              2
+            ]
+          ]
+        }
+      },
+      {
+        "beat": 3,
+        "start": 17,
+        "duration": 11,
+        "spans": [
+          [
+            "s1-rfq",
+            4,
+            18,
+            3
+          ],
+          [
+            "s1-rfq",
+            24,
+            34,
+            3.5
+          ],
+          [
+            "s1-rfq",
+            40.5,
+            43.3,
+            3
+          ],
+          [
+            "s1-rfq",
+            44.2,
+            44.2,
+            1.5
+          ]
+        ],
+        "crop": null,
+        "copy": {
+          "ar": "طلب عرض سعر واحد… لـ٣ موردين، والكميات بالعبوة.",
+          "en": "One RFQ. Three suppliers. Quantities in packs."
+        },
+        "spans_by_language": {
+          "ar": [
+            [
+              "s1-rfq",
+              4,
+              18,
+              3
+            ],
+            [
+              "s1-rfq",
+              24,
+              34,
+              3.5
+            ],
+            [
+              "s1-rfq",
+              40.5,
+              43.3,
+              3
+            ],
+            [
+              "s1-rfq",
+              44.2,
+              44.2,
+              1.5
+            ]
+          ],
+          "en": [
+            [
+              "s1-rfq",
+              4,
+              18,
+              3
+            ],
+            [
+              "s1-rfq",
+              24,
+              34,
+              3.5
+            ],
+            [
+              "s1-rfq",
+              40.5,
+              43.3,
+              3
+            ],
+            [
+              "s1-rfq",
+              44.2,
+              44.2,
+              1.5
+            ]
+          ]
+        }
+      },
+      {
+        "beat": 5,
+        "start": 28,
+        "duration": 5,
+        "spans": [
+          [
+            "s2-quote-photo",
+            0.3,
+            4.8,
+            5
+          ]
+        ],
+        "crop": null,
+        "copy": {
+          "ar": "٣ ردود: ملفين PDF… وصورة واتساب.",
+          "en": "Three replies: two PDFs and a WhatsApp photo."
+        },
+        "spans_by_language": {
+          "ar": [
+            [
+              "s2-quote-photo",
+              0.3,
+              4.8,
+              5
+            ]
+          ],
+          "en": [
+            [
+              "s2-quote-photo",
+              0.3,
+              4.8,
+              5
+            ]
+          ]
+        }
+      },
+      {
+        "beat": 6,
+        "start": 33,
+        "duration": 12,
+        "spans": [
+          [
+            "s2-quote-photo",
+            8,
+            11,
+            3
+          ],
+          [
+            "s2-quote-photo",
+            22,
+            23,
+            3
+          ],
+          [
+            "s2-quote-photo",
+            24,
+            25,
+            4
+          ],
+          [
+            "s2-quote-photo",
+            8.5,
+            8.5,
+            2
+          ]
+        ],
+        "crop": null,
+        "copy": {
+          "ar": "اتقرت لوحدها: البنود، بالجنيه، والصلاحية… والإجمالي مطابق.",
+          "en": "Read automatically: lines, pounds, expiry. The total checks out."
+        },
+        "spans_by_language": {
+          "ar": [
+            [
+              "s2-quote-photo",
+              8,
+              11,
+              3
+            ],
+            [
+              "s2-quote-photo",
+              22,
+              23,
+              3
+            ],
+            [
+              "s2-quote-photo",
+              24,
+              25,
+              4
+            ],
+            [
+              "s2-quote-photo",
+              8.5,
+              8.5,
+              2
+            ]
+          ],
+          "en": [
+            [
+              "s2-quote-photo",
+              8,
+              11,
+              3
+            ],
+            [
+              "s2-quote-photo",
+              22,
+              23,
+              3
+            ],
+            [
+              "s2-quote-photo",
+              24,
+              25,
+              4
+            ],
+            [
+              "s2-quote-photo",
+              8.5,
+              8.5,
+              2
+            ]
+          ]
+        }
+      },
+      {
+        "beat": 7,
+        "start": 45,
+        "duration": 5,
+        "spans": [
+          [
+            "s2-quote-photo",
+            24.5,
+            26.5,
+            3.5
+          ],
+          [
+            "s2-quote-photo",
+            26.5,
+            26.5,
+            1.5
+          ]
+        ],
+        "crop": null,
+        "copy": {
+          "ar": "بس الاعتماد قرارك إنت.",
+          "en": "But you sign it off."
+        },
+        "spans_by_language": {
+          "ar": [
+            [
+              "s2-quote-photo",
+              24.5,
+              26.5,
+              3.5
+            ],
+            [
+              "s2-quote-photo",
+              26.5,
+              26.5,
+              1.5
+            ]
+          ],
+          "en": [
+            [
+              "s2-quote-photo",
+              24.5,
+              26.5,
+              3.5
+            ],
+            [
+              "s2-quote-photo",
+              26.5,
+              26.5,
+              1.5
+            ]
+          ]
+        }
+      },
+      {
+        "beat": 8,
+        "start": 50,
+        "duration": 11,
+        "spans": [
+          [
+            "s3c-smart-compare",
+            10.5,
+            14,
+            3
+          ],
+          [
+            "s3c-smart-compare",
+            20,
+            27,
+            5.5
+          ],
+          [
+            "s3c-smart-compare",
+            29,
+            29,
+            2.5
+          ]
+        ],
+        "crop": null,
+        "copy": {
+          "ar": "مقارنة بالعبوة وبالتكلفة الواصلة: الأمانة أوفر بـ٢٠٠ ج.م",
+          "en": "Per pack, landed cost: Al-Amana is cheaper by EGP 200."
+        },
+        "spans_by_language": {
+          "ar": [
+            [
+              "s3c-smart-compare",
+              10.5,
+              14,
+              3
+            ],
+            [
+              "s3c-smart-compare",
+              20,
+              27,
+              5.5
+            ],
+            [
+              "s3c-smart-compare",
+              29,
+              29,
+              2.5
+            ]
+          ],
+          "en": [
+            [
+              "s3c-smart-compare",
+              10.5,
+              14,
+              3
+            ],
+            [
+              "s3c-smart-compare",
+              20,
+              27,
+              5.5
+            ],
+            [
+              "s3c-smart-compare",
+              29,
+              29,
+              2.5
+            ]
+          ]
+        }
+      },
+      {
+        "beat": 10,
+        "start": 61,
+        "duration": 10,
+        "spans": [
+          [
+            "s3-guardrail-draft",
+            5,
+            10,
+            4
+          ],
+          [
+            "s3-guardrail-draft",
+            16,
+            22,
+            4
+          ],
+          [
+            "s3-guardrail-draft",
+            22.5,
+            24.1,
+            2
+          ]
+        ],
+        "crop": null,
+        "copy": {
+          "ar": "الضوابط اللي حطّيتها جهّزت الطلب… مسودة، مش شراء.",
+          "en": "Your guardrails drafted the request. A draft, not a purchase."
+        },
+        "spans_by_language": {
+          "ar": [
+            [
+              "s3-guardrail-draft",
+              5,
+              10,
+              4
+            ],
+            [
+              "s3-guardrail-draft",
+              16,
+              22,
+              4
+            ],
+            [
+              "s3-guardrail-draft",
+              22.5,
+              24.1,
+              2
+            ]
+          ],
+          "en": [
+            [
+              "s3-guardrail-draft",
+              5,
+              10,
+              4
+            ],
+            [
+              "s3-guardrail-draft",
+              16,
+              22,
+              4
+            ],
+            [
+              "s3-guardrail-draft",
+              22.5,
+              24.1,
+              2
+            ]
+          ]
+        }
+      },
+      {
+        "beat": 11,
+        "start": 71,
+        "duration": 8,
+        "spans": [
+          [
+            "s4-phone-approve",
+            5,
+            5.5,
+            1
+          ],
+          [
+            "s4-phone-approve",
+            7,
+            8,
+            2
+          ],
+          [
+            "s4-phone-approve",
+            13.5,
+            15.4,
+            3
+          ],
+          [
+            "s4-phone-approve",
+            15.8,
+            15.8,
+            2
+          ]
+        ],
+        "crop": null,
+        "copy": {
+          "ar": "والمدير يعتمد من موبايله.",
+          "en": "The manager approves from their phone."
+        },
+        "spans_by_language": {
+          "ar": [
+            [
+              "s4-phone-approve",
+              5,
+              5.5,
+              1
+            ],
+            [
+              "s4-phone-approve",
+              7,
+              8,
+              2
+            ],
+            [
+              "s4-phone-approve",
+              13.5,
+              15.4,
+              3
+            ],
+            [
+              "s4-phone-approve",
+              15.8,
+              15.8,
+              2
+            ]
+          ],
+          "en": [
+            [
+              "s4-phone-approve",
+              5,
+              5.5,
+              1
+            ],
+            [
+              "s4-phone-approve",
+              7,
+              8,
+              2
+            ],
+            [
+              "s4-phone-approve",
+              13.5,
+              15.4,
+              3
+            ],
+            [
+              "s4-phone-approve",
+              15.8,
+              15.8,
+              2
+            ]
+          ]
+        }
+      },
+      {
+        "beat": 12,
+        "start": 79,
+        "duration": 9,
+        "spans": [
+          [
+            "s5-po-savings",
+            3,
+            9,
+            2.5
+          ],
+          [
+            "s5-po-savings",
+            13,
+            20,
+            2.5
+          ],
+          [
+            "s5-po-savings",
+            22,
+            23.2,
+            2
+          ],
+          [
+            "s5-po-savings",
+            26,
+            26,
+            2
+          ]
+        ],
+        "crop": null,
+        "copy": {
+          "ar": "أمر الشراء طالع من الطلب المعتمد… واتبعت.",
+          "en": "The PO comes from the approved request, and goes out."
+        },
+        "spans_by_language": {
+          "ar": [
+            [
+              "s5-po-savings",
+              3,
+              9,
+              2.5
+            ],
+            [
+              "s5-po-savings",
+              13,
+              20,
+              2.5
+            ],
+            [
+              "s5-po-savings",
+              22,
+              23.2,
+              2
+            ],
+            [
+              "s5-po-savings",
+              26,
+              26,
+              2
+            ]
+          ],
+          "en": [
+            [
+              "s5-po-savings",
+              3,
+              9,
+              2.5
+            ],
+            [
+              "s5-po-savings",
+              13,
+              20,
+              2.5
+            ],
+            [
+              "s5-po-savings",
+              22,
+              23.2,
+              2
+            ],
+            [
+              "s5-po-savings",
+              26,
+              26,
+              2
+            ]
+          ]
+        }
+      },
+      {
+        "beat": 13,
+        "start": 88,
+        "duration": 7,
+        "spans": [
+          [
+            "s5-po-savings",
+            32,
+            35,
+            2
+          ],
+          [
+            "s5-po-savings",
+            36,
+            38.5,
+            3
+          ],
+          [
+            "s5-po-savings",
+            42,
+            42,
+            2
+          ]
+        ],
+        "crop": null,
+        "copy": {
+          "ar": "وفّرت ٣٠٠ ج.م على الطلب ده، مقابل آخر سعر شراء.",
+          "en": "You saved EGP 200 on this order, against the last purchase price."
+        },
+        "spans_by_language": {
+          "ar": [
+            [
+              "s5-po-savings",
+              32,
+              35,
+              2
+            ],
+            [
+              "s5-po-savings",
+              36,
+              38.5,
+              3
+            ],
+            [
+              "s5-po-savings",
+              42,
+              42,
+              2
+            ]
+          ],
+          "en": [
+            [
+              "s5-po-savings",
+              32,
+              35,
+              2
+            ],
+            [
+              "s5-po-savings",
+              38,
+              40.3,
+              3
+            ],
+            [
+              "s5-po-savings",
+              44.5,
+              44.5,
+              2
+            ]
+          ]
+        }
+      },
+      {
+        "beat": 14,
+        "start": 95,
+        "duration": 6,
+        "spans": [
+          [
+            "s6-savings-close",
+            4,
+            8,
+            6
+          ]
+        ],
+        "crop": null,
+        "copy": {
+          "ar": "وكل وفر متسجّل ومتراجع… جاهز للمالك.",
+          "en": "Every saving logged and verified, ready for the owner."
+        },
+        "spans_by_language": {
+          "ar": [
+            [
+              "s6-savings-close",
+              4,
+              8,
+              6
+            ]
+          ],
+          "en": [
+            [
+              "s6-savings-close",
+              4,
+              8,
+              6
+            ]
+          ]
+        }
+      }
+    ]
+  },
+  "v": {
+    "body": 51,
+    "outro": 8.5,
+    "scenes": [
+      {
+        "beat": 0,
+        "start": 0,
+        "duration": 3,
+        "spans": [
+          [
+            "opening-v",
+            0,
+            3,
+            3
+          ]
+        ],
+        "crop": null,
+        "copy": {
+          "ar": "٣ موردين… ٣ صيغ… وشيت بتكتبه بإيدك.",
+          "en": "Three suppliers. Three formats. One sheet you retype by hand."
+        },
+        "spans_by_language": {
+          "ar": [
+            [
+              "opening-v",
+              0,
+              3,
+              3
+            ]
+          ],
+          "en": [
+            [
+              "opening-v",
+              0,
+              3,
+              3
+            ]
+          ]
+        }
+      },
+      {
+        "beat": 1,
+        "start": 3,
+        "duration": 4,
+        "spans": [
+          [
+            "s5-po-savings",
+            42,
+            42,
+            4
+          ]
+        ],
+        "crop": [
+          300,
+          100,
+          1320,
+          900
+        ],
+        "copy": {
+          "ar": "من بلاغ نقص… لأمر شراء معتمد. في مكان واحد.",
+          "en": "From a low-stock report to an approved PO. In one place."
+        },
+        "spans_by_language": {
+          "ar": [
+            [
+              "s5-po-savings",
+              42,
+              42,
+              4
+            ]
+          ],
+          "en": [
+            [
+              "s5-po-savings",
+              44.5,
+              44.5,
+              4
+            ]
+          ]
+        }
+      },
+      {
+        "beat": 3,
+        "start": 7,
+        "duration": 6,
+        "spans": [
+          [
+            "s1-rfq",
+            24,
+            28,
+            3
+          ],
+          [
+            "s1-rfq",
+            40.5,
+            43.3,
+            1.5
+          ],
+          [
+            "s1-rfq",
+            44.2,
+            44.2,
+            1.5
+          ]
+        ],
+        "crop": null,
+        "copy": {
+          "ar": "طلب عرض سعر واحد… لـ٣ موردين، والكميات بالعبوة.",
+          "en": "One RFQ. Three suppliers. Quantities in packs."
+        },
+        "spans_by_language": {
+          "ar": [
+            [
+              "s1-rfq",
+              24,
+              28,
+              3
+            ],
+            [
+              "s1-rfq",
+              40.5,
+              43.3,
+              1.5
+            ],
+            [
+              "s1-rfq",
+              44.2,
+              44.2,
+              1.5
+            ]
+          ],
+          "en": [
+            [
+              "s1-rfq",
+              24,
+              28,
+              3
+            ],
+            [
+              "s1-rfq",
+              40.5,
+              43.3,
+              1.5
+            ],
+            [
+              "s1-rfq",
+              44.2,
+              44.2,
+              1.5
+            ]
+          ]
+        }
+      },
+      {
+        "beat": 5,
+        "start": 13,
+        "duration": 3,
+        "spans": [
+          [
+            "s2-quote-photo",
+            0.3,
+            4.8,
+            3
+          ]
+        ],
+        "crop": null,
+        "copy": {
+          "ar": "٣ ردود: ملفين PDF… وصورة واتساب.",
+          "en": "Three replies: two PDFs and a WhatsApp photo."
+        },
+        "spans_by_language": {
+          "ar": [
+            [
+              "s2-quote-photo",
+              0.3,
+              4.8,
+              3
+            ]
+          ],
+          "en": [
+            [
+              "s2-quote-photo",
+              0.3,
+              4.8,
+              3
+            ]
+          ]
+        }
+      },
+      {
+        "beat": 6,
+        "start": 16,
+        "duration": 7,
+        "spans": [
+          [
+            "s2-quote-photo",
+            8,
+            11,
+            2
+          ],
+          [
+            "s2-quote-photo",
+            24,
+            25,
+            3
+          ],
+          [
+            "s2-quote-photo",
+            8.5,
+            8.5,
+            2
+          ]
+        ],
+        "crop": null,
+        "copy": {
+          "ar": "اتقرت لوحدها: البنود، بالجنيه، والصلاحية… والإجمالي مطابق.",
+          "en": "Read automatically: lines, pounds, expiry. The total checks out."
+        },
+        "spans_by_language": {
+          "ar": [
+            [
+              "s2-quote-photo",
+              8,
+              11,
+              2
+            ],
+            [
+              "s2-quote-photo",
+              24,
+              25,
+              3
+            ],
+            [
+              "s2-quote-photo",
+              8.5,
+              8.5,
+              2
+            ]
+          ],
+          "en": [
+            [
+              "s2-quote-photo",
+              8,
+              11,
+              2
+            ],
+            [
+              "s2-quote-photo",
+              24,
+              25,
+              3
+            ],
+            [
+              "s2-quote-photo",
+              8.5,
+              8.5,
+              2
+            ]
+          ]
+        }
+      },
+      {
+        "beat": 7,
+        "start": 23,
+        "duration": 3,
+        "spans": [
+          [
+            "s2-quote-photo",
+            24.5,
+            26.5,
+            1.5
+          ],
+          [
+            "s2-quote-photo",
+            26.5,
+            26.5,
+            1.5
+          ]
+        ],
+        "crop": null,
+        "copy": {
+          "ar": "بس الاعتماد قرارك إنت.",
+          "en": "But you sign it off."
+        },
+        "spans_by_language": {
+          "ar": [
+            [
+              "s2-quote-photo",
+              24.5,
+              26.5,
+              1.5
+            ],
+            [
+              "s2-quote-photo",
+              26.5,
+              26.5,
+              1.5
+            ]
+          ],
+          "en": [
+            [
+              "s2-quote-photo",
+              24.5,
+              26.5,
+              1.5
+            ],
+            [
+              "s2-quote-photo",
+              26.5,
+              26.5,
+              1.5
+            ]
+          ]
+        }
+      },
+      {
+        "beat": 8,
+        "start": 26,
+        "duration": 7,
+        "spans": [
+          [
+            "s3c-smart-compare",
+            20,
+            27,
+            5
+          ],
+          [
+            "s3c-smart-compare",
+            29,
+            29,
+            2
+          ]
+        ],
+        "crop": null,
+        "copy": {
+          "ar": "مقارنة بالعبوة وبالتكلفة الواصلة: الأمانة أوفر بـ٢٠٠ ج.م",
+          "en": "Per pack, landed cost: Al-Amana is cheaper by EGP 200."
+        },
+        "spans_by_language": {
+          "ar": [
+            [
+              "s3c-smart-compare",
+              20,
+              27,
+              5
+            ],
+            [
+              "s3c-smart-compare",
+              29,
+              29,
+              2
+            ]
+          ],
+          "en": [
+            [
+              "s3c-smart-compare",
+              20,
+              27,
+              5
+            ],
+            [
+              "s3c-smart-compare",
+              29,
+              29,
+              2
+            ]
+          ]
+        }
+      },
+      {
+        "beat": 10,
+        "start": 33,
+        "duration": 5,
+        "spans": [
+          [
+            "s3-guardrail-draft",
+            5,
+            10,
+            3
+          ],
+          [
+            "s3-guardrail-draft",
+            20,
+            23,
+            2
+          ]
+        ],
+        "crop": null,
+        "copy": {
+          "ar": "الضوابط اللي حطّيتها جهّزت الطلب… مسودة، مش شراء.",
+          "en": "Your guardrails drafted the request. A draft, not a purchase."
+        },
+        "spans_by_language": {
+          "ar": [
+            [
+              "s3-guardrail-draft",
+              5,
+              10,
+              3
+            ],
+            [
+              "s3-guardrail-draft",
+              20,
+              23,
+              2
+            ]
+          ],
+          "en": [
+            [
+              "s3-guardrail-draft",
+              5,
+              10,
+              3
+            ],
+            [
+              "s3-guardrail-draft",
+              20,
+              23,
+              2
+            ]
+          ]
+        }
+      },
+      {
+        "beat": 11,
+        "start": 38,
+        "duration": 5,
+        "spans": [
+          [
+            "s4-phone-approve",
+            7,
+            8,
+            1
+          ],
+          [
+            "s4-phone-approve",
+            13.5,
+            15.4,
+            2
+          ],
+          [
+            "s4-phone-approve",
+            15.8,
+            15.8,
+            2
+          ]
+        ],
+        "crop": null,
+        "copy": {
+          "ar": "والمدير يعتمد من موبايله.",
+          "en": "The manager approves from their phone."
+        },
+        "spans_by_language": {
+          "ar": [
+            [
+              "s4-phone-approve",
+              7,
+              8,
+              1
+            ],
+            [
+              "s4-phone-approve",
+              13.5,
+              15.4,
+              2
+            ],
+            [
+              "s4-phone-approve",
+              15.8,
+              15.8,
+              2
+            ]
+          ],
+          "en": [
+            [
+              "s4-phone-approve",
+              7,
+              8,
+              1
+            ],
+            [
+              "s4-phone-approve",
+              13.5,
+              15.4,
+              2
+            ],
+            [
+              "s4-phone-approve",
+              15.8,
+              15.8,
+              2
+            ]
+          ]
+        }
+      },
+      {
+        "beat": 12,
+        "start": 43,
+        "duration": 4,
+        "spans": [
+          [
+            "s5-po-savings",
+            22,
+            23.2,
+            2
+          ],
+          [
+            "s5-po-savings",
+            26,
+            26,
+            2
+          ]
+        ],
+        "crop": null,
+        "copy": {
+          "ar": "أمر الشراء طالع من الطلب المعتمد… واتبعت.",
+          "en": "The PO comes from the approved request, and goes out."
+        },
+        "spans_by_language": {
+          "ar": [
+            [
+              "s5-po-savings",
+              22,
+              23.2,
+              2
+            ],
+            [
+              "s5-po-savings",
+              26,
+              26,
+              2
+            ]
+          ],
+          "en": [
+            [
+              "s5-po-savings",
+              22,
+              23.2,
+              2
+            ],
+            [
+              "s5-po-savings",
+              26,
+              26,
+              2
+            ]
+          ]
+        }
+      },
+      {
+        "beat": 13,
+        "start": 47,
+        "duration": 4,
+        "spans": [
+          [
+            "s5-po-savings",
+            36,
+            38.5,
+            2
+          ],
+          [
+            "s5-po-savings",
+            42,
+            42,
+            2
+          ]
+        ],
+        "crop": null,
+        "copy": {
+          "ar": "وفّرت ٣٠٠ ج.م على الطلب ده، مقابل آخر سعر شراء.",
+          "en": "You saved EGP 200 on this order, against the last purchase price."
+        },
+        "spans_by_language": {
+          "ar": [
+            [
+              "s5-po-savings",
+              36,
+              38.5,
+              2
+            ],
+            [
+              "s5-po-savings",
+              42,
+              42,
+              2
+            ]
+          ],
+          "en": [
+            [
+              "s5-po-savings",
+              38,
+              40.3,
+              2
+            ],
+            [
+              "s5-po-savings",
+              44.5,
+              44.5,
+              2
+            ]
+          ]
+        }
+      }
+    ]
+  }
+}
