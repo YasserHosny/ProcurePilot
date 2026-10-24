@@ -104,6 +104,7 @@
             <mat-slide-toggle
               *appRole="'owner'"
               class="status-toggle"
+              hideIcon
               [checked]="cfg.enabled"
               [disabled]="isMutating()"
               (change)="toggleEnabled()"

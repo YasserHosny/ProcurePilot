@@ -1,8 +1,425 @@
+// Angular Material 22.2.4 theme: the bridge from docs/design/design-system.html (P-10, PPS-32).
+// M3 system tokens. No mat.core() and no prebuilt theme: mat.theme() emits everything needed.
+// Every override key below is valid in @angular/material 22.2.4; an unknown key fails the build,
+// so re-compile after any Material upgrade.
 @use "@angular/material" as mat;
 @use "styles/ledger-tokens"; // Ledger design tokens as global custom properties (all three layers)
+@use "styles/theme-colors"; // generated: ng generate @angular/material:theme-color (see the design page)
 
-@include mat.elevation-classes();
-@include mat.app-background();
+html {
+  color-scheme: light;   // light only: dark mode is a separate decision (no dark theme, no toggle)
+  @include mat.theme((
+    color: (
+      primary: theme-colors.$primary-palette,     // seeded from Navy #0B2545
+      tertiary: theme-colors.$tertiary-palette,   // seeded from Teal #12A594: savings only
+      theme-type: light,
+    ),
+    typography: (
+      plain-family: "Readex Pro",
+      brand-family: "Readex Pro",
+      regular-weight: 400,
+      medium-weight: 500,
+      bold-weight: 600,
+    ),
+    density: -1,
+  ));
+
+  // System tokens -> Ledger semantic layer. Generated tones cannot hit Navy #0B2545 or
+  // Teal #0C7A6E exactly, so every role a Material component reads is re-pointed here.
+  // Roles not listed (the twelve *-fixed roles, neutral-variant20) stay on the brand palettes.
+  --mat-sys-primary: var(--pp-primary);
+  --mat-sys-on-primary: var(--pp-on-primary);
+  --mat-sys-primary-container: var(--pp-primary-container);
+  --mat-sys-on-primary-container: var(--pp-on-primary-container);
+  --mat-sys-inverse-primary: var(--pp-inverse-primary);
+  --mat-sys-surface-tint: var(--pp-primary);
+  // Ledger has no secondary hue: secondary is navy too (tonal button, selected chip,
+  // selected option, active nav item, default focus indicator)
+  --mat-sys-secondary: var(--pp-primary);
+  --mat-sys-on-secondary: var(--pp-on-primary);
+  --mat-sys-secondary-container: var(--pp-primary-container);
+  --mat-sys-on-secondary-container: var(--pp-on-primary-container);
+  // tertiary carries savings and best offer, nothing else
+  --mat-sys-tertiary: var(--pp-savings);
+  --mat-sys-on-tertiary: var(--pp-on-savings);
+  --mat-sys-tertiary-container: var(--pp-savings-container);
+  --mat-sys-on-tertiary-container: var(--pp-savings);
+  // surfaces: Material reads 'surface' for cards, tables, toolbar, sidenav and expansion
+  --mat-sys-background: var(--pp-surface-page);
+  --mat-sys-on-background: var(--pp-text-strong);
+  --mat-sys-surface: var(--pp-surface-card);
+  --mat-sys-surface-bright: var(--pp-surface-card);
+  --mat-sys-surface-container-lowest: var(--pp-surface-card);
+  --mat-sys-surface-container-low: var(--pp-surface-card);
+  --mat-sys-surface-container: var(--pp-surface-raised);
+  --mat-sys-surface-container-high: var(--pp-surface-raised);
+  --mat-sys-surface-container-highest: var(--pp-surface-sunken);
+  --mat-sys-surface-variant: var(--pp-surface-sunken);
+  --mat-sys-surface-dim: var(--pp-surface-sunken);
+  --mat-sys-on-surface: var(--pp-text-strong);
+  --mat-sys-on-surface-variant: var(--pp-text-muted);
+  --mat-sys-inverse-surface: var(--pp-inverse-surface);
+  --mat-sys-inverse-on-surface: var(--pp-on-inverse-surface);
+  --mat-sys-neutral10: var(--pp-text-strong);
+  --mat-sys-outline: var(--pp-border-strong);
+  --mat-sys-outline-variant: var(--pp-border);
+  --mat-sys-error: var(--pp-error);
+  --mat-sys-on-error: var(--pp-on-error);
+  --mat-sys-error-container: var(--pp-error-container);
+  --mat-sys-on-error-container: var(--pp-error);
+  --mat-sys-scrim: var(--pp-scrim);
+  --mat-sys-shadow: var(--pp-shadow);
+  --mat-sys-corner-extra-small: var(--pp-radius-chip);
+  --mat-sys-corner-small: var(--pp-radius-control);
+  --mat-sys-corner-medium: var(--pp-radius-card);
+  --mat-sys-corner-large: var(--pp-radius-panel);
+  --mat-sys-level1: var(--pp-elev-1);
+  --mat-sys-level2: var(--pp-elev-2);
+  --mat-sys-level3: var(--pp-elev-3);
+
+  // One focus ring for every Material control (Material hides its indicator by default)
+  @include mat.strong-focus-indicators((
+    border-color: var(--pp-focus-ring-color),
+    border-width: var(--pp-focus-ring-width),
+    border-radius: var(--pp-focus-ring-radius),
+  ));
+
+  // Component layer -> per-component overrides
+  @include mat.button-overrides((
+    filled-container-color: var(--pp-button-primary-bg),
+    filled-label-text-color: var(--pp-button-primary-fg),
+    filled-disabled-container-color: var(--pp-button-disabled-bg),
+    filled-disabled-label-text-color: var(--pp-button-disabled-fg),
+    filled-progress-active-indicator-color: var(--pp-button-progress-fg),   // a loading button is also disabled
+    tonal-container-color: var(--pp-button-tonal-bg),
+    tonal-label-text-color: var(--pp-button-tonal-fg),
+    tonal-disabled-container-color: var(--pp-button-disabled-bg),
+    tonal-disabled-label-text-color: var(--pp-button-disabled-fg),
+    outlined-outline-color: var(--pp-button-outline-border),
+    outlined-label-text-color: var(--pp-button-outline-fg),
+    outlined-disabled-label-text-color: var(--pp-button-disabled-fg),
+    text-label-text-color: var(--pp-button-text-fg),
+    text-disabled-label-text-color: var(--pp-button-disabled-fg),
+    protected-container-color: var(--pp-button-outline-bg),
+    protected-label-text-color: var(--pp-button-outline-fg),
+    protected-container-elevation-shadow: var(--pp-button-raised-shadow),
+    filled-container-shape: var(--pp-button-radius),
+    tonal-container-shape: var(--pp-button-radius),
+    outlined-container-shape: var(--pp-button-radius),
+    text-container-shape: var(--pp-button-radius),
+    protected-container-shape: var(--pp-button-radius),
+    filled-container-height: var(--pp-button-height-md),
+    tonal-container-height: var(--pp-button-height-md),
+    outlined-container-height: var(--pp-button-height-md),
+    text-container-height: var(--pp-button-height-md),
+    protected-container-height: var(--pp-button-height-md),
+    filled-horizontal-padding: var(--pp-button-padding-inline),
+    tonal-horizontal-padding: var(--pp-button-padding-inline),
+    outlined-horizontal-padding: var(--pp-button-padding-inline),
+    text-horizontal-padding: var(--pp-button-padding-inline),
+    protected-horizontal-padding: var(--pp-button-padding-inline),
+  ));
+  @include mat.icon-button-overrides((
+    icon-color: var(--pp-button-icon-fg),
+    container-shape: var(--pp-button-radius),
+    state-layer-size: var(--pp-button-height-md),
+  ));
+  @include mat.form-field-overrides((
+    container-height: var(--pp-field-height),
+    container-vertical-padding: var(--pp-field-padding-block),
+    filled-with-label-container-padding-top: var(--pp-field-padding-block),
+    filled-with-label-container-padding-bottom: var(--pp-field-padding-block),
+    container-text-size: var(--pp-field-font-size),
+    outlined-label-text-size: var(--pp-field-font-size),
+    filled-label-text-size: var(--pp-field-font-size),
+    outlined-container-shape: var(--pp-field-radius),
+    filled-container-shape: var(--pp-field-radius),
+    outlined-outline-color: var(--pp-field-border),
+    outlined-hover-outline-color: var(--pp-field-border-hover),
+    outlined-focus-outline-color: var(--pp-field-border-focus),
+    outlined-error-outline-color: var(--pp-field-border-error),
+    outlined-error-focus-outline-color: var(--pp-field-border-error),
+    outlined-error-hover-outline-color: var(--pp-field-border-error),
+    outlined-disabled-outline-color: var(--pp-field-border),
+    outlined-input-text-color: var(--pp-field-fg),
+    outlined-label-text-color: var(--pp-field-help-fg),
+    outlined-focus-label-text-color: var(--pp-field-border-focus),
+    filled-container-color: var(--pp-field-filled-bg),
+    filled-input-text-color: var(--pp-field-fg),
+    filled-active-indicator-color: var(--pp-field-border),
+    filled-focus-active-indicator-color: var(--pp-field-border-focus),
+    error-text-color: var(--pp-field-border-error),
+    leading-icon-color: var(--pp-field-affix-fg),
+    trailing-icon-color: var(--pp-field-affix-fg),
+  ));
+  @include mat.select-overrides((
+    panel-background-color: var(--pp-menu-bg),
+    container-elevation-shadow: var(--pp-menu-shadow),
+    enabled-trigger-text-color: var(--pp-field-fg),
+    enabled-arrow-color: var(--pp-field-affix-fg),
+    trigger-text-size: var(--pp-field-font-size),
+  ));
+  @include mat.option-overrides((
+    label-text-color: var(--pp-menu-item-fg),
+    selected-state-layer-color: var(--pp-menu-selected-bg),
+    selected-state-label-text-color: var(--pp-menu-selected-fg),
+    label-text-size: var(--pp-field-font-size),
+  ));
+  @include mat.datepicker-overrides((
+    calendar-container-background-color: var(--pp-calendar-bg),
+    calendar-container-text-color: var(--pp-calendar-fg),
+    calendar-container-shape: var(--pp-calendar-radius),
+    calendar-container-elevation-shadow: var(--pp-calendar-shadow),
+    calendar-header-divider-color: var(--pp-calendar-divider),
+    calendar-header-text-color: var(--pp-calendar-muted-fg),
+    calendar-body-label-text-color: var(--pp-calendar-muted-fg),
+    calendar-date-text-color: var(--pp-calendar-fg),
+    calendar-date-selected-state-background-color: var(--pp-calendar-selected-bg),
+    calendar-date-selected-state-text-color: var(--pp-calendar-selected-fg),
+    calendar-date-today-outline-color: var(--pp-calendar-today-outline),
+    calendar-date-in-range-state-background-color: var(--pp-calendar-range-bg),
+    toggle-icon-color: var(--pp-field-affix-fg),
+  ));
+  @include mat.card-overrides((
+    outlined-container-color: var(--pp-card-bg),
+    outlined-outline-color: var(--pp-card-border),
+    elevated-container-color: var(--pp-card-bg),
+    elevated-container-elevation: var(--pp-card-shadow),
+    filled-container-color: var(--pp-card-sunken-bg),
+    outlined-container-shape: var(--pp-card-radius),
+    elevated-container-shape: var(--pp-card-radius),
+    filled-container-shape: var(--pp-card-radius),
+    title-text-size: var(--pp-card-title-size),
+    subtitle-text-color: var(--pp-card-subtitle-fg),
+  ));
+  @include mat.table-overrides((
+    background-color: var(--pp-table-bg),
+    header-headline-color: var(--pp-table-header-fg),
+    row-item-outline-color: var(--pp-table-row-border),
+    row-item-container-height: var(--pp-table-row-height),
+    header-container-height: var(--pp-table-header-height),
+    footer-container-height: var(--pp-table-row-height),
+  ));
+  @include mat.sort-overrides((
+    arrow-color: var(--pp-table-sort-arrow),
+  ));
+  @include mat.chips-overrides((
+    container-shape-radius: var(--pp-chip-radius),
+    container-height: var(--pp-chip-height),
+    label-text-size: var(--pp-chip-font-size),
+    outline-color: var(--pp-chip-draft-border),
+    label-text-color: var(--pp-chip-draft-fg),
+    elevated-selected-container-color: var(--pp-chip-selected-bg),
+    selected-label-text-color: var(--pp-chip-selected-fg),
+  ));
+  @include mat.dialog-overrides((
+    container-color: var(--pp-dialog-bg),
+    container-shape: var(--pp-dialog-radius),
+    container-elevation-shadow: var(--pp-dialog-shadow),
+    subhead-color: var(--pp-dialog-title-fg),
+    subhead-size: var(--pp-dialog-title-size),
+    supporting-text-color: var(--pp-dialog-fg),
+  ));
+  @include mat.menu-overrides((
+    container-color: var(--pp-menu-bg),
+    container-shape: var(--pp-menu-radius),
+    container-elevation-shadow: var(--pp-menu-shadow),
+    item-label-text-color: var(--pp-menu-item-fg),
+    item-icon-color: var(--pp-menu-item-icon),
+    divider-color: var(--pp-menu-divider),
+  ));
+  @include mat.tabs-overrides((
+    active-indicator-color: var(--pp-tabs-indicator),
+    active-focus-indicator-color: var(--pp-tabs-indicator),
+    active-hover-indicator-color: var(--pp-tabs-indicator),
+    active-indicator-height: var(--pp-tabs-indicator-height),
+    active-label-text-color: var(--pp-tabs-fg-active),
+    active-focus-label-text-color: var(--pp-tabs-fg-active),
+    active-hover-label-text-color: var(--pp-tabs-fg-active),
+    inactive-label-text-color: var(--pp-tabs-fg),
+    inactive-hover-label-text-color: var(--pp-tabs-fg-active),
+    container-height: var(--pp-tabs-height),
+    divider-color: var(--pp-tabs-border),
+  ));
+  @include mat.expansion-overrides((
+    container-background-color: var(--pp-expansion-bg),
+    container-shape: var(--pp-expansion-radius),
+    container-elevation-shadow: var(--pp-expansion-edge),
+    header-text-color: var(--pp-expansion-title-fg),
+    header-description-color: var(--pp-expansion-description-fg),
+    header-indicator-color: var(--pp-expansion-description-fg),
+    header-collapsed-state-height: var(--pp-expansion-header-height),
+    header-expanded-state-height: var(--pp-expansion-header-height),
+  ));
+  @include mat.checkbox-overrides((
+    selected-icon-color: var(--pp-check-checked-bg),
+    selected-hover-icon-color: var(--pp-check-checked-bg),
+    selected-focus-icon-color: var(--pp-check-checked-bg),
+    selected-checkmark-color: var(--pp-check-mark),
+    unselected-icon-color: var(--pp-check-border),
+    unselected-hover-icon-color: var(--pp-check-border-hover),
+    disabled-selected-icon-color: var(--pp-check-disabled-bg),
+  ));
+  @include mat.radio-overrides((
+    selected-icon-color: var(--pp-check-checked-bg),
+    selected-hover-icon-color: var(--pp-check-checked-bg),
+    selected-focus-icon-color: var(--pp-check-checked-bg),
+    unselected-icon-color: var(--pp-check-border),
+    unselected-hover-icon-color: var(--pp-check-border-hover),
+  ));
+  @include mat.slide-toggle-overrides((
+    track-width: var(--pp-switch-width),
+    track-height: var(--pp-switch-height),
+    unselected-handle-size: var(--pp-switch-thumb-size),
+    selected-handle-size: var(--pp-switch-thumb-size),
+    pressed-handle-size: var(--pp-switch-thumb-size),
+    unselected-handle-horizontal-margin: 0 var(--pp-switch-thumb-inset),
+    unselected-pressed-handle-horizontal-margin: 0 var(--pp-switch-thumb-inset),
+    selected-handle-horizontal-margin: 0 calc(var(--pp-switch-width) - var(--pp-switch-thumb-size) - var(--pp-switch-thumb-inset)),
+    selected-pressed-handle-horizontal-margin: 0 calc(var(--pp-switch-width) - var(--pp-switch-thumb-size) - var(--pp-switch-thumb-inset)),
+    selected-track-color: var(--pp-switch-track-on),
+    selected-hover-track-color: var(--pp-switch-track-on),
+    selected-focus-track-color: var(--pp-switch-track-on),
+    selected-pressed-track-color: var(--pp-switch-track-on),
+    unselected-track-color: var(--pp-switch-track-off),
+    unselected-hover-track-color: var(--pp-switch-track-off),
+    unselected-focus-track-color: var(--pp-switch-track-off),
+    unselected-pressed-track-color: var(--pp-switch-track-off),
+    selected-handle-color: var(--pp-switch-thumb-on),
+    selected-hover-handle-color: var(--pp-switch-thumb-on),
+    selected-focus-handle-color: var(--pp-switch-thumb-on),
+    selected-pressed-handle-color: var(--pp-switch-thumb-on),
+    unselected-handle-color: var(--pp-switch-thumb-off),
+    unselected-hover-handle-color: var(--pp-switch-thumb-off),
+    unselected-focus-handle-color: var(--pp-switch-thumb-off),
+    unselected-pressed-handle-color: var(--pp-switch-thumb-off),
+    track-outline-color: var(--pp-switch-border),
+    selected-track-outline-color: var(--pp-switch-track-on),
+  ));
+  @include mat.progress-bar-overrides((
+    active-indicator-color: var(--pp-progress-indicator),
+    track-color: var(--pp-progress-track),
+    active-indicator-height: var(--pp-progress-height),
+    track-height: var(--pp-progress-height),
+    track-shape: var(--pp-progress-radius),
+  ));
+  @include mat.progress-spinner-overrides((
+    active-indicator-color: var(--pp-progress-indicator),
+  ));
+  @include mat.divider-overrides((
+    color: var(--pp-divider-color),
+    width: var(--pp-divider-width),
+  ));
+  @include mat.toolbar-overrides((
+    container-background-color: var(--pp-toolbar-bg),
+    container-text-color: var(--pp-toolbar-fg),
+    standard-height: var(--pp-toolbar-height),
+    mobile-height: var(--pp-toolbar-height),
+    title-text-size: var(--pp-toolbar-title-size),
+  ));
+  @include mat.sidenav-overrides((
+    container-width: var(--pp-nav-width),
+    container-background-color: var(--pp-nav-bg),
+    container-text-color: var(--pp-nav-item-fg),
+    container-divider-color: var(--pp-nav-border),
+    container-shape: var(--pp-nav-radius),
+    content-background-color: var(--pp-nav-content-bg),
+    content-text-color: var(--pp-text),
+    scrim-color: var(--pp-nav-scrim),
+  ));
+  @include mat.list-overrides((
+    active-indicator-color: var(--pp-nav-item-active-bg),
+    active-indicator-shape: var(--pp-nav-item-radius),
+    list-item-one-line-container-height: var(--pp-nav-item-height),
+    list-item-leading-icon-size: var(--pp-nav-icon-size),
+    list-item-label-text-size: var(--pp-nav-item-size),
+    list-item-label-text-color: var(--pp-list-fg),
+    list-item-supporting-text-color: var(--pp-list-supporting-fg),
+    list-item-leading-icon-color: var(--pp-list-icon),
+  ));
+  @include mat.snack-bar-overrides((
+    container-color: var(--pp-toast-bg),
+    supporting-text-color: var(--pp-toast-fg),
+    button-color: var(--pp-toast-action),
+    container-shape: var(--pp-toast-radius),
+  ));
+  @include mat.tooltip-overrides((
+    container-color: var(--pp-tooltip-bg),
+    supporting-text-color: var(--pp-tooltip-fg),
+    container-shape: var(--pp-tooltip-radius),
+  ));
+}
+
+// Variants: the same override mixins, scoped to a Ledger class instead of html.
+// Destructive actions: <button matButton="outlined" class="pp-danger">, <button mat-menu-item class="pp-danger">
+.pp-danger {
+  @include mat.button-overrides((
+    outlined-outline-color: var(--pp-button-danger-border),
+    outlined-label-text-color: var(--pp-button-danger-fg),
+    text-label-text-color: var(--pp-button-danger-fg),
+  ));
+  @include mat.menu-overrides((
+    item-label-text-color: var(--pp-menu-danger-fg),
+    item-icon-color: var(--pp-menu-danger-fg),
+  ));
+}
+// Status chips: <mat-chip class="pp-chip-pending">. A filled status draws its outline in its own fill.
+.pp-chip-draft    { @include mat.chips-overrides((outline-color: var(--pp-chip-draft-border), label-text-color: var(--pp-chip-draft-fg), with-icon-icon-color: var(--pp-chip-draft-fg))); }
+.pp-chip-pending  { @include mat.chips-overrides((outline-color: var(--pp-chip-pending-bg), elevated-container-color: var(--pp-chip-pending-bg), label-text-color: var(--pp-chip-pending-fg), with-icon-icon-color: var(--pp-chip-pending-fg))); }
+.pp-chip-approved { @include mat.chips-overrides((outline-color: var(--pp-chip-approved-bg), elevated-container-color: var(--pp-chip-approved-bg), label-text-color: var(--pp-chip-approved-fg), with-icon-icon-color: var(--pp-chip-approved-fg))); }
+.pp-chip-rejected { @include mat.chips-overrides((outline-color: var(--pp-chip-rejected-bg), elevated-container-color: var(--pp-chip-rejected-bg), label-text-color: var(--pp-chip-rejected-fg), with-icon-icon-color: var(--pp-chip-rejected-fg))); }
+.pp-chip-review   { @include mat.chips-overrides((outline-color: var(--pp-chip-review-fg), elevated-container-color: var(--pp-chip-review-bg), label-text-color: var(--pp-chip-review-fg), with-icon-icon-color: var(--pp-chip-review-fg))); }
+.pp-chip-best     { @include mat.chips-overrides((outline-color: var(--pp-chip-best-bg), elevated-container-color: var(--pp-chip-best-bg), label-text-color: var(--pp-chip-best-fg), with-icon-icon-color: var(--pp-chip-best-fg))); }
+// M3 ignores color="primary|accent|warn": only the old prebuilt M2 theme coloured them. The app
+// still marks destructive controls with color="warn", so .mat-warn draws them as Ledger danger.
+.mat-warn {
+  @include mat.button-overrides((
+    outlined-outline-color: var(--pp-button-danger-border),
+    outlined-label-text-color: var(--pp-button-danger-fg),
+    text-label-text-color: var(--pp-button-danger-fg),
+    filled-container-color: var(--pp-error),
+    filled-label-text-color: var(--pp-on-error),
+  ));
+  @include mat.icon-button-overrides((icon-color: var(--pp-error)));
+  @include mat.checkbox-overrides((
+    selected-icon-color: var(--pp-error),
+    selected-hover-icon-color: var(--pp-error),
+    selected-focus-icon-color: var(--pp-error),
+  ));
+}
+.mat-icon.mat-warn { color: var(--pp-error); }
+// Dialog backdrop: CDK paints it rgba(0,0,0,.32) with no token. Set once:
+// { provide: MAT_DIALOG_DEFAULT_OPTIONS, useValue: { backdropClass: 'pp-dialog-backdrop' } }
+.pp-dialog-backdrop { background: var(--pp-dialog-scrim); }
+// The app does not provide MAT_DIALOG_DEFAULT_OPTIONS: importing the token from
+// @angular/material/dialog pulls the whole dialog module into the initial bundle (+66 kB).
+// Dialogs keep the CDK's public default backdrop class, so the scrim is set on that instead.
+.cdk-overlay-backdrop.cdk-overlay-dark-backdrop { background: var(--pp-dialog-scrim); }
+
+// Rows Material has no state for: the best offer and the selected row. The edge sits at the inline start.
+tr.pp-best > td { background: var(--pp-table-best-bg); }
+tr[aria-selected='true'] > td { background: var(--pp-table-row-selected-bg); }
+tr.pp-best > td:first-child { box-shadow: inset 3px 0 0 var(--pp-table-best-edge); }
+tr[aria-selected='true'] > td:first-child { box-shadow: inset 3px 0 0 var(--pp-table-row-selected-edge); }
+[dir='rtl'] tr.pp-best > td:first-child { box-shadow: inset -3px 0 0 var(--pp-table-best-edge); }
+[dir='rtl'] tr[aria-selected='true'] > td:first-child { box-shadow: inset -3px 0 0 var(--pp-table-row-selected-edge); }
+
+// Footer row of reconciled figures: <tr mat-footer-row class="pp-total">
+tr.pp-total > td { border-block-start: 1px solid var(--pp-table-header-border); color: var(--pp-text-strong); font-weight: var(--pp-weight-strong); }
+
+// Figures and their headers sit at the end of the column
+:is(td, th).pp-end { text-align: end; }
+// Verified totals only: a footer total reconciled with its documents. Never a headline figure.
+.pp-ruled {
+  display: inline-block; padding-block-end: calc(2px + .25em);
+  background:
+    linear-gradient(var(--pp-table-total-rule), var(--pp-table-total-rule)) 0 100% / 100% 1.5px no-repeat,
+    linear-gradient(var(--pp-table-total-rule), var(--pp-table-total-rule)) 0 calc(100% - 4px) / 100% 1.5px no-repeat;
+}
+
+// --------------------------------------------------------------------------
+// App globals
+// --------------------------------------------------------------------------
 
 html, body {
   block-size: 100%;
@@ -331,7 +748,3 @@ mat-icon {
   }
 }
 
-// WCAG 2.1 AA contrast fix: ensure mat-warn button labels meet 4.5:1 on light backgrounds
-button.mat-warn:not(:disabled) {
-  color: var(--mat-sys-error, #dc2626) !important;
-}

@@ -37,7 +37,7 @@
   <mat-hint>{{ 'rfq.guardrails.costCentreHint' | translate }}</mat-hint>
 </mat-form-field>
 </div>
-<mat-slide-toggle [(ngModel)]="enabled">{{ 'rfq.guardrails.enabled' | translate }}</mat-slide-toggle>
+<mat-slide-toggle [(ngModel)]="enabled" hideIcon>{{ 'rfq.guardrails.enabled' | translate }}</mat-slide-toggle>
 <div class="form-actions">@if (editingId()) {
   <button mat-button (click)="cancelEdit()">{{ 'rfq.guardrails.cancel' | translate }}</button>
   }<button mat-flat-button color="primary" [disabled]="saving()" (click)="save()">{{ 'rfq.guardrails.save' | translate }}</button></div>

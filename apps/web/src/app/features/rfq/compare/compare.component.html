@@ -1,8 +1,8 @@
 <div class="page-container">
   <div class="page-header">
     <div class="header-content">
-      <h1 class="mat-headline-4">{{ 'rfq.compare.title' | translate }}</h1>
-      <p class="mat-body-1">{{ 'rfq.compare.subtitle' | translate }}</p>
+      <h1 class="page-title">{{ 'rfq.compare.title' | translate }}</h1>
+      <p class="page-subtitle">{{ 'rfq.compare.subtitle' | translate }}</p>
     </div>
   </div>
 
@@ -39,7 +39,7 @@
   }
 
   @if (responses().length > 0) {
-    <div class="controls-section mat-elevation-z1">
+    <div class="controls-section">
       <mat-form-field appearance="outline">
         <mat-label>{{ 'rfq.compare.branchLabel' | translate }}</mat-label>
         <mat-select
