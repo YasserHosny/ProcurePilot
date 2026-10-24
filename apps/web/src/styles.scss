@@ -1,4 +1,5 @@
 @use "@angular/material" as mat;
+@use "styles/ledger-tokens"; // Ledger design tokens as global custom properties (all three layers)
 
 @include mat.elevation-classes();
 @include mat.app-background();
