@@ -200,8 +200,7 @@
 }
 
 td.date-cell {
-  white-space: nowrap;
-  min-inline-size: 7.5rem;
+  overflow: visible;
 }
 
 .actions-cell {
