@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 /**
- * Guest Landing Page E2E Tests — PPS-35 (P-12).
+ * Guest Landing Page E2E Tests — PPS-35.
  *
  * Requirements:
  * - Unauthenticated "/" displays the landing page (not a redirect to /auth/sign-in)

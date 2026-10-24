@@ -15,7 +15,7 @@ export interface ScreenshotCard {
 }
 
 // Screenshot cards for the product preview gallery.
-// P-13 (PPS-36) fills this array once final UI captures are ready.
+// PPS-36 fills this array once final UI captures are ready.
 export const SCREENSHOT_CARDS: readonly ScreenshotCard[] = [];
 
 @Component({
