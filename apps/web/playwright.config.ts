@@ -1,11 +1,6 @@
 import { defineConfig, devices } from '@playwright/test';
 import { join } from 'node:path';
 
-import landingConfig from './playwright.landing.config';
-
-// Explicit file invocation (including --list) must never enter the general E2E seed/setup.
-const galleryOnly = process.argv.some(argument => argument.endsWith('landing-gallery-screenshots.spec.ts'));
-
 export const authFile = join(__dirname, 'tests', 'e2e', '.auth', 'owner.json');
 
 /**
@@ -20,11 +15,11 @@ export const authFile = join(__dirname, 'tests', 'e2e', '.auth', 'owner.json');
  * `pnpm db:seed`. These specs deliberately do not start it: an E2E suite that boots its own
  * infrastructure tends to test the boot script rather than the product.
  */
-export default galleryOnly ? landingConfig : defineConfig({
+export default defineConfig({
   testDir: './tests/e2e',
   testMatch: '**/*.spec.ts',
   globalSetup: require.resolve('./tests/e2e/global-setup'),
-  testIgnore: ['**/global-setup.ts'],
+  testIgnore: ['**/global-setup.ts', '**/landing-gallery-screenshots.spec.ts'],
   timeout: 60_000,
   expect: { timeout: 10_000 },
   fullyParallel: false,
