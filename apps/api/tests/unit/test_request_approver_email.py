@@ -86,3 +86,35 @@ def test_membership_email_batch_queries_requesters_and_assignees_once() -> None:
         requester_id: "requester@example.test",
         assigned_id: "approver@example.test",
     }
+
+
+def test_membership_email_batch_skips_missing_approval_step() -> None:
+    requester_id = str(uuid4())
+
+    class MembershipClient:
+        def __init__(self) -> None:
+            self.queries = 0
+
+        def table(self, name: str) -> MembershipClient:
+            assert name == "membership"
+            self.queries += 1
+            return self
+
+        def select(self, columns: str) -> MembershipClient:
+            assert columns == "id,email"
+            return self
+
+        def in_(self, column: str, values: list[str]) -> MembershipClient:
+            assert column == "id"
+            assert values == [requester_id]
+            return self
+
+        def execute(self) -> SimpleNamespace:
+            return SimpleNamespace(data=[{"id": requester_id, "email": "requester@example.test"}])
+
+    client = MembershipClient()
+    emails = RequestsService()._fetch_membership_emails_batch(
+        client, [{"requested_by_membership_id": requester_id}], [None]
+    )
+    assert client.queries == 1
+    assert emails == {requester_id: "requester@example.test"}

@@ -427,22 +427,26 @@ class RequestsService:
         )
         auto_prepared = self._fetch_auto_prepared_batch(client, visible)
 
-        items = [
-            self._purchase_request_with_budget_status(
-                client,
-                row,
-                lines_by_request.get(str(row["id"]), []),
-                steps_by_request.get(str(row["id"])),
-                requester_email=membership_emails.get(str(row["requested_by_membership_id"])),
-                assigned_email=membership_emails.get(
-                    str(steps_by_request.get(str(row["id"]), {}).get("assigned_membership_id"))
-                ),
-                requester_lookup=False,
-                auto_prepared=auto_prepared.get(str(row["id"])),
-                auto_prepared_lookup=False,
+        items = []
+        for row in visible:
+            step = steps_by_request.get(str(row["id"]))
+            items.append(
+                self._purchase_request_with_budget_status(
+                    client,
+                    row,
+                    lines_by_request.get(str(row["id"]), []),
+                    step,
+                    requester_email=membership_emails.get(str(row["requested_by_membership_id"])),
+                    assigned_email=(
+                        membership_emails.get(str(step["assigned_membership_id"]))
+                        if step is not None
+                        else None
+                    ),
+                    requester_lookup=False,
+                    auto_prepared=auto_prepared.get(str(row["id"])),
+                    auto_prepared_lookup=False,
+                )
             )
-            for row in visible
-        ]
         return PurchaseRequestList(items=items, next_cursor=next_cursor)
 
     def list_requests_eligible_for_order(
@@ -523,22 +527,26 @@ class RequestsService:
         membership_emails = self._fetch_membership_emails_batch(client, request_rows, visible_steps)
         auto_prepared = self._fetch_auto_prepared_batch(client, request_rows)
 
-        items = [
-            self._purchase_request_with_budget_status(
-                client,
-                row,
-                lines_by_request.get(str(row["id"]), []),
-                steps_by_request.get(str(row["id"])),
-                requester_email=membership_emails.get(str(row["requested_by_membership_id"])),
-                assigned_email=membership_emails.get(
-                    str(steps_by_request.get(str(row["id"]), {}).get("assigned_membership_id"))
-                ),
-                requester_lookup=False,
-                auto_prepared=auto_prepared.get(str(row["id"])),
-                auto_prepared_lookup=False,
+        items = []
+        for row in request_rows:
+            step = steps_by_request.get(str(row["id"]))
+            items.append(
+                self._purchase_request_with_budget_status(
+                    client,
+                    row,
+                    lines_by_request.get(str(row["id"]), []),
+                    step,
+                    requester_email=membership_emails.get(str(row["requested_by_membership_id"])),
+                    assigned_email=(
+                        membership_emails.get(str(step["assigned_membership_id"]))
+                        if step is not None
+                        else None
+                    ),
+                    requester_lookup=False,
+                    auto_prepared=auto_prepared.get(str(row["id"])),
+                    auto_prepared_lookup=False,
+                )
             )
-            for row in request_rows
-        ]
         return PurchaseRequestList(items=items, next_cursor=next_cursor)
 
     def create_low_stock_report(
@@ -2186,10 +2194,12 @@ class RequestsService:
         self,
         client: Client,
         request_rows: list[dict[str, object]],
-        step_rows: list[dict[str, object]],
+        step_rows: list[dict[str, object] | None],
     ) -> dict[str, str]:
         membership_ids = {str(row["requested_by_membership_id"]) for row in request_rows}
-        membership_ids.update(str(row["assigned_membership_id"]) for row in step_rows)
+        membership_ids.update(
+            str(row["assigned_membership_id"]) for row in step_rows if row is not None
+        )
         if not membership_ids:
             return {}
         try:

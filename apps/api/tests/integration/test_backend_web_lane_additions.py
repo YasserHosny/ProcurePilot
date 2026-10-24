@@ -53,6 +53,47 @@ def _add_branch(cur: object, workspace: object, name: str) -> UUID:
     return branch_id
 
 
+def test_list_requests_includes_draft_without_step_and_submitted_assignee_email(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    with committed_smart_context("web-draft-assignee", supplier_count=1) as context:
+        draft_id, submitted_id = uuid4(), uuid4()
+        with pytest.importorskip("psycopg").connect(TEST_DATABASE_URL) as conn:
+            with conn.cursor() as cur:
+                branch_id = _add_branch(cur, context.workspace, "Draft and submitted branch")
+                act_as(cur, context.workspace)
+                for request_id, status in [(draft_id, "draft"), (submitted_id, "submitted")]:
+                    cur.execute(
+                        "insert into purchase_request "
+                        "(id,tenant_id,branch_id,requested_by_membership_id,"
+                        "required_by_date,status) "
+                        "values (%s,%s,%s,%s,'2026-10-10',%s)",
+                        (
+                            request_id,
+                            context.workspace.tenant_id,
+                            branch_id,
+                            context.workspace.membership_id,
+                            status,
+                        ),
+                    )
+                cur.execute(
+                    "insert into approval_step "
+                    "(tenant_id,purchase_request_id,assigned_membership_id,source,status) "
+                    "values (%s,%s,%s,'owner_fallback','pending')",
+                    (context.workspace.tenant_id, submitted_id, context.workspace.membership_id),
+                )
+            client = PsycopgSupabaseClient(conn, claims=context.workspace.claims())
+            monkeypatch.setattr(requests_module, "authenticated_client", lambda *_: client)
+            service = requests_module.RequestsService(settings_for_test_db(monkeypatch))
+            result = service.list_requests(bearer_token="test-token")
+            by_id = {item.id: item for item in result.items}
+            assert set(by_id) == {draft_id, submitted_id}
+            assert by_id[draft_id].approval_step is None
+            step = by_id[submitted_id].approval_step
+            assert step is not None
+            assert step.assigned_email == context.workspace.label + "-owner@example.test"
+
+
 def test_approval_queue_includes_requester_email_and_branch_budget_reasons(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
