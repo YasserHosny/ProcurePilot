@@ -3984,31 +3984,91 @@
   },
   "landing": {
     "header": {
+      "byIronSystems": "By Iron Systems ↗",
+      "productScreens": "Product screens",
       "signIn": "Sign in"
     },
     "hero": {
-      "headline": "Every number traces back to the quote it came from.",
-      "lede": "ProcurePilot turns fragmented supplier quotes into clear, comparable purchasing decisions with proven savings — keeping you in full control.",
-      "signIn": "Sign in",
-      "requestAccess": "Request pilot access"
+      "audience": "Procurement clarity for restaurants and multi-branch teams",
+      "headline": "Compare supplier quotes. Keep purchasing under control.",
+      "lede": "ProcurePilot brings supplier quotations into one workflow: review extracted details, compare pack sizes and recorded costs, route purchase requests for approval, and trace savings to their evidence.",
+      "requestAccess": "Request pilot access",
+      "exploreScreens": "Explore product screens",
+      "note": "Invitation-only pilot in Egypt. Automation prepares and routes; a person authorises every purchase.",
+      "previewAlt": "Demonstration screen: Compare supplier offers for the quantity you need, with pack conversion, landed cost and recommendation evidence."
     },
-    "howItWorks": {
-      "title": "How it works",
-      "subtitle": "From messy supplier quotes to verified savings in three steps.",
-      "step1Title": "1. Quotes arrive",
-      "step1Description": "Supplier quotations arrive via email, PDF uploads, or mobile photos from the branch.",
-      "step2Title": "2. Clear comparison",
-      "step2Description": "Every price is extracted and normalised into comparable lines, tracing back to its original document.",
-      "step3Title": "3. Human authorisation",
-      "step3Description": "A person reviews and authorises the purchase, and every saving is proven on the ledger."
+    "buyerFit": {
+      "title": "For teams buying regularly from several suppliers",
+      "subtitle": "For restaurants and businesses managing recurring purchases across branches.",
+      "item1Title": "Scattered quotations:",
+      "item1Description": "Bring emailed quotations and uploaded documents into a review workflow.",
+      "item2Title": "Different pack sizes:",
+      "item2Description": "Compare offers on a consistent unit basis, using the costs recorded in each quotation.",
+      "item3Title": "Decisions to follow up:",
+      "item3Description": "Keep requests, approvals and purchase outcomes available for review."
+    },
+    "workflow": {
+      "title": "From supplier quotation to a documented purchasing outcome",
+      "step1Title": "1. Collect and review.",
+      "step1Description": "Forward quotations by email or upload PDFs and photos. Check extracted fields against the source.",
+      "step2Title": "2. Compare and plan.",
+      "step2Description": "Compare pack sizes and landed costs. Explore basket allocation using the recorded supplier terms.",
+      "step3Title": "3. Route for approval.",
+      "step3Description": "Send purchase requests to the responsible approver with branch, line-item and budget context where available.",
+      "step4Title": "4. Record and verify.",
+      "step4Description": "Record the purchase outcome, inspect the baseline and calculation, and verify the saving before it counts toward verified totals."
     },
     "gallery": {
-      "title": "See ProcurePilot in action",
-      "subtitle": "Explore the interface designed for clarity and confidence.",
-      "close": "Close preview"
+      "title": "See the purchasing workflow on screen",
+      "subtitle": "Explore five screens from the real application. Names, quotations and amounts shown are synthetic demonstration data—not customer results.",
+      "demonstrationNote": "Demonstration data",
+      "enlarge": "Enlarge screenshot",
+      "close": "Close preview",
+      "altPrefix": "Demonstration screen: ",
+      "tabQuotationReview": "Quotation review",
+      "captionQuotationReview": "Check extracted details beside the source document and resolve fields that need attention.",
+      "tabSmartCompare": "Smart Compare",
+      "captionSmartCompare": "Compare supplier offers for the quantity you need, with pack conversion, landed cost and recommendation evidence.",
+      "tabBasketSplit": "Basket split",
+      "captionBasketSplit": "Review how items are allocated across selected suppliers under the recorded commercial terms.",
+      "tabApprovalQueue": "Approval queue",
+      "captionApprovalQueue": "Review pending purchase requests and their available branch, pricing and budget details before deciding.",
+      "tabSavingsLedger": "Savings ledger",
+      "captionSavingsLedger": "Separate pending and verified outcomes, and inspect the baseline and evidence behind a saving."
+    },
+    "evidence": {
+      "title": "Review the evidence behind the figure",
+      "description": "Check source documents and extraction confidence. Compare consistent units with an explicit currency. Inspect the baseline and recorded purchase outcome before verifying a saving.",
+      "callout1": "Calculated saving is not yet verified saving.",
+      "callout2": "Automation supports the decision; an authorised person approves the purchase."
+    },
+    "ironSystems": {
+      "eyebrow": "Intelligence, Engineered.",
+      "title": "Built by Iron Systems",
+      "description": "Iron Systems is an engineering-first software house working across AI solutions, custom software, automation and system integration. ProcurePilot brings that engineering focus to supplier comparison and purchasing workflows.",
+      "link": "Meet Iron Systems — iron-sys.com ↗"
+    },
+    "pilot": {
+      "title": "Discuss a pilot for your purchasing team",
+      "subtitle": "Tell us about your branches, suppliers and current purchasing process. Pilot access is by invitation and is free during the agreed pilot period.",
+      "cta": "Request pilot access",
+      "instructionsPrefix": "Email",
+      "instructionsSuffix": "with your business name, number of branches and how you receive supplier quotations.",
+      "emailSubject": "ProcurePilot pilot access request",
+      "emailBody": "Business name:\nNumber of branches:\nHow quotations arrive:",
+      "q1": "How do we join?",
+      "a1": "Contact us to discuss suitability and onboarding. Creating a workspace requires an invitation.",
+      "q2": "Can we use quotations received on WhatsApp?",
+      "a2": "Upload the quotation document or image, or forward it by email. There is no direct WhatsApp integration.",
+      "q3": "Does ProcurePilot purchase automatically?",
+      "a3": "No. Automation prepares and routes; a person authorises every purchase.",
+      "q4": "What does the pilot cost?",
+      "a4": "Use is free during the agreed pilot period."
     },
     "footer": {
-      "contactSupport": "Contact support",
+      "builtBy": "Built by Iron Systems",
+      "contactSupportPrefix": "Contact: ",
+      "signIn": "Sign in",
       "copyright": "© 2026 ProcurePilot. All rights reserved."
     }
   }

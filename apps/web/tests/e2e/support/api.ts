@@ -14,7 +14,11 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-const API = process.env['E2E_API_URL'] ?? 'http://localhost:8000/api/v1';
+const API = process.env['E2E_API_URL'] ?? (
+  process.env['CAPTURE_LANDING_GALLERY'] === '1'
+    ? 'https://procurepilot-api.iron-sys.com/api/v1'
+    : 'http://localhost:8000/api/v1'
+);
 
 export interface Credentials {
   ownerEmail: string;
@@ -213,8 +217,8 @@ export async function createPendingInvitation(
  * signed in already in Arabic and failed its "starts in English" assertion. Each test normalises
  * the state it depends on instead of assuming it.
  */
-export async function setOwnerLocale(locale: 'en' | 'ar'): Promise<void> {
-  const token = await signInOwner();
+export async function setOwnerLocale(locale: 'en' | 'ar', ownerToken?: string): Promise<void> {
+  const token = ownerToken ?? await signInOwner();
   await call('/me', {
     method: 'PATCH',
     headers: { Authorization: `Bearer ${token}` },

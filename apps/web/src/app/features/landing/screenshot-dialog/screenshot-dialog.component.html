@@ -1,0 +1,23 @@
+<div class="screenshot-dialog" role="dialog" [attr.aria-label]="data.caption">
+  <div class="dialog-header">
+    <p class="dialog-caption">{{ data.caption }}</p>
+    <button
+      mat-icon-button
+      type="button"
+      class="dialog-close-btn"
+      (click)="dialogRef.close()"
+      [attr.aria-label]="'landing.gallery.close' | translate"
+    >
+      <mat-icon aria-hidden="true">close</mat-icon>
+    </button>
+  </div>
+  <div class="dialog-body">
+    <img
+      [src]="data.src"
+      [alt]="data.alt"
+      width="1440"
+      height="900"
+      class="dialog-image"
+    />
+  </div>
+</div>
