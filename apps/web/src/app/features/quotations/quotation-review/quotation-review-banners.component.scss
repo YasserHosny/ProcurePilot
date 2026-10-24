@@ -14,7 +14,7 @@
   background: var(--pp-error-container);
   border: 1px solid var(--pp-error);
   color: var(--pp-error);
-  word-break: break-all;
+  overflow-wrap: anywhere;
   .error-icon { color: var(--pp-error); }
   .error-content { display: flex; flex-direction: column; }
   .error-text { font-weight: 500; }

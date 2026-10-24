@@ -199,7 +199,7 @@
     font-weight: 500;
     font-size: 0.875rem;
     color: var(--pp-text-strong);
-    word-break: break-all;
+    overflow-wrap: anywhere;
   }
 
   .sender-domain {

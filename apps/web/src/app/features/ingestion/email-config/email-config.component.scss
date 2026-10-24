@@ -235,7 +235,7 @@
   font-size: 0.875rem;
   color: var(--pp-text-strong);
   user-select: all;
-  word-break: break-all;
+  overflow-wrap: anywhere;
 }
 
 .copy-btn {

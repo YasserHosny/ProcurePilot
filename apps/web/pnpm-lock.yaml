@@ -50,9 +50,6 @@ importers:
       '@supabase/supabase-js':
         specifier: ^2.105
         version: 2.118.0
-      material-icons:
-        specifier: ^1.13
-        version: 1.13.14
       rxjs:
         specifier: ~7.8.0
         version: 7.8.2
@@ -2427,9 +2424,6 @@ packages:
   make-dir@4.0.0:
     resolution: {integrity: sha512-hXdUTZYIVOt1Ex//jAQi+wTZZpUpwBj/0QsOzqegb3rGMMeJiSEu5xLHnYfBrRV4RH2+OCSOO95Is/7x1WJ4bw==}
     engines: {node: '>=10'}
-
-  material-icons@1.13.14:
-    resolution: {integrity: sha512-kZOfc7xCC0rAT8Q3DQixYAeT+tBqZnxkseQtp2bxBxz7q5pMAC+wmit7vJn1g/l7wRU+HEPq23gER4iPjGs5Cg==}
 
   math-intrinsics@1.1.0:
     resolution: {integrity: sha512-/IXtbwEk5HTPyEwyKX6hGkYXxM9nbj64B+ilVJnC/R6B0pH5G4V3b0pVbL7DBj4tkhBAppbQUlf6F6Xl9LHu1g==}
@@ -5464,8 +5458,6 @@ snapshots:
   make-dir@4.0.0:
     dependencies:
       semver: 7.8.5
-
-  material-icons@1.13.14: {}
 
   math-intrinsics@1.1.0: {}
 
