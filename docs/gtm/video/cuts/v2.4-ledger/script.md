@@ -2,7 +2,7 @@
 
 Status 2026-10-24: **approved by the owner; round 6 (Arabic UI) recorded** ([record](../../../demo-tenant/round-6/README.md)): compare 12,600 vs 12,800, saving EGP 300, ledger EGP 1,560. Round 7 (English UI) recorded the same evening ([record](../../../demo-tenant/round-7/README.md)): compare 12,480 vs 12,680, saving EGP 200, ledger EGP 1,760.
 
-Revision 2026-10-25 (PPS-59), **draft for the owner's approval**: copy only, footage unchanged. The owner found
+Revision 2026-10-25 (PPS-59), **approved by the owner 2026-10-25**; not yet rendered: copy only, footage unchanged. The owner found
 that the cut jumped from the viewer's pain (beat 0) to the result (beat 1) without saying that the
 product, and each feature after it, answers that pain. Codex agreed and reviewed the rest of the copy.
 Changes:
