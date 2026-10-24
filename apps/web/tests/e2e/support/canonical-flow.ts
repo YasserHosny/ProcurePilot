@@ -79,8 +79,63 @@ export async function selectReviewSupplier(page: Page, supplierName: string): Pr
   await page.locator('mat-option', { hasText: supplierName }).click();
 }
 
+/**
+ * Waits for Chrome's built-in PDF viewer inside the source-document preview iframe to settle
+ * before typing into review fields (PPS-57).
+ *
+ * If iframe.pdf-preview-frame appears, waits up to 10 s for the iframe to finish loading
+ * (marked by data-preview-loaded="true"). Then waits a further 800 ms settle period or until
+ * document.activeElement is the iframe, whichever is first, using the browser's performance.now()
+ * clock. Best-effort: never fails the test from this helper.
+ */
+export async function waitForPreviewToSettle(page: Page): Promise<void> {
+  const iframe = page.locator('iframe.pdf-preview-frame');
+  const isAttached =
+    (await iframe.count()) > 0 ||
+    (await iframe
+      .waitFor({ state: 'attached', timeout: 1000 })
+      .then(
+        () => true,
+        () => false,
+      ));
+
+  if (!isAttached) {
+    return;
+  }
+
+  const loadedIframe = page.locator('iframe.pdf-preview-frame[data-preview-loaded="true"]');
+  const isLoaded = await loadedIframe
+    .waitFor({ state: 'attached', timeout: 10000 })
+    .then(
+      () => true,
+      () => false,
+    );
+
+  if (!isLoaded) {
+    return;
+  }
+
+  const start = await page.evaluate(() => performance.now());
+  await page
+    .waitForFunction(
+      (startTime) => {
+        const frame = document.querySelector('iframe.pdf-preview-frame');
+        if (!frame) return true;
+        const isFocused = document.activeElement === frame;
+        const elapsed = performance.now() - startTime;
+        return isFocused || elapsed >= 800;
+      },
+      start,
+      { timeout: 2000 },
+    )
+    .catch(() => {
+      // Best-effort settle wait; never fail the test from this helper
+    });
+}
+
 /** Corrects Stated Total to the computed line total, reconciling the deterministic mismatch. */
 export async function correctStatedTotal(page: Page): Promise<void> {
+  await waitForPreviewToSettle(page);
   const input = page
     .locator('.field-box', { hasText: 'Stated Total Amount' })
     .locator('input');

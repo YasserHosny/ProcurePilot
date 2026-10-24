@@ -53,6 +53,8 @@
             class="pdf-preview-frame"
             [src]="safePreviewUrl"
             title="Source document preview"
+            [attr.data-preview-loaded]="previewLoaded ? 'true' : null"
+            (load)="onPreviewLoad()"
           ></iframe>
         } @else {
           <div class="doc-preview-loading">
