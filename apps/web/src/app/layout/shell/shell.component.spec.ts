@@ -1,7 +1,7 @@
-import { signal } from '@angular/core';
+import { Component, signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
-import { provideRouter } from '@angular/router';
+import { Router, provideRouter } from '@angular/router';
 import { TranslateService, provideTranslateService } from '@ngx-translate/core';
 import { of } from 'rxjs';
 
@@ -10,21 +10,32 @@ import { SessionService } from '../../core/auth/session.service';
 import { I18nService } from '../../core/i18n';
 import { ShellComponent } from './shell.component';
 
+@Component({
+  standalone: true,
+  template: '',
+})
+class DummyRouteComponent {}
+
 describe('ShellComponent account menu', () => {
   let fixture: ComponentFixture<ShellComponent>;
   const tenant = signal<{ name: string } | null>(null);
+  const userRole = signal('buyer');
 
   beforeEach(async () => {
     tenant.set(null);
+    userRole.set('buyer');
+    localStorage.removeItem('pp.sidebar.collapsed');
+
     const session = {
       currentMember: signal({ email: 'buyer@example.test', role: 'buyer' }),
       tenant,
-      role: signal('buyer'),
+      role: userRole,
       workspaces: () => of({ items: [] }),
       logout: jasmine.createSpy('logout'),
     };
     const i18n = {
       currentLocale: signal('en'),
+      isRtl: signal(false),
       setLocale: () => of(undefined),
     };
 
@@ -33,7 +44,7 @@ describe('ShellComponent account menu', () => {
       providers: [
         provideTranslateService(),
         provideNoopAnimations(),
-        provideRouter([]),
+        provideRouter([{ path: '**', component: DummyRouteComponent }]),
         { provide: SessionService, useValue: session },
         { provide: I18nService, useValue: i18n },
       ],
@@ -45,6 +56,10 @@ describe('ShellComponent account menu', () => {
 
     fixture = TestBed.createComponent(ShellComponent);
     fixture.detectChanges();
+  });
+
+  afterEach(() => {
+    localStorage.removeItem('pp.sidebar.collapsed');
   });
 
   it('offers a Contact support item that emails the support address', async () => {
@@ -92,6 +107,243 @@ describe('ShellComponent account menu', () => {
       const visible = query('.workspace-name').textContent!.trim();
 
       expect(button.getAttribute('aria-label')).toBe(visible);
+    });
+  });
+
+  describe('sidebar collapsible groups (Jira PPS-42)', () => {
+    it('renders the 5 group labels in order, with their links in order', () => {
+      userRole.set('owner');
+      fixture.detectChanges();
+
+      const root = fixture.nativeElement as HTMLElement;
+      const groupButtons = Array.from(
+        root.querySelectorAll<HTMLButtonElement>('.nav-group-toggle'),
+      );
+      expect(groupButtons.length).toBe(5);
+
+      const expectedGroups = [
+        {
+          id: 'sourcing',
+          label: 'Sourcing',
+          routes: [
+            '/quotations',
+            '/matching',
+            '/rfq/history',
+            '/offers/compare',
+            '/offers/basket-split',
+          ],
+        },
+        {
+          id: 'purchasing',
+          label: 'Purchasing',
+          routes: ['/requests', '/approvals', '/orders'],
+        },
+        {
+          id: 'catalogue',
+          label: 'Catalogue',
+          routes: ['/products', '/suppliers', '/supplier-risk', '/import'],
+        },
+        {
+          id: 'insight',
+          label: 'Insight',
+          routes: [
+            '/savings',
+            '/reports',
+            '/forecasting',
+            '/alerts',
+            '/analyst',
+            '/analyst/history',
+          ],
+        },
+        {
+          id: 'setup',
+          label: 'Setup',
+          routes: ['/team', '/settings', '/ingestion', '/accounting', '/pos'],
+        },
+      ];
+
+      expectedGroups.forEach((expected, groupIndex) => {
+        const btn = groupButtons[groupIndex];
+        expect(btn.textContent).toContain(expected.label);
+
+        const itemsContainer = root.querySelector<HTMLElement>(
+          `#nav-group-${expected.id}`,
+        )!;
+        const links = Array.from(
+          itemsContainer.querySelectorAll<HTMLAnchorElement>('.nav-item'),
+        );
+        const linkRoutes = links.map(
+          (l) => l.getAttribute('href') || l.getAttribute('ng-reflect-router-link'),
+        );
+
+        expect(linkRoutes.length).toBe(expected.routes.length);
+        expected.routes.forEach((route, itemIndex) => {
+          expect(linkRoutes[itemIndex]).toBe(route);
+        });
+      });
+    });
+
+    it('toggling a group sets aria-expanded=false and hides its links; toggling again restores them', () => {
+      const root = fixture.nativeElement as HTMLElement;
+      const sourcingBtn = root.querySelector<HTMLButtonElement>(
+        '#nav-group-header-sourcing',
+      )!;
+      const sourcingItems = root.querySelector<HTMLElement>(
+        '#nav-group-sourcing',
+      )!;
+
+      expect(sourcingBtn.getAttribute('aria-expanded')).toBe('true');
+      expect(sourcingItems.hidden).toBeFalse();
+
+      // Toggle to collapse
+      sourcingBtn.click();
+      fixture.detectChanges();
+
+      expect(sourcingBtn.getAttribute('aria-expanded')).toBe('false');
+      expect(sourcingItems.hidden).toBeTrue();
+
+      // Toggle again to expand
+      sourcingBtn.click();
+      fixture.detectChanges();
+
+      expect(sourcingBtn.getAttribute('aria-expanded')).toBe('true');
+      expect(sourcingItems.hidden).toBeFalse();
+    });
+
+    it('the group containing the active route stays expanded', async () => {
+      const router = TestBed.inject(Router);
+      await router.navigateByUrl('/requests');
+      fixture.detectChanges();
+
+      const root = fixture.nativeElement as HTMLElement;
+      const purchasingBtn = root.querySelector<HTMLButtonElement>(
+        '#nav-group-header-purchasing',
+      )!;
+      const purchasingItems = root.querySelector<HTMLElement>(
+        '#nav-group-purchasing',
+      )!;
+
+      expect(purchasingBtn.getAttribute('aria-expanded')).toBe('true');
+      expect(purchasingItems.hidden).toBeFalse();
+      expect(purchasingBtn.disabled).toBeTrue();
+
+      // Click to toggle: should stay expanded and cannot hide active route
+      purchasingBtn.click();
+      fixture.detectChanges();
+
+      expect(purchasingBtn.getAttribute('aria-expanded')).toBe('true');
+      expect(purchasingItems.hidden).toBeFalse();
+
+      // Collapse another group (sourcing)
+      const sourcingBtn = root.querySelector<HTMLButtonElement>(
+        '#nav-group-header-sourcing',
+      )!;
+      const sourcingItems = root.querySelector<HTMLElement>(
+        '#nav-group-sourcing',
+      )!;
+
+      sourcingBtn.click();
+      fixture.detectChanges();
+      expect(sourcingBtn.getAttribute('aria-expanded')).toBe('false');
+      expect(sourcingItems.hidden).toBeTrue();
+
+      // Navigating into the collapsed group opens it
+      await router.navigateByUrl('/quotations');
+      fixture.detectChanges();
+
+      expect(sourcingBtn.getAttribute('aria-expanded')).toBe('true');
+      expect(sourcingItems.hidden).toBeFalse();
+    });
+
+    it('expands owning group and disables toggle on child routes like /analyst/:id and /rfq/compare/:id', async () => {
+      const router = TestBed.inject(Router);
+      localStorage.setItem('pp.sidebar.collapsed', JSON.stringify(['insight', 'sourcing']));
+
+      const testFixture = TestBed.createComponent(ShellComponent);
+      testFixture.detectChanges();
+      const testRoot = testFixture.nativeElement as HTMLElement;
+
+      const insightBtn = testRoot.querySelector<HTMLButtonElement>('#nav-group-header-insight')!;
+      const sourcingBtn = testRoot.querySelector<HTMLButtonElement>('#nav-group-header-sourcing')!;
+
+      // Initially both start collapsed from localStorage
+      expect(insightBtn.getAttribute('aria-expanded')).toBe('false');
+      expect(sourcingBtn.getAttribute('aria-expanded')).toBe('false');
+
+      // Navigate to /analyst/abc (child route of analyst)
+      await router.navigateByUrl('/analyst/abc');
+      testFixture.detectChanges();
+
+      expect(insightBtn.getAttribute('aria-expanded')).toBe('true');
+      expect(insightBtn.disabled).toBeTrue();
+
+      // Navigate to /rfq/compare/123 (child route of rfq)
+      await router.navigateByUrl('/rfq/compare/123');
+      testFixture.detectChanges();
+
+      expect(sourcingBtn.getAttribute('aria-expanded')).toBe('true');
+      expect(sourcingBtn.disabled).toBeTrue();
+
+      testFixture.destroy();
+    });
+
+    it('gives nav-group-items role="group" and points aria-labelledby at the visible group-title text', () => {
+      const root = fixture.nativeElement as HTMLElement;
+      const expectedGroups = [
+        { id: 'sourcing', label: 'Sourcing' },
+        { id: 'purchasing', label: 'Purchasing' },
+        { id: 'catalogue', label: 'Catalogue' },
+        { id: 'insight', label: 'Insight' },
+        { id: 'setup', label: 'Setup' },
+      ];
+
+      expectedGroups.forEach((expected) => {
+        const itemsContainer = root.querySelector<HTMLElement>(`#nav-group-${expected.id}`)!;
+        expect(itemsContainer.getAttribute('role')).toBe('group');
+
+        const labelledById = itemsContainer.getAttribute('aria-labelledby');
+        expect(labelledById).not.toBeNull();
+        const labelEl = root.querySelector<HTMLElement>(`#${labelledById}`);
+        expect(labelEl).not.toBeNull();
+        expect(labelEl!.textContent?.trim()).toBe(expected.label);
+      });
+    });
+
+    it('collapsed state persists via localStorage, and the component still renders when localStorage throws', () => {
+      const root = fixture.nativeElement as HTMLElement;
+      // Test persistence
+      const sourcingBtn = root.querySelector<HTMLButtonElement>(
+        '#nav-group-header-sourcing',
+      )!;
+      sourcingBtn.click();
+      fixture.detectChanges();
+
+      const raw = localStorage.getItem('pp.sidebar.collapsed');
+      expect(raw).not.toBeNull();
+      expect(raw).toContain('sourcing');
+
+      // Next component instance restores collapsed state
+      const reloadedFixture = TestBed.createComponent(ShellComponent);
+      reloadedFixture.detectChanges();
+      const reloadedRoot = reloadedFixture.nativeElement as HTMLElement;
+      const reloadedSourcingBtn = reloadedRoot.querySelector<HTMLButtonElement>(
+        '#nav-group-header-sourcing',
+      )!;
+      expect(reloadedSourcingBtn.getAttribute('aria-expanded')).toBe('false');
+      reloadedFixture.destroy();
+
+      // Test resilience when storage throws
+      spyOn(Storage.prototype, 'getItem').and.throwError(new Error('Storage access denied'));
+      spyOn(Storage.prototype, 'setItem').and.throwError(new Error('Storage quota exceeded'));
+
+      expect(() => {
+        const errorFixture = TestBed.createComponent(ShellComponent);
+        errorFixture.detectChanges();
+        const errorRoot = errorFixture.nativeElement as HTMLElement;
+        const titles = errorRoot.querySelectorAll('.nav-section-title');
+        expect(titles.length).toBe(5);
+        errorFixture.destroy();
+      }).not.toThrow();
     });
   });
 });
