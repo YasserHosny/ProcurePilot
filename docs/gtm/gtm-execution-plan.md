@@ -25,11 +25,12 @@ set up, what is next, who does it, and what blocks what.
 |---|---|
 | Site | `https://yasser-hosny.atlassian.net` |
 | cloudId | `125b7789-fa8b-449d-b2de-ef10f5400fd4` |
-| Products | Jira (**business tier only** — no Jira Software: no Epic, no Bug, no sprints, no GitHub dev panel), Jira Product Discovery, Confluence, Loom |
-| Space `PP` | ProcurePilot — non-code work + demo/pilot gaps |
+| Products | Jira (free plan; since Atlassian merged Jira Software into Jira, it includes Scrum spaces with sprints, Epic and Bug), Jira Product Discovery, Confluence, Loom |
+| Space `PPS` | ProcurePilot Delivery — company-managed Scrum space, board 1; all delivery work (GTM, ops, demo/pilot gaps) since 2026-10-24 |
+| Space `PP` | ProcurePilot — retired 2026-10-24, empty; its 29 issues moved to `PPS` (old `PP-n` links redirect) |
 | Space `SP` | Sales Pipeline — one Lead per prospect company |
 | Space `MDP` | JPD sample data (MDP-1..6) — in the Jira trash; **ignore** |
-| Members | Dr. Yasser Hosny (owner); Omar Medhat (mr.omarmedhat@gmail.com) invited 2026-10-14 — JPD "User (creator)", Goals/Projects/Studio user, not admin; free plan gives every member access to PP and SP |
+| Members | Dr. Yasser Hosny (owner); Omar Medhat (mr.omarmedhat@gmail.com) invited 2026-10-14 — JPD "User (creator)", Goals/Projects/Studio user, not admin; free plan gives every member access to PPS and SP |
 
 **Tool capabilities:**
 
@@ -43,12 +44,12 @@ set up, what is next, who does it, and what blocks what.
 
 - **Code** → Speckit (`spec.md` → `plan.md` → `tasks.md`) → delegation lanes → PR → CI → merge.
   Never duplicated into Jira.
-- **GTM / ops** → Jira `PP`. Done = sent / published / held / signed (not "drafted").
+- **GTM / ops** → Jira `PPS`. Done = sent / published / held / signed (not "drafted").
   Drafting (scripts, one-pager copy, agreements) can be done directly by the orchestrator — no
   code lane needed.
-- **Bridge (one-way)**: demo/pilot gap → `PP` task labelled `from-demo` / `from-pilot` → if it
-  needs code, a Speckit spec → the `PP` task links to the PR.
-- **Sales conversations** → `SP` only, never `PP`.
+- **Bridge (one-way)**: demo/pilot gap → `PPS` task labelled `from-demo` / `from-pilot` → if it
+  needs code, a Speckit spec → the `PPS` task links to the PR.
+- **Sales conversations** → `SP` only, never `PPS`.
 
 ### Repo / delegation rules that bite (from user memory; details in `CLAUDE.md` + memory)
 
@@ -79,7 +80,7 @@ set up, what is next, who does it, and what blocks what.
 |---|---|
 | `docs/gtm/first-customer-gtm-plan.md` | Revised and approved 2026-10-14; committed with this file (G-0). Other untracked files under `docs/` are unrelated — don't sweep them into commits. |
 
-### Space `PP` — ProcurePilot
+### Space `PP` — ProcurePilot (retired 2026-10-24, see `PPS`)
 
 | Setting | Value | State |
 |---|---|---|
@@ -88,24 +89,29 @@ set up, what is next, who does it, and what blocks what.
 | Labels in use | `from-demo` (product gaps), `gtm`, `ops`; `from-pilot` reserved | In use |
 | Issues | 13 tasks created 2026-10-14 (J-5) — mapping below | Done |
 
-**Plan ID → Jira key** (summaries are prefixed with the plan ID, e.g. `[G-2] …`):
+**Plan ID → Jira key** (summaries are prefixed with the plan ID, e.g. `[G-2] …`). Keys are `PPS`
+since the 2026-10-24 move; the old `PP` key is in brackets.
 
 | Plan ID | Key | Plan ID | Key | Plan ID | Key |
 |---|---|---|---|---|---|
-| P-1 (C1) | PP-1 | G-1 | PP-5 | G-6 | PP-10 |
-| P-2 (C3) | PP-2 | G-2 | PP-6 | G-7 | PP-11 |
-| P-3 (C2) | PP-3 | G-3 | PP-7 | G-8 | PP-12 |
-| E-1 | PP-4 | G-4 | PP-8 | G-9 | PP-13 |
-| P-4 | PP-14 | G-5 | PP-9 | G-10 | PP-17 |
-| P-5 | PP-15 | P-6 | PP-16 | P-7 | PP-18 |
-| G-11 | PP-19 | G-12 | PP-20 | | |
+| P-1 (C1) | PPS-9 (PP-1) | G-1 | PPS-24 (PP-5) | G-7 | PPS-20 (PP-11) |
+| P-2 (C3) | PPS-5 (PP-2) | G-2 | PPS-26 (PP-6) | G-8 | PPS-21 (PP-12) |
+| P-3 (C2) | PPS-6 (PP-3) | G-3 | PPS-16 (PP-7) | G-9 | PPS-19 (PP-13) |
+| P-4 | PPS-12 (PP-14) | G-4 | PPS-18 (PP-8) | G-10 | PPS-11 (PP-17) |
+| P-5 | PPS-13 (PP-15) | G-5 | PPS-14 (PP-9) | G-11 | PPS-4 (PP-19) |
+| P-6 | PPS-10 (PP-16) | G-6 | PPS-15 (PP-10) | G-12 | PPS-1 (PP-20) |
+| P-7 | PPS-3 (PP-18) | E-1 | PPS-29 (PP-4) | | |
+| P-8 | PPS-25 (PP-28) | P-9 | PPS-17 (PP-29) | J-7 | PPS-30 |
+
+Without a plan ID: PPS-2 (PP-21), PPS-7 (PP-22), PPS-8 (PP-23), PPS-22 (PP-24), PPS-27 (PP-25),
+PPS-28 (PP-26), PPS-23 (PP-27) — architecture diagrams and two shipped code changes, all Done.
 
 PP-14..PP-18 were added 2026-10-22 to track work done since 2026-10-15 that had no Jira task. PP-19 (G-11, company website on iron-sys.com, `docs/gtm/website/`) was added the same day. PP-20 (G-12, WhatsApp pilot-invite cards + video, `docs/gtm/whatsapp-card/`) was added the same day.
 
-**Progress convention:** the PP workflow has only To Do and Done. Until the owner adds
-In Progress / Waiting on User / In Review columns (board settings; the connector cannot), work
-in flight carries the `in-progress` label, and each update is a dated **Progress** comment saying
-what is done and what is left. Dependencies are Jira *Blocks* links matching §4.
+**Progress convention:** status is the board column — To Do → In Progress → In Review → Done
+(the `in-progress` label is retired). Work runs in two-week sprints, Sunday to the second
+Thursday. Each update is a dated **Progress** comment saying what is done and what is left.
+Dependencies are Jira *Blocks* links matching §4.
 
 D-1..D-3 (user decisions), J-* (setup) and G-0 (commit) are tracked in this file only.
 
@@ -141,15 +147,15 @@ Atlassian connector) · **Lane** (code lane via Speckit: Codex / agy / OpenCode)
 
 - [x] **D-1 Pilot environment** — **decided 2026-10-14: Option B, separate paid hosted
   production** (own Supabase project + containers, isolated from staging). Self-hosting stays a
-  later option. Recorded on PP-4; confirm plan tier with the user before creating anything
+  later option. Recorded on PPS-29; confirm plan tier with the user before creating anything
   billable.
 - [x] **D-2 Post-pilot price** — **confirmed by user 2026-10-14**:
   EGP 1,500 per branch per month (minimum 2 branches), annual = 10 months' price; founding-customer
   50% off for the first 12 months in exchange for case study + logo; savings guarantee — if
   verified savings in a month are below 3× the fee, the next month is free. Revisit after the
-  first pilot's real savings data. Blocks: G-6 (PP-10).
-- [ ] **D-3 Add Jira's free software plan?** (gets Epic/Bug/GitHub linking). Owner: User.
-  Blocks: nothing. Done: yes/no recorded. Default if undecided: no.
+  first pilot's real savings data. Blocks: G-6 (PPS-15).
+- [x] **D-3 Add Jira's free software plan?** — **decided 2026-10-24: yes, as a Scrum space.** No
+  product to add (Jira already includes Scrum); `PPS` created and PP's issues moved there.
 
 ### J — Jira setup
 
@@ -161,39 +167,40 @@ Atlassian connector) · **Lane** (code lane via Speckit: Codex / agy / OpenCode)
 | [x] J-4 | End-to-end test via connector: create dummy Lead → transition to Talked → add comment → set due date → run JQL `project = SP AND duedate <= now() AND status != "Not now"` and confirm it returns the dummy. **Passed 2026-10-14 (SP-1).** SP-1 deleted by the user 2026-10-14 | User | J-1 | SP-1 deleted | SP |
 | [x] J-5 | Create PP tasks G-1..G-9, P-1..P-3 (as `from-demo`), E-1 below; put the task ID from this file in each summary (e.g. `[G-2] Demo video`) | Orch | G-0 | Issues exist; keys written back into this file's tables | PP |
 | [ ] J-6 | Save the "weekly review" JQL as a filter (needs browser if connector can't save filters) | Browser | J-4 | Filter "SP — due or overdue" exists | SP |
+| [ ] J-7 | Move delivery tracking to the `PPS` Scrum space (board 1): issues moved from PP, Story Points on the default screen, two-week sprints from 2026-10-26 | Orch + Browser | D-3 | Docs PR merged; PPS Sprint 1 active (PPS-30) | PPS |
 
-### G — GTM assets (non-code, Jira PP)
+### G — GTM assets (non-code, Jira PPS)
 
 | ID | Task | Owner | Depends on | Done when | Space |
 |---|---|---|---|---|---|
 | [x] G-0 | Commit `first-customer-gtm-plan.md` after user approval (that file only) | Orch | user approval | Commit on `main` (or PR) containing only that file | — (git) |
-| [ ] G-1 | Demo tenant on hosted: dedicated tenant, Arabic supplier names, ~30-item F&B catalogue, 2–3 branches, EGP prices, one RFQ ready to send; no test leftovers | Orch + User | P-1 (forms default to EGP) | Tenant walkthrough runs clean end-to-end | PP |
-| [ ] G-2 | 3-min demo video + 60-s vertical cut: Arabic UI, Arabic on-screen text + music (no voice-over), recorded with OBS; spec, storyboard and finished logo sting/end card in `docs/gtm/video/`. Script must follow the corrected walkthrough (human sends RFQ; guardrail on → draft purchase request; mobile approves the *request*; PO generated on web) | User (record), Orch (script) | G-1, P-1, P-2 | Video link stored on the PP task | PP |
-| [ ] G-3 | Pitch line (Arabic + English) finalised | Orch draft, User approve | — | Approved text on the PP task | PP |
-| [ ] G-4 | One-pager (Arabic + English): before (WhatsApp + Excel) vs. after (RFQ → compare → approve → PO) | Orch copy, User design | G-3 | Published PDF/link | PP |
-| [ ] G-5 | Outreach DM script (Arabic + English), diagnostic-question first | Orch draft, User approve | G-3 | Approved script on PP task | PP |
-| [ ] G-6 | Pilot agreement (1 page, Arabic + English) + week-0 baseline template: duration, success metric + baseline, day-14 terms, data ownership, supplier-price confidentiality, export/deletion on exit, Egypt PDPL (Law 151/2020) clause, C4/C5 workarounds (EGP-only suppliers, ex-VAT) | Orch draft, User approve (legal review advisable) | D-2 | Signed-ready PDF; baseline template (10–20 items, unit price, quote turnaround) | PP |
+| [ ] G-1 | Demo tenant on hosted: dedicated tenant, Arabic supplier names, ~30-item F&B catalogue, 2–3 branches, EGP prices, one RFQ ready to send; no test leftovers | Orch + User | P-1 (forms default to EGP) | Tenant walkthrough runs clean end-to-end | PPS |
+| [ ] G-2 | 3-min demo video + 60-s vertical cut: Arabic UI, Arabic on-screen text + music (no voice-over), recorded with OBS; spec, storyboard and finished logo sting/end card in `docs/gtm/video/`. Script must follow the corrected walkthrough (human sends RFQ; guardrail on → draft purchase request; mobile approves the *request*; PO generated on web) | User (record), Orch (script) | G-1, P-1, P-2 | Video link stored on the PPS task | PPS |
+| [ ] G-3 | Pitch line (Arabic + English) finalised | Orch draft, User approve | — | Approved text on the PPS task | PPS |
+| [ ] G-4 | One-pager (Arabic + English): before (WhatsApp + Excel) vs. after (RFQ → compare → approve → PO) | Orch copy, User design | G-3 | Published PDF/link | PPS |
+| [ ] G-5 | Outreach DM script (Arabic + English), diagnostic-question first | Orch draft, User approve | G-3 | Approved script on PPS task | PPS |
+| [ ] G-6 | Pilot agreement (1 page, Arabic + English) + week-0 baseline template: duration, success metric + baseline, day-14 terms, data ownership, supplier-price confidentiality, export/deletion on exit, Egypt PDPL (Law 151/2020) clause, C4/C5 workarounds (EGP-only suppliers, ex-VAT) | Orch draft, User approve (legal review advisable) | D-2 | Signed-ready PDF; baseline template (10–20 items, unit price, quote turnaround) | PPS |
 | [ ] G-7 | Community + target list: personal network audit, Egyptian founder/SME communities, LinkedIn search; each prospect → an SP Lead at Target | User (list), Orch (create Leads) | J-1, J-4 | ≥20 Leads in SP | SP |
-| [ ] G-8 | Pilot onboarding runbook: CSV/manual supplier + catalogue load, branches/approvers, inbound-email address for WhatsApp-forwarded quotes, first live RFQ, support WhatsApp group (4 working-hour response) | Orch | E-1, P-1, P-3 | Runbook doc linked on PP task, dry-run on demo tenant | PP |
+| [ ] G-8 | Pilot onboarding runbook: CSV/manual supplier + catalogue load, branches/approvers, inbound-email address for WhatsApp-forwarded quotes, first live RFQ, support WhatsApp group (4 working-hour response) | Orch | E-1, P-1, P-3 | Runbook doc linked on PPS task, dry-run on demo tenant | PPS |
 | [ ] G-9 | Outreach: work SP to 20 conversations at Talked+ | User | G-2, G-5, G-7 | 20 Leads at Talked or beyond | SP |
-| [ ] G-10 | Company formation: Egyptian one-person company on the simplified regime (research in `docs/gtm/company-formation/`) | User | — | Company registered; name + tax ID on PP-17, then into G-6 | PP |
+| [ ] G-10 | Company formation: Egyptian one-person company on the simplified regime (research in `docs/gtm/company-formation/`) | User | — | Company registered; name + tax ID on PPS-11, then into G-6 | PPS |
 
-### P — Product tasks (PP `from-demo` → Speckit spec → code lane)
+### P — Product tasks (PPS `from-demo` → Speckit spec → code lane)
 
-Each: create PP task labelled `from-demo` → write Speckit spec/plan/tasks → dispatch to a lane →
-PR → CI → merge → link PR on the PP task. Refs are in the GTM plan's currency-gap tables.
+Each: create PPS task labelled `from-demo` → write Speckit spec/plan/tasks → dispatch to a lane →
+PR → CI → merge → link PR on the PPS task. Refs are in the GTM plan's currency-gap tables.
 
 | ID | Gap | Task | Owner | Depends on | Done when |
 |---|---|---|---|---|---|
-| [x] P-1 | **C1** | Wire the **existing** `tenant.currency` (required at sign-up, returned by `/me`, already used by budget/threshold forms) into the forms that still default to USD: PO create, guardrails, quotation review fallbacks. No new setting, no schema/RLS change | Orch (spec + tenancy part), Lane (forms) | — | Merged; demo tenant set to EGP and every form opens in EGP — **done: 022 (#73), PP-1 Done** |
+| [x] P-1 | **C1** | Wire the **existing** `tenant.currency` (required at sign-up, returned by `/me`, already used by budget/threshold forms) into the forms that still default to USD: PO create, guardrails, quotation review fallbacks. No new setting, no schema/RLS change | Orch (spec + tenancy part), Lane (forms) | — | Merged; demo tenant set to EGP and every form opens in EGP — **done: 022 (#73), PPS-9 Done** |
 | [ ] P-2 | **C3** | Locale-aware money formatting on mobile (grouping, currency minor units, ar/en) for approval queue + request detail | Lane | — | Merged; `flutter test` green; screenshots show `EGP 12,500.00` (and Arabic locale equivalent) — **code merged in 022 (#73, #124); stays open until the screenshots (022 T018) exist** |
-| [ ] P-3 | **C2** | Test extraction with 5 real Egyptian quotes (incl. Arabic-Indic digits, ج.م / جنيه / LE); recognise Egyptian markers; replace the GBP fallback with **human review** for unresolved currency — never a tenant-currency default (also Azure DI £/$/€-only + hard-coded USD path; landed-cost GBP default) | Orch (test), Lane (fix) | — | Test results recorded on PP task; fix merged; q1–q3 extract as EGP; q4–q5 land flagged for review with no guessed currency — **fix merged in 022 (#73); the real-quote run is 022 T015, still open** |
+| [ ] P-3 | **C2** | Test extraction with 5 real Egyptian quotes (incl. Arabic-Indic digits, ج.م / جنيه / LE); recognise Egyptian markers; replace the GBP fallback with **human review** for unresolved currency — never a tenant-currency default (also Azure DI £/$/€-only + hard-coded USD path; landed-cost GBP default) | Orch (test), Lane (fix) | — | Test results recorded on PPS task; fix merged; q1–q3 extract as EGP; q4–q5 land flagged for review with no guessed currency — **fix merged in 022 (#73); the real-quote run is 022 T015, still open** |
 
-| [ ] P-4 | — | One combined jobs container for the background workers hosted lacks (report schedules, offer refresh, exports, digests, webhooks, accounting/POS sync); deploy workflow modelled on #108 | Lane, User (container) | demo video recorded | Deployed; overdue schedules run on hosted (PP-14) |
-| [ ] P-5 | finding 20 | Real product-matching embeddings on hosted (stub scores exact names 55%) — switch on the Bedrock provider (#62) or decide to keep the stub | User (cost OK), Orch | — | Decision on PP-15; if on, exact names score above auto-accept |
-| [ ] P-6 | finding 50 | Hidden/idle web tab signs out after a few hours; visible tab renews fine | Orch → Lane | — | Hidden tab survives several expiries, or cause fixed (PP-16) |
-| [x] P-7 | findings 1–49 | Demo-tenant fix wave record (PRs per finding) | — | — | PP-18 Done |
-| [ ] P-8 | email audit | Password reset broken on hosted: Site URL was localhost, no set-password page, no custom SMTP (2 emails/hour) | Orch (config + code), User (SMTP credentials) | — | Live reset on hosted: email arrives, link opens `/auth/update-password`, new password signs in (PP-28) |
+| [ ] P-4 | — | One combined jobs container for the background workers hosted lacks (report schedules, offer refresh, exports, digests, webhooks, accounting/POS sync); deploy workflow modelled on #108 | Lane, User (container) | demo video recorded | Deployed; overdue schedules run on hosted (PPS-12) |
+| [ ] P-5 | finding 20 | Real product-matching embeddings on hosted (stub scores exact names 55%) — switch on the Bedrock provider (#62) or decide to keep the stub | User (cost OK), Orch | — | Decision on PPS-13; if on, exact names score above auto-accept |
+| [ ] P-6 | finding 50 | Hidden/idle web tab signs out after a few hours; visible tab renews fine | Orch → Lane | — | Hidden tab survives several expiries, or cause fixed (PPS-10) |
+| [x] P-7 | findings 1–49 | Demo-tenant fix wave record (PRs per finding) | — | — | PPS-3 Done |
+| [ ] P-8 | email audit | Password reset broken on hosted: Site URL was localhost, no set-password page, no custom SMTP (2 emails/hour) | Orch (config + code), User (SMTP credentials) | — | Live reset on hosted: email arrives, link opens `/auth/update-password`, new password signs in (PPS-25) |
 
 ### E — Pilot environment
 
@@ -202,7 +209,7 @@ PR → CI → merge → link PR on the PP task. Refs are in the GTM plan's curre
   DB backups + **one tested restore**, migrations as an explicit deploy step, secrets separate
   from staging; database and admin consoles not publicly exposed; host hardening; `pnpm test:isolation`
   green against it; a full live walkthrough on it. Owner: Orch + User (infra access). Depends on: D-1. Done: restore tested and
-  recorded; app reachable over HTTPS; Mailgun inbound reaches it. Space: PP.
+  recorded; app reachable over HTTPS; Mailgun inbound reaches it. Space: PPS.
 
 ### B — Backlog (after pilot / before GCC; not blocking customer #1)
 
