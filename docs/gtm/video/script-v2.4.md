@@ -1,6 +1,6 @@
 # Demo video v2.4 — script (Ledger UI, purchasing-manager cut)
 
-Status 2026-10-24: **approved by the owner; round 6 (Arabic UI) recorded** ([record](../demo-tenant/round-6/README.md)): compare 12,600 vs 12,800, saving EGP 300, ledger EGP 1,560. Round 7 (English UI) next.
+Status 2026-10-24: **approved by the owner; round 6 (Arabic UI) recorded** ([record](../demo-tenant/round-6/README.md)): compare 12,600 vs 12,800, saving EGP 300, ledger EGP 1,560. Round 7 (English UI) recorded the same evening ([record](../demo-tenant/round-7/README.md)): compare 12,480 vs 12,680, saving EGP 200, ledger EGP 1,760.
 Written with the `technical-video-script` skill. It replaces the v2.2/v2.3 copy at the owner's request
 (2026-10-24), which overrides the "no new script" rule in [`motion-style.md`](motion-style.md) §11 for
 this version only. The honesty rules in [`README.md`](README.md) still hold, and so does the motion and
@@ -52,14 +52,14 @@ in the recording brief. Every beat has its own starting state, so any beat can b
 | 6 | Quote review: the photo beside the extracted lines; EGP, expiry, total | Zoom on the lines, then hold on the reconciled total (1.5 s hold) | «اتقرت لوحدها: البنود، بالجنيه، والصلاحية… والإجمالي مطابق.» | "Read automatically: lines, pounds, expiry. The total checks out." | Photo quote open, not yet authorised | 12 | core |
 | 7 | Same screen, the confirm panel and Authorise | Press Authorise; the chip turns to the approved shape | «بس الاعتماد قرارك إنت.» | "But you sign it off." | Photo quote open, fields confirmed | 5 | core |
 | **Chapter 4 — Compare like for like** |||||||
-| 8 | Smart Compare, oil × 8: per pack and landed, the recommended supplier marked | Teal bar overtakes the navy bar (Converge motif); hold on the gap | «مقارنة بالعبوة وبالتكلفة الواصلة: الأمانة أوفر بـ٢٠٠ ج.م» | "Per pack, landed cost: Al-Amana is cheaper by EGP 200 **[r7: 200]**." | All three quotes authorised; `/compare` for oil | 11 | core |
+| 8 | Smart Compare, oil × 8: per pack and landed, the recommended supplier marked | Teal bar overtakes the navy bar (Converge motif); hold on the gap | «مقارنة بالعبوة وبالتكلفة الواصلة: الأمانة أوفر بـ٢٠٠ ج.م» | "Per pack, landed cost: Al-Amana is cheaper by EGP 200." | All three quotes authorised; `/compare` for oil | 11 | core |
 | 9 | Basket split result across suppliers | Single plate | «أو قسّم الطلب على أكتر من مورد.» | "Or split the order across suppliers." | A basket split already run on round 6 | 5 | **cut** |
 | **Chapter 5 — Rules draft it, a manager approves** |||||||
 | 10 | Draft request with the guardrail banner, cost centre, total under the limit | Push-in to the banner, then Submit | «الضوابط اللي حطّيتها جهّزت الطلب… مسودة، مش شراء.» | "Your guardrails drafted the request. A draft, not a purchase." | Guardrail draft from round 6 open, not submitted | 10 | core |
 | 11 | Phone frame: the manager opens the request and approves | Tap Approve; confirmation | «والمدير يعتمد من موبايله.» | "The manager approves from their phone." | Request submitted; phone build on the approvals list | 8 | core |
 | **Chapter 6 — Order it, prove the saving** |||||||
 | 12 | Web: PO generated from the approved request, then sent | Create PO, then Send; chip shape changes | «أمر الشراء طالع من الطلب المعتمد… واتبعت.» | "The PO comes from the approved request, and goes out." | Approved request open, no PO yet | 9 | core |
-| 13 | Record outcome from the PO; savings per line against the last PO price | Counter rolls to the saving; teal hit | «وفّرت ٣٠٠ ج.م على الطلب ده، مقابل آخر سعر شراء.» | "You saved EGP 200 **[r7]** on this order, against the last purchase price." | PO sent, outcome not recorded | 7 | core |
+| 13 | Record outcome from the PO; savings per line against the last PO price | Counter rolls to the saving; teal hit | «وفّرت ٣٠٠ ج.م على الطلب ده، مقابل آخر سعر شراء.» | "You saved EGP 200 on this order, against the last purchase price." | PO sent, outcome not recorded | 7 | core |
 | 14 | Savings ledger, verified total, sidebar visible | Hold on the total (1.5 s) | «وكل وفر متسجّل ومتراجع… جاهز للمالك.» | "Every saving logged and verified, ready for the owner." | The round's savings verified as the owner | 6 | core |
 | 15 | Outro: logo sting, end card | Existing renders | (existing) | (existing) | `renders/outro-16x9.mp4` / `-en.mp4` | 9.75 | core |
 
@@ -193,7 +193,7 @@ on demo data. Try it free for two weeks: WhatsApp +20 102 735 4140."
 | 4. Runtime includes action time and lands on target | ✅ 1:51–2:00 / 59.5 s |
 | 5. Every chapter titled, ≥ 10 s | ✅ six chapters, shortest 16 s |
 | 6. Core/cut marked, and the core alone delivers the promise | ✅ |
-| 7. Every claim reproducible on hosted | ⏳ the [r6] figures are filled from the recording |
+| 7. Every claim reproducible on hosted | ✅ figures from rounds 6 (AR) and 7 (EN) |
 
 ## After publishing
 
