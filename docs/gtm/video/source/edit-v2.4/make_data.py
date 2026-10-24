@@ -4,7 +4,7 @@ import json
 ROOT=Path(__file__).resolve().parent
 
 def captions():
-    text=(ROOT/'../../script-v2.4.md').resolve().read_text();out={}
+    text=(ROOT/'../../cuts/v2.4-ledger/script.md').resolve().read_text();out={}
     for line in text.split('## Beats — 16:9')[1].split('## Beats — 9:16')[0].splitlines():
         parts=[p.strip() for p in line.split('|')]
         if len(parts)>7 and parts[1].isdigit():

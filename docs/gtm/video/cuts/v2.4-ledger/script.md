@@ -1,9 +1,9 @@
 # Demo video v2.4 — script (Ledger UI, purchasing-manager cut)
 
-Status 2026-10-24: **approved by the owner; round 6 (Arabic UI) recorded** ([record](../demo-tenant/round-6/README.md)): compare 12,600 vs 12,800, saving EGP 300, ledger EGP 1,560. Round 7 (English UI) recorded the same evening ([record](../demo-tenant/round-7/README.md)): compare 12,480 vs 12,680, saving EGP 200, ledger EGP 1,760.
+Status 2026-10-24: **approved by the owner; round 6 (Arabic UI) recorded** ([record](../../../demo-tenant/round-6/README.md)): compare 12,600 vs 12,800, saving EGP 300, ledger EGP 1,560. Round 7 (English UI) recorded the same evening ([record](../../../demo-tenant/round-7/README.md)): compare 12,480 vs 12,680, saving EGP 200, ledger EGP 1,760.
 Written with the `technical-video-script` skill. It replaces the v2.2/v2.3 copy at the owner's request
-(2026-10-24), which overrides the "no new script" rule in [`motion-style.md`](motion-style.md) §11 for
-this version only. The honesty rules in [`README.md`](README.md) still hold, and so does the motion and
+(2026-10-24), which overrides the "no new script" rule in [`motion-style.md`](../../motion-style.md) §11 for
+this version only. The honesty rules in [`README.md`](../../README.md) still hold, and so does the motion and
 brand direction.
 
 ## Decisions (owner, 2026-10-24)
