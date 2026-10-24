@@ -1,48 +1,82 @@
 import { test, expect } from '@playwright/test';
 
 /**
- * Guest Landing Page E2E Tests — PPS-35.
+ * Guest Landing Page E2E Tests — PPS-35 & PPS-36.
  *
  * Requirements:
  * - Unauthenticated "/" displays the landing page (not a redirect to /auth/sign-in)
  * - Sign in navigates to /auth/sign-in
  * - RTL (ar) render has dir="rtl" and Arabic copy
  * - Runs as a guest without storageState
+ * - Gallery tab switch changes the active image
+ * - Enlarge opens a dialog and Escape closes it returning focus
+ * - Iron Systems links point to https://www.iron-sys.com/ with rel noopener
  */
-test.describe('Guest Landing Page (PPS-35)', () => {
+test.describe('Guest Landing Page (PPS-35 / PPS-36)', () => {
   test('unauthenticated "/" displays the landing page without redirecting', async ({ page }) => {
     await page.goto('/');
 
     // Verify URL remains "/" and does not redirect to /auth/sign-in
     await expect(page).toHaveURL(/\/$/);
 
-    // Verify hero headline and lede are visible
+    // Verify hero headline is visible
     const headline = page.locator('.hero-headline');
     await expect(headline).toBeVisible();
-    await expect(headline).toContainText('Every number traces back to the quote it came from.');
+    await expect(headline).toContainText('Compare supplier quotes. Keep purchasing under control.');
 
-    // Verify How It Works section is rendered with three steps
+    // Verify workflow section is rendered with four steps
     const stepCards = page.locator('.step-card');
-    await expect(stepCards).toHaveCount(3);
+    await expect(stepCards).toHaveCount(4);
 
-    // Verify Gallery section is absent when screenshot cards array is empty
-    await expect(page.locator('.gallery-section')).toHaveCount(0);
+    // Verify Gallery section is rendered with tabs
+    const gallerySection = page.locator('.gallery-section');
+    await expect(gallerySection).toBeVisible();
 
-    // Verify support mailto links
-    const requestAccess = page.locator('.hero-secondary-btn');
+    // Verify hero request access CTA is primary and has mailto
+    const requestAccess = page.locator('.hero-primary-btn');
+    await expect(requestAccess).toBeVisible();
     await expect(requestAccess).toHaveAttribute('href', /^mailto:/);
+
+    // Verify Iron Systems link
+    const ironSysLinks = page.locator('a[href="https://www.iron-sys.com/"]');
+    await expect(ironSysLinks.first()).toHaveAttribute('rel', /noopener/);
+    await expect(ironSysLinks.first()).toHaveAttribute('target', '_blank');
   });
 
-  test('Sign in action navigates to /auth/sign-in', async ({ page }) => {
+  test('gallery tab switch changes the displayed screenshot', async ({ page }) => {
     await page.goto('/');
 
-    // Click hero primary Sign in button
-    const heroSignIn = page.locator('.hero-primary-btn');
-    await expect(heroSignIn).toBeVisible();
-    await heroSignIn.click();
+    const galleryImage = page.locator('.gallery-section .gallery-image').first();
+    await expect(galleryImage).toBeVisible();
+    await expect(galleryImage).toHaveAttribute('src', /01-quotation-review\.jpg/);
 
-    await page.waitForURL('**/auth/sign-in');
-    await expect(page).toHaveURL(/\/auth\/sign-in$/);
+    // Click the second tab (Smart Compare)
+    const secondTab = page.locator('.gallery-tab-group .mat-mdc-tab').nth(1);
+    await secondTab.click();
+
+    // Check that gallery image switches to 02-smart-compare.jpg
+    const activeGalleryImage = page.locator('.mat-mdc-tab-body-active .gallery-image');
+    await expect(activeGalleryImage).toHaveAttribute('src', /02-smart-compare\.jpg/);
+  });
+
+  test('Enlarge opens a dialog and Escape closes it returning focus', async ({ page }) => {
+    await page.goto('/');
+
+    const enlargeBtn = page.locator('.mat-mdc-tab-body-active .enlarge-button').first();
+    await expect(enlargeBtn).toBeVisible();
+    await enlargeBtn.focus();
+    await enlargeBtn.click();
+
+    // Wait for the dialog to be visible
+    const dialog = page.locator('mat-dialog-container');
+    await expect(dialog).toBeVisible();
+
+    // Close via Escape key
+    await page.keyboard.press('Escape');
+    await expect(dialog).toHaveCount(0);
+
+    // Verify focus is returned to the trigger button
+    await expect(enlargeBtn).toBeFocused();
   });
 
   test('header Sign in button navigates to /auth/sign-in', async ({ page }) => {
@@ -51,6 +85,17 @@ test.describe('Guest Landing Page (PPS-35)', () => {
     const headerSignIn = page.locator('.header-signin-btn');
     await expect(headerSignIn).toBeVisible();
     await headerSignIn.click();
+
+    await page.waitForURL('**/auth/sign-in');
+    await expect(page).toHaveURL(/\/auth\/sign-in$/);
+  });
+
+  test('footer Sign in link navigates to /auth/sign-in', async ({ page }) => {
+    await page.goto('/');
+
+    const footerSignIn = page.locator('.footer-signin-link');
+    await expect(footerSignIn).toBeVisible();
+    await footerSignIn.click();
 
     await page.waitForURL('**/auth/sign-in');
     await expect(page).toHaveURL(/\/auth\/sign-in$/);
@@ -69,7 +114,7 @@ test.describe('Guest Landing Page (PPS-35)', () => {
 
     const headline = page.locator('.hero-headline');
     await expect(headline).toBeVisible();
-    await expect(headline).toContainText('كل رقم يعود إلى عرض السعر الذي جاء منه.');
+    await expect(headline).toContainText('قارن عروض الموردين، وأحكم متابعة مشترياتك.');
   });
 
   test('toggles language between EN and Arabic on public pages', async ({ page }) => {
@@ -86,12 +131,12 @@ test.describe('Guest Landing Page (PPS-35)', () => {
     await expect(html).toHaveAttribute('dir', 'rtl');
     await expect(html).toHaveAttribute('lang', 'ar');
     const headline = page.locator('.hero-headline');
-    await expect(headline).toContainText('كل رقم يعود إلى عرض السعر الذي جاء منه.');
+    await expect(headline).toContainText('قارن عروض الموردين، وأحكم متابعة مشترياتك.');
 
     await page.reload();
     await expect(html).toHaveAttribute('dir', 'rtl');
     await expect(html).toHaveAttribute('lang', 'ar');
-    await expect(headline).toContainText('كل رقم يعود إلى عرض السعر الذي جاء منه.');
+    await expect(headline).toContainText('قارن عروض الموردين، وأحكم متابعة مشترياتك.');
 
     await page.goto('/auth/sign-in');
     await expect(html).toHaveAttribute('dir', 'rtl');

@@ -1,0 +1,54 @@
+:host {
+  display: block;
+}
+
+.screenshot-dialog {
+  display: flex;
+  flex-direction: column;
+  background: var(--pp-surface-card);
+  border-radius: var(--pp-radius-panel);
+  overflow: hidden;
+  max-inline-size: 100%;
+}
+
+.dialog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--pp-space-4);
+  padding: var(--pp-space-3) var(--pp-space-4);
+  border-block-end: 1px solid var(--pp-border);
+  background: var(--pp-surface-card);
+}
+
+.dialog-caption {
+  margin: 0;
+  font-size: var(--pp-text-16);
+  font-weight: var(--pp-weight-medium);
+  color: var(--pp-text-strong);
+}
+
+.dialog-close-btn {
+  color: var(--pp-text-strong);
+  flex-shrink: 0;
+}
+
+.dialog-body {
+  padding: var(--pp-space-4);
+  background: var(--pp-surface-sunken);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  overflow: auto;
+}
+
+.dialog-image {
+  max-inline-size: 100%;
+  max-block-size: 78vh;
+  inline-size: auto;
+  block-size: auto;
+  aspect-ratio: 16 / 10;
+  object-fit: contain;
+  border-radius: var(--pp-radius-control);
+  box-shadow: var(--pp-elev-2);
+}
