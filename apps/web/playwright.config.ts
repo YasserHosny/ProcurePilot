@@ -31,6 +31,10 @@ export default defineConfig({
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
     actionTimeout: 15_000,
+    // PPS-34: Material 22 fades a closing mat-select panel for 100 ms, during which the
+    // fading panel still intercepts clicks. If an E2E re-opens a select right after picking
+    // an option, it clicks the old panel. Reduced motion makes Material detach panels immediately.
+    reducedMotion: 'reduce',
   },
   projects: [
     {
