@@ -11,11 +11,15 @@ _EGP_MARKER = re.compile(
     re.IGNORECASE,
 )
 _SAR_MARKER = re.compile(
-    r"(?<![^\W\d_])(?:ر\.\s*س\.?|ريال\s+سعودي|ريال|SAR|SR)(?![^\W\d_])",
+    # SR is case-sensitive and must touch an amount on the same line: "Sr." is a
+    # common serial-number header, not evidence of Saudi riyals.
+    r"(?<![^\W\d_])(?:ر\.\s*س\.?|ريال\s+سعودي|SAR|"
+    r"(?-i:SR)(?=[ \t]*\d)|(?<=\d)[ \t]*(?-i:SR))(?![^\W\d_])",
     re.IGNORECASE,
 )
 _OTHER_MARKER = re.compile(
-    r"(?<![^\W\d_])(?:USD|GBP|EUR|AED|KWD|BHD|OMR|JPY|CAD|AUD|\$|£|€)(?![^\W\d_])",
+    r"(?<![^\W\d_])(?:ريال\s+قطري|ريال\s+عُ?ماني|"
+    r"USD|GBP|EUR|AED|QAR|KWD|BHD|OMR|JPY|CAD|AUD|\$|£|€)(?![^\W\d_])",
     re.IGNORECASE,
 )
 _ARABIC_DIGITS = str.maketrans("٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹", "01234567890123456789")

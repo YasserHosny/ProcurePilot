@@ -19,12 +19,12 @@ from procurepilot_extraction_worker.currency import detect_currency, parse_local
         "ر. س 100",
         "100 ر.س.",
         "ريال سعودي 100",
-        "100 ريال",
         "SAR 100",
         "100 SAR",
         "SR 100",
         "100 SR",
-        "100sr",
+        "SR 250",
+        "250 SR",
         "١٬٢٣٤٫٥٠ ر.س",
     ],
 )
@@ -36,7 +36,7 @@ def test_sar_markers_touching_amount(text: str) -> None:
     assert result.stated_total.value["currency"] == "SAR"
 
 
-@pytest.mark.parametrize("marker", ["ر.س", "ر. س", "ر.س.", "ريال سعودي", "ريال", "SAR", "SR"])
+@pytest.mark.parametrize("marker", ["ر.س", "ر. س", "ر.س.", "ريال سعودي", "SAR", "SR"])
 def test_sar_numeric_cells(marker: str) -> None:
     text = f"١٬٢٣٤٫٥٠ {marker}"
     assert parse_localised_decimal(text) == Decimal("1234.50")
@@ -103,3 +103,40 @@ def test_unattached_currency_word_does_not_conflict_with_sar() -> None:
         NS(documents=[NS(fields={"InvoiceTotal": NS(content=text, confidence=0.9)})]), "test"
     )
     assert result.header["currency"].value == "SAR"
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "100 ريال",
+        "ريال 100",
+        "100 ريال قطري",
+        "100 ريال عماني",
+        "100 ريال عُماني",
+        "100 QAR",
+        "Ref 2026\nSr. Description",
+        "Ref 2026\nSR Description",
+        "SR\n250",
+        "250\nSR",
+        "sr 250",
+        "250 sr",
+    ],
+)
+def test_ambiguous_riyals_and_serial_headers_are_unresolved(text: str) -> None:
+    assert detect_currency(text) is None
+    fields = {"InvoiceTotal": NS(content=text, confidence=0.9)}
+    result = _parse_invoice_result(NS(documents=[NS(fields=fields)]), "test")
+    assert "currency" not in result.header
+    if result.stated_total:
+        assert result.stated_total.value["currency"] is None
+
+
+@pytest.mark.parametrize("marker", ["ريال قطري", "ريال عماني", "ريال عُماني", "QAR"])
+@pytest.mark.parametrize("home_marker", ["SAR", "EGP"])
+def test_other_riyals_conflict_with_evidenced_currency(marker: str, home_marker: str) -> None:
+    text = f"100 {home_marker}, 200 {marker}"
+    assert detect_currency(text) is None
+    assert _has_currency_conflict(text)
+    fields = {"InvoiceTotal": NS(content=text, confidence=0.9)}
+    result = _parse_invoice_result(NS(documents=[NS(fields=fields)]), "test")
+    assert "currency" not in result.header
