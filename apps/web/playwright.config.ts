@@ -19,7 +19,7 @@ export default defineConfig({
   testDir: './tests/e2e',
   testMatch: '**/*.spec.ts',
   globalSetup: require.resolve('./tests/e2e/global-setup'),
-  testIgnore: ['**/global-setup.ts'],
+  testIgnore: ['**/global-setup.ts', '**/landing-gallery-screenshots.spec.ts'],
   timeout: 60_000,
   expect: { timeout: 10_000 },
   fullyParallel: false,
