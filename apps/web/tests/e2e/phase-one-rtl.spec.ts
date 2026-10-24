@@ -28,7 +28,7 @@ test.describe('Phase 1 Whole-Product RTL Layout (T069)', () => {
   test('Savings Ledger renders correctly in RTL', async ({ page }) => {
     await page.goto('/savings');
     await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
-    await expect(page.locator('.page-title')).toContainText('سجل الوفورات');
+    await expect(page.locator('.page-title')).toContainText('سجل التوفيرات');
   });
 
   test('Outcome Capture renders correctly in RTL', async ({ page }) => {
@@ -40,7 +40,7 @@ test.describe('Phase 1 Whole-Product RTL Layout (T069)', () => {
   test('Savings Export renders correctly in RTL', async ({ page }) => {
     await page.goto('/savings/export');
     await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
-    await expect(page.locator('.page-title')).toContainText('تصدير سجل الوفورات');
+    await expect(page.locator('.page-title')).toContainText('تصدير سجل التوفيرات');
   });
 
   test('Subscription Plan renders correctly in RTL', async ({ page }) => {
