@@ -39,13 +39,8 @@ _PERCENTAGE_PATTERN = re.compile(
 _TOTAL_ROW_RE = re.compile(
     r"^[\s:：\-–]*(?:(?:[\d.,:：()（）/\\\-_%٪\u066a]+|ر\.?\s*س\.?|SAR|SR|ج\.م|LE|EGP|\$|£|€)\s*)*"
     r"(?:(?:لل|[وبفل])?(?:الاجمالي|اجمالي|االجمايل|المجموع|مجموع)|grand\s+total|total)"
-    r"(?:"
-    r"\s+(?:النهائي|النهايي|الكلي|العام|شامل|مع|قبل|بعد|ضريب[ةه]|الضريب[ةه]|القائم|الصافي|"
-    r"المطلوب|المستحق|قدره|فقط|القيمه|المبلغ|amount|price|due|net|gross|payable|incl\.?|"
-    r"including|inclusive|before|after|excl\.?|excluding|vat|tax|for|of|value|لعام|عام|سنة|سنه)"
-    r"|\s*(?:[\d.,:：()（）/\\\-_%٪\u066a]+|ر\.?\s*س\.?|SAR|SR|ج\.م|LE|EGP|\$|£|€)"
-    r"|\s*$"
-    r")",
+    r"(?![^\W\d_])"
+    r"(?!\s*(?:ال)?فرعي(?![^\W\d_]))",
     re.IGNORECASE,
 )
 
@@ -280,18 +275,6 @@ def _parse_line_table(result: object, model_version: str) -> ExtractionResult | 
             qty = _clean_number(qty_raw)
             price = _clean_number(price_raw)
             total = _clean_number(data.get("line_total", ""))
-            if qty is None and price and total:
-                try:
-                    p = Decimal(price)
-                    t = Decimal(total)
-                    if p > 0:
-                        q = t / p
-                        if q == int(q):
-                            qty = str(int(q))
-                        else:
-                            qty = format(q, "f")
-                except Exception:
-                    pass
             label = " ".join(
                 value.replace("\n", " ").strip()
                 for value in dict.fromkeys(expanded.values())

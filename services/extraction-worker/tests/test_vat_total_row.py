@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import pytest
+
 from procurepilot_extraction_worker.azure_di import (
     _clean_number,
     _find_grand_total,
+    _is_total_row,
     _numeric_cell_amount,
     _parse_invoice_result,
 )
@@ -261,8 +264,6 @@ def test_total_fallback_loop_scans_right_to_left_and_skips_label() -> None:
 
 def test_arabic_attached_prefixes_recognized_as_totals() -> None:
     # 4 (blocking): «والإجمالي», «بالإجمالي», «فالإجمالي», «للإجمالي»/«لإجمالي»
-    from procurepilot_extraction_worker.azure_di import _is_total_row
-
     for label in ("والإجمالي", "بالإجمالي", "فالإجمالي", "للإجمالي", "لإجمالي"):
         assert _is_total_row(label), f"{label} must be recognized as a total row"
         payload = _make_table_payload(
@@ -277,6 +278,25 @@ def test_arabic_attached_prefixes_recognized_as_totals() -> None:
         assert result.stated_total.value == {"amount": "1000.00", "currency": "SAR"}
 
 
+@pytest.mark.parametrize(
+    ("label", "expected"),
+    [
+        ("إجمالي الفاتورة", True),
+        ("إجمالي العرض", True),
+        ("Total Cost", True),
+        ("Total Value", True),
+        ("إجمالي القيمة", True),
+        ("والإجمالي: 1500 ر.س", True),
+        ("الإجمالي شامل ضريبة القيمة المضافة 15%", True),
+        ("مجموعة أدوات", False),
+        ("Subtotal", False),
+        ("المجموع الفرعي", False),
+    ],
+)
+def test_is_total_row_truth_table(label: str, expected: bool) -> None:
+    assert _is_total_row(label) is expected
+
+
 def test_leading_percent_does_not_swallow_visual_order_amount() -> None:
     # 5 (non-blocking): 'الإجمالي شامل ضريبة 15 :%4,440.00 ر.س' → 4440.00
     text = "الإجمالي شامل ضريبة 15 :%4,440.00 ر.س"
@@ -285,11 +305,10 @@ def test_leading_percent_does_not_swallow_visual_order_amount() -> None:
     assert field.value == {"amount": "4440.00", "currency": "SAR"}
 
 
-def test_items_without_quantity_named_total_clean_or_collection_stay_lines() -> None:
-    # 6 (non-blocking): item without quantity named «مجموع قطع غيار» or 'Total Clean Detergent'
-    # with unit price and line total must stay lines
+def test_items_named_total_clean_or_collection_stay_lines() -> None:
+    # Item rows with unit price and line total stay lines even when starting with total words
     payload_ar = _make_table_payload(
-        [["مجموع قطع غيار", "", "100.00", "100.00"]],
+        [["مجموع قطع غيار", "1", "100.00", "100.00"]],
         "الإجمالي",
         "100.00 ر.س",
     )
@@ -300,12 +319,39 @@ def test_items_without_quantity_named_total_clean_or_collection_stay_lines() -> 
     assert result_ar.stated_total.value == {"amount": "100.00", "currency": "SAR"}
 
     payload_en = _make_table_payload(
+        [["Total Clean Detergent", "2", "50.00", "100.00"]],
+        "Total",
+        "100.00 SAR",
+    )
+    result_en = _parse_invoice_result(payload_en, "layout:test")
+    assert len(result_en.lines) == 1
+    assert result_en.lines[0].original_text == "Total Clean Detergent"
+    assert result_en.stated_total is not None
+    assert result_en.stated_total.value == {"amount": "100.00", "currency": "SAR"}
+
+
+def test_items_without_quantity_not_swallowed_as_total_row() -> None:
+    # In origin/main behaviour, items without quantity are not swallowed as total rows
+    # because of the `qty is None and not (price and total)` guard, but they increment
+    # expected_line_count without producing an ExtractedLine since qty is missing.
+    payload_ar = _make_table_payload(
+        [["مجموع قطع غيار", "", "100.00", "100.00"]],
+        "الإجمالي",
+        "100.00 ر.س",
+    )
+    result_ar = _parse_invoice_result(payload_ar, "layout:test")
+    assert len(result_ar.lines) == 0
+    assert result_ar.expected_line_count == 1
+    assert result_ar.stated_total is not None
+    assert result_ar.stated_total.value == {"amount": "100.00", "currency": "SAR"}
+
+    payload_en = _make_table_payload(
         [["Total Clean Detergent", "", "50.00", "50.00"]],
         "Total",
         "50.00 SAR",
     )
     result_en = _parse_invoice_result(payload_en, "layout:test")
-    assert len(result_en.lines) == 1
-    assert result_en.lines[0].original_text == "Total Clean Detergent"
+    assert len(result_en.lines) == 0
+    assert result_en.expected_line_count == 1
     assert result_en.stated_total is not None
     assert result_en.stated_total.value == {"amount": "50.00", "currency": "SAR"}
