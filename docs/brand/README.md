@@ -42,6 +42,15 @@ All SVG lettering is converted to outlines, so the files need no font installed.
 [Google Fonts](https://fonts.google.com/specimen/Readex+Pro). Wordmark: weight 600, tracking −2%.
 Body text: 400–500.
 
+**Figures in tables: Noto Kufi Arabic** (exception, adopted 2026-10-24). Readex Pro has no
+tabular figures: even with `font-variant-numeric: tabular-nums`, "1111" and "8888" differ in width
+(80 px vs 93 px at 40 px), for Latin and Arabic-Indic digits alike, so money columns do not line up.
+[Noto Kufi Arabic](https://fonts.google.com/noto/specimen/Noto+Kufi+Arabic) (SIL Open Font License)
+has tabular 0–9 and ٠–٩ of its own and is kufi like Readex Pro's Arabic. Use it, with
+`tabular-nums`, only where digits must align vertically: numeric and money table columns, totals
+rows, money inputs. Headline figures, prose, chips and headings stay Readex Pro. Monospace fonts were
+rejected: they read as code and carry no Arabic-Indic digits.
+
 ## Rules
 
 - Keep the mark unmirrored in Arabic layouts: the arrow means "forward", not reading direction.
