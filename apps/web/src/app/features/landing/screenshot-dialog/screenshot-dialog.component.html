@@ -1,6 +1,6 @@
-<div class="screenshot-dialog" role="dialog" [attr.aria-label]="data.caption">
+<div class="screenshot-dialog">
   <div class="dialog-header">
-    <p class="dialog-caption">{{ data.caption }}</p>
+    <h2 mat-dialog-title class="dialog-caption">{{ currentItem().caption }}</h2>
     <button
       mat-icon-button
       type="button"
@@ -12,12 +12,36 @@
     </button>
   </div>
   <div class="dialog-body">
-    <img
-      [src]="data.src"
-      [alt]="data.alt"
-      width="1440"
-      height="900"
-      class="dialog-image"
-    />
+    <button
+      mat-icon-button
+      type="button"
+      class="dialog-nav-btn prev-btn"
+      (click)="prev()"
+      [disabled]="currentIndex() === 0"
+      [disabledInteractive]="true"
+      [attr.aria-label]="'landing.gallery.previous' | translate"
+    >
+      <mat-icon aria-hidden="true">{{ isRtl() ? 'chevron_right' : 'chevron_left' }}</mat-icon>
+    </button>
+    <div class="dialog-image-wrapper">
+      <img
+        [src]="currentItem().src"
+        [alt]="currentItem().alt"
+        width="1440"
+        height="900"
+        class="dialog-image"
+      />
+    </div>
+    <button
+      mat-icon-button
+      type="button"
+      class="dialog-nav-btn next-btn"
+      (click)="next()"
+      [disabled]="currentIndex() >= items().length - 1"
+      [disabledInteractive]="true"
+      [attr.aria-label]="'landing.gallery.next' | translate"
+    >
+      <mat-icon aria-hidden="true">{{ isRtl() ? 'chevron_left' : 'chevron_right' }}</mat-icon>
+    </button>
   </div>
 </div>

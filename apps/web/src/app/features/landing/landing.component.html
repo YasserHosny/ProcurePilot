@@ -6,7 +6,7 @@
           <app-brand-logo [height]="36" />
         </a>
         <a href="https://www.iron-sys.com/" target="_blank" rel="noopener" class="header-maker-link">
-          {{ 'landing.header.byIronSystems' | translate }}
+          {{ 'landing.header.byIronSystemsPrefix' | translate }} <span class="maker-brand" dir="ltr">{{ 'landing.ironSystems.brandName' | translate }}</span> {{ 'landing.header.byIronSystemsSuffix' | translate }}
         </a>
       </div>
       <div class="header-actions">
@@ -25,7 +25,7 @@
     <section class="landing-hero" aria-labelledby="hero-headline">
       <div class="hero-container">
         <div class="hero-content">
-          <p class="hero-eyebrow">{{ 'landing.hero.audience' | translate }}</p>
+          <p class="hero-eyebrow">{{ 'landing.hero.eyebrow' | translate }}</p>
           <h1 id="hero-headline" class="hero-headline">
             {{ 'landing.hero.headline' | translate }}
           </h1>
@@ -43,42 +43,18 @@
           <p class="hero-note">{{ 'landing.hero.note' | translate }}</p>
         </div>
         <div class="hero-preview">
+          <div class="hero-chip-wrapper">
+            <span class="hero-chip">{{ 'landing.hero.visualLabel' | translate }}</span>
+          </div>
           <figure class="hero-preview-figure">
             <img
               [src]="heroImageSrc()"
               [alt]="heroImageAlt()"
-              width="1440"
-              height="900"
+              width="2304"
+              height="478"
               class="hero-preview-image"
             />
           </figure>
-        </div>
-      </div>
-    </section>
-
-    <section class="buyer-fit-section" aria-labelledby="buyer-fit-heading">
-      <div class="section-container">
-        <div class="section-header">
-          <h2 id="buyer-fit-heading" class="section-title">
-            {{ 'landing.buyerFit.title' | translate }}
-          </h2>
-          <p class="section-subtitle">
-            {{ 'landing.buyerFit.subtitle' | translate }}
-          </p>
-        </div>
-        <div class="buyer-fit-grid">
-          <div class="fit-card">
-            <h3 class="fit-card-title">{{ 'landing.buyerFit.item1Title' | translate }}</h3>
-            <p class="fit-card-text">{{ 'landing.buyerFit.item1Description' | translate }}</p>
-          </div>
-          <div class="fit-card">
-            <h3 class="fit-card-title">{{ 'landing.buyerFit.item2Title' | translate }}</h3>
-            <p class="fit-card-text">{{ 'landing.buyerFit.item2Description' | translate }}</p>
-          </div>
-          <div class="fit-card">
-            <h3 class="fit-card-title">{{ 'landing.buyerFit.item3Title' | translate }}</h3>
-            <p class="fit-card-text">{{ 'landing.buyerFit.item3Description' | translate }}</p>
-          </div>
         </div>
       </div>
     </section>
@@ -89,169 +65,52 @@
           <h2 id="workflow-heading" class="section-title">
             {{ 'landing.workflow.title' | translate }}
           </h2>
+          <p class="section-subtitle">
+            {{ 'landing.workflow.intro' | translate }}
+          </p>
         </div>
-        <div class="workflow-grid">
-          <div class="step-card">
-            <div class="step-icon-wrapper" aria-hidden="true">
-              <mat-icon>mark_email_read</mat-icon>
-            </div>
+        <ol class="workflow-sequence">
+          <li class="workflow-step step-card">
+            <span class="workflow-step-num">01</span>
             <h3 class="step-title">{{ 'landing.workflow.step1Title' | translate }}</h3>
             <p class="step-description">{{ 'landing.workflow.step1Description' | translate }}</p>
-          </div>
-          <div class="step-card">
-            <div class="step-icon-wrapper" aria-hidden="true">
-              <mat-icon>balance</mat-icon>
-            </div>
+          </li>
+          <li class="workflow-step step-card">
+            <span class="workflow-step-num">02</span>
             <h3 class="step-title">{{ 'landing.workflow.step2Title' | translate }}</h3>
             <p class="step-description">{{ 'landing.workflow.step2Description' | translate }}</p>
-          </div>
-          <div class="step-card">
-            <div class="step-icon-wrapper" aria-hidden="true">
-              <mat-icon>verified_user</mat-icon>
-            </div>
+          </li>
+          <li class="workflow-step step-card">
+            <span class="workflow-step-num">03</span>
             <h3 class="step-title">{{ 'landing.workflow.step3Title' | translate }}</h3>
             <p class="step-description">{{ 'landing.workflow.step3Description' | translate }}</p>
-          </div>
-          <div class="step-card">
-            <div class="step-icon-wrapper" aria-hidden="true">
-              <mat-icon>task_alt</mat-icon>
-            </div>
+          </li>
+          <li class="workflow-step step-card">
+            <span class="workflow-step-num">04</span>
             <h3 class="step-title">{{ 'landing.workflow.step4Title' | translate }}</h3>
             <p class="step-description">{{ 'landing.workflow.step4Description' | translate }}</p>
-          </div>
-        </div>
+          </li>
+        </ol>
       </div>
     </section>
 
-    <section id="gallery" class="gallery-section" aria-labelledby="gallery-heading">
-      <div class="section-container">
-        <div class="section-header">
-          <h2 id="gallery-heading" class="section-title">
-            {{ 'landing.gallery.title' | translate }}
-          </h2>
-          <p class="section-subtitle">
-            {{ 'landing.gallery.subtitle' | translate }}
-          </p>
+    <app-landing-gallery [(activeCardIndex)]="activeCardIndex" />
+
+    <app-landing-evidence />
+
+    <section class="maker-byline-band" aria-label="Iron Systems">
+      <div class="section-container byline-container">
+        <div class="byline-content">
+          <span class="byline-eyebrow">{{ 'landing.ironSystems.eyebrow' | translate }}</span>
+          <p class="byline-text">{{ 'landing.ironSystems.textBeforeBrand' | translate }} <span class="maker-brand" dir="ltr">{{ 'landing.ironSystems.brandName' | translate }}</span>{{ 'landing.ironSystems.textAfterBrand' | translate }}</p>
         </div>
-        <mat-tab-group
-          [selectedIndex]="selectedTabIndex()"
-          (selectedIndexChange)="selectedTabIndex.set($event)"
-          class="gallery-tab-group"
-          animationDuration="0ms"
-          mat-stretch-tabs="false"
-        >
-          @for (tab of galleryTabs; track tab.id) {
-            <mat-tab [label]="tab.labelKey | translate">
-              <div class="gallery-tab-panel">
-                <figure class="gallery-figure">
-                  <div class="figure-image-wrapper">
-                    <img
-                      [src]="'/landing/' + currentLocale() + '/' + tab.file"
-                      [alt]="('landing.gallery.altPrefix' | translate) + (tab.captionKey | translate)"
-                      width="1440"
-                      height="900"
-                      loading="lazy"
-                      class="gallery-image"
-                    />
-                  </div>
-                  <figcaption class="figure-caption-bar">
-                    <div class="caption-content">
-                      <span class="demonstration-badge">{{ 'landing.gallery.demonstrationNote' | translate }}</span>
-                      <p class="figure-caption-text">{{ tab.captionKey | translate }}</p>
-                    </div>
-                    <button
-                      mat-stroked-button
-                      type="button"
-                      class="enlarge-button"
-                      (click)="openEnlargeDialog(tab)"
-                    >
-                      <mat-icon aria-hidden="true">zoom_in</mat-icon>
-                      <span>{{ 'landing.gallery.enlarge' | translate }}</span>
-                    </button>
-                  </figcaption>
-                </figure>
-              </div>
-            </mat-tab>
-          }
-        </mat-tab-group>
+        <a href="https://www.iron-sys.com/" target="_blank" rel="noopener" class="byline-link">
+          {{ 'landing.ironSystems.link' | translate }}
+        </a>
       </div>
     </section>
 
-    <section class="evidence-section" aria-labelledby="evidence-heading">
-      <div class="section-container">
-        <div class="section-header">
-          <h2 id="evidence-heading" class="section-title">
-            {{ 'landing.evidence.title' | translate }}
-          </h2>
-          <p class="section-subtitle">
-            {{ 'landing.evidence.description' | translate }}
-          </p>
-        </div>
-        <div class="evidence-grid">
-          <div class="evidence-card">
-            <div class="evidence-icon-wrapper" aria-hidden="true">
-              <mat-icon>rule</mat-icon>
-            </div>
-            <p class="evidence-card-text">{{ 'landing.evidence.callout1' | translate }}</p>
-          </div>
-          <div class="evidence-card">
-            <div class="evidence-icon-wrapper" aria-hidden="true">
-              <mat-icon>person_check</mat-icon>
-            </div>
-            <p class="evidence-card-text">{{ 'landing.evidence.callout2' | translate }}</p>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <section class="maker-band" aria-labelledby="maker-heading">
-      <div class="section-container">
-        <div class="maker-content">
-          <p class="maker-eyebrow">{{ 'landing.ironSystems.eyebrow' | translate }}</p>
-          <h2 id="maker-heading" class="maker-title">
-            {{ 'landing.ironSystems.title' | translate }}
-          </h2>
-          <p class="maker-description">
-            {{ 'landing.ironSystems.description' | translate }}
-          </p>
-          <a href="https://www.iron-sys.com/" target="_blank" rel="noopener" class="maker-link">
-            <span>{{ 'landing.ironSystems.link' | translate }}</span>
-          </a>
-        </div>
-      </div>
-    </section>
-
-    <section class="pilot-section" aria-labelledby="pilot-heading">
-      <div class="section-container">
-        <div class="pilot-card">
-          <h2 id="pilot-heading" class="section-title">
-            {{ 'landing.pilot.title' | translate }}
-          </h2>
-          <p class="section-subtitle">
-            {{ 'landing.pilot.subtitle' | translate }}
-          </p>
-          <div class="pilot-actions">
-            <a mat-flat-button color="primary" [href]="mailtoLink()" class="pilot-primary-btn">
-              {{ 'landing.pilot.cta' | translate }}
-            </a>
-          </div>
-          <p class="pilot-instructions">
-            {{ 'landing.pilot.instructionsPrefix' | translate }} <bdi>{{ supportEmail }}</bdi> {{ 'landing.pilot.instructionsSuffix' | translate }}
-          </p>
-        </div>
-
-        <div class="faq-list">
-          @for (item of faqItems; track item.id) {
-            <details class="faq-row">
-              <summary class="faq-summary">{{ item.qKey | translate }}</summary>
-              <div class="faq-answer">
-                <p>{{ item.aKey | translate }}</p>
-              </div>
-            </details>
-          }
-        </div>
-      </div>
-    </section>
+    <app-landing-pilot [(emailCopied)]="emailCopied" />
   </main>
 
   <footer class="landing-footer">
@@ -260,13 +119,13 @@
         <span class="footer-product-name">{{ 'common.brandName' | translate }}</span>
         <span class="footer-separator" aria-hidden="true">·</span>
         <a href="https://www.iron-sys.com/" target="_blank" rel="noopener" class="footer-maker-link">
-          {{ 'landing.footer.builtBy' | translate }}
+          {{ 'landing.footer.builtByPrefix' | translate }} <span class="maker-brand" dir="ltr">{{ 'landing.ironSystems.brandName' | translate }}</span>
         </a>
       </div>
       <div class="footer-links">
         <a [href]="supportMailto" class="footer-support-link">
           <mat-icon aria-hidden="true" class="footer-icon">support_agent</mat-icon>
-          <span>{{ 'landing.footer.contactSupportPrefix' | translate }}<bdi>{{ supportEmail }}</bdi></span>
+          <span>{{ 'landing.footer.contactSupportPrefix' | translate }}<bdi class="email-bdi">{{ supportEmail }}</bdi></span>
         </a>
         <span class="footer-separator" aria-hidden="true">·</span>
         <a routerLink="/auth/sign-in" class="footer-signin-link">

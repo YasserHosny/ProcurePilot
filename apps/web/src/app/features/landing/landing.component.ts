@@ -1,8 +1,13 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  ViewChild,
+  computed,
+  inject,
+  signal,
+} from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
-import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
-import { MatTabsModule } from '@angular/material/tabs';
 import { RouterLink } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
@@ -10,60 +15,22 @@ import { environment } from '../../../environments/environment';
 import { I18nService } from '../../core/i18n/i18n.service';
 import { BrandLogoComponent } from '../../layout/brand-logo/brand-logo.component';
 import { LanguageToggleComponent } from '../../layout/language-toggle/language-toggle.component';
-import { ScreenshotDialogComponent } from './screenshot-dialog/screenshot-dialog.component';
+import { LandingEvidenceComponent } from './landing-evidence/landing-evidence.component';
+import {
+  GALLERY_CARDS,
+  type GalleryCard,
+  LandingGalleryComponent,
+} from './landing-gallery/landing-gallery.component';
+import {
+  FAQ_ITEMS,
+  type FaqItem,
+  LandingPilotComponent,
+} from './landing-pilot/landing-pilot.component';
 
-export interface GalleryTab {
-  readonly id: string;
-  readonly file: string;
-  readonly labelKey: string;
-  readonly captionKey: string;
-}
-
-export interface FaqItem {
-  readonly id: string;
-  readonly qKey: string;
-  readonly aKey: string;
-}
-
-export const GALLERY_TABS: readonly GalleryTab[] = [
-  {
-    id: 'quotation-review',
-    file: '01-quotation-review.jpg',
-    labelKey: 'landing.gallery.tabQuotationReview',
-    captionKey: 'landing.gallery.captionQuotationReview',
-  },
-  {
-    id: 'smart-compare',
-    file: '02-smart-compare.jpg',
-    labelKey: 'landing.gallery.tabSmartCompare',
-    captionKey: 'landing.gallery.captionSmartCompare',
-  },
-  {
-    id: 'basket-split',
-    file: '03-basket-split.jpg',
-    labelKey: 'landing.gallery.tabBasketSplit',
-    captionKey: 'landing.gallery.captionBasketSplit',
-  },
-  {
-    id: 'approval-queue',
-    file: '04-approval-queue.jpg',
-    labelKey: 'landing.gallery.tabApprovalQueue',
-    captionKey: 'landing.gallery.captionApprovalQueue',
-  },
-  {
-    id: 'savings-ledger',
-    file: '05-savings-ledger.jpg',
-    labelKey: 'landing.gallery.tabSavingsLedger',
-    captionKey: 'landing.gallery.captionSavingsLedger',
-  },
-];
-
-export const FAQ_ITEMS: readonly FaqItem[] = [
-  { id: 'q1', qKey: 'landing.pilot.q1', aKey: 'landing.pilot.a1' },
-  { id: 'q2', qKey: 'landing.pilot.q2', aKey: 'landing.pilot.a2' },
-  { id: 'q3', qKey: 'landing.pilot.q3', aKey: 'landing.pilot.a3' },
-  { id: 'q4', qKey: 'landing.pilot.q4', aKey: 'landing.pilot.a4' },
-];
+export { GALLERY_CARDS, FAQ_ITEMS };
+export type { GalleryCard, FaqItem };
+export type GalleryTab = GalleryCard;
+export const GALLERY_TABS = GALLERY_CARDS;
 
 @Component({
   selector: 'app-landing',
@@ -71,11 +38,12 @@ export const FAQ_ITEMS: readonly FaqItem[] = [
   imports: [
     BrandLogoComponent,
     LanguageToggleComponent,
+    LandingGalleryComponent,
+    LandingEvidenceComponent,
+    LandingPilotComponent,
     RouterLink,
     MatButtonModule,
     MatIconModule,
-    MatTabsModule,
-    MatDialogModule,
     TranslatePipe,
   ],
   templateUrl: './landing.component.html',
@@ -84,16 +52,27 @@ export const FAQ_ITEMS: readonly FaqItem[] = [
 })
 export class LandingComponent {
   private readonly translate = inject(TranslateService);
-  private readonly dialog = inject(MatDialog);
   readonly i18n = inject(I18nService);
+
+  @ViewChild(LandingGalleryComponent) galleryComponent?: LandingGalleryComponent;
+  @ViewChild(LandingPilotComponent) pilotComponent?: LandingPilotComponent;
 
   readonly supportEmail = environment.supportEmail;
   readonly supportMailto = `mailto:${environment.supportEmail}`;
   readonly currentLocale = this.i18n.currentLocale;
-  readonly selectedTabIndex = signal(0);
+  readonly isRtl = this.i18n.isRtl;
 
-  readonly galleryTabs = GALLERY_TABS;
+  readonly activeCardIndex = signal(0);
+  readonly emailCopied = signal(false);
+
+  readonly galleryCards = GALLERY_CARDS;
+  readonly galleryTabs = GALLERY_CARDS;
   readonly faqItems = FAQ_ITEMS;
+
+  readonly demoLastQuoted = { amount: 2600.0, currency: 'EGP' };
+  readonly demoPaid = { amount: 2040.0, currency: 'EGP' };
+  readonly demoCalculated = { amount: 560.0, currency: 'EGP' };
+  readonly demoVerified = { amount: 560.0, currency: 'EGP' };
 
   readonly mailtoLink = computed(() => {
     this.currentLocale();
@@ -110,25 +89,39 @@ export class LandingComponent {
     return `mailto:${this.supportEmail}${query}`;
   });
 
-  readonly heroImageSrc = computed(() => `/landing/${this.currentLocale()}/02-smart-compare.jpg`);
-  readonly heroImageAlt = computed(() => {
-    const prefix = this.translate.instant('landing.gallery.altPrefix');
-    const caption = this.translate.instant('landing.gallery.captionSmartCompare');
-    return `${prefix}${caption}`;
-  });
+  readonly heroImageSrc = computed(
+    () => `/landing/${this.currentLocale()}/hero-recommendation.jpg`
+  );
+  readonly heroImageAlt = computed(() =>
+    this.translate.instant('landing.hero.visualAlt')
+  );
 
-  openEnlargeDialog(tab: GalleryTab): void {
-    const caption = this.translate.instant(tab.captionKey);
-    const altPrefix = this.translate.instant('landing.gallery.altPrefix');
-    this.dialog.open(ScreenshotDialogComponent, {
-      data: {
-        src: `/landing/${this.currentLocale()}/${tab.file}`,
-        alt: `${altPrefix}${caption}`,
-        caption,
-      },
-      restoreFocus: true,
-      maxWidth: '95vw',
-      panelClass: 'screenshot-dialog-panel',
-    });
+  scrollToCard(index: number): void {
+    this.activeCardIndex.set(index);
+    this.galleryComponent?.scrollToCard(index);
+  }
+
+  nextCard(): void {
+    this.galleryComponent?.nextCard();
+  }
+
+  prevCard(): void {
+    this.galleryComponent?.prevCard();
+  }
+
+  onRailKeydown(event: KeyboardEvent): void {
+    this.galleryComponent?.onRailKeydown(event);
+  }
+
+  openEnlargeDialog(indexOrTab: number | GalleryCard): void {
+    this.galleryComponent?.openEnlargeDialog(indexOrTab);
+  }
+
+  copyEmail(): void {
+    this.pilotComponent?.copyEmail();
+  }
+
+  getCardAriaLabel(index: number, card: GalleryCard): string {
+    return this.galleryComponent?.getCardAriaLabel(index, card) ?? '';
   }
 }

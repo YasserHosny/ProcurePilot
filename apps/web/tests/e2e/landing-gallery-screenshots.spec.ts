@@ -21,7 +21,8 @@
  * Repeated runs reuse deterministic tenant-scoped rows and overwrite the same Storage
  * object paths. Never delete/update audit events or verified savings.
  *
- * Writes exactly ten 1440x900 JPEGs (quality 88) under public/landing/{en,ar}/.
+ * Writes ten 1440x900 JPEGs plus two 2x hero recommendation crops (quality 88)
+ * under public/landing/{en,ar}/ (PPS-45 / P-20).
  * Without CAPTURE_LANDING_GALLERY=1 every test is skipped and no hosted work runs.
  * --list is always offline, with or without the opt-in.
  */
@@ -200,6 +201,19 @@ async function zoomDenseWorkspace(page: Page): Promise<void> {
   });
 }
 
+async function prepareSmartCompare(page: Page, locale: 'en' | 'ar'): Promise<void> {
+  await page.goto(`/offers/compare?product_id=${state.productId}&quantity=2`);
+  await expect(page.locator('.offers-table tr[mat-row]')).toHaveCount(3);
+  // Match the dense quotation workspace's page zoom, retaining all controls and columns.
+  await zoomDenseWorkspace(page);
+  await expect(page.locator('.recommendation-card')).toBeVisible();
+  await expect(page.locator('.evidence-chips')).toBeVisible();
+  await expect(page.locator('.quantity-field mat-hint')).toContainText(locale === 'ar' ? '٢٥' : '25');
+  await expect(page.locator('.cost-amount')).toContainText(locale === 'ar' ? '٢٬٠٤٠' : '2,040');
+  await expect(page.locator('.expired-row')).toHaveCount(0);
+  await expect(page.locator('.offers-table tr[mat-row]').last()).toBeInViewport({ ratio: 1 });
+}
+
 async function capture(page: Page, locale: 'en' | 'ar', name: string): Promise<void> {
   await settleGallery(page);
   await expect(page.locator('html')).toHaveAttribute('dir', locale === 'ar' ? 'rtl' : 'ltr');
@@ -226,7 +240,7 @@ test.describe('PPS-36 landing gallery: synthetic Cairo restaurant procurement', 
         await setOwnerLocale(locale, state.token);
         await page.clock.setFixedTime(new Date('2026-10-22T09:00:00Z'));
         // Restore the real API-issued session in memory. No password enters the browser,
-        // and ten captures do not require ten rate-limited login requests.
+        // and captures do not require repeated rate-limited login requests.
         await page.addInitScript(({ origin, accessToken, refreshToken }) => {
           if (location.origin === origin) {
             localStorage.setItem('pp.access_token', accessToken);
@@ -257,16 +271,7 @@ test.describe('PPS-36 landing gallery: synthetic Cairo restaurant procurement', 
       });
 
       test('02 smart compare: three offers, conversion and recommendation evidence', async ({ page }) => {
-        await page.goto(`/offers/compare?product_id=${state.productId}&quantity=2`);
-        await expect(page.locator('.offers-table tr[mat-row]')).toHaveCount(3);
-        // Match the dense quotation workspace's page zoom, retaining all controls and columns.
-        await zoomDenseWorkspace(page);
-        await expect(page.locator('.recommendation-card')).toBeVisible();
-        await expect(page.locator('.evidence-chips')).toBeVisible();
-        await expect(page.locator('.quantity-field mat-hint')).toContainText(locale === 'ar' ? '٢٥' : '25');
-        await expect(page.locator('.cost-amount')).toContainText(locale === 'ar' ? '٢٬٠٤٠' : '2,040');
-        await expect(page.locator('.expired-row')).toHaveCount(0);
-        await expect(page.locator('.offers-table tr[mat-row]').last()).toBeInViewport({ ratio: 1 });
+        await prepareSmartCompare(page, locale);
         await capture(page, locale, '02-smart-compare');
       });
 
@@ -306,6 +311,54 @@ test.describe('PPS-36 landing gallery: synthetic Cairo restaurant procurement', 
         await expect(page.locator(`a[href="/savings/${state.savingId}/evidence"]`)).toBeVisible();
         await expect(page.locator('.savings-table tr[mat-row]').last()).toBeInViewport({ ratio: 1 });
         await capture(page, locale, '05-savings-ledger');
+      });
+
+      test.describe('PPS-45 hero recommendation crop', () => {
+        // Each test gets a separate context/page. Only these two captures use 2x;
+        // existing gallery contexts retain their original setup.
+        test.use({ deviceScaleFactor: 2 });
+
+        test('hero-recommendation: padded Smart Compare card at 2x', async ({ page }) => {
+          await prepareSmartCompare(page, locale);
+          await settleGallery(page);
+          await expect(page.locator('html')).toHaveAttribute('dir', locale === 'ar' ? 'rtl' : 'ltr');
+          await expect(page.locator('html')).toHaveAttribute('lang', locale);
+          await expect(page.locator('.workspace-badge')).toContainText('Synthetic demonstration data');
+          await expect(page.locator('.workspace-badge')).toBeInViewport({ ratio: 1 });
+
+          // Stable selector from compare-recommendation.component.html, enclosing
+          // supplier, unit price, landed cost, purchase action and evidence chips.
+          const card = page.locator('app-compare-recommendation .recommendation-card');
+          await expect(card).toHaveCount(1);
+          await expect(card.locator('.supplier-title')).toBeVisible();
+          await expect(card.locator('.unit-price-sub')).toBeVisible();
+          await expect(card.locator('.record-purchase-btn')).toBeVisible();
+          await expect(card.locator('.evidence-chips')).toBeVisible();
+          await card.scrollIntoViewIfNeeded();
+          const bounds = await card.boundingBox();
+          if (!bounds) throw new Error('Recommendation card has no screenshot bounds');
+          const padding = 16; // CSS pixels: 32 output pixels at deviceScaleFactor 2.
+          const clip = {
+            x: Math.floor(bounds.x - padding),
+            y: Math.floor(bounds.y - padding),
+            width: Math.ceil(bounds.x + bounds.width + padding) - Math.floor(bounds.x - padding),
+            height: Math.ceil(bounds.y + bounds.height + padding) - Math.floor(bounds.y - padding),
+          };
+          // Fail rather than silently trim padding or card content.
+          const viewport = page.viewportSize();
+          if (!viewport) throw new Error('Hero capture requires a fixed viewport');
+          expect(clip.x).toBeGreaterThanOrEqual(0);
+          expect(clip.y).toBeGreaterThanOrEqual(0);
+          expect(clip.x + clip.width).toBeLessThanOrEqual(viewport.width);
+          expect(clip.y + clip.height).toBeLessThanOrEqual(viewport.height);
+          const directory = join(ROOT, 'apps/web/public/landing', locale);
+          mkdirSync(directory, { recursive: true });
+          // Locator-derived clip preserves the real surrounding 16px of UI.
+          await page.screenshot({
+            path: join(directory, 'hero-recommendation.jpg'),
+            type: 'jpeg', quality: 88, scale: 'device', clip, animations: 'disabled',
+          });
+        });
       });
     });
   }

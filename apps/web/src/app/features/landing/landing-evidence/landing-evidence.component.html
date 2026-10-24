@@ -1,0 +1,43 @@
+<section class="evidence-section" aria-labelledby="evidence-heading">
+  <div class="evidence-container">
+    <div class="evidence-text-col">
+      <h2 id="evidence-heading" class="evidence-title">
+        {{ 'landing.evidence.title' | translate }}
+      </h2>
+      <p class="evidence-body">
+        {{ 'landing.evidence.body' | translate }}
+      </p>
+      <p class="evidence-second-point">
+        {{ 'landing.evidence.secondPoint' | translate }}
+      </p>
+    </div>
+    <div class="evidence-card-col">
+      <div class="ledger-excerpt-card">
+        <div class="excerpt-header">
+          <span class="excerpt-chip demonstration">{{ 'landing.evidence.demonstrationLabel' | translate }}</span>
+        </div>
+        <div class="excerpt-rows">
+          <div class="excerpt-row">
+            <span class="excerpt-label">{{ 'landing.evidence.rowLastQuoted' | translate }}</span>
+            <span class="excerpt-amount pp-figures">{{ demoLastQuoted | formatMoney:currentLocale() }}</span>
+          </div>
+          <div class="excerpt-row">
+            <span class="excerpt-label">{{ 'landing.evidence.rowPaid' | translate }}</span>
+            <span class="excerpt-amount pp-figures">{{ demoPaid | formatMoney:currentLocale() }}</span>
+          </div>
+          <div class="excerpt-row">
+            <span class="excerpt-label">{{ 'landing.evidence.rowCalculated' | translate }}</span>
+            <span class="excerpt-amount pp-figures">{{ demoCalculated | formatMoney:currentLocale() }}</span>
+          </div>
+          <div class="excerpt-row verified-row">
+            <div class="verified-label-group">
+              <span class="excerpt-label">{{ 'landing.evidence.rowVerified' | translate }}</span>
+              <span class="excerpt-chip verified">{{ 'landing.evidence.statusVerified' | translate }}</span>
+            </div>
+            <span class="excerpt-amount pp-figures">{{ demoVerified | formatMoney:currentLocale() }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>

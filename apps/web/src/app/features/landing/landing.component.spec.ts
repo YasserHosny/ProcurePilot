@@ -1,4 +1,5 @@
-import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { Clipboard } from '@angular/cdk/clipboard';
+import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
 import { MatDialog, MatDialogRef } from '@angular/material/dialog';
 import { By } from '@angular/platform-browser';
 import { provideRouter } from '@angular/router';
@@ -28,13 +29,9 @@ describe('LandingComponent', () => {
       providers: [
         provideRouter([]),
         provideTranslateService(),
+        { provide: MatDialog, useValue: dialogSpy },
       ],
     })
-      .overrideComponent(LandingComponent, {
-        set: {
-          providers: [{ provide: MatDialog, useValue: dialogSpy }],
-        },
-      })
       .compileComponents();
 
     translate = TestBed.inject(TranslateService);
@@ -67,7 +64,7 @@ describe('LandingComponent', () => {
 
     const secondaryBtn = fixture.debugElement.query(By.css('.hero-secondary-btn'));
     expect(secondaryBtn).toBeTruthy();
-    expect(secondaryBtn.nativeElement.textContent.trim()).toBe('Explore product screens');
+    expect(secondaryBtn.nativeElement.textContent.trim()).toBe('See the product screens');
     expect(secondaryBtn.nativeElement.getAttribute('href')).toBe('#gallery');
   });
 
@@ -80,18 +77,91 @@ describe('LandingComponent', () => {
     }
   });
 
-  it('renders five gallery tabs', () => {
-    const tabs = fixture.debugElement.queryAll(By.css('.gallery-tab-group .mat-mdc-tab'));
-    expect(tabs.length).toBe(5);
+  it('rail renders 5 cards with numbered labels and captions', () => {
+    const cards = fixture.debugElement.queryAll(By.css('.gallery-card'));
+    expect(cards.length).toBe(5);
+    for (let i = 0; i < cards.length; i++) {
+      const card = cards[i];
+      const numLabel = card.query(By.css('.gallery-card-numbered-label'));
+      expect(numLabel).toBeTruthy();
+      expect(numLabel.nativeElement.textContent).toContain(component.galleryCards[i].num);
+
+      const caption = card.query(By.css('.gallery-caption-sentence'));
+      expect(caption).toBeTruthy();
+      expect(caption.nativeElement.textContent.trim().length).toBeGreaterThan(0);
+    }
   });
 
-  it('switches gallery and preview image src between /landing/en/ and /landing/ar/ with the locale', () => {
+  it('disables next/prev at ends', () => {
+    const prevBtn = fixture.debugElement.query(By.css('.gallery-nav-btn.prev-btn'));
+    const nextBtn = fixture.debugElement.query(By.css('.gallery-nav-btn.next-btn'));
+
+    expect(component.activeCardIndex()).toBe(0);
+    expect(prevBtn.nativeElement.disabled).toBeTrue();
+    expect(nextBtn.nativeElement.disabled).toBeFalse();
+
+    component.scrollToCard(4);
+    fixture.detectChanges();
+    expect(component.activeCardIndex()).toBe(4);
+    expect(prevBtn.nativeElement.disabled).toBeFalse();
+    expect(nextBtn.nativeElement.disabled).toBeTrue();
+  });
+
+  it('step index marks the active card and clicking scrolls to it', () => {
+    const stepBtns = fixture.debugElement.queryAll(By.css('.gallery-step-btn'));
+    expect(stepBtns.length).toBe(5);
+
+    expect(stepBtns[0].nativeElement.classList).toContain('active');
+    expect(stepBtns[0].nativeElement.getAttribute('aria-current')).toBe('true');
+    expect(stepBtns[1].nativeElement.classList).not.toContain('active');
+
+    stepBtns[1].nativeElement.click();
+    fixture.detectChanges();
+
+    expect(component.activeCardIndex()).toBe(1);
+    expect(stepBtns[1].nativeElement.classList).toContain('active');
+    expect(stepBtns[1].nativeElement.getAttribute('aria-current')).toBe('true');
+    expect(stepBtns[0].nativeElement.classList).not.toContain('active');
+  });
+
+  it('moves active card with ArrowRight/Left (mirrored when dir=rtl)', () => {
+    const rail = fixture.debugElement.query(By.css('.gallery-rail'));
+
+    expect(component.isRtl()).toBeFalse();
+    expect(component.activeCardIndex()).toBe(0);
+
+    rail.triggerEventHandler('keydown', { key: 'ArrowRight', preventDefault: jasmine.createSpy() });
+    fixture.detectChanges();
+    expect(component.activeCardIndex()).toBe(1);
+
+    rail.triggerEventHandler('keydown', { key: 'ArrowLeft', preventDefault: jasmine.createSpy() });
+    fixture.detectChanges();
+    expect(component.activeCardIndex()).toBe(0);
+
+    i18nService.setLocale('ar');
+    translate.use('ar');
+    fixture.detectChanges();
+
+    expect(component.isRtl()).toBeTrue();
+    component.scrollToCard(1);
+    fixture.detectChanges();
+    expect(component.activeCardIndex()).toBe(1);
+
+    // In RTL: ArrowRight moves prev (1 -> 0)
+    rail.triggerEventHandler('keydown', { key: 'ArrowRight', preventDefault: jasmine.createSpy() });
+    fixture.detectChanges();
+    expect(component.activeCardIndex()).toBe(0);
+
+    // In RTL: ArrowLeft moves next (0 -> 1)
+    rail.triggerEventHandler('keydown', { key: 'ArrowLeft', preventDefault: jasmine.createSpy() });
+    fixture.detectChanges();
+    expect(component.activeCardIndex()).toBe(1);
+  });
+
+  it('switches hero image src between /landing/en/ and /landing/ar/ with the locale', () => {
     expect(component.currentLocale()).toBe('en');
     let heroImg = fixture.debugElement.query(By.css('.hero-preview-image'));
-    expect(heroImg.nativeElement.getAttribute('src')).toBe('/landing/en/02-smart-compare.jpg');
-
-    let galleryImg = fixture.debugElement.query(By.css('.gallery-image'));
-    expect(galleryImg.nativeElement.getAttribute('src')).toBe('/landing/en/01-quotation-review.jpg');
+    expect(heroImg.nativeElement.getAttribute('src')).toBe('/landing/en/hero-recommendation.jpg');
 
     i18nService.setLocale('ar');
     translate.use('ar');
@@ -99,26 +169,59 @@ describe('LandingComponent', () => {
 
     expect(component.currentLocale()).toBe('ar');
     heroImg = fixture.debugElement.query(By.css('.hero-preview-image'));
-    expect(heroImg.nativeElement.getAttribute('src')).toBe('/landing/ar/02-smart-compare.jpg');
-
-    galleryImg = fixture.debugElement.query(By.css('.gallery-image'));
-    expect(galleryImg.nativeElement.getAttribute('src')).toBe('/landing/ar/01-quotation-review.jpg');
+    expect(heroImg.nativeElement.getAttribute('src')).toBe('/landing/ar/hero-recommendation.jpg');
   });
 
-  it('opens MatDialog when clicking enlarge screenshot button', () => {
-    const enlargeBtn = fixture.debugElement.query(By.css('.enlarge-button'));
-    expect(enlargeBtn).toBeTruthy();
-    enlargeBtn.triggerEventHandler('click', null);
+  it('enlarge opens the dialog at the right index and dialog prev/next change the image', () => {
+    const cardEnlargeBtns = fixture.debugElement.queryAll(By.css('.gallery-enlarge-btn'));
+    expect(cardEnlargeBtns.length).toBe(5);
+
+    cardEnlargeBtns[1].triggerEventHandler('click', null);
 
     expect(dialogSpy.open).toHaveBeenCalledWith(
       ScreenshotDialogComponent,
       jasmine.objectContaining({
         data: jasmine.objectContaining({
-          src: '/landing/en/01-quotation-review.jpg',
+          initialIndex: 1,
         }),
         restoreFocus: true,
       })
     );
+  });
+
+  it('copy-email uses Clipboard and announces "Copied"', fakeAsync(() => {
+    const clipboard = TestBed.inject(Clipboard);
+    const copySpy = spyOn(clipboard, 'copy').and.returnValue(true);
+
+    const copyBtn = fixture.debugElement.query(By.css('.copy-email-btn'));
+    expect(copyBtn).toBeTruthy();
+
+    copyBtn.triggerEventHandler('click', null);
+    fixture.detectChanges();
+
+    expect(copySpy).toHaveBeenCalledWith(environment.supportEmail);
+    expect(component.emailCopied()).toBeTrue();
+
+    const liveRegion = fixture.debugElement.query(By.css('[aria-live="polite"]'));
+    expect(liveRegion.nativeElement.textContent.trim()).toBe('Copied');
+    expect(copyBtn.nativeElement.textContent).toContain('Copied');
+
+    tick(2000);
+    fixture.detectChanges();
+    expect(component.emailCopied()).toBeFalse();
+  }));
+
+  it('evidence excerpt shows the four rows with the verified row marked', () => {
+    const excerptRows = fixture.debugElement.queryAll(By.css('.excerpt-row'));
+    expect(excerptRows.length).toBe(4);
+
+    const verifiedRow = fixture.debugElement.query(By.css('.excerpt-row.verified-row'));
+    expect(verifiedRow).toBeTruthy();
+
+    const verifiedChip = verifiedRow.query(By.css('.excerpt-chip.verified'));
+    expect(verifiedChip).toBeTruthy();
+    expect(verifiedChip.nativeElement.textContent.trim()).toBe('Verified');
+    expect(verifiedRow.nativeElement.textContent).toContain('560.00');
   });
 
   it('renders Q&A with 4 items using native details and summary', () => {
