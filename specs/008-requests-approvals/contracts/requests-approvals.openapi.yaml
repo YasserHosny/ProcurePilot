@@ -472,6 +472,8 @@ components:
       properties:
         id: { type: string, format: uuid }
         assigned_membership_id: { type: string, format: uuid }
+        assigned_name: { type: string, nullable: true }
+        assigned_email: { type: string, format: email, nullable: true }
         source: { $ref: '#/components/schemas/ApprovalStepSource' }
         status: { $ref: '#/components/schemas/ApprovalStepStatus' }
         comment: { type: string, nullable: true }

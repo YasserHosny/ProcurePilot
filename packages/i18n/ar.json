@@ -2164,7 +2164,8 @@
       "assignedTo": "معيّن إلى",
       "comment": "تعليق القرار",
       "decidedAt": "تاريخ القرار",
-      "pending": "بانتظار الاعتماد"
+      "pending": "بانتظار الاعتماد",
+      "unknownApprover": "معتمد غير معروف"
     },
     "autoPrepared": {
       "badge": "مُعدّ تلقائيًا",

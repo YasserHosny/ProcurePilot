@@ -12,6 +12,7 @@ from fastapi.testclient import TestClient
 from integration.catalogue_helpers import (
     TEST_DATABASE_URL,
     act_as,
+    reset_role,
 )
 from integration.quotation_helpers import (
     PsycopgSupabaseClient,
@@ -50,6 +51,47 @@ def _add_branch(cur: object, workspace: object, name: str) -> UUID:
         (branch_id, workspace.tenant_id, name),
     )
     return branch_id
+
+
+def test_list_requests_includes_draft_without_step_and_submitted_assignee_email(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    with committed_smart_context("web-draft-assignee", supplier_count=1) as context:
+        draft_id, submitted_id = uuid4(), uuid4()
+        with pytest.importorskip("psycopg").connect(TEST_DATABASE_URL) as conn:
+            with conn.cursor() as cur:
+                branch_id = _add_branch(cur, context.workspace, "Draft and submitted branch")
+                act_as(cur, context.workspace)
+                for request_id, status in [(draft_id, "draft"), (submitted_id, "submitted")]:
+                    cur.execute(
+                        "insert into purchase_request "
+                        "(id,tenant_id,branch_id,requested_by_membership_id,"
+                        "required_by_date,status) "
+                        "values (%s,%s,%s,%s,'2026-10-10',%s)",
+                        (
+                            request_id,
+                            context.workspace.tenant_id,
+                            branch_id,
+                            context.workspace.membership_id,
+                            status,
+                        ),
+                    )
+                cur.execute(
+                    "insert into approval_step "
+                    "(tenant_id,purchase_request_id,assigned_membership_id,source,status) "
+                    "values (%s,%s,%s,'owner_fallback','pending')",
+                    (context.workspace.tenant_id, submitted_id, context.workspace.membership_id),
+                )
+            client = PsycopgSupabaseClient(conn, claims=context.workspace.claims())
+            monkeypatch.setattr(requests_module, "authenticated_client", lambda *_: client)
+            service = requests_module.RequestsService(settings_for_test_db(monkeypatch))
+            result = service.list_requests(bearer_token="test-token")
+            by_id = {item.id: item for item in result.items}
+            assert set(by_id) == {draft_id, submitted_id}
+            assert by_id[draft_id].approval_step is None
+            step = by_id[submitted_id].approval_step
+            assert step is not None
+            assert step.assigned_email == context.workspace.label + "-owner@example.test"
 
 
 def test_approval_queue_includes_requester_email_and_branch_budget_reasons(
@@ -100,11 +142,96 @@ def test_approval_queue_includes_requester_email_and_branch_budget_reasons(
                 by_id[request_ids[0]].requester_email
                 == context.workspace.label + "-owner@example.test"
             )
+            step = by_id[request_ids[0]].approval_step
+            assert step is not None
+            assert step.assigned_email == context.workspace.label + "-owner@example.test"
+            assert step.assigned_name is None
+            service = requests_module.RequestsService(settings_for_test_db(monkeypatch))
+            detail = service.get_request(bearer_token="test-token", request_id=request_ids[0])
+            assert detail.approval_step is not None
+            assert detail.approval_step.assigned_email == step.assigned_email
+            assert detail.approval_step.assigned_name is None
+            listed = service.list_requests(bearer_token="test-token")
+            assert all(
+                item.approval_step.assigned_email == step.assigned_email for item in listed.items
+            )
             assert by_id[request_ids[0]].budget_status is not None
             assert by_id[request_ids[0]].budget_status.status == "within"
             assert by_id[request_ids[1]].budget_status is not None
             assert by_id[request_ids[1]].budget_status.status == "no_budget"
             assert by_id[request_ids[1]].budget_status.reason_code == "no_budget_for_branch"
+
+
+@pytest.mark.parametrize("cross_tenant", [False, True])
+def test_request_approver_email_uses_assigned_membership_and_tenant_rls(
+    monkeypatch: pytest.MonkeyPatch, cross_tenant: bool
+) -> None:
+    with (
+        committed_smart_context("web-other-assignee", supplier_count=1) as other,
+        committed_smart_context("web-assignee", supplier_count=1) as context,
+    ):
+        with pytest.importorskip("psycopg").connect(TEST_DATABASE_URL) as conn:
+            with conn.cursor() as cur:
+                branch_id = _add_branch(cur, context.workspace, "Assignee branch")
+                request_id = uuid4()
+                # A distinct requester ensures the assigned email cannot come from the requester.
+                requester_id = uuid4()
+                cur.execute(
+                    "insert into membership (id,tenant_id,user_id,email,role) "
+                    "values (%s,%s,%s,'requester@example.test','buyer')",
+                    (requester_id, context.workspace.tenant_id, other.workspace.user_id),
+                )
+                act_as(cur, context.workspace)
+                cur.execute(
+                    "insert into purchase_request "
+                    "(id,tenant_id,branch_id,requested_by_membership_id,required_by_date,status) "
+                    "values (%s,%s,%s,%s,'2026-10-10','submitted')",
+                    (request_id, context.workspace.tenant_id, branch_id, requester_id),
+                )
+                # Deliberately seed an invalid cross-tenant assignment as the test superuser.
+                reset_role(cur)
+                assigned_id = (
+                    other.workspace.membership_id
+                    if cross_tenant
+                    else context.workspace.membership_id
+                )
+                if cross_tenant:
+                    cur.execute("set local session_replication_role = replica")
+                cur.execute(
+                    "insert into approval_step "
+                    "(tenant_id,purchase_request_id,assigned_membership_id,source,status) "
+                    "values (%s,%s,%s,'owner_fallback','pending')",
+                    (context.workspace.tenant_id, request_id, assigned_id),
+                )
+                cur.execute("set local session_replication_role = default")
+            conn.commit()
+            client = PsycopgSupabaseClient(conn, claims=context.workspace.claims())
+            monkeypatch.setattr(requests_module, "authenticated_client", lambda *_: client)
+            service = requests_module.RequestsService(settings_for_test_db(monkeypatch))
+            results = [
+                service.get_request(bearer_token="test-token", request_id=request_id),
+                *service.list_pending_approvals(
+                    bearer_token="test-token", member=member_from_workspace(context.workspace)
+                ).items,
+                *service.list_requests(bearer_token="test-token").items,
+            ]
+            member_detail = service.get_request(
+                bearer_token="test-token",
+                request_id=request_id,
+                member=member_from_workspace(context.workspace),
+            )
+            assert len(results) == 3
+            expected = None if cross_tenant else context.workspace.label + "-owner@example.test"
+            for result in results:
+                assert result.id == request_id
+                assert result.requester_email == "requester@example.test"
+                assert result.approval_step is not None
+                assert result.approval_step.assigned_membership_id == assigned_id
+                assert result.approval_step.assigned_email == expected
+                assert result.approval_step.assigned_name is None
+            assert member_detail.approval_step is not None
+            assert member_detail.approval_step.assigned_email == expected
+            assert member_detail.approval_step.assigned_name is None
 
 
 def test_prepare_request_uses_rfq_needed_by_date_and_returns_draft_id(

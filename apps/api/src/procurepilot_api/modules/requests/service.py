@@ -335,6 +335,21 @@ class RequestsService:
                     (member.tenant_id, request_id),
                 ).fetchall()
 
+                assigned_email = None
+                if step_row:
+                    try:
+                        # A savepoint keeps optional lookup failures from aborting the read.
+                        with conn.transaction():
+                            assigned_member = conn.execute(
+                                "select email from membership "
+                                "where tenant_id = %s and id = %s limit 1",
+                                (member.tenant_id, step_row["assigned_membership_id"]),
+                            ).fetchone()
+                            if assigned_member and assigned_member.get("email"):
+                                assigned_email = str(assigned_member["email"])
+                    except psycopg.Error:
+                        logger.warning("Assigned email lookup failed", exc_info=True)
+
                 auto_prepared_row = None
                 if request_row.get("source_rfq_response_id"):
                     auto_prepared_row = conn.execute(
@@ -355,6 +370,7 @@ class RequestsService:
             request_row,
             line_rows,
             step_row,
+            assigned_email=assigned_email,
             auto_prepared=(
                 AutoPreparedProvenance.model_validate(auto_prepared_row)
                 if auto_prepared_row
@@ -406,22 +422,31 @@ class RequestsService:
         request_ids = [str(r["id"]) for r in visible]
         lines_by_request = self._fetch_lines_batch(client, request_ids)
         steps_by_request = self._fetch_steps_batch(client, request_ids)
-        requester_emails = self._fetch_requester_emails_batch(client, visible)
+        membership_emails = self._fetch_membership_emails_batch(
+            client, visible, list(steps_by_request.values())
+        )
         auto_prepared = self._fetch_auto_prepared_batch(client, visible)
 
-        items = [
-            self._purchase_request_with_budget_status(
-                client,
-                row,
-                lines_by_request.get(str(row["id"]), []),
-                steps_by_request.get(str(row["id"])),
-                requester_email=requester_emails.get(str(row["requested_by_membership_id"])),
-                requester_lookup=False,
-                auto_prepared=auto_prepared.get(str(row["id"])),
-                auto_prepared_lookup=False,
+        items = []
+        for row in visible:
+            step = steps_by_request.get(str(row["id"]))
+            items.append(
+                self._purchase_request_with_budget_status(
+                    client,
+                    row,
+                    lines_by_request.get(str(row["id"]), []),
+                    step,
+                    requester_email=membership_emails.get(str(row["requested_by_membership_id"])),
+                    assigned_email=(
+                        membership_emails.get(str(step["assigned_membership_id"]))
+                        if step is not None
+                        else None
+                    ),
+                    requester_lookup=False,
+                    auto_prepared=auto_prepared.get(str(row["id"])),
+                    auto_prepared_lookup=False,
+                )
             )
-            for row in visible
-        ]
         return PurchaseRequestList(items=items, next_cursor=next_cursor)
 
     def list_requests_eligible_for_order(
@@ -499,22 +524,29 @@ class RequestsService:
         request_rows = self._fetch_requests_batch(client, request_ids)
         lines_by_request = self._fetch_lines_batch(client, request_ids)
         steps_by_request = {str(step["purchase_request_id"]): step for step in visible_steps}
-        requester_emails = self._fetch_requester_emails_batch(client, request_rows)
+        membership_emails = self._fetch_membership_emails_batch(client, request_rows, visible_steps)
         auto_prepared = self._fetch_auto_prepared_batch(client, request_rows)
 
-        items = [
-            self._purchase_request_with_budget_status(
-                client,
-                row,
-                lines_by_request.get(str(row["id"]), []),
-                steps_by_request.get(str(row["id"])),
-                requester_email=requester_emails.get(str(row["requested_by_membership_id"])),
-                requester_lookup=False,
-                auto_prepared=auto_prepared.get(str(row["id"])),
-                auto_prepared_lookup=False,
+        items = []
+        for row in request_rows:
+            step = steps_by_request.get(str(row["id"]))
+            items.append(
+                self._purchase_request_with_budget_status(
+                    client,
+                    row,
+                    lines_by_request.get(str(row["id"]), []),
+                    step,
+                    requester_email=membership_emails.get(str(row["requested_by_membership_id"])),
+                    assigned_email=(
+                        membership_emails.get(str(step["assigned_membership_id"]))
+                        if step is not None
+                        else None
+                    ),
+                    requester_lookup=False,
+                    auto_prepared=auto_prepared.get(str(row["id"])),
+                    auto_prepared_lookup=False,
+                )
             )
-            for row in request_rows
-        ]
         return PurchaseRequestList(items=items, next_cursor=next_cursor)
 
     def create_low_stock_report(
@@ -2084,15 +2116,19 @@ class RequestsService:
         step_row: dict[str, object] | None,
         *,
         requester_email: str | None = None,
+        assigned_email: str | None = None,
         requester_lookup: bool = True,
         auto_prepared: AutoPreparedProvenance | None = None,
         auto_prepared_lookup: bool = True,
     ) -> PurchaseRequest:
         if requester_lookup:
-            requester = self._fetch_requester(
-                client, str(request_row["requested_by_membership_id"])
+            membership_emails = self._fetch_membership_emails_batch(
+                client, [request_row], [step_row] if step_row else []
             )
-            requester_email = str(requester["email"]) if requester.get("email") else None
+            requester_email = membership_emails.get(str(request_row["requested_by_membership_id"]))
+            assigned_email = (
+                membership_emails.get(str(step_row["assigned_membership_id"])) if step_row else None
+            )
         if auto_prepared_lookup:
             auto_prepared = self._fetch_auto_prepared_batch(client, [request_row]).get(
                 str(request_row["id"])
@@ -2104,6 +2140,7 @@ class RequestsService:
             budget_status=self._budget_status_for(client, request_row),
             quoted_prices=self._quoted_prices_for(request_row, line_rows),
             requester_email=requester_email,
+            assigned_email=assigned_email,
             auto_prepared=auto_prepared,
         )
 
@@ -2153,10 +2190,16 @@ class RequestsService:
             )
         return provenance
 
-    def _fetch_requester_emails_batch(
-        self, client: Client, request_rows: list[dict[str, object]]
+    def _fetch_membership_emails_batch(
+        self,
+        client: Client,
+        request_rows: list[dict[str, object]],
+        step_rows: list[dict[str, object] | None],
     ) -> dict[str, str]:
         membership_ids = {str(row["requested_by_membership_id"]) for row in request_rows}
+        membership_ids.update(
+            str(row["assigned_membership_id"]) for row in step_rows if row is not None
+        )
         if not membership_ids:
             return {}
         try:
@@ -2172,27 +2215,8 @@ class RequestsService:
                 if row.get("email")
             }
         except Exception:
-            logger.warning("Requester email lookup failed for request list", exc_info=True)
+            logger.warning("Membership email lookup failed", exc_info=True)
             return {}
-
-    def _fetch_requester(self, client: Client, membership_id: str) -> dict[str, object]:
-        try:
-            response = (
-                client.table("membership")
-                .select("email")
-                .eq("id", membership_id)
-                .limit(1)
-                .execute()
-            )
-        except Exception:
-            logger.warning(
-                "Requester email lookup failed",
-                extra={"membership_id": membership_id},
-                exc_info=True,
-            )
-            return {}
-        rows = _rows(response.data)
-        return rows[0] if rows else {}
 
     def _quoted_prices_for(
         self, request_row: dict[str, object], line_rows: list[dict[str, object]]
@@ -2282,6 +2306,7 @@ def _purchase_request(
     quoted_prices: dict[UUID, tuple[Decimal, str]] | None = None,
     requester_name: str | None = None,
     requester_email: str | None = None,
+    assigned_email: str | None = None,
     auto_prepared: AutoPreparedProvenance | None = None,
 ) -> PurchaseRequest:
     return PurchaseRequest(
@@ -2304,7 +2329,9 @@ def _purchase_request(
         ),
         has_incomplete_estimate=bool(row.get("has_incomplete_estimate", False)),
         budget_status=budget_status,
-        approval_step=_approval_step(step_row) if step_row else None,
+        approval_step=(
+            _approval_step(step_row, assigned_email=assigned_email) if step_row else None
+        ),
         submitted_at=row.get("submitted_at"),
         withdrawn_at=row.get("withdrawn_at"),
         delivered_at=row.get("delivered_at"),
@@ -2354,10 +2381,11 @@ def _purchase_request_line(
     )
 
 
-def _approval_step(row: dict[str, object]) -> ApprovalStep:
+def _approval_step(row: dict[str, object], *, assigned_email: str | None = None) -> ApprovalStep:
     return ApprovalStep(
         id=UUID(str(row["id"])),
         assigned_membership_id=UUID(str(row["assigned_membership_id"])),
+        assigned_email=assigned_email,
         source=str(row["source"]),
         status=str(row["status"]),
         comment=row.get("comment"),
