@@ -142,7 +142,7 @@
               [disabled]="isGroupActive(group.id)"
               (click)="toggleGroup(group.id)"
             >
-              <span class="nav-group-title-text">{{ group.labelKey | translate }}</span>
+              <span class="nav-group-title-text" [id]="'nav-group-title-' + group.id">{{ group.labelKey | translate }}</span>
               <mat-icon class="nav-group-chevron" [class.rtl-chevron]="isRtl()" aria-hidden="true">expand_more</mat-icon>
             </button>
           </h2>
@@ -150,7 +150,8 @@
           <div
             [id]="'nav-group-' + group.id"
             class="nav-group-items"
-            [attr.aria-labelledby]="'nav-group-header-' + group.id"
+            role="group"
+            [attr.aria-labelledby]="'nav-group-title-' + group.id"
             [hidden]="isGroupCollapsed(group.id)"
           >
             @for (item of group.items; track item.route) {

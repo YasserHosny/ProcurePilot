@@ -25,6 +25,7 @@ export interface NavItem {
   icon: string;
   exact?: boolean;
   roles?: Role | Role[];
+  groupPrefix?: string;
 }
 
 export interface NavGroup {
@@ -101,7 +102,7 @@ export class ShellComponent implements OnInit {
       items: [
         { route: '/quotations', labelKey: 'shell.navQuotations', icon: 'receipt_long' },
         { route: '/matching', labelKey: 'shell.navMatching', icon: 'compare_arrows' },
-        { route: '/rfq/history', labelKey: 'shell.navRfq', icon: 'history' },
+        { route: '/rfq/history', labelKey: 'shell.navRfq', icon: 'history', groupPrefix: '/rfq' },
         { route: '/offers/compare', labelKey: 'shell.navCompare', icon: 'auto_awesome' },
         { route: '/offers/basket-split', labelKey: 'shell.navBasketSplit', icon: 'call_split' },
       ],
@@ -133,7 +134,7 @@ export class ShellComponent implements OnInit {
         { route: '/reports', labelKey: 'reports.nav', icon: 'assessment' },
         { route: '/forecasting', labelKey: 'shell.navForecasting', icon: 'trending_up', roles: ['owner', 'buyer'] },
         { route: '/alerts', labelKey: 'shell.navAlerts', icon: 'notifications' },
-        { route: '/analyst', labelKey: 'shell.navAnalyst', icon: 'forum', exact: true },
+        { route: '/analyst', labelKey: 'shell.navAnalyst', icon: 'forum', exact: true, groupPrefix: '/analyst' },
         { route: '/analyst/history', labelKey: 'analyst.navHistory', icon: 'history' },
       ],
     },
@@ -177,10 +178,9 @@ export class ShellComponent implements OnInit {
     const url = this.currentUrl() || this.router.url || '';
     const cleanUrl = url.split('?')[0].split('#')[0];
     return group.items.some((item) => {
+      const prefix = item.groupPrefix ?? item.route;
       if (cleanUrl) {
-        if (item.exact) {
-          if (cleanUrl === item.route) return true;
-        } else if (cleanUrl === item.route || cleanUrl.startsWith(item.route + '/')) {
+        if (cleanUrl === prefix || cleanUrl.startsWith(prefix + '/')) {
           return true;
         }
       }

@@ -255,6 +255,60 @@ describe('ShellComponent account menu', () => {
       expect(sourcingItems.hidden).toBeFalse();
     });
 
+    it('expands owning group and disables toggle on child routes like /analyst/:id and /rfq/compare/:id', async () => {
+      const router = TestBed.inject(Router);
+      localStorage.setItem('pp.sidebar.collapsed', JSON.stringify(['insight', 'sourcing']));
+
+      const testFixture = TestBed.createComponent(ShellComponent);
+      testFixture.detectChanges();
+      const testRoot = testFixture.nativeElement as HTMLElement;
+
+      const insightBtn = testRoot.querySelector<HTMLButtonElement>('#nav-group-header-insight')!;
+      const sourcingBtn = testRoot.querySelector<HTMLButtonElement>('#nav-group-header-sourcing')!;
+
+      // Initially both start collapsed from localStorage
+      expect(insightBtn.getAttribute('aria-expanded')).toBe('false');
+      expect(sourcingBtn.getAttribute('aria-expanded')).toBe('false');
+
+      // Navigate to /analyst/abc (child route of analyst)
+      await router.navigateByUrl('/analyst/abc');
+      testFixture.detectChanges();
+
+      expect(insightBtn.getAttribute('aria-expanded')).toBe('true');
+      expect(insightBtn.disabled).toBeTrue();
+
+      // Navigate to /rfq/compare/123 (child route of rfq)
+      await router.navigateByUrl('/rfq/compare/123');
+      testFixture.detectChanges();
+
+      expect(sourcingBtn.getAttribute('aria-expanded')).toBe('true');
+      expect(sourcingBtn.disabled).toBeTrue();
+
+      testFixture.destroy();
+    });
+
+    it('gives nav-group-items role="group" and points aria-labelledby at the visible group-title text', () => {
+      const root = fixture.nativeElement as HTMLElement;
+      const expectedGroups = [
+        { id: 'sourcing', label: 'Sourcing' },
+        { id: 'purchasing', label: 'Purchasing' },
+        { id: 'catalogue', label: 'Catalogue' },
+        { id: 'insight', label: 'Insight' },
+        { id: 'setup', label: 'Setup' },
+      ];
+
+      expectedGroups.forEach((expected) => {
+        const itemsContainer = root.querySelector<HTMLElement>(`#nav-group-${expected.id}`)!;
+        expect(itemsContainer.getAttribute('role')).toBe('group');
+
+        const labelledById = itemsContainer.getAttribute('aria-labelledby');
+        expect(labelledById).not.toBeNull();
+        const labelEl = root.querySelector<HTMLElement>(`#${labelledById}`);
+        expect(labelEl).not.toBeNull();
+        expect(labelEl!.textContent?.trim()).toBe(expected.label);
+      });
+    });
+
     it('collapsed state persists via localStorage, and the component still renders when localStorage throws', () => {
       const root = fixture.nativeElement as HTMLElement;
       // Test persistence
