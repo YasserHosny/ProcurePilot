@@ -16,6 +16,7 @@ import type { Locale, Role, WorkspaceSummary } from '../../core/api/models';
 import { RoleDirective } from '../../core/auth/role.directive';
 import { SessionService } from '../../core/auth/session.service';
 import { I18nService } from '../../core/i18n';
+import { environment } from '../../../environments/environment';
 
 @Component({
   selector: 'app-shell',
@@ -50,6 +51,7 @@ export class ShellComponent implements OnInit {
   readonly member = this.session.currentMember;
   readonly tenant = this.session.tenant;
   readonly currentLocale = this.i18n.currentLocale;
+  readonly supportMailto = `mailto:${environment.supportEmail}`;
 
   readonly isMobile = signal(false);
   readonly workspaces = signal<WorkspaceSummary[]>([]);
