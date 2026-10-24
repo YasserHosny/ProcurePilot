@@ -9,13 +9,15 @@ def call(args,log):
     (ROOT/'proof'/log).write_text(p.stderr);p.check_returncode()
 
 def main():
-    dst=(ROOT/'../../cuts/v2.4-ledger').resolve();dst.mkdir(parents=True,exist_ok=True)
+    dst=(ROOT/'../../cuts/v2.4.1-ledger').resolve();dst.mkdir(parents=True,exist_ok=True)
     (ROOT/'tmp').mkdir(exist_ok=True);(ROOT/'sheets').mkdir(exist_ok=True)
     report={}
+    timeline=json.loads((ROOT/'timeline.json').read_text())
     for lang in ['ar','en']:
-        for fmt,body in [('h',101),('v',51)]:
+        for fmt in ['h','v']:
+            body=timeline[fmt]['body']
             aspect='16x9' if fmt=='h' else '9x16';suffix='' if lang=='ar' else '-en'
-            frames=ROOT/f'frames-{lang}-{fmt}';count=body*30
+            frames=ROOT/f'frames-caption-{lang}-{fmt}';count=round(body*30)
             assert len(list(frames.glob('*.jpg')))==count,f'Missing rendered frames: {frames}'
             bodyfile=ROOT/'tmp'/f'body-{lang}-{fmt}.mp4'
             call(['-framerate','30','-i',frames/'%05d.jpg','-frames:v',count,'-c:v','libx264','-crf','18','-preset','medium','-threads','4','-pix_fmt','yuv420p','-an',bodyfile],f'encode-{lang}-{fmt}.log')
@@ -33,7 +35,7 @@ def main():
                 data=json.loads(p.stdout);video=next(s for s in data['streams'] if s['codec_type']=='video');audio=next(s for s in data['streams'] if s['codec_type']=='audio')
                 assert (video['width'],video['height'])==((1920,1080) if fmt=='h' else (1080,1920))
                 assert video['r_frame_rate']=='30/1' and video['codec_name']=='h264' and audio['codec_name']=='aac'
-                if fmt=='v':assert float(data['format']['duration'])<=60
+                if fmt=='v':assert float(data['format']['duration'])<=59.5
                 (ROOT/'proof'/f'{lang}-{fmt}-ffprobe.json').write_text(p.stdout);print('FFPROBE',final.name,p.stdout,flush=True)
             else:print('FFPROBE_UNAVAILABLE: install-free render host must supply ffprobe for requested proof',flush=True)
             report[lang+'-'+fmt]=measure(final)

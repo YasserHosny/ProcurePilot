@@ -14,10 +14,14 @@ def main():
     for name,v in control.items():
         assert v['matches']>0
         print(f"CONTROL {name} frames={v['frames']} matching_frames={v['matching_frames']} hits={v['matches']}")
+    results=json.loads((ROOT/'proof/results-privacy.json').read_text())
+    assert len(results)==4
+    for name,v in results.items():
+        assert v['after']['matches']==0
+        print(f"RESULT {name} frames={v['before']['frames']} before_hits={v['before']['matches']} legacy_hits={v['legacy_template_hits']} after_hits={v['after']['matches']} boxes={v['boxes']}")
     audio=json.loads((ROOT/'proof/audio.json').read_text())
     for name,v in audio.items():
         print(f"AUDIO {name} PCM_duration={v['pcm']['duration_seconds']:.6f}s AAC_duration={v['aac']['container_duration']} I={v['aac']['integrated_lufs']:.1f}_LUFS TP={v['aac']['true_peak_dbfs']:.1f}_dBFS")
-    finals=list((ROOT/'../../cuts/v2.4-ledger').glob('*.mp4'))
-    if not finals:print('FINAL_VIDEO_PROOF unavailable: Chrome setsockopt EPERM / SIGTRAP; no final MP4s or final-cut sheets generated')
-    print('FILE_LIST proof/files-created-or-changed.txt')
+    print('DELTA_FINAL_VIDEO_PROOF pending orchestrator render; earlier MP4 measurements do not validate this revision')
+    print('FILE_LIST proof/results-changed-files.txt')
 if __name__=='__main__':main()
