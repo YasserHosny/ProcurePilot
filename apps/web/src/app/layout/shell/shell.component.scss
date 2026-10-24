@@ -103,7 +103,7 @@
 
 .sidenav-container {
   flex: 1;
-  block-size: calc(100vh - 64px);
+  block-size: calc(100vh - var(--pp-toolbar-height));
 }
 
 .shell-sidenav {
@@ -143,10 +143,14 @@
   padding: 0.5rem 0.75rem;
   text-decoration: none;
 
+  // mat-list-item wraps its content in an inline span, so the host's flex gap never reaches the
+  // icon: align it on the label's line instead.
   mat-icon {
     font-size: 20px;
     inline-size: 20px;
     block-size: 20px;
+    vertical-align: middle;
+    margin-inline-end: 0.75rem;
     color: var(--pp-text-muted);
   }
 
