@@ -109,19 +109,11 @@ export class LandingComponent {
     this.galleryComponent?.prevCard();
   }
 
-  onRailKeydown(event: KeyboardEvent): void {
-    this.galleryComponent?.onRailKeydown(event);
-  }
-
   openEnlargeDialog(indexOrTab: number | GalleryCard): void {
     this.galleryComponent?.openEnlargeDialog(indexOrTab);
   }
 
   copyEmail(): void {
     this.pilotComponent?.copyEmail();
-  }
-
-  getCardAriaLabel(index: number, card: GalleryCard): string {
-    return this.galleryComponent?.getCardAriaLabel(index, card) ?? '';
   }
 }

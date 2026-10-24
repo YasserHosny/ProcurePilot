@@ -1,15 +1,14 @@
 import {
-  AfterViewInit,
   ChangeDetectionStrategy,
   Component,
   ElementRef,
   OnDestroy,
-  QueryList,
-  ViewChild,
-  ViewChildren,
   afterRenderEffect,
+  computed,
+  effect,
   inject,
   model,
+  signal,
   untracked,
   viewChild,
   viewChildren,
@@ -29,6 +28,7 @@ export interface GalleryCard {
   readonly id: string;
   readonly file: string;
   readonly num: string;
+  readonly numKey: string;
   readonly labelKey: string;
   readonly numberedLabelKey: string;
   readonly captionKey: string;
@@ -41,6 +41,7 @@ export const GALLERY_CARDS: readonly GalleryCard[] = [
     id: 'quotation-review',
     file: '01-quotation-review.jpg',
     num: '01',
+    numKey: 'landing.gallery.screen1Num',
     labelKey: 'landing.gallery.screen1Label',
     numberedLabelKey: 'landing.gallery.screen1Numbered',
     captionKey: 'landing.gallery.screen1Caption',
@@ -49,6 +50,7 @@ export const GALLERY_CARDS: readonly GalleryCard[] = [
     id: 'smart-compare',
     file: '02-smart-compare.jpg',
     num: '02',
+    numKey: 'landing.gallery.screen2Num',
     labelKey: 'landing.gallery.screen2Label',
     numberedLabelKey: 'landing.gallery.screen2Numbered',
     captionKey: 'landing.gallery.screen2Caption',
@@ -57,6 +59,7 @@ export const GALLERY_CARDS: readonly GalleryCard[] = [
     id: 'basket-split',
     file: '03-basket-split.jpg',
     num: '03',
+    numKey: 'landing.gallery.screen3Num',
     labelKey: 'landing.gallery.screen3Label',
     numberedLabelKey: 'landing.gallery.screen3Numbered',
     captionKey: 'landing.gallery.screen3Caption',
@@ -65,6 +68,7 @@ export const GALLERY_CARDS: readonly GalleryCard[] = [
     id: 'approval-queue',
     file: '04-approval-queue.jpg',
     num: '04',
+    numKey: 'landing.gallery.screen4Num',
     labelKey: 'landing.gallery.screen4Label',
     numberedLabelKey: 'landing.gallery.screen4Numbered',
     captionKey: 'landing.gallery.screen4Caption',
@@ -73,6 +77,7 @@ export const GALLERY_CARDS: readonly GalleryCard[] = [
     id: 'savings-ledger',
     file: '05-savings-ledger.jpg',
     num: '05',
+    numKey: 'landing.gallery.screen5Num',
     labelKey: 'landing.gallery.screen5Label',
     numberedLabelKey: 'landing.gallery.screen5Numbered',
     captionKey: 'landing.gallery.screen5Caption',
@@ -93,35 +98,79 @@ export const GALLERY_TABS = GALLERY_CARDS;
   styleUrl: './landing-gallery.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class LandingGalleryComponent implements AfterViewInit, OnDestroy {
+export class LandingGalleryComponent implements OnDestroy {
   private readonly translate = inject(TranslateService);
   private readonly dialog = inject(MatDialog);
   readonly i18n = inject(I18nService);
 
-  @ViewChild('railEl') railRef?: ElementRef<HTMLElement>;
-  @ViewChildren('cardEl') cardElements?: QueryList<ElementRef<HTMLElement>>;
-
   readonly galleryCards = GALLERY_CARDS;
   readonly activeCardIndex = model<number>(0);
+  readonly outgoingCard = signal<GalleryCard | null>(null);
   readonly currentLocale = this.i18n.currentLocale;
   readonly isRtl = this.i18n.isRtl;
+  readonly isPhone = signal<boolean>(false);
+  readonly ariaOrientation = computed<'vertical' | 'horizontal'>(() =>
+    this.isPhone() ? 'horizontal' : 'vertical'
+  );
 
-  private readonly stepIndex = viewChild<ElementRef<HTMLElement>>('stepIndexEl');
-  private readonly stepElements = viewChildren<ElementRef<HTMLElement>>('stepEl');
+  private readonly stepList = viewChild<ElementRef<HTMLElement>>('stepListEl');
+  private readonly stepElements = viewChildren<ElementRef<HTMLButtonElement>>('stepEl');
+
+  private fadeTimeoutId: ReturnType<typeof setTimeout> | null = null;
+  private mediaQueryList: MediaQueryList | null = null;
+  private mediaQueryListener: ((event: MediaQueryListEvent) => void) | null = null;
 
   constructor() {
-    let previousIndex: number | undefined;
+    if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
+      this.mediaQueryList = window.matchMedia('(max-width: 820px)');
+      this.isPhone.set(Boolean(this.mediaQueryList?.matches));
+      this.mediaQueryListener = (event: MediaQueryListEvent) => {
+        this.isPhone.set(event.matches);
+      };
+      this.mediaQueryList.addEventListener?.('change', this.mediaQueryListener);
+    }
+    let previousFadeIndex: number | undefined;
+    effect(() => {
+      const index = this.activeCardIndex();
+      const isInitial = previousFadeIndex === undefined;
+      const changed = !isInitial && previousFadeIndex !== index;
+      const oldIndex = previousFadeIndex;
+      previousFadeIndex = index;
+
+      if (!changed || oldIndex === undefined) return;
+
+      const prefersReducedMotion =
+        typeof window !== 'undefined' &&
+        window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+      if (this.fadeTimeoutId) {
+        clearTimeout(this.fadeTimeoutId);
+        this.fadeTimeoutId = null;
+      }
+
+      if (!prefersReducedMotion) {
+        this.outgoingCard.set(this.galleryCards[oldIndex]);
+        this.fadeTimeoutId = setTimeout(() => {
+          this.outgoingCard.set(null);
+          this.fadeTimeoutId = null;
+        }, 360);
+      } else {
+        this.outgoingCard.set(null);
+      }
+    });
+
+    let previousMobileScrollIndex: number | undefined;
     afterRenderEffect(() => {
       const index = this.activeCardIndex();
-      const changed = previousIndex !== undefined && previousIndex !== index;
-      previousIndex = index;
+      const changed = previousMobileScrollIndex !== undefined && previousMobileScrollIndex !== index;
+      previousMobileScrollIndex = index;
       if (!changed) return;
 
       // Only card changes scroll the nav; locale and view-query changes must not trigger it.
       untracked(() => {
-        const nav = this.stepIndex()?.nativeElement;
+        const nav = this.stepList()?.nativeElement;
         const activeStep = this.stepElements()[index]?.nativeElement;
-        if (nav && activeStep && window.matchMedia('(max-width: 600px)').matches) {
+        if (nav && activeStep && window.matchMedia('(max-width: 820px)').matches) {
           // The positioned nav is the offset parent. RTL scrollLeft is negative in Chromium.
           const left = this.isRtl()
             ? activeStep.offsetLeft + activeStep.offsetWidth - nav.clientWidth
@@ -132,38 +181,16 @@ export class LandingGalleryComponent implements AfterViewInit, OnDestroy {
     });
   }
 
-  private observer: IntersectionObserver | null = null;
-
-  ngAfterViewInit(): void {
-    if (typeof IntersectionObserver !== 'undefined' && this.railRef?.nativeElement) {
-      this.observer = new IntersectionObserver(
-        (entries) => {
-          for (const entry of entries) {
-            if (entry.isIntersecting && entry.intersectionRatio >= 0.6) {
-              const idxStr = entry.target.getAttribute('data-index');
-              if (idxStr !== null) {
-                const idx = parseInt(idxStr, 10);
-                if (!isNaN(idx) && idx !== this.activeCardIndex()) {
-                  this.activeCardIndex.set(idx);
-                }
-              }
-            }
-          }
-        },
-        {
-          root: this.railRef.nativeElement,
-          threshold: 0.6,
-        }
-      );
-
-      this.cardElements?.forEach((el) => {
-        this.observer?.observe(el.nativeElement);
-      });
-    }
-  }
-
   ngOnDestroy(): void {
-    this.observer?.disconnect();
+    if (this.fadeTimeoutId) {
+      clearTimeout(this.fadeTimeoutId);
+      this.fadeTimeoutId = null;
+    }
+    if (this.mediaQueryList && this.mediaQueryListener) {
+      this.mediaQueryList.removeEventListener?.('change', this.mediaQueryListener);
+      this.mediaQueryListener = null;
+      this.mediaQueryList = null;
+    }
   }
 
   scrollToCard(index: number): void {
@@ -171,17 +198,6 @@ export class LandingGalleryComponent implements AfterViewInit, OnDestroy {
       return;
     }
     this.activeCardIndex.set(index);
-    const cardEl = this.cardElements?.get(index)?.nativeElement;
-    if (cardEl) {
-      const prefersReducedMotion =
-        typeof window !== 'undefined' &&
-        window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-      cardEl.scrollIntoView({
-        behavior: prefersReducedMotion ? 'auto' : 'smooth',
-        inline: 'start',
-        block: 'nearest',
-      });
-    }
   }
 
   nextCard(): void {
@@ -194,28 +210,33 @@ export class LandingGalleryComponent implements AfterViewInit, OnDestroy {
     this.scrollToCard(prevIdx);
   }
 
-  onRailKeydown(event: KeyboardEvent): void {
+  onStepsKeydown(event: KeyboardEvent): void {
+    const currentIndex = this.activeCardIndex();
     const isRtl = this.isRtl();
-    if (event.key === 'ArrowRight') {
-      event.preventDefault();
-      if (isRtl) {
-        this.prevCard();
-      } else {
-        this.nextCard();
-      }
+    let targetIndex: number | null = null;
+
+    if (event.key === 'ArrowDown') {
+      targetIndex = Math.min(currentIndex + 1, this.galleryCards.length - 1);
+    } else if (event.key === 'ArrowUp') {
+      targetIndex = Math.max(currentIndex - 1, 0);
+    } else if (event.key === 'ArrowRight') {
+      targetIndex = isRtl
+        ? Math.max(currentIndex - 1, 0)
+        : Math.min(currentIndex + 1, this.galleryCards.length - 1);
     } else if (event.key === 'ArrowLeft') {
-      event.preventDefault();
-      if (isRtl) {
-        this.nextCard();
-      } else {
-        this.prevCard();
-      }
+      targetIndex = isRtl
+        ? Math.min(currentIndex + 1, this.galleryCards.length - 1)
+        : Math.max(currentIndex - 1, 0);
     } else if (event.key === 'Home') {
-      event.preventDefault();
-      this.scrollToCard(0);
+      targetIndex = 0;
     } else if (event.key === 'End') {
+      targetIndex = this.galleryCards.length - 1;
+    }
+
+    if (targetIndex !== null) {
       event.preventDefault();
-      this.scrollToCard(this.galleryCards.length - 1);
+      this.scrollToCard(targetIndex);
+      this.stepElements()[targetIndex]?.nativeElement.focus();
     }
   }
 
@@ -249,14 +270,6 @@ export class LandingGalleryComponent implements AfterViewInit, OnDestroy {
       restoreFocus: true,
       maxWidth: '95vw',
       panelClass: 'screenshot-dialog-panel',
-    });
-  }
-
-  getCardAriaLabel(index: number, card: GalleryCard): string {
-    const label = this.translate.instant(card.labelKey);
-    return this.translate.instant('landing.gallery.cardAriaLabel', {
-      n: index + 1,
-      label,
     });
   }
 }

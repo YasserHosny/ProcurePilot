@@ -110,7 +110,7 @@ since the 2026-10-24 move; the old `PP` key is in brackets.
 | P-25 | PPS-51 | G-13 | PPS-39 | | |
 | P-26 | PPS-53 | | | | |
 | P-27 | PPS-55 | P-28 | PPS-56 | P-29 | PPS-58 |
-| P-30 | PPS-59 | P-31 | PPS-61 | | |
+| P-30 | PPS-59 | P-31 | PPS-61 | P-32 | PPS-62 |
 
 Without a plan ID: PPS-2 (PP-21), PPS-7 (PP-22), PPS-8 (PP-23), PPS-22 (PP-24), PPS-27 (PP-25),
 PPS-28 (PP-26), PPS-23 (PP-27) — architecture diagrams and two shipped code changes, all Done.
@@ -233,6 +233,7 @@ PR → CI → merge → link PR on the PPS task. Refs are in the GTM plan's curr
 | [x] P-29 | — | Arabic UI said «وفر» / «وفورات» for a saving; Egyptian buyers say «توفير» / «توفيرات» (owner, 2026-10-25). 56 `ar.json` values and four Arabic E2E assertions; other roots («متوفر», «يوفر», «أوفر») untouched | Orch → Codex | — | **done 2026-10-25: #263 merged, CI green; PPS-58 Done** |
 | [ ] P-30 | — | Demo video v2.4 jumped from the pain to the result without saying the product answers it. Script revised: product bridge in beat 1, a pain card before each chapter's fix, an honest promise, caption fixes, beat 9 dropped; script moved to `video/cuts/v2.4-ledger/script.md` | Orch, User (approval) | — | owner approves the copy, `make_data.py` splits pain/fix cards, four cuts re-rendered (PPS-59) |
 | [x] P-31 | — | Material's `savings` glyph is a piggy bank (owner, 2026-10-25). Money-saved icons now `payments` (banknotes; was `toll`, owner chose 2026-10-25), empty budget list `account_balance_wallet`; 8 uses in 7 web files | Orch | — | **done 2026-10-25: #271 merged; icon switched to `payments` in #275; PPS-61** |
+| [ ] P-32 | — | Landing gallery was a sideways snap rail, so most visitors saw only screen 01 (owner, 2026-10-25). Four options mocked up; owner chose guided steps: a numbered steps list beside one framed screenshot, ARIA tabs, chip row on phones | Orch → Agy | — | merged with required checks green, EN/AR before/after on the PR (PPS-62) |
 
 ### E — Pilot environment
 

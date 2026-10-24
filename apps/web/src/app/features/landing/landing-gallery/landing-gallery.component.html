@@ -9,94 +9,138 @@
           {{ 'landing.gallery.subtitle' | translate }}
         </p>
       </div>
-      <div class="gallery-controls">
-        <button
-          mat-icon-button
-          type="button"
-          class="gallery-nav-btn prev-btn"
-          (click)="prevCard()"
-          [disabled]="activeCardIndex() === 0"
-          [attr.aria-label]="'landing.gallery.previous' | translate"
-        >
-          <mat-icon aria-hidden="true">{{ isRtl() ? 'arrow_forward' : 'arrow_back' }}</mat-icon>
-        </button>
-        <button
-          mat-icon-button
-          type="button"
-          class="gallery-nav-btn next-btn"
-          (click)="nextCard()"
-          [disabled]="activeCardIndex() === galleryCards.length - 1"
-          [attr.aria-label]="'landing.gallery.next' | translate"
-        >
-          <mat-icon aria-hidden="true">{{ isRtl() ? 'arrow_back' : 'arrow_forward' }}</mat-icon>
-        </button>
-      </div>
     </div>
 
-    <div
-      #railEl
-      class="gallery-rail"
-      role="group"
-      tabindex="0"
-      aria-roledescription="carousel"
-      [attr.aria-label]="'landing.gallery.railLabel' | translate"
-      (keydown)="onRailKeydown($event)"
-    >
-      @for (card of galleryCards; track card.id; let i = $index) {
-        <div
-          #cardEl
-          class="gallery-card"
-          [class.active]="activeCardIndex() === i"
-          role="group"
-          [attr.aria-roledescription]="'landing.gallery.slide' | translate"
-          [attr.data-index]="i"
-          [attr.aria-label]="getCardAriaLabel(i, card)"
+    <div class="gallery-grid">
+      <div class="gallery-steps-col">
+        <ol
+          #stepListEl
+          class="gallery-steps gallery-step-index"
+          role="tablist"
+          [attr.aria-orientation]="ariaOrientation()"
+          [attr.aria-label]="'landing.gallery.title' | translate"
         >
-          <figure class="gallery-card-figure">
-            <div class="gallery-card-top-bar">
-              <span class="gallery-card-numbered-label">{{ card.numberedLabelKey | translate }}</span>
-            </div>
-            <div class="gallery-image-wrapper">
+          @for (card of galleryCards; track card.id; let i = $index) {
+            <li
+              role="presentation"
+              class="gallery-step"
+              [class.active]="activeCardIndex() === i"
+              [class.done]="i < activeCardIndex()"
+            >
+              <button
+                #stepEl
+                type="button"
+                role="tab"
+                class="gallery-step-btn"
+                [id]="'gallery-tab-' + i"
+                [attr.aria-selected]="activeCardIndex() === i"
+                [attr.tabindex]="activeCardIndex() === i ? 0 : -1"
+                [attr.aria-controls]="'gallery-tabpanel'"
+                (click)="scrollToCard(i)"
+                (keydown)="onStepsKeydown($event)"
+              >
+                <span class="gallery-step-badge num">
+                  {{ card.numKey | translate }}
+                </span>
+                <span class="gallery-step-content">
+                  <span class="gallery-step-label">{{ card.labelKey | translate }}</span>
+                  <span class="gallery-step-caption">{{ card.captionKey | translate }}</span>
+                </span>
+              </button>
+            </li>
+          }
+        </ol>
+
+        <div class="gallery-progress" aria-hidden="true">
+          <i [style.inline-size.%]="((activeCardIndex() + 1) / galleryCards.length) * 100"></i>
+        </div>
+      </div>
+
+      <div class="gallery-preview-col">
+        <div class="gallery-frame">
+          <div class="gallery-frame-bar">
+            <span class="gallery-frame-dots" aria-hidden="true">
+              <i></i><i></i><i></i>
+            </span>
+            <span class="gallery-frame-addr">
+              {{ 'landing.gallery.frameAddress' | translate: { label: (galleryCards[activeCardIndex()].labelKey | translate) } }}
+            </span>
+            <span class="gallery-demonstration-chip">
+              {{ 'landing.gallery.demonstrationChip' | translate }}
+            </span>
+          </div>
+
+          <div
+            id="gallery-tabpanel"
+            class="gallery-shot"
+            role="tabpanel"
+            [attr.aria-labelledby]="'gallery-tab-' + activeCardIndex()"
+          >
+            @if (outgoingCard(); as outCard) {
               <img
-                [src]="'/landing/' + currentLocale() + '/' + card.file"
-                [alt]="('landing.gallery.altPrefix' | translate) + (card.captionKey | translate)"
+                [src]="'/landing/' + currentLocale() + '/' + outCard.file"
+                [alt]="('landing.gallery.altPrefix' | translate) + (outCard.captionKey | translate)"
                 width="1440"
                 height="900"
-                [loading]="i < 2 ? 'eager' : 'lazy'"
-                class="gallery-card-image"
+                class="gallery-card-image outgoing"
+                aria-hidden="true"
               />
-              <button
-                mat-icon-button
-                type="button"
-                class="gallery-enlarge-btn"
-                (click)="openEnlargeDialog(i)"
-                [attr.aria-label]="'landing.gallery.enlarge' | translate"
-              >
-                <mat-icon aria-hidden="true">zoom_in</mat-icon>
-              </button>
-            </div>
-            <figcaption class="gallery-card-caption">
-              <p class="gallery-caption-sentence">{{ card.captionKey | translate }}</p>
-              <span class="gallery-demonstration-chip">{{ 'landing.gallery.demonstrationChip' | translate }}</span>
-            </figcaption>
-          </figure>
+            }
+            <!-- eslint-disable-next-line @angular-eslint/template/click-events-have-key-events, @angular-eslint/template/interactive-supports-focus -->
+            <img
+              [src]="'/landing/' + currentLocale() + '/' + galleryCards[activeCardIndex()].file"
+              [alt]="('landing.gallery.altPrefix' | translate) + (galleryCards[activeCardIndex()].captionKey | translate)"
+              width="1440"
+              height="900"
+              class="gallery-card-image active"
+              [class.incoming]="outgoingCard() !== null"
+              (click)="openEnlargeDialog(activeCardIndex())"
+            />
+            <button
+              mat-icon-button
+              type="button"
+              class="gallery-enlarge-btn"
+              (click)="openEnlargeDialog(activeCardIndex())"
+              [attr.aria-label]="'landing.gallery.enlarge' | translate"
+            >
+              <mat-icon aria-hidden="true">zoom_in</mat-icon>
+            </button>
+          </div>
         </div>
-      }
-    </div>
 
-    <nav #stepIndexEl class="gallery-step-index" [attr.aria-label]="'landing.gallery.railLabel' | translate">
-      @for (card of galleryCards; track card.id; let i = $index) {
-        <button
-          type="button"
-          #stepEl
-          class="gallery-step-btn"
-          [class.active]="activeCardIndex() === i"
-          [attr.aria-current]="activeCardIndex() === i ? 'true' : null"
-          (click)="scrollToCard(i)"
-        >
-          {{ card.labelKey | translate }}
-        </button>
-      }
-    </nav>
+        <p class="gallery-mobile-caption">
+          {{ galleryCards[activeCardIndex()].captionKey | translate }}
+        </p>
+
+        <div class="gallery-footer">
+          <span class="gallery-counter num">
+            {{ 'landing.gallery.counter' | translate: { n: (galleryCards[activeCardIndex()].numKey | translate) } }}
+          </span>
+          <div class="gallery-nav-buttons">
+            <button
+              mat-stroked-button
+              type="button"
+              class="gallery-nav-btn prev-btn"
+              (click)="prevCard()"
+              [disabled]="activeCardIndex() === 0"
+              [attr.aria-label]="'landing.gallery.previous' | translate"
+            >
+              {{ 'landing.gallery.previous' | translate }}
+            </button>
+            <button
+              mat-flat-button
+              color="primary"
+              type="button"
+              class="gallery-nav-btn next-btn"
+              (click)="nextCard()"
+              [disabled]="activeCardIndex() === galleryCards.length - 1"
+              [attr.aria-label]="'landing.gallery.next' | translate"
+            >
+              {{ 'landing.gallery.next' | translate }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </section>
