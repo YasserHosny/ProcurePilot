@@ -324,6 +324,7 @@ Future<I18nLoader> loadTestI18n({String locale = 'en'}) async {
         'form': {
           'linesTitle': 'البنود',
           'quantityLabel': 'الكمية',
+          'branchLabel': 'الفرع',
         },
       },
       'units': {

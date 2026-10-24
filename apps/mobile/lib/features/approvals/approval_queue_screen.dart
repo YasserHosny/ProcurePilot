@@ -68,7 +68,13 @@ class _ApprovalQueueScreenState extends State<ApprovalQueueScreen> {
           children: [
             const BrandLogo(height: 28),
             const SizedBox(width: 8),
-            Text(i18n.t('approvals.title')),
+            Flexible(
+              child: Text(
+                i18n.t('approvals.title'),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
           ],
         ),
       ),

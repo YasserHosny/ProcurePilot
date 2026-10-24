@@ -310,7 +310,13 @@ class _LowStockReportScreenState extends State<LowStockReportScreen> {
             children: [
               const BrandLogo(height: 28),
               const SizedBox(width: 8),
-              Text(i18n.t('lowStock.title')),
+              Flexible(
+                child: Text(
+                  i18n.t('lowStock.title'),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
             ],
           ),
         ),
@@ -405,7 +411,13 @@ class _LowStockReportScreenState extends State<LowStockReportScreen> {
           children: [
             const BrandLogo(height: 28),
             const SizedBox(width: 8),
-            Text(i18n.t('lowStock.title')),
+            Flexible(
+              child: Text(
+                i18n.t('lowStock.title'),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
           ],
         ),
       ),

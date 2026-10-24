@@ -71,7 +71,13 @@ class _RequestListScreenState extends State<RequestListScreen> {
           children: [
             const BrandLogo(height: 28),
             const SizedBox(width: 8),
-            Text(i18n.t('requests.title')),
+            Flexible(
+              child: Text(
+                i18n.t('requests.title'),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
           ],
         ),
         actions: [
