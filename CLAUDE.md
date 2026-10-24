@@ -29,7 +29,7 @@ code — it is binding, not advisory.
 **Backend** — Python 3.12 · FastAPI 0.115.6 · Uvicorn 0.34.0 · Pydantic v2 +
 pydantic-settings · python-jose 3.3.0 · httpx 0.28.1 · SlowAPI 0.1.9 · supabase-py 2.11.0
 
-**Web** — TypeScript 5.6 · Angular 19 · Angular Material + CDK · RxJS · @ngx-translate/core ^16 +
+**Web** — TypeScript 6.0 · Angular 22 · Angular Material + CDK · RxJS · @ngx-translate/core ^18 +
 http-loader (runtime i18n) · Zod
 
 **Data** — Supabase Postgres 17 (`pgvector`, `pg_trgm`) · Supabase Auth · Supabase Storage ·
@@ -56,7 +56,7 @@ apps/api/          FastAPI modular monolith — the only backend deployable
                    refresh) and operator CLIs (`requeue_extraction`, `requeue_email_ingest`)
   tests/{unit,integration,contract}/
 supabase/migrations/  versioned SQL, applied via Supabase CLI (apps/api/migrations/ is a pointer)
-apps/web/          Angular 19 SPA
+apps/web/          Angular 22 SPA
   src/app/{core,layout,features}/
 apps/mobile/       Flutter app — shipped (auth, requests, approvals, low-stock, delivery, push)
 packages/          domain-types · ui · validation · i18n
@@ -102,6 +102,12 @@ interfaces, not shared internal state.
 
 **TypeScript** — strict mode, standalone components, signals for local state, RxJS for streams.
 No `any`. Shared validation schemas come from `packages/validation`.
+
+**Web dependencies** — CI installs `apps/web` from its own `apps/web/pnpm-lock.yaml`
+(`--ignore-workspace --frozen-lockfile`), not the root lockfile: after changing web dependencies,
+regenerate both or CI fails. `apps/web/i18n` is a symlink to `packages/i18n` because Angular 22
+refuses assets outside the workspace. Components carry `ChangeDetectionStrategy.Eager` (kept by the
+Angular 22 upgrade, a lint warning); move one to OnPush only when its state is signals.
 
 **Database connections** — open every Postgres connection through `procurepilot_api.db.connect`
 (or the worker's own `db.connect`): it sets `prepare_threshold=None`, which Supabase's
@@ -234,6 +240,8 @@ tasks (see the top of this file). The next feature has not been scoped.
 - Supabase Postgres 17, unchanged. Reuses `tenant.currency`; audit via existing `record_audit_event`. (022-home-currency-readiness)
 
 ## Recent Changes
+- 2026-10-24: web app on Angular 22 + Material 22, TypeScript 6.0, ngx-translate 18, Sentry 11;
+  builders moved to `@angular/build` (Karma kept); Node 24 in CI and the web image (PP-29).
 - 2026-10-15 to 10-18: hosted demo-tenant fix wave (findings in `docs/gtm/demo-tenant/README.md`).
   Ingestion: RFQ-reply supplier wins attribution (#84), Arabic filenames no longer lose emails (#90).
   Extraction: DD/MM quote dates parsed in Python, unparsed dates go to review (#96); Arabic RTL tables

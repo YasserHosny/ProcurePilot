@@ -25,7 +25,7 @@ code — it is binding, not advisory.
 **Backend** — Python 3.12 · FastAPI 0.115.6 · Uvicorn 0.34.0 · Pydantic v2 +
 pydantic-settings · python-jose 3.3.0 · httpx 0.28.1 · SlowAPI 0.1.9 · supabase-py 2.11.0
 
-**Web** — TypeScript 5.6 · Angular 19 · Angular Material + CDK · RxJS · @ngx-translate/core ^16 +
+**Web** — TypeScript 6.0 · Angular 22 · Angular Material + CDK · RxJS · @ngx-translate/core ^18 +
 http-loader (runtime i18n) · Zod
 
 **Data** — Supabase Postgres 17 (`pgvector`, `pg_trgm`) · Supabase Auth · Supabase Storage.
@@ -45,7 +45,7 @@ apps/api/          FastAPI modular monolith — the only backend deployable
   src/procurepilot_api/modules/{auth,tenants,members,health}/
   migrations/      versioned SQL, applied via Supabase CLI
   tests/{unit,integration,contract}/
-apps/web/          Angular 19 SPA
+apps/web/          Angular 22 SPA
   src/app/{core,layout,features}/
 apps/mobile/       placeholder (Phase 2)
 packages/          domain-types · ui · validation · i18n
@@ -89,6 +89,12 @@ interfaces, not shared internal state.
 No `any`. Shared validation schemas come from `packages/validation`. One stylesheet per
 component via `styleUrl` (single); CI rejects `styleUrls` arrays — they evade the per-file
 4 kB component-style budget. Decompose oversized components into child components instead.
+
+**Web dependencies** — CI installs `apps/web` from its own `apps/web/pnpm-lock.yaml`
+(`--ignore-workspace --frozen-lockfile`), not the root lockfile: after changing web dependencies,
+regenerate both or CI fails. `apps/web/i18n` is a symlink to `packages/i18n` because Angular 22
+refuses assets outside the workspace. Components carry `ChangeDetectionStrategy.Eager` (kept by the
+Angular 22 upgrade, a lint warning); move one to OnPush only when its state is signals.
 
 **SQL** — one versioned file per migration, forward-only, never edited after merge. Every new
 tenant-scoped table ships with its RLS policy in the same migration.

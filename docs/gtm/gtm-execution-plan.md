@@ -99,6 +99,7 @@ set up, what is next, who does it, and what blocks what.
 | P-4 | PP-14 | G-5 | PP-9 | G-10 | PP-17 |
 | P-5 | PP-15 | P-6 | PP-16 | P-7 | PP-18 |
 | G-11 | PP-19 | G-12 | PP-20 | | |
+| P-9 | PP-29 | | | | |
 
 PP-14..PP-18 were added 2026-10-22 to track work done since 2026-10-15 that had no Jira task. PP-19 (G-11, company website on iron-sys.com, `docs/gtm/website/`) was added the same day. PP-20 (G-12, WhatsApp pilot-invite cards + video, `docs/gtm/whatsapp-card/`) was added the same day.
 
@@ -193,6 +194,7 @@ PR → CI → merge → link PR on the PP task. Refs are in the GTM plan's curre
 | [ ] P-5 | finding 20 | Real product-matching embeddings on hosted (stub scores exact names 55%) — switch on the Bedrock provider (#62) or decide to keep the stub | User (cost OK), Orch | — | Decision on PP-15; if on, exact names score above auto-accept |
 | [ ] P-6 | finding 50 | Hidden/idle web tab signs out after a few hours; visible tab renews fine | Orch → Lane | — | Hidden tab survives several expiries, or cause fixed (PP-16) |
 | [x] P-7 | findings 1–49 | Demo-tenant fix wave record (PRs per finding) | — | — | PP-18 Done |
+| [ ] P-9 | — | Upgrade the web app to Angular 22 + Material 22 (TypeScript 6.0, ngx-translate 18, Sentry 11, `@angular/build`, Node 24 in CI/Docker) so the new design system is built on the current Material API | Orch | — | PR merged with every required check green on its head commit (PP-29) |
 
 ### E — Pilot environment
 
