@@ -25,6 +25,8 @@ describe('DirectionService (T064)', () => {
   });
 
   it('should switch to rtl and update document and CDK Directionality', () => {
+    const emitted: string[] = [];
+    cdkDir.change.subscribe((d) => emitted.push(d));
     service.setDirection('rtl', 'ar');
 
     expect(service.currentDirection()).toBe('rtl');
@@ -32,6 +34,7 @@ describe('DirectionService (T064)', () => {
     expect(doc.documentElement.getAttribute('dir')).toBe('rtl');
     expect(doc.documentElement.getAttribute('lang')).toBe('ar');
     expect(cdkDir.value).toBe('rtl');
+    expect(emitted).toEqual(['rtl']);
   });
 
   it('should switch back to ltr and update document and CDK Directionality', () => {
