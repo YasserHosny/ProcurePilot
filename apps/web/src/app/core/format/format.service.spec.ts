@@ -151,13 +151,24 @@ describe('FormatService (T069)', () => {
   });
 
   describe('formatDate', () => {
-    it('should format date for locale', () => {
+    it('should format date for locale with Arabic-Indic digits for ar and ASCII digits for en', () => {
       const d = new Date('2026-08-20T10:00:00Z');
       const enResult = service.formatDate(d, { dateStyle: 'medium' }, 'en');
       expect(enResult).toContain('2026');
+      expect(/[0-9]/.test(enResult)).toBeTrue();
 
       const arResult = service.formatDate(d, { dateStyle: 'medium' }, 'ar');
       expect(arResult.length).toBeGreaterThan(0);
+      expect(arResult).toContain('٢٠٢٦');
+      expect(/[0-9]/.test(arResult)).toBeFalse();
+
+      const overrideResult = service.formatDate(
+        d,
+        { dateStyle: 'medium', numberingSystem: 'latn' },
+        'ar',
+      );
+      expect(overrideResult).toContain('2026');
+      expect(/[0-9]/.test(overrideResult)).toBeTrue();
     });
 
     it('should return placeholder for null date', () => {

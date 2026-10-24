@@ -12,6 +12,7 @@ import { Role } from '../../../core/api/models';
 
 describe('OrderListComponent', () => {
   let fixture: ComponentFixture<OrderListComponent>;
+  let component: OrderListComponent;
   let http: HttpTestingController;
   let mockRole: WritableSignal<Role | null>;
   let mockSession: Partial<SessionService>;
@@ -46,6 +47,7 @@ describe('OrderListComponent', () => {
     });
     TestBed.inject(TranslateService).use('en');
     fixture = TestBed.createComponent(OrderListComponent);
+    component = fixture.componentInstance;
     http = TestBed.inject(HttpTestingController);
   });
 
@@ -107,7 +109,7 @@ describe('OrderListComponent', () => {
           id: 'req-approved-1',
           branch_id: 'b1',
           requested_by_membership_id: 'm1',
-          required_by_date: '2026-10-25',
+          required_by_date: '2026-09-20',
           status: 'ordered',
           approval_step: { id: 'step1', assigned_membership_id: 'm1', source: 'owner_fallback', status: 'approved', decided_by_membership_id: 'm1', decided_at: '2026-10-01T00:00:00Z' },
           lines: [],
@@ -137,6 +139,7 @@ describe('OrderListComponent', () => {
       '[data-testid="approved-request-option-req-approved-1"]',
     ) as HTMLButtonElement | null;
     expect(option).toBeTruthy();
+    expect(option?.textContent).toContain('Sep 20, 2026');
     expect(option?.textContent).toContain('EGP 56,425');
 
     option?.click();
@@ -161,5 +164,52 @@ describe('OrderListComponent', () => {
     const emptyEl = document.querySelector('[data-testid="approved-requests-empty"]');
     expect(emptyEl).toBeTruthy();
     expect(emptyEl?.textContent).toContain('No approved requests available.');
+  });
+
+  it('formats required-by dates in approved request picker in en and ar', () => {
+    fixture.detectChanges();
+    http.expectOne('/api/v1/orders?limit=50').flush({ items: [], next_cursor: null });
+
+    const fromApprovedBtn = fixture.nativeElement.querySelector(
+      '[data-testid="order-from-approved-request-btn"]',
+    ) as HTMLButtonElement;
+    fromApprovedBtn.click();
+    fixture.detectChanges();
+
+    http.expectOne('/api/v1/requests?limit=100&eligible_for_order=true').flush({
+      next_cursor: null,
+      items: [
+        {
+          id: 'req-approved-1',
+          branch_id: 'b1',
+          requested_by_membership_id: 'm1',
+          required_by_date: '2026-09-20',
+          status: 'ordered',
+          approval_step: { id: 'step1', assigned_membership_id: 'm1', source: 'owner_fallback', status: 'approved', decided_by_membership_id: 'm1', decided_at: '2026-10-01T00:00:00Z' },
+          lines: [],
+          estimated_total: { amount: '56425.0000', currency: 'EGP' },
+          has_incomplete_estimate: false,
+          created_at: '2026-10-01T00:00:00Z',
+        },
+      ],
+    });
+    fixture.detectChanges();
+
+    const option = document.querySelector(
+      '[data-testid="approved-request-option-req-approved-1"]',
+    ) as HTMLButtonElement | null;
+    expect(option?.textContent).toContain('Sep 20, 2026');
+    expect(component.formatRequiredBy('2026-09-20')).toBe('Sep 20, 2026');
+
+    TestBed.inject(TranslateService).use('ar');
+    fixture.detectChanges();
+
+    const updatedOption = document.querySelector(
+      '[data-testid="approved-request-option-req-approved-1"]',
+    ) as HTMLButtonElement | null;
+    expect(updatedOption?.textContent).toContain('٢٠');
+    expect(updatedOption?.textContent).toContain('٢٠٢٦');
+    expect(component.formatRequiredBy('2026-09-20')).toContain('٢٠');
+    expect(/[0-9]/.test(component.formatRequiredBy('2026-09-20'))).toBeFalse();
   });
 });

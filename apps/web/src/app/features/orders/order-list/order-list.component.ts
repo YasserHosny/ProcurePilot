@@ -10,6 +10,7 @@ import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { RoleDirective } from '../../../core/auth/role.directive';
 import { FormatDatePipe } from '../../../core/format/date.pipe';
 import { FormatService } from '../../../core/format/format.service';
+import { parseIsoDateLocal } from '../../../core/format/iso-date';
 import { FormatMoneyPipe } from '../../../core/format/money.pipe';
 import { RequestsApiService, type PurchaseRequest } from '../../requests/requests-api';
 import { OrdersApiService, type OrderStatus, type PurchaseOrder } from '../orders-api';
@@ -108,6 +109,10 @@ export class OrderListComponent implements OnInit {
 
   createFromApprovedRequest(request: PurchaseRequest): void {
     this.router.navigate(['/orders/new'], { queryParams: { source_request_id: request.id } });
+  }
+
+  formatRequiredBy(value: string | null | undefined): string {
+    return this.formatService.formatDate(parseIsoDateLocal(value));
   }
 
   formatApprovedRequestMoney(request: PurchaseRequest): string {

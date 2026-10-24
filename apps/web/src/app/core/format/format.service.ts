@@ -228,7 +228,11 @@ export class FormatService {
     if (isNaN(d.getTime())) return '—';
 
     const locale = this.resolveLocale(localeOverride);
-    return new Intl.DateTimeFormat(locale, options).format(d);
+    const resolvedOptions: Intl.DateTimeFormatOptions = {
+      ...(isArabicLocale(locale) ? { numberingSystem: 'arab' } : {}),
+      ...options,
+    };
+    return new Intl.DateTimeFormat(locale, resolvedOptions).format(d);
   }
 
   /**

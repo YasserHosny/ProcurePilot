@@ -369,12 +369,7 @@ export class ApprovalQueueComponent implements OnInit {
   }
 
   formatRequiredBy(value: string | null | undefined): string {
-    const locale = this.translate.getCurrentLang() || this.translate.getFallbackLang() || 'en';
-    const isAr = locale.startsWith('ar');
-    return this.formatService.formatDate(parseIsoDateLocal(value), {
-      dateStyle: 'medium',
-      ...(isAr ? { numberingSystem: 'arab' } : {}),
-    });
+    return this.formatService.formatDate(parseIsoDateLocal(value));
   }
 
   lineCountLabel(count: number): string {
