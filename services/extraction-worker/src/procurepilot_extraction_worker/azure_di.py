@@ -29,10 +29,23 @@ from procurepilot_extraction_worker.settings import WorkerSettings, get_settings
 MODEL_ID = "prebuilt-invoice"
 
 _PERCENTAGE_PATTERN = re.compile(
-    r"(?:[\d٠-٩۰-۹][\d٠-٩۰-۹.,٬٫]*\s*[%٪\u066a](?![\d٠-٩۰-۹])|[%٪\u066a]\s*[\d٠-٩۰-۹][\d٠-٩۰-۹.,٬٫]*)",
+    r"(?:"
+    r"[\d٠-٩۰-۹][\d٠-٩۰-۹.,٬٫]*\s*[%٪\u066a](?![\d٠-٩۰-۹])"
+    r"|"
+    r"[%٪\u066a]\s*[\d٠-٩۰-۹]{1,3}(?:[.,٫][\d٠-٩۰-۹]{1,2})?(?![.,٬٫\d٠-٩۰-۹])"
+    r")",
+    re.IGNORECASE,
 )
 _TOTAL_ROW_RE = re.compile(
-    r"(?<![^\W\d_])(?:grand\s+total|total|الاجمالي|اجمالي|االجمايل|المجموع|مجموع)(?![^\W\d_])",
+    r"^[\s:：\-–]*(?:(?:[\d.,:：()（）/\\\-_%٪\u066a]+|ر\.?\s*س\.?|SAR|SR|ج\.م|LE|EGP|\$|£|€)\s*)*"
+    r"(?:(?:لل|[وبفل])?(?:الاجمالي|اجمالي|االجمايل|المجموع|مجموع)|grand\s+total|total)"
+    r"(?:"
+    r"\s+(?:النهائي|النهايي|الكلي|العام|شامل|مع|قبل|بعد|ضريب[ةه]|الضريب[ةه]|القائم|الصافي|"
+    r"المطلوب|المستحق|قدره|فقط|القيمه|المبلغ|amount|price|due|net|gross|payable|incl\.?|"
+    r"including|inclusive|before|after|excl\.?|excluding|vat|tax|for|of|value|لعام|عام|سنة|سنه)"
+    r"|\s*(?:[\d.,:：()（）/\\\-_%٪\u066a]+|ر\.?\s*س\.?|SAR|SR|ج\.م|LE|EGP|\$|£|€)"
+    r"|\s*$"
+    r")",
     re.IGNORECASE,
 )
 
@@ -243,6 +256,7 @@ def _parse_line_table(result: object, model_version: str) -> ExtractionResult | 
             row_cells = rows[row]
             data: dict[str, str] = {}
             expanded: dict[int, str] = {}
+            role_cells: dict[str, object] = {}
             for cell in row_cells:
                 value = str(_get(cell, "content", "") or "").strip()
                 start = int(_get(cell, "columnIndex", _get(cell, "column_index", 0)))
@@ -251,48 +265,91 @@ def _parse_line_table(result: object, model_version: str) -> ExtractionResult | 
                     expanded[column] = value
                     role = col_roles.get(column)
                     if role and value:
-                        data.setdefault(role, value)
+                        if role not in data:
+                            data[role] = value
+                            role_cells[role] = cell
             desc = data.get("description", "").replace("\n", " ").strip()
             qty_raw = data.get("quantity", "")
-            if qty_raw and qty_raw == data.get("description"):
-                qty_raw = ""
             price_raw = data.get("unit_price", "")
-            if price_raw and price_raw == data.get("description"):
-                price_raw = ""
+            desc_cell = role_cells.get("description")
+            if desc_cell is not None:
+                if _same_cell(role_cells.get("quantity"), desc_cell):
+                    qty_raw = ""
+                if _same_cell(role_cells.get("unit_price"), desc_cell):
+                    price_raw = ""
             qty = _clean_number(qty_raw)
             price = _clean_number(price_raw)
             total = _clean_number(data.get("line_total", ""))
+            if qty is None and price and total:
+                try:
+                    p = Decimal(price)
+                    t = Decimal(total)
+                    if p > 0:
+                        q = t / p
+                        if q == int(q):
+                            qty = str(int(q))
+                        else:
+                            qty = format(q, "f")
+                except Exception:
+                    pass
             label = " ".join(
                 value.replace("\n", " ").strip()
                 for value in dict.fromkeys(expanded.values())
                 if value and _numeric_cell_amount(value) is None
             )
             desc = desc or label
-            currency_amount: str | None = None
             numeric_amounts: list[str] = []
-            for value in expanded.values():
-                val_clean = _PERCENTAGE_PATTERN.sub("", value).strip()
+            for col in sorted(expanded.keys()):
+                val_clean = _PERCENTAGE_PATTERN.sub("", expanded[col]).strip()
                 amt = _numeric_cell_amount(val_clean)
                 if amt is not None:
                     numeric_amounts.append(amt)
-                    if (
-                        _SAR_MARKER.search(value)
-                        or _EGP_MARKER.search(value)
-                        or _OTHER_MARKER.search(value)
-                    ):
-                        currency_amount = amt
-            fallback_amount = (
-                total or currency_amount or (numeric_amounts[-1] if numeric_amounts else None)
+            fallback_amount = total or (numeric_amounts[-1] if numeric_amounts else None)
+            is_total = (
+                qty is None
+                and not (price and total)
+                and (_is_total_row(label) or _is_total_row(desc))
             )
-            is_total = qty is None and (_is_total_row(label) or _is_total_row(desc))
             if is_total and fallback_amount is None:
-                for value in expanded.values():
-                    val_clean = _PERCENTAGE_PATTERN.sub("", value).strip()
-                    extracted_amts = re.findall(r"[\d٠-٩۰-۹][\d٠-٩۰-۹.,٬٫]*", val_clean)
-                    if extracted_amts:
-                        cleaned = _clean_number(extracted_amts[-1])
-                        if cleaned:
-                            fallback_amount = cleaned
+                sorted_cols = sorted(expanded.keys(), reverse=True)
+
+                def _cell_amount(text: str) -> str | None:
+                    clean = _PERCENTAGE_PATTERN.sub("", text).strip()
+                    amts = re.findall(r"[\d٠-٩۰-۹][\d٠-٩۰-۹.,٬٫]*", clean)
+                    if amts:
+                        return _clean_number(amts[-1])
+                    return None
+
+                for col in sorted_cols:
+                    val = expanded[col]
+                    if _is_total_row(val) or (bool(desc) and val == desc):
+                        continue
+                    if (
+                        _SAR_MARKER.search(val)
+                        or _EGP_MARKER.search(val)
+                        or _OTHER_MARKER.search(val)
+                    ):
+                        amt = _cell_amount(val)
+                        if amt:
+                            fallback_amount = amt
+                            break
+
+                if fallback_amount is None:
+                    for col in sorted_cols:
+                        val = expanded[col]
+                        if _is_total_row(val) or (bool(desc) and val == desc):
+                            continue
+                        amt = _cell_amount(val)
+                        if amt:
+                            fallback_amount = amt
+                            break
+
+                if fallback_amount is None:
+                    for col in sorted_cols:
+                        val = expanded[col]
+                        amt = _cell_amount(val)
+                        if amt:
+                            fallback_amount = amt
                             break
             if is_total:
                 amount = fallback_amount or price
@@ -368,6 +425,25 @@ def _parse_line_table(result: object, model_version: str) -> ExtractionResult | 
     return ExtractionResult(
         "azure_di", model_version, header, lines, stated_total, 0.0, expected_line_count=expected
     )
+
+
+def _same_cell(c1: object | None, c2: object | None) -> bool:
+    if c1 is None or c2 is None:
+        return False
+    if c1 is c2:
+        return True
+    span1 = int(_get(c1, "columnSpan", _get(c1, "column_span", 1)) or 1)
+    span2 = int(_get(c2, "columnSpan", _get(c2, "column_span", 1)) or 1)
+    if span1 > 1 or span2 > 1:
+        start1 = int(_get(c1, "columnIndex", _get(c1, "column_index", 0)))
+        start2 = int(_get(c2, "columnIndex", _get(c2, "column_index", 0)))
+        if (start1, span1) == (start2, span2):
+            return True
+        spans1 = _get(c1, "spans")
+        spans2 = _get(c2, "spans")
+        if spans1 and spans2 and spans1 == spans2:
+            return True
+    return False
 
 
 def _get(obj: object, name: str, default: Any = None) -> Any:  # noqa: ANN401

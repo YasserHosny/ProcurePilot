@@ -189,3 +189,123 @@ def test_visual_order_rate_adjacent_to_amount() -> None:
     assert result.stated_total is not None
     assert result.stated_total.value == {"amount": "4440.00", "currency": "SAR"}
     assert validate_arithmetic(result).status == "reconciled"
+
+
+def test_item_row_with_identical_description_and_quantity_stays_a_line() -> None:
+    # 1 (blocking): Real item row like description '1' / quantity '1' must not be dropped
+    payload = _make_table_payload(
+        [["1", "1", "100.00", "100.00"]],
+        "الإجمالي",
+        "100.00 ر.س",
+    )
+    result = _parse_invoice_result(payload, "layout:test")
+    assert len(result.lines) == 1
+    assert result.expected_line_count == 1
+    assert result.lines[0].original_text == "1"
+    assert result.lines[0].fields["quantity"].value == "1"
+    assert result.lines[0].fields["unit_price"].value == {"amount": "100.00", "currency": "SAR"}
+    assert result.lines[0].fields["line_total"].value == {"amount": "100.00", "currency": "SAR"}
+    assert result.stated_total is not None
+    assert result.stated_total.value == {"amount": "100.00", "currency": "SAR"}
+    assert validate_arithmetic(result).status == "reconciled"
+
+
+def test_vat_cell_with_currency_marker_does_not_beat_bare_grand_total() -> None:
+    # 2 (blocking): Total | '' | '150.00 ر.س' | '1,150.00' → 1150.00
+    # When line_total role is not explicitly bound, fallback_amount must use the last numeric
+    # column ('1,150.00'), not the VAT cell with a currency marker ('150.00 ر.س').
+    cells = [
+        {"rowIndex": 0, "columnIndex": 0, "columnSpan": 1, "content": "الصنف"},
+        {"rowIndex": 0, "columnIndex": 1, "columnSpan": 1, "content": "الكمية"},
+        {"rowIndex": 0, "columnIndex": 2, "columnSpan": 1, "content": "سعر الوحدة"},
+        {"rowIndex": 0, "columnIndex": 3, "columnSpan": 1, "content": "الصافي"},
+        {"rowIndex": 1, "columnIndex": 0, "columnSpan": 1, "content": "بند 1"},
+        {"rowIndex": 1, "columnIndex": 1, "columnSpan": 1, "content": "1"},
+        {"rowIndex": 1, "columnIndex": 2, "columnSpan": 1, "content": "1,000.00"},
+        {"rowIndex": 1, "columnIndex": 3, "columnSpan": 1, "content": "1,000.00"},
+        {"rowIndex": 2, "columnIndex": 0, "columnSpan": 1, "content": "Total"},
+        {"rowIndex": 2, "columnIndex": 1, "columnSpan": 1, "content": ""},
+        {"rowIndex": 2, "columnIndex": 2, "columnSpan": 1, "content": "150.00 ر.س"},
+        {"rowIndex": 2, "columnIndex": 3, "columnSpan": 1, "content": "1,150.00"},
+    ]
+    payload = {
+        "content": "Total 150.00 ر.س 1,150.00",
+        "tables": [{"columnCount": 4, "rowCount": 3, "cells": cells}],
+    }
+    result = _parse_invoice_result(payload, "layout:test")
+    assert result.stated_total is not None
+    assert result.stated_total.value == {"amount": "1150.00", "currency": "SAR"}
+
+
+def test_total_fallback_loop_scans_right_to_left_and_skips_label() -> None:
+    # 3 (blocking): 'إجمالي لعام 2024' | '' | 'المبلغ 1,000.00 ر.س' → 1000.00
+    cells = [
+        {"rowIndex": 0, "columnIndex": 0, "columnSpan": 1, "content": "الصنف"},
+        {"rowIndex": 0, "columnIndex": 1, "columnSpan": 1, "content": "الكمية"},
+        {"rowIndex": 0, "columnIndex": 2, "columnSpan": 1, "content": "سعر الوحدة"},
+        {"rowIndex": 1, "columnIndex": 0, "columnSpan": 1, "content": "بند"},
+        {"rowIndex": 1, "columnIndex": 1, "columnSpan": 1, "content": "1"},
+        {"rowIndex": 1, "columnIndex": 2, "columnSpan": 1, "content": "1,000.00"},
+        {"rowIndex": 2, "columnIndex": 0, "columnSpan": 1, "content": "إجمالي لعام 2024"},
+        {"rowIndex": 2, "columnIndex": 1, "columnSpan": 1, "content": ""},
+        {"rowIndex": 2, "columnIndex": 2, "columnSpan": 1, "content": "المبلغ 1,000.00 ر.س"},
+    ]
+    payload = {
+        "content": "إجمالي لعام 2024 المبلغ 1,000.00 ر.س",
+        "tables": [{"columnCount": 3, "rowCount": 3, "cells": cells}],
+    }
+    result = _parse_invoice_result(payload, "layout:test")
+    assert result.stated_total is not None
+    assert result.stated_total.value == {"amount": "1000.00", "currency": "SAR"}
+
+
+def test_arabic_attached_prefixes_recognized_as_totals() -> None:
+    # 4 (blocking): «والإجمالي», «بالإجمالي», «فالإجمالي», «للإجمالي»/«لإجمالي»
+    from procurepilot_extraction_worker.azure_di import _is_total_row
+
+    for label in ("والإجمالي", "بالإجمالي", "فالإجمالي", "للإجمالي", "لإجمالي"):
+        assert _is_total_row(label), f"{label} must be recognized as a total row"
+        payload = _make_table_payload(
+            [["بند", "1", "1,000.00", "1,000.00"]],
+            label,
+            "1,000.00 ر.س",
+        )
+        result = _parse_invoice_result(payload, "layout:test")
+        assert len(result.lines) == 1
+        assert result.expected_line_count == 1
+        assert result.stated_total is not None
+        assert result.stated_total.value == {"amount": "1000.00", "currency": "SAR"}
+
+
+def test_leading_percent_does_not_swallow_visual_order_amount() -> None:
+    # 5 (non-blocking): 'الإجمالي شامل ضريبة 15 :%4,440.00 ر.س' → 4440.00
+    text = "الإجمالي شامل ضريبة 15 :%4,440.00 ر.س"
+    field = _find_grand_total(text, "SAR")
+    assert field is not None
+    assert field.value == {"amount": "4440.00", "currency": "SAR"}
+
+
+def test_items_without_quantity_named_total_clean_or_collection_stay_lines() -> None:
+    # 6 (non-blocking): item without quantity named «مجموع قطع غيار» or 'Total Clean Detergent'
+    # with unit price and line total must stay lines
+    payload_ar = _make_table_payload(
+        [["مجموع قطع غيار", "", "100.00", "100.00"]],
+        "الإجمالي",
+        "100.00 ر.س",
+    )
+    result_ar = _parse_invoice_result(payload_ar, "layout:test")
+    assert len(result_ar.lines) == 1
+    assert result_ar.lines[0].original_text == "مجموع قطع غيار"
+    assert result_ar.stated_total is not None
+    assert result_ar.stated_total.value == {"amount": "100.00", "currency": "SAR"}
+
+    payload_en = _make_table_payload(
+        [["Total Clean Detergent", "", "50.00", "50.00"]],
+        "Total",
+        "50.00 SAR",
+    )
+    result_en = _parse_invoice_result(payload_en, "layout:test")
+    assert len(result_en.lines) == 1
+    assert result_en.lines[0].original_text == "Total Clean Detergent"
+    assert result_en.stated_total is not None
+    assert result_en.stated_total.value == {"amount": "50.00", "currency": "SAR"}
