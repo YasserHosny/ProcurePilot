@@ -1,6 +1,6 @@
 # Round 6 — Arabic-interface recording on the Ledger UI (2026-10-24)
 
-A fresh real round on «مطاعم سند» for the v2.4 demo video ([`../../video/script-v2.4.md`](../../video/script-v2.4.md)),
+A fresh real round on «مطاعم سند» for the v2.4 demo video ([`../../video/cuts/v2.4-ledger/script.md`](../../video/cuts/v2.4-ledger/script.md)),
 run and recorded in the Arabic interface after the Ledger design system shipped to the web app (#235)
 and the Flutter app (#245). Recorded by tab capture over the Chrome DevTools protocol with
 [`../../video/source/record-v24/`](../../video/source/record-v24/) (`PP_LANG=ar`); raw clips are in
