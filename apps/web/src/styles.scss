@@ -425,6 +425,13 @@ tr.pp-total > td { border-block-start: 1px solid var(--pp-table-header-border); 
     linear-gradient(var(--pp-table-total-rule), var(--pp-table-total-rule)) 0 calc(100% - 4px) / 100% 1.5px no-repeat;
 }
 
+// Material Symbols at Ledger's weight
+.mat-icon, .material-symbols-outlined {
+  font-variation-settings: 'FILL' 0, 'wght' var(--pp-icon-weight), 'GRAD' 0, 'opsz' 20;
+}
+// Icons that point along the reading direction; the logo never mirrors
+[dir='rtl'] .mat-icon.pp-mirror { transform: scaleX(-1); }
+
 // --------------------------------------------------------------------------
 // App globals
 // --------------------------------------------------------------------------

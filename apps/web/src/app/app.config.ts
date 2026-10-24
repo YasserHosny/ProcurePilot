@@ -5,6 +5,7 @@ import {
   provideAppInitializer,
   provideZoneChangeDetection,
 } from '@angular/core';
+import { MatIconRegistry } from '@angular/material/icon';
 import { provideAnimationsAsync } from '@angular/platform-browser/animations/async';
 import { provideRouter } from '@angular/router';
 import { MissingTranslationHandler, provideTranslateService } from '@ngx-translate/core';
@@ -23,6 +24,10 @@ export const appConfig: ApplicationConfig = {
     provideAppInitializer(restoreSessionOnStartup),
     provideAppInitializer(() => {
       inject(I18nService);
+    }),
+    // Ledger icons are Material Symbols Outlined (index.html loads the font).
+    provideAppInitializer(() => {
+      inject(MatIconRegistry).setDefaultFontSetClass('material-symbols-outlined');
     }),
     provideRouter(routes),
     provideHttpClient(withXhr(), withInterceptors([authInterceptor])),
