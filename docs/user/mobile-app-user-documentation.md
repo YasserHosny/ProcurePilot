@@ -643,5 +643,5 @@ missing tab.
 
 ## Getting Help
 
-- Use the web app's feedback path when available: **Account menu -> Send Feedback**.
-- Email: support@procurepilot.example.com.
+- In the web app: **Account menu -> Contact support** opens an email to support.
+- Email: support@iron-sys.com.

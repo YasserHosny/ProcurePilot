@@ -1391,6 +1391,7 @@ If you hit any of these, it's not something wrong with your setup — flag it to
 
 ## Getting Help
 
-- In-app feedback: **Account menu → Send Feedback**.
-- Email: support@procurepilot.example.com.
+- In the app: **Account menu → Contact support** opens an email to support.
+- Email: support@iron-sys.com.
+- Security issues: security@iron-sys.com (see `SECURITY.md`). Privacy and data requests: privacy@iron-sys.com.
 - Response target: within 1 business day for paid plans.
