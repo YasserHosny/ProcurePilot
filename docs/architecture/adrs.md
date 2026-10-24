@@ -18,7 +18,7 @@
   Node 24 to build). Reason: the new design system's Material theme uses the M3 API, including the
   tonal button that first shipped in Material 20, so building it once on the current major is
   cheaper than building it on 19 and porting it. Builders moved from `@angular-devkit/build-angular`
-  (deprecated) to `@angular/build`; Karma stays. Every component carries
+  (deprecated) to `@angular/build`; Karma stays. Every component with state carries
   `ChangeDetectionStrategy.Eager`, which keeps pre-22 behaviour under Angular 22's OnPush default.
 
 ## ADR-002 — Mobile Framework: Flutter

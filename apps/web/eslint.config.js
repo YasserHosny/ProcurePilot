@@ -24,8 +24,9 @@ module.exports = tseslint.config(
         'error',
         { type: 'element', prefix: 'app', style: 'kebab-case' },
       ],
-      // Angular 22 made OnPush the default, and its `ng update` migration pinned all 86 existing
-      // components to ChangeDetectionStrategy.Eager so their behaviour did not change. Moving each
+      // Angular 22 made OnPush the default, and its `ng update` migration pinned 86 components to
+      // ChangeDetectionStrategy.Eager so their behaviour did not change (the stateless
+      // RequestsComponent kept the default). Moving each
       // to OnPush is a per-component behaviour change with its own testing, not part of the
       // upgrade, so the opt-outs stay visible as warnings until that work is done.
       '@angular-eslint/prefer-on-push-component-change-detection': 'warn',
