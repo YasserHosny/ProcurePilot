@@ -360,9 +360,11 @@ real push provider — section 13) from a notification tap carrying that request
 | 4 | **Report Quality Issue button** | Shown only while the request's status is `delivered`. Opens the Quality Issue screen (section 11). |
 | 5 | **Approval section** | Read-only: a status chip, who it's assigned to, and — once decided — the approver's comment and decision timestamp. There is no approve/reject control on this screen; that lives in the Approval Queue (section 10). |
 
-**Current display limitation:** a line's product is shown by its internal product ID rather
-than its catalogue name — the same friendly-name-resolution gap noted on the equivalent web
-screen (section 19 of the web documentation).
+**Current display limitation:** lines show the product's catalogue name, or an "unknown product"
+label when the server sends no name. In the Approval section, however, "Assigned to" shows the
+approver's internal member ID rather than their name, and the decision time is shown as a raw
+timestamp (for example `2026-10-24T14:30:00.000Z`) rather than a local date — a known gap, to be
+fixed.
 
 **Business value:** a structured, native request flow captures what the web form captures —
 who needs the item, where, by when, and at what estimated cost — from the device a branch user
