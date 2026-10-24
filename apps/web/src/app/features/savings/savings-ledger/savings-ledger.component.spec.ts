@@ -120,6 +120,22 @@ describe('SavingsLedgerComponent (T022)', () => {
     expect(component.getPolicyClass('last_po_price')).toBe('policy-last-po');
   });
 
+  it('never labels a pending delta as verified', () => {
+    const el = fixture.nativeElement as HTMLElement;
+    const header = el.querySelector('th.mat-column-delta')?.textContent?.trim();
+    expect(header).toBe('savings.ledger.table.delta');
+
+    const badges = Array.from(el.querySelectorAll<HTMLElement>('[data-testid="saving-delta"]'));
+    expect(badges.length).toBe(2);
+    const [verified, pending] = badges;
+    expect(verified.classList).not.toContain('delta-pending');
+    expect(verified.querySelector('[data-testid="delta-pending-hint"]')).toBeNull();
+    expect(pending.classList).toContain('delta-pending');
+    expect(pending.querySelector('[data-testid="delta-pending-hint"]')?.textContent?.trim()).toBe(
+      'savings.ledger.table.deltaPendingHint',
+    );
+  });
+
   it('should visually differentiate pending vs verified status', () => {
     const verifiedStatus = component.getStatusClass('verified');
     const pendingStatus = component.getStatusClass('pending');

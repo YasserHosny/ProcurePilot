@@ -224,6 +224,19 @@
     background-color: var(--pp-surface-sunken);
     color: var(--pp-text-muted);
   }
+
+  // A pending delta is calculated, not verified: outlined instead of filled.
+  &.delta-pending {
+    background-color: transparent;
+    border: 1px dashed currentColor;
+  }
+}
+
+.delta-pending-hint {
+  display: block;
+  font-weight: 400;
+  font-size: 0.75rem;
+  color: var(--pp-text-muted);
 }
 
 .status-pill {

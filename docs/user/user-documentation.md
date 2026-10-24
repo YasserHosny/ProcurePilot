@@ -616,7 +616,7 @@ Reached from **Create Order** on the order list (blank), **From approved request
 | 3 | **+ Record Purchase Outcome button** | Opens the outcome capture form (below) to record a purchase and automatically calculate savings. |
 | 4 | **Stats cards** | Three summary cards: **Total Verified Savings**, **Verified Outcomes** (count), **Pending Outcomes** (count). |
 | 5 | **Filters** | Status (All/Verified/Pending), supplier, and date range. **Clear Filters** resets all. |
-| 6 | **Savings table** | Each row: product, supplier, baseline value (with the baseline policy used beneath it, e.g. "Last PO Price"), actual paid, verified saving (delta), status, and recorded date. Click **View Evidence** to drill into the full calculation. |
+| 6 | **Savings table** | Each row: product, supplier, baseline value (with the baseline policy used beneath it, e.g. "Last PO Price"), actual paid, **Saving (Delta)**, status, and recorded date. The status chip is the verification signal: a Pending row's delta is a calculated saving, shown outlined with "Calculated, not yet verified" beneath it, and only counts toward **Total Verified Savings** once an owner or buyer verifies it. Click **View Evidence** to drill into the full calculation. |
 | 7 | **Empty state** | When no savings exist, "No savings recorded yet" with a **+ Record First Purchase** link. |
 
 ### Record Purchase Outcome
