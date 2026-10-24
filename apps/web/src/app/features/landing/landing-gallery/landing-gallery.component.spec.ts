@@ -145,6 +145,33 @@ describe('LandingGalleryComponent', () => {
     }
   });
 
+  for (const locale of ['en', 'ar'] as const) {
+    it(`renders a named carousel with five localized slides in ${locale}`, () => {
+      i18nService.setLocale(locale);
+      translate.use(locale);
+      fixture.detectChanges();
+
+      const rail: HTMLElement = fixture.nativeElement.querySelector('div.gallery-rail');
+      expect(rail).not.toBeNull();
+      expect(rail.getAttribute('role')).toBe('group');
+      expect(rail.getAttribute('tabindex')).toBe('0');
+      expect(rail.getAttribute('aria-roledescription')).toBe('carousel');
+      expect(rail.getAttribute('aria-label')).toBe(translate.instant('landing.gallery.railLabel'));
+
+      const cards = rail.querySelectorAll('div.gallery-card');
+      expect(cards.length).toBe(5);
+      cards.forEach((card, index) => {
+        expect(card.getAttribute('role')).toBe('group');
+        expect(card.getAttribute('aria-roledescription')).toBe(locale === 'ar' ? 'شريحة' : 'slide');
+        const label = translate.instant(component.galleryCards[index].labelKey);
+        expect(card.getAttribute('aria-label')).toBe(
+          locale === 'ar' ? `${index + 1} من ٥: ${label}` : `${index + 1} of 5: ${label}`
+        );
+      });
+      expect(rail.querySelector('[role="list"], li')).toBeNull();
+    });
+  }
+
   it('disables next/prev at ends', () => {
     const prevBtn = fixture.debugElement.query(By.css('.gallery-nav-btn.prev-btn'));
     const nextBtn = fixture.debugElement.query(By.css('.gallery-nav-btn.next-btn'));

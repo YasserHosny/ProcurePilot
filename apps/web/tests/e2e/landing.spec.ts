@@ -96,6 +96,27 @@ test.describe('Guest Landing Page (PPS-35, PPS-36, PPS-45)', () => {
   });
 
   for (const locale of ['en', 'ar'] as const) {
+    test(`the full landing page has no WCAG 2.1 AA violations in ${locale}`, async ({ page }) => {
+      await page.addInitScript((initialLocale) => {
+        localStorage.setItem('pp.locale', initialLocale);
+      }, locale);
+      await page.goto('/');
+
+      await expect(page).toHaveURL(/\/$/);
+      await expect(page.locator('html')).toHaveAttribute('lang', locale);
+      await expect(page.locator('html')).toHaveAttribute('dir', locale === 'ar' ? 'rtl' : 'ltr');
+      await expect(page.locator('.hero-headline')).toBeVisible();
+      await expect(page.locator('.gallery-card')).toHaveCount(5);
+      await expect(page.locator('.gallery-card').first()).toHaveAttribute(
+        'aria-roledescription', locale === 'ar' ? 'شريحة' : 'slide'
+      );
+
+      const results = await new AxeBuilder({ page })
+        .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+        .analyze();
+      expect(results.violations).toEqual([]);
+    });
+
     test(`at 375x812, ${locale} load and language toggle keep the page at the top`, async ({ page }) => {
       await page.setViewportSize({ width: 375, height: 812 });
       await page.addInitScript((initialLocale) => {

@@ -33,21 +33,22 @@
       </div>
     </div>
 
-    <ul
+    <div
       #railEl
       class="gallery-rail"
-      role="list"
+      role="group"
       tabindex="0"
       aria-roledescription="carousel"
       [attr.aria-label]="'landing.gallery.railLabel' | translate"
       (keydown)="onRailKeydown($event)"
     >
       @for (card of galleryCards; track card.id; let i = $index) {
-        <li
+        <div
           #cardEl
           class="gallery-card"
           [class.active]="activeCardIndex() === i"
           role="group"
+          [attr.aria-roledescription]="'landing.gallery.slide' | translate"
           [attr.data-index]="i"
           [attr.aria-label]="getCardAriaLabel(i, card)"
         >
@@ -79,9 +80,9 @@
               <span class="gallery-demonstration-chip">{{ 'landing.gallery.demonstrationChip' | translate }}</span>
             </figcaption>
           </figure>
-        </li>
+        </div>
       }
-    </ul>
+    </div>
 
     <nav #stepIndexEl class="gallery-step-index" [attr.aria-label]="'landing.gallery.railLabel' | translate">
       @for (card of galleryCards; track card.id; let i = $index) {

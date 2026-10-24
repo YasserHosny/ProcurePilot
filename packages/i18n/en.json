@@ -4025,6 +4025,7 @@
       "next": "Next screen",
       "cardAriaLabel": "{{n}} of 5: {{label}}",
       "railLabel": "Product screens",
+      "slide": "slide",
       "enlarge": "Enlarge screenshot",
       "close": "Close",
       "demonstrationChip": "Demonstration data",
