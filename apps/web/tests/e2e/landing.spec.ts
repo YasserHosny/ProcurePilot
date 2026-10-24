@@ -2,7 +2,7 @@ import AxeBuilder from '@axe-core/playwright';
 import { test, expect } from '@playwright/test';
 
 /**
- * Guest Landing Page E2E Tests — PPS-37 (Landing v2).
+ * Guest Landing Page E2E Tests — PPS-35 / PPS-36 / PPS-45.
  *
  * Guarantees:
  * - Unauthenticated "/" displays the landing page (not a redirect to /auth/sign-in)
@@ -16,7 +16,7 @@ import { test, expect } from '@playwright/test';
  * - In Arabic the rail starts at the right and "next" moves leftwards
  * - No horizontal page scroll at 375px
  */
-test.describe('Guest Landing Page (PPS-37)', () => {
+test.describe('Guest Landing Page (PPS-35, PPS-36, PPS-45)', () => {
   test('unauthenticated "/" displays the landing page without redirecting', async ({ page }) => {
     await page.goto('/');
 
