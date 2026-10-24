@@ -101,6 +101,43 @@ void main() {
       expect(find.byType(Directionality), findsWidgets);
     });
 
+    testWidgets('formats required-by date in English and Arabic', (tester) async {
+      fakeClient.pendingResults = [
+        PurchaseRequest(
+          id: 'req-date',
+          branchId: 'branch-1',
+          requestedByMembershipId: 'member-1',
+          requesterName: 'Sarah Connor',
+          requiredByDate: '2026-10-28',
+          status: 'submitted',
+          lines: const [
+            PurchaseRequestLine(
+              id: 'line-1',
+              workspaceProductId: 'product-1',
+              quantity: '5',
+            ),
+          ],
+          estimatedTotal: const Money(amount: '125.00', currency: 'USD'),
+          hasIncompleteEstimate: false,
+          approvalStep: const ApprovalStep(
+            id: 'step-1',
+            assignedMembershipId: 'approver-1',
+            source: 'threshold_match',
+            status: 'pending',
+          ),
+          createdAt: DateTime.utc(2026, 9, 13),
+        ),
+      ];
+
+      await pumpQueue(tester, locale: 'en');
+      expect(find.text('Required By: Oct 28, 2026'), findsOneWidget);
+      expect(find.textContaining('2026-10-28'), findsNothing);
+
+      await pumpQueue(tester, locale: 'ar');
+      expect(find.textContaining('مطلوب قبل: ٢٨ أكتوبر ٢٠٢٦'), findsOneWidget);
+      expect(find.textContaining('2026-10-28'), findsNothing);
+    });
+
     testWidgets('navigating to decision screen and approving reloads queue', (
       tester,
     ) async {

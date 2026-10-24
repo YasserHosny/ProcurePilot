@@ -94,7 +94,8 @@ class RequestContextSection extends StatelessWidget {
           _AutoPreparedBanner(request: request, provenance: autoPrepared),
         RequestInfoRow(
           label: i18n.t('requests.columns.requiredByDate'),
-          value: request.requiredByDate,
+          value: formatDate(request.requiredByDate, locale: i18n.locale),
+          valueStyle: LedgerTypography.tabularFigures(),
         ),
         RequestInfoRow(
           label: i18n.t('requests.columns.status'),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/api/models.dart';
 import '../../core/api/requests_api_client.dart';
+import '../../core/format/date_format.dart';
 import '../../core/format/money_format.dart';
 import '../../core/i18n/i18n_loader.dart';
 import '../../core/theme/brand_logo.dart';
@@ -157,7 +158,7 @@ class _RequestListScreenState extends State<RequestListScreen> {
                             return ListTile(
                               key: Key('requestListItem_$index'),
                               title: Text(
-                                '${i18n.t('requests.columns.requiredByDate')}: ${req.requiredByDate}',
+                                '${i18n.t('requests.columns.requiredByDate')}: ${formatDate(req.requiredByDate, locale: i18n.locale)}',
                               ),
                               subtitle: _statusChip(req.status),
                               trailing: _moneyText(req.estimatedTotal),
