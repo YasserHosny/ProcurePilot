@@ -219,7 +219,14 @@
     "navAlerts": "Alerts Inbox",
     "navIntelligence": "Price Intelligence",
     "navForecasting": "Reorder Forecasts",
-    "navRfq": "RFQ History"
+    "navRfq": "RFQ History",
+    "sourcing": "Sourcing",
+    "purchasing": "Purchasing",
+    "catalogue": "Catalogue",
+    "insight": "Insight",
+    "setup": "Setup",
+    "showGroup": "Show {{group}}",
+    "hideGroup": "Hide {{group}}"
   },
   "analyst": {
     "title": "Procurement Analyst",

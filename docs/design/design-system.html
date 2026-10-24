@@ -781,6 +781,10 @@ dialog.real::backdrop{background:var(--pp-dialog-scrim)}
 .nav .count{margin-inline-start:auto; font-size:var(--pp-text-12); color:var(--pp-nav-count-fg)}
 .nav a[aria-current="page"] .count{color:inherit}
 .nav-sep{block-size:1px; background:var(--pp-border); margin-block:var(--pp-space-3)}
+.nav-group-btn{display:flex; align-items:center; justify-content:space-between; inline-size:100%; padding:var(--pp-space-3) var(--pp-space-2) var(--pp-space-1); margin:0; background:transparent; border:0; font-size:var(--pp-text-12); font-weight:var(--pp-weight-strong); text-transform:uppercase; letter-spacing:0.05em; color:var(--pp-text-muted); cursor:pointer; text-align:start}
+.nav-group-btn svg{inline-size:14px; block-size:14px; color:var(--pp-text-muted); transition:transform 150ms ease}
+.nav-group-btn[aria-expanded="false"] svg{transform:rotate(-90deg)}
+:root[dir="rtl"] .nav-group-btn[aria-expanded="false"] svg{transform:rotate(90deg)}
 .side .foot{margin-block-start:auto; font-size:var(--pp-text-12); color:var(--pp-text-muted); padding:var(--pp-space-2)}
 .bar-top{display:flex; align-items:center; gap:var(--pp-space-3); padding:var(--pp-space-3) var(--pp-space-5); background:var(--pp-surface-card); border-block-end:1px solid var(--pp-border)}
 .crumbs{font-size:var(--pp-text-14); color:var(--pp-text-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
@@ -881,7 +885,7 @@ dialog.real::backdrop{background:var(--pp-dialog-scrim)}
   .xnote{grid-column:1 / -1; margin:0}
   .shell{grid-template-columns:minmax(0,1fr); grid-template-rows:auto auto 1fr; block-size:auto}
   .side{grid-row:auto; border-inline-end:0; border-block-end:1px solid var(--pp-border)}
-  .side .brand,.side .foot,.nav-sep,.tenant{display:none}
+  .side .brand,.side .foot,.nav-sep,.tenant,.nav-group-btn{display:none}
   .nav{display:flex; overflow-x:auto; gap:4px}
   .nav a{white-space:nowrap}
   .search{display:none}
@@ -1752,21 +1756,24 @@ dialog.real::backdrop{background:var(--pp-dialog-scrim)}
     <!-- SHELL -->
     <section class="block" id="shell" aria-labelledby="sh-h">
       <h2 id="sh-h" data-ar="هيكل التطبيق">App shell</h2>
-      <p class="lede" data-ar="شريط جانبي بأسماء المهام لا بأسماء الأقسام التقنية. العدّاد يظهر فقط لما ينتظرك أنت. على الهاتف يصبح الشريط صفًّا أفقيًا. الشعار يختار نسخته بنفسه: عربي في العربية، ونسخة الأسطح الداكنة فوق الكحلي.">A sidebar named by the jobs people do, not by system modules. Counts appear only for work waiting on you. At phone width the sidebar becomes a scrolling row. The logo picks its own variant: Arabic lockup in Arabic, dark lockup on navy.</p>
+      <p class="lede" data-ar="شريط جانبي بأسماء المهام لا بأسماء الأقسام التقنية. مجموعات حسب المهام، قابلة للطي، والمجموعة النشطة مفتوحة دائمًا، مع تذكّر الحالة في المتصفح. العدّاد يظهر فقط لما ينتظرك أنت. على الهاتف يصبح الشريط صفًّا أفقيًا. الشعار يختار نسخته بنفسه: عربي في العربية، ونسخة الأسطح الداكنة فوق الكحلي.">A sidebar named by the jobs people do, not by system modules. Groups by job, collapsible, the active group always open, state remembered per browser. Counts appear only for work waiting on you. At phone width the sidebar becomes a scrolling row. The logo picks its own variant: Arabic lockup in Arabic, dark lockup on navy.</p>
       <div class="shell">
         <aside class="side" aria-label="Main navigation" data-ar-label="التنقّل الرئيسي">
           <a class="brand" href="#shell"><span class="pp-logo" data-kind="full" style="--pp-logo-h:24px"><svg role="img" aria-label="ProcurePilot" viewBox="0 0 956.7 220"><use href="#pp-logo-en"/></svg></span></a>
           <button class="tenant" type="button"><span><span data-ar="مجموعة مطابخ النيل">Nile Kitchens Group</span><small data-ar="٤ فروع، ج.م.">4 branches, EGP</small></span><svg width="16" height="16" aria-hidden="true"><use href="#i-down"/></svg></button>
-          <ul class="nav">
-            <li><a href="#shell"><svg><use href="#i-inbox"/></svg><span data-ar="عروض الأسعار">Quotations</span><span class="count num" data-ar="١٢">12</span></a></li>
-            <li><a href="#shell"><svg><use href="#i-compare"/></svg><span data-ar="مقارنة العروض">Compare</span></a></li>
+          <button class="nav-group-btn" type="button" aria-expanded="true" aria-controls="shell-grp-purchasing"><span data-ar="الشراء">Purchasing</span><svg aria-hidden="true"><use href="#i-down"/></svg></button>
+          <ul class="nav" id="shell-grp-purchasing">
             <li><a href="#shell"><svg><use href="#i-req"/></svg><span data-ar="طلبات الشراء">Requests</span></a></li>
             <li><a href="#shell" aria-current="page"><svg><use href="#i-check"/></svg><span data-ar="الموافقات">Approvals</span><span class="count num" data-ar="٣">3</span></a></li>
             <li><a href="#shell"><svg><use href="#i-order"/></svg><span data-ar="أوامر الشراء">Orders</span></a></li>
-            <li><a href="#shell"><svg><use href="#i-truck"/></svg><span data-ar="الاستلام">Deliveries</span></a></li>
           </ul>
-          <div class="nav-sep"></div>
-          <ul class="nav">
+          <button class="nav-group-btn" type="button" aria-expanded="false" aria-controls="shell-grp-sourcing"><span data-ar="التوريد">Sourcing</span><svg aria-hidden="true"><use href="#i-down"/></svg></button>
+          <ul class="nav" id="shell-grp-sourcing" hidden>
+            <li><a href="#shell"><svg><use href="#i-inbox"/></svg><span data-ar="عروض الأسعار">Quotations</span><span class="count num" data-ar="١٢">12</span></a></li>
+            <li><a href="#shell"><svg><use href="#i-compare"/></svg><span data-ar="مقارنة العروض">Compare</span></a></li>
+          </ul>
+          <button class="nav-group-btn" type="button" aria-expanded="true" aria-controls="shell-grp-catalogue"><span data-ar="الكتالوج">Catalogue</span><svg aria-hidden="true"><use href="#i-down"/></svg></button>
+          <ul class="nav" id="shell-grp-catalogue">
             <li><a href="#shell"><svg><use href="#i-store"/></svg><span data-ar="الموردون">Suppliers</span></a></li>
             <li><a href="#shell"><svg><use href="#i-coin"/></svg><span data-ar="التوفير">Savings</span></a></li>
             <li><a href="#shell"><svg><use href="#i-spark"/></svg><span data-ar="المحلل">Analyst</span></a></li>

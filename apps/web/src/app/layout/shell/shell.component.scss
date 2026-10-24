@@ -70,18 +70,27 @@
   }
 }
 
-.workspace-name {
-  max-inline-size: 180px;
+.workspace-name,
+.menu-user-email {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.dropdown-icon {
-  color: var(--pp-text-muted);
+.workspace-name {
+  max-inline-size: 180px;
+}
+
+.dropdown-icon,
+.nav-group-chevron,
+.active-icon {
   font-size: 18px;
   inline-size: 18px;
   block-size: 18px;
+}
+
+.dropdown-icon {
+  color: var(--pp-text-muted);
 }
 
 .account-btn {
@@ -131,6 +140,54 @@
   padding: 0.5rem 1rem 0.25rem;
 }
 
+.nav-home-wrap {
+  padding-block-start: 0.5rem;
+}
+
+.nav-group-heading {
+  margin: 0;
+  padding: 0;
+  font-size: inherit;
+  font-weight: inherit;
+}
+
+.nav-group-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  inline-size: 100%;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  text-align: start;
+  font-family: inherit;
+
+  &:disabled {
+    cursor: default;
+  }
+}
+
+.nav-group-chevron {
+  color: var(--pp-text-muted);
+  transition: transform 150ms ease;
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+  }
+}
+
+.nav-group-toggle[aria-expanded="false"] .nav-group-chevron {
+  transform: rotate(-90deg);
+
+  &.rtl-chevron {
+    transform: rotate(90deg);
+  }
+}
+
+.nav-group-items[hidden] {
+  display: none !important;
+}
+
 .nav-item {
   display: flex;
   align-items: center;
@@ -143,8 +200,6 @@
   padding: 0.5rem 0.75rem;
   text-decoration: none;
 
-  // mat-list-item wraps its content in an inline span, so the host's flex gap never reaches the
-  // icon: align it on the label's line instead.
   mat-icon {
     font-size: 20px;
     inline-size: 20px;
@@ -154,37 +209,24 @@
     color: var(--pp-text-muted);
   }
 
-  &:hover:not(.disabled) {
+  &:hover {
     background-color: t.$surface-subtle;
     color: var(--pp-text-strong);
-
-    mat-icon { color: t.$brand-primary; }
   }
 
   &.active {
     background-color: var(--pp-primary-container);
     color: t.$brand-primary-dark;
     font-weight: 600;
-
-    mat-icon { color: t.$brand-primary; }
   }
 
-  &.disabled {
-    opacity: 0.6;
-    cursor: default;
+  &:hover mat-icon,
+  &.active mat-icon {
+    color: t.$brand-primary;
   }
 }
 
 .nav-label { flex: 1; }
-
-.soon-badge {
-  font-size: 0.6875rem;
-  font-weight: 500;
-  padding: 0.125rem 0.375rem;
-  background-color: t.$surface-subtle;
-  color: var(--pp-text-muted);
-  border-radius: 4px;
-}
 
 .main-content {
   background-color: t.$surface-page;
@@ -203,9 +245,6 @@
   font-size: 0.875rem;
   color: var(--pp-text-strong);
   max-inline-size: 220px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .menu-user-role {
@@ -238,9 +277,6 @@
 .ws-role { font-size: 0.75rem; color: var(--pp-text-muted); text-transform: capitalize; }
 .active-icon {
   color: t.$brand-primary;
-  font-size: 18px;
-  inline-size: 18px;
-  block-size: 18px;
 }
 
 @include bp.tablet-down {
