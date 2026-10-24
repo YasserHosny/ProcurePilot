@@ -1,3 +1,4 @@
+import AxeBuilder from '@axe-core/playwright';
 import { test, expect } from '@playwright/test';
 
 /**
@@ -67,9 +68,17 @@ test.describe('Guest Landing Page (PPS-35 / PPS-36)', () => {
     await enlargeBtn.focus();
     await enlargeBtn.click();
 
-    // Wait for the dialog to be visible
-    const dialog = page.locator('mat-dialog-container');
+    // Verify dialog with accessible name matching the screenshot caption is visible
+    const captionText =
+      'Check extracted details beside the source document and resolve fields that need attention.';
+    const dialog = page.getByRole('dialog', { name: captionText });
     await expect(dialog).toBeVisible();
+
+    // Verify no accessibility violations while dialog is open
+    const axeResults = await new AxeBuilder({ page })
+      .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+      .analyze();
+    expect(axeResults.violations).toEqual([]);
 
     // Close via Escape key
     await page.keyboard.press('Escape');

@@ -43,9 +43,15 @@ describe('ScreenshotDialogComponent', () => {
     expect(img.alt).toBe(mockData.alt);
   });
 
-  it('renders caption text', () => {
-    const captionEl = fixture.nativeElement.querySelector('.dialog-caption');
-    expect(captionEl.textContent.trim()).toBe(mockData.caption);
+  it('renders caption via mat-dialog-title directive', () => {
+    const titleEl: HTMLElement = fixture.nativeElement.querySelector('[mat-dialog-title]');
+    expect(titleEl).toBeTruthy();
+    expect(titleEl.textContent?.trim()).toBe(mockData.caption);
+  });
+
+  it('has no redundant nested role="dialog"', () => {
+    const nestedDialog = fixture.nativeElement.querySelector('[role="dialog"]');
+    expect(nestedDialog).toBeNull();
   });
 
   it('closes the dialog when close button is clicked', () => {

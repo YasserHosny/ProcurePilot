@@ -1,6 +1,12 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
-import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
+import {
+  MAT_DIALOG_DATA,
+  MatDialogContent,
+  MatDialogModule,
+  MatDialogRef,
+  MatDialogTitle,
+} from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
 import { TranslatePipe } from '@ngx-translate/core';
 
@@ -13,7 +19,14 @@ export interface ScreenshotDialogData {
 @Component({
   selector: 'app-screenshot-dialog',
   standalone: true,
-  imports: [MatDialogModule, MatButtonModule, MatIconModule, TranslatePipe],
+  imports: [
+    MatDialogModule,
+    MatDialogTitle,
+    MatDialogContent,
+    MatButtonModule,
+    MatIconModule,
+    TranslatePipe,
+  ],
   templateUrl: './screenshot-dialog.component.html',
   styleUrl: './screenshot-dialog.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

@@ -1,6 +1,6 @@
-<div class="screenshot-dialog" role="dialog" [attr.aria-label]="data.caption">
+<div class="screenshot-dialog">
   <div class="dialog-header">
-    <p class="dialog-caption">{{ data.caption }}</p>
+    <h2 mat-dialog-title class="dialog-caption">{{ data.caption }}</h2>
     <button
       mat-icon-button
       type="button"
@@ -11,7 +11,7 @@
       <mat-icon aria-hidden="true">close</mat-icon>
     </button>
   </div>
-  <div class="dialog-body">
+  <mat-dialog-content class="dialog-body">
     <img
       [src]="data.src"
       [alt]="data.alt"
@@ -19,5 +19,5 @@
       height="900"
       class="dialog-image"
     />
-  </div>
+  </mat-dialog-content>
 </div>
