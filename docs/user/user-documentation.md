@@ -137,31 +137,33 @@ The final step of workspace creation: a summary card showing the workspace's pla
 
 ![Authenticated Sidebar](screenshots/02b-sidebar-navigation.jpg)
 
-| # | Element | Description |
-|---|---------|-------------|
-| 1 | **Main navigation section** | Groups the workspace modules available after sign-in. |
-| 2 | **Overview** | Opens the Dashboard and workspace security summary. |
-| 3 | **Products** | Opens the Product Catalogue. |
-| 4 | **Suppliers** | Opens supplier records and supplier profile management. |
-| 5 | **Supplier Risk** | Opens the workspace-wide Supplier Risk Queue (§36). |
-| 6 | **Procurement Analyst / Question History** | Opens the grounded Q&A assistant and its conversation history (§37). |
-| 7 | **Import Catalogue** | Opens the CSV import workflow for bulk product/supplier updates (Owner/Buyer). |
-| 8 | **Quotation Inbox** | Opens quotation upload, review, authorization, and audit-trail workflows. |
-| 9 | **Match Resolution** | Opens quotation-line product matching tasks. |
-| 10 | **Order Tracking** | Opens the purchase order lifecycle screens (§11). |
-| 11 | **RFQ History** | Opens the RFQ sourcing history, create, and compare screens (§38). |
-| 12 | **Smart Compare** | Opens supplier offer comparison and price intelligence tools. |
-| 13 | **Basket Split** | Opens the multi-supplier basket optimisation workflow (Owner/Buyer). |
-| 14 | **Alerts Inbox** | Opens detected pricing and procurement alerts. |
-| 15 | **Reorder Forecasts** | Opens the demand-forecast reorder queue (§35, Owner/Buyer only). |
-| 16 | **Savings Ledger** | Opens savings records, evidence, outcome capture, and export workflows. |
-| 17 | **Reports** | Opens the Reports Center (§23). |
-| 18 | **Ingestion** | Opens the automated-ingestion hub (§27). |
-| 19 | **Accounting** | Opens Accounting Integration (§33). |
-| 20 | **POS** | Opens POS & Inventory Integration (§34). |
-| 21 | **Purchase Requests / Approval Queue** | Opens request intake and approval tracking screens. |
-| 22 | **Team Management** | Opens member administration (Owner only). |
-| 23 | **Settings** | Opens organisation configuration screens. |
+The sidebar is grouped by the job you are doing. **Overview** sits on top; the five groups below it can each be collapsed with the arrow beside the group name, and the sidebar remembers which groups you collapsed on this browser. The group holding the page you are on always stays open. Some links appear only for certain roles, as noted.
+
+| Group | Link | Opens |
+|---|---|---|
+| — | **Overview** | The Dashboard and workspace security summary. |
+| **Sourcing** | **Quotation Inbox** | Quotation upload, review, authorisation and audit-trail workflows. |
+| | **Match Resolution** | Quotation-line product matching tasks. |
+| | **RFQ History** | RFQ sourcing history, create and compare screens (§38). |
+| | **Smart Compare** | Supplier offer comparison and price intelligence tools. |
+| | **Basket Split** | The multi-supplier basket optimisation workflow. |
+| **Purchasing** | **Purchase Requests** | Request intake. |
+| | **Approval Queue** | Requests waiting for your approval. |
+| | **Order Tracking** | The purchase order lifecycle screens (§11). |
+| **Catalogue** | **Products** | The Product Catalogue. |
+| | **Suppliers** | Supplier records and supplier profile management. |
+| | **Supplier Risk** | The workspace-wide Supplier Risk Queue (§36). |
+| | **Import Catalogue** | The CSV import workflow for bulk product/supplier updates (Owner/Buyer). |
+| **Insight** | **Savings Ledger** | Savings records, evidence, outcome capture and export workflows. |
+| | **Reports** | The Reports Center (§23). |
+| | **Reorder Forecasts** | The demand-forecast reorder queue (§35, Owner/Buyer only). |
+| | **Alerts Inbox** | Detected pricing and procurement alerts. |
+| | **Procurement Analyst / Analyst History** | The grounded Q&A assistant and its conversation history (§37). |
+| **Setup** | **Team Management** | Member administration (Owner only). |
+| | **Settings** | Organisation configuration screens. |
+| | **Ingestion** | The automated-ingestion hub (§27). |
+| | **Accounting** | Accounting Integration (§33). |
+| | **Point of Sale** | POS & Inventory Integration (§34). |
 
 **Business value:** the dashboard gives users a quick confidence check that they are in the right workspace, under the right role, with the right tenant isolation and financial settings. That reduces setup uncertainty before they begin uploading quotes, comparing offers, or approving spend.
 
