@@ -118,17 +118,19 @@ tenant-scoped table ships with its RLS policy in the same migration.
 **RTL** — use CSS logical properties (`margin-inline-start`, not `margin-left`). Test both
 directions.
 
-## Jira tracking (standing rule, owner 2026-10-22)
+## Jira tracking (standing rule, owner 2026-10-22; Scrum since 2026-10-24)
 
-Keep Jira space `PP` up to date with whatever is being worked on: GTM, ops, demo findings and
-code alike (site and cloudId in `docs/gtm/gtm-execution-plan.md` §1).
+Keep Jira space `PPS` (Scrum, board 1) up to date with whatever is being worked on: GTM, ops,
+demo findings and code alike (site, cloudId and the plan-ID → key map in
+`docs/gtm/gtm-execution-plan.md` §1–2). `PP` is retired; its `PP-n` keys redirect to `PPS`.
 
-- Work with no PP task gets one before you stop. Put the plan ID in the summary (e.g. `[P-8] …`)
-  and add the key to the plan file's key map.
+- Work with no PPS task gets one before you stop. Put the plan ID in the summary (e.g. `[P-8] …`)
+  and add the key to the plan file's key map. New tasks go to the backlog; the owner sets sprint
+  scope at planning (two-week sprints, Sunday to the second Thursday).
 - On every change of state, add a dated **Progress** comment: what is done (PR numbers), what is
   left, and who owns it.
-- In flight = the `in-progress` label until the board has columns for it. Done = transition to
-  Done. Link dependencies with *Blocks*.
+- Status is the board column: To Do → In Progress → In Review (PR open) → Done. Link
+  dependencies with *Blocks*.
 - The Atlassian connector often times out but still writes. Re-read before retrying, so you don't
   create duplicates.
 
