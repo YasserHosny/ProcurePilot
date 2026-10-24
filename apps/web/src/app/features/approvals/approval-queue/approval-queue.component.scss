@@ -203,6 +203,10 @@
   color: var(--pp-text-muted);
 }
 
+td.date-cell {
+  overflow: visible;
+}
+
 .lines-cell,
 .actions-cell {
   display: flex;

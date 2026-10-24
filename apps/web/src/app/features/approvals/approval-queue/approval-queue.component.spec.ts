@@ -588,4 +588,15 @@ describe('ApprovalQueueComponent', () => {
     expect(lineCountSpans[2]?.textContent?.trim()).toBe('٣ بنود');
     expect(compiled.querySelector('.line-details-title')?.textContent?.trim()).toContain('(٢)');
   });
+
+  // Guards PPS-60: in Arabic, the Required By date suffered a sub-pixel overflow
+  // under Material's table ellipsis. Setting overflow: visible prevents the clip
+  // without distorting column widths. The clip itself depends on real font metrics
+  // and is verified by the landing-gallery capture.
+  it('prevents clipping on the Required By cell via date-cell styling', () => {
+    const cell = fixture.nativeElement.querySelector('td.mat-column-requiredByDate') as HTMLElement;
+    expect(cell).toBeTruthy();
+    expect(cell.classList.contains('date-cell')).toBeTrue();
+    expect(getComputedStyle(cell).overflow).toBe('visible');
+  });
 });

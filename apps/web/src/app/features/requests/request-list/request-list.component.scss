@@ -199,6 +199,10 @@
   color: var(--pp-warning);
 }
 
+td.date-cell {
+  overflow: visible;
+}
+
 .actions-cell {
   display: flex;
   align-items: center;
