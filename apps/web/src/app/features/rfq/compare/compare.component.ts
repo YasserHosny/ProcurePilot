@@ -1,5 +1,5 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { Component, OnInit, inject, signal, ChangeDetectionStrategy } from '@angular/core';
+
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
@@ -14,7 +14,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatIconModule } from '@angular/material/icon';
-import { TranslateModule, TranslatePipe, TranslateService } from '@ngx-translate/core';
+import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
 import { ApiService } from '../../../core/api/api.service';
 import { RfqApi, RfqDetail, RfqGuardrail, RfqResponseComparison } from '../rfq-api';
@@ -34,7 +34,6 @@ const LAST_BRANCH_STORAGE_PREFIX = 'pp.rfq.lastBranchId.';
   selector: 'app-rfq-compare',
   standalone: true,
   imports: [
-    CommonModule,
     FormsModule,
     MatCardModule,
     MatButtonModule,
@@ -47,12 +46,12 @@ const LAST_BRANCH_STORAGE_PREFIX = 'pp.rfq.lastBranchId.';
     MatDatepickerModule,
     MatProgressSpinnerModule,
     MatIconModule,
-    TranslateModule,
     TranslatePipe,
     FormatMoneyPipe,
-    FormatDatePipe,
-  ],
+    FormatDatePipe
+],
   templateUrl: './compare.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './compare.component.scss',
 })
 export class CompareComponent implements OnInit {

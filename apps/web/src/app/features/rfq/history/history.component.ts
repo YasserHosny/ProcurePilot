@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { HttpErrorResponse } from '@angular/common/http';
 import { CommonModule } from '@angular/common';
 import { RouterModule, Router } from '@angular/router';
@@ -10,7 +10,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatIconModule } from '@angular/material/icon';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { TranslateModule, TranslateService } from '@ngx-translate/core';
+import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
 import { RfqApi, RfqSummary } from '../rfq-api';
 import { FormatDatePipe } from '../../../core/format/date.pipe';
@@ -32,11 +32,12 @@ import { SessionService } from '../../../core/auth/session.service';
     MatChipsModule,
     MatButtonModule,
     MatDialogModule,
-    TranslateModule,
+    TranslatePipe,
     FormatDatePipe,
     RoleDirective,
   ],
   templateUrl: './history.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './history.component.scss'
 })
 export class HistoryComponent implements OnInit {

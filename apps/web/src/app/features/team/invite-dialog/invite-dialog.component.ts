@@ -1,5 +1,5 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, inject, signal } from '@angular/core';
+import { Component, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
@@ -34,6 +34,7 @@ interface CreatedInvitationResult {
     TranslatePipe,
   ],
   templateUrl: './invite-dialog.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './invite-dialog.component.scss',
 })
 export class InviteDialogComponent {

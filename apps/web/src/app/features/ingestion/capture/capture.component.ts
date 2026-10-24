@@ -1,5 +1,5 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
+import { Component, DestroyRef, OnInit, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -57,6 +57,7 @@ const SUPPORTED_EXTENSIONS = new Set([
     RoleDirective,
   ],
   templateUrl: './capture.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './capture.component.scss',
 })
 export class CaptureComponent implements OnInit {

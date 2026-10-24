@@ -1,4 +1,4 @@
-import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClient, withXhr } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { TranslateService, provideTranslateService } from '@ngx-translate/core';
@@ -21,9 +21,9 @@ describe('FormatExtractionPipe and extraction formatting helpers', () => {
   beforeEach(() => {
     TestBed.configureTestingModule({
       providers: [
-        provideHttpClient(),
+        provideHttpClient(withXhr()),
         provideHttpClientTesting(),
-        provideTranslateService({ defaultLanguage: 'en' }),
+        provideTranslateService({ fallbackLang: 'en' }),
         FormatService,
         FormatExtractionPipe,
       ],

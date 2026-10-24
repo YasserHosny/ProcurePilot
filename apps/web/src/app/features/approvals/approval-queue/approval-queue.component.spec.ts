@@ -3,7 +3,7 @@ import type { ComponentFixture } from '@angular/core/testing';
 import { TestBed } from '@angular/core/testing';
 import { MatDialog, MatDialogRef } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { TranslateModule, TranslateService } from '@ngx-translate/core';
+import { TranslateService, provideTranslateService } from '@ngx-translate/core';
 import { of, throwError } from 'rxjs';
 
 import enCatalog from '../../../../../../../packages/i18n/en.json';
@@ -145,8 +145,9 @@ describe('ApprovalQueueComponent', () => {
     );
 
     await TestBed.configureTestingModule({
-      imports: [ApprovalQueueComponent, TranslateModule.forRoot()],
+      imports: [ApprovalQueueComponent],
       providers: [
+        provideTranslateService(),
         { provide: ApprovalsApiService, useValue: approvalsApi },
         { provide: RequestsApiService, useValue: requestsApi },
         { provide: OrganisationApiService, useValue: organisationApi },

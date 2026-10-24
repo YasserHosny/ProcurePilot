@@ -49,7 +49,7 @@ export class AppDateAdapter extends NativeDateAdapter {
   }
 
   private language(): string {
-    return this.translate?.currentLang || this.translate?.getDefaultLang() || 'en';
+    return this.translate?.getCurrentLang() || this.translate?.getFallbackLang() || 'en';
   }
 
   private region(): string | undefined {

@@ -1,5 +1,5 @@
 import { CommonModule, NgClass } from '@angular/common';
-import { Component, Input, inject } from '@angular/core';
+import { Component, Input, inject, ChangeDetectionStrategy } from '@angular/core';
 import { MatCardModule } from '@angular/material/card';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatIconModule } from '@angular/material/icon';
@@ -31,6 +31,7 @@ import { constraintText, isUserFacingConstraint } from './constraint-text';
     FormatMoneyPipe,
   ],
   templateUrl: './basket-split-results.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './basket-split-results.component.scss',
 })
 export class BasketSplitResultsComponent {

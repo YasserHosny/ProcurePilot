@@ -5,7 +5,7 @@ import { TestBed } from '@angular/core/testing';
 import { MatDialog, MatDialogRef } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { provideRouter } from '@angular/router';
-import { TranslateModule, TranslateService } from '@ngx-translate/core';
+import { TranslateService, provideTranslateService } from '@ngx-translate/core';
 import { of, throwError } from 'rxjs';
 
 import enCatalog from '../../../../../../../packages/i18n/en.json';
@@ -143,8 +143,9 @@ describe('ThresholdRuleListComponent', () => {
     );
 
     await TestBed.configureTestingModule({
-      imports: [ThresholdRuleListComponent, TranslateModule.forRoot()],
+      imports: [ThresholdRuleListComponent],
       providers: [
+        provideTranslateService(),
         provideRouter([]),
         { provide: ApprovalsApiService, useValue: approvalsApi },
         { provide: OrganisationApiService, useValue: organisationApi },

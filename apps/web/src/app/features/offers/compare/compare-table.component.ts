@@ -1,5 +1,5 @@
 import { CommonModule, NgClass } from "@angular/common";
-import { Component, Input } from "@angular/core";
+import { Component, Input, ChangeDetectionStrategy } from "@angular/core";
 import { MatButtonModule } from "@angular/material/button";
 import { MatCardModule } from "@angular/material/card";
 import { MatIconModule } from "@angular/material/icon";
@@ -29,6 +29,7 @@ import type { ProjectedOffer } from "./compare-projection";
     FormatMoneyPipe,
   ],
   templateUrl: "./compare-table.component.html",
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: "./compare-table.component.scss",
 })
 export class CompareTableComponent {

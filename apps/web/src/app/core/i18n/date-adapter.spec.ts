@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
 import { DateAdapter, MAT_NATIVE_DATE_FORMATS } from '@angular/material/core';
-import { TranslateModule, TranslateService } from '@ngx-translate/core';
+import { TranslateService, provideTranslateService } from '@ngx-translate/core';
 
 import { SessionService } from '../auth/session.service';
 import { AppDateAdapter, provideAppDateAdapter } from './date-adapter';
@@ -15,8 +15,7 @@ describe('AppDateAdapter', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      imports: [TranslateModule.forRoot()],
-      providers: [provideAppDateAdapter(), { provide: SessionService, useValue: { tenant } }],
+      providers: [provideTranslateService(), provideAppDateAdapter(), { provide: SessionService, useValue: { tenant } }],
     });
     adapter = TestBed.inject(DateAdapter) as AppDateAdapter;
     translate = TestBed.inject(TranslateService);

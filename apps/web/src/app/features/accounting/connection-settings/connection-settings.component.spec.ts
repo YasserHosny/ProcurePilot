@@ -1,4 +1,4 @@
-import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClient, withXhr } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { type WritableSignal, signal } from '@angular/core';
 import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
@@ -6,7 +6,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { By } from '@angular/platform-browser';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { ActivatedRoute, Router, provideRouter } from '@angular/router';
-import { TranslateModule, TranslateService } from '@ngx-translate/core';
+import { TranslateService, provideTranslateService } from '@ngx-translate/core';
 
 import type { Role } from '../../../core/api/models';
 import { SessionService } from '../../../core/auth/session.service';
@@ -80,9 +80,10 @@ describe('ConnectionSettingsComponent (T016)', () => {
     };
 
     await TestBed.configureTestingModule({
-      imports: [ConnectionSettingsComponent, TranslateModule.forRoot()],
+      imports: [ConnectionSettingsComponent],
       providers: [
-        provideHttpClient(),
+        provideTranslateService(),
+        provideHttpClient(withXhr()),
         provideHttpClientTesting(),
         provideNoopAnimations(),
         provideRouter([]),

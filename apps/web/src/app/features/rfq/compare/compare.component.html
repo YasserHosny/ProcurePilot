@@ -14,141 +14,163 @@
           <p>{{ 'rfq.compare.draftNoticeDescription' | translate }}</p>
         </div>
         @if (isCreator()) {
-        <div class="draft-notice-actions">
-          <button
-            mat-stroked-button
-            type="button"
-            (click)="onEditDraft()"
-            data-testid="rfq-compare-edit-button"
-          >
-            {{ 'rfq.compare.editDraft' | translate }}
-          </button>
-          <button
-            mat-flat-button
-            color="primary"
-            type="button"
-            (click)="onSendDraft()"
-            data-testid="rfq-compare-send-button"
-          >
-            {{ 'rfq.compare.sendDraft' | translate }}
-          </button>
-        </div>
+          <div class="draft-notice-actions">
+            <button
+              mat-stroked-button
+              type="button"
+              (click)="onEditDraft()"
+              data-testid="rfq-compare-edit-button"
+              >
+              {{ 'rfq.compare.editDraft' | translate }}
+            </button>
+            <button
+              mat-flat-button
+              color="primary"
+              type="button"
+              (click)="onSendDraft()"
+              data-testid="rfq-compare-send-button"
+              >
+              {{ 'rfq.compare.sendDraft' | translate }}
+            </button>
+          </div>
         }
       </div>
     </mat-card>
   }
 
-  <div class="controls-section mat-elevation-z1" *ngIf="responses().length > 0">
-    <mat-form-field appearance="outline">
-      <mat-label>{{ 'rfq.compare.branchLabel' | translate }}</mat-label>
-      <mat-select
-        [ngModel]="selectedBranchId()"
-        (ngModelChange)="onBranchChange($event)"
-        [placeholder]="'rfq.compare.branchPlaceholder' | translate"
-        required
-      >
-        <mat-option *ngFor="let branch of branches()" [value]="branch.id">
-          {{ branch.name }}
-        </mat-option>
-      </mat-select>
-    </mat-form-field>
+  @if (responses().length > 0) {
+    <div class="controls-section mat-elevation-z1">
+      <mat-form-field appearance="outline">
+        <mat-label>{{ 'rfq.compare.branchLabel' | translate }}</mat-label>
+        <mat-select
+          [ngModel]="selectedBranchId()"
+          (ngModelChange)="onBranchChange($event)"
+          [placeholder]="'rfq.compare.branchPlaceholder' | translate"
+          required
+          >
+          @for (branch of branches(); track branch) {
+            <mat-option [value]="branch.id">
+              {{ branch.name }}
+            </mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+      <mat-form-field appearance="outline">
+        <mat-label>{{ 'rfq.compare.requiredByLabel' | translate }}</mat-label>
+        <input matInput [matDatepicker]="picker" [(ngModel)]="requiredByDate">
+        <mat-datepicker-toggle matIconSuffix [for]="picker"></mat-datepicker-toggle>
+        <mat-datepicker #picker></mat-datepicker>
+      </mat-form-field>
+    </div>
+  }
 
-    <mat-form-field appearance="outline">
-      <mat-label>{{ 'rfq.compare.requiredByLabel' | translate }}</mat-label>
-      <input matInput [matDatepicker]="picker" [(ngModel)]="requiredByDate">
-      <mat-datepicker-toggle matIconSuffix [for]="picker"></mat-datepicker-toggle>
-      <mat-datepicker #picker></mat-datepicker>
-    </mat-form-field>
-  </div>
+  @if (isLoading()) {
+    <div class="loading-state">
+      <mat-spinner diameter="40"></mat-spinner>
+      <p>{{ 'rfq.compare.loading' | translate }}</p>
+    </div>
+  }
 
-  <div class="loading-state" *ngIf="isLoading()">
-    <mat-spinner diameter="40"></mat-spinner>
-    <p>{{ 'rfq.compare.loading' | translate }}</p>
-  </div>
+  @if (errorMessage()) {
+    <div class="error-state">
+      <mat-icon color="warn" aria-hidden="true">error_outline</mat-icon>
+      <p>{{ errorMessage() }}</p>
+    </div>
+  }
 
-  <div class="error-state" *ngIf="errorMessage()">
-    <mat-icon color="warn" aria-hidden="true">error_outline</mat-icon>
-    <p>{{ errorMessage() }}</p>
-  </div>
+  @if (!isLoading() && !errorMessage() && responses().length === 0) {
+    <div class="empty-state">
+      <mat-icon aria-hidden="true">inbox</mat-icon>
+      <p>{{ 'rfq.compare.noResponses' | translate }}</p>
+    </div>
+  }
 
-  <div class="empty-state" *ngIf="!isLoading() && !errorMessage() && responses().length === 0">
-    <mat-icon aria-hidden="true">inbox</mat-icon>
-    <p>{{ 'rfq.compare.noResponses' | translate }}</p>
-  </div>
-
-  <div class="responses-grid" *ngIf="!isLoading() && responses().length > 0">
-    <mat-card *ngFor="let response of responses()" class="response-card">
-      <mat-card-header>
-        <mat-card-title>{{ supplierNames()[response.supplier_id] || response.supplier_id }}</mat-card-title>
-        <mat-card-subtitle>
-          {{ 'rfq.compare.submittedAt' | translate }}: {{ response.submitted_at | formatDate }}
-        </mat-card-subtitle>
-      </mat-card-header>
-
-      <mat-card-content>
-        <div *ngIf="response.quotation_status === 'refused'" role="status">
-          <strong>{{ 'rfq.compare.refused' | translate }}</strong>
-          <p>{{ 'rfq.compare.refusedExplanation' | translate }}</p>
-        </div>
-        <table *ngIf="response.quotation_status !== 'refused'" mat-table [dataSource]="response.lines" class="lines-table">
-          <ng-container matColumnDef="product">
-            <th mat-header-cell *matHeaderCellDef>{{ 'rfq.compare.product' | translate }}</th>
-            <td mat-cell *matCellDef="let line">
-              <span *ngIf="line.pending_match" class="pending-badge">
-                <mat-icon class="pending-icon" aria-hidden="true">warning</mat-icon>
-                {{ 'rfq.compare.pendingMatch' | translate }}
-              </span>
-              <span *ngIf="!line.pending_match">
-                {{ line.workspace_product_id ? (productNames()[line.workspace_product_id] || line.workspace_product_id) : ('rfq.compare.pendingMatch' | translate) }}
-              </span>
-            </td>
-          </ng-container>
-
-          <ng-container matColumnDef="quantity">
-            <th mat-header-cell *matHeaderCellDef>{{ 'rfq.compare.quantity' | translate }}</th>
-            <td mat-cell *matCellDef="let line">{{ formatQuantity(line.quoted_quantity) }}</td>
-          </ng-container>
-
-          <ng-container matColumnDef="unitPrice">
-            <th mat-header-cell *matHeaderCellDef>{{ 'rfq.compare.unitPrice' | translate }}</th>
-            <td mat-cell *matCellDef="let line">
-              {{ { amount: line.quoted_unit_price_amount, currency: line.quoted_unit_price_currency } | formatMoney }}
-            </td>
-          </ng-container>
-
-          <ng-container matColumnDef="totalValue">
-            <th mat-header-cell *matHeaderCellDef>{{ 'rfq.compare.totalValue' | translate }}</th>
-            <td mat-cell *matCellDef="let line">
-              {{ { amount: (line.quoted_quantity * line.quoted_unit_price_amount), currency: line.quoted_unit_price_currency } | formatMoney }}
-            </td>
-          </ng-container>
-
-          <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
-          <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
-        </table>
-
-        <div class="pending-warning" *ngIf="response.quotation_status !== 'refused' && !isEligible(response)">
-          <mat-icon color="warn" aria-hidden="true">info</mat-icon>
-          <span>{{ 'rfq.compare.cannotPreparePending' | translate }}</span>
-        </div>
-        <div class="guardrail-outcomes" *ngIf="response.guardrail_evaluations?.length">
-          <h3>{{ 'rfq.compare.guardrailOutcomes' | translate }}</h3>
-          <div class="guardrail-outcome" *ngFor="let evaluation of response.guardrail_evaluations">
-            <span>{{ guardrailLabel(evaluation.guardrail_id) }}</span>
-            <span class="outcome-reason" [class.fired]="evaluation.fired">
-              {{ 'rfq.guardrails.reasons.' + evaluation.reason | translate }}
-            </span>
-          </div>
-        </div>
-      </mat-card-content>
-
-      <mat-card-actions *ngIf="response.quotation_status !== 'refused'" align="end">
-        <button mat-flat-button color="primary"
+  @if (!isLoading() && responses().length > 0) {
+    <div class="responses-grid">
+      @for (response of responses(); track response) {
+        <mat-card class="response-card">
+          <mat-card-header>
+            <mat-card-title>{{ supplierNames()[response.supplier_id] || response.supplier_id }}</mat-card-title>
+            <mat-card-subtitle>
+              {{ 'rfq.compare.submittedAt' | translate }}: {{ response.submitted_at | formatDate }}
+            </mat-card-subtitle>
+          </mat-card-header>
+          <mat-card-content>
+            @if (response.quotation_status === 'refused') {
+              <div role="status">
+                <strong>{{ 'rfq.compare.refused' | translate }}</strong>
+                <p>{{ 'rfq.compare.refusedExplanation' | translate }}</p>
+              </div>
+            }
+            @if (response.quotation_status !== 'refused') {
+              <table mat-table [dataSource]="response.lines" class="lines-table">
+                <ng-container matColumnDef="product">
+                  <th mat-header-cell *matHeaderCellDef>{{ 'rfq.compare.product' | translate }}</th>
+                  <td mat-cell *matCellDef="let line">
+                    @if (line.pending_match) {
+                      <span class="pending-badge">
+                        <mat-icon class="pending-icon" aria-hidden="true">warning</mat-icon>
+                        {{ 'rfq.compare.pendingMatch' | translate }}
+                      </span>
+                    }
+                    @if (!line.pending_match) {
+                      <span>
+                        {{ line.workspace_product_id ? (productNames()[line.workspace_product_id] || line.workspace_product_id) : ('rfq.compare.pendingMatch' | translate) }}
+                      </span>
+                    }
+                  </td>
+                </ng-container>
+                <ng-container matColumnDef="quantity">
+                  <th mat-header-cell *matHeaderCellDef>{{ 'rfq.compare.quantity' | translate }}</th>
+                  <td mat-cell *matCellDef="let line">{{ formatQuantity(line.quoted_quantity) }}</td>
+                </ng-container>
+                <ng-container matColumnDef="unitPrice">
+                  <th mat-header-cell *matHeaderCellDef>{{ 'rfq.compare.unitPrice' | translate }}</th>
+                  <td mat-cell *matCellDef="let line">
+                    {{ { amount: line.quoted_unit_price_amount, currency: line.quoted_unit_price_currency } | formatMoney }}
+                  </td>
+                </ng-container>
+                <ng-container matColumnDef="totalValue">
+                  <th mat-header-cell *matHeaderCellDef>{{ 'rfq.compare.totalValue' | translate }}</th>
+                  <td mat-cell *matCellDef="let line">
+                    {{ { amount: (line.quoted_quantity * line.quoted_unit_price_amount), currency: line.quoted_unit_price_currency } | formatMoney }}
+                  </td>
+                </ng-container>
+                <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+                <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+              </table>
+            }
+            @if (response.quotation_status !== 'refused' && !isEligible(response)) {
+              <div class="pending-warning">
+                <mat-icon color="warn" aria-hidden="true">info</mat-icon>
+                <span>{{ 'rfq.compare.cannotPreparePending' | translate }}</span>
+              </div>
+            }
+            @if (response.guardrail_evaluations?.length) {
+              <div class="guardrail-outcomes">
+                <h3>{{ 'rfq.compare.guardrailOutcomes' | translate }}</h3>
+                @for (evaluation of response.guardrail_evaluations; track evaluation) {
+                  <div class="guardrail-outcome">
+                    <span>{{ guardrailLabel(evaluation.guardrail_id) }}</span>
+                    <span class="outcome-reason" [class.fired]="evaluation.fired">
+                      {{ 'rfq.guardrails.reasons.' + evaluation.reason | translate }}
+                    </span>
+                  </div>
+                }
+              </div>
+            }
+          </mat-card-content>
+          @if (response.quotation_status !== 'refused') {
+            <mat-card-actions align="end">
+              <button mat-flat-button color="primary"
                 [disabled]="!canPrepare(response)"
                 (click)="prepareRequest(response)">
-          {{ 'rfq.compare.prepareRequest' | translate }}
-        </button>
-      </mat-card-actions>
-    </mat-card>
-  </div>
+                {{ 'rfq.compare.prepareRequest' | translate }}
+              </button>
+            </mat-card-actions>
+          }
+        </mat-card>
+      }
+    </div>
+  }
 </div>

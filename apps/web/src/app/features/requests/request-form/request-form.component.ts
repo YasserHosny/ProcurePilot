@@ -1,5 +1,5 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, DestroyRef, OnInit, computed, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormArray, FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -64,6 +64,7 @@ interface LineFormGroup {
     FormatDatePipe,
   ],
   templateUrl: './request-form.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './request-form.component.scss',
 })
 export class RequestFormComponent implements OnInit {

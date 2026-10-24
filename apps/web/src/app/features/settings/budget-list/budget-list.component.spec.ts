@@ -6,7 +6,7 @@ import type { WritableSignal } from "@angular/core";
 import { MatDialog, MatDialogRef } from "@angular/material/dialog";
 import { MatSnackBar } from "@angular/material/snack-bar";
 import { provideRouter } from "@angular/router";
-import { TranslateModule, TranslateService } from "@ngx-translate/core";
+import { TranslateService, provideTranslateService } from "@ngx-translate/core";
 import { of, throwError } from "rxjs";
 
 import enCatalog from "../../../../../../../packages/i18n/en.json";
@@ -159,8 +159,9 @@ describe("BudgetListComponent (T030)", () => {
     );
 
     await TestBed.configureTestingModule({
-      imports: [BudgetListComponent, TranslateModule.forRoot()],
+      imports: [BudgetListComponent],
       providers: [
+        provideTranslateService(),
         provideRouter([]),
         { provide: OrganisationApiService, useValue: organisationApi },
         { provide: ApiService, useValue: apiService },
@@ -332,8 +333,9 @@ describe("BudgetFormDialogComponent (T030)", () => {
     };
 
     await TestBed.configureTestingModule({
-      imports: [BudgetFormDialogComponent, TranslateModule.forRoot()],
+      imports: [BudgetFormDialogComponent],
       providers: [
+        provideTranslateService(),
         { provide: OrganisationApiService, useValue: organisationApi },
         { provide: ApiService, useValue: apiService },
         { provide: SessionService, useValue: sessionMock },

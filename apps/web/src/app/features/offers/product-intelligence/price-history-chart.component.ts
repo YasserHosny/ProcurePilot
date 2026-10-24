@@ -1,4 +1,4 @@
-import { Component, Input, OnChanges, SimpleChanges, signal } from '@angular/core';
+import { Component, Input, OnChanges, SimpleChanges, signal, ChangeDetectionStrategy } from '@angular/core';
 import { MatCardModule } from '@angular/material/card';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
@@ -49,6 +49,7 @@ const PALETTE = [
     UnitLabelPipe,
   ],
   templateUrl: './price-history-chart.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './price-history-chart.component.scss',
 })
 export class PriceHistoryChartComponent implements OnChanges {

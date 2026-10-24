@@ -1,10 +1,10 @@
-import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClient, withXhr } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { HttpErrorResponse } from '@angular/common/http';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { ActivatedRoute, convertToParamMap } from '@angular/router';
-import { TranslateModule, TranslateService } from '@ngx-translate/core';
+import { TranslateService, provideTranslateService } from '@ngx-translate/core';
 import { BehaviorSubject, of, throwError } from 'rxjs';
 
 import enCatalog from '../../../../../../../packages/i18n/en.json';
@@ -132,10 +132,11 @@ describe('SupplierScorecardComponent (T027)', () => {
     apiService.getSupplierScorecard.and.returnValue(of(mockScorecard));
 
     await TestBed.configureTestingModule({
-      imports: [SupplierScorecardComponent, TranslateModule.forRoot()],
+      imports: [SupplierScorecardComponent],
       providers: [
+        provideTranslateService(),
         provideNoopAnimations(),
-        provideHttpClient(),
+        provideHttpClient(withXhr()),
         provideHttpClientTesting(),
         { provide: ApiService, useValue: apiService },
         {

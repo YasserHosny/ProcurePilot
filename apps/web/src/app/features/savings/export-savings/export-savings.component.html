@@ -243,7 +243,7 @@
             [routerLink]="['/reports/schedule-form']"
             [queryParams]="{
               kind: 'savings_ledger',
-              format: form.get('format')?.value,
+              format: $safeNavigationMigration(form.get('format')?.value),
               branch_id: form.get('branch_id')?.value || null
             }"
             class="schedule-crosslink-btn"

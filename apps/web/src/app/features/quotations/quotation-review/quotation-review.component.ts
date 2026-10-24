@@ -1,5 +1,5 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, OnDestroy, OnInit, computed, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { DomSanitizer, type SafeResourceUrl } from '@angular/platform-browser';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -113,6 +113,7 @@ type QuotationTimestampFields = QuotationDetail & {
     QuotationAuditTrailComponent,
   ],
   templateUrl: './quotation-review.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './quotation-review.component.scss',
 })
 export class QuotationReviewComponent implements OnInit, OnDestroy {

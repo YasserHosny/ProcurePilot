@@ -5,7 +5,7 @@ import { signal } from "@angular/core";
 import { MAT_DIALOG_DATA, MatDialog, MatDialogRef } from "@angular/material/dialog";
 import { MatSnackBar } from "@angular/material/snack-bar";
 import { provideRouter } from "@angular/router";
-import { TranslateModule, TranslateService } from "@ngx-translate/core";
+import { TranslateService, provideTranslateService } from "@ngx-translate/core";
 import type { WritableSignal } from "@angular/core";
 import { of, throwError } from "rxjs";
 
@@ -83,8 +83,9 @@ describe("BranchListComponent (T016)", () => {
     organisationApi.listBranches.and.returnValue(of({ items: mockBranches, next_cursor: null }));
 
     await TestBed.configureTestingModule({
-      imports: [BranchListComponent, TranslateModule.forRoot()],
+      imports: [BranchListComponent],
       providers: [
+        provideTranslateService(),
         provideRouter([]),
         { provide: OrganisationApiService, useValue: organisationApi },
         { provide: SessionService, useValue: sessionMock },
@@ -297,8 +298,9 @@ describe("BranchFormDialogComponent (T016)", () => {
     fixture: ComponentFixture<BranchFormDialogComponent>;
   }> {
     await TestBed.configureTestingModule({
-      imports: [BranchFormDialogComponent, TranslateModule.forRoot()],
+      imports: [BranchFormDialogComponent],
       providers: [
+        provideTranslateService(),
         { provide: OrganisationApiService, useValue: organisationApi },
         { provide: MatDialogRef, useValue: dialogRefSpy },
         { provide: MAT_DIALOG_DATA, useValue: data },

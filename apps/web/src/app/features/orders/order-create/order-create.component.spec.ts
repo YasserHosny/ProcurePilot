@@ -1,9 +1,9 @@
-import { HttpErrorResponse, provideHttpClient } from '@angular/common/http';
+import { HttpErrorResponse, provideHttpClient, withXhr } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { provideRouter } from '@angular/router';
-import { TranslateModule, TranslateService } from '@ngx-translate/core';
+import { TranslateService, provideTranslateService } from '@ngx-translate/core';
 import enCatalog from '../../../../../../../packages/i18n/en.json';
 import arCatalog from '../../../../../../../packages/i18n/ar.json';
 import { of, throwError } from 'rxjs';
@@ -54,9 +54,10 @@ describe('OrderCreateComponent', () => {
     ordersApiService.getRequestPrefill.and.returnValue(of({ source_request_id: 'req-1', supplier: null }));
 
     await TestBed.configureTestingModule({
-      imports: [OrderCreateComponent, TranslateModule.forRoot()],
+      imports: [OrderCreateComponent],
       providers: [
-        provideHttpClient(),
+        provideTranslateService(),
+        provideHttpClient(withXhr()),
         provideHttpClientTesting(),
         provideNoopAnimations(),
         provideRouter([]),

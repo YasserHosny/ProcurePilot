@@ -1,5 +1,5 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
@@ -54,6 +54,7 @@ import { CompareTableComponent } from './compare-table.component';
     CompareTableComponent,
   ],
   templateUrl: './compare.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './compare.component.scss',
 })
 export class CompareComponent implements OnInit {

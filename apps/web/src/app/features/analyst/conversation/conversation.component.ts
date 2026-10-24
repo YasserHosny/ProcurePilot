@@ -1,5 +1,5 @@
 import { JsonPipe } from '@angular/common';
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
@@ -37,6 +37,7 @@ const NEXT_STEP_LABEL_KEY_BY_CATEGORY: Partial<Record<AnalystCategory, string>> 
     TranslatePipe,
   ],
   templateUrl: './conversation.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './conversation.component.scss',
 })
 export class AnalystConversationComponent implements OnInit {

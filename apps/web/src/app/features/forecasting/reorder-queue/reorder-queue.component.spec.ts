@@ -2,7 +2,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
-import { TranslateModule, TranslateService } from '@ngx-translate/core';
+import { TranslateService, provideTranslateService } from '@ngx-translate/core';
 import { of } from 'rxjs';
 
 import { ApiService } from '../../../core/api/api.service';
@@ -85,8 +85,9 @@ describe('ReorderQueueComponent (R4.0)', () => {
     const snackBar = jasmine.createSpyObj<MatSnackBar>('MatSnackBar', ['open']);
 
     await TestBed.configureTestingModule({
-      imports: [ReorderQueueComponent, TranslateModule.forRoot()],
+      imports: [ReorderQueueComponent],
       providers: [
+        provideTranslateService(),
         provideNoopAnimations(),
         { provide: ForecastingApiService, useValue: forecastingApi },
         { provide: ApiService, useValue: api },

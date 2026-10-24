@@ -1,6 +1,6 @@
 import { Direction, Directionality } from '@angular/cdk/bidi';
-import { DOCUMENT } from '@angular/common';
-import { Injectable, computed, inject, signal } from '@angular/core';
+
+import { Injectable, computed, inject, signal, DOCUMENT } from '@angular/core';
 
 export type LayoutDirection = 'ltr' | 'rtl';
 
@@ -42,7 +42,8 @@ export class DirectionService {
     // Wire CDK Directionality so overlays, dialogs, menus mirror
     const cdkDir = dir as Direction;
     if (this.cdkDirectionality.value !== cdkDir) {
-      (this.cdkDirectionality as { value: Direction }).value = cdkDir;
+      this.cdkDirectionality.valueSignal.set(cdkDir);
+      // CDK 22's root Directionality never emits `change` itself; subscribers still rely on it.
       this.cdkDirectionality.change.emit(cdkDir);
     }
   }

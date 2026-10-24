@@ -1,5 +1,5 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { Component, OnInit, inject, signal, ChangeDetectionStrategy } from '@angular/core';
+
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatSelectModule } from '@angular/material/select';
 import { MatButtonModule } from '@angular/material/button';
@@ -25,7 +25,6 @@ import { ThresholdRuleListComponent } from './threshold-rule-list/threshold-rule
   selector: 'app-settings',
   standalone: true,
   imports: [
-    CommonModule,
     MatFormFieldModule,
     MatSelectModule,
     MatButtonModule,
@@ -34,9 +33,10 @@ import { ThresholdRuleListComponent } from './threshold-rule-list/threshold-rule
     CostCentreListComponent,
     BudgetListComponent,
     ThresholdRuleListComponent,
-    DelegationListComponent,
-  ],
+    DelegationListComponent
+],
   templateUrl: './settings.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './settings.component.scss',
 })
 export class SettingsComponent implements OnInit {

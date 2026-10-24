@@ -1,4 +1,4 @@
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatIconModule } from '@angular/material/icon';
@@ -37,6 +37,7 @@ type QueueError = 'load' | 'recompute';
     FormatDatePipe,
   ],
   templateUrl: './risk-queue.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './risk-queue.component.scss',
 })
 export class RiskQueueComponent implements OnInit {

@@ -1,6 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
-import { TranslateModule, TranslateService } from '@ngx-translate/core';
+import { TranslateService, provideTranslateService } from '@ngx-translate/core';
 
 import en from '../../../../../../../packages/i18n/en.json';
 import ar from '../../../../../../../packages/i18n/ar.json';
@@ -38,8 +38,8 @@ describe('BasketSplitInfeasibleComponent — optimiser unavailable', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      imports: [BasketSplitInfeasibleComponent, TranslateModule.forRoot()],
-      providers: [provideNoopAnimations()],
+      imports: [BasketSplitInfeasibleComponent],
+      providers: [provideTranslateService(), provideNoopAnimations()],
     });
     translate = TestBed.inject(TranslateService);
     translate.setTranslation('en', en);

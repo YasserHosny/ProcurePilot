@@ -1,6 +1,6 @@
 # ProcurePilot Web
 
-Angular 19 single-page application — the primary ProcurePilot interface (Phase 1 is web-only).
+Angular 22 single-page application — the primary ProcurePilot interface (Phase 1 is web-only).
 
 ## Install
 

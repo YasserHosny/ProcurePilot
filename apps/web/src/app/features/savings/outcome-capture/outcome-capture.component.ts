@@ -1,5 +1,5 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
@@ -47,6 +47,7 @@ import { UnitLabelPipe } from '../../../core/format/unit-label';
     UnitLabelPipe,
   ],
   templateUrl: './outcome-capture.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './outcome-capture.component.scss',
 })
 export class OutcomeCaptureComponent implements OnInit {

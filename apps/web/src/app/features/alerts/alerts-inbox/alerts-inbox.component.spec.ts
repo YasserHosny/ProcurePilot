@@ -1,10 +1,10 @@
-import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClient, withXhr } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { Router, provideRouter } from '@angular/router';
-import { TranslateModule } from '@ngx-translate/core';
+import { provideTranslateService } from '@ngx-translate/core';
 import { of } from 'rxjs';
 
 import { ApiService } from '../../../core/api/api.service';
@@ -183,10 +183,11 @@ describe('AlertsInboxComponent (US4, T061)', () => {
     );
 
     await TestBed.configureTestingModule({
-      imports: [AlertsInboxComponent, TranslateModule.forRoot()],
+      imports: [AlertsInboxComponent],
       providers: [
+        provideTranslateService(),
         provideNoopAnimations(),
-        provideHttpClient(),
+        provideHttpClient(withXhr()),
         provideHttpClientTesting(),
         provideRouter([]),
         { provide: ApiService, useValue: apiService },

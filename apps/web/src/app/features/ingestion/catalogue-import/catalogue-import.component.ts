@@ -1,5 +1,5 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
+import { Component, DestroyRef, OnInit, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -50,6 +50,7 @@ const SUPPORTED_MIME_TYPES = new Set([
     RoleDirective,
   ],
   templateUrl: './catalogue-import.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './catalogue-import.component.scss',
 })
 export class CatalogueImportComponent implements OnInit {

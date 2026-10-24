@@ -1,5 +1,5 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
@@ -98,6 +98,7 @@ export interface ApprovalDecisionDialogResult {
       </button>
     </mat-dialog-actions>
   `,
+  changeDetection: ChangeDetectionStrategy.Eager,
   styles: [
     `
       .decision-comment-field {
@@ -146,6 +147,7 @@ export class ApprovalDecisionDialogComponent {
     TranslatePipe,
   ],
   templateUrl: './approval-queue.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './approval-queue.component.scss',
 })
 export class ApprovalQueueComponent implements OnInit {

@@ -1,4 +1,4 @@
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { parseIsoDateLocal, toIsoDate, toIsoDateOrNull } from '../../../core/format/iso-date';
 import { provideAppDateAdapter } from '../../../core/i18n/date-adapter';
 import { FormsModule } from '@angular/forms';
@@ -42,6 +42,7 @@ import {
     FormatDatePipe,
   ],
   templateUrl: './reorder-queue.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './reorder-queue.component.scss',
 })
 export class ReorderQueueComponent implements OnInit {

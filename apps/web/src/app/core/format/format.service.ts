@@ -135,7 +135,7 @@ export class FormatService {
     if (localeOverride) {
       return localeOverride;
     }
-    const active = this.translate?.currentLang || this.translate?.getDefaultLang();
+    const active = this.translate?.getCurrentLang() || this.translate?.getFallbackLang();
     return active || 'en';
   }
 

@@ -1,9 +1,9 @@
-import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClient, withXhr } from '@angular/common/http';
 import { provideHttpClientTesting, HttpTestingController } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { Router, provideRouter } from '@angular/router';
-import { TranslateModule, TranslateService } from '@ngx-translate/core';
+import { TranslateService, provideTranslateService } from '@ngx-translate/core';
 
 import { OrderListComponent } from './order-list.component';
 import { SessionService } from '../../../core/auth/session.service';
@@ -25,9 +25,10 @@ describe('OrderListComponent', () => {
     };
 
     await TestBed.configureTestingModule({
-      imports: [OrderListComponent, TranslateModule.forRoot()],
+      imports: [OrderListComponent],
       providers: [
-        provideHttpClient(),
+        provideTranslateService(),
+        provideHttpClient(withXhr()),
         provideHttpClientTesting(),
         provideNoopAnimations(),
         provideRouter([]),

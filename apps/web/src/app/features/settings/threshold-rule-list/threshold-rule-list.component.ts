@@ -7,6 +7,7 @@ import {
   computed,
   inject,
   signal,
+  ChangeDetectionStrategy
 } from '@angular/core';
 import {
   AbstractControl,
@@ -91,6 +92,7 @@ function amountRangeValidator(group: AbstractControl): ValidationErrors | null {
     FormatMoneyPipe,
   ],
   templateUrl: './threshold-rule-list.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './threshold-rule-list.component.scss',
 })
 export class ThresholdRuleListComponent implements OnInit {

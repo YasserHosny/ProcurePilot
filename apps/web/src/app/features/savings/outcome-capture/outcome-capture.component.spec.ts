@@ -2,7 +2,7 @@ import { signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { ActivatedRoute, convertToParamMap } from '@angular/router';
-import { TranslateModule } from '@ngx-translate/core';
+import { provideTranslateService } from '@ngx-translate/core';
 import { of, throwError } from 'rxjs';
 
 import { ApiService } from '../../../core/api/api.service';
@@ -62,8 +62,9 @@ describe('OutcomeCaptureComponent (T021)', () => {
     mockApiService.suppliers.and.returnValue(of({ items: sampleSuppliers, next_cursor: null }));
 
     await TestBed.configureTestingModule({
-      imports: [OutcomeCaptureComponent, TranslateModule.forRoot()],
+      imports: [OutcomeCaptureComponent],
       providers: [
+        provideTranslateService(),
         provideNoopAnimations(),
         { provide: ApiService, useValue: mockApiService },
         { provide: SavingsApiService, useValue: mockSavingsApiService },

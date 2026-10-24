@@ -1,5 +1,5 @@
 import { HttpErrorResponse } from "@angular/common/http";
-import { Component, OnInit, computed, inject, signal } from "@angular/core";
+import { Component, OnInit, computed, inject, signal, ChangeDetectionStrategy } from "@angular/core";
 import { MatButtonModule } from "@angular/material/button";
 import { MatCardModule } from "@angular/material/card";
 import { MatDialog, MatDialogModule } from "@angular/material/dialog";
@@ -51,6 +51,7 @@ const COST_CENTRES_I18N = "organisation.costCentres";
     RoleDirective,
   ],
   templateUrl: "./cost-centre-list.component.html",
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: "./cost-centre-list.component.scss",
 })
 export class CostCentreListComponent implements OnInit {

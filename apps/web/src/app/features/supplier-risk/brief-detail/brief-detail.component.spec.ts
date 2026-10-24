@@ -2,7 +2,7 @@ import { signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
-import { TranslateModule, TranslateService } from '@ngx-translate/core';
+import { TranslateService, provideTranslateService } from '@ngx-translate/core';
 import { BehaviorSubject, Subject, of, throwError } from 'rxjs';
 
 import { SessionService } from '../../../core/auth/session.service';
@@ -92,9 +92,10 @@ describe('BriefDetailComponent', () => {
     routeParams$ = new BehaviorSubject(convertToParamMap({ id: 'brief-001' }));
 
     await TestBed.configureTestingModule({
-      imports: [BriefDetailComponent, TranslateModule.forRoot()],
+      imports: [BriefDetailComponent],
       providers: [
-        provideHttpClient(),
+        provideTranslateService(),
+        provideHttpClient(withXhr()),
         provideHttpClientTesting(),
         provideNoopAnimations(),
         provideRouter([]),
@@ -202,5 +203,5 @@ describe('BriefDetailComponent', () => {
     expect(fixture.nativeElement.querySelector('[data-testid="brief-item"]')).toBeNull();
   });
 });
-import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClient, withXhr } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';

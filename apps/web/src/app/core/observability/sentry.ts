@@ -32,7 +32,21 @@ export function initErrorReporting(): void {
       tracesSampleRate: 0,
       replaysSessionSampleRate: 0,
       // This application shows supplier pricing and personal data. Do not ship it to a third party.
-      sendDefaultPii: false,
+      // Sentry 11 removed sendDefaultPii and, with dataCollection unset, collects every category
+      // below by default, so each one is switched off explicitly.
+      dataCollection: {
+        userInfo: false,
+        cookies: false,
+        httpHeaders: false,
+        httpBodies: [],
+        urlQueryParams: false,
+        graphQL: { document: false, variables: false },
+        genAI: { inputs: false, outputs: false },
+        mcp: { inputs: false, outputs: false },
+        databaseQueryData: false,
+        queues: false,
+        stackFrameVariables: false,
+      },
     });
   });
 }

@@ -1,6 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { Pipe, PipeTransform } from '@angular/core';
-import { TranslateModule, TranslateService } from '@ngx-translate/core';
+import { TranslateService, provideTranslateService } from '@ngx-translate/core';
 
 import { FormatDatePipe } from '../../../core/format/date.pipe';
 import { QuotationAuditTrailComponent } from './quotation-audit-trail.component';
@@ -18,7 +18,8 @@ describe('QuotationAuditTrailComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [QuotationAuditTrailComponent, TranslateModule.forRoot()],
+      providers: [provideTranslateService()],
+      imports: [QuotationAuditTrailComponent],
     })
       .overrideComponent(QuotationAuditTrailComponent, {
         remove: { imports: [FormatDatePipe] },

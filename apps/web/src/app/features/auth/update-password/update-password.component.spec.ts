@@ -3,7 +3,7 @@ import { Location } from '@angular/common';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { ActivatedRoute, provideRouter } from '@angular/router';
-import { TranslateModule, TranslateService } from '@ngx-translate/core';
+import { TranslateService, provideTranslateService } from '@ngx-translate/core';
 import { of, throwError } from 'rxjs';
 
 import enCatalog from '../../../../../../../packages/i18n/en.json';
@@ -24,8 +24,9 @@ describe('UpdatePasswordComponent (PP-28)', () => {
     location = jasmine.createSpyObj<Location>('Location', ['replaceState']);
 
     await TestBed.configureTestingModule({
-      imports: [UpdatePasswordComponent, TranslateModule.forRoot()],
+      imports: [UpdatePasswordComponent],
       providers: [
+        provideTranslateService(),
         provideNoopAnimations(),
         provideRouter([]),
         { provide: ApiService, useValue: api },

@@ -1,4 +1,4 @@
-import { Component, signal } from '@angular/core';
+import { Component, signal, ChangeDetectionStrategy } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 
@@ -9,6 +9,7 @@ import { SessionService } from './session.service';
 @Component({
   standalone: true,
   imports: [RoleDirective],
+  changeDetection: ChangeDetectionStrategy.Eager,
   template: `
     <div id="owner-only" *appRole="'owner'">Owner Content</div>
     <div id="multi-role" *appRole="['owner', 'buyer']">Multi Role Content</div>

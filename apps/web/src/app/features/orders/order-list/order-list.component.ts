@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatIconModule } from '@angular/material/icon';
@@ -30,6 +30,7 @@ import { OrdersApiService, type OrderStatus, type PurchaseOrder } from '../order
     RoleDirective,
   ],
   templateUrl: './order-list.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './order-list.component.scss',
 })
 export class OrderListComponent implements OnInit {

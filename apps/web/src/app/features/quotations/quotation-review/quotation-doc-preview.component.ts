@@ -1,5 +1,5 @@
-import { CommonModule } from '@angular/common';
-import { Component, EventEmitter, Input, Output, inject } from '@angular/core';
+
+import { Component, EventEmitter, Input, Output, inject, ChangeDetectionStrategy } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatIconModule } from '@angular/material/icon';
@@ -16,7 +16,6 @@ import { FormatExtractionPipe, isExtractionJsonFallback } from '../../../core/fo
   selector: 'app-quotation-doc-preview',
   standalone: true,
   imports: [
-    CommonModule,
     MatButtonModule,
     MatCardModule,
     MatIconModule,
@@ -24,9 +23,10 @@ import { FormatExtractionPipe, isExtractionJsonFallback } from '../../../core/fo
     MatTooltipModule,
     TranslatePipe,
     FormatDatePipe,
-    FormatExtractionPipe,
-  ],
+    FormatExtractionPipe
+],
   templateUrl: './quotation-doc-preview.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './quotation-doc-preview.component.scss',
 })
 export class QuotationDocPreviewComponent {

@@ -1,11 +1,11 @@
-import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClient, withXhr } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { type WritableSignal, signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { provideRouter } from '@angular/router';
-import { TranslateModule, TranslateService } from '@ngx-translate/core';
+import { TranslateService, provideTranslateService } from '@ngx-translate/core';
 
 import enCatalog from '../../../../../../../packages/i18n/en.json';
 import type { Role, Supplier } from '../../../core/api/models';
@@ -46,9 +46,10 @@ describe('CatalogueImportComponent (T025)', () => {
     };
 
     await TestBed.configureTestingModule({
-      imports: [CatalogueImportComponent, TranslateModule.forRoot()],
+      imports: [CatalogueImportComponent],
       providers: [
-        provideHttpClient(),
+        provideTranslateService(),
+        provideHttpClient(withXhr()),
         provideHttpClientTesting(),
         provideNoopAnimations(),
         provideRouter([]),

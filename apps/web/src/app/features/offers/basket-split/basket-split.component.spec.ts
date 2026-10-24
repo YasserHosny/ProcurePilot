@@ -1,10 +1,10 @@
-import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClient, withXhr } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
 import { signal } from '@angular/core';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { provideRouter } from '@angular/router';
-import { TranslateModule, TranslateService } from '@ngx-translate/core';
+import { TranslateService, provideTranslateService } from '@ngx-translate/core';
 import en from '../../../../../../../packages/i18n/en.json';
 import ar from '../../../../../../../packages/i18n/ar.json';
 import { of } from 'rxjs';
@@ -168,10 +168,11 @@ describe('BasketSplitComponent (US3, T045)', () => {
     );
 
     await TestBed.configureTestingModule({
-      imports: [BasketSplitComponent, TranslateModule.forRoot()],
+      imports: [BasketSplitComponent],
       providers: [
+        provideTranslateService(),
         provideNoopAnimations(),
-        provideHttpClient(),
+        provideHttpClient(withXhr()),
         provideHttpClientTesting(),
         provideRouter([]),
         { provide: ApiService, useValue: apiService },

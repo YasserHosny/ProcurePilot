@@ -1,5 +1,5 @@
 import { HttpErrorResponse } from "@angular/common/http";
-import { Component, inject, signal } from "@angular/core";
+import { Component, inject, signal, ChangeDetectionStrategy } from "@angular/core";
 import { FormBuilder, ReactiveFormsModule, Validators } from "@angular/forms";
 import { MatButtonModule } from "@angular/material/button";
 import {
@@ -51,6 +51,7 @@ const FORM_I18N = `${COST_CENTRES_I18N}.form`;
     TranslatePipe,
   ],
   templateUrl: "./cost-centre-form-dialog.component.html",
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: "./cost-centre-form-dialog.component.scss",
 })
 export class CostCentreFormDialogComponent {

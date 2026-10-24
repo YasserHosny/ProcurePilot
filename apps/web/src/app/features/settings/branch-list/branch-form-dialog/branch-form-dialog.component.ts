@@ -1,5 +1,5 @@
 import { HttpErrorResponse } from "@angular/common/http";
-import { Component, inject, signal } from "@angular/core";
+import { Component, inject, signal, ChangeDetectionStrategy } from "@angular/core";
 import { FormBuilder, ReactiveFormsModule, Validators } from "@angular/forms";
 import { MatButtonModule } from "@angular/material/button";
 import {
@@ -37,6 +37,7 @@ const FORM_I18N = "organisation.branches.form";
     TranslatePipe,
   ],
   templateUrl: "./branch-form-dialog.component.html",
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: "./branch-form-dialog.component.scss",
 })
 export class BranchFormDialogComponent {

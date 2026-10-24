@@ -1,10 +1,10 @@
-import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClient, withXhr } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { Router, provideRouter } from '@angular/router';
-import { TranslateModule, TranslateService } from '@ngx-translate/core';
+import { TranslateService, provideTranslateService } from '@ngx-translate/core';
 import { Subject, of } from 'rxjs';
 
 import type { SupplierScorecard } from '../../../core/api/models';
@@ -134,9 +134,10 @@ describe('ScorecardV2PanelComponent', () => {
     session.hasRole.and.returnValue(true);
 
     await TestBed.configureTestingModule({
-      imports: [ScorecardV2PanelComponent, TranslateModule.forRoot()],
+      imports: [ScorecardV2PanelComponent],
       providers: [
-        provideHttpClient(),
+        provideTranslateService(),
+        provideHttpClient(withXhr()),
         provideHttpClientTesting(),
         provideNoopAnimations(),
         provideRouter([]),

@@ -23,7 +23,6 @@
         data-testid="analyst-history-item"
         role="button"
         tabindex="0"
-        [attr.aria-label]="conv.turns[0]?.question_text ?? ('analyst.history.noTurns' | translate)"
         (click)="openConversation(conv.id)"
         (keyup.enter)="openConversation(conv.id)"
       >

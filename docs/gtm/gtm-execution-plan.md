@@ -202,6 +202,7 @@ PR → CI → merge → link PR on the PPS task. Refs are in the GTM plan's curr
 | [ ] P-6 | finding 50 | Hidden/idle web tab signs out after a few hours; visible tab renews fine | Orch → Lane | — | Hidden tab survives several expiries, or cause fixed (PPS-10) |
 | [x] P-7 | findings 1–49 | Demo-tenant fix wave record (PRs per finding) | — | — | PPS-3 Done |
 | [x] P-8 | email audit | Password reset broken on hosted: Site URL was localhost, no set-password page, no custom SMTP (2 emails/hour) | Orch (config + code), User (SMTP credentials) | — | Live reset on hosted: email arrives, link opens `/auth/update-password`, new password signs in — **done 2026-10-24: #227, #228, #229, Mailgun SMTP; PPS-25 Done** |
+| [ ] P-9 | — | Upgrade the web app to Angular 22 + Material 22 (TypeScript 6.0, ngx-translate 18, Sentry 11, `@angular/build`, Node 24 in CI/Docker) so the new design system is built on the current Material API | Orch | — | PR merged with every required check green on its head commit (PPS-17) |
 | [ ] P-10 | — | Design system for the web app: Ledger look on the Converge brand, three-layer tokens, aligned with Angular Material 22 (`docs/design/`); app implementation follows after P-9 | Orch | P-9 (to implement) | Docs PR merged (PPS-32) |
 
 ### E — Pilot environment

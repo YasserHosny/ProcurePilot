@@ -1,7 +1,7 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRoute, Router, provideRouter } from '@angular/router';
-import { TranslateModule, TranslateService } from '@ngx-translate/core';
+import { TranslateService, provideTranslateService } from '@ngx-translate/core';
 import { of, throwError } from 'rxjs';
 
 import enCatalog from '../../../../../../../packages/i18n/en.json';
@@ -22,8 +22,9 @@ describe('AcceptInvitationComponent (T059)', () => {
     sessionService = jasmine.createSpyObj('SessionService', ['adopt']);
 
     await TestBed.configureTestingModule({
-      imports: [AcceptInvitationComponent, TranslateModule.forRoot()],
+      imports: [AcceptInvitationComponent],
       providers: [
+        provideTranslateService(),
         provideRouter([]),
         { provide: ApiService, useValue: apiService },
         { provide: SessionService, useValue: sessionService },

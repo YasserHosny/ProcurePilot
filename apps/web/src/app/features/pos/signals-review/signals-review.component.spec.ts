@@ -3,7 +3,7 @@ import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testin
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { By } from '@angular/platform-browser';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
-import { TranslateModule, TranslateService } from '@ngx-translate/core';
+import { TranslateService, provideTranslateService } from '@ngx-translate/core';
 import { of } from 'rxjs';
 
 import enCatalog from '../../../../../../../packages/i18n/en.json';
@@ -115,8 +115,9 @@ describe('SignalsReviewComponent (T027)', () => {
     };
 
     await TestBed.configureTestingModule({
-      imports: [SignalsReviewComponent, TranslateModule.forRoot()],
+      imports: [SignalsReviewComponent],
       providers: [
+        provideTranslateService(),
         provideNoopAnimations(),
         { provide: PosApiService, useValue: posApiService },
         { provide: ApiService, useValue: apiService },

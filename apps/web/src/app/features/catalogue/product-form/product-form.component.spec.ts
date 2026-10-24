@@ -3,7 +3,7 @@ import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { signal } from "@angular/core";
 import { MatSnackBar } from "@angular/material/snack-bar";
 import { ActivatedRoute, provideRouter } from "@angular/router";
-import { TranslateModule, TranslateService } from "@ngx-translate/core";
+import { TranslateService, provideTranslateService } from "@ngx-translate/core";
 import { of, throwError } from "rxjs";
 
 import enCatalog from "../../../../../../../packages/i18n/en.json";
@@ -52,8 +52,9 @@ describe("ProductFormComponent (T017, T029)", () => {
     };
 
     await TestBed.configureTestingModule({
-      imports: [ProductFormComponent, TranslateModule.forRoot()],
+      imports: [ProductFormComponent],
       providers: [
+        provideTranslateService(),
         provideRouter([]),
         { provide: ApiService, useValue: apiService },
         { provide: PosApiService, useValue: posApiService },

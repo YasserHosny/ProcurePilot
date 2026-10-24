@@ -2,7 +2,7 @@ import { signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { provideRouter } from '@angular/router';
-import { TranslateModule } from '@ngx-translate/core';
+import { provideTranslateService } from '@ngx-translate/core';
 import { of, throwError } from 'rxjs';
 
 import { ApiService } from '../../../core/api/api.service';
@@ -84,8 +84,9 @@ describe('SavingsLedgerComponent (T022)', () => {
     mockSavingsApiService.getSavings.and.returnValue(of({ items: sampleSavings, next_cursor: null }));
 
     await TestBed.configureTestingModule({
-      imports: [SavingsLedgerComponent, TranslateModule.forRoot()],
+      imports: [SavingsLedgerComponent],
       providers: [
+        provideTranslateService(),
         provideNoopAnimations(),
         provideRouter([]),
         { provide: ApiService, useValue: mockApiService },

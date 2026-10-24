@@ -145,7 +145,7 @@
       <app-compare-table
         [offers]="visibleOffers()"
         [displayedColumns]="displayedColumns"
-        [recommendedOfferId]="proj.recommendation?.recommended_offer_id"
+        [recommendedOfferId]="$safeNavigationMigration(proj.recommendation?.recommended_offer_id)"
         [requestedQuantity]="baseQuantityInput()"
         [baseUnit]="selectedProduct()?.base_unit || 'unit'"
       ></app-compare-table>

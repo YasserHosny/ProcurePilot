@@ -1,11 +1,11 @@
-import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClient, withXhr } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { provideRouter } from '@angular/router';
-import { TranslateModule, TranslateService } from '@ngx-translate/core';
+import { TranslateService, provideTranslateService } from '@ngx-translate/core';
 
 import enCatalog from '../../../../../../../packages/i18n/en.json';
 import type { Role, Supplier } from '../../../core/api/models';
@@ -45,9 +45,10 @@ describe('CaptureComponent (T024)', () => {
     };
 
     await TestBed.configureTestingModule({
-      imports: [CaptureComponent, TranslateModule.forRoot()],
+      imports: [CaptureComponent],
       providers: [
-        provideHttpClient(),
+        provideTranslateService(),
+        provideHttpClient(withXhr()),
         provideHttpClientTesting(),
         provideNoopAnimations(),
         provideRouter([]),
@@ -180,9 +181,11 @@ describe('CaptureComponent (T024)', () => {
 
     const successContainer = fixture.debugElement.query(By.css('.result-container.success'));
     expect(successContainer).not.toBeNull();
-    const routerLink = fixture.debugElement.query(By.css('a[mat-flat-button]'));
-    expect(routerLink).not.toBeNull();
-    expect(routerLink.attributes['ng-reflect-router-link']).toContain('quot-xyz-789');
+    const reviewLink = fixture.debugElement.query(By.css('a[mat-flat-button]'));
+    expect(reviewLink).not.toBeNull();
+    expect((reviewLink.nativeElement as HTMLAnchorElement).getAttribute('href')).toBe(
+      '/quotations/quot-xyz-789',
+    );
   });
 
   it('should show error message and failed state when API returns an error', () => {

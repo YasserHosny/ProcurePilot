@@ -1,4 +1,4 @@
-import { Component, EventEmitter, Input, OnInit, Output, inject, signal } from "@angular/core";
+import { Component, EventEmitter, Input, OnInit, Output, inject, signal, ChangeDetectionStrategy } from "@angular/core";
 import { FormsModule } from "@angular/forms";
 import { MatButtonModule } from "@angular/material/button";
 import { MatCardModule } from "@angular/material/card";
@@ -26,6 +26,7 @@ import { I18nService } from "../../../core/i18n";
     TranslatePipe,
   ],
   templateUrl: "./import-wizard-preview.component.html",
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: "./import-wizard-preview.component.scss",
 })
 export class ImportWizardPreviewComponent implements OnInit {

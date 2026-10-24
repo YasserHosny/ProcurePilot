@@ -1,8 +1,8 @@
-import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClient, withXhr } from '@angular/common/http';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { ActivatedRoute, provideRouter } from '@angular/router';
-import { TranslateModule, TranslateService } from '@ngx-translate/core';
+import { TranslateService, provideTranslateService } from '@ngx-translate/core';
 import { of } from 'rxjs';
 import { ApiService } from '../../../core/api/api.service';
 import type { Product } from '../../../core/api/models';
@@ -45,10 +45,11 @@ describe('OrderDetailComponent', () => {
       },
     }));
     await TestBed.configureTestingModule({
-      imports: [OrderDetailComponent, TranslateModule.forRoot()],
+      imports: [OrderDetailComponent],
       providers: [
+        provideTranslateService(),
         { provide: ApiService, useValue: catalogue },
-        provideHttpClient(), provideNoopAnimations(), provideRouter([]), { provide: OrdersApiService, useValue: api },
+        provideHttpClient(withXhr()), provideNoopAnimations(), provideRouter([]), { provide: OrdersApiService, useValue: api },
         { provide: ActivatedRoute, useValue: { snapshot: { paramMap: { get: () => 'order-1' } } } },
       ],
     }).compileComponents();

@@ -3,7 +3,7 @@ import type { ComponentFixture } from '@angular/core/testing';
 import { TestBed } from '@angular/core/testing';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { ActivatedRoute, Router } from '@angular/router';
-import { TranslateModule, TranslateService } from '@ngx-translate/core';
+import { TranslateService, provideTranslateService } from '@ngx-translate/core';
 import { of, Subject, throwError } from 'rxjs';
 
 import enCatalog from '../../../../../../../packages/i18n/en.json';
@@ -64,8 +64,9 @@ describe('RequestFormComponent — create mode (T017)', () => {
     api.products.and.returnValue(of({ items: [], next_cursor: null }));
 
     await TestBed.configureTestingModule({
-      imports: [RequestFormComponent, TranslateModule.forRoot()],
+      imports: [RequestFormComponent],
       providers: [
+        provideTranslateService(),
         { provide: RequestsApiService, useValue: requestsApi },
         { provide: OrganisationApiService, useValue: organisationApi },
         { provide: ApiService, useValue: api },
@@ -250,8 +251,9 @@ describe('RequestFormComponent — edit mode (T017)', () => {
     requestsApi.updateRequest.and.returnValue(of(mockRequest));
 
     await TestBed.configureTestingModule({
-      imports: [RequestFormComponent, TranslateModule.forRoot()],
+      imports: [RequestFormComponent],
       providers: [
+        provideTranslateService(),
         { provide: RequestsApiService, useValue: requestsApi },
         { provide: OrganisationApiService, useValue: organisationApi },
         { provide: ApiService, useValue: api },

@@ -2,7 +2,7 @@ import type { ComponentFixture } from "@angular/core/testing";
 import { TestBed } from "@angular/core/testing";
 import { MAT_DIALOG_DATA, MatDialogRef } from "@angular/material/dialog";
 import { provideNoopAnimations } from "@angular/platform-browser/animations";
-import { TranslateModule, TranslateService } from "@ngx-translate/core";
+import { TranslateService, provideTranslateService } from "@ngx-translate/core";
 import { of, throwError } from "rxjs";
 
 import enCatalog from "../../../../../../../packages/i18n/en.json";
@@ -52,8 +52,9 @@ describe("ChangeRoleDialogComponent (T037)", () => {
     fixture: ComponentFixture<ChangeRoleDialogComponent>;
   }> {
     await TestBed.configureTestingModule({
-      imports: [ChangeRoleDialogComponent, TranslateModule.forRoot()],
+      imports: [ChangeRoleDialogComponent],
       providers: [
+        provideTranslateService(),
         provideNoopAnimations(),
         { provide: ApiService, useValue: apiService },
         { provide: MatDialogRef, useValue: dialogRefSpy },

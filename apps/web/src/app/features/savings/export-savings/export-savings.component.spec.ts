@@ -2,7 +2,7 @@ import { signal } from '@angular/core';
 import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
-import { TranslateModule } from '@ngx-translate/core';
+import { provideTranslateService } from '@ngx-translate/core';
 import { of } from 'rxjs';
 
 import { ApiService } from '../../../core/api/api.service';
@@ -78,8 +78,9 @@ describe('ExportSavingsComponent (T040)', () => {
     );
 
     await TestBed.configureTestingModule({
-      imports: [ExportSavingsComponent, TranslateModule.forRoot()],
+      imports: [ExportSavingsComponent],
       providers: [
+        provideTranslateService(),
         provideNoopAnimations(),
         provideRouter([
           { path: 'savings/export/:id', component: ExportSavingsComponent },

@@ -5,9 +5,9 @@ import { Router, provideRouter } from '@angular/router';
 import { of, throwError } from 'rxjs';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatDialog, MatDialogRef } from '@angular/material/dialog';
-import { TranslateModule } from '@ngx-translate/core';
+import { provideTranslateService } from '@ngx-translate/core';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
-import { HttpErrorResponse, provideHttpClient } from '@angular/common/http';
+import { HttpErrorResponse, provideHttpClient, withXhr } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { signal } from '@angular/core';
 import { SessionService } from '../../../core/auth/session.service';
@@ -73,9 +73,10 @@ describe('HistoryComponent', () => {
     rfqApiSpy.listRfqs.and.returnValue(of(mockRfqList));
 
     await TestBed.configureTestingModule({
-      imports: [HistoryComponent, TranslateModule.forRoot(), NoopAnimationsModule],
+      imports: [HistoryComponent, NoopAnimationsModule],
       providers: [
-        provideHttpClient(),
+        provideTranslateService(),
+        provideHttpClient(withXhr()),
         provideHttpClientTesting(),
         provideRouter([]),
         { provide: RfqApi, useValue: rfqApiSpy },

@@ -1,4 +1,4 @@
-import { Component, inject } from "@angular/core";
+import { Component, inject, ChangeDetectionStrategy } from "@angular/core";
 import { MatButtonModule } from "@angular/material/button";
 import {
   MAT_DIALOG_DATA,
@@ -18,6 +18,7 @@ export interface DependentsConfirmDialogData {
   standalone: true,
   imports: [MatDialogModule, MatButtonModule, MatIconModule, TranslatePipe],
   templateUrl: "./dependents-confirm-dialog.component.html",
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: "./dependents-confirm-dialog.component.scss",
 })
 export class BranchDependentsConfirmDialogComponent {

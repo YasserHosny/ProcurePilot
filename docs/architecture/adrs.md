@@ -14,6 +14,12 @@
   - Strong out-of-the-box tooling, routing, forms, and i18n path.
   - NgModule-based structure aligns with the blueprint.
   - Nginx serves the built SPA with SPA fallback.
+- **Amended 2026-10-24 (PP-29):** upgraded to Angular 22 + Angular Material 22 (TypeScript 6.0,
+  Node 24 to build). Reason: the new design system's Material theme uses the M3 API, including the
+  tonal button that first shipped in Material 20, so building it once on the current major is
+  cheaper than building it on 19 and porting it. Builders moved from `@angular-devkit/build-angular`
+  (deprecated) to `@angular/build`; Karma stays. Every component with state carries
+  `ChangeDetectionStrategy.Eager`, which keeps pre-22 behaviour under Angular 22's OnPush default.
 
 ## ADR-002 — Mobile Framework: Flutter
 

@@ -11,7 +11,7 @@ import {
 } from '../rfq-api';
 import { ApiService } from '../../../core/api/api.service';
 import { ActivatedRoute, Router } from '@angular/router';
-import { TranslateModule } from '@ngx-translate/core';
+import { provideTranslateService } from '@ngx-translate/core';
 import { of } from 'rxjs';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { MatSnackBar } from '@angular/material/snack-bar';
@@ -174,8 +174,9 @@ describe('CompareComponent (RFQ)', () => {
     mockDialog = jasmine.createSpyObj('MatDialog', ['open']);
 
     await TestBed.configureTestingModule({
-      imports: [CompareComponent, TranslateModule.forRoot()],
+      imports: [CompareComponent],
       providers: [
+        provideTranslateService(),
         { provide: RfqApi, useValue: mockRfqApi },
         { provide: ApiService, useValue: mockApiService },
         { provide: Router, useValue: mockRouter },

@@ -177,7 +177,7 @@
                       </span>
                       @if (disc.synced_bill_detail?.bill_date) {
                         <span class="mismatch-date">
-                          {{ disc.synced_bill_detail?.bill_date | formatDate }}
+                          {{ $safeNavigationMigration(disc.synced_bill_detail?.bill_date) | formatDate }}
                         </span>
                       }
                     </div>
@@ -196,7 +196,7 @@
                       </span>
                       @if (disc.purchase_record_detail?.date) {
                         <span class="mismatch-date">
-                          {{ disc.purchase_record_detail?.date | formatDate }}
+                          {{ $safeNavigationMigration(disc.purchase_record_detail?.date) | formatDate }}
                         </span>
                       }
                     </div>
@@ -216,7 +216,7 @@
                     </div>
                     @if (disc.synced_bill_detail?.bill_date) {
                       <span class="unmatched-date" data-testid="unmatched-bill-date">
-                        {{ disc.synced_bill_detail?.bill_date | formatDate }}
+                        {{ $safeNavigationMigration(disc.synced_bill_detail?.bill_date) | formatDate }}
                       </span>
                     }
                   </div>
@@ -235,7 +235,7 @@
                     </div>
                     @if (disc.purchase_record_detail?.date) {
                       <span class="unmatched-date" data-testid="unmatched-purchase-date">
-                        {{ disc.purchase_record_detail?.date | formatDate }}
+                        {{ $safeNavigationMigration(disc.purchase_record_detail?.date) | formatDate }}
                       </span>
                     }
                   </div>

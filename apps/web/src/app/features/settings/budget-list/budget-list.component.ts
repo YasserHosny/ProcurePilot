@@ -1,5 +1,5 @@
 import { HttpErrorResponse } from "@angular/common/http";
-import { Component, OnInit, computed, inject, signal } from "@angular/core";
+import { Component, OnInit, computed, inject, signal, ChangeDetectionStrategy } from "@angular/core";
 import { MatButtonModule } from "@angular/material/button";
 import { MatCardModule } from "@angular/material/card";
 import { MatDialog, MatDialogModule } from "@angular/material/dialog";
@@ -43,6 +43,7 @@ const BUDGETS_I18N = "organisation.budgets";
     FormatMoneyPipe,
   ],
   templateUrl: "./budget-list.component.html",
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: "./budget-list.component.scss",
 })
 export class BudgetListComponent implements OnInit {

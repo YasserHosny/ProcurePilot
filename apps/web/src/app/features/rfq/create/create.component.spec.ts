@@ -2,13 +2,13 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { RfqCreateComponent } from './create.component';
 import { RfqApi, Rfq, RfqDetail } from '../rfq-api';
 import { ApiService } from '../../../core/api/api.service';
-import { provideHttpClient, HttpErrorResponse } from '@angular/common/http';
+import { provideHttpClient, HttpErrorResponse, withXhr } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { ActivatedRoute, Router, provideRouter } from '@angular/router';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { of, throwError } from 'rxjs';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
-import { TranslateModule, TranslateService } from '@ngx-translate/core';
+import { TranslateService, provideTranslateService } from '@ngx-translate/core';
 import { Product, Supplier } from '../../../core/api/models';
 
 describe('RfqCreateComponent', () => {
@@ -38,9 +38,10 @@ describe('RfqCreateComponent', () => {
     );
 
     await TestBed.configureTestingModule({
-      imports: [RfqCreateComponent, TranslateModule.forRoot()],
+      imports: [RfqCreateComponent],
       providers: [
-        provideHttpClient(),
+        provideTranslateService(),
+        provideHttpClient(withXhr()),
         provideHttpClientTesting(),
         provideNoopAnimations(),
         provideRouter([]),

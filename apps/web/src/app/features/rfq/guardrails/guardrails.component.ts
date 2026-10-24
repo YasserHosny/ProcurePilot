@@ -1,5 +1,5 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { Component, OnInit, inject, signal, ChangeDetectionStrategy } from '@angular/core';
+
 import { FormsModule } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
 import { MatButtonModule } from '@angular/material/button';
@@ -10,7 +10,7 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatIconModule } from '@angular/material/icon';
-import { TranslateModule, TranslateService } from '@ngx-translate/core';
+import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { of } from 'rxjs';
 import { catchError } from 'rxjs/operators';
 
@@ -36,7 +36,6 @@ import {
   selector: 'app-rfq-guardrails',
   standalone: true,
   imports: [
-    CommonModule,
     FormsModule,
     MatButtonModule,
     MatCardModule,
@@ -46,10 +45,11 @@ import {
     MatSlideToggleModule,
     MatProgressSpinnerModule,
     MatIconModule,
-    TranslateModule,
-    FormatMoneyPipe,
-  ],
+    TranslatePipe,
+    FormatMoneyPipe
+],
   templateUrl: './guardrails.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './guardrails.component.scss',
 })
 export class GuardrailsComponent implements OnInit {
