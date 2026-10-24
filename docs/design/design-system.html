@@ -781,7 +781,12 @@ dialog.real::backdrop{background:var(--pp-dialog-scrim)}
 .nav .count{margin-inline-start:auto; font-size:var(--pp-text-12); color:var(--pp-nav-count-fg)}
 .nav a[aria-current="page"] .count{color:inherit}
 .nav-sep{block-size:1px; background:var(--pp-border); margin-block:var(--pp-space-3)}
-.nav-group-btn{display:flex; align-items:center; justify-content:space-between; inline-size:100%; padding:var(--pp-space-3) var(--pp-space-2) var(--pp-space-1); margin:0; background:transparent; border:0; font-size:var(--pp-text-12); font-weight:var(--pp-weight-strong); text-transform:uppercase; letter-spacing:0.05em; color:var(--pp-text-muted); cursor:pointer; text-align:start}
+.nav-group-btn{display:flex; align-items:center; justify-content:space-between; inline-size:100%; padding:var(--pp-space-3) var(--pp-space-2) var(--pp-space-1); margin:0; margin-block-start:var(--pp-space-2); background:transparent; border:0; border-block-start:var(--pp-divider-width, 1px) solid var(--pp-divider-color, var(--pp-border)); border-inline-start:3px solid transparent; border-radius:var(--pp-radius-control); font-size:var(--pp-text-12); font-weight:var(--pp-weight-strong); text-transform:uppercase; letter-spacing:0.05em; color:var(--pp-text-strong); cursor:pointer; text-align:start; box-sizing:border-box}
+.nav-group-btn:not(:disabled):hover{background:var(--pp-surface-sunken)}
+.nav-group-btn:focus-visible{outline:2px solid var(--pp-focus); outline-offset:2px}
+.nav-group-btn:disabled{cursor:default; opacity:1}
+.nav-group-btn.nav-group--active, .nav-group-btn.nav-group--active svg{color:var(--pp-teal-700)}
+.nav-group-btn.nav-group--active{border-inline-start-color:var(--pp-teal-700)}
 .nav-group-btn svg{inline-size:14px; block-size:14px; color:var(--pp-text-muted); transition:transform 150ms ease}
 .nav-group-btn[aria-expanded="false"] svg{transform:rotate(-90deg)}
 :root[dir="rtl"] .nav-group-btn[aria-expanded="false"] svg{transform:rotate(90deg)}
@@ -1761,7 +1766,7 @@ dialog.real::backdrop{background:var(--pp-dialog-scrim)}
         <aside class="side" aria-label="Main navigation" data-ar-label="التنقّل الرئيسي">
           <a class="brand" href="#shell"><span class="pp-logo" data-kind="full" style="--pp-logo-h:24px"><svg role="img" aria-label="ProcurePilot" viewBox="0 0 956.7 220"><use href="#pp-logo-en"/></svg></span></a>
           <button class="tenant" type="button"><span><span data-ar="مجموعة مطابخ النيل">Nile Kitchens Group</span><small data-ar="٤ فروع، ج.م.">4 branches, EGP</small></span><svg width="16" height="16" aria-hidden="true"><use href="#i-down"/></svg></button>
-          <button class="nav-group-btn" type="button" aria-expanded="true" aria-controls="shell-grp-purchasing"><span data-ar="الشراء">Purchasing</span><svg aria-hidden="true"><use href="#i-down"/></svg></button>
+          <button class="nav-group-btn nav-group--active" type="button" aria-expanded="true" aria-controls="shell-grp-purchasing" disabled><span data-ar="الشراء">Purchasing</span><svg aria-hidden="true"><use href="#i-down"/></svg></button>
           <ul class="nav" id="shell-grp-purchasing">
             <li><a href="#shell"><svg><use href="#i-req"/></svg><span data-ar="طلبات الشراء">Requests</span></a></li>
             <li><a href="#shell" aria-current="page"><svg><use href="#i-check"/></svg><span data-ar="الموافقات">Approvals</span><span class="count num" data-ar="٣">3</span></a></li>

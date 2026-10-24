@@ -127,7 +127,7 @@
       </div>
 
       @for (group of navGroups; track group.id) {
-        <div class="nav-group">
+        <div class="nav-group" [class.nav-group--active]="isGroupActive(group.id)">
           <h2 class="nav-group-heading">
             <button
               type="button"
