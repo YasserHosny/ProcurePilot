@@ -130,7 +130,7 @@ def main():
     saved=ROOT/'proof'/f'{args.mode}{tag}.json'
     if args.resume and saved.exists():report=json.loads(saved.read_text())
     paths=[ROOT/'raw/ar/s2-quote-photo.mp4'] if args.mode=='control' else sorted((ROOT/('masked' if args.mode=='after' else 'raw')).glob('*/*.mp4'))
-    paths=[p for p in paths if p.parent.name in ('ar','en')]
+    paths=[p for p in paths if p.parent.name in ('ar','en') and p.stem not in ('s2r-authorised','s4r-approved')]
     for p in paths:
         key=p.parent.name+'/'+p.name
         v=report[key] if key in report else scan(p,ts);report[key]=v

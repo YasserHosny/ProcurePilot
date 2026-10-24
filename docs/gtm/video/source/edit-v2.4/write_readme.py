@@ -10,9 +10,15 @@ def main():
     tl=json.loads((ROOT/'timeline.json').read_text())
     text='''# ProcurePilot v2.4 — Ledger UI edit
 
-**Handoff status: final video rendering is blocked by this sandbox.** Source masking, audit evidence,
-timeline/spec files, offline build tooling and audio are supplied here. The four final MP4s and their
-final-cut contact sheets are not represented as completed renders. No commit or push was made.
+**Result-insert delta, 2026-10-25: prepared for orchestrator rendering.** The original four cuts
+were owner-reviewed and merged. This revision replaces the processing tails in beats 7 and 11 with
+real result footage from the same quotations and requests. Captions are unchanged. No video rendering
+or commit was performed for this delta; any existing MP4s and final-file measurements predate it.
+
+The quotation result is restricted to the header (source y=60–470), with a teal underline beneath its
+recorded authorised status. The request result is an enlarged Approval block showing the approved
+bar and decision date. Both inserts hold for 1.8 s (54 frames) in every cut. The vertical cuts replace
+existing tails within their original slots, so no RFQ/PO trimming or vertical audio rebuild is needed.
 
 ## Changes from v2.3
 
@@ -24,8 +30,8 @@ caption copy, without rewriting it. Names inside the English UI remain the tenan
 The original approved openings and outro media are used. Outro video is appended by stream copy.
 
 Beats 4 (supplier email) and 9 (basket split) have no footage and are dropped under the approved cut plan.
-Horizontal body: 101 s (3030 frames); vertical body: 51 s (1530 frames). Nominal totals including the
-approved outros: 110.75 s and 59.5 s. Actual final container durations require rendering and ffprobe.
+Horizontal body: 102 s (3060 frames); vertical body: 51 s (1530 frames). Nominal totals including the
+approved outros: 111.75 s and approximately 59.51 s. Actual final container durations require rendering and ffprobe.
 
 ## Rebuild — offline, exact commands
 
@@ -39,8 +45,8 @@ bash rebuild.sh render
 ```
 
 The privacy phase audits all 16 native-resolution raw clips, burns masked copies, audits every frame of
-all masked clips, and runs the unmasked Arabic quote clip again as a positive control. The `prepare`
-phase refuses extraction unless the 16-clip zero-match masked audit exists. It extracts only `masked/`
+all original masked clips, and runs the unmasked Arabic quote clip again as a positive control. A separate `result_privacy.py` pass handles the four result clips. The `prepare`
+phase requires both the original 16-clip audit and the four zero-match result audits. It extracts only `masked/`
 plus the approved openings, builds data/textures, and creates PCM and AAC audio mixes. Nothing downloads.
 `cc` compiles the local bit-parallel matcher with the same acceptance rule as the NumPy reference;
 `check_detector.py` independently compares both implementations on seven known source positions.
@@ -50,9 +56,9 @@ To render on a host where Chrome can run, the exact remaining commands after pre
 ```bash
 export NODE_PATH=/home/yasserhosny/Work/Projects/ProcurePilot/apps/web/node_modules
 export PP_CHROME=/usr/bin/google-chrome
-node render.cjs h ar frames-ar-h 0 3030
+node render.cjs h ar frames-ar-h 0 3060
 node render.cjs v ar frames-ar-v 0 1530
-node render.cjs h en frames-en-h 0 3030
+node render.cjs h en frames-en-h 0 3060
 node render.cjs v en frames-en-v 0 1530
 /home/yasserhosny/Work/pp-video-env/bin/python finish.py
 ```
@@ -86,7 +92,20 @@ pixels. `proof/` and the staged media are git-ignored.
 This is a native-glyph detector, not a general OCR guarantee for arbitrary future fonts or layouts.
 The fixed transition windows are specific to these staged takes. A replacement take requires a new audit.
 
-### Consolidated execution evidence
+### Result-insert privacy proof
+
+Full-resolution inspection at 2 s in all four new takes located both quote identity values and the
+approver row. The original templates detected both quote values but missed the approver layout
+(legacy hits = 0). Two new native approver templates were added and checked against the independent
+NumPy implementation. Full-frame searches run on every decoded frame, before and after masking.
+Each hit must be contained by a fixed box. Boxes are opaque white (#FFFFFF), applied throughout
+each clip, without relying on temporal detection. The approval bar and date remain outside the mask.
+Counts are template hits, so multiple templates/offsets can match one address. The staged files
+decode to 78/76 AR frames and 80/74 EN frames (about 2.47–2.67 s, shorter than the nominal 5 s);
+the result source window 0.5–2.3 s is inside every clip.
+
+```text
+'''+read('results-privacy.log')+'```\n\n### Consolidated execution evidence\n\n'+'''
 
 ```text
 '''+read('execution-report.log')+'```\n\n### Real per-clip command output — raw audit\n\n```text\n'+read('before-native.log')+'```\n\n### Real per-clip command output — masked audit\n\n```text\n'+read('after-native.log')+'```\n\n### Unmasked positive control\n\n```text\n'+read('control-native.log')+'```\n\n### Detector equivalence controls\n\n```text\n'+read('detector-check.log')+'```\n\n## Edit decision lists\n\n'
@@ -112,10 +131,10 @@ cannot certify those visual properties.
 
 Music starts at 0:00 for 16:9 and 2:00 for 9:16, at −6.6 dB with a 0.5 s fade-in, then the original
 outro audio. A −3 dBFS sample limiter runs before AAC 256 kb/s. Measurements below are for the supplied
-audio masters/previews, not nonexistent final video files. `proof/audio.json` retains numeric results.
+audio masters/previews, not the pending result-insert final video files. `proof/audio.json` retains numeric results.
 
 ```text
-'''+read('audio.log')+'```\n\nLatest vertical mixes retain the complete approved audio tail (the nominal 8.5 s is rounded):\n\n```text\n'+read('audio-vertical-full-tail.log')+'```\n\n## Render blockers / unfulfilled proof\n\n'
+'''+read('results-audio.log')+'```\n\nLatest vertical mixes retain the complete approved audio tail (the nominal 8.5 s is rounded):\n\n```text\n'+read('audio-vertical-full-tail.log')+'```\n\n## Render blockers / unfulfilled proof\n\n'
     text+='''Chrome failed even with `--no-sandbox` and with crash reporting disabled. The sandbox returns
 `setsockopt: Operation not permitted (1)` and Chrome exits with `SIGTRAP`. Full real launch output is
 in `proof/chrome-check.log`; the actual v2.4 one-frame render attempt is in
@@ -127,24 +146,25 @@ available and used for decoding, masking, audio and measurements. The render hos
 to produce the requested final duration/resolution/fps/codec evidence. No final-cut ffprobe or loudness
 output is invented; no final-cut review sheet is substituted with a source sheet.
 
-Both quote sources end with the Authorise action still processing, rather than the approved
-status chip requested in beat 7. The edit ends that beat on the real confirmation action and avoids a
-fabricated approval chip or a frozen loading spinner. That specific result hold cannot be supplied
-from these takes.
-
-The approved script and motion-style files are unchanged. The missing final renders, contact sheets,
-and final-file probe/loudness proof are the remaining work, covered by the explicit Chrome fallback.
+The original Authorise and phone Approve takes end before a useful result hold. The newly recorded
+same-record end states now replace those tails in both formats. This resolves the former missing-result
+limitation without synthesising a status. Final visual review and final-file measurements belong to
+the orchestrator after rendering. The approved script, captions and outro files are unchanged.
 
 ## Files and evidence
 
-Editable source: `privacy.py`, `matcher.c`, `check_detector.py`, `check_timeline.cjs`, `engine.js`, `index.html`, `compose.js`,
+Editable source: `privacy.py`, `result_privacy.py`, `matcher.c`, `check_detector.py`, `check_timeline.cjs`, `engine.js`, `index.html`, `compose.js`,
 `spec_h.js`, `spec_v.js`, `render.cjs`, `extract.py`, `make_data.py`, `make_textures.py`, `timeline.json`,
 `audio.py`, `finish.py`, `execution_report.py`, `review_sources.py`, `write_readme.py`, `rebuild.sh`, `.gitignore`, `README.md`.
 Generated/ignored: `masked/{ar,en}/`, `proof/`, `plates/`, `data.js`, `tex/`, `audio/`, `tmp/`, Python
 bytecode, and inspection PNGs under `raw/{ar,en}/`. Fonts and original MP4 inputs were already staged.
-Structural scene-boundary and plate-path checks for all four cuts pass (`proof/timeline-check.log`);
+Structural scene-boundary and plate-path checks for all four cuts pass (`proof/results-timeline-check.log`);
 these checks do not replace final visual review.
-The complete generated-file inventory is in `proof/files-created-or-changed.txt`.
+Delta changes: `result_privacy.py`, `privacy.py`, `extract.py`, `make_data.py`, `timeline.json`,
+`compose.js`, `spec_h.js`, `check_timeline.cjs`, `audio.py`, `finish.py`, `rebuild.sh`,
+`execution_report.py`, `write_readme.py`, `README.md`; generated `data.js`, four masked result clips,
+four plate sequences, horizontal PCM/AAC mixes and result-proof logs. Original cuts remain untouched.
+The complete generated-file inventory is in `proof/results-changed-files.txt`.
 The orchestrator owns review and commit.
 '''
     (ROOT/'README.md').write_text(text)

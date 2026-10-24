@@ -57,6 +57,15 @@ function buildTimeline(fmt,lang){
         if(scene.beat===12){useCrop=[rtl?600:340,60,980,900];centerY=1110;}
         if(scene.beat===13)useCrop=[240,60,1440,980];
       }
+      // Real end-state inserts: source coordinates never include quotation identity fields.
+      if(name==='s2r-authorised'){
+        useCrop=vertical?[rtl?1070:220,140,rtl?640:790,330]:[rtl?1070:220,60,rtl?640:790,410];
+        width=vertical?960:1260;centerY=vertical?1120:535;
+      }
+      if(name==='s4r-approved'){
+        useCrop=vertical?[rtl?1070:570,775,rtl?280:370,120]:[570,775,780,120];
+        width=vertical?960:1260;centerY=vertical?1120:535;
+      }
       const p=PLATE(key,{w:width,crop:useCrop,x:centerX,y:centerY,z:10,depth:2,t0:cursor,t1:cursor+slot,map:t=>{
         const travel=slot; // Explicit a===b subslots supply the decision-result holds.
         return a+(b-a)*Math.min(1,Math.max(0,(t-cursor)/travel));
@@ -81,6 +90,13 @@ function buildTimeline(fmt,lang){
         rows.update=t=>{const seconds=a+(b-a)*Math.min(1,Math.max(0,(t-sourceStart)/slot));
           const idx=Math.max(1,Math.min(m.frames,Math.floor(seconds*FPS+1e-6)+1));
           if(idx!==rows.cur){rows.cur=idx;ri.src=`plates/${key}/${String(idx).padStart(4,'0')}.jpg`;PENDING.push(ri);}};
+      }
+      if(name==='s2r-authorised'||name==='s4r-approved'){
+        const sc=width/useCrop[2];
+        const status=name==='s2r-authorised'?[rtl?1100:790,202,rtl?168:190]:[rtl?1280:592,831,rtl?55:65];
+        const hit=R({w:status[2]*sc,h:4*sc,x:centerX-width/2+(status[0]-useCrop[0])*sc,
+          y:centerY-useCrop[3]*sc/2+(status[1]-useCrop[1])*sc,ax:0,ay:0,z:15,color:C.teal,t0:sourceStart,t1:sourceStart+slot});
+        hit.k('sx',[[sourceStart,0],[sourceStart+.2,1,'out']]);
       }
       if(phone)p.node.classList.add('phone');
       if(cursor===st)p.k('y',[[st,centerY+80],[st+.5,centerY,'out']]);

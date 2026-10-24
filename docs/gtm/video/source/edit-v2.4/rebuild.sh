@@ -12,6 +12,7 @@ case "${1:-render}" in
   "$PY" privacy.py mask | tee proof/mask.log
   "$PY" privacy.py after | tee proof/after-native.log
   "$PY" privacy.py control | tee proof/control-native.log
+  "$PY" result_privacy.py | tee proof/results-privacy.log
   ;;
  prepare)
   "$PY" extract.py
@@ -24,7 +25,7 @@ case "${1:-render}" in
   # Chrome's singleton socket path must stay under ~107 bytes: render with a short temp dir.
   export TMPDIR="$(mktemp -d /tmp/pp-render-XXXX)"
   for lang in ar en; do
-   node render.cjs h "$lang" "frames-$lang-h" 0 3030
+   node render.cjs h "$lang" "frames-$lang-h" 0 3060
    node render.cjs v "$lang" "frames-$lang-v" 0 1530
   done
   "$PY" finish.py

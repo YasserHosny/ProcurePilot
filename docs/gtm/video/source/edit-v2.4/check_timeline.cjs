@@ -15,9 +15,17 @@ class Node {
   const doc={getElementById:id=>id==='stage'?stage:defs,createElement:tag=>{const n=new Node(tag);nodes.push(n);return n;},createElementNS:(_,tag)=>new Node(tag),querySelectorAll:tag=>nodes.filter(n=>n.tag===tag)};
   const ctx={document:doc,console,Promise,Math,LANG:lang,FMT:fmt};ctx.window=ctx;vm.createContext(ctx);
   for(const file of ['data.js','engine.js','compose.js',`spec_${fmt}.js`])vm.runInContext(fs.readFileSync(path.join(__dirname,file),'utf8'),ctx,{filename:file});
-  assert.equal(ctx.DURATION,fmt==='h'?101:51);
-  const timeline=ctx.TIMELINES[fmt];const times=new Set([0,ctx.DURATION-1/30]);
-  for(const s of timeline.scenes){times.add(s.start);times.add(s.start+.6);times.add(s.start+s.duration-.01);}
+  assert.equal(ctx.DURATION,fmt==='h'?102:51);
+  const timeline=ctx.TIMELINES[fmt];
+  assert(timeline.body+timeline.outro<=(fmt==='v'?60:122));
+  assert(fmt==='v'||timeline.body+timeline.outro>=111);
+  for(const [beat,name] of [[7,'s2r-authorised'],[11,'s4r-approved']]){
+    const spans=timeline.scenes.find(s=>s.beat===beat).spans_by_language[lang];
+    const result=spans.at(-1);assert.equal(result[0],name);assert.equal(Math.round(result[3]*30),54);
+    assert(result[1]>=0&&result[2]<ctx.PLATE_META[lang+'/'+name].frames/30);
+  }
+const times=new Set([0,ctx.DURATION-1/30]);
+  for(const s of timeline.scenes){times.add(s.start);times.add(s.start+.6);times.add(s.start+s.duration-.01);let at=s.start;for(const span of s.spans_by_language[lang]){times.add(at+.01);times.add(at+span[3]-.01);at+=span[3];}}
   let checks=0;
   for(const t of times){
    await ctx.renderAt(t);

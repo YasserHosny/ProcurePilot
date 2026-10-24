@@ -9,11 +9,11 @@ def call(args,log):
     (ROOT/'proof'/log).write_text(p.stderr);p.check_returncode()
 
 def main():
-    dst=(ROOT/'../../cuts/v2.4-ledger').resolve();dst.mkdir(parents=True,exist_ok=True)
+    dst=(ROOT/'../../cuts/v2.4.1-ledger').resolve();dst.mkdir(parents=True,exist_ok=True)
     (ROOT/'tmp').mkdir(exist_ok=True);(ROOT/'sheets').mkdir(exist_ok=True)
     report={}
     for lang in ['ar','en']:
-        for fmt,body in [('h',101),('v',51)]:
+        for fmt,body in [('h',102),('v',51)]:
             aspect='16x9' if fmt=='h' else '9x16';suffix='' if lang=='ar' else '-en'
             frames=ROOT/f'frames-{lang}-{fmt}';count=body*30
             assert len(list(frames.glob('*.jpg')))==count,f'Missing rendered frames: {frames}'
