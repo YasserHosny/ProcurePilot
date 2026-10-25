@@ -18,6 +18,7 @@ def captions():
                 for v in FILL[lang].get(beat,[]):copy[lang]=copy[lang].replace('**[sa]**',v,1)
                 assert '[sa]' not in copy[lang],(beat,lang)
             copy['en']=copy['en'].replace('SAR ','€')  # the Saudi script's figures are in riyals; Liffey's are euro
+            if beat==8:copy['en']=copy['en'].replace('Per pack, VAT and delivery included:','Per pack, delivery included:')  # Irish quotes are ex-VAT (owner, 2026-10-26)
             if beat in OVERRIDE_EN:copy['en']=OVERRIDE_EN[beat]
             out[beat]=copy
     assert set(out)==set(range(16))-{4},sorted(out)  # beat 4 is not in the Saudi script (dropped since v2.4)

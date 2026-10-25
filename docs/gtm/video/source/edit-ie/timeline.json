@@ -624,7 +624,7 @@
         "crop": null,
         "copy": {
           "ar": "كراتين بأحجام مختلفة؟ / بالكرتون وشامل الضريبة والتوصيل: - أرخص بـ- ر.س في -.",
-          "en": "Different pack sizes? / Per pack, VAT and delivery included: Brennan & Walsh is €13 cheaper on oil."
+          "en": "Different pack sizes? / Per pack, delivery included: Brennan & Walsh is €13 cheaper on oil."
         },
         "spans_by_language": {
           "ar": [
@@ -691,7 +691,7 @@
               "role": "pain"
             },
             {
-              "text": "Per pack, VAT and delivery included: Brennan & Walsh is €13 cheaper on oil.",
+              "text": "Per pack, delivery included: Brennan & Walsh is €13 cheaper on oil.",
               "offset": 2.5,
               "duration": 8.5,
               "role": "fix"
@@ -1649,7 +1649,7 @@
         "crop": null,
         "copy": {
           "ar": "كراتين بأحجام مختلفة؟ / بالكرتون وشامل الضريبة والتوصيل: - أرخص بـ- ر.س في -.",
-          "en": "Different pack sizes? / Per pack, VAT and delivery included: Brennan & Walsh is €13 cheaper on oil."
+          "en": "Different pack sizes? / Per pack, delivery included: Brennan & Walsh is €13 cheaper on oil."
         },
         "spans_by_language": {
           "ar": [
@@ -1692,7 +1692,7 @@
           ],
           "en": [
             {
-              "text": "Per pack, VAT and delivery included: Brennan & Walsh is €13 cheaper on oil.",
+              "text": "Per pack, delivery included: Brennan & Walsh is €13 cheaper on oil.",
               "offset": 0,
               "duration": 7,
               "role": "fix"
