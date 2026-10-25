@@ -12,6 +12,9 @@ def captions():
     assert set(out)==set(range(16))
     return out
 
+# Source times in the re-shot Arabic s5 clip: form 35–38 and 39–41.5, ledger still on round 6's rows at 52.5.
+AR_RESHOT={(32,35):(35,38),(36,38.5):(39,41.5),(42,42):(52.5,52.5)}
+
 def generate():
     copy=captions()
     # [beat, seconds, [[source,start,end,slotSeconds]], crop]
@@ -54,7 +57,10 @@ def generate():
                 if name=='s5-po-savings' and a==42 and b==42:a=b=44.5
                 if name=='s5-po-savings' and a==36 and b==38.5:a,b=38,40.3
                 english.append([name,a,b,slot])
-            scene['spans_by_language']={'ar':scene['spans'],'en':english}
+            # PPS-63: the Arabic outcome-form and ledger shots were re-shot after the «توفير» wording change (#263);
+            # raw/ar/s5-po-savings.mp4 is now the original to 30 s, the PO-000008 re-shoot, then the current ledger.
+            arabic=[[name,*AR_RESHOT.get((a,b),(a,b)),slot] if name=='s5-po-savings' else [name,a,b,slot] for name,a,b,slot in scene['spans']]
+            scene['spans_by_language']={'ar':arabic,'en':english}
             scene['cards_by_language']={}
             for lang in ['ar','en']:
                 parts=scene['copy'][lang].split(' / ')

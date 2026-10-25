@@ -44,7 +44,7 @@ const CURSOR_JS = `(() => {
 })()`;
 
 async function connect() {
-  const b = await chromium.connectOverCDP('http://127.0.0.1:9333');
+  const b = await chromium.connectOverCDP('http://127.0.0.1:' + (process.env.PP_CDP_PORT || '9333'));
   const ctx = b.contexts()[0];
   const page = ctx.pages().find((p) => p.url().startsWith(BASE));
   if (!page) throw new Error('no ProcurePilot tab in the kiosk window');
