@@ -68,7 +68,7 @@ node render.cjs v en frames-caption-en-v 0 1529
 `render.cjs` passes `--no-sandbox`, resolves fonts locally and fails on timeline/page errors.
 `finish.py` writes H.264 / yuv420p / 30 fps bodies, appends the approved outro video by stream copy,
 stream-copies the measured AAC 256 kb/s preview, records ffprobe and final ebur128 proof, and makes one every-2-second review sheet per
-cut in `sheets/`. Output filenames under `../../cuts/v2.4.1-ledger/` (v2.4.1; the merged v2.4 cuts stay in `v2.4-ledger/`):
+cut in `sheets/`. Output filenames under `../../cuts/v2.4.2-ledger/` (v2.4.2, the Arabic «توفير» re-shoot of PPS-63; v2.4.1 and v2.4 stay in `v2.4.1-ledger/` and `v2.4-ledger/`):
 
 - `procurepilot-demo-ar-16x9.mp4`
 - `procurepilot-demo-ar-9x16-60s.mp4`

@@ -9,7 +9,7 @@ def call(args,log):
     (ROOT/'proof'/log).write_text(p.stderr);p.check_returncode()
 
 def main():
-    dst=(ROOT/'../../cuts/v2.4.1-ledger').resolve();dst.mkdir(parents=True,exist_ok=True)
+    dst=(ROOT/'../../cuts/v2.4.2-ledger').resolve();dst.mkdir(parents=True,exist_ok=True)
     (ROOT/'tmp').mkdir(exist_ok=True);(ROOT/'sheets').mkdir(exist_ok=True)
     report={}
     timeline=json.loads((ROOT/'timeline.json').read_text())

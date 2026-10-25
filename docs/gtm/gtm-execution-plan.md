@@ -111,6 +111,7 @@ since the 2026-10-24 move; the old `PP` key is in brackets.
 | P-26 | PPS-53 | | | | |
 | P-27 | PPS-55 | P-28 | PPS-56 | P-29 | PPS-58 |
 | P-30 | PPS-59 | P-31 | PPS-61 | P-32 | PPS-62 |
+| P-33 | PPS-63 | | | | |
 
 Without a plan ID: PPS-2 (PP-21), PPS-7 (PP-22), PPS-8 (PP-23), PPS-22 (PP-24), PPS-27 (PP-25),
 PPS-28 (PP-26), PPS-23 (PP-27) — architecture diagrams and two shipped code changes, all Done.
@@ -234,6 +235,7 @@ PR → CI → merge → link PR on the PPS task. Refs are in the GTM plan's curr
 | [x] P-30 | — | Demo video v2.4 jumped from the pain to the result without saying the product answers it. Script revised: product bridge in beat 1, a pain card before each chapter's fix, an honest promise, caption fixes, beat 9 dropped; script moved to `video/cuts/v2.4-ledger/script.md` | Orch, User (approval) | — | **done 2026-10-25: script #264, v2.4.1 cuts #274 (`video/cuts/v2.4.1-ledger/`); PPS-59 Done** |
 | [x] P-31 | — | Material's `savings` glyph is a piggy bank (owner, 2026-10-25). Money-saved icons now `payments` (banknotes; was `toll`, owner chose 2026-10-25), empty budget list `account_balance_wallet`; 8 uses in 7 web files. The home regional settings card, which also used `payments`, now uses `public` (globe) | Orch | — | **done 2026-10-25: #271 merged; icon switched to `payments` in #275; home settings card to `public` in #276; PPS-61 Done** |
 | [ ] P-32 | — | Landing gallery was a sideways snap rail, so most visitors saw only screen 01 (owner, 2026-10-25). Four options mocked up; owner chose guided steps: a numbered steps list beside one framed screenshot, ARIA tabs, chip row on phones | Orch → Agy | — | merged with required checks green, EN/AR before/after on the PR (PPS-62) |
+| [ ] P-33 | — | The Arabic v2.4.1 cuts still showed «وفورات» / «الوفر» in three shots recorded before #263 (owner, 2026-10-25). Re-shot on hosted, no pixel patching: the record-outcome form (PO-000008, nothing saved), the ledger after recording and the verified ledger, as hosted shows them now (١٬٧٦٠ ج.م verified). Privacy audit re-run; cuts in `docs/gtm/video/cuts/v2.4.2-ledger/`. | Orch | — | Arabic cuts show no «وفر» / «وفورات», numbers match hosted, re-published (PPS-63) |
 
 ### E — Pilot environment
 

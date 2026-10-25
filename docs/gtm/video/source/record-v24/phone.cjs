@@ -10,7 +10,7 @@ const TAP = `(() => { if (document.getElementById('__ppc')) return; const c=docu
   Object.assign(c.style,{position:'fixed',left:'195px',top:'620px',width:'34px',height:'34px',marginLeft:'-17px',marginTop:'-17px',borderRadius:'50%',background:'rgba(11,37,69,.25)',border:'2px solid rgba(255,255,255,.9)',zIndex:2147483647,pointerEvents:'none',transition:'left .6s cubic-bezier(.4,0,.2,1), top .6s cubic-bezier(.4,0,.2,1), transform .15s'}); document.documentElement.appendChild(c); })()`;
 (async () => {
   const steps = JSON.parse(fs.readFileSync(process.argv[2], 'utf8')); const name = process.argv[3];
-  const b = await chromium.connectOverCDP('http://127.0.0.1:9333'); const ctx = b.contexts()[0];
+  const b = await chromium.connectOverCDP('http://127.0.0.1:' + (process.env.PP_CDP_PORT || '9333')); const ctx = b.contexts()[0];
   let page = ctx.pages().find((p) => p.url().startsWith('http://localhost:4310'));
   if (!page) { page = await ctx.newPage(); await page.goto('http://localhost:4310/'); await sleep(5000); }
   await page.bringToFront();
