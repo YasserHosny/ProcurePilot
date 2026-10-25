@@ -483,6 +483,95 @@ def test_subtotal_variants_skipped_without_incrementing_expected(label: str) -> 
     assert result.stated_total.value == {"amount": "272.00", "currency": "EUR"}
 
 
+def _make_arabic_subtotal_payload(item_rows: list[list[str]], subtotal_label: str) -> dict:
+    # Items, then an in-table subtotal row, VAT 0% and the final «الإجمالي» row (EGP).
+    cells: list[dict] = []
+    for col, h in enumerate(["الصنف", "الكمية", "سعر الوحدة", "الإجمالي"]):
+        cells.append({"rowIndex": 0, "columnIndex": col, "columnSpan": 1, "content": h})
+    current_row = 1
+    for row_data in item_rows:
+        for col, val in enumerate(row_data):
+            cells.append(
+                {"rowIndex": current_row, "columnIndex": col, "columnSpan": 1, "content": val}
+            )
+        current_row += 1
+    amount = item_rows[-1][3] if len(item_rows) == 1 else "1,000.00 ج.م"
+    for label, value in (
+        (subtotal_label, amount),
+        ("ضريبة القيمة المضافة 0%", "0.00 ج.م"),
+        ("الإجمالي", amount),
+    ):
+        cells.append({"rowIndex": current_row, "columnIndex": 0, "columnSpan": 3, "content": label})
+        cells.append({"rowIndex": current_row, "columnIndex": 3, "columnSpan": 1, "content": value})
+        current_row += 1
+    return {
+        "content": f"{subtotal_label} {amount} الإجمالي {amount}",
+        "tables": [{"columnCount": 4, "rowCount": current_row, "cells": cells}],
+    }
+
+
+@pytest.mark.parametrize(
+    "label",
+    [
+        "المجموع الفرعي",
+        "الإجمالي الفرعي",
+        "مجموع فرعي",
+        "إجمالي فرعي",
+        "المجموع الفرعى",
+        "المجموع الفرعي:",
+        "والمجموع الفرعي",
+        "بالإجمالي الفرعي",
+        "فالمجموع الفرعي",
+        "للمجموع الفرعي",
+        "لإجمالي الفرعي",
+        "1,000.00 ج.م المجموع الفرعي",
+    ],
+)
+def test_arabic_subtotal_row_skipped_without_incrementing_expected(label: str) -> None:
+    # The subtotal is skipped, never a total: «الإجمالي» below it stays the stated total.
+    assert _is_subtotal_row(label) is True
+    assert _is_total_row(label) is False
+    assert _is_before_tax_row(label) is False
+
+    payload = _make_arabic_subtotal_payload(
+        [["زيت عباد الشمس", "1", "1,000.00", "1,000.00 ج.م"]], label
+    )
+    result = _parse_invoice_result(payload, "layout:test")
+    assert result.expected_line_count == 1 == len(result.lines)
+    assert result.stated_total is not None
+    assert result.stated_total.value == {"amount": "1000.00", "currency": "EGP"}
+
+    validation = validate_arithmetic(result)
+    assert validation.status == "reconciled"
+    no_match = SupplierMatch(supplier_id=None, confidence=None, had_candidates=False)
+    review_reason = _review_reason(result, validation.status, 0.85, no_match)
+    assert review_reason != "line_count_mismatch"
+    assert review_reason is None
+
+
+@pytest.mark.parametrize(
+    "label",
+    ["صمام فرعي", "مجموعة فرعية للمطبخ", "خط فرعي - المجموع الفرعي", "فرعي", "مجموعات فرعية"],
+)
+def test_arabic_text_mentioning_far3i_elsewhere_is_not_a_subtotal(label: str) -> None:
+    assert _is_subtotal_row(label) is False
+
+
+def test_items_named_with_far3i_stay_lines_beside_arabic_subtotal() -> None:
+    payload = _make_arabic_subtotal_payload(
+        [
+            ["صمام فرعي", "2", "250.00", "500.00 ج.م"],
+            ["مجموعة فرعية للمطبخ", "1", "500.00", "500.00 ج.م"],
+        ],
+        "المجموع الفرعي",
+    )
+    result = _parse_invoice_result(payload, "layout:test")
+    assert result.expected_line_count == 2 == len(result.lines)
+    assert result.stated_total is not None
+    assert result.stated_total.value == {"amount": "1000.00", "currency": "EGP"}
+    assert validate_arithmetic(result).status == "reconciled"
+
+
 def test_paragraph_totals_with_discount_outside_items_table_mismatches() -> None:
     # Subtotal 1,000 in the table, then "Discount -€100.00 / Total €900.00" in paragraph text:
     # in-table Subtotal does not set stated_total or before_tax_total, so paragraph Total wins

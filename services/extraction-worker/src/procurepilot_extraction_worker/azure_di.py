@@ -46,7 +46,7 @@ _TOTAL_ROW_RE = re.compile(
 )
 _BEFORE_TAX_SUBTOTAL_RE = re.compile(
     r"^[\s:：\-–]*(?:(?:[\d.,:：()（）/\\\-_%٪\u066a]+|ر\.?\s*س\.?|SAR|SR|ج\.م|LE|EGP|\$|£|€)\s*)*"
-    r"sub[\s\-]*total(?![^\W\d_])",
+    r"(?:sub[\s\-]*total|(?:لل|[وبفل])?(?:ال)?(?:مجموع|اجمالي)\s+(?:ال)?فرعي)(?![^\W\d_])",
     re.IGNORECASE,
 )
 
