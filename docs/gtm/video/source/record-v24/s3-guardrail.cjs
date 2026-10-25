@@ -1,6 +1,7 @@
 // Beat 10: the guardrail's draft request (banner, cost centre, total), then Submit for approval.
 // usage: node s3-guardrail.cjs <request id>   PP_DRY=1 screenshots the draft without recording or submitting.
 const L = require('./lib.cjs');
+const W = require('./tenants.cjs');
 const DRY = process.env.PP_DRY === '1';
 const REQ = process.argv[2];
 L.run(async () => {
@@ -14,7 +15,7 @@ L.run(async () => {
     if (!page.url().includes(REQ)) { await page.goto(L.BASE + '/requests/' + REQ); await L.sleep(3000); }
     await L.hideNav(page); await L.ensureCursor(page);
     await L.moveTo(page, page.getByText(L.t('requests.autoPrepared.title')).first()); await L.sleep(4000);
-    await L.moveTo(page, page.getByText('المطبخ — المعادي').first()); await L.sleep(2500);
+    await L.moveTo(page, page.getByText(W.costCentre).first()); await L.sleep(2500);
     if (DRY) { await page.screenshot({ path: process.argv[3] }); console.log('dry: draft shown'); return; }
     const submit = page.getByRole('button', { name: L.t('requests.form.submitButton') });
     await L.scrollToEl(page, submit, 600, 1800); await L.sleep(2500);

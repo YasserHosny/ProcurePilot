@@ -52,6 +52,11 @@ async function connect() {
   await cdp.send('Emulation.setDeviceMetricsOverride', { width: 1920, height: 1080, deviceScaleFactor: 1, mobile: false });
   await page.bringToFront();
   page.setDefaultTimeout(15000);
+  if (process.env.PP_TENANT) {  // never film the wrong workspace
+    const want = require('./tenants.cjs').name;
+    const me = await page.evaluate(async () => (await fetch('https://procurepilot.iron-sys.com/api/v1/me', { headers: { Authorization: 'Bearer ' + localStorage.getItem('pp.access_token') } })).json()).catch((e) => { console.error('workspace check failed:', e.message.slice(0, 200)); return null; });
+    if (!me || !me.tenant || me.tenant.name !== want) throw new Error(`signed-in workspace is ${me && me.tenant ? me.tenant.name : 'unknown'}, expected ${want}`);
+  }
   return { b, page };
 }
 

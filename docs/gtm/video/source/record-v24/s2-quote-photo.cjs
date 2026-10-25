@@ -2,6 +2,7 @@
 // extracted lines, a hold on the reconciled total, flagged values confirmed, Authorise.
 // PP_DRY=1 opens the review and screenshots it without recording or authorising.
 const L = require('./lib.cjs');
+const W = require('./tenants.cjs');
 const DRY = process.env.PP_DRY === '1';
 L.run(async () => {
   const { page } = await L.connect();
@@ -9,7 +10,7 @@ L.run(async () => {
   await L.hideNav(page); await L.ensureCursor(page);
   const rec = DRY ? null : await L.startRec('s2-quote-photo', page); await L.sleep(3000);
   try {
-    const row = page.locator('tr.mat-mdc-row').filter({ hasText: 'الأمانة للتجارة' }).first();
+    const row = page.locator('tr.mat-mdc-row').filter({ hasText: W.winner }).first();
     await L.moveTo(page, row); await L.sleep(1200);
     const review = row.getByRole('button', { name: L.rx('quotations.queue.actions.review') }).or(row.getByRole('link', { name: L.rx('quotations.queue.actions.review') })).first();
     await L.click(page, review, 3000);
