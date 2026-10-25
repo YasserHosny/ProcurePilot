@@ -294,7 +294,7 @@ def _parse_line_table(result: object, model_version: str) -> ExtractionResult | 
                 if amt is not None:
                     numeric_amounts.append(amt)
             fallback_amount = total or (numeric_amounts[-1] if numeric_amounts else None)
-            is_before_tax = _is_before_tax_row(label) or _is_before_tax_row(desc)
+            is_before_tax = _is_table_before_tax_row(label) or _is_table_before_tax_row(desc)
             is_total = (
                 qty is None
                 and not (price and total)
@@ -314,7 +314,7 @@ def _parse_line_table(result: object, model_version: str) -> ExtractionResult | 
                     val = expanded[col]
                     if (
                         _is_total_row(val)
-                        or _is_before_tax_row(val)
+                        or _is_table_before_tax_row(val)
                         or (bool(desc) and val == desc)
                     ):
                         continue
@@ -334,7 +334,7 @@ def _parse_line_table(result: object, model_version: str) -> ExtractionResult | 
                         val = expanded[col]
                         if (
                             _is_total_row(val)
-                            or _is_before_tax_row(val)
+                            or _is_table_before_tax_row(val)
                             or (bool(desc) and val == desc)
                         ):
                             continue
@@ -500,8 +500,17 @@ def _is_total_row(desc: str) -> bool:
 
 
 def _is_before_tax_row(desc: str) -> bool:
+    n = _normalise_header(desc)
+    return "قبل الضريبه" in n or "before tax" in n
+
+
+def _is_subtotal_row(desc: str) -> bool:
     n = _normalise_header(desc).strip()
-    return "قبل الضريبه" in n or "before tax" in n or _BEFORE_TAX_SUBTOTAL_RE.search(n) is not None
+    return _BEFORE_TAX_SUBTOTAL_RE.search(n) is not None
+
+
+def _is_table_before_tax_row(desc: str) -> bool:
+    return _is_before_tax_row(desc) or _is_subtotal_row(desc)
 
 
 def _is_tax_row(desc: str) -> bool:
@@ -585,7 +594,7 @@ def _find_grand_total(text: str, currency: str | None) -> ExtractedField | None:
     before_tax: ExtractedField | None = None
     grand_total: ExtractedField | None = None
     for line in text.splitlines():
-        if _is_total_row(line) or _is_before_tax_row(line):
+        if _is_total_row(line):
             clean_line = _PERCENTAGE_PATTERN.sub("", line)
             amounts = re.findall(r"[\d٠-٩۰-۹][\d٠-٩۰-۹.,٬٫]*", clean_line)
             if amounts:
@@ -614,10 +623,7 @@ def _find_grand_total(text: str, currency: str | None) -> ExtractedField | None:
 
 
 def _has_before_tax_total(text: str) -> bool:
-    return any(
-        (_is_total_row(line) or _is_before_tax_row(line)) and _is_before_tax_row(line)
-        for line in text.splitlines()
-    )
+    return any(_is_total_row(line) and _is_before_tax_row(line) for line in text.splitlines())
 
 
 def _has_currency_conflict(text: str) -> bool:

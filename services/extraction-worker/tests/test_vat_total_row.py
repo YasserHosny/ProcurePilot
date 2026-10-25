@@ -6,6 +6,8 @@ from procurepilot_extraction_worker.azure_di import (
     _clean_number,
     _find_grand_total,
     _is_before_tax_row,
+    _is_subtotal_row,
+    _is_table_before_tax_row,
     _is_total_row,
     _numeric_cell_amount,
     _parse_invoice_result,
@@ -461,7 +463,11 @@ def test_irish_demo_layout_one_line_variant_tomatoes() -> None:
     ["subtotal", "sub-total", "sub total", "Sub-total", "Sub total", "SUBTOTAL"],
 )
 def test_subtotal_variants_recognized_as_before_tax(label: str) -> None:
-    assert _is_before_tax_row(label) is True
+    # Recognised in table path only, NOT globally by _is_before_tax_row
+    assert _is_table_before_tax_row(label) is True
+    assert _is_subtotal_row(label) is True
+    assert _is_before_tax_row(label) is False
+
     payload = _make_irish_demo_payload(
         [
             ["1", "Tomatoes", "6 kg box", "20", "€13.60", "€272.00"],
@@ -475,6 +481,62 @@ def test_subtotal_variants_recognized_as_before_tax(label: str) -> None:
     assert result.expected_line_count == 1 == len(result.lines)
     assert result.stated_total is not None
     assert result.stated_total.value == {"amount": "272.00", "currency": "EUR"}
+
+
+def test_paragraph_totals_with_discount_outside_items_table_mismatches() -> None:
+    # When paragraph totals sit outside the items table, Subtotal must NOT be taken as before_tax
+    # total which would silently drop discount. Stated total must be grand total (900.00).
+    cells = [
+        {"rowIndex": 0, "columnIndex": 0, "columnSpan": 1, "content": "Item"},
+        {"rowIndex": 0, "columnIndex": 1, "columnSpan": 1, "content": "Qty"},
+        {"rowIndex": 0, "columnIndex": 2, "columnSpan": 1, "content": "Price"},
+        {"rowIndex": 0, "columnIndex": 3, "columnSpan": 1, "content": "Amount"},
+        {"rowIndex": 1, "columnIndex": 0, "columnSpan": 1, "content": "Item 1"},
+        {"rowIndex": 1, "columnIndex": 1, "columnSpan": 1, "content": "1"},
+        {"rowIndex": 1, "columnIndex": 2, "columnSpan": 1, "content": "€1,000.00"},
+        {"rowIndex": 1, "columnIndex": 3, "columnSpan": 1, "content": "€1,000.00"},
+    ]
+    payload = {
+        "content": "Subtotal €1,000.00\nDiscount -€100.00\nTotal €900.00",
+        "tables": [{"columnCount": 4, "rowCount": 2, "cells": cells}],
+    }
+    result = _parse_invoice_result(payload, "layout:test")
+    assert len(result.lines) == 1
+    assert result.stated_total is not None
+    assert result.stated_total.value == {"amount": "900.00", "currency": "EUR"}
+    validation = validate_arithmetic(result)
+    assert validation.status == "mismatch"
+    no_match = SupplierMatch(supplier_id=None, confidence=None, had_candidates=False)
+    review_reason = _review_reason(result, validation.status, 0.85, no_match)
+    assert review_reason == "arithmetic_mismatch"
+
+
+def test_paragraph_totals_with_delivery_outside_items_table_mismatches() -> None:
+    # Same with Delivery: Subtotal must NOT be taken as before_tax total in paragraph search.
+    # Stated total must be grand total (1,050.00) and arithmetic mismatch.
+    cells = [
+        {"rowIndex": 0, "columnIndex": 0, "columnSpan": 1, "content": "Item"},
+        {"rowIndex": 0, "columnIndex": 1, "columnSpan": 1, "content": "Qty"},
+        {"rowIndex": 0, "columnIndex": 2, "columnSpan": 1, "content": "Price"},
+        {"rowIndex": 0, "columnIndex": 3, "columnSpan": 1, "content": "Amount"},
+        {"rowIndex": 1, "columnIndex": 0, "columnSpan": 1, "content": "Item 1"},
+        {"rowIndex": 1, "columnIndex": 1, "columnSpan": 1, "content": "1"},
+        {"rowIndex": 1, "columnIndex": 2, "columnSpan": 1, "content": "€1,000.00"},
+        {"rowIndex": 1, "columnIndex": 3, "columnSpan": 1, "content": "€1,000.00"},
+    ]
+    payload = {
+        "content": "Subtotal €1,000.00\nDelivery €50.00\nTotal €1,050.00",
+        "tables": [{"columnCount": 4, "rowCount": 2, "cells": cells}],
+    }
+    result = _parse_invoice_result(payload, "layout:test")
+    assert len(result.lines) == 1
+    assert result.stated_total is not None
+    assert result.stated_total.value == {"amount": "1050.00", "currency": "EUR"}
+    validation = validate_arithmetic(result)
+    assert validation.status == "mismatch"
+    no_match = SupplierMatch(supplier_id=None, confidence=None, had_candidates=False)
+    review_reason = _review_reason(result, validation.status, 0.85, no_match)
+    assert review_reason == "arithmetic_mismatch"
 
 
 def test_negative_total_weight_and_item_total_weight_handled_as_before() -> None:
