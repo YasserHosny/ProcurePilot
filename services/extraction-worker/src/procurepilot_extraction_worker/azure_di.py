@@ -210,7 +210,6 @@ def _parse_line_table(result: object, model_version: str) -> ExtractionResult | 
     expected = 0
     stated_total = None
     before_tax_total = None
-    subtotal_total = None
     previous_col_roles: dict[int, str] | None = None
     previous_column_count: int | None = None
     charge_amount: Decimal | None = None
@@ -295,17 +294,10 @@ def _parse_line_table(result: object, model_version: str) -> ExtractionResult | 
                 if amt is not None:
                     numeric_amounts.append(amt)
             fallback_amount = total or (numeric_amounts[-1] if numeric_amounts else None)
-            is_genuine_before_tax = _is_before_tax_row(label) or _is_before_tax_row(desc)
-            is_subtotal = _is_subtotal_row(label) or _is_subtotal_row(desc)
             is_total = (
                 qty is None
                 and not (price and total)
-                and (
-                    _is_total_row(label)
-                    or _is_total_row(desc)
-                    or is_genuine_before_tax
-                    or is_subtotal
-                )
+                and (_is_total_row(label) or _is_total_row(desc))
             )
             if is_total and fallback_amount is None:
                 sorted_cols = sorted(expanded.keys(), reverse=True)
@@ -319,11 +311,7 @@ def _parse_line_table(result: object, model_version: str) -> ExtractionResult | 
 
                 for col in sorted_cols:
                     val = expanded[col]
-                    if (
-                        _is_total_row(val)
-                        or _is_table_before_tax_row(val)
-                        or (bool(desc) and val == desc)
-                    ):
+                    if _is_total_row(val) or (bool(desc) and val == desc):
                         continue
                     if (
                         _SAR_MARKER.search(val)
@@ -339,11 +327,7 @@ def _parse_line_table(result: object, model_version: str) -> ExtractionResult | 
                 if fallback_amount is None:
                     for col in sorted_cols:
                         val = expanded[col]
-                        if (
-                            _is_total_row(val)
-                            or _is_table_before_tax_row(val)
-                            or (bool(desc) and val == desc)
-                        ):
+                        if _is_total_row(val) or (bool(desc) and val == desc):
                             continue
                         amt = _cell_amount(val)
                         if amt:
@@ -361,24 +345,22 @@ def _parse_line_table(result: object, model_version: str) -> ExtractionResult | 
                 amount = fallback_amount or price
                 if amount:
                     candidate = _money_field("stated_total", amount, currency, 0.9)
-                    if is_genuine_before_tax:
+                    if _is_before_tax_row(label) or _is_before_tax_row(desc):
                         before_tax_total = candidate
-                    elif is_subtotal:
-                        subtotal_total = candidate
                     else:
                         stated_total = candidate
+                continue
+            if qty is None and (_is_subtotal_row(label) or _is_subtotal_row(desc)):
                 continue
             if qty is None and _is_tax_row(label):
                 continue
             if qty is None and _is_charge_row(label):
-                subtotal_total = None
                 amount = fallback_amount or price
                 if amount:
                     charge_amount = (charge_amount or Decimal("0")) + Decimal(amount)
                 continue
             if not desc:
                 continue
-            subtotal_total = None
             expected += 1
             if qty is None or price is None:
                 continue
@@ -409,8 +391,6 @@ def _parse_line_table(result: object, model_version: str) -> ExtractionResult | 
         return None
     if before_tax_total is not None:
         stated_total = before_tax_total
-    elif subtotal_total is not None:
-        stated_total = subtotal_total
     paragraph_total = _find_grand_total(document_text, currency)
     if paragraph_total is not None and (
         stated_total is None or _has_before_tax_total(document_text)
@@ -520,10 +500,6 @@ def _is_before_tax_row(desc: str) -> bool:
 def _is_subtotal_row(desc: str) -> bool:
     n = _normalise_header(desc).strip()
     return _BEFORE_TAX_SUBTOTAL_RE.search(n) is not None
-
-
-def _is_table_before_tax_row(desc: str) -> bool:
-    return _is_before_tax_row(desc) or _is_subtotal_row(desc)
 
 
 def _is_tax_row(desc: str) -> bool:
